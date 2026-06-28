@@ -63,10 +63,10 @@ Coverage after Phase 6:
 - Comparison package: 99.26% statements, 100% branches, 100% functions, 99.21% lines.
 - `IntervalCostCalculator`: 100% statements, branches, functions, and lines.
 
-## Runtime Note
+## Runtime Verification
 
-Fresh `docker compose up -d --build` was attempted after `docker compose down -v`.
-The build completed, but Postgres failed during `initdb` with `No space left on
-device` before migrations ran. Host disk had free space; Colima's Docker disk was
-full at `/mnt/lima-colima` (100%, 21 MB available). The failed project stack was
-cleaned up with `docker compose down -v`.
+Fresh `docker compose down -v` followed by `docker compose up -d --build` passes
+after resizing the local Colima Docker disk from 20 GiB to 80 GiB. API, Postgres,
+Redis, Vault, and web become healthy. API `/health` returns OK, web serves HTTP 200,
+`schema_migrations` contains `001`, `002`, and `003`, and
+`service_equivalence_map` contains 16 rows with 7 marked approximate.

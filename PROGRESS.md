@@ -21,19 +21,19 @@ say so explicitly rather than marking it done.
 
 ## Phase status overview
 
-| Phase                                                  | Status                               | Last updated |
-| ------------------------------------------------------ | ------------------------------------ | ------------ |
-| 0 - Build plan & approval                              | Complete                             | 2026-06-28   |
-| 1 - Repo scaffold                                      | Complete                             | 2026-06-28   |
-| 2 - Data layer (Postgres schema, NWS types, validator) | Complete                             | 2026-06-28   |
-| 3 - Cloud provider adapters                            | Complete                             | 2026-06-28   |
-| 4 - Pricing ETL job                                    | Complete                             | 2026-06-28   |
-| 5 - NWS Parser Module                                  | Complete                             | 2026-06-28   |
-| 6 - Comparison Engine                                  | Complete with known gaps (see notes) | 2026-06-29   |
-| 7 - Report Module                                      | Not started                          | -            |
-| 8 - API layer                                          | Not started                          | -            |
-| 9 - Frontend                                           | Not started                          | -            |
-| 10 - E2E verification against MVP acceptance criteria  | Not started                          | -            |
+| Phase                                                  | Status      | Last updated |
+| ------------------------------------------------------ | ----------- | ------------ |
+| 0 - Build plan & approval                              | Complete    | 2026-06-28   |
+| 1 - Repo scaffold                                      | Complete    | 2026-06-28   |
+| 2 - Data layer (Postgres schema, NWS types, validator) | Complete    | 2026-06-28   |
+| 3 - Cloud provider adapters                            | Complete    | 2026-06-28   |
+| 4 - Pricing ETL job                                    | Complete    | 2026-06-28   |
+| 5 - NWS Parser Module                                  | Complete    | 2026-06-28   |
+| 6 - Comparison Engine                                  | Complete    | 2026-06-29   |
+| 7 - Report Module                                      | Not started | -            |
+| 8 - API layer                                          | Not started | -            |
+| 9 - Frontend                                           | Not started | -            |
+| 10 - E2E verification against MVP acceptance criteria  | Not started | -            |
 
 ## Phase 0 - Build plan & approval
 
@@ -305,7 +305,7 @@ Phase 3 verification:
 
 ## Phase 6 - Comparison Engine
 
-**Status:** Complete with known gaps (see notes)
+**Status:** Complete
 **Date:** 2026-06-29
 
 - `EquivalentServiceMapper` implemented, seed mapping data reviewed for accuracy:
@@ -335,19 +335,16 @@ Phase 3 verification:
   `npm run ci:e2e`, `npm run ci:security`, `npm run security:scan`,
   `npm run check`, `npm run graphify`, direct adapter-import source scan, and direct
   `process.env` source scan.
-- Runtime verification gap: clean `docker compose up -d --build` was attempted after
-  `docker compose down -v`. API/web images built, but Postgres failed during
-  `initdb` before migrations ran because the Colima Docker disk was full
-  (`/mnt/lima-colima` at 100%, 21 MB available). Host disk had free space. The failed
-  project stack was cleaned up with `docker compose down -v`.
+- Runtime verification: after resizing the Colima Docker disk from 20 GiB to 80 GiB,
+  clean `docker compose down -v` followed by `docker compose up -d --build`
+  succeeds. API, Postgres, Redis, Vault, and web are healthy; API `/health` returns
+  OK; web serves HTTP 200; `schema_migrations` contains versions `001`, `002`, and
+  `003`; `service_equivalence_map` contains 16 rows, 7 marked approximate.
 - Security status: high/critical npm audit gate passes; npm still reports the known
   30 low/moderate development/tooling advisories. Gitleaks found no leaks; Trivy
   filesystem scan found 0 high/critical vulnerabilities in `package-lock.json`.
-- Deviations from spec: none in comparison engine behavior. Runtime database
-  application of migration 003 is not live-verified yet due to the Colima capacity
-  issue above.
-- Checkpoint: Phase 6 is complete with the runtime verification gap noted. Stop here
-  until Phase 7 is explicitly approved.
+- Deviations from spec: none in comparison engine behavior.
+- Checkpoint: Phase 6 is complete. Phase 7 approved by user request on 2026-06-29.
 
 ## Phase 7 - Report Module
 
@@ -426,9 +423,6 @@ when it is actually resolved in a later phase, with a note on which phase resolv
 - `eslint-plugin-security` reports warnings for controlled fixture reads,
   provider-response dictionary access, and the local Vault token-file read. These are
   non-blocking under the current lint config and were reviewed during Phase 3.
-- Fresh Docker runtime verification for Phase 6 is blocked until Colima's Docker disk
-  has free space. Colima reported `/mnt/lima-colima` at 100% usage with 21 MB
-  available; Postgres failed during `initdb` before migrations ran.
 
 ## Deviations from spec log
 

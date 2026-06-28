@@ -10,14 +10,20 @@ import {
   COMPARISON_CLOCK,
   COMPARISON_ID_FACTORY,
   COMPARISON_PROVIDER_ADAPTERS,
+  SERVICE_EQUIVALENCE_RULES,
 } from './comparison.tokens';
 import { EquivalentServiceMapper } from './equivalent-service-mapper';
 import { IntervalCostCalculator } from './interval-cost-calculator';
+import { SERVICE_EQUIVALENCE_SEED } from './service-equivalence.seed';
 
 @Module({
   imports: [ProviderAdaptersModule],
   providers: [
     IntervalCostCalculator,
+    {
+      provide: SERVICE_EQUIVALENCE_RULES,
+      useValue: SERVICE_EQUIVALENCE_SEED,
+    },
     EquivalentServiceMapper,
     {
       provide: COMPARISON_PROVIDER_ADAPTERS,

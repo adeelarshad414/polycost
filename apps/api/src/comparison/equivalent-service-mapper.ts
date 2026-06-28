@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import {
   ProviderId,
   ProviderPricingLineItem,
@@ -15,6 +15,7 @@ import {
   SERVICE_EQUIVALENCE_SEED,
   ServiceEquivalenceRule,
 } from './service-equivalence.seed';
+import { SERVICE_EQUIVALENCE_RULES } from './comparison.tokens';
 
 export interface EquivalentServiceMapping {
   category: ServiceCategory;
@@ -27,7 +28,15 @@ export interface EquivalentServiceMapping {
 
 @Injectable()
 export class EquivalentServiceMapper {
-  constructor(private readonly rules: ServiceEquivalenceRule[] = SERVICE_EQUIVALENCE_SEED) {}
+  private readonly rules: ServiceEquivalenceRule[];
+
+  constructor(
+    @Optional()
+    @Inject(SERVICE_EQUIVALENCE_RULES)
+    rules?: ServiceEquivalenceRule[],
+  ) {
+    this.rules = rules ?? SERVICE_EQUIVALENCE_SEED;
+  }
 
   mapWorkload(nws: NormalizedWorkloadSpec): EquivalentServiceMapping[] {
     const mappings: EquivalentServiceMapping[] = [];
