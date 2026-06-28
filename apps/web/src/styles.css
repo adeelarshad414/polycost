@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --pc-ink-50: #f7f8fa;
+  --pc-ink-100: #eef1f5;
+  --pc-ink-200: #dde3ea;
+  --pc-ink-300: #c2cad6;
+  --pc-ink-400: #97a2b5;
+  --pc-ink-500: #6b7790;
+  --pc-ink-600: #4d596f;
+  --pc-ink-700: #353e50;
+  --pc-ink-800: #212733;
+  --pc-ink-900: #12151c;
+  --pc-brand-accent: #4f6bff;
+  --pc-provider-aws: #c26b2e;
+  --pc-provider-azure: #3c6e91;
+  --pc-provider-gcp: #5b8c5a;
+  --pc-bg-canvas: var(--pc-ink-50);
+  --pc-bg-surface: #ffffff;
+  --pc-border: var(--pc-ink-200);
+  --pc-text-primary: var(--pc-ink-900);
+  --pc-text-secondary: var(--pc-ink-600);
+  --pc-font-display: Sora, system-ui, sans-serif;
+  --pc-font-body: Inter, system-ui, sans-serif;
+  --pc-space-2: 16px;
+  --pc-space-3: 24px;
+  --pc-space-4: 32px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--pc-bg-canvas);
+  color: var(--pc-text-primary);
+  font-family: var(--pc-font-body);
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: var(--pc-space-4);
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: var(--pc-space-2);
+}
+
+.app-header h1 {
+  margin: 0;
+  font-family: var(--pc-font-display);
+  font-size: 1.953rem;
+  line-height: 1.15;
+}
+
+.logo {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+}
+
+.scaffold-panel {
+  margin-top: var(--pc-space-4);
+  max-width: 720px;
+  border: 1px solid var(--pc-border);
+  border-radius: 12px;
+  background: var(--pc-bg-surface);
+  padding: var(--pc-space-3);
+  color: var(--pc-text-secondary);
+}

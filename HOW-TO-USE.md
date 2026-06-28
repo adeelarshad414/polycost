@@ -1,0 +1,119 @@
+# How to Use PolyCost
+
+This guide is for end users of the running application. For development or
+deployment setup, see `DEPLOY.md` and contributor docs instead. Keep this file in
+sync with the actual running UI as Phase 9 frontend work is built.
+
+## What PolyCost does
+
+PolyCost tells you what your application will cost to run on AWS, Azure, and GCP side
+by side. You describe what you need, and PolyCost shows the equivalent setup and
+price on all three providers.
+
+## Getting started: describing your workload
+
+You have two ways to tell PolyCost what you need.
+
+### Option 1 - Describe it in plain English
+
+Type a description of your application into the text box, the way you would explain
+it to a colleague. For example:
+
+> "I need a web app for about 5,000 people a day. It needs a Postgres database and
+> storage for user-uploaded files, up to 5GB each. It should stay up even if one
+> server goes down."
+
+PolyCost reads this and works out the pieces it needs to price: compute, storage,
+database, and high-availability needs. You will see what it understood as an editable
+form. Check it before continuing, because this is where you can correct anything it
+got wrong or fill in something it missed.
+
+### Option 2 - Fill in the form directly
+
+If you already know exactly what you need, skip the text box and fill in the
+structured form yourself: workload type, compute size, storage, database engine,
+expected traffic, and region.
+
+Even if you used the text description first, the form that appears afterward is the
+same form. You can always switch to editing it directly.
+
+## Reading your comparison
+
+Once you confirm your requirements, PolyCost shows three columns:
+
+- AWS
+- Azure
+- GCP
+
+This order never changes based on price. PolyCost does not put the cheapest option
+first, so you can compare fairly without being nudged toward one provider.
+
+Each column shows:
+
+- The specific services PolyCost matched to your requirements.
+- A line-by-line cost breakdown.
+- A total at the bottom.
+
+A dotted underline with an approximately-equal marker next to a line item means that
+service does not have an exact match on that cloud. PolyCost is showing the closest
+equivalent instead.
+
+A "Lowest cost" badge appears next to whichever total is currently cheapest. It is an
+informational marker, not a recommendation.
+
+## Choosing your time period
+
+Above the comparison, you can switch between Daily, Weekly, Monthly, Quarterly, and
+Yearly views. The underlying numbers do not change. This only shows the same cost at
+a different scale.
+
+## Getting up-to-date pricing
+
+By default, PolyCost shows pricing from its regularly refreshed catalog. You will see
+a note such as "Pricing last updated: [date]" near the top.
+
+If you want the latest number before making a final decision, click "Refresh live
+pricing". This checks directly with each cloud provider for the current price on only
+the services in your comparison.
+
+Live pricing refresh is rate-limited. If you hit the limit, wait a few minutes and
+try again.
+
+## Exporting your comparison
+
+Once you are happy with your comparison, you can save it three ways:
+
+- PDF: a clean, shareable report.
+- CSV: raw line-item data for your own spreadsheet.
+- Excel: a formatted spreadsheet.
+
+All three exports show the same numbers as the screen. Exporting does not re-run
+pricing.
+
+## Switching between light, dark, and system theme
+
+Use the theme toggle in the header to switch between Light, Dark, and System. System
+is the default and follows your device setting automatically.
+
+## Using PolyCost on your phone
+
+On smaller screens, the three columns become swipeable cards. Swipe left or right to
+move between AWS, Azure, and GCP. A small bar at the top always shows all three totals
+at once, so you do not lose the big picture.
+
+## When something does not look right
+
+- If only two columns show up instead of three, one provider's pricing data is
+  temporarily unavailable. You will see a note explaining which one and why. The
+  comparison for the other two providers is still usable.
+- If your description was not understood correctly, go back and edit the form
+  directly. Nothing is locked in until you confirm.
+
+## A note on accuracy
+
+PolyCost gives a decision-grade estimate, not a guaranteed invoice. Real cloud bills
+can vary based on negotiated discounts, committed-use agreements, and usage patterns
+that differ from what you described.
+
+Use PolyCost to compare and decide with confidence, and confirm exact figures with
+each provider's own calculator before finalizing a budget you are accountable for.

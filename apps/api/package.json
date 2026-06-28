@@ -1,0 +1,35 @@
+{
+  "name": "@polycost/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint \"src/**/*.ts\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "jest --config jest.config.cjs",
+    "test:unit": "jest --config jest.config.cjs",
+    "test:integration": "jest --config jest.config.cjs --runInBand --testMatch \"**/*.integration.spec.ts\" --passWithNoTests",
+    "test:e2e": "jest --config jest.config.cjs --runInBand --testMatch \"**/*.e2e.spec.ts\" --passWithNoTests",
+    "test:coverage": "jest --config jest.config.cjs --coverage",
+    "start:dev": "ts-node src/main.ts",
+    "start:prod": "node dist/main.js"
+  },
+  "dependencies": {
+    "@fastify/helmet": "^13.0.2",
+    "@nestjs/common": "^11.1.27",
+    "@nestjs/config": "^4.0.4",
+    "@nestjs/core": "^11.1.27",
+    "@nestjs/platform-fastify": "^11.1.27",
+    "bullmq": "^5.79.2",
+    "node-vault": "^0.10.2",
+    "pg": "^8.22.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.20.0",
+    "ts-node": "^10.9.2"
+  }
+}

@@ -1,0 +1,153 @@
+import { BaseCloudProviderAdapter } from '../common/base-cloud-provider.adapter';
+import {
+  PricingCatalogReader,
+  PricingCatalogRecord,
+  ProviderId,
+  RefreshPricingCatalogOptions,
+  ServiceCategory,
+} from '../common/cloud-provider-adapter';
+import { defaultFetch, FetchLike, parseJsonResponse } from '../common/http-client';
+
+interface AzureRetailPricesResponse {
+  Items: AzureRetailPriceItem[];
+  NextPageLink?: string;
+}
+
+interface AzureRetailPriceItem {
+  currencyCode: string;
+  retailPrice: number;
+  unitPrice: number;
+  armRegionName: string;
+  effectiveStartDate: string;
+  meterId: string;
+  meterName: string;
+  productId: string;
+  skuId: string;
+  productName: string;
+  skuName: string;
+  serviceName: string;
+  serviceFamily: string;
+  unitOfMeasure: string;
+  type: string;
+  isPrimaryMeterRegion?: boolean;
+  armSkuName?: string;
+}
+
+const AZURE_RETAIL_PRICES_ENDPOINT = 'https://prices.azure.com/api/retail/prices';
+
+const CATEGORY_FILTERS: Record<ServiceCategory, string> = {
+  compute: "serviceFamily eq 'Compute' and priceType eq 'Consumption'",
+  storage: "serviceFamily eq 'Storage' and priceType eq 'Consumption'",
+  database: "serviceFamily eq 'Databases' and priceType eq 'Consumption'",
+  network: "serviceFamily eq 'Networking' and priceType eq 'Consumption'",
+};
+
+export class AzureProviderAdapter extends BaseCloudProviderAdapter {
+  readonly providerId: ProviderId = 'azure';
+
+  constructor(
+    catalogReader: PricingCatalogReader,
+    defaultRegion: string,
+    private readonly fetchClient: FetchLike = defaultFetch,
+    private readonly now: () => Date = () => new Date(),
+  ) {
+    super(catalogReader, defaultRegion);
+  }
+
+  async refreshPricingCatalog(
+    options: RefreshPricingCatalogOptions = {},
+  ): Promise<PricingCatalogRecord[]> {
+    const categories = options.categories ?? ['compute', 'storage', 'database', 'network'];
+    const fetchedAt = options.fetchedAt ?? this.now().toISOString();
+    const records: PricingCatalogRecord[] = [];
+
+    for (const category of categories) {
+      records.push(...(await this.fetchCategory(category, fetchedAt, options.region)));
+    }
+
+    return records;
+  }
+
+  async refreshLivePricing(serviceIds: string[]): Promise<PricingCatalogRecord[]> {
+    const allRecords = await this.refreshPricingCatalog();
+    return uniqueSkuRecords(
+      allRecords.filter(
+        (record) => serviceIds.includes(record.skuId) || serviceIds.includes(record.serviceName),
+      ),
+    );
+  }
+
+  private async fetchCategory(
+    category: ServiceCategory,
+    fetchedAt: string,
+    region?: string,
+  ): Promise<PricingCatalogRecord[]> {
+    const filter = [CATEGORY_FILTERS[category], region ? `armRegionName eq '${region}'` : undefined]
+      .filter(Boolean)
+      .join(' and ');
+    const url = new URL(AZURE_RETAIL_PRICES_ENDPOINT);
+    url.searchParams.set('currencyCode', 'USD');
+    url.searchParams.set('$filter', filter);
+
+    const records: PricingCatalogRecord[] = [];
+    let nextPageUrl: string | undefined = url.toString();
+
+    while (nextPageUrl) {
+      const response = await this.fetchClient(nextPageUrl);
+      const parsed = await parseJsonResponse<AzureRetailPricesResponse>(this.providerId, response);
+
+      records.push(...parsed.Items.map((item) => this.normalizeItem(item, category, fetchedAt)));
+      nextPageUrl = parsed.NextPageLink;
+    }
+
+    return records;
+  }
+
+  private normalizeItem(
+    item: AzureRetailPriceItem,
+    category: ServiceCategory,
+    fetchedAt: string,
+  ): PricingCatalogRecord {
+    return {
+      provider: this.providerId,
+      serviceCategory: category,
+      serviceName: item.serviceName,
+      skuId: item.skuId,
+      skuDescription: `${item.productName} - ${item.meterName}`,
+      region: item.armRegionName,
+      unit: item.unitOfMeasure,
+      unitPriceUsd: item.unitPrice,
+      attributes: {
+        currencyCode: item.currencyCode,
+        meterId: item.meterId,
+        productId: item.productId,
+        skuName: item.skuName,
+        serviceFamily: item.serviceFamily,
+        priceType: item.type,
+        armSkuName: item.armSkuName,
+        isPrimaryMeterRegion: item.isPrimaryMeterRegion,
+        vcpu: parseAzureVcpu(item.skuName),
+      },
+      effectiveDate: item.effectiveStartDate,
+      fetchedAt,
+    };
+  }
+}
+
+function uniqueSkuRecords(records: PricingCatalogRecord[]): PricingCatalogRecord[] {
+  const byKey = new Map<string, PricingCatalogRecord>();
+
+  for (const record of records) {
+    const key = `${record.skuId}:${record.region}:${record.unit}`;
+    if (!byKey.has(key)) {
+      byKey.set(key, record);
+    }
+  }
+
+  return [...byKey.values()];
+}
+
+function parseAzureVcpu(skuName: string): number | undefined {
+  const match = skuName.match(/[A-Z](?<vcpu>\d+)/i);
+  return match?.groups?.vcpu ? Number.parseInt(match.groups.vcpu, 10) : undefined;
+}

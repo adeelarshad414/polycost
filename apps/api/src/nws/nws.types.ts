@@ -1,0 +1,155 @@
+import { z } from 'zod';
+
+export const SUPPORTED_NWS_SCHEMA_VERSIONS = ['1.0'] as const;
+
+export const workloadSourceTypeSchema = z.enum([
+  'natural_language',
+  'structured_form',
+  'drawio_diagram',
+  'terraform',
+]);
+
+export const workloadTypeSchema = z.enum([
+  'web_app',
+  'api_backend',
+  'static_site',
+  'batch_processing',
+  'data_pipeline',
+  'ml_workload',
+  'other',
+]);
+
+export const computeComponentSchema = z
+  .object({
+    role: z.string().min(1),
+    vcpu: z.number().positive().optional(),
+    memoryGb: z.number().positive().optional(),
+    instanceCount: z.number().int().positive().optional(),
+    scalingType: z.enum(['fixed', 'autoscaling']),
+    autoscalingRange: z
+      .object({
+        min: z.number().int().nonnegative(),
+        max: z.number().int().nonnegative(),
+      })
+      .strict()
+      .refine((range) => range.max >= range.min, {
+        message: 'autoscalingRange.max must be greater than or equal to min',
+        path: ['max'],
+      })
+      .optional(),
+  })
+  .strict();
+
+export const storageComponentSchema = z
+  .object({
+    role: z.string().min(1),
+    type: z.enum(['object', 'block', 'file']),
+    sizeGb: z.number().positive(),
+    accessPattern: z.enum(['frequent', 'infrequent', 'archive']).optional(),
+  })
+  .strict();
+
+export const databaseComponentSchema = z
+  .object({
+    role: z.string().min(1),
+    engine: z.enum([
+      'postgres',
+      'mysql',
+      'mongodb',
+      'redis',
+      'generic_relational',
+      'generic_nosql',
+    ]),
+    sizeGb: z.number().positive().optional(),
+    highAvailability: z.boolean(),
+    managedServicePreference: z.string().min(1).optional(),
+  })
+  .strict();
+
+export const sourceTraceabilitySchema = z
+  .object({
+    nwsPath: z.string().min(1),
+    sourceRef: z.string().min(1),
+  })
+  .strict();
+
+export const normalizedWorkloadSpecSchema = z
+  .object({
+    schemaVersion: z
+      .string()
+      .refine(
+        (value) =>
+          SUPPORTED_NWS_SCHEMA_VERSIONS.includes(
+            value as (typeof SUPPORTED_NWS_SCHEMA_VERSIONS)[number],
+          ),
+        {
+          message:
+            'Unsupported NWS schemaVersion; this build requires a migration before pricing this workload',
+        },
+      ),
+    metadata: z
+      .object({
+        sourceType: workloadSourceTypeSchema,
+        rawInput: z.string().optional(),
+        createdAt: z.string().datetime({ offset: true }),
+      })
+      .strict(),
+    workload: z
+      .object({
+        name: z.string().min(1).optional(),
+        type: workloadTypeSchema,
+        expectedUsers: z
+          .object({
+            dailyActiveUsers: z.number().int().nonnegative().optional(),
+            peakConcurrentUsers: z.number().int().nonnegative().optional(),
+          })
+          .strict()
+          .optional(),
+        region: z
+          .object({
+            preference: z.string().min(1).optional(),
+            isDefault: z.boolean(),
+          })
+          .strict(),
+      })
+      .strict(),
+    compute: z.array(computeComponentSchema),
+    storage: z.array(storageComponentSchema),
+    database: z.array(databaseComponentSchema),
+    network: z
+      .object({
+        estimatedMonthlyEgressGb: z.number().nonnegative().optional(),
+        cdn: z.boolean(),
+        loadBalancer: z.boolean(),
+      })
+      .strict(),
+    availability: z
+      .object({
+        multiAz: z.boolean(),
+        multiRegion: z.boolean(),
+        slaTarget: z.string().min(1).optional(),
+      })
+      .strict(),
+    sourceTraceability: z.array(sourceTraceabilitySchema).optional(),
+  })
+  .strict()
+  .superRefine((spec, ctx) => {
+    const hasPricedResource =
+      spec.compute.length > 0 || spec.storage.length > 0 || spec.database.length > 0;
+
+    if (!hasPricedResource) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['compute'],
+        message: 'At least one of compute, storage, or database must be non-empty',
+      });
+    }
+  });
+
+export type WorkloadSourceType = z.infer<typeof workloadSourceTypeSchema>;
+export type WorkloadType = z.infer<typeof workloadTypeSchema>;
+export type ComputeComponent = z.infer<typeof computeComponentSchema>;
+export type StorageComponent = z.infer<typeof storageComponentSchema>;
+export type DatabaseComponent = z.infer<typeof databaseComponentSchema>;
+export type SourceTraceability = z.infer<typeof sourceTraceabilitySchema>;
+export type NormalizedWorkloadSpec = z.infer<typeof normalizedWorkloadSpecSchema>;

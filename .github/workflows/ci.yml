@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Format check
+        run: npm run format:check
+      - name: Lint and typecheck
+        run: npm run ci:lint
+      - name: Spec and workflow QA
+        run: npm run qa
+      - name: Graph validation
+        run: npm run graphify:validate
+      - name: DevOps configuration check
+        run: npm run devops:check
+      - name: Cloud readiness check
+        run: npm run cloud:check
+      - name: Unit tests with coverage
+        run: npm run ci:unit
+      - name: Integration tests
+        run: npm run ci:integration
+      - name: Build
+        run: npm run ci:build
+      - name: E2E tests
+        run: npm run ci:e2e
+      - name: Dependency security scan
+        run: npm run security:audit

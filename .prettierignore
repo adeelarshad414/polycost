@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.graphify/
+reports/
+.turbo/
+.vite/
+test-results/
+apps/web/tsconfig.tsbuildinfo
+package-lock.json
+[0-9][0-9]-*.md
+DEPLOY.md
+HOW-TO-USE.md

@@ -1,0 +1,22 @@
+{
+  "Items": [
+    {
+      "currencyCode": "USD",
+      "retailPrice": 0.0184,
+      "unitPrice": 0.0184,
+      "armRegionName": "eastus",
+      "effectiveStartDate": "2026-01-01T00:00:00Z",
+      "meterId": "azure-meter-storage",
+      "meterName": "Hot LRS Data Stored",
+      "productId": "azure-product-storage",
+      "skuId": "AZURE-BLOB-HOT-LRS",
+      "productName": "Blob Storage",
+      "skuName": "Hot LRS",
+      "serviceName": "Storage",
+      "serviceFamily": "Storage",
+      "unitOfMeasure": "1 GB/Month",
+      "type": "Consumption",
+      "isPrimaryMeterRegion": true
+    }
+  ]
+}

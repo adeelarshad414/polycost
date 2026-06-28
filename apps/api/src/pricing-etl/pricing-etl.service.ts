@@ -1,0 +1,97 @@
+import { Injectable } from '@nestjs/common';
+import { CloudProviderAdapter } from '../adapters/common/cloud-provider-adapter';
+import {
+  PricingCatalogWriter,
+  PricingEtlRunRepository,
+} from '../database/pricing-repository.types';
+import { PricingEtlProviderResult, PricingEtlSummary } from './pricing-etl.types';
+
+const MAX_ERROR_DETAIL_LENGTH = 2000;
+
+@Injectable()
+export class PricingEtlService {
+  constructor(
+    private readonly adapters: CloudProviderAdapter[],
+    private readonly catalogWriter: PricingCatalogWriter,
+    private readonly runRepository: PricingEtlRunRepository,
+    private readonly now: () => Date = () => new Date(),
+  ) {}
+
+  async refreshAllProviders(): Promise<PricingEtlSummary> {
+    const providerResults = await Promise.all(
+      this.adapters.map((adapter) => this.refreshProvider(adapter)),
+    );
+
+    return {
+      status: summarize(providerResults),
+      providerResults,
+    };
+  }
+
+  private async refreshProvider(adapter: CloudProviderAdapter): Promise<PricingEtlProviderResult> {
+    const startedAt = this.timestamp();
+    let result: PricingEtlProviderResult;
+
+    try {
+      const records = await adapter.refreshPricingCatalog();
+      const writeResult = await this.catalogWriter.upsertPricingRecords(records);
+      const status = writeResult.recordsRejected > 0 ? 'partial' : 'success';
+      result = {
+        provider: adapter.providerId,
+        status,
+        startedAt,
+        completedAt: this.timestamp(),
+        recordsUpdated: writeResult.recordsUpdated,
+        recordsRejected: writeResult.recordsRejected,
+        ...(status === 'partial'
+          ? { errorDetail: `${writeResult.recordsRejected} pricing records were rejected` }
+          : {}),
+      };
+    } catch (error) {
+      result = {
+        provider: adapter.providerId,
+        status: 'failed',
+        startedAt,
+        completedAt: this.timestamp(),
+        recordsUpdated: 0,
+        recordsRejected: 0,
+        errorDetail: safeErrorMessage(error),
+      };
+    }
+
+    await this.runRepository.recordProviderRun({
+      provider: result.provider,
+      startedAt: result.startedAt,
+      completedAt: result.completedAt,
+      status: result.status,
+      recordsUpdated: result.recordsUpdated,
+      errorDetail: result.errorDetail,
+    });
+
+    return result;
+  }
+
+  private timestamp(): string {
+    return this.now().toISOString();
+  }
+}
+
+function summarize(results: PricingEtlProviderResult[]): PricingEtlSummary['status'] {
+  const failedCount = results.filter((result) => result.status === 'failed').length;
+  const partialCount = results.filter((result) => result.status === 'partial').length;
+
+  if (failedCount === 0 && partialCount === 0) {
+    return 'success';
+  }
+
+  if (failedCount === results.length) {
+    return 'failed';
+  }
+
+  return 'partial';
+}
+
+function safeErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : 'Unknown provider refresh error';
+  return message.slice(0, MAX_ERROR_DETAIL_LENGTH);
+}

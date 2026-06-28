@@ -1,0 +1,6 @@
+{
+  "FormatVersion": "aws_v1",
+  "PriceList": [
+    "{\"product\":{\"sku\":\"AWS-S3-STANDARD\",\"productFamily\":\"Storage\",\"attributes\":{\"servicecode\":\"AmazonS3\",\"servicename\":\"Amazon Simple Storage Service\",\"location\":\"US East (N. Virginia)\",\"regionCode\":\"us-east-1\",\"storageClass\":\"General Purpose\"}},\"serviceCode\":\"AmazonS3\",\"terms\":{\"OnDemand\":{\"AWS-S3-STANDARD.JRTCKXETXF\":{\"effectiveDate\":\"2026-01-01T00:00:00Z\",\"priceDimensions\":{\"AWS-S3-STANDARD.JRTCKXETXF.6YS6EN2CT7\":{\"unit\":\"GB-Mo\",\"description\":\"S3 Standard storage\",\"pricePerUnit\":{\"USD\":\"0.0230000000\"}}}}}},\"publicationDate\":\"2026-01-01T00:00:00Z\"}"
+  ]
+}

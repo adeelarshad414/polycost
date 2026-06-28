@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "1.0",
+  "metadata": {
+    "sourceType": "natural_language",
+    "rawInput": "A web API with autoscaling compute, object storage, managed Postgres, CDN, and a load balancer.",
+    "createdAt": "2026-06-28T00:00:00.000Z"
+  },
+  "workload": {
+    "name": "Proposal app",
+    "type": "api_backend",
+    "expectedUsers": {
+      "dailyActiveUsers": 10000,
+      "peakConcurrentUsers": 1200
+    },
+    "region": {
+      "preference": "eastus",
+      "isDefault": false
+    }
+  },
+  "compute": [
+    {
+      "role": "api",
+      "vcpu": 4,
+      "memoryGb": 16,
+      "instanceCount": 3,
+      "scalingType": "autoscaling",
+      "autoscalingRange": {
+        "min": 2,
+        "max": 8
+      }
+    }
+  ],
+  "storage": [
+    {
+      "role": "uploads",
+      "type": "object",
+      "sizeGb": 500,
+      "accessPattern": "infrequent"
+    }
+  ],
+  "database": [
+    {
+      "role": "primary",
+      "engine": "postgres",
+      "sizeGb": 100,
+      "highAvailability": true,
+      "managedServicePreference": "managed postgres"
+    }
+  ],
+  "network": {
+    "estimatedMonthlyEgressGb": 750,
+    "cdn": true,
+    "loadBalancer": true
+  },
+  "availability": {
+    "multiAz": true,
+    "multiRegion": false,
+    "slaTarget": "99.9%"
+  },
+  "sourceTraceability": [
+    {
+      "nwsPath": "compute.0.instanceCount",
+      "sourceRef": "structuredForm.compute.instances"
+    }
+  ]
+}

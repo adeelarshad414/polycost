@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "1.0",
+  "metadata": {
+    "sourceType": "structured_form",
+    "createdAt": "2026-06-28T00:00:00.000Z"
+  },
+  "workload": {
+    "type": "web_app",
+    "region": {
+      "preference": "us-east-1",
+      "isDefault": false
+    }
+  },
+  "compute": [
+    {
+      "role": "web",
+      "scalingType": "fixed",
+      "instanceCount": 2
+    }
+  ],
+  "storage": [],
+  "database": [],
+  "network": {
+    "cdn": true,
+    "loadBalancer": true
+  },
+  "availability": {
+    "multiAz": false,
+    "multiRegion": false
+  }
+}

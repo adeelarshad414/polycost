@@ -1,0 +1,76 @@
+import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JobsOptions } from 'bullmq';
+import { AppConfig } from '../config/config.schema';
+import { PricingEtlService } from './pricing-etl.service';
+import {
+  PRICING_ETL_QUEUE_NAME,
+  PRICING_ETL_REFRESH_JOB_NAME,
+  PricingEtlSummary,
+} from './pricing-etl.types';
+
+export const PRICING_ETL_QUEUE = Symbol('PRICING_ETL_QUEUE');
+export const PRICING_ETL_WORKER_FACTORY = Symbol('PRICING_ETL_WORKER_FACTORY');
+export const PRICING_ETL_ADAPTERS = Symbol('PRICING_ETL_ADAPTERS');
+export const PRICING_CATALOG_WRITER = Symbol('PRICING_CATALOG_WRITER');
+export const PRICING_ETL_RUN_REPOSITORY = Symbol('PRICING_ETL_RUN_REPOSITORY');
+
+export interface PricingEtlQueue {
+  add(name: string, data: Record<string, never>, options: JobsOptions): Promise<unknown>;
+  close(): Promise<void>;
+}
+
+export interface PricingEtlWorker {
+  close(): Promise<void>;
+}
+
+export type PricingEtlWorkerFactory = (
+  processor: () => Promise<PricingEtlSummary>,
+) => PricingEtlWorker;
+
+@Injectable()
+export class PricingEtlScheduler implements OnModuleInit, OnModuleDestroy {
+  private worker?: PricingEtlWorker;
+
+  constructor(
+    private readonly configService: ConfigService<AppConfig, true>,
+    private readonly etlService: PricingEtlService,
+    @Inject(PRICING_ETL_QUEUE) private readonly queue: PricingEtlQueue,
+    @Inject(PRICING_ETL_WORKER_FACTORY)
+    private readonly workerFactory: PricingEtlWorkerFactory,
+  ) {}
+
+  async onModuleInit(): Promise<void> {
+    await this.scheduleRecurringRefresh();
+    this.worker = this.workerFactory(() => this.etlService.refreshAllProviders());
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    if (this.worker) {
+      await this.worker.close();
+    }
+
+    await this.queue.close();
+  }
+
+  async scheduleRecurringRefresh(): Promise<void> {
+    const cronPattern = this.configService.get('PRICING_ETL_SCHEDULE_CRON', {
+      infer: true,
+    });
+
+    await this.queue.add(
+      PRICING_ETL_REFRESH_JOB_NAME,
+      {},
+      {
+        jobId: PRICING_ETL_REFRESH_JOB_NAME,
+        repeat: {
+          pattern: cronPattern,
+        },
+        removeOnComplete: true,
+        removeOnFail: 100,
+      },
+    );
+  }
+}
+
+export { PRICING_ETL_QUEUE_NAME };

@@ -1,0 +1,23 @@
+{
+  "Items": [
+    {
+      "currencyCode": "USD",
+      "retailPrice": 0.0416,
+      "unitPrice": 0.0416,
+      "armRegionName": "eastus",
+      "effectiveStartDate": "2026-01-01T00:00:00Z",
+      "meterId": "azure-meter-compute",
+      "meterName": "D2s v5",
+      "productId": "azure-product-compute",
+      "skuId": "AZURE-D2S-V5",
+      "productName": "Virtual Machines Dsv5 Series",
+      "skuName": "D2s v5",
+      "serviceName": "Virtual Machines",
+      "serviceFamily": "Compute",
+      "unitOfMeasure": "1 Hour",
+      "type": "Consumption",
+      "isPrimaryMeterRegion": true,
+      "armSkuName": "Standard_D2s_v5"
+    }
+  ]
+}

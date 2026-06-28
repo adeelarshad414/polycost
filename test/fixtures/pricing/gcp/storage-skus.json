@@ -1,0 +1,35 @@
+{
+  "skus": [
+    {
+      "skuId": "GCP-STORAGE-STANDARD",
+      "description": "Standard Storage US Central",
+      "category": {
+        "serviceDisplayName": "Cloud Storage",
+        "resourceFamily": "Storage",
+        "resourceGroup": "Standard",
+        "usageType": "OnDemand"
+      },
+      "serviceRegions": ["us-central1"],
+      "pricingInfo": [
+        {
+          "effectiveTime": "2026-01-01T00:00:00Z",
+          "pricingExpression": {
+            "usageUnit": "GiBy.mo",
+            "usageUnitDescription": "gibibyte month",
+            "tieredRates": [
+              {
+                "startUsageAmount": 0,
+                "unitPrice": {
+                  "currencyCode": "USD",
+                  "units": "0",
+                  "nanos": 26000000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "serviceProviderName": "Google"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "1.0",
+  "metadata": {
+    "sourceType": "structured_form",
+    "createdAt": "2026-06-28T00:00:00.000Z"
+  },
+  "workload": {
+    "type": "web_app",
+    "region": {
+      "isDefault": true
+    }
+  },
+  "compute": [],
+  "storage": [],
+  "database": [],
+  "network": {
+    "cdn": false,
+    "loadBalancer": false
+  },
+  "availability": {
+    "multiAz": false,
+    "multiRegion": false
+  }
+}
