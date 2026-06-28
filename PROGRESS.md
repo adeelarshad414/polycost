@@ -389,17 +389,52 @@ src/reports`, `npm run ci:unit`, `npm run ci:lint`, `npm run ci:build`,
 
 ## Phase 8 - API layer
 
-**Status:** Not started
-**Date:** -
+**Status:** Complete
+**Date:** 2026-06-29
 
-Entry template:
-
-- All endpoints from `05-API-CONTRACTS.md` implemented: [list any gaps]
-- Contract tests passing against documented request/response shapes: [yes/no]
-- Partial-degradation path tested: [yes/no]
-- Rate limiting applied per `11-SECURITY.md` section 2.5: [yes/no]
-- `helmet` and CORS allowlist configured: [yes/no]
-- Test coverage: [%] (target: 90%)
+- All endpoints from `05-API-CONTRACTS.md` implemented: yes. Implemented
+  `/api/v1/workload/parse`, `/api/v1/workload/validate`, `/api/v1/comparisons`,
+  `/api/v1/comparisons/:id`, `/api/v1/comparisons/:id/export`,
+  `/api/v1/comparisons/:id/refresh-live`, and `/api/v1/pricing/status`.
+- Contract tests passing against documented request/response shapes: yes. API
+  controller/repository tests cover parser response shape, NWS validation,
+  comparison create/get/export/refresh, admin pricing status, rate-limit behavior,
+  Vault-backed admin API-key auth, and the shared error envelope.
+- Partial-degradation path tested: yes. `ComparisonUnavailableError` maps to the
+  documented `PRICING_UNAVAILABLE` response with per-provider details; runtime smoke
+  against an empty local catalog returned the expected 503 envelope.
+- Rate limiting applied per `11-SECURITY.md` section 2.5: yes. `/workload/parse` and
+  `/comparisons/:id/refresh-live` enforce per-IP minute buckets from config and emit
+  `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, and
+  `Retry-After` on exhaustion.
+- `helmet` and CORS allowlist configured: yes. Existing Fastify helmet and
+  config-driven CORS allowlist remain active in `main.ts`; Phase 8 did not weaken
+  those controls.
+- Persistence and export integration: yes. Comparison snapshots are inserted and
+  retrieved through the application DB role from Vault, and export endpoints reuse the
+  Phase 7 PDF/CSV/XLSX report service.
+- Admin diagnostics: yes. `GET /api/v1/pricing/status` is protected by
+  `x-admin-api-key` and reads latest provider ETL status from Postgres.
+- Runtime verification: Docker Compose API rebuild/start succeeds with the API
+  healthy. Smoke tests passed for `/health`, `/api/v1/workload/validate`,
+  authorized and unauthorized `/api/v1/pricing/status`, invalid `/api/v1/workload/parse`,
+  and `/api/v1/comparisons` empty-catalog error handling.
+- Test coverage: API workspace coverage is 97.81% statements, 89.16% branches, 95.92%
+  functions, and 98.29% lines. The `src/api` package coverage is 96.42% statements,
+  81.69% branches, 94% functions, and 96.99% lines.
+- Tests/checks passing: `npm run format:check`, `npm run ci:lint`,
+  `npm run test:unit`, `npm run test:coverage --workspace @polycost/api`,
+  `npm run build`, `npm run test:integration`, `npm run test:e2e`,
+  `npm audit --audit-level=high`, `npm run db:validate`,
+  `npm run graphify:validate`, `npm run qa`, `npm run devops:check`,
+  `npm run cloud:check`, Docker Compose rebuild/start, and runtime curl smokes.
+- Deviations from spec: the `refresh-live` route creates a fresh snapshot from the
+  stored NWS and current catalog data, but does not yet perform a strict
+  SKU-scoped provider live re-query. Initial comparison requests with
+  `useLivePricing: true` return `LIVE_REFRESH_UNAVAILABLE` rather than silently
+  pretending to use live provider pricing. See the deviations log and
+  `docs/architecture/phase-8-api-layer.md`.
+- Checkpoint: Phase 8 is complete. Stop here until Phase 9 is explicitly approved.
 
 ## Phase 9 - Frontend
 
@@ -450,6 +485,10 @@ when it is actually resolved in a later phase, with a note on which phase resolv
 - `eslint-plugin-security` reports warnings for controlled fixture reads,
   provider-response dictionary access, and the local Vault token-file read. These are
   non-blocking under the current lint config and were reviewed during Phase 3.
+- Fresh local Compose stacks can have an empty `pricing_catalog` until ETL/provider
+  credentials populate it. In that state, `POST /api/v1/comparisons` correctly
+  returns `PRICING_UNAVAILABLE`; the Phase 10 clean-checkout acceptance journey still
+  needs a no-manual-seed strategy.
 
 ## Deviations from spec log
 
@@ -467,3 +506,12 @@ the reasoning, even if approved in a phase checkpoint.
 - Phase 3 `refreshPricingCatalog()` and `refreshLivePricing()` return normalized
   pricing records instead of `void`, extending the architecture sketch so the Phase 4
   ETL job can persist normalized rows cleanly.
+- Phase 8 `POST /api/v1/comparisons/:id/refresh-live` re-runs the stored NWS against
+  current catalog data and saves a new snapshot, but it does not yet re-query only
+  the exact provider SKUs/services from the original comparison. The public
+  `ComparisonResult` shape intentionally omits SKU IDs, so a later V1 hardening pass
+  should add internal SKU traceability or derive a provider refresh plan from the NWS.
+- Phase 8 `POST /api/v1/comparisons` rejects `useLivePricing: true` with
+  `LIVE_REFRESH_UNAVAILABLE` until initial live provider refresh has an explicit
+  implementation path. This avoids silently returning cached-catalog results for a
+  request that asked for live pricing.
