@@ -4,9 +4,10 @@ import { AppConfigModule } from './config/app-config.module';
 import { HealthController } from './health/health.controller';
 import { NwsParserModule } from './nws-parser/nws-parser.module';
 import { PricingEtlModule } from './pricing-etl/pricing-etl.module';
+import { ReportModule } from './reports/report.module';
 
 @Module({
-  imports: [AppConfigModule, PricingEtlModule, NwsParserModule, ComparisonModule],
+  imports: [AppConfigModule, PricingEtlModule, NwsParserModule, ComparisonModule, ReportModule],
   controllers: [HealthController],
 })
 export class AppModule {}

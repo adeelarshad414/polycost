@@ -30,7 +30,7 @@ say so explicitly rather than marking it done.
 | 4 - Pricing ETL job                                    | Complete    | 2026-06-28   |
 | 5 - NWS Parser Module                                  | Complete    | 2026-06-28   |
 | 6 - Comparison Engine                                  | Complete    | 2026-06-29   |
-| 7 - Report Module                                      | Not started | -            |
+| 7 - Report Module                                      | Complete    | 2026-06-29   |
 | 8 - API layer                                          | Not started | -            |
 | 9 - Frontend                                           | Not started | -            |
 | 10 - E2E verification against MVP acceptance criteria  | Not started | -            |
@@ -348,17 +348,44 @@ Phase 3 verification:
 
 ## Phase 7 - Report Module
 
-**Status:** Not started
-**Date:** -
+**Status:** Complete
+**Date:** 2026-06-29
 
-Entry template:
-
-- PDF generator implemented: [yes/no]
-- CSV generator implemented, formula-injection mitigation applied: [yes/no]
-- Excel generator implemented, formula-injection mitigation applied: [yes/no]
+- PDF generator implemented: yes. `PdfReportGenerator` creates deterministic binary
+  PDF output from `ComparisonResult`, including metadata, provider totals, line
+  items, warnings, line wrapping, and escaped PDF literal text.
+- CSV generator implemented, formula-injection mitigation applied: yes.
+  `CsvReportGenerator` emits comparison metadata, provider totals, line items, and
+  warnings. User-influenced spreadsheet text starting with `=`, `+`, `-`, `@`, tab,
+  carriage return, or newline is prefixed with a single quote.
+- Excel generator implemented, formula-injection mitigation applied: yes.
+  `ExcelReportGenerator` emits a real `.xlsx` OpenXML ZIP package with workbook,
+  worksheet, relationships, content types, styles, and formatted column widths. It
+  applies the same spreadsheet formula-injection mitigation as CSV.
+- Report dispatch implemented: yes. `ReportService` returns the binary content,
+  content type, and `polycost-comparison-{id}.{ext}` filename for `pdf`, `csv`, and
+  `xlsx`.
 - All three formats produce consistent numbers against the same `ComparisonResult`:
-  [yes/no]
-- Test coverage: [%]
+  yes, fixture tests assert shared totals and line-item values across PDF, CSV, and
+  XLSX output.
+- Runtime wiring: `ReportModule` is imported by `AppModule`. Docker Compose
+  rebuild/start succeeds with the API healthy after the module import.
+- Security checks: spreadsheet formula-injection mitigation and PDF escaping are
+  unit-tested. Source scans found no direct `process.env`, `dangerouslySetInnerHTML`,
+  `eval`, or `new Function` usage in app source.
+- Test coverage: API 98.18% statements, 90.79% branches, 96.36% functions, 98.63%
+  lines. Reports package coverage is 99.57% statements, 92.85% branches, 100%
+  functions, and 99.54% lines. `PdfReportGenerator` is at 100% across statements,
+  branches, functions, and lines.
+- Tests/checks passing: `npm run test:unit --workspace @polycost/api -- --runInBand
+src/reports`, `npm run ci:unit`, `npm run ci:lint`, `npm run ci:build`,
+  `npm run ci:integration`, `npm run ci:e2e`, `npm run ci:security`,
+  `npm run security:scan`, `npm run check`, Docker Compose rebuild/start,
+  API `/health`, web HTTP smoke check, direct `process.env` source scan, and unsafe
+  frontend/code-execution source scan.
+- Deviations from spec: none. The report module intentionally has no API route yet;
+  endpoint integration belongs to Phase 8.
+- Checkpoint: Phase 7 is complete. Stop here until Phase 8 is explicitly approved.
 
 ## Phase 8 - API layer
 

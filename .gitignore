@@ -2,7 +2,7 @@ node_modules/
 dist/
 coverage/
 .graphify/
-reports/
+/reports/
 .turbo/
 .vite/
 apps/web/tsconfig.tsbuildinfo

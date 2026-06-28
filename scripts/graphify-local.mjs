@@ -14,7 +14,6 @@ const ignoredDirectories = new Set([
   'coverage',
   'dist',
   'node_modules',
-  'reports',
   'test-results',
 ]);
 
