@@ -1,7 +1,8 @@
 # UI Implementation Notes
 
-These notes capture concrete frontend decisions from `07-UI-UX-DESIGN-SYSTEM.md` so
-implementation work can turn them into tests and reusable primitives.
+These notes capture concrete frontend decisions from `07-UI-UX-DESIGN-SYSTEM.md`.
+Phase 9 implemented these decisions in the Vite/React web app; see
+`docs/architecture/phase-9-frontend.md` for module boundaries and verification.
 
 ## Resolved design decisions
 
@@ -17,20 +18,23 @@ implementation work can turn them into tests and reusable primitives.
 
 ## Frontend implementation requirements
 
-- Define design tokens as CSS variables before building screen-level components.
-- Build a shared `Logo`/logomark component from the documented SVG geometry.
+- Define design tokens as CSS variables before building screen-level components:
+  complete.
+- Build a shared `Logo`/logomark component from the documented SVG geometry:
+  complete.
 - Build a reusable provider comparison panel with identical dimensions and states
-  across all three providers.
+  across all three providers: complete.
 - Add a print stylesheet for the on-screen comparison view in addition to generated
-  PDF reports.
+  PDF reports: complete.
 - Add accessibility checks for visible focus, keyboard navigation, reduced motion,
-  and screen-reader labels on comparison line items.
+  and screen-reader labels on comparison line items: complete.
 
 ## Test targets
 
-- Light, dark, and system theme resolution before first paint.
-- Desktop three-column layout at `>= 1024px`.
-- Tablet equal-column layout from `768px` to `1023px`.
-- Mobile carousel below `768px`.
-- No provider column reorders when a different provider is cheapest.
-- Export buttons have equal visual weight for PDF, CSV, and Excel.
+- Light, dark, and system theme resolution before first paint: covered.
+- Desktop three-column layout at `>= 1024px`: browser-smoked.
+- Tablet equal-column layout from `768px` to `1023px`: covered by responsive CSS.
+- Mobile carousel below `768px`: browser-smoked.
+- No provider column reorders when a different provider is cheapest: covered.
+- Export buttons have equal visual weight for PDF, CSV, and Excel: implemented and
+  covered through app interaction tests.

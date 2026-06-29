@@ -1,8 +1,7 @@
 # How to Use PolyCost
 
 This guide is for end users of the running application. For development or
-deployment setup, see `DEPLOY.md` and contributor docs instead. Keep this file in
-sync with the actual running UI as Phase 9 frontend work is built.
+deployment setup, see `DEPLOY.md` and contributor docs instead.
 
 ## What PolyCost does
 
@@ -23,10 +22,14 @@ it to a colleague. For example:
 > storage for user-uploaded files, up to 5GB each. It should stay up even if one
 > server goes down."
 
-PolyCost reads this and works out the pieces it needs to price: compute, storage,
-database, and high-availability needs. You will see what it understood as an editable
-form. Check it before continuing, because this is where you can correct anything it
-got wrong or fill in something it missed.
+When the plain-English parser is configured, PolyCost reads this and works out the
+pieces it needs to price: compute, storage, database, and high-availability needs.
+You will see what it understood as an editable form. Check it before continuing,
+because this is where you can correct anything it got wrong or fill in something it
+missed.
+
+If your self-hosted environment does not have the parser configured yet, use the
+structured form directly. The pricing comparison engine is the same either way.
 
 ### Option 2 - Fill in the form directly
 
@@ -72,12 +75,15 @@ a different scale.
 By default, PolyCost shows pricing from its regularly refreshed catalog. You will see
 a note such as "Pricing last updated: [date]" near the top.
 
-If you want the latest number before making a final decision, click "Refresh live
-pricing". This checks directly with each cloud provider for the current price on only
-the services in your comparison.
+If you want the latest number before making a final decision, click "Refresh live".
+In the current OSS V1 build, this re-runs the stored workload against the current
+local pricing catalog. Strict provider live re-query for only the exact SKUs in the
+comparison is still a carried-forward hardening item.
 
-Live pricing refresh is rate-limited. If you hit the limit, wait a few minutes and
-try again.
+Live refresh is rate-limited. If you hit the limit, wait a few minutes and try again.
+If the local catalog has not been populated yet, comparison requests can return a
+pricing-unavailable message until provider credentials and the ETL refresh are in
+place.
 
 ## Exporting your comparison
 
@@ -103,9 +109,12 @@ at once, so you do not lose the big picture.
 
 ## When something does not look right
 
-- If only two columns show up instead of three, one provider's pricing data is
-  temporarily unavailable. You will see a note explaining which one and why. The
-  comparison for the other two providers is still usable.
+- If a provider card says "Pricing unavailable", that provider's pricing data is
+  temporarily unavailable. The other provider cards remain visible so the layout and
+  provider order stay consistent.
+- If the top pricing status says "Pricing status restricted", your frontend is
+  running without the admin diagnostics key. This does not block normal comparison
+  requests.
 - If your description was not understood correctly, go back and edit the form
   directly. Nothing is locked in until you confirm.
 

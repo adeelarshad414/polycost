@@ -8,7 +8,7 @@
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "noEmit": true,
-    "types": ["vite/client"]
+    "types": ["vite/client", "jest", "node"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"]
 }

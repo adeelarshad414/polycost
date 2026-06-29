@@ -1,9 +1,31 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="light" data-theme-choice="system">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="polycost-api-base-url" content="http://localhost:3001/api/v1" />
     <title>PolyCost</title>
+    <script>
+      (function () {
+        try {
+          var choice = localStorage.getItem('polycost-theme') || 'system';
+          if (choice !== 'light' && choice !== 'dark' && choice !== 'system') {
+            choice = 'system';
+          }
+          var resolved =
+            choice === 'system'
+              ? window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light'
+              : choice;
+          document.documentElement.dataset.theme = resolved;
+          document.documentElement.dataset.themeChoice = choice;
+        } catch (error) {
+          document.documentElement.dataset.theme = 'light';
+          document.documentElement.dataset.themeChoice = 'system';
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -438,19 +438,46 @@ src/reports`, `npm run ci:unit`, `npm run ci:lint`, `npm run ci:build`,
 
 ## Phase 9 - Frontend
 
-**Status:** Not started
-**Date:** -
-
-Entry template:
+**Status:** Complete
+**Date:** 2026-06-29
 
 - Design tokens implemented as CSS variables matching
-  `07-UI-UX-DESIGN-SYSTEM.md`: [yes/no]
-- NL input plus structured form tabs: [yes/no]
-- Three-column comparison view and responsive mobile carousel: [yes/no]
-- Light/Dark/System theme switching with no flash of wrong theme: [yes/no]
-- Export bar for PDF/CSV/Excel: [yes/no]
-- Accessibility checks per `07-UI-UX-DESIGN-SYSTEM.md` section 8: [yes/no]
-- Test coverage: [%] (target: 80%)
+  `07-UI-UX-DESIGN-SYSTEM.md`: yes. The web app now defines PolyCost color,
+  typography, spacing, radius, provider-accent, light, dark, and print tokens in
+  `apps/web/src/styles.css`.
+- NL input plus structured form tabs: yes. The Describe tab calls
+  `/api/v1/workload/parse` and moves the parsed NWS into the same editable form used
+  by the Form tab.
+- Three-column comparison view and responsive mobile carousel: yes. Desktop uses
+  stable AWS/Azure/GCP columns; mobile keeps a sticky totals bar and horizontal
+  provider carousel.
+- Light/Dark/System theme switching with no flash of wrong theme: yes. The HTML shell
+  resolves the stored/system theme before React renders, and the React theme helper
+  persists explicit choices.
+- Export bar for PDF/CSV/Excel: yes. Export buttons call the Phase 8 report endpoint
+  and save the returned Blob with a comparison-specific filename.
+- Accessibility checks per `07-UI-UX-DESIGN-SYSTEM.md` section 8: yes. Native form
+  controls, keyboard-friendly tabs/buttons, visible focus states, reduced-motion
+  rules, semantic regions, provider line-item labels, and print styling are in place.
+- Runtime verification: Docker Compose web rebuild/start succeeded. Browser smoke
+  against `http://localhost:3000` passed for desktop and mobile: no console errors,
+  provider order remained AWS/Azure/GCP, desktop had no page-level horizontal overflow,
+  mobile used the sticky totals bar plus horizontal carousel, and the expected
+  empty-catalog API error rendered cleanly.
+- Test coverage: web workspace coverage is 92.5% statements, 83.51% branches, 92.1%
+  functions, and 92.42% lines.
+- Tests/checks passing: `npm run format:check`, `npm run ci:lint`,
+  `npm run test:unit`, `npm run test:coverage --workspace @polycost/web`,
+  `npm run build`, `npm run test:integration`, `npm run test:e2e`,
+  `npm audit --audit-level=high`, `npm run graphify:validate`, `npm run qa`,
+  `npm run db:validate`, `npm run devops:check`, `npm run cloud:check`, Docker
+  Compose web rebuild/start, direct Docker Compose health check, web/API HTTP smoke
+  checks, and browser responsive smoke.
+- Deviations from spec: pricing freshness is shown from comparison snapshots or the
+  protected Phase 8 pricing-status endpoint. Without an admin diagnostics key, the
+  frontend displays "Pricing status restricted" instead of provider ETL status. See
+  the deviations log and `docs/architecture/phase-9-frontend.md`.
+- Checkpoint: Phase 9 is complete. Stop here until Phase 10 is explicitly approved.
 
 ## Phase 10 - E2E verification against MVP acceptance criteria
 
@@ -489,6 +516,10 @@ when it is actually resolved in a later phase, with a note on which phase resolv
   credentials populate it. In that state, `POST /api/v1/comparisons` correctly
   returns `PRICING_UNAVAILABLE`; the Phase 10 clean-checkout acceptance journey still
   needs a no-manual-seed strategy.
+- The Phase 9 frontend can render pricing-status diagnostics only when the protected
+  Phase 8 status endpoint is accessible. In ordinary local browser use it falls back
+  to "Pricing status restricted"; Phase 10 or a V1 hardening pass should decide
+  whether to expose a frontend-safe status summary.
 
 ## Deviations from spec log
 
@@ -515,3 +546,7 @@ the reasoning, even if approved in a phase checkpoint.
   `LIVE_REFRESH_UNAVAILABLE` until initial live provider refresh has an explicit
   implementation path. This avoids silently returning cached-catalog results for a
   request that asked for live pricing.
+- Phase 9 uses the protected Phase 8 pricing-status endpoint as an optional
+  diagnostic. Because the browser is not given the admin diagnostics key, the UI
+  reports "Pricing status restricted" until a frontend-safe status contract or token
+  strategy is added.
