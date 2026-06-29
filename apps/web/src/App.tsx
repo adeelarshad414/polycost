@@ -176,6 +176,7 @@ export function App({ client = polyCostClient }: AppProps) {
 
   return (
     <main className="app-shell" aria-labelledby="page-title">
+      <ScrollProgressBar />
       <Header themeChoice={themeChoice} onThemeChange={setThemeChoice} />
 
       <section className="workbench" aria-label="Cost comparison workbench">
@@ -256,6 +257,45 @@ export function App({ client = polyCostClient }: AppProps) {
         <ComparisonView comparison={comparison} interval={interval} />
       </section>
     </main>
+  );
+}
+
+function ScrollProgressBar() {
+  const [progress, setProgress] = useState(0);
+  const percent = Math.round(progress * 100);
+
+  useEffect(() => {
+    function updateProgress() {
+      const scrollingElement = document.scrollingElement ?? document.documentElement;
+      const maxScroll = Math.max(0, scrollingElement.scrollHeight - window.innerHeight);
+      const nextProgress =
+        maxScroll === 0 ? 0 : Math.min(1, Math.max(0, window.scrollY / maxScroll));
+
+      setProgress(nextProgress);
+    }
+
+    updateProgress();
+    window.addEventListener('scroll', updateProgress, { passive: true });
+    window.addEventListener('resize', updateProgress);
+
+    return () => {
+      window.removeEventListener('scroll', updateProgress);
+      window.removeEventListener('resize', updateProgress);
+    };
+  }, []);
+
+  return (
+    <div
+      className="scroll-progress"
+      role="progressbar"
+      aria-label="Page scroll progress"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={percent}
+      aria-valuetext={`${percent}% scrolled`}
+    >
+      <span className="scroll-progress-bar" style={{ transform: `scaleX(${progress})` }} />
+    </div>
   );
 }
 

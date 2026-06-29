@@ -159,19 +159,30 @@ textarea:focus-visible {
   padding: var(--pc-space-3);
 }
 
-.app-shell::before {
+.scroll-progress {
   position: fixed;
   inset: 0 0 auto;
-  z-index: 30;
-  height: 4px;
+  z-index: 50;
+  height: 5px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--pc-border) 54%, transparent);
+  pointer-events: none;
+}
+
+.scroll-progress-bar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: left center;
   background: linear-gradient(
     90deg,
-    var(--pc-provider-aws) 0 33.33%,
-    var(--pc-provider-azure) 33.33% 66.66%,
-    var(--pc-provider-gcp) 66.66% 100%
+    var(--pc-provider-aws) 0 32%,
+    var(--pc-provider-azure) 48%,
+    var(--pc-provider-gcp-blue) 68%,
+    var(--pc-provider-gcp) 100%
   );
-  content: '';
-  pointer-events: none;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--pc-brand-accent) 45%, transparent);
+  transition: transform 120ms ease-out;
 }
 
 .app-header {
@@ -2207,6 +2218,10 @@ select:disabled {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
   }
+
+  .scroll-progress-bar {
+    transition: none;
+  }
 }
 
 @media print {
@@ -2216,6 +2231,7 @@ select:disabled {
   }
 
   .app-header,
+  .scroll-progress,
   .workbench,
   .comparison-toolbar,
   .mobile-total-bar,

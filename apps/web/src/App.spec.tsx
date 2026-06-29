@@ -70,6 +70,63 @@ describe('App', () => {
     unmount();
   });
 
+  it('updates the page scroll progress indicator', async () => {
+    const originalInnerHeight = window.innerHeight;
+    const originalScrollY = window.scrollY;
+    const originalScrollHeightDescriptor = Object.getOwnPropertyDescriptor(
+      document.documentElement,
+      'scrollHeight',
+    );
+    const { container, unmount } = render(<App client={clientMock()} />);
+
+    try {
+      Object.defineProperty(document.documentElement, 'scrollHeight', {
+        configurable: true,
+        value: 2000,
+      });
+      Object.defineProperty(window, 'innerHeight', {
+        configurable: true,
+        value: 1000,
+      });
+      Object.defineProperty(window, 'scrollY', {
+        configurable: true,
+        value: 500,
+      });
+
+      await act(async () => {
+        window.dispatchEvent(new Event('scroll'));
+      });
+
+      const progress = container.querySelector('[aria-label="Page scroll progress"]');
+      const bar = container.querySelector('.scroll-progress-bar');
+
+      expect(progress).toBeInstanceOf(HTMLElement);
+      expect(progress?.getAttribute('role')).toBe('progressbar');
+      expect(progress?.getAttribute('aria-valuenow')).toBe('50');
+      expect((bar as HTMLElement).style.transform).toBe('scaleX(0.5)');
+    } finally {
+      unmount();
+      Object.defineProperty(window, 'innerHeight', {
+        configurable: true,
+        value: originalInnerHeight,
+      });
+      Object.defineProperty(window, 'scrollY', {
+        configurable: true,
+        value: originalScrollY,
+      });
+
+      if (originalScrollHeightDescriptor) {
+        Object.defineProperty(
+          document.documentElement,
+          'scrollHeight',
+          originalScrollHeightDescriptor,
+        );
+      } else {
+        Reflect.deleteProperty(document.documentElement, 'scrollHeight');
+      }
+    }
+  });
+
   it('supports form edits, theme changes, interval changes, refresh, and export', async () => {
     const client = clientMock();
     const { container, unmount } = render(<App client={client} />);
