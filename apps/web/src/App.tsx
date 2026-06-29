@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { formatApiError, PolyCostClient, PolyCostApiError, polyCostClient } from './api-client';
 import { applyTheme, storedTheme, ThemeChoice } from './theme';
 import {
@@ -6,10 +6,10 @@ import {
   ComparisonResult,
   INTERVALS,
   IntervalKey,
+  NormalizedWorkloadSpec,
   PROVIDER_ORDER,
   ProviderId,
   ReportFormat,
-  PricingStatusResponse,
 } from './types';
 import {
   buildNwsFromForm,
@@ -32,8 +32,6 @@ export function App({ client = polyCostClient }: AppProps) {
   const [naturalLanguageInput, setNaturalLanguageInput] = useState(sampleNaturalLanguageInput);
   const [form, setForm] = useState<WorkloadFormState>(defaultWorkloadForm);
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
-  const [pricingStatus, setPricingStatus] = useState<PricingStatusResponse | null>(null);
-  const [pricingStatusUnavailable, setPricingStatusUnavailable] = useState(false);
   const [interval, setInterval] = useState<IntervalKey>('monthly');
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -42,38 +40,6 @@ export function App({ client = polyCostClient }: AppProps) {
   useEffect(() => {
     applyTheme(themeChoice);
   }, [themeChoice]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    client
-      .getPricingStatus()
-      .then((status) => {
-        if (isMounted) {
-          setPricingStatus(status);
-          setPricingStatusUnavailable(false);
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setPricingStatusUnavailable(true);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [client]);
-
-  const activeNws = useMemo(
-    () =>
-      buildNwsFromForm(
-        form,
-        inputMode === 'describe' ? 'natural_language' : 'structured_form',
-        inputMode === 'describe' ? naturalLanguageInput : undefined,
-      ),
-    [form, inputMode, naturalLanguageInput],
-  );
 
   async function handleParse() {
     setError(null);
@@ -99,15 +65,36 @@ export function App({ client = polyCostClient }: AppProps) {
     setBusyAction('compare');
 
     try {
-      await client.validateWorkload(activeNws);
-      const result = await client.createComparison(activeNws);
+      const { nws, parserNotice } = await prepareNwsForComparison();
+      await client.validateWorkload(nws);
+      const result = await client.createComparison(nws);
       setComparison(result);
-      setNotice('Comparison ready.');
+      setNotice(parserNotice ? `${parserNotice} Comparison ready.` : 'Comparison ready.');
     } catch (comparisonError) {
       setError(formatApiError(comparisonError));
     } finally {
       setBusyAction(null);
     }
+  }
+
+  async function prepareNwsForComparison(): Promise<{
+    nws: NormalizedWorkloadSpec;
+    parserNotice?: string;
+  }> {
+    if (inputMode !== 'describe') {
+      return {
+        nws: buildNwsFromForm(form, 'structured_form'),
+      };
+    }
+
+    const parsed = await client.parseWorkload(naturalLanguageInput);
+    setForm(formFromNws(parsed.draftNws));
+    setInputMode('form');
+
+    return {
+      nws: parsed.draftNws,
+      parserNotice: reviewMessage(parsed.parserConfidence, parsed.fieldsRequiringReview),
+    };
   }
 
   async function handleRefreshLive() {
@@ -191,11 +178,7 @@ export function App({ client = polyCostClient }: AppProps) {
         </section>
 
         <section className="summary-zone" aria-label="Current estimate controls">
-          <PricingFreshness
-            comparison={comparison}
-            pricingStatus={pricingStatus}
-            pricingStatusUnavailable={pricingStatusUnavailable}
-          />
+          <PricingFreshness comparison={comparison} />
 
           <RequirementSummary form={form} />
 
@@ -207,7 +190,7 @@ export function App({ client = polyCostClient }: AppProps) {
               disabled={busyAction !== null}
             >
               <CompareIcon />
-              {busyAction === 'compare' ? 'Comparing' : 'Compare'}
+              {compareButtonLabel(inputMode, busyAction)}
             </button>
             <button
               type="button"
@@ -499,7 +482,7 @@ function WorkloadForm({
       </div>
 
       <button type="submit" className="sr-only">
-        Compare
+        Submit structured workload
       </button>
     </form>
   );
@@ -577,37 +560,14 @@ function CheckboxField({
   );
 }
 
-function PricingFreshness({
-  comparison,
-  pricingStatus,
-  pricingStatusUnavailable,
-}: {
-  comparison: ComparisonResult | null;
-  pricingStatus: PricingStatusResponse | null;
-  pricingStatusUnavailable: boolean;
-}) {
+function PricingFreshness({ comparison }: { comparison: ComparisonResult | null }) {
   if (comparison) {
     return (
       <div className="freshness-strip">Pricing as of {formatDate(comparison.pricingAsOf)}</div>
     );
   }
 
-  if (pricingStatus) {
-    return (
-      <div className="freshness-strip">
-        {PROVIDER_ORDER.map((provider) => {
-          const status = pricingStatus.providers.find((entry) => entry.providerId === provider);
-          return `${provider.toUpperCase()}: ${status?.status ?? 'unknown'}`;
-        }).join(' · ')}
-      </div>
-    );
-  }
-
-  return (
-    <div className="freshness-strip">
-      {pricingStatusUnavailable ? 'Pricing status restricted' : 'Pricing status pending'}
-    </div>
-  );
+  return <div className="freshness-strip">Using cached pricing catalog</div>;
 }
 
 function RequirementSummary({ form }: { form: WorkloadFormState }) {
@@ -719,7 +679,11 @@ export function ComparisonView({
             <span key={providerId}>
               {providerLabel(providerId)}{' '}
               <strong>
-                {provider ? formatCurrency(costForInterval(provider, interval)) : 'Unavailable'}
+                {provider
+                  ? formatCurrency(costForInterval(provider, interval))
+                  : comparison
+                    ? 'Unavailable'
+                    : 'Pending'}
               </strong>
             </span>
           );
@@ -734,6 +698,7 @@ export function ComparisonView({
             provider={providerResults.get(providerId)}
             cheapestProviderId={comparison?.cheapestProviderId}
             interval={interval}
+            hasComparison={Boolean(comparison)}
           />
         ))}
       </div>
@@ -757,11 +722,13 @@ function ProviderPanel({
   provider,
   cheapestProviderId,
   interval,
+  hasComparison,
 }: {
   providerId: ProviderId;
   provider?: ComparisonProviderResult;
   cheapestProviderId?: ProviderId;
   interval: IntervalKey;
+  hasComparison: boolean;
 }) {
   const isCheapest = cheapestProviderId === providerId;
 
@@ -776,7 +743,11 @@ function ProviderPanel({
           {isCheapest ? <span className="lowest-badge">Lowest cost</span> : null}
         </div>
         <strong className="provider-total">
-          {provider ? formatCurrency(costForInterval(provider, interval)) : 'Unavailable'}
+          {provider
+            ? formatCurrency(costForInterval(provider, interval))
+            : hasComparison
+              ? 'Unavailable'
+              : 'Pending'}
         </strong>
       </header>
 
@@ -805,7 +776,9 @@ function ProviderPanel({
           ))}
         </ul>
       ) : (
-        <div className="provider-empty">Pricing unavailable</div>
+        <div className="provider-empty">
+          {hasComparison ? 'Pricing unavailable' : 'Ready to compare'}
+        </div>
       )}
     </article>
   );
@@ -878,6 +851,14 @@ function costForInterval(provider: ComparisonProviderResult, interval: IntervalK
     case 'yearly':
       return provider.totals.yearly;
   }
+}
+
+function compareButtonLabel(inputMode: InputMode, busyAction: BusyAction): string {
+  if (busyAction === 'compare') {
+    return inputMode === 'describe' ? 'Parsing' : 'Comparing';
+  }
+
+  return inputMode === 'describe' ? 'Parse & compare' : 'Compare';
 }
 
 function reviewMessage(confidence: string, fields: string[]): string {

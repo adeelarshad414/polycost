@@ -22,14 +22,14 @@ it to a colleague. For example:
 > storage for user-uploaded files, up to 5GB each. It should stay up even if one
 > server goes down."
 
-When the plain-English parser is configured, PolyCost reads this and works out the
-pieces it needs to price: compute, storage, database, and high-availability needs.
+PolyCost reads this and works out the pieces it needs to price: compute, storage,
+database, and high-availability needs. If a configured LLM parser is not available,
+the self-hosted build falls back to a conservative local parser for common workload
+phrases and marks defaulted fields for review.
+
 You will see what it understood as an editable form. Check it before continuing,
 because this is where you can correct anything it got wrong or fill in something it
 missed.
-
-If your self-hosted environment does not have the parser configured yet, use the
-structured form directly. The pricing comparison engine is the same either way.
 
 ### Option 2 - Fill in the form directly
 
@@ -72,8 +72,10 @@ a different scale.
 
 ## Getting up-to-date pricing
 
-By default, PolyCost shows pricing from its regularly refreshed catalog. You will see
-a note such as "Pricing last updated: [date]" near the top.
+By default, PolyCost shows pricing from its cached catalog. Local self-hosted stacks
+include a small baseline catalog so the first comparison works before live ETL
+credentials are configured. Once provider ETL data exists, real provider rows take
+precedence over local seed rows.
 
 If you want the latest number before making a final decision, click "Refresh live".
 In the current OSS V1 build, this re-runs the stored workload against the current
@@ -81,9 +83,6 @@ local pricing catalog. Strict provider live re-query for only the exact SKUs in 
 comparison is still a carried-forward hardening item.
 
 Live refresh is rate-limited. If you hit the limit, wait a few minutes and try again.
-If the local catalog has not been populated yet, comparison requests can return a
-pricing-unavailable message until provider credentials and the ETL refresh are in
-place.
 
 ## Exporting your comparison
 
@@ -109,12 +108,9 @@ at once, so you do not lose the big picture.
 
 ## When something does not look right
 
-- If a provider card says "Pricing unavailable", that provider's pricing data is
-  temporarily unavailable. The other provider cards remain visible so the layout and
-  provider order stay consistent.
-- If the top pricing status says "Pricing status restricted", your frontend is
-  running without the admin diagnostics key. This does not block normal comparison
-  requests.
+- If a provider card says "Pricing unavailable" after a comparison, that provider's
+  pricing data is temporarily unavailable. The other provider cards remain visible so
+  the layout and provider order stay consistent.
 - If your description was not understood correctly, go back and edit the form
   directly. Nothing is locked in until you confirm.
 

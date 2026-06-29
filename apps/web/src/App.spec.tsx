@@ -101,6 +101,34 @@ describe('App', () => {
     unmount();
   });
 
+  it('parses describe input before creating a comparison', async () => {
+    const parsedNws = buildNwsFromForm({
+      ...defaultWorkloadForm,
+      workloadName: 'Parsed and compared portal',
+    });
+    const client = clientMock({
+      parseWorkload: jest.fn(async () => ({
+        draftNws: parsedNws,
+        parserConfidence: 'medium' as const,
+        fieldsRequiringReview: ['database[0].sizeGb'],
+      })),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Parse & compare'));
+
+    expect(client.parseWorkload).toHaveBeenCalledWith(expect.stringContaining('web app'));
+    expect(client.validateWorkload).toHaveBeenCalledWith(parsedNws);
+    expect(client.createComparison).toHaveBeenCalledWith(parsedNws);
+    expect((container.querySelector('#name') as HTMLInputElement).value).toBe(
+      'Parsed and compared portal',
+    );
+    expect(text(container)).toContain('Parsed with medium confidence. Review 1 field.');
+    expect(text(container)).toContain('Comparison ready.');
+
+    unmount();
+  });
+
   it('parses natural-language input into the editable form', async () => {
     const parsedNws = buildNwsFromForm({
       ...defaultWorkloadForm,
@@ -139,13 +167,10 @@ describe('App', () => {
     unmount();
   });
 
-  it('renders parse errors and pricing-status restrictions', async () => {
+  it('renders parse errors without exposing admin-only pricing diagnostics', async () => {
     const client = clientMock({
       parseWorkload: jest.fn(async () => {
         throw new PolyCostApiError(422, 'WORKLOAD_PARSE_ERROR', 'Input was not understood');
-      }),
-      getPricingStatus: jest.fn(async () => {
-        throw new PolyCostApiError(401, 'UNAUTHORIZED', 'Admin API key is required');
       }),
     });
     const { container, unmount } = render(<App client={client} />);
@@ -154,13 +179,25 @@ describe('App', () => {
     await click(buttonByText(container, 'Parse'));
 
     expect(text(container)).toContain('Input was not understood');
-    expect(text(container)).toContain('Pricing status restricted');
+    expect(text(container)).toContain('Using cached pricing catalog');
+    expect(text(container)).not.toContain('Pricing status restricted');
 
     unmount();
   });
 });
 
 describe('ComparisonView', () => {
+  it('renders an empty pre-comparison state without pricing failure language', () => {
+    const { container, unmount } = render(<ComparisonView comparison={null} interval="monthly" />);
+
+    expect(providerHeadings(container)).toEqual(['AWS', 'Azure', 'GCP']);
+    expect(text(container)).toContain('Pending');
+    expect(text(container)).toContain('Ready to compare');
+    expect(text(container)).not.toContain('Pricing unavailable');
+
+    unmount();
+  });
+
   it('keeps provider order stable and marks unavailable providers', () => {
     const partialResult: ComparisonResult = {
       ...comparisonResult,

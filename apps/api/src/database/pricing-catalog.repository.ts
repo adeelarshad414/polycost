@@ -100,7 +100,8 @@ export class PostgresPricingCatalogRepository
                fetched_at
         FROM pricing_catalog
         WHERE ${conditions.join(' AND ')}
-        ORDER BY unit_price_usd ASC
+        ORDER BY CASE WHEN attributes->>'source' = 'local_seed' THEN 1 ELSE 0 END,
+                 unit_price_usd ASC
       `,
       values,
     );

@@ -462,10 +462,9 @@ src/reports`, `npm run ci:unit`, `npm run ci:lint`, `npm run ci:build`,
 - Runtime verification: Docker Compose web rebuild/start succeeded. Browser smoke
   against `http://localhost:3000` passed for desktop and mobile: no console errors,
   provider order remained AWS/Azure/GCP, desktop had no page-level horizontal overflow,
-  mobile used the sticky totals bar plus horizontal carousel, and the expected
-  empty-catalog API error rendered cleanly.
-- Test coverage: web workspace coverage is 92.5% statements, 83.51% branches, 92.1%
-  functions, and 92.42% lines.
+  and mobile used the sticky totals bar plus horizontal carousel.
+- Test coverage: web workspace coverage is 92.63% statements, 84.15% branches, 92.66%
+  functions, and 92.57% lines.
 - Tests/checks passing: `npm run format:check`, `npm run ci:lint`,
   `npm run test:unit`, `npm run test:coverage --workspace @polycost/web`,
   `npm run build`, `npm run test:integration`, `npm run test:e2e`,
@@ -473,11 +472,46 @@ src/reports`, `npm run ci:unit`, `npm run ci:lint`, `npm run ci:build`,
   `npm run db:validate`, `npm run devops:check`, `npm run cloud:check`, Docker
   Compose web rebuild/start, direct Docker Compose health check, web/API HTTP smoke
   checks, and browser responsive smoke.
-- Deviations from spec: pricing freshness is shown from comparison snapshots or the
-  protected Phase 8 pricing-status endpoint. Without an admin diagnostics key, the
-  frontend displays "Pricing status restricted" instead of provider ETL status. See
-  the deviations log and `docs/architecture/phase-9-frontend.md`.
+- Deviations from spec: none for the anonymous frontend flow. Pricing freshness is
+  shown as cached-catalog status before comparison and as the comparison snapshot
+  timestamp after comparison; the admin pricing-status endpoint remains backend-only.
 - Checkpoint: Phase 9 is complete. Stop here until Phase 10 is explicitly approved.
+
+## Post-Phase 9 audit remediation - frontend/backend
+
+**Status:** Complete
+**Date:** 2026-06-29
+
+- Findings: clean local stacks had zero `pricing_catalog` rows, so the MVP comparison
+  path returned `PRICING_UNAVAILABLE`; the Describe-tab `Compare` action priced the
+  default form instead of the typed natural-language text; the initial provider cards
+  showed failure language before any comparison; and the anonymous frontend surfaced
+  the admin-only pricing-status endpoint as "Pricing status restricted."
+- Backend fixes: added `004_seed_local_pricing_catalog.sql` with 42 baseline
+  AWS/Azure/GCP rows across compute, storage, database, and network categories; wired
+  the migration into fresh Postgres initialization and DB validation; sorted real ETL
+  rows ahead of `local_seed` rows; added provider-default region fallback with
+  approximate marking; and added a conservative local natural-language parser fallback
+  when no LLM endpoint/model is configured.
+- Frontend fixes: the Describe-tab primary action is now `Parse & compare` and prices
+  the parsed NWS; pre-comparison provider panels render as `Pending` / `Ready to
+compare`; anonymous UI no longer calls the admin-only pricing-status endpoint; and
+  tests cover the repaired plain-English compare flow.
+- Runtime verification: applied migration `004` to the running local database,
+  verified 42 seeded catalog rows, rebuilt API/web containers, confirmed Docker
+  health, confirmed `/workload/parse` works without LLM config, confirmed
+  `/comparisons` returns all three providers, confirmed CSV export returns real
+  line-items, and browser-audited desktop/mobile UI with no console errors or text
+  overflow.
+- Tests/checks passing: `npm run format:check`, `npm run ci:lint`,
+  `npm run test:unit`, `npm run test:coverage --workspace @polycost/web`,
+  `npm run build`, `npm run test:integration`, `npm run test:e2e`,
+  `npm audit --audit-level=high`, `npm run graphify:validate`, `npm run qa`,
+  `npm run db:validate`, `npm run devops:check`, `npm run cloud:check`, Docker
+  Compose rebuild/start, direct Docker Compose health check, direct API/web HTTP
+  smoke checks, export smoke, and browser responsive smoke.
+- Checkpoint: the Phase 9 audit remediation is complete. Phase 10 can now start from
+  a working end-to-end MVP workflow.
 
 ## Phase 10 - E2E verification against MVP acceptance criteria
 
@@ -512,14 +546,6 @@ when it is actually resolved in a later phase, with a note on which phase resolv
 - `eslint-plugin-security` reports warnings for controlled fixture reads,
   provider-response dictionary access, and the local Vault token-file read. These are
   non-blocking under the current lint config and were reviewed during Phase 3.
-- Fresh local Compose stacks can have an empty `pricing_catalog` until ETL/provider
-  credentials populate it. In that state, `POST /api/v1/comparisons` correctly
-  returns `PRICING_UNAVAILABLE`; the Phase 10 clean-checkout acceptance journey still
-  needs a no-manual-seed strategy.
-- The Phase 9 frontend can render pricing-status diagnostics only when the protected
-  Phase 8 status endpoint is accessible. In ordinary local browser use it falls back
-  to "Pricing status restricted"; Phase 10 or a V1 hardening pass should decide
-  whether to expose a frontend-safe status summary.
 
 ## Deviations from spec log
 
@@ -546,7 +572,7 @@ the reasoning, even if approved in a phase checkpoint.
   `LIVE_REFRESH_UNAVAILABLE` until initial live provider refresh has an explicit
   implementation path. This avoids silently returning cached-catalog results for a
   request that asked for live pricing.
-- Phase 9 uses the protected Phase 8 pricing-status endpoint as an optional
-  diagnostic. Because the browser is not given the admin diagnostics key, the UI
-  reports "Pricing status restricted" until a frontend-safe status contract or token
-  strategy is added.
+- Post-Phase 9 audit remediation seeds a local baseline pricing catalog so clean
+  self-hosted Compose stacks can produce first-run comparisons before provider ETL
+  credentials are configured. Seed rows are marked `attributes.source = local_seed`,
+  and catalog reads prefer real ETL rows over local seed rows when both exist.

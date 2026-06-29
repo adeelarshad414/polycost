@@ -9,14 +9,22 @@ import { StructuredLlmClient } from './nws-parser.types';
 
 const fixedNow = () => new Date('2026-06-28T12:00:00.000Z');
 
-const configService = (maxInputChars = 4000) =>
+const configService = (maxInputChars = 4000, llmConfigured = true) =>
   ({
     get: jest.fn((key: keyof AppConfig) => {
       if (key === 'NL_PARSE_MAX_INPUT_CHARS') {
         return maxInputChars;
       }
 
-      throw new Error(`Unexpected config key: ${String(key)}`);
+      if (key === 'LLM_PARSE_ENDPOINT') {
+        return llmConfigured ? 'https://llm.example.test/v1/chat/completions' : undefined;
+      }
+
+      if (key === 'LLM_PARSE_MODEL') {
+        return llmConfigured ? 'test-parser-model' : undefined;
+      }
+
+      return undefined;
     }),
   }) as unknown as ConfigService<AppConfig, true>;
 
@@ -142,6 +150,82 @@ describe('NLParserService', () => {
         fieldsRequiringReview: [],
       }),
     );
+  });
+
+  it('falls back to local parsing when no LLM endpoint is configured', async () => {
+    const client: StructuredLlmClient = {
+      createStructuredOutput: jest.fn(),
+    };
+    const service = new NLParserService(configService(4000, false), client, fixedNow);
+
+    const result = await service.parse(
+      'I need a web app for 5,000 daily active users with two web servers, a Postgres database, 250GB of upload storage, CDN, load balancing, and multi-AZ availability.',
+    );
+
+    expect(client.createStructuredOutput).not.toHaveBeenCalled();
+    expect(result).toEqual(
+      expect.objectContaining({
+        parserConfidence: 'medium',
+        fieldsRequiringReview: expect.arrayContaining([
+          'compute[0].vcpu',
+          'compute[0].memoryGb',
+          'database[0].sizeGb',
+        ]),
+      }),
+    );
+    expect(result.draftNws).toEqual(
+      expect.objectContaining({
+        schemaVersion: '1.0',
+        metadata: {
+          sourceType: 'natural_language',
+          rawInput:
+            'I need a web app for 5,000 daily active users with two web servers, a Postgres database, 250GB of upload storage, CDN, load balancing, and multi-AZ availability.',
+          createdAt: '2026-06-28T12:00:00.000Z',
+        },
+        workload: expect.objectContaining({
+          type: 'web_app',
+          expectedUsers: {
+            dailyActiveUsers: 5000,
+          },
+          region: {
+            isDefault: true,
+          },
+        }),
+        compute: [
+          expect.objectContaining({
+            role: 'web',
+            vcpu: 2,
+            memoryGb: 4,
+            instanceCount: 2,
+            scalingType: 'fixed',
+          }),
+        ],
+        storage: [
+          {
+            role: 'uploads',
+            type: 'object',
+            sizeGb: 250,
+            accessPattern: 'frequent',
+          },
+        ],
+        database: [
+          {
+            role: 'primary',
+            engine: 'postgres',
+            highAvailability: true,
+          },
+        ],
+        network: {
+          cdn: true,
+          loadBalancer: true,
+        },
+        availability: {
+          multiAz: true,
+          multiRegion: false,
+        },
+      }),
+    );
+    expect(result.fieldsRequiringReview).not.toContain('compute[0].instanceCount');
   });
 
   it('rejects invalid LLM output through the shared NWS validator', async () => {

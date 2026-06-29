@@ -46,11 +46,11 @@ immutable JSON snapshots so report exports are reproducible.
 
 ## Known Runtime Behavior
 
-On a fresh local Compose stack, `pricing_catalog` may be empty because provider
-catalog refresh depends on ETL/provider credentials. In that state,
-`POST /api/v1/comparisons` correctly returns `PRICING_UNAVAILABLE` with per-provider
-details. Once catalog rows exist, the same endpoint persists and returns a
-comparison snapshot.
+Fresh local Compose stacks seed a small baseline pricing catalog through
+`004_seed_local_pricing_catalog.sql` so anonymous first-run comparisons work before
+provider ETL credentials are configured. Seed rows are marked with
+`attributes.source = local_seed`; repository reads sort real ETL rows ahead of these
+baseline rows when both exist.
 
 Initial comparisons use the cached catalog. Requests with `useLivePricing: true`
 return `LIVE_REFRESH_UNAVAILABLE` until SKU-scoped live refresh is implemented.

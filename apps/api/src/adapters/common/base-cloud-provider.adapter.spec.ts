@@ -219,6 +219,49 @@ describe('BaseCloudProviderAdapter', () => {
     expect(result.baseMonthlyCostUsd).toBe(36.5);
   });
 
+  it('falls back to the adapter default region when a cloud-specific region has no match', async () => {
+    const adapter = new TestProviderAdapter(
+      new InMemoryPricingCatalogReader([
+        {
+          ...catalog[1],
+          region: 'fallback-region',
+        },
+      ]),
+      'fallback-region',
+    );
+
+    const result = await adapter.priceWorkload({
+      ...fullWorkload,
+      workload: {
+        type: 'web_app',
+        region: {
+          preference: 'aws-shaped-region',
+          isDefault: false,
+        },
+      },
+      storage: [],
+      database: [],
+      network: {
+        cdn: false,
+        loadBalancer: false,
+      },
+      compute: [
+        {
+          role: 'web',
+          scalingType: 'fixed',
+          instanceCount: 1,
+        },
+      ],
+    });
+
+    expect(result.baseMonthlyCostUsd).toBe(36.5);
+    expect(result.lineItems[0]).toEqual(
+      expect.objectContaining({
+        isApproximate: true,
+      }),
+    );
+  });
+
   it('fails clearly when no matching catalog record exists', async () => {
     const adapter = new TestProviderAdapter(new InMemoryPricingCatalogReader([]), 'test-region');
 

@@ -99,12 +99,10 @@ describe('PostgresPricingCatalogRepository', () => {
         serviceIds: ['SKU-1'],
       }),
     ).resolves.toEqual([record]);
-    expect(query).toHaveBeenCalledWith(expect.any(String), [
-      'aws',
-      'compute',
-      'us-east-1',
-      ['SKU-1'],
-    ]);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("attributes->>'source' = 'local_seed'"),
+      ['aws', 'compute', 'us-east-1', ['SKU-1']],
+    );
   });
 
   it('reads catalog rows without optional filters or nullable row fields', async () => {

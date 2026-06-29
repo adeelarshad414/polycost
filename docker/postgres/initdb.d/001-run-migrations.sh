@@ -31,3 +31,8 @@ psql \
   --username "$POSTGRES_USER" \
   --dbname "$POSTGRES_DB" \
   --file /polycost-migrations/003_seed_service_equivalence_map.sql
+
+psql \
+  --username "$POSTGRES_USER" \
+  --dbname "$POSTGRES_DB" \
+  --file /polycost-migrations/004_seed_local_pricing_catalog.sql

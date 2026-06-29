@@ -24,9 +24,10 @@ export the finished comparison.
 ## User flow
 
 The Describe tab posts natural-language input to `/workload/parse`. On success, the
-draft NWS is copied into the structured form for review and edits. The Form tab can
-be used directly when the parser is not configured or the user already knows the
-inputs.
+draft NWS is copied into the structured form for review and edits. The primary
+summary action says `Parse & compare` while Describe is active and prices the parsed
+NWS, not the stale/default form state. The Form tab can be used directly when the
+user already knows the inputs.
 
 Comparison always validates the generated NWS through `/workload/validate` before
 calling `/comparisons` with `useLivePricing: false`. This keeps the frontend aligned
@@ -53,13 +54,13 @@ The local Docker web image serves the built app on port `3000`; the HTML shell p
 the browser client at `http://localhost:3001/api/v1`. The theme is resolved before
 React renders to avoid an initial flash of the wrong theme.
 
-`GET /pricing/status` is optional from the UI's perspective. The Phase 8 endpoint is
-admin-protected, so ordinary browser sessions show `Pricing status restricted` until
-a frontend-safe status contract or token strategy is added.
+The anonymous frontend does not call the admin-only `/pricing/status` endpoint. Before
+a comparison exists, it shows `Using cached pricing catalog`; after comparison it
+shows the snapshot `pricingAsOf` timestamp returned by the API.
 
-Fresh local stacks can still have an empty pricing catalog. In that state the UI
-renders the backend `PRICING_UNAVAILABLE` message and keeps all three provider panels
-visible as unavailable.
+Before the first comparison, provider panels render as `Pending` / `Ready to compare`.
+Provider cards show `Pricing unavailable` only after a comparison exists and a
+specific provider failed to produce pricing.
 
 ## Verification
 
@@ -69,6 +70,7 @@ provider ordering, unavailable-provider states, interval switching, refresh, and
 exports.
 
 Browser smoke against the Docker-served app passed on desktop and mobile. Desktop
-verified stable three-column provider order and no page-level horizontal overflow.
-Mobile verified the sticky totals bar, collapsed navigation, horizontal provider
-carousel, and no text overflow in visible controls.
+verified the initial pending state, the plain-English `Parse & compare` journey,
+stable three-column provider order, enabled export controls after comparison, and no
+page-level horizontal overflow. Mobile verified the sticky totals bar, collapsed
+navigation, horizontal provider carousel, and no text overflow in visible controls.

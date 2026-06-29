@@ -112,11 +112,31 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     category: ServiceCategory,
     region: string,
   ): Promise<PricingCatalogRecord[]> {
-    return this.catalogReader.find({
+    const exactMatches = await this.catalogReader.find({
       provider: this.providerId,
       category,
       region,
     });
+
+    if (exactMatches.length > 0 || region === this.defaultRegion) {
+      return exactMatches;
+    }
+
+    const fallbackMatches = await this.catalogReader.find({
+      provider: this.providerId,
+      category,
+      region: this.defaultRegion,
+    });
+
+    return fallbackMatches.map((record) => ({
+      ...record,
+      attributes: {
+        ...(record.attributes ?? {}),
+        isApproximate: true,
+        regionFallbackFrom: region,
+        regionFallbackTo: this.defaultRegion,
+      },
+    }));
   }
 
   private async selectComputeRecord(
