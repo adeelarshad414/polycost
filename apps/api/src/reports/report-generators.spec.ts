@@ -70,6 +70,9 @@ describe('report generators', () => {
     expect(csv).toContain('FinOps Summary');
     expect(csv).toContain('Executive recommendation,gcp is the current cost baseline');
     expect(csv).toContain('Decision confidence,Medium - 2/3 providers priced; 1 approximate mappings');
+    expect(csv).toContain('Solution architect review');
+    expect(csv).toContain('gcp requires service-equivalence');
+    expect(csv).toContain('Architecture risk,Medium - validate provider coverage');
     expect(csv).toContain('Lowest monthly run rate,gcp $20');
     expect(csv).toContain('Annual avoidable spread,$612');
     expect(csv).toContain('Dominant cost driver,storage $20');
@@ -91,6 +94,8 @@ describe('report generators', () => {
     expect(xlsxText).toContain('FinOps Summary');
     expect(xlsxText).toContain('Executive recommendation');
     expect(xlsxText).toContain('Decision confidence');
+    expect(xlsxText).toContain('Solution architect review');
+    expect(xlsxText).toContain('Architecture risk');
     expect(xlsxText).toContain('Lowest monthly run rate');
     expect(xlsxText).toContain('<v>71</v>');
     expect(xlsxText).toContain('&apos;=cmd(1)\\risky compute');
@@ -131,6 +136,8 @@ describe('report generators', () => {
     expect(pdfText).toContain('FinOps summary');
     expect(pdfText).toContain('Executive recommendation: gcp is the current cost baseline');
     expect(pdfText).toContain('Decision confidence: Medium');
+    expect(pdfText).toContain('Solution architect review: gcp requires service-equivalence');
+    expect(pdfText).toContain('Architecture risk: Medium');
     expect(pdfText).toContain('Lowest monthly run rate: gcp $20');
     expect(pdfText).toContain('aws: daily $2.37, weekly $16.59, monthly $71');
     expect(pdfText).toContain('=cmd\\(1\\)\\\\risky compute');

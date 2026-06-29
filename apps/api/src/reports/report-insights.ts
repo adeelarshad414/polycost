@@ -35,6 +35,14 @@ export function buildReportInsights(result: ComparisonResult): ReportInsight[] {
       value: decisionConfidence(pricedProviders, approximateLineItems),
     },
     {
+      label: 'Solution architect review',
+      value: solutionArchitectReview(lowest, pricedProviders, approximateLineItems),
+    },
+    {
+      label: 'Architecture risk',
+      value: architectureRisk(pricedProviders, approximateLineItems),
+    },
+    {
       label: 'Lowest monthly run rate',
       value: lowest ? `${lowest.providerId} $${lowest.totals.monthly}` : 'Pending',
     },
@@ -79,6 +87,38 @@ function decisionConfidence(pricedProviders: number, approximateLineItems: numbe
   }
 
   return `Low - ${pricedProviders}/3 providers priced; validate before sharing`;
+}
+
+function solutionArchitectReview(
+  lowest: ComparisonResult['providers'][number] | undefined,
+  pricedProviders: number,
+  approximateLineItems: number,
+): string {
+  if (!lowest) {
+    return 'Pending';
+  }
+
+  if (pricedProviders < 3 || approximateLineItems > 0) {
+    return `${lowest.providerId} requires service-equivalence, resilience, data-path, and quota review`;
+  }
+
+  return `${lowest.providerId} is ready for architecture shortlist after regional SKU and quota validation`;
+}
+
+function architectureRisk(pricedProviders: number, approximateLineItems: number): string {
+  if (pricedProviders === 0) {
+    return 'Pending - no provider estimates yet';
+  }
+
+  if (pricedProviders < 2) {
+    return 'High - provider coverage is too thin for target-cloud selection';
+  }
+
+  if (pricedProviders < 3 || approximateLineItems > 0) {
+    return 'Medium - validate provider coverage and approximate service mappings';
+  }
+
+  return 'Low - exact mappings across all three providers; validate region and quotas';
 }
 
 function dominantCategory(

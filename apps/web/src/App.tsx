@@ -55,6 +55,7 @@ interface ProviderCostSummary {
 
 interface FinOpsReview {
   executiveDecision: ExecutiveDecision;
+  solutionArchitecture: SolutionArchitectureReview;
   monthlyLowest?: ProviderCostSummary;
   yearlyLowest?: ProviderCostSummary;
   monthlySpread?: number;
@@ -79,10 +80,26 @@ interface ExecutiveDecision {
 }
 
 interface ExecutiveLens {
-  role: 'CEO' | 'CTO' | 'FinOps' | 'Cloud';
+  role: 'CEO' | 'CTO' | 'Solution Architect' | 'FinOps' | 'Cloud';
   label: string;
   value: string;
   detail: string;
+}
+
+interface SolutionArchitectureReview {
+  posture: 'Ready for shortlist' | 'Architecture review' | 'Assumptions needed' | 'Pending';
+  riskLevel: 'Low' | 'Medium' | 'High' | 'Pending';
+  summary: string;
+  baselineLabel: string;
+  baselineValue: string;
+  checkpoints: SolutionArchitectureCheckpoint[];
+}
+
+interface SolutionArchitectureCheckpoint {
+  label: string;
+  value: string;
+  detail: string;
+  tone: 'good' | 'review' | 'risk' | 'pending';
 }
 
 interface ProviderFitSummary {
@@ -321,7 +338,7 @@ export function App({ client = polyCostClient }: AppProps) {
 
       <section className="comparison-section" aria-label="Provider comparison">
         <ComparisonToolbar interval={interval} onIntervalChange={setInterval} />
-        <ComparisonView comparison={comparison} interval={interval} />
+        <ComparisonView comparison={comparison} interval={interval} form={form} />
       </section>
     </main>
   );
@@ -1245,9 +1262,11 @@ function ComparisonToolbar({
 export function ComparisonView({
   comparison,
   interval,
+  form = defaultWorkloadForm,
 }: {
   comparison: ComparisonResult | null;
   interval: IntervalKey;
+  form?: WorkloadFormState;
 }) {
   const providerResults = new Map<ProviderId, ComparisonProviderResult>(
     comparison?.providers.map((provider) => [provider.providerId, provider]) ?? [],
@@ -1274,7 +1293,7 @@ export function ComparisonView({
         })}
       </div>
 
-      <CostDashboard comparison={comparison} interval={interval} />
+      <CostDashboard comparison={comparison} interval={interval} form={form} />
 
       <div className="provider-grid">
         {PROVIDER_ORDER.map((providerId) => (
@@ -1379,9 +1398,11 @@ function ProviderPanel({
 function CostDashboard({
   comparison,
   interval,
+  form,
 }: {
   comparison: ComparisonResult | null;
   interval: IntervalKey;
+  form: WorkloadFormState;
 }) {
   const summaries = providerCostSummaries(comparison, interval);
   const pricedSummaries = summaries.filter((summary) => summary.total !== undefined);
@@ -1396,7 +1417,7 @@ function CostDashboard({
         pricedSummaries.length
       : undefined;
   const categorySummaries = categoryCostSummaries(comparison, interval);
-  const finOpsReview = buildFinOpsReview(comparison, interval);
+  const finOpsReview = buildFinOpsReview(comparison, interval, form);
 
   return (
     <section className="cost-dashboard" aria-label="Cost dashboard">
@@ -1439,6 +1460,8 @@ function CostDashboard({
       />
 
       <FinOpsReviewPanel review={finOpsReview} />
+
+      <SolutionArchitecturePanel review={finOpsReview.solutionArchitecture} />
 
       <div className="dashboard-grid">
         <section className="dashboard-panel" aria-label="Provider spend chart">
@@ -1539,13 +1562,51 @@ function ExecutiveDecisionPanel({ decision }: { decision: ExecutiveDecision }) {
       <div className="stakeholder-lens-grid">
         {decision.lenses.map((lens) => (
           <div
-            className={`stakeholder-lens stakeholder-${lens.role.toLowerCase()}`}
+            className={`stakeholder-lens stakeholder-${roleClassName(lens.role)}`}
             key={lens.role}
           >
             <span>{lens.role}</span>
             <strong>{lens.value}</strong>
             <small>{lens.label}</small>
             <p>{lens.detail}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SolutionArchitecturePanel({ review }: { review: SolutionArchitectureReview }) {
+  return (
+    <section className="solution-architecture" aria-label="Solution architect review">
+      <div className="panel-heading">
+        <div>
+          <span>Solution Architect</span>
+          <h3>Architecture Fit Review</h3>
+        </div>
+        <strong className={`architecture-risk architecture-risk-${review.riskLevel.toLowerCase()}`}>
+          {review.riskLevel} risk
+        </strong>
+      </div>
+
+      <div className="architecture-summary">
+        <div>
+          <span>{review.posture}</span>
+          <strong>{review.baselineValue}</strong>
+          <small>{review.baselineLabel}</small>
+        </div>
+        <p>{review.summary}</p>
+      </div>
+
+      <div className="architecture-checkpoint-grid">
+        {review.checkpoints.map((checkpoint) => (
+          <div
+            className={`architecture-checkpoint architecture-checkpoint-${checkpoint.tone}`}
+            key={checkpoint.label}
+          >
+            <span>{checkpoint.label}</span>
+            <strong>{checkpoint.value}</strong>
+            <p>{checkpoint.detail}</p>
           </div>
         ))}
       </div>
@@ -1563,7 +1624,7 @@ function FinOpsReviewPanel({ review }: { review: FinOpsReview }) {
     <section className="finops-review" aria-label="FinOps review">
       <div className="panel-heading">
         <div>
-          <span>Architect Review</span>
+          <span>FinOps Review</span>
           <h3>FinOps Decision Signals</h3>
         </div>
         <strong>
@@ -2139,6 +2200,10 @@ function providerSubtitle(provider: ProviderId): string {
   }
 }
 
+function roleClassName(role: ExecutiveLens['role']): string {
+  return role.toLowerCase().split(' ').join('-');
+}
+
 function costForInterval(provider: ComparisonProviderResult, interval: IntervalKey): number {
   switch (interval) {
     case 'daily':
@@ -2207,6 +2272,7 @@ function providerCostSummaries(
 function buildFinOpsReview(
   comparison: ComparisonResult | null,
   interval: IntervalKey,
+  form: WorkloadFormState,
 ): FinOpsReview {
   const monthlySummaries = providerCostSummaries(comparison, 'monthly');
   const yearlySummaries = providerCostSummaries(comparison, 'yearly');
@@ -2247,6 +2313,15 @@ function buildFinOpsReview(
       monthlySpreadPercent,
       pricedProviderCount,
       yearlyLowest,
+    }),
+    solutionArchitecture: buildSolutionArchitectureReview({
+      approximateCount,
+      dominantCategory,
+      form,
+      lineItemCount,
+      monthlyLowest,
+      monthlySpreadPercent,
+      pricedProviderCount,
     }),
     monthlyLowest,
     yearlyLowest,
@@ -2347,6 +2422,12 @@ function buildExecutiveDecision({
             'Capture availability, data, and scaling assumptions before shortlisting a cloud.',
         },
         {
+          role: 'Solution Architect',
+          label: 'Fit decision',
+          value: 'Pending',
+          detail: 'Validate workload assumptions before mapping services to provider designs.',
+        },
+        {
           role: 'FinOps',
           label: 'Governance decision',
           value: 'Pending',
@@ -2395,6 +2476,12 @@ function buildExecutiveDecision({
         detail: `Prioritize ${driver.toLowerCase()} sizing, resilience, and managed-service tier review.`,
       },
       {
+        role: 'Solution Architect',
+        label: 'Fit decision',
+        value: approximateCount > 0 ? 'Mapping review' : 'Pattern review',
+        detail: `Validate ${provider} regional services, HA pattern, quotas, and data/network assumptions before target-cloud selection.`,
+      },
+      {
         role: 'FinOps',
         label: 'Governance decision',
         value:
@@ -2414,6 +2501,181 @@ function buildExecutiveDecision({
       },
     ],
   };
+}
+
+function buildSolutionArchitectureReview({
+  approximateCount,
+  dominantCategory,
+  form,
+  lineItemCount,
+  monthlyLowest,
+  monthlySpreadPercent,
+  pricedProviderCount,
+}: {
+  approximateCount: number;
+  dominantCategory?: CategoryCostSummary;
+  form: WorkloadFormState;
+  lineItemCount: number;
+  monthlyLowest?: ProviderCostSummary;
+  monthlySpreadPercent?: number;
+  pricedProviderCount: number;
+}): SolutionArchitectureReview {
+  if (lineItemCount === 0 || !monthlyLowest) {
+    return {
+      posture: 'Pending',
+      riskLevel: 'Pending',
+      baselineLabel: 'Provider baseline pending',
+      baselineValue: 'Run comparison',
+      summary:
+        'A Solution Architect review will appear after PolyCost has provider totals and workload assumptions to inspect.',
+      checkpoints: [
+        {
+          label: 'Service mapping',
+          value: 'Pending',
+          detail: 'Normalize requirements before validating AWS, Azure, and GCP equivalents.',
+          tone: 'pending',
+        },
+        {
+          label: 'Resilience',
+          value: 'Pending',
+          detail: 'Confirm multi-AZ, database HA, recovery objectives, and SLA target.',
+          tone: 'pending',
+        },
+        {
+          label: 'Scaling',
+          value: 'Pending',
+          detail: 'Capture fixed or autoscaling bounds before provider selection.',
+          tone: 'pending',
+        },
+        {
+          label: 'Data and network',
+          value: 'Pending',
+          detail: 'Estimate egress, CDN, load-balancing, and stateful service needs.',
+          tone: 'pending',
+        },
+      ],
+    };
+  }
+
+  const riskLevel = solutionArchitectureRisk({
+    approximateCount,
+    form,
+    pricedProviderCount,
+  });
+  const posture = solutionArchitecturePosture(riskLevel);
+  const provider = providerLabel(monthlyLowest.providerId);
+  const driver = dominantCategory ? capitalize(dominantCategory.category) : 'Core workload';
+  const egressGb = parseInputNumber(form.monthlyEgressGb);
+  const egressLabel =
+    egressGb !== undefined ? `${egressGb}GB monthly egress modeled` : 'Egress not specified';
+  const peakUsers = parseInputNumber(form.peakConcurrentUsers);
+  const hasResilience = form.multiRegion || form.multiAz;
+  const databaseHaReady = !form.databaseEnabled || form.databaseHighAvailability;
+  const loadPathReady = form.loadBalancer || (peakUsers !== undefined && peakUsers < 250);
+  const edgeReady = form.cdn || egressGb === undefined || egressGb < 500;
+
+  return {
+    posture,
+    riskLevel,
+    baselineLabel: `${provider} cost baseline`,
+    baselineValue: driver,
+    summary: [
+      `${provider} is the current cost baseline, but the Solution Architect gate should validate service equivalence, resilience, scaling, and data movement before cloud commitment.`,
+      monthlySpreadPercent !== undefined && monthlySpreadPercent >= 20
+        ? `The ${formatPercent(monthlySpreadPercent)} provider spread is material enough to review architecture patterns before procurement.`
+        : 'The cost spread is not enough by itself to skip architecture-fit validation.',
+    ].join(' '),
+    checkpoints: [
+      {
+        label: 'Service mapping',
+        value: approximateCount > 0 ? `${approximateCount} approximate` : 'Exact mappings',
+        detail:
+          approximateCount > 0
+            ? 'Validate managed-service behavior, limits, and operational differences before shortlisting.'
+            : 'Exact catalog mappings are present; still confirm regional SKU availability and quotas.',
+        tone: approximateCount > 0 ? 'review' : 'good',
+      },
+      {
+        label: 'Resilience',
+        value: form.multiRegion ? 'Multi-region' : form.multiAz ? 'Multi-AZ' : 'Single-zone risk',
+        detail: databaseHaReady
+          ? `SLA target ${form.slaTarget || 'not stated'}; confirm RTO/RPO and failover design.`
+          : 'Database HA is disabled; validate recovery objectives before production approval.',
+        tone: hasResilience && databaseHaReady ? 'good' : 'risk',
+      },
+      {
+        label: 'Scaling',
+        value:
+          form.scalingType === 'autoscaling'
+            ? `${form.autoscaleMin || 'min'}-${form.autoscaleMax || 'max'} autoscale`
+            : `${form.instanceCount || 'Fixed'} fixed nodes`,
+        detail:
+          form.scalingType === 'autoscaling'
+            ? 'Review warm-up time, scaling policy, and provider-specific quota ceilings.'
+            : 'Fixed capacity needs load testing against peak concurrency before target-cloud selection.',
+        tone: form.scalingType === 'autoscaling' ? 'good' : 'review',
+      },
+      {
+        label: 'Data and network',
+        value: form.cdn && form.loadBalancer ? 'Edge ready' : 'Review path',
+        detail:
+          loadPathReady && edgeReady
+            ? `${egressLabel}; confirm CDN cache ratio and transfer paths.`
+            : 'Validate load balancing, CDN, private connectivity, and egress assumptions for production traffic.',
+        tone: loadPathReady && edgeReady ? 'good' : 'review',
+      },
+    ],
+  };
+}
+
+function solutionArchitectureRisk({
+  approximateCount,
+  form,
+  pricedProviderCount,
+}: {
+  approximateCount: number;
+  form: WorkloadFormState;
+  pricedProviderCount: number;
+}): SolutionArchitectureReview['riskLevel'] {
+  const egressGb = parseInputNumber(form.monthlyEgressGb);
+  const peakUsers = parseInputNumber(form.peakConcurrentUsers);
+  const resilienceGap = !form.multiAz && !form.multiRegion;
+  const databaseGap = form.databaseEnabled && !form.databaseHighAvailability;
+  const loadPathGap = Boolean(peakUsers && peakUsers >= 500 && !form.loadBalancer);
+
+  if (pricedProviderCount <= 1 || databaseGap || loadPathGap) {
+    return 'High';
+  }
+
+  if (
+    pricedProviderCount < 3 ||
+    approximateCount > 0 ||
+    resilienceGap ||
+    form.scalingType === 'fixed' ||
+    Boolean(egressGb && egressGb >= 500 && !form.cdn)
+  ) {
+    return 'Medium';
+  }
+
+  return 'Low';
+}
+
+function solutionArchitecturePosture(
+  riskLevel: SolutionArchitectureReview['riskLevel'],
+): SolutionArchitectureReview['posture'] {
+  if (riskLevel === 'Low') {
+    return 'Ready for shortlist';
+  }
+
+  if (riskLevel === 'Medium') {
+    return 'Architecture review';
+  }
+
+  if (riskLevel === 'High') {
+    return 'Assumptions needed';
+  }
+
+  return 'Pending';
 }
 
 function decisionConfidence(
@@ -2658,6 +2920,11 @@ function compareButtonLabel(inputMode: InputMode, busyAction: BusyAction): strin
 
 function roundCurrency(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function parseInputNumber(value: string): number | undefined {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function reviewMessage(confidence: string, fields: string[]): string {

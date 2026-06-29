@@ -792,6 +792,28 @@ remain carried-forward UI automation work.
   and `npm run test:e2e` against the rebuilt stack.
 - `npm run ci:lint` still reports only the existing 15 API security warnings.
 
+## Post-Phase 10 solution architect review layer
+
+**Status:** Complete
+**Date:** 2026-06-29
+
+- Dashboard upgrades: added a dedicated Solution Architect Architecture Fit Review
+  layer that evaluates service mapping, resilience, scaling, and data/network
+  readiness from the active workload assumptions and comparison result.
+- Executive memo: promoted Solution Architect to a first-class stakeholder lens
+  alongside CEO, CTO, FinOps, and Cloud so architecture validation is visible in the
+  decision brief, not hidden in technical detail.
+- Risk posture: added low/medium/high/pending architecture risk logic based on
+  provider coverage, approximate mappings, availability posture, database HA, load
+  path, CDN, egress, and scaling model.
+- Report upgrades: PDF, CSV, and Excel exports now include Solution Architect review
+  and Architecture risk rows in the FinOps Summary section.
+- Tests/checks passing: `npm run format:check`, `npm run ci:lint`,
+  `npm run test:unit`, `npm run build`, `docker compose up -d --build`,
+  `curl -fsS http://localhost:3001/health`, `curl -fsSI http://localhost:3000`,
+  and `npm run test:e2e` against the rebuilt stack.
+- `npm run ci:lint` still reports only the existing 15 API security warnings.
+
 ## Known issues / carried-forward items
 
 Running list. Add here whenever a phase completes with known gaps. Remove an item only

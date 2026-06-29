@@ -40,6 +40,7 @@
   --pc-bg-surface: #ffffff;
   --pc-bg-surface-2: var(--pc-ink-100);
   --pc-border: var(--pc-ink-200);
+  --pc-border-strong: var(--pc-ink-300);
   --pc-text-primary: var(--pc-ink-900);
   --pc-text-secondary: var(--pc-ink-600);
   --pc-text-tertiary: var(--pc-ink-400);
@@ -72,6 +73,7 @@
   --pc-bg-surface: var(--pc-ink-800);
   --pc-bg-surface-2: var(--pc-ink-700);
   --pc-border: var(--pc-ink-700);
+  --pc-border-strong: var(--pc-ink-500);
   --pc-text-primary: var(--pc-ink-50);
   --pc-text-secondary: var(--pc-ink-300);
   --pc-text-tertiary: var(--pc-ink-500);
@@ -1236,6 +1238,7 @@ select:disabled {
 .metric-card,
 .dashboard-panel,
 .executive-decision,
+.solution-architecture,
 .finops-review {
   min-width: 0;
   border: 1px solid color-mix(in srgb, var(--pc-border) 88%, transparent);
@@ -1322,7 +1325,9 @@ select:disabled {
 
 .executive-copy span,
 .confidence-pill span,
-.stakeholder-lens span {
+.stakeholder-lens span,
+.architecture-summary span,
+.architecture-checkpoint span {
   color: var(--pc-text-secondary);
   font-size: var(--pc-text-xs);
   font-weight: 800;
@@ -1338,7 +1343,9 @@ select:disabled {
 }
 
 .executive-copy p,
-.stakeholder-lens p {
+.stakeholder-lens p,
+.architecture-summary p,
+.architecture-checkpoint p {
   margin: 0;
   color: var(--pc-text-secondary);
   line-height: 1.5;
@@ -1397,7 +1404,7 @@ select:disabled {
 
 .stakeholder-lens-grid {
   grid-column: 1 / -1;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .stakeholder-lens {
@@ -1412,6 +1419,10 @@ select:disabled {
 
 .stakeholder-cto {
   border-top-color: var(--pc-provider-azure);
+}
+
+.stakeholder-solution-architect {
+  border-top-color: var(--pc-provider-gcp-blue);
 }
 
 .stakeholder-finops {
@@ -1450,6 +1461,128 @@ select:disabled {
   display: grid;
   gap: var(--pc-space-2);
   padding: var(--pc-space-2);
+}
+
+.solution-architecture {
+  display: grid;
+  gap: var(--pc-space-2);
+  overflow: hidden;
+  border-top: 4px solid var(--pc-provider-gcp-blue);
+  padding: var(--pc-space-2);
+  background:
+    linear-gradient(
+      140deg,
+      color-mix(in srgb, var(--pc-provider-gcp-soft) 44%, transparent),
+      transparent 42%
+    ),
+    linear-gradient(
+      245deg,
+      color-mix(in srgb, var(--pc-provider-azure-soft) 38%, transparent),
+      transparent 36%
+    ),
+    var(--pc-bg-surface);
+}
+
+.solution-architecture .panel-heading {
+  align-items: start;
+}
+
+.architecture-risk {
+  flex: 0 0 auto;
+  border: 1px solid var(--pc-border);
+  border-radius: 999px;
+  background: var(--pc-bg-surface);
+  padding: 6px 10px;
+  font-size: var(--pc-text-xs);
+}
+
+.architecture-risk-low {
+  color: var(--pc-success);
+}
+
+.architecture-risk-medium {
+  color: var(--pc-warning);
+}
+
+.architecture-risk-high {
+  color: var(--pc-error);
+}
+
+.architecture-risk-pending {
+  color: var(--pc-text-secondary);
+}
+
+.architecture-summary {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.38fr) minmax(0, 1fr);
+  gap: var(--pc-space-2);
+  align-items: start;
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface) 86%, var(--pc-bg-surface-2));
+  padding: var(--pc-space-2);
+}
+
+.architecture-summary div {
+  display: grid;
+  gap: var(--pc-space-0-5);
+  min-width: 0;
+}
+
+.architecture-summary strong {
+  overflow: hidden;
+  font-family: var(--pc-font-display);
+  font-size: var(--pc-text-xl);
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.architecture-summary small {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-sm);
+  font-weight: 800;
+}
+
+.architecture-checkpoint-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--pc-space-1);
+}
+
+.architecture-checkpoint {
+  display: grid;
+  gap: var(--pc-space-0-5);
+  min-width: 0;
+  border: 1px solid var(--pc-border);
+  border-left-width: 4px;
+  border-radius: 8px;
+  background: var(--pc-bg-surface);
+  padding: 12px;
+}
+
+.architecture-checkpoint strong {
+  overflow: hidden;
+  font-family: var(--pc-font-mono);
+  font-size: var(--pc-text-base);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.architecture-checkpoint-good {
+  border-left-color: var(--pc-success);
+}
+
+.architecture-checkpoint-review {
+  border-left-color: var(--pc-warning);
+}
+
+.architecture-checkpoint-risk {
+  border-left-color: var(--pc-error);
+}
+
+.architecture-checkpoint-pending {
+  border-left-color: var(--pc-border-strong);
 }
 
 .finops-review {
@@ -2355,8 +2488,13 @@ select:disabled {
   }
 
   .executive-scoreboard,
-  .stakeholder-lens-grid {
+  .stakeholder-lens-grid,
+  .architecture-checkpoint-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .architecture-summary {
+    grid-template-columns: 1fr;
   }
 
   .provider-fit {
@@ -2428,6 +2566,7 @@ select:disabled {
   .metric-grid,
   .executive-scoreboard,
   .stakeholder-lens-grid,
+  .architecture-checkpoint-grid,
   .finops-metric-grid,
   .finops-advisor-grid,
   .insight-chip-row,

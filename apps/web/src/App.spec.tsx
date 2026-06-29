@@ -426,6 +426,10 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('GCP is the current executive cost baseline');
     expect(text(container)).toContain('CEO');
     expect(text(container)).toContain('CTO');
+    expect(text(container)).toContain('Solution Architect');
+    expect(text(container)).toContain('Architecture Fit Review');
+    expect(text(container)).toContain('Service mapping');
+    expect(text(container)).toContain('Data and network');
     expect(text(container)).toContain('Provider Spend');
     expect(text(container)).toContain('Category Mix');
     expect(text(container)).toContain('FinOps Decision Signals');
