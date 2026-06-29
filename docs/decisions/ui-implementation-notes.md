@@ -38,6 +38,9 @@ Phase 9 implemented these decisions in the Vite/React web app; see
 - Upgrade the structured Form tab from a flat input grid into a sectioned workload
   configurator with live summary chips, suffix inputs, switch-style service toggles,
   and editable storage/database detail fields: complete.
+- Add a catalog-backed Cloud services section that exposes AWS/Azure/GCP equivalents
+  across major service families, labels each family as Priced/Mapped/Roadmap, and
+  carries selected family IDs through NWS `sourceTraceability`: complete.
 - Add a print stylesheet for the on-screen comparison view in addition to generated
   PDF reports: complete.
 - Add accessibility checks for visible focus, keyboard navigation, reduced motion,
@@ -55,6 +58,9 @@ Phase 9 implemented these decisions in the Vite/React web app; see
 - Advanced structured form at desktop `1440x1000` and mobile `390x844`:
   browser-smoked with no form overflow, no form-wide elements, successful Form-mode
   comparison, and enabled exports.
+- Service catalog selector: unit-covered for UI rendering, selected family
+  traceability, and NWS round-trip behavior; browser-smoked with desktop/mobile
+  layout checks.
 - No provider column reorders when a different provider is cheapest: covered.
 - Export buttons have equal visual weight for PDF, CSV, and Excel: implemented and
   covered through app interaction tests.

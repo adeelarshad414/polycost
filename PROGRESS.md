@@ -661,6 +661,41 @@ compare`; anonymous UI no longer calls the admin-only pricing-status endpoint; a
 - Checkpoint: advanced form UX polish is complete. Continue Phase 10 acceptance work
   from the upgraded structured-form workflow.
 
+## Post-Phase 9 multi-cloud service portfolio expansion
+
+**Status:** Complete
+**Date:** 2026-06-29
+
+- Frontend upgrades: added a catalog-backed Cloud services section with 51
+  AWS/Azure/GCP service families across compute, containers, application platforms,
+  storage, databases, analytics, AI/ML, integration, networking, security,
+  operations, DevOps, migration, edge/hybrid, and business services.
+- Coverage model: service families are labeled as `Priced`, `Mapped`, or `Roadmap`.
+  The V1 estimator remains decision-grade for currently priced families; the catalog
+  now exposes broader provider portfolio coverage without claiming every cloud SKU is
+  fully priced.
+- NWS integration: selected service family IDs round-trip through
+  `sourceTraceability` as `serviceCatalog:*` references, so future backend pricing
+  work can consume the selected portfolio without changing the form contract again.
+- Runtime verification: rebuilt the Docker web image and browser-smoked
+  `http://localhost:3000` at desktop `1440x1000` and mobile `390x844`. Desktop
+  verified 15 categories, 51 service families, 7 default selections, priced/mapped/
+  roadmap badges, visible AWS/Azure/GCP service equivalents, no catalog or page
+  overflow, a successful Form-mode comparison after selecting Generative AI, stable
+  provider order, and enabled PDF/CSV/Excel exports. Mobile verified one-column
+  catalog stats/cards, no page or catalog overflow, no internal service-list scroll,
+  and no console errors.
+- Tests/checks passing: `npm run format:check`, `npm run ci:lint`,
+  `npm run test:unit`, `npm run test:coverage --workspace @polycost/web`,
+  `npm run build`, Docker Compose web rebuild/start, `docker compose ps`,
+  `curl -fsSI http://localhost:3000`, `curl -fsS http://localhost:3001/health`,
+  and browser responsive service-catalog smoke. `npm run ci:lint` still reports only
+  the existing 15 API security warnings.
+- Coverage note: web workspace coverage is 95.4% statements, 86.56% branches,
+  96.13% functions, and 95.21% lines.
+- Checkpoint: multi-cloud service portfolio expansion is complete. Continue Phase 10
+  acceptance work from the broader catalog-backed structured form.
+
 ## Phase 10 - E2E verification against MVP acceptance criteria
 
 **Status:** Not started

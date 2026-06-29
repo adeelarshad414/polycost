@@ -71,6 +71,10 @@ export interface NormalizedWorkloadSpec {
     multiRegion: boolean;
     slaTarget?: string;
   };
+  sourceTraceability?: Array<{
+    nwsPath: string;
+    sourceRef: string;
+  }>;
 }
 
 export interface ParsedNwsDraft {

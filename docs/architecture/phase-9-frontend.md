@@ -15,6 +15,9 @@ export the finished comparison.
 - `apps/web/src/workload.ts` maps the editable structured form to and from the
   Normalized Workload Specification. Parsed natural-language drafts are converted
   into the same form state before comparison.
+- `apps/web/src/service-catalog.ts` defines the frontend service-family catalog used
+  to map AWS, Azure, and GCP product portfolios into cloud-neutral selectable
+  families. Selected families are persisted through NWS `sourceTraceability`.
 - `apps/web/src/theme.ts` resolves and persists Light/Dark/System choices.
 - `apps/web/src/types.ts` keeps the frontend copies of the V1 API and NWS response
   shapes used by the UI.
@@ -53,10 +56,17 @@ segmented controls, card-style line items, framed chart/table panels, and respon
 spacing rules that keep the summary rail sticky only where there is enough room.
 
 The structured Form tab is a sectioned workload configurator rather than a flat input
-grid. It groups Workload, Compute, Services, Data, and Network inputs, shows live
-traffic/compute/scale/data summary chips, uses switch-style service toggles, and
-surfaces storage role, storage access pattern, database role, and database
-high-availability fields that map into the same NWS form state.
+grid. It groups Workload, Compute, Services, Cloud services, Data, and Network inputs,
+shows live traffic/compute/scale/portfolio/data summary chips, uses switch-style
+service toggles, and surfaces storage role, storage access pattern, database role,
+and database high-availability fields that map into the same NWS form state.
+
+The Cloud services section covers a broad AWS/Azure/GCP service-family portfolio
+across compute, containers, app platforms, storage, databases, analytics, AI/ML,
+integration, networking, security, operations, DevOps, migration, edge/hybrid, and
+business services. Each family shows provider equivalents and a support badge:
+`Priced` for V1 estimator-backed families, `Mapped` for normalized equivalents, and
+`Roadmap` for catalog coverage that still needs pricing-engine implementation.
 
 The app uses native form controls, semantic regions, labelled comparison sections,
 visible focus states, and reduced-motion CSS. Provider line items include aria labels

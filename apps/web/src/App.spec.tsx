@@ -42,9 +42,21 @@ describe('App', () => {
 
     expect(text(container)).toContain('Traffic');
     expect(text(container)).toContain('Services');
+    expect(text(container)).toContain('Cloud services');
+    expect(text(container)).toContain('Virtual machines');
+    expect(text(container)).toContain('Generative AI');
+    expect(text(container)).toContain('Mapped / roadmap');
     expect(text(container)).toContain('Network');
     expect(client.validateWorkload).toHaveBeenCalledWith(
-      expect.objectContaining({ schemaVersion: '1.0' }),
+      expect.objectContaining({
+        schemaVersion: '1.0',
+        sourceTraceability: expect.arrayContaining([
+          {
+            nwsPath: 'metadata.serviceCatalog',
+            sourceRef: 'serviceCatalog:vm-compute',
+          },
+        ]),
+      }),
     );
     expect(client.createComparison).toHaveBeenCalled();
     expect(text(container)).toContain('Comparison ready.');
@@ -78,6 +90,7 @@ describe('App', () => {
     await changeSelect(selectById(container, 'scaling'), 'autoscaling');
     await changeInput(inputById(container, 'scale-min'), '2');
     await changeInput(inputById(container, 'scale-max'), '8');
+    await click(serviceFamilyCheckboxByLabel(container, 'Generative AI'));
     await click(checkboxByLabel(container, 'CDN'));
     await click(checkboxByLabel(container, 'Load balancer'));
     await click(checkboxByLabel(container, 'Multi-region'));
@@ -117,6 +130,12 @@ describe('App', () => {
             role: 'orders',
           }),
         ],
+        sourceTraceability: expect.arrayContaining([
+          {
+            nwsPath: 'metadata.serviceCatalog',
+            sourceRef: 'serviceCatalog:generative-ai',
+          },
+        ]),
       }),
     );
     expect(client.refreshLiveComparison).toHaveBeenCalledWith(comparisonResult.comparisonId);
@@ -394,6 +413,19 @@ function checkboxByLabel(container: HTMLElement, label: string): HTMLInputElemen
 
   if (!(input instanceof HTMLInputElement)) {
     throw new Error(`Checkbox not found: ${label}`);
+  }
+
+  return input;
+}
+
+function serviceFamilyCheckboxByLabel(container: HTMLElement, label: string): HTMLInputElement {
+  const field = Array.from(container.querySelectorAll('.service-family-card')).find((candidate) =>
+    candidate.textContent?.includes(label),
+  );
+  const input = field?.querySelector('input');
+
+  if (!(input instanceof HTMLInputElement)) {
+    throw new Error(`Service family not found: ${label}`);
   }
 
   return input;

@@ -1,5 +1,14 @@
 import { FormEvent, ReactNode, useEffect, useState } from 'react';
 import { formatApiError, PolyCostClient, PolyCostApiError, polyCostClient } from './api-client';
+import {
+  CLOUD_SERVICE_CATALOG,
+  SERVICE_CATALOG_CATEGORIES,
+  type CloudServiceFamily,
+  type ServiceSupportStatus,
+  orderedServiceFamilyIds,
+  serviceCatalogTraceability,
+  supportLabel,
+} from './service-catalog';
 import { applyTheme, storedTheme, ThemeChoice } from './theme';
 import {
   ComparisonProviderResult,
@@ -22,7 +31,7 @@ import {
 type InputMode = 'describe' | 'form';
 type BusyAction = 'parse' | 'compare' | 'refresh' | 'export' | null;
 type ServiceCategory = ComparisonProviderResult['lineItems'][number]['category'];
-type FormSectionTone = 'profile' | 'compute' | 'services' | 'data' | 'network';
+type FormSectionTone = 'profile' | 'compute' | 'services' | 'portfolio' | 'data' | 'network';
 type ToggleIconKind = 'storage' | 'database' | 'cdn' | 'loadBalancer' | 'multiAz' | 'multiRegion';
 
 const SERVICE_CATEGORIES: ServiceCategory[] = ['compute', 'storage', 'database', 'network'];
@@ -110,11 +119,17 @@ export function App({ client = polyCostClient }: AppProps) {
     }
 
     const parsed = await client.parseWorkload(naturalLanguageInput);
-    setForm(formFromNws(parsed.draftNws));
+    const parsedForm = formFromNws(parsed.draftNws);
+    setForm(parsedForm);
     setInputMode('form');
 
     return {
-      nws: parsed.draftNws,
+      nws: {
+        ...parsed.draftNws,
+        sourceTraceability:
+          parsed.draftNws.sourceTraceability ??
+          serviceCatalogTraceability(parsedForm.selectedServiceFamilyIds),
+      },
       parserNotice: reviewMessage(parsed.parserConfidence, parsed.fieldsRequiringReview),
     };
   }
@@ -340,6 +355,18 @@ function WorkloadForm({
     });
   }
 
+  function toggleServiceFamily(id: string) {
+    const selected = new Set(form.selectedServiceFamilyIds);
+
+    if (selected.has(id)) {
+      selected.delete(id);
+    } else {
+      selected.add(id);
+    }
+
+    update('selectedServiceFamilyIds', orderedServiceFamilyIds([...selected]));
+  }
+
   const sizingSummary = formSizingSummary(form);
 
   return (
@@ -348,6 +375,7 @@ function WorkloadForm({
         <FormSummaryChip label="Traffic" value={sizingSummary.traffic} tone="profile" />
         <FormSummaryChip label="Compute" value={sizingSummary.compute} tone="compute" />
         <FormSummaryChip label="Scale" value={sizingSummary.scale} tone="services" />
+        <FormSummaryChip label="Portfolio" value={sizingSummary.services} tone="portfolio" />
         <FormSummaryChip label="Data" value={sizingSummary.data} tone="data" />
       </div>
 
@@ -485,6 +513,13 @@ function WorkloadForm({
             onChange={(checked) => update('multiRegion', checked)}
           />
         </div>
+      </FormSection>
+
+      <FormSection title="Cloud services" tone="portfolio">
+        <ServiceCatalogPicker
+          selectedIds={form.selectedServiceFamilyIds}
+          onToggle={toggleServiceFamily}
+        />
       </FormSection>
 
       <FormSection title="Data" tone="data">
@@ -751,6 +786,139 @@ function CheckboxField({
   );
 }
 
+function ServiceCatalogPicker({
+  selectedIds,
+  onToggle,
+}: {
+  selectedIds: string[];
+  onToggle: (id: string) => void;
+}) {
+  const selected = new Set(selectedIds);
+  const selectedFamilies = CLOUD_SERVICE_CATALOG.filter((service) => selected.has(service.id));
+  const selectedPriced = selectedFamilies.filter((service) => service.supportStatus === 'priced');
+  const selectedMapped = selectedFamilies.filter((service) => service.supportStatus === 'mapped');
+  const selectedRoadmap = selectedFamilies.filter((service) => service.supportStatus === 'roadmap');
+
+  return (
+    <div className="service-catalog" aria-label="AWS Azure GCP service catalog">
+      <div className="service-catalog-stats" aria-label="Service catalog summary">
+        <ServiceCatalogStat label="Families" value={String(CLOUD_SERVICE_CATALOG.length)} />
+        <ServiceCatalogStat
+          label="Selected"
+          value={String(selectedFamilies.length)}
+          tone="selected"
+        />
+        <ServiceCatalogStat label="Priced" value={String(selectedPriced.length)} tone="priced" />
+        <ServiceCatalogStat
+          label="Mapped / roadmap"
+          value={`${selectedMapped.length} / ${selectedRoadmap.length}`}
+          tone="mapped"
+        />
+      </div>
+
+      <div className="service-category-list">
+        {SERVICE_CATALOG_CATEGORIES.map((category) => {
+          const families = CLOUD_SERVICE_CATALOG.filter(
+            (service) => service.categoryId === category.id,
+          );
+          const selectedCount = families.filter((service) => selected.has(service.id)).length;
+          const headingId = `service-category-${category.id}`;
+
+          return (
+            <section
+              key={category.id}
+              className="service-category-panel"
+              aria-labelledby={headingId}
+            >
+              <div className="service-category-heading">
+                <h4 id={headingId}>{category.label}</h4>
+                <span>
+                  {selectedCount}/{families.length}
+                </span>
+              </div>
+              <div className="service-family-grid">
+                {families.map((family) => (
+                  <ServiceFamilyCard
+                    key={family.id}
+                    family={family}
+                    checked={selected.has(family.id)}
+                    onToggle={onToggle}
+                  />
+                ))}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ServiceCatalogStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: 'selected' | 'priced' | 'mapped';
+}) {
+  return (
+    <div className={tone ? `service-stat service-stat-${tone}` : 'service-stat'}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function ServiceFamilyCard({
+  family,
+  checked,
+  onToggle,
+}: {
+  family: CloudServiceFamily;
+  checked: boolean;
+  onToggle: (id: string) => void;
+}) {
+  return (
+    <label className={`service-family-card service-family-card-${family.supportStatus}`}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={() => onToggle(family.id)}
+        aria-label={family.label}
+      />
+      <span className="service-family-header">
+        <span className="service-family-title">{family.label}</span>
+        <SupportBadge status={family.supportStatus} />
+      </span>
+      <span className="provider-service-map">
+        {PROVIDER_ORDER.map((providerId) => (
+          <span key={providerId} className={`provider-service-row provider-service-${providerId}`}>
+            <strong>{providerLabel(providerId)}</strong>
+            <span>{providerServicesForFamily(family, providerId).join(', ')}</span>
+          </span>
+        ))}
+      </span>
+    </label>
+  );
+}
+
+function providerServicesForFamily(family: CloudServiceFamily, providerId: ProviderId): string[] {
+  switch (providerId) {
+    case 'aws':
+      return family.providerServices.aws;
+    case 'azure':
+      return family.providerServices.azure;
+    case 'gcp':
+      return family.providerServices.gcp;
+  }
+}
+
+function SupportBadge({ status }: { status: ServiceSupportStatus }) {
+  return <span className={`support-badge support-badge-${status}`}>{supportLabel(status)}</span>;
+}
+
 function FormSectionIcon({ tone }: { tone: FormSectionTone }) {
   return (
     <svg className="form-icon-svg" viewBox="0 0 24 24" focusable="false">
@@ -760,6 +928,8 @@ function FormSectionIcon({ tone }: { tone: FormSectionTone }) {
         <path d="M8 4v3M16 4v3M8 17v3M16 17v3M4 8h3M17 8h3M4 16h3M17 16h3M8 8h8v8H8z" />
       ) : tone === 'services' ? (
         <path d="M6 8h12M8 5h8M8 19h8M6 16h12M5 8v8M19 8v8" />
+      ) : tone === 'portfolio' ? (
+        <path d="M4 7h7v7H4zM13 5h7v7h-7zM12 16h8v3h-8zM4 18h5M7 14v7" />
       ) : tone === 'data' ? (
         <path d="M5 7c0-1.7 3.1-3 7-3s7 1.3 7 3-3.1 3-7 3-7-1.3-7-3zM5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5" />
       ) : (
@@ -791,7 +961,7 @@ function ToggleIcon({ icon }: { icon: ToggleIconKind }) {
 
 function formSizingSummary(
   form: WorkloadFormState,
-): Record<'traffic' | 'compute' | 'scale' | 'data', string> {
+): Record<'traffic' | 'compute' | 'scale' | 'services' | 'data', string> {
   const dailyUsers = formatCompactInput(form.dailyActiveUsers);
   const peakUsers = formatCompactInput(form.peakConcurrentUsers);
   const vcpu = parseFormNumber(form.vcpu) ?? 0;
@@ -813,6 +983,7 @@ function formSizingSummary(
       form.scalingType === 'autoscaling'
         ? `${formatDecimal(scaleMin)}-${formatDecimal(scaleMax)} nodes`
         : `${formatDecimal(instances)} fixed`,
+    services: `${form.selectedServiceFamilyIds.length}/${CLOUD_SERVICE_CATALOG.length} families`,
     data: `${storageText} / ${databaseText}`,
   };
 }
@@ -863,6 +1034,12 @@ function RequirementSummary({ form }: { form: WorkloadFormState }) {
         <span className="summary-label">Compute</span>
         <strong>
           {form.instanceCount} x {form.vcpu} vCPU
+        </strong>
+      </div>
+      <div>
+        <span className="summary-label">Portfolio</span>
+        <strong>
+          {form.selectedServiceFamilyIds.length}/{CLOUD_SERVICE_CATALOG.length} families
         </strong>
       </div>
       <div>

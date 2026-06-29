@@ -1,4 +1,5 @@
 import { applyTheme, resolveTheme, storedTheme, THEME_STORAGE_KEY } from './theme';
+import { DEFAULT_SELECTED_SERVICE_FAMILY_IDS } from './service-catalog';
 import { NormalizedWorkloadSpec } from './types';
 import { buildNwsFromForm, defaultWorkloadForm, formFromNws } from './workload';
 
@@ -35,6 +36,14 @@ describe('workload helpers', () => {
       loadBalancer: true,
       estimatedMonthlyEgressGb: 750,
     });
+    expect(nws.sourceTraceability).toContainEqual({
+      nwsPath: 'metadata.serviceCatalog',
+      sourceRef: 'serviceCatalog:vm-compute',
+    });
+    expect(nws.sourceTraceability).toContainEqual({
+      nwsPath: 'metadata.serviceCatalog',
+      sourceRef: 'serviceCatalog:object-storage',
+    });
   });
 
   it('maps an NWS back into editable form values', () => {
@@ -45,6 +54,26 @@ describe('workload helpers', () => {
     expect(form.regionPreference).toBe(defaultWorkloadForm.regionPreference);
     expect(form.dailyActiveUsers).toBe(defaultWorkloadForm.dailyActiveUsers);
     expect(form.databaseEngine).toBe(defaultWorkloadForm.databaseEngine);
+    expect(form.selectedServiceFamilyIds).toEqual(DEFAULT_SELECTED_SERVICE_FAMILY_IDS);
+  });
+
+  it('round-trips selected cloud service families through NWS traceability', () => {
+    const nws = buildNwsFromForm({
+      ...defaultWorkloadForm,
+      selectedServiceFamilyIds: ['generative-ai', 'data-warehouse', 'unknown-family'],
+    });
+
+    expect(nws.sourceTraceability).toEqual([
+      {
+        nwsPath: 'metadata.serviceCatalog',
+        sourceRef: 'serviceCatalog:data-warehouse',
+      },
+      {
+        nwsPath: 'metadata.serviceCatalog',
+        sourceRef: 'serviceCatalog:generative-ai',
+      },
+    ]);
+    expect(formFromNws(nws).selectedServiceFamilyIds).toEqual(['data-warehouse', 'generative-ai']);
   });
 
   it('omits optional resources and falls back safely for sparse values', () => {

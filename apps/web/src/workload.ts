@@ -1,4 +1,9 @@
 import { NormalizedWorkloadSpec } from './types';
+import {
+  DEFAULT_SELECTED_SERVICE_FAMILY_IDS,
+  serviceCatalogTraceability,
+  serviceFamilyIdsFromTraceability,
+} from './service-catalog';
 
 export type WorkloadType = NormalizedWorkloadSpec['workload']['type'];
 export type StorageType = NormalizedWorkloadSpec['storage'][number]['type'];
@@ -30,6 +35,7 @@ export interface WorkloadFormState {
   monthlyEgressGb: string;
   cdn: boolean;
   loadBalancer: boolean;
+  selectedServiceFamilyIds: string[];
   multiAz: boolean;
   multiRegion: boolean;
   slaTarget: string;
@@ -64,6 +70,7 @@ export const defaultWorkloadForm: WorkloadFormState = {
   monthlyEgressGb: '750',
   cdn: true,
   loadBalancer: true,
+  selectedServiceFamilyIds: DEFAULT_SELECTED_SERVICE_FAMILY_IDS,
   multiAz: true,
   multiRegion: false,
   slaTarget: '99.9%',
@@ -140,6 +147,7 @@ export function buildNwsFromForm(
       multiRegion: form.multiRegion,
       ...(form.slaTarget.trim() ? { slaTarget: form.slaTarget.trim() } : {}),
     },
+    sourceTraceability: serviceCatalogTraceability(form.selectedServiceFamilyIds),
   };
 }
 
@@ -176,6 +184,7 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
     monthlyEgressGb: numberToInput(nws.network.estimatedMonthlyEgressGb),
     cdn: nws.network.cdn,
     loadBalancer: nws.network.loadBalancer,
+    selectedServiceFamilyIds: serviceFamilyIdsFromTraceability(nws.sourceTraceability),
     multiAz: nws.availability.multiAz,
     multiRegion: nws.availability.multiRegion,
     slaTarget: nws.availability.slaTarget ?? '',
