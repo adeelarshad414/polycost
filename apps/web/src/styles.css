@@ -1235,6 +1235,7 @@ select:disabled {
 
 .metric-card,
 .dashboard-panel,
+.executive-decision,
 .finops-review {
   min-width: 0;
   border: 1px solid color-mix(in srgb, var(--pc-border) 88%, transparent);
@@ -1289,6 +1290,144 @@ select:disabled {
 
 .metric-gcp {
   border-top-color: var(--pc-provider-gcp);
+}
+
+.executive-decision {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.95fr) minmax(360px, 1.05fr);
+  gap: var(--pc-space-2);
+  overflow: hidden;
+  border-top: 4px solid var(--pc-brand-accent);
+  padding: var(--pc-space-2);
+  background:
+    linear-gradient(
+      115deg,
+      color-mix(in srgb, var(--pc-provider-aws-soft) 56%, transparent),
+      transparent 32%
+    ),
+    linear-gradient(
+      245deg,
+      color-mix(in srgb, var(--pc-provider-gcp-soft) 48%, transparent),
+      transparent 30%
+    ),
+    var(--pc-bg-surface);
+}
+
+.executive-copy {
+  display: grid;
+  align-content: center;
+  gap: var(--pc-space-1);
+  min-width: 0;
+}
+
+.executive-copy span,
+.confidence-pill span,
+.stakeholder-lens span {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.executive-copy h3 {
+  margin: 0;
+  font-family: var(--pc-font-display);
+  font-size: clamp(1.35rem, 2vw, 2rem);
+  line-height: 1.1;
+}
+
+.executive-copy p,
+.stakeholder-lens p {
+  margin: 0;
+  color: var(--pc-text-secondary);
+  line-height: 1.5;
+}
+
+.executive-scoreboard,
+.stakeholder-lens-grid {
+  display: grid;
+  gap: var(--pc-space-1);
+}
+
+.executive-scoreboard {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.confidence-pill,
+.stakeholder-lens {
+  display: grid;
+  min-width: 0;
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface) 88%, var(--pc-bg-surface-2));
+}
+
+.confidence-pill {
+  gap: var(--pc-space-0-5);
+  border-top: 4px solid var(--pc-warning);
+  padding: 12px;
+}
+
+.confidence-high {
+  border-top-color: var(--pc-success);
+}
+
+.confidence-medium {
+  border-top-color: var(--pc-warning);
+}
+
+.confidence-low,
+.confidence-pending {
+  border-top-color: var(--pc-border-strong);
+}
+
+.confidence-pill strong {
+  font-family: var(--pc-font-display);
+  font-size: var(--pc-text-lg);
+}
+
+.confidence-pill small,
+.stakeholder-lens small {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-sm);
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.stakeholder-lens-grid {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.stakeholder-lens {
+  gap: var(--pc-space-0-5);
+  border-top: 4px solid var(--pc-brand-accent);
+  padding: 12px;
+}
+
+.stakeholder-ceo {
+  border-top-color: var(--pc-provider-aws);
+}
+
+.stakeholder-cto {
+  border-top-color: var(--pc-provider-azure);
+}
+
+.stakeholder-finops {
+  border-top-color: var(--pc-provider-gcp);
+}
+
+.stakeholder-cloud {
+  border-top-color: var(--pc-provider-gcp-blue);
+}
+
+.stakeholder-lens strong {
+  overflow: hidden;
+  font-family: var(--pc-font-mono);
+  font-size: var(--pc-text-base);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dashboard-grid {
@@ -2168,6 +2307,7 @@ select:disabled {
 @media (max-width: 1023px) {
   .app-header,
   .workbench,
+  .executive-decision,
   .decision-brief,
   .dashboard-grid,
   .analysis-grid,
@@ -2211,6 +2351,11 @@ select:disabled {
   }
 
   .finops-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .executive-scoreboard,
+  .stakeholder-lens-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -2281,6 +2426,8 @@ select:disabled {
   .service-catalog-stats,
   .service-family-grid,
   .metric-grid,
+  .executive-scoreboard,
+  .stakeholder-lens-grid,
   .finops-metric-grid,
   .finops-advisor-grid,
   .insight-chip-row,

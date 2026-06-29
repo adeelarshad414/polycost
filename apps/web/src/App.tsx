@@ -54,6 +54,7 @@ interface ProviderCostSummary {
 }
 
 interface FinOpsReview {
+  executiveDecision: ExecutiveDecision;
   monthlyLowest?: ProviderCostSummary;
   yearlyLowest?: ProviderCostSummary;
   monthlySpread?: number;
@@ -62,8 +63,26 @@ interface FinOpsReview {
   dominantCategoryProvider?: ProviderId;
   approximateCount: number;
   lineItemCount: number;
+  pricedProviderCount: number;
   providerFit: ProviderFitSummary[];
   recommendations: string[];
+}
+
+interface ExecutiveDecision {
+  headline: string;
+  subhead: string;
+  confidence: 'High' | 'Medium' | 'Low' | 'Pending';
+  confidenceDetail: string;
+  annualExposure?: number;
+  avoidableAnnualSpend?: number;
+  lenses: ExecutiveLens[];
+}
+
+interface ExecutiveLens {
+  role: 'CEO' | 'CTO' | 'FinOps' | 'Cloud';
+  label: string;
+  value: string;
+  detail: string;
 }
 
 interface ProviderFitSummary {
@@ -1381,6 +1400,8 @@ function CostDashboard({
 
   return (
     <section className="cost-dashboard" aria-label="Cost dashboard">
+      <ExecutiveDecisionPanel decision={finOpsReview.executiveDecision} />
+
       <div className="metric-grid">
         <MetricCard
           label="Lowest"
@@ -1475,6 +1496,58 @@ function CostDashboard({
         <ProviderRanking summaries={summaries} interval={interval} />
         <IntervalOutlook comparison={comparison} />
         <CategoryHeatmap summaries={summaries} />
+      </div>
+    </section>
+  );
+}
+
+function ExecutiveDecisionPanel({ decision }: { decision: ExecutiveDecision }) {
+  return (
+    <section className="executive-decision" aria-label="Executive decision memo">
+      <div className="executive-copy">
+        <span>Executive Memo</span>
+        <h3>{decision.headline}</h3>
+        <p>{decision.subhead}</p>
+      </div>
+
+      <div className="executive-scoreboard">
+        <div className={`confidence-pill confidence-${decision.confidence.toLowerCase()}`}>
+          <span>Confidence</span>
+          <strong>{decision.confidence}</strong>
+          <small>{decision.confidenceDetail}</small>
+        </div>
+        <InsightCard
+          label="Annual exposure"
+          value={
+            decision.annualExposure !== undefined
+              ? formatCurrency(decision.annualExposure)
+              : 'Pending'
+          }
+          detail="Lowest on-demand baseline"
+        />
+        <InsightCard
+          label="Avoidable annual spread"
+          value={
+            decision.avoidableAnnualSpend !== undefined
+              ? formatCurrency(decision.avoidableAnnualSpend)
+              : 'Pending'
+          }
+          detail="Before commitments and discounts"
+        />
+      </div>
+
+      <div className="stakeholder-lens-grid">
+        {decision.lenses.map((lens) => (
+          <div
+            className={`stakeholder-lens stakeholder-${lens.role.toLowerCase()}`}
+            key={lens.role}
+          >
+            <span>{lens.role}</span>
+            <strong>{lens.value}</strong>
+            <small>{lens.label}</small>
+            <p>{lens.detail}</p>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -2150,6 +2223,7 @@ function buildFinOpsReview(
     monthlySpread !== undefined && monthlyLowest?.total !== undefined && monthlyLowest.total > 0
       ? (monthlySpread / monthlyLowest.total) * 100
       : undefined;
+  const pricedProviderCount = monthlyPriced.length;
   const dominantProvider = intervalSummaries.find((summary) => summary.total !== undefined);
   const dominantCategory = dominantProvider?.categoryTotals
     .filter((category) => category.total > 0)
@@ -2164,6 +2238,16 @@ function buildFinOpsReview(
   );
 
   return {
+    executiveDecision: buildExecutiveDecision({
+      approximateCount,
+      dominantCategory,
+      lineItemCount,
+      monthlyLowest,
+      monthlySpread,
+      monthlySpreadPercent,
+      pricedProviderCount,
+      yearlyLowest,
+    }),
     monthlyLowest,
     yearlyLowest,
     monthlySpread,
@@ -2172,6 +2256,7 @@ function buildFinOpsReview(
     dominantCategoryProvider: dominantCategory ? dominantProvider?.providerId : undefined,
     approximateCount,
     lineItemCount,
+    pricedProviderCount,
     providerFit: providerFitSummaries(intervalSummaries, monthlyLowest),
     recommendations: finOpsRecommendations({
       approximateCount,
@@ -2219,6 +2304,155 @@ function providerFitSummaries(
       tone: summary.approximateCount > 0 ? 'review' : 'preferred',
     };
   });
+}
+
+function buildExecutiveDecision({
+  approximateCount,
+  dominantCategory,
+  lineItemCount,
+  monthlyLowest,
+  monthlySpread,
+  monthlySpreadPercent,
+  pricedProviderCount,
+  yearlyLowest,
+}: {
+  approximateCount: number;
+  dominantCategory?: CategoryCostSummary;
+  lineItemCount: number;
+  monthlyLowest?: ProviderCostSummary;
+  monthlySpread?: number;
+  monthlySpreadPercent?: number;
+  pricedProviderCount: number;
+  yearlyLowest?: ProviderCostSummary;
+}): ExecutiveDecision {
+  if (lineItemCount === 0 || !monthlyLowest) {
+    return {
+      headline: 'Run a comparison to create a decision memo',
+      subhead:
+        'PolyCost will translate requirements into a cloud-neutral cost baseline, provider fit, and stakeholder actions.',
+      confidence: 'Pending',
+      confidenceDetail: 'No provider estimates yet',
+      lenses: [
+        {
+          role: 'CEO',
+          label: 'Budget decision',
+          value: 'Pending',
+          detail: 'A comparison is required before the estimate can support budget approval.',
+        },
+        {
+          role: 'CTO',
+          label: 'Architecture decision',
+          value: 'Pending',
+          detail:
+            'Capture availability, data, and scaling assumptions before shortlisting a cloud.',
+        },
+        {
+          role: 'FinOps',
+          label: 'Governance decision',
+          value: 'Pending',
+          detail: 'Use the first estimate to seed budgets, tags, and scenario tracking.',
+        },
+        {
+          role: 'Cloud',
+          label: 'Provider decision',
+          value: 'Pending',
+          detail: 'Validate service equivalence after the workload is normalized.',
+        },
+      ],
+    };
+  }
+
+  const confidence = decisionConfidence(pricedProviderCount, approximateCount);
+  const annualExposure = yearlyLowest?.total;
+  const avoidableAnnualSpend =
+    monthlySpread !== undefined ? roundCurrency(monthlySpread * 12) : undefined;
+  const provider = providerLabel(monthlyLowest.providerId);
+  const driver = dominantCategory ? capitalize(dominantCategory.category) : 'the top category';
+
+  return {
+    headline: `${provider} is the current executive cost baseline`,
+    subhead: [
+      `${provider} leads the on-demand monthly view at ${formatCurrency(monthlyLowest.total ?? 0)}.`,
+      avoidableAnnualSpend !== undefined && avoidableAnnualSpend > 0
+        ? `The annualized spread to the highest estimate is ${formatCurrency(avoidableAnnualSpend)} before commitments or private pricing.`
+        : 'All priced providers are tightly clustered before commitments or private pricing.',
+    ].join(' '),
+    confidence,
+    confidenceDetail: confidenceDetail(confidence, pricedProviderCount, approximateCount),
+    annualExposure,
+    avoidableAnnualSpend,
+    lenses: [
+      {
+        role: 'CEO',
+        label: 'Budget decision',
+        value: annualExposure !== undefined ? formatCurrency(annualExposure) : 'Pending',
+        detail: 'Use as the directional annual budget baseline before vendor negotiation.',
+      },
+      {
+        role: 'CTO',
+        label: 'Architecture decision',
+        value: driver,
+        detail: `Prioritize ${driver.toLowerCase()} sizing, resilience, and managed-service tier review.`,
+      },
+      {
+        role: 'FinOps',
+        label: 'Governance decision',
+        value:
+          monthlySpreadPercent !== undefined
+            ? `${formatPercent(monthlySpreadPercent)} spread`
+            : 'Spread pending',
+        detail: 'Create guardrails for tags, budgets, alerts, and commitment-model scenarios.',
+      },
+      {
+        role: 'Cloud',
+        label: 'Provider decision',
+        value: approximateCount > 0 ? 'Equivalence review' : 'Service fit ready',
+        detail:
+          approximateCount > 0
+            ? 'Validate approximate mappings against AWS, Azure, and GCP managed-service behavior.'
+            : 'Validate regional SKU availability, quotas, and network/data-transfer assumptions.',
+      },
+    ],
+  };
+}
+
+function decisionConfidence(
+  pricedProviderCount: number,
+  approximateCount: number,
+): ExecutiveDecision['confidence'] {
+  if (pricedProviderCount === 0) {
+    return 'Pending';
+  }
+
+  if (pricedProviderCount === 3 && approximateCount === 0) {
+    return 'High';
+  }
+
+  if (pricedProviderCount >= 2) {
+    return 'Medium';
+  }
+
+  return 'Low';
+}
+
+function confidenceDetail(
+  confidence: ExecutiveDecision['confidence'],
+  pricedProviderCount: number,
+  approximateCount: number,
+): string {
+  if (confidence === 'Pending') {
+    return 'No provider estimates yet';
+  }
+
+  if (confidence === 'High') {
+    return 'Three providers priced with exact mappings';
+  }
+
+  if (confidence === 'Medium') {
+    return `${pricedProviderCount}/3 providers priced; ${approximateCount} approximate mappings`;
+  }
+
+  return `${pricedProviderCount}/3 providers priced; validate before sharing`;
 }
 
 function finOpsRecommendations({

@@ -769,6 +769,29 @@ remain carried-forward UI automation work.
   and `npm run test:e2e` against the rebuilt stack.
 - `npm run ci:lint` still reports only the existing 15 API security warnings.
 
+## Post-Phase 10 executive decision memo polish
+
+**Status:** Complete
+**Date:** 2026-06-29
+
+- Dashboard upgrades: added an Executive Decision Memo above the detailed cost
+  analysis so CEO, CTO, FinOps, and cloud-architecture stakeholders can immediately
+  see the recommended baseline, annual exposure, avoidable annual spread, and
+  confidence level.
+- Decision logic: the memo now grades confidence from priced-provider coverage and
+  approximate mappings, then adapts the recommendation copy for complete,
+  partial, high-confidence, and no-price scenarios.
+- Stakeholder lenses: added concise CEO, CTO, FinOps, and cloud follow-up prompts
+  that turn the comparison from a raw calculator into a review-ready decision aid.
+- Report upgrades: PDF, CSV, and Excel exports now include executive
+  recommendation, decision confidence, and annual avoidable spread alongside the
+  existing FinOps summary metrics.
+- Tests/checks passing: `npm run format:check`, `npm run ci:lint`,
+  `npm run test:unit`, `npm run build`, `docker compose up -d --build`,
+  `curl -fsS http://localhost:3001/health`, `curl -fsSI http://localhost:3000`,
+  and `npm run test:e2e` against the rebuilt stack.
+- `npm run ci:lint` still reports only the existing 15 API security warnings.
+
 ## Known issues / carried-forward items
 
 Running list. Add here whenever a phase completes with known gaps. Remove an item only

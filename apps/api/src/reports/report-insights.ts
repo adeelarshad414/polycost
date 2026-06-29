@@ -13,6 +13,8 @@ export function buildReportInsights(result: ComparisonResult): ReportInsight[] {
   const highest = providersByMonthly.at(-1);
   const monthlySpread =
     lowest && highest ? roundCurrency(highest.totals.monthly - lowest.totals.monthly) : undefined;
+  const annualAvoidableSpread =
+    monthlySpread !== undefined ? roundCurrency(monthlySpread * 12) : undefined;
   const dominant = lowest ? dominantCategory(lowest.lineItems) : undefined;
   const approximateLineItems = result.providers.reduce(
     (count, provider) =>
@@ -22,6 +24,16 @@ export function buildReportInsights(result: ComparisonResult): ReportInsight[] {
   const pricedProviders = result.providers.length;
 
   return [
+    {
+      label: 'Executive recommendation',
+      value: lowest
+        ? `${lowest.providerId} is the current cost baseline before commitments`
+        : 'Pending',
+    },
+    {
+      label: 'Decision confidence',
+      value: decisionConfidence(pricedProviders, approximateLineItems),
+    },
     {
       label: 'Lowest monthly run rate',
       value: lowest ? `${lowest.providerId} $${lowest.totals.monthly}` : 'Pending',
@@ -33,6 +45,10 @@ export function buildReportInsights(result: ComparisonResult): ReportInsight[] {
     {
       label: 'Monthly optimization spread',
       value: monthlySpread !== undefined ? `$${monthlySpread}` : 'Pending',
+    },
+    {
+      label: 'Annual avoidable spread',
+      value: annualAvoidableSpread !== undefined ? `$${annualAvoidableSpread}` : 'Pending',
     },
     {
       label: 'Dominant cost driver',
@@ -47,6 +63,22 @@ export function buildReportInsights(result: ComparisonResult): ReportInsight[] {
       value: `${pricedProviders}/3`,
     },
   ];
+}
+
+function decisionConfidence(pricedProviders: number, approximateLineItems: number): string {
+  if (pricedProviders === 0) {
+    return 'Pending - no provider estimates yet';
+  }
+
+  if (pricedProviders === 3 && approximateLineItems === 0) {
+    return 'High - three providers priced with exact mappings';
+  }
+
+  if (pricedProviders >= 2) {
+    return `Medium - ${pricedProviders}/3 providers priced; ${approximateLineItems} approximate mappings`;
+  }
+
+  return `Low - ${pricedProviders}/3 providers priced; validate before sharing`;
 }
 
 function dominantCategory(

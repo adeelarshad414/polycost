@@ -68,7 +68,10 @@ describe('report generators', () => {
 
     expect(csv).toContain('Comparison ID,comparison-123');
     expect(csv).toContain('FinOps Summary');
+    expect(csv).toContain('Executive recommendation,gcp is the current cost baseline');
+    expect(csv).toContain('Decision confidence,Medium - 2/3 providers priced; 1 approximate mappings');
     expect(csv).toContain('Lowest monthly run rate,gcp $20');
+    expect(csv).toContain('Annual avoidable spread,$612');
     expect(csv).toContain('Dominant cost driver,storage $20');
     expect(csv).toContain('aws,2.37,16.59,71,213,852');
     expect(csv).toContain("aws,compute,'=cmd(1)\\risky compute,no,60.8");
@@ -86,6 +89,8 @@ describe('report generators', () => {
     expect(xlsxText).toContain('xl/worksheets/sheet1.xml');
     expect(xlsxText).toContain('<sheet name="Comparison"');
     expect(xlsxText).toContain('FinOps Summary');
+    expect(xlsxText).toContain('Executive recommendation');
+    expect(xlsxText).toContain('Decision confidence');
     expect(xlsxText).toContain('Lowest monthly run rate');
     expect(xlsxText).toContain('<v>71</v>');
     expect(xlsxText).toContain('&apos;=cmd(1)\\risky compute');
@@ -124,6 +129,8 @@ describe('report generators', () => {
     expect(pdf.subarray(0, 8).toString('utf8')).toBe('%PDF-1.4');
     expect(pdfText).toContain('Comparison ID: comparison-123');
     expect(pdfText).toContain('FinOps summary');
+    expect(pdfText).toContain('Executive recommendation: gcp is the current cost baseline');
+    expect(pdfText).toContain('Decision confidence: Medium');
     expect(pdfText).toContain('Lowest monthly run rate: gcp $20');
     expect(pdfText).toContain('aws: daily $2.37, weekly $16.59, monthly $71');
     expect(pdfText).toContain('=cmd\\(1\\)\\\\risky compute');
