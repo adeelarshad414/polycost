@@ -194,6 +194,39 @@ describe('App', () => {
     }
   });
 
+  it('clears requirements input and rendered cost breakdowns', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Clear'));
+
+    expect((container.querySelector('#natural-language-input') as HTMLTextAreaElement).value).toBe(
+      '',
+    );
+    expect(buttonByText(container, 'Clear').disabled).toBe(true);
+
+    await click(buttonByText(container, 'Sample'));
+
+    expect(
+      (container.querySelector('#natural-language-input') as HTMLTextAreaElement).value.length,
+    ).toBeGreaterThan(0);
+
+    await click(buttonByText(container, 'Form'));
+    await click(buttonByText(container, 'Compare'));
+
+    expect(text(container)).toContain('Comparison ready.');
+    expect(buttonByText(container, 'Refresh live').disabled).toBe(false);
+    expect(buttonByText(container, 'PDF').disabled).toBe(false);
+
+    await click(buttonByText(container, 'Clear costs'));
+
+    expect(text(container)).toContain('Ready to compare');
+    expect(buttonByText(container, 'Refresh live').disabled).toBe(true);
+    expect(buttonByText(container, 'PDF').disabled).toBe(true);
+
+    unmount();
+  });
+
   it('supports form edits, theme changes, interval changes, refresh, and export', async () => {
     const client = clientMock();
     const { container, unmount } = render(<App client={client} />);

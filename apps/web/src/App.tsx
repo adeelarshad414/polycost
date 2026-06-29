@@ -177,6 +177,20 @@ export function App({ client = polyCostClient }: AppProps) {
     }
   }
 
+  function handleClearRequirements() {
+    setNaturalLanguageInput('');
+    setNotice(null);
+    setError(null);
+  }
+
+  function handleClearComparison() {
+    setComparison(null);
+    setInterval('monthly');
+    setExportingFormat(null);
+    setNotice(null);
+    setError(null);
+  }
+
   return (
     <main className="app-shell" aria-labelledby="page-title">
       <ScrollProgressBar />
@@ -212,6 +226,7 @@ export function App({ client = polyCostClient }: AppProps) {
               value={naturalLanguageInput}
               isParsing={busyAction === 'parse'}
               onChange={setNaturalLanguageInput}
+              onClear={handleClearRequirements}
               onParse={handleParse}
               onUseSample={() => setNaturalLanguageInput(sampleNaturalLanguageInput)}
             />
@@ -243,6 +258,15 @@ export function App({ client = polyCostClient }: AppProps) {
             >
               {busyAction === 'refresh' ? <LoadingSpinner /> : <RefreshIcon />}
               Refresh live
+            </button>
+            <button
+              type="button"
+              className="pc-button pc-button-secondary"
+              onClick={handleClearComparison}
+              disabled={!comparison || busyAction !== null}
+            >
+              <ClearIcon />
+              Clear costs
             </button>
           </div>
 
@@ -344,12 +368,14 @@ function DescribePanel({
   value,
   isParsing,
   onChange,
+  onClear,
   onParse,
   onUseSample,
 }: {
   value: string;
   isParsing: boolean;
   onChange: (value: string) => void;
+  onClear: () => void;
   onParse: () => void;
   onUseSample: () => void;
 }) {
@@ -377,6 +403,15 @@ function DescribePanel({
         <button type="button" className="pc-button pc-button-secondary" onClick={onUseSample}>
           <SampleIcon />
           Sample
+        </button>
+        <button
+          type="button"
+          className="pc-button pc-button-secondary"
+          onClick={onClear}
+          disabled={isParsing || value.length === 0}
+        >
+          <ClearIcon />
+          Clear
         </button>
       </div>
     </div>
@@ -1851,6 +1886,14 @@ function DownloadIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon">
       <path d="M12 4v10M8 10l4 4 4-4M5 20h14" />
+    </svg>
+  );
+}
+
+function ClearIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon">
+      <path d="M6 6l12 12M18 6 6 18" />
     </svg>
   );
 }
