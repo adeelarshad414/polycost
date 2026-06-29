@@ -144,6 +144,128 @@ describe('ApiDatabaseRepository', () => {
       ],
     });
   });
+
+  it('creates normalized workload records through the app DB role', async () => {
+    const repository = createRepository(
+      jest.fn(async () => ({
+        rows: [
+          {
+            id: '22222222-2222-4222-8222-222222222222',
+            instance_family: 'general-purpose',
+            vcpu: 4,
+            memory_gb: '16',
+            region: 'us-east',
+            instance_count: 2,
+            hours_per_month: '730',
+            storage_gb: '500',
+            storage_tier: 'standard',
+            egress_gb_per_month: '1200',
+            created_at: new Date('2026-06-29T00:00:00.000Z'),
+            updated_at: new Date('2026-06-29T00:00:00.000Z'),
+          },
+        ],
+        rowCount: 1,
+      })),
+    );
+
+    await expect(
+      repository.createWorkload({
+        instanceFamily: 'general-purpose',
+        vcpu: 4,
+        memoryGb: 16,
+        region: 'us-east',
+        instanceCount: 2,
+        hoursPerMonth: 730,
+        storageGb: 500,
+        storageTier: 'standard',
+        egressGbPerMonth: 1200,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        instanceFamily: 'general-purpose',
+        memoryGb: 16,
+        region: 'us-east',
+      }),
+    );
+  });
+
+  it('compares normalized cached pricing across canonical provider regions', async () => {
+    const query = jest.fn(async () => ({
+      rows: [
+        {
+          provider: 'aws',
+          provider_sku_id: 'm7i.xlarge',
+          sku_id: '33333333-3333-4333-8333-333333333333',
+          price_per_hour: '0.19200000',
+          term: 'on_demand',
+          region: 'us-east-1',
+          currency: 'USD',
+          effective_date: new Date('2026-06-29T00:00:00.000Z'),
+        },
+      ],
+      rowCount: 1,
+    }));
+    const repository = createRepository(query);
+
+    await expect(
+      repository.compareCachedPricing({
+        instanceFamily: 'general-purpose',
+        vcpu: 4,
+        memoryGb: 16,
+        region: 'us-east',
+        term: 'on_demand',
+      }),
+    ).resolves.toEqual([
+      {
+        provider: 'aws',
+        providerSkuId: 'm7i.xlarge',
+        skuId: '33333333-3333-4333-8333-333333333333',
+        pricePerHour: 0.192,
+        term: 'on_demand',
+        region: 'us-east-1',
+        currency: 'USD',
+        effectiveDate: '2026-06-29T00:00:00.000Z',
+      },
+    ]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('FROM requested_regions'), [
+      'general-purpose',
+      4,
+      16,
+      'us-east-1',
+      'eastus',
+      'us-east1',
+      'on_demand',
+    ]);
+  });
+
+  it('returns cached exchange rates keyed by quote currency', async () => {
+    const repository = createRepository(
+      jest.fn(async () => ({
+        rows: [
+          {
+            quote_currency: 'EUR',
+            rate: '0.93000000',
+            fetched_at: new Date('2026-06-29T00:00:00.000Z'),
+          },
+          {
+            quote_currency: 'PKR',
+            rate: '278.00000000',
+            fetched_at: new Date('2026-06-29T01:00:00.000Z'),
+          },
+        ],
+        rowCount: 2,
+      })),
+    );
+
+    await expect(repository.getExchangeRates('USD')).resolves.toEqual({
+      base: 'USD',
+      lastUpdated: '2026-06-29T01:00:00.000Z',
+      rates: {
+        EUR: 0.93,
+        PKR: 278,
+      },
+    });
+  });
 });
 
 function createRepository(query: jest.Mock): ApiDatabaseRepository {

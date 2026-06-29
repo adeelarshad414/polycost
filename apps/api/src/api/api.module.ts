@@ -12,6 +12,16 @@ import { ApiExceptionFilter } from './api-exception.filter';
 import { ApiRateLimitService } from './rate-limit.service';
 import { ComparisonApplicationService } from './comparison-application.service';
 import { ComparisonsController } from './comparisons.controller';
+import {
+  AlertsController,
+  BudgetsController,
+  CachedPricingController,
+  ExchangeRatesController,
+  SharedReportsController,
+  ShareLinksController,
+  WorkloadsController,
+} from './cost-management.controller';
+import { CostManagementService } from './cost-management.service';
 import { PricingStatusController } from './pricing-status.controller';
 import { RegionsController } from './regions.controller';
 import { RegionsService } from './regions.service';
@@ -24,6 +34,13 @@ import { WorkloadController } from './workload.controller';
     ComparisonsController,
     PricingStatusController,
     RegionsController,
+    CachedPricingController,
+    WorkloadsController,
+    BudgetsController,
+    AlertsController,
+    ShareLinksController,
+    SharedReportsController,
+    ExchangeRatesController,
   ],
   providers: [
     SecretsService,
@@ -39,6 +56,12 @@ import { WorkloadController } from './workload.controller';
     },
     AdminApiKeyGuard,
     ComparisonApplicationService,
+    {
+      provide: CostManagementService,
+      inject: [ApiDatabaseRepository],
+      useFactory: (apiDatabaseRepository: ApiDatabaseRepository) =>
+        new CostManagementService(apiDatabaseRepository),
+    },
     RegionsService,
     {
       provide: APP_FILTER,

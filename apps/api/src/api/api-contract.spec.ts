@@ -17,6 +17,26 @@ import { ApiRateLimitService } from './rate-limit.service';
 import { ComparisonApplicationService } from './comparison-application.service';
 import { ComparisonsController } from './comparisons.controller';
 import {
+  AlertsController,
+  BudgetsController,
+  CachedPricingController,
+  ExchangeRatesController,
+  SharedReportsController,
+  ShareLinksController,
+  WorkloadsController,
+} from './cost-management.controller';
+import { CostManagementService } from './cost-management.service';
+import {
+  AlertRecord,
+  BudgetRecord,
+  CachedPricingCompareRow,
+  ExchangeRatesResponse,
+  SharedReportResponse,
+  ShareLinkResponse,
+  WorkloadCostBreakdown,
+  WorkloadRecord,
+} from './cost-management.types';
+import {
   ApiNotFoundError,
   ApiUnauthorizedError,
   ApiValidationError,
@@ -81,6 +101,93 @@ const comparisonResult: ComparisonResult = {
       },
     },
   ],
+};
+
+const workloadRecord: WorkloadRecord = {
+  id: '22222222-2222-4222-8222-222222222222',
+  instanceFamily: 'general-purpose',
+  vcpu: 4,
+  memoryGb: 16,
+  region: 'us-east',
+  instanceCount: 2,
+  hoursPerMonth: 730,
+  storageGb: 500,
+  storageTier: 'standard',
+  egressGbPerMonth: 1200,
+  createdAt: '2026-06-29T00:00:00.000Z',
+  updatedAt: '2026-06-29T00:00:00.000Z',
+};
+
+const cachedCompareRows: CachedPricingCompareRow[] = [
+  {
+    provider: 'aws',
+    providerSkuId: 'm7i.xlarge',
+    skuId: '33333333-3333-4333-8333-333333333333',
+    pricePerHour: 0.192,
+    term: 'on_demand',
+    region: 'us-east-1',
+    currency: 'USD',
+    effectiveDate: '2026-06-29T00:00:00.000Z',
+  },
+];
+
+const workloadBreakdown: WorkloadCostBreakdown = {
+  workloadId: workloadRecord.id,
+  term: 'on_demand',
+  providers: [
+    {
+      provider: 'aws',
+      region: 'us-east-1',
+      compute: 280.32,
+      storage: 11.5,
+      egress: 108,
+      total: 399.82,
+      currency: 'USD',
+    },
+  ],
+};
+
+const budgetRecord: BudgetRecord = {
+  id: '44444444-4444-4444-8444-444444444444',
+  workloadId: workloadRecord.id,
+  thresholdUsd: 500,
+  alertOnAnomalyPercent: 20,
+  createdAt: '2026-06-29T00:00:00.000Z',
+  updatedAt: '2026-06-29T00:00:00.000Z',
+};
+
+const alertRecord: AlertRecord = {
+  id: '55555555-5555-4555-8555-555555555555',
+  workloadId: workloadRecord.id,
+  budgetId: budgetRecord.id,
+  alertType: 'budget_threshold',
+  message: 'Budget threshold exceeded',
+  thresholdUsd: 500,
+  observedUsd: 520,
+  dismissed: false,
+  triggeredAt: '2026-06-29T00:00:00.000Z',
+};
+
+const shareLinkResponse: ShareLinkResponse = {
+  token: 'share-token-12345678901234567890',
+  url: '/api/v1/share/share-token-12345678901234567890',
+};
+
+const sharedReportResponse: SharedReportResponse = {
+  token: shareLinkResponse.token,
+  watermark: true,
+  expiresAt: '2026-07-29T00:00:00.000Z',
+  workload: workloadRecord,
+  breakdown: workloadBreakdown,
+};
+
+const exchangeRatesResponse: ExchangeRatesResponse = {
+  base: 'USD',
+  lastUpdated: '2026-06-29T00:00:00.000Z',
+  rates: {
+    EUR: 0.93,
+    PKR: 278,
+  },
 };
 
 const configService = {
@@ -220,6 +327,132 @@ describe('API contracts', () => {
         },
       ],
     });
+  });
+
+  it('GET /pricing/compare reads normalized cached pricing only', async () => {
+    const service = costManagementService();
+    const controller = new CachedPricingController(service);
+
+    await expect(
+      controller.compare({
+        instanceFamily: 'general-purpose',
+        vcpu: '4',
+        memoryGb: '16',
+        region: 'us-east',
+        term: 'on_demand',
+      }),
+    ).resolves.toEqual(cachedCompareRows);
+    expect(service.compareCachedPricing).toHaveBeenCalledWith({
+      instanceFamily: 'general-purpose',
+      vcpu: 4,
+      memoryGb: 16,
+      region: 'us-east',
+      term: 'on_demand',
+    });
+  });
+
+  it('GET /pricing/breakdown reads workload breakdown from cached tables', async () => {
+    const service = costManagementService();
+    const controller = new CachedPricingController(service);
+
+    await expect(
+      controller.breakdown({
+        workloadId: workloadRecord.id,
+        term: 'reserved_1yr',
+      }),
+    ).resolves.toEqual(workloadBreakdown);
+    expect(service.getWorkloadCostBreakdown).toHaveBeenCalledWith(
+      workloadRecord.id,
+      'reserved_1yr',
+    );
+  });
+
+  it('POST /workloads persists a normalized workload config', async () => {
+    const service = costManagementService();
+    const controller = new WorkloadsController(service);
+
+    await expect(
+      controller.create({
+        instanceFamily: 'general-purpose',
+        vcpu: 4,
+        memoryGb: 16,
+        region: 'us-east',
+        instanceCount: 2,
+        hoursPerMonth: 730,
+        storageGb: 500,
+        storageTier: 'standard',
+        egressGbPerMonth: 1200,
+      }),
+    ).resolves.toEqual(workloadRecord);
+    expect(service.createWorkload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        instanceFamily: 'general-purpose',
+        region: 'us-east',
+        storageTier: 'standard',
+      }),
+    );
+  });
+
+  it('rejects unsupported canonical regions instead of guessing equivalence', async () => {
+    const controller = new WorkloadsController(costManagementService());
+
+    expect(() =>
+      controller.create({
+        instanceFamily: 'general-purpose',
+        vcpu: 4,
+        memoryGb: 16,
+        region: 'moon-west',
+      }),
+    ).toThrow(ApiValidationError);
+  });
+
+  it('POST /budgets and GET/PATCH /alerts expose budget alert workflows', async () => {
+    const service = costManagementService();
+    const budgetsController = new BudgetsController(service);
+    const alertsController = new AlertsController(service);
+
+    await expect(
+      budgetsController.create({
+        workloadId: workloadRecord.id,
+        thresholdUsd: 500,
+        alertOnAnomalyPercent: 20,
+      }),
+    ).resolves.toEqual(budgetRecord);
+    await expect(alertsController.list(workloadRecord.id)).resolves.toEqual([alertRecord]);
+    await expect(alertsController.update(alertRecord.id, { dismissed: true })).resolves.toEqual(
+      alertRecord,
+    );
+    expect(service.createBudget).toHaveBeenCalledWith({
+      workloadId: workloadRecord.id,
+      thresholdUsd: 500,
+      alertOnAnomalyPercent: 20,
+    });
+    expect(service.updateAlertDismissed).toHaveBeenCalledWith(alertRecord.id, true);
+  });
+
+  it('POST /share-links and GET /share/:token expose scoped read-only reports', async () => {
+    const service = costManagementService();
+    const shareLinksController = new ShareLinksController(service);
+    const sharedReportsController = new SharedReportsController(service);
+
+    await expect(
+      shareLinksController.create({
+        workloadId: workloadRecord.id,
+        watermark: true,
+        expiresInDays: 30,
+      }),
+    ).resolves.toEqual(shareLinkResponse);
+    await expect(sharedReportsController.get(shareLinkResponse.token)).resolves.toEqual(
+      sharedReportResponse,
+    );
+  });
+
+  it('GET /exchange-rates returns cached currency data', async () => {
+    const service = costManagementService();
+    const controller = new ExchangeRatesController(service);
+
+    await expect(controller.get('usd')).resolves.toEqual(exchangeRatesResponse);
+    expect(service.getExchangeRates).toHaveBeenCalledWith('USD');
   });
 
   it('GET /regions returns the cloud region catalog without an admin key', async () => {
@@ -488,6 +721,20 @@ function comparisonApplicationService() {
       ],
     })),
   } as unknown as jest.Mocked<ComparisonApplicationService>;
+}
+
+function costManagementService() {
+  return {
+    createWorkload: jest.fn(async () => workloadRecord),
+    compareCachedPricing: jest.fn(async () => cachedCompareRows),
+    getWorkloadCostBreakdown: jest.fn(async () => workloadBreakdown),
+    createBudget: jest.fn(async () => budgetRecord),
+    listAlerts: jest.fn(async () => [alertRecord]),
+    updateAlertDismissed: jest.fn(async () => alertRecord),
+    createShareLink: jest.fn(async () => shareLinkResponse),
+    getSharedReport: jest.fn(async () => sharedReportResponse),
+    getExchangeRates: jest.fn(async () => exchangeRatesResponse),
+  } as unknown as jest.Mocked<CostManagementService>;
 }
 
 function comparisonsController(service: jest.Mocked<ComparisonApplicationService>) {
