@@ -47,6 +47,11 @@ interval outlook, and cross-provider category heatmap. Mobile keeps the same pro
 order, shows a sticky totals bar, stacks dashboard charts, and makes provider cards
 horizontally scrollable.
 
+The polished app shell uses a sticky translucent header on desktop, a provider-accent
+top stripe, contextual comparison toolbar, consistent elevation tokens, refined
+segmented controls, card-style line items, framed chart/table panels, and responsive
+spacing rules that keep the summary rail sticky only where there is enough room.
+
 The app uses native form controls, semantic regions, labelled comparison sections,
 visible focus states, and reduced-motion CSS. Provider line items include aria labels
 with provider, category, description, and monthly price so screen readers get the
@@ -86,3 +91,9 @@ verified the initial pending state, the plain-English `Parse & compare` journey,
 stable three-column provider order, enabled export controls after comparison, and no
 page-level horizontal overflow. Mobile verified the sticky totals bar, collapsed
 navigation, horizontal provider carousel, and no text overflow in visible controls.
+
+A later professional UI/UX polish pass rebuilt the Docker web image and browser-smoked
+the populated comparison at desktop `1440x1000` and mobile `390x844`. It verified
+provider logos, dashboard charts, interval controls, export controls, stable provider
+order, no page overflow, no visible text overflow, no unintended wide elements outside
+intentional scroll containers, and no console errors.

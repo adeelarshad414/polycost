@@ -31,8 +31,8 @@ say so explicitly rather than marking it done.
 | 5 - NWS Parser Module                                  | Complete    | 2026-06-28   |
 | 6 - Comparison Engine                                  | Complete    | 2026-06-29   |
 | 7 - Report Module                                      | Complete    | 2026-06-29   |
-| 8 - API layer                                          | Not started | -            |
-| 9 - Frontend                                           | Not started | -            |
+| 8 - API layer                                          | Complete    | 2026-06-29   |
+| 9 - Frontend                                           | Complete    | 2026-06-29   |
 | 10 - E2E verification against MVP acceptance criteria  | Not started | -            |
 
 ## Phase 0 - Build plan & approval
@@ -596,6 +596,40 @@ compare`; anonymous UI no longer calls the admin-only pricing-status endpoint; a
 - Checkpoint: provider branding polish is complete. Continue Phase 10 acceptance work
   from the branded comparison UI.
 
+## Post-Phase 9 professional UI/UX polish
+
+**Status:** Complete
+**Date:** 2026-06-29
+
+- Frontend upgrades: refined the app shell with a sticky translucent header, provider
+  accent stripe, stronger wordmark/logomark treatment, contextual comparison toolbar,
+  polished segmented controls, button states, form fields, checkboxes, and summary
+  rail.
+- Dashboard and comparison refinements: added consistent elevation tokens, tighter
+  metric cards, clearer dashboard panels, row-backed bar charts, framed ranking and
+  heatmap tables, card-style provider line items, and subtle hover/focus states.
+- Responsiveness: desktop keeps the summary rail sticky while tablet/mobile return it
+  to normal document flow; mobile interval controls now fit all labels; provider
+  cards remain a horizontal carousel with the sticky totals bar.
+- Runtime verification: rebuilt the Docker web image and browser-smoked
+  `http://localhost:3000` at desktop `1440x1000` and mobile `390x844`. The
+  `Parse & compare` flow produced populated dashboard metrics, provider logos,
+  interval controls, exports, stable AWS/Azure/GCP order, no page overflow, no
+  visible text overflow, no unintended wide elements, and no console errors.
+- Tests/checks passing: `npm run format:check`, `npm run ci:lint`,
+  `npm run test:unit`, `npm run test:coverage --workspace @polycost/web`,
+  `npm run build`, Docker Compose web rebuild/start, `docker compose ps`,
+  `curl -fsSI http://localhost:3000`, `curl -fsS http://localhost:3001/health`,
+  and browser responsive smoke. `npm run ci:lint` still reports only the existing 15
+  API security warnings.
+- Coverage note: web workspace coverage remains 94.83% statements, 88.68% branches,
+  95.2% functions, and 94.7% lines. A full all-workspace `npm run test:coverage`
+  run executes all API tests successfully but currently fails the API global branch
+  threshold at 81.56% versus the configured 85% target; this is carried forward as a
+  backend coverage item.
+- Checkpoint: professional UI/UX polish is complete. Continue Phase 10 acceptance
+  work from the polished comparison UI.
+
 ## Phase 10 - E2E verification against MVP acceptance criteria
 
 **Status:** Not started
@@ -629,6 +663,10 @@ when it is actually resolved in a later phase, with a note on which phase resolv
 - `eslint-plugin-security` reports warnings for controlled fixture reads,
   provider-response dictionary access, and the local Vault token-file read. These are
   non-blocking under the current lint config and were reviewed during Phase 3.
+- Full all-workspace `npm run test:coverage` currently fails the API global branch
+  threshold: all API tests pass, but aggregate API branch coverage reports 81.56%
+  against the configured 85% target. The focused web coverage gate for the frontend
+  polish passes.
 
 ## Deviations from spec log
 

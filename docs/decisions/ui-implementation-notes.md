@@ -32,6 +32,9 @@ Phase 9 implemented these decisions in the Vite/React web app; see
   scannable without relying only on text: complete.
 - Use larger provider-card SVG logo lockups and provider-tinted card surfaces for
   AWS, Azure, and GCP while keeping the dashboard itself cloud-neutral: complete.
+- Apply professional product polish across all screen surfaces, including the app
+  shell, sticky header, comparison toolbar, form controls, dashboard panels, charts,
+  tables, provider cards, hover/focus states, and responsive breakpoints: complete.
 - Add a print stylesheet for the on-screen comparison view in addition to generated
   PDF reports: complete.
 - Add accessibility checks for visible focus, keyboard navigation, reduced motion,
@@ -43,6 +46,9 @@ Phase 9 implemented these decisions in the Vite/React web app; see
 - Desktop three-column layout at `>= 1024px`: browser-smoked.
 - Tablet equal-column layout from `768px` to `1023px`: covered by responsive CSS.
 - Mobile carousel below `768px`: browser-smoked.
+- Professional UI polish at desktop `1440x1000` and mobile `390x844`: browser-smoked
+  with no page overflow, visible text overflow, unintended wide elements, or console
+  errors.
 - No provider column reorders when a different provider is cheapest: covered.
 - Export buttons have equal visual weight for PDF, CSV, and Excel: implemented and
   covered through app interaction tests.

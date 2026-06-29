@@ -667,6 +667,10 @@ function ComparisonToolbar({
 }) {
   return (
     <div className="comparison-toolbar" id="comparison">
+      <div className="toolbar-title">
+        <span>Comparison</span>
+        <strong>{capitalize(interval)} outlook</strong>
+      </div>
       <div className="interval-toggle" role="group" aria-label="Cost interval">
         {INTERVALS.map(({ key, label }) => (
           <button
