@@ -147,6 +147,11 @@ export interface PricingStatusResponse {
   }>;
 }
 
+export interface BackendHealthResponse {
+  status: 'ok' | string;
+  service: string;
+}
+
 export type RegionCatalogSource = 'live' | 'fallback';
 
 export interface CloudRegion {

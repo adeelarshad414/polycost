@@ -17,6 +17,7 @@ import {
 } from './service-catalog';
 import { applyTheme, ResolvedTheme, resolveTheme, storedTheme, ThemeChoice } from './theme';
 import {
+  BackendHealthResponse,
   ComparisonProviderResult,
   ComparisonResult,
   INTERVALS,
@@ -273,6 +274,8 @@ export function App({ client = polyCostClient }: AppProps) {
   const [exportingFormat, setExportingFormat] = useState<ReportFormat | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [backendHealth, setBackendHealth] = useState<BackendHealthResponse | null>(null);
+  const [backendHealthError, setBackendHealthError] = useState<string | null>(null);
   const [regionCatalog, setRegionCatalog] = useState<RegionCatalogResponse | null>(null);
   const [regionCatalogError, setRegionCatalogError] = useState<string | null>(null);
 
@@ -282,6 +285,25 @@ export function App({ client = polyCostClient }: AppProps) {
 
   useEffect(() => {
     let isMounted = true;
+
+    void client
+      .getHealth()
+      .then((health) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setBackendHealth(health);
+        setBackendHealthError(null);
+      })
+      .catch((healthError) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setBackendHealth(null);
+        setBackendHealthError(formatApiError(healthError));
+      });
 
     void client
       .getRegionCatalog()
@@ -517,6 +539,15 @@ export function App({ client = polyCostClient }: AppProps) {
 
           <section className="summary-zone lg:!static" aria-label="Current estimate controls">
             <PricingFreshness comparison={comparison} />
+
+            <PlatformReadinessStatus
+              backendHealth={backendHealth}
+              backendHealthError={backendHealthError}
+              regionCatalog={regionCatalog}
+              regionCatalogError={regionCatalogError}
+              comparison={comparison}
+              busyAction={busyAction}
+            />
 
             <RequirementSummary form={form} />
 
@@ -1509,6 +1540,134 @@ function PricingFreshness({ comparison }: { comparison: ComparisonResult | null 
   }
 
   return <div className="freshness-strip">Using cached pricing catalog</div>;
+}
+
+function PlatformReadinessStatus({
+  backendHealth,
+  backendHealthError,
+  regionCatalog,
+  regionCatalogError,
+  comparison,
+  busyAction,
+}: {
+  backendHealth: BackendHealthResponse | null;
+  backendHealthError: string | null;
+  regionCatalog: RegionCatalogResponse | null;
+  regionCatalogError: string | null;
+  comparison: ComparisonResult | null;
+  busyAction: BusyAction;
+}) {
+  const backendTone = readinessTone(backendHealth?.status === 'ok', Boolean(backendHealthError));
+  const hasLiveRegions =
+    regionCatalog?.providers.some((provider) => provider.source === 'live') ?? false;
+  const regionTone = regionCatalog
+    ? hasLiveRegions
+      ? 'good'
+      : 'review'
+    : regionCatalogError
+      ? 'attention'
+      : 'checking';
+  const comparisonTone = comparison ? 'good' : busyAction ? 'checking' : 'review';
+  const regionCount =
+    regionCatalog?.providers.reduce((count, provider) => count + provider.regions.length, 0) ?? 0;
+  const regionValue = regionCatalog
+    ? `${regionCount} loaded`
+    : regionCatalogError
+      ? 'Fallback'
+      : 'Loading';
+  const snapshotValue = comparison
+    ? shortComparisonId(comparison.comparisonId)
+    : busyAction
+      ? `${capitalize(busyAction)} running`
+      : 'Pending';
+
+  return (
+    <section
+      className={`platform-readiness platform-readiness-${backendTone}`}
+      aria-label="Platform readiness"
+      aria-live="polite"
+    >
+      <div className="platform-readiness-header">
+        <span className="readiness-dot" aria-hidden="true" />
+        <div>
+          <span>Platform readiness</span>
+          <strong>{backendReadinessLabel(backendHealth, backendHealthError)}</strong>
+        </div>
+      </div>
+      <p>{backendReadinessDetail(backendHealth, backendHealthError, regionCatalogError)}</p>
+      <div className="readiness-pill-row">
+        <ReadinessPill
+          tone={backendTone}
+          label="API"
+          value={backendHealth?.service ?? (backendHealthError ? 'Unavailable' : 'Checking')}
+        />
+        <ReadinessPill tone={regionTone} label="Regions" value={regionValue} />
+        <ReadinessPill tone={comparisonTone} label="Snapshot" value={snapshotValue} />
+      </div>
+    </section>
+  );
+}
+
+function ReadinessPill({
+  tone,
+  label,
+  value,
+}: {
+  tone: 'good' | 'checking' | 'attention' | 'review';
+  label: string;
+  value: string;
+}) {
+  return (
+    <span className={`readiness-pill readiness-pill-${tone}`}>
+      <small>{label}</small>
+      <strong>{value}</strong>
+    </span>
+  );
+}
+
+function readinessTone(isReady: boolean, hasError: boolean): 'good' | 'checking' | 'attention' {
+  if (hasError) {
+    return 'attention';
+  }
+
+  return isReady ? 'good' : 'checking';
+}
+
+function backendReadinessLabel(
+  backendHealth: BackendHealthResponse | null,
+  backendHealthError: string | null,
+): string {
+  if (backendHealth?.status === 'ok') {
+    return 'Backend connected';
+  }
+
+  if (backendHealthError) {
+    return 'Backend unavailable';
+  }
+
+  return 'Checking backend';
+}
+
+function backendReadinessDetail(
+  backendHealth: BackendHealthResponse | null,
+  backendHealthError: string | null,
+  regionCatalogError: string | null,
+): string {
+  if (backendHealthError) {
+    return `${backendHealthError}. Local UI remains available, but live parse, compare, refresh, and export calls need the API.`;
+  }
+
+  if (backendHealth?.status === 'ok') {
+    return regionCatalogError
+      ? 'API health is responding; region catalog is using the built-in fallback until live regions load.'
+      : 'API health and public region catalog checks are wired into this session.';
+  }
+
+  return 'Verifying the API before parse, compare, refresh, export, and region lookup actions.';
+}
+
+function shortComparisonId(comparisonId: string): string {
+  return comparisonId.slice(0, 8);
 }
 
 function RequirementSummary({ form }: { form: WorkloadFormState }) {

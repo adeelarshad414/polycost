@@ -3,6 +3,7 @@ import { createRoot, Root } from 'react-dom/client';
 import { App, ComparisonView } from './App';
 import { PolyCostClient, PolyCostApiError } from './api-client';
 import {
+  BackendHealthResponse,
   ComparisonResult,
   ParsedNwsDraft,
   PricingStatusResponse,
@@ -759,9 +760,14 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       { providerId: 'gcp', status: 'success' },
     ],
   };
+  const backendHealth: BackendHealthResponse = {
+    status: 'ok',
+    service: 'polycost-api',
+  };
   const pendingRegionCatalog = new Promise<RegionCatalogResponse>(() => undefined);
 
   return {
+    getHealth: jest.fn(async () => backendHealth),
     parseWorkload: jest.fn(async () => parsed),
     validateWorkload: jest.fn(async () => ({ valid: true as const })),
     createComparison: jest.fn(async () => comparisonResult),

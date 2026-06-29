@@ -1,5 +1,6 @@
 import {
   ApiErrorDetail,
+  BackendHealthResponse,
   ComparisonResult,
   NormalizedWorkloadSpec,
   ParsedNwsDraft,
@@ -32,6 +33,7 @@ export class PolyCostApiError extends Error {
 }
 
 export interface PolyCostClient {
+  getHealth(): Promise<BackendHealthResponse>;
   parseWorkload(input: string): Promise<ParsedNwsDraft>;
   validateWorkload(nws: NormalizedWorkloadSpec): Promise<{ valid: true }>;
   createComparison(nws: NormalizedWorkloadSpec): Promise<ComparisonResult>;
@@ -55,6 +57,9 @@ export function configuredApiBaseUrl(documentRef: Document = document): string {
 
 export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCostClient {
   return {
+    getHealth() {
+      return requestJson<BackendHealthResponse>(apiRootHealthUrl(baseUrl));
+    },
     parseWorkload(input) {
       return requestJson<ParsedNwsDraft>(baseUrl, '/workload/parse', {
         method: 'POST',
@@ -103,8 +108,25 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
   };
 }
 
-async function requestJson<T>(baseUrl: string, path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${baseUrl}${path}`, {
+function apiRootHealthUrl(baseUrl: string): string {
+  try {
+    const url = new URL(baseUrl);
+    url.pathname = url.pathname.replace(/\/api\/v1\/?$/, '/health');
+    url.search = '';
+    url.hash = '';
+
+    return url.toString();
+  } catch {
+    return `${baseUrl.replace(/\/api\/v1\/?$/, '')}/health`;
+  }
+}
+
+async function requestJson<T>(
+  baseUrlOrAbsoluteUrl: string,
+  path = '',
+  init: RequestInit = {},
+): Promise<T> {
+  const response = await fetch(`${baseUrlOrAbsoluteUrl}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',

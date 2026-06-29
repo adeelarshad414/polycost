@@ -106,6 +106,30 @@ describe('api client', () => {
     );
   });
 
+  it('fetches API health from the backend root', async () => {
+    const fetchMock = jest.fn(async () =>
+      jsonResponse({
+        status: 'ok',
+        service: 'polycost-api',
+      }),
+    );
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(client.getHealth()).resolves.toEqual({
+      status: 'ok',
+      service: 'polycost-api',
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/health',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+  });
+
   it('fetches the live cloud region catalog', async () => {
     const fetchMock = jest.fn(async () =>
       jsonResponse({
