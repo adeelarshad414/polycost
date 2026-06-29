@@ -569,6 +569,33 @@ compare`; anonymous UI no longer calls the admin-only pricing-status endpoint; a
 - Checkpoint: deep comparison polish is complete. Phase 10 acceptance work can now
   validate a richer decision-grade UI.
 
+## Post-Phase 9 provider brand polish
+
+**Status:** Complete
+**Date:** 2026-06-29
+
+- Frontend upgrades: added larger inline SVG provider-card logo lockups for AWS,
+  Azure, and GCP; added provider subtitles for Amazon Web Services, Microsoft Azure,
+  and Google Cloud Platform; and kept compact marks in dense charts/tables.
+- Visual refinements: provider cards now use cloud-specific tinted surfaces,
+  cloud-colored borders, logo frames, and adjusted header typography while preserving
+  fixed AWS/Azure/GCP comparison order.
+- Responsiveness: mobile provider cards stack the logo/title block and total to avoid
+  crowding while keeping the horizontal provider carousel behavior.
+- Runtime verification: rebuilt the Docker web image and browser-smoked
+  `http://localhost:3000` at desktop `1280x720` and mobile `390x844`. The provider
+  cards rendered AWS/Azure/GCP logo lockups, cloud-specific tinted card surfaces,
+  subtitles, stable provider order, no page overflow, no visible element overflow,
+  and no console errors.
+- Test coverage: web workspace coverage is 94.83% statements, 88.68% branches,
+  95.2% functions, and 94.7% lines.
+- Tests/checks passing: `npm run format:check`, `npm run ci:lint`,
+  `npm run test:unit`, `npm run test:coverage --workspace @polycost/web`,
+  `npm run build`, Docker Compose web rebuild/start, direct Docker Compose health
+  check, web/API HTTP smoke checks, and browser responsive smoke.
+- Checkpoint: provider branding polish is complete. Continue Phase 10 acceptance work
+  from the branded comparison UI.
+
 ## Phase 10 - E2E verification against MVP acceptance criteria
 
 **Status:** Not started

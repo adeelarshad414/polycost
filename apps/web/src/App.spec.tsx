@@ -46,6 +46,10 @@ describe('App', () => {
     expect(client.createComparison).toHaveBeenCalled();
     expect(text(container)).toContain('Comparison ready.');
     expect(providerHeadings(container)).toEqual(['AWS', 'Azure', 'GCP']);
+    expect(providerLogoProviders(container)).toEqual(['aws', 'azure', 'gcp']);
+    expect(text(container)).toContain('Amazon Web Services');
+    expect(text(container)).toContain('Microsoft Azure');
+    expect(text(container)).toContain('Google Cloud Platform');
     expect(text(container)).toContain('Lowest cost');
 
     unmount();
@@ -389,6 +393,12 @@ function buttonByText(container: HTMLElement, label: string): HTMLButtonElement 
 function providerHeadings(container: HTMLElement): string[] {
   return Array.from(container.querySelectorAll('.provider-card h2')).map(
     (heading) => heading.textContent ?? '',
+  );
+}
+
+function providerLogoProviders(container: HTMLElement): string[] {
+  return Array.from(container.querySelectorAll('[data-provider-logo]')).map(
+    (logo) => logo.getAttribute('data-provider-logo') ?? '',
   );
 }
 

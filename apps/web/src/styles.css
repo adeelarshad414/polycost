@@ -33,6 +33,9 @@
   --pc-provider-aws-soft: #fff3df;
   --pc-provider-azure-soft: #e2f2ff;
   --pc-provider-gcp-soft: #e8f5ea;
+  --pc-provider-aws-panel: #fff8ed;
+  --pc-provider-azure-panel: #f1f8ff;
+  --pc-provider-gcp-panel: #f3fbf5;
   --pc-bg-canvas: var(--pc-ink-50);
   --pc-bg-surface: #ffffff;
   --pc-bg-surface-2: var(--pc-ink-100);
@@ -77,6 +80,9 @@
   --pc-provider-aws-soft: #332414;
   --pc-provider-azure-soft: #11283a;
   --pc-provider-gcp-soft: #132b1b;
+  --pc-provider-aws-panel: #211a12;
+  --pc-provider-azure-panel: #101d28;
+  --pc-provider-gcp-panel: #101f15;
   --pc-brand-accent: #66a6ff;
   --pc-brand-accent-hover: #8bbcff;
   --pc-brand-accent-soft: #142544;
@@ -670,6 +676,10 @@ select:focus {
   gap: var(--pc-space-1);
 }
 
+.provider-title-block > div {
+  min-width: 0;
+}
+
 .bar-provider strong,
 .category-row strong {
   overflow: hidden;
@@ -917,36 +927,191 @@ select:focus {
 }
 
 .provider-card {
+  position: relative;
   min-width: 0;
   border: 1px solid var(--pc-border);
   border-top-width: 4px;
   border-radius: var(--pc-radius-card);
   background: var(--pc-bg-surface);
   padding: var(--pc-space-2);
+  overflow: hidden;
+}
+
+.provider-card::before {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 88px;
+  content: '';
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.provider-card > * {
+  position: relative;
 }
 
 .provider-aws {
   border-top-color: var(--pc-provider-aws);
+  background:
+    linear-gradient(180deg, var(--pc-provider-aws-panel) 0, var(--pc-bg-surface) 58%),
+    var(--pc-bg-surface);
+}
+
+.provider-aws::before {
+  background: linear-gradient(90deg, var(--pc-provider-aws-soft), transparent 72%);
 }
 
 .provider-azure {
   border-top-color: var(--pc-provider-azure);
+  background:
+    linear-gradient(180deg, var(--pc-provider-azure-panel) 0, var(--pc-bg-surface) 58%),
+    var(--pc-bg-surface);
+}
+
+.provider-azure::before {
+  background: linear-gradient(90deg, var(--pc-provider-azure-soft), transparent 72%);
 }
 
 .provider-gcp {
   border-top-color: var(--pc-provider-gcp);
+  background:
+    linear-gradient(180deg, var(--pc-provider-gcp-panel) 0, var(--pc-bg-surface) 58%),
+    var(--pc-bg-surface);
+}
+
+.provider-gcp::before {
+  background: linear-gradient(90deg, var(--pc-provider-gcp-soft), transparent 72%);
 }
 
 .provider-header {
   justify-content: space-between;
   gap: var(--pc-space-2);
-  min-height: 72px;
+  min-height: 92px;
+  border-bottom: 1px solid color-mix(in srgb, var(--pc-border) 72%, transparent);
+  padding-bottom: var(--pc-space-2);
 }
 
 .provider-header h2 {
-  margin: 0 0 var(--pc-space-1);
+  margin: 0 0 2px;
   font-family: var(--pc-font-display);
   font-size: var(--pc-text-lg);
+  line-height: 1.05;
+}
+
+.provider-subtitle {
+  display: block;
+  margin-bottom: var(--pc-space-1);
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.provider-logo-lockup {
+  display: inline-flex;
+  width: 118px;
+  height: 54px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: var(--pc-bg-surface);
+  box-shadow: 0 10px 28px rgb(18 21 28 / 7%);
+}
+
+.provider-logo-lockup-aws {
+  border-color: color-mix(in srgb, var(--pc-provider-aws) 46%, var(--pc-border));
+  background: linear-gradient(180deg, #ffffff 0%, var(--pc-provider-aws-soft) 140%);
+}
+
+.provider-logo-lockup-azure {
+  border-color: color-mix(in srgb, var(--pc-provider-azure) 46%, var(--pc-border));
+  background: linear-gradient(180deg, #ffffff 0%, var(--pc-provider-azure-soft) 140%);
+}
+
+.provider-logo-lockup-gcp {
+  border-color: color-mix(in srgb, var(--pc-provider-gcp) 46%, var(--pc-border));
+  background: linear-gradient(180deg, #ffffff 0%, var(--pc-provider-gcp-soft) 140%);
+}
+
+:root[data-theme='dark'] .provider-logo-lockup-aws,
+:root[data-theme='dark'] .provider-logo-lockup-azure,
+:root[data-theme='dark'] .provider-logo-lockup-gcp {
+  background: var(--pc-bg-surface-2);
+  box-shadow: none;
+}
+
+.provider-logo-icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+}
+
+.provider-logo-icon-aws {
+  width: 40px;
+}
+
+.provider-logo-word {
+  color: var(--pc-ink-800);
+  font-family: var(--pc-font-display);
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.provider-logo-word-aws {
+  font-size: 29px;
+  letter-spacing: -0.5px;
+}
+
+.provider-logo-word-azure {
+  font-size: 20px;
+}
+
+.provider-logo-word-gcp {
+  display: grid;
+  gap: 1px;
+  font-size: 14px;
+}
+
+.aws-smile,
+.aws-arrow {
+  fill: none;
+  stroke: var(--pc-provider-aws);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.azure-shard-main {
+  fill: var(--pc-provider-azure);
+}
+
+.azure-shard-fold {
+  fill: #46a8f8;
+}
+
+.gcp-logo-blue {
+  fill: var(--pc-provider-gcp-blue);
+}
+
+.gcp-logo-red {
+  fill: var(--pc-provider-gcp-red);
+}
+
+.gcp-logo-yellow {
+  fill: var(--pc-provider-gcp-yellow);
+}
+
+.gcp-logo-green {
+  fill: var(--pc-provider-gcp);
+}
+
+:root[data-theme='dark'] .provider-logo-word {
+  color: var(--pc-text-primary);
 }
 
 .lowest-badge {
@@ -1217,6 +1382,21 @@ select:focus {
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     padding-bottom: var(--pc-space-1);
+  }
+
+  .provider-header {
+    align-items: flex-start;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .provider-title-block {
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .provider-total {
+    text-align: left;
   }
 
   .provider-card {

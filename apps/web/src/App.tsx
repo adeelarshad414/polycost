@@ -766,9 +766,10 @@ function ProviderPanel({
     >
       <header className="provider-header">
         <div className="provider-title-block">
-          <ProviderMark providerId={providerId} />
+          <ProviderLogo providerId={providerId} />
           <div>
             <h2 id={`${providerId}-title`}>{providerLabel(providerId)}</h2>
+            <span className="provider-subtitle">{providerSubtitle(providerId)}</span>
             {isCheapest ? <span className="lowest-badge">Lowest cost</span> : null}
           </div>
         </div>
@@ -1178,6 +1179,80 @@ function Logo() {
   );
 }
 
+function ProviderLogo({ providerId }: { providerId: ProviderId }) {
+  if (providerId === 'aws') {
+    return (
+      <div
+        className="provider-logo-lockup provider-logo-lockup-aws"
+        data-provider-logo={providerId}
+        aria-hidden="true"
+      >
+        <svg
+          className="provider-logo-icon provider-logo-icon-aws"
+          viewBox="0 0 46 38"
+          focusable="false"
+        >
+          <path className="aws-smile" d="M4 24c11 5.5 23 5.3 36-.5" />
+          <path className="aws-arrow" d="M35 20.5 43 23l-6.5 6" />
+        </svg>
+        <span className="provider-logo-word provider-logo-word-aws">aws</span>
+      </div>
+    );
+  }
+
+  if (providerId === 'azure') {
+    return (
+      <div
+        className="provider-logo-lockup provider-logo-lockup-azure"
+        data-provider-logo={providerId}
+        aria-hidden="true"
+      >
+        <svg
+          className="provider-logo-icon provider-logo-icon-azure"
+          viewBox="0 0 54 54"
+          focusable="false"
+        >
+          <path className="azure-shard-main" d="M23 9 9 44h19L47 9z" />
+          <path className="azure-shard-fold" d="M38 30 28 44h30z" />
+        </svg>
+        <span className="provider-logo-word provider-logo-word-azure">Azure</span>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="provider-logo-lockup provider-logo-lockup-gcp"
+      data-provider-logo={providerId}
+      aria-hidden="true"
+    >
+      <svg
+        className="provider-logo-icon provider-logo-icon-gcp"
+        viewBox="0 0 54 54"
+        focusable="false"
+      >
+        <path className="gcp-logo-blue" d="M21 39a15 15 0 0 1 2-25.2l4.2 7.2a7 7 0 0 0-1.9 12.2z" />
+        <path
+          className="gcp-logo-red"
+          d="M23 13.8a15 15 0 0 1 20.2 3.5l-6.8 4.9a7 7 0 0 0-9.3-1.2z"
+        />
+        <path
+          className="gcp-logo-yellow"
+          d="M43.2 17.3A15 15 0 0 1 44.7 35l-7-4.5a7 7 0 0 0-1.3-8.4z"
+        />
+        <path
+          className="gcp-logo-green"
+          d="M44.7 35A15 15 0 0 1 21 39l4.3-5.8a7 7 0 0 0 12.4-2.7z"
+        />
+      </svg>
+      <span className="provider-logo-word provider-logo-word-gcp">
+        <span>Google</span>
+        <span>Cloud</span>
+      </span>
+    </div>
+  );
+}
+
 function ProviderMark({ providerId }: { providerId: ProviderId }) {
   if (providerId === 'aws') {
     return (
@@ -1303,6 +1378,17 @@ function providerLabel(provider: ProviderId): string {
       return 'Azure';
     case 'gcp':
       return 'GCP';
+  }
+}
+
+function providerSubtitle(provider: ProviderId): string {
+  switch (provider) {
+    case 'aws':
+      return 'Amazon Web Services';
+    case 'azure':
+      return 'Microsoft Azure';
+    case 'gcp':
+      return 'Google Cloud Platform';
   }
 }
 

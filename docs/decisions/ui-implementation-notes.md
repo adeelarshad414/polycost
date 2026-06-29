@@ -30,6 +30,8 @@ Phase 9 implemented these decisions in the Vite/React web app; see
   counts, and cross-provider category comparison: complete.
 - Use inline SVG provider marks in buttons/charts/cards so the comparison is
   scannable without relying only on text: complete.
+- Use larger provider-card SVG logo lockups and provider-tinted card surfaces for
+  AWS, Azure, and GCP while keeping the dashboard itself cloud-neutral: complete.
 - Add a print stylesheet for the on-screen comparison view in addition to generated
   PDF reports: complete.
 - Add accessibility checks for visible focus, keyboard navigation, reduced motion,

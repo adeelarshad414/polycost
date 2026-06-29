@@ -52,10 +52,12 @@ visible focus states, and reduced-motion CSS. Provider line items include aria l
 with provider, category, description, and monthly price so screen readers get the
 same cost context as visual users.
 
-Provider marks are inline SVGs for AWS, Azure, and GCP-inspired identities. The
-palette uses provider-inspired accents: AWS orange, Azure blue, and GCP green plus
-the GCP blue/red/yellow secondary colors for chart details. These are PolyCost-owned
-UI marks and color treatments, not official vendor trademarks.
+Provider marks and larger provider-card logo lockups are inline SVGs for AWS, Azure,
+and GCP-inspired identities. Provider cards use cloud-specific tinted surfaces and
+subtitles while retaining the neutral comparison order. The palette uses
+provider-inspired accents: AWS orange, Azure blue, and GCP green plus the GCP
+blue/red/yellow secondary colors for chart details. These are PolyCost-owned UI
+marks and color treatments, not official vendor trademarks.
 
 ## Runtime behavior
 
@@ -75,9 +77,9 @@ specific provider failed to produce pricing.
 
 Phase 9 frontend tests cover the API client, NWS form mapping, theme helpers, the
 structured-form comparison flow, natural-language parse flow, error rendering,
-provider ordering, unavailable-provider states, dashboard metrics, dynamic provider
-chart sizing, decision brief, provider ranking, interval outlook, category heatmap,
-interval switching, refresh, and exports.
+provider ordering, provider logo lockups, unavailable-provider states, dashboard
+metrics, dynamic provider chart sizing, decision brief, provider ranking, interval
+outlook, category heatmap, interval switching, refresh, and exports.
 
 Browser smoke against the Docker-served app passed on desktop and mobile. Desktop
 verified the initial pending state, the plain-English `Parse & compare` journey,
