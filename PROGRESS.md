@@ -513,6 +513,35 @@ compare`; anonymous UI no longer calls the admin-only pricing-status endpoint; a
 - Checkpoint: the Phase 9 audit remediation is complete. Phase 10 can now start from
   a working end-to-end MVP workflow.
 
+## Post-Phase 9 dashboard/theme enhancement
+
+**Status:** Complete
+**Date:** 2026-06-29
+
+- Frontend upgrades: added a dynamic cost dashboard above the provider cards with
+  lowest-cost, spread, average, and provider-coverage metrics; provider spend bars
+  sorted by current interval cost; and a cheapest-provider category mix chart.
+- Visual system upgrades: added inline SVG marks for AWS, Azure, and GCP-inspired
+  provider identity; added SVG icons to mode/theme/sample controls; and refreshed
+  light/dark tokens around AWS orange, Azure blue, and GCP green with GCP secondary
+  colors for charts.
+- Responsiveness: dashboard charts stack on tablet/mobile, the sticky mobile totals
+  bar now includes provider marks, and provider cards retain the existing mobile
+  carousel behavior.
+- Runtime verification: rebuilt the Docker web image and browser-smoked
+  `http://localhost:3000` at desktop `1280x720` and mobile `390x844`. The
+  `Parse & compare` flow produced populated dashboard metrics, provider spend bars,
+  category mix bars, enabled exports, stable AWS/Azure/GCP provider order, no page
+  overflow, no visible text overflow, and no console errors.
+- Test coverage: web workspace coverage is 92.88% statements, 85.36% branches,
+  93.93% functions, and 92.76% lines.
+- Tests/checks passing: `npm run format:check`, `npm run ci:lint`,
+  `npm run test:unit`, `npm run test:coverage --workspace @polycost/web`,
+  `npm run build`, Docker Compose web rebuild/start, direct Docker Compose health
+  check, web/API HTTP smoke checks, and browser responsive smoke.
+- Checkpoint: dashboard/theme enhancement is complete. Continue Phase 10 acceptance
+  work from the upgraded comparison UI.
+
 ## Phase 10 - E2E verification against MVP acceptance criteria
 
 **Status:** Not started

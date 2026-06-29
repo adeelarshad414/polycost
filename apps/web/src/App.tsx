@@ -21,6 +21,9 @@ import {
 
 type InputMode = 'describe' | 'form';
 type BusyAction = 'parse' | 'compare' | 'refresh' | 'export' | null;
+type ServiceCategory = ComparisonProviderResult['lineItems'][number]['category'];
+
+const SERVICE_CATEGORIES: ServiceCategory[] = ['compute', 'storage', 'database', 'network'];
 
 interface AppProps {
   client?: PolyCostClient;
@@ -151,6 +154,7 @@ export function App({ client = polyCostClient }: AppProps) {
               className="tab-button"
               onClick={() => setInputMode('describe')}
             >
+              <ModeIcon mode="describe" />
               Describe
             </button>
             <button
@@ -160,6 +164,7 @@ export function App({ client = polyCostClient }: AppProps) {
               className="tab-button"
               onClick={() => setInputMode('form')}
             >
+              <ModeIcon mode="form" />
               Form
             </button>
           </div>
@@ -248,6 +253,7 @@ function Header({
             aria-pressed={themeChoice === choice}
             onClick={() => onThemeChange(choice)}
           >
+            <ThemeIcon choice={choice} />
             {capitalize(choice)}
           </button>
         ))}
@@ -291,6 +297,7 @@ function DescribePanel({
           {isParsing ? 'Parsing' : 'Parse'}
         </button>
         <button type="button" className="pc-button pc-button-secondary" onClick={onUseSample}>
+          <SampleIcon />
           Sample
         </button>
       </div>
@@ -677,7 +684,8 @@ export function ComparisonView({
           const provider = providerResults.get(providerId);
           return (
             <span key={providerId}>
-              {providerLabel(providerId)}{' '}
+              <ProviderMark providerId={providerId} />
+              {providerLabel(providerId)}
               <strong>
                 {provider
                   ? formatCurrency(costForInterval(provider, interval))
@@ -689,6 +697,8 @@ export function ComparisonView({
           );
         })}
       </div>
+
+      <CostDashboard comparison={comparison} interval={interval} />
 
       <div className="provider-grid">
         {PROVIDER_ORDER.map((providerId) => (
@@ -738,9 +748,12 @@ function ProviderPanel({
       aria-labelledby={`${providerId}-title`}
     >
       <header className="provider-header">
-        <div>
-          <h2 id={`${providerId}-title`}>{providerLabel(providerId)}</h2>
-          {isCheapest ? <span className="lowest-badge">Lowest cost</span> : null}
+        <div className="provider-title-block">
+          <ProviderMark providerId={providerId} />
+          <div>
+            <h2 id={`${providerId}-title`}>{providerLabel(providerId)}</h2>
+            {isCheapest ? <span className="lowest-badge">Lowest cost</span> : null}
+          </div>
         </div>
         <strong className="provider-total">
           {provider
@@ -784,6 +797,130 @@ function ProviderPanel({
   );
 }
 
+function CostDashboard({
+  comparison,
+  interval,
+}: {
+  comparison: ComparisonResult | null;
+  interval: IntervalKey;
+}) {
+  const summaries = providerCostSummaries(comparison, interval);
+  const pricedSummaries = summaries.filter((summary) => summary.total !== undefined);
+  const lowest = pricedSummaries[0];
+  const highest = pricedSummaries.at(-1);
+  const spread =
+    lowest?.total !== undefined && highest?.total !== undefined ? highest.total - lowest.total : 0;
+  const average =
+    pricedSummaries.length > 0
+      ? pricedSummaries.reduce((sum, summary) => sum + (summary.total ?? 0), 0) /
+        pricedSummaries.length
+      : undefined;
+  const categorySummaries = categoryCostSummaries(comparison, interval);
+
+  return (
+    <section className="cost-dashboard" aria-label="Cost dashboard">
+      <div className="metric-grid">
+        <MetricCard
+          label="Lowest"
+          value={lowest ? formatCurrency(lowest.total ?? 0) : 'Pending'}
+          detail={lowest ? providerLabel(lowest.providerId) : 'Awaiting estimate'}
+          providerId={lowest?.providerId}
+        />
+        <MetricCard
+          label="Spread"
+          value={pricedSummaries.length > 1 ? formatCurrency(spread) : 'Pending'}
+          detail={pricedSummaries.length > 1 ? 'Highest minus lowest' : 'Need provider totals'}
+        />
+        <MetricCard
+          label="Average"
+          value={average !== undefined ? formatCurrency(average) : 'Pending'}
+          detail={`${capitalize(interval)} view`}
+        />
+        <MetricCard
+          label="Priced"
+          value={`${pricedSummaries.length}/3`}
+          detail="Providers available"
+        />
+      </div>
+
+      <div className="dashboard-grid">
+        <section className="dashboard-panel" aria-label="Provider spend chart">
+          <div className="panel-heading">
+            <h3>Provider Spend</h3>
+            <span>{capitalize(interval)}</span>
+          </div>
+          <div className="provider-bars">
+            {summaries.map((summary) => (
+              <div className="provider-bar-row" key={summary.providerId}>
+                <div className="bar-provider">
+                  <ProviderMark providerId={summary.providerId} />
+                  <strong>{providerLabel(summary.providerId)}</strong>
+                </div>
+                <div className="bar-track" aria-hidden="true">
+                  <span
+                    className={`bar-fill provider-fill-${summary.providerId}`}
+                    style={{ width: `${summary.percentOfMax}%` }}
+                  />
+                </div>
+                <span className="bar-value">
+                  {summary.total !== undefined ? formatCurrency(summary.total) : 'Pending'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="dashboard-panel" aria-label="Lowest provider category breakdown">
+          <div className="panel-heading">
+            <h3>Category Mix</h3>
+            <span>{lowest ? providerLabel(lowest.providerId) : 'Pending'}</span>
+          </div>
+          <div className="category-bars">
+            {categorySummaries.map((summary) => (
+              <div className="category-row" key={summary.category}>
+                <div>
+                  <span className={`category-dot category-${summary.category}`} />
+                  <strong>{capitalize(summary.category)}</strong>
+                </div>
+                <div className="bar-track" aria-hidden="true">
+                  <span
+                    className={`bar-fill category-fill category-${summary.category}`}
+                    style={{ width: `${summary.percentOfTotal}%` }}
+                  />
+                </div>
+                <span className="bar-value">{formatCurrency(summary.total)}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+    </section>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  detail,
+  providerId,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  providerId?: ProviderId;
+}) {
+  return (
+    <div className={providerId ? `metric-card metric-${providerId}` : 'metric-card'}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>
+        {providerId ? <ProviderMark providerId={providerId} /> : null}
+        {detail}
+      </small>
+    </div>
+  );
+}
+
 function Logo() {
   return (
     <svg className="logo" viewBox="0 0 32 32" role="img" aria-label="PolyCost">
@@ -791,6 +928,57 @@ function Logo() {
       <rect x="13" y="6" width="6" height="20" rx="1.5" fill="var(--pc-provider-azure)" />
       <rect x="23" y="6" width="6" height="20" rx="1.5" fill="var(--pc-provider-gcp)" />
       <rect x="2" y="26" width="28" height="2.5" rx="1.25" fill="var(--pc-text-primary)" />
+    </svg>
+  );
+}
+
+function ProviderMark({ providerId }: { providerId: ProviderId }) {
+  if (providerId === 'aws') {
+    return (
+      <svg
+        className="provider-mark"
+        viewBox="0 0 32 32"
+        role="img"
+        aria-label="AWS"
+        focusable="false"
+      >
+        <rect x="5" y="8" width="22" height="12" rx="3" />
+        <path d="M9 23c5 2.5 10 2.5 15 0" />
+        <path d="M22 21l4 2-4 2" />
+      </svg>
+    );
+  }
+
+  if (providerId === 'azure') {
+    return (
+      <svg
+        className="provider-mark"
+        viewBox="0 0 32 32"
+        role="img"
+        aria-label="Azure"
+        focusable="false"
+      >
+        <path d="M14.5 5 6 25h8.2L23 5z" />
+        <path d="M18.5 17.5 13.4 25H26z" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      className="provider-mark provider-mark-gcp"
+      viewBox="0 0 32 32"
+      role="img"
+      aria-label="GCP"
+      focusable="false"
+    >
+      <path className="gcp-blue" d="M10.2 22.8a8 8 0 0 1 1-13.4l2.2 3.8a3.7 3.7 0 0 0-1 6.5z" />
+      <path className="gcp-red" d="M11.2 9.4a8 8 0 0 1 10.8 1.9l-3.6 2.6a3.7 3.7 0 0 0-5-.7z" />
+      <path className="gcp-yellow" d="M22 11.3a8 8 0 0 1 .8 9.5l-3.7-2.4a3.7 3.7 0 0 0-.7-4.5z" />
+      <path
+        className="gcp-green"
+        d="M22.8 20.8A8 8 0 0 1 10.2 22.8l2.2-3.1a3.7 3.7 0 0 0 6.7-1.3z"
+      />
     </svg>
   );
 }
@@ -807,6 +995,40 @@ function ParseIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon">
       <path d="M5 5h14M5 12h10M5 19h7" />
+    </svg>
+  );
+}
+
+function ModeIcon({ mode }: { mode: InputMode }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="segment-icon">
+      {mode === 'describe' ? (
+        <path d="M5 7h14M5 12h10M5 17h6" />
+      ) : (
+        <path d="M5 5h6v6H5zM13 5h6v6h-6zM5 13h6v6H5zM13 13h6v6h-6z" />
+      )}
+    </svg>
+  );
+}
+
+function ThemeIcon({ choice }: { choice: ThemeChoice }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="segment-icon">
+      {choice === 'light' ? (
+        <path d="M12 4v2M12 18v2M4 12h2M18 12h2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M17.7 6.3l-1.4 1.4M7.7 16.3l-1.4 1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" />
+      ) : choice === 'dark' ? (
+        <path d="M19 14.4A7 7 0 0 1 9.6 5a7.5 7.5 0 1 0 9.4 9.4z" />
+      ) : (
+        <path d="M4 5h16v10H4zM9 19h6M12 15v4" />
+      )}
+    </svg>
+  );
+}
+
+function SampleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon">
+      <path d="M7 4h10v16H7zM10 8h4M10 12h4M10 16h2" />
     </svg>
   );
 }
@@ -853,12 +1075,94 @@ function costForInterval(provider: ComparisonProviderResult, interval: IntervalK
   }
 }
 
+function providerCostSummaries(
+  comparison: ComparisonResult | null,
+  interval: IntervalKey,
+): Array<{ providerId: ProviderId; total?: number; percentOfMax: number }> {
+  const providerResults = new Map<ProviderId, ComparisonProviderResult>(
+    comparison?.providers.map((provider) => [provider.providerId, provider]) ?? [],
+  );
+  const totals = PROVIDER_ORDER.map((providerId) => {
+    const provider = providerResults.get(providerId);
+    return {
+      providerId,
+      total: provider ? costForInterval(provider, interval) : undefined,
+    };
+  });
+  const maxTotal = Math.max(...totals.map((summary) => summary.total ?? 0), 0);
+
+  return totals
+    .map((summary) => ({
+      ...summary,
+      percentOfMax:
+        summary.total !== undefined && maxTotal > 0
+          ? Math.max(4, (summary.total / maxTotal) * 100)
+          : 0,
+    }))
+    .sort(
+      (left, right) =>
+        (left.total ?? Number.POSITIVE_INFINITY) - (right.total ?? Number.POSITIVE_INFINITY),
+    );
+}
+
+function categoryCostSummaries(
+  comparison: ComparisonResult | null,
+  interval: IntervalKey,
+): Array<{ category: ServiceCategory; total: number; percentOfTotal: number }> {
+  const cheapestProvider = comparison?.providers.find(
+    (provider) => provider.providerId === comparison.cheapestProviderId,
+  );
+  const intervalMultiplier = intervalCostMultiplier(interval);
+  const categoryTotals = new Map<ServiceCategory, number>(
+    SERVICE_CATEGORIES.map((category) => [category, 0]),
+  );
+
+  for (const lineItem of cheapestProvider?.lineItems ?? []) {
+    categoryTotals.set(
+      lineItem.category,
+      (categoryTotals.get(lineItem.category) ?? 0) +
+        lineItem.baseMonthlyCostUsd * intervalMultiplier,
+    );
+  }
+
+  const total = Array.from(categoryTotals.values()).reduce((sum, value) => sum + value, 0);
+
+  return SERVICE_CATEGORIES.map((category) => {
+    const categoryTotal = categoryTotals.get(category) ?? 0;
+
+    return {
+      category,
+      total: roundCurrency(categoryTotal),
+      percentOfTotal: total > 0 ? Math.max(4, (categoryTotal / total) * 100) : 0,
+    };
+  });
+}
+
+function intervalCostMultiplier(interval: IntervalKey): number {
+  switch (interval) {
+    case 'daily':
+      return 1 / 30;
+    case 'weekly':
+      return 7 / 30;
+    case 'monthly':
+      return 1;
+    case 'quarterly':
+      return 3;
+    case 'yearly':
+      return 12;
+  }
+}
+
 function compareButtonLabel(inputMode: InputMode, busyAction: BusyAction): string {
   if (busyAction === 'compare') {
     return inputMode === 'describe' ? 'Parsing' : 'Comparing';
   }
 
   return inputMode === 'describe' ? 'Parse & compare' : 'Compare';
+}
+
+function roundCurrency(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 function reviewMessage(confidence: string, fields: string[]): string {

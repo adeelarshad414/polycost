@@ -7,8 +7,8 @@ Phase 9 implemented these decisions in the Vite/React web app; see
 ## Resolved design decisions
 
 - Provider order is always AWS, Azure, GCP.
-- Provider colors are PolyCost-owned neutral accents, not official provider brand
-  colors.
+- Provider colors are PolyCost-owned AWS/Azure/GCP-inspired accents, not official
+  provider brand assets or trademark claims.
 - Cheapest provider is indicated with a success badge, not by reordering or
   recoloring provider columns.
 - Default theme preference is `system`, with explicit Light/Dark/System control.
@@ -24,6 +24,10 @@ Phase 9 implemented these decisions in the Vite/React web app; see
   complete.
 - Build a reusable provider comparison panel with identical dimensions and states
   across all three providers: complete.
+- Build a dynamic dashboard with summary metrics, provider spend bars, and category
+  mix charts above the detailed provider panels: complete.
+- Use inline SVG provider marks in buttons/charts/cards so the comparison is
+  scannable without relying only on text: complete.
 - Add a print stylesheet for the on-screen comparison view in addition to generated
   PDF reports: complete.
 - Add accessibility checks for visible focus, keyboard navigation, reduced motion,

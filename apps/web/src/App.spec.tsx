@@ -214,6 +214,30 @@ describe('ComparisonView', () => {
 
     unmount();
   });
+
+  it('renders dashboard metrics and dynamic provider charts', () => {
+    const { container, unmount } = render(
+      <ComparisonView comparison={comparisonResult} interval="monthly" />,
+    );
+
+    expect(text(container)).toContain('Provider Spend');
+    expect(text(container)).toContain('Category Mix');
+    expect(text(container)).toContain('Lowest');
+    expect(text(container)).toContain('Average');
+    expect(text(container)).toContain('$36.67');
+    expect(text(container)).toContain('3/3');
+    expect(providerChartLabels(container)).toEqual(['GCP', 'Azure', 'AWS']);
+
+    const gcpBar = container.querySelector('.provider-fill-gcp');
+    const awsBar = container.querySelector('.provider-fill-aws');
+
+    expect(gcpBar).toBeInstanceOf(HTMLElement);
+    expect(awsBar).toBeInstanceOf(HTMLElement);
+    expect((gcpBar as HTMLElement).style.width).toBe('71.42857142857143%');
+    expect((awsBar as HTMLElement).style.width).toBe('100%');
+
+    unmount();
+  });
 });
 
 function render(ui: React.ReactElement): { container: HTMLElement; unmount: () => void } {
@@ -306,6 +330,12 @@ function buttonByText(container: HTMLElement, label: string): HTMLButtonElement 
 function providerHeadings(container: HTMLElement): string[] {
   return Array.from(container.querySelectorAll('.provider-card h2')).map(
     (heading) => heading.textContent ?? '',
+  );
+}
+
+function providerChartLabels(container: HTMLElement): string[] {
+  return Array.from(container.querySelectorAll('.provider-bars .bar-provider strong')).map(
+    (label) => label.textContent ?? '',
   );
 }
 
