@@ -78,8 +78,27 @@ describe('App', () => {
     expect(text(container)).toContain('Save vs next');
     expect(text(container)).toContain('$8.00');
     expect(text(container)).toContain('Official calculators');
+    expect(text(container)).toContain('Official region and zone maps');
+    expect(text(container)).toContain('AWS Regions & AZs');
+    expect(text(container)).toContain('Azure Regions & AZs');
+    expect(text(container)).toContain('GCP Regions & Zones');
     expect(
       container.querySelector<HTMLAnchorElement>('a[href="https://calculator.aws/#/"]'),
+    ).toBeInstanceOf(HTMLAnchorElement);
+    expect(
+      container.querySelector<HTMLAnchorElement>(
+        'a[href="https://aws.amazon.com/about-aws/global-infrastructure/regions_az/"]',
+      ),
+    ).toBeInstanceOf(HTMLAnchorElement);
+    expect(
+      container.querySelector<HTMLAnchorElement>(
+        'a[href="https://learn.microsoft.com/en-us/azure/reliability/availability-zones-region-support"]',
+      ),
+    ).toBeInstanceOf(HTMLAnchorElement);
+    expect(
+      container.querySelector<HTMLAnchorElement>(
+        'a[href="https://cloud.google.com/compute/docs/regions-zones"]',
+      ),
     ).toBeInstanceOf(HTMLAnchorElement);
 
     await click(resultTabByText(container, 'Engineering View'));

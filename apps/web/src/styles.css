@@ -1739,10 +1739,20 @@ select:disabled {
   overflow-wrap: anywhere;
 }
 
+.calculator-links-subheading {
+  margin-top: var(--pc-space-1);
+  border-top: 1px solid var(--pc-border);
+  padding-top: var(--pc-space-1);
+}
+
 .calculator-link-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--pc-space-1);
+}
+
+.region-link-grid {
+  grid-template-columns: 1fr;
 }
 
 .calculator-link {
@@ -1777,6 +1787,21 @@ select:disabled {
 .calculator-link span {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.region-link .provider-mark {
+  width: 22px;
+  height: 22px;
+  border-color: color-mix(in srgb, currentColor 42%, var(--pc-border));
+}
+
+.region-link {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.region-link span {
+  flex: 1;
 }
 
 .calculator-link svg {

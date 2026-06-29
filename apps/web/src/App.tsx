@@ -67,6 +67,12 @@ const DEFAULT_CALCULATOR_URLS: Record<ProviderId, string> = {
   gcp: 'https://cloud.google.com/products/calculator',
 };
 
+const DEFAULT_REGION_REFERENCE_URLS: Record<ProviderId, string> = {
+  aws: 'https://aws.amazon.com/about-aws/global-infrastructure/regions_az/',
+  azure: 'https://learn.microsoft.com/en-us/azure/reliability/availability-zones-region-support',
+  gcp: 'https://cloud.google.com/compute/docs/regions-zones',
+};
+
 const FALLBACK_REGION_CATALOG: RegionCatalogResponse = {
   generatedAt: 'fallback',
   cacheTtlSeconds: 0,
@@ -1541,7 +1547,7 @@ function CloudCalculatorLinks({ regionCatalog }: { regionCatalog: RegionCatalogR
   );
 
   return (
-    <section className="calculator-links" aria-label="Official cloud pricing calculators">
+    <section className="calculator-links" aria-label="Official cloud pricing and region references">
       <div className="calculator-links-heading">
         <span>Official calculators</span>
         <strong>Validate regional pricing</strong>
@@ -1565,6 +1571,25 @@ function CloudCalculatorLinks({ regionCatalog }: { regionCatalog: RegionCatalogR
             </a>
           );
         })}
+      </div>
+      <div className="calculator-links-heading calculator-links-subheading">
+        <span>Official region and zone maps</span>
+        <strong>Check regions, AZs, and zones</strong>
+      </div>
+      <div className="calculator-link-grid region-link-grid">
+        {PROVIDER_ORDER.map((providerId) => (
+          <a
+            key={providerId}
+            className={`calculator-link region-link calculator-link-${providerId}`}
+            href={regionReferenceUrl(providerId)}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <ProviderMark providerId={providerId} />
+            <span>{regionReferenceLabel(providerId)}</span>
+            <ExternalLinkIcon />
+          </a>
+        ))}
       </div>
     </section>
   );
@@ -2970,6 +2995,28 @@ function defaultCalculatorUrl(providerId: ProviderId): string {
       return DEFAULT_CALCULATOR_URLS.azure;
     case 'gcp':
       return DEFAULT_CALCULATOR_URLS.gcp;
+  }
+}
+
+function regionReferenceUrl(providerId: ProviderId): string {
+  switch (providerId) {
+    case 'aws':
+      return DEFAULT_REGION_REFERENCE_URLS.aws;
+    case 'azure':
+      return DEFAULT_REGION_REFERENCE_URLS.azure;
+    case 'gcp':
+      return DEFAULT_REGION_REFERENCE_URLS.gcp;
+  }
+}
+
+function regionReferenceLabel(providerId: ProviderId): string {
+  switch (providerId) {
+    case 'aws':
+      return 'AWS Regions & AZs';
+    case 'azure':
+      return 'Azure Regions & AZs';
+    case 'gcp':
+      return 'GCP Regions & Zones';
   }
 }
 
