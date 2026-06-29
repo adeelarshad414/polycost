@@ -220,13 +220,28 @@ describe('ComparisonView', () => {
       <ComparisonView comparison={comparisonResult} interval="monthly" />,
     );
 
+    expect(text(container)).toContain('Decision Brief');
     expect(text(container)).toContain('Provider Spend');
     expect(text(container)).toContain('Category Mix');
+    expect(text(container)).toContain('Provider Ranking');
+    expect(text(container)).toContain('Interval Outlook');
+    expect(text(container)).toContain('Category Heatmap');
     expect(text(container)).toContain('Lowest');
     expect(text(container)).toContain('Average');
     expect(text(container)).toContain('$36.67');
     expect(text(container)).toContain('3/3');
+    expect(text(container)).toContain('GCP leads Monthly');
+    expect(text(container)).toContain('Save vs next');
+    expect(text(container)).toContain('Approximate lines');
     expect(providerChartLabels(container)).toEqual(['GCP', 'Azure', 'AWS']);
+    expect(rankingProviderLabels(container)).toEqual(['GCP', 'Azure', 'AWS']);
+    expect(intervalLabels(container)).toEqual([
+      'Daily',
+      'Weekly',
+      'Monthly',
+      'Quarterly',
+      'Yearly',
+    ]);
 
     const gcpBar = container.querySelector('.provider-fill-gcp');
     const awsBar = container.querySelector('.provider-fill-aws');
@@ -235,6 +250,50 @@ describe('ComparisonView', () => {
     expect(awsBar).toBeInstanceOf(HTMLElement);
     expect((gcpBar as HTMLElement).style.width).toBe('71.42857142857143%');
     expect((awsBar as HTMLElement).style.width).toBe('100%');
+
+    unmount();
+  });
+
+  it('renders cross-provider ranking and category heatmap from multi-category costs', () => {
+    const richResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'azure',
+      providers: [
+        providerWithItems('aws', [
+          ['compute', 'aws compute', 50],
+          ['storage', 'aws storage', 10],
+          ['database', 'aws database', 20],
+          ['network', 'aws network', 5],
+        ]),
+        providerWithItems('azure', [
+          ['compute', 'azure compute', 40],
+          ['storage', 'azure storage', 8],
+          ['database', 'azure database', 18],
+          ['network', 'azure network', 4],
+        ]),
+        providerWithItems('gcp', [
+          ['compute', 'gcp compute', 60, true],
+          ['storage', 'gcp storage', 12, true],
+          ['database', 'gcp database', 30, true],
+          ['network', 'gcp network', 6, true],
+        ]),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView comparison={richResult} interval="monthly" />,
+    );
+
+    expect(text(container)).toContain('Azure leads Monthly');
+    expect(text(container)).toContain('$15.00');
+    expect(text(container)).toContain('$38.00');
+    expect(text(container)).toContain('4');
+    expect(rankingProviderLabels(container)).toEqual(['Azure', 'AWS', 'GCP']);
+    expect(heatmapRows(container)).toEqual([
+      'Compute$50.00$40.00$60.00',
+      'Storage$10.00$8.00$12.00',
+      'Database$20.00$18.00$30.00',
+      'Network$5.00$4.00$6.00',
+    ]);
 
     unmount();
   });
@@ -339,6 +398,24 @@ function providerChartLabels(container: HTMLElement): string[] {
   );
 }
 
+function rankingProviderLabels(container: HTMLElement): string[] {
+  return Array.from(container.querySelectorAll('.ranking-table .rank-provider')).map(
+    (label) => label.textContent ?? '',
+  );
+}
+
+function intervalLabels(container: HTMLElement): string[] {
+  return Array.from(container.querySelectorAll('.interval-row > strong')).map(
+    (label) => label.textContent ?? '',
+  );
+}
+
+function heatmapRows(container: HTMLElement): string[] {
+  return Array.from(container.querySelectorAll('.heatmap-row:not(.heatmap-head)')).map((row) =>
+    (row.textContent ?? '').replace(/\s+/g, ''),
+  );
+}
+
 function text(container: HTMLElement): string {
   return container.textContent ?? '';
 }
@@ -383,6 +460,37 @@ function provider(
         baseMonthlyCostUsd: monthly,
       },
     ],
+    totals: {
+      daily: monthly / 30,
+      weekly: (monthly / 30) * 7,
+      monthly,
+      quarterly: monthly * 3,
+      yearly: monthly * 12,
+    },
+  };
+}
+
+function providerWithItems(
+  providerId: ComparisonResult['providers'][number]['providerId'],
+  lineItems: Array<
+    [
+      ComparisonResult['providers'][number]['lineItems'][number]['category'],
+      string,
+      number,
+      boolean?,
+    ]
+  >,
+): ComparisonResult['providers'][number] {
+  const monthly = lineItems.reduce((sum, [, , cost]) => sum + cost, 0);
+
+  return {
+    providerId,
+    lineItems: lineItems.map(([category, description, baseMonthlyCostUsd, isApproximate]) => ({
+      category,
+      description,
+      isApproximate: Boolean(isApproximate),
+      baseMonthlyCostUsd,
+    })),
     totals: {
       daily: monthly / 30,
       weekly: (monthly / 30) * 7,

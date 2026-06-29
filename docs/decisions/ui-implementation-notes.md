@@ -26,6 +26,8 @@ Phase 9 implemented these decisions in the Vite/React web app; see
   across all three providers: complete.
 - Build a dynamic dashboard with summary metrics, provider spend bars, and category
   mix charts above the detailed provider panels: complete.
+- Add decision-support surfaces for ranking, deltas, interval outlook, approximation
+  counts, and cross-provider category comparison: complete.
 - Use inline SVG provider marks in buttons/charts/cards so the comparison is
   scannable without relying only on text: complete.
 - Add a print stylesheet for the on-screen comparison view in addition to generated

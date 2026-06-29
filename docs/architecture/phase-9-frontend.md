@@ -42,8 +42,9 @@ all call `/comparisons/:id/export` and download the returned Blob locally.
 Provider order is fixed as AWS, Azure, GCP in every state. Desktop renders a dynamic
 cost dashboard followed by the three provider panels as equal columns. The dashboard
 summarizes lowest cost, spread, average cost, provider coverage, provider spend bars,
-and the cheapest provider's category mix. Mobile keeps the same provider order,
-shows a sticky totals bar, stacks dashboard charts, and makes provider cards
+the cheapest provider's category mix, a decision brief, provider ranking table,
+interval outlook, and cross-provider category heatmap. Mobile keeps the same provider
+order, shows a sticky totals bar, stacks dashboard charts, and makes provider cards
 horizontally scrollable.
 
 The app uses native form controls, semantic regions, labelled comparison sections,
@@ -75,7 +76,8 @@ specific provider failed to produce pricing.
 Phase 9 frontend tests cover the API client, NWS form mapping, theme helpers, the
 structured-form comparison flow, natural-language parse flow, error rendering,
 provider ordering, unavailable-provider states, dashboard metrics, dynamic provider
-chart sizing, interval switching, refresh, and exports.
+chart sizing, decision brief, provider ranking, interval outlook, category heatmap,
+interval switching, refresh, and exports.
 
 Browser smoke against the Docker-served app passed on desktop and mobile. Desktop
 verified the initial pending state, the plain-English `Parse & compare` journey,

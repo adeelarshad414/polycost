@@ -25,6 +25,23 @@ type ServiceCategory = ComparisonProviderResult['lineItems'][number]['category']
 
 const SERVICE_CATEGORIES: ServiceCategory[] = ['compute', 'storage', 'database', 'network'];
 
+interface CategoryCostSummary {
+  category: ServiceCategory;
+  total: number;
+  percentOfTotal: number;
+}
+
+interface ProviderCostSummary {
+  providerId: ProviderId;
+  total?: number;
+  percentOfMax: number;
+  deltaFromLowest?: number;
+  percentOverLowest?: number;
+  approximateCount: number;
+  lineItemCount: number;
+  categoryTotals: CategoryCostSummary[];
+}
+
 interface AppProps {
   client?: PolyCostClient;
 }
@@ -774,7 +791,9 @@ function ProviderPanel({
               )} monthly`}
             >
               <div>
-                <span className="line-category">{item.category}</span>
+                <span className={`line-category line-category-${item.category}`}>
+                  {item.category}
+                </span>
                 <span
                   className={
                     item.isApproximate ? 'line-description approximate' : 'line-description'
@@ -807,6 +826,7 @@ function CostDashboard({
   const summaries = providerCostSummaries(comparison, interval);
   const pricedSummaries = summaries.filter((summary) => summary.total !== undefined);
   const lowest = pricedSummaries[0];
+  const secondLowest = pricedSummaries[1];
   const highest = pricedSummaries.at(-1);
   const spread =
     lowest?.total !== undefined && highest?.total !== undefined ? highest.total - lowest.total : 0;
@@ -842,6 +862,18 @@ function CostDashboard({
           detail="Providers available"
         />
       </div>
+
+      <DecisionBrief
+        lowest={lowest}
+        secondLowest={secondLowest}
+        highest={highest}
+        interval={interval}
+        pricedCount={pricedSummaries.length}
+        approximateCount={pricedSummaries.reduce(
+          (count, summary) => count + summary.approximateCount,
+          0,
+        )}
+      />
 
       <div className="dashboard-grid">
         <section className="dashboard-panel" aria-label="Provider spend chart">
@@ -893,6 +925,220 @@ function CostDashboard({
             ))}
           </div>
         </section>
+      </div>
+
+      <div className="analysis-grid">
+        <ProviderRanking summaries={summaries} interval={interval} />
+        <IntervalOutlook comparison={comparison} />
+        <CategoryHeatmap summaries={summaries} />
+      </div>
+    </section>
+  );
+}
+
+function DecisionBrief({
+  lowest,
+  secondLowest,
+  highest,
+  interval,
+  pricedCount,
+  approximateCount,
+}: {
+  lowest?: ProviderCostSummary;
+  secondLowest?: ProviderCostSummary;
+  highest?: ProviderCostSummary;
+  interval: IntervalKey;
+  pricedCount: number;
+  approximateCount: number;
+}) {
+  const saveVsNext =
+    lowest?.total !== undefined && secondLowest?.total !== undefined
+      ? secondLowest.total - lowest.total
+      : undefined;
+  const saveVsHighest =
+    lowest?.total !== undefined && highest?.total !== undefined ? highest.total - lowest.total : 0;
+
+  return (
+    <section className="decision-brief" aria-label="Decision brief">
+      <div className="decision-lede">
+        {lowest ? <ProviderMark providerId={lowest.providerId} /> : null}
+        <div>
+          <span>Decision Brief</span>
+          <strong>
+            {lowest
+              ? `${providerLabel(lowest.providerId)} leads ${capitalize(interval)}`
+              : 'Awaiting estimate'}
+          </strong>
+        </div>
+      </div>
+
+      <div className="insight-chip-row">
+        <InsightChip
+          label="Save vs next"
+          value={saveVsNext !== undefined ? formatCurrency(saveVsNext) : 'Pending'}
+        />
+        <InsightChip
+          label="Save vs highest"
+          value={pricedCount > 1 ? formatCurrency(saveVsHighest) : 'Pending'}
+        />
+        <InsightChip label="Priced providers" value={`${pricedCount}/3`} />
+        <InsightChip
+          label="Approximate lines"
+          value={approximateCount > 0 ? String(approximateCount) : '0'}
+          tone={approximateCount > 0 ? 'warning' : 'success'}
+        />
+      </div>
+    </section>
+  );
+}
+
+function InsightChip({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: 'success' | 'warning';
+}) {
+  return (
+    <div className={tone ? `insight-chip insight-${tone}` : 'insight-chip'}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function ProviderRanking({
+  summaries,
+  interval,
+}: {
+  summaries: ProviderCostSummary[];
+  interval: IntervalKey;
+}) {
+  return (
+    <section className="dashboard-panel ranking-panel" aria-label="Provider ranking">
+      <div className="panel-heading">
+        <h3>Provider Ranking</h3>
+        <span>{capitalize(interval)}</span>
+      </div>
+      <div className="table-wrap">
+        <table className="ranking-table">
+          <thead>
+            <tr>
+              <th scope="col">Rank</th>
+              <th scope="col">Provider</th>
+              <th scope="col">Cost</th>
+              <th scope="col">Delta</th>
+              <th scope="col">Over Low</th>
+              <th scope="col">Approx</th>
+            </tr>
+          </thead>
+          <tbody>
+            {summaries.map((summary, index) => (
+              <tr key={summary.providerId}>
+                <td>{summary.total !== undefined ? `#${index + 1}` : '-'}</td>
+                <td>
+                  <span className="rank-provider">
+                    <ProviderMark providerId={summary.providerId} />
+                    {providerLabel(summary.providerId)}
+                  </span>
+                </td>
+                <td>{summary.total !== undefined ? formatCurrency(summary.total) : 'Pending'}</td>
+                <td>
+                  {summary.deltaFromLowest !== undefined
+                    ? formatSignedCurrency(summary.deltaFromLowest)
+                    : 'Pending'}
+                </td>
+                <td>
+                  {summary.percentOverLowest !== undefined
+                    ? formatPercent(summary.percentOverLowest)
+                    : 'Pending'}
+                </td>
+                <td>{summary.approximateCount}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function IntervalOutlook({ comparison }: { comparison: ComparisonResult | null }) {
+  const rows = intervalOutlookRows(comparison);
+
+  return (
+    <section className="dashboard-panel interval-panel" aria-label="Interval outlook">
+      <div className="panel-heading">
+        <h3>Interval Outlook</h3>
+        <span>All periods</span>
+      </div>
+      <div className="interval-outlook">
+        {rows.map((row) => (
+          <div className="interval-row" key={row.interval}>
+            <strong>{row.label}</strong>
+            <div className="interval-provider-strip">
+              {row.providers.map((provider) => (
+                <span
+                  className={`interval-pill interval-${provider.providerId}`}
+                  key={provider.providerId}
+                >
+                  <span
+                    className={`interval-fill provider-fill-${provider.providerId}`}
+                    style={{ width: `${provider.percentOfMax}%` }}
+                  />
+                  <span className="interval-content">
+                    <ProviderMark providerId={provider.providerId} />
+                    {provider.total !== undefined ? formatCurrency(provider.total) : 'Pending'}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CategoryHeatmap({ summaries }: { summaries: ProviderCostSummary[] }) {
+  const rows = categoryHeatmapRows(summaries);
+
+  return (
+    <section className="dashboard-panel heatmap-panel" aria-label="Category heatmap">
+      <div className="panel-heading">
+        <h3>Category Heatmap</h3>
+        <span>Current view</span>
+      </div>
+      <div className="heatmap-grid" role="table" aria-label="Provider category costs">
+        <div className="heatmap-row heatmap-head" role="row">
+          <span role="columnheader">Category</span>
+          {PROVIDER_ORDER.map((providerId) => (
+            <span role="columnheader" key={providerId}>
+              {providerLabel(providerId)}
+            </span>
+          ))}
+        </div>
+        {rows.map((row) => (
+          <div className="heatmap-row" role="row" key={row.category}>
+            <strong role="rowheader">
+              <span className={`category-dot category-${row.category}`} />
+              {capitalize(row.category)}
+            </strong>
+            {row.providers.map((provider) => (
+              <span className="heat-cell" role="cell" key={provider.providerId}>
+                <span
+                  className={`heat-fill provider-fill-${provider.providerId}`}
+                  style={{ width: `${provider.percentOfMax}%` }}
+                />
+                <span>
+                  {provider.total !== undefined ? formatCurrency(provider.total) : 'Pending'}
+                </span>
+              </span>
+            ))}
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -1078,18 +1324,30 @@ function costForInterval(provider: ComparisonProviderResult, interval: IntervalK
 function providerCostSummaries(
   comparison: ComparisonResult | null,
   interval: IntervalKey,
-): Array<{ providerId: ProviderId; total?: number; percentOfMax: number }> {
+): ProviderCostSummary[] {
   const providerResults = new Map<ProviderId, ComparisonProviderResult>(
     comparison?.providers.map((provider) => [provider.providerId, provider]) ?? [],
   );
   const totals = PROVIDER_ORDER.map((providerId) => {
     const provider = providerResults.get(providerId);
+
     return {
       providerId,
       total: provider ? costForInterval(provider, interval) : undefined,
+      approximateCount:
+        provider?.lineItems.filter((lineItem) => lineItem.isApproximate).length ?? 0,
+      lineItemCount: provider?.lineItems.length ?? 0,
+      categoryTotals: provider
+        ? categoryTotalsForLineItems(provider.lineItems, interval)
+        : emptyCategoryTotals(),
     };
   });
   const maxTotal = Math.max(...totals.map((summary) => summary.total ?? 0), 0);
+  const lowestTotal = Math.min(
+    ...totals
+      .map((summary) => summary.total)
+      .filter((total): total is number => total !== undefined),
+  );
 
   return totals
     .map((summary) => ({
@@ -1098,6 +1356,14 @@ function providerCostSummaries(
         summary.total !== undefined && maxTotal > 0
           ? Math.max(4, (summary.total / maxTotal) * 100)
           : 0,
+      deltaFromLowest:
+        summary.total !== undefined && Number.isFinite(lowestTotal)
+          ? roundCurrency(summary.total - lowestTotal)
+          : undefined,
+      percentOverLowest:
+        summary.total !== undefined && Number.isFinite(lowestTotal) && lowestTotal > 0
+          ? ((summary.total - lowestTotal) / lowestTotal) * 100
+          : undefined,
     }))
     .sort(
       (left, right) =>
@@ -1108,16 +1374,26 @@ function providerCostSummaries(
 function categoryCostSummaries(
   comparison: ComparisonResult | null,
   interval: IntervalKey,
-): Array<{ category: ServiceCategory; total: number; percentOfTotal: number }> {
+): CategoryCostSummary[] {
   const cheapestProvider = comparison?.providers.find(
     (provider) => provider.providerId === comparison.cheapestProviderId,
   );
+
+  return cheapestProvider
+    ? categoryTotalsForLineItems(cheapestProvider.lineItems, interval)
+    : emptyCategoryTotals();
+}
+
+function categoryTotalsForLineItems(
+  lineItems: ComparisonProviderResult['lineItems'],
+  interval: IntervalKey,
+): CategoryCostSummary[] {
   const intervalMultiplier = intervalCostMultiplier(interval);
   const categoryTotals = new Map<ServiceCategory, number>(
     SERVICE_CATEGORIES.map((category) => [category, 0]),
   );
 
-  for (const lineItem of cheapestProvider?.lineItems ?? []) {
+  for (const lineItem of lineItems) {
     categoryTotals.set(
       lineItem.category,
       (categoryTotals.get(lineItem.category) ?? 0) +
@@ -1134,6 +1410,81 @@ function categoryCostSummaries(
       category,
       total: roundCurrency(categoryTotal),
       percentOfTotal: total > 0 ? Math.max(4, (categoryTotal / total) * 100) : 0,
+    };
+  });
+}
+
+function emptyCategoryTotals(): CategoryCostSummary[] {
+  return SERVICE_CATEGORIES.map((category) => ({
+    category,
+    total: 0,
+    percentOfTotal: 0,
+  }));
+}
+
+function intervalOutlookRows(comparison: ComparisonResult | null): Array<{
+  interval: IntervalKey;
+  label: string;
+  providers: Array<{ providerId: ProviderId; total?: number; percentOfMax: number }>;
+}> {
+  const providerResults = new Map<ProviderId, ComparisonProviderResult>(
+    comparison?.providers.map((provider) => [provider.providerId, provider]) ?? [],
+  );
+
+  return INTERVALS.map(({ key, label }) => {
+    const providers = PROVIDER_ORDER.map((providerId) => {
+      const provider = providerResults.get(providerId);
+
+      return {
+        providerId,
+        total: provider ? costForInterval(provider, key) : undefined,
+      };
+    });
+    const maxTotal = Math.max(...providers.map((provider) => provider.total ?? 0), 0);
+
+    return {
+      interval: key,
+      label,
+      providers: providers.map((provider) => ({
+        ...provider,
+        percentOfMax:
+          provider.total !== undefined && maxTotal > 0
+            ? Math.max(4, (provider.total / maxTotal) * 100)
+            : 0,
+      })),
+    };
+  });
+}
+
+function categoryHeatmapRows(summaries: ProviderCostSummary[]): Array<{
+  category: ServiceCategory;
+  providers: Array<{ providerId: ProviderId; total?: number; percentOfMax: number }>;
+}> {
+  const summaryMap = new Map<ProviderId, ProviderCostSummary>(
+    summaries.map((summary) => [summary.providerId, summary]),
+  );
+
+  return SERVICE_CATEGORIES.map((category) => {
+    const providers = PROVIDER_ORDER.map((providerId) => {
+      const summary = summaryMap.get(providerId);
+      const categoryTotal = summary?.categoryTotals.find((item) => item.category === category);
+
+      return {
+        providerId,
+        total: summary?.total !== undefined ? (categoryTotal?.total ?? 0) : undefined,
+      };
+    });
+    const maxTotal = Math.max(...providers.map((provider) => provider.total ?? 0), 0);
+
+    return {
+      category,
+      providers: providers.map((provider) => ({
+        ...provider,
+        percentOfMax:
+          provider.total !== undefined && maxTotal > 0
+            ? Math.max(4, (provider.total / maxTotal) * 100)
+            : 0,
+      })),
     };
   });
 }
@@ -1177,6 +1528,20 @@ function formatCurrency(value: number): string {
     currency: 'USD',
     maximumFractionDigits: 2,
   }).format(value);
+}
+
+function formatSignedCurrency(value: number): string {
+  if (value === 0) {
+    return '$0.00';
+  }
+
+  return `${value > 0 ? '+' : '-'}${formatCurrency(Math.abs(value))}`;
+}
+
+function formatPercent(value: number): string {
+  return `${value.toLocaleString('en-US', {
+    maximumFractionDigits: value > 0 && value < 10 ? 1 : 0,
+  })}%`;
 }
 
 function formatDate(value: string): string {

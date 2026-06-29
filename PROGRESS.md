@@ -542,6 +542,33 @@ compare`; anonymous UI no longer calls the admin-only pricing-status endpoint; a
 - Checkpoint: dashboard/theme enhancement is complete. Continue Phase 10 acceptance
   work from the upgraded comparison UI.
 
+## Post-Phase 9 deep comparison polish
+
+**Status:** Complete
+**Date:** 2026-06-29
+
+- Frontend upgrades: added a decision brief, savings-vs-next and savings-vs-highest
+  chips, provider ranking table with deltas and percent-over-lowest, interval outlook
+  bars across daily/weekly/monthly/quarterly/yearly, and a cross-provider category
+  heatmap.
+- Refinements: provider line-item categories now carry category accents, estimate
+  quality includes approximate-line counts, heatmap/ranking tables scroll within
+  their panels on narrow screens, and all new chart surfaces share the existing
+  AWS/Azure/GCP-inspired token system.
+- Runtime verification: rebuilt the Docker web image and browser-smoked
+  `http://localhost:3000` at desktop `1280x720` and mobile `390x844`. The
+  `Parse & compare` flow produced populated decision brief, ranking, interval
+  outlook, category heatmap, provider cards, and exports with stable AWS/Azure/GCP
+  order, no page overflow, no visible text overflow, and no console errors.
+- Test coverage: web workspace coverage is 94.7% statements, 88.5% branches, 95.15%
+  functions, and 94.57% lines.
+- Tests/checks passing: `npm run format:check`, `npm run ci:lint`,
+  `npm run test:unit`, `npm run test:coverage --workspace @polycost/web`,
+  `npm run build`, Docker Compose web rebuild/start, direct Docker Compose health
+  check, web/API HTTP smoke checks, and browser responsive smoke.
+- Checkpoint: deep comparison polish is complete. Phase 10 acceptance work can now
+  validate a richer decision-grade UI.
+
 ## Phase 10 - E2E verification against MVP acceptance criteria
 
 **Status:** Not started
