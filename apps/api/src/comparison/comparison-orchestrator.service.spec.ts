@@ -181,6 +181,85 @@ describe('ComparisonOrchestratorService', () => {
     ]);
   });
 
+  it('returns pricing-model availability and a scoped workload breakdown', async () => {
+    const richProviderResult: ProviderPricingResult = {
+      providerId: 'aws',
+      baseMonthlyCostUsd: 145,
+      lineItems: [
+        {
+          category: 'compute',
+          costComponent: 'compute',
+          description: 'aws compute',
+          isApproximate: false,
+          baseMonthlyCostUsd: 100,
+          skuId: 'aws-compute',
+          unit: 'hour',
+          unitPriceUsd: 0.14,
+          pricingBasis: 'flat',
+          pricingModels: [
+            { model: 'on-demand', available: true, monthlyCostUsd: 100 },
+            { model: 'reserved-1yr', available: true, monthlyCostUsd: 80 },
+            { model: 'reserved-3yr', available: true, monthlyCostUsd: 50 },
+          ],
+        },
+        {
+          category: 'storage',
+          costComponent: 'storage',
+          description: 'aws storage',
+          isApproximate: false,
+          baseMonthlyCostUsd: 10,
+          skuId: 'aws-storage',
+          unit: 'GB-Mo',
+          unitPriceUsd: 0.02,
+          pricingBasis: 'flat',
+        },
+        {
+          category: 'network',
+          costComponent: 'egress',
+          description: 'aws internet egress',
+          isApproximate: false,
+          baseMonthlyCostUsd: 15,
+          skuId: 'aws-egress',
+          unit: 'GB',
+          unitPriceUsd: 0.09,
+          pricingBasis: 'tiered',
+        },
+        {
+          category: 'database',
+          costComponent: 'database',
+          description: 'aws database',
+          isApproximate: false,
+          baseMonthlyCostUsd: 20,
+          skuId: 'aws-database',
+          unit: 'hour',
+          unitPriceUsd: 0.03,
+          pricingBasis: 'flat',
+        },
+      ],
+    };
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async () => richProviderResult),
+      ),
+    ]);
+
+    const result = await service.compare(validWorkload);
+
+    expect(result.providers[0].pricingModels).toEqual([
+      { model: 'on-demand', available: true, monthlyCostUsd: 145 },
+      { model: 'reserved-1yr', available: true, monthlyCostUsd: 125 },
+      { model: 'reserved-3yr', available: true, monthlyCostUsd: 95 },
+    ]);
+    expect(result.providers[0].breakdown).toEqual({
+      computeMonthlyCostUsd: 100,
+      storageMonthlyCostUsd: 10,
+      egressMonthlyCostUsd: 15,
+      databaseMonthlyCostUsd: 20,
+      scopedMonthlyCostUsd: 125,
+    });
+  });
+
   it('uses a safe warning when a provider fails without an Error object', async () => {
     const service = createService([
       adapter(

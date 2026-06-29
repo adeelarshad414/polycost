@@ -1,0 +1,6 @@
+<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title id="title">PolyCost</title>
+  <rect x="2" y="7" width="3" height="7" rx="0.8" fill="#D85A30"/>
+  <rect x="6.5" y="4.5" width="3" height="9.5" rx="0.8" fill="#378ADD"/>
+  <rect x="11" y="1.5" width="3" height="12.5" rx="0.8" fill="#1D9E75"/>
+</svg>

@@ -1,8 +1,11 @@
 import { NWSValidator } from '../../nws/nws-validator';
 import {
   CloudProviderAdapter,
+  CostComponent,
   PricingCatalogReader,
   PricingCatalogRecord,
+  PricingModelCost,
+  PricingModelKey,
   ProviderId,
   ProviderPricingLineItem,
   ProviderPricingResult,
@@ -12,6 +15,18 @@ import {
 import { AdapterPricingError } from './adapter-errors';
 
 const HOURS_PER_MONTH = 730;
+const COMMITMENT_PRICING_MODELS: PricingModelKey[] = ['reserved-1yr', 'reserved-3yr'];
+const PRICING_MODEL_UNAVAILABLE = 'Not available for this configuration.';
+
+interface EgressTier {
+  startGb: number;
+  unitPriceUsd: number;
+}
+
+interface CostCalculation {
+  monthlyCostUsd: number;
+  pricingBasis: 'flat' | 'tiered';
+}
 
 export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
   abstract readonly providerId: ProviderId;
@@ -27,13 +42,28 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     const lineItems: ProviderPricingLineItem[] = [];
 
     for (const component of nws.compute) {
-      const record = await this.selectComputeRecord(region, component.vcpu, component.memoryGb);
+      const record = await this.selectComputeRecord(
+        region,
+        component.vcpu,
+        component.memoryGb,
+        'on-demand',
+      );
       const quantity =
         component.scalingType === 'autoscaling' && component.autoscalingRange
           ? (component.autoscalingRange.min + component.autoscalingRange.max) / 2
           : (component.instanceCount ?? 1);
 
-      lineItems.push(this.toLineItem('compute', record, quantity, `${component.role} compute`));
+      lineItems.push(
+        this.toLineItem('compute', record, quantity, `${component.role} compute`, {
+          pricingModels: await this.computePricingModels(
+            region,
+            component.vcpu,
+            component.memoryGb,
+            quantity,
+            record,
+          ),
+        }),
+      );
     }
 
     for (const component of nws.storage) {
@@ -143,16 +173,93 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     region: string,
     vcpu?: number,
     memoryGb?: number,
+    pricingModel: PricingModelKey = 'on-demand',
   ): Promise<PricingCatalogRecord> {
-    return this.selectRecord('compute', region, (candidate) => {
+    return this.selectRecord(
+      'compute',
+      region,
+      this.computeRecordPredicate(vcpu, memoryGb, pricingModel),
+    );
+  }
+
+  private async selectOptionalComputeRecord(
+    region: string,
+    vcpu: number | undefined,
+    memoryGb: number | undefined,
+    pricingModel: PricingModelKey,
+  ): Promise<PricingCatalogRecord | undefined> {
+    return this.selectOptionalRecord(
+      'compute',
+      region,
+      this.computeRecordPredicate(vcpu, memoryGb, pricingModel),
+    );
+  }
+
+  private computeRecordPredicate(
+    vcpu: number | undefined,
+    memoryGb: number | undefined,
+    pricingModel: PricingModelKey,
+  ): (record: PricingCatalogRecord) => boolean {
+    return (candidate) => {
       const candidateVcpu = this.numberAttribute(candidate, 'vcpu');
       const candidateMemoryGb = this.numberAttribute(candidate, 'memoryGb');
 
       return (
+        this.matchesPricingModel(candidate, pricingModel) &&
         (vcpu === undefined || candidateVcpu === undefined || candidateVcpu >= vcpu) &&
         (memoryGb === undefined || candidateMemoryGb === undefined || candidateMemoryGb >= memoryGb)
       );
-    });
+    };
+  }
+
+  private async computePricingModels(
+    region: string,
+    vcpu: number | undefined,
+    memoryGb: number | undefined,
+    quantity: number,
+    onDemandRecord: PricingCatalogRecord,
+  ): Promise<PricingModelCost[]> {
+    const models: PricingModelCost[] = [
+      {
+        model: 'on-demand',
+        available: true,
+        monthlyCostUsd: this.monthlyCost(onDemandRecord, quantity).monthlyCostUsd,
+      },
+    ];
+
+    for (const pricingModel of COMMITMENT_PRICING_MODELS) {
+      const record = await this.selectOptionalComputeRecord(region, vcpu, memoryGb, pricingModel);
+
+      if (!record) {
+        models.push({
+          model: pricingModel,
+          available: false,
+          unavailableReason: PRICING_MODEL_UNAVAILABLE,
+        });
+        continue;
+      }
+
+      models.push({
+        model: pricingModel,
+        available: true,
+        monthlyCostUsd: this.monthlyCost(record, quantity).monthlyCostUsd,
+      });
+    }
+
+    return models;
+  }
+
+  private matchesPricingModel(
+    record: PricingCatalogRecord,
+    pricingModel: PricingModelKey,
+  ): boolean {
+    const recordPricingModel = record.attributes?.pricingModel;
+
+    if (pricingModel === 'on-demand') {
+      return recordPricingModel === undefined || recordPricingModel === 'on-demand';
+    }
+
+    return recordPricingModel === pricingModel;
   }
 
   private async selectRecord(
@@ -196,20 +303,99 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     record: PricingCatalogRecord,
     quantity: number,
     descriptionPrefix: string,
+    options: {
+      costComponent?: CostComponent;
+      pricingModels?: PricingModelCost[];
+    } = {},
   ): ProviderPricingLineItem {
-    const baseMonthlyCostUsd = this.roundCurrency(
-      this.monthlyQuantity(record.unit, quantity) * record.unitPriceUsd,
-    );
+    const cost = this.monthlyCost(record, quantity);
 
     return {
       category,
+      costComponent: options.costComponent ?? this.costComponentForCategory(category),
       description: `${descriptionPrefix}: ${record.serviceName}`,
       isApproximate: record.attributes?.isApproximate === true,
-      baseMonthlyCostUsd,
+      baseMonthlyCostUsd: cost.monthlyCostUsd,
       skuId: record.skuId,
       unit: record.unit,
       unitPriceUsd: record.unitPriceUsd,
+      pricingBasis: cost.pricingBasis,
+      ...(options.pricingModels ? { pricingModels: options.pricingModels } : {}),
     };
+  }
+
+  private monthlyCost(record: PricingCatalogRecord, quantity: number): CostCalculation {
+    const tiers = record.serviceCategory === 'network' ? this.egressTiers(record) : [];
+
+    if (tiers.length > 0) {
+      return {
+        monthlyCostUsd: this.roundCurrency(this.tieredUsageCost(quantity, tiers)),
+        pricingBasis: 'tiered',
+      };
+    }
+
+    return {
+      monthlyCostUsd: this.roundCurrency(
+        this.monthlyQuantity(record.unit, quantity) * record.unitPriceUsd,
+      ),
+      pricingBasis: 'flat',
+    };
+  }
+
+  private egressTiers(record: PricingCatalogRecord): EgressTier[] {
+    const value = record.attributes?.egressTiers;
+
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .map((item) => this.toEgressTier(item))
+      .filter((item): item is EgressTier => item !== undefined)
+      .sort((left, right) => left.startGb - right.startGb);
+  }
+
+  private toEgressTier(value: unknown): EgressTier | undefined {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      return undefined;
+    }
+
+    const record = value as Record<string, unknown>;
+    const startGb =
+      this.numberValue(record.startGb) ??
+      this.numberValue(record.startUsageAmount) ??
+      this.numberValue(record.startUsageAmountGb);
+    const unitPriceUsd =
+      this.numberValue(record.unitPriceUsd) ??
+      this.numberValue(record.pricePerGbUsd) ??
+      this.numberValue(record.pricePerUnitUsd);
+
+    if (startGb === undefined || unitPriceUsd === undefined) {
+      return undefined;
+    }
+
+    return {
+      startGb,
+      unitPriceUsd,
+    };
+  }
+
+  private tieredUsageCost(quantity: number, tiers: EgressTier[]): number {
+    return tiers.reduce((sum, tier, index) => {
+      const nextTier = tiers[index + 1];
+      const upperBound = nextTier?.startGb ?? quantity;
+      const billableGb = Math.max(0, Math.min(quantity, upperBound) - tier.startGb);
+
+      return sum + billableGb * tier.unitPriceUsd;
+    }, 0);
+  }
+
+  private costComponentForCategory(category: ServiceCategory): CostComponent {
+    if (category === 'network') {
+      return 'egress';
+    }
+
+    return category;
   }
 
   private monthlyQuantity(unit: string, quantity: number): number {
@@ -234,8 +420,10 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
   }
 
   private numberAttribute(record: PricingCatalogRecord, key: string): number | undefined {
-    const value = record.attributes?.[key];
+    return this.numberValue(record.attributes?.[key]);
+  }
 
+  private numberValue(value: unknown): number | undefined {
     if (typeof value === 'number') {
       return value;
     }

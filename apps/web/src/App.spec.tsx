@@ -2,7 +2,12 @@ import React, { act } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { App, ComparisonView } from './App';
 import { PolyCostClient, PolyCostApiError } from './api-client';
-import { ComparisonResult, ParsedNwsDraft, PricingStatusResponse } from './types';
+import {
+  ComparisonResult,
+  ParsedNwsDraft,
+  PricingStatusResponse,
+  RegionCatalogResponse,
+} from './types';
 import { buildNwsFromForm, defaultWorkloadForm } from './workload';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -20,6 +25,8 @@ describe('App', () => {
   const originalAnchorClick = HTMLAnchorElement.prototype.click;
 
   beforeEach(() => {
+    window.localStorage.removeItem('polycost-persona-view');
+    window.localStorage.removeItem('polycost-dismissed-budget-alerts');
     window.URL.createObjectURL = jest.fn(() => 'blob:polycost-report');
     window.URL.revokeObjectURL = jest.fn();
     HTMLAnchorElement.prototype.click = jest.fn();
@@ -30,7 +37,9 @@ describe('App', () => {
     window.URL.revokeObjectURL = originalRevokeObjectUrl;
     HTMLAnchorElement.prototype.click = originalAnchorClick;
     document.documentElement.dataset.theme = 'light';
-    document.documentElement.dataset.themeChoice = 'system';
+    document.documentElement.dataset.themeChoice = 'light';
+    window.localStorage.removeItem('polycost-persona-view');
+    window.localStorage.removeItem('polycost-dismissed-budget-alerts');
   });
 
   it('runs the structured-form comparison flow', async () => {
@@ -60,12 +69,25 @@ describe('App', () => {
     );
     expect(client.createComparison).toHaveBeenCalled();
     expect(text(container)).toContain('Comparison ready.');
-    expect(providerHeadings(container)).toEqual(['AWS', 'Azure', 'GCP']);
-    expect(providerLogoProviders(container)).toEqual(['aws', 'azure', 'gcp']);
-    expect(text(container)).toContain('Amazon Web Services');
-    expect(text(container)).toContain('Microsoft Azure');
-    expect(text(container)).toContain('Google Cloud Platform');
-    expect(text(container)).toContain('Lowest cost');
+    expect(mobileProviderLabels(container)).toEqual(['AWS', 'Azure', 'GCP']);
+    expect(text(container)).toContain('Demo workspace');
+    expect(text(container)).toContain('GCP is the current executive cost baseline');
+    expect(text(container)).toContain('Decision Brief');
+    expect(text(container)).toContain('Save vs next');
+    expect(text(container)).toContain('$8.00');
+    expect(text(container)).toContain('Official calculators');
+    expect(
+      container.querySelector<HTMLAnchorElement>('a[href="https://calculator.aws/#/"]'),
+    ).toBeInstanceOf(HTMLAnchorElement);
+
+    await click(resultTabByText(container, 'Engineering'));
+    await click(buttonByText(container, 'Engineering view'));
+
+    expect(text(container)).toContain('Resource name');
+    expect(text(container)).toContain('Spec / SKU');
+    expect(text(container)).toContain('Export CSV');
+    expect(text(container)).toContain('API JSON');
+    expect(text(container)).toContain('SKU/spec pending API field');
 
     unmount();
   });
@@ -148,7 +170,7 @@ describe('App', () => {
     try {
       await click(buttonByText(container, 'Parse'));
 
-      expect(buttonByText(container, 'Parsing').querySelector('.animate-spin')).toBeInstanceOf(
+      expect(buttonByText(container, 'Parsing...').querySelector('.animate-spin')).toBeInstanceOf(
         SVGElement,
       );
 
@@ -159,7 +181,7 @@ describe('App', () => {
 
       await click(buttonByText(container, 'Compare'));
 
-      expect(buttonByText(container, 'Comparing').querySelector('.animate-spin')).toBeInstanceOf(
+      expect(buttonByText(container, 'Comparing...').querySelector('.animate-spin')).toBeInstanceOf(
         SVGElement,
       );
 
@@ -170,9 +192,9 @@ describe('App', () => {
 
       await click(buttonByText(container, 'Refresh live'));
 
-      expect(buttonByText(container, 'Refresh live').querySelector('.animate-spin')).toBeInstanceOf(
-        SVGElement,
-      );
+      expect(
+        buttonByText(container, 'Refreshing...').querySelector('.animate-spin'),
+      ).toBeInstanceOf(SVGElement);
 
       refreshDeferred.resolve(comparisonResult);
       await act(async () => {
@@ -181,9 +203,9 @@ describe('App', () => {
 
       await click(buttonByText(container, 'PDF'));
 
-      expect(buttonByText(container, 'PDF').querySelector('.animate-spin')).toBeInstanceOf(
-        SVGElement,
-      );
+      expect(
+        buttonByText(container, 'Exporting PDF...').querySelector('.animate-spin'),
+      ).toBeInstanceOf(SVGElement);
 
       exportDeferred.resolve(new Blob(['report']));
       await act(async () => {
@@ -220,7 +242,7 @@ describe('App', () => {
 
     await click(buttonByText(container, 'Clear costs'));
 
-    expect(text(container)).toContain('Ready to compare');
+    expect(text(container)).toContain('Run comparison to populate data');
     expect(buttonByText(container, 'Refresh live').disabled).toBe(true);
     expect(buttonByText(container, 'PDF').disabled).toBe(true);
 
@@ -231,13 +253,13 @@ describe('App', () => {
     const client = clientMock();
     const { container, unmount } = render(<App client={client} />);
 
-    await click(buttonByText(container, 'Dark'));
-    await click(buttonByText(container, 'System'));
+    await click(buttonByText(container, 'Switch to dark mode'));
+    await click(buttonByText(container, 'Switch to light mode'));
     await click(buttonByText(container, 'Form'));
 
     await changeInput(inputById(container, 'name'), 'Edited portal');
     await changeSelect(selectById(container, 'type'), 'api_backend');
-    await changeInput(inputById(container, 'region'), 'us-west-2');
+    await changeSelect(selectById(container, 'region'), 'us-west-2');
     await changeInput(inputById(container, 'daily-users'), '7000');
     await changeInput(inputById(container, 'peak-users'), '800');
     await changeInput(inputById(container, 'compute-role'), 'api');
@@ -297,7 +319,7 @@ describe('App', () => {
     );
     expect(client.refreshLiveComparison).toHaveBeenCalledWith(comparisonResult.comparisonId);
     expect(client.exportComparison).toHaveBeenCalledWith(comparisonResult.comparisonId, 'pdf');
-    expect(document.documentElement.dataset.themeChoice).toBe('system');
+    expect(document.documentElement.dataset.themeChoice).toBe('light');
 
     unmount();
   });
@@ -388,12 +410,22 @@ describe('App', () => {
 });
 
 describe('ComparisonView', () => {
+  beforeEach(() => {
+    window.localStorage.removeItem('polycost-persona-view');
+    window.localStorage.removeItem('polycost-dismissed-budget-alerts');
+  });
+
+  afterEach(() => {
+    window.localStorage.removeItem('polycost-persona-view');
+    window.localStorage.removeItem('polycost-dismissed-budget-alerts');
+  });
+
   it('renders an empty pre-comparison state without pricing failure language', () => {
     const { container, unmount } = render(<ComparisonView comparison={null} interval="monthly" />);
 
-    expect(providerHeadings(container)).toEqual(['AWS', 'Azure', 'GCP']);
+    expect(mobileProviderLabels(container)).toEqual(['AWS', 'Azure', 'GCP']);
     expect(text(container)).toContain('Pending');
-    expect(text(container)).toContain('Ready to compare');
+    expect(text(container)).toContain('Run comparison to populate data');
     expect(text(container)).not.toContain('Pricing unavailable');
 
     unmount();
@@ -409,65 +441,41 @@ describe('ComparisonView', () => {
       <ComparisonView comparison={partialResult} interval="monthly" />,
     );
 
-    expect(providerHeadings(container)).toEqual(['AWS', 'Azure', 'GCP']);
+    expect(mobileProviderLabels(container)).toEqual(['AWS', 'Azure', 'GCP']);
     expect(text(container)).toContain('Unavailable');
-    expect(text(container)).toContain('Lowest cost');
+    expect(text(container)).toContain('Azure is the current executive cost baseline');
 
     unmount();
   });
 
-  it('renders dashboard metrics and dynamic provider charts', () => {
+  it('renders executive persona metrics and engineering resource rows from shared costs', async () => {
     const { container, unmount } = render(
       <ComparisonView comparison={comparisonResult} interval="monthly" />,
     );
 
-    expect(text(container)).toContain('Decision Brief');
-    expect(text(container)).toContain('Executive Memo');
+    expect(text(container)).toContain('$30.00');
     expect(text(container)).toContain('GCP is the current executive cost baseline');
-    expect(text(container)).toContain('CEO');
-    expect(text(container)).toContain('CTO');
-    expect(text(container)).toContain('Solution Architect');
-    expect(text(container)).toContain('Architecture Fit Review');
-    expect(text(container)).toContain('Service mapping');
-    expect(text(container)).toContain('Data and network');
-    expect(text(container)).toContain('Provider Spend');
-    expect(text(container)).toContain('Category Mix');
-    expect(text(container)).toContain('FinOps Decision Signals');
-    expect(text(container)).toContain('Monthly run-rate');
-    expect(text(container)).toContain('Provider Fit');
-    expect(text(container)).toContain('Recommended Next Checks');
-    expect(text(container)).toContain('Provider Ranking');
-    expect(text(container)).toContain('Interval Outlook');
-    expect(text(container)).toContain('Category Heatmap');
-    expect(text(container)).toContain('Lowest');
-    expect(text(container)).toContain('Average');
-    expect(text(container)).toContain('$36.67');
-    expect(text(container)).toContain('3/3');
-    expect(text(container)).toContain('GCP leads Monthly');
+    expect(text(container)).toContain('Decision Brief');
+    expect(text(container)).toContain('$360.00');
     expect(text(container)).toContain('Save vs next');
-    expect(text(container)).toContain('Approximate lines');
-    expect(providerChartLabels(container)).toEqual(['GCP', 'Azure', 'AWS']);
-    expect(rankingProviderLabels(container)).toEqual(['GCP', 'Azure', 'AWS']);
-    expect(intervalLabels(container)).toEqual([
-      'Daily',
-      'Weekly',
-      'Monthly',
-      'Quarterly',
-      'Yearly',
-    ]);
+    expect(text(container)).toContain('$8.00');
 
-    const gcpBar = container.querySelector('.provider-fill-gcp');
-    const awsBar = container.querySelector('.provider-fill-aws');
+    await click(resultTabByText(container, 'Engineering'));
+    await click(buttonByText(container, 'Engineering view'));
 
-    expect(gcpBar).toBeInstanceOf(HTMLElement);
-    expect(awsBar).toBeInstanceOf(HTMLElement);
-    expect((gcpBar as HTMLElement).style.width).toBe('71.42857142857143%');
-    expect((awsBar as HTMLElement).style.width).toBe('100%');
+    expect(text(container)).toContain('Filter by tag');
+    expect(text(container)).toContain('Backend contract note');
+    expect(text(container)).toContain('Resource name');
+    expect(text(container)).toContain('Spec / SKU');
+    expect(text(container)).toContain('aws-compute-01');
+    expect(text(container)).toContain('azure-compute-01');
+    expect(text(container)).toContain('gcp-compute-01');
+    expect(text(container)).toContain('Tag filtering is ready in the UI');
 
     unmount();
   });
 
-  it('renders cross-provider ranking and category heatmap from multi-category costs', () => {
+  it('renders multi-category comparison rows in engineering mode', async () => {
     const richResult: ComparisonResult = {
       ...comparisonResult,
       cheapestProviderId: 'azure',
@@ -496,17 +504,77 @@ describe('ComparisonView', () => {
       <ComparisonView comparison={richResult} interval="monthly" />,
     );
 
-    expect(text(container)).toContain('Azure leads Monthly');
+    expect(text(container)).toContain('Save vs next');
     expect(text(container)).toContain('$15.00');
-    expect(text(container)).toContain('$38.00');
-    expect(text(container)).toContain('4');
-    expect(rankingProviderLabels(container)).toEqual(['Azure', 'AWS', 'GCP']);
-    expect(heatmapRows(container)).toEqual([
-      'Compute$50.00$40.00$60.00',
-      'Storage$10.00$8.00$12.00',
-      'Database$20.00$18.00$30.00',
-      'Network$5.00$4.00$6.00',
-    ]);
+
+    await click(resultTabByText(container, 'Engineering'));
+    await click(buttonByText(container, 'Engineering view'));
+
+    expect(text(container)).toContain('aws compute');
+    expect(text(container)).toContain('aws storage');
+    expect(text(container)).toContain('aws database');
+    expect(text(container)).toContain('aws network');
+    expect(text(container)).toContain('azure compute');
+    expect(text(container)).toContain('gcp compute');
+    expect(text(container)).toContain('$60.00');
+    expect(text(container)).toContain('$4.00');
+
+    unmount();
+  });
+
+  it('renders FinOps feature additions without fabricating unsupported backend data', async () => {
+    const richResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'azure',
+      providers: [
+        providerWithItems('aws', [
+          ['compute', 'aws compute', 50],
+          ['storage', 'aws storage', 10],
+          ['database', 'aws database', 10],
+          ['network', 'aws network egress', 30],
+        ]),
+        providerWithItems('azure', [
+          ['compute', 'azure compute', 40],
+          ['storage', 'azure storage', 8],
+          ['database', 'azure database', 17],
+          ['network', 'azure network egress', 10],
+        ]),
+        providerWithItems('gcp', [
+          ['compute', 'gcp compute', 60],
+          ['storage', 'gcp storage', 12],
+          ['database', 'gcp database', 23],
+          ['network', 'gcp network egress', 15],
+        ]),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView comparison={richResult} interval="monthly" />,
+    );
+
+    await click(resultTabByText(container, 'FinOps'));
+
+    expect(text(container)).toContain('Commitment scenario controls');
+    expect(buttonByText(container, 'On-demand').disabled).toBe(false);
+    expect(buttonByText(container, '1yr reserved').disabled).toBe(false);
+    expect(buttonByText(container, '3yr reserved').disabled).toBe(false);
+    expect(text(container)).not.toContain('Spot');
+    expect(text(container)).toContain('3yr reserved: Not available for this configuration.');
+    expect(text(container)).toContain('Compute, storage, and data-transfer mix');
+    expect(text(container)).toContain('Egress/data transfer');
+    expect(text(container)).toContain('Egress risk: $30.00 is 200% above the lowest provider.');
+    expect(text(container)).toContain('No fake public link has been generated.');
+    expect(text(container)).toContain('PKR - exchange backend pending');
+
+    await changeInput(inputById(container, 'budget-threshold-usd'), '70');
+
+    expect(text(container)).toContain('Estimated run-rate exceeds budget threshold.');
+    expect(text(container)).toContain(
+      'live anomaly monitoring still needs backend alert infrastructure',
+    );
+
+    await click(buttonByText(container, 'Dismiss'));
+
+    expect(text(container)).not.toContain('Estimated run-rate exceeds budget threshold.');
 
     unmount();
   });
@@ -612,40 +680,27 @@ function buttonByText(container: HTMLElement, label: string): HTMLButtonElement 
   return button;
 }
 
-function providerHeadings(container: HTMLElement): string[] {
-  return Array.from(container.querySelectorAll('.provider-card h2')).map(
-    (heading) => heading.textContent ?? '',
+function resultTabByText(container: HTMLElement, label: string): HTMLButtonElement {
+  const button = Array.from(container.querySelectorAll('.result-tabs button')).find((candidate) =>
+    Array.from(candidate.querySelectorAll('span')).some(
+      (span) => span.textContent?.trim() === label,
+    ),
   );
+
+  if (!(button instanceof HTMLButtonElement)) {
+    throw new Error(`Result tab not found: ${label}`);
+  }
+
+  return button;
 }
 
-function providerLogoProviders(container: HTMLElement): string[] {
-  return Array.from(container.querySelectorAll('[data-provider-logo]')).map(
-    (logo) => logo.getAttribute('data-provider-logo') ?? '',
-  );
-}
+function mobileProviderLabels(container: HTMLElement): string[] {
+  return Array.from(container.querySelectorAll('.mobile-total-bar > span')).map((providerTotal) => {
+    const value = providerTotal.textContent ?? '';
+    const provider = ['AWS', 'Azure', 'GCP'].find((candidate) => value.startsWith(candidate));
 
-function providerChartLabels(container: HTMLElement): string[] {
-  return Array.from(container.querySelectorAll('.provider-bars .bar-provider strong')).map(
-    (label) => label.textContent ?? '',
-  );
-}
-
-function rankingProviderLabels(container: HTMLElement): string[] {
-  return Array.from(container.querySelectorAll('.ranking-table .rank-provider')).map(
-    (label) => label.textContent ?? '',
-  );
-}
-
-function intervalLabels(container: HTMLElement): string[] {
-  return Array.from(container.querySelectorAll('.interval-row > strong')).map(
-    (label) => label.textContent ?? '',
-  );
-}
-
-function heatmapRows(container: HTMLElement): string[] {
-  return Array.from(container.querySelectorAll('.heatmap-row:not(.heatmap-head)')).map((row) =>
-    (row.textContent ?? '').replace(/\s+/g, ''),
-  );
+    return provider ?? value;
+  });
 }
 
 function text(container: HTMLElement): string {
@@ -680,6 +735,7 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       { providerId: 'gcp', status: 'success' },
     ],
   };
+  const pendingRegionCatalog = new Promise<RegionCatalogResponse>(() => undefined);
 
   return {
     parseWorkload: jest.fn(async () => parsed),
@@ -688,6 +744,7 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     refreshLiveComparison: jest.fn(async () => comparisonResult),
     exportComparison: jest.fn(async () => new Blob(['report'])),
     getPricingStatus: jest.fn(async () => pricingStatus),
+    getRegionCatalog: jest.fn(() => pendingRegionCatalog),
     ...overrides,
   };
 }

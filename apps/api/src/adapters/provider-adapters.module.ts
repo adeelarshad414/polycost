@@ -30,7 +30,6 @@ export const CLOUD_PROVIDER_ADAPTERS = Symbol('CLOUD_PROVIDER_ADAPTERS');
         new AwsProviderAdapter(
           catalogRepository,
           configService.get('PRICING_ETL_DEFAULT_REGION_AWS', { infer: true }),
-          secretsService,
         ),
         new AzureProviderAdapter(
           catalogRepository,

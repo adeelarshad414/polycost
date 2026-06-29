@@ -24,6 +24,7 @@ import {
   RateLimitExceededError,
 } from './api-errors';
 import { PricingStatusController } from './pricing-status.controller';
+import { RegionsController } from './regions.controller';
 import { WorkloadController } from './workload.controller';
 
 const validNws: NormalizedWorkloadSpec = {
@@ -219,6 +220,37 @@ describe('API contracts', () => {
         },
       ],
     });
+  });
+
+  it('GET /regions returns the cloud region catalog without an admin key', async () => {
+    const catalog = {
+      generatedAt: '2026-06-29T00:00:00.000Z',
+      cacheTtlSeconds: 43_200,
+      providers: [
+        {
+          providerId: 'aws' as const,
+          label: 'AWS',
+          source: 'live' as const,
+          sourceUrl: 'https://b0.p.awsstatic.com/locations/1.0/aws/current/locations.json',
+          calculatorUrl: 'https://calculator.aws/#/',
+          regions: [
+            {
+              providerId: 'aws' as const,
+              id: 'us-east-1',
+              label: 'US East (N. Virginia)',
+              source: 'live' as const,
+            },
+          ],
+        },
+      ],
+    };
+    const service = {
+      getRegionCatalog: jest.fn(async () => catalog),
+    };
+    const controller = new RegionsController(service as never);
+
+    await expect(controller.getRegions()).resolves.toEqual(catalog);
+    expect(service.getRegionCatalog).toHaveBeenCalledTimes(1);
   });
 
   it('rejects invalid comparison and export request shapes', async () => {

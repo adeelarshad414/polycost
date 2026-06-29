@@ -2,6 +2,16 @@ import { NormalizedWorkloadSpec } from '../../nws/nws.types';
 
 export type ProviderId = 'aws' | 'azure' | 'gcp';
 export type ServiceCategory = 'compute' | 'storage' | 'database' | 'network';
+export type CostComponent = 'compute' | 'storage' | 'database' | 'egress';
+export type PricingModelKey = 'on-demand' | 'reserved-1yr' | 'reserved-3yr';
+export type PricingBasis = 'flat' | 'tiered';
+
+export interface PricingModelCost {
+  model: PricingModelKey;
+  available: boolean;
+  monthlyCostUsd?: number;
+  unavailableReason?: string;
+}
 
 export interface PricingCatalogRecord {
   provider: ProviderId;
@@ -19,12 +29,15 @@ export interface PricingCatalogRecord {
 
 export interface ProviderPricingLineItem {
   category: ServiceCategory;
+  costComponent?: CostComponent;
   description: string;
   isApproximate: boolean;
   baseMonthlyCostUsd: number;
   skuId: string;
   unit: string;
   unitPriceUsd: number;
+  pricingBasis?: PricingBasis;
+  pricingModels?: PricingModelCost[];
 }
 
 export interface ProviderPricingResult {

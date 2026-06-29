@@ -106,6 +106,53 @@ describe('api client', () => {
     );
   });
 
+  it('fetches the live cloud region catalog', async () => {
+    const fetchMock = jest.fn(async () =>
+      jsonResponse({
+        generatedAt: '2026-06-29T00:00:00.000Z',
+        cacheTtlSeconds: 43_200,
+        providers: [
+          {
+            providerId: 'aws',
+            label: 'AWS',
+            source: 'live',
+            sourceUrl: 'https://b0.p.awsstatic.com/locations/1.0/aws/current/locations.json',
+            calculatorUrl: 'https://calculator.aws/#/',
+            regions: [
+              {
+                providerId: 'aws',
+                id: 'us-east-1',
+                label: 'US East (N. Virginia)',
+                source: 'live',
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(client.getRegionCatalog()).resolves.toEqual(
+      expect.objectContaining({
+        providers: expect.arrayContaining([
+          expect.objectContaining({
+            providerId: 'aws',
+            calculatorUrl: 'https://calculator.aws/#/',
+          }),
+        ]),
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/regions',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+  });
+
   it('formats unknown and API errors for UI display', () => {
     expect(
       formatApiError(

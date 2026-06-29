@@ -1,5 +1,11 @@
 import { FormEvent, ReactNode, useEffect, useState } from 'react';
 import { formatApiError, PolyCostClient, PolyCostApiError, polyCostClient } from './api-client';
+import { Button } from './components/Button';
+import { FinOpsFeatureLayer, SharedReportPlaceholder } from './components/FinOpsFeatureLayer';
+import { LandingPage } from './components/LandingPage';
+import { PersonaComparisonWorkspace } from './components/PersonaComparisonWorkspace';
+import { TopLoadingBar } from './components/TopLoadingBar';
+import { providerLogoSrc } from './provider-brand';
 import {
   CLOUD_SERVICE_CATALOG,
   SERVICE_CATALOG_CATEGORIES,
@@ -9,7 +15,7 @@ import {
   serviceCatalogTraceability,
   supportLabel,
 } from './service-catalog';
-import { applyTheme, storedTheme, ThemeChoice } from './theme';
+import { applyTheme, ResolvedTheme, resolveTheme, storedTheme, ThemeChoice } from './theme';
 import {
   ComparisonProviderResult,
   ComparisonResult,
@@ -18,6 +24,7 @@ import {
   NormalizedWorkloadSpec,
   PROVIDER_ORDER,
   ProviderId,
+  RegionCatalogResponse,
   ReportFormat,
 } from './types';
 import {
@@ -30,11 +37,137 @@ import {
 
 type InputMode = 'describe' | 'form';
 type BusyAction = 'parse' | 'compare' | 'refresh' | 'export' | null;
+type ResultWorkspaceTab = 'overview' | 'providers' | 'finops' | 'architecture' | 'engineering';
 type ServiceCategory = ComparisonProviderResult['lineItems'][number]['category'];
 type FormSectionTone = 'profile' | 'compute' | 'services' | 'portfolio' | 'data' | 'network';
 type ToggleIconKind = 'storage' | 'database' | 'cdn' | 'loadBalancer' | 'multiAz' | 'multiRegion';
 
+const RESULT_WORKSPACE_TABS: Array<{
+  key: ResultWorkspaceTab;
+  label: string;
+  audience: string;
+}> = [
+  { key: 'overview', label: 'Overview', audience: 'CEO / CFO / COO' },
+  { key: 'providers', label: 'Providers', audience: 'CTO / DevOps' },
+  { key: 'finops', label: 'FinOps', audience: 'CFO / FinOps' },
+  { key: 'architecture', label: 'Architecture', audience: 'Solution Architect' },
+  { key: 'engineering', label: 'Engineering', audience: 'Engineering / QA / Security' },
+];
+
 const SERVICE_CATEGORIES: ServiceCategory[] = ['compute', 'storage', 'database', 'network'];
+
+const DEFAULT_CALCULATOR_URLS: Record<ProviderId, string> = {
+  aws: 'https://calculator.aws/#/',
+  azure: 'https://azure.microsoft.com/en-us/pricing/calculator/',
+  gcp: 'https://cloud.google.com/products/calculator',
+};
+
+const FALLBACK_REGION_CATALOG: RegionCatalogResponse = {
+  generatedAt: 'fallback',
+  cacheTtlSeconds: 0,
+  providers: [
+    {
+      providerId: 'aws',
+      label: 'AWS',
+      source: 'fallback',
+      sourceUrl: 'https://b0.p.awsstatic.com/locations/1.0/aws/current/locations.json',
+      calculatorUrl: DEFAULT_CALCULATOR_URLS.aws,
+      regions: [
+        { providerId: 'aws', id: 'us-east-1', label: 'US East (N. Virginia)', source: 'fallback' },
+        { providerId: 'aws', id: 'us-east-2', label: 'US East (Ohio)', source: 'fallback' },
+        {
+          providerId: 'aws',
+          id: 'us-west-1',
+          label: 'US West (N. California)',
+          source: 'fallback',
+        },
+        { providerId: 'aws', id: 'us-west-2', label: 'US West (Oregon)', source: 'fallback' },
+        { providerId: 'aws', id: 'eu-west-1', label: 'Europe (Ireland)', source: 'fallback' },
+        { providerId: 'aws', id: 'eu-central-1', label: 'Europe (Frankfurt)', source: 'fallback' },
+        { providerId: 'aws', id: 'ap-south-1', label: 'Asia Pacific (Mumbai)', source: 'fallback' },
+        {
+          providerId: 'aws',
+          id: 'ap-southeast-1',
+          label: 'Asia Pacific (Singapore)',
+          source: 'fallback',
+        },
+        {
+          providerId: 'aws',
+          id: 'ap-northeast-1',
+          label: 'Asia Pacific (Tokyo)',
+          source: 'fallback',
+        },
+      ],
+    },
+    {
+      providerId: 'azure',
+      label: 'Azure',
+      source: 'fallback',
+      sourceUrl:
+        'https://azure.microsoft.com/en-us/explore/global-infrastructure/products-by-region/table',
+      calculatorUrl: DEFAULT_CALCULATOR_URLS.azure,
+      regions: [
+        { providerId: 'azure', id: 'eastus', label: 'East US', source: 'fallback' },
+        { providerId: 'azure', id: 'eastus2', label: 'East US 2', source: 'fallback' },
+        { providerId: 'azure', id: 'centralus', label: 'Central US', source: 'fallback' },
+        { providerId: 'azure', id: 'westus', label: 'West US', source: 'fallback' },
+        { providerId: 'azure', id: 'westus2', label: 'West US 2', source: 'fallback' },
+        { providerId: 'azure', id: 'westus3', label: 'West US 3', source: 'fallback' },
+        { providerId: 'azure', id: 'uksouth', label: 'UK South', source: 'fallback' },
+        { providerId: 'azure', id: 'westeurope', label: 'West Europe', source: 'fallback' },
+        { providerId: 'azure', id: 'southeastasia', label: 'Southeast Asia', source: 'fallback' },
+      ],
+    },
+    {
+      providerId: 'gcp',
+      label: 'Google Cloud',
+      source: 'fallback',
+      sourceUrl: 'https://www.gstatic.com/ipranges/cloud.json',
+      calculatorUrl: DEFAULT_CALCULATOR_URLS.gcp,
+      regions: [
+        { providerId: 'gcp', id: 'us-central1', label: 'US Central (Iowa)', source: 'fallback' },
+        {
+          providerId: 'gcp',
+          id: 'us-east1',
+          label: 'US East (South Carolina)',
+          source: 'fallback',
+        },
+        {
+          providerId: 'gcp',
+          id: 'us-east4',
+          label: 'US East (Northern Virginia)',
+          source: 'fallback',
+        },
+        { providerId: 'gcp', id: 'us-west1', label: 'US West (Oregon)', source: 'fallback' },
+        {
+          providerId: 'gcp',
+          id: 'europe-west1',
+          label: 'Europe West (Belgium)',
+          source: 'fallback',
+        },
+        {
+          providerId: 'gcp',
+          id: 'europe-west2',
+          label: 'Europe West (London)',
+          source: 'fallback',
+        },
+        { providerId: 'gcp', id: 'asia-south1', label: 'Asia South (Mumbai)', source: 'fallback' },
+        {
+          providerId: 'gcp',
+          id: 'asia-southeast1',
+          label: 'Asia Southeast (Singapore)',
+          source: 'fallback',
+        },
+        {
+          providerId: 'gcp',
+          id: 'asia-northeast1',
+          label: 'Asia Northeast (Tokyo)',
+          source: 'fallback',
+        },
+      ],
+    },
+  ],
+};
 
 interface CategoryCostSummary {
   category: ServiceCategory;
@@ -114,7 +247,12 @@ interface AppProps {
 }
 
 export function App({ client = polyCostClient }: AppProps) {
+  const shareToken = shareTokenFromLocation();
+  const isPageLoading = usePageLoadingState();
   const [themeChoice, setThemeChoice] = useState<ThemeChoice>(() => storedTheme());
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
+    resolveTheme(storedTheme()),
+  );
   const [inputMode, setInputMode] = useState<InputMode>('describe');
   const [naturalLanguageInput, setNaturalLanguageInput] = useState(sampleNaturalLanguageInput);
   const [form, setForm] = useState<WorkloadFormState>(defaultWorkloadForm);
@@ -124,10 +262,43 @@ export function App({ client = polyCostClient }: AppProps) {
   const [exportingFormat, setExportingFormat] = useState<ReportFormat | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [regionCatalog, setRegionCatalog] = useState<RegionCatalogResponse | null>(null);
+  const [regionCatalogError, setRegionCatalogError] = useState<string | null>(null);
 
   useEffect(() => {
-    applyTheme(themeChoice);
+    setResolvedTheme(applyTheme(themeChoice));
   }, [themeChoice]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    void client
+      .getRegionCatalog()
+      .then((catalog) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setRegionCatalog(catalog);
+        setRegionCatalogError(null);
+      })
+      .catch((catalogError) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setRegionCatalog(null);
+        setRegionCatalogError(formatApiError(catalogError));
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [client]);
+
+  if (shareToken) {
+    return <SharedReportPlaceholder token={shareToken} />;
+  }
 
   async function handleParse() {
     setError(null);
@@ -247,101 +418,225 @@ export function App({ client = polyCostClient }: AppProps) {
     setError(null);
   }
 
+  function handleStartComparing() {
+    setInputMode('describe');
+    scrollToElement('requirements');
+    window.requestAnimationFrame(() => {
+      document.getElementById('natural-language-input')?.focus();
+    });
+  }
+
+  function handleViewDemo() {
+    scrollToElement('pricing');
+  }
+
+  function handleSignInNotice() {
+    setError(null);
+    setNotice('Sign in is not configured in this self-hosted MVP.');
+    scrollToElement('requirements');
+  }
+
   return (
     <main className="app-shell" aria-labelledby="page-title">
+      <TopLoadingBar isLoading={isPageLoading} />
       <ScrollProgressBar />
-      <Header themeChoice={themeChoice} onThemeChange={setThemeChoice} />
+      <LandingPage
+        comparison={comparison}
+        form={form}
+        resolvedTheme={resolvedTheme}
+        themeChoice={themeChoice}
+        onStartComparing={handleStartComparing}
+        onThemeChange={setThemeChoice}
+        onViewDemo={handleViewDemo}
+        onSignIn={handleSignInNotice}
+      />
 
-      <section className="workbench" aria-label="Cost comparison workbench">
-        <section className="input-zone" aria-label="Workload requirements">
-          <div className="mode-tabs" role="tablist" aria-label="Requirement input mode">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={inputMode === 'describe'}
-              className="tab-button"
-              onClick={() => setInputMode('describe')}
-            >
-              <ModeIcon mode="describe" />
-              Describe
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={inputMode === 'form'}
-              className="tab-button"
-              onClick={() => setInputMode('form')}
-            >
-              <ModeIcon mode="form" />
-              Form
-            </button>
-          </div>
+      <section
+        className="workbench-shell mx-auto grid max-w-[1440px] gap-5 xl:grid-cols-[minmax(320px,0.34fr)_minmax(0,0.66fr)] xl:items-start"
+        id="requirements"
+        aria-label="Cost comparison workbench"
+      >
+        <div
+          className="workbench-config grid min-w-0 gap-4 print:hidden"
+          aria-label="Workload configuration"
+        >
+          <section className="input-zone" aria-label="Workload requirements">
+            <div className="mode-tabs" role="tablist" aria-label="Requirement input mode">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={inputMode === 'describe'}
+                className="tab-button"
+                onClick={() => setInputMode('describe')}
+              >
+                <ModeIcon mode="describe" />
+                Describe
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={inputMode === 'form'}
+                className="tab-button"
+                onClick={() => setInputMode('form')}
+              >
+                <ModeIcon mode="form" />
+                Form
+              </button>
+            </div>
 
-          {inputMode === 'describe' ? (
-            <DescribePanel
-              value={naturalLanguageInput}
-              isParsing={busyAction === 'parse'}
-              onChange={setNaturalLanguageInput}
-              onClear={handleClearRequirements}
-              onParse={handleParse}
-              onUseSample={() => setNaturalLanguageInput(sampleNaturalLanguageInput)}
+            {inputMode === 'describe' ? (
+              <DescribePanel
+                value={naturalLanguageInput}
+                isParsing={busyAction === 'parse'}
+                onChange={setNaturalLanguageInput}
+                onClear={handleClearRequirements}
+                onParse={handleParse}
+                onUseSample={() => setNaturalLanguageInput(sampleNaturalLanguageInput)}
+              />
+            ) : (
+              <WorkloadForm
+                form={form}
+                regionCatalog={regionCatalog}
+                regionCatalogError={regionCatalogError}
+                onChange={setForm}
+                onSubmit={handleCompare}
+              />
+            )}
+          </section>
+
+          <section className="summary-zone lg:!static" aria-label="Current estimate controls">
+            <PricingFreshness comparison={comparison} />
+
+            <RequirementSummary form={form} />
+
+            <CloudCalculatorLinks regionCatalog={regionCatalog} />
+
+            <div className="action-row">
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => void handleCompare()}
+                loading={busyAction === 'compare'}
+                loadingLabel={compareLoadingLabel(inputMode)}
+                disabled={busyAction !== null && busyAction !== 'compare'}
+              >
+                <CompareIcon />
+                {compareButtonLabel(inputMode)}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleRefreshLive}
+                loading={busyAction === 'refresh'}
+                loadingLabel="Refreshing..."
+                disabled={!comparison || (busyAction !== null && busyAction !== 'refresh')}
+              >
+                <RefreshIcon />
+                Refresh live
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleClearComparison}
+                disabled={!comparison || busyAction !== null}
+              >
+                <ClearIcon />
+                Clear costs
+              </Button>
+            </div>
+
+            <ExportBar
+              disabled={!comparison || (busyAction !== null && busyAction !== 'export')}
+              exportingFormat={exportingFormat}
+              onExport={(format) => void handleExport(format)}
             />
-          ) : (
-            <WorkloadForm form={form} onChange={setForm} onSubmit={handleCompare} />
-          )}
-        </section>
 
-        <section className="summary-zone" aria-label="Current estimate controls">
-          <PricingFreshness comparison={comparison} />
+            <StatusMessage notice={notice} error={error} />
+          </section>
+        </div>
 
-          <RequirementSummary form={form} />
-
-          <div className="action-row">
-            <button
-              type="button"
-              className="pc-button pc-button-primary"
-              onClick={() => void handleCompare()}
-              disabled={busyAction !== null}
-            >
-              {busyAction === 'compare' ? <LoadingSpinner /> : <CompareIcon />}
-              {compareButtonLabel(inputMode, busyAction)}
-            </button>
-            <button
-              type="button"
-              className="pc-button pc-button-secondary"
-              onClick={handleRefreshLive}
-              disabled={!comparison || busyAction !== null}
-            >
-              {busyAction === 'refresh' ? <LoadingSpinner /> : <RefreshIcon />}
-              Refresh live
-            </button>
-            <button
-              type="button"
-              className="pc-button pc-button-secondary"
-              onClick={handleClearComparison}
-              disabled={!comparison || busyAction !== null}
-            >
-              <ClearIcon />
-              Clear costs
-            </button>
-          </div>
-
-          <ExportBar
-            disabled={!comparison || busyAction !== null}
+        <section className="workbench-results min-w-0" id="docs" aria-label="Provider comparison">
+          <ComparisonToolbar interval={interval} onIntervalChange={setInterval} />
+          <ComparisonView
+            comparison={comparison}
+            interval={interval}
+            form={form}
+            isLoading={busyAction === 'compare' || busyAction === 'refresh'}
+            error={error}
             exportingFormat={exportingFormat}
             onExport={(format) => void handleExport(format)}
           />
-
-          <StatusMessage notice={notice} error={error} />
         </section>
-      </section>
-
-      <section className="comparison-section" aria-label="Provider comparison">
-        <ComparisonToolbar interval={interval} onIntervalChange={setInterval} />
-        <ComparisonView comparison={comparison} interval={interval} form={form} />
       </section>
     </main>
   );
+}
+
+function usePageLoadingState(): boolean {
+  const [isPageLoading, setIsPageLoading] = useState(() => document.readyState !== 'complete');
+
+  useEffect(() => {
+    let hashNavigationStarted = false;
+
+    function stopLoading() {
+      hashNavigationStarted = false;
+      setIsPageLoading(false);
+    }
+
+    function startLoadingForHashNavigation(event: MouseEvent) {
+      if (!(event.target instanceof Element)) {
+        return;
+      }
+
+      const anchor = event.target.closest<HTMLAnchorElement>('a[href]');
+
+      if (!anchor) {
+        return;
+      }
+
+      const destination = new URL(anchor.href, window.location.href);
+      const isSameDocument =
+        destination.origin === window.location.origin &&
+        destination.pathname === window.location.pathname &&
+        destination.search === window.location.search;
+
+      if (!isSameDocument || !destination.hash || destination.hash === window.location.hash) {
+        return;
+      }
+
+      hashNavigationStarted = true;
+      setIsPageLoading(true);
+    }
+
+    function handleHashChange() {
+      if (hashNavigationStarted) {
+        stopLoading();
+      }
+    }
+
+    function handleBeforeUnload() {
+      setIsPageLoading(true);
+    }
+
+    if (document.readyState === 'complete') {
+      setIsPageLoading(false);
+    } else {
+      window.addEventListener('load', stopLoading, { once: true });
+    }
+
+    document.addEventListener('click', startLoadingForHashNavigation, true);
+    window.addEventListener('hashchange', handleHashChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('load', stopLoading);
+      document.removeEventListener('click', startLoadingForHashNavigation, true);
+      window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
+  return isPageLoading;
 }
 
 function ScrollProgressBar() {
@@ -383,43 +678,6 @@ function ScrollProgressBar() {
   );
 }
 
-function Header({
-  themeChoice,
-  onThemeChange,
-}: {
-  themeChoice: ThemeChoice;
-  onThemeChange: (choice: ThemeChoice) => void;
-}) {
-  return (
-    <header className="app-header">
-      <div className="brand-lockup">
-        <Logo />
-        <h1 id="page-title" className="wordmark">
-          <span>Poly</span>
-          <strong>Cost</strong>
-        </h1>
-      </div>
-      <nav className="top-nav" aria-label="Primary">
-        <a href="#requirements">Requirements</a>
-        <a href="#comparison">Comparison</a>
-      </nav>
-      <div className="theme-toggle" role="group" aria-label="Theme">
-        {(['light', 'dark', 'system'] as ThemeChoice[]).map((choice) => (
-          <button
-            key={choice}
-            type="button"
-            aria-pressed={themeChoice === choice}
-            onClick={() => onThemeChange(choice)}
-          >
-            <ThemeIcon choice={choice} />
-            {capitalize(choice)}
-          </button>
-        ))}
-      </div>
-    </header>
-  );
-}
-
 function DescribePanel({
   value,
   isParsing,
@@ -436,7 +694,7 @@ function DescribePanel({
   onUseSample: () => void;
 }) {
   return (
-    <div className="describe-panel" id="requirements">
+    <div className="describe-panel">
       <label className="field-label" htmlFor="natural-language-input">
         Requirements
       </label>
@@ -447,28 +705,29 @@ function DescribePanel({
         placeholder="e.g. A web app for 5,000 daily users with a Postgres database and file storage for uploads"
       />
       <div className="action-row">
-        <button
+        <Button
           type="button"
-          className="pc-button pc-button-primary"
+          variant="primary"
           onClick={onParse}
-          disabled={isParsing}
+          loading={isParsing}
+          loadingLabel="Parsing..."
         >
-          {isParsing ? <LoadingSpinner /> : <ParseIcon />}
-          {isParsing ? 'Parsing' : 'Parse'}
-        </button>
-        <button type="button" className="pc-button pc-button-secondary" onClick={onUseSample}>
+          <ParseIcon />
+          Parse
+        </Button>
+        <Button type="button" variant="secondary" onClick={onUseSample}>
           <SampleIcon />
           Sample
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          className="pc-button pc-button-secondary"
+          variant="destructive"
           onClick={onClear}
           disabled={isParsing || value.length === 0}
         >
           <ClearIcon />
           Clear
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -476,10 +735,14 @@ function DescribePanel({
 
 function WorkloadForm({
   form,
+  regionCatalog,
+  regionCatalogError,
   onChange,
   onSubmit,
 }: {
   form: WorkloadFormState;
+  regionCatalog: RegionCatalogResponse | null;
+  regionCatalogError: string | null;
   onChange: (form: WorkloadFormState) => void;
   onSubmit: (event: FormEvent) => void;
 }) {
@@ -505,7 +768,7 @@ function WorkloadForm({
   const sizingSummary = formSizingSummary(form);
 
   return (
-    <form className="structured-form" id="requirements" onSubmit={onSubmit}>
+    <form className="structured-form" onSubmit={onSubmit}>
       <div className="form-overview-strip" aria-label="Workload sizing summary">
         <FormSummaryChip label="Traffic" value={sizingSummary.traffic} tone="profile" />
         <FormSummaryChip label="Compute" value={sizingSummary.compute} tone="compute" />
@@ -514,7 +777,7 @@ function WorkloadForm({
         <FormSummaryChip label="Data" value={sizingSummary.data} tone="data" />
       </div>
 
-      <FormSection title="Workload" tone="profile">
+      <FormSection title="Workload" tone="profile" defaultOpen>
         <div className="form-grid form-grid-profile">
           <TextField
             label="Name"
@@ -535,9 +798,10 @@ function WorkloadForm({
             ]}
             onChange={(value) => update('workloadType', value)}
           />
-          <TextField
-            label="Region"
+          <RegionSelectField
             value={form.regionPreference}
+            regionCatalog={regionCatalog}
+            regionCatalogError={regionCatalogError}
             onChange={(value) => update('regionPreference', value)}
           />
           <TextField
@@ -555,7 +819,7 @@ function WorkloadForm({
         </div>
       </FormSection>
 
-      <FormSection title="Compute" tone="compute">
+      <FormSection title="Compute" tone="compute" defaultOpen>
         <div className="form-grid form-grid-compute">
           <TextField
             label="Compute role"
@@ -609,7 +873,7 @@ function WorkloadForm({
         </div>
       </FormSection>
 
-      <FormSection title="Services" tone="services">
+      <FormSection title="Services" tone="services" defaultOpen>
         <div className="form-switches" aria-label="Workload options">
           <CheckboxField
             label="Object storage"
@@ -785,24 +1049,35 @@ function WorkloadForm({
 function FormSection({
   title,
   tone,
+  defaultOpen = false,
   children,
 }: {
   title: string;
   tone: FormSectionTone;
+  defaultOpen?: boolean;
   children: ReactNode;
 }) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
   const headingId = `form-section-${tone}`;
 
   return (
-    <section className={`form-section form-section-${tone}`} aria-labelledby={headingId}>
-      <div className="form-section-heading">
+    <details
+      className={`form-section form-section-${tone}`}
+      aria-labelledby={headingId}
+      open={isOpen}
+      onToggle={(event) => setIsOpen(event.currentTarget.open)}
+    >
+      <summary className="form-section-heading">
         <span className="form-section-icon" aria-hidden="true">
           <FormSectionIcon tone={tone} />
         </span>
         <h3 id={headingId}>{title}</h3>
-      </div>
+        <span className="form-section-chevron" aria-hidden="true">
+          {isOpen ? '-' : '+'}
+        </span>
+      </summary>
       <div className="form-section-body">{children}</div>
-    </section>
+    </details>
   );
 }
 
@@ -885,6 +1160,73 @@ function SelectField<T extends string>({
           </option>
         ))}
       </select>
+    </label>
+  );
+}
+
+function RegionSelectField({
+  value,
+  regionCatalog,
+  regionCatalogError,
+  onChange,
+}: {
+  value: string;
+  regionCatalog: RegionCatalogResponse | null;
+  regionCatalogError: string | null;
+  onChange: (value: string) => void;
+}) {
+  const catalog = regionCatalog ?? FALLBACK_REGION_CATALOG;
+  const providerCatalogs = PROVIDER_ORDER.map((providerId) =>
+    catalog.providers.find((provider) => provider.providerId === providerId),
+  ).filter((provider): provider is RegionCatalogResponse['providers'][number] => Boolean(provider));
+  const regionCount = providerCatalogs.reduce(
+    (count, provider) => count + provider.regions.length,
+    0,
+  );
+  const selectedRegion = providerCatalogs
+    .flatMap((provider) => provider.regions)
+    .find((region) => region.id === value);
+  const catalogLabel = regionCatalog
+    ? providerCatalogs.some((provider) => provider.source === 'live')
+      ? 'Live provider catalog'
+      : 'Fallback provider catalog'
+    : 'Loading live provider catalog';
+
+  return (
+    <label className="form-field region-field" htmlFor="region">
+      <span className="region-field-header">
+        <span className="field-caption">Region</span>
+        <span
+          className={regionCatalogError ? 'region-source-pill is-warning' : 'region-source-pill'}
+        >
+          {regionCatalogError ? 'Fallback' : regionCatalog ? 'Live' : 'Loading'}
+        </span>
+      </span>
+      <select
+        id="region"
+        className="region-select"
+        value={value}
+        onChange={(event) => onChange(event.currentTarget.value)}
+      >
+        {value && !selectedRegion ? (
+          <option value={value}>Current selection: {value}</option>
+        ) : null}
+        {providerCatalogs.map((provider) => (
+          <optgroup
+            key={provider.providerId}
+            label={`${providerLabel(provider.providerId)} regions (${provider.regions.length})`}
+          >
+            {provider.regions.map((region) => (
+              <option key={`${provider.providerId}-${region.id}`} value={region.id}>
+                {region.id} - {region.label}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+      <span className="field-help">
+        {catalogLabel} · {regionCount} regions · calculators open provider pricing pages.
+      </span>
     </label>
   );
 }
@@ -1188,6 +1530,41 @@ function RequirementSummary({ form }: { form: WorkloadFormState }) {
   );
 }
 
+function CloudCalculatorLinks({ regionCatalog }: { regionCatalog: RegionCatalogResponse | null }) {
+  const catalogsByProvider = new Map(
+    regionCatalog?.providers.map((provider) => [provider.providerId, provider]) ?? [],
+  );
+
+  return (
+    <section className="calculator-links" aria-label="Official cloud pricing calculators">
+      <div className="calculator-links-heading">
+        <span>Official calculators</span>
+        <strong>Validate regional pricing</strong>
+      </div>
+      <div className="calculator-link-grid">
+        {PROVIDER_ORDER.map((providerId) => {
+          const url =
+            catalogsByProvider.get(providerId)?.calculatorUrl ?? defaultCalculatorUrl(providerId);
+
+          return (
+            <a
+              key={providerId}
+              className={`calculator-link calculator-link-${providerId}`}
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <img src={providerLogoSrc(providerId)} alt="" aria-hidden="true" />
+              <span>{providerLabel(providerId)} Calculator</span>
+              <ExternalLinkIcon />
+            </a>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function ExportBar({
   disabled,
   exportingFormat,
@@ -1199,18 +1576,25 @@ function ExportBar({
 }) {
   return (
     <div className="export-bar" aria-label="Export comparison">
-      {(['pdf', 'csv', 'xlsx'] as ReportFormat[]).map((format) => (
-        <button
-          key={format}
-          type="button"
-          className="pc-button pc-button-secondary"
-          disabled={disabled}
-          onClick={() => onExport(format)}
-        >
-          {exportingFormat === format ? <LoadingSpinner /> : <DownloadIcon />}
-          {format === 'xlsx' ? 'Excel' : format.toUpperCase()}
-        </button>
-      ))}
+      {(['pdf', 'csv', 'xlsx'] as ReportFormat[]).map((format) => {
+        const label = reportFormatLabel(format);
+        const isExporting = exportingFormat === format;
+
+        return (
+          <Button
+            key={format}
+            type="button"
+            variant="secondary"
+            disabled={disabled || (exportingFormat !== null && !isExporting)}
+            loading={isExporting}
+            loadingLabel={`Exporting ${label}...`}
+            onClick={() => onExport(format)}
+          >
+            <DownloadIcon />
+            {label}
+          </Button>
+        );
+      })}
     </div>
   );
 }
@@ -1261,13 +1645,22 @@ function ComparisonToolbar({
 
 export function ComparisonView({
   comparison,
-  interval,
+  error = null,
+  exportingFormat = null,
   form = defaultWorkloadForm,
+  interval,
+  isLoading = false,
+  onExport,
 }: {
   comparison: ComparisonResult | null;
+  error?: string | null;
+  exportingFormat?: ReportFormat | null;
   interval: IntervalKey;
   form?: WorkloadFormState;
+  isLoading?: boolean;
+  onExport?: (format: ReportFormat) => void;
 }) {
+  const [activeView, setActiveView] = useState<ResultWorkspaceTab>('overview');
   const providerResults = new Map<ProviderId, ComparisonProviderResult>(
     comparison?.providers.map((provider) => [provider.providerId, provider]) ?? [],
   );
@@ -1282,19 +1675,189 @@ export function ComparisonView({
               <ProviderMark providerId={providerId} />
               {providerLabel(providerId)}
               <strong>
-                {provider
-                  ? formatCurrency(costForInterval(provider, interval))
-                  : comparison
-                    ? 'Unavailable'
-                    : 'Pending'}
+                {provider ? (
+                  formatCurrency(costForInterval(provider, interval))
+                ) : comparison ? (
+                  'Unavailable'
+                ) : (
+                  <ProviderPendingValue providerId={providerId} compact />
+                )}
               </strong>
             </span>
           );
         })}
       </div>
 
-      <CostDashboard comparison={comparison} interval={interval} form={form} />
+      <ResultWorkspaceNav
+        activeView={activeView}
+        hasComparison={Boolean(comparison)}
+        onChange={setActiveView}
+      />
 
+      <div className="result-workspace-panel">
+        {activeView === 'overview' ? (
+          <ExecutiveOverview comparison={comparison} interval={interval} form={form} />
+        ) : activeView === 'providers' ? (
+          <ProviderCostWorkspace comparison={comparison} interval={interval} />
+        ) : activeView === 'finops' ? (
+          <FinOpsFeatureLayer comparison={comparison} interval={interval} isLoading={isLoading} />
+        ) : activeView === 'architecture' ? (
+          <ArchitectureWorkspace comparison={comparison} interval={interval} form={form} />
+        ) : (
+          <PersonaComparisonWorkspace
+            comparison={comparison}
+            interval={interval}
+            form={form}
+            isLoading={isLoading}
+            error={error}
+            exportingFormat={exportingFormat}
+            onExport={onExport}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ResultWorkspaceNav({
+  activeView,
+  hasComparison,
+  onChange,
+}: {
+  activeView: ResultWorkspaceTab;
+  hasComparison: boolean;
+  onChange: (tab: ResultWorkspaceTab) => void;
+}) {
+  return (
+    <section className="result-workspace-nav" aria-label="Demo audience views">
+      <div>
+        <span>Demo workspace</span>
+        <strong>{hasComparison ? 'Comparison ready' : 'Run comparison to populate data'}</strong>
+      </div>
+      <div className="result-tabs" role="tablist" aria-label="Result workspace views">
+        {RESULT_WORKSPACE_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            role="tab"
+            aria-selected={activeView === tab.key}
+            onClick={() => onChange(tab.key)}
+          >
+            <span>{tab.label}</span>
+            <small>{tab.audience}</small>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ExecutiveOverview({
+  comparison,
+  interval,
+  form,
+}: {
+  comparison: ComparisonResult | null;
+  interval: IntervalKey;
+  form: WorkloadFormState;
+}) {
+  const summaries = providerCostSummaries(comparison, interval);
+  const pricedSummaries = summaries.filter((summary) => summary.total !== undefined);
+  const lowest = pricedSummaries[0];
+  const secondLowest = pricedSummaries[1];
+  const highest = pricedSummaries.at(-1);
+  const spread =
+    lowest?.total !== undefined && highest?.total !== undefined ? highest.total - lowest.total : 0;
+  const average =
+    pricedSummaries.length > 0
+      ? pricedSummaries.reduce((sum, summary) => sum + (summary.total ?? 0), 0) /
+        pricedSummaries.length
+      : undefined;
+  const review = buildFinOpsReview(comparison, interval, form);
+
+  return (
+    <section className="demo-overview" aria-label="Executive demo overview">
+      <ExecutiveDecisionPanel decision={review.executiveDecision} />
+
+      <div className="metric-grid metric-grid-compact">
+        <MetricCard
+          label="Lowest"
+          value={lowest ? formatCurrency(lowest.total ?? 0) : 'Pending'}
+          detail={lowest ? providerLabel(lowest.providerId) : 'Awaiting estimate'}
+          providerId={lowest?.providerId}
+        />
+        <MetricCard
+          label="Spread"
+          value={pricedSummaries.length > 1 ? formatCurrency(spread) : 'Pending'}
+          detail={pricedSummaries.length > 1 ? 'Highest minus lowest' : 'Need provider totals'}
+        />
+        <MetricCard
+          label="Average"
+          value={average !== undefined ? formatCurrency(average) : 'Pending'}
+          detail={`${capitalize(interval)} view`}
+        />
+        <MetricCard
+          label="Confidence"
+          value={review.executiveDecision.confidence}
+          detail={review.executiveDecision.confidenceDetail}
+        />
+      </div>
+
+      <DecisionBrief
+        lowest={lowest}
+        secondLowest={secondLowest}
+        highest={highest}
+        interval={interval}
+        pricedCount={pricedSummaries.length}
+        approximateCount={pricedSummaries.reduce(
+          (count, summary) => count + summary.approximateCount,
+          0,
+        )}
+      />
+
+      <section className="dashboard-panel" aria-label="Provider spend chart">
+        <div className="panel-heading">
+          <h3>Provider Spend</h3>
+          <span>{capitalize(interval)}</span>
+        </div>
+        <div className="provider-bars">
+          {summaries.map((summary) => (
+            <div className="provider-bar-row" key={summary.providerId}>
+              <div className="bar-provider">
+                <ProviderMark providerId={summary.providerId} />
+                <strong>{providerLabel(summary.providerId)}</strong>
+              </div>
+              <div className="bar-track" aria-hidden="true">
+                <span
+                  className={`bar-fill provider-fill-${summary.providerId}`}
+                  style={{ width: `${summary.percentOfMax}%` }}
+                />
+              </div>
+              <span className="bar-value">
+                {summary.total !== undefined ? formatCurrency(summary.total) : 'Pending'}
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
+    </section>
+  );
+}
+
+function ProviderCostWorkspace({
+  comparison,
+  interval,
+}: {
+  comparison: ComparisonResult | null;
+  interval: IntervalKey;
+}) {
+  const providerResults = new Map<ProviderId, ComparisonProviderResult>(
+    comparison?.providers.map((provider) => [provider.providerId, provider]) ?? [],
+  );
+  const summaries = providerCostSummaries(comparison, interval);
+
+  return (
+    <section className="provider-cost-workspace" aria-label="Provider cost comparison">
       <div className="provider-grid">
         {PROVIDER_ORDER.map((providerId) => (
           <ProviderPanel
@@ -1308,21 +1871,42 @@ export function ComparisonView({
         ))}
       </div>
 
-      {comparison?.warnings && comparison.warnings.length > 0 ? (
-        <div className="warning-list" role="status">
-          {comparison.warnings.map((warning) => (
-            <span key={`${warning.providerId ?? 'provider'}-${warning.message}`}>
-              {warning.providerId ? `${providerLabel(warning.providerId)}: ` : ''}
-              {warning.message}
-            </span>
-          ))}
-        </div>
-      ) : null}
-    </div>
+      <div className="analysis-grid analysis-grid-compact">
+        <ProviderRanking summaries={summaries} interval={interval} />
+        <IntervalOutlook comparison={comparison} />
+        <CategoryHeatmap summaries={summaries} />
+      </div>
+    </section>
   );
 }
 
-function ProviderPanel({
+function ArchitectureWorkspace({
+  comparison,
+  interval,
+  form,
+}: {
+  comparison: ComparisonResult | null;
+  interval: IntervalKey;
+  form: WorkloadFormState;
+}) {
+  const review = buildFinOpsReview(comparison, interval, form);
+  const summaries = providerCostSummaries(comparison, interval);
+
+  return (
+    <section className="architecture-workspace" aria-label="Architecture and governance review">
+      <SolutionArchitecturePanel review={review.solutionArchitecture} />
+      <FinOpsReviewPanel review={review} />
+      <CategoryHeatmap summaries={summaries} />
+    </section>
+  );
+}
+
+function shareTokenFromLocation(): string | undefined {
+  const match = window.location.pathname.match(/^\/share\/([^/]+)$/);
+  return match?.[1] ? decodeURIComponent(match[1]) : undefined;
+}
+
+export function ProviderPanel({
   providerId,
   provider,
   cheapestProviderId,
@@ -1352,11 +1936,13 @@ function ProviderPanel({
           </div>
         </div>
         <strong className="provider-total">
-          {provider
-            ? formatCurrency(costForInterval(provider, interval))
-            : hasComparison
-              ? 'Unavailable'
-              : 'Pending'}
+          {provider ? (
+            formatCurrency(costForInterval(provider, interval))
+          ) : hasComparison ? (
+            'Unavailable'
+          ) : (
+            <ProviderPendingValue providerId={providerId} />
+          )}
         </strong>
       </header>
 
@@ -1388,14 +1974,18 @@ function ProviderPanel({
         </ul>
       ) : (
         <div className="provider-empty">
-          {hasComparison ? 'Pricing unavailable' : 'Ready to compare'}
+          {hasComparison ? (
+            'Pricing unavailable'
+          ) : (
+            <ProviderPendingValue providerId={providerId} label="Ready to estimate" />
+          )}
         </div>
       )}
     </article>
   );
 }
 
-function CostDashboard({
+export function CostDashboard({
   comparison,
   interval,
   form,
@@ -1959,139 +2549,59 @@ function MetricCard({
   );
 }
 
-function Logo() {
-  return (
-    <svg className="logo" viewBox="0 0 32 32" role="img" aria-label="PolyCost">
-      <rect x="3" y="6" width="6" height="20" rx="1.5" fill="var(--pc-provider-aws)" />
-      <rect x="13" y="6" width="6" height="20" rx="1.5" fill="var(--pc-provider-azure)" />
-      <rect x="23" y="6" width="6" height="20" rx="1.5" fill="var(--pc-provider-gcp)" />
-      <rect x="2" y="26" width="28" height="2.5" rx="1.25" fill="var(--pc-text-primary)" />
-    </svg>
-  );
-}
-
 function ProviderLogo({ providerId }: { providerId: ProviderId }) {
-  if (providerId === 'aws') {
-    return (
-      <div
-        className="provider-logo-lockup provider-logo-lockup-aws"
-        data-provider-logo={providerId}
-        aria-hidden="true"
-      >
-        <svg
-          className="provider-logo-icon provider-logo-icon-aws"
-          viewBox="0 0 46 38"
-          focusable="false"
-        >
-          <path className="aws-smile" d="M4 24c11 5.5 23 5.3 36-.5" />
-          <path className="aws-arrow" d="M35 20.5 43 23l-6.5 6" />
-        </svg>
-        <span className="provider-logo-word provider-logo-word-aws">aws</span>
-      </div>
-    );
-  }
-
-  if (providerId === 'azure') {
-    return (
-      <div
-        className="provider-logo-lockup provider-logo-lockup-azure"
-        data-provider-logo={providerId}
-        aria-hidden="true"
-      >
-        <svg
-          className="provider-logo-icon provider-logo-icon-azure"
-          viewBox="0 0 54 54"
-          focusable="false"
-        >
-          <path className="azure-shard-main" d="M23 9 9 44h19L47 9z" />
-          <path className="azure-shard-fold" d="M38 30 28 44h30z" />
-        </svg>
-        <span className="provider-logo-word provider-logo-word-azure">Azure</span>
-      </div>
-    );
-  }
-
   return (
     <div
-      className="provider-logo-lockup provider-logo-lockup-gcp"
+      className={`provider-logo-lockup provider-logo-lockup-${providerId}`}
       data-provider-logo={providerId}
       aria-hidden="true"
     >
-      <svg
-        className="provider-logo-icon provider-logo-icon-gcp"
-        viewBox="0 0 54 54"
-        focusable="false"
-      >
-        <path className="gcp-logo-blue" d="M21 39a15 15 0 0 1 2-25.2l4.2 7.2a7 7 0 0 0-1.9 12.2z" />
-        <path
-          className="gcp-logo-red"
-          d="M23 13.8a15 15 0 0 1 20.2 3.5l-6.8 4.9a7 7 0 0 0-9.3-1.2z"
-        />
-        <path
-          className="gcp-logo-yellow"
-          d="M43.2 17.3A15 15 0 0 1 44.7 35l-7-4.5a7 7 0 0 0-1.3-8.4z"
-        />
-        <path
-          className="gcp-logo-green"
-          d="M44.7 35A15 15 0 0 1 21 39l4.3-5.8a7 7 0 0 0 12.4-2.7z"
-        />
-      </svg>
-      <span className="provider-logo-word provider-logo-word-gcp">
-        <span>Google</span>
-        <span>Cloud</span>
-      </span>
+      <img className="provider-logo-image" src={providerLogoSrc(providerId)} alt="" />
     </div>
   );
 }
 
 function ProviderMark({ providerId }: { providerId: ProviderId }) {
-  if (providerId === 'aws') {
-    return (
-      <svg
-        className="provider-mark"
-        viewBox="0 0 32 32"
-        role="img"
-        aria-label="AWS"
-        focusable="false"
-      >
-        <rect x="5" y="8" width="22" height="12" rx="3" />
-        <path d="M9 23c5 2.5 10 2.5 15 0" />
-        <path d="M22 21l4 2-4 2" />
-      </svg>
-    );
-  }
-
-  if (providerId === 'azure') {
-    return (
-      <svg
-        className="provider-mark"
-        viewBox="0 0 32 32"
-        role="img"
-        aria-label="Azure"
-        focusable="false"
-      >
-        <path d="M14.5 5 6 25h8.2L23 5z" />
-        <path d="M18.5 17.5 13.4 25H26z" />
-      </svg>
-    );
-  }
-
   return (
-    <svg
-      className="provider-mark provider-mark-gcp"
-      viewBox="0 0 32 32"
-      role="img"
-      aria-label="GCP"
-      focusable="false"
+    <img
+      className={`provider-mark provider-mark-${providerId}`}
+      src={providerLogoSrc(providerId)}
+      alt=""
+      aria-hidden="true"
+    />
+  );
+}
+
+function ProviderPendingValue({
+  providerId,
+  label = 'Estimating',
+  compact = false,
+}: {
+  providerId: ProviderId;
+  label?: string;
+  compact?: boolean;
+}) {
+  return (
+    <span
+      className={[
+        'provider-pending',
+        `provider-pending-${providerId}`,
+        compact ? 'provider-pending-compact' : undefined,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      aria-label={`${providerLabel(providerId)} estimate pending`}
     >
-      <path className="gcp-blue" d="M10.2 22.8a8 8 0 0 1 1-13.4l2.2 3.8a3.7 3.7 0 0 0-1 6.5z" />
-      <path className="gcp-red" d="M11.2 9.4a8 8 0 0 1 10.8 1.9l-3.6 2.6a3.7 3.7 0 0 0-5-.7z" />
-      <path className="gcp-yellow" d="M22 11.3a8 8 0 0 1 .8 9.5l-3.7-2.4a3.7 3.7 0 0 0-.7-4.5z" />
-      <path
-        className="gcp-green"
-        d="M22.8 20.8A8 8 0 0 1 10.2 22.8l2.2-3.1a3.7 3.7 0 0 0 6.7-1.3z"
-      />
-    </svg>
+      <span className="provider-pending-icon" aria-hidden="true">
+        <img src={providerLogoSrc(providerId)} alt="" />
+      </span>
+      <span>{label}</span>
+      <span className="provider-pending-bars" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
+    </span>
   );
 }
 
@@ -2123,20 +2633,6 @@ function ModeIcon({ mode }: { mode: InputMode }) {
   );
 }
 
-function ThemeIcon({ choice }: { choice: ThemeChoice }) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="segment-icon">
-      {choice === 'light' ? (
-        <path d="M12 4v2M12 18v2M4 12h2M18 12h2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M17.7 6.3l-1.4 1.4M7.7 16.3l-1.4 1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" />
-      ) : choice === 'dark' ? (
-        <path d="M19 14.4A7 7 0 0 1 9.6 5a7.5 7.5 0 1 0 9.4 9.4z" />
-      ) : (
-        <path d="M4 5h16v10H4zM9 19h6M12 15v4" />
-      )}
-    </svg>
-  );
-}
-
 function SampleIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon">
@@ -2161,19 +2657,29 @@ function DownloadIcon() {
   );
 }
 
-function ClearIcon() {
+function ExternalLinkIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon">
-      <path d="M6 6l12 12M18 6 6 18" />
+      <path d="M14 5h5v5M19 5l-9 9M19 14v5H5V5h5" />
     </svg>
   );
 }
 
-function LoadingSpinner() {
+function defaultCalculatorUrl(providerId: ProviderId): string {
+  switch (providerId) {
+    case 'aws':
+      return DEFAULT_CALCULATOR_URLS.aws;
+    case 'azure':
+      return DEFAULT_CALCULATOR_URLS.azure;
+    case 'gcp':
+      return DEFAULT_CALCULATOR_URLS.gcp;
+  }
+}
+
+function ClearIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon animate-spin">
-      <circle cx="12" cy="12" r="8" />
-      <path d="M20 12a8 8 0 0 0-8-8" />
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon">
+      <path d="M6 6l12 12M18 6 6 18" />
     </svg>
   );
 }
@@ -2910,16 +3416,27 @@ function intervalCostMultiplier(interval: IntervalKey): number {
   }
 }
 
-function compareButtonLabel(inputMode: InputMode, busyAction: BusyAction): string {
-  if (busyAction === 'compare') {
-    return inputMode === 'describe' ? 'Parsing' : 'Comparing';
-  }
-
+function compareButtonLabel(inputMode: InputMode): string {
   return inputMode === 'describe' ? 'Parse & compare' : 'Compare';
+}
+
+function compareLoadingLabel(inputMode: InputMode): string {
+  return inputMode === 'describe' ? 'Parsing & comparing...' : 'Comparing...';
+}
+
+function reportFormatLabel(format: ReportFormat): string {
+  return format === 'xlsx' ? 'Excel' : format.toUpperCase();
 }
 
 function roundCurrency(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function scrollToElement(id: string) {
+  document.getElementById(id)?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start',
+  });
 }
 
 function parseInputNumber(value: string): number | undefined {

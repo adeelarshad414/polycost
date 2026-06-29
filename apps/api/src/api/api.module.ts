@@ -13,11 +13,18 @@ import { ApiRateLimitService } from './rate-limit.service';
 import { ComparisonApplicationService } from './comparison-application.service';
 import { ComparisonsController } from './comparisons.controller';
 import { PricingStatusController } from './pricing-status.controller';
+import { RegionsController } from './regions.controller';
+import { RegionsService } from './regions.service';
 import { WorkloadController } from './workload.controller';
 
 @Module({
   imports: [NwsParserModule, ComparisonModule, ReportModule],
-  controllers: [WorkloadController, ComparisonsController, PricingStatusController],
+  controllers: [
+    WorkloadController,
+    ComparisonsController,
+    PricingStatusController,
+    RegionsController,
+  ],
   providers: [
     SecretsService,
     {
@@ -32,6 +39,7 @@ import { WorkloadController } from './workload.controller';
     },
     AdminApiKeyGuard,
     ComparisonApplicationService,
+    RegionsService,
     {
       provide: APP_FILTER,
       useClass: ApiExceptionFilter,

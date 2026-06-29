@@ -1,20 +1,27 @@
-import { SecretsReader } from '../../secrets/secrets.service';
 import { BaseCloudProviderAdapter } from '../common/base-cloud-provider.adapter';
 import {
   PricingCatalogReader,
   PricingCatalogRecord,
+  PricingModelKey,
   ProviderId,
   RefreshPricingCatalogOptions,
   ServiceCategory,
 } from '../common/cloud-provider-adapter';
-import { AdapterCredentialError } from '../common/adapter-errors';
 import { defaultFetch, FetchLike, parseJsonResponse } from '../common/http-client';
-import { AwsCredentials, signAwsJsonRequest } from './aws-signature-v4';
 
-interface AwsGetProductsResponse {
-  FormatVersion: string;
-  NextToken?: string;
-  PriceList: string[];
+interface AwsBulkPriceListResponse {
+  products: Record<string, AwsProduct>;
+  terms: {
+    OnDemand?: Record<string, Record<string, AwsOnDemandTerm>>;
+    Reserved?: Record<string, Record<string, AwsReservedTerm>>;
+  };
+  publicationDate?: string;
+}
+
+interface AwsProduct {
+  sku: string;
+  productFamily?: string;
+  attributes: Record<string, string>;
 }
 
 interface AwsPriceDimension {
@@ -30,22 +37,11 @@ interface AwsOnDemandTerm {
   priceDimensions: Record<string, AwsPriceDimension>;
 }
 
-interface AwsPriceListItem {
-  product: {
-    sku: string;
-    productFamily?: string;
-    attributes: Record<string, string>;
-  };
-  serviceCode: string;
-  terms: {
-    OnDemand?: Record<string, AwsOnDemandTerm>;
-  };
-  publicationDate?: string;
+interface AwsReservedTerm extends AwsOnDemandTerm {
+  termAttributes?: Record<string, string>;
 }
 
-const AWS_PRICING_HOST = 'api.pricing.us-east-1.amazonaws.com';
-const AWS_PRICING_ENDPOINT = `https://${AWS_PRICING_HOST}`;
-const AWS_SECRET_PATH = 'polycost/providers/aws';
+const AWS_BULK_PRICING_ENDPOINT = 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws';
 
 const CATEGORY_SERVICE_CODES: Record<ServiceCategory, string[]> = {
   compute: ['AmazonEC2'],
@@ -62,15 +58,38 @@ const AWS_LOCATION_TO_REGION: Record<string, string> = {
 
 export class AwsProviderAdapter extends BaseCloudProviderAdapter {
   readonly providerId: ProviderId = 'aws';
+  private readonly fetchClient: FetchLike;
+  private readonly now: () => Date;
 
+  constructor(catalogReader: PricingCatalogReader, defaultRegion: string);
   constructor(
     catalogReader: PricingCatalogReader,
     defaultRegion: string,
-    private readonly secretsReader: SecretsReader,
-    private readonly fetchClient: FetchLike = defaultFetch,
-    private readonly now: () => Date = () => new Date(),
+    fetchClient: FetchLike,
+    now?: () => Date,
+  );
+  constructor(
+    catalogReader: PricingCatalogReader,
+    defaultRegion: string,
+    legacySecretsReader: unknown,
+    fetchClient?: FetchLike,
+    now?: () => Date,
+  );
+  constructor(
+    catalogReader: PricingCatalogReader,
+    defaultRegion: string,
+    fetchClientOrLegacySecretsReader: FetchLike | unknown = defaultFetch,
+    fetchClientOrNow?: FetchLike | (() => Date),
+    now?: () => Date,
   ) {
     super(catalogReader, defaultRegion);
+    const hasLegacySecretsReader = typeof fetchClientOrLegacySecretsReader !== 'function';
+    this.fetchClient = hasLegacySecretsReader
+      ? ((fetchClientOrNow as FetchLike | undefined) ?? defaultFetch)
+      : (fetchClientOrLegacySecretsReader as FetchLike);
+    this.now =
+      (hasLegacySecretsReader ? now : (fetchClientOrNow as (() => Date) | undefined)) ??
+      (() => new Date());
   }
 
   async refreshPricingCatalog(
@@ -106,127 +125,127 @@ export class AwsProviderAdapter extends BaseCloudProviderAdapter {
     fetchedAt: string,
     region?: string,
   ): Promise<PricingCatalogRecord[]> {
-    const credentials = await this.getCredentials();
-    const records: PricingCatalogRecord[] = [];
-    let nextToken: string | undefined;
+    const url = `${AWS_BULK_PRICING_ENDPOINT}/${serviceCode}/current/index.json`;
+    const response = await this.fetchClient(url);
+    const parsed = await parseJsonResponse<AwsBulkPriceListResponse>(this.providerId, response);
 
-    do {
-      const requestBody = JSON.stringify({
-        ServiceCode: serviceCode,
-        FormatVersion: 'aws_v1',
-        MaxResults: 100,
-        ...(nextToken ? { NextToken: nextToken } : {}),
-      });
-      const signedRequest = signAwsJsonRequest({
-        credentials,
-        region: 'us-east-1',
-        service: 'pricing',
-        host: AWS_PRICING_HOST,
-        target: 'AWSPriceListService.GetProducts',
-        body: requestBody,
-        now: this.now(),
-      });
-      const response = await this.fetchClient(AWS_PRICING_ENDPOINT, {
-        method: 'POST',
-        headers: signedRequest.headers,
-        body: signedRequest.body,
-      });
-      const parsed = await parseJsonResponse<AwsGetProductsResponse>(this.providerId, response);
-
-      records.push(...this.normalizePriceList(parsed.PriceList, category, fetchedAt, region));
-      nextToken = parsed.NextToken;
-    } while (nextToken);
-
-    return records;
+    return this.normalizeBulkCatalog(parsed, serviceCode, category, fetchedAt, region);
   }
 
-  private normalizePriceList(
-    priceList: string[],
+  private normalizeBulkCatalog(
+    priceList: AwsBulkPriceListResponse,
+    serviceCode: string,
     category: ServiceCategory,
     fetchedAt: string,
     regionFilter?: string,
   ): PricingCatalogRecord[] {
-    return priceList.flatMap((priceListEntry) => {
-      const parsed = JSON.parse(priceListEntry) as AwsPriceListItem;
+    return Object.values(priceList.products).flatMap((product) => {
       const region =
-        parsed.product.attributes.regionCode ??
-        AWS_LOCATION_TO_REGION[parsed.product.attributes.location] ??
-        parsed.product.attributes.location;
+        product.attributes.regionCode ??
+        AWS_LOCATION_TO_REGION[product.attributes.location] ??
+        product.attributes.location;
 
       if (regionFilter && region !== regionFilter) {
         return [];
       }
 
-      const dimension = this.firstPriceDimension(parsed);
-
-      if (!dimension || !dimension.pricePerUnit.USD) {
-        return [];
-      }
+      const onDemandTerms = Object.entries(priceList.terms.OnDemand?.[product.sku] ?? {});
+      const reservedTerms = Object.entries(priceList.terms.Reserved?.[product.sku] ?? {});
 
       return [
-        {
-          provider: this.providerId,
-          serviceCategory: category,
-          serviceName:
-            parsed.product.attributes.servicename ??
-            parsed.product.attributes.servicecode ??
-            parsed.serviceCode,
-          skuId: parsed.product.sku,
-          skuDescription: dimension.description,
-          region,
-          unit: dimension.unit,
-          unitPriceUsd: Number.parseFloat(dimension.pricePerUnit.USD),
-          attributes: {
-            ...parsed.product.attributes,
-            productFamily: parsed.product.productFamily,
-            rawServiceCode: parsed.serviceCode,
-            vcpu: parseOptionalNumber(parsed.product.attributes.vcpu),
-            memoryGb: parseMemoryGb(parsed.product.attributes.memory),
-          },
-          effectiveDate: this.firstEffectiveDate(parsed) ?? parsed.publicationDate ?? fetchedAt,
-          fetchedAt,
-        },
+        ...onDemandTerms.flatMap(([termCode, term]) =>
+          this.normalizeTerm(
+            product,
+            serviceCode,
+            termCode,
+            term,
+            category,
+            region,
+            fetchedAt,
+            priceList.publicationDate,
+            'on-demand',
+          ),
+        ),
+        ...reservedTerms.flatMap(([termCode, term]) => {
+          const pricingModel = awsReservedPricingModel(term);
+
+          if (!pricingModel) {
+            return [];
+          }
+
+          return this.normalizeTerm(
+            product,
+            serviceCode,
+            termCode,
+            term,
+            category,
+            region,
+            fetchedAt,
+            priceList.publicationDate,
+            pricingModel,
+          );
+        }),
       ];
     });
   }
-  private firstPriceDimension(parsed: AwsPriceListItem): AwsPriceDimension | undefined {
-    const term = Object.values(parsed.terms.OnDemand ?? {})[0];
-    return term ? Object.values(term.priceDimensions)[0] : undefined;
+
+  private normalizeTerm(
+    product: AwsProduct,
+    serviceCode: string,
+    termCode: string,
+    term: AwsOnDemandTerm | AwsReservedTerm,
+    category: ServiceCategory,
+    region: string,
+    fetchedAt: string,
+    publicationDate: string | undefined,
+    pricingModel: PricingModelKey,
+  ): PricingCatalogRecord[] {
+    return this.priceDimensions(term, pricingModel).map(([dimensionCode, dimension]) => ({
+      provider: this.providerId,
+      serviceCategory: category,
+      serviceName: product.attributes.servicename ?? product.attributes.servicecode ?? serviceCode,
+      skuId:
+        pricingModel === 'on-demand'
+          ? product.sku
+          : `${product.sku}:${pricingModel}:${termCode}:${dimensionCode}`,
+      skuDescription: dimension.description,
+      region,
+      unit: dimension.unit,
+      unitPriceUsd: Number.parseFloat(dimension.pricePerUnit.USD ?? '0'),
+      attributes: {
+        ...product.attributes,
+        pricingModel,
+        productFamily: product.productFamily,
+        rawServiceCode: serviceCode,
+        ...(isReservedTerm(term) ? term.termAttributes : {}),
+        vcpu: parseOptionalNumber(product.attributes.vcpu),
+        memoryGb: parseMemoryGb(product.attributes.memory),
+      },
+      effectiveDate: term.effectiveDate ?? publicationDate ?? fetchedAt,
+      fetchedAt,
+    }));
   }
 
-  private firstEffectiveDate(parsed: AwsPriceListItem): string | undefined {
-    return Object.values(parsed.terms.OnDemand ?? {})[0]?.effectiveDate;
-  }
+  private priceDimensions(
+    term: AwsOnDemandTerm | AwsReservedTerm,
+    pricingModel: PricingModelKey,
+  ): Array<[string, AwsPriceDimension]> {
+    const dimensions = Object.entries(term.priceDimensions).filter(
+      ([, dimension]) => dimension.pricePerUnit.USD !== undefined,
+    );
 
-  private async getCredentials(): Promise<AwsCredentials> {
-    const accessKeyId = await this.getRequiredSecret('access_key_id');
-    const secretAccessKey = await this.getRequiredSecret('secret_access_key');
-    const sessionToken = await this.getOptionalSecret('session_token');
-
-    return {
-      accessKeyId,
-      secretAccessKey,
-      ...(sessionToken ? { sessionToken } : {}),
-    };
-  }
-
-  private async getRequiredSecret(key: string): Promise<string> {
-    try {
-      return await this.secretsReader.getSecret(AWS_SECRET_PATH, key);
-    } catch {
-      throw new AdapterCredentialError(
-        this.providerId,
-        `missing required AWS pricing credential ${key}`,
-      );
+    if (pricingModel === 'on-demand') {
+      return dimensions.slice(0, 1);
     }
-  }
 
-  private async getOptionalSecret(key: string): Promise<string | undefined> {
-    try {
-      return await this.secretsReader.getSecret(AWS_SECRET_PATH, key);
-    } catch {
-      return undefined;
-    }
+    return dimensions
+      .filter(([, dimension]) => {
+        const normalizedUnit = dimension.unit.toLowerCase();
+        const normalizedDescription = dimension.description.toLowerCase();
+
+        return normalizedUnit.includes('hour') || normalizedDescription.includes('hourly');
+      })
+      .slice(0, 1);
   }
 }
 
@@ -234,7 +253,9 @@ function uniqueSkuRecords(records: PricingCatalogRecord[]): PricingCatalogRecord
   const byKey = new Map<string, PricingCatalogRecord>();
 
   for (const record of records) {
-    const key = `${record.skuId}:${record.region}:${record.unit}`;
+    const key = `${record.skuId}:${record.region}:${record.unit}:${String(
+      record.attributes?.pricingModel ?? 'on-demand',
+    )}`;
     if (!byKey.has(key)) {
       byKey.set(key, record);
     }
@@ -260,4 +281,29 @@ function parseMemoryGb(value: string | undefined): number | undefined {
   const normalized = value.replace(/,/g, '');
   const match = normalized.match(/(?<amount>\d+(\.\d+)?)\s*GiB/i);
   return match?.groups?.amount ? Number.parseFloat(match.groups.amount) : undefined;
+}
+
+function awsReservedPricingModel(term: AwsReservedTerm): PricingModelKey | undefined {
+  const length =
+    term.termAttributes?.LeaseContractLength ??
+    term.termAttributes?.leaseContractLength ??
+    term.termAttributes?.leasecontractlength;
+
+  if (!length) {
+    return undefined;
+  }
+
+  if (length.includes('3') || /three/i.test(length)) {
+    return 'reserved-3yr';
+  }
+
+  if (length.includes('1') || /one/i.test(length)) {
+    return 'reserved-1yr';
+  }
+
+  return undefined;
+}
+
+function isReservedTerm(term: AwsOnDemandTerm | AwsReservedTerm): term is AwsReservedTerm {
+  return 'termAttributes' in term;
 }

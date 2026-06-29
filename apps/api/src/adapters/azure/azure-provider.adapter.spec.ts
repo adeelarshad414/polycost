@@ -17,9 +17,12 @@ const jsonResponse = (body: unknown) => ({
 
 describe('AzureProviderAdapter', () => {
   it('normalizes Azure Retail Prices responses into catalog records', async () => {
-    const fetchClient = jest.fn(async () =>
-      jsonResponse(fixture('test/fixtures/pricing/azure/retail-compute.json')),
-    ) as FetchLike;
+    const fetchClient = jest
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse(fixture('test/fixtures/pricing/azure/retail-compute.json')),
+      )
+      .mockResolvedValueOnce(jsonResponse({ Items: [] })) as FetchLike;
     const adapter = new AzureProviderAdapter(
       new InMemoryPricingCatalogReader([]),
       'eastus',
@@ -42,6 +45,9 @@ describe('AzureProviderAdapter', () => {
         region: 'eastus',
         unit: '1 Hour',
         unitPriceUsd: 0.0416,
+        attributes: expect.objectContaining({
+          pricingModel: 'on-demand',
+        }),
       }),
     ]);
     expect(fetchClient).toHaveBeenCalledWith(

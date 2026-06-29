@@ -1,0 +1,7 @@
+<svg width="180" height="96" viewBox="0 0 180 96" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title id="title">Microsoft Azure</title>
+  <rect width="180" height="96" rx="16" fill="#FFFFFF"/>
+  <path d="M53 22 30 74h24l48-52H53Z" fill="#0078D4"/>
+  <path d="M72 56 54 74h63L86 22 72 56Z" fill="#50A4F1"/>
+  <text x="121" y="55" text-anchor="middle" font-family="Segoe UI, Arial, Helvetica, sans-serif" font-size="22" font-weight="600" fill="#1F2937">Azure</text>
+</svg>

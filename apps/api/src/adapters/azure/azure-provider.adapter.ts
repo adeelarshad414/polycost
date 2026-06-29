@@ -31,15 +31,19 @@ interface AzureRetailPriceItem {
   type: string;
   isPrimaryMeterRegion?: boolean;
   armSkuName?: string;
+  reservationTerm?: string;
 }
 
 const AZURE_RETAIL_PRICES_ENDPOINT = 'https://prices.azure.com/api/retail/prices';
 
-const CATEGORY_FILTERS: Record<ServiceCategory, string> = {
-  compute: "serviceFamily eq 'Compute' and priceType eq 'Consumption'",
-  storage: "serviceFamily eq 'Storage' and priceType eq 'Consumption'",
-  database: "serviceFamily eq 'Databases' and priceType eq 'Consumption'",
-  network: "serviceFamily eq 'Networking' and priceType eq 'Consumption'",
+const CATEGORY_FILTERS: Record<ServiceCategory, string[]> = {
+  compute: [
+    "serviceFamily eq 'Compute' and priceType eq 'Consumption'",
+    "serviceFamily eq 'Compute' and priceType eq 'Reservation'",
+  ],
+  storage: ["serviceFamily eq 'Storage' and priceType eq 'Consumption'"],
+  database: ["serviceFamily eq 'Databases' and priceType eq 'Consumption'"],
+  network: ["serviceFamily eq 'Networking' and priceType eq 'Consumption'"],
 };
 
 export class AzureProviderAdapter extends BaseCloudProviderAdapter {
@@ -82,22 +86,27 @@ export class AzureProviderAdapter extends BaseCloudProviderAdapter {
     fetchedAt: string,
     region?: string,
   ): Promise<PricingCatalogRecord[]> {
-    const filter = [CATEGORY_FILTERS[category], region ? `armRegionName eq '${region}'` : undefined]
-      .filter(Boolean)
-      .join(' and ');
-    const url = new URL(AZURE_RETAIL_PRICES_ENDPOINT);
-    url.searchParams.set('currencyCode', 'USD');
-    url.searchParams.set('$filter', filter);
-
     const records: PricingCatalogRecord[] = [];
-    let nextPageUrl: string | undefined = url.toString();
 
-    while (nextPageUrl) {
-      const response = await this.fetchClient(nextPageUrl);
-      const parsed = await parseJsonResponse<AzureRetailPricesResponse>(this.providerId, response);
+    for (const categoryFilter of CATEGORY_FILTERS[category]) {
+      const filter = [categoryFilter, region ? `armRegionName eq '${region}'` : undefined]
+        .filter(Boolean)
+        .join(' and ');
+      const url = new URL(AZURE_RETAIL_PRICES_ENDPOINT);
+      url.searchParams.set('currencyCode', 'USD');
+      url.searchParams.set('$filter', filter);
+      let nextPageUrl: string | undefined = url.toString();
 
-      records.push(...parsed.Items.map((item) => this.normalizeItem(item, category, fetchedAt)));
-      nextPageUrl = parsed.NextPageLink;
+      while (nextPageUrl) {
+        const response = await this.fetchClient(nextPageUrl);
+        const parsed = await parseJsonResponse<AzureRetailPricesResponse>(
+          this.providerId,
+          response,
+        );
+
+        records.push(...parsed.Items.map((item) => this.normalizeItem(item, category, fetchedAt)));
+        nextPageUrl = parsed.NextPageLink;
+      }
     }
 
     return records;
@@ -124,6 +133,8 @@ export class AzureProviderAdapter extends BaseCloudProviderAdapter {
         skuName: item.skuName,
         serviceFamily: item.serviceFamily,
         priceType: item.type,
+        pricingModel: azurePricingModel(item),
+        reservationTerm: item.reservationTerm,
         armSkuName: item.armSkuName,
         isPrimaryMeterRegion: item.isPrimaryMeterRegion,
         vcpu: parseAzureVcpu(item.skuName),
@@ -150,4 +161,18 @@ function uniqueSkuRecords(records: PricingCatalogRecord[]): PricingCatalogRecord
 function parseAzureVcpu(skuName: string): number | undefined {
   const match = skuName.match(/[A-Z](?<vcpu>\d+)/i);
   return match?.groups?.vcpu ? Number.parseInt(match.groups.vcpu, 10) : undefined;
+}
+
+function azurePricingModel(
+  item: AzureRetailPriceItem,
+): 'on-demand' | 'reserved-1yr' | 'reserved-3yr' {
+  if (item.type !== 'Reservation') {
+    return 'on-demand';
+  }
+
+  if (item.reservationTerm?.includes('3')) {
+    return 'reserved-3yr';
+  }
+
+  return 'reserved-1yr';
 }

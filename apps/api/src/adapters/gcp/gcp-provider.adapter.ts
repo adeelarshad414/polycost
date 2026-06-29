@@ -186,7 +186,8 @@ export class GcpProviderAdapter extends BaseCloudProviderAdapter {
     fetchedAt: string,
     regionFilter?: string,
   ): PricingCatalogRecord[] {
-    const price = sku.pricingInfo[0]?.pricingExpression.tieredRates[0]?.unitPrice;
+    const pricingExpression = sku.pricingInfo[0]?.pricingExpression;
+    const price = pricingExpression?.tieredRates[0]?.unitPrice;
 
     if (!price) {
       return [];
@@ -203,18 +204,19 @@ export class GcpProviderAdapter extends BaseCloudProviderAdapter {
       skuId: sku.skuId,
       skuDescription: sku.description,
       region,
-      unit:
-        sku.pricingInfo[0]?.pricingExpression.usageUnitDescription ??
-        sku.pricingInfo[0]?.pricingExpression.usageUnit ??
-        'unit',
+      unit: pricingExpression?.usageUnitDescription ?? pricingExpression?.usageUnit ?? 'unit',
       unitPriceUsd: moneyToNumber(price.units, price.nanos),
       attributes: {
+        pricingModel: 'on-demand',
         resourceFamily: sku.category.resourceFamily,
         resourceGroup: sku.category.resourceGroup,
         usageType: sku.category.usageType,
         serviceProviderName: sku.serviceProviderName,
-        baseUnit: sku.pricingInfo[0]?.pricingExpression.baseUnit,
-        baseUnitDescription: sku.pricingInfo[0]?.pricingExpression.baseUnitDescription,
+        baseUnit: pricingExpression?.baseUnit,
+        baseUnitDescription: pricingExpression?.baseUnitDescription,
+        ...(category === 'network' && pricingExpression
+          ? { egressTiers: gcpTieredRates(pricingExpression.tieredRates) }
+          : {}),
       },
       effectiveDate: sku.pricingInfo[0]?.effectiveTime ?? fetchedAt,
       fetchedAt,
@@ -248,4 +250,13 @@ function uniqueSkuRecords(records: PricingCatalogRecord[]): PricingCatalogRecord
 
 function moneyToNumber(units = '0', nanos = 0): number {
   return Number.parseInt(units, 10) + nanos / 1_000_000_000;
+}
+
+function gcpTieredRates(
+  rates: GcpSku['pricingInfo'][number]['pricingExpression']['tieredRates'],
+): Array<{ startUsageAmount: number; unitPriceUsd: number }> {
+  return rates.map((rate) => ({
+    startUsageAmount: rate.startUsageAmount,
+    unitPriceUsd: moneyToNumber(rate.unitPrice.units, rate.unitPrice.nanos),
+  }));
 }

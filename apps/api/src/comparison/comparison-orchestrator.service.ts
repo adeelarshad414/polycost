@@ -1,8 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   CloudProviderAdapter,
+  CostComponent,
+  PricingModelCost,
+  PricingModelKey,
   ProviderId,
   ProviderPricingResult,
+  ServiceCategory,
 } from '../adapters/common/cloud-provider-adapter';
 import { NormalizedWorkloadSpec } from '../nws/nws.types';
 import { NWSValidator } from '../nws/nws-validator';
@@ -15,6 +19,7 @@ import {
 } from './comparison.tokens';
 import {
   ComparisonLineItem,
+  ComparisonCostBreakdown,
   ComparisonProviderResult,
   ComparisonResult,
   ComparisonWarning,
@@ -102,12 +107,27 @@ export class ComparisonOrchestratorService {
         result.providerId,
         lineItem,
       );
+      const costComponent =
+        annotatedLineItem.costComponent ??
+        this.costComponentForCategory(annotatedLineItem.category);
 
       return {
         category: annotatedLineItem.category,
+        costComponent,
         description: annotatedLineItem.description,
         isApproximate: annotatedLineItem.isApproximate,
         baseMonthlyCostUsd: this.roundCurrency(annotatedLineItem.baseMonthlyCostUsd),
+        pricingBasis: annotatedLineItem.pricingBasis ?? 'flat',
+        ...(annotatedLineItem.pricingModels
+          ? {
+              pricingModels: annotatedLineItem.pricingModels.map((model) => ({
+                ...model,
+                ...(model.monthlyCostUsd !== undefined
+                  ? { monthlyCostUsd: this.roundCurrency(model.monthlyCostUsd) }
+                  : {}),
+              })),
+            }
+          : {}),
       };
     });
 
@@ -119,7 +139,105 @@ export class ComparisonOrchestratorService {
       providerId: result.providerId,
       lineItems,
       totals: this.intervalCostCalculator.calculate(monthlyCostUsd),
+      pricingModels: this.providerPricingModels(lineItems, monthlyCostUsd),
+      breakdown: this.costBreakdown(lineItems),
     };
+  }
+
+  private providerPricingModels(
+    lineItems: ComparisonLineItem[],
+    onDemandMonthlyCostUsd: number,
+  ): PricingModelCost[] {
+    return [
+      {
+        model: 'on-demand',
+        available: true,
+        monthlyCostUsd: onDemandMonthlyCostUsd,
+      },
+      this.providerCommitmentModel(lineItems, 'reserved-1yr'),
+      this.providerCommitmentModel(lineItems, 'reserved-3yr'),
+    ];
+  }
+
+  private providerCommitmentModel(
+    lineItems: ComparisonLineItem[],
+    pricingModel: PricingModelKey,
+  ): PricingModelCost {
+    const computeLineItems = lineItems.filter((lineItem) => lineItem.costComponent === 'compute');
+
+    if (computeLineItems.length === 0) {
+      return {
+        model: pricingModel,
+        available: false,
+        unavailableReason: 'No compute line items in this workload.',
+      };
+    }
+
+    const commitmentCosts = computeLineItems.map((lineItem) =>
+      lineItem.pricingModels?.find((model) => model.model === pricingModel),
+    );
+    const allCommitmentCostsAvailable = commitmentCosts.every(
+      (model) => model?.available === true && model.monthlyCostUsd !== undefined,
+    );
+
+    if (!allCommitmentCostsAvailable) {
+      return {
+        model: pricingModel,
+        available: false,
+        unavailableReason: 'Not available for this configuration.',
+      };
+    }
+
+    const nonComputeMonthlyCostUsd = lineItems
+      .filter((lineItem) => lineItem.costComponent !== 'compute')
+      .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+    const computeMonthlyCostUsd = commitmentCosts.reduce(
+      (sum, model) => sum + (model?.monthlyCostUsd ?? 0),
+      0,
+    );
+
+    return {
+      model: pricingModel,
+      available: true,
+      monthlyCostUsd: this.roundCurrency(nonComputeMonthlyCostUsd + computeMonthlyCostUsd),
+    };
+  }
+
+  private costBreakdown(lineItems: ComparisonLineItem[]): ComparisonCostBreakdown {
+    const computeMonthlyCostUsd = this.componentTotal(lineItems, 'compute');
+    const storageMonthlyCostUsd = this.componentTotal(lineItems, 'storage');
+    const egressMonthlyCostUsd = this.componentTotal(lineItems, 'egress');
+    const databaseMonthlyCostUsd = this.componentTotal(lineItems, 'database');
+
+    return {
+      computeMonthlyCostUsd,
+      storageMonthlyCostUsd,
+      egressMonthlyCostUsd,
+      databaseMonthlyCostUsd,
+      scopedMonthlyCostUsd: this.roundCurrency(
+        computeMonthlyCostUsd + storageMonthlyCostUsd + egressMonthlyCostUsd,
+      ),
+    };
+  }
+
+  private componentTotal(lineItems: ComparisonLineItem[], component: CostComponent): number {
+    return this.roundCurrency(
+      lineItems
+        .filter((lineItem) => this.lineItemComponent(lineItem) === component)
+        .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0),
+    );
+  }
+
+  private lineItemComponent(lineItem: ComparisonLineItem): CostComponent {
+    return lineItem.costComponent ?? this.costComponentForCategory(lineItem.category);
+  }
+
+  private costComponentForCategory(category: ServiceCategory): CostComponent {
+    if (category === 'network') {
+      return 'egress';
+    }
+
+    return category;
   }
 
   private cheapestProvider(providers: ComparisonProviderResult[]): ProviderId {

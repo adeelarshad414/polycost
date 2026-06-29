@@ -1,28 +1,40 @@
 <!doctype html>
-<html lang="en" data-theme="light" data-theme-choice="system">
+<html lang="en" data-theme="light" data-theme-choice="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="polycost-api-base-url" content="http://localhost:3001/api/v1" />
-    <title>PolyCost</title>
+    <meta
+      name="description"
+      content="Multi-cloud cost clarity, in one place. Compare AWS, Azure, and GCP costs — instantly."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="PolyCost — Multi-cloud cost clarity, in one place." />
+    <meta property="og:description" content="Compare AWS, Azure, and GCP costs — instantly." />
+    <meta property="og:image" content="/brand/polycost-lockup.svg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="PolyCost — Multi-cloud cost clarity, in one place." />
+    <meta name="twitter:description" content="Compare AWS, Azure, and GCP costs — instantly." />
+    <meta name="twitter:image" content="/brand/polycost-lockup.svg" />
+    <link rel="icon" type="image/svg+xml" sizes="16x16" href="/brand/favicon-16.svg" />
+    <link rel="icon" type="image/svg+xml" sizes="32x32" href="/brand/favicon-32.svg" />
+    <link rel="icon" type="image/svg+xml" sizes="48x48" href="/brand/favicon-48.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon.svg" />
+    <title>PolyCost — Multi-cloud cost clarity, in one place.</title>
     <script>
       (function () {
         try {
-          var choice = localStorage.getItem('polycost-theme') || 'system';
-          if (choice !== 'light' && choice !== 'dark' && choice !== 'system') {
-            choice = 'system';
+          var choice = localStorage.getItem('polycost-theme');
+          if (choice !== 'light' && choice !== 'dark') {
+            choice = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
           }
-          var resolved =
-            choice === 'system'
-              ? window.matchMedia('(prefers-color-scheme: dark)').matches
-                ? 'dark'
-                : 'light'
-              : choice;
-          document.documentElement.dataset.theme = resolved;
+          document.documentElement.dataset.theme = choice;
           document.documentElement.dataset.themeChoice = choice;
+          document.documentElement.style.colorScheme = choice;
         } catch (error) {
           document.documentElement.dataset.theme = 'light';
-          document.documentElement.dataset.themeChoice = 'system';
+          document.documentElement.dataset.themeChoice = 'light';
+          document.documentElement.style.colorScheme = 'light';
         }
       })();
     </script>

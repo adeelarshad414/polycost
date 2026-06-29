@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { SecretsReader } from '../../secrets/secrets.service';
 import { InMemoryPricingCatalogReader } from '../common/in-memory-pricing-catalog.reader';
 import { FetchLike } from '../common/http-client';
 import { PricingCatalogRecord } from '../common/cloud-provider-adapter';
@@ -16,37 +15,38 @@ const jsonResponse = (body: unknown) => ({
   text: async () => JSON.stringify(body),
 });
 
-const secretsReader = (): SecretsReader => ({
-  getSecret: jest.fn(async (_path, key) => {
-    if (key === 'access_key_id') {
-      return 'test-access-key';
+const awsBulkFixture = (relativePath: string) => {
+  const getProducts = fixture<{ PriceList: string[] }>(relativePath);
+  const products: Record<string, unknown> = {};
+  const onDemand: Record<string, unknown> = {};
+  const reserved: Record<string, unknown> = {};
+  let publicationDate: string | undefined;
+
+  for (const rawItem of getProducts.PriceList) {
+    const item = JSON.parse(rawItem) as {
+      product: { sku: string };
+      terms: { OnDemand?: Record<string, unknown>; Reserved?: Record<string, unknown> };
+      publicationDate?: string;
+    };
+    products[item.product.sku] = item.product;
+    onDemand[item.product.sku] = item.terms.OnDemand ?? {};
+
+    if (item.terms.Reserved) {
+      reserved[item.product.sku] = item.terms.Reserved;
     }
 
-    if (key === 'secret_access_key') {
-      return 'test-secret-key';
-    }
+    publicationDate = item.publicationDate ?? publicationDate;
+  }
 
-    throw new Error('missing optional secret');
-  }),
-});
-
-const secretsReaderWithSessionToken = (): SecretsReader => ({
-  getSecret: jest.fn(async (_path, key) => {
-    if (key === 'access_key_id') {
-      return 'test-access-key';
-    }
-
-    if (key === 'secret_access_key') {
-      return 'test-secret-key';
-    }
-
-    if (key === 'session_token') {
-      return 'test-session-token';
-    }
-
-    throw new Error('missing secret');
-  }),
-});
+  return {
+    products,
+    terms: {
+      OnDemand: onDemand,
+      Reserved: reserved,
+    },
+    publicationDate,
+  };
+};
 
 const minimalNws = {
   schemaVersion: '1.0',
@@ -81,14 +81,13 @@ const minimalNws = {
 };
 
 describe('AwsProviderAdapter', () => {
-  it('normalizes AWS GetProducts responses into pricing catalog records', async () => {
+  it('normalizes public AWS Bulk Price List responses into pricing catalog records', async () => {
     const fetchClient = jest.fn(async () =>
-      jsonResponse(fixture('test/fixtures/pricing/aws/get-products-ec2.json')),
+      jsonResponse(awsBulkFixture('test/fixtures/pricing/aws/get-products-ec2.json')),
     ) as FetchLike;
     const adapter = new AwsProviderAdapter(
       new InMemoryPricingCatalogReader([]),
       'us-east-1',
-      secretsReader(),
       fetchClient,
       () => new Date('2026-06-28T00:00:00.000Z'),
     );
@@ -111,19 +110,63 @@ describe('AwsProviderAdapter', () => {
     ]);
     expect(records[0].attributes).toEqual(
       expect.objectContaining({
+        pricingModel: 'on-demand',
         vcpu: 2,
         memoryGb: 2,
       }),
     );
     expect(fetchClient).toHaveBeenCalledWith(
-      'https://api.pricing.us-east-1.amazonaws.com',
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({
-          authorization: expect.stringContaining('AWS4-HMAC-SHA256'),
-          'x-amz-target': 'AWSPriceListService.GetProducts',
+      'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/index.json',
+    );
+  });
+
+  it('normalizes AWS reserved terms when hourly recurring dimensions exist', async () => {
+    const bulkCatalog = awsBulkFixture('test/fixtures/pricing/aws/get-products-ec2.json') as {
+      terms: { Reserved: Record<string, unknown> };
+    };
+    bulkCatalog.terms.Reserved = {
+      'AWS-EC2-T3SMALL': {
+        'AWS-EC2-T3SMALL.6QCMYABX3D': {
+          effectiveDate: '2026-01-01T00:00:00Z',
+          termAttributes: {
+            LeaseContractLength: '3yr',
+            PurchaseOption: 'No Upfront',
+          },
+          priceDimensions: {
+            'AWS-EC2-T3SMALL.6QCMYABX3D.HRS': {
+              unit: 'Hrs',
+              description: 'Linux t3.small three-year reserved hourly recurring charge',
+              pricePerUnit: {
+                USD: '0.0100000000',
+              },
+            },
+          },
+        },
+      },
+    };
+    const fetchClient = jest.fn(async () => jsonResponse(bulkCatalog)) as FetchLike;
+    const adapter = new AwsProviderAdapter(
+      new InMemoryPricingCatalogReader([]),
+      'us-east-1',
+      fetchClient,
+    );
+
+    const records = await adapter.refreshPricingCatalog({
+      categories: ['compute'],
+      fetchedAt: '2026-06-28T00:00:00.000Z',
+    });
+
+    expect(records).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          skuId: expect.stringContaining('reserved-3yr'),
+          unitPriceUsd: 0.01,
+          attributes: expect.objectContaining({
+            pricingModel: 'reserved-3yr',
+            PurchaseOption: 'No Upfront',
+          }),
         }),
-      }),
+      ]),
     );
   });
 
@@ -141,11 +184,7 @@ describe('AwsProviderAdapter', () => {
         fetchedAt: '2026-06-28T00:00:00.000Z',
       },
     ];
-    const adapter = new AwsProviderAdapter(
-      new InMemoryPricingCatalogReader(records),
-      'us-east-1',
-      secretsReader(),
-    );
+    const adapter = new AwsProviderAdapter(new InMemoryPricingCatalogReader(records), 'us-east-1');
 
     const result = await adapter.priceWorkload(minimalNws);
 
@@ -159,16 +198,14 @@ describe('AwsProviderAdapter', () => {
     );
   });
 
-  it('filters live AWS pricing by requested service id', async () => {
+  it('filters refreshed AWS pricing by requested service id', async () => {
     const fetchClient = jest.fn(async () =>
-      jsonResponse(fixture('test/fixtures/pricing/aws/get-products-s3.json')),
+      jsonResponse(awsBulkFixture('test/fixtures/pricing/aws/get-products-s3.json')),
     ) as FetchLike;
     const adapter = new AwsProviderAdapter(
       new InMemoryPricingCatalogReader([]),
       'us-east-1',
-      secretsReader(),
       fetchClient,
-      () => new Date('2026-06-28T00:00:00.000Z'),
     );
 
     const records = await adapter.refreshLivePricing(['AWS-S3-STANDARD']);
@@ -179,35 +216,32 @@ describe('AwsProviderAdapter', () => {
 
   it('drops AWS records outside the requested region or without a USD price', async () => {
     const noPriceRecord = {
-      FormatVersion: 'aws_v1',
-      PriceList: [
-        JSON.stringify({
-          product: {
-            sku: 'AWS-EC2-NOPRICE',
-            productFamily: 'Compute Instance',
-            attributes: {
-              servicename: 'Amazon Elastic Compute Cloud',
-              location: 'US East (N. Virginia)',
-              regionCode: 'us-east-1',
-            },
+      products: {
+        'AWS-EC2-NOPRICE': {
+          sku: 'AWS-EC2-NOPRICE',
+          productFamily: 'Compute Instance',
+          attributes: {
+            servicename: 'Amazon Elastic Compute Cloud',
+            location: 'US East (N. Virginia)',
+            regionCode: 'us-east-1',
           },
-          serviceCode: 'AmazonEC2',
-          terms: {
-            OnDemand: {},
-          },
-        }),
-      ],
+        },
+      },
+      terms: {
+        OnDemand: {
+          'AWS-EC2-NOPRICE': {},
+        },
+      },
     };
     const fetchClient = jest
       .fn()
       .mockResolvedValueOnce(
-        jsonResponse(fixture('test/fixtures/pricing/aws/get-products-ec2.json')),
+        jsonResponse(awsBulkFixture('test/fixtures/pricing/aws/get-products-ec2.json')),
       )
       .mockResolvedValueOnce(jsonResponse(noPriceRecord)) as FetchLike;
     const adapter = new AwsProviderAdapter(
       new InMemoryPricingCatalogReader([]),
       'us-east-1',
-      secretsReader(),
       fetchClient,
     );
 
@@ -225,78 +259,40 @@ describe('AwsProviderAdapter', () => {
     ).resolves.toEqual([]);
   });
 
-  it('follows AWS pagination and includes optional session tokens', async () => {
-    const fetchClient = jest
-      .fn()
-      .mockResolvedValueOnce(
-        jsonResponse({
-          FormatVersion: 'aws_v1',
-          PriceList: [],
-          NextToken: 'aws-page-2',
-        }),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse(fixture('test/fixtures/pricing/aws/get-products-ec2.json')),
-      ) as FetchLike;
-    const adapter = new AwsProviderAdapter(
-      new InMemoryPricingCatalogReader([]),
-      'us-east-1',
-      secretsReaderWithSessionToken(),
-      fetchClient,
-    );
-
-    const records = await adapter.refreshPricingCatalog({ categories: ['compute'] });
-
-    expect(records).toHaveLength(1);
-    expect(fetchClient).toHaveBeenNthCalledWith(
-      2,
-      'https://api.pricing.us-east-1.amazonaws.com',
-      expect.objectContaining({
-        body: expect.stringContaining('aws-page-2'),
-        headers: expect.objectContaining({
-          'x-amz-security-token': 'test-session-token',
-        }),
-      }),
-    );
-  });
-
   it('uses AWS fallback service names and fetched-at effective dates', async () => {
     const fallbackRecord = {
-      FormatVersion: 'aws_v1',
-      PriceList: [
-        JSON.stringify({
-          product: {
-            sku: 'AWS-FALLBACK-SKU',
-            attributes: {
-              servicecode: 'AmazonEC2',
-              location: 'US East (N. Virginia)',
-              vcpu: 'not-a-number',
-            },
+      products: {
+        'AWS-FALLBACK-SKU': {
+          sku: 'AWS-FALLBACK-SKU',
+          attributes: {
+            servicecode: 'AmazonEC2',
+            location: 'US East (N. Virginia)',
+            vcpu: 'not-a-number',
           },
-          serviceCode: 'AmazonEC2',
-          terms: {
-            OnDemand: {
-              term: {
-                priceDimensions: {
-                  dimension: {
-                    unit: 'Hrs',
-                    description: 'Fallback compute',
-                    pricePerUnit: {
-                      USD: '0.01',
-                    },
+        },
+      },
+      terms: {
+        OnDemand: {
+          'AWS-FALLBACK-SKU': {
+            term: {
+              priceDimensions: {
+                dimension: {
+                  unit: 'Hrs',
+                  description: 'Fallback compute',
+                  pricePerUnit: {
+                    USD: '0.01',
                   },
                 },
               },
             },
           },
-        }),
-      ],
+        },
+      },
     };
     const fetchClient = jest.fn(async () => jsonResponse(fallbackRecord)) as FetchLike;
     const adapter = new AwsProviderAdapter(
       new InMemoryPricingCatalogReader([]),
       'us-east-1',
-      secretsReader(),
       fetchClient,
       () => new Date('2026-06-28T00:00:00.000Z'),
     );
@@ -320,15 +316,18 @@ describe('AwsProviderAdapter', () => {
     );
   });
 
-  it('fails clearly when required AWS credentials are unavailable', async () => {
-    const adapter = new AwsProviderAdapter(new InMemoryPricingCatalogReader([]), 'us-east-1', {
-      getSecret: jest.fn(async () => {
-        throw new Error('missing');
-      }),
-    });
+  it('does not require AWS credentials for public pricing refresh', async () => {
+    const fetchClient = jest.fn(async () =>
+      jsonResponse(awsBulkFixture('test/fixtures/pricing/aws/get-products-ec2.json')),
+    ) as FetchLike;
+    const adapter = new AwsProviderAdapter(
+      new InMemoryPricingCatalogReader([]),
+      'us-east-1',
+      fetchClient,
+    );
 
-    await expect(adapter.refreshPricingCatalog({ categories: ['compute'] })).rejects.toThrow(
-      'missing required AWS pricing credential access_key_id',
+    await expect(adapter.refreshPricingCatalog({ categories: ['compute'] })).resolves.toHaveLength(
+      1,
     );
   });
 });

@@ -1,5 +1,6 @@
 import { ComparisonResult } from '../comparison/comparison.types';
 import { NormalizedWorkloadSpec } from '../nws/nws.types';
+import { RegionCatalogResponse } from './regions.types';
 
 const API_BASE_URL = 'http://localhost:3001/api/v1';
 const WEB_BASE_URL = 'http://localhost:3000';
@@ -61,6 +62,26 @@ describe('MVP acceptance criteria E2E', () => {
     expectProviderComparison(refreshed);
     expect(refreshed.comparisonId).not.toBe(structuredComparison.comparisonId);
     expect(Date.parse(refreshed.pricingAsOf)).not.toBeNaN();
+  });
+
+  it('serves live cloud region metadata and official calculator links', async () => {
+    const catalog = await requestJson<RegionCatalogResponse>('/regions');
+
+    expect(catalog.providers.map((provider) => provider.providerId).sort()).toEqual([
+      'aws',
+      'azure',
+      'gcp',
+    ]);
+    expect(catalog.providers.every((provider) => provider.regions.length > 0)).toBe(true);
+    expect(catalog.providers.find((provider) => provider.providerId === 'aws')?.calculatorUrl).toBe(
+      'https://calculator.aws/#/',
+    );
+    expect(
+      catalog.providers.find((provider) => provider.providerId === 'azure')?.calculatorUrl,
+    ).toBe('https://azure.microsoft.com/en-us/pricing/calculator/');
+    expect(catalog.providers.find((provider) => provider.providerId === 'gcp')?.calculatorUrl).toBe(
+      'https://cloud.google.com/products/calculator',
+    );
   });
 
   it('exports the same comparison as PDF, CSV, and Excel downloads', async () => {

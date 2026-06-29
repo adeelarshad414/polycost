@@ -1,4 +1,11 @@
-import { applyTheme, resolveTheme, storedTheme, THEME_STORAGE_KEY } from './theme';
+import {
+  applyTheme,
+  resolveTheme,
+  storedTheme,
+  subscribeToSystemTheme,
+  systemTheme,
+  THEME_STORAGE_KEY,
+} from './theme';
 import { DEFAULT_SELECTED_SERVICE_FAMILY_IDS } from './service-catalog';
 import { NormalizedWorkloadSpec } from './types';
 import { buildNwsFromForm, defaultWorkloadForm, formFromNws } from './workload';
@@ -144,10 +151,10 @@ describe('workload helpers', () => {
 });
 
 describe('theme helpers', () => {
-  it('resolves system theme from the media query', () => {
-    expect(resolveTheme('system', () => ({ matches: true }))).toBe('dark');
-    expect(resolveTheme('system', () => ({ matches: false }))).toBe('light');
-    expect(resolveTheme('light', () => ({ matches: true }))).toBe('light');
+  it('resolves the initial system theme from the media query', () => {
+    expect(systemTheme(() => ({ matches: true }))).toBe('dark');
+    expect(systemTheme(() => ({ matches: false }))).toBe('light');
+    expect(resolveTheme('light')).toBe('light');
   });
 
   it('reads, writes, and applies theme choices', () => {
@@ -158,7 +165,7 @@ describe('theme helpers', () => {
     };
     const root = document.createElement('html');
 
-    expect(storedTheme(storageLike)).toBe('system');
+    expect(storedTheme(storageLike, () => ({ matches: true }))).toBe('dark');
     storage.set(THEME_STORAGE_KEY, 'dark');
     expect(storedTheme(storageLike)).toBe('dark');
 
@@ -167,6 +174,28 @@ describe('theme helpers', () => {
     expect(resolved).toBe('light');
     expect(root.dataset.theme).toBe('light');
     expect(root.dataset.themeChoice).toBe('light');
+    expect(root.style.colorScheme).toBe('light');
     expect(storageLike.setItem).toHaveBeenCalledWith(THEME_STORAGE_KEY, 'light');
+  });
+
+  it('subscribes to live system theme changes', () => {
+    let listener: (() => void) | undefined;
+    const mediaQuery = {
+      matches: false,
+      addEventListener: jest.fn((_event: string, nextListener: () => void) => {
+        listener = nextListener;
+      }),
+      removeEventListener: jest.fn(),
+    };
+    const onChange = jest.fn();
+
+    const unsubscribe = subscribeToSystemTheme(onChange, () => mediaQuery);
+    mediaQuery.matches = true;
+    listener?.();
+    unsubscribe();
+
+    expect(onChange).toHaveBeenCalledWith('dark');
+    expect(mediaQuery.addEventListener).toHaveBeenCalledWith('change', expect.any(Function));
+    expect(mediaQuery.removeEventListener).toHaveBeenCalledWith('change', expect.any(Function));
   });
 });

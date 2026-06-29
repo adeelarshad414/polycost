@@ -1,4 +1,10 @@
-import { ProviderId, ServiceCategory } from '../adapters/common/cloud-provider-adapter';
+import {
+  CostComponent,
+  PricingBasis,
+  PricingModelCost,
+  ProviderId,
+  ServiceCategory,
+} from '../adapters/common/cloud-provider-adapter';
 
 export interface CostIntervals {
   daily: number;
@@ -10,15 +16,28 @@ export interface CostIntervals {
 
 export interface ComparisonLineItem {
   category: ServiceCategory;
+  costComponent?: CostComponent;
   description: string;
   isApproximate: boolean;
   baseMonthlyCostUsd: number;
+  pricingBasis?: PricingBasis;
+  pricingModels?: PricingModelCost[];
+}
+
+export interface ComparisonCostBreakdown {
+  computeMonthlyCostUsd: number;
+  storageMonthlyCostUsd: number;
+  egressMonthlyCostUsd: number;
+  databaseMonthlyCostUsd: number;
+  scopedMonthlyCostUsd: number;
 }
 
 export interface ComparisonProviderResult {
   providerId: ProviderId;
   lineItems: ComparisonLineItem[];
   totals: CostIntervals;
+  pricingModels?: PricingModelCost[];
+  breakdown?: ComparisonCostBreakdown;
 }
 
 export interface ComparisonWarning {

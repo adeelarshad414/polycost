@@ -183,6 +183,78 @@ describe('BaseCloudProviderAdapter', () => {
     expect(result.lineItems[1].isApproximate).toBe(true);
   });
 
+  it('uses cached commitment rows and walks egress tier bands', async () => {
+    const tieredAndCommittedCatalog: PricingCatalogRecord[] = [
+      ...catalog.map((record) =>
+        record.skuId === 'NETWORK'
+          ? {
+              ...record,
+              unitPriceUsd: 0,
+              attributes: {
+                egressTiers: [
+                  { startGb: 0, unitPriceUsd: 0 },
+                  { startGb: 5, unitPriceUsd: 0.1 },
+                  { startGb: 10, unitPriceUsd: 0.08 },
+                ],
+              },
+            }
+          : record,
+      ),
+      {
+        ...catalog[1],
+        serviceName: 'one-year reserved compute',
+        skuId: 'COMPUTE-RIGHT-1YR',
+        unitPriceUsd: 0.03,
+        attributes: {
+          ...catalog[1].attributes,
+          pricingModel: 'reserved-1yr',
+        },
+      },
+      {
+        ...catalog[1],
+        serviceName: 'three-year reserved compute',
+        skuId: 'COMPUTE-RIGHT-3YR',
+        unitPriceUsd: 0.02,
+        attributes: {
+          ...catalog[1].attributes,
+          pricingModel: 'reserved-3yr',
+        },
+      },
+    ];
+    const adapter = new TestProviderAdapter(
+      new InMemoryPricingCatalogReader(tieredAndCommittedCatalog),
+      'fallback-region',
+    );
+
+    const result = await adapter.priceWorkload(fullWorkload);
+
+    expect(result.baseMonthlyCostUsd).toBe(185.5);
+    expect(result.lineItems[0].pricingModels).toEqual([
+      {
+        model: 'on-demand',
+        available: true,
+        monthlyCostUsd: 109.5,
+      },
+      {
+        model: 'reserved-1yr',
+        available: true,
+        monthlyCostUsd: 65.7,
+      },
+      {
+        model: 'reserved-3yr',
+        available: true,
+        monthlyCostUsd: 43.8,
+      },
+    ]);
+    expect(result.lineItems[4]).toEqual(
+      expect.objectContaining({
+        baseMonthlyCostUsd: 0.5,
+        costComponent: 'egress',
+        pricingBasis: 'tiered',
+      }),
+    );
+  });
+
   it('uses the adapter default region when the workload marks its region as default', async () => {
     const adapter = new TestProviderAdapter(
       new InMemoryPricingCatalogReader([

@@ -1,6 +1,9 @@
 export const PROVIDER_ORDER = ['aws', 'azure', 'gcp'] as const;
 export type ProviderId = (typeof PROVIDER_ORDER)[number];
 export type ServiceCategory = 'compute' | 'storage' | 'database' | 'network';
+export type CostComponent = 'compute' | 'storage' | 'database' | 'egress';
+export type PricingModelKey = 'on-demand' | 'reserved-1yr' | 'reserved-3yr';
+export type PricingBasis = 'flat' | 'tiered';
 export type IntervalKey = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 
 export const INTERVALS: Array<{ key: IntervalKey; label: string }> = [
@@ -93,15 +96,35 @@ export interface CostIntervals {
 
 export interface ComparisonLineItem {
   category: ServiceCategory;
+  costComponent?: CostComponent;
   description: string;
   isApproximate: boolean;
   baseMonthlyCostUsd: number;
+  pricingBasis?: PricingBasis;
+  pricingModels?: PricingModelCost[];
+}
+
+export interface PricingModelCost {
+  model: PricingModelKey;
+  available: boolean;
+  monthlyCostUsd?: number;
+  unavailableReason?: string;
+}
+
+export interface ComparisonCostBreakdown {
+  computeMonthlyCostUsd: number;
+  storageMonthlyCostUsd: number;
+  egressMonthlyCostUsd: number;
+  databaseMonthlyCostUsd: number;
+  scopedMonthlyCostUsd: number;
 }
 
 export interface ComparisonProviderResult {
   providerId: ProviderId;
   lineItems: ComparisonLineItem[];
   totals: CostIntervals;
+  pricingModels?: PricingModelCost[];
+  breakdown?: ComparisonCostBreakdown;
 }
 
 export interface ComparisonResult {
@@ -122,6 +145,31 @@ export interface PricingStatusResponse {
     status: 'success' | 'partial' | 'failed';
     lastSuccessfulRun?: string;
   }>;
+}
+
+export type RegionCatalogSource = 'live' | 'fallback';
+
+export interface CloudRegion {
+  providerId: ProviderId;
+  id: string;
+  label: string;
+  location?: string;
+  source: RegionCatalogSource;
+}
+
+export interface CloudRegionProviderCatalog {
+  providerId: ProviderId;
+  label: string;
+  source: RegionCatalogSource;
+  sourceUrl: string;
+  calculatorUrl: string;
+  regions: CloudRegion[];
+}
+
+export interface RegionCatalogResponse {
+  generatedAt: string;
+  cacheTtlSeconds: number;
+  providers: CloudRegionProviderCatalog[];
 }
 
 export type ReportFormat = 'pdf' | 'csv' | 'xlsx';

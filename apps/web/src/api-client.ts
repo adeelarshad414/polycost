@@ -4,6 +4,7 @@ import {
   NormalizedWorkloadSpec,
   ParsedNwsDraft,
   PricingStatusResponse,
+  RegionCatalogResponse,
   ReportFormat,
 } from './types';
 
@@ -37,6 +38,7 @@ export interface PolyCostClient {
   refreshLiveComparison(comparisonId: string): Promise<ComparisonResult>;
   exportComparison(comparisonId: string, format: ReportFormat): Promise<Blob>;
   getPricingStatus(): Promise<PricingStatusResponse>;
+  getRegionCatalog(): Promise<RegionCatalogResponse>;
 }
 
 export function configuredApiBaseUrl(documentRef: Document = document): string {
@@ -94,6 +96,9 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
     },
     getPricingStatus() {
       return requestJson<PricingStatusResponse>(baseUrl, '/pricing/status');
+    },
+    getRegionCatalog() {
+      return requestJson<RegionCatalogResponse>(baseUrl, '/regions');
     },
   };
 }
