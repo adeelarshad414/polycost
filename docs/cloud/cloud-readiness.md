@@ -20,6 +20,11 @@ Application configuration comes from environment variables validated by
 - `VAULT_TOKEN_FILE`
 - `CORS_ALLOWED_ORIGINS`
 - `PRICING_ETL_SCHEDULE_CRON`
+- `CURRENCY_SYNC_SCHEDULE_CRON`
+- `ALERT_EVALUATOR_SCHEDULE_CRON`
+- `SHARE_LINK_CLEANUP_SCHEDULE_CRON`
+- `EXCHANGE_RATE_API_URL`
+- `EXCHANGE_RATE_TARGET_CURRENCIES`
 - `PRICING_ETL_DEFAULT_REGION_AWS`
 - `PRICING_ETL_DEFAULT_REGION_AZURE`
 - `PRICING_ETL_DEFAULT_REGION_GCP`
@@ -56,6 +61,8 @@ Provider adapter secret paths:
 - Confirm `/health` passes before routing traffic.
 - Do not run pricing ETL jobs with real provider credentials until secrets and rate
   limits are reviewed.
+- Confirm BullMQ repeatable jobs exist for pricing ETL, currency sync, alert
+  evaluation, and share-link cleanup before enabling production traffic.
 
 ## Rollback Notes
 

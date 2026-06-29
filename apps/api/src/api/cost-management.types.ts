@@ -116,3 +116,39 @@ export interface ExchangeRatesResponse {
   lastUpdated?: string;
   rates: Record<string, number>;
 }
+
+export interface BudgetEvaluationRecord {
+  budget: BudgetRecord;
+  workload: WorkloadRecord;
+}
+
+export interface CreateAlertInput {
+  workloadId: string;
+  budgetId?: string;
+  alertType: AlertRecord['alertType'];
+  message: string;
+  thresholdUsd?: number;
+  observedUsd?: number;
+  anomalyPercent?: number;
+}
+
+export interface CostObservationInput {
+  workloadId: string;
+  budgetId?: string;
+  term: CachedPricingTerm;
+  provider: ProviderId;
+  observedMonthlyUsd: number;
+  observedAt: string;
+}
+
+export interface CostObservationRecord extends CostObservationInput {
+  id: string;
+  source: 'modeled_cache';
+}
+
+export interface ExchangeRateUpsertInput {
+  baseCurrency: string;
+  rates: Record<string, number>;
+  source: string;
+  fetchedAt: string;
+}

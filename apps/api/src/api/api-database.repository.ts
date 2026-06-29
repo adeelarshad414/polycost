@@ -12,11 +12,16 @@ import { PricingStatusResponse } from './api-errors';
 import {
   AlertRecord,
   BudgetInput,
+  BudgetEvaluationRecord,
   BudgetRecord,
   CachedPricingCompareQuery,
   CachedPricingCompareRow,
   CachedPricingTerm,
+  CostObservationInput,
+  CostObservationRecord,
+  CreateAlertInput,
   ExchangeRatesResponse,
+  ExchangeRateUpsertInput,
   ShareLinkRecord,
   WorkloadCostBreakdown,
   WorkloadInput,
@@ -104,6 +109,26 @@ interface BudgetRow {
   updated_at: Date;
 }
 
+interface BudgetEvaluationRow {
+  budget_id: string;
+  workload_id: string;
+  threshold_usd: string;
+  alert_on_anomaly_percent: string | null;
+  budget_created_at: Date;
+  budget_updated_at: Date;
+  instance_family: WorkloadRecord['instanceFamily'];
+  vcpu: number;
+  memory_gb: string;
+  region: string;
+  instance_count: number;
+  hours_per_month: string;
+  storage_gb: string;
+  storage_tier: WorkloadRecord['storageTier'];
+  egress_gb_per_month: string;
+  workload_created_at: Date;
+  workload_updated_at: Date;
+}
+
 interface AlertRow {
   id: string;
   workload_id: string;
@@ -131,6 +156,17 @@ interface ExchangeRateRow {
   quote_currency: string;
   rate: string;
   fetched_at: Date;
+}
+
+interface CostObservationRow {
+  id: string;
+  workload_id: string;
+  budget_id: string | null;
+  term: CachedPricingTerm;
+  provider: ProviderId;
+  observed_monthly_usd: string;
+  source: 'modeled_cache';
+  observed_at: Date;
 }
 
 const PROVIDERS: ProviderId[] = ['aws', 'azure', 'gcp'];
@@ -440,6 +476,187 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     return toBudgetRecord(result.rows[0]);
   }
 
+  async listBudgetsForEvaluation(): Promise<BudgetEvaluationRecord[]> {
+    const result = await (
+      await this.getPool()
+    ).query<BudgetEvaluationRow>(
+      `
+        SELECT budgets.id AS budget_id,
+               budgets.workload_id,
+               budgets.threshold_usd,
+               budgets.alert_on_anomaly_percent,
+               budgets.created_at AS budget_created_at,
+               budgets.updated_at AS budget_updated_at,
+               workloads.instance_family,
+               workloads.vcpu,
+               workloads.memory_gb,
+               workloads.region,
+               workloads.instance_count,
+               workloads.hours_per_month,
+               workloads.storage_gb,
+               workloads.storage_tier,
+               workloads.egress_gb_per_month,
+               workloads.created_at AS workload_created_at,
+               workloads.updated_at AS workload_updated_at
+        FROM budgets
+        JOIN workloads
+          ON workloads.id = budgets.workload_id
+        ORDER BY budgets.updated_at DESC
+      `,
+    );
+
+    return result.rows.map((row) => ({
+      budget: toBudgetRecord({
+        id: row.budget_id,
+        workload_id: row.workload_id,
+        threshold_usd: row.threshold_usd,
+        alert_on_anomaly_percent: row.alert_on_anomaly_percent,
+        created_at: row.budget_created_at,
+        updated_at: row.budget_updated_at,
+      }),
+      workload: toWorkloadRecord({
+        id: row.workload_id,
+        instance_family: row.instance_family,
+        vcpu: row.vcpu,
+        memory_gb: row.memory_gb,
+        region: row.region,
+        instance_count: row.instance_count,
+        hours_per_month: row.hours_per_month,
+        storage_gb: row.storage_gb,
+        storage_tier: row.storage_tier,
+        egress_gb_per_month: row.egress_gb_per_month,
+        created_at: row.workload_created_at,
+        updated_at: row.workload_updated_at,
+      }),
+    }));
+  }
+
+  async createAlertIfNotActive(input: CreateAlertInput): Promise<AlertRecord | undefined> {
+    const result = await (
+      await this.getPool()
+    ).query<AlertRow>(
+      `
+        WITH inserted AS (
+          INSERT INTO alerts (
+            workload_id,
+            budget_id,
+            alert_type,
+            message,
+            threshold_usd,
+            observed_usd,
+            anomaly_percent
+          )
+          SELECT $1,
+                 $2,
+                 $3,
+                 $4,
+                 $5,
+                 $6,
+                 $7
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM alerts
+            WHERE workload_id = $1
+              AND budget_id IS NOT DISTINCT FROM $2::uuid
+              AND alert_type = $3
+              AND dismissed = false
+              AND triggered_at > now() - interval '1 day'
+          )
+          RETURNING id,
+                    workload_id,
+                    budget_id,
+                    alert_type,
+                    message,
+                    threshold_usd,
+                    observed_usd,
+                    anomaly_percent,
+                    dismissed,
+                    triggered_at,
+                    dismissed_at
+        )
+        SELECT *
+        FROM inserted
+      `,
+      [
+        input.workloadId,
+        input.budgetId ?? null,
+        input.alertType,
+        input.message,
+        input.thresholdUsd ?? null,
+        input.observedUsd ?? null,
+        input.anomalyPercent ?? null,
+      ],
+    );
+
+    return result.rows[0] ? toAlertRecord(result.rows[0]) : undefined;
+  }
+
+  async insertCostObservation(input: CostObservationInput): Promise<CostObservationRecord> {
+    const result = await (
+      await this.getPool()
+    ).query<CostObservationRow>(
+      `
+        INSERT INTO workload_cost_observations (
+          workload_id,
+          budget_id,
+          term,
+          provider,
+          observed_monthly_usd,
+          observed_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id,
+                  workload_id,
+                  budget_id,
+                  term,
+                  provider,
+                  observed_monthly_usd,
+                  source,
+                  observed_at
+      `,
+      [
+        input.workloadId,
+        input.budgetId ?? null,
+        input.term,
+        input.provider,
+        input.observedMonthlyUsd,
+        input.observedAt,
+      ],
+    );
+
+    return toCostObservationRecord(result.rows[0]);
+  }
+
+  async getLatestCostObservationBefore(input: {
+    workloadId: string;
+    budgetId?: string;
+    observedBefore: string;
+  }): Promise<CostObservationRecord | undefined> {
+    const result = await (
+      await this.getPool()
+    ).query<CostObservationRow>(
+      `
+        SELECT id,
+               workload_id,
+               budget_id,
+               term,
+               provider,
+               observed_monthly_usd,
+               source,
+               observed_at
+        FROM workload_cost_observations
+        WHERE workload_id = $1
+          AND budget_id IS NOT DISTINCT FROM $2::uuid
+          AND observed_at <= $3
+        ORDER BY observed_at DESC
+        LIMIT 1
+      `,
+      [input.workloadId, input.budgetId ?? null, input.observedBefore],
+    );
+
+    return result.rows[0] ? toCostObservationRecord(result.rows[0]) : undefined;
+  }
+
   async listAlerts(workloadId?: string): Promise<AlertRecord[]> {
     const result = await (
       await this.getPool()
@@ -581,6 +798,51 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
       ...(lastUpdated ? { lastUpdated } : {}),
       rates,
     };
+  }
+
+  async upsertExchangeRates(input: ExchangeRateUpsertInput): Promise<number> {
+    const pool = await this.getPool();
+    let recordsUpdated = 0;
+
+    for (const [quoteCurrency, rate] of Object.entries(input.rates)) {
+      const result = await pool.query(
+        `
+          INSERT INTO exchange_rates (
+            base_currency,
+            quote_currency,
+            rate,
+            source,
+            fetched_at
+          )
+          VALUES ($1, $2, $3, $4, $5)
+          ON CONFLICT (base_currency, quote_currency, fetched_at)
+          DO UPDATE SET
+            rate = EXCLUDED.rate,
+            source = EXCLUDED.source
+        `,
+        [input.baseCurrency, quoteCurrency, rate, input.source, input.fetchedAt],
+      );
+
+      recordsUpdated += result.rowCount ?? 0;
+    }
+
+    return recordsUpdated;
+  }
+
+  async cleanupExpiredShareLinks(now: string): Promise<number> {
+    const result = await (
+      await this.getPool()
+    ).query(
+      `
+        UPDATE share_links
+        SET revoked_at = $1
+        WHERE revoked_at IS NULL
+          AND expires_at <= $1
+      `,
+      [now],
+    );
+
+    return result.rowCount ?? 0;
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -756,5 +1018,18 @@ function toShareLinkRecord(row: ShareLinkRow): ShareLinkRecord {
     expiresAt: row.expires_at.toISOString(),
     ...(row.revoked_at ? { revokedAt: row.revoked_at.toISOString() } : {}),
     createdAt: row.created_at.toISOString(),
+  };
+}
+
+function toCostObservationRecord(row: CostObservationRow): CostObservationRecord {
+  return {
+    id: row.id,
+    workloadId: row.workload_id,
+    ...(row.budget_id ? { budgetId: row.budget_id } : {}),
+    term: row.term,
+    provider: row.provider,
+    observedMonthlyUsd: Number.parseFloat(row.observed_monthly_usd),
+    source: row.source,
+    observedAt: row.observed_at.toISOString(),
   };
 }

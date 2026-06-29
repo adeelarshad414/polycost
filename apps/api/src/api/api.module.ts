@@ -68,5 +68,6 @@ import { WorkloadController } from './workload.controller';
       useClass: ApiExceptionFilter,
     },
   ],
+  exports: [ApiDatabaseRepository, CostManagementService],
 })
 export class ApiModule {}

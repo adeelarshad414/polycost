@@ -266,6 +266,83 @@ describe('ApiDatabaseRepository', () => {
       },
     });
   });
+
+  it('lists budgets with workload details for modeled-cost evaluation', async () => {
+    const repository = createRepository(
+      jest.fn(async () => ({
+        rows: [
+          {
+            budget_id: '11111111-1111-4111-8111-111111111111',
+            workload_id: '22222222-2222-4222-8222-222222222222',
+            threshold_usd: '900.00',
+            alert_on_anomaly_percent: '20.00',
+            budget_created_at: new Date('2026-06-20T00:00:00.000Z'),
+            budget_updated_at: new Date('2026-06-29T00:00:00.000Z'),
+            instance_family: 'general-purpose',
+            vcpu: 4,
+            memory_gb: '16',
+            region: 'us-east',
+            instance_count: 2,
+            hours_per_month: '730',
+            storage_gb: '500',
+            storage_tier: 'standard',
+            egress_gb_per_month: '1200',
+            workload_created_at: new Date('2026-06-19T00:00:00.000Z'),
+            workload_updated_at: new Date('2026-06-28T00:00:00.000Z'),
+          },
+        ],
+        rowCount: 1,
+      })),
+    );
+
+    await expect(repository.listBudgetsForEvaluation()).resolves.toEqual([
+      {
+        budget: {
+          id: '11111111-1111-4111-8111-111111111111',
+          workloadId: '22222222-2222-4222-8222-222222222222',
+          thresholdUsd: 900,
+          alertOnAnomalyPercent: 20,
+          createdAt: '2026-06-20T00:00:00.000Z',
+          updatedAt: '2026-06-29T00:00:00.000Z',
+        },
+        workload: expect.objectContaining({
+          id: '22222222-2222-4222-8222-222222222222',
+          createdAt: '2026-06-19T00:00:00.000Z',
+          updatedAt: '2026-06-28T00:00:00.000Z',
+        }),
+      },
+    ]);
+  });
+
+  it('upserts exchange-rate snapshots and cleans up expired share links', async () => {
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 3 });
+    const repository = createRepository(query);
+
+    await expect(
+      repository.upsertExchangeRates({
+        baseCurrency: 'USD',
+        rates: {
+          EUR: 0.87673,
+          GBP: 0.75587,
+        },
+        source: 'https://api.frankfurter.app/latest',
+        fetchedAt: '2026-06-30T00:00:00.000Z',
+      }),
+    ).resolves.toBe(2);
+    await expect(repository.cleanupExpiredShareLinks('2026-06-30T00:00:00.000Z')).resolves.toBe(3);
+    expect(query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('INSERT INTO exchange_rates'),
+      ['USD', 'EUR', 0.87673, 'https://api.frankfurter.app/latest', '2026-06-30T00:00:00.000Z'],
+    );
+    expect(query).toHaveBeenNthCalledWith(3, expect.stringContaining('UPDATE share_links'), [
+      '2026-06-30T00:00:00.000Z',
+    ]);
+  });
 });
 
 function createRepository(query: jest.Mock): ApiDatabaseRepository {
