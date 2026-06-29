@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ComparisonResult } from '../comparison/comparison.types';
+import { buildReportInsights } from './report-insights';
 import { sanitizeSpreadsheetText } from './report-security';
 
 @Injectable()
@@ -10,6 +11,13 @@ export class CsvReportGenerator {
       ['Comparison ID', result.comparisonId],
       ['Pricing As Of', result.pricingAsOf],
       ['Cheapest Provider', result.cheapestProviderId],
+      [],
+      ['FinOps Summary'],
+      ['Metric', 'Value'],
+      ...buildReportInsights(result).map((insight) => [
+        insight.label,
+        sanitizeSpreadsheetText(insight.value),
+      ]),
       [],
       ['Provider Totals'],
       ['Provider', 'Daily USD', 'Weekly USD', 'Monthly USD', 'Quarterly USD', 'Yearly USD'],

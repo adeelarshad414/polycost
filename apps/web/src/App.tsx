@@ -53,6 +53,26 @@ interface ProviderCostSummary {
   categoryTotals: CategoryCostSummary[];
 }
 
+interface FinOpsReview {
+  monthlyLowest?: ProviderCostSummary;
+  yearlyLowest?: ProviderCostSummary;
+  monthlySpread?: number;
+  monthlySpreadPercent?: number;
+  dominantCategory?: CategoryCostSummary;
+  dominantCategoryProvider?: ProviderId;
+  approximateCount: number;
+  lineItemCount: number;
+  providerFit: ProviderFitSummary[];
+  recommendations: string[];
+}
+
+interface ProviderFitSummary {
+  providerId: ProviderId;
+  label: string;
+  detail: string;
+  tone: 'preferred' | 'review' | 'unavailable';
+}
+
 interface AppProps {
   client?: PolyCostClient;
 }
@@ -1357,6 +1377,7 @@ function CostDashboard({
         pricedSummaries.length
       : undefined;
   const categorySummaries = categoryCostSummaries(comparison, interval);
+  const finOpsReview = buildFinOpsReview(comparison, interval);
 
   return (
     <section className="cost-dashboard" aria-label="Cost dashboard">
@@ -1395,6 +1416,8 @@ function CostDashboard({
           0,
         )}
       />
+
+      <FinOpsReviewPanel review={finOpsReview} />
 
       <div className="dashboard-grid">
         <section className="dashboard-panel" aria-label="Provider spend chart">
@@ -1454,6 +1477,120 @@ function CostDashboard({
         <CategoryHeatmap summaries={summaries} />
       </div>
     </section>
+  );
+}
+
+function FinOpsReviewPanel({ review }: { review: FinOpsReview }) {
+  const dominantProvider = review.dominantCategoryProvider
+    ? providerLabel(review.dominantCategoryProvider)
+    : undefined;
+  const dominantCategory = review.dominantCategory;
+
+  return (
+    <section className="finops-review" aria-label="FinOps review">
+      <div className="panel-heading">
+        <div>
+          <span>Architect Review</span>
+          <h3>FinOps Decision Signals</h3>
+        </div>
+        <strong>
+          {review.lineItemCount > 0 ? `${review.lineItemCount} priced drivers` : 'Pending'}
+        </strong>
+      </div>
+
+      <div className="finops-metric-grid">
+        <InsightCard
+          label="Monthly run-rate"
+          value={review.monthlyLowest ? formatCurrency(review.monthlyLowest.total ?? 0) : 'Pending'}
+          detail={
+            review.monthlyLowest
+              ? providerLabel(review.monthlyLowest.providerId)
+              : 'Awaiting estimate'
+          }
+          providerId={review.monthlyLowest?.providerId}
+        />
+        <InsightCard
+          label="Annual exposure"
+          value={review.yearlyLowest ? formatCurrency(review.yearlyLowest.total ?? 0) : 'Pending'}
+          detail={
+            review.yearlyLowest
+              ? `${providerLabel(review.yearlyLowest.providerId)} on-demand`
+              : 'Awaiting estimate'
+          }
+          providerId={review.yearlyLowest?.providerId}
+        />
+        <InsightCard
+          label="Optimization spread"
+          value={
+            review.monthlySpread !== undefined ? formatCurrency(review.monthlySpread) : 'Pending'
+          }
+          detail={
+            review.monthlySpreadPercent !== undefined
+              ? `${formatPercent(review.monthlySpreadPercent)} between high and low`
+              : 'Need multiple providers'
+          }
+        />
+        <InsightCard
+          label="Top cost driver"
+          value={dominantCategory ? capitalize(dominantCategory.category) : 'Pending'}
+          detail={
+            dominantCategory && dominantProvider
+              ? `${formatCurrency(dominantCategory.total)} on ${dominantProvider}`
+              : 'No priced categories yet'
+          }
+        />
+      </div>
+
+      <div className="finops-advisor-grid">
+        <div className="advisor-panel">
+          <h4>Provider Fit</h4>
+          <div className="provider-fit-list">
+            {review.providerFit.map((fit) => (
+              <div className={`provider-fit provider-fit-${fit.tone}`} key={fit.providerId}>
+                <span>
+                  <ProviderMark providerId={fit.providerId} />
+                  {providerLabel(fit.providerId)}
+                </span>
+                <strong>{fit.label}</strong>
+                <small>{fit.detail}</small>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="advisor-panel">
+          <h4>Recommended Next Checks</h4>
+          <ul className="advisor-list">
+            {review.recommendations.map((recommendation) => (
+              <li key={recommendation}>{recommendation}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function InsightCard({
+  label,
+  value,
+  detail,
+  providerId,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  providerId?: ProviderId;
+}) {
+  return (
+    <div className={providerId ? `finops-card finops-card-${providerId}` : 'finops-card'}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>
+        {providerId ? <ProviderMark providerId={providerId} /> : null}
+        {detail}
+      </small>
+    </div>
   );
 }
 
@@ -1992,6 +2129,156 @@ function providerCostSummaries(
       (left, right) =>
         (left.total ?? Number.POSITIVE_INFINITY) - (right.total ?? Number.POSITIVE_INFINITY),
     );
+}
+
+function buildFinOpsReview(
+  comparison: ComparisonResult | null,
+  interval: IntervalKey,
+): FinOpsReview {
+  const monthlySummaries = providerCostSummaries(comparison, 'monthly');
+  const yearlySummaries = providerCostSummaries(comparison, 'yearly');
+  const intervalSummaries = providerCostSummaries(comparison, interval);
+  const monthlyPriced = monthlySummaries.filter((summary) => summary.total !== undefined);
+  const monthlyLowest = monthlyPriced[0];
+  const monthlyHighest = monthlyPriced.at(-1);
+  const yearlyLowest = yearlySummaries.find((summary) => summary.total !== undefined);
+  const monthlySpread =
+    monthlyLowest?.total !== undefined && monthlyHighest?.total !== undefined
+      ? roundCurrency(monthlyHighest.total - monthlyLowest.total)
+      : undefined;
+  const monthlySpreadPercent =
+    monthlySpread !== undefined && monthlyLowest?.total !== undefined && monthlyLowest.total > 0
+      ? (monthlySpread / monthlyLowest.total) * 100
+      : undefined;
+  const dominantProvider = intervalSummaries.find((summary) => summary.total !== undefined);
+  const dominantCategory = dominantProvider?.categoryTotals
+    .filter((category) => category.total > 0)
+    .sort((left, right) => right.total - left.total)[0];
+  const approximateCount = intervalSummaries.reduce(
+    (count, summary) => count + summary.approximateCount,
+    0,
+  );
+  const lineItemCount = intervalSummaries.reduce(
+    (count, summary) => count + summary.lineItemCount,
+    0,
+  );
+
+  return {
+    monthlyLowest,
+    yearlyLowest,
+    monthlySpread,
+    monthlySpreadPercent,
+    dominantCategory,
+    dominantCategoryProvider: dominantCategory ? dominantProvider?.providerId : undefined,
+    approximateCount,
+    lineItemCount,
+    providerFit: providerFitSummaries(intervalSummaries, monthlyLowest),
+    recommendations: finOpsRecommendations({
+      approximateCount,
+      dominantCategory,
+      lineItemCount,
+      monthlyLowest,
+      monthlySpread,
+      monthlySpreadPercent,
+    }),
+  };
+}
+
+function providerFitSummaries(
+  summaries: ProviderCostSummary[],
+  monthlyLowest?: ProviderCostSummary,
+): ProviderFitSummary[] {
+  return PROVIDER_ORDER.map((providerId) => {
+    const summary = summaries.find((item) => item.providerId === providerId);
+
+    if (!summary || summary.total === undefined) {
+      return {
+        providerId,
+        label: 'Needs pricing',
+        detail: 'Provider returned no priced estimate for this workload.',
+        tone: 'unavailable',
+      };
+    }
+
+    if (monthlyLowest?.providerId === providerId) {
+      return {
+        providerId,
+        label: 'Cost leader',
+        detail: 'Use as the baseline for business-case and procurement review.',
+        tone: summary.approximateCount > 0 ? 'review' : 'preferred',
+      };
+    }
+
+    return {
+      providerId,
+      label: summary.approximateCount > 0 ? 'Review fit' : 'Viable alternative',
+      detail:
+        summary.deltaFromLowest !== undefined
+          ? `${formatSignedCurrency(summary.deltaFromLowest)} versus current low estimate.`
+          : 'Compare service constraints before shortlisting.',
+      tone: summary.approximateCount > 0 ? 'review' : 'preferred',
+    };
+  });
+}
+
+function finOpsRecommendations({
+  approximateCount,
+  dominantCategory,
+  lineItemCount,
+  monthlyLowest,
+  monthlySpread,
+  monthlySpreadPercent,
+}: {
+  approximateCount: number;
+  dominantCategory?: CategoryCostSummary;
+  lineItemCount: number;
+  monthlyLowest?: ProviderCostSummary;
+  monthlySpread?: number;
+  monthlySpreadPercent?: number;
+}): string[] {
+  if (lineItemCount === 0) {
+    return [
+      'Run a comparison to populate provider-specific cost drivers.',
+      'Capture region, data transfer, database HA, and storage access assumptions before presenting.',
+      'Use exports as the proposal artifact once provider prices are available.',
+    ];
+  }
+
+  const recommendations = [
+    monthlyLowest
+      ? `Use ${providerLabel(monthlyLowest.providerId)} as the current on-demand baseline, then model commitments before final selection.`
+      : 'Confirm provider availability before final selection.',
+  ];
+
+  if (monthlySpread !== undefined && monthlySpread > 0) {
+    recommendations.push(
+      `Validate the ${formatCurrency(monthlySpread)} monthly spread with provider calculators and regional SKU assumptions.`,
+    );
+  }
+
+  if (monthlySpreadPercent !== undefined && monthlySpreadPercent >= 20) {
+    recommendations.push(
+      'Treat the spread as material for architecture governance and procurement negotiation.',
+    );
+  }
+
+  if (dominantCategory) {
+    recommendations.push(
+      `${capitalize(dominantCategory.category)} is the leading driver; optimize sizing, utilization, and managed-service tier first.`,
+    );
+  }
+
+  if (approximateCount > 0) {
+    recommendations.push(
+      `Review ${approximateCount} approximate line item${approximateCount === 1 ? '' : 's'} before using this as a client-facing estimate.`,
+    );
+  }
+
+  recommendations.push(
+    'For production decisions, add reserved/Savings Plan/CUD scenarios and expected data-growth sensitivity.',
+  );
+
+  return recommendations.slice(0, 5);
 }
 
 function categoryCostSummaries(

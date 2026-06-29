@@ -747,6 +747,28 @@ core MVP criteria. Browser-driven Playwright journeys for theme switching, respo
 carousel behavior, partial provider failure warning, and keyboard-only navigation
 remain carried-forward UI automation work.
 
+## Post-Phase 10 FinOps dashboard and report polish
+
+**Status:** Complete
+**Date:** 2026-06-29
+
+- Dashboard upgrades: added a FinOps Decision Signals panel with monthly run-rate,
+  annual exposure, optimization spread, top cost driver, provider-fit summaries, and
+  recommended next checks for architecture/procurement review.
+- Provider guidance: each AWS/Azure/GCP result now receives a cost-leader, viable
+  alternative, review-fit, or unavailable posture based on available pricing,
+  deltas, and approximation count.
+- Report upgrades: PDF, CSV, and Excel exports now include a FinOps Summary section
+  with lowest monthly run-rate, annual exposure, optimization spread, dominant cost
+  driver, approximate line count, and priced provider count.
+- Responsiveness: the new FinOps cards and provider-fit list collapse cleanly across
+  desktop, tablet, and mobile layouts without adding horizontal page overflow.
+- Tests/checks passing: `npm run format:check`, `npm run ci:lint`,
+  `npm run test:unit`, `npm run build`, `docker compose up -d --build`,
+  `curl -fsS http://localhost:3001/health`, `curl -fsSI http://localhost:3000`,
+  and `npm run test:e2e` against the rebuilt stack.
+- `npm run ci:lint` still reports only the existing 15 API security warnings.
+
 ## Known issues / carried-forward items
 
 Running list. Add here whenever a phase completes with known gaps. Remove an item only

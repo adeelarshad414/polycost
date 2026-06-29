@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ComparisonResult } from '../comparison/comparison.types';
+import { buildReportInsights } from './report-insights';
 import { escapePdfText } from './report-security';
 
 interface PdfLine {
@@ -45,6 +46,12 @@ export class PdfReportGenerator {
       { text: `Comparison ID: ${result.comparisonId}`, fontSize: 10 },
       { text: `Pricing as of: ${result.pricingAsOf}`, fontSize: 10 },
       { text: `Cheapest provider: ${result.cheapestProviderId}`, fontSize: 10 },
+      { text: '', fontSize: 10 },
+      { text: 'FinOps summary', fontSize: 14 },
+      ...buildReportInsights(result).map((insight) => ({
+        text: `${insight.label}: ${insight.value}`,
+        fontSize: 10,
+      })),
       { text: '', fontSize: 10 },
       { text: 'Provider totals', fontSize: 14 },
     ];

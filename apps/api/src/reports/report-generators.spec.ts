@@ -67,6 +67,9 @@ describe('report generators', () => {
     const csv = new CsvReportGenerator().generate(comparison).toString('utf8');
 
     expect(csv).toContain('Comparison ID,comparison-123');
+    expect(csv).toContain('FinOps Summary');
+    expect(csv).toContain('Lowest monthly run rate,gcp $20');
+    expect(csv).toContain('Dominant cost driver,storage $20');
     expect(csv).toContain('aws,2.37,16.59,71,213,852');
     expect(csv).toContain("aws,compute,'=cmd(1)\\risky compute,no,60.8");
     expect(csv).toContain('"primary ""postgres"", managed"');
@@ -82,6 +85,8 @@ describe('report generators', () => {
     expect(xlsxText).toContain('xl/workbook.xml');
     expect(xlsxText).toContain('xl/worksheets/sheet1.xml');
     expect(xlsxText).toContain('<sheet name="Comparison"');
+    expect(xlsxText).toContain('FinOps Summary');
+    expect(xlsxText).toContain('Lowest monthly run rate');
     expect(xlsxText).toContain('<v>71</v>');
     expect(xlsxText).toContain('&apos;=cmd(1)\\risky compute');
     expect(xlsxText).toContain('&apos;+pricing temporarily unavailable');
@@ -118,6 +123,8 @@ describe('report generators', () => {
 
     expect(pdf.subarray(0, 8).toString('utf8')).toBe('%PDF-1.4');
     expect(pdfText).toContain('Comparison ID: comparison-123');
+    expect(pdfText).toContain('FinOps summary');
+    expect(pdfText).toContain('Lowest monthly run rate: gcp $20');
     expect(pdfText).toContain('aws: daily $2.37, weekly $16.59, monthly $71');
     expect(pdfText).toContain('=cmd\\(1\\)\\\\risky compute');
     expect(pdfText).toContain('general | provider_pricing_failed | general warning');

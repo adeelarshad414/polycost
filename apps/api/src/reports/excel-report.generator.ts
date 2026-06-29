@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ComparisonResult } from '../comparison/comparison.types';
+import { buildReportInsights } from './report-insights';
 import { escapeXml, sanitizeSpreadsheetText } from './report-security';
 import { createZip } from './zip-writer';
 
@@ -58,6 +59,20 @@ export class ExcelReportGenerator {
       {
         cells: ['Cheapest Provider', result.cheapestProviderId],
       },
+      {
+        cells: [],
+      },
+      {
+        cells: ['FinOps Summary'],
+        style: 2,
+      },
+      {
+        cells: ['Metric', 'Value'],
+        style: 2,
+      },
+      ...buildReportInsights(result).map((insight) => ({
+        cells: [insight.label, sanitizeSpreadsheetText(insight.value)],
+      })),
       {
         cells: [],
       },

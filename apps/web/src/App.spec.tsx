@@ -424,6 +424,10 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Decision Brief');
     expect(text(container)).toContain('Provider Spend');
     expect(text(container)).toContain('Category Mix');
+    expect(text(container)).toContain('FinOps Decision Signals');
+    expect(text(container)).toContain('Monthly run-rate');
+    expect(text(container)).toContain('Provider Fit');
+    expect(text(container)).toContain('Recommended Next Checks');
     expect(text(container)).toContain('Provider Ranking');
     expect(text(container)).toContain('Interval Outlook');
     expect(text(container)).toContain('Category Heatmap');
