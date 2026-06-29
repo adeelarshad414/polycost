@@ -10,3 +10,14 @@ export function providerLogoSrc(providerId: ProviderId): string {
       return '/cloud/gcp-logo.svg';
   }
 }
+
+export function providerMarkSrc(providerId: ProviderId): string {
+  switch (providerId) {
+    case 'aws':
+      return '/cloud/aws-mark.svg';
+    case 'azure':
+      return '/cloud/azure-mark.svg';
+    case 'gcp':
+      return '/cloud/gcp-mark.svg';
+  }
+}

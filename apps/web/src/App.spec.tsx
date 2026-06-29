@@ -70,7 +70,9 @@ describe('App', () => {
     expect(client.createComparison).toHaveBeenCalled();
     expect(text(container)).toContain('Comparison ready.');
     expect(mobileProviderLabels(container)).toEqual(['AWS', 'Azure', 'GCP']);
-    expect(text(container)).toContain('Demo workspace');
+    expect(text(container)).toContain('Workspace');
+    expect(text(container)).toContain('Executive View');
+    expect(text(container)).toContain('Engineering View');
     expect(text(container)).toContain('GCP is the current executive cost baseline');
     expect(text(container)).toContain('Decision Brief');
     expect(text(container)).toContain('Save vs next');
@@ -80,8 +82,7 @@ describe('App', () => {
       container.querySelector<HTMLAnchorElement>('a[href="https://calculator.aws/#/"]'),
     ).toBeInstanceOf(HTMLAnchorElement);
 
-    await click(resultTabByText(container, 'Engineering'));
-    await click(buttonByText(container, 'Engineering view'));
+    await click(resultTabByText(container, 'Engineering View'));
 
     expect(text(container)).toContain('Resource name');
     expect(text(container)).toContain('Spec / SKU');
@@ -459,9 +460,14 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('$360.00');
     expect(text(container)).toContain('Save vs next');
     expect(text(container)).toContain('$8.00');
+    expect(text(container)).toContain('Financial Analytics');
+    expect(text(container)).toContain('Run-rate Ladder');
+    expect(text(container)).toContain('Provider Variance');
+    expect(text(container)).toContain('Cost Mix Stack');
+    expect(text(container)).toContain('Unit Economics');
+    expect(text(container)).toContain('$1,080.00');
 
-    await click(resultTabByText(container, 'Engineering'));
-    await click(buttonByText(container, 'Engineering view'));
+    await click(resultTabByText(container, 'Engineering View'));
 
     expect(text(container)).toContain('Filter by tag');
     expect(text(container)).toContain('Backend contract note');
@@ -507,8 +513,7 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Save vs next');
     expect(text(container)).toContain('$15.00');
 
-    await click(resultTabByText(container, 'Engineering'));
-    await click(buttonByText(container, 'Engineering view'));
+    await click(resultTabByText(container, 'Engineering View'));
 
     expect(text(container)).toContain('aws compute');
     expect(text(container)).toContain('aws storage');
@@ -551,7 +556,7 @@ describe('ComparisonView', () => {
       <ComparisonView comparison={richResult} interval="monthly" />,
     );
 
-    await click(resultTabByText(container, 'FinOps'));
+    await click(resultTabByText(container, 'Engineering View'));
 
     expect(text(container)).toContain('Commitment scenario controls');
     expect(buttonByText(container, 'On-demand').disabled).toBe(false);

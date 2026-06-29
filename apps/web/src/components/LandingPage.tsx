@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { POLYCOST_HERO_SUBHEAD, POLYCOST_TAGLINE } from '../brand';
-import { providerLogoSrc } from '../provider-brand';
+import { providerLogoSrc, providerMarkSrc } from '../provider-brand';
 import { ResolvedTheme, ThemeChoice } from '../theme';
 import { ComparisonProviderResult, ComparisonResult, PROVIDER_ORDER, ProviderId } from '../types';
 import { WorkloadFormState } from '../workload';
@@ -209,7 +209,7 @@ function ProviderEstimateLoader({ providerId, label }: { providerId: ProviderId;
       aria-label={`${providerLabel(providerId)} estimate pending`}
     >
       <span className="provider-pending-icon" aria-hidden="true">
-        <img src={providerLogoSrc(providerId)} alt="" />
+        <img src={providerMarkSrc(providerId)} alt="" />
       </span>
       <span>{label}</span>
       <span className="provider-pending-bars" aria-hidden="true">

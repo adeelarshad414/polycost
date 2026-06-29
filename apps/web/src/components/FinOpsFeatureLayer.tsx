@@ -10,7 +10,7 @@ import {
   PricingModelKey,
   ProviderId,
 } from '../types';
-import { providerLogoSrc } from '../provider-brand';
+import { providerMarkSrc } from '../provider-brand';
 
 type CurrencyCode = 'USD' | 'PKR' | 'EUR' | 'GBP';
 
@@ -726,7 +726,7 @@ function IconPath({ path }: { path: string }) {
 function ProviderLogoHeading({ providerId }: { providerId: ProviderId }) {
   return (
     <span className={`provider-mini-heading provider-mini-heading-${providerId}`}>
-      <img src={providerLogoSrc(providerId)} alt="" aria-hidden="true" />
+      <img src={providerMarkSrc(providerId)} alt="" aria-hidden="true" />
       <span>{providerLabel(providerId)}</span>
     </span>
   );

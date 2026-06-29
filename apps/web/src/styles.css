@@ -2022,9 +2022,12 @@ select:disabled {
 }
 
 .result-workspace-nav {
+  position: sticky;
+  top: 72px;
+  z-index: 8;
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(190px, 0.24fr) minmax(0, 0.76fr);
+  grid-template-columns: minmax(180px, 0.22fr) minmax(0, 0.78fr);
   gap: var(--pc-space-2);
   align-items: center;
   border: 1px solid color-mix(in srgb, var(--pc-border) 88%, transparent);
@@ -2040,13 +2043,19 @@ select:disabled {
   min-width: 0;
 }
 
-.result-workspace-nav > div:first-child span,
-.result-tabs small {
+.result-workspace-nav > div:first-child span {
   color: var(--pc-text-secondary);
   font-size: var(--pc-text-xs);
   font-weight: 800;
   letter-spacing: 0;
   text-transform: uppercase;
+}
+
+.result-tabs small {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 750;
+  line-height: 1.35;
 }
 
 .result-workspace-nav > div:first-child strong {
@@ -2060,22 +2069,22 @@ select:disabled {
 .result-tabs {
   display: grid;
   min-width: 0;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--pc-space-1);
 }
 
 .result-tabs button {
   display: grid;
   min-width: 0;
-  min-height: 56px;
+  min-height: 70px;
   align-content: center;
-  gap: 2px;
-  border: 1px solid transparent;
+  gap: 4px;
+  border: 1px solid var(--pc-border);
   border-radius: 8px;
-  background: transparent;
+  background: color-mix(in srgb, var(--pc-bg-surface-2) 54%, transparent);
   color: var(--pc-text-secondary);
   cursor: pointer;
-  padding: 8px 10px;
+  padding: 10px 12px;
   text-align: left;
   transition:
     background-color 120ms ease,
@@ -2087,7 +2096,7 @@ select:disabled {
 .result-tabs button span {
   overflow: hidden;
   color: inherit;
-  font-size: var(--pc-text-sm);
+  font-size: var(--pc-text-base);
   font-weight: 850;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2098,7 +2107,7 @@ select:disabled {
   color: var(--pc-text-primary);
 }
 
-.result-tabs button[aria-selected='true'] {
+.result-tabs button[aria-pressed='true'] {
   border-color: color-mix(in srgb, var(--pc-action-primary) 32%, var(--pc-border));
   background: color-mix(in srgb, var(--pc-action-primary-soft) 72%, var(--pc-bg-surface));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pc-action-primary) 16%, transparent);
@@ -2106,12 +2115,54 @@ select:disabled {
 }
 
 .result-workspace-panel,
+.result-workspace-stack,
+.result-view-section,
 .demo-overview,
 .provider-cost-workspace,
 .architecture-workspace {
   display: grid;
   min-width: 0;
   gap: var(--pc-space-2);
+}
+
+.result-workspace-stack {
+  gap: var(--pc-space-4);
+}
+
+.result-view-section {
+  scroll-margin-top: 156px;
+}
+
+.result-section-header {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.42fr) minmax(0, 1fr);
+  gap: var(--pc-space-2);
+  align-items: end;
+  border-block: 1px solid color-mix(in srgb, var(--pc-border) 82%, transparent);
+  padding: var(--pc-space-2) 2px;
+}
+
+.result-section-header span {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.result-section-header h2 {
+  margin: 2px 0 0;
+  color: var(--pc-text-primary);
+  font-family: var(--pc-font-display);
+  font-size: clamp(1.35rem, 2vw, 1.9rem);
+  line-height: 1.08;
+}
+
+.result-section-header p {
+  max-width: 72ch;
+  margin: 0;
+  color: var(--pc-text-secondary);
+  line-height: 1.5;
 }
 
 .mobile-total-bar {
@@ -2221,6 +2272,7 @@ select:disabled {
 .metric-card,
 .dashboard-panel,
 .executive-decision,
+.financial-analytics,
 .solution-architecture,
 .finops-review {
   min-width: 0;
@@ -2396,23 +2448,23 @@ select:disabled {
   padding: 12px;
 }
 
-.stakeholder-ceo {
+.stakeholder-budget {
   border-top-color: var(--pc-action-primary);
 }
 
-.stakeholder-cto {
+.stakeholder-delivery {
   border-top-color: var(--pc-info);
 }
 
-.stakeholder-solution-architect {
+.stakeholder-risk {
   border-top-color: var(--pc-success);
 }
 
-.stakeholder-finops {
+.stakeholder-governance {
   border-top-color: var(--pc-warning);
 }
 
-.stakeholder-cloud {
+.stakeholder-provider {
   border-top-color: var(--pc-border-strong);
 }
 
@@ -2422,6 +2474,243 @@ select:disabled {
   font-size: var(--pc-text-base);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.financial-analytics {
+  display: grid;
+  gap: var(--pc-space-2);
+  overflow: hidden;
+  border-top: 4px solid var(--pc-action-primary);
+  padding: var(--pc-space-2);
+  background:
+    linear-gradient(
+      125deg,
+      color-mix(in srgb, var(--pc-provider-aws-soft) 42%, transparent),
+      transparent 30%
+    ),
+    linear-gradient(
+      235deg,
+      color-mix(in srgb, var(--pc-provider-azure-soft) 38%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--pc-provider-gcp-soft) 30%, transparent),
+      transparent 42%
+    ),
+    var(--pc-bg-surface);
+}
+
+.financial-analytics .panel-heading {
+  align-items: start;
+}
+
+.financial-analytics .panel-heading strong {
+  flex: 0 0 auto;
+  border: 1px solid var(--pc-border);
+  border-radius: 999px;
+  background: var(--pc-bg-surface);
+  color: var(--pc-text-secondary);
+  padding: 6px 10px;
+  font-size: var(--pc-text-xs);
+}
+
+.financial-kpi-grid,
+.financial-chart-grid,
+.unit-economics-grid {
+  display: grid;
+  gap: var(--pc-space-2);
+}
+
+.financial-kpi-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.financial-chart-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.financial-chart-card {
+  display: grid;
+  gap: var(--pc-space-2);
+  min-width: 0;
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface) 90%, var(--pc-bg-surface-2));
+  padding: var(--pc-space-2);
+}
+
+.chart-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--pc-space-1);
+}
+
+.chart-heading h4 {
+  margin: 0;
+  color: var(--pc-text-primary);
+  font-family: var(--pc-font-display);
+  font-size: var(--pc-text-base);
+}
+
+.chart-heading span,
+.forecast-bar-item span,
+.financial-ratio-card span,
+.financial-ratio-card small,
+.variance-value small {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 750;
+}
+
+.forecast-bars {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--pc-space-1);
+  align-items: end;
+}
+
+.forecast-bar-item {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  justify-items: center;
+  text-align: center;
+}
+
+.forecast-bar-track {
+  display: flex;
+  width: 100%;
+  height: 154px;
+  align-items: end;
+  overflow: hidden;
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface-2) 74%, var(--pc-bg-surface));
+  padding: 6px;
+}
+
+.forecast-bar-fill {
+  display: block;
+  width: 100%;
+  min-height: 5px;
+  border-radius: 6px;
+  background: var(--pc-action-primary);
+  box-shadow: 0 -10px 24px color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.forecast-bar-item strong,
+.financial-ratio-card strong,
+.variance-value {
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--pc-text-primary);
+  font-family: var(--pc-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variance-list,
+.mix-stack-list {
+  display: grid;
+  gap: var(--pc-space-1);
+}
+
+.variance-row,
+.mix-stack-row {
+  display: grid;
+  grid-template-columns: minmax(92px, 0.28fr) minmax(120px, 1fr) minmax(96px, auto);
+  align-items: center;
+  gap: var(--pc-space-1);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface-2) 58%, transparent);
+  padding: 8px;
+}
+
+.variance-provider,
+.mix-stack-label,
+.mix-legend,
+.mix-legend span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.variance-provider strong,
+.mix-stack-label strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variance-track,
+.mix-stack-bar {
+  position: relative;
+  height: 18px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--pc-bg-surface-2) 82%, var(--pc-bg-surface));
+  box-shadow: inset 0 1px 2px rgb(18 21 28 / 8%);
+}
+
+.variance-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  min-width: 0;
+  border-radius: inherit;
+}
+
+.variance-value {
+  display: grid;
+  justify-items: end;
+  text-align: right;
+}
+
+.mix-stack-bar {
+  display: flex;
+}
+
+.mix-segment {
+  display: block;
+  min-width: 0;
+  height: 100%;
+}
+
+.mix-legend {
+  flex-wrap: wrap;
+}
+
+.mix-legend span {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 800;
+}
+
+.unit-economics-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.financial-ratio-card {
+  display: grid;
+  gap: var(--pc-space-0-5);
+  min-width: 0;
+  border: 1px solid var(--pc-border);
+  border-left: 4px solid var(--pc-action-primary);
+  border-radius: 8px;
+  background: var(--pc-bg-surface);
+  padding: 12px;
+}
+
+.financial-ratio-card:nth-child(2) {
+  border-left-color: var(--pc-provider-azure);
+}
+
+.financial-ratio-card:nth-child(3) {
+  border-left-color: var(--pc-provider-gcp);
 }
 
 .dashboard-grid {
@@ -3138,14 +3427,14 @@ select:disabled {
 
 .provider-logo-lockup {
   display: inline-flex;
-  width: 116px;
-  height: 58px;
+  width: 128px;
+  height: 56px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--pc-border);
   border-radius: 8px;
-  background: var(--pc-bg-surface);
+  background: #fff;
   box-shadow: 0 10px 28px rgb(18 21 28 / 7%);
   transition:
     transform 120ms ease,
@@ -3157,7 +3446,7 @@ select:disabled {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 6px;
+  padding: 7px 9px;
 }
 
 .provider-logo-lockup-aws {
@@ -3178,8 +3467,8 @@ select:disabled {
 :root[data-theme='dark'] .provider-logo-lockup-aws,
 :root[data-theme='dark'] .provider-logo-lockup-azure,
 :root[data-theme='dark'] .provider-logo-lockup-gcp {
-  background: var(--pc-bg-surface-2);
-  box-shadow: none;
+  background: #fff;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 22%);
 }
 
 .lowest-badge {
@@ -3206,14 +3495,14 @@ select:disabled {
 }
 
 .provider-mark {
-  width: 34px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   flex: 0 0 auto;
   border: 1px solid var(--pc-border);
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fff;
   object-fit: contain;
-  padding: 2px;
+  padding: 3px;
 }
 
 .provider-mark-aws {
@@ -3269,8 +3558,8 @@ select:disabled {
 }
 
 .provider-pending-icon img {
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
   object-fit: contain;
 }
 
@@ -3350,11 +3639,11 @@ select:disabled {
 
 .provider-mini-heading img {
   display: block;
-  width: 46px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   flex: 0 0 auto;
   border: 1px solid var(--pc-border);
-  border-radius: 7px;
+  border-radius: 8px;
   background: #fff;
   object-fit: contain;
   padding: 3px;
@@ -3467,11 +3756,13 @@ select:disabled {
 
   .app-header,
   .result-workspace-nav,
+  .result-section-header,
   .workbench,
   .executive-decision,
   .decision-brief,
   .dashboard-grid,
   .analysis-grid,
+  .financial-chart-grid,
   .finops-advisor-grid {
     grid-template-columns: 1fr;
   }
@@ -3512,6 +3803,10 @@ select:disabled {
   }
 
   .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .financial-kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -3696,6 +3991,8 @@ select:disabled {
   .service-catalog-stats,
   .service-family-grid,
   .metric-grid,
+  .financial-kpi-grid,
+  .unit-economics-grid,
   .executive-scoreboard,
   .stakeholder-lens-grid,
   .architecture-checkpoint-grid,
@@ -3753,14 +4050,26 @@ select:disabled {
   }
 
   .provider-bar-row,
-  .category-row {
+  .category-row,
+  .variance-row,
+  .mix-stack-row {
     grid-template-columns: 1fr;
     gap: var(--pc-space-1);
   }
 
-  .bar-value {
+  .bar-value,
+  .variance-value {
     min-width: 0;
     text-align: left;
+    justify-items: start;
+  }
+
+  .forecast-bars {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .forecast-bar-track {
+    height: 124px;
   }
 
   .interval-row {

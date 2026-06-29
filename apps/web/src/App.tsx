@@ -5,7 +5,7 @@ import { FinOpsFeatureLayer, SharedReportPlaceholder } from './components/FinOps
 import { LandingPage } from './components/LandingPage';
 import { PersonaComparisonWorkspace } from './components/PersonaComparisonWorkspace';
 import { TopLoadingBar } from './components/TopLoadingBar';
-import { providerLogoSrc } from './provider-brand';
+import { providerLogoSrc, providerMarkSrc } from './provider-brand';
 import {
   CLOUD_SERVICE_CATALOG,
   SERVICE_CATALOG_CATEGORIES,
@@ -37,21 +37,26 @@ import {
 
 type InputMode = 'describe' | 'form';
 type BusyAction = 'parse' | 'compare' | 'refresh' | 'export' | null;
-type ResultWorkspaceTab = 'overview' | 'providers' | 'finops' | 'architecture' | 'engineering';
+type ResultWorkspaceView = 'executive' | 'engineering';
 type ServiceCategory = ComparisonProviderResult['lineItems'][number]['category'];
 type FormSectionTone = 'profile' | 'compute' | 'services' | 'portfolio' | 'data' | 'network';
 type ToggleIconKind = 'storage' | 'database' | 'cdn' | 'loadBalancer' | 'multiAz' | 'multiRegion';
 
-const RESULT_WORKSPACE_TABS: Array<{
-  key: ResultWorkspaceTab;
+const RESULT_WORKSPACE_VIEWS: Array<{
+  key: ResultWorkspaceView;
   label: string;
-  audience: string;
+  description: string;
 }> = [
-  { key: 'overview', label: 'Overview', audience: 'CEO / CFO / COO' },
-  { key: 'providers', label: 'Providers', audience: 'CTO / DevOps' },
-  { key: 'finops', label: 'FinOps', audience: 'CFO / FinOps' },
-  { key: 'architecture', label: 'Architecture', audience: 'Solution Architect' },
-  { key: 'engineering', label: 'Engineering', audience: 'Engineering / QA / Security' },
+  {
+    key: 'executive',
+    label: 'Executive View',
+    description: 'Decision memo, savings, provider ranking',
+  },
+  {
+    key: 'engineering',
+    label: 'Engineering View',
+    description: 'Architecture checks, cost drivers, exports',
+  },
 ];
 
 const SERVICE_CATEGORIES: ServiceCategory[] = ['compute', 'storage', 'database', 'network'];
@@ -213,7 +218,7 @@ interface ExecutiveDecision {
 }
 
 interface ExecutiveLens {
-  role: 'CEO' | 'CTO' | 'Solution Architect' | 'FinOps' | 'Cloud';
+  role: 'Budget' | 'Delivery' | 'Risk' | 'Governance' | 'Provider';
   label: string;
   value: string;
   detail: string;
@@ -1660,10 +1665,17 @@ export function ComparisonView({
   isLoading?: boolean;
   onExport?: (format: ReportFormat) => void;
 }) {
-  const [activeView, setActiveView] = useState<ResultWorkspaceTab>('overview');
+  const [activeView, setActiveView] = useState<ResultWorkspaceView>('executive');
   const providerResults = new Map<ProviderId, ComparisonProviderResult>(
     comparison?.providers.map((provider) => [provider.providerId, provider]) ?? [],
   );
+
+  function handleViewChange(view: ResultWorkspaceView) {
+    setActiveView(view);
+    window.requestAnimationFrame(() => {
+      scrollToElement(`${view}-view`);
+    });
+  }
 
   return (
     <div className="comparison-view">
@@ -1691,29 +1703,51 @@ export function ComparisonView({
       <ResultWorkspaceNav
         activeView={activeView}
         hasComparison={Boolean(comparison)}
-        onChange={setActiveView}
+        onChange={handleViewChange}
       />
 
-      <div className="result-workspace-panel">
-        {activeView === 'overview' ? (
+      <div className="result-workspace-panel result-workspace-stack">
+        <section
+          className="result-view-section result-view-section-executive"
+          id="executive-view"
+          aria-labelledby="executive-view-title"
+        >
+          <ResultSectionHeader
+            id="executive-view-title"
+            eyebrow="Executive View"
+            title="Decision-ready comparison"
+            description="A concise business view of provider totals, savings spread, annual exposure, confidence, and shortlist ranking."
+          />
           <ExecutiveOverview comparison={comparison} interval={interval} form={form} />
-        ) : activeView === 'providers' ? (
           <ProviderCostWorkspace comparison={comparison} interval={interval} />
-        ) : activeView === 'finops' ? (
-          <FinOpsFeatureLayer comparison={comparison} interval={interval} isLoading={isLoading} />
-        ) : activeView === 'architecture' ? (
+        </section>
+
+        <section
+          className="result-view-section result-view-section-engineering"
+          id="engineering-view"
+          aria-labelledby="engineering-view-title"
+        >
+          <ResultSectionHeader
+            id="engineering-view-title"
+            eyebrow="Engineering View"
+            title="Technical validation workspace"
+            description="Service fit, resilience checks, commitment scenarios, cost drivers, export controls, and API-facing line-item rows."
+          />
           <ArchitectureWorkspace comparison={comparison} interval={interval} form={form} />
-        ) : (
+          <FinOpsFeatureLayer comparison={comparison} interval={interval} isLoading={isLoading} />
           <PersonaComparisonWorkspace
             comparison={comparison}
             interval={interval}
             form={form}
+            defaultViewMode="engineering"
+            emptyStateMessage="Run a comparison to populate engineering rows, export controls, and API-facing cost evidence."
             isLoading={isLoading}
             error={error}
             exportingFormat={exportingFormat}
             onExport={onExport}
+            showViewSwitcher={false}
           />
-        )}
+        </section>
       </div>
     </div>
   );
@@ -1724,31 +1758,52 @@ function ResultWorkspaceNav({
   hasComparison,
   onChange,
 }: {
-  activeView: ResultWorkspaceTab;
+  activeView: ResultWorkspaceView;
   hasComparison: boolean;
-  onChange: (tab: ResultWorkspaceTab) => void;
+  onChange: (view: ResultWorkspaceView) => void;
 }) {
   return (
-    <section className="result-workspace-nav" aria-label="Demo audience views">
+    <section className="result-workspace-nav" aria-label="Result audience views">
       <div>
-        <span>Demo workspace</span>
+        <span>Workspace</span>
         <strong>{hasComparison ? 'Comparison ready' : 'Run comparison to populate data'}</strong>
       </div>
-      <div className="result-tabs" role="tablist" aria-label="Result workspace views">
-        {RESULT_WORKSPACE_TABS.map((tab) => (
+      <div className="result-tabs" role="group" aria-label="Jump to result view">
+        {RESULT_WORKSPACE_VIEWS.map((tab) => (
           <button
             key={tab.key}
             type="button"
-            role="tab"
-            aria-selected={activeView === tab.key}
+            aria-pressed={activeView === tab.key}
             onClick={() => onChange(tab.key)}
           >
             <span>{tab.label}</span>
-            <small>{tab.audience}</small>
+            <small>{tab.description}</small>
           </button>
         ))}
       </div>
     </section>
+  );
+}
+
+function ResultSectionHeader({
+  description,
+  eyebrow,
+  id,
+  title,
+}: {
+  description: string;
+  eyebrow: string;
+  id: string;
+  title: string;
+}) {
+  return (
+    <div className="result-section-header">
+      <div>
+        <span>{eyebrow}</span>
+        <h2 id={id}>{title}</h2>
+      </div>
+      <p>{description}</p>
+    </div>
   );
 }
 
@@ -1815,6 +1870,8 @@ function ExecutiveOverview({
         )}
       />
 
+      <FinancialAnalyticsPanel comparison={comparison} form={form} />
+
       <section className="dashboard-panel" aria-label="Provider spend chart">
         <div className="panel-heading">
           <h3>Provider Spend</h3>
@@ -1841,6 +1898,246 @@ function ExecutiveOverview({
         </div>
       </section>
     </section>
+  );
+}
+
+function FinancialAnalyticsPanel({
+  comparison,
+  form,
+}: {
+  comparison: ComparisonResult | null;
+  form: WorkloadFormState;
+}) {
+  const monthlySummaries = providerCostSummaries(comparison, 'monthly');
+  const pricedMonthly = monthlySummaries.filter((summary) => summary.total !== undefined);
+  const lowest = pricedMonthly[0];
+  const highest = pricedMonthly.at(-1);
+  const monthlyBaseline = lowest?.total;
+  const annualBaseline =
+    monthlyBaseline !== undefined ? roundCurrency(monthlyBaseline * 12) : undefined;
+  const threeYearBaseline =
+    monthlyBaseline !== undefined ? roundCurrency(monthlyBaseline * 36) : undefined;
+  const annualSpread =
+    lowest?.total !== undefined && highest?.total !== undefined
+      ? roundCurrency((highest.total - lowest.total) * 12)
+      : undefined;
+  const dailyUsers = parseInputNumber(form.dailyActiveUsers);
+  const peakUsers = parseInputNumber(form.peakConcurrentUsers);
+  const egressGb = parseInputNumber(form.monthlyEgressGb);
+  const unitDailyUser =
+    monthlyBaseline !== undefined && dailyUsers && dailyUsers > 0
+      ? monthlyBaseline / dailyUsers
+      : undefined;
+  const unitPeakUser =
+    monthlyBaseline !== undefined && peakUsers && peakUsers > 0
+      ? monthlyBaseline / peakUsers
+      : undefined;
+  const unitEgress =
+    monthlyBaseline !== undefined && egressGb && egressGb > 0
+      ? monthlyBaseline / egressGb
+      : undefined;
+  const forecastRows = financialForecastRows(monthlyBaseline);
+  const maxMonthlyTotal = Math.max(...monthlySummaries.map((summary) => summary.total ?? 0), 0);
+
+  return (
+    <section className="financial-analytics" aria-label="Financial analytics">
+      <div className="panel-heading">
+        <div>
+          <span>Financial Analytics</span>
+          <h3>Run-rate, variance, and unit economics</h3>
+        </div>
+        <strong>
+          {lowest ? `${providerLabel(lowest.providerId)} baseline` : 'Pending baseline'}
+        </strong>
+      </div>
+
+      <div className="financial-kpi-grid">
+        <InsightCard
+          label="Monthly run-rate"
+          value={monthlyBaseline !== undefined ? formatCurrency(monthlyBaseline) : 'Pending'}
+          detail={
+            lowest
+              ? `${providerLabel(lowest.providerId)} lowest estimate`
+              : 'Awaiting provider totals'
+          }
+          providerId={lowest?.providerId}
+        />
+        <InsightCard
+          label="Annualized exposure"
+          value={annualBaseline !== undefined ? formatCurrency(annualBaseline) : 'Pending'}
+          detail="12-month on-demand view"
+          providerId={lowest?.providerId}
+        />
+        <InsightCard
+          label="3-year exposure"
+          value={threeYearBaseline !== undefined ? formatCurrency(threeYearBaseline) : 'Pending'}
+          detail="Before commitments and growth"
+          providerId={lowest?.providerId}
+        />
+        <InsightCard
+          label="Annual savings spread"
+          value={annualSpread !== undefined ? formatCurrency(annualSpread) : 'Pending'}
+          detail="Highest minus lowest provider"
+        />
+      </div>
+
+      <div className="financial-chart-grid">
+        <section
+          className="financial-chart-card forecast-card"
+          aria-label="Run-rate forecast ladder"
+        >
+          <div className="chart-heading">
+            <h4>Run-rate Ladder</h4>
+            <span>Month to 3 years</span>
+          </div>
+          <div className="forecast-bars">
+            {forecastRows.map((row) => (
+              <div className="forecast-bar-item" key={row.label}>
+                <div className="forecast-bar-track" aria-hidden="true">
+                  <span
+                    className={
+                      lowest
+                        ? `forecast-bar-fill provider-fill-${lowest.providerId}`
+                        : 'forecast-bar-fill'
+                    }
+                    style={{ height: `${row.percent}%` }}
+                  />
+                </div>
+                <strong>{row.total !== undefined ? formatCurrency(row.total) : 'Pending'}</strong>
+                <span>{row.label}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="financial-chart-card variance-card" aria-label="Provider variance bars">
+          <div className="chart-heading">
+            <h4>Provider Variance</h4>
+            <span>Monthly delta</span>
+          </div>
+          <div className="variance-list">
+            {monthlySummaries.map((summary) => (
+              <div className="variance-row" key={summary.providerId}>
+                <div className="variance-provider">
+                  <ProviderMark providerId={summary.providerId} />
+                  <strong>{providerLabel(summary.providerId)}</strong>
+                </div>
+                <div className="variance-track" aria-hidden="true">
+                  <span
+                    className={`variance-fill provider-fill-${summary.providerId}`}
+                    style={{
+                      width:
+                        summary.total !== undefined && maxMonthlyTotal > 0
+                          ? `${Math.max(4, (summary.total / maxMonthlyTotal) * 100)}%`
+                          : '0%',
+                    }}
+                  />
+                </div>
+                <span className="variance-value">
+                  {summary.total !== undefined ? formatCurrency(summary.total) : 'Pending'}
+                  <small>
+                    {summary.deltaFromLowest !== undefined
+                      ? formatSignedCurrency(summary.deltaFromLowest)
+                      : 'Delta pending'}
+                  </small>
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="financial-chart-card mix-card" aria-label="Provider category mix">
+          <div className="chart-heading">
+            <h4>Cost Mix Stack</h4>
+            <span>Compute / storage / database / network</span>
+          </div>
+          <div className="mix-stack-list">
+            {monthlySummaries.map((summary) => (
+              <div className="mix-stack-row" key={summary.providerId}>
+                <div className="mix-stack-label">
+                  <ProviderMark providerId={summary.providerId} />
+                  <strong>{providerLabel(summary.providerId)}</strong>
+                </div>
+                <div className="mix-stack-bar" aria-hidden="true">
+                  {summary.categoryTotals.map((category) => (
+                    <span
+                      className={`mix-segment category-fill category-${category.category}`}
+                      key={`${summary.providerId}-${category.category}`}
+                      style={{ width: `${category.percentOfTotal}%` }}
+                    />
+                  ))}
+                </div>
+                <span>
+                  {summary.total !== undefined ? formatCurrency(summary.total) : 'Pending'}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="mix-legend" aria-label="Cost mix legend">
+            {SERVICE_CATEGORIES.map((category) => (
+              <span key={category}>
+                <i className={`category-dot category-${category}`} />
+                {capitalize(category)}
+              </span>
+            ))}
+          </div>
+        </section>
+
+        <section className="financial-chart-card unit-card" aria-label="Unit economics">
+          <div className="chart-heading">
+            <h4>Unit Economics</h4>
+            <span>Blended workload ratios</span>
+          </div>
+          <div className="unit-economics-grid">
+            <FinancialRatioCard
+              label="Per daily user"
+              value={unitDailyUser !== undefined ? formatUnitCurrency(unitDailyUser) : 'Pending'}
+              detail={
+                dailyUsers
+                  ? `${dailyUsers.toLocaleString('en-US')} DAU modeled`
+                  : 'DAU not specified'
+              }
+            />
+            <FinancialRatioCard
+              label="Per peak user"
+              value={unitPeakUser !== undefined ? formatUnitCurrency(unitPeakUser) : 'Pending'}
+              detail={
+                peakUsers
+                  ? `${peakUsers.toLocaleString('en-US')} peak concurrent`
+                  : 'Peak not specified'
+              }
+            />
+            <FinancialRatioCard
+              label="Per egress GB"
+              value={unitEgress !== undefined ? formatUnitCurrency(unitEgress) : 'Pending'}
+              detail={
+                egressGb
+                  ? `${egressGb.toLocaleString('en-US')}GB monthly egress`
+                  : 'Egress not specified'
+              }
+            />
+          </div>
+        </section>
+      </div>
+    </section>
+  );
+}
+
+function FinancialRatioCard({
+  detail,
+  label,
+  value,
+}: {
+  detail: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="financial-ratio-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+    </div>
   );
 }
 
@@ -2168,10 +2465,10 @@ function ExecutiveDecisionPanel({ decision }: { decision: ExecutiveDecision }) {
 
 function SolutionArchitecturePanel({ review }: { review: SolutionArchitectureReview }) {
   return (
-    <section className="solution-architecture" aria-label="Solution architect review">
+    <section className="solution-architecture" aria-label="Engineering architecture review">
       <div className="panel-heading">
         <div>
-          <span>Solution Architect</span>
+          <span>Engineering Review</span>
           <h3>Architecture Fit Review</h3>
         </div>
         <strong className={`architecture-risk architecture-risk-${review.riskLevel.toLowerCase()}`}>
@@ -2211,11 +2508,11 @@ function FinOpsReviewPanel({ review }: { review: FinOpsReview }) {
   const dominantCategory = review.dominantCategory;
 
   return (
-    <section className="finops-review" aria-label="FinOps review">
+    <section className="finops-review" aria-label="Cost governance review">
       <div className="panel-heading">
         <div>
-          <span>FinOps Review</span>
-          <h3>FinOps Decision Signals</h3>
+          <span>Cost Governance</span>
+          <h3>Decision Signals</h3>
         </div>
         <strong>
           {review.lineItemCount > 0 ? `${review.lineItemCount} priced drivers` : 'Pending'}
@@ -2565,7 +2862,7 @@ function ProviderMark({ providerId }: { providerId: ProviderId }) {
   return (
     <img
       className={`provider-mark provider-mark-${providerId}`}
-      src={providerLogoSrc(providerId)}
+      src={providerMarkSrc(providerId)}
       alt=""
       aria-hidden="true"
     />
@@ -2593,7 +2890,7 @@ function ProviderPendingValue({
       aria-label={`${providerLabel(providerId)} estimate pending`}
     >
       <span className="provider-pending-icon" aria-hidden="true">
-        <img src={providerLogoSrc(providerId)} alt="" />
+        <img src={providerMarkSrc(providerId)} alt="" />
       </span>
       <span>{label}</span>
       <span className="provider-pending-bars" aria-hidden="true">
@@ -2915,32 +3212,32 @@ function buildExecutiveDecision({
       confidenceDetail: 'No provider estimates yet',
       lenses: [
         {
-          role: 'CEO',
+          role: 'Budget',
           label: 'Budget decision',
           value: 'Pending',
           detail: 'A comparison is required before the estimate can support budget approval.',
         },
         {
-          role: 'CTO',
-          label: 'Architecture decision',
+          role: 'Delivery',
+          label: 'Delivery decision',
           value: 'Pending',
           detail:
             'Capture availability, data, and scaling assumptions before shortlisting a cloud.',
         },
         {
-          role: 'Solution Architect',
+          role: 'Risk',
           label: 'Fit decision',
           value: 'Pending',
           detail: 'Validate workload assumptions before mapping services to provider designs.',
         },
         {
-          role: 'FinOps',
+          role: 'Governance',
           label: 'Governance decision',
           value: 'Pending',
           detail: 'Use the first estimate to seed budgets, tags, and scenario tracking.',
         },
         {
-          role: 'Cloud',
+          role: 'Provider',
           label: 'Provider decision',
           value: 'Pending',
           detail: 'Validate service equivalence after the workload is normalized.',
@@ -2970,25 +3267,25 @@ function buildExecutiveDecision({
     avoidableAnnualSpend,
     lenses: [
       {
-        role: 'CEO',
+        role: 'Budget',
         label: 'Budget decision',
         value: annualExposure !== undefined ? formatCurrency(annualExposure) : 'Pending',
         detail: 'Use as the directional annual budget baseline before vendor negotiation.',
       },
       {
-        role: 'CTO',
-        label: 'Architecture decision',
+        role: 'Delivery',
+        label: 'Delivery decision',
         value: driver,
         detail: `Prioritize ${driver.toLowerCase()} sizing, resilience, and managed-service tier review.`,
       },
       {
-        role: 'Solution Architect',
+        role: 'Risk',
         label: 'Fit decision',
         value: approximateCount > 0 ? 'Mapping review' : 'Pattern review',
         detail: `Validate ${provider} regional services, HA pattern, quotas, and data/network assumptions before target-cloud selection.`,
       },
       {
-        role: 'FinOps',
+        role: 'Governance',
         label: 'Governance decision',
         value:
           monthlySpreadPercent !== undefined
@@ -2997,7 +3294,7 @@ function buildExecutiveDecision({
         detail: 'Create guardrails for tags, budgets, alerts, and commitment-model scenarios.',
       },
       {
-        role: 'Cloud',
+        role: 'Provider',
         label: 'Provider decision',
         value: approximateCount > 0 ? 'Equivalence review' : 'Service fit ready',
         detail:
@@ -3033,7 +3330,7 @@ function buildSolutionArchitectureReview({
       baselineLabel: 'Provider baseline pending',
       baselineValue: 'Run comparison',
       summary:
-        'A Solution Architect review will appear after PolyCost has provider totals and workload assumptions to inspect.',
+        'An engineering review will appear after PolyCost has provider totals and workload assumptions to inspect.',
       checkpoints: [
         {
           label: 'Service mapping',
@@ -3086,7 +3383,7 @@ function buildSolutionArchitectureReview({
     baselineLabel: `${provider} cost baseline`,
     baselineValue: driver,
     summary: [
-      `${provider} is the current cost baseline, but the Solution Architect gate should validate service equivalence, resilience, scaling, and data movement before cloud commitment.`,
+      `${provider} is the current cost baseline, but the engineering gate should validate service equivalence, resilience, scaling, and data movement before cloud commitment.`,
       monthlySpreadPercent !== undefined && monthlySpreadPercent >= 20
         ? `The ${formatPercent(monthlySpreadPercent)} provider spread is material enough to review architecture patterns before procurement.`
         : 'The cost spread is not enough by itself to skip architecture-fit validation.',
@@ -3401,6 +3698,35 @@ function categoryHeatmapRows(summaries: ProviderCostSummary[]): Array<{
   });
 }
 
+function financialForecastRows(monthlyTotal?: number): Array<{
+  label: string;
+  total?: number;
+  percent: number;
+}> {
+  const rows = [
+    { label: 'Month', total: monthlyTotal },
+    {
+      label: 'Quarter',
+      total: monthlyTotal !== undefined ? roundCurrency(monthlyTotal * 3) : undefined,
+    },
+    {
+      label: 'Year',
+      total: monthlyTotal !== undefined ? roundCurrency(monthlyTotal * 12) : undefined,
+    },
+    {
+      label: '3-year',
+      total: monthlyTotal !== undefined ? roundCurrency(monthlyTotal * 36) : undefined,
+    },
+  ];
+  const maxTotal = Math.max(...rows.map((row) => row.total ?? 0), 0);
+
+  return rows.map((row) => ({
+    ...row,
+    percent:
+      row.total !== undefined && maxTotal > 0 ? Math.max(8, (row.total / maxTotal) * 100) : 0,
+  }));
+}
+
 function intervalCostMultiplier(interval: IntervalKey): number {
   switch (interval) {
     case 'daily':
@@ -3433,7 +3759,13 @@ function roundCurrency(value: number): number {
 }
 
 function scrollToElement(id: string) {
-  document.getElementById(id)?.scrollIntoView({
+  const element = document.getElementById(id);
+
+  if (!element || typeof element.scrollIntoView !== 'function') {
+    return;
+  }
+
+  element.scrollIntoView({
     behavior: 'smooth',
     block: 'start',
   });
@@ -3455,6 +3787,14 @@ function formatCurrency(value: number): string {
     style: 'currency',
     currency: 'USD',
     maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatUnitCurrency(value: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: value > 0 && value < 1 ? 4 : 2,
   }).format(value);
 }
 

@@ -20,10 +20,13 @@ interface PersonaComparisonWorkspaceProps {
   comparison: ComparisonResult | null;
   interval: IntervalKey;
   form: WorkloadFormState;
+  defaultViewMode?: PersonaViewMode;
+  emptyStateMessage?: string;
   isLoading?: boolean;
   error?: string | null;
   exportingFormat?: ReportFormat | null;
   onExport?: (format: ReportFormat) => void;
+  showViewSwitcher?: boolean;
 }
 
 interface PersonaComparisonData {
@@ -68,22 +71,30 @@ const PERSONA_VIEW_STORAGE_KEY = 'polycost-persona-view';
 
 export function PersonaComparisonWorkspace({
   comparison,
+  defaultViewMode = 'executive',
+  emptyStateMessage,
   interval,
   form,
   isLoading = false,
   error = null,
   exportingFormat = null,
   onExport,
+  showViewSwitcher = true,
 }: PersonaComparisonWorkspaceProps) {
-  const [viewMode, setViewMode] = useState<PersonaViewMode>(() => storedPersonaViewMode());
+  const [selectedViewMode, setSelectedViewMode] = useState<PersonaViewMode>(() =>
+    showViewSwitcher ? storedPersonaViewMode() : defaultViewMode,
+  );
   const [sortKey, setSortKey] = useState<SortKey>('monthlyCost');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [tagFilter, setTagFilter] = useState('all');
   const data = usePersonaComparisonData(comparison, interval, form);
+  const viewMode = showViewSwitcher ? selectedViewMode : defaultViewMode;
 
   useEffect(() => {
-    storePersonaViewMode(viewMode);
-  }, [viewMode]);
+    if (showViewSwitcher) {
+      storePersonaViewMode(selectedViewMode);
+    }
+  }, [selectedViewMode, showViewSwitcher]);
 
   const tagOptions = useMemo(() => {
     const tags = new Set<string>();
@@ -112,18 +123,27 @@ export function PersonaComparisonWorkspace({
   }
 
   return (
-    <section className="mt-6 min-w-0 space-y-4" aria-label="Persona-aware cost views">
-      <div className="flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-surface-1 p-3 shadow-sm md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">View mode</p>
-          <h2 className="mt-1 text-lg font-semibold text-text-primary">
-            Choose the lens for this comparison
-          </h2>
+    <section className="min-w-0 space-y-4" aria-label="Persona-aware cost views">
+      {showViewSwitcher ? (
+        <div className="flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-surface-1 p-3 shadow-sm md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+              View mode
+            </p>
+            <h2 className="mt-1 text-lg font-semibold text-text-primary">
+              Choose the lens for this comparison
+            </h2>
+          </div>
+          <PersonaViewSwitcher viewMode={selectedViewMode} onViewModeChange={setSelectedViewMode} />
         </div>
-        <PersonaViewSwitcher viewMode={viewMode} onViewModeChange={setViewMode} />
-      </div>
+      ) : null}
 
-      <SharedComparisonState data={data} error={error} isLoading={isLoading} />
+      <SharedComparisonState
+        data={data}
+        emptyStateMessage={emptyStateMessage}
+        error={error}
+        isLoading={isLoading}
+      />
 
       {viewMode === 'executive' ? (
         <ExecutivePersonaView
@@ -513,10 +533,12 @@ function EngineeringPersonaView({
 
 function SharedComparisonState({
   data,
+  emptyStateMessage,
   error,
   isLoading,
 }: {
   data: PersonaComparisonData;
+  emptyStateMessage?: string;
   error: string | null;
   isLoading: boolean;
 }) {
@@ -544,7 +566,8 @@ function SharedComparisonState({
   if (!data.comparisonId) {
     return (
       <div className="rounded-lg border border-border bg-surface-1 p-3 text-sm text-text-secondary">
-        Run a comparison to populate both Executive and Engineering views from the same result.
+        {emptyStateMessage ??
+          'Run a comparison to populate both Executive and Engineering views from the same result.'}
       </div>
     );
   }
