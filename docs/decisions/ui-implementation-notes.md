@@ -35,6 +35,9 @@ Phase 9 implemented these decisions in the Vite/React web app; see
 - Apply professional product polish across all screen surfaces, including the app
   shell, sticky header, comparison toolbar, form controls, dashboard panels, charts,
   tables, provider cards, hover/focus states, and responsive breakpoints: complete.
+- Upgrade the structured Form tab from a flat input grid into a sectioned workload
+  configurator with live summary chips, suffix inputs, switch-style service toggles,
+  and editable storage/database detail fields: complete.
 - Add a print stylesheet for the on-screen comparison view in addition to generated
   PDF reports: complete.
 - Add accessibility checks for visible focus, keyboard navigation, reduced motion,
@@ -49,6 +52,9 @@ Phase 9 implemented these decisions in the Vite/React web app; see
 - Professional UI polish at desktop `1440x1000` and mobile `390x844`: browser-smoked
   with no page overflow, visible text overflow, unintended wide elements, or console
   errors.
+- Advanced structured form at desktop `1440x1000` and mobile `390x844`:
+  browser-smoked with no form overflow, no form-wide elements, successful Form-mode
+  comparison, and enabled exports.
 - No provider column reorders when a different provider is cheapest: covered.
 - Export buttons have equal visual weight for PDF, CSV, and Excel: implemented and
   covered through app interaction tests.

@@ -40,6 +40,9 @@ describe('App', () => {
     await click(buttonByText(container, 'Form'));
     await click(buttonByText(container, 'Compare'));
 
+    expect(text(container)).toContain('Traffic');
+    expect(text(container)).toContain('Services');
+    expect(text(container)).toContain('Network');
     expect(client.validateWorkload).toHaveBeenCalledWith(
       expect.objectContaining({ schemaVersion: '1.0' }),
     );
@@ -78,10 +81,14 @@ describe('App', () => {
     await click(checkboxByLabel(container, 'CDN'));
     await click(checkboxByLabel(container, 'Load balancer'));
     await click(checkboxByLabel(container, 'Multi-region'));
+    await changeInput(inputById(container, 'storage-role'), 'media uploads');
     await changeInput(inputById(container, 'storage-gb'), '512');
     await changeSelect(selectById(container, 'storage-type'), 'file');
+    await changeSelect(selectById(container, 'access-pattern'), 'archive');
+    await changeInput(inputById(container, 'database-role'), 'orders');
     await changeSelect(selectById(container, 'database'), 'mysql');
     await changeInput(inputById(container, 'database-gb'), '200');
+    await click(checkboxByLabel(container, 'Database HA'));
     await changeInput(inputById(container, 'egress-gb-mo'), '900');
     await changeInput(inputById(container, 'sla-target'), '99.95%');
 
@@ -96,6 +103,20 @@ describe('App', () => {
           name: 'Edited portal',
           type: 'api_backend',
         }),
+        storage: [
+          expect.objectContaining({
+            accessPattern: 'archive',
+            role: 'media uploads',
+            type: 'file',
+          }),
+        ],
+        database: [
+          expect.objectContaining({
+            engine: 'mysql',
+            highAvailability: false,
+            role: 'orders',
+          }),
+        ],
       }),
     );
     expect(client.refreshLiveComparison).toHaveBeenCalledWith(comparisonResult.comparisonId);

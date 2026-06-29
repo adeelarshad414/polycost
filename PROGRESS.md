@@ -630,6 +630,37 @@ compare`; anonymous UI no longer calls the admin-only pricing-status endpoint; a
 - Checkpoint: professional UI/UX polish is complete. Continue Phase 10 acceptance
   work from the polished comparison UI.
 
+## Post-Phase 9 advanced form UX polish
+
+**Status:** Complete
+**Date:** 2026-06-29
+
+- Frontend upgrades: replaced the flat structured form with a sectioned workload
+  configurator covering Workload, Compute, Services, Data, and Network. Added live
+  sizing summary chips for traffic, compute, scale, and data.
+- Form controls: added input suffix affordances for cores, GB, nodes, min/max, and
+  egress; upgraded service checkboxes into icon-backed switch tiles; and surfaced the
+  previously hidden storage role, storage access pattern, database role, and database
+  high-availability fields.
+- Responsiveness: desktop keeps the richer form compact in multi-column sections;
+  tablet collapses to two columns; mobile stacks summary chips, fields, and switch
+  tiles without horizontal form overflow.
+- Runtime verification: rebuilt the Docker web image and browser-smoked
+  `http://localhost:3000` at desktop `1440x1000` and mobile `390x844`. Form mode
+  rendered all five sections, live summary chips, seven switch tiles, 28 form
+  controls, no form-wide elements, no page overflow, and no console errors. A mobile
+  Form-mode `Compare` run completed successfully and enabled PDF/CSV/Excel exports.
+- Tests/checks passing: `npm run format:check`, `npm run ci:lint`,
+  `npm run test:unit`, `npm run test:coverage --workspace @polycost/web`,
+  `npm run build`, Docker Compose web rebuild/start, `docker compose ps`,
+  `curl -fsSI http://localhost:3000`, `curl -fsS http://localhost:3001/health`,
+  and browser responsive form smoke. `npm run ci:lint` still reports only the
+  existing 15 API security warnings.
+- Coverage note: web workspace coverage is 94.96% statements, 86.64% branches,
+  95.53% functions, and 94.84% lines.
+- Checkpoint: advanced form UX polish is complete. Continue Phase 10 acceptance work
+  from the upgraded structured-form workflow.
+
 ## Phase 10 - E2E verification against MVP acceptance criteria
 
 **Status:** Not started

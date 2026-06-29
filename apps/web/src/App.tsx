@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, ReactNode, useEffect, useState } from 'react';
 import { formatApiError, PolyCostClient, PolyCostApiError, polyCostClient } from './api-client';
 import { applyTheme, storedTheme, ThemeChoice } from './theme';
 import {
@@ -22,6 +22,8 @@ import {
 type InputMode = 'describe' | 'form';
 type BusyAction = 'parse' | 'compare' | 'refresh' | 'export' | null;
 type ServiceCategory = ComparisonProviderResult['lineItems'][number]['category'];
+type FormSectionTone = 'profile' | 'compute' | 'services' | 'data' | 'network';
+type ToggleIconKind = 'storage' | 'database' | 'cdn' | 'loadBalancer' | 'multiAz' | 'multiRegion';
 
 const SERVICE_CATEGORIES: ServiceCategory[] = ['compute', 'storage', 'database', 'network'];
 
@@ -338,172 +340,270 @@ function WorkloadForm({
     });
   }
 
+  const sizingSummary = formSizingSummary(form);
+
   return (
     <form className="structured-form" id="requirements" onSubmit={onSubmit}>
-      <div className="form-grid">
-        <TextField
-          label="Name"
-          value={form.workloadName}
-          onChange={(value) => update('workloadName', value)}
-        />
-        <SelectField
-          label="Type"
-          value={form.workloadType}
-          options={[
-            ['web_app', 'Web app'],
-            ['api_backend', 'API backend'],
-            ['static_site', 'Static site'],
-            ['batch_processing', 'Batch'],
-            ['data_pipeline', 'Data pipeline'],
-            ['ml_workload', 'ML workload'],
-            ['other', 'Other'],
-          ]}
-          onChange={(value) => update('workloadType', value)}
-        />
-        <TextField
-          label="Region"
-          value={form.regionPreference}
-          onChange={(value) => update('regionPreference', value)}
-        />
-        <TextField
-          label="Daily users"
-          value={form.dailyActiveUsers}
-          inputMode="numeric"
-          onChange={(value) => update('dailyActiveUsers', value)}
-        />
-        <TextField
-          label="Peak users"
-          value={form.peakConcurrentUsers}
-          inputMode="numeric"
-          onChange={(value) => update('peakConcurrentUsers', value)}
-        />
-        <TextField
-          label="Compute role"
-          value={form.computeRole}
-          onChange={(value) => update('computeRole', value)}
-        />
-        <TextField
-          label="vCPU"
-          value={form.vcpu}
-          inputMode="decimal"
-          onChange={(value) => update('vcpu', value)}
-        />
-        <TextField
-          label="Memory GB"
-          value={form.memoryGb}
-          inputMode="decimal"
-          onChange={(value) => update('memoryGb', value)}
-        />
-        <TextField
-          label="Instances"
-          value={form.instanceCount}
-          inputMode="numeric"
-          onChange={(value) => update('instanceCount', value)}
-        />
-        <SelectField
-          label="Scaling"
-          value={form.scalingType}
-          options={[
-            ['fixed', 'Fixed'],
-            ['autoscaling', 'Autoscaling'],
-          ]}
-          onChange={(value) => update('scalingType', value)}
-        />
-        <TextField
-          label="Scale min"
-          value={form.autoscaleMin}
-          inputMode="numeric"
-          onChange={(value) => update('autoscaleMin', value)}
-        />
-        <TextField
-          label="Scale max"
-          value={form.autoscaleMax}
-          inputMode="numeric"
-          onChange={(value) => update('autoscaleMax', value)}
-        />
+      <div className="form-overview-strip" aria-label="Workload sizing summary">
+        <FormSummaryChip label="Traffic" value={sizingSummary.traffic} tone="profile" />
+        <FormSummaryChip label="Compute" value={sizingSummary.compute} tone="compute" />
+        <FormSummaryChip label="Scale" value={sizingSummary.scale} tone="services" />
+        <FormSummaryChip label="Data" value={sizingSummary.data} tone="data" />
       </div>
 
-      <div className="form-switches" aria-label="Workload options">
-        <CheckboxField
-          label="Object storage"
-          checked={form.storageEnabled}
-          onChange={(checked) => update('storageEnabled', checked)}
-        />
-        <CheckboxField
-          label="Managed database"
-          checked={form.databaseEnabled}
-          onChange={(checked) => update('databaseEnabled', checked)}
-        />
-        <CheckboxField
-          label="CDN"
-          checked={form.cdn}
-          onChange={(checked) => update('cdn', checked)}
-        />
-        <CheckboxField
-          label="Load balancer"
-          checked={form.loadBalancer}
-          onChange={(checked) => update('loadBalancer', checked)}
-        />
-        <CheckboxField
-          label="Multi-AZ"
-          checked={form.multiAz}
-          onChange={(checked) => update('multiAz', checked)}
-        />
-        <CheckboxField
-          label="Multi-region"
-          checked={form.multiRegion}
-          onChange={(checked) => update('multiRegion', checked)}
-        />
-      </div>
+      <FormSection title="Workload" tone="profile">
+        <div className="form-grid form-grid-profile">
+          <TextField
+            label="Name"
+            value={form.workloadName}
+            onChange={(value) => update('workloadName', value)}
+          />
+          <SelectField
+            label="Type"
+            value={form.workloadType}
+            options={[
+              ['web_app', 'Web app'],
+              ['api_backend', 'API backend'],
+              ['static_site', 'Static site'],
+              ['batch_processing', 'Batch'],
+              ['data_pipeline', 'Data pipeline'],
+              ['ml_workload', 'ML workload'],
+              ['other', 'Other'],
+            ]}
+            onChange={(value) => update('workloadType', value)}
+          />
+          <TextField
+            label="Region"
+            value={form.regionPreference}
+            onChange={(value) => update('regionPreference', value)}
+          />
+          <TextField
+            label="Daily users"
+            value={form.dailyActiveUsers}
+            inputMode="numeric"
+            onChange={(value) => update('dailyActiveUsers', value)}
+          />
+          <TextField
+            label="Peak users"
+            value={form.peakConcurrentUsers}
+            inputMode="numeric"
+            onChange={(value) => update('peakConcurrentUsers', value)}
+          />
+        </div>
+      </FormSection>
 
-      <div className="form-grid secondary-grid">
-        <TextField
-          label="Storage GB"
-          value={form.storageSizeGb}
-          inputMode="decimal"
-          onChange={(value) => update('storageSizeGb', value)}
-        />
-        <SelectField
-          label="Storage type"
-          value={form.storageType}
-          options={[
-            ['object', 'Object'],
-            ['block', 'Block'],
-            ['file', 'File'],
-          ]}
-          onChange={(value) => update('storageType', value)}
-        />
-        <SelectField
-          label="Database"
-          value={form.databaseEngine}
-          options={[
-            ['postgres', 'Postgres'],
-            ['mysql', 'MySQL'],
-            ['mongodb', 'MongoDB'],
-            ['redis', 'Redis'],
-            ['generic_relational', 'Relational'],
-            ['generic_nosql', 'NoSQL'],
-          ]}
-          onChange={(value) => update('databaseEngine', value)}
-        />
-        <TextField
-          label="Database GB"
-          value={form.databaseSizeGb}
-          inputMode="decimal"
-          onChange={(value) => update('databaseSizeGb', value)}
-        />
-        <TextField
-          label="Egress GB/mo"
-          value={form.monthlyEgressGb}
-          inputMode="decimal"
-          onChange={(value) => update('monthlyEgressGb', value)}
-        />
-        <TextField
-          label="SLA target"
-          value={form.slaTarget}
-          onChange={(value) => update('slaTarget', value)}
-        />
-      </div>
+      <FormSection title="Compute" tone="compute">
+        <div className="form-grid form-grid-compute">
+          <TextField
+            label="Compute role"
+            value={form.computeRole}
+            onChange={(value) => update('computeRole', value)}
+          />
+          <TextField
+            label="vCPU"
+            value={form.vcpu}
+            inputMode="decimal"
+            suffix="cores"
+            onChange={(value) => update('vcpu', value)}
+          />
+          <TextField
+            label="Memory GB"
+            value={form.memoryGb}
+            inputMode="decimal"
+            suffix="GB"
+            onChange={(value) => update('memoryGb', value)}
+          />
+          <TextField
+            label="Instances"
+            value={form.instanceCount}
+            inputMode="numeric"
+            suffix="nodes"
+            onChange={(value) => update('instanceCount', value)}
+          />
+          <SelectField
+            label="Scaling"
+            value={form.scalingType}
+            options={[
+              ['fixed', 'Fixed'],
+              ['autoscaling', 'Autoscaling'],
+            ]}
+            onChange={(value) => update('scalingType', value)}
+          />
+          <TextField
+            label="Scale min"
+            value={form.autoscaleMin}
+            inputMode="numeric"
+            suffix="min"
+            onChange={(value) => update('autoscaleMin', value)}
+          />
+          <TextField
+            label="Scale max"
+            value={form.autoscaleMax}
+            inputMode="numeric"
+            suffix="max"
+            onChange={(value) => update('autoscaleMax', value)}
+          />
+        </div>
+      </FormSection>
+
+      <FormSection title="Services" tone="services">
+        <div className="form-switches" aria-label="Workload options">
+          <CheckboxField
+            label="Object storage"
+            icon="storage"
+            checked={form.storageEnabled}
+            onChange={(checked) => update('storageEnabled', checked)}
+          />
+          <CheckboxField
+            label="Managed database"
+            icon="database"
+            checked={form.databaseEnabled}
+            onChange={(checked) => update('databaseEnabled', checked)}
+          />
+          <CheckboxField
+            label="CDN"
+            icon="cdn"
+            checked={form.cdn}
+            onChange={(checked) => update('cdn', checked)}
+          />
+          <CheckboxField
+            label="Load balancer"
+            icon="loadBalancer"
+            checked={form.loadBalancer}
+            onChange={(checked) => update('loadBalancer', checked)}
+          />
+          <CheckboxField
+            label="Multi-AZ"
+            icon="multiAz"
+            checked={form.multiAz}
+            onChange={(checked) => update('multiAz', checked)}
+          />
+          <CheckboxField
+            label="Multi-region"
+            icon="multiRegion"
+            checked={form.multiRegion}
+            onChange={(checked) => update('multiRegion', checked)}
+          />
+        </div>
+      </FormSection>
+
+      <FormSection title="Data" tone="data">
+        <div className="form-subsection">
+          <div className="form-subsection-heading">
+            <span>Storage</span>
+            <strong>{form.storageEnabled ? 'Enabled' : 'Off'}</strong>
+          </div>
+          <div
+            className={
+              form.storageEnabled ? 'form-grid form-grid-data' : 'form-grid form-grid-data is-muted'
+            }
+          >
+            <TextField
+              label="Storage role"
+              value={form.storageRole}
+              disabled={!form.storageEnabled}
+              onChange={(value) => update('storageRole', value)}
+            />
+            <TextField
+              label="Storage GB"
+              value={form.storageSizeGb}
+              inputMode="decimal"
+              suffix="GB"
+              disabled={!form.storageEnabled}
+              onChange={(value) => update('storageSizeGb', value)}
+            />
+            <SelectField
+              label="Storage type"
+              value={form.storageType}
+              disabled={!form.storageEnabled}
+              options={[
+                ['object', 'Object'],
+                ['block', 'Block'],
+                ['file', 'File'],
+              ]}
+              onChange={(value) => update('storageType', value)}
+            />
+            <SelectField
+              label="Access pattern"
+              value={form.storageAccessPattern}
+              disabled={!form.storageEnabled}
+              options={[
+                ['frequent', 'Frequent'],
+                ['infrequent', 'Infrequent'],
+                ['archive', 'Archive'],
+              ]}
+              onChange={(value) => update('storageAccessPattern', value)}
+            />
+          </div>
+        </div>
+
+        <div className="form-subsection">
+          <div className="form-subsection-heading">
+            <span>Database</span>
+            <strong>{form.databaseEnabled ? 'Enabled' : 'Off'}</strong>
+          </div>
+          <div
+            className={
+              form.databaseEnabled
+                ? 'form-grid form-grid-data'
+                : 'form-grid form-grid-data is-muted'
+            }
+          >
+            <TextField
+              label="Database role"
+              value={form.databaseRole}
+              disabled={!form.databaseEnabled}
+              onChange={(value) => update('databaseRole', value)}
+            />
+            <SelectField
+              label="Database"
+              value={form.databaseEngine}
+              disabled={!form.databaseEnabled}
+              options={[
+                ['postgres', 'Postgres'],
+                ['mysql', 'MySQL'],
+                ['mongodb', 'MongoDB'],
+                ['redis', 'Redis'],
+                ['generic_relational', 'Relational'],
+                ['generic_nosql', 'NoSQL'],
+              ]}
+              onChange={(value) => update('databaseEngine', value)}
+            />
+            <TextField
+              label="Database GB"
+              value={form.databaseSizeGb}
+              inputMode="decimal"
+              suffix="GB"
+              disabled={!form.databaseEnabled}
+              onChange={(value) => update('databaseSizeGb', value)}
+            />
+            <CheckboxField
+              label="Database HA"
+              icon="multiAz"
+              checked={form.databaseHighAvailability}
+              disabled={!form.databaseEnabled}
+              onChange={(checked) => update('databaseHighAvailability', checked)}
+            />
+          </div>
+        </div>
+      </FormSection>
+
+      <FormSection title="Network" tone="network">
+        <div className="form-grid secondary-grid">
+          <TextField
+            label="Egress GB/mo"
+            value={form.monthlyEgressGb}
+            inputMode="decimal"
+            suffix="GB"
+            onChange={(value) => update('monthlyEgressGb', value)}
+          />
+          <TextField
+            label="SLA target"
+            value={form.slaTarget}
+            onChange={(value) => update('slaTarget', value)}
+          />
+        </div>
+      </FormSection>
 
       <button type="submit" className="sr-only">
         Submit structured workload
@@ -512,27 +612,76 @@ function WorkloadForm({
   );
 }
 
+function FormSection({
+  title,
+  tone,
+  children,
+}: {
+  title: string;
+  tone: FormSectionTone;
+  children: ReactNode;
+}) {
+  const headingId = `form-section-${tone}`;
+
+  return (
+    <section className={`form-section form-section-${tone}`} aria-labelledby={headingId}>
+      <div className="form-section-heading">
+        <span className="form-section-icon" aria-hidden="true">
+          <FormSectionIcon tone={tone} />
+        </span>
+        <h3 id={headingId}>{title}</h3>
+      </div>
+      <div className="form-section-body">{children}</div>
+    </section>
+  );
+}
+
+function FormSummaryChip({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: FormSectionTone;
+}) {
+  return (
+    <div className={`form-summary-chip form-summary-chip-${tone}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
 function TextField({
   label,
   value,
   inputMode,
+  suffix,
+  disabled,
   onChange,
 }: {
   label: string;
   value: string;
   inputMode?: 'text' | 'numeric' | 'decimal';
+  suffix?: string;
+  disabled?: boolean;
   onChange: (value: string) => void;
 }) {
   const id = toId(label);
   return (
     <label className="form-field" htmlFor={id}>
-      <span>{label}</span>
-      <input
-        id={id}
-        value={value}
-        inputMode={inputMode}
-        onChange={(event) => onChange(event.currentTarget.value)}
-      />
+      <span className="field-caption">{label}</span>
+      <span className={suffix ? 'field-control field-control-suffix' : 'field-control'}>
+        <input
+          id={id}
+          value={value}
+          inputMode={inputMode}
+          disabled={disabled}
+          onChange={(event) => onChange(event.currentTarget.value)}
+        />
+        {suffix ? <span className="field-suffix">{suffix}</span> : null}
+      </span>
     </label>
   );
 }
@@ -541,18 +690,25 @@ function SelectField<T extends string>({
   label,
   value,
   options,
+  disabled,
   onChange,
 }: {
   label: string;
   value: T;
   options: Array<[T, string]>;
+  disabled?: boolean;
   onChange: (value: T) => void;
 }) {
   const id = toId(label);
   return (
     <label className="form-field" htmlFor={id}>
-      <span>{label}</span>
-      <select id={id} value={value} onChange={(event) => onChange(event.currentTarget.value as T)}>
+      <span className="field-caption">{label}</span>
+      <select
+        id={id}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.currentTarget.value as T)}
+      >
         {options.map(([optionValue, optionLabel]) => (
           <option key={optionValue} value={optionValue}>
             {optionLabel}
@@ -565,11 +721,15 @@ function SelectField<T extends string>({
 
 function CheckboxField({
   label,
+  icon,
   checked,
+  disabled,
   onChange,
 }: {
   label: string;
+  icon: ToggleIconKind;
   checked: boolean;
+  disabled?: boolean;
   onChange: (checked: boolean) => void;
 }) {
   return (
@@ -577,11 +737,109 @@ function CheckboxField({
       <input
         type="checkbox"
         checked={checked}
+        disabled={disabled}
         onChange={(event) => onChange(event.currentTarget.checked)}
       />
-      <span>{label}</span>
+      <span className="checkbox-content">
+        <span className="checkbox-icon" aria-hidden="true">
+          <ToggleIcon icon={icon} />
+        </span>
+        <span className="checkbox-label">{label}</span>
+      </span>
+      <span className="switch-visual" aria-hidden="true" />
     </label>
   );
+}
+
+function FormSectionIcon({ tone }: { tone: FormSectionTone }) {
+  return (
+    <svg className="form-icon-svg" viewBox="0 0 24 24" focusable="false">
+      {tone === 'profile' ? (
+        <path d="M4 7h16M4 12h10M4 17h7" />
+      ) : tone === 'compute' ? (
+        <path d="M8 4v3M16 4v3M8 17v3M16 17v3M4 8h3M17 8h3M4 16h3M17 16h3M8 8h8v8H8z" />
+      ) : tone === 'services' ? (
+        <path d="M6 8h12M8 5h8M8 19h8M6 16h12M5 8v8M19 8v8" />
+      ) : tone === 'data' ? (
+        <path d="M5 7c0-1.7 3.1-3 7-3s7 1.3 7 3-3.1 3-7 3-7-1.3-7-3zM5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5" />
+      ) : (
+        <path d="M4 12h5M15 12h5M9 12a3 3 0 1 0 6 0 3 3 0 0 0-6 0zM12 5v4M12 15v4" />
+      )}
+    </svg>
+  );
+}
+
+function ToggleIcon({ icon }: { icon: ToggleIconKind }) {
+  return (
+    <svg className="form-icon-svg" viewBox="0 0 24 24" focusable="false">
+      {icon === 'storage' ? (
+        <path d="M5 7c0-1.7 3.1-3 7-3s7 1.3 7 3-3.1 3-7 3-7-1.3-7-3zM5 7v10c0 1.7 3.1 3 7 3s7-1.3 7-3V7" />
+      ) : icon === 'database' ? (
+        <path d="M6 6h12v12H6zM9 9h6M9 13h6M9 17h3" />
+      ) : icon === 'cdn' ? (
+        <path d="M12 4v4M12 16v4M4 12h4M16 12h4M8 8l-3-3M16 8l3-3M8 16l-3 3M16 16l3 3M9 9h6v6H9z" />
+      ) : icon === 'loadBalancer' ? (
+        <path d="M4 7h6M14 7h6M10 7a2 2 0 1 0 4 0 2 2 0 0 0-4 0zM4 17h6M14 17h6M10 17a2 2 0 1 0 4 0 2 2 0 0 0-4 0z" />
+      ) : icon === 'multiAz' ? (
+        <path d="M5 18V8l7-4 7 4v10M8 18v-6h8v6M4 18h16" />
+      ) : (
+        <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3.5 12h17M12 3c2.5 2.6 3.7 5.6 3.7 9S14.5 18.4 12 21M12 3c-2.5 2.6-3.7 5.6-3.7 9s1.2 6.4 3.7 9" />
+      )}
+    </svg>
+  );
+}
+
+function formSizingSummary(
+  form: WorkloadFormState,
+): Record<'traffic' | 'compute' | 'scale' | 'data', string> {
+  const dailyUsers = formatCompactInput(form.dailyActiveUsers);
+  const peakUsers = formatCompactInput(form.peakConcurrentUsers);
+  const vcpu = parseFormNumber(form.vcpu) ?? 0;
+  const memory = parseFormNumber(form.memoryGb) ?? 0;
+  const instances = parseFormNumber(form.instanceCount) ?? 0;
+  const scaleMin = parseFormNumber(form.autoscaleMin) ?? instances;
+  const scaleMax = parseFormNumber(form.autoscaleMax) ?? instances;
+  const totalVcpu = vcpu * Math.max(instances, 1);
+  const totalMemory = memory * Math.max(instances, 1);
+  const storageText = form.storageEnabled
+    ? `${formatCompactInput(form.storageSizeGb)}GB`
+    : 'No storage';
+  const databaseText = form.databaseEnabled ? form.databaseEngine : 'No database';
+
+  return {
+    traffic: `${dailyUsers} daily / ${peakUsers} peak`,
+    compute: `${formatDecimal(totalVcpu)} vCPU / ${formatDecimal(totalMemory)}GB`,
+    scale:
+      form.scalingType === 'autoscaling'
+        ? `${formatDecimal(scaleMin)}-${formatDecimal(scaleMax)} nodes`
+        : `${formatDecimal(instances)} fixed`,
+    data: `${storageText} / ${databaseText}`,
+  };
+}
+
+function parseFormNumber(value: string): number | undefined {
+  const parsed = Number(value.replace(/,/g, '').trim());
+
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function formatCompactInput(value: string): string {
+  const parsed = parseFormNumber(value);
+
+  if (parsed === undefined) {
+    return '0';
+  }
+
+  return new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: parsed >= 1000 ? 1 : 0,
+    notation: parsed >= 1000 ? 'compact' : 'standard',
+  }).format(parsed);
+}
+
+function formatDecimal(value: number): string {
+  return new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: value % 1 === 0 ? 0 : 1,
+  }).format(value);
 }
 
 function PricingFreshness({ comparison }: { comparison: ComparisonResult | null }) {

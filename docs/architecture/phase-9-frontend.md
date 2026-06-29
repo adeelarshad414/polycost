@@ -52,6 +52,12 @@ top stripe, contextual comparison toolbar, consistent elevation tokens, refined
 segmented controls, card-style line items, framed chart/table panels, and responsive
 spacing rules that keep the summary rail sticky only where there is enough room.
 
+The structured Form tab is a sectioned workload configurator rather than a flat input
+grid. It groups Workload, Compute, Services, Data, and Network inputs, shows live
+traffic/compute/scale/data summary chips, uses switch-style service toggles, and
+surfaces storage role, storage access pattern, database role, and database
+high-availability fields that map into the same NWS form state.
+
 The app uses native form controls, semantic regions, labelled comparison sections,
 visible focus states, and reduced-motion CSS. Provider line items include aria labels
 with provider, category, description, and monthly price so screen readers get the
@@ -97,3 +103,8 @@ the populated comparison at desktop `1440x1000` and mobile `390x844`. It verifie
 provider logos, dashboard charts, interval controls, export controls, stable provider
 order, no page overflow, no visible text overflow, no unintended wide elements outside
 intentional scroll containers, and no console errors.
+
+The advanced form pass also browser-smoked the Form tab at desktop `1440x1000` and
+mobile `390x844`. It verified all five form sections, live summary chips, seven
+switch tiles, 28 form controls, no form-wide elements, no page overflow, a successful
+Form-mode comparison, enabled exports, and no console errors.
