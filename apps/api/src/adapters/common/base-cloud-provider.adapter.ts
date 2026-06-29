@@ -1,5 +1,9 @@
 import { NWSValidator } from '../../nws/nws-validator';
 import {
+  calculateEgressCost,
+  EgressTierRate,
+} from '../../pricing-normalization/egress-tier-calculator';
+import {
   CloudProviderAdapter,
   CostComponent,
   PricingCatalogReader,
@@ -17,11 +21,6 @@ import { AdapterPricingError } from './adapter-errors';
 const HOURS_PER_MONTH = 730;
 const COMMITMENT_PRICING_MODELS: PricingModelKey[] = ['reserved-1yr', 'reserved-3yr'];
 const PRICING_MODEL_UNAVAILABLE = 'Not available for this configuration.';
-
-interface EgressTier {
-  startGb: number;
-  unitPriceUsd: number;
-}
 
 interface CostCalculation {
   monthlyCostUsd: number;
@@ -329,7 +328,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
 
     if (tiers.length > 0) {
       return {
-        monthlyCostUsd: this.roundCurrency(this.tieredUsageCost(quantity, tiers)),
+        monthlyCostUsd: this.roundCurrency(calculateEgressCost(tiers, quantity)),
         pricingBasis: 'tiered',
       };
     }
@@ -342,7 +341,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     };
   }
 
-  private egressTiers(record: PricingCatalogRecord): EgressTier[] {
+  private egressTiers(record: PricingCatalogRecord): EgressTierRate[] {
     const value = record.attributes?.egressTiers;
 
     if (!Array.isArray(value)) {
@@ -351,43 +350,41 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
 
     return value
       .map((item) => this.toEgressTier(item))
-      .filter((item): item is EgressTier => item !== undefined)
-      .sort((left, right) => left.startGb - right.startGb);
+      .filter((item): item is EgressTierRate => item !== undefined)
+      .sort((left, right) => left.tierFromGb - right.tierFromGb);
   }
 
-  private toEgressTier(value: unknown): EgressTier | undefined {
+  private toEgressTier(value: unknown): EgressTierRate | undefined {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
       return undefined;
     }
 
     const record = value as Record<string, unknown>;
-    const startGb =
+    const tierFromGb =
+      this.numberValue(record.tierFromGb) ??
       this.numberValue(record.startGb) ??
       this.numberValue(record.startUsageAmount) ??
       this.numberValue(record.startUsageAmountGb);
-    const unitPriceUsd =
+    const tierToGb =
+      this.numberValue(record.tierToGb) ??
+      this.numberValue(record.endGb) ??
+      this.numberValue(record.endUsageAmount) ??
+      this.numberValue(record.endUsageAmountGb);
+    const pricePerGb =
+      this.numberValue(record.pricePerGb) ??
       this.numberValue(record.unitPriceUsd) ??
       this.numberValue(record.pricePerGbUsd) ??
       this.numberValue(record.pricePerUnitUsd);
 
-    if (startGb === undefined || unitPriceUsd === undefined) {
+    if (tierFromGb === undefined || pricePerGb === undefined) {
       return undefined;
     }
 
     return {
-      startGb,
-      unitPriceUsd,
+      tierFromGb,
+      ...(tierToGb !== undefined ? { tierToGb } : {}),
+      pricePerGb,
     };
-  }
-
-  private tieredUsageCost(quantity: number, tiers: EgressTier[]): number {
-    return tiers.reduce((sum, tier, index) => {
-      const nextTier = tiers[index + 1];
-      const upperBound = nextTier?.startGb ?? quantity;
-      const billableGb = Math.max(0, Math.min(quantity, upperBound) - tier.startGb);
-
-      return sum + billableGb * tier.unitPriceUsd;
-    }, 0);
   }
 
   private costComponentForCategory(category: ServiceCategory): CostComponent {

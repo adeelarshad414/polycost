@@ -1,0 +1,12 @@
+{
+  "us-east": { "aws": "us-east-1", "azure": "eastus", "gcp": "us-east1" },
+  "us-central": { "aws": "us-east-2", "azure": "centralus", "gcp": "us-central1" },
+  "us-west": { "aws": "us-west-2", "azure": "westus2", "gcp": "us-west1" },
+  "eu-west": { "aws": "eu-west-1", "azure": "westeurope", "gcp": "europe-west1" },
+  "eu-central": {
+    "aws": "eu-central-1",
+    "azure": "germanywestcentral",
+    "gcp": "europe-west3"
+  },
+  "ap-south": { "aws": "ap-south-1", "azure": "centralindia", "gcp": "asia-south1" }
+}

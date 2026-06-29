@@ -37,6 +37,7 @@ async function validateMigrations() {
     '002_least_privilege_roles.sql',
     '003_seed_service_equivalence_map.sql',
     '004_seed_local_pricing_catalog.sql',
+    '005_backend_architecture_tables.sql',
   ]) {
     const migrationPath = path.join(migrationsDir, migration);
     if (!existsSync(migrationPath)) {
@@ -89,7 +90,8 @@ async function validateMigrations() {
     !result.stdout.includes('001') ||
     !result.stdout.includes('002') ||
     !result.stdout.includes('003') ||
-    !result.stdout.includes('004')
+    !result.stdout.includes('004') ||
+    !result.stdout.includes('005')
   ) {
     fail(`Live schema_migrations output is missing expected versions:\n${result.stdout}`);
   }

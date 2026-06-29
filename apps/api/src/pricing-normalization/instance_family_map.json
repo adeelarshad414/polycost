@@ -1,0 +1,35 @@
+{
+  "aws": {
+    "a": "general-purpose",
+    "c": "compute-optimized",
+    "g": "accelerated-computing",
+    "i": "storage-optimized",
+    "inf": "accelerated-computing",
+    "m": "general-purpose",
+    "p": "accelerated-computing",
+    "r": "memory-optimized",
+    "t": "general-purpose",
+    "x": "memory-optimized"
+  },
+  "azure": {
+    "b": "general-purpose",
+    "d": "general-purpose",
+    "e": "memory-optimized",
+    "f": "compute-optimized",
+    "l": "storage-optimized",
+    "m": "memory-optimized",
+    "n": "accelerated-computing"
+  },
+  "gcp": {
+    "a2": "accelerated-computing",
+    "c2": "compute-optimized",
+    "c3": "compute-optimized",
+    "e2": "general-purpose",
+    "m1": "memory-optimized",
+    "m2": "memory-optimized",
+    "m3": "memory-optimized",
+    "n1": "general-purpose",
+    "n2": "general-purpose",
+    "t2d": "general-purpose"
+  }
+}
