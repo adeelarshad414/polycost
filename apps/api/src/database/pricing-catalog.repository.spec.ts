@@ -215,6 +215,98 @@ describe('PostgresPricingCatalogRepository', () => {
     ]);
   });
 
+  it('upserts normalized compute, storage, and egress cache rows', async () => {
+    const query = jest.fn(async () => ({ rows: [], rowCount: 1 }));
+    const pool: PgPoolLike = {
+      query: query as PgPoolLike['query'],
+      end: jest.fn(async () => undefined),
+    };
+    const repository = new PostgresPricingCatalogRepository(
+      configService(),
+      secretsReader(),
+      () => pool,
+    );
+
+    await expect(
+      repository.upsertNormalizedPricingRecords([
+        {
+          ...record,
+          attributes: {
+            pricingModel: 'on-demand',
+            instanceType: 't3.small',
+            vcpu: 2,
+            memoryGb: 2,
+          },
+        },
+        {
+          provider: 'aws',
+          serviceCategory: 'storage',
+          serviceName: 'Amazon S3',
+          skuId: 'AWS-S3-STANDARD',
+          skuDescription: 'S3 Standard storage',
+          region: 'us-east-1',
+          unit: 'GB-Mo',
+          unitPriceUsd: 0.023,
+          attributes: {
+            storageClass: 'General Purpose',
+          },
+          effectiveDate: '2026-01-01T00:00:00.000Z',
+          fetchedAt: '2026-06-28T00:00:00.000Z',
+        },
+        {
+          provider: 'aws',
+          serviceCategory: 'network',
+          serviceName: 'AWS Data Transfer',
+          skuId: 'AWS-EGRESS',
+          region: 'us-east-1',
+          unit: 'GB',
+          unitPriceUsd: 0.09,
+          effectiveDate: '2026-01-01T00:00:00.000Z',
+          fetchedAt: '2026-06-28T00:00:00.000Z',
+        },
+      ]),
+    ).resolves.toEqual({
+      recordsUpdated: 3,
+      recordsRejected: 0,
+      recordsSkipped: 0,
+    });
+    expect(query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('INSERT INTO provider_skus'),
+      expect.arrayContaining(['aws', 't3.small', 'general-purpose', 2, 2, 'us-east-1']),
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('INSERT INTO storage_pricing'),
+      ['aws', 'us-east-1', 'standard', 0.023, 'USD', '2026-01-01T00:00:00.000Z'],
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining('INSERT INTO egress_tier_rates'),
+      ['aws', 'us-east-1', 0, null, 0.09, '2026-01-01T00:00:00.000Z'],
+    );
+  });
+
+  it('reports unsupported normalized records as skipped without rejecting the run', async () => {
+    const query = jest.fn(async () => ({ rows: [], rowCount: 1 }));
+    const pool: PgPoolLike = {
+      query: query as PgPoolLike['query'],
+      end: jest.fn(async () => undefined),
+    };
+    const repository = new PostgresPricingCatalogRepository(
+      configService(),
+      secretsReader(),
+      () => pool,
+    );
+
+    await expect(repository.upsertNormalizedPricingRecords([minimalRecord])).resolves.toEqual({
+      recordsUpdated: 0,
+      recordsRejected: 0,
+      recordsSkipped: 1,
+    });
+    expect(query).not.toHaveBeenCalled();
+  });
+
   it('records provider ETL outcomes without optional error detail', async () => {
     const query = jest.fn(async () => ({ rows: [], rowCount: 1 }));
     const pool: PgPoolLike = {

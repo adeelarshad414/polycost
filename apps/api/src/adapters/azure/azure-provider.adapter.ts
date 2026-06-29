@@ -138,6 +138,7 @@ export class AzureProviderAdapter extends BaseCloudProviderAdapter {
         armSkuName: item.armSkuName,
         isPrimaryMeterRegion: item.isPrimaryMeterRegion,
         vcpu: parseAzureVcpu(item.skuName),
+        memoryGb: parseAzureMemoryGb(item.armSkuName ?? item.skuName),
       },
       effectiveDate: item.effectiveStartDate,
       fetchedAt,
@@ -161,6 +162,43 @@ function uniqueSkuRecords(records: PricingCatalogRecord[]): PricingCatalogRecord
 function parseAzureVcpu(skuName: string): number | undefined {
   const match = skuName.match(/[A-Z](?<vcpu>\d+)/i);
   return match?.groups?.vcpu ? Number.parseInt(match.groups.vcpu, 10) : undefined;
+}
+
+function parseAzureMemoryGb(skuName: string): number | undefined {
+  const normalized = skuName
+    .toLowerCase()
+    .replace(/^standard[_\s-]?/, '')
+    .replace(/[_\s-]/g, '');
+  const match = normalized.match(/^(?<family>[a-z]+)(?<vcpu>\d+)(?<variant>[a-z]*)v?\d*$/i);
+  const familyPrefix = match?.groups?.family?.[0]?.toLowerCase();
+  const vcpu = match?.groups?.vcpu ? Number.parseInt(match.groups.vcpu, 10) : undefined;
+  const variant = match?.groups?.variant ?? '';
+
+  if (!familyPrefix || !vcpu) {
+    return undefined;
+  }
+
+  switch (familyPrefix) {
+    case 'b':
+      if (vcpu === 1) {
+        return variant.includes('m') ? 2 : 1;
+      }
+      return variant.includes('m') ? vcpu * 4 : vcpu * 2;
+    case 'd':
+      return vcpu * 4;
+    case 'e':
+      return vcpu * 8;
+    case 'f':
+      return vcpu * 2;
+    case 'l':
+      return vcpu * 8;
+    case 'm':
+      return vcpu * 16;
+    case 'n':
+      return vcpu * 7;
+    default:
+      return undefined;
+  }
 }
 
 function azurePricingModel(

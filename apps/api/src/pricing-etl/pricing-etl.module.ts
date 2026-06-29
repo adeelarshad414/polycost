@@ -15,6 +15,7 @@ import {
   PRICING_ETL_QUEUE_NAME,
   PRICING_ETL_RUN_REPOSITORY,
   PRICING_ETL_WORKER_FACTORY,
+  NORMALIZED_PRICING_WRITER,
   PricingEtlScheduler,
   PricingEtlWorkerFactory,
 } from './pricing-etl.scheduler';
@@ -33,17 +34,34 @@ import { PricingEtlService } from './pricing-etl.service';
       useExisting: PostgresPricingCatalogRepository,
     },
     {
+      provide: NORMALIZED_PRICING_WRITER,
+      useExisting: PostgresPricingCatalogRepository,
+    },
+    {
       provide: PRICING_ETL_RUN_REPOSITORY,
       useExisting: PostgresPricingCatalogRepository,
     },
     {
       provide: PricingEtlService,
-      inject: [PRICING_ETL_ADAPTERS, PRICING_CATALOG_WRITER, PRICING_ETL_RUN_REPOSITORY],
+      inject: [
+        PRICING_ETL_ADAPTERS,
+        PRICING_CATALOG_WRITER,
+        PRICING_ETL_RUN_REPOSITORY,
+        NORMALIZED_PRICING_WRITER,
+      ],
       useFactory: (
         adapters: CloudProviderAdapter[],
         catalogRepository: PostgresPricingCatalogRepository,
         runRepository: PostgresPricingCatalogRepository,
-      ) => new PricingEtlService(adapters, catalogRepository, runRepository),
+        normalizedPricingWriter: PostgresPricingCatalogRepository,
+      ) =>
+        new PricingEtlService(
+          adapters,
+          catalogRepository,
+          runRepository,
+          undefined,
+          normalizedPricingWriter,
+        ),
     },
     {
       provide: PRICING_ETL_QUEUE,

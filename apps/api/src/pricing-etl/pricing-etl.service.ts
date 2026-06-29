@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { CloudProviderAdapter } from '../adapters/common/cloud-provider-adapter';
 import {
+  NormalizedPricingWriter,
   PricingCatalogWriter,
   PricingEtlRunRepository,
 } from '../database/pricing-repository.types';
@@ -15,6 +16,7 @@ export class PricingEtlService {
     private readonly catalogWriter: PricingCatalogWriter,
     private readonly runRepository: PricingEtlRunRepository,
     private readonly now: () => Date = () => new Date(),
+    private readonly normalizedPricingWriter?: NormalizedPricingWriter,
   ) {}
 
   async refreshAllProviders(): Promise<PricingEtlSummary> {
@@ -34,17 +36,24 @@ export class PricingEtlService {
 
     try {
       const records = await adapter.refreshPricingCatalog();
-      const writeResult = await this.catalogWriter.upsertPricingRecords(records);
-      const status = writeResult.recordsRejected > 0 ? 'partial' : 'success';
+      const catalogWriteResult = await this.catalogWriter.upsertPricingRecords(records);
+      const normalizedWriteResult = this.normalizedPricingWriter
+        ? await this.normalizedPricingWriter.upsertNormalizedPricingRecords(records)
+        : { recordsUpdated: 0, recordsRejected: 0, recordsSkipped: 0 };
+      const recordsUpdated =
+        catalogWriteResult.recordsUpdated + normalizedWriteResult.recordsUpdated;
+      const recordsRejected =
+        catalogWriteResult.recordsRejected + normalizedWriteResult.recordsRejected;
+      const status = recordsRejected > 0 ? 'partial' : 'success';
       result = {
         provider: adapter.providerId,
         status,
         startedAt,
         completedAt: this.timestamp(),
-        recordsUpdated: writeResult.recordsUpdated,
-        recordsRejected: writeResult.recordsRejected,
+        recordsUpdated,
+        recordsRejected,
         ...(status === 'partial'
-          ? { errorDetail: `${writeResult.recordsRejected} pricing records were rejected` }
+          ? { errorDetail: `${recordsRejected} pricing records were rejected` }
           : {}),
       };
     } catch (error) {

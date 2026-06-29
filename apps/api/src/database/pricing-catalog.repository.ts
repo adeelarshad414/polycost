@@ -8,8 +8,10 @@ import {
   ProviderId,
 } from '../adapters/common/cloud-provider-adapter';
 import { AppConfig } from '../config/config.schema';
+import { normalizePricingCatalogRecords } from '../pricing-normalization/normalized-pricing-records';
 import { SecretsReader } from '../secrets/secrets.service';
 import {
+  NormalizedPricingWriter,
   PricingCatalogWriteResult,
   PricingEtlRunRecord,
   PricingEtlRunRepository,
@@ -54,7 +56,12 @@ const defaultPgPoolFactory: PgPoolFactory = (config) => new Pool(config);
 
 @Injectable()
 export class PostgresPricingCatalogRepository
-  implements OnModuleDestroy, PricingCatalogReader, PricingCatalogWriter, PricingEtlRunRepository
+  implements
+    OnModuleDestroy,
+    PricingCatalogReader,
+    PricingCatalogWriter,
+    NormalizedPricingWriter,
+    PricingEtlRunRepository
 {
   private pool?: PgPoolLike;
 
@@ -166,6 +173,153 @@ export class PostgresPricingCatalogRepository
     return {
       recordsUpdated,
       recordsRejected,
+    };
+  }
+
+  async upsertNormalizedPricingRecords(
+    records: PricingCatalogRecord[],
+  ): Promise<PricingCatalogWriteResult> {
+    const normalized = normalizePricingCatalogRecords(records);
+    const pool = await this.getPool();
+    let recordsUpdated = 0;
+    let recordsRejected = 0;
+
+    for (const record of normalized.compute) {
+      try {
+        const result = await pool.query(
+          `
+            WITH upserted_sku AS (
+              INSERT INTO provider_skus (
+                provider,
+                provider_sku_id,
+                family,
+                vcpu,
+                memory_gb,
+                region,
+                os,
+                raw_payload,
+                last_synced_at
+              )
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
+              ON CONFLICT (provider, provider_sku_id, region)
+              DO UPDATE SET
+                family = EXCLUDED.family,
+                vcpu = EXCLUDED.vcpu,
+                memory_gb = EXCLUDED.memory_gb,
+                os = EXCLUDED.os,
+                raw_payload = EXCLUDED.raw_payload,
+                last_synced_at = EXCLUDED.last_synced_at
+              RETURNING id
+            )
+            INSERT INTO pricing_snapshots (
+              sku_id,
+              term,
+              price_per_hour,
+              currency,
+              effective_date
+            )
+            SELECT id, $10, $11, $12, $13
+            FROM upserted_sku
+            ON CONFLICT (sku_id, term, effective_date)
+            DO UPDATE SET
+              price_per_hour = EXCLUDED.price_per_hour,
+              currency = EXCLUDED.currency
+          `,
+          [
+            record.provider,
+            record.providerSkuId,
+            record.family,
+            record.vcpu,
+            record.memoryGb,
+            record.region,
+            record.os,
+            JSON.stringify(record.rawPayload),
+            record.lastSyncedAt,
+            record.term,
+            record.pricePerHour,
+            record.currency,
+            record.effectiveDate,
+          ],
+        );
+
+        recordsUpdated += result.rowCount ?? 0;
+      } catch {
+        recordsRejected += 1;
+      }
+    }
+
+    for (const record of normalized.storage) {
+      try {
+        const result = await pool.query(
+          `
+            INSERT INTO storage_pricing (
+              provider,
+              region,
+              tier,
+              price_per_gb_month,
+              currency,
+              effective_date
+            )
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (provider, region, tier, effective_date)
+            DO UPDATE SET
+              price_per_gb_month = EXCLUDED.price_per_gb_month,
+              currency = EXCLUDED.currency
+          `,
+          [
+            record.provider,
+            record.region,
+            record.tier,
+            record.pricePerGbMonth,
+            record.currency,
+            record.effectiveDate,
+          ],
+        );
+
+        recordsUpdated += result.rowCount ?? 0;
+      } catch {
+        recordsRejected += 1;
+      }
+    }
+
+    for (const record of normalized.egress) {
+      try {
+        const result = await pool.query(
+          `
+            INSERT INTO egress_tier_rates (
+              provider,
+              region,
+              tier_from_gb,
+              tier_to_gb,
+              price_per_gb,
+              effective_date
+            )
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (provider, region, tier_from_gb, effective_date)
+            DO UPDATE SET
+              tier_to_gb = EXCLUDED.tier_to_gb,
+              price_per_gb = EXCLUDED.price_per_gb
+          `,
+          [
+            record.provider,
+            record.region,
+            record.tierFromGb,
+            record.tierToGb ?? null,
+            record.pricePerGb,
+            record.effectiveDate,
+          ],
+        );
+
+        recordsUpdated += result.rowCount ?? 0;
+      } catch {
+        recordsRejected += 1;
+      }
+    }
+
+    return {
+      recordsUpdated,
+      recordsRejected,
+      recordsSkipped: normalized.skipped,
     };
   }
 

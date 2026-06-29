@@ -47,6 +47,8 @@ describe('AzureProviderAdapter', () => {
         unitPriceUsd: 0.0416,
         attributes: expect.objectContaining({
           pricingModel: 'on-demand',
+          vcpu: 2,
+          memoryGb: 8,
         }),
       }),
     ]);

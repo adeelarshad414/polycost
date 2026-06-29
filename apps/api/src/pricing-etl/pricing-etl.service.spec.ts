@@ -3,6 +3,7 @@ import {
   PricingCatalogRecord,
 } from '../adapters/common/cloud-provider-adapter';
 import {
+  NormalizedPricingWriter,
   PricingCatalogWriter,
   PricingEtlRunRepository,
 } from '../database/pricing-repository.types';
@@ -92,6 +93,51 @@ describe('PricingEtlService', () => {
         recordsUpdated: 1,
       }),
     );
+  });
+
+  it('persists normalized pricing rows during each provider refresh', async () => {
+    const writer: PricingCatalogWriter = {
+      upsertPricingRecords: jest.fn(async (records) => ({
+        recordsUpdated: records.length,
+        recordsRejected: 0,
+      })),
+    };
+    const normalizedWriter: NormalizedPricingWriter = {
+      upsertNormalizedPricingRecords: jest.fn(async () => ({
+        recordsUpdated: 2,
+        recordsRejected: 0,
+        recordsSkipped: 1,
+      })),
+    };
+    const runRepository: PricingEtlRunRepository = {
+      recordProviderRun: jest.fn(async () => undefined),
+    };
+    const service = new PricingEtlService(
+      [
+        adapter(
+          'aws',
+          jest.fn(async () => [createCatalogRecord('aws', 'AWS-1')]),
+        ),
+      ],
+      writer,
+      runRepository,
+      fixedClock(),
+      normalizedWriter,
+    );
+
+    const summary = await service.refreshAllProviders();
+
+    expect(summary.providerResults[0]).toEqual(
+      expect.objectContaining({
+        provider: 'aws',
+        status: 'success',
+        recordsUpdated: 3,
+        recordsRejected: 0,
+      }),
+    );
+    expect(normalizedWriter.upsertNormalizedPricingRecords).toHaveBeenCalledWith([
+      createCatalogRecord('aws', 'AWS-1'),
+    ]);
   });
 
   it('returns a partial summary when one provider fails and logs all outcomes', async () => {

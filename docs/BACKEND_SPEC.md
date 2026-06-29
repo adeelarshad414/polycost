@@ -81,12 +81,12 @@ Unmapped regions or families must fail clearly or be marked unsupported. Do not 
 
 ## 5. Scheduled Jobs
 
-| Job                       | Frequency        | Responsibility                                                                |
-| ------------------------- | ---------------- | ----------------------------------------------------------------------------- |
-| `refresh-pricing-catalog` | Daily            | Pull provider pricing data through adapters and write cached catalog data.    |
-| `currency-sync`           | Hourly           | Pull exchange rates using USD as the default base and write `exchange_rates`. |
-| `alert-evaluator`         | Every 15 minutes | Evaluate modeled workload cost against `budgets` and write `alerts`.          |
-| `share-link-cleanup`      | Daily            | Revoke expired share links by setting `revoked_at`.                           |
+| Job                       | Frequency        | Responsibility                                                                                                                   |
+| ------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `refresh-pricing-catalog` | Daily            | Pull provider pricing data through adapters, write cached catalog data, and derive normalized compute/storage/egress cache rows. |
+| `currency-sync`           | Hourly           | Pull exchange rates using USD as the default base and write `exchange_rates`.                                                    |
+| `alert-evaluator`         | Every 15 minutes | Evaluate modeled workload cost against `budgets` and write `alerts`.                                                             |
+| `share-link-cleanup`      | Daily            | Revoke expired share links by setting `revoked_at`.                                                                              |
 
 Use the scheduler already present in the backend. The current implementation uses BullMQ backed by Redis.
 
@@ -99,7 +99,18 @@ AWS and Azure pricing syncs should use public pricing APIs:
 - AWS Bulk Price List API / Price List data
 - Azure Retail Prices API
 
-The current GCP Cloud Billing Catalog adapter uses a Vault-provided access token because Google Cloud Billing Catalog access can require authenticated API access. This is a documented deviation from the earlier draft statement that all provider catalog calls are unauthenticated. The implementation must not call GCP at request time.
+The current AWS adapter uses public AWS offer files. AWS's filtered `GetProducts`
+API requires authentication, so narrow real AWS refreshes need either a streaming
+public bulk parser or explicit authenticated API support; do not fetch large AWS
+offer files at request time.
+
+The current GCP Cloud Billing Catalog adapter uses a Vault-provided access token
+because Google Cloud Billing Catalog access can require authenticated API access. This
+is a documented deviation from the earlier draft statement that all provider catalog
+calls are unauthenticated. The implementation must not call GCP at request time.
+
+Normalized ETL writes only rows with trustworthy shape and price data. Unsupported
+catalog rows are counted as skipped, not silently coerced into comparable pricing.
 
 ## 7. Request-Time API Scope
 

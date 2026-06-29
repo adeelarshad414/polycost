@@ -5,10 +5,17 @@ export type PricingEtlProviderStatus = 'success' | 'partial' | 'failed';
 export interface PricingCatalogWriteResult {
   recordsUpdated: number;
   recordsRejected: number;
+  recordsSkipped?: number;
 }
 
 export interface PricingCatalogWriter {
   upsertPricingRecords(records: PricingCatalogRecord[]): Promise<PricingCatalogWriteResult>;
+}
+
+export interface NormalizedPricingWriter {
+  upsertNormalizedPricingRecords(
+    records: PricingCatalogRecord[],
+  ): Promise<PricingCatalogWriteResult>;
 }
 
 export interface PricingEtlRunRecord {
