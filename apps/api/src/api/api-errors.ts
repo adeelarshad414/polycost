@@ -56,5 +56,8 @@ export interface PricingStatusResponse {
     providerId: ProviderId;
     lastSuccessfulRun?: string;
     status: 'success' | 'partial' | 'failed';
+    recordsUpdated: number;
+    recordsRejected: number;
+    recordsSkipped: number;
   }>;
 }

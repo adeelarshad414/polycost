@@ -334,9 +334,11 @@ export class PostgresPricingCatalogRepository
           completed_at,
           status,
           records_updated,
+          records_rejected,
+          records_skipped,
           error_detail
         )
-        VALUES ($1, $2, $3, $4, $5, $6)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       `,
       [
         run.provider,
@@ -344,6 +346,8 @@ export class PostgresPricingCatalogRepository
         run.completedAt,
         run.status,
         run.recordsUpdated,
+        run.recordsRejected,
+        run.recordsSkipped,
         run.errorDetail ?? null,
       ],
     );

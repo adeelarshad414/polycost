@@ -39,6 +39,7 @@ async function validateMigrations() {
     '004_seed_local_pricing_catalog.sql',
     '005_backend_architecture_tables.sql',
     '006_cost_management_jobs.sql',
+    '007_pricing_etl_run_counters.sql',
   ]) {
     const migrationPath = path.join(migrationsDir, migration);
     if (!existsSync(migrationPath)) {
@@ -93,7 +94,8 @@ async function validateMigrations() {
     !result.stdout.includes('003') ||
     !result.stdout.includes('004') ||
     !result.stdout.includes('005') ||
-    !result.stdout.includes('006')
+    !result.stdout.includes('006') ||
+    !result.stdout.includes('007')
   ) {
     fail(`Live schema_migrations output is missing expected versions:\n${result.stdout}`);
   }

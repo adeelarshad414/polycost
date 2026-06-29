@@ -144,6 +144,9 @@ export interface PricingStatusResponse {
     providerId: ProviderId;
     status: 'success' | 'partial' | 'failed';
     lastSuccessfulRun?: string;
+    recordsUpdated: number;
+    recordsRejected: number;
+    recordsSkipped: number;
   }>;
 }
 

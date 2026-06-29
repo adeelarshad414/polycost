@@ -44,6 +44,8 @@ export class PricingEtlService {
         catalogWriteResult.recordsUpdated + normalizedWriteResult.recordsUpdated;
       const recordsRejected =
         catalogWriteResult.recordsRejected + normalizedWriteResult.recordsRejected;
+      const recordsSkipped =
+        (catalogWriteResult.recordsSkipped ?? 0) + (normalizedWriteResult.recordsSkipped ?? 0);
       const status = recordsRejected > 0 ? 'partial' : 'success';
       result = {
         provider: adapter.providerId,
@@ -52,6 +54,7 @@ export class PricingEtlService {
         completedAt: this.timestamp(),
         recordsUpdated,
         recordsRejected,
+        recordsSkipped,
         ...(status === 'partial'
           ? { errorDetail: `${recordsRejected} pricing records were rejected` }
           : {}),
@@ -64,6 +67,7 @@ export class PricingEtlService {
         completedAt: this.timestamp(),
         recordsUpdated: 0,
         recordsRejected: 0,
+        recordsSkipped: 0,
         errorDetail: safeErrorMessage(error),
       };
     }
@@ -74,6 +78,8 @@ export class PricingEtlService {
       completedAt: result.completedAt,
       status: result.status,
       recordsUpdated: result.recordsUpdated,
+      recordsRejected: result.recordsRejected,
+      recordsSkipped: result.recordsSkipped,
       errorDetail: result.errorDetail,
     });
 

@@ -62,6 +62,9 @@ interface PricingStatusRow {
   provider: ProviderId;
   status: 'success' | 'partial' | 'failed';
   last_successful_run: Date | null;
+  records_updated: number | null;
+  records_rejected: number | null;
+  records_skipped: number | null;
 }
 
 interface WorkloadRow {
@@ -240,7 +243,10 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         WITH latest AS (
           SELECT DISTINCT ON (provider)
                  provider,
-                 status
+                 status,
+                 records_updated,
+                 records_rejected,
+                 records_skipped
           FROM pricing_etl_runs
           ORDER BY provider, started_at DESC
         ),
@@ -253,6 +259,9 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         )
         SELECT latest.provider,
                latest.status,
+               latest.records_updated,
+               latest.records_rejected,
+               latest.records_skipped,
                successful.last_successful_run
         FROM latest
         LEFT JOIN successful
@@ -268,6 +277,9 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         return {
           providerId,
           status: row?.status ?? 'failed',
+          recordsUpdated: row?.records_updated ?? 0,
+          recordsRejected: row?.records_rejected ?? 0,
+          recordsSkipped: row?.records_skipped ?? 0,
           ...(row?.last_successful_run
             ? { lastSuccessfulRun: row.last_successful_run.toISOString() }
             : {}),

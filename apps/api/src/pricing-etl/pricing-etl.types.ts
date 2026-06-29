@@ -13,6 +13,7 @@ export interface PricingEtlProviderResult {
   completedAt: string;
   recordsUpdated: number;
   recordsRejected: number;
+  recordsSkipped: number;
   errorDetail?: string;
 }
 

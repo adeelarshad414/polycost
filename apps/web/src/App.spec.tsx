@@ -755,9 +755,27 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
   };
   const pricingStatus: PricingStatusResponse = {
     providers: [
-      { providerId: 'aws', status: 'success' },
-      { providerId: 'azure', status: 'success' },
-      { providerId: 'gcp', status: 'success' },
+      {
+        providerId: 'aws',
+        status: 'success',
+        recordsUpdated: 0,
+        recordsRejected: 0,
+        recordsSkipped: 0,
+      },
+      {
+        providerId: 'azure',
+        status: 'success',
+        recordsUpdated: 0,
+        recordsRejected: 0,
+        recordsSkipped: 0,
+      },
+      {
+        providerId: 'gcp',
+        status: 'success',
+        recordsUpdated: 0,
+        recordsRejected: 0,
+        recordsSkipped: 0,
+      },
     ],
   };
   const backendHealth: BackendHealthResponse = {

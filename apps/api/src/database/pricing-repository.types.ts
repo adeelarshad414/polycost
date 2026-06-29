@@ -24,6 +24,8 @@ export interface PricingEtlRunRecord {
   completedAt: string;
   status: PricingEtlProviderStatus;
   recordsUpdated: number;
+  recordsRejected: number;
+  recordsSkipped: number;
   errorDetail?: string;
 }
 

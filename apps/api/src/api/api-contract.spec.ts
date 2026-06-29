@@ -323,6 +323,9 @@ describe('API contracts', () => {
         {
           providerId: 'aws',
           status: 'success',
+          recordsUpdated: 12,
+          recordsRejected: 0,
+          recordsSkipped: 3,
           lastSuccessfulRun: '2026-06-29T00:00:00.000Z',
         },
       ],
@@ -716,6 +719,9 @@ function comparisonApplicationService() {
         {
           providerId: 'aws',
           status: 'success',
+          recordsUpdated: 12,
+          recordsRejected: 0,
+          recordsSkipped: 3,
           lastSuccessfulRun: '2026-06-29T00:00:00.000Z',
         },
       ],

@@ -202,6 +202,8 @@ describe('PostgresPricingCatalogRepository', () => {
       completedAt: '2026-06-28T00:01:00.000Z',
       status: 'failed',
       recordsUpdated: 0,
+      recordsRejected: 1,
+      recordsSkipped: 4,
       errorDetail: 'provider unavailable',
     });
 
@@ -211,6 +213,8 @@ describe('PostgresPricingCatalogRepository', () => {
       '2026-06-28T00:01:00.000Z',
       'failed',
       0,
+      1,
+      4,
       'provider unavailable',
     ]);
   });
@@ -325,6 +329,8 @@ describe('PostgresPricingCatalogRepository', () => {
       completedAt: '2026-06-28T00:01:00.000Z',
       status: 'success',
       recordsUpdated: 3,
+      recordsRejected: 0,
+      recordsSkipped: 2,
     });
 
     expect(query).toHaveBeenCalledWith(expect.any(String), [
@@ -333,6 +339,8 @@ describe('PostgresPricingCatalogRepository', () => {
       '2026-06-28T00:01:00.000Z',
       'success',
       3,
+      0,
+      2,
       null,
     ]);
   });

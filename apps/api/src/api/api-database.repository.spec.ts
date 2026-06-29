@@ -114,11 +114,17 @@ describe('ApiDatabaseRepository', () => {
           {
             provider: 'aws',
             status: 'success',
+            records_updated: 12,
+            records_rejected: 1,
+            records_skipped: 7,
             last_successful_run: new Date('2026-06-29T00:00:00.000Z'),
           },
           {
             provider: 'azure',
             status: 'failed',
+            records_updated: 0,
+            records_rejected: 3,
+            records_skipped: 0,
             last_successful_run: null,
           },
         ],
@@ -131,15 +137,24 @@ describe('ApiDatabaseRepository', () => {
         {
           providerId: 'aws',
           status: 'success',
+          recordsUpdated: 12,
+          recordsRejected: 1,
+          recordsSkipped: 7,
           lastSuccessfulRun: '2026-06-29T00:00:00.000Z',
         },
         {
           providerId: 'azure',
           status: 'failed',
+          recordsUpdated: 0,
+          recordsRejected: 3,
+          recordsSkipped: 0,
         },
         {
           providerId: 'gcp',
           status: 'failed',
+          recordsUpdated: 0,
+          recordsRejected: 0,
+          recordsSkipped: 0,
         },
       ],
     });

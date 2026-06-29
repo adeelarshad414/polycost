@@ -58,6 +58,7 @@ The V1 normalized pricing cache is:
 - `pricing_snapshots`: on-demand and commitment-term hourly prices for normalized SKUs.
 - `storage_pricing`: flat per-GB-month storage prices by provider, region, and normalized tier.
 - `egress_tier_rates`: tiered public-internet egress rates by provider, region, and effective date.
+- `pricing_etl_runs`: provider run history with status plus updated, rejected, and skipped row counters.
 - `exchange_rates`: cached exchange rates by base/quote currency and fetch timestamp.
 - `workloads`: persisted normalized workload inputs for comparison, sharing, and alerting.
 - `budgets`: one budget threshold per workload.
@@ -111,6 +112,9 @@ calls are unauthenticated. The implementation must not call GCP at request time.
 
 Normalized ETL writes only rows with trustworthy shape and price data. Unsupported
 catalog rows are counted as skipped, not silently coerced into comparable pricing.
+The admin pricing status endpoint exposes updated, rejected, and skipped counters
+from the latest run so operators can distinguish catalog sync failures from
+unsupported SKU coverage.
 
 ## 7. Request-Time API Scope
 

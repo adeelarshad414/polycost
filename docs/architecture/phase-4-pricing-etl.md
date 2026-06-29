@@ -40,7 +40,8 @@ persistence, and ETL run logging:
   `pricing_snapshots`, `storage_pricing`, and `egress_tier_rates`. Unsupported records
   are reported as skipped instead of being treated as failed writes.
 - `recordProviderRun()` inserts success, partial, or failed provider outcomes into
-  `pricing_etl_runs`.
+  `pricing_etl_runs`, including updated, rejected, and skipped row counters for
+  operator visibility.
 
 The repository obtains ETL database credentials from Vault through `SecretsReader` at
 secret path `polycost/db` using keys `etl_username` and `etl_password`. No direct
@@ -48,9 +49,9 @@ secret path `polycost/db` using keys `etl_username` and `etl_password`. No direc
 
 ## Verification Notes
 
-- Unit tests cover all-success, normalized writer rollup, partial provider failure,
-  all-failed, row-level partial rejection, non-`Error` rejection, scheduler
-  configuration, and repository SQL parameter binding.
+- Unit tests cover all-success, normalized writer rollup, skipped-row accounting,
+  partial provider failure, all-failed, row-level partial rejection, non-`Error`
+  rejection, scheduler configuration, and repository SQL parameter binding.
 - Normalization tests cover direct AWS/Azure compute rows, GCP component SKU synthesis,
   storage tier rows, egress tier rows, and local seed cache rows.
 - Clean Docker startup verifies Nest module initialization against Vault, Postgres,

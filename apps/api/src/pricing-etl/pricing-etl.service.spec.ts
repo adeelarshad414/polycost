@@ -133,6 +133,15 @@ describe('PricingEtlService', () => {
         status: 'success',
         recordsUpdated: 3,
         recordsRejected: 0,
+        recordsSkipped: 1,
+      }),
+    );
+    expect(runRepository.recordProviderRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'aws',
+        recordsUpdated: 3,
+        recordsRejected: 0,
+        recordsSkipped: 1,
       }),
     );
     expect(normalizedWriter.upsertNormalizedPricingRecords).toHaveBeenCalledWith([

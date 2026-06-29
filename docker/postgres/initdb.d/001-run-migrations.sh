@@ -36,3 +36,18 @@ psql \
   --username "$POSTGRES_USER" \
   --dbname "$POSTGRES_DB" \
   --file /polycost-migrations/004_seed_local_pricing_catalog.sql
+
+psql \
+  --username "$POSTGRES_USER" \
+  --dbname "$POSTGRES_DB" \
+  --file /polycost-migrations/005_backend_architecture_tables.sql
+
+psql \
+  --username "$POSTGRES_USER" \
+  --dbname "$POSTGRES_DB" \
+  --file /polycost-migrations/006_cost_management_jobs.sql
+
+psql \
+  --username "$POSTGRES_USER" \
+  --dbname "$POSTGRES_DB" \
+  --file /polycost-migrations/007_pricing_etl_run_counters.sql
