@@ -127,6 +127,73 @@ describe('App', () => {
     }
   });
 
+  it('shows loading spinners while parse, compare, refresh, and export actions are pending', async () => {
+    const parsed: ParsedNwsDraft = {
+      draftNws: buildNwsFromForm(defaultWorkloadForm),
+      parserConfidence: 'medium',
+      fieldsRequiringReview: [],
+    };
+    const parseDeferred = deferred<ParsedNwsDraft>();
+    const validateDeferred = deferred<{ valid: true }>();
+    const refreshDeferred = deferred<ComparisonResult>();
+    const exportDeferred = deferred<Blob>();
+    const client = clientMock({
+      parseWorkload: jest.fn(() => parseDeferred.promise),
+      validateWorkload: jest.fn(() => validateDeferred.promise),
+      refreshLiveComparison: jest.fn(() => refreshDeferred.promise),
+      exportComparison: jest.fn(() => exportDeferred.promise),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    try {
+      await click(buttonByText(container, 'Parse'));
+
+      expect(buttonByText(container, 'Parsing').querySelector('.animate-spin')).toBeInstanceOf(
+        SVGElement,
+      );
+
+      parseDeferred.resolve(parsed);
+      await act(async () => {
+        await parseDeferred.promise;
+      });
+
+      await click(buttonByText(container, 'Compare'));
+
+      expect(buttonByText(container, 'Comparing').querySelector('.animate-spin')).toBeInstanceOf(
+        SVGElement,
+      );
+
+      validateDeferred.resolve({ valid: true });
+      await act(async () => {
+        await validateDeferred.promise;
+      });
+
+      await click(buttonByText(container, 'Refresh live'));
+
+      expect(buttonByText(container, 'Refresh live').querySelector('.animate-spin')).toBeInstanceOf(
+        SVGElement,
+      );
+
+      refreshDeferred.resolve(comparisonResult);
+      await act(async () => {
+        await refreshDeferred.promise;
+      });
+
+      await click(buttonByText(container, 'PDF'));
+
+      expect(buttonByText(container, 'PDF').querySelector('.animate-spin')).toBeInstanceOf(
+        SVGElement,
+      );
+
+      exportDeferred.resolve(new Blob(['report']));
+      await act(async () => {
+        await exportDeferred.promise;
+      });
+    } finally {
+      unmount();
+    }
+  });
+
   it('supports form edits, theme changes, interval changes, refresh, and export', async () => {
     const client = clientMock();
     const { container, unmount } = render(<App client={client} />);
@@ -538,6 +605,21 @@ function heatmapRows(container: HTMLElement): string[] {
 
 function text(container: HTMLElement): string {
   return container.textContent ?? '';
+}
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+
+  return { promise, resolve, reject };
 }
 
 function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {

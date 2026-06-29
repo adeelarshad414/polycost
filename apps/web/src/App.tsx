@@ -65,6 +65,7 @@ export function App({ client = polyCostClient }: AppProps) {
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
   const [interval, setInterval] = useState<IntervalKey>('monthly');
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
+  const [exportingFormat, setExportingFormat] = useState<ReportFormat | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -162,6 +163,7 @@ export function App({ client = polyCostClient }: AppProps) {
     setError(null);
     setNotice(null);
     setBusyAction('export');
+    setExportingFormat(format);
 
     try {
       const blob = await client.exportComparison(comparison.comparisonId, format);
@@ -171,6 +173,7 @@ export function App({ client = polyCostClient }: AppProps) {
       setError(formatApiError(exportError));
     } finally {
       setBusyAction(null);
+      setExportingFormat(null);
     }
   }
 
@@ -229,7 +232,7 @@ export function App({ client = polyCostClient }: AppProps) {
               onClick={() => void handleCompare()}
               disabled={busyAction !== null}
             >
-              <CompareIcon />
+              {busyAction === 'compare' ? <LoadingSpinner /> : <CompareIcon />}
               {compareButtonLabel(inputMode, busyAction)}
             </button>
             <button
@@ -238,13 +241,14 @@ export function App({ client = polyCostClient }: AppProps) {
               onClick={handleRefreshLive}
               disabled={!comparison || busyAction !== null}
             >
-              <RefreshIcon />
+              {busyAction === 'refresh' ? <LoadingSpinner /> : <RefreshIcon />}
               Refresh live
             </button>
           </div>
 
           <ExportBar
             disabled={!comparison || busyAction !== null}
+            exportingFormat={exportingFormat}
             onExport={(format) => void handleExport(format)}
           />
 
@@ -367,7 +371,7 @@ function DescribePanel({
           onClick={onParse}
           disabled={isParsing}
         >
-          <ParseIcon />
+          {isParsing ? <LoadingSpinner /> : <ParseIcon />}
           {isParsing ? 'Parsing' : 'Parse'}
         </button>
         <button type="button" className="pc-button pc-button-secondary" onClick={onUseSample}>
@@ -1095,9 +1099,11 @@ function RequirementSummary({ form }: { form: WorkloadFormState }) {
 
 function ExportBar({
   disabled,
+  exportingFormat,
   onExport,
 }: {
   disabled: boolean;
+  exportingFormat: ReportFormat | null;
   onExport: (format: ReportFormat) => void;
 }) {
   return (
@@ -1110,7 +1116,7 @@ function ExportBar({
           disabled={disabled}
           onClick={() => onExport(format)}
         >
-          <DownloadIcon />
+          {exportingFormat === format ? <LoadingSpinner /> : <DownloadIcon />}
           {format === 'xlsx' ? 'Excel' : format.toUpperCase()}
         </button>
       ))}
@@ -1845,6 +1851,15 @@ function DownloadIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon">
       <path d="M12 4v10M8 10l4 4 4-4M5 20h14" />
+    </svg>
+  );
+}
+
+function LoadingSpinner() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon animate-spin">
+      <circle cx="12" cy="12" r="8" />
+      <path d="M20 12a8 8 0 0 0-8-8" />
     </svg>
   );
 }

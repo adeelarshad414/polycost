@@ -1060,6 +1060,16 @@ select:disabled {
   stroke-linejoin: round;
 }
 
+.animate-spin {
+  animation: pc-spin 0.85s linear infinite;
+}
+
+@keyframes pc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .segment-icon {
   width: 16px;
   height: 16px;
@@ -2221,6 +2231,10 @@ select:disabled {
 
   .scroll-progress-bar {
     transition: none;
+  }
+
+  .animate-spin {
+    animation: none;
   }
 }
 
