@@ -23,10 +23,12 @@ import {
 import { AdapterPricingError } from './adapter-errors';
 
 const HOURS_PER_MONTH = 730;
-const COMMITMENT_PRICING_MODELS: PricingModelKey[] = ['reserved-1yr', 'reserved-3yr'];
+const CATALOG_COMMITMENT_PRICING_MODELS: PricingModelKey[] = ['reserved-1yr', 'reserved-3yr'];
+const ESTIMATED_COMPUTE_PRICING_MODELS: PricingModelKey[] = ['spot', 'savings-plan'];
 const PRICING_MODEL_UNAVAILABLE = 'Not available for this configuration.';
 
 interface CostCalculation {
+  hourlyCostUsd: number;
   monthlyCostUsd: number;
   pricingBasis: 'flat' | 'tiered';
 }
@@ -127,10 +129,17 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     const baseMonthlyCostUsd = this.roundCurrency(
       lineItems.reduce((sum, item) => sum + item.baseMonthlyCostUsd, 0),
     );
+    const baseHourlyCostUsd = this.roundCurrency(
+      lineItems.reduce(
+        (sum, item) => sum + (item.baseHourlyCostUsd ?? item.baseMonthlyCostUsd / HOURS_PER_MONTH),
+        0,
+      ),
+    );
 
     return {
       providerId: this.providerId,
       lineItems,
+      baseHourlyCostUsd,
       baseMonthlyCostUsd,
     };
   }
@@ -241,17 +250,19 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       {
         model: 'on-demand',
         available: true,
-        monthlyCostUsd: this.monthlyCost(onDemandRecord, quantity).monthlyCostUsd,
+        ...this.pricingModelMetadata('on-demand', onDemandRecord),
+        ...this.pricingModelCost(onDemandRecord, quantity),
       },
     ];
 
-    for (const pricingModel of COMMITMENT_PRICING_MODELS) {
+    for (const pricingModel of CATALOG_COMMITMENT_PRICING_MODELS) {
       const record = await this.selectOptionalComputeRecord(region, vcpu, memoryGb, pricingModel);
 
       if (!record) {
         models.push({
           model: pricingModel,
           available: false,
+          ...this.pricingModelMetadata(pricingModel, onDemandRecord),
           unavailableReason: PRICING_MODEL_UNAVAILABLE,
         });
         continue;
@@ -260,8 +271,13 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       models.push({
         model: pricingModel,
         available: true,
-        monthlyCostUsd: this.monthlyCost(record, quantity).monthlyCostUsd,
+        ...this.pricingModelMetadata(pricingModel, record),
+        ...this.pricingModelCost(record, quantity),
       });
+    }
+
+    for (const pricingModel of ESTIMATED_COMPUTE_PRICING_MODELS) {
+      models.push(this.estimatedComputePricingModel(pricingModel, onDemandRecord, quantity));
     }
 
     return models;
@@ -333,6 +349,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       costComponent: options.costComponent ?? this.costComponentForCategory(category),
       description: `${descriptionPrefix}: ${record.serviceName}`,
       isApproximate: record.attributes?.isApproximate === true,
+      baseHourlyCostUsd: cost.hourlyCostUsd,
       baseMonthlyCostUsd: cost.monthlyCostUsd,
       skuId: record.skuId,
       region: record.region,
@@ -347,18 +364,122 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     const tiers = record.serviceCategory === 'network' ? this.egressTiers(record) : [];
 
     if (tiers.length > 0) {
+      const monthlyCostUsd = this.roundCurrency(calculateEgressCost(tiers, quantity));
+
       return {
-        monthlyCostUsd: this.roundCurrency(calculateEgressCost(tiers, quantity)),
+        hourlyCostUsd: this.roundCurrency(monthlyCostUsd / HOURS_PER_MONTH),
+        monthlyCostUsd,
         pricingBasis: 'tiered',
       };
     }
 
+    const monthlyCostUsd = this.roundCurrency(
+      this.monthlyQuantity(record.unit, quantity) * record.unitPriceUsd,
+    );
+
     return {
-      monthlyCostUsd: this.roundCurrency(
-        this.monthlyQuantity(record.unit, quantity) * record.unitPriceUsd,
+      hourlyCostUsd: this.roundCurrency(
+        this.hourlyQuantity(record.unit, quantity) * record.unitPriceUsd,
       ),
+      monthlyCostUsd,
       pricingBasis: 'flat',
     };
+  }
+
+  private pricingModelCost(
+    record: PricingCatalogRecord,
+    quantity: number,
+  ): Pick<PricingModelCost, 'hourlyCostUsd' | 'monthlyCostUsd'> {
+    const cost = this.monthlyCost(record, quantity);
+
+    return {
+      hourlyCostUsd: cost.hourlyCostUsd,
+      monthlyCostUsd: cost.monthlyCostUsd,
+    };
+  }
+
+  private estimatedComputePricingModel(
+    pricingModel: PricingModelKey,
+    onDemandRecord: PricingCatalogRecord,
+    quantity: number,
+  ): PricingModelCost {
+    const onDemandCost = this.monthlyCost(onDemandRecord, quantity);
+    const factor = this.estimatedDiscountFactor(pricingModel);
+    const monthlyCostUsd = this.roundCurrency(onDemandCost.monthlyCostUsd * factor);
+    const hourlyCostUsd = this.roundCurrency(monthlyCostUsd / HOURS_PER_MONTH);
+
+    return {
+      model: pricingModel,
+      available: true,
+      ...this.pricingModelMetadata(pricingModel, onDemandRecord),
+      source: 'modeled-estimate',
+      estimated: true,
+      hourlyCostUsd,
+      monthlyCostUsd,
+      savingsPercentVsOnDemand: this.savingsPercent(monthlyCostUsd, onDemandCost.monthlyCostUsd),
+    };
+  }
+
+  private pricingModelMetadata(
+    pricingModel: PricingModelKey,
+    record: PricingCatalogRecord,
+  ): Omit<PricingModelCost, 'model' | 'available' | 'monthlyCostUsd' | 'hourlyCostUsd'> {
+    const metadata = providerPricingModelMetadata(this.providerId, pricingModel);
+
+    return {
+      displayName: metadata.displayName,
+      providerTerm: metadata.providerTerm,
+      source: 'catalog',
+      estimated: false,
+      volatility: metadata.volatility,
+      ...(metadata.commitmentTermMonths
+        ? { commitmentTermMonths: metadata.commitmentTermMonths }
+        : {}),
+      ...(typeof record.attributes?.upfrontOption === 'string'
+        ? { upfrontOption: normalizeUpfrontOption(record.attributes.upfrontOption) }
+        : {}),
+      lastFetchedAt: record.fetchedAt,
+      caveat: metadata.caveat,
+    };
+  }
+
+  private estimatedDiscountFactor(pricingModel: PricingModelKey): number {
+    if (pricingModel === 'spot') {
+      switch (this.providerId) {
+        case 'aws':
+          return 0.35;
+        case 'azure':
+          return 0.4;
+        case 'gcp':
+          return 0.45;
+      }
+    }
+
+    if (pricingModel === 'savings-plan') {
+      switch (this.providerId) {
+        case 'aws':
+          return 0.72;
+        case 'azure':
+          return 0.7;
+        case 'gcp':
+          return 0.68;
+      }
+    }
+
+    return 1;
+  }
+
+  private savingsPercent(candidateMonthlyCostUsd: number, onDemandMonthlyCostUsd: number): number {
+    if (onDemandMonthlyCostUsd <= 0) {
+      return 0;
+    }
+
+    return this.roundCurrency(
+      Math.max(
+        0,
+        ((onDemandMonthlyCostUsd - candidateMonthlyCostUsd) / onDemandMonthlyCostUsd) * 100,
+      ),
+    );
   }
 
   private egressTiers(record: PricingCatalogRecord): EgressTierRate[] {
@@ -429,6 +550,20 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     return quantity;
   }
 
+  private hourlyQuantity(unit: string, quantity: number): number {
+    const normalizedUnit = unit.toLowerCase();
+
+    if (
+      normalizedUnit.includes('hour') ||
+      normalizedUnit.includes('hrs') ||
+      normalizedUnit === 'h'
+    ) {
+      return quantity;
+    }
+
+    return quantity / HOURS_PER_MONTH;
+  }
+
   private resourceFitRank(record: PricingCatalogRecord): number {
     return (
       (this.numberAttribute(record, 'vcpu') ?? 0) * 1000 +
@@ -456,4 +591,103 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
   protected roundCurrency(value: number): number {
     return Math.round((value + Number.EPSILON) * 100) / 100;
   }
+}
+
+function providerPricingModelMetadata(
+  providerId: ProviderId,
+  pricingModel: PricingModelKey,
+): Pick<
+  PricingModelCost,
+  'displayName' | 'providerTerm' | 'volatility' | 'commitmentTermMonths' | 'caveat'
+> {
+  switch (pricingModel) {
+    case 'on-demand':
+      return {
+        displayName: 'On-demand',
+        providerTerm: 'On-demand',
+        volatility: 'stable',
+        caveat: 'No long-term commitment modeled.',
+      };
+    case 'reserved-1yr':
+      return {
+        displayName: 'Reserved 1 year',
+        providerTerm: commitmentProviderTerm(providerId, 12),
+        volatility: 'stable',
+        commitmentTermMonths: 12,
+        caveat:
+          'Commitment pricing depends on SKU availability, payment option, operating system, and tenancy.',
+      };
+    case 'reserved-3yr':
+      return {
+        displayName: 'Reserved 3 year',
+        providerTerm: commitmentProviderTerm(providerId, 36),
+        volatility: 'stable',
+        commitmentTermMonths: 36,
+        caveat:
+          'Commitment pricing depends on SKU availability, payment option, operating system, and tenancy.',
+      };
+    case 'spot':
+      return {
+        displayName: 'Spot',
+        providerTerm: spotProviderTerm(providerId),
+        volatility: 'volatile',
+        caveat:
+          'Spot pricing is interruptible and volatile; modeled values are planning estimates unless catalog rows are present.',
+      };
+    case 'savings-plan':
+      return {
+        displayName: 'Savings / committed use',
+        providerTerm: savingsProviderTerm(providerId),
+        volatility: 'variable',
+        caveat:
+          'Savings-plan and committed-use benefits differ by provider and require usage commitment validation.',
+      };
+  }
+}
+
+function commitmentProviderTerm(providerId: ProviderId, months: 12 | 36): string {
+  switch (providerId) {
+    case 'aws':
+      return `EC2 Reserved Instance ${months / 12}yr`;
+    case 'azure':
+      return `Azure Reserved VM Instance ${months / 12}yr`;
+    case 'gcp':
+      return `Google Cloud CUD ${months / 12}yr`;
+  }
+}
+
+function spotProviderTerm(providerId: ProviderId): string {
+  switch (providerId) {
+    case 'aws':
+      return 'EC2 Spot Instances';
+    case 'azure':
+      return 'Azure Spot VMs';
+    case 'gcp':
+      return 'Google Cloud Spot VMs';
+  }
+}
+
+function savingsProviderTerm(providerId: ProviderId): string {
+  switch (providerId) {
+    case 'aws':
+      return 'AWS Savings Plans';
+    case 'azure':
+      return 'Azure Reservations';
+    case 'gcp':
+      return 'Google Cloud committed use discounts';
+  }
+}
+
+function normalizeUpfrontOption(value: string): 'none' | 'partial' | 'all' {
+  const normalized = value.toLowerCase();
+
+  if (normalized.includes('all')) {
+    return 'all';
+  }
+
+  if (normalized.includes('partial')) {
+    return 'partial';
+  }
+
+  return 'none';
 }

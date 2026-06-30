@@ -7,6 +7,7 @@ import {
 } from '../adapters/common/cloud-provider-adapter';
 
 export interface CostIntervals {
+  hourly?: number;
   daily: number;
   weekly: number;
   monthly: number;
@@ -19,6 +20,7 @@ export interface ComparisonLineItem {
   costComponent?: CostComponent;
   description: string;
   isApproximate: boolean;
+  baseHourlyCostUsd?: number;
   baseMonthlyCostUsd: number;
   skuId?: string;
   region?: string;

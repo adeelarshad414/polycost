@@ -4120,6 +4120,8 @@ function roleClassName(role: ExecutiveLens['role']): string {
 
 function costForInterval(provider: ComparisonProviderResult, interval: IntervalKey): number {
   switch (interval) {
+    case 'hourly':
+      return provider.totals.hourly ?? provider.totals.monthly / 730;
     case 'daily':
       return provider.totals.daily;
     case 'weekly':
@@ -4995,6 +4997,8 @@ function categoryHeatmapRows(summaries: ProviderCostSummary[]): Array<{
 
 function intervalCostMultiplier(interval: IntervalKey): number {
   switch (interval) {
+    case 'hourly':
+      return 1 / 730;
     case 'daily':
       return 1 / 30;
     case 'weekly':

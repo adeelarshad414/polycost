@@ -27,8 +27,19 @@ interface LivePricingReferenceGroup {
   skuIds: string[];
 }
 
+interface LivePricingCacheEntry {
+  expiresAt: number;
+  records: PricingCatalogRecord[];
+}
+
+const LIVE_PRICING_CACHE_TTL_MS = 60_000;
+const LIVE_PRICING_MAX_ATTEMPTS = 3;
+const LIVE_PRICING_BACKOFF_MS = 75;
+
 @Injectable()
 export class LivePricingRefreshService {
+  private readonly livePricingCache = new Map<string, LivePricingCacheEntry>();
+
   constructor(
     private readonly adapters: CloudProviderAdapter[],
     private readonly catalogWriter: PricingCatalogWriter,
@@ -79,10 +90,7 @@ export class LivePricingRefreshService {
       const records = (
         await Promise.all(
           groupReferences(refreshableReferences).map((group) =>
-            adapter.refreshLivePricing(group.skuIds, {
-              categories: [group.category],
-              region: group.region,
-            }),
+            this.refreshGroupWithCacheAndBackoff(adapter, group),
           ),
         )
       ).flat();
@@ -117,6 +125,33 @@ export class LivePricingRefreshService {
         message: `${adapter.providerId} live refresh failed: ${safeErrorMessage(error)}`,
       };
     }
+  }
+
+  private async refreshGroupWithCacheAndBackoff(
+    adapter: CloudProviderAdapter,
+    group: LivePricingReferenceGroup,
+  ): Promise<PricingCatalogRecord[]> {
+    const key = cacheKey(group);
+    const cached = this.livePricingCache.get(key);
+    const now = Date.now();
+
+    if (cached && cached.expiresAt > now) {
+      return cached.records;
+    }
+
+    const records = await retryWithBackoff(() =>
+      adapter.refreshLivePricing(group.skuIds, {
+        categories: [group.category],
+        region: group.region,
+      }),
+    );
+
+    this.livePricingCache.set(key, {
+      expiresAt: now + LIVE_PRICING_CACHE_TTL_MS,
+      records,
+    });
+
+    return records;
   }
 }
 
@@ -180,6 +215,39 @@ function uniquePricingRecords(records: PricingCatalogRecord[]): PricingCatalogRe
   }
 
   return [...unique.values()];
+}
+
+function cacheKey(group: LivePricingReferenceGroup): string {
+  return [
+    group.providerId,
+    group.category,
+    group.region,
+    [...group.skuIds].sort().join(','),
+  ].join(':');
+}
+
+async function retryWithBackoff<T>(operation: () => Promise<T>): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= LIVE_PRICING_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+
+      if (attempt < LIVE_PRICING_MAX_ATTEMPTS) {
+        await delay(LIVE_PRICING_BACKOFF_MS * attempt);
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+function delay(durationMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, durationMs);
+  });
 }
 
 function safeErrorMessage(error: unknown): string {

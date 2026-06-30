@@ -354,6 +354,36 @@ describe('API contracts', () => {
     });
   });
 
+  it('GET /pricing/models returns provider-specific model terminology', () => {
+    const service = costManagementService();
+    const controller = new CachedPricingController(service);
+
+    expect(controller.models()).toEqual({
+      defaultModel: 'on-demand',
+      generatedAt: expect.any(String),
+      models: expect.arrayContaining([
+        expect.objectContaining({
+          model: 'spot',
+          cachedTerm: 'spot',
+          volatility: 'volatile',
+          providerTerms: expect.objectContaining({
+            aws: 'EC2 Spot Instances',
+            azure: 'Azure Spot VMs',
+            gcp: 'Google Cloud Spot VMs',
+          }),
+        }),
+        expect.objectContaining({
+          model: 'savings-plan',
+          cachedTerm: 'savings_plan',
+          providerTerms: expect.objectContaining({
+            aws: 'AWS Savings Plans',
+            gcp: 'Committed use discounts',
+          }),
+        }),
+      ]),
+    });
+  });
+
   it('GET /pricing/breakdown reads workload breakdown from cached tables', async () => {
     const service = costManagementService();
     const controller = new CachedPricingController(service);

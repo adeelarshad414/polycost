@@ -229,23 +229,41 @@ describe('BaseCloudProviderAdapter', () => {
     const result = await adapter.priceWorkload(fullWorkload);
 
     expect(result.baseMonthlyCostUsd).toBe(185.5);
-    expect(result.lineItems[0].pricingModels).toEqual([
-      {
-        model: 'on-demand',
-        available: true,
-        monthlyCostUsd: 109.5,
-      },
-      {
-        model: 'reserved-1yr',
-        available: true,
-        monthlyCostUsd: 65.7,
-      },
-      {
-        model: 'reserved-3yr',
-        available: true,
-        monthlyCostUsd: 43.8,
-      },
-    ]);
+    expect(result.lineItems[0].pricingModels).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          model: 'on-demand',
+          available: true,
+          hourlyCostUsd: 0.15,
+          monthlyCostUsd: 109.5,
+        }),
+        expect.objectContaining({
+          model: 'reserved-1yr',
+          available: true,
+          hourlyCostUsd: 0.09,
+          monthlyCostUsd: 65.7,
+        }),
+        expect.objectContaining({
+          model: 'reserved-3yr',
+          available: true,
+          hourlyCostUsd: 0.06,
+          monthlyCostUsd: 43.8,
+        }),
+        expect.objectContaining({
+          model: 'spot',
+          available: true,
+          estimated: true,
+          source: 'modeled-estimate',
+          volatility: 'volatile',
+        }),
+        expect.objectContaining({
+          model: 'savings-plan',
+          available: true,
+          estimated: true,
+          source: 'modeled-estimate',
+        }),
+      ]),
+    );
     expect(result.lineItems[4]).toEqual(
       expect.objectContaining({
         baseMonthlyCostUsd: 0.5,

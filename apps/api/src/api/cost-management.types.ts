@@ -1,8 +1,29 @@
 import { ProviderId } from '../adapters/common/cloud-provider-adapter';
 import { NormalizedInstanceFamily } from '../pricing-normalization/family-normalizer';
 
-export type CachedPricingTerm = 'on_demand' | 'reserved_1yr' | 'reserved_3yr';
+export type CachedPricingTerm =
+  | 'on_demand'
+  | 'reserved_1yr'
+  | 'reserved_3yr'
+  | 'spot'
+  | 'savings_plan';
 export type StoragePricingTier = 'standard' | 'infrequent_access' | 'archive';
+
+export interface PricingModelCatalogEntry {
+  model: 'on-demand' | 'reserved-1yr' | 'reserved-3yr' | 'spot' | 'savings-plan';
+  cachedTerm: CachedPricingTerm;
+  label: string;
+  default: boolean;
+  volatility: 'stable' | 'variable' | 'volatile';
+  providerTerms: Record<ProviderId, string>;
+  caveat: string;
+}
+
+export interface PricingModelCatalogResponse {
+  models: PricingModelCatalogEntry[];
+  defaultModel: PricingModelCatalogEntry['model'];
+  generatedAt: string;
+}
 
 export interface WorkloadInput {
   instanceFamily: NormalizedInstanceFamily;

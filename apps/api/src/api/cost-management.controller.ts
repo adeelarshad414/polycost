@@ -9,6 +9,7 @@ import {
   BudgetInput,
   CachedPricingCompareQuery,
   CachedPricingTerm,
+  PricingModelCatalogResponse,
   ShareLinkInput,
   StoragePricingTier,
   WorkloadInput,
@@ -24,7 +25,13 @@ const INSTANCE_FAMILIES = [
   'accelerated-computing',
 ] as const;
 const STORAGE_TIERS: StoragePricingTier[] = ['standard', 'infrequent_access', 'archive'];
-const PRICING_TERMS: CachedPricingTerm[] = ['on_demand', 'reserved_1yr', 'reserved_3yr'];
+const PRICING_TERMS: CachedPricingTerm[] = [
+  'on_demand',
+  'reserved_1yr',
+  'reserved_3yr',
+  'spot',
+  'savings_plan',
+];
 
 @Controller('api/v1/pricing')
 export class CachedPricingController {
@@ -41,6 +48,11 @@ export class CachedPricingController {
     const term = parsePricingTerm(query.term);
 
     return this.costManagementService.getWorkloadCostBreakdown(workloadId, term);
+  }
+
+  @Get('models')
+  models(): PricingModelCatalogResponse {
+    return pricingModelCatalog();
   }
 }
 
@@ -220,6 +232,80 @@ function parsePricingTerm(value: unknown): CachedPricingTerm {
   }
 
   return term as CachedPricingTerm;
+}
+
+function pricingModelCatalog(): PricingModelCatalogResponse {
+  return {
+    defaultModel: 'on-demand',
+    generatedAt: new Date().toISOString(),
+    models: [
+      {
+        model: 'on-demand',
+        cachedTerm: 'on_demand',
+        label: 'On-demand',
+        default: true,
+        volatility: 'stable',
+        providerTerms: {
+          aws: 'On-Demand Instances',
+          azure: 'Pay as you go',
+          gcp: 'On-demand pricing',
+        },
+        caveat: 'No usage commitment is modeled.',
+      },
+      {
+        model: 'reserved-1yr',
+        cachedTerm: 'reserved_1yr',
+        label: 'Reserved 1 year',
+        default: false,
+        volatility: 'stable',
+        providerTerms: {
+          aws: 'EC2 Reserved Instances 1yr',
+          azure: 'Azure Reserved VM Instances 1yr',
+          gcp: 'Google Cloud CUDs 1yr',
+        },
+        caveat: 'Payment option and SKU availability vary by provider.',
+      },
+      {
+        model: 'reserved-3yr',
+        cachedTerm: 'reserved_3yr',
+        label: 'Reserved 3 year',
+        default: false,
+        volatility: 'stable',
+        providerTerms: {
+          aws: 'EC2 Reserved Instances 3yr',
+          azure: 'Azure Reserved VM Instances 3yr',
+          gcp: 'Google Cloud CUDs 3yr',
+        },
+        caveat: 'Payment option and SKU availability vary by provider.',
+      },
+      {
+        model: 'spot',
+        cachedTerm: 'spot',
+        label: 'Spot',
+        default: false,
+        volatility: 'volatile',
+        providerTerms: {
+          aws: 'EC2 Spot Instances',
+          azure: 'Azure Spot VMs',
+          gcp: 'Google Cloud Spot VMs',
+        },
+        caveat: 'Spot prices are interruptible and volatile; estimates require live validation.',
+      },
+      {
+        model: 'savings-plan',
+        cachedTerm: 'savings_plan',
+        label: 'Savings / committed use',
+        default: false,
+        volatility: 'variable',
+        providerTerms: {
+          aws: 'AWS Savings Plans',
+          azure: 'Azure Reservations',
+          gcp: 'Committed use discounts',
+        },
+        caveat: 'Commitment programs are similar but not identical across providers.',
+      },
+    ],
+  };
 }
 
 function parseCanonicalRegion(value: unknown): string {

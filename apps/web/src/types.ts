@@ -2,19 +2,32 @@ export const PROVIDER_ORDER = ['aws', 'azure', 'gcp'] as const;
 export type ProviderId = (typeof PROVIDER_ORDER)[number];
 export type ServiceCategory = 'compute' | 'storage' | 'database' | 'network';
 export type CostComponent = 'compute' | 'storage' | 'database' | 'egress';
-export type PricingModelKey = 'on-demand' | 'reserved-1yr' | 'reserved-3yr';
+export type PricingModelKey =
+  | 'on-demand'
+  | 'reserved-1yr'
+  | 'reserved-3yr'
+  | 'spot'
+  | 'savings-plan';
 export type PricingBasis = 'flat' | 'tiered';
-export type IntervalKey = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+export type PricingVolatility = 'stable' | 'variable' | 'volatile';
+export type PricingSource = 'catalog' | 'modeled-estimate';
+export type IntervalKey = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 export type NormalizedInstanceFamily =
   | 'general-purpose'
   | 'compute-optimized'
   | 'memory-optimized'
   | 'storage-optimized'
   | 'accelerated-computing';
-export type CachedPricingTerm = 'on_demand' | 'reserved_1yr' | 'reserved_3yr';
+export type CachedPricingTerm =
+  | 'on_demand'
+  | 'reserved_1yr'
+  | 'reserved_3yr'
+  | 'spot'
+  | 'savings_plan';
 export type StoragePricingTier = 'standard' | 'infrequent_access' | 'archive';
 
 export const INTERVALS: Array<{ key: IntervalKey; label: string }> = [
+  { key: 'hourly', label: 'Hourly' },
   { key: 'daily', label: 'Daily' },
   { key: 'weekly', label: 'Weekly' },
   { key: 'monthly', label: 'Monthly' },
@@ -95,6 +108,7 @@ export interface ParsedNwsDraft {
 }
 
 export interface CostIntervals {
+  hourly?: number;
   daily: number;
   weekly: number;
   monthly: number;
@@ -107,6 +121,7 @@ export interface ComparisonLineItem {
   costComponent?: CostComponent;
   description: string;
   isApproximate: boolean;
+  baseHourlyCostUsd?: number;
   baseMonthlyCostUsd: number;
   skuId?: string;
   region?: string;
@@ -119,7 +134,18 @@ export interface ComparisonLineItem {
 export interface PricingModelCost {
   model: PricingModelKey;
   available: boolean;
+  displayName?: string;
+  providerTerm?: string;
+  source?: PricingSource;
+  estimated?: boolean;
+  volatility?: PricingVolatility;
   monthlyCostUsd?: number;
+  hourlyCostUsd?: number;
+  savingsPercentVsOnDemand?: number;
+  upfrontOption?: 'none' | 'partial' | 'all';
+  commitmentTermMonths?: number;
+  lastFetchedAt?: string;
+  caveat?: string;
   unavailableReason?: string;
 }
 
@@ -160,6 +186,22 @@ export interface PricingStatusResponse {
     recordsRejected: number;
     recordsSkipped: number;
   }>;
+}
+
+export interface PricingModelCatalogEntry {
+  model: PricingModelKey;
+  cachedTerm: CachedPricingTerm;
+  label: string;
+  default: boolean;
+  volatility: PricingVolatility;
+  providerTerms: Record<ProviderId, string>;
+  caveat: string;
+}
+
+export interface PricingModelCatalogResponse {
+  models: PricingModelCatalogEntry[];
+  defaultModel: PricingModelKey;
+  generatedAt: string;
 }
 
 export interface BackendHealthResponse {

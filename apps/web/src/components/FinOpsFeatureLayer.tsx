@@ -30,6 +30,7 @@ interface PricingModelOption {
   key: PricingModelKey;
   label: string;
   detail: string;
+  caveat: string;
 }
 
 interface CurrencyOption {
@@ -64,16 +65,31 @@ const PRICING_MODELS: PricingModelOption[] = [
     key: 'on-demand',
     label: 'On-demand',
     detail: 'Current cached USD on-demand pricing.',
+    caveat: 'No commitment. Current default behavior remains unchanged.',
   },
   {
     key: 'reserved-1yr',
     label: '1yr reserved',
     detail: 'Uses cached one-year reservation, Savings Plan, or committed-use rows when present.',
+    caveat: 'Provider reservations and CUDs are not identical; validate payment options.',
   },
   {
     key: 'reserved-3yr',
     label: '3yr reserved',
     detail: 'Uses cached three-year reservation, Savings Plan, or committed-use rows when present.',
+    caveat: 'Longer commitments can save more but reduce flexibility.',
+  },
+  {
+    key: 'spot',
+    label: 'Spot',
+    detail: 'Modeled interruptible compute estimate unless live catalog rows are present.',
+    caveat: 'Volatile and interruptible. Use only for fault-tolerant workloads.',
+  },
+  {
+    key: 'savings-plan',
+    label: 'Savings plan',
+    detail: 'AWS Savings Plans, Azure reservations, or GCP committed-use discount scenarios.',
+    caveat: 'Commitment programs differ materially by provider.',
   },
 ];
 
@@ -123,6 +139,8 @@ export function FinOpsFeatureLayer({
   const [budgetStatus, setBudgetStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [budgetError, setBudgetError] = useState<string | null>(null);
   const currencyOptions = useMemo(() => currencyOptionsFromRates(exchangeRates), [exchangeRates]);
+  const selectedPricingModelOption =
+    PRICING_MODELS.find((model) => model.key === pricingModel) ?? PRICING_MODELS[0];
   const selectedCurrency =
     currencyOptions.find((option) => option.code === currencyCode) ?? USD_CURRENCY;
   const currency = selectedCurrency.available ? selectedCurrency : USD_CURRENCY;
@@ -290,7 +308,7 @@ export function FinOpsFeatureLayer({
             </h2>
           </div>
           <div
-            className="grid min-h-11 grid-cols-1 rounded-lg border border-border bg-surface-0 p-1 shadow-inner sm:inline-grid sm:grid-cols-3"
+            className="grid min-h-11 grid-cols-1 rounded-lg border border-border bg-surface-0 p-1 shadow-inner sm:inline-grid sm:grid-cols-2 xl:grid-cols-5"
             role="group"
             aria-label="Pricing model"
           >
@@ -316,6 +334,10 @@ export function FinOpsFeatureLayer({
             ))}
           </div>
         </div>
+        <p className="rounded-lg border border-border bg-surface-0 px-3 py-2 text-sm leading-5 text-text-secondary">
+          <strong className="text-text-primary">{selectedPricingModelOption.label}:</strong>{' '}
+          {selectedPricingModelOption.caveat}
+        </p>
 
         <div className="grid gap-3 lg:grid-cols-3">
           {PROVIDER_ORDER.map((providerId) => {
@@ -324,11 +346,11 @@ export function FinOpsFeatureLayer({
               ? providerModelCost(provider, pricingModel)
               : undefined;
 
-            return (
-              <article
-                key={providerId}
-                className="min-w-0 rounded-lg border border-border bg-surface-0 p-3"
-              >
+          return (
+            <article
+              key={providerId}
+              className="min-w-0 rounded-lg border border-border bg-surface-0 p-3"
+            >
                 <div className="flex min-w-0 items-center justify-between gap-3">
                   <ProviderTextHeading providerId={providerId} />
                   <strong className="font-mono text-base text-text-primary">
@@ -337,10 +359,16 @@ export function FinOpsFeatureLayer({
                       : 'Pending'}
                   </strong>
                 </div>
+                {provider ? (
+                  <PricingModelSavingsCue
+                    bestModel={bestSavingsModel(provider)}
+                    selectedModel={selectedModelCost}
+                  />
+                ) : null}
                 <p className="mt-2 text-sm leading-5 text-text-secondary">
                   {provider
-                    ? threeYearReservedSummary(provider, currency)
-                    : '3yr reserved: pending comparison data.'}
+                    ? pricingModelSummary(provider, pricingModel, currency)
+                    : `${selectedPricingModelOption.label}: pending comparison data.`}
                 </p>
               </article>
             );
@@ -618,6 +646,38 @@ export function FinOpsFeatureLayer({
         </div>
       </section>
     </section>
+  );
+}
+
+function PricingModelSavingsCue({
+  bestModel,
+  selectedModel,
+}: {
+  bestModel?: PricingModelCost;
+  selectedModel?: PricingModelCost;
+}) {
+  if (!bestModel && !selectedModel?.caveat) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2 text-xs font-semibold">
+      {bestModel?.savingsPercentVsOnDemand !== undefined ? (
+        <span className="rounded-full border border-[color:var(--pc-success)] bg-[color:var(--pc-success-soft)] px-2 py-1 text-text-primary">
+          Best: {bestModel.providerTerm ?? bestModel.displayName ?? pricingModelLabel(bestModel.model)} saves{' '}
+          {formatPercent(bestModel.savingsPercentVsOnDemand)}
+        </span>
+      ) : null}
+      {selectedModel?.caveat ? (
+        <span
+          className="inline-flex min-h-7 items-center gap-1 rounded-full border border-border bg-surface-1 px-2 py-1 text-text-secondary"
+          title={selectedModel.caveat}
+        >
+          <InfoIcon />
+          Caveat
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -1099,6 +1159,7 @@ function providerModelCost(
     return {
       model: 'on-demand',
       available: true,
+      hourlyCostUsd: provider.totals.hourly ?? provider.totals.monthly / 730,
       monthlyCostUsd: provider.totals.monthly,
     };
   }
@@ -1110,6 +1171,23 @@ function providerModelCost(
   };
 }
 
+function bestSavingsModel(provider: ComparisonProviderResult): PricingModelCost | undefined {
+  return provider.pricingModels
+    ?.filter(
+      (model) =>
+        model.model !== 'on-demand' &&
+        model.available &&
+        model.monthlyCostUsd !== undefined &&
+        model.savingsPercentVsOnDemand !== undefined,
+    )
+    .sort((left, right) => {
+      const rightSavings = right.savingsPercentVsOnDemand ?? 0;
+      const leftSavings = left.savingsPercentVsOnDemand ?? 0;
+
+      return rightSavings - leftSavings;
+    })[0];
+}
+
 function formatModelCost(
   modelCost: PricingModelCost,
   interval: IntervalKey,
@@ -1119,18 +1197,24 @@ function formatModelCost(
     return 'Not available';
   }
 
+  if (interval === 'hourly') {
+    return formatMoney(modelCost.hourlyCostUsd ?? modelCost.monthlyCostUsd / 730, currency);
+  }
+
   return formatMoney(modelCost.monthlyCostUsd * intervalCostMultiplier(interval), currency);
 }
 
-function threeYearReservedSummary(
+function pricingModelSummary(
   provider: ComparisonProviderResult,
+  pricingModel: PricingModelKey,
   currency: CurrencyOption,
 ): string {
   const onDemand = providerModelCost(provider, 'on-demand');
-  const reserved = providerModelCost(provider, 'reserved-3yr');
+  const selected = providerModelCost(provider, pricingModel);
+  const label = selected.providerTerm ?? selected.displayName ?? pricingModelLabel(pricingModel);
 
-  if (!reserved.available || reserved.monthlyCostUsd === undefined) {
-    return `3yr reserved: ${reserved.unavailableReason ?? 'Not available for this configuration.'}`;
+  if (!selected.available || selected.monthlyCostUsd === undefined) {
+    return `${label}: ${selected.unavailableReason ?? 'Not available for this configuration.'}`;
   }
 
   if (
@@ -1138,15 +1222,21 @@ function threeYearReservedSummary(
     onDemand.monthlyCostUsd === undefined ||
     onDemand.monthlyCostUsd <= 0
   ) {
-    return `3yr reserved: ${formatMoney(reserved.monthlyCostUsd, currency)}/mo`;
+    return `${label}: ${formatMoney(selected.monthlyCostUsd, currency)}/mo`;
   }
 
-  const savings = Math.max(
-    0,
-    ((onDemand.monthlyCostUsd - reserved.monthlyCostUsd) / onDemand.monthlyCostUsd) * 100,
-  );
+  const savings =
+    selected.savingsPercentVsOnDemand ??
+    Math.max(
+      0,
+      ((onDemand.monthlyCostUsd - selected.monthlyCostUsd) / onDemand.monthlyCostUsd) * 100,
+    );
+  const flags = [
+    selected.estimated ? 'estimated' : undefined,
+    selected.volatility === 'volatile' ? 'volatile' : undefined,
+  ].filter(Boolean);
 
-  return `3yr reserved: ${formatMoney(reserved.monthlyCostUsd, currency)}/mo · saves ${formatPercent(savings)}`;
+  return `${label}: ${formatMoney(selected.monthlyCostUsd, currency)}/mo · saves ${formatPercent(savings)}${flags.length > 0 ? ` · ${flags.join(', ')}` : ''}`;
 }
 
 function InfoTile({ label, value, detail }: { label: string; value: string; detail: string }) {
@@ -1162,6 +1252,14 @@ function InfoTile({ label, value, detail }: { label: string; value: string; deta
 }
 
 function PricingModelIcon({ model }: { model: PricingModelKey }) {
+  if (model === 'spot') {
+    return <IconPath path="M13 2 4 14h7l-1 8 9-12h-7z" />;
+  }
+
+  if (model === 'savings-plan') {
+    return <IconPath path="M4 12a8 8 0 1 0 8-8M4 12h5M12 4v5M8 16h8M10 12h6" />;
+  }
+
   if (model === 'reserved-3yr') {
     return <IconPath path="M5 5h14v14H5zM8 9h8M8 13h8M8 17h5" />;
   }
@@ -1171,6 +1269,10 @@ function PricingModelIcon({ model }: { model: PricingModelKey }) {
   }
 
   return <IconPath path="M4 12h16M12 4v16M7 7h10v10H7z" />;
+}
+
+function pricingModelLabel(model: PricingModelKey): string {
+  return PRICING_MODELS.find((option) => option.key === model)?.label ?? model;
 }
 
 function ShareIcon() {
@@ -1183,6 +1285,10 @@ function RevokeIcon() {
 
 function BudgetIcon() {
   return <IconPath path="M5 6h14v12H5zM8 10h8M8 14h4M16 14h1" />;
+}
+
+function InfoIcon() {
+  return <IconPath path="M12 17v-5M12 8h.01M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z" />;
 }
 
 function IconPath({ path }: { path: string }) {
@@ -1218,6 +1324,8 @@ function providerLabel(provider: ProviderId): string {
 
 function intervalCostMultiplier(interval: IntervalKey): number {
   switch (interval) {
+    case 'hourly':
+      return 1 / 730;
     case 'daily':
       return 1 / 30;
     case 'weekly':

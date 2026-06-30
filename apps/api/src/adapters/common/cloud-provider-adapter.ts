@@ -3,13 +3,31 @@ import { NormalizedWorkloadSpec } from '../../nws/nws.types';
 export type ProviderId = 'aws' | 'azure' | 'gcp';
 export type ServiceCategory = 'compute' | 'storage' | 'database' | 'network';
 export type CostComponent = 'compute' | 'storage' | 'database' | 'egress';
-export type PricingModelKey = 'on-demand' | 'reserved-1yr' | 'reserved-3yr';
+export type PricingModelKey =
+  | 'on-demand'
+  | 'reserved-1yr'
+  | 'reserved-3yr'
+  | 'spot'
+  | 'savings-plan';
 export type PricingBasis = 'flat' | 'tiered';
+export type PricingVolatility = 'stable' | 'variable' | 'volatile';
+export type PricingSource = 'catalog' | 'modeled-estimate';
 
 export interface PricingModelCost {
   model: PricingModelKey;
   available: boolean;
+  displayName?: string;
+  providerTerm?: string;
+  source?: PricingSource;
+  estimated?: boolean;
+  volatility?: PricingVolatility;
   monthlyCostUsd?: number;
+  hourlyCostUsd?: number;
+  savingsPercentVsOnDemand?: number;
+  upfrontOption?: 'none' | 'partial' | 'all';
+  commitmentTermMonths?: number;
+  lastFetchedAt?: string;
+  caveat?: string;
   unavailableReason?: string;
 }
 
@@ -32,6 +50,7 @@ export interface ProviderPricingLineItem {
   costComponent?: CostComponent;
   description: string;
   isApproximate: boolean;
+  baseHourlyCostUsd?: number;
   baseMonthlyCostUsd: number;
   skuId: string;
   region: string;
@@ -44,6 +63,7 @@ export interface ProviderPricingLineItem {
 export interface ProviderPricingResult {
   providerId: ProviderId;
   lineItems: ProviderPricingLineItem[];
+  baseHourlyCostUsd?: number;
   baseMonthlyCostUsd: number;
 }
 

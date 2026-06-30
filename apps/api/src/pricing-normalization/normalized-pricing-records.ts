@@ -5,7 +5,12 @@ import {
 } from '../adapters/common/cloud-provider-adapter';
 import { normalizeInstanceFamily, NormalizedInstanceFamily } from './family-normalizer';
 
-export type NormalizedPricingTerm = 'on_demand' | 'reserved_1yr' | 'reserved_3yr';
+export type NormalizedPricingTerm =
+  | 'on_demand'
+  | 'reserved_1yr'
+  | 'reserved_3yr'
+  | 'spot'
+  | 'savings_plan';
 export type NormalizedStorageTier = 'standard' | 'infrequent_access' | 'archive';
 
 export interface NormalizedComputePricingRecord {
@@ -522,6 +527,10 @@ function normalizePricingTerm(record: PricingCatalogRecord): NormalizedPricingTe
       return 'reserved_1yr';
     case 'reserved-3yr':
       return 'reserved_3yr';
+    case 'spot':
+      return 'spot';
+    case 'savings-plan':
+      return 'savings_plan';
     default:
       return undefined;
   }

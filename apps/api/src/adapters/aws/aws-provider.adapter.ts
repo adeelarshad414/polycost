@@ -223,6 +223,7 @@ export class AwsProviderAdapter extends BaseCloudProviderAdapter {
         productFamily: product.productFamily,
         rawServiceCode: serviceCode,
         ...(isReservedTerm(term) ? term.termAttributes : {}),
+        ...(isReservedTerm(term) ? { upfrontOption: awsUpfrontOption(term) } : {}),
         vcpu: parseOptionalNumber(product.attributes.vcpu),
         memoryGb: parseMemoryGb(product.attributes.memory),
       },
@@ -307,6 +308,15 @@ function awsReservedPricingModel(term: AwsReservedTerm): PricingModelKey | undef
   }
 
   return undefined;
+}
+
+function awsUpfrontOption(term: AwsReservedTerm): string {
+  return (
+    term.termAttributes?.PurchaseOption ??
+    term.termAttributes?.purchaseOption ??
+    term.termAttributes?.purchaseoption ??
+    'No Upfront'
+  );
 }
 
 function isReservedTerm(term: AwsOnDemandTerm | AwsReservedTerm): term is AwsReservedTerm {

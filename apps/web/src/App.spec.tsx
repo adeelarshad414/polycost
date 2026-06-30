@@ -237,6 +237,9 @@ describe('App', () => {
     await click(buttonByText(container, 'Yearly'));
     expect(text(container)).toContain('Yearly estimate');
 
+    await click(buttonByText(container, 'Hourly'));
+    expect(text(container)).toContain('Hourly estimate');
+
     await click(buttonByText(container, '1yr reserved'));
     expect(buttonByText(container, '1yr reserved').getAttribute('aria-pressed')).toBe('true');
     expect(text(container)).toContain('Compute, storage, and data-transfer mix');
@@ -750,12 +753,32 @@ describe('ComparisonView', () => {
       ...comparisonResult,
       cheapestProviderId: 'azure',
       providers: [
-        providerWithItems('aws', [
-          ['compute', 'aws compute', 50],
-          ['storage', 'aws storage', 10],
-          ['database', 'aws database', 10],
-          ['network', 'aws network egress', 30],
-        ]),
+        {
+          ...providerWithItems('aws', [
+            ['compute', 'aws compute', 50],
+            ['storage', 'aws storage', 10],
+            ['database', 'aws database', 10],
+            ['network', 'aws network egress', 30],
+          ]),
+          pricingModels: [
+            {
+              model: 'on-demand',
+              available: true,
+              monthlyCostUsd: 100,
+              savingsPercentVsOnDemand: 0,
+            },
+            {
+              model: 'spot',
+              available: true,
+              providerTerm: 'EC2 Spot Instances',
+              estimated: true,
+              volatility: 'volatile',
+              monthlyCostUsd: 47.5,
+              savingsPercentVsOnDemand: 52.5,
+              caveat: 'Spot pricing is interruptible and volatile.',
+            },
+          ],
+        },
         providerWithItems('azure', [
           ['compute', 'azure compute', 40],
           ['storage', 'azure storage', 8],
@@ -780,7 +803,10 @@ describe('ComparisonView', () => {
     expect(buttonByText(container, 'On-demand').disabled).toBe(false);
     expect(buttonByText(container, '1yr reserved').disabled).toBe(false);
     expect(buttonByText(container, '3yr reserved').disabled).toBe(false);
-    expect(text(container)).not.toContain('Spot');
+    expect(buttonByText(container, 'Spot').disabled).toBe(false);
+    expect(buttonByText(container, 'Savings plan').disabled).toBe(false);
+    expect(text(container)).toContain('Best:');
+    await click(buttonByText(container, '3yr reserved'));
     expect(text(container)).toContain('3yr reserved: Not available for this configuration.');
     expect(text(container)).toContain('Compute, storage, and data-transfer mix');
     expect(text(container)).toContain('Egress/data transfer');
@@ -1031,6 +1057,11 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     refreshLiveComparison: jest.fn(async () => comparisonResult),
     exportComparison: jest.fn(async () => new Blob(['report'])),
     getPricingStatus: jest.fn(async () => pricingStatus),
+    getPricingModels: jest.fn(async () => ({
+      defaultModel: 'on-demand' as const,
+      generatedAt: '2026-06-30T00:00:00.000Z',
+      models: [],
+    })),
     getRegionCatalog: jest.fn(() => pendingRegionCatalog),
     createWorkload: jest.fn(async (input) => ({
       ...input,
@@ -1136,6 +1167,7 @@ function provider(
       },
     ],
     totals: {
+      hourly: monthly / 730,
       daily: monthly / 30,
       weekly: (monthly / 30) * 7,
       monthly,
@@ -1167,6 +1199,7 @@ function providerWithItems(
       baseMonthlyCostUsd,
     })),
     totals: {
+      hourly: monthly / 730,
       daily: monthly / 30,
       weekly: (monthly / 30) * 7,
       monthly,

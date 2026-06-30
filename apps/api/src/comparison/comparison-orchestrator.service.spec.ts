@@ -108,13 +108,14 @@ describe('ComparisonOrchestratorService', () => {
       providers: [
         expect.objectContaining({
           providerId: 'aws',
-          totals: {
+          totals: expect.objectContaining({
+            hourly: 0.05,
             daily: 1.33,
             weekly: 9.31,
             monthly: 40,
             quarterly: 120,
             yearly: 480,
-          },
+          }),
         }),
         expect.objectContaining({
           providerId: 'azure',
@@ -199,7 +200,7 @@ describe('ComparisonOrchestratorService', () => {
           unitPriceUsd: 0.14,
           pricingBasis: 'flat',
           pricingModels: [
-            { model: 'on-demand', available: true, monthlyCostUsd: 100 },
+            { model: 'on-demand', available: true, monthlyCostUsd: 100, hourlyCostUsd: 0.14 },
             { model: 'reserved-1yr', available: true, monthlyCostUsd: 80 },
             { model: 'reserved-3yr', available: true, monthlyCostUsd: 50 },
           ],
@@ -251,11 +252,37 @@ describe('ComparisonOrchestratorService', () => {
 
     const result = await service.compare(validWorkload);
 
-    expect(result.providers[0].pricingModels).toEqual([
-      { model: 'on-demand', available: true, monthlyCostUsd: 145 },
-      { model: 'reserved-1yr', available: true, monthlyCostUsd: 125 },
-      { model: 'reserved-3yr', available: true, monthlyCostUsd: 95 },
-    ]);
+    expect(result.providers[0].pricingModels).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          model: 'on-demand',
+          available: true,
+          hourlyCostUsd: 0.2,
+          monthlyCostUsd: 145,
+          savingsPercentVsOnDemand: 0,
+        }),
+        expect.objectContaining({
+          model: 'reserved-1yr',
+          available: true,
+          monthlyCostUsd: 125,
+          savingsPercentVsOnDemand: 13.79,
+        }),
+        expect.objectContaining({
+          model: 'reserved-3yr',
+          available: true,
+          monthlyCostUsd: 95,
+          savingsPercentVsOnDemand: 34.48,
+        }),
+        expect.objectContaining({
+          model: 'spot',
+          available: false,
+        }),
+        expect.objectContaining({
+          model: 'savings-plan',
+          available: false,
+        }),
+      ]),
+    );
     expect(result.providers[0].breakdown).toEqual({
       computeMonthlyCostUsd: 100,
       storageMonthlyCostUsd: 10,

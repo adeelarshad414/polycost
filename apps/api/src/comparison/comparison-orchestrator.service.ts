@@ -27,6 +27,8 @@ import {
 import { EquivalentServiceMapper } from './equivalent-service-mapper';
 import { IntervalCostCalculator } from './interval-cost-calculator';
 
+const HOURS_PER_MONTH = 730;
+
 interface ProviderSuccess {
   result: ProviderPricingResult;
 }
@@ -116,6 +118,10 @@ export class ComparisonOrchestratorService {
         costComponent,
         description: annotatedLineItem.description,
         isApproximate: annotatedLineItem.isApproximate,
+        baseHourlyCostUsd: this.roundCurrency(
+          annotatedLineItem.baseHourlyCostUsd ??
+            annotatedLineItem.baseMonthlyCostUsd / HOURS_PER_MONTH,
+        ),
         baseMonthlyCostUsd: this.roundCurrency(annotatedLineItem.baseMonthlyCostUsd),
         skuId: annotatedLineItem.skuId,
         region: annotatedLineItem.region,
@@ -126,6 +132,12 @@ export class ComparisonOrchestratorService {
           ? {
               pricingModels: annotatedLineItem.pricingModels.map((model) => ({
                 ...model,
+                ...(model.monthlyCostUsd !== undefined && model.hourlyCostUsd === undefined
+                  ? { hourlyCostUsd: this.roundCurrency(model.monthlyCostUsd / HOURS_PER_MONTH) }
+                  : {}),
+                ...(model.hourlyCostUsd !== undefined
+                  ? { hourlyCostUsd: this.roundCurrency(model.hourlyCostUsd) }
+                  : {}),
                 ...(model.monthlyCostUsd !== undefined
                   ? { monthlyCostUsd: this.roundCurrency(model.monthlyCostUsd) }
                   : {}),
@@ -138,12 +150,19 @@ export class ComparisonOrchestratorService {
     const monthlyCostUsd = this.roundCurrency(
       lineItems.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0),
     );
+    const hourlyCostUsd = this.roundCurrency(
+      lineItems.reduce(
+        (sum, lineItem) =>
+          sum + (lineItem.baseHourlyCostUsd ?? lineItem.baseMonthlyCostUsd / HOURS_PER_MONTH),
+        0,
+      ),
+    );
 
     return {
       providerId: result.providerId,
       lineItems,
       totals: this.intervalCostCalculator.calculate(monthlyCostUsd),
-      pricingModels: this.providerPricingModels(lineItems, monthlyCostUsd),
+      pricingModels: this.providerPricingModels(lineItems, monthlyCostUsd, hourlyCostUsd),
       breakdown: this.costBreakdown(lineItems),
     };
   }
@@ -151,21 +170,33 @@ export class ComparisonOrchestratorService {
   private providerPricingModels(
     lineItems: ComparisonLineItem[],
     onDemandMonthlyCostUsd: number,
+    onDemandHourlyCostUsd: number,
   ): PricingModelCost[] {
     return [
       {
         model: 'on-demand',
         available: true,
+        displayName: 'On-demand',
+        providerTerm: 'On-demand',
+        source: 'catalog',
+        estimated: false,
+        volatility: 'stable',
+        hourlyCostUsd: onDemandHourlyCostUsd,
         monthlyCostUsd: onDemandMonthlyCostUsd,
+        savingsPercentVsOnDemand: 0,
+        caveat: 'No long-term commitment modeled.',
       },
-      this.providerCommitmentModel(lineItems, 'reserved-1yr'),
-      this.providerCommitmentModel(lineItems, 'reserved-3yr'),
+      this.providerCommitmentModel(lineItems, 'reserved-1yr', onDemandMonthlyCostUsd),
+      this.providerCommitmentModel(lineItems, 'reserved-3yr', onDemandMonthlyCostUsd),
+      this.providerCommitmentModel(lineItems, 'spot', onDemandMonthlyCostUsd),
+      this.providerCommitmentModel(lineItems, 'savings-plan', onDemandMonthlyCostUsd),
     ];
   }
 
   private providerCommitmentModel(
     lineItems: ComparisonLineItem[],
     pricingModel: PricingModelKey,
+    onDemandMonthlyCostUsd: number,
   ): PricingModelCost {
     const computeLineItems = lineItems.filter((lineItem) => lineItem.costComponent === 'compute');
 
@@ -179,6 +210,9 @@ export class ComparisonOrchestratorService {
 
     const commitmentCosts = computeLineItems.map((lineItem) =>
       lineItem.pricingModels?.find((model) => model.model === pricingModel),
+    );
+    const representativeModel = commitmentCosts.find(
+      (model): model is PricingModelCost => model !== undefined,
     );
     const allCommitmentCostsAvailable = commitmentCosts.every(
       (model) => model?.available === true && model.monthlyCostUsd !== undefined,
@@ -199,11 +233,31 @@ export class ComparisonOrchestratorService {
       (sum, model) => sum + (model?.monthlyCostUsd ?? 0),
       0,
     );
+    const monthlyCostUsd = this.roundCurrency(nonComputeMonthlyCostUsd + computeMonthlyCostUsd);
 
     return {
       model: pricingModel,
       available: true,
-      monthlyCostUsd: this.roundCurrency(nonComputeMonthlyCostUsd + computeMonthlyCostUsd),
+      displayName: representativeModel?.displayName,
+      providerTerm: representativeModel?.providerTerm,
+      source: commitmentCosts.some((model) => model?.source === 'modeled-estimate')
+        ? 'modeled-estimate'
+        : representativeModel?.source,
+      estimated: commitmentCosts.some((model) => model?.estimated === true),
+      volatility: representativeModel?.volatility,
+      ...(representativeModel?.upfrontOption
+        ? { upfrontOption: representativeModel.upfrontOption }
+        : {}),
+      ...(representativeModel?.commitmentTermMonths
+        ? { commitmentTermMonths: representativeModel.commitmentTermMonths }
+        : {}),
+      ...(representativeModel?.lastFetchedAt
+        ? { lastFetchedAt: representativeModel.lastFetchedAt }
+        : {}),
+      caveat: representativeModel?.caveat,
+      hourlyCostUsd: this.roundCurrency(monthlyCostUsd / HOURS_PER_MONTH),
+      monthlyCostUsd,
+      savingsPercentVsOnDemand: this.savingsPercent(monthlyCostUsd, onDemandMonthlyCostUsd),
     };
   }
 
@@ -268,6 +322,19 @@ export class ComparisonOrchestratorService {
 
   private roundCurrency(value: number): number {
     return Math.round((value + Number.EPSILON) * 100) / 100;
+  }
+
+  private savingsPercent(candidateMonthlyCostUsd: number, onDemandMonthlyCostUsd: number): number {
+    if (onDemandMonthlyCostUsd <= 0) {
+      return 0;
+    }
+
+    return this.roundCurrency(
+      Math.max(
+        0,
+        ((onDemandMonthlyCostUsd - candidateMonthlyCostUsd) / onDemandMonthlyCostUsd) * 100,
+      ),
+    );
   }
 }
 

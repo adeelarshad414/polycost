@@ -3,6 +3,7 @@ import { CostIntervals } from './comparison.types';
 
 const DAYS_PER_MONTH = 30;
 const DAYS_PER_WEEK = 7;
+const HOURS_PER_MONTH = 730;
 const MONTHS_PER_QUARTER = 3;
 const MONTHS_PER_YEAR = 12;
 
@@ -17,6 +18,7 @@ export class IntervalCostCalculator {
     const daily = this.roundCurrency(monthly / DAYS_PER_MONTH);
 
     return {
+      hourly: this.roundCurrency(monthly / HOURS_PER_MONTH),
       daily,
       weekly: this.roundCurrency(daily * DAYS_PER_WEEK),
       monthly,

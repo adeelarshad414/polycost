@@ -177,6 +177,52 @@ describe('api client', () => {
     );
   });
 
+  it('fetches pricing model metadata', async () => {
+    const fetchMock = jest.fn(async () =>
+      jsonResponse({
+        defaultModel: 'on-demand',
+        generatedAt: '2026-06-30T00:00:00.000Z',
+        models: [
+          {
+            model: 'spot',
+            cachedTerm: 'spot',
+            label: 'Spot',
+            default: false,
+            volatility: 'volatile',
+            providerTerms: {
+              aws: 'EC2 Spot Instances',
+              azure: 'Azure Spot VMs',
+              gcp: 'Google Cloud Spot VMs',
+            },
+            caveat: 'Spot prices are interruptible and volatile.',
+          },
+        ],
+      }),
+    );
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(client.getPricingModels()).resolves.toEqual(
+      expect.objectContaining({
+        defaultModel: 'on-demand',
+        models: expect.arrayContaining([
+          expect.objectContaining({
+            model: 'spot',
+            volatility: 'volatile',
+          }),
+        ]),
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/pricing/models',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+  });
+
   it('creates workload-scoped share links and resolves public reports', async () => {
     const fetchMock = jest
       .fn()
