@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { POLYCOST_HERO_SUBHEAD, POLYCOST_TAGLINE } from '../brand';
-import { providerLogoSrc, providerMarkSrc } from '../provider-brand';
 import { ResolvedTheme, ThemeChoice } from '../theme';
 import { ComparisonProviderResult, ComparisonResult, PROVIDER_ORDER, ProviderId } from '../types';
 import { WorkloadFormState } from '../workload';
@@ -171,10 +170,9 @@ function LandingComparisonCard({
     >
       {card.isBestValue ? <span className="landing-best-badge">Best value</span> : null}
       <div className="landing-card-header">
-        <img
+        <span
           className={`landing-provider-logo landing-provider-logo-${card.providerId}`}
-          src={providerLogoSrc(card.providerId)}
-          alt=""
+          data-label={card.label}
           aria-hidden="true"
         />
         <span className={`landing-provider-label landing-provider-label-${card.providerId}`}>
@@ -209,7 +207,10 @@ function ProviderEstimateLoader({ providerId, label }: { providerId: ProviderId;
       aria-label={`${providerLabel(providerId)} estimate pending`}
     >
       <span className="provider-pending-icon" aria-hidden="true">
-        <img src={providerMarkSrc(providerId)} alt="" />
+        <span
+          className={`provider-mark provider-mark-${providerId}`}
+          data-code={providerShortCode(providerId)}
+        />
       </span>
       <span>{label}</span>
       <span className="provider-pending-bars" aria-hidden="true">
@@ -288,6 +289,17 @@ function providerLabel(providerId: ProviderId): string {
       return 'AWS';
     case 'azure':
       return 'Azure';
+    case 'gcp':
+      return 'GCP';
+  }
+}
+
+function providerShortCode(providerId: ProviderId): string {
+  switch (providerId) {
+    case 'aws':
+      return 'AWS';
+    case 'azure':
+      return 'AZ';
     case 'gcp':
       return 'GCP';
   }

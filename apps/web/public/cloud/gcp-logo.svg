@@ -1,9 +1,0 @@
-<svg width="170" height="48" viewBox="0 0 170 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="gcp-logo-title">
-  <title id="gcp-logo-title">Google Cloud</title>
-  <path d="M29.5 36.5a16.1 16.1 0 0 1 2-27l4.4 7.6a7.6 7.6 0 0 0-2.1 12.6l-4.3 6.8Z" fill="#4285F4"/>
-  <path d="M31.5 9.5a16.1 16.1 0 0 1 21.8 3.8l-7.1 5.2A7.6 7.6 0 0 0 35.9 17l-4.4-7.5Z" fill="#EA4335"/>
-  <path d="M53.3 13.3A16.1 16.1 0 0 1 55 32.2l-7.3-4.6a7.6 7.6 0 0 0-1.5-9.1l7.1-5.2Z" fill="#FBBC04"/>
-  <path d="M55 32.2a16.1 16.1 0 0 1-25.5 4.3l4.3-6.8a7.6 7.6 0 0 0 13.9-2.1l7.3 4.6Z" fill="#34A853"/>
-  <text x="72" y="21" fill="#3C4043" font-family="Google Sans, Arial, Helvetica, sans-serif" font-size="16" font-weight="650">Google</text>
-  <text x="72" y="37" fill="#3C4043" font-family="Google Sans, Arial, Helvetica, sans-serif" font-size="16" font-weight="650">Cloud</text>
-</svg>

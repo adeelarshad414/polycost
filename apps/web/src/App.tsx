@@ -7,7 +7,6 @@ import { FinOpsFeatureLayer, SharedReportPlaceholder } from './components/FinOps
 import { PersonaComparisonWorkspace } from './components/PersonaComparisonWorkspace';
 import { ThemeSwitcher } from './components/ThemeSwitcher';
 import { TopLoadingBar } from './components/TopLoadingBar';
-import { providerLogoSrc, providerMarkSrc } from './provider-brand';
 import {
   COMPARISON_REGION_GROUPS,
   comparisonRegionLabel,
@@ -46,27 +45,9 @@ import {
 
 type InputMode = 'describe' | 'form';
 type BusyAction = 'parse' | 'compare' | 'refresh' | 'export' | null;
-type ResultWorkspaceView = 'executive' | 'engineering';
 type ServiceCategory = ComparisonProviderResult['lineItems'][number]['category'];
 type FormSectionTone = 'profile' | 'compute' | 'services' | 'portfolio' | 'data' | 'network';
 type ToggleIconKind = 'storage' | 'database' | 'cdn' | 'loadBalancer' | 'multiAz' | 'multiRegion';
-
-const RESULT_WORKSPACE_VIEWS: Array<{
-  key: ResultWorkspaceView;
-  label: string;
-  description: string;
-}> = [
-  {
-    key: 'executive',
-    label: 'Executive View',
-    description: 'Decision memo, savings, provider ranking',
-  },
-  {
-    key: 'engineering',
-    label: 'Engineering View',
-    description: 'Architecture checks, cost drivers, exports',
-  },
-];
 
 const INPUT_MODE_OPTIONS: Array<{
   key: InputMode;
@@ -363,8 +344,6 @@ export function App({ client = polyCostClient }: AppProps) {
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
     resolveTheme(storedTheme()),
   );
-  const [activeWorkspaceView, setActiveWorkspaceView] =
-    useState<ResultWorkspaceView>('executive');
   const [inputMode, setInputMode] = useState<InputMode>('form');
   const [naturalLanguageInput, setNaturalLanguageInput] = useState(sampleNaturalLanguageInput);
   const [form, setForm] = useState<WorkloadFormState>(INITIAL_HOME_FORM);
@@ -668,16 +647,13 @@ export function App({ client = polyCostClient }: AppProps) {
       <TopLoadingBar isLoading={isPageLoading} />
       {hasComparison ? <ScrollProgressBar /> : null}
       <AppHeader
-        activeWorkspaceView={activeWorkspaceView}
         resolvedTheme={resolvedTheme}
         themeChoice={themeChoice}
         onSignIn={handleSignIn}
         onThemeChange={setThemeChoice}
-        onWorkspaceViewChange={setActiveWorkspaceView}
       />
       {comparison ? (
         <ProgressiveComparisonPage
-          activeWorkspaceView={activeWorkspaceView}
           client={client}
           comparison={comparison}
           form={form}
@@ -837,19 +813,15 @@ function ScrollProgressBar() {
 }
 
 function AppHeader({
-  activeWorkspaceView,
   resolvedTheme,
   themeChoice,
   onSignIn,
   onThemeChange,
-  onWorkspaceViewChange,
 }: {
-  activeWorkspaceView: ResultWorkspaceView;
   resolvedTheme: ResolvedTheme;
   themeChoice: ThemeChoice;
   onSignIn: () => void;
   onThemeChange: (choice: ThemeChoice) => void;
-  onWorkspaceViewChange: (view: ResultWorkspaceView) => void;
 }) {
   return (
     <header className="app-header" aria-label="PolyCost workspace header">
@@ -862,20 +834,6 @@ function AppHeader({
           <span className="brand-subhead">AWS, Azure, and GCP decision support</span>
         </span>
       </a>
-
-      <div className="persona-view-toggle" role="group" aria-label="Comparison audience view">
-        {RESULT_WORKSPACE_VIEWS.map((view) => (
-          <button
-            key={view.key}
-            type="button"
-            aria-pressed={activeWorkspaceView === view.key}
-            onClick={() => onWorkspaceViewChange(view.key)}
-          >
-            <HeaderViewIcon view={view.key} />
-            <span>{view.label}</span>
-          </button>
-        ))}
-      </div>
 
       <div className="app-header-actions">
         <ThemeSwitcher themeChoice={themeChoice} onThemeChange={onThemeChange} />
@@ -1062,7 +1020,6 @@ function InitialHomePage({
 }
 
 function ProgressiveComparisonPage({
-  activeWorkspaceView,
   client,
   comparison,
   form,
@@ -1092,7 +1049,6 @@ function ProgressiveComparisonPage({
   onRefreshLive,
   onExport,
 }: {
-  activeWorkspaceView: ResultWorkspaceView;
   client: PolyCostClient;
   comparison: ComparisonResult;
   form: WorkloadFormState;
@@ -1159,11 +1115,13 @@ function ProgressiveComparisonPage({
 
             <ProviderSummaryCards comparison={comparison} interval={interval} />
 
-            {activeWorkspaceView === 'executive' ? (
+            <div
+              className="progressive-analytics-stack"
+              aria-label="Executive and engineering analytics"
+            >
               <ExecutiveAnalyticsPreview comparison={comparison} form={submittedForm} />
-            ) : (
               <EngineeringAnalyticsPreview comparison={comparison} interval={interval} />
-            )}
+            </div>
 
             <div className="result-disclosure-stack" aria-label="Additional comparison details">
               <ResultDisclosureSection
@@ -1171,7 +1129,6 @@ function ProgressiveComparisonPage({
                 description="Expand for cost periods, charts, commitment scenarios, budget alerts, sharing, architecture evidence, calculators, and exports."
               >
                 <StateDetailContent
-                  activeWorkspaceView={activeWorkspaceView}
                   busyAction={busyAction}
                   client={client}
                   comparison={comparison}
@@ -1229,7 +1186,6 @@ function RequirementSummaryStrip({
 }
 
 function StateDetailContent({
-  activeWorkspaceView,
   busyAction,
   client,
   comparison,
@@ -1242,7 +1198,6 @@ function StateDetailContent({
   onIntervalChange,
   onRefreshLive,
 }: {
-  activeWorkspaceView: ResultWorkspaceView;
   busyAction: BusyAction;
   client: PolyCostClient;
   comparison: ComparisonResult;
@@ -1257,29 +1212,23 @@ function StateDetailContent({
 }) {
   const isLoading = busyAction === 'compare' || busyAction === 'refresh';
 
-  if (activeWorkspaceView === 'executive') {
-    return (
-      <div className="state-detail-stack state-detail-stack-executive">
-        <section className="state-detail-panel" aria-label="Executive recommendation and export">
-          <ResultDetailHeading
-            title="Executive decision brief"
-            description="A plain-language recommendation, forecast, and board-ready PDF summary export."
-          />
-          <ExecutiveDecisionDashboard
-            comparison={comparison}
-            form={form}
-            regionCatalog={regionCatalog}
-            exportingFormat={exportingFormat}
-            isLoading={isLoading}
-            onExport={onExport}
-          />
-        </section>
-      </div>
-    );
-  }
-
   return (
-    <div className="state-detail-stack state-detail-stack-engineering">
+    <div className="state-detail-stack state-detail-stack-combined">
+      <section className="state-detail-panel" aria-label="Executive recommendation and export">
+        <ResultDetailHeading
+          title="Executive decision brief"
+          description="A plain-language recommendation, forecast, and board-ready PDF summary export."
+        />
+        <ExecutiveDecisionDashboard
+          comparison={comparison}
+          form={form}
+          regionCatalog={regionCatalog}
+          exportingFormat={exportingFormat}
+          isLoading={isLoading}
+          onExport={onExport}
+        />
+      </section>
+
       <section className="state-detail-panel" aria-label="Engineering cost controls">
         <ResultDetailHeading
           title="Engineering cost controls"
@@ -2549,7 +2498,7 @@ function CloudCalculatorLinks({ regionCatalog }: { regionCatalog: RegionCatalogR
               target="_blank"
               rel="noreferrer"
             >
-              <img src={providerLogoSrc(providerId)} alt="" aria-hidden="true" />
+              <ProviderMark providerId={providerId} />
               <span>{providerLabel(providerId)} Calculator</span>
               <ExternalLinkIcon />
             </a>
@@ -2676,17 +2625,9 @@ export function ComparisonView({
   isLoading?: boolean;
   onExport?: (format: ReportFormat) => void;
 }) {
-  const [activeView, setActiveView] = useState<ResultWorkspaceView>('executive');
   const providerResults = new Map<ProviderId, ComparisonProviderResult>(
     comparison?.providers.map((provider) => [provider.providerId, provider]) ?? [],
   );
-
-  function handleViewChange(view: ResultWorkspaceView) {
-    setActiveView(view);
-    window.requestAnimationFrame(() => {
-      scrollToElement(`${view}-view`);
-    });
-  }
 
   return (
     <div className="comparison-view">
@@ -2710,12 +2651,6 @@ export function ComparisonView({
           );
         })}
       </div>
-
-      <ResultWorkspaceNav
-        activeView={activeView}
-        hasComparison={Boolean(comparison)}
-        onChange={handleViewChange}
-      />
 
       <div className="result-workspace-panel result-workspace-stack">
         <section
@@ -2774,38 +2709,6 @@ export function ComparisonView({
         </section>
       </div>
     </div>
-  );
-}
-
-function ResultWorkspaceNav({
-  activeView,
-  hasComparison,
-  onChange,
-}: {
-  activeView: ResultWorkspaceView;
-  hasComparison: boolean;
-  onChange: (view: ResultWorkspaceView) => void;
-}) {
-  return (
-    <section className="result-workspace-nav" aria-label="Result audience views">
-      <div>
-        <span>Workspace</span>
-        <strong>{hasComparison ? 'Comparison ready' : 'Run comparison to populate data'}</strong>
-      </div>
-      <div className="result-tabs" role="group" aria-label="Jump to result view">
-        {RESULT_WORKSPACE_VIEWS.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            aria-pressed={activeView === tab.key}
-            onClick={() => onChange(tab.key)}
-          >
-            <span>{tab.label}</span>
-            <small>{tab.description}</small>
-          </button>
-        ))}
-      </div>
-    </section>
   );
 }
 
@@ -4070,17 +3973,19 @@ function ProviderLogo({ providerId }: { providerId: ProviderId }) {
       data-provider-logo={providerId}
       aria-hidden="true"
     >
-      <img className="provider-logo-image" src={providerLogoSrc(providerId)} alt="" />
+      <span
+        className={`provider-logo-wordmark provider-logo-wordmark-${providerId}`}
+        data-label={providerLabel(providerId)}
+      />
     </div>
   );
 }
 
 function ProviderMark({ providerId }: { providerId: ProviderId }) {
   return (
-    <img
+    <span
       className={`provider-mark provider-mark-${providerId}`}
-      src={providerMarkSrc(providerId)}
-      alt=""
+      data-code={providerShortCode(providerId)}
       aria-hidden="true"
     />
   );
@@ -4107,7 +4012,7 @@ function ProviderPendingValue({
       aria-label={`${providerLabel(providerId)} estimate pending`}
     >
       <span className="provider-pending-icon" aria-hidden="true">
-        <img src={providerMarkSrc(providerId)} alt="" />
+        <ProviderMark providerId={providerId} />
       </span>
       <span>{label}</span>
       <span className="provider-pending-bars" aria-hidden="true">
@@ -4116,18 +4021,6 @@ function ProviderPendingValue({
         <i />
       </span>
     </span>
-  );
-}
-
-function HeaderViewIcon({ view }: { view: ResultWorkspaceView }) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="segment-icon">
-      {view === 'executive' ? (
-        <path d="M5 19V5h14v14H5zM8 15h3V9H8zM13 15h3v-4h-3z" />
-      ) : (
-        <path d="M4 7h16M6 7v10h12V7M9 11h2M13 11h2M9 15h6" />
-      )}
-    </svg>
   );
 }
 
@@ -4252,6 +4145,17 @@ function providerLabel(provider: ProviderId): string {
       return 'AWS';
     case 'azure':
       return 'Azure';
+    case 'gcp':
+      return 'GCP';
+  }
+}
+
+function providerShortCode(provider: ProviderId): string {
+  switch (provider) {
+    case 'aws':
+      return 'AWS';
+    case 'azure':
+      return 'AZ';
     case 'gcp':
       return 'GCP';
   }
@@ -5180,19 +5084,6 @@ function reportFormatLabel(format: ReportFormat): string {
 
 function roundCurrency(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
-}
-
-function scrollToElement(id: string) {
-  const element = document.getElementById(id);
-
-  if (!element || typeof element.scrollIntoView !== 'function') {
-    return;
-  }
-
-  element.scrollIntoView({
-    behavior: 'smooth',
-    block: 'start',
-  });
 }
 
 function parseInputNumber(value: string): number | undefined {

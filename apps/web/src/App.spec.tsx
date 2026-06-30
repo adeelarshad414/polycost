@@ -94,7 +94,8 @@ describe('App', () => {
     expect(text(container)).toContain('Trend pending');
     expect(container.querySelector('.recharts-wrapper')).toBeInstanceOf(HTMLElement);
     expect(text(container)).toContain('Show full breakdown, pricing models & export options');
-    expect(text(container)).not.toContain('Engineering service spend');
+    expect(text(container)).toContain('Engineering service spend');
+    expect(text(container)).toContain('Cost-by-service concentration');
     expect(text(container)).not.toContain('Cost periods & executive analytics');
     expect(text(container)).not.toContain('Pricing models, breakdown, budget & share');
     expect(text(container)).not.toContain('Architecture & engineering evidence');
@@ -224,10 +225,6 @@ describe('App', () => {
     );
     expect(text(container)).toContain('Executive decision brief');
     expect(text(container)).toContain('Export summary');
-    expect(text(container)).not.toContain('Engineering cost controls');
-    expect(text(container)).not.toContain('Filter by tag');
-
-    await click(buttonByText(container, 'Engineering View'));
     expect(detailGate.dataset.open).toBe('true');
     expect(text(container)).toContain('Engineering cost controls');
     expect(text(container)).toContain('Engineering service spend');
@@ -277,12 +274,11 @@ describe('App', () => {
     await click(buttonByText(container, 'PDF'));
     expect(client.exportComparison).toHaveBeenCalledWith(comparisonResult.comparisonId, 'pdf');
 
-    await click(buttonByText(container, 'Executive View'));
     expect(detailGate.dataset.open).toBe('true');
     expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);
     expect(text(container)).toContain('Executive decision brief');
     expect(text(container)).toContain('Export summary');
-    expect(text(container)).not.toContain('Filter by tag');
+    expect(text(container)).toContain('Filter by tag');
 
     await click(disclosureSummary(detailGate));
     expect(detailGate.dataset.open).toBe('false');
@@ -317,7 +313,6 @@ describe('App', () => {
         await validateDeferred.promise;
       });
 
-      await click(buttonByText(container, 'Engineering View'));
       await click(
         disclosureSummary(
           resultDisclosureByTitle(container, 'Show full breakdown, pricing models & export options'),
@@ -362,7 +357,6 @@ describe('App', () => {
 
     expect(text(container)).not.toContain('Comparison ready.');
     expect(container.querySelector('.requirement-summary-strip')).toBeInstanceOf(HTMLElement);
-    await click(buttonByText(container, 'Engineering View'));
     await click(
       disclosureSummary(
         resultDisclosureByTitle(container, 'Show full breakdown, pricing models & export options'),
@@ -459,7 +453,6 @@ describe('App', () => {
       container,
       'Show full breakdown, pricing models & export options',
     );
-    await click(buttonByText(container, 'Engineering View'));
     await click(disclosureSummary(detailGate));
     await click(buttonByText(container, 'Yearly'));
     await click(buttonByText(container, 'Refresh live'));
@@ -644,7 +637,7 @@ describe('ComparisonView', () => {
 
     expect(mobileProviderLabels(container)).toEqual(['AWS', 'Azure', 'GCP']);
     expect(text(container)).toContain('Pending');
-    expect(text(container)).toContain('Run comparison to populate data');
+    expect(text(container)).toContain('Run a comparison to populate AWS service bars.');
     expect(text(container)).not.toContain('Pricing unavailable');
 
     unmount();
@@ -682,8 +675,6 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Shortlist GCP');
     expect(text(container)).toContain('$360.00');
     expect(text(container)).toContain('$144.00');
-
-    await click(resultTabByText(container, 'Engineering View'));
 
     expect(text(container)).toContain('Service driver split');
     expect(text(container)).toContain('EC2');
@@ -736,8 +727,6 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Potential savings');
     expect(text(container)).toContain('$456.00');
 
-    await click(resultTabByText(container, 'Engineering View'));
-
     expect(text(container)).toContain('EBS / S3');
     expect(text(container)).toContain('Disk / Blob');
     expect(text(container)).toContain('Azure SQL');
@@ -786,8 +775,6 @@ describe('ComparisonView', () => {
       <ComparisonView client={client} comparison={richResult} interval="monthly" />,
     );
     await act(async () => undefined);
-
-    await click(resultTabByText(container, 'Engineering View'));
 
     expect(text(container)).toContain('Commitment scenario controls');
     expect(buttonByText(container, 'On-demand').disabled).toBe(false);
@@ -930,20 +917,6 @@ function buttonByText(container: HTMLElement, label: string): HTMLButtonElement 
 
   if (!(button instanceof HTMLButtonElement)) {
     throw new Error(`Button not found: ${label}`);
-  }
-
-  return button;
-}
-
-function resultTabByText(container: HTMLElement, label: string): HTMLButtonElement {
-  const button = Array.from(container.querySelectorAll('.result-tabs button')).find((candidate) =>
-    Array.from(candidate.querySelectorAll('span')).some(
-      (span) => span.textContent?.trim() === label,
-    ),
-  );
-
-  if (!(button instanceof HTMLButtonElement)) {
-    throw new Error(`Result tab not found: ${label}`);
   }
 
   return button;

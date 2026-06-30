@@ -18,7 +18,6 @@ import {
   StoragePricingTier,
   WorkloadInput,
 } from '../types';
-import { providerMarkSrc } from '../provider-brand';
 import {
   canonicalRegionForRegionPreference,
   DEFAULT_COMPARISON_REGION,
@@ -1201,7 +1200,11 @@ function IconPath({ path }: { path: string }) {
 function ProviderLogoHeading({ providerId }: { providerId: ProviderId }) {
   return (
     <span className={`provider-mini-heading provider-mini-heading-${providerId}`}>
-      <img src={providerMarkSrc(providerId)} alt="" aria-hidden="true" />
+      <span
+        className={`provider-mark provider-mark-${providerId}`}
+        data-code={providerShortCode(providerId)}
+        aria-hidden="true"
+      />
       <span>{providerLabel(providerId)}</span>
     </span>
   );
@@ -1213,6 +1216,17 @@ function providerLabel(provider: ProviderId): string {
       return 'AWS';
     case 'azure':
       return 'Azure';
+    case 'gcp':
+      return 'GCP';
+  }
+}
+
+function providerShortCode(provider: ProviderId): string {
+  switch (provider) {
+    case 'aws':
+      return 'AWS';
+    case 'azure':
+      return 'AZ';
     case 'gcp':
       return 'GCP';
   }
