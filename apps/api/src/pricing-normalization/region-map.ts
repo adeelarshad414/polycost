@@ -39,6 +39,23 @@ export function isCanonicalRegion(region: string): region is CanonicalRegion {
   return regionMapFor(region) !== undefined;
 }
 
+export function canonicalRegionForProviderRegion(region: string): CanonicalRegion | undefined {
+  const normalizedRegion = region.trim().toLowerCase();
+
+  for (const canonicalRegion of supportedCanonicalRegions()) {
+    const providerRegions = regionMapFor(canonicalRegion);
+
+    if (
+      providerRegions &&
+      Object.values(providerRegions).some((providerRegion) => providerRegion === normalizedRegion)
+    ) {
+      return canonicalRegion;
+    }
+  }
+
+  return undefined;
+}
+
 export function providerRegionForCanonicalRegion(
   region: string,
   provider: ProviderId,

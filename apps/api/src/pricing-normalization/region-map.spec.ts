@@ -1,4 +1,5 @@
 import {
+  canonicalRegionForProviderRegion,
   providerRegionForCanonicalRegion,
   providerRegionsForCanonicalRegion,
   supportedCanonicalRegions,
@@ -14,7 +15,14 @@ describe('region-map', () => {
     expect(providerRegionForCanonicalRegion('eu-west', 'azure')).toBe('westeurope');
   });
 
+  it('maps provider-specific region codes back to canonical comparison regions', () => {
+    expect(canonicalRegionForProviderRegion('us-east-1')).toBe('us-east');
+    expect(canonicalRegionForProviderRegion('eastus')).toBe('us-east');
+    expect(canonicalRegionForProviderRegion('us-east1')).toBe('us-east');
+  });
+
   it('does not guess unsupported canonical regions', () => {
+    expect(canonicalRegionForProviderRegion('antarctica-south')).toBeUndefined();
     expect(providerRegionsForCanonicalRegion('antarctica-south')).toBeUndefined();
     expect(providerRegionForCanonicalRegion('antarctica-south', 'aws')).toBeUndefined();
     expect(supportedCanonicalRegions()).toContain('us-east');

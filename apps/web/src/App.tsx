@@ -1,11 +1,18 @@
-import { FormEvent, KeyboardEvent, ReactNode, useEffect, useRef, useState } from 'react';
+import { FormEvent, ReactNode, useEffect, useRef, useState } from 'react';
+import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatApiError, PolyCostClient, PolyCostApiError, polyCostClient } from './api-client';
 import { POLYCOST_TAGLINE } from './brand';
 import { Button } from './components/Button';
 import { FinOpsFeatureLayer, SharedReportPlaceholder } from './components/FinOpsFeatureLayer';
 import { PersonaComparisonWorkspace } from './components/PersonaComparisonWorkspace';
+import { ThemeSwitcher } from './components/ThemeSwitcher';
 import { TopLoadingBar } from './components/TopLoadingBar';
 import { providerLogoSrc, providerMarkSrc } from './provider-brand';
+import {
+  COMPARISON_REGION_GROUPS,
+  comparisonRegionLabel,
+  providerRegionSummary,
+} from './region-normalization';
 import {
   CLOUD_SERVICE_CATALOG,
   SERVICE_CATALOG_CATEGORIES,
@@ -17,7 +24,6 @@ import {
 } from './service-catalog';
 import { applyTheme, ResolvedTheme, resolveTheme, storedTheme, ThemeChoice } from './theme';
 import {
-  BackendHealthResponse,
   ComparisonProviderResult,
   ComparisonResult,
   INTERVALS,
@@ -33,6 +39,8 @@ import {
   defaultWorkloadForm,
   formFromNws,
   sampleNaturalLanguageInput,
+  validateWorkloadForm,
+  WorkloadFormIssue,
   WorkloadFormState,
 } from './workload';
 
@@ -57,6 +65,26 @@ const RESULT_WORKSPACE_VIEWS: Array<{
     key: 'engineering',
     label: 'Engineering View',
     description: 'Architecture checks, cost drivers, exports',
+  },
+];
+
+const INPUT_MODE_OPTIONS: Array<{
+  key: InputMode;
+  label: string;
+  summaryLabel: string;
+  description: string;
+}> = [
+  {
+    key: 'form',
+    label: 'Guided form',
+    summaryLabel: 'Manual entry',
+    description: 'Structured sizing fields',
+  },
+  {
+    key: 'describe',
+    label: 'Paste / parse',
+    summaryLabel: 'Parsed from text',
+    description: 'Natural language or pasted bill text',
   },
 ];
 
@@ -219,6 +247,54 @@ interface ProviderCostSummary {
   categoryTotals: CategoryCostSummary[];
 }
 
+interface ProviderMixDatum {
+  providerId: ProviderId;
+  name: string;
+  value: number;
+  percent: number;
+  color: string;
+}
+
+interface ExecutiveAnalyticsModel {
+  review: FinOpsReview;
+  monthlySummaries: ProviderCostSummary[];
+  pricedMonthlySummaries: ProviderCostSummary[];
+  totalMonthlyAcrossProviders?: number;
+  providerMix: ProviderMixDatum[];
+  cheapest?: ProviderCostSummary;
+  highest?: ProviderCostSummary;
+  annualPotentialSavings?: number;
+  monthlyPotentialSavings?: number;
+}
+
+interface EngineeringServiceDatum {
+  category: ServiceCategory;
+  serviceLabel: string;
+  value: number;
+  percent: number;
+  color: string;
+}
+
+interface EngineeringProviderServiceModel {
+  providerId: ProviderId;
+  total?: number;
+  lineItemCount: number;
+  approximateCount: number;
+  services: EngineeringServiceDatum[];
+  dominantService?: EngineeringServiceDatum;
+}
+
+interface EngineeringAnalyticsModel {
+  providers: EngineeringProviderServiceModel[];
+  pricedProviders: EngineeringProviderServiceModel[];
+  totalLineItems: number;
+  approximateCount: number;
+  topDriver?: {
+    providerId: ProviderId;
+    service: EngineeringServiceDatum;
+  };
+}
+
 interface FinOpsReview {
   executiveDecision: ExecutiveDecision;
   solutionArchitecture: SolutionArchitectureReview;
@@ -283,14 +359,17 @@ export function App({ client = polyCostClient }: AppProps) {
   const shareToken = shareTokenFromLocation();
   const isPageLoading = usePageLoadingState();
   const activeAsyncActionId = useRef(0);
-  const [themeChoice] = useState<ThemeChoice>(() => storedTheme());
+  const [themeChoice, setThemeChoice] = useState<ThemeChoice>(() => storedTheme());
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
     resolveTheme(storedTheme()),
   );
+  const [activeWorkspaceView, setActiveWorkspaceView] =
+    useState<ResultWorkspaceView>('executive');
   const [inputMode, setInputMode] = useState<InputMode>('form');
   const [naturalLanguageInput, setNaturalLanguageInput] = useState(sampleNaturalLanguageInput);
   const [form, setForm] = useState<WorkloadFormState>(INITIAL_HOME_FORM);
   const [submittedForm, setSubmittedForm] = useState<WorkloadFormState>(INITIAL_HOME_FORM);
+  const [submittedInputMode, setSubmittedInputMode] = useState<InputMode>('form');
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
   const [interval, setInterval] = useState<IntervalKey>('monthly');
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
@@ -298,10 +377,9 @@ export function App({ client = polyCostClient }: AppProps) {
   const [isEditingRequirements, setIsEditingRequirements] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [backendHealth, setBackendHealth] = useState<BackendHealthResponse | null>(null);
-  const [backendHealthError, setBackendHealthError] = useState<string | null>(null);
   const [regionCatalog, setRegionCatalog] = useState<RegionCatalogResponse | null>(null);
   const [regionCatalogError, setRegionCatalogError] = useState<string | null>(null);
+  const [formValidationIssues, setFormValidationIssues] = useState<WorkloadFormIssue[]>([]);
 
   useEffect(() => {
     setResolvedTheme(applyTheme(themeChoice));
@@ -309,25 +387,6 @@ export function App({ client = polyCostClient }: AppProps) {
 
   useEffect(() => {
     let isMounted = true;
-
-    void client
-      .getHealth()
-      .then((health) => {
-        if (!isMounted) {
-          return;
-        }
-
-        setBackendHealth(health);
-        setBackendHealthError(null);
-      })
-      .catch((healthError) => {
-        if (!isMounted) {
-          return;
-        }
-
-        setBackendHealth(null);
-        setBackendHealthError(formatApiError(healthError));
-      });
 
     void client
       .getRegionCatalog()
@@ -354,10 +413,16 @@ export function App({ client = polyCostClient }: AppProps) {
   }, [client]);
 
   if (shareToken) {
-    return <SharedReportPlaceholder token={shareToken} />;
+    return <SharedReportPlaceholder client={client} token={shareToken} />;
   }
 
   async function handleParse() {
+    if (!naturalLanguageInput.trim()) {
+      setError('Enter workload requirements before parsing.');
+      setNotice(null);
+      return;
+    }
+
     const actionId = startAsyncAction();
     setError(null);
     setNotice(null);
@@ -370,6 +435,7 @@ export function App({ client = polyCostClient }: AppProps) {
       }
 
       setForm(formFromNws(parsed.draftNws));
+      setFormValidationIssues([]);
       setInputMode('form');
       setNotice(reviewMessage(parsed.parserConfidence, parsed.fieldsRequiringReview));
     } catch (parseError) {
@@ -384,14 +450,30 @@ export function App({ client = polyCostClient }: AppProps) {
   }
 
   async function handleCompare(event?: FormEvent) {
-    const actionId = startAsyncAction();
     event?.preventDefault();
+    const validationIssues = inputMode === 'form' ? validateWorkloadForm(form) : [];
+
+    if (inputMode === 'describe' && !naturalLanguageInput.trim()) {
+      setError('Enter workload requirements before comparing.');
+      setNotice(null);
+      return;
+    }
+
+    if (validationIssues.length > 0) {
+      setFormValidationIssues(validationIssues);
+      setError(formValidationSummaryMessage(validationIssues));
+      setNotice(null);
+      return;
+    }
+
+    setFormValidationIssues([]);
+    const actionId = startAsyncAction();
     setError(null);
     setNotice(null);
     setBusyAction('compare');
 
     try {
-      const { nws, parserNotice, parsedForm, submittedComparisonForm } =
+      const { nws, parserNotice, parsedForm, submittedComparisonForm, submittedComparisonInputMode } =
         await prepareNwsForComparison();
       if (!isCurrentAsyncAction(actionId)) {
         return;
@@ -399,7 +481,7 @@ export function App({ client = polyCostClient }: AppProps) {
 
       if (parsedForm) {
         setForm(parsedForm);
-        setInputMode('form');
+        setFormValidationIssues([]);
       }
 
       await client.validateWorkload(nws);
@@ -414,6 +496,7 @@ export function App({ client = polyCostClient }: AppProps) {
 
       setComparison(result);
       setSubmittedForm(submittedComparisonForm);
+      setSubmittedInputMode(submittedComparisonInputMode);
       setIsEditingRequirements(false);
       setNotice(parserNotice ? `${parserNotice} Comparison ready.` : 'Comparison ready.');
     } catch (comparisonError) {
@@ -432,11 +515,13 @@ export function App({ client = polyCostClient }: AppProps) {
     parserNotice?: string;
     parsedForm?: WorkloadFormState;
     submittedComparisonForm: WorkloadFormState;
+    submittedComparisonInputMode: InputMode;
   }> {
     if (inputMode !== 'describe') {
       return {
         nws: buildNwsFromForm(form, 'structured_form'),
         submittedComparisonForm: form,
+        submittedComparisonInputMode: 'form',
       };
     }
 
@@ -453,6 +538,7 @@ export function App({ client = polyCostClient }: AppProps) {
       parserNotice: reviewMessage(parsed.parserConfidence, parsed.fieldsRequiringReview),
       parsedForm,
       submittedComparisonForm: parsedForm,
+      submittedComparisonInputMode: 'describe',
     };
   }
 
@@ -518,6 +604,7 @@ export function App({ client = polyCostClient }: AppProps) {
 
   function handleClearRequirements() {
     setNaturalLanguageInput('');
+    setFormValidationIssues([]);
     setNotice(null);
     setError(null);
   }
@@ -526,6 +613,7 @@ export function App({ client = polyCostClient }: AppProps) {
     cancelAsyncActions();
     setForm(INITIAL_HOME_FORM);
     setSubmittedForm(INITIAL_HOME_FORM);
+    setSubmittedInputMode('form');
     setInputMode('form');
     setNaturalLanguageInput(sampleNaturalLanguageInput);
     setComparison(null);
@@ -535,18 +623,26 @@ export function App({ client = polyCostClient }: AppProps) {
     setExportingFormat(null);
     setNotice(null);
     setError(null);
+    setFormValidationIssues([]);
+  }
+
+  function handleFormChange(nextForm: WorkloadFormState) {
+    setForm(nextForm);
+    setFormValidationIssues((currentIssues) =>
+      currentIssues.length > 0 ? validateWorkloadForm(nextForm) : currentIssues,
+    );
   }
 
   function handleEditComparison() {
     setForm(submittedForm);
-    setInputMode('form');
+    setFormValidationIssues([]);
+    setInputMode(submittedInputMode);
     setIsEditingRequirements(true);
   }
 
-  function handleCancelEdit() {
-    setForm(submittedForm);
-    setInputMode('form');
-    setIsEditingRequirements(false);
+  function handleSignIn() {
+    setError(null);
+    setNotice('Sign in is not required for the local open-source demo.');
   }
 
   function startAsyncAction(): number {
@@ -571,11 +667,22 @@ export function App({ client = polyCostClient }: AppProps) {
     >
       <TopLoadingBar isLoading={isPageLoading} />
       {hasComparison ? <ScrollProgressBar /> : null}
+      <AppHeader
+        activeWorkspaceView={activeWorkspaceView}
+        resolvedTheme={resolvedTheme}
+        themeChoice={themeChoice}
+        onSignIn={handleSignIn}
+        onThemeChange={setThemeChoice}
+        onWorkspaceViewChange={setActiveWorkspaceView}
+      />
       {comparison ? (
         <ProgressiveComparisonPage
+          activeWorkspaceView={activeWorkspaceView}
+          client={client}
           comparison={comparison}
           form={form}
           submittedForm={submittedForm}
+          submittedInputMode={submittedInputMode}
           inputMode={inputMode}
           interval={interval}
           isEditingRequirements={isEditingRequirements}
@@ -586,12 +693,12 @@ export function App({ client = polyCostClient }: AppProps) {
           naturalLanguageInput={naturalLanguageInput}
           regionCatalog={regionCatalog}
           regionCatalogError={regionCatalogError}
+          validationIssues={formValidationIssues}
           onClear={handleClearComparison}
           onEdit={handleEditComparison}
-          onCancelEdit={handleCancelEdit}
           onInputModeChange={setInputMode}
           onNaturalLanguageChange={setNaturalLanguageInput}
-          onFormChange={setForm}
+          onFormChange={handleFormChange}
           onSubmit={handleCompare}
           onParse={handleParse}
           onClearRequirements={handleClearRequirements}
@@ -603,14 +710,20 @@ export function App({ client = polyCostClient }: AppProps) {
       ) : (
         <InitialHomePage
           form={form}
+          inputMode={inputMode}
+          naturalLanguageInput={naturalLanguageInput}
           regionCatalog={regionCatalog}
           regionCatalogError={regionCatalogError}
-          resolvedTheme={resolvedTheme}
           notice={notice}
           error={error}
+          validationIssues={formValidationIssues}
           isComparing={busyAction === 'compare'}
-          onChange={setForm}
+          onInputModeChange={setInputMode}
+          onNaturalLanguageChange={setNaturalLanguageInput}
+          onChange={handleFormChange}
+          onClearRequirements={handleClearRequirements}
           onSubmit={handleCompare}
+          onUseSample={() => setNaturalLanguageInput(sampleNaturalLanguageInput)}
         />
       )}
     </main>
@@ -723,26 +836,90 @@ function ScrollProgressBar() {
   );
 }
 
+function AppHeader({
+  activeWorkspaceView,
+  resolvedTheme,
+  themeChoice,
+  onSignIn,
+  onThemeChange,
+  onWorkspaceViewChange,
+}: {
+  activeWorkspaceView: ResultWorkspaceView;
+  resolvedTheme: ResolvedTheme;
+  themeChoice: ThemeChoice;
+  onSignIn: () => void;
+  onThemeChange: (choice: ThemeChoice) => void;
+  onWorkspaceViewChange: (view: ResultWorkspaceView) => void;
+}) {
+  return (
+    <header className="app-header" aria-label="PolyCost workspace header">
+      <a className="brand-lockup app-brand-link" href="#requirements" aria-label="PolyCost home">
+        <span className="brand-logo-shell">
+          <img className="brand-logo-image" src={logoSrcForTheme(resolvedTheme)} alt="" />
+        </span>
+        <span className="brand-copy">
+          <span className="brand-tagline">Cloud-neutral cost comparison</span>
+          <span className="brand-subhead">AWS, Azure, and GCP decision support</span>
+        </span>
+      </a>
+
+      <div className="persona-view-toggle" role="group" aria-label="Comparison audience view">
+        {RESULT_WORKSPACE_VIEWS.map((view) => (
+          <button
+            key={view.key}
+            type="button"
+            aria-pressed={activeWorkspaceView === view.key}
+            onClick={() => onWorkspaceViewChange(view.key)}
+          >
+            <HeaderViewIcon view={view.key} />
+            <span>{view.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="app-header-actions">
+        <ThemeSwitcher themeChoice={themeChoice} onThemeChange={onThemeChange} />
+        <Button type="button" variant="secondary" className="app-signin-button" onClick={onSignIn}>
+          <SignInIcon />
+          Sign in
+        </Button>
+      </div>
+    </header>
+  );
+}
+
 function InitialHomePage({
   form,
+  inputMode,
+  naturalLanguageInput,
   regionCatalog,
   regionCatalogError,
-  resolvedTheme,
   notice,
   error,
+  validationIssues,
   isComparing,
+  onInputModeChange,
+  onNaturalLanguageChange,
   onChange,
+  onClearRequirements,
   onSubmit,
+  onUseSample,
 }: {
   form: WorkloadFormState;
+  inputMode: InputMode;
+  naturalLanguageInput: string;
   regionCatalog: RegionCatalogResponse | null;
   regionCatalogError: string | null;
-  resolvedTheme: ResolvedTheme;
   notice: string | null;
   error: string | null;
+  validationIssues: WorkloadFormIssue[];
   isComparing: boolean;
+  onInputModeChange: (mode: InputMode) => void;
+  onNaturalLanguageChange: (value: string) => void;
   onChange: (form: WorkloadFormState) => void;
+  onClearRequirements: () => void;
   onSubmit: (event: FormEvent) => void;
+  onUseSample: () => void;
 }) {
   function update<K extends keyof WorkloadFormState>(key: K, value: WorkloadFormState[K]) {
     onChange({
@@ -759,100 +936,138 @@ function InitialHomePage({
     });
   }
 
+  const fieldErrors = validationIssueMap(validationIssues);
+
   return (
-    <section className="initial-home" aria-labelledby="page-title">
+    <section className="initial-home" id="requirements" aria-labelledby="page-title">
       <div className="initial-home-brand">
-        <img src={logoSrcForTheme(resolvedTheme)} alt="PolyCost" />
         <h1 id="page-title">{POLYCOST_TAGLINE}</h1>
+        <p>Enter the core workload shape, then compare AWS, Azure, and GCP side by side.</p>
       </div>
 
-      <form className="initial-home-form" onSubmit={onSubmit} aria-label="Compare cloud costs">
-        <div className="initial-home-fields">
-          <SelectField
-            label="Workload type"
-            value={form.workloadType}
-            options={[
-              ['web_app', 'Web app'],
-              ['api_backend', 'API backend'],
-              ['static_site', 'Static site'],
-              ['batch_processing', 'Batch'],
-              ['data_pipeline', 'Data pipeline'],
-              ['ml_workload', 'ML workload'],
-              ['other', 'Other'],
-            ]}
-            onChange={(value) => update('workloadType', value)}
-          />
-          <TextField
-            label="vCPU"
-            value={form.vcpu}
-            inputMode="decimal"
-            suffix="cores"
-            onChange={(value) => update('vcpu', value)}
-          />
-          <TextField
-            label="Memory GB"
-            value={form.memoryGb}
-            inputMode="decimal"
-            suffix="GB"
-            onChange={(value) => update('memoryGb', value)}
-          />
-          <RegionSelectField
-            value={form.regionPreference}
-            regionCatalog={regionCatalog}
-            regionCatalogError={regionCatalogError}
-            compact
-            onChange={(value) => update('regionPreference', value)}
-          />
-        </div>
+      <div className="initial-home-form" aria-label="Compare cloud costs">
+        <InputModeTabs inputMode={inputMode} onInputModeChange={onInputModeChange} />
 
-        <details className="initial-optional-estimate">
-          <summary>
-            <span>Add storage & egress estimate</span>
-            <span className="initial-optional-chevron" aria-hidden="true">
-              +
-            </span>
-          </summary>
-          <div className="initial-optional-fields">
-            <TextField
-              label="Storage GB"
-              value={form.storageSizeGb}
-              inputMode="decimal"
-              suffix="GB"
-              onChange={updateStorageSize}
+        {inputMode === 'form' ? (
+          <form className="initial-guided-form" onSubmit={onSubmit}>
+            <FormValidationSummary issues={validationIssues} />
+            <div className="initial-home-fields">
+              <SelectField
+                label="Workload type"
+                value={form.workloadType}
+                options={[
+                  ['web_app', 'Web app'],
+                  ['api_backend', 'API backend'],
+                  ['static_site', 'Static site'],
+                  ['batch_processing', 'Batch'],
+                  ['data_pipeline', 'Data pipeline'],
+                  ['ml_workload', 'ML workload'],
+                  ['other', 'Other'],
+                ]}
+                onChange={(value) => update('workloadType', value)}
+              />
+              <TextField
+                label="vCPU"
+                value={form.vcpu}
+                inputMode="decimal"
+                suffix="cores"
+                error={fieldErrors.vcpu}
+                onChange={(value) => update('vcpu', value)}
+              />
+              <TextField
+                label="Memory GB"
+                value={form.memoryGb}
+                inputMode="decimal"
+                suffix="GB"
+                error={fieldErrors.memoryGb}
+                onChange={(value) => update('memoryGb', value)}
+              />
+              <RegionSelectField
+                value={form.regionPreference}
+                regionCatalog={regionCatalog}
+                regionCatalogError={regionCatalogError}
+                compact
+                onChange={(value) => update('regionPreference', value)}
+              />
+            </div>
+
+            <details className="initial-optional-estimate">
+              <summary>
+                <span>Add storage & egress estimate</span>
+                <span className="initial-optional-chevron" aria-hidden="true">
+                  +
+                </span>
+              </summary>
+              <div className="initial-optional-fields">
+                <TextField
+                  label="Storage GB"
+                  value={form.storageSizeGb}
+                  inputMode="decimal"
+                  suffix="GB"
+                  error={fieldErrors.storageSizeGb}
+                  onChange={updateStorageSize}
+                />
+                <TextField
+                  label="Egress GB/mo"
+                  value={form.monthlyEgressGb}
+                  inputMode="decimal"
+                  suffix="GB"
+                  error={fieldErrors.monthlyEgressGb}
+                  onChange={(value) => update('monthlyEgressGb', value)}
+                />
+              </div>
+            </details>
+
+            <div className="initial-home-actions">
+              <Button
+                type="submit"
+                variant="primary"
+                loading={isComparing}
+                loadingLabel="Comparing costs..."
+                disabled={isComparing}
+              >
+                <CompareIcon />
+                Compare costs
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <form className="initial-paste-form" onSubmit={onSubmit}>
+            <DescribePanel
+              value={naturalLanguageInput}
+              isParsing={isComparing}
+              onChange={onNaturalLanguageChange}
+              onClear={onClearRequirements}
+              onUseSample={onUseSample}
             />
-            <TextField
-              label="Egress GB/mo"
-              value={form.monthlyEgressGb}
-              inputMode="decimal"
-              suffix="GB"
-              onChange={(value) => update('monthlyEgressGb', value)}
-            />
-          </div>
-        </details>
+            <div className="initial-home-actions">
+              <Button
+                type="submit"
+                variant="primary"
+                loading={isComparing}
+                loadingLabel={compareLoadingLabel(inputMode)}
+                disabled={isComparing}
+              >
+                <ParseIcon />
+                {compareButtonLabel(inputMode)}
+              </Button>
+            </div>
+          </form>
+        )}
 
-        <div className="initial-home-actions">
-          <Button
-            type="submit"
-            variant="primary"
-            loading={isComparing}
-            loadingLabel="Comparing costs..."
-            disabled={isComparing}
-          >
-            <CompareIcon />
-            Compare costs
-          </Button>
-        </div>
-
-        <StatusMessage notice={notice} error={error} />
-      </form>
+        <StatusMessage notice={initialStatusNotice(notice)} error={error} />
+      </div>
     </section>
   );
 }
 
 function ProgressiveComparisonPage({
+  activeWorkspaceView,
+  client,
   comparison,
   form,
   submittedForm,
+  submittedInputMode,
   inputMode,
   interval,
   isEditingRequirements,
@@ -863,9 +1078,9 @@ function ProgressiveComparisonPage({
   naturalLanguageInput,
   regionCatalog,
   regionCatalogError,
+  validationIssues,
   onClear,
   onEdit,
-  onCancelEdit,
   onInputModeChange,
   onNaturalLanguageChange,
   onFormChange,
@@ -877,9 +1092,12 @@ function ProgressiveComparisonPage({
   onRefreshLive,
   onExport,
 }: {
+  activeWorkspaceView: ResultWorkspaceView;
+  client: PolyCostClient;
   comparison: ComparisonResult;
   form: WorkloadFormState;
   submittedForm: WorkloadFormState;
+  submittedInputMode: InputMode;
   inputMode: InputMode;
   interval: IntervalKey;
   isEditingRequirements: boolean;
@@ -890,9 +1108,9 @@ function ProgressiveComparisonPage({
   naturalLanguageInput: string;
   regionCatalog: RegionCatalogResponse | null;
   regionCatalogError: string | null;
+  validationIssues: WorkloadFormIssue[];
   onClear: () => void;
   onEdit: () => void;
-  onCancelEdit: () => void;
   onInputModeChange: (mode: InputMode) => void;
   onNaturalLanguageChange: (value: string) => void;
   onFormChange: (form: WorkloadFormState) => void;
@@ -908,110 +1126,69 @@ function ProgressiveComparisonPage({
     <section className="progressive-results" id="requirements" aria-label="Cost comparison results">
       <div className="progressive-results-inner">
         {isEditingRequirements ? (
-          <RequirementsEditPanel
-            form={form}
-            inputMode={inputMode}
-            naturalLanguageInput={naturalLanguageInput}
-            regionCatalog={regionCatalog}
-            regionCatalogError={regionCatalogError}
-            busyAction={busyAction}
-            onCancel={onCancelEdit}
-            onClearRequirements={onClearRequirements}
-            onFormChange={onFormChange}
-            onInputModeChange={onInputModeChange}
-            onNaturalLanguageChange={onNaturalLanguageChange}
-            onParse={onParse}
-            onSubmit={onSubmit}
-            onUseSample={onUseSample}
-          />
+          <>
+            <RequirementsEditPanel
+              form={form}
+              inputMode={inputMode}
+              naturalLanguageInput={naturalLanguageInput}
+              regionCatalog={regionCatalog}
+              regionCatalogError={regionCatalogError}
+              validationIssues={validationIssues}
+              busyAction={busyAction}
+              onClearRequirements={onClearRequirements}
+              onFormChange={onFormChange}
+              onInputModeChange={onInputModeChange}
+              onNaturalLanguageChange={onNaturalLanguageChange}
+              onParse={onParse}
+              onSubmit={onSubmit}
+              onUseSample={onUseSample}
+            />
+            <StatusMessage notice={editStatusNotice(notice)} error={error} />
+          </>
         ) : (
-          <RequirementSummaryStrip
-            form={submittedForm}
-            regionCatalog={regionCatalog}
-            onClear={onClear}
-            onEdit={onEdit}
-          />
+          <>
+            <RequirementSummaryStrip
+              form={submittedForm}
+              inputMode={submittedInputMode}
+              regionCatalog={regionCatalog}
+              onClear={onClear}
+              onEdit={onEdit}
+            />
+
+            <StatusMessage notice={resultStatusNotice(notice)} error={null} />
+
+            <ProviderSummaryCards comparison={comparison} interval={interval} />
+
+            {activeWorkspaceView === 'executive' ? (
+              <ExecutiveAnalyticsPreview comparison={comparison} form={submittedForm} />
+            ) : (
+              <EngineeringAnalyticsPreview comparison={comparison} interval={interval} />
+            )}
+
+            <div className="result-disclosure-stack" aria-label="Additional comparison details">
+              <ResultDisclosureSection
+                title="Show full breakdown, pricing models & export options"
+                description="Expand for cost periods, charts, commitment scenarios, budget alerts, sharing, architecture evidence, calculators, and exports."
+              >
+                <StateDetailContent
+                  activeWorkspaceView={activeWorkspaceView}
+                  busyAction={busyAction}
+                  client={client}
+                  comparison={comparison}
+                  error={error}
+                  exportingFormat={exportingFormat}
+                  form={submittedForm}
+                  interval={interval}
+                  regionCatalog={regionCatalog}
+                  onExport={onExport}
+                  onIntervalChange={onIntervalChange}
+                  onRefreshLive={onRefreshLive}
+                />
+              </ResultDisclosureSection>
+            </div>
+          </>
         )}
 
-        <ProviderSummaryCards comparison={comparison} interval={interval} />
-
-        <StatusMessage notice={isEditingRequirements ? editStatusNotice(notice) : null} error={error} />
-
-        <div className="result-disclosure-stack" aria-label="Additional comparison details">
-          <ResultDisclosureSection
-            title="Cost periods & executive analytics"
-            description="Daily to yearly views, financial charts, provider ranking, and category heatmap."
-          >
-            <ComparisonToolbar interval={interval} onIntervalChange={onIntervalChange} />
-            <ExecutiveOverview comparison={comparison} interval={interval} form={submittedForm} />
-            <div className="analysis-grid analysis-grid-compact">
-              <ProviderRanking summaries={providerCostSummaries(comparison, interval)} interval={interval} />
-              <IntervalOutlook comparison={comparison} />
-              <CategoryHeatmap summaries={providerCostSummaries(comparison, interval)} />
-            </div>
-          </ResultDisclosureSection>
-
-          <ResultDisclosureSection
-            title="Pricing models, breakdown, budget & share"
-            description="Commitment scenarios, compute/storage/egress mix, budget alerts, currency, and share workflow."
-          >
-            <FinOpsFeatureLayer
-              comparison={comparison}
-              interval={interval}
-              isLoading={busyAction === 'compare' || busyAction === 'refresh'}
-            />
-          </ResultDisclosureSection>
-
-          <ResultDisclosureSection
-            title="Architecture & engineering evidence"
-            description="Solution architecture review, governance checks, line-item evidence, and API-facing rows."
-          >
-            <ArchitectureWorkspace comparison={comparison} interval={interval} form={submittedForm} />
-            <PersonaComparisonWorkspace
-              comparison={comparison}
-              interval={interval}
-              form={submittedForm}
-              defaultViewMode="engineering"
-              emptyStateMessage="Run a comparison to populate engineering rows, export controls, and API-facing cost evidence."
-              isLoading={busyAction === 'compare' || busyAction === 'refresh'}
-              error={error}
-              exportingFormat={exportingFormat}
-              onExport={onExport}
-              showViewSwitcher={false}
-            />
-          </ResultDisclosureSection>
-
-          <ResultDisclosureSection
-            title="Official calculators & regions"
-            description="Provider calculator links and official region/AZ references for validation."
-          >
-            <CloudCalculatorLinks regionCatalog={regionCatalog} />
-          </ResultDisclosureSection>
-
-          <ResultDisclosureSection
-            title="Export report"
-            description="Download the current comparison as PDF, CSV, or Excel."
-          >
-            <div className="progressive-export-panel">
-              <ExportBar
-                disabled={busyAction !== null && busyAction !== 'export'}
-                exportingFormat={exportingFormat}
-                onExport={onExport}
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={onRefreshLive}
-                loading={busyAction === 'refresh'}
-                loadingLabel="Refreshing..."
-                disabled={busyAction !== null && busyAction !== 'refresh'}
-              >
-                <RefreshIcon />
-                Refresh live
-              </Button>
-            </div>
-          </ResultDisclosureSection>
-        </div>
       </div>
     </section>
   );
@@ -1019,11 +1196,13 @@ function ProgressiveComparisonPage({
 
 function RequirementSummaryStrip({
   form,
+  inputMode,
   regionCatalog,
   onClear,
   onEdit,
 }: {
   form: WorkloadFormState;
+  inputMode: InputMode;
   regionCatalog: RegionCatalogResponse | null;
   onClear: () => void;
   onEdit: () => void;
@@ -1031,7 +1210,10 @@ function RequirementSummaryStrip({
   return (
     <section className="requirement-summary-strip" aria-label="Current workload summary">
       <div className="summary-strip-main">
-        <span>Requirements</span>
+        <span className="summary-strip-kicker">
+          <InputModeBadge mode={inputMode} />
+          <span>Requirements</span>
+        </span>
         <strong>{compactRequirementSummary(form, regionCatalog)}</strong>
       </div>
       <div className="summary-strip-actions">
@@ -1046,10 +1228,171 @@ function RequirementSummaryStrip({
   );
 }
 
+function StateDetailContent({
+  activeWorkspaceView,
+  busyAction,
+  client,
+  comparison,
+  error,
+  exportingFormat,
+  form,
+  interval,
+  regionCatalog,
+  onExport,
+  onIntervalChange,
+  onRefreshLive,
+}: {
+  activeWorkspaceView: ResultWorkspaceView;
+  busyAction: BusyAction;
+  client: PolyCostClient;
+  comparison: ComparisonResult;
+  error: string | null;
+  exportingFormat: ReportFormat | null;
+  form: WorkloadFormState;
+  interval: IntervalKey;
+  regionCatalog: RegionCatalogResponse | null;
+  onExport: (format: ReportFormat) => void;
+  onIntervalChange: (interval: IntervalKey) => void;
+  onRefreshLive: () => void;
+}) {
+  const isLoading = busyAction === 'compare' || busyAction === 'refresh';
+
+  if (activeWorkspaceView === 'executive') {
+    return (
+      <div className="state-detail-stack state-detail-stack-executive">
+        <section className="state-detail-panel" aria-label="Executive recommendation and export">
+          <ResultDetailHeading
+            title="Executive decision brief"
+            description="A plain-language recommendation, forecast, and board-ready PDF summary export."
+          />
+          <ExecutiveDecisionDashboard
+            comparison={comparison}
+            form={form}
+            regionCatalog={regionCatalog}
+            exportingFormat={exportingFormat}
+            isLoading={isLoading}
+            onExport={onExport}
+          />
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div className="state-detail-stack state-detail-stack-engineering">
+      <section className="state-detail-panel" aria-label="Engineering cost controls">
+        <ResultDetailHeading
+          title="Engineering cost controls"
+          description="Cost periods, commitment scenarios, compute/storage/egress mix, budget alerts, currency, and share workflow."
+        />
+        <EngineeringAnalyticsDashboard comparison={comparison} interval={interval} />
+        <ComparisonToolbar interval={interval} onIntervalChange={onIntervalChange} />
+        <FinOpsFeatureLayer
+          client={client}
+          comparison={comparison}
+          form={form}
+          interval={interval}
+          isLoading={isLoading}
+        />
+      </section>
+
+      <section className="state-detail-panel" aria-label="Architecture and engineering evidence">
+        <ResultDetailHeading
+          title="Architecture & engineering evidence"
+          description="Solution architecture review, governance checks, sortable resource rows, CSV export, and API-facing JSON."
+        />
+        <ArchitectureWorkspace comparison={comparison} interval={interval} form={form} />
+        <PersonaComparisonWorkspace
+          comparison={comparison}
+          interval={interval}
+          form={form}
+          defaultViewMode="engineering"
+          emptyStateMessage="Run a comparison to populate engineering rows, export controls, and API-facing cost evidence."
+          isLoading={isLoading}
+          error={error}
+          exportingFormat={exportingFormat}
+          onExport={onExport}
+          showViewSwitcher={false}
+        />
+      </section>
+
+      <section className="state-detail-panel" aria-label="Official calculators, regions, and exports">
+        <ResultDetailHeading
+          title="Official calculators, regions & exports"
+          description="Provider calculator links, official region references, refresh, and PDF/CSV/Excel report downloads."
+        />
+        <CloudCalculatorLinks regionCatalog={regionCatalog} />
+        <div className="progressive-export-panel">
+          <ExportBar
+            disabled={busyAction !== null && busyAction !== 'export'}
+            exportingFormat={exportingFormat}
+            onExport={onExport}
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onRefreshLive}
+            loading={busyAction === 'refresh'}
+            loadingLabel="Refreshing..."
+            disabled={busyAction !== null && busyAction !== 'refresh'}
+          >
+            <RefreshIcon />
+            Refresh live
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function editStatusNotice(notice: string | null): string | null {
   const meaningfulNotice = notice?.replace(/ ?Comparison ready\.$/, '').trim();
 
   return meaningfulNotice ? meaningfulNotice : null;
+}
+
+function initialStatusNotice(notice: string | null): string | null {
+  return notice === 'Comparison ready.' ? null : notice;
+}
+
+function resultStatusNotice(notice: string | null): string | null {
+  return editStatusNotice(notice);
+}
+
+function InputModeTabs({
+  inputMode,
+  onInputModeChange,
+}: {
+  inputMode: InputMode;
+  onInputModeChange: (mode: InputMode) => void;
+}) {
+  return (
+    <div className="mode-tabs" role="tablist" aria-label="Requirement input mode">
+      {INPUT_MODE_OPTIONS.map((option) => (
+        <button
+          type="button"
+          role="tab"
+          aria-selected={inputMode === option.key}
+          className="tab-button"
+          title={option.description}
+          key={option.key}
+          onClick={() => onInputModeChange(option.key)}
+        >
+          <ModeIcon mode={option.key} />
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function InputModeBadge({ mode }: { mode: InputMode }) {
+  return (
+    <span className={`input-mode-badge input-mode-badge-${mode}`}>
+      <ModeIcon mode={mode} />
+      {inputModeSummaryLabel(mode)}
+    </span>
+  );
 }
 
 function RequirementsEditPanel({
@@ -1058,8 +1401,8 @@ function RequirementsEditPanel({
   naturalLanguageInput,
   regionCatalog,
   regionCatalogError,
+  validationIssues,
   busyAction,
-  onCancel,
   onClearRequirements,
   onFormChange,
   onInputModeChange,
@@ -1073,8 +1416,8 @@ function RequirementsEditPanel({
   naturalLanguageInput: string;
   regionCatalog: RegionCatalogResponse | null;
   regionCatalogError: string | null;
+  validationIssues: WorkloadFormIssue[];
   busyAction: BusyAction;
-  onCancel: () => void;
   onClearRequirements: () => void;
   onFormChange: (form: WorkloadFormState) => void;
   onInputModeChange: (mode: InputMode) => void;
@@ -1090,32 +1433,8 @@ function RequirementsEditPanel({
           <span>Edit requirements</span>
           <strong>Adjust inputs and compare again</strong>
         </div>
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          Done
-        </Button>
       </div>
-      <div className="mode-tabs" role="tablist" aria-label="Requirement input mode">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={inputMode === 'describe'}
-          className="tab-button"
-          onClick={() => onInputModeChange('describe')}
-        >
-          <ModeIcon mode="describe" />
-          Describe
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={inputMode === 'form'}
-          className="tab-button"
-          onClick={() => onInputModeChange('form')}
-        >
-          <ModeIcon mode="form" />
-          Form
-        </button>
-      </div>
+      <InputModeTabs inputMode={inputMode} onInputModeChange={onInputModeChange} />
       {inputMode === 'describe' ? (
         <DescribePanel
           value={naturalLanguageInput}
@@ -1130,6 +1449,7 @@ function RequirementsEditPanel({
           form={form}
           regionCatalog={regionCatalog}
           regionCatalogError={regionCatalogError}
+          validationIssues={validationIssues}
           onChange={onFormChange}
           onSubmit={onSubmit}
         />
@@ -1205,43 +1525,73 @@ function ResultDisclosureSection({
   children: ReactNode;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [hasOpened, setHasOpened] = useState(false);
   const headingId = `result-disclosure-${toId(title)}`;
   const bodyId = `${headingId}-body`;
+  const actionLabel = isOpen ? 'Hide full breakdown' : title;
+  const actionDescription = isOpen
+    ? 'Collapse detailed cost periods, charts, commitment scenarios, budget alerts, sharing, architecture evidence, calculators, and exports.'
+    : description;
 
-  function toggleFromKeyboard(event: KeyboardEvent<HTMLElement>) {
-    if (event.key !== 'Enter' && event.key !== ' ') {
-      return;
-    }
+  function handleToggle() {
+    setIsOpen((current) => {
+      const nextOpen = !current;
+      if (nextOpen) {
+        setHasOpened(true);
+      }
 
-    event.preventDefault();
-    setIsOpen((current) => !current);
+      return nextOpen;
+    });
   }
 
   return (
-    <details
+    <section
       className="result-disclosure"
       aria-labelledby={headingId}
-      open={isOpen}
-      onToggle={(event) => setIsOpen(event.currentTarget.open)}
+      data-open={isOpen ? 'true' : 'false'}
+      data-mounted={hasOpened ? 'true' : 'false'}
     >
-      <summary
+      <button
+        type="button"
         className="result-disclosure-heading"
         aria-controls={bodyId}
         aria-expanded={isOpen}
-        onKeyDown={toggleFromKeyboard}
+        aria-label={`${actionLabel}. ${actionDescription}`}
+        onClick={handleToggle}
       >
         <span>
-          <strong id={headingId}>{title}</strong>
-          <small>{description}</small>
+          <strong id={headingId}>{actionLabel}</strong>
+          {' '}
+          <small>{actionDescription}</small>
         </span>
         <span className="result-disclosure-chevron" aria-hidden="true">
           {isOpen ? '-' : '+'}
         </span>
-      </summary>
-      <div id={bodyId} className="result-disclosure-body">
-        {children}
+      </button>
+      <div
+        id={bodyId}
+        className="result-disclosure-panel"
+        aria-hidden={!isOpen}
+        data-open={isOpen ? 'true' : 'false'}
+      >
+        <div className="result-disclosure-body">{hasOpened ? children : null}</div>
       </div>
-    </details>
+    </section>
+  );
+}
+
+function ResultDetailHeading({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="state-detail-heading">
+      <h3>{title}</h3>
+      <p>{description}</p>
+    </div>
   );
 }
 
@@ -1257,7 +1607,7 @@ function DescribePanel({
   isParsing: boolean;
   onChange: (value: string) => void;
   onClear: () => void;
-  onParse: () => void;
+  onParse?: () => void;
   onUseSample: () => void;
 }) {
   return (
@@ -1269,19 +1619,21 @@ function DescribePanel({
         id="natural-language-input"
         value={value}
         onChange={(event) => onChange(event.currentTarget.value)}
-        placeholder="e.g. A web app for 5,000 daily users with a Postgres database and file storage for uploads"
+        placeholder="Paste an architecture description, cloud bill excerpt, or CSV-like text. Example: A web app for 5,000 daily users with Postgres, 250GB object storage, CDN, and US East preference."
       />
       <div className="action-row">
-        <Button
-          type="button"
-          variant="primary"
-          onClick={onParse}
-          loading={isParsing}
-          loadingLabel="Parsing..."
-        >
-          <ParseIcon />
-          Parse
-        </Button>
+        {onParse ? (
+          <Button
+            type="button"
+            variant="primary"
+            onClick={onParse}
+            loading={isParsing}
+            loadingLabel="Parsing..."
+          >
+            <ParseIcon />
+            Parse
+          </Button>
+        ) : null}
         <Button type="button" variant="secondary" onClick={onUseSample}>
           <SampleIcon />
           Sample
@@ -1304,12 +1656,14 @@ function WorkloadForm({
   form,
   regionCatalog,
   regionCatalogError,
+  validationIssues,
   onChange,
   onSubmit,
 }: {
   form: WorkloadFormState;
   regionCatalog: RegionCatalogResponse | null;
   regionCatalogError: string | null;
+  validationIssues: WorkloadFormIssue[];
   onChange: (form: WorkloadFormState) => void;
   onSubmit: (event: FormEvent) => void;
 }) {
@@ -1333,9 +1687,11 @@ function WorkloadForm({
   }
 
   const sizingSummary = formSizingSummary(form);
+  const fieldErrors = validationIssueMap(validationIssues);
 
   return (
     <form className="structured-form" onSubmit={onSubmit}>
+      <FormValidationSummary issues={validationIssues} />
       <div className="form-overview-strip" aria-label="Workload sizing summary">
         <FormSummaryChip label="Traffic" value={sizingSummary.traffic} tone="profile" />
         <FormSummaryChip label="Compute" value={sizingSummary.compute} tone="compute" />
@@ -1375,12 +1731,14 @@ function WorkloadForm({
             label="Daily users"
             value={form.dailyActiveUsers}
             inputMode="numeric"
+            error={fieldErrors.dailyActiveUsers}
             onChange={(value) => update('dailyActiveUsers', value)}
           />
           <TextField
             label="Peak users"
             value={form.peakConcurrentUsers}
             inputMode="numeric"
+            error={fieldErrors.peakConcurrentUsers}
             onChange={(value) => update('peakConcurrentUsers', value)}
           />
         </div>
@@ -1398,6 +1756,7 @@ function WorkloadForm({
             value={form.vcpu}
             inputMode="decimal"
             suffix="cores"
+            error={fieldErrors.vcpu}
             onChange={(value) => update('vcpu', value)}
           />
           <TextField
@@ -1405,6 +1764,7 @@ function WorkloadForm({
             value={form.memoryGb}
             inputMode="decimal"
             suffix="GB"
+            error={fieldErrors.memoryGb}
             onChange={(value) => update('memoryGb', value)}
           />
           <TextField
@@ -1412,6 +1772,7 @@ function WorkloadForm({
             value={form.instanceCount}
             inputMode="numeric"
             suffix="nodes"
+            error={fieldErrors.instanceCount}
             onChange={(value) => update('instanceCount', value)}
           />
           <SelectField
@@ -1428,6 +1789,7 @@ function WorkloadForm({
             value={form.autoscaleMin}
             inputMode="numeric"
             suffix="min"
+            error={fieldErrors.autoscaleMin}
             onChange={(value) => update('autoscaleMin', value)}
           />
           <TextField
@@ -1435,6 +1797,7 @@ function WorkloadForm({
             value={form.autoscaleMax}
             inputMode="numeric"
             suffix="max"
+            error={fieldErrors.autoscaleMax}
             onChange={(value) => update('autoscaleMax', value)}
           />
         </div>
@@ -1511,6 +1874,7 @@ function WorkloadForm({
               inputMode="decimal"
               suffix="GB"
               disabled={!form.storageEnabled}
+              error={fieldErrors.storageSizeGb}
               onChange={(value) => update('storageSizeGb', value)}
             />
             <SelectField
@@ -1576,6 +1940,7 @@ function WorkloadForm({
               inputMode="decimal"
               suffix="GB"
               disabled={!form.databaseEnabled}
+              error={fieldErrors.databaseSizeGb}
               onChange={(value) => update('databaseSizeGb', value)}
             />
             <CheckboxField
@@ -1596,6 +1961,7 @@ function WorkloadForm({
             value={form.monthlyEgressGb}
             inputMode="decimal"
             suffix="GB"
+            error={fieldErrors.monthlyEgressGb}
             onChange={(value) => update('monthlyEgressGb', value)}
           />
           <TextField
@@ -1665,12 +2031,36 @@ function FormSummaryChip({
   );
 }
 
+function FormValidationSummary({ issues }: { issues: WorkloadFormIssue[] }) {
+  if (issues.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="form-validation-summary" role="alert">
+      <strong>Fix {issues.length} requirement field{issues.length === 1 ? '' : 's'}.</strong>
+      {' '}
+      <span>{issues.map((issue) => issue.message).join(' ')}</span>
+    </div>
+  );
+}
+
+function validationIssueMap(
+  issues: WorkloadFormIssue[],
+): Partial<Record<keyof WorkloadFormState, string>> {
+  return issues.reduce<Partial<Record<keyof WorkloadFormState, string>>>((map, issue) => {
+    map[issue.field] = issue.message;
+    return map;
+  }, {});
+}
+
 function TextField({
   label,
   value,
   inputMode,
   suffix,
   disabled,
+  error,
   onChange,
 }: {
   label: string;
@@ -1678,23 +2068,34 @@ function TextField({
   inputMode?: 'text' | 'numeric' | 'decimal';
   suffix?: string;
   disabled?: boolean;
+  error?: string;
   onChange: (value: string) => void;
 }) {
   const id = toId(label);
+  const errorId = `${id}-error`;
   return (
-    <label className="form-field" htmlFor={id}>
-      <span className="field-caption">{label}</span>
+    <div className={error ? 'form-field is-invalid' : 'form-field'}>
+      <label className="field-caption" htmlFor={id}>
+        {label}
+      </label>
       <span className={suffix ? 'field-control field-control-suffix' : 'field-control'}>
         <input
           id={id}
           value={value}
           inputMode={inputMode}
           disabled={disabled}
+          aria-invalid={error ? 'true' : undefined}
+          aria-describedby={error ? errorId : undefined}
           onChange={(event) => onChange(event.currentTarget.value)}
         />
         {suffix ? <span className="field-suffix">{suffix}</span> : null}
       </span>
-    </label>
+      {error ? (
+        <span id={errorId} className="field-error">
+          {error}
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -1752,6 +2153,7 @@ function RegionSelectField({
     (count, provider) => count + provider.regions.length,
     0,
   );
+  const selectedComparisonRegion = COMPARISON_REGION_GROUPS.find((group) => group.id === value);
   const selectedRegion = providerCatalogs
     .flatMap((provider) => provider.regions)
     .find((region) => region.id === value);
@@ -1782,9 +2184,16 @@ function RegionSelectField({
         value={value}
         onChange={(event) => onChange(event.currentTarget.value)}
       >
-        {value && !selectedRegion ? (
+        {value && !selectedRegion && !selectedComparisonRegion ? (
           <option value={value}>Current selection: {value}</option>
         ) : null}
+        <optgroup label="Comparable regions (priced peer groups)">
+          {COMPARISON_REGION_GROUPS.map((group) => (
+            <option key={group.id} value={group.id}>
+              {group.label} - {providerRegionSummary(group)}
+            </option>
+          ))}
+        </optgroup>
         {providerCatalogs.map((provider) => (
           <optgroup
             key={provider.providerId}
@@ -1800,7 +2209,8 @@ function RegionSelectField({
       </select>
       {compact ? null : (
         <span className="field-help">
-          {catalogLabel} · {regionCount} regions · calculators open provider pricing pages.
+          {catalogLabel} · {regionCount} provider regions · comparable groups normalize AWS,
+          Azure, and GCP pricing.
         </span>
       )}
     </label>
@@ -2076,6 +2486,12 @@ function regionLabelForSummary(
   value: string,
   regionCatalog: RegionCatalogResponse | null,
 ): string {
+  const comparisonLabel = comparisonRegionLabel(value);
+
+  if (comparisonLabel) {
+    return comparisonLabel;
+  }
+
   const catalog = regionCatalog ?? FALLBACK_REGION_CATALOG;
   const region = catalog.providers
     .flatMap((provider) => provider.regions)
@@ -2107,174 +2523,6 @@ function formatDecimal(value: number): string {
   return new Intl.NumberFormat('en-US', {
     maximumFractionDigits: value % 1 === 0 ? 0 : 1,
   }).format(value);
-}
-
-function PricingFreshness({ comparison }: { comparison: ComparisonResult | null }) {
-  if (comparison) {
-    return (
-      <div className="freshness-strip">Pricing as of {formatDate(comparison.pricingAsOf)}</div>
-    );
-  }
-
-  return <div className="freshness-strip">Using cached pricing catalog</div>;
-}
-
-function PlatformReadinessStatus({
-  backendHealth,
-  backendHealthError,
-  regionCatalog,
-  regionCatalogError,
-  comparison,
-  busyAction,
-}: {
-  backendHealth: BackendHealthResponse | null;
-  backendHealthError: string | null;
-  regionCatalog: RegionCatalogResponse | null;
-  regionCatalogError: string | null;
-  comparison: ComparisonResult | null;
-  busyAction: BusyAction;
-}) {
-  const backendTone = readinessTone(backendHealth?.status === 'ok', Boolean(backendHealthError));
-  const hasLiveRegions =
-    regionCatalog?.providers.some((provider) => provider.source === 'live') ?? false;
-  const regionTone = regionCatalog
-    ? hasLiveRegions
-      ? 'good'
-      : 'review'
-    : regionCatalogError
-      ? 'attention'
-      : 'checking';
-  const comparisonTone = comparison ? 'good' : busyAction ? 'checking' : 'review';
-  const regionCount =
-    regionCatalog?.providers.reduce((count, provider) => count + provider.regions.length, 0) ?? 0;
-  const regionValue = regionCatalog
-    ? `${regionCount} loaded`
-    : regionCatalogError
-      ? 'Fallback'
-      : 'Loading';
-  const snapshotValue = comparison
-    ? shortComparisonId(comparison.comparisonId)
-    : busyAction
-      ? `${capitalize(busyAction)} running`
-      : 'Pending';
-
-  return (
-    <section
-      className={`platform-readiness platform-readiness-${backendTone}`}
-      aria-label="Platform readiness"
-      aria-live="polite"
-    >
-      <div className="platform-readiness-header">
-        <span className="readiness-dot" aria-hidden="true" />
-        <div>
-          <span>Platform readiness</span>
-          <strong>{backendReadinessLabel(backendHealth, backendHealthError)}</strong>
-        </div>
-      </div>
-      <p>{backendReadinessDetail(backendHealth, backendHealthError, regionCatalogError)}</p>
-      <div className="readiness-pill-row">
-        <ReadinessPill
-          tone={backendTone}
-          label="API"
-          value={backendHealth?.service ?? (backendHealthError ? 'Unavailable' : 'Checking')}
-        />
-        <ReadinessPill tone={regionTone} label="Regions" value={regionValue} />
-        <ReadinessPill tone={comparisonTone} label="Snapshot" value={snapshotValue} />
-      </div>
-    </section>
-  );
-}
-
-function ReadinessPill({
-  tone,
-  label,
-  value,
-}: {
-  tone: 'good' | 'checking' | 'attention' | 'review';
-  label: string;
-  value: string;
-}) {
-  return (
-    <span className={`readiness-pill readiness-pill-${tone}`}>
-      <small>{label}</small>
-      <strong>{value}</strong>
-    </span>
-  );
-}
-
-function readinessTone(isReady: boolean, hasError: boolean): 'good' | 'checking' | 'attention' {
-  if (hasError) {
-    return 'attention';
-  }
-
-  return isReady ? 'good' : 'checking';
-}
-
-function backendReadinessLabel(
-  backendHealth: BackendHealthResponse | null,
-  backendHealthError: string | null,
-): string {
-  if (backendHealth?.status === 'ok') {
-    return 'Backend connected';
-  }
-
-  if (backendHealthError) {
-    return 'Backend unavailable';
-  }
-
-  return 'Checking backend';
-}
-
-function backendReadinessDetail(
-  backendHealth: BackendHealthResponse | null,
-  backendHealthError: string | null,
-  regionCatalogError: string | null,
-): string {
-  if (backendHealthError) {
-    return `${backendHealthError}. Local UI remains available, but live parse, compare, refresh, and export calls need the API.`;
-  }
-
-  if (backendHealth?.status === 'ok') {
-    return regionCatalogError
-      ? 'API health is responding; region catalog is using the built-in fallback until live regions load.'
-      : 'API health and public region catalog checks are wired into this session.';
-  }
-
-  return 'Verifying the API before parse, compare, refresh, export, and region lookup actions.';
-}
-
-function shortComparisonId(comparisonId: string): string {
-  return comparisonId.slice(0, 8);
-}
-
-function RequirementSummary({ form }: { form: WorkloadFormState }) {
-  return (
-    <div className="requirement-summary" aria-label="Requirement summary">
-      <div>
-        <span className="summary-label">Workload</span>
-        <strong>{form.workloadName || 'Unnamed workload'}</strong>
-      </div>
-      <div>
-        <span className="summary-label">Compute</span>
-        <strong>
-          {form.instanceCount} x {form.vcpu} vCPU
-        </strong>
-      </div>
-      <div>
-        <span className="summary-label">Portfolio</span>
-        <strong>
-          {form.selectedServiceFamilyIds.length}/{CLOUD_SERVICE_CATALOG.length} families
-        </strong>
-      </div>
-      <div>
-        <span className="summary-label">Data</span>
-        <strong>
-          {form.storageEnabled ? `${form.storageSizeGb}GB` : 'No storage'} ·{' '}
-          {form.databaseEnabled ? form.databaseEngine : 'No database'}
-        </strong>
-      </div>
-    </div>
-  );
 }
 
 function CloudCalculatorLinks({ regionCatalog }: { regionCatalog: RegionCatalogResponse | null }) {
@@ -2410,6 +2658,7 @@ function ComparisonToolbar({
 }
 
 export function ComparisonView({
+  client = polyCostClient,
   comparison,
   error = null,
   exportingFormat = null,
@@ -2418,6 +2667,7 @@ export function ComparisonView({
   isLoading = false,
   onExport,
 }: {
+  client?: PolyCostClient;
   comparison: ComparisonResult | null;
   error?: string | null;
   exportingFormat?: ReportFormat | null;
@@ -2479,7 +2729,13 @@ export function ComparisonView({
             title="Decision-ready comparison"
             description="A concise business view of provider totals, savings spread, annual exposure, confidence, and shortlist ranking."
           />
-          <ExecutiveOverview comparison={comparison} interval={interval} form={form} />
+          <ExecutiveOverview
+            comparison={comparison}
+            exportingFormat={exportingFormat}
+            form={form}
+            isLoading={isLoading}
+            onExport={onExport}
+          />
           <ProviderCostWorkspace comparison={comparison} interval={interval} />
         </section>
 
@@ -2494,8 +2750,15 @@ export function ComparisonView({
             title="Technical validation workspace"
             description="Service fit, resilience checks, commitment scenarios, cost drivers, export controls, and API-facing line-item rows."
           />
+          <EngineeringAnalyticsDashboard comparison={comparison} interval={interval} />
           <ArchitectureWorkspace comparison={comparison} interval={interval} form={form} />
-          <FinOpsFeatureLayer comparison={comparison} interval={interval} isLoading={isLoading} />
+          <FinOpsFeatureLayer
+            client={client}
+            comparison={comparison}
+            form={form}
+            interval={interval}
+            isLoading={isLoading}
+          />
           <PersonaComparisonWorkspace
             comparison={comparison}
             interval={interval}
@@ -2570,335 +2833,528 @@ function ResultSectionHeader({
 
 function ExecutiveOverview({
   comparison,
-  interval,
+  exportingFormat,
   form,
+  isLoading,
+  onExport,
 }: {
   comparison: ComparisonResult | null;
-  interval: IntervalKey;
+  exportingFormat?: ReportFormat | null;
   form: WorkloadFormState;
+  isLoading?: boolean;
+  onExport?: (format: ReportFormat) => void;
 }) {
-  const summaries = providerCostSummaries(comparison, interval);
-  const pricedSummaries = summaries.filter((summary) => summary.total !== undefined);
-  const lowest = pricedSummaries[0];
-  const secondLowest = pricedSummaries[1];
-  const highest = pricedSummaries.at(-1);
-  const spread =
-    lowest?.total !== undefined && highest?.total !== undefined ? highest.total - lowest.total : 0;
-  const average =
-    pricedSummaries.length > 0
-      ? pricedSummaries.reduce((sum, summary) => sum + (summary.total ?? 0), 0) /
-        pricedSummaries.length
-      : undefined;
-  const review = buildFinOpsReview(comparison, interval, form);
-
   return (
-    <section className="demo-overview" aria-label="Executive demo overview">
-      <ExecutiveDecisionPanel decision={review.executiveDecision} />
-
-      <div className="metric-grid metric-grid-compact">
-        <MetricCard
-          label="Lowest"
-          value={lowest ? formatCurrency(lowest.total ?? 0) : 'Pending'}
-          detail={lowest ? providerLabel(lowest.providerId) : 'Awaiting estimate'}
-          providerId={lowest?.providerId}
-        />
-        <MetricCard
-          label="Spread"
-          value={pricedSummaries.length > 1 ? formatCurrency(spread) : 'Pending'}
-          detail={pricedSummaries.length > 1 ? 'Highest minus lowest' : 'Need provider totals'}
-        />
-        <MetricCard
-          label="Average"
-          value={average !== undefined ? formatCurrency(average) : 'Pending'}
-          detail={`${capitalize(interval)} view`}
-        />
-        <MetricCard
-          label="Confidence"
-          value={review.executiveDecision.confidence}
-          detail={review.executiveDecision.confidenceDetail}
-        />
-      </div>
-
-      <DecisionBrief
-        lowest={lowest}
-        secondLowest={secondLowest}
-        highest={highest}
-        interval={interval}
-        pricedCount={pricedSummaries.length}
-        approximateCount={pricedSummaries.reduce(
-          (count, summary) => count + summary.approximateCount,
-          0,
-        )}
+    <section className="demo-overview" aria-label="Executive analytics overview">
+      <ExecutiveAnalyticsPreview comparison={comparison} form={form} />
+      <ExecutiveDecisionDashboard
+        comparison={comparison}
+        form={form}
+        regionCatalog={null}
+        exportingFormat={exportingFormat ?? null}
+        isLoading={Boolean(isLoading)}
+        onExport={onExport}
       />
-
-      <FinancialAnalyticsPanel comparison={comparison} form={form} />
-
-      <section className="dashboard-panel" aria-label="Provider spend chart">
-        <div className="panel-heading">
-          <h3>Provider Spend</h3>
-          <span>{capitalize(interval)}</span>
-        </div>
-        <div className="provider-bars">
-          {summaries.map((summary) => (
-            <div className="provider-bar-row" key={summary.providerId}>
-              <div className="bar-provider">
-                <ProviderMark providerId={summary.providerId} />
-                <strong>{providerLabel(summary.providerId)}</strong>
-              </div>
-              <div className="bar-track" aria-hidden="true">
-                <span
-                  className={`bar-fill provider-fill-${summary.providerId}`}
-                  style={{ width: `${summary.percentOfMax}%` }}
-                />
-              </div>
-              <span className="bar-value">
-                {summary.total !== undefined ? formatCurrency(summary.total) : 'Pending'}
-              </span>
-            </div>
-          ))}
-        </div>
-      </section>
     </section>
   );
 }
 
-function FinancialAnalyticsPanel({
+function ExecutiveAnalyticsPreview({
   comparison,
   form,
 }: {
   comparison: ComparisonResult | null;
   form: WorkloadFormState;
 }) {
-  const monthlySummaries = providerCostSummaries(comparison, 'monthly');
-  const pricedMonthly = monthlySummaries.filter((summary) => summary.total !== undefined);
-  const lowest = pricedMonthly[0];
-  const highest = pricedMonthly.at(-1);
-  const monthlyBaseline = lowest?.total;
-  const annualBaseline =
-    monthlyBaseline !== undefined ? roundCurrency(monthlyBaseline * 12) : undefined;
-  const threeYearBaseline =
-    monthlyBaseline !== undefined ? roundCurrency(monthlyBaseline * 36) : undefined;
-  const annualSpread =
-    lowest?.total !== undefined && highest?.total !== undefined
-      ? roundCurrency((highest.total - lowest.total) * 12)
-      : undefined;
-  const dailyUsers = parseInputNumber(form.dailyActiveUsers);
-  const peakUsers = parseInputNumber(form.peakConcurrentUsers);
-  const egressGb = parseInputNumber(form.monthlyEgressGb);
-  const unitDailyUser =
-    monthlyBaseline !== undefined && dailyUsers && dailyUsers > 0
-      ? monthlyBaseline / dailyUsers
-      : undefined;
-  const unitPeakUser =
-    monthlyBaseline !== undefined && peakUsers && peakUsers > 0
-      ? monthlyBaseline / peakUsers
-      : undefined;
-  const unitEgress =
-    monthlyBaseline !== undefined && egressGb && egressGb > 0
-      ? monthlyBaseline / egressGb
-      : undefined;
-  const forecastRows = financialForecastRows(monthlyBaseline);
-  const maxMonthlyTotal = Math.max(...monthlySummaries.map((summary) => summary.total ?? 0), 0);
+  const analytics = executiveAnalyticsModel(comparison, form);
+  const pricedCount = analytics.pricedMonthlySummaries.length;
+  const totalMonthly = analytics.totalMonthlyAcrossProviders;
 
   return (
-    <section className="financial-analytics" aria-label="Financial analytics">
-      <div className="panel-heading">
-        <div>
-          <span>Financial Analytics</span>
-          <h3>Run-rate, variance, and unit economics</h3>
+    <section className="executive-analytics-preview" aria-label="Executive analytics dashboard">
+      <article className="executive-headline-card">
+        <div className="executive-card-heading">
+          <span>Executive monthly baseline</span>
+          <strong>Total across priced clouds</strong>
         </div>
-        <strong>
-          {lowest ? `${providerLabel(lowest.providerId)} baseline` : 'Pending baseline'}
-        </strong>
-      </div>
+        <div className="executive-headline-value">
+          {totalMonthly !== undefined ? formatCurrency(totalMonthly) : 'Pending'}
+        </div>
+        <p>
+          {pricedCount > 0
+            ? `${pricedCount}/3 provider estimates priced for this workload.`
+            : 'Run a comparison to calculate provider estimates.'}
+        </p>
+        <div className="executive-trend-pending" role="status">
+          <span>Trend pending</span>
+          <strong>Historical spend data not yet available</strong>
+          <div className="executive-pending-sparkline" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+            <i />
+            <i />
+          </div>
+        </div>
+      </article>
 
-      <div className="financial-kpi-grid">
-        <InsightCard
-          label="Monthly run-rate"
-          value={monthlyBaseline !== undefined ? formatCurrency(monthlyBaseline) : 'Pending'}
+      <article className="executive-provider-mix-card">
+        <div className="executive-card-heading">
+          <span>Provider mix</span>
+          <strong>Share of current estimates</strong>
+        </div>
+        <ProviderMixDonut data={analytics.providerMix} />
+      </article>
+
+      <div className="executive-stat-grid" aria-label="Executive compact stats">
+        <ExecutiveStatTile
+          label="Cheapest provider"
+          value={
+            analytics.cheapest ? providerLabel(analytics.cheapest.providerId) : 'Pending'
+          }
           detail={
-            lowest
-              ? `${providerLabel(lowest.providerId)} lowest estimate`
+            analytics.cheapest?.total !== undefined
+              ? `${formatCurrency(analytics.cheapest.total)} monthly`
               : 'Awaiting provider totals'
           }
-          providerId={lowest?.providerId}
+          providerId={analytics.cheapest?.providerId}
         />
-        <InsightCard
-          label="Annualized exposure"
-          value={annualBaseline !== undefined ? formatCurrency(annualBaseline) : 'Pending'}
-          detail="12-month on-demand view"
-          providerId={lowest?.providerId}
+        <ExecutiveStatTile
+          label="90-day forecast"
+          value="Pending"
+          detail="Backend trend series required"
         />
-        <InsightCard
-          label="3-year exposure"
-          value={threeYearBaseline !== undefined ? formatCurrency(threeYearBaseline) : 'Pending'}
-          detail="Before commitments and growth"
-          providerId={lowest?.providerId}
+        <ExecutiveStatTile
+          label="Potential savings"
+          value={
+            analytics.annualPotentialSavings !== undefined && analytics.annualPotentialSavings > 0
+              ? formatCurrency(analytics.annualPotentialSavings)
+              : 'Pending'
+          }
+          detail={
+            analytics.annualPotentialSavings !== undefined && analytics.annualPotentialSavings > 0
+              ? 'Annual spread vs highest estimate'
+              : 'Need at least two priced clouds'
+          }
         />
-        <InsightCard
-          label="Annual savings spread"
-          value={annualSpread !== undefined ? formatCurrency(annualSpread) : 'Pending'}
-          detail="Highest minus lowest provider"
-        />
-      </div>
-
-      <div className="financial-chart-grid">
-        <section
-          className="financial-chart-card forecast-card"
-          aria-label="Run-rate forecast ladder"
-        >
-          <div className="chart-heading">
-            <h4>Run-rate Ladder</h4>
-            <span>Month to 3 years</span>
-          </div>
-          <div className="forecast-bars">
-            {forecastRows.map((row) => (
-              <div className="forecast-bar-item" key={row.label}>
-                <div className="forecast-bar-track" aria-hidden="true">
-                  <span
-                    className={
-                      lowest
-                        ? `forecast-bar-fill provider-fill-${lowest.providerId}`
-                        : 'forecast-bar-fill'
-                    }
-                    style={{ height: `${row.percent}%` }}
-                  />
-                </div>
-                <strong>{row.total !== undefined ? formatCurrency(row.total) : 'Pending'}</strong>
-                <span>{row.label}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="financial-chart-card variance-card" aria-label="Provider variance bars">
-          <div className="chart-heading">
-            <h4>Provider Variance</h4>
-            <span>Monthly delta</span>
-          </div>
-          <div className="variance-list">
-            {monthlySummaries.map((summary) => (
-              <div className="variance-row" key={summary.providerId}>
-                <div className="variance-provider">
-                  <ProviderMark providerId={summary.providerId} />
-                  <strong>{providerLabel(summary.providerId)}</strong>
-                </div>
-                <div className="variance-track" aria-hidden="true">
-                  <span
-                    className={`variance-fill provider-fill-${summary.providerId}`}
-                    style={{
-                      width:
-                        summary.total !== undefined && maxMonthlyTotal > 0
-                          ? `${Math.max(4, (summary.total / maxMonthlyTotal) * 100)}%`
-                          : '0%',
-                    }}
-                  />
-                </div>
-                <span className="variance-value">
-                  {summary.total !== undefined ? formatCurrency(summary.total) : 'Pending'}
-                  <small>
-                    {summary.deltaFromLowest !== undefined
-                      ? formatSignedCurrency(summary.deltaFromLowest)
-                      : 'Delta pending'}
-                  </small>
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="financial-chart-card mix-card" aria-label="Provider category mix">
-          <div className="chart-heading">
-            <h4>Cost Mix Stack</h4>
-            <span>Compute / storage / database / network</span>
-          </div>
-          <div className="mix-stack-list">
-            {monthlySummaries.map((summary) => (
-              <div className="mix-stack-row" key={summary.providerId}>
-                <div className="mix-stack-label">
-                  <ProviderMark providerId={summary.providerId} />
-                  <strong>{providerLabel(summary.providerId)}</strong>
-                </div>
-                <div className="mix-stack-bar" aria-hidden="true">
-                  {summary.categoryTotals.map((category) => (
-                    <span
-                      className={`mix-segment category-fill category-${category.category}`}
-                      key={`${summary.providerId}-${category.category}`}
-                      style={{ width: `${category.percentOfTotal}%` }}
-                    />
-                  ))}
-                </div>
-                <span>
-                  {summary.total !== undefined ? formatCurrency(summary.total) : 'Pending'}
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="mix-legend" aria-label="Cost mix legend">
-            {SERVICE_CATEGORIES.map((category) => (
-              <span key={category}>
-                <i className={`category-dot category-${category}`} />
-                {capitalize(category)}
-              </span>
-            ))}
-          </div>
-        </section>
-
-        <section className="financial-chart-card unit-card" aria-label="Unit economics">
-          <div className="chart-heading">
-            <h4>Unit Economics</h4>
-            <span>Blended workload ratios</span>
-          </div>
-          <div className="unit-economics-grid">
-            <FinancialRatioCard
-              label="Per daily user"
-              value={unitDailyUser !== undefined ? formatUnitCurrency(unitDailyUser) : 'Pending'}
-              detail={
-                dailyUsers
-                  ? `${dailyUsers.toLocaleString('en-US')} DAU modeled`
-                  : 'DAU not specified'
-              }
-            />
-            <FinancialRatioCard
-              label="Per peak user"
-              value={unitPeakUser !== undefined ? formatUnitCurrency(unitPeakUser) : 'Pending'}
-              detail={
-                peakUsers
-                  ? `${peakUsers.toLocaleString('en-US')} peak concurrent`
-                  : 'Peak not specified'
-              }
-            />
-            <FinancialRatioCard
-              label="Per egress GB"
-              value={unitEgress !== undefined ? formatUnitCurrency(unitEgress) : 'Pending'}
-              detail={
-                egressGb
-                  ? `${egressGb.toLocaleString('en-US')}GB monthly egress`
-                  : 'Egress not specified'
-              }
-            />
-          </div>
-        </section>
       </div>
     </section>
   );
 }
 
-function FinancialRatioCard({
+function ExecutiveDecisionDashboard({
+  comparison,
+  form,
+  regionCatalog,
+  exportingFormat,
+  isLoading,
+  onExport,
+}: {
+  comparison: ComparisonResult | null;
+  form: WorkloadFormState;
+  regionCatalog: RegionCatalogResponse | null;
+  exportingFormat: ReportFormat | null;
+  isLoading: boolean;
+  onExport?: (format: ReportFormat) => void;
+}) {
+  const analytics = executiveAnalyticsModel(comparison, form);
+  const decision = analytics.review.executiveDecision;
+  const recommendation = executiveRecommendation(analytics, form, regionCatalog);
+
+  return (
+    <section className="executive-decision-dashboard" aria-label="Executive decision dashboard">
+      <div className="executive-detail-grid">
+        <article className="executive-recommendation-card">
+          <div className="executive-card-heading">
+            <span>Recommendation</span>
+            <strong>{decision.confidence} confidence</strong>
+          </div>
+          <h3>{recommendation.headline}</h3>
+          <p>{recommendation.detail}</p>
+          <div className="executive-recommendation-actions">
+            <Button
+              type="button"
+              variant="primary"
+              disabled={
+                !comparison ||
+                isLoading ||
+                !onExport ||
+                (exportingFormat !== null && exportingFormat !== 'pdf')
+              }
+              loading={exportingFormat === 'pdf'}
+              loadingLabel="Exporting summary..."
+              onClick={() => onExport?.('pdf')}
+            >
+              <DownloadIcon />
+              Export summary
+            </Button>
+          </div>
+        </article>
+
+        <article className="executive-data-gap-card">
+          <div className="executive-card-heading">
+            <span>Trend & forecast</span>
+            <strong>Pending backend series</strong>
+          </div>
+          <div className="executive-data-gap-chart" role="status">
+            <span>Trend data not yet available</span>
+            <p>
+              PolyCost has current comparison totals, but no exposed historical cost series or
+              forecast endpoint yet. Sparkline and 90-day forecast stay pending instead of showing
+              fabricated data.
+            </p>
+          </div>
+        </article>
+      </div>
+
+      <div className="executive-lens-grid" aria-label="Executive decision lenses">
+        {decision.lenses.slice(0, 3).map((lens) => (
+          <article className={`executive-lens-card lens-${roleClassName(lens.role)}`} key={lens.role}>
+            <span>{lens.label}</span>
+            <strong>{lens.value}</strong>
+            <p>{lens.detail}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ProviderMixDonut({ data }: { data: ProviderMixDatum[] }) {
+  if (data.length === 0) {
+    return (
+      <div className="provider-mix-empty" role="status">
+        Provider mix pending until comparison totals are available.
+      </div>
+    );
+  }
+
+  return (
+    <div className="provider-mix-layout">
+      <div className="provider-mix-chart-shell" aria-hidden="true">
+        <PieChart width={220} height={220}>
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="name"
+            cx="50%"
+            cy="50%"
+            innerRadius={58}
+            outerRadius={88}
+            paddingAngle={3}
+            stroke="var(--pc-bg-surface)"
+            strokeWidth={4}
+            isAnimationActive={false}
+          >
+            {data.map((entry) => (
+              <Cell fill={entry.color} key={entry.providerId} />
+            ))}
+          </Pie>
+        </PieChart>
+      </div>
+      <div className="provider-mix-legend">
+        {data.map((entry) => (
+          <span key={entry.providerId}>
+            <i className={`provider-dot provider-fill-${entry.providerId}`} aria-hidden="true" />
+            <strong>{entry.name}</strong>
+            <small>
+              {formatCurrency(entry.value)} · {formatPercent(entry.percent)}
+            </small>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ExecutiveStatTile({
   detail,
   label,
+  providerId,
   value,
 }: {
   detail: string;
   label: string;
+  providerId?: ProviderId;
   value: string;
 }) {
   return (
-    <div className="financial-ratio-card">
+    <article className={providerId ? `executive-stat-tile executive-stat-${providerId}` : 'executive-stat-tile'}>
       <span>{label}</span>
-      <strong>{value}</strong>
+      <strong>
+        {providerId ? <ProviderMark providerId={providerId} /> : null}
+        {value}
+      </strong>
       <small>{detail}</small>
+    </article>
+  );
+}
+
+function EngineeringAnalyticsPreview({
+  comparison,
+  interval,
+}: {
+  comparison: ComparisonResult | null;
+  interval: IntervalKey;
+}) {
+  const analytics = engineeringAnalyticsModel(comparison, interval);
+
+  return (
+    <section className="engineering-analytics-preview" aria-label="Engineering analytics dashboard">
+      <div className="engineering-preview-header">
+        <div>
+          <span>Engineering service spend</span>
+          <h3>Cost-by-service concentration</h3>
+        </div>
+        <strong>{capitalize(interval)} view</strong>
+      </div>
+
+      <EngineeringServiceChartGrid analytics={analytics} compact />
+
+      <div className="engineering-signal-strip" aria-label="Engineering data signals">
+        <EngineeringSignal
+          label="Line items"
+          value={analytics.totalLineItems > 0 ? String(analytics.totalLineItems) : 'Pending'}
+          detail="Provider-returned cost drivers"
+        />
+        <EngineeringSignal
+          label="Approximate mappings"
+          value={String(analytics.approximateCount)}
+          detail="Require architecture review"
+          tone={analytics.approximateCount > 0 ? 'review' : 'ready'}
+        />
+        <EngineeringSignal
+          label="Top driver"
+          value={
+            analytics.topDriver
+              ? `${providerServiceLabel(
+                  analytics.topDriver.providerId,
+                  analytics.topDriver.service.category,
+                )}`
+              : 'Pending'
+          }
+          detail={
+            analytics.topDriver
+              ? `${providerLabel(analytics.topDriver.providerId)} · ${formatCurrency(
+                  analytics.topDriver.service.value,
+                )}`
+              : 'Awaiting provider costs'
+          }
+          providerId={analytics.topDriver?.providerId}
+        />
+      </div>
+    </section>
+  );
+}
+
+function EngineeringAnalyticsDashboard({
+  comparison,
+  interval,
+}: {
+  comparison: ComparisonResult | null;
+  interval: IntervalKey;
+}) {
+  const analytics = engineeringAnalyticsModel(comparison, interval);
+
+  return (
+    <section className="engineering-analytics-dashboard" aria-label="Engineering service dashboard">
+      <div className="engineering-dashboard-heading">
+        <div>
+          <span>Service driver split</span>
+          <h3>Provider cost by mapped service family</h3>
+        </div>
+        <p>
+          Bars are calculated from the current comparison line items. SKU, exact region, and tag
+          metadata stay with the resource table until the API exposes those per row.
+        </p>
+      </div>
+
+      <EngineeringServiceChartGrid analytics={analytics} />
+    </section>
+  );
+}
+
+function EngineeringServiceChartGrid({
+  analytics,
+  compact = false,
+}: {
+  analytics: EngineeringAnalyticsModel;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={compact ? 'engineering-chart-grid engineering-chart-grid-compact' : 'engineering-chart-grid'}
+      aria-label="Provider service cost charts"
+    >
+      {analytics.providers.map((provider) => (
+        <EngineeringProviderServiceChart
+          key={provider.providerId}
+          provider={provider}
+          compact={compact}
+        />
+      ))}
     </div>
+  );
+}
+
+function EngineeringProviderServiceChart({
+  provider,
+  compact = false,
+}: {
+  provider: EngineeringProviderServiceModel;
+  compact?: boolean;
+}) {
+  const hasData = provider.total !== undefined && provider.total > 0;
+  const viewportWidth = useViewportWidth();
+  const { height: chartHeight, width: chartWidth } = engineeringChartDimensions(
+    compact,
+    viewportWidth,
+  );
+
+  return (
+    <article className={`engineering-chart-card engineering-chart-${provider.providerId}`}>
+      <div className="engineering-chart-title">
+        <span>
+          <ProviderMark providerId={provider.providerId} />
+          {providerLabel(provider.providerId)}
+        </span>
+        <strong>{hasData ? formatCurrency(provider.total ?? 0) : 'Pending'}</strong>
+      </div>
+
+      {hasData ? (
+        <>
+          <div className="engineering-bar-chart-shell" aria-hidden="true">
+            <BarChart
+              width={chartWidth}
+              height={chartHeight}
+              data={provider.services}
+              margin={{ top: 10, right: 4, bottom: 0, left: -20 }}
+            >
+              <CartesianGrid
+                stroke="var(--pc-chart-grid)"
+                strokeDasharray="3 3"
+                vertical={false}
+              />
+              <XAxis
+                dataKey="serviceLabel"
+                interval={0}
+                tick={{ fill: 'var(--pc-text-secondary)', fontSize: 10 }}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis hide />
+              <Tooltip
+                cursor={{ fill: 'var(--pc-chart-hover)' }}
+                formatter={(value) => [formatCurrency(Number(value)), 'Cost']}
+                contentStyle={{
+                  background: 'var(--pc-bg-surface)',
+                  border: '1px solid var(--pc-border)',
+                  borderRadius: '8px',
+                  color: 'var(--pc-text-primary)',
+                  fontSize: '12px',
+                }}
+              />
+              <Bar dataKey="value" radius={[6, 6, 2, 2]} isAnimationActive={false}>
+                {provider.services.map((service) => (
+                  <Cell
+                    key={`${provider.providerId}-${service.category}`}
+                    fill={service.color}
+                    opacity={service.value > 0 ? 1 : 0.2}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </div>
+          <div className="engineering-service-list">
+            {provider.services.map((service) => (
+              <span key={service.category}>
+                <i className={`category-dot category-${service.category}`} aria-hidden="true" />
+                <strong>{service.serviceLabel}</strong>
+                <small>
+                  {formatCurrency(service.value)} · {formatPercent(service.percent)}
+                </small>
+              </span>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="engineering-chart-empty" role="status">
+          Run a comparison to populate {providerLabel(provider.providerId)} service bars.
+        </div>
+      )}
+
+      <p className="engineering-chart-footnote">
+        {provider.dominantService
+          ? `${provider.dominantService.serviceLabel} is the largest mapped driver.`
+          : 'Service concentration pending provider line items.'}
+      </p>
+    </article>
+  );
+}
+
+function useViewportWidth(): number {
+  const [viewportWidth, setViewportWidth] = useState(() =>
+    typeof window === 'undefined' ? 1024 : window.innerWidth,
+  );
+
+  useEffect(() => {
+    function handleResize() {
+      setViewportWidth(window.innerWidth);
+    }
+
+    window.addEventListener('resize', handleResize);
+
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return viewportWidth;
+}
+
+function engineeringChartDimensions(
+  compact: boolean,
+  viewportWidth: number,
+): { width: number; height: number } {
+  if (viewportWidth < 420) {
+    return { width: 196, height: compact ? 126 : 140 };
+  }
+
+  if (viewportWidth < 768) {
+    return { width: compact ? 220 : 238, height: compact ? 132 : 148 };
+  }
+
+  return { width: compact ? 238 : 276, height: compact ? 138 : 164 };
+}
+
+function EngineeringSignal({
+  detail,
+  label,
+  providerId,
+  tone,
+  value,
+}: {
+  detail: string;
+  label: string;
+  providerId?: ProviderId;
+  tone?: 'ready' | 'review';
+  value: string;
+}) {
+  const className = [
+    'engineering-signal',
+    providerId ? `engineering-signal-${providerId}` : undefined,
+    tone ? `engineering-signal-${tone}` : undefined,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <article className={className}>
+      <span>{label}</span>
+      <strong>
+        {providerId ? <ProviderMark providerId={providerId} /> : null}
+        {value}
+      </strong>
+      <small>{detail}</small>
+    </article>
   );
 }
 
@@ -3663,6 +4119,26 @@ function ProviderPendingValue({
   );
 }
 
+function HeaderViewIcon({ view }: { view: ResultWorkspaceView }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="segment-icon">
+      {view === 'executive' ? (
+        <path d="M5 19V5h14v14H5zM8 15h3V9H8zM13 15h3v-4h-3z" />
+      ) : (
+        <path d="M4 7h16M6 7v10h12V7M9 11h2M13 11h2M9 15h6" />
+      )}
+    </svg>
+  );
+}
+
+function SignInIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon">
+      <path d="M10 6h8v12h-8M4 12h10M11 9l3 3-3 3" />
+    </svg>
+  );
+}
+
 function CompareIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon">
@@ -3859,6 +4335,190 @@ function providerCostSummaries(
       (left, right) =>
         (left.total ?? Number.POSITIVE_INFINITY) - (right.total ?? Number.POSITIVE_INFINITY),
     );
+}
+
+function executiveAnalyticsModel(
+  comparison: ComparisonResult | null,
+  form: WorkloadFormState,
+): ExecutiveAnalyticsModel {
+  const monthlySummaries = providerCostSummaries(comparison, 'monthly');
+  const summaryByProvider = new Map(monthlySummaries.map((summary) => [summary.providerId, summary]));
+  const pricedMonthlySummaries = monthlySummaries.filter(
+    (summary) => summary.total !== undefined,
+  );
+  const pricedInProviderOrder = PROVIDER_ORDER.map((providerId) => summaryByProvider.get(providerId))
+    .filter((summary): summary is ProviderCostSummary => Boolean(summary))
+    .filter((summary) => summary.total !== undefined);
+  const totalMonthlyAcrossProviders =
+    pricedMonthlySummaries.length > 0
+      ? roundCurrency(
+          pricedMonthlySummaries.reduce((sum, summary) => sum + (summary.total ?? 0), 0),
+        )
+      : undefined;
+  const review = buildFinOpsReview(comparison, 'monthly', form);
+  const highest = pricedMonthlySummaries.at(-1);
+  const monthlyPotentialSavings = review.monthlySpread;
+  const annualPotentialSavings =
+    review.executiveDecision.avoidableAnnualSpend ??
+    (monthlyPotentialSavings !== undefined ? roundCurrency(monthlyPotentialSavings * 12) : undefined);
+
+  return {
+    review,
+    monthlySummaries,
+    pricedMonthlySummaries,
+    totalMonthlyAcrossProviders,
+    providerMix:
+      totalMonthlyAcrossProviders !== undefined && totalMonthlyAcrossProviders > 0
+        ? pricedInProviderOrder.map((summary) => ({
+            providerId: summary.providerId,
+            name: providerLabel(summary.providerId),
+            value: roundCurrency(summary.total ?? 0),
+            percent: ((summary.total ?? 0) / totalMonthlyAcrossProviders) * 100,
+            color: providerChartColor(summary.providerId),
+          }))
+        : [],
+    cheapest: review.monthlyLowest,
+    highest,
+    annualPotentialSavings,
+    monthlyPotentialSavings,
+  };
+}
+
+function providerChartColor(providerId: ProviderId): string {
+  switch (providerId) {
+    case 'aws':
+      return 'var(--pc-provider-aws)';
+    case 'azure':
+      return 'var(--pc-provider-azure)';
+    case 'gcp':
+      return 'var(--pc-provider-gcp)';
+  }
+}
+
+function executiveRecommendation(
+  analytics: ExecutiveAnalyticsModel,
+  form: WorkloadFormState,
+  regionCatalog: RegionCatalogResponse | null,
+): { headline: string; detail: string } {
+  const lowest = analytics.cheapest;
+
+  if (!lowest) {
+    return {
+      headline: 'Run a comparison to create a recommendation',
+      detail:
+        'PolyCost will use current provider totals, service mappings, and workload assumptions to produce an export-ready executive brief.',
+    };
+  }
+
+  const provider = providerLabel(lowest.providerId);
+  const region = regionLabelForSummary(form.regionPreference, regionCatalog);
+  const annualSavings = analytics.annualPotentialSavings;
+  const savingsPhrase =
+    annualSavings !== undefined && annualSavings > 0
+      ? `can avoid up to ${formatCurrency(annualSavings)}/yr versus the highest current estimate`
+      : 'is currently the lowest priced option, with providers tightly clustered';
+
+  return {
+    headline: `Shortlist ${provider} in ${region}`,
+    detail: `${provider} ${savingsPhrase}. Validate service equivalence, regional availability, quotas, resilience, and data-transfer assumptions before target-cloud commitment.`,
+  };
+}
+
+function engineeringAnalyticsModel(
+  comparison: ComparisonResult | null,
+  interval: IntervalKey,
+): EngineeringAnalyticsModel {
+  const providerResults = new Map<ProviderId, ComparisonProviderResult>(
+    comparison?.providers.map((provider) => [provider.providerId, provider]) ?? [],
+  );
+
+  const providers = PROVIDER_ORDER.map((providerId): EngineeringProviderServiceModel => {
+    const provider = providerResults.get(providerId);
+    const total = provider ? costForInterval(provider, interval) : undefined;
+    const services = categoryTotalsForLineItems(provider?.lineItems ?? [], interval).map(
+      (categorySummary): EngineeringServiceDatum => ({
+        category: categorySummary.category,
+        serviceLabel: providerServiceLabel(providerId, categorySummary.category),
+        value: categorySummary.total,
+        percent: categorySummary.total > 0 ? categorySummary.percentOfTotal : 0,
+        color: providerChartColor(providerId),
+      }),
+    );
+    const dominantService = services
+      .filter((service) => service.value > 0)
+      .sort((left, right) => right.value - left.value)[0];
+
+    return {
+      providerId,
+      total,
+      lineItemCount: provider?.lineItems.length ?? 0,
+      approximateCount:
+        provider?.lineItems.filter((lineItem) => lineItem.isApproximate).length ?? 0,
+      services,
+      dominantService,
+    };
+  });
+
+  const pricedProviders = providers.filter(
+    (provider): provider is EngineeringProviderServiceModel & { total: number } =>
+      provider.total !== undefined,
+  );
+  const topDriver = providers
+    .flatMap((provider) =>
+      provider.services.map((service) => ({
+        providerId: provider.providerId,
+        service,
+      })),
+    )
+    .filter((driver) => driver.service.value > 0)
+    .sort((left, right) => right.service.value - left.service.value)[0];
+
+  return {
+    providers,
+    pricedProviders,
+    totalLineItems: providers.reduce((sum, provider) => sum + provider.lineItemCount, 0),
+    approximateCount: providers.reduce((sum, provider) => sum + provider.approximateCount, 0),
+    topDriver,
+  };
+}
+
+function providerServiceLabel(providerId: ProviderId, category: ServiceCategory): string {
+  if (providerId === 'aws') {
+    switch (category) {
+      case 'compute':
+        return 'EC2';
+      case 'storage':
+        return 'EBS / S3';
+      case 'database':
+        return 'RDS';
+      case 'network':
+        return 'Data transfer';
+    }
+  }
+
+  if (providerId === 'azure') {
+    switch (category) {
+      case 'compute':
+        return 'VM';
+      case 'storage':
+        return 'Disk / Blob';
+      case 'database':
+        return 'Azure SQL';
+      case 'network':
+        return 'Bandwidth';
+    }
+  }
+
+  switch (category) {
+    case 'compute':
+      return 'GCE';
+    case 'storage':
+      return 'PD / GCS';
+    case 'database':
+      return 'Cloud SQL';
+    case 'network':
+      return 'Egress';
+  }
 }
 
 function buildFinOpsReview(
@@ -4487,35 +5147,6 @@ function categoryHeatmapRows(summaries: ProviderCostSummary[]): Array<{
   });
 }
 
-function financialForecastRows(monthlyTotal?: number): Array<{
-  label: string;
-  total?: number;
-  percent: number;
-}> {
-  const rows = [
-    { label: 'Month', total: monthlyTotal },
-    {
-      label: 'Quarter',
-      total: monthlyTotal !== undefined ? roundCurrency(monthlyTotal * 3) : undefined,
-    },
-    {
-      label: 'Year',
-      total: monthlyTotal !== undefined ? roundCurrency(monthlyTotal * 12) : undefined,
-    },
-    {
-      label: '3-year',
-      total: monthlyTotal !== undefined ? roundCurrency(monthlyTotal * 36) : undefined,
-    },
-  ];
-  const maxTotal = Math.max(...rows.map((row) => row.total ?? 0), 0);
-
-  return rows.map((row) => ({
-    ...row,
-    percent:
-      row.total !== undefined && maxTotal > 0 ? Math.max(8, (row.total / maxTotal) * 100) : 0,
-  }));
-}
-
 function intervalCostMultiplier(interval: IntervalKey): number {
   switch (interval) {
     case 'daily':
@@ -4536,7 +5167,11 @@ function compareButtonLabel(inputMode: InputMode): string {
 }
 
 function compareLoadingLabel(inputMode: InputMode): string {
-  return inputMode === 'describe' ? 'Parsing & comparing...' : 'Comparing...';
+  return inputMode === 'describe' ? 'Parsing...' : 'Comparing...';
+}
+
+function inputModeSummaryLabel(inputMode: InputMode): string {
+  return INPUT_MODE_OPTIONS.find((option) => option.key === inputMode)?.summaryLabel ?? 'Manual entry';
 }
 
 function reportFormatLabel(format: ReportFormat): string {
@@ -4571,19 +5206,17 @@ function reviewMessage(confidence: string, fields: string[]): string {
     : `Parsed with ${confidence} confidence.`;
 }
 
+function formValidationSummaryMessage(issues: WorkloadFormIssue[]): string {
+  return `Fix ${issues.length} requirement field${issues.length === 1 ? '' : 's'} before comparing. ${issues
+    .map((issue) => issue.message)
+    .join(' ')}`;
+}
+
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatUnitCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: value > 0 && value < 1 ? 4 : 2,
   }).format(value);
 }
 
@@ -4599,13 +5232,6 @@ function formatPercent(value: number): string {
   return `${value.toLocaleString('en-US', {
     maximumFractionDigits: value > 0 && value < 10 ? 1 : 0,
   })}%`;
-}
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
 }
 
 function capitalize(value: string): string {

@@ -1,16 +1,29 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { formatApiError, polyCostClient, PolyCostClient } from '../api-client';
 import { Button } from './Button';
 import {
+  AlertRecord,
+  BudgetRecord,
   ComparisonProviderResult,
   ComparisonResult,
   CostComponent,
+  ExchangeRatesResponse,
   IntervalKey,
+  NormalizedInstanceFamily,
   PROVIDER_ORDER,
   PricingModelCost,
   PricingModelKey,
   ProviderId,
+  SharedReportResponse,
+  StoragePricingTier,
+  WorkloadInput,
 } from '../types';
 import { providerMarkSrc } from '../provider-brand';
+import {
+  canonicalRegionForRegionPreference,
+  DEFAULT_COMPARISON_REGION,
+} from '../region-normalization';
+import { WorkloadFormState } from '../workload';
 
 type CurrencyCode = 'USD' | 'PKR' | 'EUR' | 'GBP';
 
@@ -25,6 +38,7 @@ interface CurrencyOption {
   label: string;
   locale: string;
   available: boolean;
+  rate: number;
 }
 
 interface BreakdownPart {
@@ -39,6 +53,11 @@ interface EgressWarning {
   providerId: ProviderId;
   amount: number;
   percentOverLowest: number;
+}
+
+interface GeneratedShareLink {
+  token: string;
+  publicUrl: string;
 }
 
 const PRICING_MODELS: PricingModelOption[] = [
@@ -59,21 +78,33 @@ const PRICING_MODELS: PricingModelOption[] = [
   },
 ];
 
-const CURRENCY_OPTIONS: CurrencyOption[] = [
-  { code: 'USD', label: 'USD', locale: 'en-US', available: true },
-  { code: 'PKR', label: 'PKR', locale: 'en-PK', available: false },
-  { code: 'EUR', label: 'EUR', locale: 'de-DE', available: false },
-  { code: 'GBP', label: 'GBP', locale: 'en-GB', available: false },
+const USD_CURRENCY: CurrencyOption = {
+  code: 'USD',
+  label: 'USD',
+  locale: 'en-US',
+  available: true,
+  rate: 1,
+};
+
+const CURRENCY_OPTIONS: Array<Pick<CurrencyOption, 'code' | 'label' | 'locale'>> = [
+  { code: 'USD', label: 'USD', locale: 'en-US' },
+  { code: 'PKR', label: 'PKR', locale: 'en-PK' },
+  { code: 'EUR', label: 'EUR', locale: 'de-DE' },
+  { code: 'GBP', label: 'GBP', locale: 'en-GB' },
 ];
 
 const DISMISSED_ALERT_STORAGE_KEY = 'polycost-dismissed-budget-alerts';
 
 export function FinOpsFeatureLayer({
+  client = polyCostClient,
   comparison,
+  form,
   interval,
   isLoading = false,
 }: {
+  client?: PolyCostClient;
   comparison: ComparisonResult | null;
+  form: WorkloadFormState;
   interval: IntervalKey;
   isLoading?: boolean;
 }) {
@@ -82,8 +113,20 @@ export function FinOpsFeatureLayer({
   const [dismissedAlerts, setDismissedAlerts] = useState<string[]>(() => readDismissedAlerts());
   const [watermarkEnabled, setWatermarkEnabled] = useState(true);
   const [currencyCode, setCurrencyCode] = useState<CurrencyCode>('USD');
-  const currency =
-    CURRENCY_OPTIONS.find((option) => option.code === currencyCode) ?? CURRENCY_OPTIONS[0];
+  const [shareLink, setShareLink] = useState<GeneratedShareLink | null>(null);
+  const [shareStatus, setShareStatus] = useState<'idle' | 'creating' | 'ready' | 'copied'>('idle');
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [exchangeRates, setExchangeRates] = useState<ExchangeRatesResponse | null>(null);
+  const [exchangeRateError, setExchangeRateError] = useState<string | null>(null);
+  const [isLoadingExchangeRates, setIsLoadingExchangeRates] = useState(true);
+  const [budgetRecord, setBudgetRecord] = useState<BudgetRecord | null>(null);
+  const [backendAlerts, setBackendAlerts] = useState<AlertRecord[]>([]);
+  const [budgetStatus, setBudgetStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [budgetError, setBudgetError] = useState<string | null>(null);
+  const currencyOptions = useMemo(() => currencyOptionsFromRates(exchangeRates), [exchangeRates]);
+  const selectedCurrency =
+    currencyOptions.find((option) => option.code === currencyCode) ?? USD_CURRENCY;
+  const currency = selectedCurrency.available ? selectedCurrency : USD_CURRENCY;
   const providerResults = useMemo(
     () =>
       new Map<ProviderId, ComparisonProviderResult>(
@@ -107,6 +150,60 @@ export function FinOpsFeatureLayer({
     cheapestMonthly > parsedThreshold &&
     !dismissedAlerts.includes(budgetAlertId);
 
+  useEffect(() => {
+    setShareLink(null);
+    setShareStatus('idle');
+    setShareError(null);
+  }, [comparison?.comparisonId, watermarkEnabled]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    setIsLoadingExchangeRates(true);
+    setExchangeRateError(null);
+
+    client
+      .getExchangeRates('USD')
+      .then((rates) => {
+        if (!isActive) {
+          return;
+        }
+
+        setExchangeRates(rates);
+        setExchangeRateError(null);
+      })
+      .catch((error) => {
+        if (!isActive) {
+          return;
+        }
+
+        setExchangeRates(null);
+        setExchangeRateError(formatApiError(error));
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsLoadingExchangeRates(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [client]);
+
+  useEffect(() => {
+    if (!selectedCurrency.available) {
+      setCurrencyCode('USD');
+    }
+  }, [selectedCurrency.available]);
+
+  useEffect(() => {
+    setBudgetRecord(null);
+    setBackendAlerts([]);
+    setBudgetStatus('idle');
+    setBudgetError(null);
+  }, [budgetThreshold, comparison?.comparisonId]);
+
   function dismissBudgetAlert() {
     if (!budgetAlertId) {
       return;
@@ -115,6 +212,70 @@ export function FinOpsFeatureLayer({
     const nextDismissedAlerts = [...dismissedAlerts, budgetAlertId];
     setDismissedAlerts(nextDismissedAlerts);
     storeDismissedAlerts(nextDismissedAlerts);
+  }
+
+  async function saveBackendBudget() {
+    if (!comparison || parsedThreshold === undefined || budgetStatus === 'saving') {
+      return;
+    }
+
+    setBudgetStatus('saving');
+    setBudgetError(null);
+
+    try {
+      const workload = await client.createWorkload(workloadInputFromForm(form));
+      const budget = await client.createBudget({
+        workloadId: workload.id,
+        thresholdUsd: parsedThreshold,
+        alertOnAnomalyPercent: 20,
+      });
+      const alerts = await client.listAlerts(workload.id);
+
+      setBudgetRecord(budget);
+      setBackendAlerts(alerts);
+      setBudgetStatus('saved');
+    } catch (error) {
+      setBudgetStatus('idle');
+      setBudgetError(formatApiError(error));
+    }
+  }
+
+  async function dismissBackendAlert(alertId: string) {
+    try {
+      const updatedAlert = await client.updateAlertDismissed(alertId, true);
+      setBackendAlerts((alerts) =>
+        alerts.map((alert) => (alert.id === updatedAlert.id ? updatedAlert : alert)),
+      );
+      setBudgetError(null);
+    } catch (error) {
+      setBudgetError(formatApiError(error));
+    }
+  }
+
+  async function createAndCopyShareLink() {
+    if (!comparison || shareStatus === 'creating') {
+      return;
+    }
+
+    setShareStatus('creating');
+    setShareError(null);
+
+    try {
+      const workload = await client.createWorkload(workloadInputFromForm(form));
+      const share = await client.createShareLink({
+        workloadId: workload.id,
+        watermark: watermarkEnabled,
+        expiresInDays: 30,
+      });
+      const publicUrl = publicShareUrl(share.url, share.token);
+
+      await copyToClipboard(publicUrl);
+      setShareLink({ token: share.token, publicUrl });
+      setShareStatus('copied');
+    } catch (error) {
+      setShareStatus('idle');
+      setShareError(formatApiError(error));
+    }
   }
 
   return (
@@ -207,8 +368,8 @@ export function FinOpsFeatureLayer({
                 Estimate guardrail and anomaly readiness
               </h3>
             </div>
-            <label className="grid min-w-[220px] gap-1 text-sm font-semibold text-text-primary">
-              <span>Monthly budget threshold</span>
+            <div className="grid min-w-[220px] gap-1 text-sm font-semibold text-text-primary">
+              <label htmlFor="budget-threshold-usd">Monthly budget threshold</label>
               <span className="relative block">
                 <input
                   id="budget-threshold-usd"
@@ -222,7 +383,28 @@ export function FinOpsFeatureLayer({
                   USD
                 </span>
               </span>
-            </label>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={
+                !comparison ||
+                parsedThreshold === undefined ||
+                isLoading ||
+                budgetStatus === 'saving'
+              }
+              loading={budgetStatus === 'saving'}
+              loadingLabel="Saving budget..."
+              onClick={saveBackendBudget}
+            >
+              <BudgetIcon />
+              Save backend budget
+            </Button>
+            <span className="inline-flex min-h-11 items-center rounded-lg border border-border bg-surface-0 px-3 text-xs font-semibold uppercase tracking-wide text-text-muted">
+              20% anomaly threshold
+            </span>
           </div>
 
           {budgetAlertActive && parsedThreshold !== undefined && cheapestMonthly !== undefined ? (
@@ -236,7 +418,7 @@ export function FinOpsFeatureLayer({
                   <p className="mt-1 text-text-secondary">
                     Lowest monthly estimate is {formatMoney(cheapestMonthly, currency)} against a{' '}
                     {formatMoney(parsedThreshold, currency)} threshold. This is an estimate
-                    guardrail; live anomaly monitoring still needs backend alert infrastructure.
+                    guardrail before the scheduled backend evaluator runs.
                   </p>
                 </div>
                 <Button type="button" variant="secondary" onClick={dismissBudgetAlert}>
@@ -246,11 +428,57 @@ export function FinOpsFeatureLayer({
             </div>
           ) : (
             <div className="rounded-lg border border-border bg-surface-0 p-3 text-sm text-text-secondary">
-              Live spend threshold monitoring, week-over-week anomaly detection, and notification
-              delivery are backend gaps. This UI stores the estimate threshold and will not invent a
-              live alert.
+              Enter a threshold to run an instant estimate guardrail. Save it to create a real
+              backend budget; scheduled evaluation can then populate threshold and anomaly alerts.
             </div>
           )}
+          {budgetError ? (
+            <div
+              className="rounded-lg border border-action-destructive bg-surface-0 p-3 text-sm text-text-primary"
+              role="alert"
+            >
+              <strong>Budget workflow failed.</strong> {budgetError}
+            </div>
+          ) : null}
+          {budgetRecord ? (
+            <div className="grid gap-3 rounded-lg border border-border bg-surface-0 p-3 text-sm text-text-secondary">
+              <div>
+                <strong className="text-text-primary">Backend budget saved.</strong>{' '}
+                {formatMoney(budgetRecord.thresholdUsd, currency)} threshold · workload{' '}
+                {budgetRecord.workloadId}
+              </div>
+              {backendAlerts.length > 0 ? (
+                <div className="grid gap-2">
+                  {backendAlerts.map((alert) => (
+                    <div
+                      key={alert.id}
+                      className="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-surface-1 p-2 md:flex-row md:items-center md:justify-between"
+                    >
+                      <span>
+                        <strong className="text-text-primary">
+                          {alert.alertType === 'anomaly' ? 'Anomaly' : 'Budget threshold'}
+                        </strong>{' '}
+                        {alert.message}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={alert.dismissed}
+                        onClick={() => void dismissBackendAlert(alert.id)}
+                      >
+                        {alert.dismissed ? 'Dismissed' : 'Dismiss'}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <span>
+                  No active backend alerts returned yet. The scheduled evaluator creates alert rows;
+                  notification delivery remains outside the V1 UI.
+                </span>
+              )}
+            </div>
+          ) : null}
         </section>
 
         <section className="grid gap-3 rounded-lg border border-border bg-surface-1 p-4 shadow-sm">
@@ -272,31 +500,59 @@ export function FinOpsFeatureLayer({
             />
           </label>
           <div className="rounded-lg border border-border bg-surface-0 p-3 text-sm text-text-secondary">
-            Share token generation, public token resolution, expiry, and revocation endpoints are
-            not present yet. No fake public link has been generated.
+            {shareLink ? (
+              <>
+                <strong className="text-text-primary">Public report ready.</strong>{' '}
+                <a
+                  href={shareLink.publicUrl}
+                  className="font-semibold text-action-primary underline-offset-4 hover:underline"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open read-only report
+                </a>{' '}
+                · token {shareLink.token}
+              </>
+            ) : (
+              <>
+                Create a real read-only report link scoped to this workload. Links expire after 30
+                days and resolve through the backend share-token API.
+              </>
+            )}
           </div>
+          {shareError ? (
+            <div
+              className="rounded-lg border border-action-destructive bg-surface-0 p-3 text-sm text-text-primary"
+              role="alert"
+            >
+              <strong>Share link failed.</strong> {shareError}
+            </div>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
               variant="secondary"
-              disabled
-              title="Requires backend share-token generation."
+              disabled={!comparison || isLoading || shareStatus === 'creating'}
+              loading={shareStatus === 'creating'}
+              loadingLabel="Creating link..."
+              onClick={createAndCopyShareLink}
             >
               <ShareIcon />
-              Copy link
+              {shareLink ? 'Copy fresh link' : 'Create & copy link'}
             </Button>
             <Button
               type="button"
               variant="destructive"
               disabled
-              title="Requires backend share-token revocation."
+              title="Backend revoke endpoint is not exposed in the V1 share-link contract."
             >
               <RevokeIcon />
               Revoke
             </Button>
           </div>
           <p className="text-xs font-semibold text-text-muted">
-            Current mode: {watermarkEnabled ? 'branded report' : 'white-label ready'}
+            Current mode: {watermarkEnabled ? 'branded report' : 'white-label ready'} ·{' '}
+            {shareStatus === 'copied' ? 'link copied' : 'revoke requires backend support'}
           </p>
         </section>
       </div>
@@ -318,10 +574,10 @@ export function FinOpsFeatureLayer({
               onChange={(event) => setCurrencyCode(event.currentTarget.value as CurrencyCode)}
               className="min-h-11 rounded-lg border border-border bg-surface-0 px-3 text-sm text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
             >
-              {CURRENCY_OPTIONS.map((option) => (
+              {currencyOptions.map((option) => (
                 <option key={option.code} value={option.code} disabled={!option.available}>
                   {option.label}
-                  {option.available ? '' : ' - exchange backend pending'}
+                  {option.available ? '' : ' - rate unavailable'}
                 </option>
               ))}
             </select>
@@ -331,7 +587,11 @@ export function FinOpsFeatureLayer({
           <InfoTile
             label="Active currency"
             value={currency.code}
-            detail="USD is the only live currency returned by the pricing APIs."
+            detail={
+              currency.code === 'USD'
+                ? 'USD is the cached pricing base currency.'
+                : `1 USD = ${formatRate(currency.rate)} ${currency.code}`
+            }
           />
           <InfoTile
             label="Lowest monthly"
@@ -342,8 +602,19 @@ export function FinOpsFeatureLayer({
           />
           <InfoTile
             label="Exchange rates"
-            value="Backend pending"
-            detail="PKR, EUR, and GBP need a real exchange-rate service with timestamps."
+            value={
+              isLoadingExchangeRates
+                ? 'Loading'
+                : exchangeRates && Object.keys(exchangeRates.rates).length > 0
+                  ? `${Object.keys(exchangeRates.rates).length} rates`
+                  : 'USD only'
+            }
+            detail={
+              exchangeRateError ??
+              (exchangeRates?.lastUpdated
+                ? `Cached ${formatReportDate(exchangeRates.lastUpdated)}`
+                : 'Backend returned no quote-currency rows.')
+            }
           />
         </div>
       </section>
@@ -471,7 +742,113 @@ function WorkloadBreakdown({
   );
 }
 
-export function SharedReportPlaceholder({ token }: { token: string }) {
+function workloadInputFromForm(form: WorkloadFormState): WorkloadInput {
+  const vcpu = positiveNumberOrDefault(form.vcpu, 2);
+  const memoryGb = positiveNumberOrDefault(form.memoryGb, 4);
+
+  return {
+    instanceFamily: instanceFamilyForWorkload(vcpu, memoryGb),
+    vcpu,
+    memoryGb,
+    region: canonicalRegionForRegionPreference(form.regionPreference) ?? DEFAULT_COMPARISON_REGION,
+    instanceCount: Math.round(positiveNumberOrDefault(form.instanceCount, 1)),
+    hoursPerMonth: 730,
+    storageGb: form.storageEnabled ? nonNegativeNumberOrDefault(form.storageSizeGb, 0) : 0,
+    storageTier: storageTierForAccessPattern(form.storageAccessPattern),
+    egressGbPerMonth: nonNegativeNumberOrDefault(form.monthlyEgressGb, 0),
+  };
+}
+
+function instanceFamilyForWorkload(
+  vcpu: number,
+  memoryGb: number,
+): NormalizedInstanceFamily {
+  if (memoryGb / Math.max(vcpu, 1) >= 6) {
+    return 'memory-optimized';
+  }
+
+  if (vcpu >= 8) {
+    return 'compute-optimized';
+  }
+
+  return 'general-purpose';
+}
+
+function storageTierForAccessPattern(
+  accessPattern: WorkloadFormState['storageAccessPattern'],
+): StoragePricingTier {
+  if (accessPattern === 'archive') {
+    return 'archive';
+  }
+
+  if (accessPattern === 'infrequent') {
+    return 'infrequent_access';
+  }
+
+  return 'standard';
+}
+
+function positiveNumberOrDefault(value: string, fallback: number): number {
+  const parsed = Number.parseFloat(value.replace(/,/g, '').trim());
+
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function nonNegativeNumberOrDefault(value: string, fallback: number): number {
+  const parsed = Number.parseFloat(value.replace(/,/g, '').trim());
+
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function publicShareUrl(apiShareUrl: string, token: string): string {
+  const tokenFromUrl = apiShareUrl.match(/\/share\/([^/?#]+)/)?.[1] ?? token;
+  const publicPath = `/share/${tokenFromUrl}`;
+
+  return new URL(publicPath, window.location.origin).toString();
+}
+
+async function copyToClipboard(value: string): Promise<void> {
+  if (!navigator.clipboard?.writeText) {
+    return;
+  }
+
+  await navigator.clipboard.writeText(value);
+}
+
+export function SharedReportPlaceholder({
+  client = polyCostClient,
+  token,
+}: {
+  client?: PolyCostClient;
+  token: string;
+}) {
+  const [report, setReport] = useState<SharedReportResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    setReport(null);
+    setError(null);
+
+    client
+      .getSharedReport(token)
+      .then((nextReport) => {
+        if (isActive) {
+          setReport(nextReport);
+        }
+      })
+      .catch((nextError) => {
+        if (isActive) {
+          setError(formatApiError(nextError));
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [client, token]);
+
   return (
     <main className="min-h-screen bg-surface-0 px-4 py-8 text-text-primary">
       <section className="mx-auto grid max-w-4xl gap-4 rounded-lg border border-border bg-surface-1 p-6 shadow-sm">
@@ -481,23 +858,117 @@ export function SharedReportPlaceholder({ token }: { token: string }) {
               PolyCost shared report
             </p>
             <h1 className="mt-2 text-2xl font-semibold text-text-primary">
-              Read-only report token pending backend resolution
+              Read-only cloud cost report
             </h1>
           </div>
           <span className="rounded-full border border-border bg-surface-0 px-3 py-1 text-xs font-semibold text-text-muted">
             /share/{token}
           </span>
         </div>
-        <div className="rounded-lg border border-border bg-surface-0 p-4 text-sm leading-6 text-text-secondary">
-          This stripped-down view is ready for public report rendering, but the API does not yet
-          provide share-token lookup, expiry, revocation, or scoped read-only report data. No
-          account navigation or edit controls are shown here.
-        </div>
-        <InfoTile
-          label="Backend gap"
-          value="Share token service"
-          detail={`Token received: ${token}. The frontend will render the comparison once the API can resolve it.`}
-        />
+
+        {error ? (
+          <div
+            className="rounded-lg border border-action-destructive bg-surface-0 p-4 text-sm leading-6 text-text-primary"
+            role="alert"
+          >
+            <strong>Shared report unavailable.</strong> {error}
+          </div>
+        ) : null}
+
+        {!report && !error ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Shared report loading">
+            {[0, 1, 2].map((item) => (
+              <div
+                key={item}
+                className="h-24 animate-pulse rounded-lg border border-border bg-surface-0 motion-reduce:animate-none"
+              />
+            ))}
+          </div>
+        ) : null}
+
+        {report ? (
+          <>
+            <div className="grid gap-3 md:grid-cols-3">
+              <InfoTile
+                label="Token"
+                value={report.token}
+                detail="Public, read-only, and scoped to this workload."
+              />
+              <InfoTile
+                label="Expires"
+                value={formatReportDate(report.expiresAt)}
+                detail="Expired or revoked tokens return no report data."
+              />
+              <InfoTile
+                label="Watermark"
+                value={report.watermark ? 'Enabled' : 'Disabled'}
+                detail="Controls branded report presentation only."
+              />
+            </div>
+
+            <section className="rounded-lg border border-border bg-surface-0 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+                Workload scope
+              </p>
+              <div className="mt-3 grid gap-3 md:grid-cols-4">
+                <InfoTile
+                  label="Region"
+                  value={report.workload.region}
+                  detail="Canonical comparison region."
+                />
+                <InfoTile
+                  label="Compute"
+                  value={`${report.workload.instanceCount} x ${report.workload.vcpu} vCPU`}
+                  detail={`${report.workload.memoryGb} GB RAM per instance.`}
+                />
+                <InfoTile
+                  label="Storage"
+                  value={`${report.workload.storageGb} GB`}
+                  detail={report.workload.storageTier.replace(/_/g, ' ')}
+                />
+                <InfoTile
+                  label="Egress"
+                  value={`${report.workload.egressGbPerMonth} GB/mo`}
+                  detail="Public internet transfer estimate."
+                />
+              </div>
+            </section>
+
+            <section className="rounded-lg border border-border bg-surface-0 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+                Provider breakdown
+              </p>
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                {report.breakdown.providers.map((provider) => (
+                  <article
+                    key={provider.provider}
+                    className="rounded-lg border border-border bg-surface-1 p-3"
+                  >
+                    <ProviderLogoHeading providerId={provider.provider} />
+                    <strong className="mt-3 block font-mono text-xl text-text-primary">
+                      {formatMoney(provider.total, USD_CURRENCY)}
+                    </strong>
+                    <dl className="mt-3 grid gap-2 text-sm text-text-secondary">
+                      <div className="flex justify-between gap-3">
+                        <dt>Compute</dt>
+                        <dd>{formatMoney(provider.compute, USD_CURRENCY)}</dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt>Storage</dt>
+                        <dd>{formatMoney(provider.storage, USD_CURRENCY)}</dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt>Egress</dt>
+                        <dd>{formatMoney(provider.egress, USD_CURRENCY)}</dd>
+                      </div>
+                    </dl>
+                    <p className="mt-3 text-xs text-text-muted">Region: {provider.region}</p>
+                  </article>
+                ))}
+              </div>
+            </section>
+          </>
+        ) : null}
       </section>
     </main>
   );
@@ -711,6 +1182,10 @@ function RevokeIcon() {
   return <IconPath path="M6 6l12 12M18 6 6 18M12 3a9 9 0 1 1-9 9 9 9 0 0 1 9-9z" />;
 }
 
+function BudgetIcon() {
+  return <IconPath path="M5 6h14v12H5zM8 10h8M8 14h4M16 14h1" />;
+}
+
 function IconPath({ path }: { path: string }) {
   return (
     <svg
@@ -758,11 +1233,45 @@ function intervalCostMultiplier(interval: IntervalKey): number {
   }
 }
 
+function currencyOptionsFromRates(rates: ExchangeRatesResponse | null): CurrencyOption[] {
+  return CURRENCY_OPTIONS.map((option) => {
+    if (option.code === 'USD') {
+      return USD_CURRENCY;
+    }
+
+    const rate = rates?.rates[option.code];
+
+    return {
+      ...option,
+      available: typeof rate === 'number' && Number.isFinite(rate) && rate > 0,
+      rate: typeof rate === 'number' && Number.isFinite(rate) && rate > 0 ? rate : 1,
+    };
+  });
+}
+
+function formatReportDate(value: string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    dateStyle: 'medium',
+  }).format(date);
+}
+
 function formatMoney(value: number, currency: CurrencyOption): string {
   return new Intl.NumberFormat(currency.locale, {
     style: 'currency',
     currency: currency.code,
     maximumFractionDigits: 2,
+  }).format(value * currency.rate);
+}
+
+function formatRate(value: number): string {
+  return new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: value >= 100 ? 2 : 4,
   }).format(value);
 }
 

@@ -42,6 +42,11 @@ interface PersonaComparisonData {
   activeRegion: string;
   warningMessages: string[];
   missingEngineeringFields: string[];
+  confidence: 'High' | 'Medium' | 'Low' | 'Pending';
+  confidenceDetail: string;
+  pricedProviderCount: number;
+  totalApproximateCount: number;
+  totalLineItemCount: number;
 }
 
 interface PersonaProviderSummary {
@@ -202,7 +207,7 @@ export function usePersonaComparisonData(
     const rows =
       comparison?.providers.flatMap((provider) =>
         provider.lineItems.map((lineItem, index) =>
-          engineeringRowFromLineItem(provider.providerId, lineItem, index, activeRegion),
+          engineeringRowFromLineItem(provider.providerId, lineItem, index),
         ),
       ) ?? [];
     const cheapest = pricedSummaries[0];
@@ -212,6 +217,18 @@ export function usePersonaComparisonData(
       cheapest?.monthlyTotal !== undefined && highest?.monthlyTotal !== undefined
         ? roundCurrency(highest.monthlyTotal - cheapest.monthlyTotal)
         : undefined;
+    const pricedProviderCount = providerSummaries.filter(
+      (summary) => summary.monthlyTotal !== undefined,
+    ).length;
+    const totalApproximateCount = providerSummaries.reduce(
+      (count, summary) => count + summary.approximateCount,
+      0,
+    );
+    const totalLineItemCount = providerSummaries.reduce(
+      (count, summary) => count + summary.lineItemCount,
+      0,
+    );
+    const confidence = decisionConfidence(pricedProviderCount, totalApproximateCount);
 
     return {
       comparisonId: comparison?.comparisonId,
@@ -225,11 +242,12 @@ export function usePersonaComparisonData(
       annualForecast: cheapest ? roundCurrency(cheapest.monthlyTotal * 12) : undefined,
       activeRegion,
       warningMessages: comparison?.warnings?.map((warning) => warning.message) ?? [],
-      missingEngineeringFields: [
-        'Per-line-item SKU/spec details are not exposed by the comparison API yet.',
-        'Per-line-item region is inferred from the workload preference, not returned per row.',
-        'Tags are not present in the comparison response yet.',
-      ],
+      missingEngineeringFields: ['Tags are not present in the comparison response yet.'],
+      confidence,
+      confidenceDetail: confidenceDetail(confidence, pricedProviderCount, totalApproximateCount),
+      pricedProviderCount,
+      totalApproximateCount,
+      totalLineItemCount,
     };
   }, [comparison, form.regionPreference, interval]);
 }
@@ -378,63 +396,6 @@ function EngineeringPersonaView({
 }) {
   return (
     <div className="min-w-0 space-y-4" aria-label="Engineering comparison view">
-      <div className="grid min-w-0 gap-3 rounded-lg border border-border bg-surface-1 p-3 shadow-sm lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-        <label className="grid gap-1 text-sm font-semibold text-text-primary">
-          <span>Filter by tag</span>
-          <select
-            value={tagFilter}
-            onChange={(event) => onTagFilterChange(event.target.value)}
-            className="min-h-11 rounded-lg border border-border bg-surface-0 px-3 text-sm text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
-          >
-            <option value="all">All tags</option>
-            {tagOptions.map((tag) => (
-              <option key={tag} value={tag}>
-                {tag}
-              </option>
-            ))}
-          </select>
-          {tagOptions.length === 0 ? (
-            <span className="text-xs font-normal text-text-muted">
-              Tag filtering is ready in the UI; the current API does not return tags yet.
-            </span>
-          ) : null}
-        </label>
-
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={
-              !data.comparisonId ||
-              isLoading ||
-              !onExport ||
-              (exportingFormat !== null && exportingFormat !== 'csv')
-            }
-            loading={exportingFormat === 'csv'}
-            loadingLabel="Exporting CSV..."
-            onClick={() => onExport?.('csv')}
-          >
-            <ExportIcon />
-            Export CSV
-          </Button>
-          {apiEndpoint ? (
-            <a
-              href={apiEndpoint}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border-strong bg-surface-1 px-4 py-2 text-sm font-semibold text-text-primary transition hover:bg-surface-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
-            >
-              <ApiIcon />
-              API JSON
-            </a>
-          ) : (
-            <span className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-muted">
-              API JSON pending comparison
-            </span>
-          )}
-        </div>
-      </div>
-
       {data.missingEngineeringFields.length > 0 ? (
         <div className="rounded-lg border border-border bg-surface-1 p-3 text-sm text-text-secondary">
           <strong className="text-text-primary">Backend contract note:</strong>{' '}
@@ -527,6 +488,63 @@ function EngineeringPersonaView({
           </table>
         </div>
       </div>
+
+      <div className="grid min-w-0 gap-3 rounded-lg border border-border bg-surface-1 p-3 shadow-sm lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+        <label className="grid gap-1 text-sm font-semibold text-text-primary">
+          <span>Filter by tag</span>
+          <select
+            value={tagFilter}
+            onChange={(event) => onTagFilterChange(event.target.value)}
+            className="min-h-11 rounded-lg border border-border bg-surface-0 px-3 text-sm text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
+          >
+            <option value="all">All tags</option>
+            {tagOptions.map((tag) => (
+              <option key={tag} value={tag}>
+                {tag}
+              </option>
+            ))}
+          </select>
+          {tagOptions.length === 0 ? (
+            <span className="text-xs font-normal text-text-muted">
+              Tag filtering is ready in the UI; the current API does not return tags yet.
+            </span>
+          ) : null}
+        </label>
+
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={
+              !data.comparisonId ||
+              isLoading ||
+              !onExport ||
+              (exportingFormat !== null && exportingFormat !== 'csv')
+            }
+            loading={exportingFormat === 'csv'}
+            loadingLabel="Exporting CSV..."
+            onClick={() => onExport?.('csv')}
+          >
+            <ExportIcon />
+            Export CSV
+          </Button>
+          {apiEndpoint ? (
+            <a
+              href={apiEndpoint}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border-strong bg-surface-1 px-4 py-2 text-sm font-semibold text-text-primary transition hover:bg-surface-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
+            >
+              <ApiIcon />
+              API JSON
+            </a>
+          ) : (
+            <span className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-muted">
+              API JSON pending comparison
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -572,16 +590,28 @@ function SharedComparisonState({
     );
   }
 
-  if (data.warningMessages.length > 0) {
-    return (
-      <div className="rounded-lg border border-border bg-surface-1 p-3 text-sm text-text-secondary">
-        <strong className="text-text-primary">Pricing warnings:</strong>{' '}
-        {data.warningMessages.join(' ')}
+  return (
+    <div className="grid gap-3 rounded-lg border border-border bg-surface-1 p-3 text-sm text-text-secondary">
+      <div className="flex min-w-0 flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <strong className="text-text-primary">Comparison evidence:</strong>{' '}
+          {comparisonEvidenceSummary(data)}
+        </div>
+        <span className={`confidence-pill confidence-${data.confidence.toLowerCase()}`}>
+          <strong>{data.confidence}</strong>
+          <small>{data.confidenceDetail}</small>
+        </span>
       </div>
-    );
-  }
-
-  return null;
+      {data.warningMessages.length > 0 ? (
+        <div
+          className="rounded-md border border-[color:var(--pc-warning)] bg-[color:var(--pc-warning-soft)] p-2 text-text-primary"
+          role="alert"
+        >
+          <strong>Pricing warnings:</strong> {data.warningMessages.join(' ')}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function ExecutiveMetricCard({
@@ -653,7 +683,6 @@ function engineeringRowFromLineItem(
   providerId: ProviderId,
   lineItem: ComparisonLineItem,
   index: number,
-  activeRegion: string,
 ): EngineeringCostRow {
   const resourceName = `${providerId}-${lineItem.category}-${String(index + 1).padStart(2, '0')}`;
 
@@ -663,13 +692,90 @@ function engineeringRowFromLineItem(
     providerId,
     providerName: providerLabel(providerId),
     category: lineItem.category,
-    region: activeRegion,
-    spec: 'SKU/spec pending API field',
+    region: lineItem.region ?? 'Provider default',
+    spec: lineItemSpec(lineItem),
     monthlyCost: lineItem.baseMonthlyCostUsd,
     description: lineItem.description,
     isApproximate: lineItem.isApproximate,
     tags: [],
   };
+}
+
+function lineItemSpec(lineItem: ComparisonLineItem): string {
+  const parts = [
+    lineItem.skuId ? `SKU ${lineItem.skuId}` : undefined,
+    lineItem.unit ? `Unit ${lineItem.unit}` : undefined,
+    lineItem.unitPriceUsd !== undefined ? `${formatCurrency(lineItem.unitPriceUsd)}/unit` : undefined,
+    lineItem.pricingBasis ? `${capitalize(lineItem.pricingBasis)} pricing` : undefined,
+  ].filter((part): part is string => Boolean(part));
+
+  return parts.length > 0 ? parts.join(' · ') : 'Provider SKU detail unavailable';
+}
+
+function comparisonEvidenceSummary(data: PersonaComparisonData): string {
+  const pricingDate = data.pricingAsOf ? formatDateTime(data.pricingAsOf) : 'pricing date pending';
+  const approximateText =
+    data.totalApproximateCount === 1
+      ? '1 approximate mapping'
+      : `${data.totalApproximateCount} approximate mappings`;
+
+  return `${pricingDate} · ${data.pricedProviderCount}/3 clouds priced · ${data.totalLineItemCount} line items · ${approximateText}.`;
+}
+
+function decisionConfidence(
+  pricedProviderCount: number,
+  approximateCount: number,
+): PersonaComparisonData['confidence'] {
+  if (pricedProviderCount === 0) {
+    return 'Pending';
+  }
+
+  if (pricedProviderCount === PROVIDER_ORDER.length && approximateCount === 0) {
+    return 'High';
+  }
+
+  if (pricedProviderCount >= 2) {
+    return 'Medium';
+  }
+
+  return 'Low';
+}
+
+function confidenceDetail(
+  confidence: PersonaComparisonData['confidence'],
+  pricedProviderCount: number,
+  approximateCount: number,
+): string {
+  if (confidence === 'Pending') {
+    return 'No provider estimates yet';
+  }
+
+  if (confidence === 'High') {
+    return 'All clouds priced with exact mappings';
+  }
+
+  if (confidence === 'Medium') {
+    return `${pricedProviderCount}/3 clouds priced; ${approximateCount} approximate mappings`;
+  }
+
+  return `${pricedProviderCount}/3 clouds priced; validate before decision`;
+}
+
+function capitalize(value: string): string {
+  return value ? `${value.charAt(0).toUpperCase()}${value.slice(1)}` : value;
+}
+
+function formatDateTime(value: string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return `Pricing as of ${value}`;
+  }
+
+  return `Pricing as of ${new Intl.DateTimeFormat('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)}`;
 }
 
 function executiveRecommendationHeadline(

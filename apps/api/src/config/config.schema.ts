@@ -26,7 +26,11 @@ export const configSchema = z.object({
   VAULT_ADDR: z.string().url(),
   VAULT_TOKEN_FILE: z.string().min(1).optional(),
   VAULT_NAMESPACE: z.string().optional(),
-  CORS_ALLOWED_ORIGINS: z.string().default('http://localhost:3000'),
+  CORS_ALLOWED_ORIGINS: z
+    .string()
+    .default(
+      'http://localhost:3000,http://localhost:3002,http://127.0.0.1:3000,http://127.0.0.1:3002',
+    ),
   FEATURE_LIVE_PRICING_REFRESH_ENABLED: z.coerce.boolean().default(true),
 });
 

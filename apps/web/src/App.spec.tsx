@@ -48,6 +48,8 @@ describe('App', () => {
     const { container, unmount } = render(<App client={client} />);
 
     expect(text(container)).toContain('Multi-cloud cost clarity, in one place.');
+    expect(buttonByText(container, 'Guided form').getAttribute('aria-selected')).toBe('true');
+    expect(buttonByText(container, 'Paste / parse').getAttribute('aria-selected')).toBe('false');
     expect(buttonByText(container, 'Compare costs')).toBeInstanceOf(HTMLButtonElement);
     expect(container.querySelector('.landing-comparison')).toBeNull();
     expect(container.querySelector('.comparison-toolbar')).toBeNull();
@@ -59,16 +61,19 @@ describe('App', () => {
     await click(buttonByText(container, 'Compare costs'));
 
     expect(text(container)).toContain('Requirements');
-    expect(text(container)).toContain('Web app · 2 vCPU · 4GB · US East (N. Virginia)');
+    expect(text(container)).toContain('Manual entry');
+    expect(text(container)).toContain(
+      'Web app · 2 vCPU · 4GB · US East (AWS us-east-1 · Azure eastus · GCP us-east1)',
+    );
     expect(text(container)).toContain('Best value');
     expect(text(container)).toContain('Monthly estimate');
     expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);
-    expect(Array.from(container.querySelectorAll<HTMLDetailsElement>('.result-disclosure'))).toHaveLength(
-      5,
+    expect(Array.from(container.querySelectorAll<HTMLElement>('.result-disclosure'))).toHaveLength(
+      1,
     );
     expect(
-      Array.from(container.querySelectorAll<HTMLDetailsElement>('.result-disclosure')).every(
-        (details) => !details.open,
+      Array.from(container.querySelectorAll<HTMLElement>('.result-disclosure')).every(
+        (details) => details.dataset.open === 'false' && details.dataset.mounted === 'false',
       ),
     ).toBe(true);
     expect(client.validateWorkload).toHaveBeenCalledWith(
@@ -84,44 +89,40 @@ describe('App', () => {
     expect(text(container)).toContain('AWS');
     expect(text(container)).toContain('Azure');
     expect(text(container)).toContain('GCP');
-    expect(text(container)).toContain('Cost periods & executive analytics');
-    expect(text(container)).toContain('Pricing models, breakdown, budget & share');
-    expect(text(container)).toContain('Architecture & engineering evidence');
-    expect(text(container)).toContain('Official calculators & regions');
-    expect(text(container)).toContain('Export report');
-    expect(text(container)).toContain('GCP is the current executive cost baseline');
-    expect(text(container)).toContain('Decision Brief');
-    expect(text(container)).toContain('Save vs next');
-    expect(text(container)).toContain('$8.00');
-    expect(text(container)).toContain('Official calculators');
-    expect(text(container)).toContain('Official region and zone maps');
-    expect(text(container)).toContain('AWS Regions & AZs');
-    expect(text(container)).toContain('Azure Regions & AZs');
-    expect(text(container)).toContain('GCP Regions & Zones');
-    expect(
-      container.querySelector<HTMLAnchorElement>('a[href="https://calculator.aws/#/"]'),
-    ).toBeInstanceOf(HTMLAnchorElement);
-    expect(
-      container.querySelector<HTMLAnchorElement>(
-        'a[href="https://aws.amazon.com/about-aws/global-infrastructure/regions_az/"]',
-      ),
-    ).toBeInstanceOf(HTMLAnchorElement);
-    expect(
-      container.querySelector<HTMLAnchorElement>(
-        'a[href="https://learn.microsoft.com/en-us/azure/reliability/availability-zones-region-support"]',
-      ),
-    ).toBeInstanceOf(HTMLAnchorElement);
-    expect(
-      container.querySelector<HTMLAnchorElement>(
-        'a[href="https://cloud.google.com/compute/docs/regions-zones"]',
-      ),
-    ).toBeInstanceOf(HTMLAnchorElement);
+    expect(text(container)).toContain('Executive monthly baseline');
+    expect(text(container)).toContain('Provider mix');
+    expect(text(container)).toContain('Trend pending');
+    expect(container.querySelector('.recharts-wrapper')).toBeInstanceOf(HTMLElement);
+    expect(text(container)).toContain('Show full breakdown, pricing models & export options');
+    expect(text(container)).not.toContain('Engineering service spend');
+    expect(text(container)).not.toContain('Cost periods & executive analytics');
+    expect(text(container)).not.toContain('Pricing models, breakdown, budget & share');
+    expect(text(container)).not.toContain('Architecture & engineering evidence');
+    expect(text(container)).not.toContain('Official calculators & regions');
+    expect(text(container)).not.toContain('Export report');
+    expect(text(container)).not.toContain('GCP is the current executive cost baseline');
+    expect(container.querySelector<HTMLAnchorElement>('a[href="https://calculator.aws/#/"]')).toBeNull();
+    expect(text(container)).not.toContain('Resource name');
+    expect(text(container)).not.toContain('Spec / SKU');
+    expect(text(container)).not.toContain('Export CSV');
+    expect(text(container)).not.toContain('API JSON');
+    expect(text(container)).not.toContain('SKU/spec pending API field');
 
-    expect(text(container)).toContain('Resource name');
-    expect(text(container)).toContain('Spec / SKU');
-    expect(text(container)).toContain('Export CSV');
-    expect(text(container)).toContain('API JSON');
-    expect(text(container)).toContain('SKU/spec pending API field');
+    unmount();
+  });
+
+  it('blocks invalid guided form values before backend comparison', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await changeInput(inputById(container, 'vcpu'), '0');
+    await click(buttonByText(container, 'Compare costs'));
+
+    expect(text(container)).toContain('Fix 1 requirement field before comparing.');
+    expect(text(container)).toContain('vCPU must be greater than 0.');
+    expect(inputById(container, 'vcpu').getAttribute('aria-invalid')).toBe('true');
+    expect(client.validateWorkload).not.toHaveBeenCalled();
+    expect(client.createComparison).not.toHaveBeenCalled();
 
     unmount();
   });
@@ -187,17 +188,21 @@ describe('App', () => {
     }
   });
 
-  it('keeps relocated features functional inside accessible accordions', async () => {
+  it('keeps relocated features functional inside a single accessible detail gate', async () => {
     const client = clientMock();
     const { container, unmount } = render(<App client={client} />);
 
     await click(buttonByText(container, 'Compare costs'));
 
     const disclosures = Array.from(
-      container.querySelectorAll<HTMLDetailsElement>('.result-disclosure'),
+      container.querySelectorAll<HTMLElement>('.result-disclosure'),
     );
-    expect(disclosures).toHaveLength(5);
-    expect(disclosures.every((details) => !details.open)).toBe(true);
+    expect(disclosures).toHaveLength(1);
+    expect(
+      disclosures.every(
+        (details) => details.dataset.open === 'false' && details.dataset.mounted === 'false',
+      ),
+    ).toBe(true);
     expect(
       disclosures.every(
         (details) =>
@@ -206,38 +211,60 @@ describe('App', () => {
       ),
     ).toBe(true);
 
-    const costPeriods = resultDisclosureByTitle(container, 'Cost periods & executive analytics');
-    await keyDown(disclosureSummary(costPeriods), 'Enter');
-    expect(costPeriods.open).toBe(true);
-    expect(disclosureSummary(costPeriods).getAttribute('aria-expanded')).toBe('true');
+    const detailGate = resultDisclosureByTitle(
+      container,
+      'Show full breakdown, pricing models & export options',
+    );
+    await click(disclosureSummary(detailGate));
+    expect(detailGate.dataset.open).toBe('true');
+    expect(detailGate.dataset.mounted).toBe('true');
+    expect(disclosureSummary(detailGate).getAttribute('aria-expanded')).toBe('true');
+    expect(detailGate.querySelector('.result-disclosure-panel')?.getAttribute('aria-hidden')).toBe(
+      'false',
+    );
+    expect(text(container)).toContain('Executive decision brief');
+    expect(text(container)).toContain('Export summary');
+    expect(text(container)).not.toContain('Engineering cost controls');
+    expect(text(container)).not.toContain('Filter by tag');
+
+    await click(buttonByText(container, 'Engineering View'));
+    expect(detailGate.dataset.open).toBe('true');
+    expect(text(container)).toContain('Engineering cost controls');
+    expect(text(container)).toContain('Engineering service spend');
+    expect(text(container)).toContain('Service driver split');
+    expect(text(container)).toContain('EC2');
+    expect(text(container)).toContain('VM');
+    expect(text(container)).toContain('GCE');
+    expect(text(container)).toContain('Filter by tag');
 
     await click(buttonByText(container, 'Yearly'));
     expect(text(container)).toContain('Yearly estimate');
 
-    const finOps = resultDisclosureByTitle(container, 'Pricing models, breakdown, budget & share');
-    await keyDown(disclosureSummary(finOps), ' ');
-    expect(finOps.open).toBe(true);
-    expect(disclosureSummary(finOps).getAttribute('aria-expanded')).toBe('true');
-
     await click(buttonByText(container, '1yr reserved'));
     expect(buttonByText(container, '1yr reserved').getAttribute('aria-pressed')).toBe('true');
     expect(text(container)).toContain('Compute, storage, and data-transfer mix');
-    expect(text(container)).toContain('No fake public link has been generated.');
+    expect(text(container)).toContain(
+      'Create a real read-only report link scoped to this workload.',
+    );
+    await click(buttonByText(detailGate, 'Create & copy link'));
+    expect(client.createWorkload).toHaveBeenCalledWith(
+      expect.objectContaining({ region: 'us-east' }),
+    );
+    expect(client.createShareLink).toHaveBeenCalledWith({
+      workloadId: '22222222-2222-4222-8222-222222222222',
+      watermark: true,
+      expiresInDays: 30,
+    });
+    expect(text(container)).toContain('Public report ready.');
 
     await changeInput(inputById(container, 'budget-threshold-usd'), '10');
     expect(text(container)).toContain('Estimated run-rate exceeds budget threshold.');
     await click(buttonByText(container, 'Dismiss'));
     expect(text(container)).not.toContain('Estimated run-rate exceeds budget threshold.');
 
-    const architecture = resultDisclosureByTitle(container, 'Architecture & engineering evidence');
-    await keyDown(disclosureSummary(architecture), 'Enter');
-    expect(architecture.open).toBe(true);
     expect(text(container)).toContain('Resource name');
     expect(text(container)).toContain('API JSON');
 
-    const officialLinks = resultDisclosureByTitle(container, 'Official calculators & regions');
-    await keyDown(disclosureSummary(officialLinks), 'Enter');
-    expect(officialLinks.open).toBe(true);
     expect(
       container.querySelector<HTMLAnchorElement>('a[href="https://calculator.aws/#/"]'),
     ).toBeInstanceOf(HTMLAnchorElement);
@@ -247,11 +274,22 @@ describe('App', () => {
       ),
     ).toBeInstanceOf(HTMLAnchorElement);
 
-    const exportReport = resultDisclosureByTitle(container, 'Export report');
-    await keyDown(disclosureSummary(exportReport), 'Enter');
-    expect(exportReport.open).toBe(true);
     await click(buttonByText(container, 'PDF'));
     expect(client.exportComparison).toHaveBeenCalledWith(comparisonResult.comparisonId, 'pdf');
+
+    await click(buttonByText(container, 'Executive View'));
+    expect(detailGate.dataset.open).toBe('true');
+    expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);
+    expect(text(container)).toContain('Executive decision brief');
+    expect(text(container)).toContain('Export summary');
+    expect(text(container)).not.toContain('Filter by tag');
+
+    await click(disclosureSummary(detailGate));
+    expect(detailGate.dataset.open).toBe('false');
+    expect(detailGate.dataset.mounted).toBe('true');
+    expect(detailGate.querySelector('.result-disclosure-panel')?.getAttribute('aria-hidden')).toBe(
+      'true',
+    );
 
     unmount();
   });
@@ -279,6 +317,12 @@ describe('App', () => {
         await validateDeferred.promise;
       });
 
+      await click(buttonByText(container, 'Engineering View'));
+      await click(
+        disclosureSummary(
+          resultDisclosureByTitle(container, 'Show full breakdown, pricing models & export options'),
+        ),
+      );
       await click(buttonByText(container, 'Refresh live'));
 
       expect(
@@ -318,6 +362,12 @@ describe('App', () => {
 
     expect(text(container)).not.toContain('Comparison ready.');
     expect(container.querySelector('.requirement-summary-strip')).toBeInstanceOf(HTMLElement);
+    await click(buttonByText(container, 'Engineering View'));
+    await click(
+      disclosureSummary(
+        resultDisclosureByTitle(container, 'Show full breakdown, pricing models & export options'),
+      ),
+    );
     expect(buttonByText(container, 'Refresh live').disabled).toBe(false);
     expect(buttonByText(container, 'PDF').disabled).toBe(false);
     expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);
@@ -347,6 +397,13 @@ describe('App', () => {
     expect(container.querySelector('.result-disclosure')).toBeNull();
 
     unmount();
+
+    const reloaded = render(<App client={client} />);
+    expect(text(reloaded.container)).toContain('Multi-cloud cost clarity, in one place.');
+    expect(buttonByText(reloaded.container, 'Compare costs')).toBeInstanceOf(HTMLButtonElement);
+    expect(reloaded.container.querySelector('.provider-summary-card')).toBeNull();
+    expect(reloaded.container.querySelector('.result-disclosure')).toBeNull();
+    reloaded.unmount();
   });
 
   it('supports form edits, interval changes, refresh, and export', async () => {
@@ -363,7 +420,8 @@ describe('App', () => {
 
     expect(container.querySelector('.requirement-summary-strip')).toBeNull();
     expect(container.querySelector('.requirements-edit-panel')).toBeInstanceOf(HTMLElement);
-    expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);
+    expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(0);
+    expect(container.querySelector('.result-disclosure')).toBeNull();
     expect(selectById(container, 'type').value).toBe('api_backend');
     expect(selectById(container, 'region').value).toBe('us-west-2');
     expect(inputById(container, 'vcpu').value).toBe('4');
@@ -397,6 +455,12 @@ describe('App', () => {
     await changeInput(inputById(container, 'sla-target'), '99.95%');
 
     await click(buttonByText(container, 'Compare'));
+    const detailGate = resultDisclosureByTitle(
+      container,
+      'Show full breakdown, pricing models & export options',
+    );
+    await click(buttonByText(container, 'Engineering View'));
+    await click(disclosureSummary(detailGate));
     await click(buttonByText(container, 'Yearly'));
     await click(buttonByText(container, 'Refresh live'));
     await click(buttonByText(container, 'PDF'));
@@ -435,7 +499,7 @@ describe('App', () => {
     unmount();
   });
 
-  it('keeps submitted results stable while editing draft requirements', async () => {
+  it('hides submitted results while editing draft requirements', async () => {
     const client = clientMock();
     const { container, unmount } = render(<App client={client} />);
 
@@ -451,16 +515,16 @@ describe('App', () => {
     await changeInput(inputById(container, 'memory-gb'), '64');
 
     expect(container.querySelector('.requirements-edit-panel')).toBeInstanceOf(HTMLElement);
-    expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);
-    expect(text(container)).toContain('$42.00');
+    expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(0);
+    expect(container.querySelector('.result-disclosure')).toBeNull();
+    expect(text(container)).not.toContain('$42.00');
 
-    await click(buttonByText(container, 'Done'));
+    await click(buttonByText(container, 'Compare'));
 
     expect(container.querySelector('.requirements-edit-panel')).toBeNull();
     expect(container.querySelector('.requirement-summary-strip')).toBeInstanceOf(HTMLElement);
-    expect(text(container)).toContain('API backend · 4 vCPU · 8GB');
-    expect(text(container)).not.toContain('16 vCPU');
-    expect(text(container)).not.toContain('64GB');
+    expect(text(container)).toContain('API backend · 16 vCPU · 64GB');
+    expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);
 
     unmount();
   });
@@ -479,16 +543,20 @@ describe('App', () => {
     });
     const { container, unmount } = render(<App client={client} />);
 
-    await click(buttonByText(container, 'Compare costs'));
-    clearClientCalls(client);
-    await click(buttonByText(container, 'Edit'));
-    await click(buttonByText(container, 'Describe'));
+    await click(buttonByText(container, 'Paste / parse'));
     await click(buttonByText(container, 'Parse & compare'));
 
     expect(client.parseWorkload).toHaveBeenCalledWith(expect.stringContaining('web app'));
     expect(client.validateWorkload).toHaveBeenCalledWith(parsedNws);
     expect(client.createComparison).toHaveBeenCalledWith(parsedNws);
+    expect(text(container)).toContain('Parsed from text');
+    expect(text(container)).toContain('Parsed with medium confidence. Review 1 field.');
+
     await click(buttonByText(container, 'Edit'));
+    expect(buttonByText(container, 'Paste / parse').getAttribute('aria-selected')).toBe('true');
+    expect(textareaById(container, 'natural-language-input').value).toContain('web app');
+
+    await click(buttonByText(container, 'Guided form'));
     expect((container.querySelector('#name') as HTMLInputElement).value).toBe(
       'Parsed and compared portal',
     );
@@ -515,7 +583,7 @@ describe('App', () => {
     await click(buttonByText(container, 'Compare costs'));
     clearClientCalls(client);
     await click(buttonByText(container, 'Edit'));
-    await click(buttonByText(container, 'Describe'));
+    await click(buttonByText(container, 'Paste / parse'));
     await click(buttonByText(container, 'Parse'));
 
     expect(text(container)).toContain('Parsed with high confidence');
@@ -547,13 +615,13 @@ describe('App', () => {
     });
     const { container, unmount } = render(<App client={client} />);
 
-    await click(buttonByText(container, 'Compare costs'));
-    await click(buttonByText(container, 'Edit'));
-    await click(buttonByText(container, 'Describe'));
-    await click(buttonByText(container, 'Parse'));
+    await click(buttonByText(container, 'Paste / parse'));
+    await click(buttonByText(container, 'Parse & compare'));
 
     expect(text(container)).toContain('Input was not understood');
-    expect(text(container)).toContain('Monthly estimate');
+    expect(container.querySelector('.initial-home-form')).toBeInstanceOf(HTMLElement);
+    expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(0);
+    expect(text(container)).not.toContain('Monthly estimate');
     expect(text(container)).not.toContain('Pricing status restricted');
 
     unmount();
@@ -594,7 +662,8 @@ describe('ComparisonView', () => {
 
     expect(mobileProviderLabels(container)).toEqual(['AWS', 'Azure', 'GCP']);
     expect(text(container)).toContain('Unavailable');
-    expect(text(container)).toContain('Azure is the current executive cost baseline');
+    expect(text(container)).toContain('Shortlist Azure');
+    expect(text(container)).toContain('Trend data not yet available');
 
     unmount();
   });
@@ -605,20 +674,22 @@ describe('ComparisonView', () => {
     );
 
     expect(text(container)).toContain('$30.00');
-    expect(text(container)).toContain('GCP is the current executive cost baseline');
-    expect(text(container)).toContain('Decision Brief');
+    expect(text(container)).toContain('Executive monthly baseline');
+    expect(text(container)).toContain('Provider mix');
+    expect(text(container)).toContain('$110.00');
+    expect(text(container)).toContain('90-day forecast');
+    expect(text(container)).toContain('Trend data not yet available');
+    expect(text(container)).toContain('Shortlist GCP');
     expect(text(container)).toContain('$360.00');
-    expect(text(container)).toContain('Save vs next');
-    expect(text(container)).toContain('$8.00');
-    expect(text(container)).toContain('Financial Analytics');
-    expect(text(container)).toContain('Run-rate Ladder');
-    expect(text(container)).toContain('Provider Variance');
-    expect(text(container)).toContain('Cost Mix Stack');
-    expect(text(container)).toContain('Unit Economics');
-    expect(text(container)).toContain('$1,080.00');
+    expect(text(container)).toContain('$144.00');
 
     await click(resultTabByText(container, 'Engineering View'));
 
+    expect(text(container)).toContain('Service driver split');
+    expect(text(container)).toContain('EC2');
+    expect(text(container)).toContain('VM');
+    expect(text(container)).toContain('GCE');
+    expect(container.querySelectorAll('.engineering-bar-chart-shell .recharts-wrapper').length).toBeGreaterThanOrEqual(3);
     expect(text(container)).toContain('Filter by tag');
     expect(text(container)).toContain('Backend contract note');
     expect(text(container)).toContain('Resource name');
@@ -656,15 +727,23 @@ describe('ComparisonView', () => {
         ]),
       ],
     };
+    const client = clientMock();
     const { container, unmount } = render(
-      <ComparisonView comparison={richResult} interval="monthly" />,
+      <ComparisonView client={client} comparison={richResult} interval="monthly" />,
     );
+    await act(async () => undefined);
 
-    expect(text(container)).toContain('Save vs next');
-    expect(text(container)).toContain('$15.00');
+    expect(text(container)).toContain('Potential savings');
+    expect(text(container)).toContain('$456.00');
 
     await click(resultTabByText(container, 'Engineering View'));
 
+    expect(text(container)).toContain('EBS / S3');
+    expect(text(container)).toContain('Disk / Blob');
+    expect(text(container)).toContain('Azure SQL');
+    expect(text(container)).toContain('Data transfer');
+    expect(text(container)).toContain('Cloud SQL');
+    expect(text(container)).toContain('Egress');
     expect(text(container)).toContain('aws compute');
     expect(text(container)).toContain('aws storage');
     expect(text(container)).toContain('aws database');
@@ -702,9 +781,11 @@ describe('ComparisonView', () => {
         ]),
       ],
     };
+    const client = clientMock();
     const { container, unmount } = render(
-      <ComparisonView comparison={richResult} interval="monthly" />,
+      <ComparisonView client={client} comparison={richResult} interval="monthly" />,
     );
+    await act(async () => undefined);
 
     await click(resultTabByText(container, 'Engineering View'));
 
@@ -717,15 +798,24 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Compute, storage, and data-transfer mix');
     expect(text(container)).toContain('Egress/data transfer');
     expect(text(container)).toContain('Egress risk: $30.00 is 200% above the lowest provider.');
-    expect(text(container)).toContain('No fake public link has been generated.');
-    expect(text(container)).toContain('PKR - exchange backend pending');
+    expect(text(container)).toContain(
+      'Create a real read-only report link scoped to this workload.',
+    );
+    expect(client.getExchangeRates).toHaveBeenCalledWith('USD');
+    expect(text(container)).toContain('Exchange rates');
 
     await changeInput(inputById(container, 'budget-threshold-usd'), '70');
 
     expect(text(container)).toContain('Estimated run-rate exceeds budget threshold.');
-    expect(text(container)).toContain(
-      'live anomaly monitoring still needs backend alert infrastructure',
+    expect(text(container)).toContain('scheduled backend evaluator runs');
+    await click(buttonByText(container, 'Save backend budget'));
+    expect(client.createBudget).toHaveBeenCalledWith(
+      expect.objectContaining({
+        thresholdUsd: 70,
+        alertOnAnomalyPercent: 20,
+      }),
     );
+    expect(text(container)).toContain('Backend budget saved.');
 
     await click(buttonByText(container, 'Dismiss'));
 
@@ -762,12 +852,6 @@ async function click(element: HTMLElement): Promise<void> {
   });
 }
 
-async function keyDown(element: HTMLElement, key: string): Promise<void> {
-  await act(async () => {
-    element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key }));
-  });
-}
-
 async function changeInput(input: HTMLInputElement, value: string): Promise<void> {
   await act(async () => {
     const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
@@ -791,6 +875,16 @@ function inputById(container: HTMLElement, id: string): HTMLInputElement {
   }
 
   return input;
+}
+
+function textareaById(container: HTMLElement, id: string): HTMLTextAreaElement {
+  const textarea = container.querySelector(`#${id}`);
+
+  if (!(textarea instanceof HTMLTextAreaElement)) {
+    throw new Error(`Textarea not found: ${id}`);
+  }
+
+  return textarea;
 }
 
 function selectById(container: HTMLElement, id: string): HTMLSelectElement {
@@ -855,23 +949,23 @@ function resultTabByText(container: HTMLElement, label: string): HTMLButtonEleme
   return button;
 }
 
-function resultDisclosureByTitle(container: HTMLElement, title: string): HTMLDetailsElement {
-  const disclosure = Array.from(container.querySelectorAll<HTMLDetailsElement>('.result-disclosure')).find(
+function resultDisclosureByTitle(container: HTMLElement, title: string): HTMLElement {
+  const disclosure = Array.from(container.querySelectorAll<HTMLElement>('.result-disclosure')).find(
     (details) => disclosureSummary(details).textContent?.includes(title),
   );
 
-  if (!(disclosure instanceof HTMLDetailsElement)) {
+  if (!(disclosure instanceof HTMLElement)) {
     throw new Error(`Result disclosure not found: ${title}`);
   }
 
   return disclosure;
 }
 
-function disclosureSummary(details: HTMLDetailsElement): HTMLElement {
-  const summary = details.querySelector('summary');
+function disclosureSummary(details: HTMLElement): HTMLButtonElement {
+  const summary = details.querySelector('.result-disclosure-heading');
 
-  if (!(summary instanceof HTMLElement)) {
-    throw new Error('Result disclosure summary not found');
+  if (!(summary instanceof HTMLButtonElement)) {
+    throw new Error('Result disclosure button not found');
   }
 
   return summary;
@@ -965,6 +1059,90 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     exportComparison: jest.fn(async () => new Blob(['report'])),
     getPricingStatus: jest.fn(async () => pricingStatus),
     getRegionCatalog: jest.fn(() => pendingRegionCatalog),
+    createWorkload: jest.fn(async (input) => ({
+      ...input,
+      id: '22222222-2222-4222-8222-222222222222',
+      createdAt: '2026-06-29T00:00:00.000Z',
+      updatedAt: '2026-06-29T00:00:00.000Z',
+    })),
+    createShareLink: jest.fn(async () => ({
+      token: 'public-token-123',
+      url: '/api/v1/share/public-token-123',
+    })),
+    getSharedReport: jest.fn(async () => ({
+      token: 'public-token-123',
+      watermark: true,
+      expiresAt: '2026-07-29T00:00:00.000Z',
+      workload: {
+        id: '22222222-2222-4222-8222-222222222222',
+        instanceFamily: 'general-purpose' as const,
+        vcpu: 2,
+        memoryGb: 4,
+        region: 'us-east',
+        instanceCount: 2,
+        hoursPerMonth: 730,
+        storageGb: 250,
+        storageTier: 'standard' as const,
+        egressGbPerMonth: 750,
+        createdAt: '2026-06-29T00:00:00.000Z',
+        updatedAt: '2026-06-29T00:00:00.000Z',
+      },
+      breakdown: {
+        workloadId: '22222222-2222-4222-8222-222222222222',
+        term: 'on_demand' as const,
+        providers: [
+          {
+            provider: 'aws' as const,
+            region: 'us-east-1',
+            compute: 20,
+            storage: 10,
+            egress: 5,
+            total: 35,
+            currency: 'USD' as const,
+          },
+        ],
+      },
+    })),
+    createBudget: jest.fn(async (input) => ({
+      ...input,
+      id: '33333333-3333-4333-8333-333333333333',
+      createdAt: '2026-06-29T00:00:00.000Z',
+      updatedAt: '2026-06-29T00:00:00.000Z',
+    })),
+    listAlerts: jest.fn(async (workloadId = '22222222-2222-4222-8222-222222222222') => [
+      {
+        id: '44444444-4444-4444-8444-444444444444',
+        workloadId,
+        budgetId: '33333333-3333-4333-8333-333333333333',
+        alertType: 'budget_threshold' as const,
+        message: 'Modeled monthly cost exceeds budget threshold.',
+        thresholdUsd: 70,
+        observedUsd: 75,
+        dismissed: false,
+        triggeredAt: '2026-06-29T00:00:00.000Z',
+      },
+    ]),
+    updateAlertDismissed: jest.fn(async (alertId) => ({
+      id: alertId,
+      workloadId: '22222222-2222-4222-8222-222222222222',
+      budgetId: '33333333-3333-4333-8333-333333333333',
+      alertType: 'budget_threshold' as const,
+      message: 'Modeled monthly cost exceeds budget threshold.',
+      thresholdUsd: 70,
+      observedUsd: 75,
+      dismissed: true,
+      dismissedAt: '2026-06-29T00:00:00.000Z',
+      triggeredAt: '2026-06-29T00:00:00.000Z',
+    })),
+    getExchangeRates: jest.fn(async () => ({
+      base: 'USD',
+      lastUpdated: '2026-06-29T00:00:00.000Z',
+      rates: {
+        PKR: 278,
+        EUR: 0.93,
+        GBP: 0.79,
+      },
+    })),
     ...overrides,
   };
 }

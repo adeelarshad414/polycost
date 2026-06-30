@@ -5,6 +5,14 @@ export type CostComponent = 'compute' | 'storage' | 'database' | 'egress';
 export type PricingModelKey = 'on-demand' | 'reserved-1yr' | 'reserved-3yr';
 export type PricingBasis = 'flat' | 'tiered';
 export type IntervalKey = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+export type NormalizedInstanceFamily =
+  | 'general-purpose'
+  | 'compute-optimized'
+  | 'memory-optimized'
+  | 'storage-optimized'
+  | 'accelerated-computing';
+export type CachedPricingTerm = 'on_demand' | 'reserved_1yr' | 'reserved_3yr';
+export type StoragePricingTier = 'standard' | 'infrequent_access' | 'archive';
 
 export const INTERVALS: Array<{ key: IntervalKey; label: string }> = [
   { key: 'daily', label: 'Daily' },
@@ -182,6 +190,85 @@ export interface RegionCatalogResponse {
   generatedAt: string;
   cacheTtlSeconds: number;
   providers: CloudRegionProviderCatalog[];
+}
+
+export interface WorkloadInput {
+  instanceFamily: NormalizedInstanceFamily;
+  vcpu: number;
+  memoryGb: number;
+  region: string;
+  instanceCount: number;
+  hoursPerMonth: number;
+  storageGb: number;
+  storageTier: StoragePricingTier;
+  egressGbPerMonth: number;
+}
+
+export interface WorkloadRecord extends WorkloadInput {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BudgetInput {
+  workloadId: string;
+  thresholdUsd: number;
+  alertOnAnomalyPercent?: number;
+}
+
+export interface BudgetRecord extends BudgetInput {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AlertRecord {
+  id: string;
+  workloadId: string;
+  budgetId?: string;
+  alertType: 'budget_threshold' | 'anomaly';
+  message: string;
+  thresholdUsd?: number;
+  observedUsd?: number;
+  anomalyPercent?: number;
+  dismissed: boolean;
+  triggeredAt: string;
+  dismissedAt?: string;
+}
+
+export interface ProviderCostBreakdown {
+  provider: ProviderId;
+  region: string;
+  compute: number;
+  storage: number;
+  egress: number;
+  total: number;
+  currency: 'USD';
+}
+
+export interface WorkloadCostBreakdown {
+  workloadId: string;
+  term: CachedPricingTerm;
+  providers: ProviderCostBreakdown[];
+}
+
+export interface ShareLinkResponse {
+  token: string;
+  url: string;
+}
+
+export interface SharedReportResponse {
+  token: string;
+  watermark: boolean;
+  expiresAt: string;
+  workload: WorkloadRecord;
+  breakdown: WorkloadCostBreakdown;
+}
+
+export interface ExchangeRatesResponse {
+  base: string;
+  lastUpdated?: string;
+  rates: Record<string, number>;
 }
 
 export type ReportFormat = 'pdf' | 'csv' | 'xlsx';

@@ -4,6 +4,10 @@ import {
   serviceCatalogTraceability,
   serviceFamilyIdsFromTraceability,
 } from './service-catalog';
+import {
+  canonicalRegionForRegionPreference,
+  DEFAULT_COMPARISON_REGION,
+} from './region-normalization';
 
 export type WorkloadType = NormalizedWorkloadSpec['workload']['type'];
 export type StorageType = NormalizedWorkloadSpec['storage'][number]['type'];
@@ -41,13 +45,30 @@ export interface WorkloadFormState {
   slaTarget: string;
 }
 
+export interface WorkloadFormIssue {
+  field: keyof WorkloadFormState;
+  message: string;
+}
+
+type NumericWorkloadFormField =
+  | 'dailyActiveUsers'
+  | 'peakConcurrentUsers'
+  | 'vcpu'
+  | 'memoryGb'
+  | 'instanceCount'
+  | 'autoscaleMin'
+  | 'autoscaleMax'
+  | 'storageSizeGb'
+  | 'databaseSizeGb'
+  | 'monthlyEgressGb';
+
 export const sampleNaturalLanguageInput =
   'A web app for 5,000 daily users with two web servers, a Postgres database, 250GB of upload storage, CDN, load balancing, and multi-AZ availability.';
 
 export const defaultWorkloadForm: WorkloadFormState = {
   workloadName: 'Customer portal',
   workloadType: 'web_app',
-  regionPreference: 'us-east-1',
+  regionPreference: DEFAULT_COMPARISON_REGION,
   dailyActiveUsers: '5000',
   peakConcurrentUsers: '600',
   computeRole: 'web',
@@ -75,6 +96,71 @@ export const defaultWorkloadForm: WorkloadFormState = {
   multiRegion: false,
   slaTarget: '99.9%',
 };
+
+export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue[] {
+  const issues: WorkloadFormIssue[] = [];
+
+  requirePositiveNumber(issues, form, 'vcpu', 'vCPU must be greater than 0.');
+  requirePositiveNumber(issues, form, 'memoryGb', 'Memory must be greater than 0.');
+  requirePositiveInteger(issues, form, 'instanceCount', 'Instances must be a whole number above 0.');
+  optionalNonNegativeIntegerField(
+    issues,
+    form,
+    'dailyActiveUsers',
+    'Daily users must be a whole number 0 or higher.',
+  );
+  optionalNonNegativeIntegerField(
+    issues,
+    form,
+    'peakConcurrentUsers',
+    'Peak users must be a whole number 0 or higher.',
+  );
+
+  if (form.scalingType === 'autoscaling') {
+    requirePositiveInteger(issues, form, 'autoscaleMin', 'Scale min must be a whole number above 0.');
+    requirePositiveInteger(issues, form, 'autoscaleMax', 'Scale max must be a whole number above 0.');
+
+    const autoscaleMin = parseOptionalNumber(form.autoscaleMin);
+    const autoscaleMax = parseOptionalNumber(form.autoscaleMax);
+
+    if (
+      autoscaleMin !== undefined &&
+      autoscaleMax !== undefined &&
+      autoscaleMin > 0 &&
+      autoscaleMax > 0 &&
+      Number.isInteger(autoscaleMin) &&
+      Number.isInteger(autoscaleMax) &&
+      autoscaleMax < autoscaleMin
+    ) {
+      issues.push({
+        field: 'autoscaleMax',
+        message: 'Scale max must be greater than or equal to scale min.',
+      });
+    }
+  }
+
+  if (form.storageEnabled) {
+    requirePositiveNumber(issues, form, 'storageSizeGb', 'Storage must be greater than 0 GB.');
+  }
+
+  if (form.databaseEnabled) {
+    optionalPositiveNumberField(
+      issues,
+      form,
+      'databaseSizeGb',
+      'Database size must be greater than 0 GB when provided.',
+    );
+  }
+
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'monthlyEgressGb',
+    'Egress must be 0 GB or higher.',
+  );
+
+  return issues;
+}
 
 export function buildNwsFromForm(
   form: WorkloadFormState,
@@ -111,10 +197,7 @@ export function buildNwsFromForm(
         ...optionalNonNegativeInteger('dailyActiveUsers', form.dailyActiveUsers),
         ...optionalNonNegativeInteger('peakConcurrentUsers', form.peakConcurrentUsers),
       },
-      region: {
-        ...(form.regionPreference.trim() ? { preference: form.regionPreference.trim() } : {}),
-        isDefault: !form.regionPreference.trim(),
-      },
+      region: normalizedRegionPreference(form.regionPreference),
     },
     compute: [compute],
     storage: form.storageEnabled
@@ -191,6 +274,19 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
   };
 }
 
+function normalizedRegionPreference(
+  regionPreference: string,
+): NormalizedWorkloadSpec['workload']['region'] {
+  const trimmedPreference = regionPreference.trim();
+  const canonicalPreference = canonicalRegionForRegionPreference(trimmedPreference);
+  const preference = canonicalPreference ?? trimmedPreference;
+
+  return {
+    ...(preference ? { preference } : {}),
+    isDefault: !preference,
+  };
+}
+
 function optionalPositiveNumber<K extends string>(
   key: K,
   value: string,
@@ -236,10 +332,124 @@ function parseNonNegativeInteger(value: string, fallback: number): number {
 }
 
 function parseOptionalNumber(value: string): number | undefined {
-  const parsed = Number.parseFloat(value);
+  const trimmed = value.replace(/,/g, '').trim();
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function numberToInput(value: number | undefined): string {
   return value === undefined ? '' : value.toString();
+}
+
+function requirePositiveNumber(
+  issues: WorkloadFormIssue[],
+  form: WorkloadFormState,
+  field: NumericWorkloadFormField,
+  message: string,
+): void {
+  const parsed = parseOptionalNumber(formNumericValue(form, field));
+
+  if (parsed === undefined || parsed <= 0) {
+    issues.push({ field, message });
+  }
+}
+
+function requirePositiveInteger(
+  issues: WorkloadFormIssue[],
+  form: WorkloadFormState,
+  field: NumericWorkloadFormField,
+  message: string,
+): void {
+  const parsed = parseOptionalNumber(formNumericValue(form, field));
+
+  if (parsed === undefined || parsed <= 0 || !Number.isInteger(parsed)) {
+    issues.push({ field, message });
+  }
+}
+
+function optionalPositiveNumberField(
+  issues: WorkloadFormIssue[],
+  form: WorkloadFormState,
+  field: NumericWorkloadFormField,
+  message: string,
+): void {
+  const value = formNumericValue(form, field).trim();
+
+  if (!value) {
+    return;
+  }
+
+  const parsed = parseOptionalNumber(value);
+
+  if (parsed === undefined || parsed <= 0) {
+    issues.push({ field, message });
+  }
+}
+
+function optionalNonNegativeNumberField(
+  issues: WorkloadFormIssue[],
+  form: WorkloadFormState,
+  field: NumericWorkloadFormField,
+  message: string,
+): void {
+  const value = formNumericValue(form, field).trim();
+
+  if (!value) {
+    return;
+  }
+
+  const parsed = parseOptionalNumber(value);
+
+  if (parsed === undefined || parsed < 0) {
+    issues.push({ field, message });
+  }
+}
+
+function optionalNonNegativeIntegerField(
+  issues: WorkloadFormIssue[],
+  form: WorkloadFormState,
+  field: NumericWorkloadFormField,
+  message: string,
+): void {
+  const value = formNumericValue(form, field).trim();
+
+  if (!value) {
+    return;
+  }
+
+  const parsed = parseOptionalNumber(value);
+
+  if (parsed === undefined || parsed < 0 || !Number.isInteger(parsed)) {
+    issues.push({ field, message });
+  }
+}
+
+function formNumericValue(form: WorkloadFormState, field: NumericWorkloadFormField): string {
+  switch (field) {
+    case 'dailyActiveUsers':
+      return form.dailyActiveUsers;
+    case 'peakConcurrentUsers':
+      return form.peakConcurrentUsers;
+    case 'vcpu':
+      return form.vcpu;
+    case 'memoryGb':
+      return form.memoryGb;
+    case 'instanceCount':
+      return form.instanceCount;
+    case 'autoscaleMin':
+      return form.autoscaleMin;
+    case 'autoscaleMax':
+      return form.autoscaleMax;
+    case 'storageSizeGb':
+      return form.storageSizeGb;
+    case 'databaseSizeGb':
+      return form.databaseSizeGb;
+    case 'monthlyEgressGb':
+      return form.monthlyEgressGb;
+  }
 }

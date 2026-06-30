@@ -4,6 +4,10 @@ import {
   EgressTierRate,
 } from '../../pricing-normalization/egress-tier-calculator';
 import {
+  canonicalRegionForProviderRegion,
+  providerRegionForCanonicalRegion,
+} from '../../pricing-normalization/region-map';
+import {
   CloudProviderAdapter,
   CostComponent,
   PricingCatalogReader,
@@ -37,7 +41,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
 
   async priceWorkload(input: unknown): Promise<ProviderPricingResult> {
     const nws = NWSValidator.validate(input);
-    const region = nws.workload.region.preference ?? this.defaultRegion;
+    const region = this.providerRegionForPreference(nws.workload.region.preference);
     const lineItems: ProviderPricingLineItem[] = [];
 
     for (const component of nws.compute) {
@@ -139,6 +143,18 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     serviceIds: string[],
     options?: RefreshPricingCatalogOptions,
   ): Promise<PricingCatalogRecord[]>;
+
+  private providerRegionForPreference(regionPreference: string | undefined): string {
+    const preference = regionPreference?.trim();
+
+    if (!preference) {
+      return this.defaultRegion;
+    }
+
+    const canonicalRegion = canonicalRegionForProviderRegion(preference) ?? preference;
+
+    return providerRegionForCanonicalRegion(canonicalRegion, this.providerId) ?? preference;
+  }
 
   protected async findCatalogRecords(
     category: ServiceCategory,

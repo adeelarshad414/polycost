@@ -8,7 +8,12 @@ import {
 } from './theme';
 import { DEFAULT_SELECTED_SERVICE_FAMILY_IDS } from './service-catalog';
 import { NormalizedWorkloadSpec } from './types';
-import { buildNwsFromForm, defaultWorkloadForm, formFromNws } from './workload';
+import {
+  buildNwsFromForm,
+  defaultWorkloadForm,
+  formFromNws,
+  validateWorkloadForm,
+} from './workload';
 
 describe('workload helpers', () => {
   it('builds a valid NWS from the structured form', () => {
@@ -62,6 +67,45 @@ describe('workload helpers', () => {
     expect(form.dailyActiveUsers).toBe(defaultWorkloadForm.dailyActiveUsers);
     expect(form.databaseEngine).toBe(defaultWorkloadForm.databaseEngine);
     expect(form.selectedServiceFamilyIds).toEqual(DEFAULT_SELECTED_SERVICE_FAMILY_IDS);
+  });
+
+  it('normalizes provider-specific region preferences into comparison regions', () => {
+    expect(
+      buildNwsFromForm({
+        ...defaultWorkloadForm,
+        regionPreference: 'eastus',
+      }).workload.region,
+    ).toEqual({
+      preference: 'us-east',
+      isDefault: false,
+    });
+  });
+
+  it('flags invalid numeric form values before NWS generation can fall back silently', () => {
+    expect(
+      validateWorkloadForm({
+        ...defaultWorkloadForm,
+        vcpu: '0',
+        memoryGb: '4abc',
+        instanceCount: '2.5',
+        storageSizeGb: '',
+        monthlyEgressGb: '-1',
+      }).map((issue) => issue.field),
+    ).toEqual(['vcpu', 'memoryGb', 'instanceCount', 'storageSizeGb', 'monthlyEgressGb']);
+  });
+
+  it('requires valid autoscaling ranges when autoscaling is selected', () => {
+    expect(
+      validateWorkloadForm({
+        ...defaultWorkloadForm,
+        scalingType: 'autoscaling',
+        autoscaleMin: '4',
+        autoscaleMax: '2',
+      }),
+    ).toContainEqual({
+      field: 'autoscaleMax',
+      message: 'Scale max must be greater than or equal to scale min.',
+    });
   });
 
   it('round-trips selected cloud service families through NWS traceability', () => {

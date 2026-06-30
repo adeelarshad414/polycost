@@ -30,7 +30,7 @@ describe('api client', () => {
     meta.content = '%VITE_API_BASE_URL%';
     document.head.appendChild(meta);
 
-    expect(configuredApiBaseUrl()).toBe('http://localhost:3001/api/v1');
+    expect(configuredApiBaseUrl()).toBe('/api/v1');
   });
 
   it('sends comparison requests with cached-pricing options', async () => {
@@ -169,6 +169,180 @@ describe('api client', () => {
     );
     expect(fetchMock).toHaveBeenCalledWith(
       'http://api.test/api/v1/regions',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+  });
+
+  it('creates workload-scoped share links and resolves public reports', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: 'workload-1',
+          instanceFamily: 'general-purpose',
+          vcpu: 2,
+          memoryGb: 4,
+          region: 'us-east',
+          instanceCount: 2,
+          hoursPerMonth: 730,
+          storageGb: 250,
+          storageTier: 'standard',
+          egressGbPerMonth: 750,
+          createdAt: '2026-06-29T00:00:00.000Z',
+          updatedAt: '2026-06-29T00:00:00.000Z',
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          token: 'public-token',
+          url: '/api/v1/share/public-token',
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          token: 'public-token',
+          watermark: true,
+          expiresAt: '2026-07-29T00:00:00.000Z',
+          workload: {},
+          breakdown: {},
+        }),
+      );
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await client.createWorkload({
+      instanceFamily: 'general-purpose',
+      vcpu: 2,
+      memoryGb: 4,
+      region: 'us-east',
+      instanceCount: 2,
+      hoursPerMonth: 730,
+      storageGb: 250,
+      storageTier: 'standard',
+      egressGbPerMonth: 750,
+    });
+    await client.createShareLink({
+      workloadId: 'workload-1',
+      watermark: true,
+      expiresInDays: 30,
+    });
+    await client.getSharedReport('public-token');
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'http://api.test/api/v1/workloads',
+      expect.objectContaining({
+        method: 'POST',
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://api.test/api/v1/share-links',
+      expect.objectContaining({
+        method: 'POST',
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      'http://api.test/api/v1/share/public-token',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+  });
+
+  it('uses budget, alert, and exchange-rate endpoints', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: 'budget-1',
+          workloadId: 'workload-1',
+          thresholdUsd: 500,
+          alertOnAnomalyPercent: 20,
+          createdAt: '2026-06-29T00:00:00.000Z',
+          updatedAt: '2026-06-29T00:00:00.000Z',
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse([
+          {
+            id: 'alert-1',
+            workloadId: 'workload-1',
+            budgetId: 'budget-1',
+            alertType: 'budget_threshold',
+            message: 'Budget exceeded',
+            dismissed: false,
+            triggeredAt: '2026-06-29T00:00:00.000Z',
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: 'alert-1',
+          workloadId: 'workload-1',
+          budgetId: 'budget-1',
+          alertType: 'budget_threshold',
+          message: 'Budget exceeded',
+          dismissed: true,
+          triggeredAt: '2026-06-29T00:00:00.000Z',
+          dismissedAt: '2026-06-29T01:00:00.000Z',
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          base: 'USD',
+          lastUpdated: '2026-06-29T00:00:00.000Z',
+          rates: {
+            PKR: 278,
+          },
+        }),
+      );
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await client.createBudget({
+      workloadId: 'workload-1',
+      thresholdUsd: 500,
+      alertOnAnomalyPercent: 20,
+    });
+    await client.listAlerts('workload-1');
+    await client.updateAlertDismissed('alert-1', true);
+    await client.getExchangeRates('USD');
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'http://api.test/api/v1/budgets',
+      expect.objectContaining({
+        method: 'POST',
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://api.test/api/v1/alerts?workloadId=workload-1',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      'http://api.test/api/v1/alerts/alert-1',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ dismissed: true }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      'http://api.test/api/v1/exchange-rates?base=USD',
       expect.objectContaining({
         headers: expect.objectContaining({
           'Content-Type': 'application/json',

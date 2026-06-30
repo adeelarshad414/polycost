@@ -1,15 +1,23 @@
 import {
   ApiErrorDetail,
+  AlertRecord,
   BackendHealthResponse,
+  BudgetInput,
+  BudgetRecord,
   ComparisonResult,
+  ExchangeRatesResponse,
   NormalizedWorkloadSpec,
   ParsedNwsDraft,
   PricingStatusResponse,
   RegionCatalogResponse,
   ReportFormat,
+  SharedReportResponse,
+  ShareLinkResponse,
+  WorkloadInput,
+  WorkloadRecord,
 } from './types';
 
-const DEFAULT_API_BASE_URL = 'http://localhost:3001/api/v1';
+const DEFAULT_API_BASE_URL = '/api/v1';
 
 interface ApiErrorEnvelope {
   error?: {
@@ -41,6 +49,17 @@ export interface PolyCostClient {
   exportComparison(comparisonId: string, format: ReportFormat): Promise<Blob>;
   getPricingStatus(): Promise<PricingStatusResponse>;
   getRegionCatalog(): Promise<RegionCatalogResponse>;
+  createWorkload(input: WorkloadInput): Promise<WorkloadRecord>;
+  createShareLink(input: {
+    workloadId: string;
+    watermark: boolean;
+    expiresInDays: number;
+  }): Promise<ShareLinkResponse>;
+  getSharedReport(token: string): Promise<SharedReportResponse>;
+  createBudget(input: BudgetInput): Promise<BudgetRecord>;
+  listAlerts(workloadId?: string): Promise<AlertRecord[]>;
+  updateAlertDismissed(alertId: string, dismissed: boolean): Promise<AlertRecord>;
+  getExchangeRates(base?: string): Promise<ExchangeRatesResponse>;
 }
 
 export function configuredApiBaseUrl(documentRef: Document = document): string {
@@ -104,6 +123,43 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
     },
     getRegionCatalog() {
       return requestJson<RegionCatalogResponse>(baseUrl, '/regions');
+    },
+    createWorkload(input) {
+      return requestJson<WorkloadRecord>(baseUrl, '/workloads', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      });
+    },
+    createShareLink(input) {
+      return requestJson<ShareLinkResponse>(baseUrl, '/share-links', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      });
+    },
+    getSharedReport(token) {
+      return requestJson<SharedReportResponse>(baseUrl, `/share/${encodeURIComponent(token)}`);
+    },
+    createBudget(input) {
+      return requestJson<BudgetRecord>(baseUrl, '/budgets', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      });
+    },
+    listAlerts(workloadId) {
+      const query = workloadId ? `?workloadId=${encodeURIComponent(workloadId)}` : '';
+      return requestJson<AlertRecord[]>(baseUrl, `/alerts${query}`);
+    },
+    updateAlertDismissed(alertId, dismissed) {
+      return requestJson<AlertRecord>(baseUrl, `/alerts/${encodeURIComponent(alertId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ dismissed }),
+      });
+    },
+    getExchangeRates(base = 'USD') {
+      return requestJson<ExchangeRatesResponse>(
+        baseUrl,
+        `/exchange-rates?base=${encodeURIComponent(base)}`,
+      );
     },
   };
 }
