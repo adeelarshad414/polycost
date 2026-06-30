@@ -9,6 +9,26 @@ const comparison: ComparisonResult = {
   comparisonId: 'comparison-123',
   pricingAsOf: '2026-06-29T00:00:00.000Z',
   cheapestProviderId: 'gcp',
+  requirements: {
+    sourceType: 'structured_form',
+    workloadName: 'Client portal',
+    workloadType: 'web_app',
+    regionPreference: 'us-east',
+    serviceRequirements: [
+      {
+        serviceCategory: 'compute',
+        serviceType: 'vm-compute',
+        instanceType: 'balanced tier - 2 vCPU - 4GB',
+        tier: 'balanced',
+        region: 'us-east',
+        az: '2 zones',
+        quantity: 2,
+        scaleParams: {
+          scalingType: 'fixed',
+        },
+      },
+    ],
+  },
   providers: [
     {
       providerId: 'aws',
@@ -33,6 +53,21 @@ const comparison: ComparisonResult = {
         quarterly: 213,
         yearly: 852,
       },
+      pricingModels: [
+        {
+          model: 'on-demand',
+          available: true,
+          monthlyCostUsd: 71,
+          hourlyCostUsd: 0.1,
+        },
+        {
+          model: 'reserved-3yr',
+          available: true,
+          monthlyCostUsd: 42,
+          hourlyCostUsd: 0.06,
+          caveat: 'Three-year commitment.',
+        },
+      ],
     },
     {
       providerId: 'gcp',
@@ -64,9 +99,13 @@ const comparison: ComparisonResult = {
 
 describe('report generators', () => {
   it('creates a CSV report with matching totals and spreadsheet injection mitigation', () => {
-    const csv = new CsvReportGenerator().generate(comparison).toString('utf8');
+    const csv = new CsvReportGenerator()
+      .generate(comparison, { interval: 'quarterly', pricingModel: 'reserved-3yr' })
+      .toString('utf8');
 
     expect(csv).toContain('Comparison ID,comparison-123');
+    expect(csv).toContain('Selected interval,Quarterly');
+    expect(csv).toContain('Selected pricing model,Reserved 3-year');
     expect(csv).toContain('FinOps Summary');
     expect(csv).toContain('Executive recommendation,gcp is the current cost baseline');
     expect(csv).toContain('Decision confidence,Medium - 2/3 providers priced; 1 approximate mappings');
@@ -76,6 +115,11 @@ describe('report generators', () => {
     expect(csv).toContain('Lowest monthly run rate,gcp $20');
     expect(csv).toContain('Annual avoidable spread,$612');
     expect(csv).toContain('Dominant cost driver,storage $20');
+    expect(csv).toContain('Selected Pricing Scenario');
+    expect(csv).toContain('aws,yes,126,42,0.06,Three-year commitment.');
+    expect(csv).toContain('Normalized Service Requirements');
+    expect(csv).toContain('compute,vm-compute,balanced tier - 2 vCPU - 4GB / balanced');
+    expect(csv).toContain('Rate Math Evidence');
     expect(csv).toContain('aws,2.33,16.34,71,213,852');
     expect(csv).toContain("aws,compute,'=cmd(1)\\risky compute,no,60.8");
     expect(csv).toContain('"primary ""postgres"", managed"');
@@ -83,7 +127,10 @@ describe('report generators', () => {
   });
 
   it('creates a real XLSX package with matching totals and spreadsheet injection mitigation', () => {
-    const xlsx = new ExcelReportGenerator().generate(comparison);
+    const xlsx = new ExcelReportGenerator().generate(comparison, {
+      interval: 'quarterly',
+      pricingModel: 'reserved-3yr',
+    });
     const xlsxText = xlsx.toString('utf8');
 
     expect(xlsx.subarray(0, 2).toString('utf8')).toBe('PK');
@@ -97,42 +144,50 @@ describe('report generators', () => {
     expect(xlsxText).toContain('Solution architect review');
     expect(xlsxText).toContain('Architecture risk');
     expect(xlsxText).toContain('Lowest monthly run rate');
+    expect(xlsxText).toContain('Selected Pricing Scenario');
+    expect(xlsxText).toContain('Normalized Service Requirements');
+    expect(xlsxText).toContain('Rate Math Evidence');
     expect(xlsxText).toContain('<v>71</v>');
     expect(xlsxText).toContain('&apos;=cmd(1)\\risky compute');
     expect(xlsxText).toContain('&apos;+pricing temporarily unavailable');
   });
 
   it('creates a PDF report with matching totals and escaped interpolated text', () => {
-    const pdf = new PdfReportGenerator().generate({
-      ...comparison,
-      warnings: [
-        ...(comparison.warnings ?? []),
-        {
-          code: 'provider_pricing_failed',
-          message: 'general warning',
-        },
-      ],
-      providers: [
-        {
-          ...comparison.providers[0],
-          lineItems: [
-            ...comparison.providers[0].lineItems,
-            {
-              category: 'network',
-              description:
-                'this is a deliberately long line item description that forces the pdf report generator to wrap text across multiple drawing commands cleanly',
-              isApproximate: false,
-              baseMonthlyCostUsd: 1.23,
-            },
-          ],
-        },
-        comparison.providers[1],
-      ],
-    });
+    const pdf = new PdfReportGenerator().generate(
+      {
+        ...comparison,
+        warnings: [
+          ...(comparison.warnings ?? []),
+          {
+            code: 'provider_pricing_failed',
+            message: 'general warning',
+          },
+        ],
+        providers: [
+          {
+            ...comparison.providers[0],
+            lineItems: [
+              ...comparison.providers[0].lineItems,
+              {
+                category: 'network',
+                description:
+                  'this is a deliberately long line item description that forces the pdf report generator to wrap text across multiple drawing commands cleanly',
+                isApproximate: false,
+                baseMonthlyCostUsd: 1.23,
+              },
+            ],
+          },
+          comparison.providers[1],
+        ],
+      },
+      { interval: 'quarterly', pricingModel: 'reserved-3yr' },
+    );
     const pdfText = pdf.toString('utf8');
 
     expect(pdf.subarray(0, 8).toString('utf8')).toBe('%PDF-1.4');
     expect(pdfText).toContain('Comparison ID: comparison-123');
+    expect(pdfText).toContain('Selected interval: Quarterly');
+    expect(pdfText).toContain('Selected pricing model: Reserved 3-year');
     expect(pdfText).toContain('FinOps summary');
     expect(pdfText).toContain('Executive recommendation: gcp is the current cost baseline');
     expect(pdfText).toContain('Decision confidence: Medium');
@@ -140,6 +195,9 @@ describe('report generators', () => {
     expect(pdfText).toContain('Architecture risk: Medium');
     expect(pdfText).toContain('Lowest monthly run rate: gcp $20');
     expect(pdfText).toContain('aws: daily $2.33, weekly $16.34, monthly $71');
+    expect(pdfText).toContain('Selected pricing scenario');
+    expect(pdfText).toContain('Normalized service requirements');
+    expect(pdfText).toContain('Rate math evidence');
     expect(pdfText).toContain('=cmd\\(1\\)\\\\risky compute');
     expect(pdfText).toContain('general | provider_pricing_failed | general warning');
     expect(pdfText).toContain('this is a deliberately long line item description');

@@ -95,10 +95,37 @@ export interface NormalizedWorkloadSpec {
     multiRegion: boolean;
     slaTarget?: string;
   };
+  serviceRequirements?: ServiceRequirement[];
   sourceTraceability?: Array<{
     nwsPath: string;
     sourceRef: string;
   }>;
+}
+
+export interface ServiceRequirement {
+  serviceCategory:
+    | 'compute'
+    | 'containers'
+    | 'application'
+    | 'storage'
+    | 'database'
+    | 'analytics'
+    | 'ai'
+    | 'integration'
+    | 'networking'
+    | 'security'
+    | 'operations'
+    | 'devops'
+    | 'migration'
+    | 'edge'
+    | 'business';
+  serviceType: string;
+  instanceType?: string;
+  tier?: string;
+  region?: string;
+  az?: string;
+  quantity: number;
+  scaleParams?: Record<string, string | number | boolean>;
 }
 
 export interface ParsedNwsDraft {
@@ -168,6 +195,13 @@ export interface ComparisonProviderResult {
 export interface ComparisonResult {
   comparisonId: string;
   pricingAsOf: string;
+  requirements?: {
+    sourceType: NormalizedWorkloadSpec['metadata']['sourceType'];
+    workloadName?: string;
+    workloadType: NormalizedWorkloadSpec['workload']['type'];
+    regionPreference?: string;
+    serviceRequirements: ServiceRequirement[];
+  };
   providers: ComparisonProviderResult[];
   cheapestProviderId: ProviderId;
   warnings?: Array<{

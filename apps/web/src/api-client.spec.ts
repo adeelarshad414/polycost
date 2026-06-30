@@ -108,9 +108,14 @@ describe('api client', () => {
     global.fetch = fetchMock as typeof fetch;
     const client = createPolyCostClient('http://api.test/api/v1');
 
-    await expect(client.exportComparison('comparison-1', 'csv')).resolves.toBe(blob);
+    await expect(
+      client.exportComparison('comparison-1', 'csv', {
+        interval: 'quarterly',
+        pricingModel: 'reserved-3yr',
+      }),
+    ).resolves.toBe(blob);
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://api.test/api/v1/comparisons/comparison-1/export?format=csv',
+      'http://api.test/api/v1/comparisons/comparison-1/export?format=csv&interval=quarterly&pricingModel=reserved-3yr',
     );
   });
 

@@ -56,6 +56,21 @@ describe('workload helpers', () => {
       nwsPath: 'metadata.serviceCatalog',
       sourceRef: 'serviceCatalog:object-storage',
     });
+    expect(nws.serviceRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceCategory: 'compute',
+          serviceType: 'vm-compute',
+          quantity: 2,
+          tier: 'balanced',
+        }),
+        expect.objectContaining({
+          serviceCategory: 'database',
+          serviceType: 'relational-database',
+          tier: 'high-availability',
+        }),
+      ]),
+    );
   });
 
   it('maps an NWS back into editable form values', () => {
@@ -66,6 +81,8 @@ describe('workload helpers', () => {
     expect(form.regionPreference).toBe(defaultWorkloadForm.regionPreference);
     expect(form.dailyActiveUsers).toBe(defaultWorkloadForm.dailyActiveUsers);
     expect(form.databaseEngine).toBe(defaultWorkloadForm.databaseEngine);
+    expect(form.selectedServiceCategory).toBe('compute');
+    expect(form.selectedServiceFamilyId).toBe('vm-compute');
     expect(form.selectedServiceFamilyIds).toEqual(DEFAULT_SELECTED_SERVICE_FAMILY_IDS);
   });
 
@@ -124,7 +141,15 @@ describe('workload helpers', () => {
         sourceRef: 'serviceCatalog:generative-ai',
       },
     ]);
-    expect(formFromNws(nws).selectedServiceFamilyIds).toEqual(['data-warehouse', 'generative-ai']);
+    expect(formFromNws(nws).selectedServiceFamilyIds).toEqual([
+      'vm-compute',
+      'object-storage',
+      'relational-database',
+      'data-warehouse',
+      'generative-ai',
+      'cdn-edge',
+      'load-balancing',
+    ]);
   });
 
   it('omits optional resources and falls back safely for sparse values', () => {

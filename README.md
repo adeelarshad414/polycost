@@ -173,6 +173,8 @@ Local Docker Compose runs Vault, Postgres, Redis, the API, and the web app. The 
 - `HOW-TO-USE.md` explains the product workflow.
 - `DEPLOY.md` covers deployment guidance.
 - `PROGRESS.md` tracks project progress.
+- `docs/architecture/phase-10-cost-intelligence.md` documents the Phase 1
+  cost-intelligence model and future import/Terraform hooks.
 - `specs/README.md` links the deeper product, architecture, data-model, API, security, and testing specs.
 
 ## Project Principles

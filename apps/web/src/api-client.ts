@@ -48,7 +48,11 @@ export interface PolyCostClient {
   validateWorkload(nws: NormalizedWorkloadSpec): Promise<{ valid: true }>;
   createComparison(nws: NormalizedWorkloadSpec): Promise<ComparisonResult>;
   refreshLiveComparison(comparisonId: string): Promise<ComparisonResult>;
-  exportComparison(comparisonId: string, format: ReportFormat): Promise<Blob>;
+  exportComparison(
+    comparisonId: string,
+    format: ReportFormat,
+    options?: { interval?: string; pricingModel?: string },
+  ): Promise<Blob>;
   getPricingStatus(): Promise<PricingStatusResponse>;
   getPricingModels(): Promise<PricingModelCatalogResponse>;
   getPricingModelsForService(
@@ -115,10 +119,18 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         method: 'POST',
       });
     },
-    async exportComparison(comparisonId, format) {
-      const response = await fetch(
-        `${baseUrl}/comparisons/${comparisonId}/export?format=${format}`,
-      );
+    async exportComparison(comparisonId, format, options = {}) {
+      const query = new URLSearchParams({ format });
+
+      if (options.interval) {
+        query.set('interval', options.interval);
+      }
+
+      if (options.pricingModel) {
+        query.set('pricingModel', options.pricingModel);
+      }
+
+      const response = await fetch(`${baseUrl}/comparisons/${comparisonId}/export?${query}`);
 
       if (!response.ok) {
         throw await toApiError(response);

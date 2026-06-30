@@ -104,6 +104,21 @@ describe('ComparisonOrchestratorService', () => {
     expect(result).toEqual({
       comparisonId: 'comparison-123',
       pricingAsOf: '2026-06-28T12:00:00.000Z',
+      requirements: {
+        sourceType: 'structured_form',
+        workloadType: 'web_app',
+        serviceRequirements: expect.arrayContaining([
+          expect.objectContaining({
+            serviceCategory: 'compute',
+            serviceType: 'vm-compute',
+            quantity: 2,
+          }),
+          expect.objectContaining({
+            serviceCategory: 'database',
+            serviceType: 'relational-database',
+          }),
+        ]),
+      },
       cheapestProviderId: 'azure',
       providers: [
         expect.objectContaining({

@@ -64,7 +64,7 @@ describe('App', () => {
     expect(text(container)).toContain('Requirements');
     expect(text(container)).toContain('Manual entry');
     expect(text(container)).toContain(
-      'Web app · 2 vCPU · 4GB · US East (AWS us-east-1 · Azure eastus · GCP us-east1)',
+      'Web app · Virtual machines · 2 vCPU · 4GB · US East (AWS us-east-1 · Azure eastus · GCP us-east1)',
     );
     expect(text(container)).toContain('Best value');
     expect(text(container)).toContain('Monthly estimate');
@@ -278,7 +278,10 @@ describe('App', () => {
     ).toBeInstanceOf(HTMLAnchorElement);
 
     await click(buttonByText(container, 'PDF'));
-    expect(client.exportComparison).toHaveBeenCalledWith(comparisonResult.comparisonId, 'pdf');
+    expect(client.exportComparison).toHaveBeenCalledWith(comparisonResult.comparisonId, 'pdf', {
+      interval: 'hourly',
+      pricingModel: 'reserved-1yr',
+    });
 
     expect(detailGate.dataset.open).toBe('true');
     expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);
@@ -496,7 +499,10 @@ describe('App', () => {
       }),
     );
     expect(client.refreshLiveComparison).toHaveBeenCalledWith(comparisonResult.comparisonId);
-    expect(client.exportComparison).toHaveBeenCalledWith(comparisonResult.comparisonId, 'pdf');
+    expect(client.exportComparison).toHaveBeenCalledWith(comparisonResult.comparisonId, 'pdf', {
+      interval: 'yearly',
+      pricingModel: 'on-demand',
+    });
 
     unmount();
   });
@@ -510,7 +516,7 @@ describe('App', () => {
     await changeInput(inputById(container, 'memory-gb'), '8');
     await click(buttonByText(container, 'Compare costs'));
 
-    expect(text(container)).toContain('API backend · 4 vCPU · 8GB');
+    expect(text(container)).toContain('API backend · Virtual machines · 4 vCPU · 8GB');
 
     await click(buttonByText(container, 'Edit'));
     await changeInput(inputById(container, 'vcpu'), '16');
@@ -525,7 +531,7 @@ describe('App', () => {
 
     expect(container.querySelector('.requirements-edit-panel')).toBeNull();
     expect(container.querySelector('.requirement-summary-strip')).toBeInstanceOf(HTMLElement);
-    expect(text(container)).toContain('API backend · 16 vCPU · 64GB');
+    expect(text(container)).toContain('API backend · Virtual machines · 16 vCPU · 64GB');
     expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);
 
     unmount();

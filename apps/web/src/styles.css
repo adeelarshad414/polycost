@@ -1997,6 +1997,16 @@ select:hover {
   gap: var(--pc-space-2);
 }
 
+.service-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--pc-space-1);
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface-2) 68%, var(--pc-bg-surface));
+  padding: var(--pc-space-1);
+}
+
 .service-catalog-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3520,6 +3530,80 @@ select:disabled {
   font-size: var(--pc-text-sm);
   font-weight: 650;
   line-height: 1.55;
+}
+
+.service-cheapest-matrix,
+.cost-formula-evidence {
+  display: grid;
+  gap: var(--pc-space-2);
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface) 90%, var(--pc-bg-surface-2));
+  padding: var(--pc-space-2);
+}
+
+.service-matrix-table td:last-child {
+  min-width: 180px;
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-sm);
+  line-height: 1.35;
+}
+
+.formula-evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--pc-space-1);
+}
+
+.formula-evidence-card {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  border: 1px solid var(--pc-border);
+  border-top: 4px solid var(--pc-border-strong);
+  border-radius: 8px;
+  background: var(--pc-bg-surface);
+  padding: 12px;
+}
+
+.formula-aws {
+  border-top-color: var(--pc-provider-aws);
+}
+
+.formula-azure {
+  border-top-color: var(--pc-provider-azure);
+}
+
+.formula-gcp {
+  border-top-color: var(--pc-provider-gcp);
+}
+
+.formula-evidence-card span {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.formula-evidence-card strong,
+.formula-evidence-card p {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.formula-evidence-card strong {
+  color: var(--pc-text-primary);
+  font-size: var(--pc-text-sm);
+  line-height: 1.35;
+}
+
+.formula-evidence-card p {
+  color: var(--pc-text-secondary);
+  font-family: var(--pc-font-mono);
+  font-size: var(--pc-text-xs);
+  line-height: 1.45;
 }
 
 .engineering-chart-grid {
@@ -5389,6 +5473,11 @@ select:disabled {
 
   .landing-hero-actions .pc-button {
     width: 100%;
+  }
+
+  .service-selector-grid,
+  .formula-evidence-grid {
+    grid-template-columns: 1fr;
   }
 }
 

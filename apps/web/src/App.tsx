@@ -110,6 +110,15 @@ const PRICING_MODEL_OPTIONS: Array<{
   },
 ];
 
+const INSTANCE_TIER_OPTIONS: Array<[string, string]> = [
+  ['small', 'Small - dev/test or light production'],
+  ['balanced', 'Balanced - general production'],
+  ['compute', 'Compute optimized - CPU-heavy'],
+  ['memory', 'Memory optimized - data-heavy'],
+  ['storage', 'Storage optimized - high I/O'],
+  ['custom', 'Custom - use vCPU and memory fields'],
+];
+
 const SERVICE_CATEGORIES: ServiceCategory[] = ['compute', 'storage', 'database', 'network'];
 
 const DEFAULT_CALCULATOR_URLS: Record<ProviderId, string> = {
@@ -246,6 +255,10 @@ const INITIAL_HOME_FORM: WorkloadFormState = {
   monthlyEgressGb: '',
   cdn: false,
   loadBalancer: false,
+  selectedServiceCategory: 'compute',
+  selectedServiceFamilyId: 'vm-compute',
+  instanceTier: 'small',
+  availabilityZoneCount: '1',
   selectedServiceFamilyIds: [],
   multiAz: false,
   multiRegion: false,
@@ -609,7 +622,10 @@ export function App({ client = polyCostClient }: AppProps) {
     setExportingFormat(format);
 
     try {
-      const blob = await client.exportComparison(comparison.comparisonId, format);
+      const blob = await client.exportComparison(comparison.comparisonId, format, {
+        interval,
+        pricingModel,
+      });
       if (!isCurrentAsyncAction(actionId)) {
         return;
       }
@@ -947,6 +963,15 @@ function InitialHomePage({
     });
   }
 
+  function updateServiceCategory(value: string) {
+    onChange({
+      ...form,
+      selectedServiceCategory: value,
+      selectedServiceFamilyId:
+        firstServiceFamilyIdForCategory(value) ?? form.selectedServiceFamilyId,
+    });
+  }
+
   function updateStorageSize(value: string) {
     onChange({
       ...form,
@@ -976,6 +1001,18 @@ function InitialHomePage({
             <FormValidationSummary issues={validationIssues} />
             <div className="initial-home-fields">
               <SelectField
+                label="Service category"
+                value={form.selectedServiceCategory}
+                options={serviceCategoryOptions()}
+                onChange={updateServiceCategory}
+              />
+              <SelectField
+                label="Specific service"
+                value={form.selectedServiceFamilyId}
+                options={serviceFamilyOptions(form.selectedServiceCategory)}
+                onChange={(value) => update('selectedServiceFamilyId', value)}
+              />
+              <SelectField
                 label="Workload type"
                 value={form.workloadType}
                 options={[
@@ -988,6 +1025,12 @@ function InitialHomePage({
                   ['other', 'Other'],
                 ]}
                 onChange={(value) => update('workloadType', value)}
+              />
+              <SelectField
+                label="Instance tier"
+                value={form.instanceTier}
+                options={INSTANCE_TIER_OPTIONS}
+                onChange={(value) => update('instanceTier', value)}
               />
               <TextField
                 label="vCPU"
@@ -1011,6 +1054,13 @@ function InitialHomePage({
                 regionCatalogError={regionCatalogError}
                 compact
                 onChange={(value) => update('regionPreference', value)}
+              />
+              <TextField
+                label="Availability zones"
+                value={form.availabilityZoneCount}
+                inputMode="numeric"
+                suffix="AZs"
+                onChange={(value) => update('availabilityZoneCount', value)}
               />
             </div>
 
@@ -1315,6 +1365,8 @@ function StateDetailContent({
           description="Cost periods, commitment scenarios, compute/storage/egress mix, budget alerts, currency, and share workflow."
         />
         <EngineeringAnalyticsDashboard comparison={comparison} interval={interval} />
+        <ServiceCheapestMatrix comparison={comparison} interval={interval} />
+        <CostFormulaEvidence comparison={comparison} />
         <ComparisonToolbar interval={interval} onIntervalChange={onIntervalChange} />
         <FinOpsFeatureLayer
           client={client}
@@ -1744,6 +1796,15 @@ function WorkloadForm({
     });
   }
 
+  function updateServiceCategory(value: string) {
+    onChange({
+      ...form,
+      selectedServiceCategory: value,
+      selectedServiceFamilyId:
+        firstServiceFamilyIdForCategory(value) ?? form.selectedServiceFamilyId,
+    });
+  }
+
   function toggleServiceFamily(id: string) {
     const selected = new Set(form.selectedServiceFamilyIds);
 
@@ -1915,6 +1976,33 @@ function WorkloadForm({
       </FormSection>
 
       <FormSection title="Cloud services" tone="portfolio">
+        <div className="service-selector-grid" aria-label="Primary cloud-neutral service selector">
+          <SelectField
+            label="Service category"
+            value={form.selectedServiceCategory}
+            options={serviceCategoryOptions()}
+            onChange={updateServiceCategory}
+          />
+          <SelectField
+            label="Specific service"
+            value={form.selectedServiceFamilyId}
+            options={serviceFamilyOptions(form.selectedServiceCategory)}
+            onChange={(value) => update('selectedServiceFamilyId', value)}
+          />
+          <SelectField
+            label="Instance tier"
+            value={form.instanceTier}
+            options={INSTANCE_TIER_OPTIONS}
+            onChange={(value) => update('instanceTier', value)}
+          />
+          <TextField
+            label="Availability zones"
+            value={form.availabilityZoneCount}
+            inputMode="numeric"
+            suffix="AZs"
+            onChange={(value) => update('availabilityZoneCount', value)}
+          />
+        </div>
         <ServiceCatalogPicker
           selectedIds={form.selectedServiceFamilyIds}
           onToggle={toggleServiceFamily}
@@ -2451,6 +2539,30 @@ function providerServicesForFamily(family: CloudServiceFamily, providerId: Provi
   }
 }
 
+function serviceCategoryOptions(): Array<[string, string]> {
+  return SERVICE_CATALOG_CATEGORIES.map((category) => [category.id, category.label]);
+}
+
+function serviceFamilyOptions(categoryId: string): Array<[string, string]> {
+  return CLOUD_SERVICE_CATALOG.filter((family) => family.categoryId === categoryId).map(
+    (family) => [family.id, serviceFamilyOptionLabel(family)],
+  );
+}
+
+function firstServiceFamilyIdForCategory(categoryId: string): string | undefined {
+  return CLOUD_SERVICE_CATALOG.find((family) => family.categoryId === categoryId)?.id;
+}
+
+function serviceFamilyOptionLabel(family: CloudServiceFamily): string {
+  const secondary = PROVIDER_ORDER.map(
+    (providerId) => providerServicesForFamily(family, providerId)[0],
+  )
+    .filter(Boolean)
+    .join(' / ');
+
+  return `${family.label} - ${secondary}`;
+}
+
 function SupportBadge({ status }: { status: ServiceSupportStatus }) {
   return <span className={`support-badge support-badge-${status}`}>{supportLabel(status)}</span>;
 }
@@ -2511,6 +2623,10 @@ function formSizingSummary(
     ? `${formatCompactInput(form.storageSizeGb)}GB`
     : 'No storage';
   const databaseText = form.databaseEnabled ? form.databaseEngine : 'No database';
+  const selectedServiceCount = new Set([
+    form.selectedServiceFamilyId,
+    ...form.selectedServiceFamilyIds,
+  ]).size;
 
   return {
     traffic: `${dailyUsers} daily / ${peakUsers} peak`,
@@ -2519,7 +2635,7 @@ function formSizingSummary(
       form.scalingType === 'autoscaling'
         ? `${formatDecimal(scaleMin)}-${formatDecimal(scaleMax)} nodes`
         : `${formatDecimal(instances)} fixed`,
-    services: `${form.selectedServiceFamilyIds.length}/${CLOUD_SERVICE_CATALOG.length} families`,
+    services: `${selectedServiceCount}/${CLOUD_SERVICE_CATALOG.length} families`,
     data: `${storageText} / ${databaseText}`,
   };
 }
@@ -2532,8 +2648,16 @@ function compactRequirementSummary(
   const vcpu = form.vcpu.trim() || '0';
   const memory = form.memoryGb.trim() || '0';
   const region = regionLabelForSummary(form.regionPreference, regionCatalog);
+  const service = serviceFamilyShortLabel(form.selectedServiceFamilyId);
 
-  return `${workload} · ${vcpu} vCPU · ${memory}GB · ${region}`;
+  return `${workload} · ${service} · ${vcpu} vCPU · ${memory}GB · ${region}`;
+}
+
+function serviceFamilyShortLabel(serviceFamilyId: string): string {
+  return (
+    CLOUD_SERVICE_CATALOG.find((family) => family.id === serviceFamilyId)?.label ??
+    'Selected service'
+  );
 }
 
 function workloadTypeLabel(type: WorkloadFormState['workloadType']): string {
@@ -3194,6 +3318,162 @@ function EngineeringAnalyticsDashboard({
 
       <EngineeringServiceChartGrid analytics={analytics} />
     </section>
+  );
+}
+
+function ServiceCheapestMatrix({
+  comparison,
+  interval,
+}: {
+  comparison: ComparisonResult | null;
+  interval: IntervalKey;
+}) {
+  const rows = serviceCheapestRows(comparison, interval);
+
+  return (
+    <section className="service-cheapest-matrix" aria-label="Cheapest provider by service">
+      <div className="engineering-dashboard-heading">
+        <div>
+          <span>Cheapest by service</span>
+          <h3>Per-service decision matrix</h3>
+        </div>
+        <p>
+          Each row uses the same provider line items as the dashboard and flags approximate service
+          mappings for architecture review.
+        </p>
+      </div>
+      <div className="table-wrap">
+        <table className="ranking-table service-matrix-table">
+          <thead>
+            <tr>
+              <th scope="col">Service</th>
+              <th scope="col">Cheapest</th>
+              <th scope="col">Cost</th>
+              <th scope="col">Coverage</th>
+              <th scope="col">Caveat</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.category}>
+                <td>{capitalize(row.category)}</td>
+                <td>{row.providerId ? providerLabel(row.providerId) : 'Pending'}</td>
+                <td>{row.cost !== undefined ? formatCurrency(row.cost) : 'Pending'}</td>
+                <td>{row.coverage}</td>
+                <td>{row.caveat}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function CostFormulaEvidence({ comparison }: { comparison: ComparisonResult | null }) {
+  const rows = costFormulaRows(comparison);
+
+  return (
+    <section className="cost-formula-evidence" aria-label="Cost calculation evidence">
+      <div className="engineering-dashboard-heading">
+        <div>
+          <span>Calculation evidence</span>
+          <h3>Rate x quantity x time</h3>
+        </div>
+        <p>
+          Monthly totals are derived from cached rates and the shared 730-hours/month constant; no
+          request-time cloud calculator calls are made.
+        </p>
+      </div>
+      <div className="formula-evidence-grid">
+        {rows.map((row) => (
+          <article className={`formula-evidence-card formula-${row.providerId}`} key={row.key}>
+            <span>
+              {providerLabel(row.providerId)} · {capitalize(row.category)}
+            </span>
+            <strong>{row.description}</strong>
+            <p>{row.formula}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function serviceCheapestRows(
+  comparison: ComparisonResult | null,
+  interval: IntervalKey,
+): Array<{
+  category: ServiceCategory;
+  providerId?: ProviderId;
+  cost?: number;
+  coverage: string;
+  caveat: string;
+}> {
+  return SERVICE_CATEGORIES.map((category) => {
+    const candidates =
+      comparison?.providers
+        .map((provider) => {
+          const categoryCost = provider.lineItems
+            .filter((lineItem) => lineItem.category === category)
+            .reduce(
+              (sum, lineItem) =>
+                sum + lineItem.baseMonthlyCostUsd * intervalMultiplierFromMonthly(interval),
+              0,
+            );
+          const approximate = provider.lineItems.some(
+            (lineItem) => lineItem.category === category && lineItem.isApproximate,
+          );
+
+          return {
+            providerId: provider.providerId,
+            cost: categoryCost,
+            approximate,
+          };
+        })
+        .filter((candidate) => candidate.cost > 0) ?? [];
+    const cheapest = [...candidates].sort((left, right) => left.cost - right.cost)[0];
+
+    return {
+      category,
+      providerId: cheapest?.providerId,
+      cost: cheapest?.cost,
+      coverage: `${candidates.length}/3 providers`,
+      caveat: cheapest
+        ? cheapest.approximate
+          ? 'Approximate service mapping; validate fit.'
+          : 'Exact mapped line item.'
+        : 'No priced line item for this service.',
+    };
+  });
+}
+
+function costFormulaRows(comparison: ComparisonResult | null): Array<{
+  key: string;
+  providerId: ProviderId;
+  category: ServiceCategory;
+  description: string;
+  formula: string;
+}> {
+  return (
+    comparison?.providers.flatMap((provider) =>
+      provider.lineItems.slice(0, 4).map((lineItem, index) => ({
+        key: `${provider.providerId}-${lineItem.category}-${index}`,
+        providerId: provider.providerId,
+        category: lineItem.category,
+        description: lineItem.description,
+        formula:
+          lineItem.baseHourlyCostUsd !== undefined
+            ? `${formatCurrency(lineItem.baseHourlyCostUsd)} hourly x 730 hours = ${formatCurrency(
+                lineItem.baseMonthlyCostUsd,
+              )} monthly`
+            : lineItem.unitPriceUsd !== undefined
+              ? `${formatCurrency(lineItem.unitPriceUsd)} per ${lineItem.unit ?? 'unit'} rolled into ${formatCurrency(
+                  lineItem.baseMonthlyCostUsd,
+                )} monthly`
+              : `Provider adapter subtotal = ${formatCurrency(lineItem.baseMonthlyCostUsd)} monthly`,
+      })),
+    ) ?? []
   );
 }
 

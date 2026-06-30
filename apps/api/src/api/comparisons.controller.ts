@@ -12,7 +12,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema';
 import { ReportService } from '../reports/report.service';
-import { ReportFormat } from '../reports/report.types';
+import { ReportFormat, ReportInterval, ReportPricingModel } from '../reports/report.types';
 import { ApiValidationError } from './api-errors';
 import {
   ComparisonApplicationService,
@@ -56,11 +56,17 @@ export class ComparisonsController {
   async export(
     @Param('id') comparisonId: string,
     @Query('format') formatQuery: unknown,
+    @Query('interval') intervalQuery: unknown,
+    @Query('pricingModel') pricingModelQuery: unknown,
     @Res({ passthrough: true }) response: HeaderResponse,
   ): Promise<StreamableFile> {
     const format = parseReportFormat(formatQuery);
+    const options = {
+      interval: parseReportInterval(intervalQuery),
+      pricingModel: parseReportPricingModel(pricingModelQuery),
+    };
     const snapshot = await this.comparisonApplicationService.getComparison(comparisonId);
-    const report = this.reportService.generate(snapshot.resultSnapshot, format);
+    const report = this.reportService.generate(snapshot.resultSnapshot, format, options);
     const fileName = report.fileName.replace(/"/g, '');
     const disposition = `attachment; filename="${fileName}"`;
 
@@ -145,6 +151,53 @@ function parseReportFormat(format: unknown): ReportFormat {
     {
       field: 'format',
       issue: 'must be pdf, csv, or xlsx',
+    },
+  ]);
+}
+
+function parseReportInterval(interval: unknown): ReportInterval | undefined {
+  if (interval === undefined) {
+    return undefined;
+  }
+
+  if (
+    interval === 'hourly' ||
+    interval === 'daily' ||
+    interval === 'weekly' ||
+    interval === 'monthly' ||
+    interval === 'quarterly' ||
+    interval === 'yearly'
+  ) {
+    return interval;
+  }
+
+  throw new ApiValidationError('interval must be a supported report interval', [
+    {
+      field: 'interval',
+      issue: 'must be hourly, daily, weekly, monthly, quarterly, or yearly',
+    },
+  ]);
+}
+
+function parseReportPricingModel(pricingModel: unknown): ReportPricingModel | undefined {
+  if (pricingModel === undefined) {
+    return undefined;
+  }
+
+  if (
+    pricingModel === 'on-demand' ||
+    pricingModel === 'reserved-1yr' ||
+    pricingModel === 'reserved-3yr' ||
+    pricingModel === 'savings-plan' ||
+    pricingModel === 'spot'
+  ) {
+    return pricingModel;
+  }
+
+  throw new ApiValidationError('pricingModel must be a supported report pricing model', [
+    {
+      field: 'pricingModel',
+      issue: 'must be on-demand, reserved-1yr, reserved-3yr, savings-plan, or spot',
     },
   ]);
 }

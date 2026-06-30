@@ -5,6 +5,7 @@ import {
   ProviderId,
   ServiceCategory,
 } from '../adapters/common/cloud-provider-adapter';
+import { ServiceRequirement, WorkloadSourceType, WorkloadType } from '../nws/nws.types';
 
 export interface CostIntervals {
   hourly?: number;
@@ -52,9 +53,18 @@ export interface ComparisonWarning {
   message: string;
 }
 
+export interface ComparisonRequirementSummary {
+  sourceType: WorkloadSourceType;
+  workloadName?: string;
+  workloadType: WorkloadType;
+  regionPreference?: string;
+  serviceRequirements: ServiceRequirement[];
+}
+
 export interface ComparisonResult {
   comparisonId: string;
   pricingAsOf: string;
+  requirements?: ComparisonRequirementSummary;
   providers: ComparisonProviderResult[];
   cheapestProviderId: ProviderId;
   warnings?: ComparisonWarning[];

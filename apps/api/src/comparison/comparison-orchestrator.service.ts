@@ -9,7 +9,7 @@ import {
   ServiceCategory,
 } from '../adapters/common/cloud-provider-adapter';
 import { HOURS_PER_MONTH } from '../cost-time';
-import { NormalizedWorkloadSpec } from '../nws/nws.types';
+import { NormalizedWorkloadSpec, ServiceRequirement } from '../nws/nws.types';
 import { NWSValidator } from '../nws/nws-validator';
 import {
   COMPARISON_CLOCK,
@@ -76,6 +76,7 @@ export class ComparisonOrchestratorService {
     return {
       comparisonId: this.idFactory(),
       pricingAsOf: this.clock().toISOString(),
+      requirements: this.requirementSummary(nws),
       providers,
       cheapestProviderId: this.cheapestProvider(providers),
       ...(warnings.length > 0 ? { warnings } : {}),
@@ -301,6 +302,107 @@ export class ComparisonOrchestratorService {
     return providers.reduce((cheapest, current) =>
       current.totals.monthly < cheapest.totals.monthly ? current : cheapest,
     ).providerId;
+  }
+
+  private requirementSummary(nws: NormalizedWorkloadSpec): ComparisonResult['requirements'] {
+    return {
+      sourceType: nws.metadata.sourceType,
+      workloadType: nws.workload.type,
+      ...(nws.workload.name ? { workloadName: nws.workload.name } : {}),
+      ...(nws.workload.region.preference
+        ? { regionPreference: nws.workload.region.preference }
+        : {}),
+      serviceRequirements: nws.serviceRequirements ?? this.serviceRequirementsFromNws(nws),
+    };
+  }
+
+  private serviceRequirementsFromNws(nws: NormalizedWorkloadSpec): ServiceRequirement[] {
+    const region = nws.workload.region.preference;
+    const computeRequirements: ServiceRequirement[] = nws.compute.map((compute) => ({
+      serviceCategory: 'compute',
+      serviceType: compute.scalingType === 'autoscaling' ? 'autoscaling-compute' : 'vm-compute',
+      instanceType:
+        compute.vcpu !== undefined || compute.memoryGb !== undefined
+          ? `${compute.vcpu ?? '?'} vCPU / ${compute.memoryGb ?? '?'} GB`
+          : undefined,
+      region,
+      az: nws.availability.multiAz ? 'multi-az' : 'single-az',
+      quantity: compute.instanceCount ?? compute.autoscalingRange?.min ?? 1,
+      scaleParams: {
+        role: compute.role,
+        scalingType: compute.scalingType,
+        ...(compute.autoscalingRange
+          ? {
+              min: compute.autoscalingRange.min,
+              max: compute.autoscalingRange.max,
+            }
+          : {}),
+      },
+    }));
+    const storageRequirements: ServiceRequirement[] = nws.storage.map((storage) => ({
+      serviceCategory: 'storage',
+      serviceType:
+        storage.type === 'block'
+          ? 'block-storage'
+          : storage.type === 'file'
+            ? 'file-storage'
+            : storage.accessPattern === 'archive'
+              ? 'archive-storage'
+              : 'object-storage',
+      tier: storage.accessPattern,
+      region,
+      quantity: 1,
+      scaleParams: {
+        role: storage.role,
+        sizeGb: storage.sizeGb,
+      },
+    }));
+    const databaseRequirements: ServiceRequirement[] = nws.database.map((database) => ({
+      serviceCategory: 'database',
+      serviceType: database.engine === 'redis' ? 'cache' : 'relational-database',
+      tier: database.highAvailability ? 'high-availability' : 'single-zone',
+      region,
+      az: database.highAvailability ? 'multi-az' : 'single-az',
+      quantity: 1,
+      scaleParams: {
+        role: database.role,
+        engine: database.engine,
+        ...(database.sizeGb !== undefined ? { sizeGb: database.sizeGb } : {}),
+      },
+    }));
+    const networkRequirements: ServiceRequirement[] = [
+      ...(nws.network.cdn
+        ? [
+            {
+              serviceCategory: 'networking' as const,
+              serviceType: 'cdn-edge',
+              region,
+              quantity: 1,
+              scaleParams: {
+                estimatedMonthlyEgressGb: nws.network.estimatedMonthlyEgressGb ?? 0,
+              },
+            },
+          ]
+        : []),
+      ...(nws.network.loadBalancer
+        ? [
+            {
+              serviceCategory: 'networking' as const,
+              serviceType: 'load-balancing',
+              region,
+              az: nws.availability.multiAz ? 'multi-az' : 'single-az',
+              quantity: 1,
+            },
+          ]
+        : []),
+    ];
+
+    return [
+      ...computeRequirements,
+      ...storageRequirements,
+      ...databaseRequirements,
+      ...networkRequirements,
+    ];
   }
 
   private toWarning(failure: ProviderFailure): ComparisonWarning {

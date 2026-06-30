@@ -73,6 +73,35 @@ export const sourceTraceabilitySchema = z
   })
   .strict();
 
+export const serviceRequirementSchema = z
+  .object({
+    serviceCategory: z.enum([
+      'compute',
+      'containers',
+      'application',
+      'storage',
+      'database',
+      'analytics',
+      'ai',
+      'integration',
+      'networking',
+      'security',
+      'operations',
+      'devops',
+      'migration',
+      'edge',
+      'business',
+    ]),
+    serviceType: z.string().min(1),
+    instanceType: z.string().min(1).optional(),
+    tier: z.string().min(1).optional(),
+    region: z.string().min(1).optional(),
+    az: z.string().min(1).optional(),
+    quantity: z.number().int().positive(),
+    scaleParams: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+  })
+  .strict();
+
 export const normalizedWorkloadSpecSchema = z
   .object({
     schemaVersion: z
@@ -130,6 +159,7 @@ export const normalizedWorkloadSpecSchema = z
         slaTarget: z.string().min(1).optional(),
       })
       .strict(),
+    serviceRequirements: z.array(serviceRequirementSchema).optional(),
     sourceTraceability: z.array(sourceTraceabilitySchema).optional(),
   })
   .strict()
@@ -152,4 +182,5 @@ export type ComputeComponent = z.infer<typeof computeComponentSchema>;
 export type StorageComponent = z.infer<typeof storageComponentSchema>;
 export type DatabaseComponent = z.infer<typeof databaseComponentSchema>;
 export type SourceTraceability = z.infer<typeof sourceTraceabilitySchema>;
+export type ServiceRequirement = z.infer<typeof serviceRequirementSchema>;
 export type NormalizedWorkloadSpec = z.infer<typeof normalizedWorkloadSpecSchema>;

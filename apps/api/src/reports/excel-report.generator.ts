@@ -1,7 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { ComparisonResult } from '../comparison/comparison.types';
+import {
+  lineItemEvidenceRows,
+  reportContextRows,
+  selectedScenarioRows,
+  serviceRequirementRows,
+} from './report-evidence';
 import { buildReportInsights } from './report-insights';
 import { escapeXml, sanitizeSpreadsheetText } from './report-security';
+import { ReportOptions } from './report.types';
 import { createZip } from './zip-writer';
 
 type CellValue = string | number;
@@ -13,8 +20,8 @@ interface WorksheetRow {
 
 @Injectable()
 export class ExcelReportGenerator {
-  generate(result: ComparisonResult): Buffer {
-    const rows = this.rows(result);
+  generate(result: ComparisonResult, options: ReportOptions = {}): Buffer {
+    const rows = this.rows(result, options);
 
     return createZip([
       {
@@ -44,7 +51,7 @@ export class ExcelReportGenerator {
     ]);
   }
 
-  private rows(result: ComparisonResult): WorksheetRow[] {
+  private rows(result: ComparisonResult, options: ReportOptions): WorksheetRow[] {
     const rows: WorksheetRow[] = [
       {
         cells: ['PolyCost Comparison Report'],
@@ -59,6 +66,9 @@ export class ExcelReportGenerator {
       {
         cells: ['Cheapest Provider', result.cheapestProviderId],
       },
+      ...reportContextRows(options).map((row) => ({
+        cells: row,
+      })),
       {
         cells: [],
       },
@@ -98,6 +108,28 @@ export class ExcelReportGenerator {
         cells: [],
       },
       {
+        cells: ['Selected Pricing Scenario'],
+        style: 2,
+      },
+      ...selectedScenarioRows(result, options).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
+      {
+        cells: [],
+      },
+      {
+        cells: ['Normalized Service Requirements'],
+        style: 2,
+      },
+      ...serviceRequirementRows(result).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
+      {
+        cells: [],
+      },
+      {
         cells: ['Line Items'],
         style: 2,
       },
@@ -116,6 +148,17 @@ export class ExcelReportGenerator {
           ],
         })),
       ),
+      {
+        cells: [],
+      },
+      {
+        cells: ['Rate Math Evidence'],
+        style: 2,
+      },
+      ...lineItemEvidenceRows(result).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
     ];
 
     if (result.warnings && result.warnings.length > 0) {

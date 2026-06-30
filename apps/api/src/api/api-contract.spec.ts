@@ -286,7 +286,13 @@ describe('API contracts', () => {
       header: jest.fn(),
     };
 
-    const file = await controller.export(comparisonResult.comparisonId, 'csv', response);
+    const file = await controller.export(
+      comparisonResult.comparisonId,
+      'csv',
+      'quarterly',
+      'reserved-3yr',
+      response,
+    );
 
     expect(file.getHeaders()).toEqual({
       type: 'text/csv',
@@ -524,7 +530,9 @@ describe('API contracts', () => {
 
     await expect(controller.create({})).rejects.toThrow(ApiValidationError);
     await expect(
-      controller.export(comparisonResult.comparisonId, 'docx', { header: jest.fn() }),
+      controller.export(comparisonResult.comparisonId, 'docx', undefined, undefined, {
+        header: jest.fn(),
+      }),
     ).rejects.toThrow(ApiValidationError);
   });
 

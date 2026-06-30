@@ -1,6 +1,8 @@
-import { NormalizedWorkloadSpec } from './types';
+import { NormalizedWorkloadSpec, ServiceRequirement } from './types';
 import {
+  CLOUD_SERVICE_CATALOG,
   DEFAULT_SELECTED_SERVICE_FAMILY_IDS,
+  SERVICE_CATALOG_CATEGORIES,
   serviceCatalogTraceability,
   serviceFamilyIdsFromTraceability,
 } from './service-catalog';
@@ -39,6 +41,10 @@ export interface WorkloadFormState {
   monthlyEgressGb: string;
   cdn: boolean;
   loadBalancer: boolean;
+  selectedServiceCategory: string;
+  selectedServiceFamilyId: string;
+  instanceTier: string;
+  availabilityZoneCount: string;
   selectedServiceFamilyIds: string[];
   multiAz: boolean;
   multiRegion: boolean;
@@ -61,6 +67,8 @@ type NumericWorkloadFormField =
   | 'storageSizeGb'
   | 'databaseSizeGb'
   | 'monthlyEgressGb';
+
+const serviceCategoryIds = new Set(SERVICE_CATALOG_CATEGORIES.map((category) => category.id));
 
 export const sampleNaturalLanguageInput =
   'A web app for 5,000 daily users with two web servers, a Postgres database, 250GB of upload storage, CDN, load balancing, and multi-AZ availability.';
@@ -91,6 +99,10 @@ export const defaultWorkloadForm: WorkloadFormState = {
   monthlyEgressGb: '750',
   cdn: true,
   loadBalancer: true,
+  selectedServiceCategory: 'compute',
+  selectedServiceFamilyId: 'vm-compute',
+  instanceTier: 'balanced',
+  availabilityZoneCount: '2',
   selectedServiceFamilyIds: DEFAULT_SELECTED_SERVICE_FAMILY_IDS,
   multiAz: true,
   multiRegion: false,
@@ -240,6 +252,7 @@ export function buildNwsFromForm(
       multiRegion: form.multiRegion,
       ...(form.slaTarget.trim() ? { slaTarget: form.slaTarget.trim() } : {}),
     },
+    serviceRequirements: serviceRequirementsFromForm(form),
     sourceTraceability: serviceCatalogTraceability(form.selectedServiceFamilyIds),
   };
 }
@@ -277,11 +290,164 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
     monthlyEgressGb: numberToInput(nws.network.estimatedMonthlyEgressGb),
     cdn: nws.network.cdn,
     loadBalancer: nws.network.loadBalancer,
-    selectedServiceFamilyIds: serviceFamilyIdsFromTraceability(nws.sourceTraceability),
+    selectedServiceCategory: primaryServiceRequirement(nws)?.serviceCategory ?? 'compute',
+    selectedServiceFamilyId:
+      primaryServiceRequirement(nws)?.serviceType ??
+      serviceFamilyIdsFromTraceability(nws.sourceTraceability)[0] ??
+      'vm-compute',
+    instanceTier: primaryServiceRequirement(nws)?.tier ?? defaultWorkloadForm.instanceTier,
+    availabilityZoneCount:
+      primaryServiceRequirement(nws)?.az?.match(/\d+/)?.[0] ??
+      (nws.availability.multiAz ? '2' : '1'),
+    selectedServiceFamilyIds:
+      nws.serviceRequirements?.length && nws.serviceRequirements.length > 0
+        ? orderedRequirementFamilyIds(nws.serviceRequirements)
+        : serviceFamilyIdsFromTraceability(nws.sourceTraceability),
     multiAz: nws.availability.multiAz,
     multiRegion: nws.availability.multiRegion,
     slaTarget: nws.availability.slaTarget ?? '',
   };
+}
+
+export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceRequirement[] {
+  const selectedIds = orderedRequirementIds(form);
+  const region = normalizedRegionPreference(form.regionPreference).preference;
+  const availabilityZones = form.multiAz
+    ? `${Math.max(2, parseNonNegativeInteger(form.availabilityZoneCount, 2))} zones`
+    : 'single-zone';
+
+  return selectedIds.map((serviceType) => {
+    const family = CLOUD_SERVICE_CATALOG.find((candidate) => candidate.id === serviceType);
+    const serviceCategory = serviceCategoryForFamily(serviceType);
+
+    return {
+      serviceCategory,
+      serviceType,
+      instanceType: instanceTypeForServiceRequirement(serviceType, form),
+      tier: tierForServiceRequirement(serviceType, form),
+      ...(region ? { region } : {}),
+      az: availabilityZones,
+      quantity: quantityForServiceRequirement(serviceType, form),
+      scaleParams: {
+        categoryLabel:
+          SERVICE_CATALOG_CATEGORIES.find((category) => category.id === serviceCategory)?.label ??
+          serviceCategory,
+        providerServices: family
+          ? [
+              ...family.providerServices.aws,
+              ...family.providerServices.azure,
+              ...family.providerServices.gcp,
+            ].join(' | ')
+          : serviceType,
+        supportStatus: family?.supportStatus ?? 'mapped',
+        ...(form.scalingType === 'autoscaling'
+          ? {
+              scalingType: form.scalingType,
+              min: parseNonNegativeInteger(form.autoscaleMin, 1),
+              max: parseNonNegativeInteger(form.autoscaleMax, 3),
+            }
+          : { scalingType: form.scalingType }),
+      },
+    };
+  });
+}
+
+function orderedRequirementIds(form: WorkloadFormState): string[] {
+  const ids = new Set([
+    form.selectedServiceFamilyId,
+    ...form.selectedServiceFamilyIds,
+    ...(form.storageEnabled ? [storageServiceFamilyId(form)] : []),
+    ...(form.databaseEnabled ? [databaseServiceFamilyId(form)] : []),
+    ...(form.cdn ? ['cdn-edge'] : []),
+    ...(form.loadBalancer ? ['load-balancing'] : []),
+  ]);
+
+  return CLOUD_SERVICE_CATALOG.filter((family) => ids.has(family.id)).map((family) => family.id);
+}
+
+function orderedRequirementFamilyIds(requirements: ServiceRequirement[]): string[] {
+  const ids = new Set(requirements.map((requirement) => requirement.serviceType));
+
+  return CLOUD_SERVICE_CATALOG.filter((family) => ids.has(family.id)).map((family) => family.id);
+}
+
+function primaryServiceRequirement(nws: NormalizedWorkloadSpec): ServiceRequirement | undefined {
+  return nws.serviceRequirements?.find((requirement) =>
+    CLOUD_SERVICE_CATALOG.some((family) => family.id === requirement.serviceType),
+  );
+}
+
+function serviceCategoryForFamily(serviceType: string): ServiceRequirement['serviceCategory'] {
+  const family = CLOUD_SERVICE_CATALOG.find((candidate) => candidate.id === serviceType);
+  const categoryId = family?.categoryId ?? 'compute';
+
+  return serviceCategoryIds.has(categoryId)
+    ? (categoryId as ServiceRequirement['serviceCategory'])
+    : 'compute';
+}
+
+function quantityForServiceRequirement(serviceType: string, form: WorkloadFormState): number {
+  if (serviceType === 'vm-compute' || serviceType === 'autoscaling-compute') {
+    return form.scalingType === 'autoscaling'
+      ? Math.max(1, parseNonNegativeInteger(form.autoscaleMin, 1))
+      : Math.max(1, parseNonNegativeInteger(form.instanceCount, 1));
+  }
+
+  return 1;
+}
+
+function instanceTypeForServiceRequirement(
+  serviceType: string,
+  form: WorkloadFormState,
+): string | undefined {
+  if (serviceType === 'vm-compute' || serviceType === 'autoscaling-compute') {
+    return `${form.instanceTier} tier - ${form.vcpu || '?'} vCPU - ${form.memoryGb || '?'}GB`;
+  }
+
+  if (serviceType.includes('storage')) {
+    return `${form.storageType} - ${form.storageSizeGb || '0'}GB`;
+  }
+
+  if (serviceType.includes('database') || serviceType === 'cache') {
+    return `${form.databaseEngine} - ${form.databaseSizeGb || 'provider default'}GB`;
+  }
+
+  return undefined;
+}
+
+function tierForServiceRequirement(
+  serviceType: string,
+  form: WorkloadFormState,
+): string | undefined {
+  if (serviceType === 'vm-compute' || serviceType === 'autoscaling-compute') {
+    return form.instanceTier;
+  }
+
+  if (serviceType.includes('storage')) {
+    return form.storageAccessPattern;
+  }
+
+  if (serviceType.includes('database') || serviceType === 'cache') {
+    return form.databaseHighAvailability ? 'high-availability' : 'standard';
+  }
+
+  return undefined;
+}
+
+function storageServiceFamilyId(form: WorkloadFormState): string {
+  if (form.storageType === 'block') {
+    return 'block-storage';
+  }
+
+  if (form.storageType === 'file') {
+    return 'file-storage';
+  }
+
+  return form.storageAccessPattern === 'archive' ? 'archive-storage' : 'object-storage';
+}
+
+function databaseServiceFamilyId(form: WorkloadFormState): string {
+  return form.databaseEngine === 'redis' ? 'cache' : 'relational-database';
 }
 
 function normalizedRegionPreference(
