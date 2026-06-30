@@ -170,11 +170,6 @@ function LandingComparisonCard({
     >
       {card.isBestValue ? <span className="landing-best-badge">Best value</span> : null}
       <div className="landing-card-header">
-        <span
-          className={`landing-provider-logo landing-provider-logo-${card.providerId}`}
-          data-label={card.label}
-          aria-hidden="true"
-        />
         <span className={`landing-provider-label landing-provider-label-${card.providerId}`}>
           {card.label} / {card.region}
         </span>
@@ -206,12 +201,6 @@ function ProviderEstimateLoader({ providerId, label }: { providerId: ProviderId;
       className={`provider-pending provider-pending-${providerId}`}
       aria-label={`${providerLabel(providerId)} estimate pending`}
     >
-      <span className="provider-pending-icon" aria-hidden="true">
-        <span
-          className={`provider-mark provider-mark-${providerId}`}
-          data-code={providerShortCode(providerId)}
-        />
-      </span>
       <span>{label}</span>
       <span className="provider-pending-bars" aria-hidden="true">
         <i />
@@ -289,17 +278,6 @@ function providerLabel(providerId: ProviderId): string {
       return 'AWS';
     case 'azure':
       return 'Azure';
-    case 'gcp':
-      return 'GCP';
-  }
-}
-
-function providerShortCode(providerId: ProviderId): string {
-  switch (providerId) {
-    case 'aws':
-      return 'AWS';
-    case 'azure':
-      return 'AZ';
     case 'gcp':
       return 'GCP';
   }

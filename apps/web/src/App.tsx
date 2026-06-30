@@ -1446,7 +1446,6 @@ function ProviderSummaryCards({
             >
               {isCheapest ? <span className="lowest-badge">Best value</span> : null}
               <div className="provider-summary-heading">
-                <ProviderLogo providerId={providerId} />
                 <div>
                   <h2 id={`summary-${providerId}-title`}>{providerLabel(providerId)}</h2>
                   <span>{providerSubtitle(providerId)}</span>
@@ -2498,7 +2497,6 @@ function CloudCalculatorLinks({ regionCatalog }: { regionCatalog: RegionCatalogR
               target="_blank"
               rel="noreferrer"
             >
-              <ProviderMark providerId={providerId} />
               <span>{providerLabel(providerId)} Calculator</span>
               <ExternalLinkIcon />
             </a>
@@ -2518,7 +2516,6 @@ function CloudCalculatorLinks({ regionCatalog }: { regionCatalog: RegionCatalogR
             target="_blank"
             rel="noreferrer"
           >
-            <ProviderMark providerId={providerId} />
             <span>{regionReferenceLabel(providerId)}</span>
             <ExternalLinkIcon />
           </a>
@@ -2636,7 +2633,6 @@ export function ComparisonView({
           const provider = providerResults.get(providerId);
           return (
             <span key={providerId}>
-              <ProviderMark providerId={providerId} />
               {providerLabel(providerId)}
               <strong>
                 {provider ? (
@@ -2985,7 +2981,6 @@ function ExecutiveStatTile({
     <article className={providerId ? `executive-stat-tile executive-stat-${providerId}` : 'executive-stat-tile'}>
       <span>{label}</span>
       <strong>
-        {providerId ? <ProviderMark providerId={providerId} /> : null}
         {value}
       </strong>
       <small>{detail}</small>
@@ -3118,7 +3113,6 @@ function EngineeringProviderServiceChart({
     <article className={`engineering-chart-card engineering-chart-${provider.providerId}`}>
       <div className="engineering-chart-title">
         <span>
-          <ProviderMark providerId={provider.providerId} />
           {providerLabel(provider.providerId)}
         </span>
         <strong>{hasData ? formatCurrency(provider.total ?? 0) : 'Pending'}</strong>
@@ -3253,7 +3247,6 @@ function EngineeringSignal({
     <article className={className}>
       <span>{label}</span>
       <strong>
-        {providerId ? <ProviderMark providerId={providerId} /> : null}
         {value}
       </strong>
       <small>{detail}</small>
@@ -3345,7 +3338,6 @@ export function ProviderPanel({
     >
       <header className="provider-header">
         <div className="provider-title-block">
-          <ProviderLogo providerId={providerId} />
           <div>
             <h2 id={`${providerId}-title`}>{providerLabel(providerId)}</h2>
             <span className="provider-subtitle">{providerSubtitle(providerId)}</span>
@@ -3480,7 +3472,6 @@ export function CostDashboard({
             {summaries.map((summary) => (
               <div className="provider-bar-row" key={summary.providerId}>
                 <div className="bar-provider">
-                  <ProviderMark providerId={summary.providerId} />
                   <strong>{providerLabel(summary.providerId)}</strong>
                 </div>
                 <div className="bar-track" aria-hidden="true">
@@ -3689,7 +3680,6 @@ function FinOpsReviewPanel({ review }: { review: FinOpsReview }) {
             {review.providerFit.map((fit) => (
               <div className={`provider-fit provider-fit-${fit.tone}`} key={fit.providerId}>
                 <span>
-                  <ProviderMark providerId={fit.providerId} />
                   {providerLabel(fit.providerId)}
                 </span>
                 <strong>{fit.label}</strong>
@@ -3727,10 +3717,7 @@ function InsightCard({
     <div className={providerId ? `finops-card finops-card-${providerId}` : 'finops-card'}>
       <span>{label}</span>
       <strong>{value}</strong>
-      <small>
-        {providerId ? <ProviderMark providerId={providerId} /> : null}
-        {detail}
-      </small>
+      <small>{detail}</small>
     </div>
   );
 }
@@ -3760,7 +3747,6 @@ function DecisionBrief({
   return (
     <section className="decision-brief" aria-label="Decision brief">
       <div className="decision-lede">
-        {lowest ? <ProviderMark providerId={lowest.providerId} /> : null}
         <div>
           <span>Decision Brief</span>
           <strong>
@@ -3839,7 +3825,6 @@ function ProviderRanking({
                 <td>{summary.total !== undefined ? `#${index + 1}` : '-'}</td>
                 <td>
                   <span className="rank-provider">
-                    <ProviderMark providerId={summary.providerId} />
                     {providerLabel(summary.providerId)}
                   </span>
                 </td>
@@ -3888,7 +3873,6 @@ function IntervalOutlook({ comparison }: { comparison: ComparisonResult | null }
                     style={{ width: `${provider.percentOfMax}%` }}
                   />
                   <span className="interval-content">
-                    <ProviderMark providerId={provider.providerId} />
                     {provider.total !== undefined ? formatCurrency(provider.total) : 'Pending'}
                   </span>
                 </span>
@@ -3958,36 +3942,8 @@ function MetricCard({
     <div className={providerId ? `metric-card metric-${providerId}` : 'metric-card'}>
       <span>{label}</span>
       <strong>{value}</strong>
-      <small>
-        {providerId ? <ProviderMark providerId={providerId} /> : null}
-        {detail}
-      </small>
+      <small>{detail}</small>
     </div>
-  );
-}
-
-function ProviderLogo({ providerId }: { providerId: ProviderId }) {
-  return (
-    <div
-      className={`provider-logo-lockup provider-logo-lockup-${providerId}`}
-      data-provider-logo={providerId}
-      aria-hidden="true"
-    >
-      <span
-        className={`provider-logo-wordmark provider-logo-wordmark-${providerId}`}
-        data-label={providerLabel(providerId)}
-      />
-    </div>
-  );
-}
-
-function ProviderMark({ providerId }: { providerId: ProviderId }) {
-  return (
-    <span
-      className={`provider-mark provider-mark-${providerId}`}
-      data-code={providerShortCode(providerId)}
-      aria-hidden="true"
-    />
   );
 }
 
@@ -4011,9 +3967,6 @@ function ProviderPendingValue({
         .join(' ')}
       aria-label={`${providerLabel(providerId)} estimate pending`}
     >
-      <span className="provider-pending-icon" aria-hidden="true">
-        <ProviderMark providerId={providerId} />
-      </span>
       <span>{label}</span>
       <span className="provider-pending-bars" aria-hidden="true">
         <i />
@@ -4145,17 +4098,6 @@ function providerLabel(provider: ProviderId): string {
       return 'AWS';
     case 'azure':
       return 'Azure';
-    case 'gcp':
-      return 'GCP';
-  }
-}
-
-function providerShortCode(provider: ProviderId): string {
-  switch (provider) {
-    case 'aws':
-      return 'AWS';
-    case 'azure':
-      return 'AZ';
     case 'gcp':
       return 'GCP';
   }

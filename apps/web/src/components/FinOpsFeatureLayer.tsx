@@ -330,7 +330,7 @@ export function FinOpsFeatureLayer({
                 className="min-w-0 rounded-lg border border-border bg-surface-0 p-3"
               >
                 <div className="flex min-w-0 items-center justify-between gap-3">
-                  <ProviderLogoHeading providerId={providerId} />
+                  <ProviderTextHeading providerId={providerId} />
                   <strong className="font-mono text-base text-text-primary">
                     {selectedModelCost
                       ? formatModelCost(selectedModelCost, interval, currency)
@@ -665,7 +665,7 @@ function WorkloadBreakdown({
               className="grid min-w-0 gap-3 rounded-lg border border-border bg-surface-0 p-3"
             >
               <div className="flex min-w-0 items-center justify-between gap-3">
-                <ProviderLogoHeading providerId={providerId} />
+                <ProviderTextHeading providerId={providerId} />
                 <strong className="font-mono text-sm text-text-primary">
                   {provider
                     ? formatModelCost(providerModelCost(provider, pricingModel), interval, currency)
@@ -943,7 +943,7 @@ export function SharedReportPlaceholder({
                     key={provider.provider}
                     className="rounded-lg border border-border bg-surface-1 p-3"
                   >
-                    <ProviderLogoHeading providerId={provider.provider} />
+                    <ProviderTextHeading providerId={provider.provider} />
                     <strong className="mt-3 block font-mono text-xl text-text-primary">
                       {formatMoney(provider.total, USD_CURRENCY)}
                     </strong>
@@ -1197,14 +1197,9 @@ function IconPath({ path }: { path: string }) {
   );
 }
 
-function ProviderLogoHeading({ providerId }: { providerId: ProviderId }) {
+function ProviderTextHeading({ providerId }: { providerId: ProviderId }) {
   return (
     <span className={`provider-mini-heading provider-mini-heading-${providerId}`}>
-      <span
-        className={`provider-mark provider-mark-${providerId}`}
-        data-code={providerShortCode(providerId)}
-        aria-hidden="true"
-      />
       <span>{providerLabel(providerId)}</span>
     </span>
   );
@@ -1216,17 +1211,6 @@ function providerLabel(provider: ProviderId): string {
       return 'AWS';
     case 'azure':
       return 'Azure';
-    case 'gcp':
-      return 'GCP';
-  }
-}
-
-function providerShortCode(provider: ProviderId): string {
-  switch (provider) {
-    case 'aws':
-      return 'AWS';
-    case 'azure':
-      return 'AZ';
     case 'gcp':
       return 'GCP';
   }
