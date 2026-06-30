@@ -47,33 +47,48 @@ describe('App', () => {
     const client = clientMock();
     const { container, unmount } = render(<App client={client} />);
 
-    await click(buttonByText(container, 'Form'));
-    await click(buttonByText(container, 'Compare'));
+    expect(text(container)).toContain('Multi-cloud cost clarity, in one place.');
+    expect(buttonByText(container, 'Compare costs')).toBeInstanceOf(HTMLButtonElement);
+    expect(container.querySelector('.landing-comparison')).toBeNull();
+    expect(container.querySelector('.comparison-toolbar')).toBeNull();
+    expect(container.querySelector('.workbench-results')).toBeNull();
+    expect(container.querySelector<HTMLDetailsElement>('.initial-optional-estimate')?.open).toBe(
+      false,
+    );
 
-    expect(text(container)).toContain('Traffic');
-    expect(text(container)).toContain('Services');
-    expect(text(container)).toContain('Cloud services');
-    expect(text(container)).toContain('Virtual machines');
-    expect(text(container)).toContain('Generative AI');
-    expect(text(container)).toContain('Mapped / roadmap');
-    expect(text(container)).toContain('Network');
+    await click(buttonByText(container, 'Compare costs'));
+
+    expect(text(container)).toContain('Requirements');
+    expect(text(container)).toContain('Web app · 2 vCPU · 4GB · US East (N. Virginia)');
+    expect(text(container)).toContain('Best value');
+    expect(text(container)).toContain('Monthly estimate');
+    expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);
+    expect(Array.from(container.querySelectorAll<HTMLDetailsElement>('.result-disclosure'))).toHaveLength(
+      5,
+    );
+    expect(
+      Array.from(container.querySelectorAll<HTMLDetailsElement>('.result-disclosure')).every(
+        (details) => !details.open,
+      ),
+    ).toBe(true);
     expect(client.validateWorkload).toHaveBeenCalledWith(
       expect.objectContaining({
         schemaVersion: '1.0',
-        sourceTraceability: expect.arrayContaining([
-          {
-            nwsPath: 'metadata.serviceCatalog',
-            sourceRef: 'serviceCatalog:vm-compute',
-          },
-        ]),
+        workload: expect.objectContaining({ type: 'web_app' }),
+        compute: [expect.objectContaining({ instanceCount: 1, memoryGb: 4, vcpu: 2 })],
+        storage: [],
       }),
     );
     expect(client.createComparison).toHaveBeenCalled();
-    expect(text(container)).toContain('Comparison ready.');
-    expect(mobileProviderLabels(container)).toEqual(['AWS', 'Azure', 'GCP']);
-    expect(text(container)).toContain('Workspace');
-    expect(text(container)).toContain('Executive View');
-    expect(text(container)).toContain('Engineering View');
+    expect(text(container)).not.toContain('Comparison ready.');
+    expect(text(container)).toContain('AWS');
+    expect(text(container)).toContain('Azure');
+    expect(text(container)).toContain('GCP');
+    expect(text(container)).toContain('Cost periods & executive analytics');
+    expect(text(container)).toContain('Pricing models, breakdown, budget & share');
+    expect(text(container)).toContain('Architecture & engineering evidence');
+    expect(text(container)).toContain('Official calculators & regions');
+    expect(text(container)).toContain('Export report');
     expect(text(container)).toContain('GCP is the current executive cost baseline');
     expect(text(container)).toContain('Decision Brief');
     expect(text(container)).toContain('Save vs next');
@@ -102,8 +117,6 @@ describe('App', () => {
       ),
     ).toBeInstanceOf(HTMLAnchorElement);
 
-    await click(resultTabByText(container, 'Engineering View'));
-
     expect(text(container)).toContain('Resource name');
     expect(text(container)).toContain('Spec / SKU');
     expect(text(container)).toContain('Export CSV');
@@ -123,6 +136,10 @@ describe('App', () => {
     const { container, unmount } = render(<App client={clientMock()} />);
 
     try {
+      expect(container.querySelector('[aria-label="Page scroll progress"]')).toBeNull();
+
+      await click(buttonByText(container, 'Compare costs'));
+
       Object.defineProperty(document.documentElement, 'scrollHeight', {
         configurable: true,
         value: 2000,
@@ -170,18 +187,80 @@ describe('App', () => {
     }
   });
 
-  it('shows loading spinners while parse, compare, refresh, and export actions are pending', async () => {
-    const parsed: ParsedNwsDraft = {
-      draftNws: buildNwsFromForm(defaultWorkloadForm),
-      parserConfidence: 'medium',
-      fieldsRequiringReview: [],
-    };
-    const parseDeferred = deferred<ParsedNwsDraft>();
+  it('keeps relocated features functional inside accessible accordions', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Compare costs'));
+
+    const disclosures = Array.from(
+      container.querySelectorAll<HTMLDetailsElement>('.result-disclosure'),
+    );
+    expect(disclosures).toHaveLength(5);
+    expect(disclosures.every((details) => !details.open)).toBe(true);
+    expect(
+      disclosures.every(
+        (details) =>
+          disclosureSummary(details).getAttribute('aria-expanded') === 'false' &&
+          Boolean(document.getElementById(disclosureSummary(details).getAttribute('aria-controls') ?? '')),
+      ),
+    ).toBe(true);
+
+    const costPeriods = resultDisclosureByTitle(container, 'Cost periods & executive analytics');
+    await keyDown(disclosureSummary(costPeriods), 'Enter');
+    expect(costPeriods.open).toBe(true);
+    expect(disclosureSummary(costPeriods).getAttribute('aria-expanded')).toBe('true');
+
+    await click(buttonByText(container, 'Yearly'));
+    expect(text(container)).toContain('Yearly estimate');
+
+    const finOps = resultDisclosureByTitle(container, 'Pricing models, breakdown, budget & share');
+    await keyDown(disclosureSummary(finOps), ' ');
+    expect(finOps.open).toBe(true);
+    expect(disclosureSummary(finOps).getAttribute('aria-expanded')).toBe('true');
+
+    await click(buttonByText(container, '1yr reserved'));
+    expect(buttonByText(container, '1yr reserved').getAttribute('aria-pressed')).toBe('true');
+    expect(text(container)).toContain('Compute, storage, and data-transfer mix');
+    expect(text(container)).toContain('No fake public link has been generated.');
+
+    await changeInput(inputById(container, 'budget-threshold-usd'), '10');
+    expect(text(container)).toContain('Estimated run-rate exceeds budget threshold.');
+    await click(buttonByText(container, 'Dismiss'));
+    expect(text(container)).not.toContain('Estimated run-rate exceeds budget threshold.');
+
+    const architecture = resultDisclosureByTitle(container, 'Architecture & engineering evidence');
+    await keyDown(disclosureSummary(architecture), 'Enter');
+    expect(architecture.open).toBe(true);
+    expect(text(container)).toContain('Resource name');
+    expect(text(container)).toContain('API JSON');
+
+    const officialLinks = resultDisclosureByTitle(container, 'Official calculators & regions');
+    await keyDown(disclosureSummary(officialLinks), 'Enter');
+    expect(officialLinks.open).toBe(true);
+    expect(
+      container.querySelector<HTMLAnchorElement>('a[href="https://calculator.aws/#/"]'),
+    ).toBeInstanceOf(HTMLAnchorElement);
+    expect(
+      container.querySelector<HTMLAnchorElement>(
+        'a[href="https://cloud.google.com/compute/docs/regions-zones"]',
+      ),
+    ).toBeInstanceOf(HTMLAnchorElement);
+
+    const exportReport = resultDisclosureByTitle(container, 'Export report');
+    await keyDown(disclosureSummary(exportReport), 'Enter');
+    expect(exportReport.open).toBe(true);
+    await click(buttonByText(container, 'PDF'));
+    expect(client.exportComparison).toHaveBeenCalledWith(comparisonResult.comparisonId, 'pdf');
+
+    unmount();
+  });
+
+  it('shows loading spinners while compare, refresh, and export actions are pending', async () => {
     const validateDeferred = deferred<{ valid: true }>();
     const refreshDeferred = deferred<ComparisonResult>();
     const exportDeferred = deferred<Blob>();
     const client = clientMock({
-      parseWorkload: jest.fn(() => parseDeferred.promise),
       validateWorkload: jest.fn(() => validateDeferred.promise),
       refreshLiveComparison: jest.fn(() => refreshDeferred.promise),
       exportComparison: jest.fn(() => exportDeferred.promise),
@@ -189,22 +268,11 @@ describe('App', () => {
     const { container, unmount } = render(<App client={client} />);
 
     try {
-      await click(buttonByText(container, 'Parse'));
+      await click(buttonByText(container, 'Compare costs'));
 
-      expect(buttonByText(container, 'Parsing...').querySelector('.animate-spin')).toBeInstanceOf(
-        SVGElement,
-      );
-
-      parseDeferred.resolve(parsed);
-      await act(async () => {
-        await parseDeferred.promise;
-      });
-
-      await click(buttonByText(container, 'Compare'));
-
-      expect(buttonByText(container, 'Comparing...').querySelector('.animate-spin')).toBeInstanceOf(
-        SVGElement,
-      );
+      expect(
+        buttonByText(container, 'Comparing costs...').querySelector('.animate-spin'),
+      ).toBeInstanceOf(SVGElement);
 
       validateDeferred.resolve({ valid: true });
       await act(async () => {
@@ -238,49 +306,70 @@ describe('App', () => {
   });
 
   it('clears requirements input and rendered cost breakdowns', async () => {
-    const client = clientMock();
+    const refreshDeferred = deferred<ComparisonResult>();
+    const client = clientMock({
+      refreshLiveComparison: jest.fn(() => refreshDeferred.promise),
+    });
     const { container, unmount } = render(<App client={client} />);
+
+    expect(container.querySelector('#natural-language-input')).toBeNull();
+
+    await click(buttonByText(container, 'Compare costs'));
+
+    expect(text(container)).not.toContain('Comparison ready.');
+    expect(container.querySelector('.requirement-summary-strip')).toBeInstanceOf(HTMLElement);
+    expect(buttonByText(container, 'Refresh live').disabled).toBe(false);
+    expect(buttonByText(container, 'PDF').disabled).toBe(false);
+    expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);
+
+    await click(buttonByText(container, 'Refresh live'));
 
     await click(buttonByText(container, 'Clear'));
 
-    expect((container.querySelector('#natural-language-input') as HTMLTextAreaElement).value).toBe(
-      '',
-    );
-    expect(buttonByText(container, 'Clear').disabled).toBe(true);
+    expect(text(container)).toContain('Multi-cloud cost clarity, in one place.');
+    expect(buttonByText(container, 'Compare costs')).toBeInstanceOf(HTMLButtonElement);
+    expect(container.querySelector('.requirement-summary-strip')).toBeNull();
+    expect(container.querySelector('.workbench-results')).toBeNull();
+    expect(container.querySelector('.provider-summary-card')).toBeNull();
+    expect(container.querySelector('.result-disclosure')).toBeNull();
+    expect(text(container)).not.toContain('$42.00');
 
-    await click(buttonByText(container, 'Sample'));
+    refreshDeferred.resolve({
+      ...comparisonResult,
+      comparisonId: 'stale-refresh-after-clear',
+    });
+    await act(async () => {
+      await refreshDeferred.promise;
+    });
 
-    expect(
-      (container.querySelector('#natural-language-input') as HTMLTextAreaElement).value.length,
-    ).toBeGreaterThan(0);
-
-    await click(buttonByText(container, 'Form'));
-    await click(buttonByText(container, 'Compare'));
-
-    expect(text(container)).toContain('Comparison ready.');
-    expect(buttonByText(container, 'Refresh live').disabled).toBe(false);
-    expect(buttonByText(container, 'PDF').disabled).toBe(false);
-
-    await click(buttonByText(container, 'Clear costs'));
-
-    expect(text(container)).toContain('Run comparison to populate data');
-    expect(buttonByText(container, 'Refresh live').disabled).toBe(true);
-    expect(buttonByText(container, 'PDF').disabled).toBe(true);
+    expect(text(container)).toContain('Multi-cloud cost clarity, in one place.');
+    expect(container.querySelector('.provider-summary-card')).toBeNull();
+    expect(container.querySelector('.result-disclosure')).toBeNull();
 
     unmount();
   });
 
-  it('supports form edits, theme changes, interval changes, refresh, and export', async () => {
+  it('supports form edits, interval changes, refresh, and export', async () => {
     const client = clientMock();
     const { container, unmount } = render(<App client={client} />);
 
-    await click(buttonByText(container, 'Switch to dark mode'));
-    await click(buttonByText(container, 'Switch to light mode'));
-    await click(buttonByText(container, 'Form'));
+    await changeSelect(selectById(container, 'workload-type'), 'api_backend');
+    await changeSelect(selectById(container, 'region'), 'us-west-2');
+    await changeInput(inputById(container, 'vcpu'), '4');
+    await changeInput(inputById(container, 'memory-gb'), '8');
+    await click(buttonByText(container, 'Compare costs'));
+
+    await click(buttonByText(container, 'Edit'));
+
+    expect(container.querySelector('.requirement-summary-strip')).toBeNull();
+    expect(container.querySelector('.requirements-edit-panel')).toBeInstanceOf(HTMLElement);
+    expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);
+    expect(selectById(container, 'type').value).toBe('api_backend');
+    expect(selectById(container, 'region').value).toBe('us-west-2');
+    expect(inputById(container, 'vcpu').value).toBe('4');
+    expect(inputById(container, 'memory-gb').value).toBe('8');
 
     await changeInput(inputById(container, 'name'), 'Edited portal');
-    await changeSelect(selectById(container, 'type'), 'api_backend');
-    await changeSelect(selectById(container, 'region'), 'us-west-2');
     await changeInput(inputById(container, 'daily-users'), '7000');
     await changeInput(inputById(container, 'peak-users'), '800');
     await changeInput(inputById(container, 'compute-role'), 'api');
@@ -291,6 +380,8 @@ describe('App', () => {
     await changeInput(inputById(container, 'scale-min'), '2');
     await changeInput(inputById(container, 'scale-max'), '8');
     await click(serviceFamilyCheckboxByLabel(container, 'Generative AI'));
+    await click(checkboxByLabel(container, 'Object storage'));
+    await click(checkboxByLabel(container, 'Managed database'));
     await click(checkboxByLabel(container, 'CDN'));
     await click(checkboxByLabel(container, 'Load balancer'));
     await click(checkboxByLabel(container, 'Multi-region'));
@@ -340,7 +431,36 @@ describe('App', () => {
     );
     expect(client.refreshLiveComparison).toHaveBeenCalledWith(comparisonResult.comparisonId);
     expect(client.exportComparison).toHaveBeenCalledWith(comparisonResult.comparisonId, 'pdf');
-    expect(document.documentElement.dataset.themeChoice).toBe('light');
+
+    unmount();
+  });
+
+  it('keeps submitted results stable while editing draft requirements', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await changeSelect(selectById(container, 'workload-type'), 'api_backend');
+    await changeInput(inputById(container, 'vcpu'), '4');
+    await changeInput(inputById(container, 'memory-gb'), '8');
+    await click(buttonByText(container, 'Compare costs'));
+
+    expect(text(container)).toContain('API backend · 4 vCPU · 8GB');
+
+    await click(buttonByText(container, 'Edit'));
+    await changeInput(inputById(container, 'vcpu'), '16');
+    await changeInput(inputById(container, 'memory-gb'), '64');
+
+    expect(container.querySelector('.requirements-edit-panel')).toBeInstanceOf(HTMLElement);
+    expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);
+    expect(text(container)).toContain('$42.00');
+
+    await click(buttonByText(container, 'Done'));
+
+    expect(container.querySelector('.requirements-edit-panel')).toBeNull();
+    expect(container.querySelector('.requirement-summary-strip')).toBeInstanceOf(HTMLElement);
+    expect(text(container)).toContain('API backend · 4 vCPU · 8GB');
+    expect(text(container)).not.toContain('16 vCPU');
+    expect(text(container)).not.toContain('64GB');
 
     unmount();
   });
@@ -359,16 +479,21 @@ describe('App', () => {
     });
     const { container, unmount } = render(<App client={client} />);
 
+    await click(buttonByText(container, 'Compare costs'));
+    clearClientCalls(client);
+    await click(buttonByText(container, 'Edit'));
+    await click(buttonByText(container, 'Describe'));
     await click(buttonByText(container, 'Parse & compare'));
 
     expect(client.parseWorkload).toHaveBeenCalledWith(expect.stringContaining('web app'));
     expect(client.validateWorkload).toHaveBeenCalledWith(parsedNws);
     expect(client.createComparison).toHaveBeenCalledWith(parsedNws);
+    await click(buttonByText(container, 'Edit'));
     expect((container.querySelector('#name') as HTMLInputElement).value).toBe(
       'Parsed and compared portal',
     );
     expect(text(container)).toContain('Parsed with medium confidence. Review 1 field.');
-    expect(text(container)).toContain('Comparison ready.');
+    expect(text(container)).not.toContain('Comparison ready.');
 
     unmount();
   });
@@ -387,6 +512,10 @@ describe('App', () => {
     });
     const { container, unmount } = render(<App client={client} />);
 
+    await click(buttonByText(container, 'Compare costs'));
+    clearClientCalls(client);
+    await click(buttonByText(container, 'Edit'));
+    await click(buttonByText(container, 'Describe'));
     await click(buttonByText(container, 'Parse'));
 
     expect(text(container)).toContain('Parsed with high confidence');
@@ -403,8 +532,7 @@ describe('App', () => {
     });
     const { container, unmount } = render(<App client={client} />);
 
-    await click(buttonByText(container, 'Form'));
-    await click(buttonByText(container, 'Compare'));
+    await click(buttonByText(container, 'Compare costs'));
 
     expect(text(container)).toContain('No pricing available');
 
@@ -419,11 +547,13 @@ describe('App', () => {
     });
     const { container, unmount } = render(<App client={client} />);
 
-    await click(buttonByText(container, 'Sample'));
+    await click(buttonByText(container, 'Compare costs'));
+    await click(buttonByText(container, 'Edit'));
+    await click(buttonByText(container, 'Describe'));
     await click(buttonByText(container, 'Parse'));
 
     expect(text(container)).toContain('Input was not understood');
-    expect(text(container)).toContain('Using cached pricing catalog');
+    expect(text(container)).toContain('Monthly estimate');
     expect(text(container)).not.toContain('Pricing status restricted');
 
     unmount();
@@ -632,6 +762,12 @@ async function click(element: HTMLElement): Promise<void> {
   });
 }
 
+async function keyDown(element: HTMLElement, key: string): Promise<void> {
+  await act(async () => {
+    element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key }));
+  });
+}
+
 async function changeInput(input: HTMLInputElement, value: string): Promise<void> {
   await act(async () => {
     const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
@@ -719,12 +855,48 @@ function resultTabByText(container: HTMLElement, label: string): HTMLButtonEleme
   return button;
 }
 
+function resultDisclosureByTitle(container: HTMLElement, title: string): HTMLDetailsElement {
+  const disclosure = Array.from(container.querySelectorAll<HTMLDetailsElement>('.result-disclosure')).find(
+    (details) => disclosureSummary(details).textContent?.includes(title),
+  );
+
+  if (!(disclosure instanceof HTMLDetailsElement)) {
+    throw new Error(`Result disclosure not found: ${title}`);
+  }
+
+  return disclosure;
+}
+
+function disclosureSummary(details: HTMLDetailsElement): HTMLElement {
+  const summary = details.querySelector('summary');
+
+  if (!(summary instanceof HTMLElement)) {
+    throw new Error('Result disclosure summary not found');
+  }
+
+  return summary;
+}
+
 function mobileProviderLabels(container: HTMLElement): string[] {
   return Array.from(container.querySelectorAll('.mobile-total-bar > span')).map((providerTotal) => {
     const value = providerTotal.textContent ?? '';
     const provider = ['AWS', 'Azure', 'GCP'].find((candidate) => value.startsWith(candidate));
 
     return provider ?? value;
+  });
+}
+
+function clearClientCalls(client: PolyCostClient): void {
+  [
+    client.parseWorkload,
+    client.validateWorkload,
+    client.createComparison,
+    client.refreshLiveComparison,
+    client.exportComparison,
+  ].forEach((method) => {
+    if (jest.isMockFunction(method)) {
+      method.mockClear();
+    }
   });
 }
 

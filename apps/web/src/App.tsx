@@ -1,8 +1,8 @@
-import { FormEvent, ReactNode, useEffect, useState } from 'react';
+import { FormEvent, KeyboardEvent, ReactNode, useEffect, useRef, useState } from 'react';
 import { formatApiError, PolyCostClient, PolyCostApiError, polyCostClient } from './api-client';
+import { POLYCOST_TAGLINE } from './brand';
 import { Button } from './components/Button';
 import { FinOpsFeatureLayer, SharedReportPlaceholder } from './components/FinOpsFeatureLayer';
-import { LandingPage } from './components/LandingPage';
 import { PersonaComparisonWorkspace } from './components/PersonaComparisonWorkspace';
 import { TopLoadingBar } from './components/TopLoadingBar';
 import { providerLogoSrc, providerMarkSrc } from './provider-brand';
@@ -181,6 +181,27 @@ const FALLBACK_REGION_CATALOG: RegionCatalogResponse = {
   ],
 };
 
+const INITIAL_HOME_FORM: WorkloadFormState = {
+  ...defaultWorkloadForm,
+  workloadName: '',
+  dailyActiveUsers: '',
+  peakConcurrentUsers: '',
+  instanceCount: '1',
+  autoscaleMin: '1',
+  autoscaleMax: '3',
+  storageEnabled: false,
+  storageSizeGb: '',
+  databaseEnabled: false,
+  databaseSizeGb: '',
+  monthlyEgressGb: '',
+  cdn: false,
+  loadBalancer: false,
+  selectedServiceFamilyIds: [],
+  multiAz: false,
+  multiRegion: false,
+  slaTarget: '',
+};
+
 interface CategoryCostSummary {
   category: ServiceCategory;
   total: number;
@@ -261,17 +282,20 @@ interface AppProps {
 export function App({ client = polyCostClient }: AppProps) {
   const shareToken = shareTokenFromLocation();
   const isPageLoading = usePageLoadingState();
-  const [themeChoice, setThemeChoice] = useState<ThemeChoice>(() => storedTheme());
+  const activeAsyncActionId = useRef(0);
+  const [themeChoice] = useState<ThemeChoice>(() => storedTheme());
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
     resolveTheme(storedTheme()),
   );
-  const [inputMode, setInputMode] = useState<InputMode>('describe');
+  const [inputMode, setInputMode] = useState<InputMode>('form');
   const [naturalLanguageInput, setNaturalLanguageInput] = useState(sampleNaturalLanguageInput);
-  const [form, setForm] = useState<WorkloadFormState>(defaultWorkloadForm);
+  const [form, setForm] = useState<WorkloadFormState>(INITIAL_HOME_FORM);
+  const [submittedForm, setSubmittedForm] = useState<WorkloadFormState>(INITIAL_HOME_FORM);
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
   const [interval, setInterval] = useState<IntervalKey>('monthly');
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [exportingFormat, setExportingFormat] = useState<ReportFormat | null>(null);
+  const [isEditingRequirements, setIsEditingRequirements] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [backendHealth, setBackendHealth] = useState<BackendHealthResponse | null>(null);
@@ -334,55 +358,90 @@ export function App({ client = polyCostClient }: AppProps) {
   }
 
   async function handleParse() {
+    const actionId = startAsyncAction();
     setError(null);
     setNotice(null);
     setBusyAction('parse');
 
     try {
       const parsed = await client.parseWorkload(naturalLanguageInput);
+      if (!isCurrentAsyncAction(actionId)) {
+        return;
+      }
+
       setForm(formFromNws(parsed.draftNws));
       setInputMode('form');
       setNotice(reviewMessage(parsed.parserConfidence, parsed.fieldsRequiringReview));
     } catch (parseError) {
-      setError(formatApiError(parseError));
+      if (isCurrentAsyncAction(actionId)) {
+        setError(formatApiError(parseError));
+      }
     } finally {
-      setBusyAction(null);
+      if (isCurrentAsyncAction(actionId)) {
+        setBusyAction(null);
+      }
     }
   }
 
   async function handleCompare(event?: FormEvent) {
+    const actionId = startAsyncAction();
     event?.preventDefault();
     setError(null);
     setNotice(null);
     setBusyAction('compare');
 
     try {
-      const { nws, parserNotice } = await prepareNwsForComparison();
+      const { nws, parserNotice, parsedForm, submittedComparisonForm } =
+        await prepareNwsForComparison();
+      if (!isCurrentAsyncAction(actionId)) {
+        return;
+      }
+
+      if (parsedForm) {
+        setForm(parsedForm);
+        setInputMode('form');
+      }
+
       await client.validateWorkload(nws);
+      if (!isCurrentAsyncAction(actionId)) {
+        return;
+      }
+
       const result = await client.createComparison(nws);
+      if (!isCurrentAsyncAction(actionId)) {
+        return;
+      }
+
       setComparison(result);
+      setSubmittedForm(submittedComparisonForm);
+      setIsEditingRequirements(false);
       setNotice(parserNotice ? `${parserNotice} Comparison ready.` : 'Comparison ready.');
     } catch (comparisonError) {
-      setError(formatApiError(comparisonError));
+      if (isCurrentAsyncAction(actionId)) {
+        setError(formatApiError(comparisonError));
+      }
     } finally {
-      setBusyAction(null);
+      if (isCurrentAsyncAction(actionId)) {
+        setBusyAction(null);
+      }
     }
   }
 
   async function prepareNwsForComparison(): Promise<{
     nws: NormalizedWorkloadSpec;
     parserNotice?: string;
+    parsedForm?: WorkloadFormState;
+    submittedComparisonForm: WorkloadFormState;
   }> {
     if (inputMode !== 'describe') {
       return {
         nws: buildNwsFromForm(form, 'structured_form'),
+        submittedComparisonForm: form,
       };
     }
 
     const parsed = await client.parseWorkload(naturalLanguageInput);
     const parsedForm = formFromNws(parsed.draftNws);
-    setForm(parsedForm);
-    setInputMode('form');
 
     return {
       nws: {
@@ -392,6 +451,8 @@ export function App({ client = polyCostClient }: AppProps) {
           serviceCatalogTraceability(parsedForm.selectedServiceFamilyIds),
       },
       parserNotice: reviewMessage(parsed.parserConfidence, parsed.fieldsRequiringReview),
+      parsedForm,
+      submittedComparisonForm: parsedForm,
     };
   }
 
@@ -400,18 +461,27 @@ export function App({ client = polyCostClient }: AppProps) {
       return;
     }
 
+    const actionId = startAsyncAction();
     setError(null);
     setNotice(null);
     setBusyAction('refresh');
 
     try {
       const result = await client.refreshLiveComparison(comparison.comparisonId);
+      if (!isCurrentAsyncAction(actionId)) {
+        return;
+      }
+
       setComparison(result);
       setNotice('Live refresh snapshot created.');
     } catch (refreshError) {
-      setError(formatApiError(refreshError));
+      if (isCurrentAsyncAction(actionId)) {
+        setError(formatApiError(refreshError));
+      }
     } finally {
-      setBusyAction(null);
+      if (isCurrentAsyncAction(actionId)) {
+        setBusyAction(null);
+      }
     }
   }
 
@@ -420,6 +490,7 @@ export function App({ client = polyCostClient }: AppProps) {
       return;
     }
 
+    const actionId = startAsyncAction();
     setError(null);
     setNotice(null);
     setBusyAction('export');
@@ -427,13 +498,21 @@ export function App({ client = polyCostClient }: AppProps) {
 
     try {
       const blob = await client.exportComparison(comparison.comparisonId, format);
+      if (!isCurrentAsyncAction(actionId)) {
+        return;
+      }
+
       downloadBlob(blob, `polycost-comparison-${comparison.comparisonId}.${format}`);
       setNotice(`${format.toUpperCase()} export downloaded.`);
     } catch (exportError) {
-      setError(formatApiError(exportError));
+      if (isCurrentAsyncAction(actionId)) {
+        setError(formatApiError(exportError));
+      }
     } finally {
-      setBusyAction(null);
-      setExportingFormat(null);
+      if (isCurrentAsyncAction(actionId)) {
+        setBusyAction(null);
+        setExportingFormat(null);
+      }
     }
   }
 
@@ -444,172 +523,96 @@ export function App({ client = polyCostClient }: AppProps) {
   }
 
   function handleClearComparison() {
+    cancelAsyncActions();
+    setForm(INITIAL_HOME_FORM);
+    setSubmittedForm(INITIAL_HOME_FORM);
+    setInputMode('form');
+    setNaturalLanguageInput(sampleNaturalLanguageInput);
     setComparison(null);
+    setIsEditingRequirements(false);
     setInterval('monthly');
+    setBusyAction(null);
     setExportingFormat(null);
     setNotice(null);
     setError(null);
   }
 
-  function handleStartComparing() {
-    setInputMode('describe');
-    scrollToElement('requirements');
-    window.requestAnimationFrame(() => {
-      document.getElementById('natural-language-input')?.focus();
-    });
+  function handleEditComparison() {
+    setForm(submittedForm);
+    setInputMode('form');
+    setIsEditingRequirements(true);
   }
 
-  function handleViewDemo() {
-    scrollToElement('pricing');
+  function handleCancelEdit() {
+    setForm(submittedForm);
+    setInputMode('form');
+    setIsEditingRequirements(false);
   }
 
-  function handleSignInNotice() {
-    setError(null);
-    setNotice('Sign in is not configured in this self-hosted MVP.');
-    scrollToElement('requirements');
+  function startAsyncAction(): number {
+    activeAsyncActionId.current += 1;
+    return activeAsyncActionId.current;
   }
+
+  function cancelAsyncActions() {
+    activeAsyncActionId.current += 1;
+  }
+
+  function isCurrentAsyncAction(actionId: number): boolean {
+    return activeAsyncActionId.current === actionId;
+  }
+
+  const hasComparison = Boolean(comparison);
 
   return (
-    <main className="app-shell" aria-labelledby="page-title">
+    <main
+      className={hasComparison ? 'app-shell' : 'app-shell app-shell-minimal'}
+      aria-labelledby="page-title"
+    >
       <TopLoadingBar isLoading={isPageLoading} />
-      <ScrollProgressBar />
-      <LandingPage
-        comparison={comparison}
-        form={form}
-        resolvedTheme={resolvedTheme}
-        themeChoice={themeChoice}
-        onStartComparing={handleStartComparing}
-        onThemeChange={setThemeChoice}
-        onViewDemo={handleViewDemo}
-        onSignIn={handleSignInNotice}
-      />
-
-      <section
-        className="workbench-shell mx-auto grid max-w-[1440px] gap-5 xl:grid-cols-[minmax(320px,0.34fr)_minmax(0,0.66fr)] xl:items-start"
-        id="requirements"
-        aria-label="Cost comparison workbench"
-      >
-        <div
-          className="workbench-config grid min-w-0 gap-4 print:hidden"
-          aria-label="Workload configuration"
-        >
-          <section className="input-zone" aria-label="Workload requirements">
-            <div className="mode-tabs" role="tablist" aria-label="Requirement input mode">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={inputMode === 'describe'}
-                className="tab-button"
-                onClick={() => setInputMode('describe')}
-              >
-                <ModeIcon mode="describe" />
-                Describe
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={inputMode === 'form'}
-                className="tab-button"
-                onClick={() => setInputMode('form')}
-              >
-                <ModeIcon mode="form" />
-                Form
-              </button>
-            </div>
-
-            {inputMode === 'describe' ? (
-              <DescribePanel
-                value={naturalLanguageInput}
-                isParsing={busyAction === 'parse'}
-                onChange={setNaturalLanguageInput}
-                onClear={handleClearRequirements}
-                onParse={handleParse}
-                onUseSample={() => setNaturalLanguageInput(sampleNaturalLanguageInput)}
-              />
-            ) : (
-              <WorkloadForm
-                form={form}
-                regionCatalog={regionCatalog}
-                regionCatalogError={regionCatalogError}
-                onChange={setForm}
-                onSubmit={handleCompare}
-              />
-            )}
-          </section>
-
-          <section className="summary-zone lg:!static" aria-label="Current estimate controls">
-            <PricingFreshness comparison={comparison} />
-
-            <PlatformReadinessStatus
-              backendHealth={backendHealth}
-              backendHealthError={backendHealthError}
-              regionCatalog={regionCatalog}
-              regionCatalogError={regionCatalogError}
-              comparison={comparison}
-              busyAction={busyAction}
-            />
-
-            <RequirementSummary form={form} />
-
-            <CloudCalculatorLinks regionCatalog={regionCatalog} />
-
-            <div className="action-row">
-              <Button
-                type="button"
-                variant="primary"
-                onClick={() => void handleCompare()}
-                loading={busyAction === 'compare'}
-                loadingLabel={compareLoadingLabel(inputMode)}
-                disabled={busyAction !== null && busyAction !== 'compare'}
-              >
-                <CompareIcon />
-                {compareButtonLabel(inputMode)}
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={handleRefreshLive}
-                loading={busyAction === 'refresh'}
-                loadingLabel="Refreshing..."
-                disabled={!comparison || (busyAction !== null && busyAction !== 'refresh')}
-              >
-                <RefreshIcon />
-                Refresh live
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={handleClearComparison}
-                disabled={!comparison || busyAction !== null}
-              >
-                <ClearIcon />
-                Clear costs
-              </Button>
-            </div>
-
-            <ExportBar
-              disabled={!comparison || (busyAction !== null && busyAction !== 'export')}
-              exportingFormat={exportingFormat}
-              onExport={(format) => void handleExport(format)}
-            />
-
-            <StatusMessage notice={notice} error={error} />
-          </section>
-        </div>
-
-        <section className="workbench-results min-w-0" id="docs" aria-label="Provider comparison">
-          <ComparisonToolbar interval={interval} onIntervalChange={setInterval} />
-          <ComparisonView
-            comparison={comparison}
-            interval={interval}
-            form={form}
-            isLoading={busyAction === 'compare' || busyAction === 'refresh'}
-            error={error}
-            exportingFormat={exportingFormat}
-            onExport={(format) => void handleExport(format)}
-          />
-        </section>
-      </section>
+      {hasComparison ? <ScrollProgressBar /> : null}
+      {comparison ? (
+        <ProgressiveComparisonPage
+          comparison={comparison}
+          form={form}
+          submittedForm={submittedForm}
+          inputMode={inputMode}
+          interval={interval}
+          isEditingRequirements={isEditingRequirements}
+          busyAction={busyAction}
+          exportingFormat={exportingFormat}
+          notice={notice}
+          error={error}
+          naturalLanguageInput={naturalLanguageInput}
+          regionCatalog={regionCatalog}
+          regionCatalogError={regionCatalogError}
+          onClear={handleClearComparison}
+          onEdit={handleEditComparison}
+          onCancelEdit={handleCancelEdit}
+          onInputModeChange={setInputMode}
+          onNaturalLanguageChange={setNaturalLanguageInput}
+          onFormChange={setForm}
+          onSubmit={handleCompare}
+          onParse={handleParse}
+          onClearRequirements={handleClearRequirements}
+          onUseSample={() => setNaturalLanguageInput(sampleNaturalLanguageInput)}
+          onIntervalChange={setInterval}
+          onRefreshLive={handleRefreshLive}
+          onExport={(format) => void handleExport(format)}
+        />
+      ) : (
+        <InitialHomePage
+          form={form}
+          regionCatalog={regionCatalog}
+          regionCatalogError={regionCatalogError}
+          resolvedTheme={resolvedTheme}
+          notice={notice}
+          error={error}
+          isComparing={busyAction === 'compare'}
+          onChange={setForm}
+          onSubmit={handleCompare}
+        />
+      )}
     </main>
   );
 }
@@ -717,6 +720,528 @@ function ScrollProgressBar() {
     >
       <span className="scroll-progress-bar" style={{ transform: `scaleX(${progress})` }} />
     </div>
+  );
+}
+
+function InitialHomePage({
+  form,
+  regionCatalog,
+  regionCatalogError,
+  resolvedTheme,
+  notice,
+  error,
+  isComparing,
+  onChange,
+  onSubmit,
+}: {
+  form: WorkloadFormState;
+  regionCatalog: RegionCatalogResponse | null;
+  regionCatalogError: string | null;
+  resolvedTheme: ResolvedTheme;
+  notice: string | null;
+  error: string | null;
+  isComparing: boolean;
+  onChange: (form: WorkloadFormState) => void;
+  onSubmit: (event: FormEvent) => void;
+}) {
+  function update<K extends keyof WorkloadFormState>(key: K, value: WorkloadFormState[K]) {
+    onChange({
+      ...form,
+      [key]: value,
+    });
+  }
+
+  function updateStorageSize(value: string) {
+    onChange({
+      ...form,
+      storageEnabled: value.trim().length > 0,
+      storageSizeGb: value,
+    });
+  }
+
+  return (
+    <section className="initial-home" aria-labelledby="page-title">
+      <div className="initial-home-brand">
+        <img src={logoSrcForTheme(resolvedTheme)} alt="PolyCost" />
+        <h1 id="page-title">{POLYCOST_TAGLINE}</h1>
+      </div>
+
+      <form className="initial-home-form" onSubmit={onSubmit} aria-label="Compare cloud costs">
+        <div className="initial-home-fields">
+          <SelectField
+            label="Workload type"
+            value={form.workloadType}
+            options={[
+              ['web_app', 'Web app'],
+              ['api_backend', 'API backend'],
+              ['static_site', 'Static site'],
+              ['batch_processing', 'Batch'],
+              ['data_pipeline', 'Data pipeline'],
+              ['ml_workload', 'ML workload'],
+              ['other', 'Other'],
+            ]}
+            onChange={(value) => update('workloadType', value)}
+          />
+          <TextField
+            label="vCPU"
+            value={form.vcpu}
+            inputMode="decimal"
+            suffix="cores"
+            onChange={(value) => update('vcpu', value)}
+          />
+          <TextField
+            label="Memory GB"
+            value={form.memoryGb}
+            inputMode="decimal"
+            suffix="GB"
+            onChange={(value) => update('memoryGb', value)}
+          />
+          <RegionSelectField
+            value={form.regionPreference}
+            regionCatalog={regionCatalog}
+            regionCatalogError={regionCatalogError}
+            compact
+            onChange={(value) => update('regionPreference', value)}
+          />
+        </div>
+
+        <details className="initial-optional-estimate">
+          <summary>
+            <span>Add storage & egress estimate</span>
+            <span className="initial-optional-chevron" aria-hidden="true">
+              +
+            </span>
+          </summary>
+          <div className="initial-optional-fields">
+            <TextField
+              label="Storage GB"
+              value={form.storageSizeGb}
+              inputMode="decimal"
+              suffix="GB"
+              onChange={updateStorageSize}
+            />
+            <TextField
+              label="Egress GB/mo"
+              value={form.monthlyEgressGb}
+              inputMode="decimal"
+              suffix="GB"
+              onChange={(value) => update('monthlyEgressGb', value)}
+            />
+          </div>
+        </details>
+
+        <div className="initial-home-actions">
+          <Button
+            type="submit"
+            variant="primary"
+            loading={isComparing}
+            loadingLabel="Comparing costs..."
+            disabled={isComparing}
+          >
+            <CompareIcon />
+            Compare costs
+          </Button>
+        </div>
+
+        <StatusMessage notice={notice} error={error} />
+      </form>
+    </section>
+  );
+}
+
+function ProgressiveComparisonPage({
+  comparison,
+  form,
+  submittedForm,
+  inputMode,
+  interval,
+  isEditingRequirements,
+  busyAction,
+  exportingFormat,
+  notice,
+  error,
+  naturalLanguageInput,
+  regionCatalog,
+  regionCatalogError,
+  onClear,
+  onEdit,
+  onCancelEdit,
+  onInputModeChange,
+  onNaturalLanguageChange,
+  onFormChange,
+  onSubmit,
+  onParse,
+  onClearRequirements,
+  onUseSample,
+  onIntervalChange,
+  onRefreshLive,
+  onExport,
+}: {
+  comparison: ComparisonResult;
+  form: WorkloadFormState;
+  submittedForm: WorkloadFormState;
+  inputMode: InputMode;
+  interval: IntervalKey;
+  isEditingRequirements: boolean;
+  busyAction: BusyAction;
+  exportingFormat: ReportFormat | null;
+  notice: string | null;
+  error: string | null;
+  naturalLanguageInput: string;
+  regionCatalog: RegionCatalogResponse | null;
+  regionCatalogError: string | null;
+  onClear: () => void;
+  onEdit: () => void;
+  onCancelEdit: () => void;
+  onInputModeChange: (mode: InputMode) => void;
+  onNaturalLanguageChange: (value: string) => void;
+  onFormChange: (form: WorkloadFormState) => void;
+  onSubmit: (event?: FormEvent) => void;
+  onParse: () => void;
+  onClearRequirements: () => void;
+  onUseSample: () => void;
+  onIntervalChange: (interval: IntervalKey) => void;
+  onRefreshLive: () => void;
+  onExport: (format: ReportFormat) => void;
+}) {
+  return (
+    <section className="progressive-results" id="requirements" aria-label="Cost comparison results">
+      <div className="progressive-results-inner">
+        {isEditingRequirements ? (
+          <RequirementsEditPanel
+            form={form}
+            inputMode={inputMode}
+            naturalLanguageInput={naturalLanguageInput}
+            regionCatalog={regionCatalog}
+            regionCatalogError={regionCatalogError}
+            busyAction={busyAction}
+            onCancel={onCancelEdit}
+            onClearRequirements={onClearRequirements}
+            onFormChange={onFormChange}
+            onInputModeChange={onInputModeChange}
+            onNaturalLanguageChange={onNaturalLanguageChange}
+            onParse={onParse}
+            onSubmit={onSubmit}
+            onUseSample={onUseSample}
+          />
+        ) : (
+          <RequirementSummaryStrip
+            form={submittedForm}
+            regionCatalog={regionCatalog}
+            onClear={onClear}
+            onEdit={onEdit}
+          />
+        )}
+
+        <ProviderSummaryCards comparison={comparison} interval={interval} />
+
+        <StatusMessage notice={isEditingRequirements ? editStatusNotice(notice) : null} error={error} />
+
+        <div className="result-disclosure-stack" aria-label="Additional comparison details">
+          <ResultDisclosureSection
+            title="Cost periods & executive analytics"
+            description="Daily to yearly views, financial charts, provider ranking, and category heatmap."
+          >
+            <ComparisonToolbar interval={interval} onIntervalChange={onIntervalChange} />
+            <ExecutiveOverview comparison={comparison} interval={interval} form={submittedForm} />
+            <div className="analysis-grid analysis-grid-compact">
+              <ProviderRanking summaries={providerCostSummaries(comparison, interval)} interval={interval} />
+              <IntervalOutlook comparison={comparison} />
+              <CategoryHeatmap summaries={providerCostSummaries(comparison, interval)} />
+            </div>
+          </ResultDisclosureSection>
+
+          <ResultDisclosureSection
+            title="Pricing models, breakdown, budget & share"
+            description="Commitment scenarios, compute/storage/egress mix, budget alerts, currency, and share workflow."
+          >
+            <FinOpsFeatureLayer
+              comparison={comparison}
+              interval={interval}
+              isLoading={busyAction === 'compare' || busyAction === 'refresh'}
+            />
+          </ResultDisclosureSection>
+
+          <ResultDisclosureSection
+            title="Architecture & engineering evidence"
+            description="Solution architecture review, governance checks, line-item evidence, and API-facing rows."
+          >
+            <ArchitectureWorkspace comparison={comparison} interval={interval} form={submittedForm} />
+            <PersonaComparisonWorkspace
+              comparison={comparison}
+              interval={interval}
+              form={submittedForm}
+              defaultViewMode="engineering"
+              emptyStateMessage="Run a comparison to populate engineering rows, export controls, and API-facing cost evidence."
+              isLoading={busyAction === 'compare' || busyAction === 'refresh'}
+              error={error}
+              exportingFormat={exportingFormat}
+              onExport={onExport}
+              showViewSwitcher={false}
+            />
+          </ResultDisclosureSection>
+
+          <ResultDisclosureSection
+            title="Official calculators & regions"
+            description="Provider calculator links and official region/AZ references for validation."
+          >
+            <CloudCalculatorLinks regionCatalog={regionCatalog} />
+          </ResultDisclosureSection>
+
+          <ResultDisclosureSection
+            title="Export report"
+            description="Download the current comparison as PDF, CSV, or Excel."
+          >
+            <div className="progressive-export-panel">
+              <ExportBar
+                disabled={busyAction !== null && busyAction !== 'export'}
+                exportingFormat={exportingFormat}
+                onExport={onExport}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onRefreshLive}
+                loading={busyAction === 'refresh'}
+                loadingLabel="Refreshing..."
+                disabled={busyAction !== null && busyAction !== 'refresh'}
+              >
+                <RefreshIcon />
+                Refresh live
+              </Button>
+            </div>
+          </ResultDisclosureSection>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RequirementSummaryStrip({
+  form,
+  regionCatalog,
+  onClear,
+  onEdit,
+}: {
+  form: WorkloadFormState;
+  regionCatalog: RegionCatalogResponse | null;
+  onClear: () => void;
+  onEdit: () => void;
+}) {
+  return (
+    <section className="requirement-summary-strip" aria-label="Current workload summary">
+      <div className="summary-strip-main">
+        <span>Requirements</span>
+        <strong>{compactRequirementSummary(form, regionCatalog)}</strong>
+      </div>
+      <div className="summary-strip-actions">
+        <Button type="button" variant="secondary" onClick={onEdit}>
+          Edit
+        </Button>
+        <Button type="button" variant="destructive" onClick={onClear}>
+          Clear
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function editStatusNotice(notice: string | null): string | null {
+  const meaningfulNotice = notice?.replace(/ ?Comparison ready\.$/, '').trim();
+
+  return meaningfulNotice ? meaningfulNotice : null;
+}
+
+function RequirementsEditPanel({
+  form,
+  inputMode,
+  naturalLanguageInput,
+  regionCatalog,
+  regionCatalogError,
+  busyAction,
+  onCancel,
+  onClearRequirements,
+  onFormChange,
+  onInputModeChange,
+  onNaturalLanguageChange,
+  onParse,
+  onSubmit,
+  onUseSample,
+}: {
+  form: WorkloadFormState;
+  inputMode: InputMode;
+  naturalLanguageInput: string;
+  regionCatalog: RegionCatalogResponse | null;
+  regionCatalogError: string | null;
+  busyAction: BusyAction;
+  onCancel: () => void;
+  onClearRequirements: () => void;
+  onFormChange: (form: WorkloadFormState) => void;
+  onInputModeChange: (mode: InputMode) => void;
+  onNaturalLanguageChange: (value: string) => void;
+  onParse: () => void;
+  onSubmit: (event?: FormEvent) => void;
+  onUseSample: () => void;
+}) {
+  return (
+    <section className="requirements-edit-panel" aria-label="Edit workload requirements">
+      <div className="requirements-edit-header">
+        <div>
+          <span>Edit requirements</span>
+          <strong>Adjust inputs and compare again</strong>
+        </div>
+        <Button type="button" variant="secondary" onClick={onCancel}>
+          Done
+        </Button>
+      </div>
+      <div className="mode-tabs" role="tablist" aria-label="Requirement input mode">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={inputMode === 'describe'}
+          className="tab-button"
+          onClick={() => onInputModeChange('describe')}
+        >
+          <ModeIcon mode="describe" />
+          Describe
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={inputMode === 'form'}
+          className="tab-button"
+          onClick={() => onInputModeChange('form')}
+        >
+          <ModeIcon mode="form" />
+          Form
+        </button>
+      </div>
+      {inputMode === 'describe' ? (
+        <DescribePanel
+          value={naturalLanguageInput}
+          isParsing={busyAction === 'parse'}
+          onChange={onNaturalLanguageChange}
+          onClear={onClearRequirements}
+          onParse={onParse}
+          onUseSample={onUseSample}
+        />
+      ) : (
+        <WorkloadForm
+          form={form}
+          regionCatalog={regionCatalog}
+          regionCatalogError={regionCatalogError}
+          onChange={onFormChange}
+          onSubmit={onSubmit}
+        />
+      )}
+      <div className="requirements-edit-actions">
+        <Button
+          type="button"
+          variant="primary"
+          onClick={() => void onSubmit()}
+          loading={busyAction === 'compare'}
+          loadingLabel={compareLoadingLabel(inputMode)}
+          disabled={busyAction !== null && busyAction !== 'compare'}
+        >
+          <CompareIcon />
+          {compareButtonLabel(inputMode)}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function ProviderSummaryCards({
+  comparison,
+  interval,
+}: {
+  comparison: ComparisonResult;
+  interval: IntervalKey;
+}) {
+  const providerResults = new Map<ProviderId, ComparisonProviderResult>(
+    comparison.providers.map((provider) => [provider.providerId, provider]),
+  );
+
+  return (
+    <section className="provider-summary-results" aria-label="Provider cost summary">
+      <div className="provider-summary-grid">
+        {PROVIDER_ORDER.map((providerId) => {
+          const provider = providerResults.get(providerId);
+          const isCheapest = comparison.cheapestProviderId === providerId && Boolean(provider);
+
+          return (
+            <article
+              key={providerId}
+              className={`provider-summary-card provider-summary-card-${providerId}`}
+              aria-labelledby={`summary-${providerId}-title`}
+            >
+              {isCheapest ? <span className="lowest-badge">Best value</span> : null}
+              <div className="provider-summary-heading">
+                <ProviderLogo providerId={providerId} />
+                <div>
+                  <h2 id={`summary-${providerId}-title`}>{providerLabel(providerId)}</h2>
+                  <span>{providerSubtitle(providerId)}</span>
+                </div>
+              </div>
+              <strong className="provider-summary-total">
+                {provider ? formatCurrency(costForInterval(provider, interval)) : 'Unavailable'}
+              </strong>
+              <span className="provider-summary-period">{capitalize(interval)} estimate</span>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ResultDisclosureSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const headingId = `result-disclosure-${toId(title)}`;
+  const bodyId = `${headingId}-body`;
+
+  function toggleFromKeyboard(event: KeyboardEvent<HTMLElement>) {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+
+    event.preventDefault();
+    setIsOpen((current) => !current);
+  }
+
+  return (
+    <details
+      className="result-disclosure"
+      aria-labelledby={headingId}
+      open={isOpen}
+      onToggle={(event) => setIsOpen(event.currentTarget.open)}
+    >
+      <summary
+        className="result-disclosure-heading"
+        aria-controls={bodyId}
+        aria-expanded={isOpen}
+        onKeyDown={toggleFromKeyboard}
+      >
+        <span>
+          <strong id={headingId}>{title}</strong>
+          <small>{description}</small>
+        </span>
+        <span className="result-disclosure-chevron" aria-hidden="true">
+          {isOpen ? '-' : '+'}
+        </span>
+      </summary>
+      <div id={bodyId} className="result-disclosure-body">
+        {children}
+      </div>
+    </details>
   );
 }
 
@@ -1210,11 +1735,13 @@ function RegionSelectField({
   value,
   regionCatalog,
   regionCatalogError,
+  compact = false,
   onChange,
 }: {
   value: string;
   regionCatalog: RegionCatalogResponse | null;
   regionCatalogError: string | null;
+  compact?: boolean;
   onChange: (value: string) => void;
 }) {
   const catalog = regionCatalog ?? FALLBACK_REGION_CATALOG;
@@ -1235,14 +1762,19 @@ function RegionSelectField({
     : 'Loading live provider catalog';
 
   return (
-    <label className="form-field region-field" htmlFor="region">
+    <label
+      className={compact ? 'form-field region-field region-field-compact' : 'form-field region-field'}
+      htmlFor="region"
+    >
       <span className="region-field-header">
         <span className="field-caption">Region</span>
-        <span
-          className={regionCatalogError ? 'region-source-pill is-warning' : 'region-source-pill'}
-        >
-          {regionCatalogError ? 'Fallback' : regionCatalog ? 'Live' : 'Loading'}
-        </span>
+        {compact ? null : (
+          <span
+            className={regionCatalogError ? 'region-source-pill is-warning' : 'region-source-pill'}
+          >
+            {regionCatalogError ? 'Fallback' : regionCatalog ? 'Live' : 'Loading'}
+          </span>
+        )}
       </span>
       <select
         id="region"
@@ -1266,9 +1798,11 @@ function RegionSelectField({
           </optgroup>
         ))}
       </select>
-      <span className="field-help">
-        {catalogLabel} · {regionCount} regions · calculators open provider pricing pages.
-      </span>
+      {compact ? null : (
+        <span className="field-help">
+          {catalogLabel} · {regionCount} regions · calculators open provider pricing pages.
+        </span>
+      )}
     </label>
   );
 }
@@ -1505,6 +2039,49 @@ function formSizingSummary(
     services: `${form.selectedServiceFamilyIds.length}/${CLOUD_SERVICE_CATALOG.length} families`,
     data: `${storageText} / ${databaseText}`,
   };
+}
+
+function compactRequirementSummary(
+  form: WorkloadFormState,
+  regionCatalog: RegionCatalogResponse | null,
+): string {
+  const workload = workloadTypeLabel(form.workloadType);
+  const vcpu = form.vcpu.trim() || '0';
+  const memory = form.memoryGb.trim() || '0';
+  const region = regionLabelForSummary(form.regionPreference, regionCatalog);
+
+  return `${workload} · ${vcpu} vCPU · ${memory}GB · ${region}`;
+}
+
+function workloadTypeLabel(type: WorkloadFormState['workloadType']): string {
+  switch (type) {
+    case 'web_app':
+      return 'Web app';
+    case 'api_backend':
+      return 'API backend';
+    case 'static_site':
+      return 'Static site';
+    case 'batch_processing':
+      return 'Batch processing';
+    case 'data_pipeline':
+      return 'Data pipeline';
+    case 'ml_workload':
+      return 'ML workload';
+    case 'other':
+      return 'General-purpose';
+  }
+}
+
+function regionLabelForSummary(
+  value: string,
+  regionCatalog: RegionCatalogResponse | null,
+): string {
+  const catalog = regionCatalog ?? FALLBACK_REGION_CATALOG;
+  const region = catalog.providers
+    .flatMap((provider) => provider.regions)
+    .find((candidate) => candidate.id === value);
+
+  return region ? region.label : value || 'Default region';
 }
 
 function parseFormNumber(value: string): number | undefined {
@@ -3177,6 +3754,12 @@ function regionReferenceLabel(providerId: ProviderId): string {
     case 'gcp':
       return 'GCP Regions & Zones';
   }
+}
+
+function logoSrcForTheme(resolvedTheme: ResolvedTheme): string {
+  return resolvedTheme === 'dark'
+    ? '/brand/polycost-lockup-dark.svg'
+    : '/brand/polycost-lockup.svg';
 }
 
 function ClearIcon() {
