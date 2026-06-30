@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import {
   configuredApiBaseUrl,
   createPolyCostClient,
@@ -31,6 +33,12 @@ describe('api client', () => {
     document.head.appendChild(meta);
 
     expect(configuredApiBaseUrl()).toBe('/api/v1');
+  });
+
+  it('exposes the Docker build API base through Vite HTML env replacement', () => {
+    const html = readFileSync('index.html', 'utf8');
+
+    expect(html).toContain('name="polycost-api-base-url" content="%VITE_API_BASE_URL%"');
   });
 
   it('sends comparison requests with cached-pricing options', async () => {
