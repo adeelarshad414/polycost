@@ -3,11 +3,7 @@ export type ProviderId = (typeof PROVIDER_ORDER)[number];
 export type ServiceCategory = 'compute' | 'storage' | 'database' | 'network';
 export type CostComponent = 'compute' | 'storage' | 'database' | 'egress';
 export type PricingModelKey =
-  | 'on-demand'
-  | 'reserved-1yr'
-  | 'reserved-3yr'
-  | 'spot'
-  | 'savings-plan';
+  'on-demand' | 'reserved-1yr' | 'reserved-3yr' | 'spot' | 'savings-plan';
 export type PricingBasis = 'flat' | 'tiered';
 export type PricingVolatility = 'stable' | 'variable' | 'volatile';
 export type PricingSource = 'catalog' | 'modeled-estimate';
@@ -19,11 +15,7 @@ export type NormalizedInstanceFamily =
   | 'storage-optimized'
   | 'accelerated-computing';
 export type CachedPricingTerm =
-  | 'on_demand'
-  | 'reserved_1yr'
-  | 'reserved_3yr'
-  | 'spot'
-  | 'savings_plan';
+  'on_demand' | 'reserved_1yr' | 'reserved_3yr' | 'spot' | 'savings_plan';
 export type PricingTermCode =
   | 'on_demand'
   | 'reserved_1yr'

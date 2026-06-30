@@ -3118,8 +3118,16 @@ select:disabled {
   border-top: 4px solid var(--pc-action-primary);
   padding: var(--pc-space-2);
   background:
-    linear-gradient(120deg, color-mix(in srgb, var(--pc-provider-aws-soft) 48%, transparent), transparent 36%),
-    linear-gradient(240deg, color-mix(in srgb, var(--pc-provider-azure-soft) 46%, transparent), transparent 34%),
+    linear-gradient(
+      120deg,
+      color-mix(in srgb, var(--pc-provider-aws-soft) 48%, transparent),
+      transparent 36%
+    ),
+    linear-gradient(
+      240deg,
+      color-mix(in srgb, var(--pc-provider-azure-soft) 46%, transparent),
+      transparent 34%
+    ),
     var(--pc-bg-surface);
 }
 
@@ -3363,7 +3371,11 @@ select:disabled {
   border-top: 4px solid var(--pc-action-primary);
   padding: var(--pc-space-2);
   background:
-    linear-gradient(115deg, color-mix(in srgb, var(--pc-action-primary-soft) 46%, transparent), transparent 34%),
+    linear-gradient(
+      115deg,
+      color-mix(in srgb, var(--pc-action-primary-soft) 46%, transparent),
+      transparent 34%
+    ),
     var(--pc-bg-surface);
 }
 
@@ -3446,8 +3458,16 @@ select:disabled {
   border-top: 4px solid var(--pc-provider-azure);
   padding: var(--pc-space-2);
   background:
-    linear-gradient(116deg, color-mix(in srgb, var(--pc-provider-azure-soft) 48%, transparent), transparent 36%),
-    linear-gradient(244deg, color-mix(in srgb, var(--pc-provider-gcp-soft) 38%, transparent), transparent 34%),
+    linear-gradient(
+      116deg,
+      color-mix(in srgb, var(--pc-provider-azure-soft) 48%, transparent),
+      transparent 36%
+    ),
+    linear-gradient(
+      244deg,
+      color-mix(in srgb, var(--pc-provider-gcp-soft) 38%, transparent),
+      transparent 34%
+    ),
     var(--pc-bg-surface);
 }
 
@@ -4804,7 +4824,6 @@ select:disabled {
     box-shadow: var(--pc-shadow-strong);
     transform: translateY(-1px);
   }
-
 }
 
 .warning-list {
@@ -5377,7 +5396,6 @@ select:disabled {
   .provider-card {
     flex-basis: 92%;
   }
-
 }
 
 @media (max-width: 359px) {

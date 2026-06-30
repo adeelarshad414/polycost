@@ -2,11 +2,7 @@ import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ProviderId } from '../adapters/common/cloud-provider-adapter';
 import { ApiValidationError } from '../api/api-errors';
 import { providerRegionForCanonicalRegion } from '../pricing-normalization/region-map';
-import {
-  PaymentOptionCode,
-  PricingGranularity,
-  PricingTermCode,
-} from './pricing-models.types';
+import { PaymentOptionCode, PricingGranularity, PricingTermCode } from './pricing-models.types';
 import { PricingMatrixService } from './pricing-matrix.service';
 
 type QueryValue = string | string[] | undefined;

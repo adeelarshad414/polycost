@@ -84,6 +84,10 @@ Default local URLs:
 - Health check: `http://localhost:3001/health`
 - Vault dev UI/API: `http://localhost:8200`
 
+The health check returns the API status plus downstream dependency probes for Postgres
+and Redis, so a healthy response means the request path can reach the core data and
+cache services.
+
 If you only want to run the workspaces directly:
 
 ```bash
@@ -158,6 +162,7 @@ Start from `.env.example`. Important local settings include:
 - `EXCHANGE_RATE_API_URL`
 - `EXCHANGE_RATE_TARGET_CURRENCIES`
 - `FEATURE_LIVE_PRICING_REFRESH_ENABLED`
+- `FEATURE_RESERVED_PRICING`
 - `RATE_LIMIT_NL_PARSE_PER_MINUTE`
 - `RATE_LIMIT_LIVE_REFRESH_PER_MINUTE`
 

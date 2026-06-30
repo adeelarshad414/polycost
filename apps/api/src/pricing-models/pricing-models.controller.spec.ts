@@ -1,9 +1,6 @@
 import { PricingCacheService } from './pricing-cache.service';
 import { PricingMatrixService } from './pricing-matrix.service';
-import {
-  PricingCompareV2Controller,
-  PricingModelsController,
-} from './pricing-models.controller';
+import { PricingCompareV2Controller, PricingModelsController } from './pricing-models.controller';
 import { PricingRateReader, PricingRateRecord } from './pricing-models.types';
 import { PricingTermsService } from './pricing-terms.service';
 import { RateResolverService } from './rate-resolver.service';

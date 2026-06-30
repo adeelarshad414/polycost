@@ -247,9 +247,7 @@ describe('api client', () => {
     global.fetch = fetchMock as typeof fetch;
     const client = createPolyCostClient('http://api.test/api/v1');
 
-    await expect(
-      client.getPricingModelsForService('aws', 'compute', 'us-east-1'),
-    ).resolves.toEqual(
+    await expect(client.getPricingModelsForService('aws', 'compute', 'us-east-1')).resolves.toEqual(
       expect.objectContaining({
         schemaVersion: 2,
         models: expect.arrayContaining([

@@ -102,7 +102,12 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
 
   requirePositiveNumber(issues, form, 'vcpu', 'vCPU must be greater than 0.');
   requirePositiveNumber(issues, form, 'memoryGb', 'Memory must be greater than 0.');
-  requirePositiveInteger(issues, form, 'instanceCount', 'Instances must be a whole number above 0.');
+  requirePositiveInteger(
+    issues,
+    form,
+    'instanceCount',
+    'Instances must be a whole number above 0.',
+  );
   optionalNonNegativeIntegerField(
     issues,
     form,
@@ -117,8 +122,18 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
   );
 
   if (form.scalingType === 'autoscaling') {
-    requirePositiveInteger(issues, form, 'autoscaleMin', 'Scale min must be a whole number above 0.');
-    requirePositiveInteger(issues, form, 'autoscaleMax', 'Scale max must be a whole number above 0.');
+    requirePositiveInteger(
+      issues,
+      form,
+      'autoscaleMin',
+      'Scale min must be a whole number above 0.',
+    );
+    requirePositiveInteger(
+      issues,
+      form,
+      'autoscaleMax',
+      'Scale max must be a whole number above 0.',
+    );
 
     const autoscaleMin = parseOptionalNumber(form.autoscaleMin);
     const autoscaleMax = parseOptionalNumber(form.autoscaleMax);
@@ -152,12 +167,7 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
     );
   }
 
-  optionalNonNegativeNumberField(
-    issues,
-    form,
-    'monthlyEgressGb',
-    'Egress must be 0 GB or higher.',
-  );
+  optionalNonNegativeNumberField(issues, form, 'monthlyEgressGb', 'Egress must be 0 GB or higher.');
 
   return issues;
 }

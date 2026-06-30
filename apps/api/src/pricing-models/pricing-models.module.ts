@@ -1,9 +1,6 @@
 import { Module } from '@nestjs/common';
 import { SecretsService } from '../secrets/secrets.service';
-import {
-  PricingCompareV2Controller,
-  PricingModelsController,
-} from './pricing-models.controller';
+import { PricingCompareV2Controller, PricingModelsController } from './pricing-models.controller';
 import { PricingCacheService } from './pricing-cache.service';
 import { PricingMatrixService } from './pricing-matrix.service';
 import { PostgresPricingRatesRepository } from './pricing-rates.repository';

@@ -218,12 +218,9 @@ function uniquePricingRecords(records: PricingCatalogRecord[]): PricingCatalogRe
 }
 
 function cacheKey(group: LivePricingReferenceGroup): string {
-  return [
-    group.providerId,
-    group.category,
-    group.region,
-    [...group.skuIds].sort().join(','),
-  ].join(':');
+  return [group.providerId, group.category, group.region, [...group.skuIds].sort().join(',')].join(
+    ':',
+  );
 }
 
 async function retryWithBackoff<T>(operation: () => Promise<T>): Promise<T> {

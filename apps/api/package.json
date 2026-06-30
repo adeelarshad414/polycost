@@ -11,7 +11,7 @@
     "test:unit": "jest --config jest.config.cjs --testPathIgnorePatterns \"\\.integration\\.spec\\.ts$\" --testPathIgnorePatterns \"\\.e2e\\.spec\\.ts$\"",
     "test:integration": "jest --config jest.config.cjs --runInBand --testMatch \"**/*.integration.spec.ts\" --passWithNoTests",
     "test:e2e": "jest --config jest.config.cjs --runInBand --testMatch \"**/*.e2e.spec.ts\" --passWithNoTests",
-    "test:coverage": "jest --config jest.config.cjs --coverage",
+    "test:coverage": "jest --config jest.config.cjs --coverage --testPathIgnorePatterns \"\\.integration\\.spec\\.ts$\" --testPathIgnorePatterns \"\\.e2e\\.spec\\.ts$\"",
     "start:dev": "ts-node src/main.ts",
     "start:prod": "node dist/main.js"
   },
