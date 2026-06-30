@@ -27,8 +27,8 @@ const comparison: ComparisonResult = {
         },
       ],
       totals: {
-        daily: 2.37,
-        weekly: 16.59,
+        daily: 2.33,
+        weekly: 16.34,
         monthly: 71,
         quarterly: 213,
         yearly: 852,
@@ -45,8 +45,8 @@ const comparison: ComparisonResult = {
         },
       ],
       totals: {
-        daily: 0.67,
-        weekly: 4.69,
+        daily: 0.66,
+        weekly: 4.6,
         monthly: 20,
         quarterly: 60,
         yearly: 240,
@@ -76,7 +76,7 @@ describe('report generators', () => {
     expect(csv).toContain('Lowest monthly run rate,gcp $20');
     expect(csv).toContain('Annual avoidable spread,$612');
     expect(csv).toContain('Dominant cost driver,storage $20');
-    expect(csv).toContain('aws,2.37,16.59,71,213,852');
+    expect(csv).toContain('aws,2.33,16.34,71,213,852');
     expect(csv).toContain("aws,compute,'=cmd(1)\\risky compute,no,60.8");
     expect(csv).toContain('"primary ""postgres"", managed"');
     expect(csv).toContain("azure,provider_pricing_failed,'+pricing temporarily unavailable");
@@ -139,7 +139,7 @@ describe('report generators', () => {
     expect(pdfText).toContain('Solution architect review: gcp requires service-equivalence');
     expect(pdfText).toContain('Architecture risk: Medium');
     expect(pdfText).toContain('Lowest monthly run rate: gcp $20');
-    expect(pdfText).toContain('aws: daily $2.37, weekly $16.59, monthly $71');
+    expect(pdfText).toContain('aws: daily $2.33, weekly $16.34, monthly $71');
     expect(pdfText).toContain('=cmd\\(1\\)\\\\risky compute');
     expect(pdfText).toContain('general | provider_pricing_failed | general warning');
     expect(pdfText).toContain('this is a deliberately long line item description');

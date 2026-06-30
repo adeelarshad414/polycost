@@ -7,6 +7,7 @@ import { FinOpsFeatureLayer, SharedReportPlaceholder } from './components/FinOps
 import { PersonaComparisonWorkspace } from './components/PersonaComparisonWorkspace';
 import { ThemeSwitcher } from './components/ThemeSwitcher';
 import { TopLoadingBar } from './components/TopLoadingBar';
+import { hourlyFromMonthly, intervalMultiplierFromMonthly } from './cost-time';
 import {
   COMPARISON_REGION_GROUPS,
   comparisonRegionLabel,
@@ -391,9 +392,7 @@ export function App({ client = polyCostClient }: AppProps) {
   const [submittedInputMode, setSubmittedInputMode] = useState<InputMode>('form');
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
   const [interval, setInterval] = useState<IntervalKey>('monthly');
-  const [pricingModel, setPricingModel] = useState<PricingModelKey>(() =>
-    readStoredPricingModel(),
-  );
+  const [pricingModel, setPricingModel] = useState<PricingModelKey>(() => readStoredPricingModel());
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [exportingFormat, setExportingFormat] = useState<ReportFormat | null>(null);
   const [isEditingRequirements, setIsEditingRequirements] = useState(false);
@@ -495,8 +494,13 @@ export function App({ client = polyCostClient }: AppProps) {
     setBusyAction('compare');
 
     try {
-      const { nws, parserNotice, parsedForm, submittedComparisonForm, submittedComparisonInputMode } =
-        await prepareNwsForComparison();
+      const {
+        nws,
+        parserNotice,
+        parsedForm,
+        submittedComparisonForm,
+        submittedComparisonInputMode,
+      } = await prepareNwsForComparison();
       if (!isCurrentAsyncAction(actionId)) {
         return;
       }
@@ -1215,7 +1219,6 @@ function ProgressiveComparisonPage({
             </div>
           </>
         )}
-
       </div>
     </section>
   );
@@ -1344,7 +1347,10 @@ function StateDetailContent({
         />
       </section>
 
-      <section className="state-detail-panel" aria-label="Official calculators, regions, and exports">
+      <section
+        className="state-detail-panel"
+        aria-label="Official calculators, regions, and exports"
+      >
         <ResultDetailHeading
           title="Official calculators, regions & exports"
           description="Provider calculator links, official region references, refresh, and PDF/CSV/Excel report downloads."
@@ -1632,9 +1638,7 @@ function ResultDisclosureSection({
         onClick={handleToggle}
       >
         <span>
-          <strong id={headingId}>{actionLabel}</strong>
-          {' '}
-          <small>{actionDescription}</small>
+          <strong id={headingId}>{actionLabel}</strong> <small>{actionDescription}</small>
         </span>
         <span className="result-disclosure-chevron" aria-hidden="true">
           {isOpen ? '-' : '+'}
@@ -1652,13 +1656,7 @@ function ResultDisclosureSection({
   );
 }
 
-function ResultDetailHeading({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
+function ResultDetailHeading({ title, description }: { title: string; description: string }) {
   return (
     <div className="state-detail-heading">
       <h3>{title}</h3>
@@ -2110,8 +2108,9 @@ function FormValidationSummary({ issues }: { issues: WorkloadFormIssue[] }) {
 
   return (
     <div className="form-validation-summary" role="alert">
-      <strong>Fix {issues.length} requirement field{issues.length === 1 ? '' : 's'}.</strong>
-      {' '}
+      <strong>
+        Fix {issues.length} requirement field{issues.length === 1 ? '' : 's'}.
+      </strong>{' '}
       <span>{issues.map((issue) => issue.message).join(' ')}</span>
     </div>
   );
@@ -2237,7 +2236,9 @@ function RegionSelectField({
 
   return (
     <label
-      className={compact ? 'form-field region-field region-field-compact' : 'form-field region-field'}
+      className={
+        compact ? 'form-field region-field region-field-compact' : 'form-field region-field'
+      }
       htmlFor="region"
     >
       <span className="region-field-header">
@@ -2281,8 +2282,8 @@ function RegionSelectField({
       </select>
       {compact ? null : (
         <span className="field-help">
-          {catalogLabel} · {regionCount} provider regions · comparable groups normalize AWS,
-          Azure, and GCP pricing.
+          {catalogLabel} · {regionCount} provider regions · comparable groups normalize AWS, Azure,
+          and GCP pricing.
         </span>
       )}
     </label>
@@ -2554,10 +2555,7 @@ function workloadTypeLabel(type: WorkloadFormState['workloadType']): string {
   }
 }
 
-function regionLabelForSummary(
-  value: string,
-  regionCatalog: RegionCatalogResponse | null,
-): string {
+function regionLabelForSummary(value: string, regionCatalog: RegionCatalogResponse | null): string {
   const comparisonLabel = comparisonRegionLabel(value);
 
   if (comparisonLabel) {
@@ -2932,9 +2930,7 @@ function ExecutiveAnalyticsPreview({
       <div className="executive-stat-grid" aria-label="Executive compact stats">
         <ExecutiveStatTile
           label="Cheapest provider"
-          value={
-            analytics.cheapest ? providerLabel(analytics.cheapest.providerId) : 'Pending'
-          }
+          value={analytics.cheapest ? providerLabel(analytics.cheapest.providerId) : 'Pending'}
           detail={
             analytics.cheapest?.total !== undefined
               ? `${formatCurrency(analytics.cheapest.total)} monthly`
@@ -3032,7 +3028,10 @@ function ExecutiveDecisionDashboard({
 
       <div className="executive-lens-grid" aria-label="Executive decision lenses">
         {decision.lenses.slice(0, 3).map((lens) => (
-          <article className={`executive-lens-card lens-${roleClassName(lens.role)}`} key={lens.role}>
+          <article
+            className={`executive-lens-card lens-${roleClassName(lens.role)}`}
+            key={lens.role}
+          >
             <span>{lens.label}</span>
             <strong>{lens.value}</strong>
             <p>{lens.detail}</p>
@@ -3102,11 +3101,13 @@ function ExecutiveStatTile({
   value: string;
 }) {
   return (
-    <article className={providerId ? `executive-stat-tile executive-stat-${providerId}` : 'executive-stat-tile'}>
+    <article
+      className={
+        providerId ? `executive-stat-tile executive-stat-${providerId}` : 'executive-stat-tile'
+      }
+    >
       <span>{label}</span>
-      <strong>
-        {value}
-      </strong>
+      <strong>{value}</strong>
       <small>{detail}</small>
     </article>
   );
@@ -3205,7 +3206,9 @@ function EngineeringServiceChartGrid({
 }) {
   return (
     <div
-      className={compact ? 'engineering-chart-grid engineering-chart-grid-compact' : 'engineering-chart-grid'}
+      className={
+        compact ? 'engineering-chart-grid engineering-chart-grid-compact' : 'engineering-chart-grid'
+      }
       aria-label="Provider service cost charts"
     >
       {analytics.providers.map((provider) => (
@@ -3236,9 +3239,7 @@ function EngineeringProviderServiceChart({
   return (
     <article className={`engineering-chart-card engineering-chart-${provider.providerId}`}>
       <div className="engineering-chart-title">
-        <span>
-          {providerLabel(provider.providerId)}
-        </span>
+        <span>{providerLabel(provider.providerId)}</span>
         <strong>{hasData ? formatCurrency(provider.total ?? 0) : 'Pending'}</strong>
       </div>
 
@@ -3251,11 +3252,7 @@ function EngineeringProviderServiceChart({
               data={provider.services}
               margin={{ top: 10, right: 4, bottom: 0, left: -20 }}
             >
-              <CartesianGrid
-                stroke="var(--pc-chart-grid)"
-                strokeDasharray="3 3"
-                vertical={false}
-              />
+              <CartesianGrid stroke="var(--pc-chart-grid)" strokeDasharray="3 3" vertical={false} />
               <XAxis
                 dataKey="serviceLabel"
                 interval={0}
@@ -3370,9 +3367,7 @@ function EngineeringSignal({
   return (
     <article className={className}>
       <span>{label}</span>
-      <strong>
-        {value}
-      </strong>
+      <strong>{value}</strong>
       <small>{detail}</small>
     </article>
   );
@@ -3803,9 +3798,7 @@ function FinOpsReviewPanel({ review }: { review: FinOpsReview }) {
           <div className="provider-fit-list">
             {review.providerFit.map((fit) => (
               <div className={`provider-fit provider-fit-${fit.tone}`} key={fit.providerId}>
-                <span>
-                  {providerLabel(fit.providerId)}
-                </span>
+                <span>{providerLabel(fit.providerId)}</span>
                 <strong>{fit.label}</strong>
                 <small>{fit.detail}</small>
               </div>
@@ -3948,9 +3941,7 @@ function ProviderRanking({
               <tr key={summary.providerId}>
                 <td>{summary.total !== undefined ? `#${index + 1}` : '-'}</td>
                 <td>
-                  <span className="rank-provider">
-                    {providerLabel(summary.providerId)}
-                  </span>
+                  <span className="rank-provider">{providerLabel(summary.providerId)}</span>
                 </td>
                 <td>{summary.total !== undefined ? formatCurrency(summary.total) : 'Pending'}</td>
                 <td>
@@ -4259,7 +4250,7 @@ function roleClassName(role: ExecutiveLens['role']): string {
 function costForInterval(provider: ComparisonProviderResult, interval: IntervalKey): number {
   switch (interval) {
     case 'hourly':
-      return provider.totals.hourly ?? provider.totals.monthly / 730;
+      return provider.totals.hourly ?? hourlyFromMonthly(provider.totals.monthly);
     case 'daily':
       return provider.totals.daily;
     case 'weekly':
@@ -4328,11 +4319,13 @@ function executiveAnalyticsModel(
   form: WorkloadFormState,
 ): ExecutiveAnalyticsModel {
   const monthlySummaries = providerCostSummaries(comparison, 'monthly');
-  const summaryByProvider = new Map(monthlySummaries.map((summary) => [summary.providerId, summary]));
-  const pricedMonthlySummaries = monthlySummaries.filter(
-    (summary) => summary.total !== undefined,
+  const summaryByProvider = new Map(
+    monthlySummaries.map((summary) => [summary.providerId, summary]),
   );
-  const pricedInProviderOrder = PROVIDER_ORDER.map((providerId) => summaryByProvider.get(providerId))
+  const pricedMonthlySummaries = monthlySummaries.filter((summary) => summary.total !== undefined);
+  const pricedInProviderOrder = PROVIDER_ORDER.map((providerId) =>
+    summaryByProvider.get(providerId),
+  )
     .filter((summary): summary is ProviderCostSummary => Boolean(summary))
     .filter((summary) => summary.total !== undefined);
   const totalMonthlyAcrossProviders =
@@ -4346,7 +4339,9 @@ function executiveAnalyticsModel(
   const monthlyPotentialSavings = review.monthlySpread;
   const annualPotentialSavings =
     review.executiveDecision.avoidableAnnualSpend ??
-    (monthlyPotentialSavings !== undefined ? roundCurrency(monthlyPotentialSavings * 12) : undefined);
+    (monthlyPotentialSavings !== undefined
+      ? roundCurrency(monthlyPotentialSavings * 12)
+      : undefined);
 
   return {
     review,
@@ -5134,20 +5129,7 @@ function categoryHeatmapRows(summaries: ProviderCostSummary[]): Array<{
 }
 
 function intervalCostMultiplier(interval: IntervalKey): number {
-  switch (interval) {
-    case 'hourly':
-      return 1 / 730;
-    case 'daily':
-      return 1 / 30;
-    case 'weekly':
-      return 7 / 30;
-    case 'monthly':
-      return 1;
-    case 'quarterly':
-      return 3;
-    case 'yearly':
-      return 12;
-  }
+  return intervalMultiplierFromMonthly(interval);
 }
 
 function compareButtonLabel(inputMode: InputMode): string {
@@ -5159,7 +5141,9 @@ function compareLoadingLabel(inputMode: InputMode): string {
 }
 
 function inputModeSummaryLabel(inputMode: InputMode): string {
-  return INPUT_MODE_OPTIONS.find((option) => option.key === inputMode)?.summaryLabel ?? 'Manual entry';
+  return (
+    INPUT_MODE_OPTIONS.find((option) => option.key === inputMode)?.summaryLabel ?? 'Manual entry'
+  );
 }
 
 function pricingModelSummaryLabel(pricingModel: PricingModelKey): string {

@@ -110,8 +110,8 @@ describe('ComparisonOrchestratorService', () => {
           providerId: 'aws',
           totals: expect.objectContaining({
             hourly: 0.05,
-            daily: 1.33,
-            weekly: 9.31,
+            daily: 1.32,
+            weekly: 9.21,
             monthly: 40,
             quarterly: 120,
             yearly: 480,

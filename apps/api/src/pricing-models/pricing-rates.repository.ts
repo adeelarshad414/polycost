@@ -1,4 +1,4 @@
-import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, OnModuleDestroy, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
 import { ProviderId } from '../adapters/common/cloud-provider-adapter';
@@ -51,6 +51,8 @@ interface PricingRateSqlRow {
 
 const defaultPgPoolFactory: PgPoolFactory = (config) => new Pool(config);
 
+export const PRICING_RATES_POOL_FACTORY = Symbol('PRICING_RATES_POOL_FACTORY');
+
 const SERVICE_FAMILY_ALIASES = new Map<string, string>([
   ['compute', 'general-purpose'],
   ['ec2', 'general-purpose'],
@@ -85,6 +87,8 @@ export class PostgresPricingRatesRepository implements PricingRateReader, OnModu
     private readonly configService: ConfigService<AppConfig, true>,
     @Inject(SecretsService)
     private readonly secretsReader: SecretsReader,
+    @Optional()
+    @Inject(PRICING_RATES_POOL_FACTORY)
     private readonly poolFactory: PgPoolFactory = defaultPgPoolFactory,
   ) {}
 
@@ -204,7 +208,7 @@ function fallbackPricingRate(
   reasonCode: 'not_cached' | 'schema_or_connection_unavailable',
 ): PricingRateRecord {
   const hourlyRateUsd = roundRate(
-    PROVIDER_BASELINE_HOURLY_RATE_USD[query.provider] * pricingTermFactor(query.termCode),
+    baselineHourlyRate(query.provider) * pricingTermFactor(query.termCode, query.paymentOptionCode),
   );
   const isSpot = query.termCode === 'spot_estimate';
   const now = new Date().toISOString();
@@ -242,20 +246,70 @@ function serviceFamilyFromSlug(service: string): string {
   return SERVICE_FAMILY_ALIASES.get(normalized) ?? 'general-purpose';
 }
 
-function pricingTermFactor(termCode: PricingTermCode): number {
+function baselineHourlyRate(provider: ProviderId): number {
+  switch (provider) {
+    case 'aws':
+      return PROVIDER_BASELINE_HOURLY_RATE_USD.aws;
+    case 'azure':
+      return PROVIDER_BASELINE_HOURLY_RATE_USD.azure;
+    case 'gcp':
+      return PROVIDER_BASELINE_HOURLY_RATE_USD.gcp;
+  }
+}
+
+function pricingTermFactor(
+  termCode: PricingTermCode,
+  paymentOptionCode?: PaymentOptionCode,
+): number {
   switch (termCode) {
     case 'on_demand':
       return 1;
     case 'reserved_1yr':
-      return 0.68;
+      return paymentAdjustedFactor(paymentOptionCode, {
+        noUpfront: 0.68,
+        partialUpfront: 0.62,
+        allUpfront: 0.58,
+      });
     case 'reserved_3yr':
-      return 0.52;
+      return paymentAdjustedFactor(paymentOptionCode, {
+        noUpfront: 0.52,
+        partialUpfront: 0.47,
+        allUpfront: 0.43,
+      });
     case 'savings_plan_1yr':
-      return 0.72;
+      return paymentAdjustedFactor(paymentOptionCode, {
+        noUpfront: 0.72,
+        partialUpfront: 0.68,
+        allUpfront: 0.64,
+      });
     case 'savings_plan_3yr':
-      return 0.58;
+      return paymentAdjustedFactor(paymentOptionCode, {
+        noUpfront: 0.58,
+        partialUpfront: 0.54,
+        allUpfront: 0.5,
+      });
     case 'spot_estimate':
       return 0.35;
+  }
+}
+
+function paymentAdjustedFactor(
+  paymentOptionCode: PaymentOptionCode | undefined,
+  factors: {
+    noUpfront: number;
+    partialUpfront: number;
+    allUpfront: number;
+  },
+): number {
+  switch (paymentOptionCode) {
+    case 'partial_upfront':
+      return factors.partialUpfront;
+    case 'all_upfront':
+      return factors.allUpfront;
+    case 'no_upfront':
+    case 'n_a':
+    case undefined:
+      return factors.noUpfront;
   }
 }
 

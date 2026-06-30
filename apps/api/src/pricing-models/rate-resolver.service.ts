@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ApiValidationError } from '../api/api-errors';
+import { HOURS_PER_DAY, HOURS_PER_MONTH, HOURS_PER_WEEK, HOURS_PER_YEAR } from '../cost-time';
 import { PricingCacheService } from './pricing-cache.service';
 import {
   PaymentOptionCode,
@@ -15,10 +16,10 @@ import { PricingTermsService } from './pricing-terms.service';
 const PRICING_TTL_SECONDS = 24 * 60 * 60;
 const GRANULARITY_MULTIPLIERS: Record<PricingGranularity, number> = {
   hourly: 1,
-  daily: 24,
-  weekly: 24 * 7,
-  monthly: 730,
-  yearly: 8760,
+  daily: HOURS_PER_DAY,
+  weekly: HOURS_PER_WEEK,
+  monthly: HOURS_PER_MONTH,
+  yearly: HOURS_PER_YEAR,
 };
 
 @Injectable()
@@ -156,10 +157,7 @@ function roundRate(value: number): number {
   return Math.round((value + Number.EPSILON) * 1_000_000) / 1_000_000;
 }
 
-function amountForGranularity(
-  intervals: RateIntervals,
-  granularity: PricingGranularity,
-): number {
+function amountForGranularity(intervals: RateIntervals, granularity: PricingGranularity): number {
   switch (granularity) {
     case 'hourly':
       return intervals.hourly;

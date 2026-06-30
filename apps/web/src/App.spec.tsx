@@ -9,6 +9,7 @@ import {
   PricingStatusResponse,
   RegionCatalogResponse,
 } from './types';
+import { intervalMultiplierFromMonthly } from './cost-time';
 import { buildNwsFromForm, defaultWorkloadForm } from './workload';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -102,7 +103,9 @@ describe('App', () => {
     expect(text(container)).not.toContain('Official calculators & regions');
     expect(text(container)).not.toContain('Export report');
     expect(text(container)).not.toContain('GCP is the current executive cost baseline');
-    expect(container.querySelector<HTMLAnchorElement>('a[href="https://calculator.aws/#/"]')).toBeNull();
+    expect(
+      container.querySelector<HTMLAnchorElement>('a[href="https://calculator.aws/#/"]'),
+    ).toBeNull();
     expect(text(container)).not.toContain('Resource name');
     expect(text(container)).not.toContain('Spec / SKU');
     expect(text(container)).not.toContain('Export CSV');
@@ -195,9 +198,7 @@ describe('App', () => {
 
     await click(buttonByText(container, 'Compare costs'));
 
-    const disclosures = Array.from(
-      container.querySelectorAll<HTMLElement>('.result-disclosure'),
-    );
+    const disclosures = Array.from(container.querySelectorAll<HTMLElement>('.result-disclosure'));
     expect(disclosures).toHaveLength(1);
     expect(
       disclosures.every(
@@ -208,7 +209,9 @@ describe('App', () => {
       disclosures.every(
         (details) =>
           disclosureSummary(details).getAttribute('aria-expanded') === 'false' &&
-          Boolean(document.getElementById(disclosureSummary(details).getAttribute('aria-controls') ?? '')),
+          Boolean(
+            document.getElementById(disclosureSummary(details).getAttribute('aria-controls') ?? ''),
+          ),
       ),
     ).toBe(true);
 
@@ -318,7 +321,10 @@ describe('App', () => {
 
       await click(
         disclosureSummary(
-          resultDisclosureByTitle(container, 'Show full breakdown, pricing models & export options'),
+          resultDisclosureByTitle(
+            container,
+            'Show full breakdown, pricing models & export options',
+          ),
         ),
       );
       await click(buttonByText(container, 'Refresh live'));
@@ -683,7 +689,9 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('EC2');
     expect(text(container)).toContain('VM');
     expect(text(container)).toContain('GCE');
-    expect(container.querySelectorAll('.engineering-bar-chart-shell .recharts-wrapper').length).toBeGreaterThanOrEqual(3);
+    expect(
+      container.querySelectorAll('.engineering-bar-chart-shell .recharts-wrapper').length,
+    ).toBeGreaterThanOrEqual(3);
     expect(text(container)).toContain('Filter by tag');
     expect(text(container)).toContain('Backend contract note');
     expect(text(container)).toContain('Resource name');
@@ -806,6 +814,9 @@ describe('ComparisonView', () => {
     expect(buttonByText(container, 'Spot').disabled).toBe(false);
     expect(buttonByText(container, 'Savings plan').disabled).toBe(false);
     expect(text(container)).toContain('Best:');
+    await click(buttonByText(container, 'Spot'));
+    expect(text(container)).toContain('Est. $38.00-$57.00');
+    expect(text(container)).toContain('estimated $38.00-$57.00/mo range');
     await click(buttonByText(container, '3yr reserved'));
     expect(text(container)).toContain('3yr reserved: Not available for this configuration.');
     expect(text(container)).toContain('Compute, storage, and data-transfer mix');
@@ -1215,12 +1226,12 @@ function provider(
       },
     ],
     totals: {
-      hourly: monthly / 730,
-      daily: monthly / 30,
-      weekly: (monthly / 30) * 7,
+      hourly: monthly * intervalMultiplierFromMonthly('hourly'),
+      daily: monthly * intervalMultiplierFromMonthly('daily'),
+      weekly: monthly * intervalMultiplierFromMonthly('weekly'),
       monthly,
-      quarterly: monthly * 3,
-      yearly: monthly * 12,
+      quarterly: monthly * intervalMultiplierFromMonthly('quarterly'),
+      yearly: monthly * intervalMultiplierFromMonthly('yearly'),
     },
   };
 }
@@ -1247,12 +1258,12 @@ function providerWithItems(
       baseMonthlyCostUsd,
     })),
     totals: {
-      hourly: monthly / 730,
-      daily: monthly / 30,
-      weekly: (monthly / 30) * 7,
+      hourly: monthly * intervalMultiplierFromMonthly('hourly'),
+      daily: monthly * intervalMultiplierFromMonthly('daily'),
+      weekly: monthly * intervalMultiplierFromMonthly('weekly'),
       monthly,
-      quarterly: monthly * 3,
-      yearly: monthly * 12,
+      quarterly: monthly * intervalMultiplierFromMonthly('quarterly'),
+      yearly: monthly * intervalMultiplierFromMonthly('yearly'),
     },
   };
 }

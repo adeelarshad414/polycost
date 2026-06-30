@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { formatApiError, polyCostClient, PolyCostClient } from '../api-client';
 import { Button } from './Button';
+import { hourlyFromMonthly, intervalMultiplierFromMonthly } from '../cost-time';
 import {
   AlertRecord,
   BudgetRecord,
@@ -201,7 +202,7 @@ export function FinOpsFeatureLayer({
     parsedThreshold !== undefined &&
     cheapestMonthly !== undefined &&
     cheapestMonthly > parsedThreshold &&
-      !dismissedAlerts.includes(budgetAlertId);
+    !dismissedAlerts.includes(budgetAlertId);
   const paymentOptionRequired = requiresPaymentOption(pricingModel);
   const dynamicPaymentOptions = useMemo(
     () => paymentOptionsForModel(pricingModelsForService, pricingModel),
@@ -435,7 +436,8 @@ export function FinOpsFeatureLayer({
           {paymentOptionRequired ? (
             <>
               {' '}
-              Payment option: <strong className="text-text-primary">{selectedPaymentOption.label}</strong>.
+              Payment option:{' '}
+              <strong className="text-text-primary">{selectedPaymentOption.label}</strong>.
             </>
           ) : null}
         </p>
@@ -495,11 +497,11 @@ export function FinOpsFeatureLayer({
               ? providerModelCost(provider, pricingModel)
               : undefined;
 
-          return (
-            <article
-              key={providerId}
-              className="min-w-0 rounded-lg border border-border bg-surface-0 p-3"
-            >
+            return (
+              <article
+                key={providerId}
+                className="min-w-0 rounded-lg border border-border bg-surface-0 p-3"
+              >
                 <div className="flex min-w-0 items-center justify-between gap-3">
                   <ProviderTextHeading providerId={providerId} />
                   <strong className="font-mono text-base text-text-primary">
@@ -813,8 +815,9 @@ function PricingModelSavingsCue({
     <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2 text-xs font-semibold">
       {bestModel?.savingsPercentVsOnDemand !== undefined ? (
         <span className="rounded-full border border-[color:var(--pc-success)] bg-[color:var(--pc-success-soft)] px-2 py-1 text-text-primary">
-          Best: {bestModel.providerTerm ?? bestModel.displayName ?? pricingModelLabel(bestModel.model)} saves{' '}
-          {formatPercent(bestModel.savingsPercentVsOnDemand)}
+          Best:{' '}
+          {bestModel.providerTerm ?? bestModel.displayName ?? pricingModelLabel(bestModel.model)}{' '}
+          saves {formatPercent(bestModel.savingsPercentVsOnDemand)}
         </span>
       ) : null}
       {selectedModel?.caveat ? (
@@ -967,10 +970,7 @@ function workloadInputFromForm(form: WorkloadFormState): WorkloadInput {
   };
 }
 
-function instanceFamilyForWorkload(
-  vcpu: number,
-  memoryGb: number,
-): NormalizedInstanceFamily {
+function instanceFamilyForWorkload(vcpu: number, memoryGb: number): NormalizedInstanceFamily {
   if (memoryGb / Math.max(vcpu, 1) >= 6) {
     return 'memory-optimized';
   }
@@ -1308,7 +1308,7 @@ function providerModelCost(
     return {
       model: 'on-demand',
       available: true,
-      hourlyCostUsd: provider.totals.hourly ?? provider.totals.monthly / 730,
+      hourlyCostUsd: provider.totals.hourly ?? hourlyFromMonthly(provider.totals.monthly),
       monthlyCostUsd: provider.totals.monthly,
     };
   }
@@ -1346,11 +1346,31 @@ function formatModelCost(
     return 'Not available';
   }
 
+  if (modelCost.model === 'spot' && modelCost.estimated) {
+    return formatSpotEstimateRange(modelCost, interval, currency);
+  }
+
   if (interval === 'hourly') {
-    return formatMoney(modelCost.hourlyCostUsd ?? modelCost.monthlyCostUsd / 730, currency);
+    return formatMoney(
+      modelCost.hourlyCostUsd ?? hourlyFromMonthly(modelCost.monthlyCostUsd),
+      currency,
+    );
   }
 
   return formatMoney(modelCost.monthlyCostUsd * intervalCostMultiplier(interval), currency);
+}
+
+function formatSpotEstimateRange(
+  modelCost: PricingModelCost,
+  interval: IntervalKey,
+  currency: CurrencyOption,
+): string {
+  const baseCost =
+    interval === 'hourly'
+      ? (modelCost.hourlyCostUsd ?? hourlyFromMonthly(modelCost.monthlyCostUsd ?? 0))
+      : (modelCost.monthlyCostUsd ?? 0) * intervalCostMultiplier(interval);
+
+  return `Est. ${formatMoney(baseCost * 0.8, currency)}-${formatMoney(baseCost * 1.2, currency)}`;
 }
 
 function pricingModelSummary(
@@ -1364,6 +1384,13 @@ function pricingModelSummary(
 
   if (!selected.available || selected.monthlyCostUsd === undefined) {
     return `${label}: ${selected.unavailableReason ?? 'Not available for this configuration.'}`;
+  }
+
+  if (selected.model === 'spot' && selected.estimated) {
+    const low = selected.monthlyCostUsd * 0.8;
+    const high = selected.monthlyCostUsd * 1.2;
+
+    return `${label}: estimated ${formatMoney(low, currency)}-${formatMoney(high, currency)}/mo range · volatile interruptible capacity`;
   }
 
   if (
@@ -1436,10 +1463,11 @@ function paymentOptionsForModel(
   const options = metadata?.models.find((item) => item.code === termCode)?.paymentOptions ?? [];
 
   return options
-    .filter((option): option is { code: PaymentOptionKey; label: string } =>
-      option.code === 'no_upfront' ||
-      option.code === 'partial_upfront' ||
-      option.code === 'all_upfront',
+    .filter(
+      (option): option is { code: PaymentOptionKey; label: string } =>
+        option.code === 'no_upfront' ||
+        option.code === 'partial_upfront' ||
+        option.code === 'all_upfront',
     )
     .map((option) => ({
       key: option.code,
@@ -1448,7 +1476,9 @@ function paymentOptionsForModel(
     }));
 }
 
-function pricingTermCodeForModel(model: PricingModelKey): PricingModelsForServiceResponse['models'][number]['code'] {
+function pricingTermCodeForModel(
+  model: PricingModelKey,
+): PricingModelsForServiceResponse['models'][number]['code'] {
   switch (model) {
     case 'reserved-1yr':
       return 'reserved_1yr';
@@ -1464,7 +1494,10 @@ function pricingTermCodeForModel(model: PricingModelKey): PricingModelsForServic
 }
 
 function paymentOptionDetail(option: PaymentOptionKey): string {
-  return PAYMENT_OPTIONS.find((item) => item.key === option)?.detail ?? 'Provider-specific commitment payment option.';
+  return (
+    PAYMENT_OPTIONS.find((item) => item.key === option)?.detail ??
+    'Provider-specific commitment payment option.'
+  );
 }
 
 function ShareIcon() {
@@ -1515,20 +1548,7 @@ function providerLabel(provider: ProviderId): string {
 }
 
 function intervalCostMultiplier(interval: IntervalKey): number {
-  switch (interval) {
-    case 'hourly':
-      return 1 / 730;
-    case 'daily':
-      return 1 / 30;
-    case 'weekly':
-      return 7 / 30;
-    case 'monthly':
-      return 1;
-    case 'quarterly':
-      return 3;
-    case 'yearly':
-      return 12;
-  }
+  return intervalMultiplierFromMonthly(interval);
 }
 
 function currencyOptionsFromRates(rates: ExchangeRatesResponse | null): CurrencyOption[] {

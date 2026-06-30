@@ -21,8 +21,8 @@ import {
   ServiceCategory,
 } from './cloud-provider-adapter';
 import { AdapterPricingError } from './adapter-errors';
+import { HOURS_PER_MONTH } from '../../cost-time';
 
-const HOURS_PER_MONTH = 730;
 const CATALOG_COMMITMENT_PRICING_MODELS: PricingModelKey[] = ['reserved-1yr', 'reserved-3yr'];
 const ESTIMATED_COMPUTE_PRICING_MODELS: PricingModelKey[] = ['spot', 'savings-plan'];
 const PRICING_MODEL_UNAVAILABLE = 'Not available for this configuration.';

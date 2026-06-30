@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { configuredApiBaseUrl } from '../api-client';
 import { Button } from './Button';
+import { hourlyFromMonthly } from '../cost-time';
 import {
   ComparisonLineItem,
   ComparisonProviderResult,
@@ -705,7 +706,9 @@ function lineItemSpec(lineItem: ComparisonLineItem): string {
   const parts = [
     lineItem.skuId ? `SKU ${lineItem.skuId}` : undefined,
     lineItem.unit ? `Unit ${lineItem.unit}` : undefined,
-    lineItem.unitPriceUsd !== undefined ? `${formatCurrency(lineItem.unitPriceUsd)}/unit` : undefined,
+    lineItem.unitPriceUsd !== undefined
+      ? `${formatCurrency(lineItem.unitPriceUsd)}/unit`
+      : undefined,
     lineItem.pricingBasis ? `${capitalize(lineItem.pricingBasis)} pricing` : undefined,
   ].filter((part): part is string => Boolean(part));
 
@@ -827,7 +830,7 @@ function compareRows(
 function costForInterval(provider: ComparisonProviderResult, interval: IntervalKey): number {
   switch (interval) {
     case 'hourly':
-      return provider.totals.hourly ?? provider.totals.monthly / 730;
+      return provider.totals.hourly ?? hourlyFromMonthly(provider.totals.monthly);
     case 'daily':
       return provider.totals.daily;
     case 'weekly':

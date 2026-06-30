@@ -8,6 +8,7 @@ import {
   ProviderPricingResult,
   ServiceCategory,
 } from '../adapters/common/cloud-provider-adapter';
+import { HOURS_PER_MONTH } from '../cost-time';
 import { NormalizedWorkloadSpec } from '../nws/nws.types';
 import { NWSValidator } from '../nws/nws-validator';
 import {
@@ -26,8 +27,6 @@ import {
 } from './comparison.types';
 import { EquivalentServiceMapper } from './equivalent-service-mapper';
 import { IntervalCostCalculator } from './interval-cost-calculator';
-
-const HOURS_PER_MONTH = 730;
 
 interface ProviderSuccess {
   result: ProviderPricingResult;
