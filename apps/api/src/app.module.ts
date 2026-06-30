@@ -6,6 +6,7 @@ import { CostManagementJobsModule } from './cost-management-jobs/cost-management
 import { HealthController } from './health/health.controller';
 import { NwsParserModule } from './nws-parser/nws-parser.module';
 import { PricingEtlModule } from './pricing-etl/pricing-etl.module';
+import { PricingModelsModule } from './pricing-models/pricing-models.module';
 import { ReportModule } from './reports/report.module';
 
 @Module({
@@ -15,6 +16,7 @@ import { ReportModule } from './reports/report.module';
     NwsParserModule,
     ComparisonModule,
     ReportModule,
+    PricingModelsModule,
     ApiModule,
     CostManagementJobsModule,
   ],

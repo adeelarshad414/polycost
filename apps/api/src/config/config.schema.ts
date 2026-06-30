@@ -32,6 +32,7 @@ export const configSchema = z.object({
       'http://localhost:3000,http://localhost:3002,http://127.0.0.1:3000,http://127.0.0.1:3002',
     ),
   FEATURE_LIVE_PRICING_REFRESH_ENABLED: z.coerce.boolean().default(true),
+  FEATURE_RESERVED_PRICING: z.coerce.boolean().default(true),
 });
 
 export type AppConfig = z.infer<typeof configSchema>;
