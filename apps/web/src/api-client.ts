@@ -9,6 +9,7 @@ import {
   NormalizedWorkloadSpec,
   ParsedNwsDraft,
   PricingModelCatalogResponse,
+  PricingModelsForServiceResponse,
   PricingStatusResponse,
   RegionCatalogResponse,
   ReportFormat,
@@ -50,6 +51,11 @@ export interface PolyCostClient {
   exportComparison(comparisonId: string, format: ReportFormat): Promise<Blob>;
   getPricingStatus(): Promise<PricingStatusResponse>;
   getPricingModels(): Promise<PricingModelCatalogResponse>;
+  getPricingModelsForService(
+    provider: string,
+    service: string,
+    region: string,
+  ): Promise<PricingModelsForServiceResponse>;
   getRegionCatalog(): Promise<RegionCatalogResponse>;
   createWorkload(input: WorkloadInput): Promise<WorkloadRecord>;
   createShareLink(input: {
@@ -125,6 +131,14 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
     },
     getPricingModels() {
       return requestJson<PricingModelCatalogResponse>(baseUrl, '/pricing/models');
+    },
+    getPricingModelsForService(provider, service, region) {
+      return requestJson<PricingModelsForServiceResponse>(
+        baseUrl,
+        `/pricing/${encodeURIComponent(provider)}/${encodeURIComponent(
+          service,
+        )}/models?region=${encodeURIComponent(region)}`,
+      );
     },
     getRegionCatalog() {
       return requestJson<RegionCatalogResponse>(baseUrl, '/regions');

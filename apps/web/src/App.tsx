@@ -29,6 +29,7 @@ import {
   IntervalKey,
   NormalizedWorkloadSpec,
   PROVIDER_ORDER,
+  PricingModelKey,
   ProviderId,
   RegionCatalogResponse,
   ReportFormat,
@@ -66,6 +67,45 @@ const INPUT_MODE_OPTIONS: Array<{
     label: 'Paste / parse',
     summaryLabel: 'Parsed from text',
     description: 'Natural language or pasted bill text',
+  },
+];
+
+const PRICING_MODEL_STORAGE_KEY = 'polycost-pricing-model';
+const PRICING_MODEL_OPTIONS: Array<{
+  key: PricingModelKey;
+  label: string;
+  shortLabel: string;
+  description: string;
+}> = [
+  {
+    key: 'on-demand',
+    label: 'On-demand',
+    shortLabel: 'On-demand',
+    description: 'Baseline cached pay-as-you-go pricing.',
+  },
+  {
+    key: 'reserved-1yr',
+    label: 'Reserved 1yr',
+    shortLabel: 'Reserved 1yr',
+    description: 'One-year commitment scenario.',
+  },
+  {
+    key: 'reserved-3yr',
+    label: 'Reserved 3yr',
+    shortLabel: 'Reserved 3yr',
+    description: 'Three-year commitment scenario.',
+  },
+  {
+    key: 'savings-plan',
+    label: 'Savings/CUD',
+    shortLabel: 'Savings/CUD',
+    description: 'Savings Plans, Azure reservations, or GCP committed-use discounts.',
+  },
+  {
+    key: 'spot',
+    label: 'Spot estimate',
+    shortLabel: 'Spot estimate',
+    description: 'Interruptible compute shown as an estimate range.',
   },
 ];
 
@@ -351,6 +391,9 @@ export function App({ client = polyCostClient }: AppProps) {
   const [submittedInputMode, setSubmittedInputMode] = useState<InputMode>('form');
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
   const [interval, setInterval] = useState<IntervalKey>('monthly');
+  const [pricingModel, setPricingModel] = useState<PricingModelKey>(() =>
+    readStoredPricingModel(),
+  );
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [exportingFormat, setExportingFormat] = useState<ReportFormat | null>(null);
   const [isEditingRequirements, setIsEditingRequirements] = useState(false);
@@ -598,6 +641,7 @@ export function App({ client = polyCostClient }: AppProps) {
     setComparison(null);
     setIsEditingRequirements(false);
     setInterval('monthly');
+    handlePricingModelChange('on-demand');
     setBusyAction(null);
     setExportingFormat(null);
     setNotice(null);
@@ -617,6 +661,11 @@ export function App({ client = polyCostClient }: AppProps) {
     setFormValidationIssues([]);
     setInputMode(submittedInputMode);
     setIsEditingRequirements(true);
+  }
+
+  function handlePricingModelChange(nextPricingModel: PricingModelKey) {
+    setPricingModel(nextPricingModel);
+    storePricingModel(nextPricingModel);
   }
 
   function handleSignIn() {
@@ -660,6 +709,7 @@ export function App({ client = polyCostClient }: AppProps) {
           submittedForm={submittedForm}
           submittedInputMode={submittedInputMode}
           inputMode={inputMode}
+          pricingModel={pricingModel}
           interval={interval}
           isEditingRequirements={isEditingRequirements}
           busyAction={busyAction}
@@ -673,6 +723,7 @@ export function App({ client = polyCostClient }: AppProps) {
           onClear={handleClearComparison}
           onEdit={handleEditComparison}
           onInputModeChange={setInputMode}
+          onPricingModelChange={handlePricingModelChange}
           onNaturalLanguageChange={setNaturalLanguageInput}
           onFormChange={handleFormChange}
           onSubmit={handleCompare}
@@ -687,6 +738,7 @@ export function App({ client = polyCostClient }: AppProps) {
         <InitialHomePage
           form={form}
           inputMode={inputMode}
+          pricingModel={pricingModel}
           naturalLanguageInput={naturalLanguageInput}
           regionCatalog={regionCatalog}
           regionCatalogError={regionCatalogError}
@@ -695,6 +747,7 @@ export function App({ client = polyCostClient }: AppProps) {
           validationIssues={formValidationIssues}
           isComparing={busyAction === 'compare'}
           onInputModeChange={setInputMode}
+          onPricingModelChange={handlePricingModelChange}
           onNaturalLanguageChange={setNaturalLanguageInput}
           onChange={handleFormChange}
           onClearRequirements={handleClearRequirements}
@@ -849,6 +902,7 @@ function AppHeader({
 function InitialHomePage({
   form,
   inputMode,
+  pricingModel,
   naturalLanguageInput,
   regionCatalog,
   regionCatalogError,
@@ -857,6 +911,7 @@ function InitialHomePage({
   validationIssues,
   isComparing,
   onInputModeChange,
+  onPricingModelChange,
   onNaturalLanguageChange,
   onChange,
   onClearRequirements,
@@ -865,6 +920,7 @@ function InitialHomePage({
 }: {
   form: WorkloadFormState;
   inputMode: InputMode;
+  pricingModel: PricingModelKey;
   naturalLanguageInput: string;
   regionCatalog: RegionCatalogResponse | null;
   regionCatalogError: string | null;
@@ -873,6 +929,7 @@ function InitialHomePage({
   validationIssues: WorkloadFormIssue[];
   isComparing: boolean;
   onInputModeChange: (mode: InputMode) => void;
+  onPricingModelChange: (model: PricingModelKey) => void;
   onNaturalLanguageChange: (value: string) => void;
   onChange: (form: WorkloadFormState) => void;
   onClearRequirements: () => void;
@@ -905,6 +962,10 @@ function InitialHomePage({
 
       <div className="initial-home-form" aria-label="Compare cloud costs">
         <InputModeTabs inputMode={inputMode} onInputModeChange={onInputModeChange} />
+        <PricingModelPreferenceControl
+          pricingModel={pricingModel}
+          onPricingModelChange={onPricingModelChange}
+        />
 
         {inputMode === 'form' ? (
           <form className="initial-guided-form" onSubmit={onSubmit}>
@@ -1026,6 +1087,7 @@ function ProgressiveComparisonPage({
   submittedForm,
   submittedInputMode,
   inputMode,
+  pricingModel,
   interval,
   isEditingRequirements,
   busyAction,
@@ -1039,6 +1101,7 @@ function ProgressiveComparisonPage({
   onClear,
   onEdit,
   onInputModeChange,
+  onPricingModelChange,
   onNaturalLanguageChange,
   onFormChange,
   onSubmit,
@@ -1055,6 +1118,7 @@ function ProgressiveComparisonPage({
   submittedForm: WorkloadFormState;
   submittedInputMode: InputMode;
   inputMode: InputMode;
+  pricingModel: PricingModelKey;
   interval: IntervalKey;
   isEditingRequirements: boolean;
   busyAction: BusyAction;
@@ -1068,6 +1132,7 @@ function ProgressiveComparisonPage({
   onClear: () => void;
   onEdit: () => void;
   onInputModeChange: (mode: InputMode) => void;
+  onPricingModelChange: (model: PricingModelKey) => void;
   onNaturalLanguageChange: (value: string) => void;
   onFormChange: (form: WorkloadFormState) => void;
   onSubmit: (event?: FormEvent) => void;
@@ -1087,6 +1152,7 @@ function ProgressiveComparisonPage({
               form={form}
               inputMode={inputMode}
               naturalLanguageInput={naturalLanguageInput}
+              pricingModel={pricingModel}
               regionCatalog={regionCatalog}
               regionCatalogError={regionCatalogError}
               validationIssues={validationIssues}
@@ -1094,6 +1160,7 @@ function ProgressiveComparisonPage({
               onClearRequirements={onClearRequirements}
               onFormChange={onFormChange}
               onInputModeChange={onInputModeChange}
+              onPricingModelChange={onPricingModelChange}
               onNaturalLanguageChange={onNaturalLanguageChange}
               onParse={onParse}
               onSubmit={onSubmit}
@@ -1106,6 +1173,7 @@ function ProgressiveComparisonPage({
             <RequirementSummaryStrip
               form={submittedForm}
               inputMode={submittedInputMode}
+              pricingModel={pricingModel}
               regionCatalog={regionCatalog}
               onClear={onClear}
               onEdit={onEdit}
@@ -1136,9 +1204,11 @@ function ProgressiveComparisonPage({
                   exportingFormat={exportingFormat}
                   form={submittedForm}
                   interval={interval}
+                  pricingModel={pricingModel}
                   regionCatalog={regionCatalog}
                   onExport={onExport}
                   onIntervalChange={onIntervalChange}
+                  onPricingModelChange={onPricingModelChange}
                   onRefreshLive={onRefreshLive}
                 />
               </ResultDisclosureSection>
@@ -1154,12 +1224,14 @@ function ProgressiveComparisonPage({
 function RequirementSummaryStrip({
   form,
   inputMode,
+  pricingModel,
   regionCatalog,
   onClear,
   onEdit,
 }: {
   form: WorkloadFormState;
   inputMode: InputMode;
+  pricingModel: PricingModelKey;
   regionCatalog: RegionCatalogResponse | null;
   onClear: () => void;
   onEdit: () => void;
@@ -1169,6 +1241,7 @@ function RequirementSummaryStrip({
       <div className="summary-strip-main">
         <span className="summary-strip-kicker">
           <InputModeBadge mode={inputMode} />
+          <PricingModelBadge pricingModel={pricingModel} />
           <span>Requirements</span>
         </span>
         <strong>{compactRequirementSummary(form, regionCatalog)}</strong>
@@ -1193,9 +1266,11 @@ function StateDetailContent({
   exportingFormat,
   form,
   interval,
+  pricingModel,
   regionCatalog,
   onExport,
   onIntervalChange,
+  onPricingModelChange,
   onRefreshLive,
 }: {
   busyAction: BusyAction;
@@ -1205,9 +1280,11 @@ function StateDetailContent({
   exportingFormat: ReportFormat | null;
   form: WorkloadFormState;
   interval: IntervalKey;
+  pricingModel: PricingModelKey;
   regionCatalog: RegionCatalogResponse | null;
   onExport: (format: ReportFormat) => void;
   onIntervalChange: (interval: IntervalKey) => void;
+  onPricingModelChange: (model: PricingModelKey) => void;
   onRefreshLive: () => void;
 }) {
   const isLoading = busyAction === 'compare' || busyAction === 'refresh';
@@ -1242,6 +1319,8 @@ function StateDetailContent({
           form={form}
           interval={interval}
           isLoading={isLoading}
+          pricingModelPreference={pricingModel}
+          onPricingModelPreferenceChange={onPricingModelChange}
         />
       </section>
 
@@ -1344,10 +1423,48 @@ function InputModeBadge({ mode }: { mode: InputMode }) {
   );
 }
 
+function PricingModelPreferenceControl({
+  pricingModel,
+  onPricingModelChange,
+}: {
+  pricingModel: PricingModelKey;
+  onPricingModelChange: (model: PricingModelKey) => void;
+}) {
+  return (
+    <div className="pricing-model-preference" aria-label="Pricing model preference">
+      <span className="pricing-model-preference-label">Scenario</span>
+      <div className="pricing-model-preference-options" role="group" aria-label="Pricing model">
+        {PRICING_MODEL_OPTIONS.map((option) => (
+          <button
+            type="button"
+            key={option.key}
+            title={option.description}
+            aria-pressed={pricingModel === option.key}
+            onClick={() => onPricingModelChange(option.key)}
+          >
+            <PricingModelMiniIcon pricingModel={option.key} />
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PricingModelBadge({ pricingModel }: { pricingModel: PricingModelKey }) {
+  return (
+    <span className={`pricing-model-badge pricing-model-badge-${pricingModel}`}>
+      <PricingModelMiniIcon pricingModel={pricingModel} />
+      {pricingModelSummaryLabel(pricingModel)}
+    </span>
+  );
+}
+
 function RequirementsEditPanel({
   form,
   inputMode,
   naturalLanguageInput,
+  pricingModel,
   regionCatalog,
   regionCatalogError,
   validationIssues,
@@ -1355,6 +1472,7 @@ function RequirementsEditPanel({
   onClearRequirements,
   onFormChange,
   onInputModeChange,
+  onPricingModelChange,
   onNaturalLanguageChange,
   onParse,
   onSubmit,
@@ -1363,6 +1481,7 @@ function RequirementsEditPanel({
   form: WorkloadFormState;
   inputMode: InputMode;
   naturalLanguageInput: string;
+  pricingModel: PricingModelKey;
   regionCatalog: RegionCatalogResponse | null;
   regionCatalogError: string | null;
   validationIssues: WorkloadFormIssue[];
@@ -1370,6 +1489,7 @@ function RequirementsEditPanel({
   onClearRequirements: () => void;
   onFormChange: (form: WorkloadFormState) => void;
   onInputModeChange: (mode: InputMode) => void;
+  onPricingModelChange: (model: PricingModelKey) => void;
   onNaturalLanguageChange: (value: string) => void;
   onParse: () => void;
   onSubmit: (event?: FormEvent) => void;
@@ -1384,6 +1504,10 @@ function RequirementsEditPanel({
         </div>
       </div>
       <InputModeTabs inputMode={inputMode} onInputModeChange={onInputModeChange} />
+      <PricingModelPreferenceControl
+        pricingModel={pricingModel}
+        onPricingModelChange={onPricingModelChange}
+      />
       {inputMode === 'describe' ? (
         <DescribePanel
           value={naturalLanguageInput}
@@ -4013,6 +4137,20 @@ function ModeIcon({ mode }: { mode: InputMode }) {
   );
 }
 
+function PricingModelMiniIcon({ pricingModel }: { pricingModel: PricingModelKey }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="segment-icon">
+      {pricingModel === 'spot' ? (
+        <path d="M5 17l4-8 4 5 3-6 3 9M5 20h14" />
+      ) : pricingModel === 'on-demand' ? (
+        <path d="M6 7h12M6 12h12M6 17h8" />
+      ) : (
+        <path d="M7 20V9M12 20V5M17 20v-8M5 20h14" />
+      )}
+    </svg>
+  );
+}
+
 function SampleIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon">
@@ -5022,6 +5160,24 @@ function compareLoadingLabel(inputMode: InputMode): string {
 
 function inputModeSummaryLabel(inputMode: InputMode): string {
   return INPUT_MODE_OPTIONS.find((option) => option.key === inputMode)?.summaryLabel ?? 'Manual entry';
+}
+
+function pricingModelSummaryLabel(pricingModel: PricingModelKey): string {
+  return (
+    PRICING_MODEL_OPTIONS.find((option) => option.key === pricingModel)?.shortLabel ?? 'On-demand'
+  );
+}
+
+function readStoredPricingModel(): PricingModelKey {
+  const stored = window.localStorage.getItem(PRICING_MODEL_STORAGE_KEY);
+
+  return PRICING_MODEL_OPTIONS.some((option) => option.key === stored)
+    ? (stored as PricingModelKey)
+    : 'on-demand';
+}
+
+function storePricingModel(pricingModel: PricingModelKey): void {
+  window.localStorage.setItem(PRICING_MODEL_STORAGE_KEY, pricingModel);
 }
 
 function reportFormatLabel(format: ReportFormat): string {

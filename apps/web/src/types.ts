@@ -24,6 +24,14 @@ export type CachedPricingTerm =
   | 'reserved_3yr'
   | 'spot'
   | 'savings_plan';
+export type PricingTermCode =
+  | 'on_demand'
+  | 'reserved_1yr'
+  | 'reserved_3yr'
+  | 'savings_plan_1yr'
+  | 'savings_plan_3yr'
+  | 'spot_estimate';
+export type PaymentOptionCode = 'no_upfront' | 'partial_upfront' | 'all_upfront' | 'n_a';
 export type StoragePricingTier = 'standard' | 'infrequent_access' | 'archive';
 
 export const INTERVALS: Array<{ key: IntervalKey; label: string }> = [
@@ -202,6 +210,26 @@ export interface PricingModelCatalogResponse {
   models: PricingModelCatalogEntry[];
   defaultModel: PricingModelKey;
   generatedAt: string;
+}
+
+export interface PricingModelsForServiceResponse {
+  schemaVersion: 2;
+  provider: ProviderId;
+  service: string;
+  region: string;
+  generatedAt: string;
+  models: Array<{
+    code: PricingTermCode;
+    label: string;
+    termMonths?: number;
+    requiresPaymentOption: boolean;
+    isEstimateOnly: boolean;
+    paymentOptions: Array<{
+      code: PaymentOptionCode;
+      label: string;
+    }>;
+    defaultPaymentOption?: PaymentOptionCode;
+  }>;
 }
 
 export interface BackendHealthResponse {

@@ -223,6 +223,52 @@ describe('api client', () => {
     );
   });
 
+  it('fetches provider/service pricing model metadata for dynamic selectors', async () => {
+    const fetchMock = jest.fn(async () =>
+      jsonResponse({
+        schemaVersion: 2,
+        provider: 'aws',
+        service: 'compute',
+        region: 'us-east-1',
+        generatedAt: '2026-06-30T00:00:00.000Z',
+        models: [
+          {
+            code: 'reserved_3yr',
+            label: 'Reserved (3-Year)',
+            termMonths: 36,
+            requiresPaymentOption: true,
+            isEstimateOnly: false,
+            paymentOptions: [{ code: 'no_upfront', label: 'No upfront' }],
+            defaultPaymentOption: 'no_upfront',
+          },
+        ],
+      }),
+    );
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(
+      client.getPricingModelsForService('aws', 'compute', 'us-east-1'),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        schemaVersion: 2,
+        models: expect.arrayContaining([
+          expect.objectContaining({
+            code: 'reserved_3yr',
+          }),
+        ]),
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/pricing/aws/compute/models?region=us-east-1',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+  });
+
   it('creates workload-scoped share links and resolves public reports', async () => {
     const fetchMock = jest
       .fn()
