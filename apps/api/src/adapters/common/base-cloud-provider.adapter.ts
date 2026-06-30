@@ -135,7 +135,10 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     options?: RefreshPricingCatalogOptions,
   ): Promise<PricingCatalogRecord[]>;
 
-  abstract refreshLivePricing(serviceIds: string[]): Promise<PricingCatalogRecord[]>;
+  abstract refreshLivePricing(
+    serviceIds: string[],
+    options?: RefreshPricingCatalogOptions,
+  ): Promise<PricingCatalogRecord[]>;
 
   protected async findCatalogRecords(
     category: ServiceCategory,
@@ -316,6 +319,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       isApproximate: record.attributes?.isApproximate === true,
       baseMonthlyCostUsd: cost.monthlyCostUsd,
       skuId: record.skuId,
+      region: record.region,
       unit: record.unit,
       unitPriceUsd: record.unitPriceUsd,
       pricingBasis: cost.pricingBasis,

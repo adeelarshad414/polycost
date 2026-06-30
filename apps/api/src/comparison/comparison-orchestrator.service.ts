@@ -117,6 +117,10 @@ export class ComparisonOrchestratorService {
         description: annotatedLineItem.description,
         isApproximate: annotatedLineItem.isApproximate,
         baseMonthlyCostUsd: this.roundCurrency(annotatedLineItem.baseMonthlyCostUsd),
+        skuId: annotatedLineItem.skuId,
+        region: annotatedLineItem.region,
+        unit: annotatedLineItem.unit,
+        unitPriceUsd: annotatedLineItem.unitPriceUsd,
         pricingBasis: annotatedLineItem.pricingBasis ?? 'flat',
         ...(annotatedLineItem.pricingModels
           ? {

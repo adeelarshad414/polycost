@@ -8,7 +8,7 @@ import {
 } from './regions.types';
 
 const REGION_CACHE_TTL_SECONDS = 12 * 60 * 60;
-const FETCH_TIMEOUT_MS = 8_000;
+const FETCH_TIMEOUT_MS = 3_000;
 
 const AWS_REGIONS_URL = 'https://b0.p.awsstatic.com/locations/1.0/aws/current/locations.json';
 const AZURE_REGIONS_URL =

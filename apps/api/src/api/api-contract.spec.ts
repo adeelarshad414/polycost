@@ -665,7 +665,14 @@ describe('API contracts', () => {
         providers: [],
       })),
     };
-    const service = new ComparisonApplicationService(orchestrator as never, repository as never);
+    const liveRefresh = {
+      refreshSnapshot: jest.fn(async () => []),
+    };
+    const service = new ComparisonApplicationService(
+      orchestrator as never,
+      repository as never,
+      liveRefresh as never,
+    );
 
     await expect(service.createComparison(validNws, { useLivePricing: false })).resolves.toEqual(
       comparisonResult,
@@ -678,8 +685,65 @@ describe('API contracts', () => {
     await expect(
       service.refreshLiveComparison(comparisonResult.comparisonId, true),
     ).resolves.toEqual(comparisonResult);
+    expect(liveRefresh.refreshSnapshot).toHaveBeenCalledWith({
+      nwsSnapshot: validNws,
+      resultSnapshot: comparisonResult,
+    });
     await expect(service.validateNws(validNws)).resolves.toEqual({ valid: true });
     await expect(service.getPricingStatus()).resolves.toEqual({ providers: [] });
+  });
+
+  it('merges live-refresh warnings into refreshed comparison snapshots', async () => {
+    const refreshedResult: ComparisonResult = {
+      ...comparisonResult,
+      comparisonId: '22222222-2222-4222-8222-222222222222',
+    };
+    const repository = {
+      saveComparison: jest.fn(async () => undefined),
+      getComparison: jest.fn(async () => ({
+        nwsSnapshot: validNws,
+        resultSnapshot: comparisonResult,
+      })),
+      getPricingStatus: jest.fn(),
+    };
+    const service = new ComparisonApplicationService(
+      {
+        compare: jest.fn(async () => refreshedResult),
+      } as never,
+      repository as never,
+      {
+        refreshSnapshot: jest.fn(async () => [
+          {
+            providerId: 'azure',
+            code: 'live_refresh_failed',
+            message: 'azure live refresh failed: provider throttled',
+          },
+        ]),
+      } as never,
+    );
+
+    await expect(
+      service.refreshLiveComparison(comparisonResult.comparisonId, true),
+    ).resolves.toEqual({
+      ...refreshedResult,
+      warnings: [
+        {
+          providerId: 'azure',
+          code: 'live_refresh_failed',
+          message: 'azure live refresh failed: provider throttled',
+        },
+      ],
+    });
+    expect(repository.saveComparison).toHaveBeenCalledWith(validNws, {
+      ...refreshedResult,
+      warnings: [
+        {
+          providerId: 'azure',
+          code: 'live_refresh_failed',
+          message: 'azure live refresh failed: provider throttled',
+        },
+      ],
+    });
   });
 
   it('reports comparison application not-found and disabled live-refresh failures', async () => {

@@ -100,6 +100,10 @@ export interface ComparisonLineItem {
   description: string;
   isApproximate: boolean;
   baseMonthlyCostUsd: number;
+  skuId?: string;
+  region?: string;
+  unit?: string;
+  unitPriceUsd?: number;
   pricingBasis?: PricingBasis;
   pricingModels?: PricingModelCost[];
 }

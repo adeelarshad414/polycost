@@ -12,7 +12,9 @@ Every frontend feature in PolyCost depends on a trustworthy backend cache:
 
 1. SKU normalization: AWS, Azure, and GCP expose pricing catalogs with different service and SKU shapes.
 2. Cache versus live separation: large provider catalogs and currency rates are synchronized on schedules, while user workloads are request-time data.
-3. Scheduled jobs, not request-time provider calls: API routes read from PostgreSQL and never call cloud pricing or exchange-rate APIs directly.
+3. Scheduled jobs by default: normal API routes read from PostgreSQL; the explicit,
+   rate-limited `refresh-live` route is the only request-time provider refresh
+   exception.
 
 ## 2. System Overview
 
@@ -48,7 +50,10 @@ request-time API
   GET  /api/v1/exchange-rates
 ```
 
-Rule of thumb: if it touches a provider pricing API, an exchange-rate API, or alert evaluation, it runs in a scheduled job and writes to the database. Request-time routes read from the database only.
+Rule of thumb: if it touches a provider pricing API, an exchange-rate API, or alert
+evaluation, it runs in a scheduled job and writes to the database. The exception is
+`POST /api/v1/comparisons/:id/refresh-live`, which is user-triggered, rate-limited,
+SKU-scoped, writes refreshed rows to the cache, and then compares from cached data.
 
 ## 3. Normalized Internal Schema
 
@@ -129,6 +134,11 @@ Request-time endpoints read from PostgreSQL only:
 - `POST /api/v1/share-links`: creates token-scoped read-only links.
 - `GET /api/v1/share/:token`: returns only the shared workload and its comparison breakdown.
 - `GET /api/v1/exchange-rates`: reads latest cached exchange rates.
+
+`POST /api/v1/comparisons/:id/refresh-live` is not a broad live-pricing fallback. It
+uses provider SKU/region traceability saved in the original comparison snapshot to
+refresh only referenced provider groups before creating a new cached comparison.
+Legacy snapshots without SKU traceability fail with `LIVE_REFRESH_UNAVAILABLE`.
 
 ## 8. Egress Calculation
 

@@ -34,6 +34,7 @@ export interface ProviderPricingLineItem {
   isApproximate: boolean;
   baseMonthlyCostUsd: number;
   skuId: string;
+  region: string;
   unit: string;
   unitPriceUsd: number;
   pricingBasis?: PricingBasis;
@@ -70,5 +71,8 @@ export interface CloudProviderAdapter {
 
   refreshPricingCatalog(options?: RefreshPricingCatalogOptions): Promise<PricingCatalogRecord[]>;
 
-  refreshLivePricing(serviceIds: string[]): Promise<PricingCatalogRecord[]>;
+  refreshLivePricing(
+    serviceIds: string[],
+    options?: RefreshPricingCatalogOptions,
+  ): Promise<PricingCatalogRecord[]>;
 }

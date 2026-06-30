@@ -7,7 +7,8 @@ single exception filter for the documented error envelope.
 
 ## Runtime Wiring
 
-`ApiModule` imports the parser, comparison, and report modules. It provides:
+`ApiModule` imports the parser, comparison, provider-adapter, and report modules. It
+provides:
 
 - `WorkloadController` for `POST /workload/parse` and `POST /workload/validate`.
 - `ComparisonsController` for comparison creation, lookup, export, and refresh.
@@ -15,6 +16,8 @@ single exception filter for the documented error envelope.
 - `ApiExceptionFilter` as a global filter for V1 response envelopes.
 - `ApiRateLimitService` for per-IP in-memory minute buckets.
 - `ApiDatabaseRepository` for comparison snapshots and pricing status reads.
+- `LivePricingRefreshService` for rate-limited SKU-scoped provider refreshes of
+  existing comparison snapshots.
 
 The API repository uses the runtime application database role from Vault
 (`secret/polycost/db:username` and `secret/polycost/db:password`) and only writes
@@ -53,9 +56,14 @@ provider ETL credentials are configured. Seed rows are marked with
 baseline rows when both exist.
 
 Initial comparisons use the cached catalog. Requests with `useLivePricing: true`
-return `LIVE_REFRESH_UNAVAILABLE` until SKU-scoped live refresh is implemented.
+still return `LIVE_REFRESH_UNAVAILABLE`; users must first create a cache-backed
+comparison snapshot.
 
-`POST /api/v1/comparisons/:id/refresh-live` creates a new comparison snapshot from
-the stored NWS and current catalog data. A stricter SKU-scoped provider live refresh
-needs either internal SKU traceability in stored snapshots or an internal refresh
-plan derived from the NWS; this is tracked as a carried-forward V1 hardening item.
+`POST /api/v1/comparisons/:id/refresh-live` is the explicit request-time provider
+exception. It reads provider SKU traceability from the stored comparison snapshot,
+groups those SKU references by provider, category, and region, refreshes those
+groups through `refreshLivePricing()`, writes raw and normalized pricing rows to the
+cache, and then creates a new comparison snapshot from the stored NWS. Provider live
+refresh failures are returned as `live_refresh_failed` warnings while the refreshed
+comparison still uses the best available cached data. Older snapshots without SKU
+traceability return `LIVE_REFRESH_UNAVAILABLE` instead of broad-refreshing catalogs.

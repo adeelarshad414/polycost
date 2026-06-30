@@ -2,7 +2,32 @@
 
 Base URL: `/api/v1`
 
-This document reflects the implemented backend contract. Request-time endpoints read the database cache only; provider pricing and currency APIs are used by scheduled jobs.
+This document reflects the implemented backend contract. Normal compare/breakdown
+requests read the database cache only; provider pricing and currency APIs are used by
+scheduled jobs. The only request-time provider exception is the explicit,
+rate-limited `POST /comparisons/:id/refresh-live` flow for existing comparison
+snapshots.
+
+## Comparisons
+
+`POST /comparisons`
+
+Initial comparisons use cached pricing. `options.useLivePricing: true` returns
+`LIVE_REFRESH_UNAVAILABLE`; create the comparison first, then call refresh-live.
+
+`POST /comparisons/:id/refresh-live`
+
+Refreshes provider pricing for the saved provider SKUs in the existing comparison,
+writes refreshed raw and normalized pricing rows to the cache, and returns a new
+comparison snapshot. The response shape is the standard `ComparisonResult`.
+
+Notes:
+
+- Existing snapshots must include line-item `skuId` and `region` traceability.
+- Provider failures return `warnings[]` entries with `code: "live_refresh_failed"`.
+- If every provider fails live refresh, the comparison can still return from cached
+  data with warnings.
+- Older snapshots without traceability return `LIVE_REFRESH_UNAVAILABLE`.
 
 ## Pricing Compare
 

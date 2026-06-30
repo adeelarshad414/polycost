@@ -110,8 +110,11 @@ export class AwsProviderAdapter extends BaseCloudProviderAdapter {
     return records;
   }
 
-  async refreshLivePricing(serviceIds: string[]): Promise<PricingCatalogRecord[]> {
-    const allRecords = await this.refreshPricingCatalog();
+  async refreshLivePricing(
+    serviceIds: string[],
+    options: RefreshPricingCatalogOptions = {},
+  ): Promise<PricingCatalogRecord[]> {
+    const allRecords = await this.refreshPricingCatalog(options);
     return uniqueSkuRecords(
       allRecords.filter(
         (record) => serviceIds.includes(record.skuId) || serviceIds.includes(record.serviceName),
@@ -125,7 +128,9 @@ export class AwsProviderAdapter extends BaseCloudProviderAdapter {
     fetchedAt: string,
     region?: string,
   ): Promise<PricingCatalogRecord[]> {
-    const url = `${AWS_BULK_PRICING_ENDPOINT}/${serviceCode}/current/index.json`;
+    const url = region
+      ? `${AWS_BULK_PRICING_ENDPOINT}/${serviceCode}/current/${region}/index.json`
+      : `${AWS_BULK_PRICING_ENDPOINT}/${serviceCode}/current/index.json`;
     const response = await this.fetchClient(url);
     const parsed = await parseJsonResponse<AwsBulkPriceListResponse>(this.providerId, response);
 

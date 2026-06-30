@@ -7,7 +7,7 @@ comparison engine and pricing ETL job.
 
 Implemented providers:
 
-- AWS via the Price List `GetProducts` API.
+- AWS via public Price List offer files.
 - Azure via the Retail Prices API.
 - GCP via the Cloud Billing Catalog services/SKUs APIs.
 
@@ -15,7 +15,8 @@ Each adapter supports:
 
 - `priceWorkload()` from cached normalized catalog records.
 - `refreshPricingCatalog()` from provider pricing APIs.
-- `refreshLivePricing()` for service/SKU-specific live refreshes.
+- `refreshLivePricing()` for service/SKU-specific live refreshes, with optional
+  category and region hints supplied by saved comparison traceability.
 
 ## Adapter contract
 
@@ -30,10 +31,9 @@ from the normalized catalog reader injected into the adapter.
 ## Credentials
 
 Provider credentials flow through `SecretsReader`/`SecretsService`, not environment
-variables:
+variables, when a provider API requires them:
 
-- AWS requires `polycost/providers/aws` keys `access_key_id` and
-  `secret_access_key`; `session_token` is optional.
+- AWS public offer-file refresh does not require credentials in the current adapter.
 - GCP requires `polycost/providers/gcp` key `access_token`.
 - Azure Retail Prices does not require credentials.
 

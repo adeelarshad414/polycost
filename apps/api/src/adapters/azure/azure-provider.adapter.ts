@@ -72,8 +72,11 @@ export class AzureProviderAdapter extends BaseCloudProviderAdapter {
     return records;
   }
 
-  async refreshLivePricing(serviceIds: string[]): Promise<PricingCatalogRecord[]> {
-    const allRecords = await this.refreshPricingCatalog();
+  async refreshLivePricing(
+    serviceIds: string[],
+    options: RefreshPricingCatalogOptions = {},
+  ): Promise<PricingCatalogRecord[]> {
+    const allRecords = await this.refreshPricingCatalog(options);
     return uniqueSkuRecords(
       allRecords.filter(
         (record) => serviceIds.includes(record.skuId) || serviceIds.includes(record.serviceName),

@@ -20,6 +20,10 @@ export interface ComparisonLineItem {
   description: string;
   isApproximate: boolean;
   baseMonthlyCostUsd: number;
+  skuId?: string;
+  region?: string;
+  unit?: string;
+  unitPriceUsd?: number;
   pricingBasis?: PricingBasis;
   pricingModels?: PricingModelCost[];
 }
@@ -42,7 +46,7 @@ export interface ComparisonProviderResult {
 
 export interface ComparisonWarning {
   providerId?: ProviderId;
-  code: 'provider_pricing_failed';
+  code: 'provider_pricing_failed' | 'live_refresh_failed';
   message: string;
 }
 

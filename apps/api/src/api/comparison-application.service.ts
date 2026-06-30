@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ComparisonOrchestratorService } from '../comparison/comparison-orchestrator.service';
-import { ComparisonResult } from '../comparison/comparison.types';
+import { ComparisonResult, ComparisonWarning } from '../comparison/comparison.types';
 import { NWSValidator } from '../nws/nws-validator';
 import { ApiNotFoundError, LiveRefreshUnavailableError } from './api-errors';
 import { ApiDatabaseRepository, ComparisonSnapshot } from './api-database.repository';
+import { LivePricingRefreshService } from './live-pricing-refresh.service';
 
 export interface CreateComparisonOptions {
   useLivePricing?: boolean;
@@ -14,6 +15,7 @@ export class ComparisonApplicationService {
   constructor(
     private readonly comparisonOrchestratorService: ComparisonOrchestratorService,
     private readonly apiDatabaseRepository: ApiDatabaseRepository,
+    private readonly livePricingRefreshService?: LivePricingRefreshService,
   ) {}
 
   async createComparison(
@@ -53,7 +55,13 @@ export class ComparisonApplicationService {
     }
 
     const snapshot = await this.getComparison(comparisonId);
-    const refreshed = await this.comparisonOrchestratorService.compare(snapshot.nwsSnapshot);
+    const liveRefreshWarnings = this.livePricingRefreshService
+      ? await this.livePricingRefreshService.refreshSnapshot(snapshot)
+      : [];
+    const refreshed = mergeWarnings(
+      await this.comparisonOrchestratorService.compare(snapshot.nwsSnapshot),
+      liveRefreshWarnings,
+    );
 
     await this.apiDatabaseRepository.saveComparison(snapshot.nwsSnapshot, refreshed);
 
@@ -70,4 +78,18 @@ export class ComparisonApplicationService {
   async getPricingStatus() {
     return this.apiDatabaseRepository.getPricingStatus();
   }
+}
+
+function mergeWarnings(
+  result: ComparisonResult,
+  liveRefreshWarnings: ComparisonWarning[],
+): ComparisonResult {
+  if (liveRefreshWarnings.length === 0) {
+    return result;
+  }
+
+  return {
+    ...result,
+    warnings: [...(result.warnings ?? []), ...liveRefreshWarnings],
+  };
 }

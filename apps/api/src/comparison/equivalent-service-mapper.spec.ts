@@ -103,6 +103,7 @@ describe('EquivalentServiceMapper', () => {
       isApproximate: true,
       baseMonthlyCostUsd: 10,
       skuId: 'sku-1',
+      region: 'us-east-1',
       unit: 'hour',
       unitPriceUsd: 0.01,
     });
