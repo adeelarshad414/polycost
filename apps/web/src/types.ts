@@ -382,6 +382,26 @@ export interface ProviderDeltaAnalysis {
   explanation: string;
 }
 
+export interface RegionVarianceProviderCost {
+  providerId: ProviderId;
+  providerRegion: string;
+  modeledMonthlyUsd: number;
+  deltaVsSelectedMonthlyUsd: number;
+  isLowest: boolean;
+}
+
+export interface RegionVarianceHeatMapRow {
+  comparisonRegion: string;
+  label: string;
+  regionSummary: string;
+  multiplier: number;
+  evidence: string;
+  isSelected: boolean;
+  complianceEligible: boolean;
+  lowestProviderId?: ProviderId;
+  providers: RegionVarianceProviderCost[];
+}
+
 export interface SensitivityScenarioRow {
   variable: 'compute_capacity' | 'storage_volume' | 'egress_traffic' | 'database_capacity';
   label: string;
@@ -484,6 +504,7 @@ export interface ComparisonAnalyticsResponse {
   costCoverageMap: CostCoverageMapEntry[];
   costComposition: ProviderCostComposition[];
   providerDeltaAnalysis: ProviderDeltaAnalysis[];
+  regionVarianceHeatMap: RegionVarianceHeatMapRow[];
   sensitivityScenarios: SensitivityScenarioRow[];
   commitmentRoiTimelines: CommitmentRoiTimeline[];
   commitmentCoverage: CommitmentCoverageRow[];

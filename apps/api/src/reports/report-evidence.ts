@@ -43,6 +43,16 @@ const REGION_VARIANCE_PROFILES = [
   },
 ] as const;
 
+export interface RegionComparisonEvidenceRow {
+  providerId: string;
+  comparisonRegion: string;
+  providerRegion: string;
+  modeledMonthlyUsd: number;
+  deltaVsSelectedMonthlyUsd: number;
+  multiplier: number;
+  evidence: string;
+}
+
 interface ProviderScenario {
   providerId: string;
   available: boolean;
@@ -1565,24 +1575,27 @@ export function egressNetworkingDetailRows(result: ComparisonResult): string[][]
   ];
 }
 
-export function regionComparisonRows(result: ComparisonResult): string[][] {
-  const rows = result.providers.flatMap((provider) =>
+export function regionComparisonEvidenceRows(
+  result: ComparisonResult,
+): RegionComparisonEvidenceRow[] {
+  return result.providers.flatMap((provider) =>
     REGION_VARIANCE_PROFILES.map((profile) => {
-      const modeledMonthly = roundCurrency(provider.totals.monthly * profile.multiplier);
-      const delta = roundCurrency(modeledMonthly - provider.totals.monthly);
+      const modeledMonthlyUsd = roundCurrency(provider.totals.monthly * profile.multiplier);
 
-      return [
-        provider.providerId,
-        profile.region,
-        providerRegionLabel(provider.providerId, profile.region),
-        formatNumber(modeledMonthly),
-        formatNumber(delta),
-        formatNumber(profile.multiplier),
-        profile.evidence,
-      ];
+      return {
+        providerId: provider.providerId,
+        comparisonRegion: profile.region,
+        providerRegion: providerRegionLabel(provider.providerId, profile.region),
+        modeledMonthlyUsd,
+        deltaVsSelectedMonthlyUsd: roundCurrency(modeledMonthlyUsd - provider.totals.monthly),
+        multiplier: profile.multiplier,
+        evidence: profile.evidence,
+      };
     }),
   );
+}
 
+export function regionComparisonRows(result: ComparisonResult): string[][] {
   return [
     [
       'Provider',
@@ -1593,7 +1606,15 @@ export function regionComparisonRows(result: ComparisonResult): string[][] {
       'Multiplier',
       'Evidence',
     ],
-    ...rows,
+    ...regionComparisonEvidenceRows(result).map((row) => [
+      row.providerId,
+      row.comparisonRegion,
+      row.providerRegion,
+      formatNumber(row.modeledMonthlyUsd),
+      formatNumber(row.deltaVsSelectedMonthlyUsd),
+      formatNumber(row.multiplier),
+      row.evidence,
+    ]),
   ];
 }
 

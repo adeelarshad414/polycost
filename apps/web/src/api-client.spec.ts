@@ -115,6 +115,27 @@ describe('api client', () => {
         },
       ],
       providerDeltaAnalysis: [],
+      regionVarianceHeatMap: [
+        {
+          comparisonRegion: 'us-east',
+          label: 'US East',
+          regionSummary: 'AWS us-east-1 · Azure eastus · GCP us-east1',
+          multiplier: 1,
+          evidence: 'Baseline North America pricing sensitivity.',
+          isSelected: true,
+          complianceEligible: true,
+          lowestProviderId: 'aws',
+          providers: [
+            {
+              providerId: 'aws',
+              providerRegion: 'us-east-1',
+              modeledMonthlyUsd: 100,
+              deltaVsSelectedMonthlyUsd: 0,
+              isLowest: true,
+            },
+          ],
+        },
+      ],
       sensitivityScenarios: [],
       commitmentRoiTimelines: [],
       commitmentCoverage: [

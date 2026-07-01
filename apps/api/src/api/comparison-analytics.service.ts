@@ -5,7 +5,7 @@ import {
   ComparisonProviderResult,
   ComparisonResult,
 } from '../comparison/comparison.types';
-import { costCoverageMapRows } from '../reports/report-evidence';
+import { costCoverageMapRows, regionComparisonEvidenceRows } from '../reports/report-evidence';
 
 type AnalyticsDimension =
   | 'compute'
@@ -49,6 +49,26 @@ export interface ProviderDeltaAnalysis {
   deltaMonthlyUsd: number;
   deltaPercentVsMostExpensive: number;
   explanation: string;
+}
+
+export interface RegionVarianceProviderCost {
+  providerId: ProviderId;
+  providerRegion: string;
+  modeledMonthlyUsd: number;
+  deltaVsSelectedMonthlyUsd: number;
+  isLowest: boolean;
+}
+
+export interface RegionVarianceHeatMapRow {
+  comparisonRegion: string;
+  label: string;
+  regionSummary: string;
+  multiplier: number;
+  evidence: string;
+  isSelected: boolean;
+  complianceEligible: boolean;
+  lowestProviderId?: ProviderId;
+  providers: RegionVarianceProviderCost[];
 }
 
 export interface SensitivityScenarioRow {
@@ -157,6 +177,7 @@ export interface ComparisonAnalyticsResponse {
   costCoverageMap: CostCoverageMapEntry[];
   costComposition: ProviderCostComposition[];
   providerDeltaAnalysis: ProviderDeltaAnalysis[];
+  regionVarianceHeatMap: RegionVarianceHeatMapRow[];
   sensitivityScenarios: SensitivityScenarioRow[];
   commitmentRoiTimelines: CommitmentRoiTimeline[];
   commitmentCoverage: CommitmentCoverageRow[];
@@ -225,6 +246,24 @@ const COMMITMENT_MODELS: Array<Exclude<PricingModelKey, 'on-demand' | 'spot'>> =
   'savings-plan',
 ];
 
+const COMPARISON_REGION_IDS = [
+  'us-east',
+  'us-west',
+  'eu-west',
+  'ap-southeast',
+  'ap-south',
+] as const;
+
+const COMPARISON_REGION_PROVIDER_REGIONS: Record<string, string[]> = {
+  'us-east': ['us-east-1', 'eastus', 'us-east1'],
+  'us-west': ['us-west-2', 'westus2', 'us-west1'],
+  'eu-west': ['eu-west-1', 'westeurope', 'europe-west1'],
+  'ap-southeast': ['ap-southeast-1', 'southeastasia', 'asia-southeast1'],
+  'ap-south': ['ap-south-1', 'centralindia', 'asia-south1'],
+};
+
+const PROVIDER_SORT_ORDER: ProviderId[] = ['aws', 'azure', 'gcp'];
+
 @Injectable()
 export class ComparisonAnalyticsService {
   build(result: ComparisonResult, generatedAt = new Date()): ComparisonAnalyticsResponse {
@@ -243,6 +282,7 @@ export class ComparisonAnalyticsService {
         costComposition(provider, amounts),
       ),
       providerDeltaAnalysis: providerDeltaAnalysis(providerDimensionAmounts),
+      regionVarianceHeatMap: regionVarianceHeatMap(result),
       sensitivityScenarios: sensitivityScenarios(providerDimensionAmounts),
       commitmentRoiTimelines: commitmentRoiTimelines(result.providers),
       commitmentCoverage: commitmentCoverage(result),
@@ -250,6 +290,58 @@ export class ComparisonAnalyticsService {
       finOpsFindings: finOpsFindings(result, providerDimensionAmounts),
     };
   }
+}
+
+function regionVarianceHeatMap(result: ComparisonResult): RegionVarianceHeatMapRow[] {
+  const selectedRegion =
+    canonicalRegionForRegionPreference(result.requirements?.regionPreference ?? '') ?? 'us-east';
+  const dataResidency = result.requirements?.workloadProfile?.dataResidency;
+  const allowedRegions = dataResidency?.complianceLocked
+    ? canonicalRegionsForResidencyScope(dataResidency.scope)
+    : undefined;
+  const rowsByRegion = new Map<string, ReturnType<typeof regionComparisonEvidenceRows>>();
+
+  for (const row of regionComparisonEvidenceRows(result)) {
+    if (allowedRegions && !allowedRegions.includes(row.comparisonRegion)) {
+      continue;
+    }
+
+    const rows = rowsByRegion.get(row.comparisonRegion) ?? [];
+    rows.push(row);
+    rowsByRegion.set(row.comparisonRegion, rows);
+  }
+
+  return [...rowsByRegion.entries()].map(([comparisonRegion, rows]) => {
+    const sortedRows = [...rows].sort(
+      (left, right) => left.modeledMonthlyUsd - right.modeledMonthlyUsd,
+    );
+    const lowestProviderId = sortedRows[0]?.providerId as ProviderId | undefined;
+    const providers = rows
+      .map((row) => ({
+        providerId: row.providerId as ProviderId,
+        providerRegion: row.providerRegion,
+        modeledMonthlyUsd: row.modeledMonthlyUsd,
+        deltaVsSelectedMonthlyUsd: row.deltaVsSelectedMonthlyUsd,
+        isLowest: row.providerId === lowestProviderId,
+      }))
+      .sort(
+        (left, right) => providerSortIndex(left.providerId) - providerSortIndex(right.providerId),
+      );
+
+    return {
+      comparisonRegion,
+      label: comparisonRegionLabel(comparisonRegion),
+      regionSummary: providers
+        .map((provider) => `${providerLabel(provider.providerId)} ${provider.providerRegion}`)
+        .join(' · '),
+      multiplier: rows[0]?.multiplier ?? 1,
+      evidence: rows[0]?.evidence ?? 'Modeled regional pricing sensitivity.',
+      isSelected: selectedRegion === comparisonRegion,
+      complianceEligible: !allowedRegions || allowedRegions.includes(comparisonRegion),
+      ...(lowestProviderId ? { lowestProviderId } : {}),
+      providers,
+    };
+  });
 }
 
 function costCoverageMap(result: ComparisonResult): CostCoverageMapEntry[] {
@@ -768,6 +860,109 @@ function defaultTermMonths(pricingModel: Exclude<PricingModelKey, 'on-demand' | 
   }
 
   return 12;
+}
+
+function canonicalRegionForRegionPreference(regionPreference: string): string | undefined {
+  const normalizedRegion = regionPreference.trim().toLowerCase();
+
+  if (!normalizedRegion) {
+    return undefined;
+  }
+
+  if (COMPARISON_REGION_IDS.some((regionId) => regionId === normalizedRegion)) {
+    return normalizedRegion;
+  }
+
+  return Object.entries(COMPARISON_REGION_PROVIDER_REGIONS).find(([, providerRegions]) =>
+    providerRegions.includes(normalizedRegion),
+  )?.[0];
+}
+
+function canonicalRegionsForResidencyScope(scope: string): string[] | undefined {
+  switch (normalizedResidencyScope(scope)) {
+    case 'us':
+      return ['us-east', 'us-west'];
+    case 'eu':
+      return ['eu-west'];
+    case 'apac':
+      return ['ap-south', 'ap-southeast'];
+    default:
+      return undefined;
+  }
+}
+
+function normalizedResidencyScope(scope: string): 'us' | 'eu' | 'apac' | undefined {
+  const normalizedScope = scope
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z]/g, '');
+
+  if (!normalizedScope || normalizedScope === 'global' || normalizedScope === 'anywhere') {
+    return undefined;
+  }
+
+  if (
+    normalizedScope === 'us' ||
+    normalizedScope === 'usa' ||
+    normalizedScope === 'unitedstates' ||
+    normalizedScope === 'america'
+  ) {
+    return 'us';
+  }
+
+  if (
+    normalizedScope === 'eu' ||
+    normalizedScope === 'europe' ||
+    normalizedScope === 'europeanunion' ||
+    normalizedScope === 'eea' ||
+    normalizedScope === 'gdpr'
+  ) {
+    return 'eu';
+  }
+
+  if (
+    normalizedScope === 'apac' ||
+    normalizedScope === 'asia' ||
+    normalizedScope === 'asiapacific'
+  ) {
+    return 'apac';
+  }
+
+  return undefined;
+}
+
+function providerSortIndex(providerId: ProviderId): number {
+  const index = PROVIDER_SORT_ORDER.indexOf(providerId);
+
+  return index === -1 ? PROVIDER_SORT_ORDER.length : index;
+}
+
+function providerLabel(providerId: ProviderId): string {
+  switch (providerId) {
+    case 'aws':
+      return 'AWS';
+    case 'azure':
+      return 'Azure';
+    case 'gcp':
+      return 'GCP';
+  }
+}
+
+function comparisonRegionLabel(comparisonRegion: string): string {
+  switch (comparisonRegion) {
+    case 'us-east':
+      return 'US East';
+    case 'us-west':
+      return 'US West';
+    case 'eu-west':
+      return 'Europe West';
+    case 'ap-southeast':
+      return 'Asia Pacific Southeast';
+    case 'ap-south':
+      return 'Asia Pacific South';
+    default:
+      return comparisonRegion;
+  }
 }
 
 function topLineMonthly(lineItems: ComparisonLineItem[], description: string): number {

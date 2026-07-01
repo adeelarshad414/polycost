@@ -371,6 +371,7 @@ describe('App', () => {
     expect(detailGate.dataset.open).toBe('true');
     expect(text(container)).toContain('Engineering cost controls');
     expect(text(container)).toContain('Engineering service spend');
+    expect(text(container)).toContain('Backend-modeled baseline region sensitivity.');
     expect(text(container)).toContain('Backend commitment exposure');
     expect(text(container)).toContain('Service driver split');
     expect(text(container)).toContain('EC2');
@@ -1837,7 +1838,7 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Azure is 33% lower than GCP for compute.');
     expect(text(container)).toContain('Region variance heat map');
     expect(text(container)).toContain('Modeled monthly sensitivity by compliant region');
-    expect(text(container)).toContain('Europe West');
+    expect(text(container)).toContain('Baseline North America pricing sensitivity.');
     expect(text(container)).toContain('Commitment coverage gap');
     expect(text(container)).toContain('0% on-demand vs target blend vs 100% committed');
     expect(text(container)).toContain('$20.30/mo');
@@ -2328,6 +2329,41 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       ],
       costComposition: [],
       providerDeltaAnalysis: [],
+      regionVarianceHeatMap: [
+        {
+          comparisonRegion: 'us-east',
+          label: 'US East',
+          regionSummary: 'AWS us-east-1 · Azure eastus · GCP us-east1',
+          multiplier: 1,
+          evidence: 'Backend-modeled baseline region sensitivity.',
+          isSelected: true,
+          complianceEligible: true,
+          lowestProviderId: 'gcp' as const,
+          providers: [
+            {
+              providerId: 'aws' as const,
+              providerRegion: 'us-east-1',
+              modeledMonthlyUsd: 42,
+              deltaVsSelectedMonthlyUsd: 0,
+              isLowest: false,
+            },
+            {
+              providerId: 'azure' as const,
+              providerRegion: 'eastus',
+              modeledMonthlyUsd: 38,
+              deltaVsSelectedMonthlyUsd: 0,
+              isLowest: false,
+            },
+            {
+              providerId: 'gcp' as const,
+              providerRegion: 'us-east1',
+              modeledMonthlyUsd: 30,
+              deltaVsSelectedMonthlyUsd: 0,
+              isLowest: true,
+            },
+          ],
+        },
+      ],
       sensitivityScenarios: [],
       commitmentRoiTimelines: [],
       commitmentCoverage: [

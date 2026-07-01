@@ -9,9 +9,14 @@ const comparison: ComparisonResult = {
     sourceType: 'structured_form',
     workloadName: 'Production API',
     workloadType: 'api_backend',
+    regionPreference: 'eu-west',
     workloadProfile: {
       environment: 'production',
       commitmentPreferencePercent: 80,
+      dataResidency: {
+        scope: 'EU',
+        complianceLocked: true,
+      },
       operatingSystem: 'windows',
       supportTier: 'business',
       usagePattern: {
@@ -286,6 +291,39 @@ describe('ComparisonAnalyticsService', () => {
         }),
       ]),
     );
+    expect(analytics.regionVarianceHeatMap).toEqual([
+      expect.objectContaining({
+        comparisonRegion: 'eu-west',
+        label: 'Europe West',
+        multiplier: 1.08,
+        isSelected: true,
+        complianceEligible: true,
+        lowestProviderId: 'azure',
+        providers: [
+          {
+            providerId: 'aws',
+            providerRegion: 'eu-west-1',
+            modeledMonthlyUsd: 1080,
+            deltaVsSelectedMonthlyUsd: 80,
+            isLowest: false,
+          },
+          {
+            providerId: 'azure',
+            providerRegion: 'westeurope',
+            modeledMonthlyUsd: 864,
+            deltaVsSelectedMonthlyUsd: 64,
+            isLowest: true,
+          },
+          {
+            providerId: 'gcp',
+            providerRegion: 'europe-west1',
+            modeledMonthlyUsd: 972,
+            deltaVsSelectedMonthlyUsd: 72,
+            isLowest: false,
+          },
+        ],
+      }),
+    ]);
     expect(analytics.sensitivityScenarios).toEqual(
       expect.arrayContaining([
         {

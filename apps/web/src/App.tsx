@@ -6321,7 +6321,11 @@ function ProductionDepthAnalytics({
   const insights = productionDepthInsights(comparison, form);
   const providerDeltas = providerDeltaRows(comparison);
   const computeSpecifications = computeSpecificationRows(comparison, form);
-  const regionVariance = regionVarianceRows(comparison, form);
+  const regionVariance = regionVarianceRows(
+    comparison,
+    form,
+    serverAnalytics?.regionVarianceHeatMap,
+  );
   const commitmentCoverage = commitmentCoverageGapRows(comparison, form);
   const tcoSignals = crossProviderTcoRows(comparison, form);
   const storageOptimizations = storageOptimizationRows(comparison, form);
@@ -11082,7 +11086,27 @@ function operationsOptimizationSignal(
 function regionVarianceRows(
   comparison: ComparisonResult | null,
   form: WorkloadFormState,
+  serverRows?: ComparisonAnalyticsResponse['regionVarianceHeatMap'],
 ): RegionVarianceRow[] {
+  if (serverRows && serverRows.length > 0) {
+    return serverRows.map((row) => ({
+      regionId: row.comparisonRegion,
+      label: row.label,
+      regionSummary: row.regionSummary,
+      multiplier: row.multiplier,
+      evidence: row.evidence,
+      isSelected: row.isSelected,
+      providers: row.providers.map((provider) => ({
+        providerId: provider.providerId,
+        providerRegion: provider.providerRegion,
+        modeledMonthly: provider.modeledMonthlyUsd,
+        deltaVsSelected: provider.deltaVsSelectedMonthlyUsd,
+        isLowest: provider.isLowest,
+      })),
+      lowestProviderId: row.lowestProviderId,
+    }));
+  }
+
   if (!comparison || comparison.providers.length === 0) {
     return [];
   }

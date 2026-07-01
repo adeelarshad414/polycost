@@ -357,6 +357,25 @@ describe('API contracts', () => {
             maxMonthlySavingsUsd: 0,
           }),
         ]),
+        regionVarianceHeatMap: expect.arrayContaining([
+          expect.objectContaining({
+            comparisonRegion: 'us-east',
+            label: 'US East',
+            multiplier: 1,
+            isSelected: true,
+            complianceEligible: true,
+            lowestProviderId: 'aws',
+            providers: [
+              {
+                providerId: 'aws',
+                providerRegion: 'us-east-1',
+                modeledMonthlyUsd: 30,
+                deltaVsSelectedMonthlyUsd: 0,
+                isLowest: true,
+              },
+            ],
+          }),
+        ]),
       }),
     );
   });
