@@ -213,12 +213,19 @@ async function requestJson<T>(
   path = '',
   init: RequestInit = {},
 ): Promise<T> {
+  const headers = normalizeHeaders(init.headers);
+  const method = init.method?.toUpperCase() ?? 'GET';
+
+  if (
+    (init.body !== undefined || method === 'GET' || method === 'HEAD') &&
+    !hasHeader(headers, 'Content-Type')
+  ) {
+    headers['Content-Type'] = 'application/json';
+  }
+
   const response = await fetch(`${baseUrlOrAbsoluteUrl}${path}`, {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...init.headers,
-    },
+    headers,
   });
 
   if (!response.ok) {
@@ -226,6 +233,26 @@ async function requestJson<T>(
   }
 
   return (await response.json()) as T;
+}
+
+function normalizeHeaders(headers: HeadersInit | undefined): Record<string, string> {
+  if (!headers) {
+    return {};
+  }
+
+  if (headers instanceof Headers) {
+    return Object.fromEntries(headers.entries());
+  }
+
+  if (Array.isArray(headers)) {
+    return Object.fromEntries(headers);
+  }
+
+  return { ...headers };
+}
+
+function hasHeader(headers: Record<string, string>, headerName: string): boolean {
+  return Object.keys(headers).some((key) => key.toLowerCase() === headerName.toLowerCase());
 }
 
 async function toApiError(response: Response): Promise<PolyCostApiError> {

@@ -506,6 +506,13 @@ describe('api client', () => {
         method: 'POST',
       }),
     );
+    expect((fetchMock.mock.calls[0][1] as RequestInit).headers).toEqual(
+      expect.objectContaining({ 'Content-Type': 'application/json' }),
+    );
+    expect((fetchMock.mock.calls[1][1] as RequestInit).body).toBeUndefined();
+    expect((fetchMock.mock.calls[1][1] as RequestInit).headers).not.toEqual(
+      expect.objectContaining({ 'Content-Type': 'application/json' }),
+    );
   });
 });
 

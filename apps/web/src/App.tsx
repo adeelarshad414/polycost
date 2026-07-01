@@ -999,6 +999,21 @@ function InitialHomePage({
         {inputMode === 'form' ? (
           <form className="initial-guided-form" onSubmit={onSubmit}>
             <FormValidationSummary issues={validationIssues} />
+            <div className="initial-home-actions initial-home-actions-primary">
+              <span className="initial-home-action-hint">
+                Adjust the workload below, or run the default estimate now.
+              </span>
+              <Button
+                type="submit"
+                variant="primary"
+                loading={isComparing}
+                loadingLabel="Comparing costs..."
+                disabled={isComparing}
+              >
+                <CompareIcon />
+                Compare costs
+              </Button>
+            </div>
             <div className="initial-home-fields">
               <SelectField
                 label="Service category"
@@ -1090,19 +1105,6 @@ function InitialHomePage({
                 />
               </div>
             </details>
-
-            <div className="initial-home-actions">
-              <Button
-                type="submit"
-                variant="primary"
-                loading={isComparing}
-                loadingLabel="Comparing costs..."
-                disabled={isComparing}
-              >
-                <CompareIcon />
-                Compare costs
-              </Button>
-            </div>
           </form>
         ) : (
           <form className="initial-paste-form" onSubmit={onSubmit}>
@@ -1233,7 +1235,17 @@ function ProgressiveComparisonPage({
               onEdit={onEdit}
             />
 
-            <StatusMessage notice={resultStatusNotice(notice)} error={null} />
+            <ResultQuickActions
+              comparison={comparison}
+              interval={interval}
+              pricingModel={pricingModel}
+              busyAction={busyAction}
+              exportingFormat={exportingFormat}
+              onExport={onExport}
+              onRefreshLive={onRefreshLive}
+            />
+
+            <StatusMessage notice={resultStatusNotice(notice)} error={error} />
 
             <ProviderSummaryCards comparison={comparison} interval={interval} />
 
@@ -1305,6 +1317,70 @@ function RequirementSummaryStrip({
         </Button>
         <Button type="button" variant="destructive" onClick={onClear}>
           Clear
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function ResultQuickActions({
+  comparison,
+  interval,
+  pricingModel,
+  busyAction,
+  exportingFormat,
+  onExport,
+  onRefreshLive,
+}: {
+  comparison: ComparisonResult;
+  interval: IntervalKey;
+  pricingModel: PricingModelKey;
+  busyAction: BusyAction;
+  exportingFormat: ReportFormat | null;
+  onExport: (format: ReportFormat) => void;
+  onRefreshLive: () => void;
+}) {
+  const cheapestProvider = comparison.providers.find(
+    (provider) => provider.providerId === comparison.cheapestProviderId,
+  );
+  const pricedProviderCount = comparison.providers.filter(
+    (provider) => provider.totals.monthly > 0,
+  ).length;
+  const scenarioLabel = pricingModelSummaryLabel(pricingModel);
+  const intervalLabel = capitalize(interval);
+
+  return (
+    <section className="result-quick-actions" aria-label="Comparison quick actions">
+      <div className="result-quick-actions-copy">
+        <span className="result-quick-actions-kicker">Demo controls</span>
+        <strong>
+          {cheapestProvider
+            ? `${providerLabel(comparison.cheapestProviderId)} leads at ${formatCurrency(
+                costForInterval(cheapestProvider, interval),
+              )}`
+            : 'Provider recommendation pending'}
+        </strong>
+        <span>
+          {intervalLabel} · {scenarioLabel} · {pricedProviderCount}/{comparison.providers.length}{' '}
+          providers priced
+        </span>
+      </div>
+      <div className="result-quick-actions-controls">
+        <ExportBar
+          disabled={busyAction !== null && busyAction !== 'export'}
+          exportingFormat={exportingFormat}
+          onExport={onExport}
+        />
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onRefreshLive}
+          loading={busyAction === 'refresh'}
+          loadingLabel="Refreshing..."
+          disabled={busyAction !== null && busyAction !== 'refresh'}
+        >
+          <RefreshIcon />
+          Refresh live
         </Button>
       </div>
     </section>

@@ -356,6 +356,27 @@ describe('App', () => {
     }
   });
 
+  it('shows quick refresh API errors on the results page', async () => {
+    const client = clientMock({
+      refreshLiveComparison: jest.fn(async () => {
+        throw new PolyCostApiError(
+          503,
+          'live_refresh_failed',
+          'Live pricing refresh is temporarily unavailable.',
+        );
+      }),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Compare costs'));
+    await click(buttonByText(container, 'Refresh live'));
+
+    expect(client.refreshLiveComparison).toHaveBeenCalledWith(comparisonResult.comparisonId);
+    expect(text(container)).toContain('Live pricing refresh is temporarily unavailable.');
+
+    unmount();
+  });
+
   it('clears requirements input and rendered cost breakdowns', async () => {
     const refreshDeferred = deferred<ComparisonResult>();
     const client = clientMock({
