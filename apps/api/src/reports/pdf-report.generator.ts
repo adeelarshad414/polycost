@@ -4,6 +4,7 @@ import {
   architectureOverviewRows,
   breakEvenSummaryRows,
   commitmentTcoRows,
+  costCoverageMapRows,
   decisionSummaryRows,
   egressNetworkingDetailRows,
   egressTierBreakdownRows,
@@ -156,6 +157,14 @@ export class PdfReportGenerator {
     for (const row of providerCostDetailRows(result).slice(1)) {
       lines.push({
         text: `${row[0]} | ${row[1]} | ${row[2]} / ${row[3]} | monthly $${row[7]} | share ${row[8]} | ${row[10]}`,
+        fontSize: 10,
+      });
+    }
+
+    lines.push({ text: '', fontSize: 10 }, { text: 'Cost coverage map', fontSize: 14 });
+    for (const row of costCoverageMapRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]} | ${row[1]} | ${row[2]} | rows ${row[3]} | monthly $${row[5] || 'n/a'} | ${row[6]}`,
         fontSize: 10,
       });
     }

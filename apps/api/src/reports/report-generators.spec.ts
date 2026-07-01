@@ -6,6 +6,7 @@ import {
   architectureOverviewRows,
   breakEvenSummaryRows,
   commitmentTcoRows,
+  costCoverageMapRows,
   decisionSummaryRows,
   egressNetworkingDetailRows,
   egressTierBreakdownRows,
@@ -208,6 +209,8 @@ describe('report generators', () => {
     expect(csv).toContain('Provider Cost Detail');
     expect(csv).toContain('Provider total,aws,all,all,aws monthly total');
     expect(csv).toContain('Category subtotal,aws,network,egress,network / egress subtotal');
+    expect(csv).toContain('Cost Coverage Map');
+    expect(csv).toContain('aws,Compute families and sizing,Covered,1,0,60.8');
     expect(csv).toContain('Selected Pricing Scenario');
     expect(csv).toContain('aws,yes,126,42,0.06,Three-year commitment.');
     expect(csv).toContain('Pricing Model Availability');
@@ -294,13 +297,14 @@ describe('report generators', () => {
     expect(xlsxText).toContain('<sheet name="What If" sheetId="2"');
     expect(xlsxText).toContain('<sheet name="Architecture Overview" sheetId="3"');
     expect(xlsxText).toContain('<sheet name="Provider Cost Detail" sheetId="4"');
-    expect(xlsxText).toContain('<sheet name="Optimization Opportunities" sheetId="5"');
-    expect(xlsxText).toContain('<sheet name="Egress &amp; Networking Detail" sheetId="6"');
-    expect(xlsxText).toContain('<sheet name="Region Comparison" sheetId="7"');
-    expect(xlsxText).toContain('<sheet name="Break-Even Analysis" sheetId="8"');
-    expect(xlsxText).toContain('<sheet name="Break-Even Summary" sheetId="9"');
-    expect(xlsxText).toContain('<sheet name="Methodology &amp; Sources" sheetId="10"');
-    expect(xlsxText).toContain('<sheet name="SKU Mapping Appendix" sheetId="11"');
+    expect(xlsxText).toContain('<sheet name="Cost Coverage Map" sheetId="5"');
+    expect(xlsxText).toContain('<sheet name="Optimization Opportunities" sheetId="6"');
+    expect(xlsxText).toContain('<sheet name="Egress &amp; Networking Detail" sheetId="7"');
+    expect(xlsxText).toContain('<sheet name="Region Comparison" sheetId="8"');
+    expect(xlsxText).toContain('<sheet name="Break-Even Analysis" sheetId="9"');
+    expect(xlsxText).toContain('<sheet name="Break-Even Summary" sheetId="10"');
+    expect(xlsxText).toContain('<sheet name="Methodology &amp; Sources" sheetId="11"');
+    expect(xlsxText).toContain('<sheet name="SKU Mapping Appendix" sheetId="12"');
     expect(xlsxText).toContain('<calcPr calcMode="auto" fullCalcOnLoad="1"/>');
     expect(xlsxText).toContain(
       '<definedName name="WhatIfScaleFactor">&apos;What If&apos;!$B$5</definedName>',
@@ -334,6 +338,8 @@ describe('report generators', () => {
     expect(xlsxText).toContain('Provider Cost Detail');
     expect(xlsxText).toContain('Provider total');
     expect(xlsxText).toContain('Category subtotal');
+    expect(xlsxText).toContain('Cost Coverage Map');
+    expect(xlsxText).toContain('Compute families and sizing');
     expect(xlsxText).toContain('FinOps Summary');
     expect(xlsxText).toContain('Executive recommendation');
     expect(xlsxText).toContain('Decision confidence');
@@ -457,6 +463,8 @@ describe('report generators', () => {
     expect(pdfText).toContain('aws: daily $2.33, weekly $16.34, monthly $71');
     expect(pdfText).toContain('Provider cost detail');
     expect(pdfText).toContain('Provider total | aws | all / all | monthly $71');
+    expect(pdfText).toContain('Cost coverage map');
+    expect(pdfText).toContain('aws | Compute families and sizing | Covered');
     expect(pdfText).toContain('Selected pricing scenario');
     expect(pdfText).toContain('Pricing model availability');
     expect(pdfText).toContain('Commitment payment and TCO');
@@ -626,6 +634,41 @@ describe('report generators', () => {
           'Mapped',
           expect.stringContaining('$0.09 per GB rolled into $46.08 monthly'),
         ]),
+      ]),
+    );
+
+    expect(costCoverageMapRows(comparison)).toEqual(
+      expect.arrayContaining([
+        [
+          'aws',
+          'Compute families and sizing',
+          'Covered',
+          '1',
+          '0',
+          '60.8',
+          expect.stringContaining('risky compute'),
+          expect.stringContaining('Validate family'),
+        ],
+        [
+          'aws',
+          'Database, NoSQL, cache, warehouse, and search',
+          'Partial',
+          '1',
+          '1',
+          '10.2',
+          expect.stringContaining('primary "postgres"'),
+          expect.stringContaining('Validate engine tier'),
+        ],
+        [
+          'gcp',
+          'Compute families and sizing',
+          'Missing priced row',
+          '0',
+          '0',
+          '',
+          expect.stringContaining('configured requirement but no priced row'),
+          expect.stringContaining('Validate family'),
+        ],
       ]),
     );
 

@@ -4,6 +4,7 @@ import {
   architectureOverviewRows,
   breakEvenSummaryRows,
   commitmentTcoRows,
+  costCoverageMapRows,
   decisionSummaryRows,
   egressNetworkingDetailRows,
   egressTierBreakdownRows,
@@ -137,6 +138,7 @@ export class ExcelReportGenerator {
         },
         evidenceSheet('Architecture Overview', architectureOverviewRows(result)),
         evidenceSheet('Provider Cost Detail', providerCostDetailRows(result)),
+        evidenceSheet('Cost Coverage Map', costCoverageMapRows(result)),
         evidenceSheet('Optimization Opportunities', optimizationOpportunityRows(result)),
         evidenceSheet('Egress & Networking Detail', egressNetworkingDetailRows(result)),
         evidenceSheet('Region Comparison', regionComparisonRows(result)),
@@ -255,6 +257,17 @@ export class ExcelReportGenerator {
         style: 2,
       },
       ...providerCostDetailRows(result).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
+      {
+        cells: [],
+      },
+      {
+        cells: ['Cost Coverage Map'],
+        style: 2,
+      },
+      ...costCoverageMapRows(result).map((row, index) => ({
         cells: row.map(sanitizeSpreadsheetText),
         ...(index === 0 ? { style: 2 } : {}),
       })),

@@ -90,6 +90,15 @@ type ComputeSpecTier =
   | 'accelerated'
   | 'custom';
 
+interface CostCoverageDimension {
+  key: string;
+  label: string;
+  requirementCategories: string[];
+  reviewCue: string;
+  matches(lineItem: ComparisonLineItem): boolean;
+  configured?(result: ComparisonResult): boolean;
+}
+
 const APP_PLATFORM_MODEL_RATES: Record<
   ComparisonProviderResult['providerId'],
   AppPlatformModelRates
@@ -310,6 +319,109 @@ const COMPUTE_SPEC_EVIDENCE: Record<
     },
   },
 };
+
+const COST_COVERAGE_DIMENSIONS: CostCoverageDimension[] = [
+  {
+    key: 'compute',
+    label: 'Compute families and sizing',
+    requirementCategories: ['compute'],
+    reviewCue: 'Validate family, architecture, vCPU/RAM, tenancy, bandwidth, disk baseline, and commitment eligibility.',
+    matches: (lineItem) => lineItem.category === 'compute' || lineItem.costComponent === 'compute',
+  },
+  {
+    key: 'storage',
+    label: 'Storage classes, snapshots, and retrieval',
+    requirementCategories: ['storage'],
+    reviewCue: 'Validate storage class, operations, retrieval, replication, snapshot retention, IOPS, and lifecycle policies.',
+    matches: (lineItem) =>
+      lineItem.category === 'storage' ||
+      /storage|snapshot|retrieval|replication|lifecycle|archive|backup/i.test(lineItem.description),
+  },
+  {
+    key: 'networking',
+    label: 'Networking, egress, CDN, NAT, DNS, and private connectivity',
+    requirementCategories: ['networking', 'edge'],
+    reviewCue: 'Validate tiered internet egress, CDN hit ratio, NAT path, DNS volume, inter-region, cross-AZ, VPN, and private circuit assumptions.',
+    matches: (lineItem) =>
+      lineItem.category === 'network' ||
+      lineItem.costComponent === 'egress' ||
+      /egress|cdn|nat|dns|vpn|direct connect|expressroute|interconnect|load balancer|private/i.test(
+        lineItem.description,
+      ),
+  },
+  {
+    key: 'database',
+    label: 'Database, NoSQL, cache, warehouse, and search',
+    requirementCategories: ['database', 'analytics'],
+    reviewCue: 'Validate engine tier, storage growth, backup retention, IOPS, replicas, RU/s, cache, warehouse query, and search capacity.',
+    matches: (lineItem) =>
+      lineItem.category === 'database' ||
+      lineItem.costComponent === 'database' ||
+      /database|rds|sql|nosql|ru\/s|cosmos|dynamodb|cache|redis|warehouse|redshift|synapse|bigquery|search|opensearch/i.test(
+        lineItem.description,
+      ),
+  },
+  {
+    key: 'runtime',
+    label: 'Serverless, containers, registry, and app platforms',
+    requirementCategories: ['containers', 'application', 'integration'],
+    reviewCue: 'Validate invocation duration, memory curve, control-plane overhead, node cost, registry storage/transfer, and request-vs-always-on fit.',
+    matches: (lineItem) =>
+      /lambda|function|serverless|container|kubernetes|eks|aks|gke|registry|artifact|app runner|app service|cloud run|api gateway|queue|event/i.test(
+        lineItem.description,
+      ),
+  },
+  {
+    key: 'operations',
+    label: 'Monitoring, observability, secrets, WAF, and security operations',
+    requirementCategories: ['operations', 'security', 'devops'],
+    reviewCue: 'Validate logs, metrics, traces, alarms, dashboards, secrets, WAF, DDoS, posture-management, and retention assumptions.',
+    matches: (lineItem) =>
+      lineItem.category === 'operations' ||
+      lineItem.costComponent === 'operations' ||
+      /monitor|observability|log|metric|trace|alarm|dashboard|secret|key vault|waf|ddos|defender|guardduty|security/i.test(
+        lineItem.description,
+      ),
+  },
+  {
+    key: 'support-licensing',
+    label: 'Support plans and OS/licensing',
+    requirementCategories: [],
+    reviewCue: 'Validate selected support tier, Windows/BYOL eligibility, Hybrid Benefit, sole-tenant or licensing constraints, and support minimums.',
+    matches: (lineItem) =>
+      lineItem.category === 'support' ||
+      lineItem.category === 'licensing' ||
+      lineItem.costComponent === 'support' ||
+      lineItem.costComponent === 'licensing' ||
+      /support|license|windows|byol|hybrid benefit/i.test(lineItem.description),
+    configured: (result) => {
+      const profile = result.requirements?.workloadProfile;
+      return Boolean(
+        profile?.supportTier ||
+          (profile?.operatingSystem && profile.operatingSystem !== 'linux'),
+      );
+    },
+  },
+  {
+    key: 'pricing-models',
+    label: 'Pricing models, commitments, and spot estimates',
+    requirementCategories: [],
+    reviewCue: 'Validate on-demand, reserved, Savings Plan/CUD, spot estimate, upfront option, term length, and commitment coverage assumptions.',
+    matches: (lineItem) =>
+      Boolean(
+        lineItem.pricingModels?.some(
+          (model) => model.model !== 'on-demand' && (model.available || model.estimated),
+        ),
+      ),
+    configured: (result) =>
+      result.providers.some((provider) =>
+        provider.pricingModels?.some(
+          (model) => model.model !== 'on-demand' && (model.available || model.estimated),
+        ),
+      ) ||
+      (result.requirements?.workloadProfile?.commitmentPreferencePercent ?? 0) > 0,
+  },
+];
 
 export function reportCoverRows(result: ComparisonResult, options: ReportOptions): string[][] {
   const pricedProviders = result.providers.filter((provider) => provider.totals.monthly > 0).length;
@@ -777,6 +889,26 @@ export function providerCostDetailRows(result: ComparisonResult): string[][] {
       'Calculation',
     ],
     ...result.providers.flatMap((provider) => providerCostDetailRowsForProvider(provider)),
+  ];
+}
+
+export function costCoverageMapRows(result: ComparisonResult): string[][] {
+  return [
+    [
+      'Provider',
+      'Cost dimension',
+      'Coverage status',
+      'Priced rows',
+      'Approximate rows',
+      'Monthly USD',
+      'Evidence',
+      'Review cue',
+    ],
+    ...result.providers.flatMap((provider) =>
+      COST_COVERAGE_DIMENSIONS.map((dimension) =>
+        costCoverageMapRow(result, provider, dimension),
+      ),
+    ),
   ];
 }
 
@@ -1675,6 +1807,92 @@ function providerCostDetailRowsForProvider(provider: ComparisonProviderResult): 
       calculationText(lineItem),
     ]),
   ];
+}
+
+function costCoverageMapRow(
+  result: ComparisonResult,
+  provider: ComparisonProviderResult,
+  dimension: CostCoverageDimension,
+): string[] {
+  const matchingRows = provider.lineItems.filter((lineItem) => dimension.matches(lineItem));
+  const monthly = matchingRows.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+  const approximateRows = matchingRows.filter(
+    (lineItem) =>
+      lineItem.isApproximate ||
+      lineItem.skuId?.startsWith('modeled-'),
+  ).length;
+  const hasRequirement = costCoverageDimensionConfigured(result, dimension);
+  const status = costCoverageStatus({
+    approximateRows,
+    hasRequirement,
+    matchingRows,
+    provider,
+  });
+
+  return [
+    provider.providerId,
+    dimension.label,
+    status,
+    matchingRows.length.toString(),
+    approximateRows.toString(),
+    matchingRows.length > 0 ? formatNumber(monthly) : '',
+    costCoverageEvidence(provider, matchingRows, hasRequirement),
+    dimension.reviewCue,
+  ];
+}
+
+function costCoverageDimensionConfigured(
+  result: ComparisonResult,
+  dimension: CostCoverageDimension,
+): boolean {
+  if (dimension.configured?.(result)) {
+    return true;
+  }
+
+  return Boolean(
+    result.requirements?.serviceRequirements.some((requirement) =>
+      dimension.requirementCategories.includes(requirement.serviceCategory),
+    ),
+  );
+}
+
+function costCoverageStatus(input: {
+  approximateRows: number;
+  hasRequirement: boolean;
+  matchingRows: ComparisonLineItem[];
+  provider: ComparisonProviderResult;
+}): string {
+  if (input.matchingRows.length === 0) {
+    return input.hasRequirement ? 'Missing priced row' : 'Not configured';
+  }
+
+  if (input.approximateRows > 0 || input.provider.totals.monthly <= 0) {
+    return 'Partial';
+  }
+
+  return 'Covered';
+}
+
+function costCoverageEvidence(
+  provider: ComparisonProviderResult,
+  matchingRows: ComparisonLineItem[],
+  hasRequirement: boolean,
+): string {
+  if (matchingRows.length === 0) {
+    return hasRequirement
+      ? `${provider.providerId} has a configured requirement but no priced row in this comparison.`
+      : `${provider.providerId} has no configured or priced signal for this dimension.`;
+  }
+
+  const primary = [...matchingRows].sort(
+    (left, right) => right.baseMonthlyCostUsd - left.baseMonthlyCostUsd,
+  )[0];
+  const modeledRows = matchingRows.filter((lineItem) => lineItem.skuId?.startsWith('modeled-')).length;
+  const skuEvidence = primary.skuId ? `SKU ${primary.skuId}` : 'no SKU attached';
+
+  return `${provider.providerId} has ${matchingRows.length} row(s); top driver "${primary.description}" is $${formatNumber(
+    primary.baseMonthlyCostUsd,
+  )}/mo (${skuEvidence}${modeledRows > 0 ? `; ${modeledRows} modeled row(s)` : ''}).`;
 }
 
 function selectedMonthlyCost(model: PricingModelCost | undefined, fallbackMonthly: number): number {
