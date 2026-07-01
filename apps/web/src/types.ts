@@ -367,6 +367,9 @@ export interface SharedReportResponse {
   token: string;
   watermark: boolean;
   expiresAt: string;
+  pricingModel: PricingModelKey;
+  granularity: IntervalKey;
+  passwordProtected: boolean;
   workload: WorkloadRecord;
   breakdown: WorkloadCostBreakdown;
 }

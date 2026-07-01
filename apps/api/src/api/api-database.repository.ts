@@ -150,6 +150,9 @@ interface ShareLinkRow {
   token: string;
   workload_id: string;
   watermark: boolean;
+  pricing_model: ShareLinkRecord['pricingModel'];
+  granularity: ShareLinkRecord['granularity'];
+  password_hash: string | null;
   expires_at: Date;
   revoked_at: Date | null;
   created_at: Date;
@@ -729,6 +732,9 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     token: string;
     workloadId: string;
     watermark: boolean;
+    pricingModel: ShareLinkRecord['pricingModel'];
+    granularity: ShareLinkRecord['granularity'];
+    passwordHash?: string;
     expiresAt: string;
   }): Promise<ShareLinkRecord> {
     const result = await (
@@ -739,17 +745,31 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
           token,
           workload_id,
           watermark,
+          pricing_model,
+          granularity,
+          password_hash,
           expires_at
         )
-        VALUES ($1, $2, $3, $4)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING token,
                   workload_id,
                   watermark,
+                  pricing_model,
+                  granularity,
+                  password_hash,
                   expires_at,
                   revoked_at,
                   created_at
       `,
-      [input.token, input.workloadId, input.watermark, input.expiresAt],
+      [
+        input.token,
+        input.workloadId,
+        input.watermark,
+        input.pricingModel,
+        input.granularity,
+        input.passwordHash ?? null,
+        input.expiresAt,
+      ],
     );
 
     return toShareLinkRecord(result.rows[0]);
@@ -763,6 +783,9 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         SELECT token,
                workload_id,
                watermark,
+               pricing_model,
+               granularity,
+               password_hash,
                expires_at,
                revoked_at,
                created_at
@@ -772,6 +795,31 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
           AND expires_at > now()
       `,
       [token],
+    );
+
+    return result.rows[0] ? toShareLinkRecord(result.rows[0]) : undefined;
+  }
+
+  async revokeShareLink(token: string, revokedAt: string): Promise<ShareLinkRecord | undefined> {
+    const result = await (
+      await this.getPool()
+    ).query<ShareLinkRow>(
+      `
+        UPDATE share_links
+        SET revoked_at = $2
+        WHERE token = $1
+          AND revoked_at IS NULL
+        RETURNING token,
+                  workload_id,
+                  watermark,
+                  pricing_model,
+                  granularity,
+                  password_hash,
+                  expires_at,
+                  revoked_at,
+                  created_at
+      `,
+      [token, revokedAt],
     );
 
     return result.rows[0] ? toShareLinkRecord(result.rows[0]) : undefined;
@@ -1027,6 +1075,9 @@ function toShareLinkRecord(row: ShareLinkRow): ShareLinkRecord {
     token: row.token,
     workloadId: row.workload_id,
     watermark: row.watermark,
+    pricingModel: row.pricing_model,
+    granularity: row.granularity,
+    ...(row.password_hash ? { passwordHash: row.password_hash } : {}),
     expiresAt: row.expires_at.toISOString(),
     ...(row.revoked_at ? { revokedAt: row.revoked_at.toISOString() } : {}),
     createdAt: row.created_at.toISOString(),

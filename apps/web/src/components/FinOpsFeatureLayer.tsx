@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { formatApiError, polyCostClient, PolyCostClient } from '../api-client';
 import { Button } from './Button';
 import { hourlyFromMonthly, intervalMultiplierFromMonthly } from '../cost-time';
@@ -160,6 +160,7 @@ export function FinOpsFeatureLayer({
   const [budgetThreshold, setBudgetThreshold] = useState('');
   const [dismissedAlerts, setDismissedAlerts] = useState<string[]>(() => readDismissedAlerts());
   const [watermarkEnabled, setWatermarkEnabled] = useState(true);
+  const [sharePassword, setSharePassword] = useState('');
   const [currencyCode, setCurrencyCode] = useState<CurrencyCode>('USD');
   const [shareLink, setShareLink] = useState<GeneratedShareLink | null>(null);
   const [shareStatus, setShareStatus] = useState<'idle' | 'creating' | 'ready' | 'copied'>('idle');
@@ -262,7 +263,7 @@ export function FinOpsFeatureLayer({
     setShareLink(null);
     setShareStatus('idle');
     setShareError(null);
-  }, [comparison?.comparisonId, watermarkEnabled]);
+  }, [comparison?.comparisonId, watermarkEnabled, interval, pricingModel, sharePassword]);
 
   useEffect(() => {
     let isActive = true;
@@ -374,14 +375,35 @@ export function FinOpsFeatureLayer({
         workloadId: workload.id,
         watermark: watermarkEnabled,
         expiresInDays: 30,
+        pricingModel,
+        granularity: interval,
+        ...(sharePassword.trim() ? { password: sharePassword.trim() } : {}),
       });
-      const publicUrl = publicShareUrl(share.url, share.token);
+      const publicUrl = publicShareUrl(share.url, share.token, interval, pricingModel);
 
       await copyToClipboard(publicUrl);
       setShareLink({ token: share.token, publicUrl });
       setShareStatus('copied');
     } catch (error) {
       setShareStatus('idle');
+      setShareError(formatApiError(error));
+    }
+  }
+
+  async function revokeCurrentShareLink() {
+    if (!shareLink || shareStatus === 'creating') {
+      return;
+    }
+
+    setShareStatus('creating');
+    setShareError(null);
+
+    try {
+      await client.revokeShareLink(shareLink.token);
+      setShareLink(null);
+      setShareStatus('idle');
+    } catch (error) {
+      setShareStatus('ready');
       setShareError(formatApiError(error));
     }
   }
@@ -514,6 +536,13 @@ export function FinOpsFeatureLayer({
                   <PricingModelSavingsCue
                     bestModel={bestSavingsModel(provider)}
                     selectedModel={selectedModelCost}
+                  />
+                ) : null}
+                {provider ? (
+                  <PricingModelDeltaCue
+                    provider={provider}
+                    selectedModel={selectedModelCost}
+                    currency={currency}
                   />
                 ) : null}
                 <p className="mt-2 text-sm leading-5 text-text-secondary">
@@ -677,6 +706,16 @@ export function FinOpsFeatureLayer({
               className="h-5 min-h-5 w-5 accent-action-primary"
             />
           </label>
+          <label className="grid gap-1 text-sm font-semibold text-text-primary">
+            <span>Optional link password</span>
+            <input
+              type="password"
+              value={sharePassword}
+              onChange={(event) => setSharePassword(event.currentTarget.value)}
+              placeholder="Leave blank for open read-only link"
+              className="min-h-11 rounded-lg border border-border bg-surface-0 px-3 text-sm text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
+            />
+          </label>
           <div className="rounded-lg border border-border bg-surface-0 p-3 text-sm text-text-secondary">
             {shareLink ? (
               <>
@@ -689,12 +728,15 @@ export function FinOpsFeatureLayer({
                 >
                   Open read-only report
                 </a>{' '}
-                · token {shareLink.token}
+                · token {shareLink.token} · {pricingModelLabel(pricingModel)} ·{' '}
+                {capitalize(interval)}
+                {sharePassword.trim() ? ' · password protected' : ''}
               </>
             ) : (
               <>
-                Create a real read-only report link scoped to this workload. Links expire after 30
-                days and resolve through the backend share-token API.
+                Create a real read-only report link scoped to this workload, pricing model, and time
+                granularity. Links expire after 30 days and resolve through the backend share-token
+                API.
               </>
             )}
           </div>
@@ -721,8 +763,10 @@ export function FinOpsFeatureLayer({
             <Button
               type="button"
               variant="destructive"
-              disabled
-              title="Backend revoke endpoint is not exposed in the V1 share-link contract."
+              disabled={!shareLink || shareStatus === 'creating'}
+              loading={shareStatus === 'creating' && Boolean(shareLink)}
+              loadingLabel="Revoking..."
+              onClick={() => void revokeCurrentShareLink()}
             >
               <RevokeIcon />
               Revoke
@@ -730,7 +774,8 @@ export function FinOpsFeatureLayer({
           </div>
           <p className="text-xs font-semibold text-text-muted">
             Current mode: {watermarkEnabled ? 'branded report' : 'white-label ready'} ·{' '}
-            {shareStatus === 'copied' ? 'link copied' : 'revoke requires backend support'}
+            {shareStatus === 'copied' ? 'link copied' : 'ready for secure sharing'} ·{' '}
+            {sharePassword.trim() ? 'password will be required' : 'no password set'}
           </p>
         </section>
       </div>
@@ -829,6 +874,46 @@ function PricingModelSavingsCue({
           Caveat
         </span>
       ) : null}
+    </div>
+  );
+}
+
+function PricingModelDeltaCue({
+  provider,
+  selectedModel,
+  currency,
+}: {
+  provider: ComparisonProviderResult;
+  selectedModel?: PricingModelCost;
+  currency: CurrencyOption;
+}) {
+  const onDemand = providerModelCost(provider, 'on-demand');
+
+  if (
+    !selectedModel?.available ||
+    selectedModel.model === 'on-demand' ||
+    selectedModel.monthlyCostUsd === undefined ||
+    onDemand?.monthlyCostUsd === undefined
+  ) {
+    return null;
+  }
+
+  const delta = selectedModel.monthlyCostUsd - onDemand.monthlyCostUsd;
+  const percent =
+    onDemand.monthlyCostUsd > 0 ? Math.abs((delta / onDemand.monthlyCostUsd) * 100) : 0;
+  const savesMoney = delta < 0;
+
+  return (
+    <div
+      className={[
+        'mt-2 rounded-lg border px-2 py-1 text-xs font-semibold',
+        savesMoney
+          ? 'border-[color:var(--pc-success)] bg-[color:var(--pc-success-soft)] text-text-primary'
+          : 'border-[color:var(--pc-warning)] bg-[color:var(--pc-warning-soft)] text-text-primary',
+      ].join(' ')}
+    >
+      What-if delta: {savesMoney ? 'saves' : 'adds'} {formatMoney(Math.abs(delta), currency)}/mo vs
+      on-demand ({formatPercent(percent)}).
     </div>
   );
 }
@@ -1008,11 +1093,24 @@ function nonNegativeNumberOrDefault(value: string, fallback: number): number {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
-function publicShareUrl(apiShareUrl: string, token: string): string {
+function publicShareUrl(
+  apiShareUrl: string,
+  token: string,
+  interval: IntervalKey,
+  pricingModel: PricingModelKey,
+): string {
   const tokenFromUrl = apiShareUrl.match(/\/share\/([^/?#]+)/)?.[1] ?? token;
   const publicPath = `/share/${tokenFromUrl}`;
+  const url = new URL(publicPath, window.location.origin);
 
-  return new URL(publicPath, window.location.origin).toString();
+  url.searchParams.set('interval', interval);
+  url.searchParams.set('pricingModel', pricingModel);
+
+  return url.toString();
+}
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 async function copyToClipboard(value: string): Promise<void> {
@@ -1032,6 +1130,8 @@ export function SharedReportPlaceholder({
 }) {
   const [report, setReport] = useState<SharedReportResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [password, setPassword] = useState('');
+  const [submittedPassword, setSubmittedPassword] = useState<string | undefined>();
 
   useEffect(() => {
     let isActive = true;
@@ -1040,7 +1140,7 @@ export function SharedReportPlaceholder({
     setError(null);
 
     client
-      .getSharedReport(token)
+      .getSharedReport(token, submittedPassword)
       .then((nextReport) => {
         if (isActive) {
           setReport(nextReport);
@@ -1055,7 +1155,12 @@ export function SharedReportPlaceholder({
     return () => {
       isActive = false;
     };
-  }, [client, token]);
+  }, [client, submittedPassword, token]);
+
+  function submitPassword(event: FormEvent) {
+    event.preventDefault();
+    setSubmittedPassword(password.trim() || undefined);
+  }
 
   return (
     <main className="min-h-screen bg-surface-0 px-4 py-8 text-text-primary">
@@ -1080,6 +1185,24 @@ export function SharedReportPlaceholder({
             role="alert"
           >
             <strong>Shared report unavailable.</strong> {error}
+            {error.toLowerCase().includes('password') ? (
+              <form className="mt-3 flex flex-col gap-2 sm:flex-row" onSubmit={submitPassword}>
+                <label className="sr-only" htmlFor="share-password">
+                  Share password
+                </label>
+                <input
+                  id="share-password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.currentTarget.value)}
+                  placeholder="Enter share password"
+                  className="min-h-11 rounded-lg border border-border bg-surface-1 px-3 text-sm text-text-primary"
+                />
+                <Button type="submit" variant="primary">
+                  Open report
+                </Button>
+              </form>
+            ) : null}
           </div>
         ) : null}
 
@@ -1111,6 +1234,11 @@ export function SharedReportPlaceholder({
                 label="Watermark"
                 value={report.watermark ? 'Enabled' : 'Disabled'}
                 detail="Controls branded report presentation only."
+              />
+              <InfoTile
+                label="Shared scenario"
+                value={`${pricingModelLabel(report.pricingModel)} · ${capitalize(report.granularity)}`}
+                detail={report.passwordProtected ? 'Password protected.' : 'Open read-only link.'}
               />
             </div>
 

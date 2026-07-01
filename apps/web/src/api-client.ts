@@ -66,8 +66,12 @@ export interface PolyCostClient {
     workloadId: string;
     watermark: boolean;
     expiresInDays: number;
+    pricingModel: string;
+    granularity: string;
+    password?: string;
   }): Promise<ShareLinkResponse>;
-  getSharedReport(token: string): Promise<SharedReportResponse>;
+  revokeShareLink(token: string): Promise<ShareLinkResponse>;
+  getSharedReport(token: string, password?: string): Promise<SharedReportResponse>;
   createBudget(input: BudgetInput): Promise<BudgetRecord>;
   listAlerts(workloadId?: string): Promise<AlertRecord[]>;
   updateAlertDismissed(alertId: string, dismissed: boolean): Promise<AlertRecord>;
@@ -167,8 +171,21 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         body: JSON.stringify(input),
       });
     },
-    getSharedReport(token) {
-      return requestJson<SharedReportResponse>(baseUrl, `/share/${encodeURIComponent(token)}`);
+    revokeShareLink(token) {
+      return requestJson<ShareLinkResponse>(
+        baseUrl,
+        `/share-links/${encodeURIComponent(token)}/revoke`,
+        {
+          method: 'POST',
+        },
+      );
+    },
+    getSharedReport(token, password) {
+      const query = password ? `?password=${encodeURIComponent(password)}` : '';
+      return requestJson<SharedReportResponse>(
+        baseUrl,
+        `/share/${encodeURIComponent(token)}${query}`,
+      );
     },
     createBudget(input) {
       return requestJson<BudgetRecord>(baseUrl, '/budgets', {

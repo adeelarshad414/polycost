@@ -249,7 +249,7 @@ describe('App', () => {
     expect(buttonByText(container, '1yr reserved').getAttribute('aria-pressed')).toBe('true');
     expect(text(container)).toContain('Compute, storage, and data-transfer mix');
     expect(text(container)).toContain(
-      'Create a real read-only report link scoped to this workload.',
+      'Create a real read-only report link scoped to this workload, pricing model, and time granularity.',
     );
     await click(buttonByText(detailGate, 'Create & copy link'));
     expect(client.createWorkload).toHaveBeenCalledWith(
@@ -259,6 +259,8 @@ describe('App', () => {
       workloadId: '22222222-2222-4222-8222-222222222222',
       watermark: true,
       expiresInDays: 30,
+      pricingModel: 'reserved-1yr',
+      granularity: 'hourly',
     });
     expect(text(container)).toContain('Public report ready.');
 
@@ -874,7 +876,7 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Egress/data transfer');
     expect(text(container)).toContain('Egress risk: $30.00 is 200% above the lowest provider.');
     expect(text(container)).toContain(
-      'Create a real read-only report link scoped to this workload.',
+      'Create a real read-only report link scoped to this workload, pricing model, and time granularity.',
     );
     expect(client.getExchangeRates).toHaveBeenCalledWith('USD');
     expect(text(container)).toContain('Exchange rates');
@@ -1183,10 +1185,17 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       token: 'public-token-123',
       url: '/api/v1/share/public-token-123',
     })),
+    revokeShareLink: jest.fn(async () => ({
+      token: 'public-token-123',
+      url: '/api/v1/share/public-token-123',
+    })),
     getSharedReport: jest.fn(async () => ({
       token: 'public-token-123',
       watermark: true,
       expiresAt: '2026-07-29T00:00:00.000Z',
+      pricingModel: 'on-demand' as const,
+      granularity: 'monthly' as const,
+      passwordProtected: false,
       workload: {
         id: '22222222-2222-4222-8222-222222222222',
         instanceFamily: 'general-purpose' as const,

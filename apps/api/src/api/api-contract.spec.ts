@@ -177,6 +177,9 @@ const sharedReportResponse: SharedReportResponse = {
   token: shareLinkResponse.token,
   watermark: true,
   expiresAt: '2026-07-29T00:00:00.000Z',
+  pricingModel: 'reserved-3yr',
+  granularity: 'yearly',
+  passwordProtected: true,
   workload: workloadRecord,
   breakdown: workloadBreakdown,
 };
@@ -479,10 +482,25 @@ describe('API contracts', () => {
         workloadId: workloadRecord.id,
         watermark: true,
         expiresInDays: 30,
+        pricingModel: 'reserved-3yr',
+        granularity: 'yearly',
+        password: 'client-demo',
       }),
     ).resolves.toEqual(shareLinkResponse);
-    await expect(sharedReportsController.get(shareLinkResponse.token)).resolves.toEqual(
-      sharedReportResponse,
+    expect(service.createShareLink).toHaveBeenCalledWith({
+      workloadId: workloadRecord.id,
+      watermark: true,
+      expiresInDays: 30,
+      pricingModel: 'reserved-3yr',
+      granularity: 'yearly',
+      password: 'client-demo',
+    });
+    await expect(
+      sharedReportsController.get(shareLinkResponse.token, 'client-demo'),
+    ).resolves.toEqual(sharedReportResponse);
+    expect(service.getSharedReport).toHaveBeenCalledWith(shareLinkResponse.token, 'client-demo');
+    await expect(shareLinksController.revoke(shareLinkResponse.token)).resolves.toEqual(
+      shareLinkResponse,
     );
   });
 
@@ -841,6 +859,7 @@ function costManagementService() {
     updateAlertDismissed: jest.fn(async () => alertRecord),
     createShareLink: jest.fn(async () => shareLinkResponse),
     getSharedReport: jest.fn(async () => sharedReportResponse),
+    revokeShareLink: jest.fn(async () => shareLinkResponse),
     getExchangeRates: jest.fn(async () => exchangeRatesResponse),
   } as unknown as jest.Mocked<CostManagementService>;
 }

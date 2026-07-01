@@ -310,6 +310,9 @@ describe('api client', () => {
           token: 'public-token',
           watermark: true,
           expiresAt: '2026-07-29T00:00:00.000Z',
+          pricingModel: 'reserved-3yr',
+          granularity: 'yearly',
+          passwordProtected: true,
           workload: {},
           breakdown: {},
         }),
@@ -332,8 +335,11 @@ describe('api client', () => {
       workloadId: 'workload-1',
       watermark: true,
       expiresInDays: 30,
+      pricingModel: 'reserved-3yr',
+      granularity: 'yearly',
+      password: 'client-demo',
     });
-    await client.getSharedReport('public-token');
+    await client.getSharedReport('public-token', 'client-demo');
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -347,11 +353,19 @@ describe('api client', () => {
       'http://api.test/api/v1/share-links',
       expect.objectContaining({
         method: 'POST',
+        body: JSON.stringify({
+          workloadId: 'workload-1',
+          watermark: true,
+          expiresInDays: 30,
+          pricingModel: 'reserved-3yr',
+          granularity: 'yearly',
+          password: 'client-demo',
+        }),
       }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
-      'http://api.test/api/v1/share/public-token',
+      'http://api.test/api/v1/share/public-token?password=client-demo',
       expect.objectContaining({
         headers: expect.objectContaining({
           'Content-Type': 'application/json',
