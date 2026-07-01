@@ -850,6 +850,32 @@ describe('report generators', () => {
     expect(
       optimizationOpportunityRows({
         ...comparison,
+        requirements: {
+          ...comparison.requirements!,
+          serviceRequirements: [
+            ...comparison.requirements!.serviceRequirements,
+            {
+              serviceCategory: 'database',
+              serviceType: 'nosql-database',
+              instanceType: 'generic_nosql / 250GB',
+              tier: 'managed',
+              region: 'us-east',
+              quantity: 1,
+              scaleParams: {
+                databaseEngine: 'generic_nosql',
+                databaseSizeGb: 250,
+                ruPerSecond: 4000,
+                nosqlReadRequestUnitsMillion: 50,
+                nosqlWriteRequestUnitsMillion: 20,
+                backupStorageGb: 100,
+                backupRetentionDays: 30,
+                provisionedIops: 8000,
+                readReplicaCount: 1,
+                crossRegionReplicaTransferGb: 100,
+              },
+            },
+          ],
+        },
         providers: [
           {
             providerId: 'aws',
@@ -948,6 +974,15 @@ describe('report generators', () => {
           'Low',
           'Medium',
           'aws dominant database row is "AWS primary RU/s provisioned capacity estimate" at $80/mo; RU/s right-sizing is modeled as a 25% reduction of that row.',
+        ]),
+        expect.arrayContaining([
+          'Database anatomy',
+          'aws generic_nosql capacity review; validate RU/s utilization, autoscale bounds, and serverless break-even.',
+          '',
+          '',
+          'High',
+          'Medium',
+          expect.stringContaining('ru $80/mo, nosql $40/mo'),
         ]),
       ]),
     );

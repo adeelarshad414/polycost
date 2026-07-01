@@ -884,6 +884,8 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
     ]);
   }
 
+  rows.push(...databaseAnatomyOpportunityRows(result));
+
   for (const provider of result.providers) {
     const runtimeMonthly = runtimeIntelligenceMonthly(provider);
     const providerMonthly = provider.totals.monthly;
@@ -2624,6 +2626,234 @@ function databaseOptimizationInsight(
       databaseMonthly,
     )}/mo across ${databaseRows.length} database/analytics row(s); tier review is modeled at 15% of spend.`,
   };
+}
+
+function databaseAnatomyOpportunityRows(result: ComparisonResult): string[][] {
+  const databaseRequirement = result.requirements?.serviceRequirements.find(
+    (requirement) => requirement.serviceCategory === 'database',
+  );
+
+  if (!databaseRequirement) {
+    return [];
+  }
+
+  const params = requirementScaleParams(databaseRequirement);
+  const engine = String(params.databaseEngine ?? params.engine ?? databaseRequirement.serviceType);
+  const sizeGb = numericScaleParam(params, 'databaseSizeGb') || numericScaleParam(params, 'sizeGb');
+  const backupGb = numericScaleParam(params, 'backupStorageGb');
+  const backupDays = numericScaleParam(params, 'backupRetentionDays');
+  const provisionedIops = numericScaleParam(params, 'provisionedIops');
+  const readReplicas = numericScaleParam(params, 'readReplicaCount');
+  const replicaTransferGb = numericScaleParam(params, 'crossRegionReplicaTransferGb');
+  const readUnits = numericScaleParam(params, 'nosqlReadRequestUnitsMillion');
+  const writeUnits = numericScaleParam(params, 'nosqlWriteRequestUnitsMillion');
+  const ruPerSecond = numericScaleParam(params, 'ruPerSecond');
+  const queryDataTb = numericScaleParam(params, 'queryDataTb');
+  const cacheReplicas = numericScaleParam(params, 'cacheReplicaCount');
+  const storageGrowthGb = numericScaleParam(params, 'storageGrowthGbPerMonth');
+  const searchNodeCount = numericScaleParam(params, 'searchNodeCount');
+  const searchStorageGb = numericScaleParam(params, 'searchStorageGb');
+  const searchQueriesMillion = numericScaleParam(params, 'searchQueriesMillion');
+  const annualGrowthPercent = sizeGb > 0 ? (storageGrowthGb * 12 * 100) / sizeGb : 0;
+
+  return result.providers.flatMap((provider) => {
+    const rows = databaseIntelligenceLineItems(provider);
+
+    if (rows.length === 0) {
+      return [];
+    }
+
+    const dimensions = databaseAnatomyDimensions(rows);
+    const monthly = rows.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+    const action = databaseAnatomyReportAction(dimensions, {
+      cacheReplicas,
+      provisionedIops,
+      queryDataTb,
+      readReplicas,
+      ruPerSecond,
+      searchNodeCount,
+      storageGrowthGb,
+    });
+    const capacityEvidence = [
+      ruPerSecond > 0 ? `${formatNumber(ruPerSecond)} RU/s` : undefined,
+      readUnits + writeUnits > 0
+        ? `${formatNumber(readUnits)}M reads and ${formatNumber(writeUnits)}M writes`
+        : undefined,
+    ].filter(Boolean);
+    const resilienceEvidence = [
+      backupGb > 0 ? `${formatNumber(backupGb)}GB backup for ${formatNumber(backupDays)} days` : undefined,
+      readReplicas > 0 || replicaTransferGb > 0
+        ? `${formatNumber(readReplicas)} replicas and ${formatNumber(replicaTransferGb)}GB transfer`
+        : undefined,
+      provisionedIops > 0 ? `${formatNumber(provisionedIops)} provisioned IOPS` : undefined,
+      storageGrowthGb > 0
+        ? `${formatNumber(storageGrowthGb)}GB/month growth (${formatNumber(
+            annualGrowthPercent,
+          )}% annualized)`
+        : undefined,
+    ].filter(Boolean);
+    const analyticsEvidence = [
+      queryDataTb > 0 ? `${formatNumber(queryDataTb)}TB query processing` : undefined,
+      cacheReplicas > 0 ? `${formatNumber(cacheReplicas)} cache replicas` : undefined,
+      searchNodeCount + searchStorageGb + searchQueriesMillion > 0
+        ? `${formatNumber(searchNodeCount)} search nodes, ${formatNumber(
+            searchStorageGb,
+          )}GB index, ${formatNumber(searchQueriesMillion)}M queries`
+        : undefined,
+    ].filter(Boolean);
+
+    return [
+      [
+        'Database anatomy',
+        `${provider.providerId} ${engine} capacity review; ${action}`,
+        '',
+        '',
+        monthly > 100 ? 'High' : monthly > 25 ? 'Medium' : 'Low',
+        'Medium',
+        `${provider.providerId} database-related run-rate is $${formatNumber(
+          monthly,
+        )}/mo across ${rows.length} row(s): ${databaseAnatomyDimensionSummary(dimensions)}. ${
+          capacityEvidence.length ? capacityEvidence.join('; ') : 'capacity-mode dimensions not configured'
+        }. ${resilienceEvidence.length ? resilienceEvidence.join('; ') : 'no backup/replica/IOPS signal'}. ${
+          analyticsEvidence.length ? analyticsEvidence.join('; ') : 'no cache/warehouse/search signal'
+        }.`,
+      ],
+    ];
+  });
+}
+
+function databaseAnatomyDimensions(
+  lineItems: ComparisonLineItem[],
+): Record<
+  'base' | 'nosql' | 'ru' | 'query' | 'warehouse' | 'search' | 'cache' | 'backup' | 'replica' | 'performance',
+  number
+> {
+  return lineItems.reduce(
+    (totals, lineItem) => {
+      const normalized = `${lineItem.skuId ?? ''} ${lineItem.description}`.toLowerCase();
+      const monthly = lineItem.baseMonthlyCostUsd;
+
+      if (normalized.includes('ru') || normalized.includes('cosmos')) {
+        totals.ru += monthly;
+      } else if (
+        normalized.includes('nosql') ||
+        normalized.includes('read unit') ||
+        normalized.includes('write unit')
+      ) {
+        totals.nosql += monthly;
+      } else if (
+        normalized.includes('search') ||
+        normalized.includes('opensearch') ||
+        normalized.includes('cognitive search') ||
+        normalized.includes('azure ai search') ||
+        normalized.includes('cloud search') ||
+        normalized.includes('vertex ai search')
+      ) {
+        totals.search += monthly;
+      } else if (
+        normalized.includes('warehouse') ||
+        normalized.includes('bigquery') ||
+        normalized.includes('redshift') ||
+        normalized.includes('synapse')
+      ) {
+        totals.warehouse += monthly;
+      } else if (normalized.includes('query')) {
+        totals.query += monthly;
+      } else if (normalized.includes('cache') || normalized.includes('redis')) {
+        totals.cache += monthly;
+      } else if (normalized.includes('backup') || normalized.includes('growth')) {
+        totals.backup += monthly;
+      } else if (
+        normalized.includes('replica') ||
+        normalized.includes('standby') ||
+        normalized.includes('multi-az')
+      ) {
+        totals.replica += monthly;
+      } else if (normalized.includes('iops') || normalized.includes('performance')) {
+        totals.performance += monthly;
+      } else {
+        totals.base += monthly;
+      }
+
+      return totals;
+    },
+    {
+      base: 0,
+      nosql: 0,
+      ru: 0,
+      query: 0,
+      warehouse: 0,
+      search: 0,
+      cache: 0,
+      backup: 0,
+      replica: 0,
+      performance: 0,
+    },
+  );
+}
+
+function databaseAnatomyDimensionSummary(
+  dimensions: Record<
+    'base' | 'nosql' | 'ru' | 'query' | 'warehouse' | 'search' | 'cache' | 'backup' | 'replica' | 'performance',
+    number
+  >,
+): string {
+  return Object.entries(dimensions)
+    .filter(([, value]) => value > 0.005)
+    .map(([key, value]) => `${key} $${formatNumber(value)}/mo`)
+    .join(', ');
+}
+
+function databaseAnatomyReportAction(
+  dimensions: Record<
+    'base' | 'nosql' | 'ru' | 'query' | 'warehouse' | 'search' | 'cache' | 'backup' | 'replica' | 'performance',
+    number
+  >,
+  signals: {
+    cacheReplicas: number;
+    provisionedIops: number;
+    queryDataTb: number;
+    readReplicas: number;
+    ruPerSecond: number;
+    searchNodeCount: number;
+    storageGrowthGb: number;
+  },
+): string {
+  const dominant = Object.entries(dimensions).sort((left, right) => right[1] - left[1])[0]?.[0];
+
+  if (dominant === 'ru' || signals.ruPerSecond > 0) {
+    return 'validate RU/s utilization, autoscale bounds, and serverless break-even.';
+  }
+
+  if (dominant === 'nosql') {
+    return 'compare on-demand and provisioned NoSQL capacity before choosing mode.';
+  }
+
+  if (dominant === 'query' || dominant === 'warehouse' || signals.queryDataTb > 0) {
+    return 'separate warehouse storage from query compute and compare committed capacity.';
+  }
+
+  if (dominant === 'search' || signals.searchNodeCount > 0) {
+    return 'right-size search replicas, partitions, and index lifecycle before scaling.';
+  }
+
+  if (dominant === 'cache' || signals.cacheReplicas > 0) {
+    return 'validate cache replica count, TTL policy, and failover topology.';
+  }
+
+  if (dominant === 'replica' || signals.readReplicas > 0) {
+    return 'confirm read-replica count and standby topology against RPO/RTO.';
+  }
+
+  if (dominant === 'performance' || signals.provisionedIops > 0) {
+    return 'tune provisioned IOPS using observed latency and transaction peaks.';
+  }
+
+  if (dominant === 'backup' || signals.storageGrowthGb > 0) {
+    return 'model backup retention and database storage autoscaling before commitment.';
+  }
+
+  return 'validate managed tier, engine limits, storage growth, and query profile.';
 }
 
 function runtimeOptimizationInsight(

@@ -1248,6 +1248,12 @@ describe('ComparisonView', () => {
       ['compute', 'aws compute', 40],
       ['database', 'AWS primary RU/s provisioned capacity estimate', 32],
       ['database', 'AWS primary NoSQL write unit estimate', 20],
+      ['database', 'AWS primary backup retention estimate', 10],
+      ['database', 'AWS primary read replica estimate', 18],
+      ['database', 'AWS primary provisioned IOPS estimate', 8],
+      ['database', 'AWS cache replica estimate', 12],
+      ['database', 'AWS data warehouse query processing estimate', 25],
+      ['database', 'Amazon OpenSearch Service capacity estimate', 16],
     ]);
     awsProvider.lineItems[1] = {
       ...awsProvider.lineItems[1],
@@ -1258,6 +1264,36 @@ describe('ComparisonView', () => {
       ...awsProvider.lineItems[2],
       costComponent: 'database',
       skuId: 'modeled-database-nosql-write-units',
+    };
+    awsProvider.lineItems[3] = {
+      ...awsProvider.lineItems[3],
+      costComponent: 'database',
+      skuId: 'modeled-database-backup-storage',
+    };
+    awsProvider.lineItems[4] = {
+      ...awsProvider.lineItems[4],
+      costComponent: 'database',
+      skuId: 'modeled-database-read-replica',
+    };
+    awsProvider.lineItems[5] = {
+      ...awsProvider.lineItems[5],
+      costComponent: 'database',
+      skuId: 'modeled-database-iops',
+    };
+    awsProvider.lineItems[6] = {
+      ...awsProvider.lineItems[6],
+      costComponent: 'database',
+      skuId: 'modeled-database-cache-replica',
+    };
+    awsProvider.lineItems[7] = {
+      ...awsProvider.lineItems[7],
+      costComponent: 'database',
+      skuId: 'modeled-analytics-warehouse-query',
+    };
+    awsProvider.lineItems[8] = {
+      ...awsProvider.lineItems[8],
+      costComponent: 'database',
+      skuId: 'modeled-database-search-capacity',
     };
     const databaseResult: ComparisonResult = {
       ...comparisonResult,
@@ -1276,9 +1312,22 @@ describe('ComparisonView', () => {
           databaseEnabled: true,
           databaseEngine: 'generic_nosql',
           databaseSizeGb: '250',
+          databaseBackupStorageGb: '100',
+          databaseBackupRetentionDays: '30',
+          databaseProvisionedIops: '8000',
+          databaseReadReplicaCount: '1',
+          databaseCrossRegionReplicaTransferGb: '100',
           databaseNosqlReadRequestUnitsMillion: '50',
           databaseNosqlWriteRequestUnitsMillion: '20',
           databaseRuPerSecond: '4000',
+          databaseQueryDataTb: '3',
+          databaseCacheReplicaCount: '2',
+          databaseStorageGrowthGbPerMonth: '30',
+          databaseSearchNodeCount: '2',
+          databaseSearchStorageGb: '500',
+          databaseSearchQueriesMillion: '25',
+          analyticsWarehouseStorageGb: '500',
+          analyticsWarehouseQueryTb: '4',
         }}
         interval="monthly"
       />,
@@ -1297,6 +1346,19 @@ describe('ComparisonView', () => {
       'Validate RU/s utilization, autoscale limits, and serverless break-even.',
     );
     expect(text(container)).toContain('4,000 RU/s configured');
+    expect(text(container)).toContain('Database cost anatomy');
+    expect(text(container)).toContain(
+      'Relational, NoSQL, cache, warehouse, search, backup, and IOPS',
+    );
+    expect(text(container)).toContain('generic nosql · HA / multi-zone');
+    expect(text(container)).toContain('4,000 RU/s ($32.00/mo)');
+    expect(text(container)).toContain('50M reads / 20M writes ($20.00/mo)');
+    expect(text(container)).toContain('1 replicas / 100GB transfer ($18.00/mo)');
+    expect(text(container)).toContain('100GB backup / 30GB growth ($10.00/mo)');
+    expect(text(container)).toContain('8,000 IOPS ($8.00/mo)');
+    expect(text(container)).toContain('7TB query / 500GB warehouse ($25.00/mo)');
+    expect(text(container)).toContain('2 cache replicas ($12.00/mo)');
+    expect(text(container)).toContain('2 search nodes / 500GB index ($16.00/mo)');
 
     unmount();
   });
