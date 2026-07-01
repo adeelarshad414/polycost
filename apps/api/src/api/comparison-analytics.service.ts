@@ -5,7 +5,11 @@ import {
   ComparisonProviderResult,
   ComparisonResult,
 } from '../comparison/comparison.types';
-import { costCoverageMapRows, regionComparisonEvidenceRows } from '../reports/report-evidence';
+import {
+  costCoverageMapRows,
+  optimizationOpportunityRows,
+  regionComparisonEvidenceRows,
+} from '../reports/report-evidence';
 
 type AnalyticsDimension =
   | 'compute'
@@ -127,6 +131,17 @@ export interface TcoSignal {
   note: string;
 }
 
+export interface OptimizationOpportunity {
+  id: string;
+  category: string;
+  recommendation: string;
+  estimatedMonthlySavingsUsd?: number;
+  estimatedAnnualSavingsUsd?: number;
+  priority: 'High' | 'Medium' | 'Low';
+  effort: 'High' | 'Medium' | 'Low';
+  evidence: string;
+}
+
 export interface FinOpsFinding {
   id: string;
   severity: 'info' | 'review' | 'warning' | 'critical';
@@ -182,6 +197,7 @@ export interface ComparisonAnalyticsResponse {
   commitmentRoiTimelines: CommitmentRoiTimeline[];
   commitmentCoverage: CommitmentCoverageRow[];
   tcoSignals: TcoSignal[];
+  optimizationOpportunities: OptimizationOpportunity[];
   finOpsFindings: FinOpsFinding[];
 }
 
@@ -287,6 +303,7 @@ export class ComparisonAnalyticsService {
       commitmentRoiTimelines: commitmentRoiTimelines(result.providers),
       commitmentCoverage: commitmentCoverage(result),
       tcoSignals: tcoSignals(providerDimensionAmounts),
+      optimizationOpportunities: optimizationOpportunities(result),
       finOpsFindings: finOpsFindings(result, providerDimensionAmounts),
     };
   }
@@ -643,6 +660,33 @@ function tcoSignals(
   });
 }
 
+function optimizationOpportunities(result: ComparisonResult): OptimizationOpportunity[] {
+  const opportunities = optimizationOpportunityRows(result)
+    .slice(1)
+    .map((row, index) => ({
+      id: `${slugify(row[0] ?? 'opportunity')}-${index + 1}`,
+      category: row[0] ?? 'Optimization opportunity',
+      recommendation: row[1] ?? '',
+      ...(numberFromCell(row[2]) !== undefined
+        ? { estimatedMonthlySavingsUsd: numberFromCell(row[2]) }
+        : {}),
+      ...(numberFromCell(row[3]) !== undefined
+        ? { estimatedAnnualSavingsUsd: numberFromCell(row[3]) }
+        : {}),
+      priority: priorityFromCell(row[4]),
+      effort: priorityFromCell(row[5]),
+      evidence: row[6] ?? '',
+    }))
+    .sort(
+      (left, right) =>
+        priorityWeight(right.priority) - priorityWeight(left.priority) ||
+        (right.estimatedMonthlySavingsUsd ?? 0) - (left.estimatedMonthlySavingsUsd ?? 0) ||
+        left.category.localeCompare(right.category),
+    );
+
+  return opportunities.slice(0, 5);
+}
+
 function finOpsFindings(
   result: ComparisonResult,
   providerDimensionAmounts: Array<{
@@ -946,6 +990,45 @@ function providerLabel(providerId: ProviderId): string {
     case 'gcp':
       return 'GCP';
   }
+}
+
+function priorityFromCell(value: string | undefined): OptimizationOpportunity['priority'] {
+  if (value === 'High' || value === 'Medium' || value === 'Low') {
+    return value;
+  }
+
+  return 'Low';
+}
+
+function priorityWeight(priority: OptimizationOpportunity['priority']): number {
+  switch (priority) {
+    case 'High':
+      return 3;
+    case 'Medium':
+      return 2;
+    case 'Low':
+      return 1;
+  }
+}
+
+function numberFromCell(value: string | undefined): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = Number(value.replace(/,/g, ''));
+
+  return Number.isFinite(parsed) ? roundCurrency(parsed) : undefined;
+}
+
+function slugify(value: string): string {
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+
+  return slug || 'opportunity';
 }
 
 function comparisonRegionLabel(comparisonRegion: string): string {

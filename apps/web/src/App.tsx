@@ -6371,6 +6371,9 @@ function ProductionDepthAnalytics({
       <ComputeSpecificationPanel rows={computeSpecifications} />
       <RegionVariancePanel rows={regionVariance} />
       <ServerCommitmentExposurePanel rows={serverAnalytics?.commitmentCoverage ?? []} />
+      <ServerOptimizationOpportunitiesPanel
+        rows={serverAnalytics?.optimizationOpportunities ?? []}
+      />
       <CommitmentCoverageGapPanel rows={commitmentCoverage} />
       <CrossProviderTcoPanel rows={tcoSignals} />
       <StorageOptimizationPanel rows={storageOptimizations} />
@@ -6662,6 +6665,68 @@ function ServerCommitmentExposurePanel({
                 <td>
                   <strong>{formatCurrency(row.remainingOpportunityMonthlyUsd)}/mo open</strong>
                   <small>{row.recommendation}</small>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function ServerOptimizationOpportunitiesPanel({
+  rows,
+}: {
+  rows: ComparisonAnalyticsResponse['optimizationOpportunities'];
+}) {
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="provider-delta-analysis" aria-label="Backend optimization opportunities">
+      <div className="scenario-sensitivity-heading">
+        <div>
+          <span>Backend optimization opportunities</span>
+          <h4>Top deterministic savings actions</h4>
+        </div>
+      </div>
+      <div className="table-wrap provider-delta-wrap">
+        <table className="ranking-table provider-delta-table">
+          <thead>
+            <tr>
+              <th scope="col">Opportunity</th>
+              <th scope="col">Savings</th>
+              <th scope="col">Priority</th>
+              <th scope="col">Evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id}>
+                <td>
+                  <strong>{row.category}</strong>
+                  <small>{row.recommendation}</small>
+                </td>
+                <td>
+                  <strong>
+                    {row.estimatedMonthlySavingsUsd !== undefined
+                      ? `${formatCurrency(row.estimatedMonthlySavingsUsd)}/mo`
+                      : 'Review'}
+                  </strong>
+                  <small>
+                    {row.estimatedAnnualSavingsUsd !== undefined
+                      ? `${formatCurrency(row.estimatedAnnualSavingsUsd)}/yr`
+                      : 'No modeled dollar impact'}
+                  </small>
+                </td>
+                <td>
+                  <strong>{row.priority}</strong>
+                  <small>{row.effort} effort</small>
+                </td>
+                <td>
+                  <small>{row.evidence}</small>
                 </td>
               </tr>
             ))}

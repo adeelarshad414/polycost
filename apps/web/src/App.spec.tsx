@@ -373,6 +373,10 @@ describe('App', () => {
     expect(text(container)).toContain('Engineering service spend');
     expect(text(container)).toContain('Backend-modeled baseline region sensitivity.');
     expect(text(container)).toContain('Backend commitment exposure');
+    expect(text(container)).toContain('Backend optimization opportunities');
+    expect(text(container)).toContain(
+      'Backend-ranked provider delta from current cached comparison.',
+    );
     expect(text(container)).toContain('Service driver split');
     expect(text(container)).toContain('EC2');
     expect(text(container)).toContain('VM');
@@ -2387,6 +2391,18 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
         },
       ],
       tcoSignals: [],
+      optimizationOpportunities: [
+        {
+          id: 'provider-selection-1',
+          category: 'Provider selection',
+          recommendation: 'Shortlist GCP before committing to AWS.',
+          estimatedMonthlySavingsUsd: 12,
+          estimatedAnnualSavingsUsd: 144,
+          priority: 'High' as const,
+          effort: 'Medium' as const,
+          evidence: 'Backend-ranked provider delta from current cached comparison.',
+        },
+      ],
       finOpsFindings: [],
     })),
     refreshLiveComparison: jest.fn(async () => comparisonResult),

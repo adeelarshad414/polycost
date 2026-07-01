@@ -391,6 +391,20 @@ describe('ComparisonAnalyticsService', () => {
         }),
       ]),
     );
+    expect(analytics.optimizationOpportunities.length).toBeLessThanOrEqual(5);
+    expect(analytics.optimizationOpportunities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'provider-selection-1',
+          category: 'Provider selection',
+          estimatedMonthlySavingsUsd: 200,
+          estimatedAnnualSavingsUsd: 2400,
+          priority: 'High',
+          effort: 'Medium',
+          evidence: 'Provider delta from current cached comparison: aws $1000/mo vs azure $800/mo.',
+        }),
+      ]),
+    );
     expect(analytics.finOpsFindings).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

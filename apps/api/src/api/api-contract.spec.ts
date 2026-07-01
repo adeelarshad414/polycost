@@ -376,6 +376,16 @@ describe('API contracts', () => {
             ],
           }),
         ]),
+        optimizationOpportunities: expect.arrayContaining([
+          expect.objectContaining({
+            id: expect.any(String),
+            category: expect.any(String),
+            recommendation: expect.any(String),
+            priority: expect.stringMatching(/High|Medium|Low/),
+            effort: expect.stringMatching(/High|Medium|Low/),
+            evidence: expect.any(String),
+          }),
+        ]),
       }),
     );
   });

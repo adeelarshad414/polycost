@@ -159,6 +159,18 @@ describe('api client', () => {
         },
       ],
       tcoSignals: [],
+      optimizationOpportunities: [
+        {
+          id: 'provider-selection-1',
+          category: 'Provider selection',
+          recommendation: 'Shortlist aws before committing to gcp.',
+          estimatedMonthlySavingsUsd: 20,
+          estimatedAnnualSavingsUsd: 240,
+          priority: 'High',
+          effort: 'Medium',
+          evidence: 'Provider delta from current cached comparison.',
+        },
+      ],
       finOpsFindings: [],
     };
     const fetchMock = jest.fn(async () => jsonResponse(analytics));

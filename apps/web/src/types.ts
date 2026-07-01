@@ -456,6 +456,17 @@ export interface TcoSignal {
   note: string;
 }
 
+export interface OptimizationOpportunity {
+  id: string;
+  category: string;
+  recommendation: string;
+  estimatedMonthlySavingsUsd?: number;
+  estimatedAnnualSavingsUsd?: number;
+  priority: 'High' | 'Medium' | 'Low';
+  effort: 'High' | 'Medium' | 'Low';
+  evidence: string;
+}
+
 export interface FinOpsFinding {
   id: string;
   severity: 'info' | 'review' | 'warning' | 'critical';
@@ -509,6 +520,7 @@ export interface ComparisonAnalyticsResponse {
   commitmentRoiTimelines: CommitmentRoiTimeline[];
   commitmentCoverage: CommitmentCoverageRow[];
   tcoSignals: TcoSignal[];
+  optimizationOpportunities: OptimizationOpportunity[];
   finOpsFindings: FinOpsFinding[];
 }
 
