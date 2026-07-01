@@ -1314,7 +1314,7 @@ describe('ComparisonView', () => {
 
     expect(text(container)).toContain('Runtime optimization detail');
     expect(text(container)).toContain(
-      'Functions, Kubernetes overhead, container registry, and platform fit',
+      'Functions, memory curve, Kubernetes overhead, registry, and platform fit',
     );
     expect(text(container)).toContain('Function duration / memory');
     expect(text(container)).toContain(
@@ -1326,6 +1326,12 @@ describe('ComparisonView', () => {
       'Tune the memory-duration knee and compare functions with always-on containers for steady traffic.',
     );
     expect(text(container)).toContain('5M invocations · 200ms @ 512MB');
+    expect(text(container)).toContain('Serverless memory-duration curve');
+    expect(text(container)).toContain('1,024MB @ 100ms');
+    expect(text(container)).toContain('$9.33/mo');
+    expect(text(container)).toContain(
+      'Benchmark 1,024MB; keep duration at or below 100ms to improve latency without raising compute cost.',
+    );
 
     unmount();
   });

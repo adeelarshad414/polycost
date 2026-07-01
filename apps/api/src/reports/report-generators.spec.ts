@@ -1009,6 +1009,52 @@ describe('report generators', () => {
           ...comparison.requirements!,
           serviceRequirements: [
             {
+              serviceCategory: 'compute',
+              serviceType: 'serverless-functions',
+              quantity: 1,
+              scaleParams: {
+                functionInvocationsMillion: 5,
+                functionDurationMs: 200,
+                functionMemoryMb: 512,
+              },
+            },
+          ],
+        },
+        providers: [
+          {
+            providerId: 'aws',
+            lineItems: [],
+            totals: {
+              daily: 0.31,
+              weekly: 2.15,
+              monthly: 9.33,
+              quarterly: 27.99,
+              yearly: 111.96,
+            },
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'Serverless memory curve',
+          'aws function memory break-even: 1024MB must run at or below 100ms to keep GB-second cost flat while improving latency.',
+          '0',
+          '0',
+          'Low',
+          'Low',
+          'aws current function shape is 5M invocations/month at 200ms and 512MB: $9.33/mo current vs $9.33/mo at the linear memory-duration knee.',
+        ]),
+      ]),
+    );
+
+    expect(
+      optimizationOpportunityRows({
+        ...comparison,
+        requirements: {
+          ...comparison.requirements!,
+          serviceRequirements: [
+            {
               serviceCategory: 'application',
               serviceType: 'app-platform',
               quantity: 1,

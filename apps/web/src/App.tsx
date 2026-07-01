@@ -6124,6 +6124,7 @@ function ProductionDepthAnalytics({
   const storageOptimizations = storageOptimizationRows(comparison, form);
   const databaseOptimizations = databaseOptimizationRows(comparison, form);
   const runtimeOptimizations = runtimeOptimizationRows(comparison, form);
+  const serverlessMemoryCurves = serverlessMemoryCurveRows(comparison, form);
   const appPlatformModels = appPlatformModelRows(comparison, form);
   const operationsOptimizations = operationsOptimizationRows(comparison, form);
   const egressOptimizations = egressOptimizationRows(comparison, form);
@@ -6162,7 +6163,10 @@ function ProductionDepthAnalytics({
       <CrossProviderTcoPanel rows={tcoSignals} />
       <StorageOptimizationPanel rows={storageOptimizations} />
       <DatabaseOptimizationPanel rows={databaseOptimizations} />
-      <RuntimeOptimizationPanel rows={runtimeOptimizations} />
+      <RuntimeOptimizationPanel
+        rows={runtimeOptimizations}
+        memoryCurveRows={serverlessMemoryCurves}
+      />
       <AppPlatformModelPanel rows={appPlatformModels} />
       <OperationsOptimizationPanel rows={operationsOptimizations} />
       <EgressOptimizationPanel rows={egressOptimizations} />
@@ -6563,13 +6567,19 @@ function DatabaseOptimizationPanel({ rows }: { rows: DatabaseOptimizationRow[] }
   );
 }
 
-function RuntimeOptimizationPanel({ rows }: { rows: RuntimeOptimizationRow[] }) {
+function RuntimeOptimizationPanel({
+  rows,
+  memoryCurveRows,
+}: {
+  rows: RuntimeOptimizationRow[];
+  memoryCurveRows: ServerlessMemoryCurveRow[];
+}) {
   return (
     <div className="runtime-optimization-panel" aria-label="Runtime optimization detail">
       <div className="scenario-sensitivity-heading">
         <div>
           <span>Runtime optimization detail</span>
-          <h4>Functions, Kubernetes overhead, container registry, and platform fit</h4>
+          <h4>Functions, memory curve, Kubernetes overhead, registry, and platform fit</h4>
         </div>
       </div>
 
@@ -6621,6 +6631,57 @@ function RuntimeOptimizationPanel({ rows }: { rows: RuntimeOptimizationRow[] }) 
         <div className="scenario-sensitivity-empty" role="status">
           Runtime optimization appears when function duration, invocation volume, Kubernetes
           control-plane/node overhead, or container registry transfer becomes material.
+        </div>
+      )}
+
+      {memoryCurveRows.length > 0 && (
+        <div className="table-wrap runtime-memory-curve-wrap">
+          <table className="ranking-table runtime-memory-curve-table">
+            <caption>Serverless memory-duration curve</caption>
+            <thead>
+              <tr>
+                <th scope="col">Provider</th>
+                <th scope="col">Current shape</th>
+                <th scope="col">2x memory break-even</th>
+                <th scope="col">Cost signal</th>
+                <th scope="col">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {memoryCurveRows.map((row) => (
+                <tr key={row.providerId}>
+                  <td>
+                    <span className={`scenario-low-label scenario-low-${row.providerId}`}>
+                      {providerLabel(row.providerId)}
+                    </span>
+                    <small>{row.usageSignal}</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.currentMonthly)}/mo</strong>
+                    <small>
+                      {formatDecimal(row.currentDurationMs)}ms @{' '}
+                      {formatDecimal(row.currentMemoryMb)}MB
+                    </small>
+                  </td>
+                  <td>
+                    <strong>
+                      {formatDecimal(row.breakEvenMemoryMb)}MB @{' '}
+                      {formatDecimal(row.breakEvenDurationMs)}ms
+                    </strong>
+                    <small>linear GB-second knee</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.modeledMonthly)}/mo</strong>
+                    <small>{formatPercent(row.deltaPercent)} delta at break-even</small>
+                  </td>
+                  <td>
+                    <strong>{row.recommendation}</strong>
+                    <small>{row.evidence}</small>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
@@ -7653,6 +7714,26 @@ interface RuntimeOptimizationRow {
   evidence: string;
 }
 
+interface ServerlessFunctionRates {
+  requestPerMillion: number;
+  gbSecond: number;
+  evidence: string;
+}
+
+interface ServerlessMemoryCurveRow {
+  providerId: ProviderId;
+  currentMonthly: number;
+  modeledMonthly: number;
+  currentMemoryMb: number;
+  currentDurationMs: number;
+  breakEvenMemoryMb: number;
+  breakEvenDurationMs: number;
+  deltaPercent: number;
+  usageSignal: string;
+  recommendation: string;
+  evidence: string;
+}
+
 interface AppPlatformModelRates {
   requestPerMillion: number;
   vcpuHour: number;
@@ -7751,6 +7832,24 @@ const APP_PLATFORM_MODEL_RATES: Record<ProviderId, AppPlatformModelRates> = {
     alwaysOnVcpuHour: 0.0648,
     alwaysOnMemoryGbHour: 0.00675,
     evidence: 'Cloud Run request-based model compared with always-allocated CPU worker posture.',
+  },
+};
+
+const SERVERLESS_FUNCTION_RATES: Record<ProviderId, ServerlessFunctionRates> = {
+  aws: {
+    requestPerMillion: 0.2,
+    gbSecond: 0.0000166667,
+    evidence: 'Lambda-style requests plus GB-second duration model.',
+  },
+  azure: {
+    requestPerMillion: 0.2,
+    gbSecond: 0.000016,
+    evidence: 'Azure Functions-style executions plus GB-second duration model.',
+  },
+  gcp: {
+    requestPerMillion: 0.4,
+    gbSecond: 0.0000025,
+    evidence: 'Cloud Run functions-style invocations plus GB-second duration model.',
   },
 };
 
@@ -8539,6 +8638,95 @@ function runtimeIntelligenceLineItems(provider: ComparisonProviderResult): Compa
   return provider.lineItems.filter((lineItem) =>
     runtimeDescriptionMatches(`${lineItem.skuId ?? ''} ${lineItem.description}`),
   );
+}
+
+function serverlessMemoryCurveRows(
+  comparison: ComparisonResult | null,
+  form: WorkloadFormState,
+): ServerlessMemoryCurveRow[] {
+  if (!comparison) {
+    return [];
+  }
+
+  const requestsMillion = parseInputNumber(form.functionInvocationsMillion) ?? 0;
+  const currentDurationMs = parseInputNumber(form.functionDurationMs) ?? 0;
+  const currentMemoryMb = parseInputNumber(form.functionMemoryMb) ?? 0;
+
+  if (requestsMillion <= 0 || currentDurationMs <= 0 || currentMemoryMb <= 0) {
+    return [];
+  }
+
+  const hasServerlessRows = comparison.providers.some((provider) =>
+    provider.lineItems.some((lineItem) =>
+      `${lineItem.skuId ?? ''} ${lineItem.description}`.toLowerCase().includes('serverless'),
+    ),
+  );
+  const serverlessSelected =
+    form.selectedServiceFamilyId === 'serverless-functions' ||
+    form.selectedServiceFamilyIds.includes('serverless-functions');
+
+  if (!hasServerlessRows && !serverlessSelected) {
+    return [];
+  }
+
+  const breakEvenMemoryMb = currentMemoryMb * 2;
+  const breakEvenDurationMs = (currentDurationMs * currentMemoryMb) / breakEvenMemoryMb;
+  const usageSignal = `${formatDecimal(requestsMillion)}M invocations`;
+
+  return comparison.providers
+    .map((provider) => {
+      const currentMonthly = serverlessFunctionMonthly(provider.providerId, {
+        requestsMillion,
+        durationMs: currentDurationMs,
+        memoryMb: currentMemoryMb,
+      });
+      const modeledMonthly = serverlessFunctionMonthly(provider.providerId, {
+        requestsMillion,
+        durationMs: breakEvenDurationMs,
+        memoryMb: breakEvenMemoryMb,
+      });
+      const deltaPercent =
+        currentMonthly > 0 ? ((modeledMonthly - currentMonthly) / currentMonthly) * 100 : 0;
+
+      return {
+        providerId: provider.providerId,
+        currentMonthly,
+        modeledMonthly,
+        currentMemoryMb,
+        currentDurationMs,
+        breakEvenMemoryMb,
+        breakEvenDurationMs,
+        deltaPercent,
+        usageSignal,
+        recommendation: `Benchmark ${formatDecimal(breakEvenMemoryMb)}MB; keep duration at or below ${formatDecimal(
+          breakEvenDurationMs,
+        )}ms to improve latency without raising compute cost.`,
+        evidence: `${SERVERLESS_FUNCTION_RATES[provider.providerId].evidence} ${formatDecimal(
+          breakEvenMemoryMb,
+        )}MB is the linear break-even point for the configured ${formatDecimal(
+          currentDurationMs,
+        )}ms @ ${formatDecimal(currentMemoryMb)}MB function.`,
+      };
+    })
+    .filter((row) => row.currentMonthly > 0 || row.modeledMonthly > 0);
+}
+
+function serverlessFunctionMonthly(
+  providerId: ProviderId,
+  input: {
+    requestsMillion: number;
+    durationMs: number;
+    memoryMb: number;
+  },
+): number {
+  const rates = SERVERLESS_FUNCTION_RATES[providerId];
+  const invocations = input.requestsMillion * 1_000_000;
+  const durationSeconds = input.durationMs / 1000;
+  const memoryGb = input.memoryMb / 1024;
+  const requestCost = input.requestsMillion * rates.requestPerMillion;
+  const durationCost = invocations * durationSeconds * memoryGb * rates.gbSecond;
+
+  return roundCurrency(requestCost + durationCost);
 }
 
 function runtimeOptimizationSignal(

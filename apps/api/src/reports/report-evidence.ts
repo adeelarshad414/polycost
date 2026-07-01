@@ -66,6 +66,11 @@ interface AppPlatformModelRates {
   alwaysOnMemoryGbHour: number;
 }
 
+interface ServerlessFunctionRates {
+  requestPerMillion: number;
+  gbSecond: number;
+}
+
 const APP_PLATFORM_MODEL_RATES: Record<
   ComparisonProviderResult['providerId'],
   AppPlatformModelRates
@@ -90,6 +95,24 @@ const APP_PLATFORM_MODEL_RATES: Record<
     memoryGbHour: 0.009,
     alwaysOnVcpuHour: 0.0648,
     alwaysOnMemoryGbHour: 0.00675,
+  },
+};
+
+const SERVERLESS_FUNCTION_RATES: Record<
+  ComparisonProviderResult['providerId'],
+  ServerlessFunctionRates
+> = {
+  aws: {
+    requestPerMillion: 0.2,
+    gbSecond: 0.0000166667,
+  },
+  azure: {
+    requestPerMillion: 0.2,
+    gbSecond: 0.000016,
+  },
+  gcp: {
+    requestPerMillion: 0.4,
+    gbSecond: 0.0000025,
   },
 };
 
@@ -686,6 +709,47 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
       insight.effort,
       insight.evidence,
     ]);
+  }
+
+  const serverlessCurve = serverlessMemoryCurveAssumptions(result);
+
+  if (serverlessCurve.requestsMillion > 0) {
+    for (const provider of result.providers) {
+      const currentMonthly = serverlessFunctionMonthly(provider.providerId, {
+        requestsMillion: serverlessCurve.requestsMillion,
+        durationMs: serverlessCurve.durationMs,
+        memoryMb: serverlessCurve.memoryMb,
+      });
+      const breakEvenMemoryMb = serverlessCurve.memoryMb * 2;
+      const breakEvenDurationMs =
+        (serverlessCurve.durationMs * serverlessCurve.memoryMb) / breakEvenMemoryMb;
+      const modeledMonthly = serverlessFunctionMonthly(provider.providerId, {
+        requestsMillion: serverlessCurve.requestsMillion,
+        durationMs: breakEvenDurationMs,
+        memoryMb: breakEvenMemoryMb,
+      });
+      const monthlyDelta = roundCurrency(Math.abs(modeledMonthly - currentMonthly));
+
+      rows.push([
+        'Serverless memory curve',
+        `${provider.providerId} function memory break-even: ${formatNumber(
+          breakEvenMemoryMb,
+        )}MB must run at or below ${formatNumber(
+          breakEvenDurationMs,
+        )}ms to keep GB-second cost flat while improving latency.`,
+        formatNumber(monthlyDelta),
+        formatNumber(monthlyDelta * 12),
+        monthlyDelta > 100 ? 'High' : monthlyDelta > 20 ? 'Medium' : 'Low',
+        'Low',
+        `${provider.providerId} current function shape is ${formatNumber(
+          serverlessCurve.requestsMillion,
+        )}M invocations/month at ${formatNumber(serverlessCurve.durationMs)}ms and ${formatNumber(
+          serverlessCurve.memoryMb,
+        )}MB: $${formatNumber(currentMonthly)}/mo current vs $${formatNumber(
+          modeledMonthly,
+        )}/mo at the linear memory-duration knee.`,
+      ]);
+    }
   }
 
   const appPlatformModel = appPlatformModelAssumptions(result);
@@ -2127,6 +2191,41 @@ function maxRequirementScaleParam(
     0,
     ...requirements.map((requirement) => numericScaleParam(requirement.scaleParams ?? {}, key)),
   );
+}
+
+function serverlessMemoryCurveAssumptions(result: ComparisonResult): {
+  durationMs: number;
+  memoryMb: number;
+  requestsMillion: number;
+} {
+  const requirements = result.requirements?.serviceRequirements ?? [];
+  const functionRequirements = requirements.filter(
+    (requirement) => requirement.serviceType === 'serverless-functions',
+  );
+
+  return {
+    durationMs: maxRequirementScaleParam(functionRequirements, 'functionDurationMs') || 100,
+    memoryMb: maxRequirementScaleParam(functionRequirements, 'functionMemoryMb') || 512,
+    requestsMillion: maxRequirementScaleParam(functionRequirements, 'functionInvocationsMillion'),
+  };
+}
+
+function serverlessFunctionMonthly(
+  providerId: ComparisonProviderResult['providerId'],
+  input: {
+    durationMs: number;
+    memoryMb: number;
+    requestsMillion: number;
+  },
+): number {
+  const rates = SERVERLESS_FUNCTION_RATES[providerId];
+  const invocations = input.requestsMillion * 1_000_000;
+  const durationSeconds = input.durationMs / 1000;
+  const memoryGb = input.memoryMb / 1024;
+  const requestCost = input.requestsMillion * rates.requestPerMillion;
+  const durationCost = invocations * durationSeconds * memoryGb * rates.gbSecond;
+
+  return roundCurrency(requestCost + durationCost);
 }
 
 function appPlatformRequestLineMonthly(provider: ComparisonProviderResult): number {
