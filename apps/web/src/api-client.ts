@@ -7,12 +7,15 @@ import {
   ComparisonResult,
   DataHealthResponse,
   ExchangeRatesResponse,
+  IntervalKey,
   NormalizedWorkloadSpec,
   ParsedNwsDraft,
   PricingModelCatalogResponse,
   PricingModelsForServiceResponse,
+  PricingModelKey,
   PricingStatusResponse,
   RegionCatalogResponse,
+  ReportExportJobResponse,
   ReportFormat,
   SharedReportResponse,
   ShareLinkAnalyticsResponse,
@@ -22,6 +25,13 @@ import {
 } from './types';
 
 const DEFAULT_API_BASE_URL = '/api/v1';
+const EXPORT_JOB_POLL_INTERVAL_MS = 500;
+const EXPORT_JOB_MAX_ATTEMPTS = 120;
+
+interface ExportComparisonOptions {
+  interval?: IntervalKey;
+  pricingModel?: PricingModelKey;
+}
 
 interface ApiErrorEnvelope {
   error?: {
@@ -51,10 +61,17 @@ export interface PolyCostClient {
   validateWorkload(nws: NormalizedWorkloadSpec): Promise<{ valid: true }>;
   createComparison(nws: NormalizedWorkloadSpec): Promise<ComparisonResult>;
   refreshLiveComparison(comparisonId: string): Promise<ComparisonResult>;
+  createExportJob(
+    comparisonId: string,
+    format: ReportFormat,
+    options?: ExportComparisonOptions,
+  ): Promise<ReportExportJobResponse>;
+  getExportJob(comparisonId: string, jobId: string): Promise<ReportExportJobResponse>;
+  downloadExportJob(comparisonId: string, jobId: string): Promise<Blob>;
   exportComparison(
     comparisonId: string,
     format: ReportFormat,
-    options?: { interval?: string; pricingModel?: string },
+    options?: ExportComparisonOptions,
   ): Promise<Blob>;
   getPricingStatus(): Promise<PricingStatusResponse>;
   getPricingModels(): Promise<PricingModelCatalogResponse>;
@@ -130,24 +147,20 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         method: 'POST',
       });
     },
+    createExportJob(comparisonId, format, options = {}) {
+      return createExportJobRequest(baseUrl, comparisonId, format, options);
+    },
+    getExportJob(comparisonId, jobId) {
+      return getExportJobRequest(baseUrl, comparisonId, jobId);
+    },
+    downloadExportJob(comparisonId, jobId) {
+      return downloadExportJobRequest(baseUrl, comparisonId, jobId);
+    },
     async exportComparison(comparisonId, format, options = {}) {
-      const query = new URLSearchParams({ format });
+      const job = await createExportJobRequest(baseUrl, comparisonId, format, options);
+      const completedJob = await pollExportJob(baseUrl, comparisonId, job);
 
-      if (options.interval) {
-        query.set('interval', options.interval);
-      }
-
-      if (options.pricingModel) {
-        query.set('pricingModel', options.pricingModel);
-      }
-
-      const response = await fetch(`${baseUrl}/comparisons/${comparisonId}/export?${query}`);
-
-      if (!response.ok) {
-        throw await toApiError(response);
-      }
-
-      return response.blob();
+      return downloadExportJobRequest(baseUrl, comparisonId, completedJob.jobId);
     },
     getPricingStatus() {
       return requestJson<PricingStatusResponse>(baseUrl, '/pricing/status');
@@ -223,6 +236,92 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
       );
     },
   };
+}
+
+function createExportJobRequest(
+  baseUrl: string,
+  comparisonId: string,
+  format: ReportFormat,
+  options: ExportComparisonOptions,
+): Promise<ReportExportJobResponse> {
+  return requestJson<ReportExportJobResponse>(
+    baseUrl,
+    `/comparisons/${encodeURIComponent(comparisonId)}/export-jobs`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        format,
+        interval: options.interval,
+        pricingModel: options.pricingModel,
+      }),
+    },
+  );
+}
+
+function getExportJobRequest(
+  baseUrl: string,
+  comparisonId: string,
+  jobId: string,
+): Promise<ReportExportJobResponse> {
+  return requestJson<ReportExportJobResponse>(
+    baseUrl,
+    `/comparisons/${encodeURIComponent(comparisonId)}/export-jobs/${encodeURIComponent(jobId)}`,
+  );
+}
+
+async function downloadExportJobRequest(
+  baseUrl: string,
+  comparisonId: string,
+  jobId: string,
+): Promise<Blob> {
+  const response = await fetch(
+    `${baseUrl}/comparisons/${encodeURIComponent(comparisonId)}/export-jobs/${encodeURIComponent(
+      jobId,
+    )}/download`,
+  );
+
+  if (!response.ok) {
+    throw await toApiError(response);
+  }
+
+  return response.blob();
+}
+
+async function pollExportJob(
+  baseUrl: string,
+  comparisonId: string,
+  initialJob: ReportExportJobResponse,
+): Promise<ReportExportJobResponse> {
+  let job = initialJob;
+
+  for (let attempt = 0; attempt < EXPORT_JOB_MAX_ATTEMPTS; attempt += 1) {
+    if (job.status === 'completed') {
+      return job;
+    }
+
+    if (job.status === 'failed') {
+      throw new PolyCostApiError(
+        422,
+        'EXPORT_JOB_FAILED',
+        job.errorMessage ?? 'Report generation failed. Try again after refreshing the comparison.',
+      );
+    }
+
+    await delay(EXPORT_JOB_POLL_INTERVAL_MS);
+    job = await getExportJobRequest(baseUrl, comparisonId, job.jobId);
+  }
+
+  throw new PolyCostApiError(
+    408,
+    'EXPORT_JOB_TIMEOUT',
+    'Report generation is still running. Try the download again in a moment.',
+  );
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 function apiRootHealthUrl(baseUrl: string): string {

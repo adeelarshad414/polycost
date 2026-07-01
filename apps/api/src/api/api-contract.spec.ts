@@ -11,6 +11,7 @@ import { CsvReportGenerator } from '../reports/csv-report.generator';
 import { ExcelReportGenerator } from '../reports/excel-report.generator';
 import { PdfReportGenerator } from '../reports/pdf-report.generator';
 import { ReportService } from '../reports/report.service';
+import { ReportExportJobResponse } from '../reports/report.types';
 import { AdminApiKeyGuard } from './admin-api-key.guard';
 import { ApiExceptionFilter } from './api-exception.filter';
 import { ApiRateLimitService } from './rate-limit.service';
@@ -27,6 +28,7 @@ import {
 } from './cost-management.controller';
 import { CostManagementService } from './cost-management.service';
 import { DataHealthController } from './data-health.controller';
+import { ReportExportJobsService } from './report-export-jobs.service';
 import {
   AlertRecord,
   BudgetRecord,
@@ -213,6 +215,22 @@ const exchangeRatesResponse: ExchangeRatesResponse = {
   },
 };
 
+const exportJobResponse: ReportExportJobResponse = {
+  jobId: '66666666-6666-4666-8666-666666666666',
+  comparisonId: comparisonResult.comparisonId,
+  format: 'pdf',
+  interval: 'monthly',
+  pricingModel: 'on-demand',
+  status: 'completed',
+  fileName: `polycost-comparison-${comparisonResult.comparisonId}.pdf`,
+  contentType: 'application/pdf',
+  createdAt: '2026-07-01T00:00:00.000Z',
+  startedAt: '2026-07-01T00:00:01.000Z',
+  completedAt: '2026-07-01T00:00:02.000Z',
+  statusUrl: `/api/v1/comparisons/${comparisonResult.comparisonId}/export-jobs/66666666-6666-4666-8666-666666666666`,
+  downloadUrl: `/api/v1/comparisons/${comparisonResult.comparisonId}/export-jobs/66666666-6666-4666-8666-666666666666/download`,
+};
+
 const configService = {
   get: jest.fn((key: keyof AppConfig) => {
     switch (key) {
@@ -328,6 +346,44 @@ describe('API contracts', () => {
       'Content-Disposition',
       'attachment; filename="polycost-comparison-11111111-1111-4111-8111-111111111111.csv"',
     );
+  });
+
+  it('POST /comparisons/:id/export-jobs returns async export job status and download', async () => {
+    const service = comparisonApplicationService();
+    const exportJobs = reportExportJobsService();
+    const controller = comparisonsController(service, exportJobs);
+    const response = {
+      header: jest.fn(),
+    };
+
+    await expect(
+      controller.createExportJob(comparisonResult.comparisonId, {
+        format: 'pdf',
+        interval: 'monthly',
+        pricingModel: 'on-demand',
+      }),
+    ).resolves.toEqual(exportJobResponse);
+    expect(exportJobs.createExportJob).toHaveBeenCalledWith(comparisonResult.comparisonId, 'pdf', {
+      interval: 'monthly',
+      pricingModel: 'on-demand',
+    });
+    await expect(
+      controller.getExportJob(comparisonResult.comparisonId, exportJobResponse.jobId),
+    ).resolves.toEqual(exportJobResponse);
+
+    const file = await controller.downloadExportJob(
+      comparisonResult.comparisonId,
+      exportJobResponse.jobId,
+      response,
+    );
+
+    expect(file.getHeaders()).toEqual({
+      type: 'application/pdf',
+      disposition:
+        'attachment; filename="polycost-comparison-11111111-1111-4111-8111-111111111111.pdf"',
+      length: expect.any(Number),
+    });
+    expect(response.header).toHaveBeenCalledWith('Content-Type', 'application/pdf');
   });
 
   it('POST /comparisons/:id/refresh-live creates a new comparison snapshot', async () => {
@@ -957,7 +1013,23 @@ function costManagementService() {
   } as unknown as jest.Mocked<CostManagementService>;
 }
 
-function comparisonsController(service: jest.Mocked<ComparisonApplicationService>) {
+function reportExportJobsService() {
+  return {
+    createExportJob: jest.fn(async () => exportJobResponse),
+    getExportJob: jest.fn(async () => exportJobResponse),
+    downloadExportJob: jest.fn(async () => ({
+      fileName:
+        exportJobResponse.fileName ?? `polycost-comparison-${comparisonResult.comparisonId}.pdf`,
+      contentType: exportJobResponse.contentType ?? 'application/pdf',
+      content: Buffer.from('report'),
+    })),
+  } as unknown as jest.Mocked<ReportExportJobsService>;
+}
+
+function comparisonsController(
+  service: jest.Mocked<ComparisonApplicationService>,
+  exportJobs: jest.Mocked<ReportExportJobsService> = reportExportJobsService(),
+) {
   return new ComparisonsController(
     service,
     new ReportService(
@@ -967,6 +1039,7 @@ function comparisonsController(service: jest.Mocked<ComparisonApplicationService
     ),
     new ApiRateLimitService(() => 0),
     configService,
+    exportJobs,
   );
 }
 

@@ -95,16 +95,31 @@ describe('api client', () => {
     );
   });
 
-  it('downloads binary exports', async () => {
+  it('downloads binary exports through the async export-job flow', async () => {
     const blob = new Blob(['csv']);
-    const fetchMock = jest.fn(
-      async () =>
-        ({
-          ok: true,
-          status: 200,
-          blob: jest.fn(async () => blob),
-        }) as unknown as Response,
-    );
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          jobId: 'job-1',
+          comparisonId: 'comparison-1',
+          format: 'csv',
+          interval: 'quarterly',
+          pricingModel: 'reserved-3yr',
+          status: 'completed',
+          fileName: 'polycost-comparison.csv',
+          contentType: 'text/csv',
+          createdAt: '2026-07-01T00:00:00.000Z',
+          completedAt: '2026-07-01T00:00:01.000Z',
+          statusUrl: '/api/v1/comparisons/comparison-1/export-jobs/job-1',
+          downloadUrl: '/api/v1/comparisons/comparison-1/export-jobs/job-1/download',
+        }),
+      )
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        blob: jest.fn(async () => blob),
+      } as unknown as Response);
     global.fetch = fetchMock as typeof fetch;
     const client = createPolyCostClient('http://api.test/api/v1');
 
@@ -114,8 +129,83 @@ describe('api client', () => {
         pricingModel: 'reserved-3yr',
       }),
     ).resolves.toBe(blob);
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://api.test/api/v1/comparisons/comparison-1/export?format=csv&interval=quarterly&pricingModel=reserved-3yr',
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'http://api.test/api/v1/comparisons/comparison-1/export-jobs',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          format: 'csv',
+          interval: 'quarterly',
+          pricingModel: 'reserved-3yr',
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://api.test/api/v1/comparisons/comparison-1/export-jobs/job-1/download',
+    );
+  });
+
+  it('creates, reads, and downloads report export jobs', async () => {
+    const blob = new Blob(['xlsx']);
+    const pendingJob = {
+      jobId: 'job-1',
+      comparisonId: 'comparison-1',
+      format: 'xlsx',
+      interval: 'monthly',
+      pricingModel: 'on-demand',
+      status: 'pending',
+      createdAt: '2026-07-01T00:00:00.000Z',
+      statusUrl: '/api/v1/comparisons/comparison-1/export-jobs/job-1',
+    };
+    const completedJob = {
+      ...pendingJob,
+      status: 'completed',
+      fileName: 'polycost-comparison.xlsx',
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      completedAt: '2026-07-01T00:00:01.000Z',
+      downloadUrl: '/api/v1/comparisons/comparison-1/export-jobs/job-1/download',
+    };
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(pendingJob))
+      .mockResolvedValueOnce(jsonResponse(completedJob))
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        blob: jest.fn(async () => blob),
+      } as unknown as Response);
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(
+      client.createExportJob('comparison-1', 'xlsx', {
+        interval: 'monthly',
+        pricingModel: 'on-demand',
+      }),
+    ).resolves.toEqual(pendingJob);
+    await expect(client.getExportJob('comparison-1', 'job-1')).resolves.toEqual(completedJob);
+    await expect(client.downloadExportJob('comparison-1', 'job-1')).resolves.toBe(blob);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'http://api.test/api/v1/comparisons/comparison-1/export-jobs',
+      expect.objectContaining({
+        method: 'POST',
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://api.test/api/v1/comparisons/comparison-1/export-jobs/job-1',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      'http://api.test/api/v1/comparisons/comparison-1/export-jobs/job-1/download',
     );
   });
 

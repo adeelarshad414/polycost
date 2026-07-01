@@ -19,3 +19,25 @@ export interface GeneratedReport {
   contentType: string;
   content: Buffer;
 }
+
+export type ReportExportJobStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+export interface ReportExportJobRecord {
+  jobId: string;
+  comparisonId: string;
+  format: ReportFormat;
+  interval?: ReportInterval;
+  pricingModel?: ReportPricingModel;
+  status: ReportExportJobStatus;
+  fileName?: string;
+  contentType?: string;
+  errorMessage?: string;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+export interface ReportExportJobResponse extends ReportExportJobRecord {
+  statusUrl: string;
+  downloadUrl?: string;
+}

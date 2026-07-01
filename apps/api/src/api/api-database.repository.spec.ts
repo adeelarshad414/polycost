@@ -290,6 +290,172 @@ describe('ApiDatabaseRepository', () => {
     });
   });
 
+  it('creates, transitions, and reads report export jobs', async () => {
+    const createdAt = new Date('2026-07-01T00:00:00.000Z');
+    const startedAt = new Date('2026-07-01T00:00:05.000Z');
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: '66666666-6666-4666-8666-666666666666',
+            comparison_id: comparisonResult.comparisonId,
+            format: 'pdf',
+            interval: 'monthly',
+            pricing_model: 'reserved-1yr',
+            status: 'pending',
+            file_name: null,
+            content_type: null,
+            error_message: null,
+            created_at: createdAt,
+            started_at: null,
+            completed_at: null,
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: '66666666-6666-4666-8666-666666666666',
+            comparison_id: comparisonResult.comparisonId,
+            format: 'pdf',
+            interval: 'monthly',
+            pricing_model: 'reserved-1yr',
+            status: 'running',
+            file_name: null,
+            content_type: null,
+            error_message: null,
+            created_at: createdAt,
+            started_at: startedAt,
+            completed_at: null,
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [],
+        rowCount: 1,
+      });
+    const repository = createRepository(query);
+
+    await expect(
+      repository.createReportExportJob({
+        comparisonId: comparisonResult.comparisonId,
+        format: 'pdf',
+        interval: 'monthly',
+        pricingModel: 'reserved-1yr',
+      }),
+    ).resolves.toEqual({
+      jobId: '66666666-6666-4666-8666-666666666666',
+      comparisonId: comparisonResult.comparisonId,
+      format: 'pdf',
+      interval: 'monthly',
+      pricingModel: 'reserved-1yr',
+      status: 'pending',
+      createdAt: '2026-07-01T00:00:00.000Z',
+    });
+    await expect(
+      repository.getReportExportJob(
+        comparisonResult.comparisonId,
+        '66666666-6666-4666-8666-666666666666',
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        status: 'running',
+        startedAt: '2026-07-01T00:00:05.000Z',
+      }),
+    );
+    await repository.markReportExportJobRunning(
+      '66666666-6666-4666-8666-666666666666',
+      '2026-07-01T00:00:05.000Z',
+    );
+    await repository.completeReportExportJob(
+      '66666666-6666-4666-8666-666666666666',
+      {
+        fileName: 'polycost-comparison.pdf',
+        contentType: 'application/pdf',
+        content: Buffer.from('pdf'),
+      },
+      '2026-07-01T00:00:10.000Z',
+    );
+
+    expect(query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('INSERT INTO report_export_jobs'),
+      [comparisonResult.comparisonId, 'pdf', 'monthly', 'reserved-1yr'],
+    );
+    expect(query).toHaveBeenNthCalledWith(3, expect.stringContaining("SET status = 'running'"), [
+      '66666666-6666-4666-8666-666666666666',
+      '2026-07-01T00:00:05.000Z',
+    ]);
+    expect(query).toHaveBeenNthCalledWith(4, expect.stringContaining("SET status = 'completed'"), [
+      '66666666-6666-4666-8666-666666666666',
+      'polycost-comparison.pdf',
+      'application/pdf',
+      Buffer.from('pdf'),
+      '2026-07-01T00:00:10.000Z',
+    ]);
+  });
+
+  it('reads completed report export artifacts and records export failures', async () => {
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: '66666666-6666-4666-8666-666666666666',
+            comparison_id: comparisonResult.comparisonId,
+            format: 'xlsx',
+            interval: 'yearly',
+            pricing_model: 'on-demand',
+            status: 'completed',
+            file_name: 'polycost-comparison.xlsx',
+            content_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            artifact: Buffer.from('xlsx'),
+            error_message: null,
+            created_at: new Date('2026-07-01T00:00:00.000Z'),
+            started_at: new Date('2026-07-01T00:00:05.000Z'),
+            completed_at: new Date('2026-07-01T00:00:10.000Z'),
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [],
+        rowCount: 1,
+      });
+    const repository = createRepository(query);
+
+    await expect(
+      repository.getReportExportJobArtifact(
+        comparisonResult.comparisonId,
+        '66666666-6666-4666-8666-666666666666',
+      ),
+    ).resolves.toEqual({
+      job: expect.objectContaining({
+        fileName: 'polycost-comparison.xlsx',
+        status: 'completed',
+      }),
+      content: Buffer.from('xlsx'),
+    });
+    await repository.failReportExportJob(
+      '66666666-6666-4666-8666-666666666666',
+      'Generation failed',
+      '2026-07-01T00:00:12.000Z',
+    );
+
+    expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining("SET status = 'failed'"), [
+      '66666666-6666-4666-8666-666666666666',
+      'Generation failed',
+      '2026-07-01T00:00:12.000Z',
+    ]);
+  });
+
   it('creates normalized workload records through the app DB role', async () => {
     const repository = createRepository(
       jest.fn(async () => ({

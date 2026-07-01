@@ -456,6 +456,24 @@ export interface ExchangeRatesResponse {
 }
 
 export type ReportFormat = 'pdf' | 'csv' | 'xlsx';
+export type ReportExportJobStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+export interface ReportExportJobResponse {
+  jobId: string;
+  comparisonId: string;
+  format: ReportFormat;
+  interval?: IntervalKey;
+  pricingModel?: PricingModelKey;
+  status: ReportExportJobStatus;
+  fileName?: string;
+  contentType?: string;
+  errorMessage?: string;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  statusUrl: string;
+  downloadUrl?: string;
+}
 
 export interface ApiErrorDetail {
   field?: string;

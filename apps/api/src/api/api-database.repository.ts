@@ -10,6 +10,13 @@ import { providerRegionForCanonicalRegion } from '../pricing-normalization/regio
 import { SecretsReader, SecretsService } from '../secrets/secrets.service';
 import { DataHealthResponse, PricingStatusResponse } from './api-errors';
 import {
+  GeneratedReport,
+  ReportExportJobRecord,
+  ReportFormat,
+  ReportInterval,
+  ReportPricingModel,
+} from '../reports/report.types';
+import {
   AlertRecord,
   BudgetInput,
   BudgetEvaluationRecord,
@@ -182,6 +189,22 @@ interface CostObservationRow {
   observed_monthly_usd: string;
   source: 'modeled_cache';
   observed_at: Date;
+}
+
+interface ReportExportJobRow {
+  id: string;
+  comparison_id: string;
+  format: ReportFormat;
+  interval: ReportInterval | null;
+  pricing_model: ReportPricingModel | null;
+  status: ReportExportJobRecord['status'];
+  file_name: string | null;
+  content_type: string | null;
+  artifact?: Buffer | null;
+  error_message: string | null;
+  created_at: Date;
+  started_at: Date | null;
+  completed_at: Date | null;
 }
 
 const PROVIDERS: ProviderId[] = ['aws', 'azure', 'gcp'];
@@ -429,6 +452,168 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
       alertCount: alerts.length,
       alerts,
       providers,
+    };
+  }
+
+  async createReportExportJob(input: {
+    comparisonId: string;
+    format: ReportFormat;
+    interval?: ReportInterval;
+    pricingModel?: ReportPricingModel;
+  }): Promise<ReportExportJobRecord> {
+    const result = await (
+      await this.getPool()
+    ).query<ReportExportJobRow>(
+      `
+        INSERT INTO report_export_jobs (
+          comparison_id,
+          format,
+          interval,
+          pricing_model
+        )
+        VALUES ($1, $2, $3, $4)
+        RETURNING id,
+                  comparison_id,
+                  format,
+                  interval,
+                  pricing_model,
+                  status,
+                  file_name,
+                  content_type,
+                  error_message,
+                  created_at,
+                  started_at,
+                  completed_at
+      `,
+      [input.comparisonId, input.format, input.interval ?? null, input.pricingModel ?? null],
+    );
+
+    return toReportExportJobRecord(result.rows[0]);
+  }
+
+  async getReportExportJob(
+    comparisonId: string,
+    jobId: string,
+  ): Promise<ReportExportJobRecord | undefined> {
+    const result = await (
+      await this.getPool()
+    ).query<ReportExportJobRow>(
+      `
+        SELECT id,
+               comparison_id,
+               format,
+               interval,
+               pricing_model,
+               status,
+               file_name,
+               content_type,
+               error_message,
+               created_at,
+               started_at,
+               completed_at
+        FROM report_export_jobs
+        WHERE comparison_id = $1
+          AND id = $2
+      `,
+      [comparisonId, jobId],
+    );
+
+    return result.rows[0] ? toReportExportJobRecord(result.rows[0]) : undefined;
+  }
+
+  async markReportExportJobRunning(jobId: string, startedAt: string): Promise<void> {
+    await (
+      await this.getPool()
+    ).query(
+      `
+        UPDATE report_export_jobs
+        SET status = 'running',
+            started_at = $2,
+            error_message = NULL
+        WHERE id = $1
+          AND status = 'pending'
+      `,
+      [jobId, startedAt],
+    );
+  }
+
+  async completeReportExportJob(
+    jobId: string,
+    report: GeneratedReport,
+    completedAt: string,
+  ): Promise<void> {
+    await (
+      await this.getPool()
+    ).query(
+      `
+        UPDATE report_export_jobs
+        SET status = 'completed',
+            file_name = $2,
+            content_type = $3,
+            artifact = $4,
+            completed_at = $5,
+            error_message = NULL
+        WHERE id = $1
+      `,
+      [jobId, report.fileName, report.contentType, report.content, completedAt],
+    );
+  }
+
+  async failReportExportJob(
+    jobId: string,
+    errorMessage: string,
+    completedAt: string,
+  ): Promise<void> {
+    await (
+      await this.getPool()
+    ).query(
+      `
+        UPDATE report_export_jobs
+        SET status = 'failed',
+            error_message = $2,
+            completed_at = $3
+        WHERE id = $1
+      `,
+      [jobId, errorMessage, completedAt],
+    );
+  }
+
+  async getReportExportJobArtifact(
+    comparisonId: string,
+    jobId: string,
+  ): Promise<{ job: ReportExportJobRecord; content: Buffer } | undefined> {
+    const result = await (
+      await this.getPool()
+    ).query<ReportExportJobRow>(
+      `
+        SELECT id,
+               comparison_id,
+               format,
+               interval,
+               pricing_model,
+               status,
+               file_name,
+               content_type,
+               artifact,
+               error_message,
+               created_at,
+               started_at,
+               completed_at
+        FROM report_export_jobs
+        WHERE comparison_id = $1
+          AND id = $2
+      `,
+      [comparisonId, jobId],
+    );
+    const row = result.rows[0];
+
+    if (!row || !row.artifact) {
+      return undefined;
+    }
+
+    return {
+      job: toReportExportJobRecord(row),
+      content: row.artifact,
     };
   }
 
@@ -1318,6 +1503,23 @@ function toCostObservationRecord(row: CostObservationRow): CostObservationRecord
     observedMonthlyUsd: Number.parseFloat(row.observed_monthly_usd),
     source: row.source,
     observedAt: row.observed_at.toISOString(),
+  };
+}
+
+function toReportExportJobRecord(row: ReportExportJobRow): ReportExportJobRecord {
+  return {
+    jobId: row.id,
+    comparisonId: row.comparison_id,
+    format: row.format,
+    ...(row.interval ? { interval: row.interval } : {}),
+    ...(row.pricing_model ? { pricingModel: row.pricing_model } : {}),
+    status: row.status,
+    ...(row.file_name ? { fileName: row.file_name } : {}),
+    ...(row.content_type ? { contentType: row.content_type } : {}),
+    ...(row.error_message ? { errorMessage: row.error_message } : {}),
+    createdAt: row.created_at.toISOString(),
+    ...(row.started_at ? { startedAt: row.started_at.toISOString() } : {}),
+    ...(row.completed_at ? { completedAt: row.completed_at.toISOString() } : {}),
   };
 }
 

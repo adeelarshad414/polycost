@@ -9,6 +9,7 @@ import {
   ParsedNwsDraft,
   PricingStatusResponse,
   RegionCatalogResponse,
+  ReportExportJobResponse,
 } from './types';
 import { intervalMultiplierFromMonthly } from './cost-time';
 import { buildNwsFromForm, defaultWorkloadForm } from './workload';
@@ -349,7 +350,7 @@ describe('App', () => {
       await click(buttonByText(container, 'PDF'));
 
       expect(
-        buttonByText(container, 'Exporting PDF...').querySelector('.animate-spin'),
+        buttonByText(container, 'Generating PDF...').querySelector('.animate-spin'),
       ).toBeInstanceOf(SVGElement);
 
       exportDeferred.resolve(new Blob(['report']));
@@ -1216,6 +1217,9 @@ function clearClientCalls(client: PolyCostClient): void {
     client.validateWorkload,
     client.createComparison,
     client.refreshLiveComparison,
+    client.createExportJob,
+    client.getExportJob,
+    client.downloadExportJob,
     client.exportComparison,
   ].forEach((method) => {
     if (jest.isMockFunction(method)) {
@@ -1321,6 +1325,21 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     ],
   };
   const pendingRegionCatalog = new Promise<RegionCatalogResponse>(() => undefined);
+  const reportExportJob: ReportExportJobResponse = {
+    jobId: '66666666-6666-4666-8666-666666666666',
+    comparisonId: comparisonResult.comparisonId,
+    format: 'pdf',
+    interval: 'monthly',
+    pricingModel: 'on-demand',
+    status: 'completed',
+    fileName: 'polycost-comparison.pdf',
+    contentType: 'application/pdf',
+    createdAt: '2026-07-01T00:00:00.000Z',
+    startedAt: '2026-07-01T00:00:01.000Z',
+    completedAt: '2026-07-01T00:00:02.000Z',
+    statusUrl: `/api/v1/comparisons/${comparisonResult.comparisonId}/export-jobs/66666666-6666-4666-8666-666666666666`,
+    downloadUrl: `/api/v1/comparisons/${comparisonResult.comparisonId}/export-jobs/66666666-6666-4666-8666-666666666666/download`,
+  };
 
   return {
     getHealth: jest.fn(async () => backendHealth),
@@ -1329,6 +1348,9 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     validateWorkload: jest.fn(async () => ({ valid: true as const })),
     createComparison: jest.fn(async () => comparisonResult),
     refreshLiveComparison: jest.fn(async () => comparisonResult),
+    createExportJob: jest.fn(async () => reportExportJob),
+    getExportJob: jest.fn(async () => reportExportJob),
+    downloadExportJob: jest.fn(async () => new Blob(['report'])),
     exportComparison: jest.fn(async () => new Blob(['report'])),
     getPricingStatus: jest.fn(async () => pricingStatus),
     getPricingModels: jest.fn(async () => ({

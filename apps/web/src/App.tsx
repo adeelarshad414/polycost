@@ -760,7 +760,7 @@ export function App({ client = polyCostClient }: AppProps) {
       }
 
       downloadBlob(blob, `polycost-comparison-${comparison.comparisonId}.${format}`);
-      setNotice(`${format.toUpperCase()} export downloaded.`);
+      setNotice(`${format.toUpperCase()} report generated and downloaded.`);
     } catch (exportError) {
       if (isCurrentAsyncAction(actionId)) {
         setError(formatApiError(exportError));
@@ -3481,7 +3481,7 @@ function ExportBar({
             variant="secondary"
             disabled={disabled || (exportingFormat !== null && !isExporting)}
             loading={isExporting}
-            loadingLabel={`Exporting ${label}...`}
+            loadingLabel={`Generating ${label}...`}
             onClick={() => onExport(format)}
           >
             <DownloadIcon />

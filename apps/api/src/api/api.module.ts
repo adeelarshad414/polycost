@@ -11,6 +11,7 @@ import { AppConfig } from '../config/config.schema';
 import { PostgresPricingCatalogRepository } from '../database/pricing-catalog.repository';
 import { NwsParserModule } from '../nws-parser/nws-parser.module';
 import { ReportModule } from '../reports/report.module';
+import { ReportService } from '../reports/report.service';
 import { SecretsService } from '../secrets/secrets.service';
 import { AdminApiKeyGuard } from './admin-api-key.guard';
 import { ApiDatabaseRepository } from './api-database.repository';
@@ -33,6 +34,7 @@ import { DataHealthController } from './data-health.controller';
 import { PricingStatusController } from './pricing-status.controller';
 import { RegionsController } from './regions.controller';
 import { RegionsService } from './regions.service';
+import { ReportExportJobsService } from './report-export-jobs.service';
 import { WorkloadController } from './workload.controller';
 
 @Module({
@@ -73,6 +75,20 @@ import { WorkloadController } from './workload.controller';
       ) => new LivePricingRefreshService(adapters, pricingRepository, pricingRepository),
     },
     ComparisonApplicationService,
+    {
+      provide: ReportExportJobsService,
+      inject: [ComparisonApplicationService, ApiDatabaseRepository, ReportService],
+      useFactory: (
+        comparisonApplicationService: ComparisonApplicationService,
+        apiDatabaseRepository: ApiDatabaseRepository,
+        reportService: ReportService,
+      ) =>
+        new ReportExportJobsService(
+          comparisonApplicationService,
+          apiDatabaseRepository,
+          reportService,
+        ),
+    },
     {
       provide: CostManagementService,
       inject: [ApiDatabaseRepository],

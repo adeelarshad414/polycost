@@ -19,6 +19,7 @@ import {
   CreateComparisonOptions,
 } from './comparison-application.service';
 import { ApiRateLimitService, requestIdentity, writeRateLimitHeaders } from './rate-limit.service';
+import { ReportExportJobsService } from './report-export-jobs.service';
 
 interface RequestLike {
   ip?: string;
@@ -36,6 +37,7 @@ export class ComparisonsController {
     private readonly reportService: ReportService,
     private readonly apiRateLimitService: ApiRateLimitService,
     private readonly configService: ConfigService<AppConfig, true>,
+    private readonly reportExportJobsService: ReportExportJobsService,
   ) {}
 
   @Post()
@@ -67,6 +69,42 @@ export class ComparisonsController {
     };
     const snapshot = await this.comparisonApplicationService.getComparison(comparisonId);
     const report = this.reportService.generate(snapshot.resultSnapshot, format, options);
+    const fileName = report.fileName.replace(/"/g, '');
+    const disposition = `attachment; filename="${fileName}"`;
+
+    response.header('Content-Type', report.contentType);
+    response.header('Content-Disposition', disposition);
+
+    return new StreamableFile(report.content, {
+      type: report.contentType,
+      disposition,
+      length: report.content.length,
+    });
+  }
+
+  @Post(':id/export-jobs')
+  async createExportJob(@Param('id') comparisonId: string, @Body() body: unknown) {
+    const request = parseCreateExportJobRequest(body);
+
+    return this.reportExportJobsService.createExportJob(
+      comparisonId,
+      request.format,
+      request.options,
+    );
+  }
+
+  @Get(':id/export-jobs/:jobId')
+  async getExportJob(@Param('id') comparisonId: string, @Param('jobId') jobId: string) {
+    return this.reportExportJobsService.getExportJob(comparisonId, jobId);
+  }
+
+  @Get(':id/export-jobs/:jobId/download')
+  async downloadExportJob(
+    @Param('id') comparisonId: string,
+    @Param('jobId') jobId: string,
+    @Res({ passthrough: true }) response: HeaderResponse,
+  ): Promise<StreamableFile> {
+    const report = await this.reportExportJobsService.downloadExportJob(comparisonId, jobId);
     const fileName = report.fileName.replace(/"/g, '');
     const disposition = `attachment; filename="${fileName}"`;
 
@@ -139,6 +177,26 @@ function parseOptions(value: unknown): CreateComparisonOptions {
 
   return {
     ...(typeof value.useLivePricing === 'boolean' ? { useLivePricing: value.useLivePricing } : {}),
+  };
+}
+
+function parseCreateExportJobRequest(body: unknown): {
+  format: ReportFormat;
+  options: {
+    interval?: ReportInterval;
+    pricingModel?: ReportPricingModel;
+  };
+} {
+  if (!isRecord(body)) {
+    throw new ApiValidationError('Export job request body must be an object');
+  }
+
+  return {
+    format: parseReportFormat(body.format),
+    options: {
+      interval: parseReportInterval(body.interval),
+      pricingModel: parseReportPricingModel(body.pricingModel),
+    },
   };
 }
 
