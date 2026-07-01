@@ -1571,6 +1571,21 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain(
       'Connectivity architecture review models $64.75/mo opportunity at 25% of that private-connectivity baseline.',
     );
+    expect(text(container)).toContain('Networking cost itemization');
+    expect(text(container)).toContain(
+      'Load balancing, CDN, NAT, DNS, VPN, and private-path charges',
+    );
+    expect(text(container)).toContain('VPN connectivity');
+    expect(text(container)).toContain('Private connectivity');
+    expect(text(container)).toContain('2 connection(s), 730 hrs, 1000 GB transfer');
+    expect(text(container)).toContain('1 circuit(s), 730 port hrs, 2000 GB transfer');
+    expect(text(container)).toContain('Monthly modeled subtotal');
+    expect(text(container)).toContain(
+      'Validate tunnel count, redundancy, transfer volume, and private-circuit break-even.',
+    );
+    expect(text(container)).toContain(
+      'Validate port speed, redundancy, metered transfer, and commitment terms.',
+    );
 
     unmount();
   });

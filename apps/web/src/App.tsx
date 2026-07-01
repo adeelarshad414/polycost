@@ -6129,6 +6129,7 @@ function ProductionDepthAnalytics({
   const appPlatformModels = appPlatformModelRows(comparison, form);
   const operationsOptimizations = operationsOptimizationRows(comparison, form);
   const egressOptimizations = egressOptimizationRows(comparison, form);
+  const networkingCosts = networkingCostRows(comparison);
   const spotBlendRows = spotBlendOptimizerRows(comparison, form);
   const licenseRows = licenseOptimizationRows(comparison, form);
   const architectureRisks = architectureRiskFlags(comparison, form);
@@ -6172,6 +6173,7 @@ function ProductionDepthAnalytics({
       <AppPlatformModelPanel rows={appPlatformModels} />
       <OperationsOptimizationPanel rows={operationsOptimizations} />
       <EgressOptimizationPanel rows={egressOptimizations} />
+      <NetworkingCostPanel rows={networkingCosts} />
       <SpotBlendOptimizerPanel rows={spotBlendRows} />
       <LicenseOptimizationPanel rows={licenseRows} operatingSystem={form.operatingSystem} />
       <ArchitectureRiskFlagsPanel flags={architectureRisks} />
@@ -6943,6 +6945,68 @@ function EgressOptimizationPanel({ rows }: { rows: EgressOptimizationRow[] }) {
         <div className="scenario-sensitivity-empty" role="status">
           Egress optimization appears when network or data-transfer line items exceed materiality
           thresholds.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NetworkingCostPanel({ rows }: { rows: NetworkingCostRow[] }) {
+  return (
+    <div className="networking-cost-panel" aria-label="Networking cost itemization">
+      <div className="scenario-sensitivity-heading">
+        <div>
+          <span>Networking cost itemization</span>
+          <h4>Load balancing, CDN, NAT, DNS, VPN, and private-path charges</h4>
+        </div>
+      </div>
+
+      {rows.length > 0 ? (
+        <div className="table-wrap networking-cost-wrap">
+          <table className="ranking-table networking-cost-table">
+            <thead>
+              <tr>
+                <th scope="col">Provider</th>
+                <th scope="col">Component</th>
+                <th scope="col">Monthly cost</th>
+                <th scope="col">Rate math</th>
+                <th scope="col">Validation action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id}>
+                  <td>
+                    <span className={`scenario-low-label scenario-low-${row.providerId}`}>
+                      {providerLabel(row.providerId)}
+                    </span>
+                    <small>{row.volumeEvidence}</small>
+                  </td>
+                  <td>
+                    <strong>{row.component}</strong>
+                    <small>{row.evidence}</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.monthly)}/mo</strong>
+                    <small>{formatPercent(row.sharePercent)} of provider total</small>
+                  </td>
+                  <td>
+                    <strong>{row.rateEvidence}</strong>
+                    <small>Provider-modeled network line item</small>
+                  </td>
+                  <td>
+                    <strong>{row.validationAction}</strong>
+                    <small>Keep networking separate from compute/storage totals in review.</small>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="scenario-sensitivity-empty" role="status">
+          Networking itemization appears when provider results include egress, CDN, NAT, DNS, load
+          balancer, VPN, or private-connectivity rows.
         </div>
       )}
     </div>
@@ -7761,6 +7825,18 @@ interface EgressOptimizationRow {
   effort: 'Low' | 'Medium' | 'High';
   recommendation: string;
   driverEvidence: string;
+  evidence: string;
+}
+
+interface NetworkingCostRow {
+  id: string;
+  providerId: ProviderId;
+  component: string;
+  monthly: number;
+  sharePercent: number;
+  rateEvidence: string;
+  volumeEvidence: string;
+  validationAction: string;
   evidence: string;
 }
 
@@ -10010,6 +10086,138 @@ function networkLineItems(provider: ComparisonProviderResult): ComparisonLineIte
       lineItemCostComponent(lineItem) === 'egress' ||
       networkDescriptionMatches(lineItem.description),
   );
+}
+
+function networkingCostRows(comparison: ComparisonResult | null): NetworkingCostRow[] {
+  if (!comparison) {
+    return [];
+  }
+
+  return comparison.providers
+    .flatMap((provider) =>
+      networkLineItems(provider).map((lineItem, index) => {
+        const component = networkingComponentLabel(lineItem);
+        const sharePercent =
+          provider.totals.monthly > 0
+            ? (lineItem.baseMonthlyCostUsd / provider.totals.monthly) * 100
+            : 0;
+
+        return {
+          id: `${provider.providerId}-${index}-${lineItem.skuId ?? lineItem.description}`,
+          providerId: provider.providerId,
+          component,
+          monthly: roundCurrency(lineItem.baseMonthlyCostUsd),
+          sharePercent,
+          rateEvidence: networkingRateEvidence(lineItem),
+          volumeEvidence: networkingVolumeEvidence(lineItem),
+          validationAction: networkingValidationAction(component),
+          evidence: lineItem.description,
+        };
+      }),
+    )
+    .sort((left, right) => {
+      const providerDelta =
+        PROVIDER_ORDER.indexOf(left.providerId) - PROVIDER_ORDER.indexOf(right.providerId);
+
+      return providerDelta !== 0 ? providerDelta : right.monthly - left.monthly;
+    });
+}
+
+function networkingComponentLabel(lineItem: ComparisonLineItem): string {
+  const normalized = `${lineItem.skuId ?? ''} ${lineItem.description}`.toLowerCase();
+
+  if (normalized.includes('load balancer')) {
+    return 'Load balancer capacity';
+  }
+
+  if (normalized.includes('nat')) {
+    return 'NAT gateway processing';
+  }
+
+  if (normalized.includes('cdn')) {
+    return 'CDN delivery';
+  }
+
+  if (normalized.includes('dns')) {
+    return 'DNS zones and queries';
+  }
+
+  if (normalized.includes('vpn')) {
+    return 'VPN connectivity';
+  }
+
+  if (
+    normalized.includes('private circuit') ||
+    normalized.includes('direct connect') ||
+    normalized.includes('expressroute') ||
+    normalized.includes('interconnect')
+  ) {
+    return 'Private connectivity';
+  }
+
+  if (normalized.includes('cross-az')) {
+    return 'Cross-AZ transfer';
+  }
+
+  if (normalized.includes('inter-region')) {
+    return 'Inter-region transfer';
+  }
+
+  return lineItem.costComponent === 'egress' ? 'Internet egress' : 'Network charge';
+}
+
+function networkingRateEvidence(lineItem: ComparisonLineItem): string {
+  const tieredGb = lineItemTierBillableGb(lineItem);
+
+  if (lineItem.egressTiers?.length && tieredGb > 0) {
+    const blendedRate = lineItem.baseMonthlyCostUsd / tieredGb;
+
+    return `${lineItem.egressTiers.length} tier(s) · ${formatCurrency(blendedRate)}/GB blended`;
+  }
+
+  if (lineItem.unitPriceUsd !== undefined) {
+    return `${formatCurrency(lineItem.unitPriceUsd)} per ${lineItem.unit ?? 'unit'}`;
+  }
+
+  if (lineItem.baseHourlyCostUsd !== undefined) {
+    return `${formatCurrency(lineItem.baseHourlyCostUsd)}/hr x 730 hrs`;
+  }
+
+  return 'Monthly modeled subtotal';
+}
+
+function networkingVolumeEvidence(lineItem: ComparisonLineItem): string {
+  const tieredGb = lineItemTierBillableGb(lineItem);
+
+  if (tieredGb > 0) {
+    return `${formatDecimal(tieredGb)}GB tier-traced`;
+  }
+
+  const match = lineItem.description.match(/\(([^)]+)\)/);
+
+  return match?.[1] ?? lineItem.region ?? 'Volume/rate captured in line item';
+}
+
+function networkingValidationAction(component: string): string {
+  switch (component) {
+    case 'Load balancer capacity':
+      return 'Validate LCU/capacity-unit drivers: rules, connections, bandwidth, and hours.';
+    case 'NAT gateway processing':
+      return 'Confirm private endpoints or route changes can remove NAT hairpin traffic.';
+    case 'CDN delivery':
+      return 'Tune cache hit, origin path, edge requests, and direct-egress alternative.';
+    case 'DNS zones and queries':
+      return 'Check hosted-zone count, query volume, and resolver forwarding assumptions.';
+    case 'VPN connectivity':
+      return 'Validate tunnel count, redundancy, transfer volume, and private-circuit break-even.';
+    case 'Private connectivity':
+      return 'Validate port speed, redundancy, metered transfer, and commitment terms.';
+    case 'Cross-AZ transfer':
+    case 'Inter-region transfer':
+      return 'Confirm placement, replication, and service-to-service traffic paths.';
+    default:
+      return 'Review provider-specific rate tiers and traffic source before sign-off.';
+  }
 }
 
 function egressOptimizationSignal(
