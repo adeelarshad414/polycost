@@ -662,6 +662,12 @@ describe('report generators', () => {
           '255.36',
         ]),
         expect.arrayContaining([
+          'Compute specification',
+          'aws M7i/M6i mapping should be validated for vCPU/RAM, network bandwidth, and disk baseline; evaluate M7g Graviton3 as an ARM target before locking M7i/M6i.',
+          '12.16',
+          '145.92',
+        ]),
+        expect.arrayContaining([
           'Architecture risk',
           'aws data-transfer line items are 64.9% of monthly spend; validate CDN, NAT, cross-AZ, and inter-region paths before sign-off.',
           '',

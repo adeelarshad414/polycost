@@ -71,6 +71,24 @@ interface ServerlessFunctionRates {
   gbSecond: number;
 }
 
+interface ComputeSpecEvidenceProfile {
+  x86Family: string;
+  armFamily: string;
+  gpuFamily?: string;
+  useCase: string;
+  networkBaseline: string;
+  diskBaseline: string;
+}
+
+type ComputeSpecTier =
+  | 'small'
+  | 'balanced'
+  | 'compute'
+  | 'memory'
+  | 'storage'
+  | 'accelerated'
+  | 'custom';
+
 const APP_PLATFORM_MODEL_RATES: Record<
   ComparisonProviderResult['providerId'],
   AppPlatformModelRates
@@ -113,6 +131,182 @@ const SERVERLESS_FUNCTION_RATES: Record<
   gcp: {
     requestPerMillion: 0.4,
     gbSecond: 0.0000025,
+  },
+};
+
+const COMPUTE_ARM_COST_FACTORS: Record<ComparisonProviderResult['providerId'], number> = {
+  aws: 0.8,
+  azure: 0.85,
+  gcp: 0.82,
+};
+
+const COMPUTE_SPEC_EVIDENCE: Record<
+  ComputeSpecTier,
+  Record<ComparisonProviderResult['providerId'], ComputeSpecEvidenceProfile>
+> = {
+  small: {
+    aws: {
+      x86Family: 'T3',
+      armFamily: 'T4g',
+      useCase: 'burstable/shared-core compute',
+      networkBaseline: 'low-to-moderate burst network with CPU-credit caveat',
+      diskBaseline: 'gp3/EBS baseline IOPS must be validated',
+    },
+    azure: {
+      x86Family: 'Bsv2',
+      armFamily: 'Bpsv2',
+      useCase: 'burstable/shared-core compute',
+      networkBaseline: 'variable burst network with CPU-credit caveat',
+      diskBaseline: 'Managed Disk baseline depends on chosen VM size',
+    },
+    gcp: {
+      x86Family: 'E2 shared-core',
+      armFamily: 'Tau T2A',
+      useCase: 'shared-core small compute',
+      networkBaseline: 'shared-core network profile; validate sustained CPU',
+      diskBaseline: 'Persistent Disk baseline depends on disk type and size',
+    },
+  },
+  balanced: {
+    aws: {
+      x86Family: 'M7i/M6i',
+      armFamily: 'M7g Graviton3',
+      useCase: 'general-purpose production compute',
+      networkBaseline: 'moderate-to-high ENA bandwidth by size',
+      diskBaseline: 'EBS gp3/io2 baseline should be checked with the final SKU',
+    },
+    azure: {
+      x86Family: 'Dv5/Dsv5',
+      armFamily: 'Dpsv5 Ampere Altra',
+      useCase: 'balanced application and middleware compute',
+      networkBaseline: 'Accelerated Networking bandwidth scales by VM size',
+      diskBaseline: 'Premium/Standard SSD baseline should be checked with the final SKU',
+    },
+    gcp: {
+      x86Family: 'N2/N2D',
+      armFamily: 'Tau T2A',
+      useCase: 'general-purpose portable compute',
+      networkBaseline: 'machine-size network bandwidth tiers apply',
+      diskBaseline: 'Balanced PD/Hyperdisk baseline should be checked with the final SKU',
+    },
+  },
+  compute: {
+    aws: {
+      x86Family: 'C7i/C6i',
+      armFamily: 'C7g Graviton3',
+      useCase: 'CPU-intensive web, batch, and encoding compute',
+      networkBaseline: 'higher packet/network profile than general purpose at similar sizes',
+      diskBaseline: 'EBS throughput should be validated for batch and scratch workloads',
+    },
+    azure: {
+      x86Family: 'Fsv2',
+      armFamily: 'Dpsv5 Ampere Altra',
+      useCase: 'CPU-heavy APIs and batch workers',
+      networkBaseline: 'high CPU-to-memory ratio; NIC bandwidth varies by size',
+      diskBaseline: 'Premium SSD/Ultra Disk may be needed for scratch throughput',
+    },
+    gcp: {
+      x86Family: 'C3/C2',
+      armFamily: 'Tau T2A',
+      useCase: 'CPU-bound services and batch processing',
+      networkBaseline: 'high-performance networking on larger compute shapes',
+      diskBaseline: 'Hyperdisk/Balanced PD should be selected if I/O gates CPU',
+    },
+  },
+  memory: {
+    aws: {
+      x86Family: 'R7i/X2idn',
+      armFamily: 'R7g Graviton3',
+      useCase: 'database, cache, and memory-heavy compute',
+      networkBaseline: 'high bandwidth options on larger memory sizes',
+      diskBaseline: 'EBS-optimized throughput and IOPS must be validated for databases',
+    },
+    azure: {
+      x86Family: 'Esv5/Mv2',
+      armFamily: 'Epsv5 Ampere Altra',
+      useCase: 'SQL, SAP, cache, and memory-heavy compute',
+      networkBaseline: 'bandwidth scales materially by VM size',
+      diskBaseline: 'Premium SSD v2 or Ultra Disk may be needed for database I/O',
+    },
+    gcp: {
+      x86Family: 'M3/M2',
+      armFamily: 'Tau T2A',
+      useCase: 'large memory stores and database engines',
+      networkBaseline: 'high-memory network profile varies by size',
+      diskBaseline: 'Hyperdisk/SSD PD should be modeled for sustained database I/O',
+    },
+  },
+  storage: {
+    aws: {
+      x86Family: 'I4i/D3',
+      armFamily: 'I4g',
+      useCase: 'high I/O storage-optimized compute',
+      networkBaseline: 'high network/EBS bandwidth on local-storage families',
+      diskBaseline: 'local NVMe or dense HDD profile; validate durability and replication',
+    },
+    azure: {
+      x86Family: 'Lsv3',
+      armFamily: 'Lasv3',
+      useCase: 'high-throughput local-disk compute',
+      networkBaseline: 'storage-optimized networking varies by L-series size',
+      diskBaseline: 'local NVMe plus managed-disk persistence requirements',
+    },
+    gcp: {
+      x86Family: 'Z3',
+      armFamily: 'Tau T2A',
+      useCase: 'storage-optimized analytics and scratch-heavy compute',
+      networkBaseline: 'high-throughput machine profile; size determines bandwidth',
+      diskBaseline: 'local SSD/Hyperdisk tradeoffs must be modeled explicitly',
+    },
+  },
+  accelerated: {
+    aws: {
+      x86Family: 'G5/P4d',
+      armFamily: 'G5g',
+      gpuFamily: 'G5/P4d',
+      useCase: 'CUDA, ML, graphics, and accelerator compute',
+      networkBaseline: 'validate GPU interconnect, EFA, and data-ingest bandwidth',
+      diskBaseline: 'local NVMe/EBS throughput can dominate dataset staging',
+    },
+    azure: {
+      x86Family: 'NCv3/NC A100',
+      armFamily: 'NC A100',
+      gpuFamily: 'NCv3/NC A100',
+      useCase: 'CUDA, ML, HPC, and visualization compute',
+      networkBaseline: 'validate InfiniBand/RDMA support when training scales',
+      diskBaseline: 'Premium SSD/Ultra Disk often required for data staging',
+    },
+    gcp: {
+      x86Family: 'A2/G2',
+      armFamily: 'G2',
+      gpuFamily: 'A2/G2',
+      useCase: 'ML training/inference and accelerator-heavy compute',
+      networkBaseline: 'validate GPU count, local SSD, and network tier for training',
+      diskBaseline: 'local SSD/Hyperdisk staging can dominate effective throughput',
+    },
+  },
+  custom: {
+    aws: {
+      x86Family: 'custom-sized EC2 family',
+      armFamily: 'custom Graviton target',
+      useCase: 'custom CPU/memory compute',
+      networkBaseline: 'bandwidth depends on nearest selected EC2 size',
+      diskBaseline: 'EBS baseline depends on volume type and attached instance size',
+    },
+    azure: {
+      x86Family: 'custom-sized VM family',
+      armFamily: 'custom Ampere target',
+      useCase: 'custom CPU/memory compute',
+      networkBaseline: 'bandwidth depends on chosen VM size and NIC limits',
+      diskBaseline: 'Managed Disk IOPS/throughput depends on disk tier and VM size',
+    },
+    gcp: {
+      x86Family: 'custom machine type',
+      armFamily: 'custom Tau target',
+      useCase: 'custom CPU/memory compute',
+      networkBaseline: 'network bandwidth scales with vCPU count and machine family',
+      diskBaseline: 'Persistent Disk/Hyperdisk performance must be sized separately',
+    },
   },
 };
 
@@ -613,6 +807,8 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
       ]);
     }
   }
+
+  rows.push(...computeSpecificationOpportunityRows(result));
 
   for (const provider of result.providers) {
     const spotInsight = spotBlendInsight(result, provider);
@@ -1349,6 +1545,197 @@ function componentMonthly(
   return provider.lineItems
     .filter((lineItem) => (lineItem.costComponent ?? costComponentForCategory(lineItem.category)) === component)
     .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+}
+
+function computeSpecificationOpportunityRows(result: ComparisonResult): string[][] {
+  const computeRequirement = result.requirements?.serviceRequirements.find(
+    (requirement) => requirement.serviceCategory === 'compute',
+  );
+
+  if (!computeRequirement) {
+    return [];
+  }
+
+  const tier = computeSpecTierForRequirement(computeRequirement);
+  const architecture = computeArchitectureForRequirement(computeRequirement);
+  const tenancy = computeTenancyForRequirement(computeRequirement);
+  const capacity = computeCapacityForRequirement(computeRequirement);
+
+  return result.providers.flatMap((provider) => {
+    const computeMonthly = componentMonthly(provider, 'compute');
+
+    if (computeMonthly <= 0) {
+      return [];
+    }
+
+    const profile = COMPUTE_SPEC_EVIDENCE[tier][provider.providerId];
+    const family = computeSpecFamilyLabel(profile, architecture);
+    const monthlySavings = computeArchitectureMonthlyDelta(
+      provider.providerId,
+      computeMonthly,
+      architecture,
+    );
+    const recommendation = computeSpecRecommendation(
+      provider.providerId,
+      profile,
+      architecture,
+      tenancy,
+    );
+
+    return [
+      [
+        'Compute specification',
+        `${provider.providerId} ${family} mapping should be validated for vCPU/RAM, network bandwidth, and disk baseline; ${recommendation}`,
+        architecture === 'gpu' ? '' : formatNumber(monthlySavings),
+        architecture === 'gpu' ? '' : formatNumber(monthlySavings * 12),
+        monthlySavings > 100 ? 'High' : monthlySavings > 20 ? 'Medium' : 'Low',
+        tenancy === 'shared' ? 'Low' : 'Medium',
+        `${provider.providerId} ${profile.useCase} evidence: ${capacity}; network baseline ${profile.networkBaseline}; disk baseline ${profile.diskBaseline}; tenancy ${tenancy}.`,
+      ],
+    ];
+  });
+}
+
+function computeSpecTierForRequirement(
+  requirement: NonNullable<ComparisonResult['requirements']>['serviceRequirements'][number],
+): ComputeSpecTier {
+  const params = requirementScaleParams(requirement);
+  const tier = String(requirement.tier ?? '').toLowerCase();
+  const instanceFamily = String(params.instanceFamily ?? '').toLowerCase();
+  const source = tier || instanceFamily;
+
+  switch (source) {
+    case 'small':
+      return 'small';
+    case 'compute':
+    case 'compute-optimized':
+      return 'compute';
+    case 'memory':
+    case 'memory-optimized':
+      return 'memory';
+    case 'storage':
+    case 'storage-optimized':
+      return 'storage';
+    case 'accelerated':
+    case 'accelerated-computing':
+      return 'accelerated';
+    case 'custom':
+      return 'custom';
+    case 'balanced':
+    case 'general-purpose':
+    default:
+      return 'balanced';
+  }
+}
+
+function computeArchitectureForRequirement(
+  requirement: NonNullable<ComparisonResult['requirements']>['serviceRequirements'][number],
+): 'x86_64' | 'arm64' | 'gpu' {
+  const architecture = String(requirementScaleParams(requirement).processorArchitecture ?? 'x86_64');
+
+  if (architecture === 'arm64' || architecture === 'gpu') {
+    return architecture;
+  }
+
+  return 'x86_64';
+}
+
+function computeTenancyForRequirement(
+  requirement: NonNullable<ComparisonResult['requirements']>['serviceRequirements'][number],
+): 'shared' | 'dedicated-host' | 'sole-tenant' {
+  const tenancy = String(requirementScaleParams(requirement).tenancy ?? 'shared');
+
+  if (tenancy === 'dedicated-host' || tenancy === 'sole-tenant') {
+    return tenancy;
+  }
+
+  return 'shared';
+}
+
+function computeCapacityForRequirement(
+  requirement: NonNullable<ComparisonResult['requirements']>['serviceRequirements'][number],
+): string {
+  const params = requirementScaleParams(requirement);
+  const quantity = Math.max(1, requirement.quantity ?? 1);
+  const vcpu =
+    numericScaleParam(params, 'vcpu') ||
+    numberFromRequirementText(requirement.instanceType, /([\d.]+)\s*vCPU/i);
+  const memoryGb =
+    numericScaleParam(params, 'memoryGb') ||
+    numberFromRequirementText(requirement.instanceType, /([\d.]+)\s*GB/i);
+
+  if (vcpu > 0 && memoryGb > 0) {
+    return `${formatNumber(quantity)} node(s), ${formatNumber(vcpu * quantity)} vCPU / ${formatNumber(
+      memoryGb * quantity,
+    )}GB requested`;
+  }
+
+  return requirement.instanceType
+    ? `${formatNumber(quantity)} node(s), ${requirement.instanceType}`
+    : `${formatNumber(quantity)} compute unit(s) requested`;
+}
+
+function computeSpecFamilyLabel(
+  profile: ComputeSpecEvidenceProfile,
+  architecture: 'x86_64' | 'arm64' | 'gpu',
+): string {
+  if (architecture === 'gpu') {
+    return profile.gpuFamily ?? profile.x86Family;
+  }
+
+  return architecture === 'arm64' ? profile.armFamily : profile.x86Family;
+}
+
+function computeArchitectureMonthlyDelta(
+  providerId: ComparisonProviderResult['providerId'],
+  computeMonthly: number,
+  architecture: 'x86_64' | 'arm64' | 'gpu',
+): number {
+  if (architecture === 'gpu') {
+    return 0;
+  }
+
+  const armFactor = COMPUTE_ARM_COST_FACTORS[providerId];
+
+  if (architecture === 'arm64') {
+    return roundCurrency(Math.max(0, computeMonthly / armFactor - computeMonthly));
+  }
+
+  return roundCurrency(Math.max(0, computeMonthly - computeMonthly * armFactor));
+}
+
+function computeSpecRecommendation(
+  providerId: ComparisonProviderResult['providerId'],
+  profile: ComputeSpecEvidenceProfile,
+  architecture: 'x86_64' | 'arm64' | 'gpu',
+  tenancy: 'shared' | 'dedicated-host' | 'sole-tenant',
+): string {
+  if (architecture === 'gpu') {
+    return 'compare accelerator type, quota, CUDA/framework support, and data-staging cost before choosing on list price.';
+  }
+
+  if (tenancy !== 'shared') {
+    return 'validate dedicated-host or sole-tenant density before accepting the per-instance comparison.';
+  }
+
+  if (architecture === 'x86_64') {
+    return `evaluate ${profile.armFamily} as an ARM target before locking ${profile.x86Family}.`;
+  }
+
+  return `keep ${providerId} x86 fallback sizing in the proposal for packages that are not ARM-ready.`;
+}
+
+function requirementScaleParams(
+  requirement: NonNullable<ComparisonResult['requirements']>['serviceRequirements'][number],
+): Record<string, string | number | boolean> {
+  return (requirement.scaleParams ?? {}) as Record<string, string | number | boolean>;
+}
+
+function numberFromRequirementText(value: string | undefined, pattern: RegExp): number {
+  const match = value?.match(pattern);
+  const parsed = match ? Number(match[1]) : 0;
+
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function databaseIntelligenceMonthly(provider: ComparisonProviderResult): number {

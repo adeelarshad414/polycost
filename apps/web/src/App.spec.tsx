@@ -1054,6 +1054,51 @@ describe('ComparisonView', () => {
     unmount();
   });
 
+  it('surfaces compute specification matrix with architecture and tenancy economics', async () => {
+    const computeResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'gcp',
+      providers: [
+        providerWithItems('aws', [['compute', 'aws memory compute', 200]]),
+        providerWithItems('azure', [['compute', 'azure memory compute', 180]]),
+        providerWithItems('gcp', [['compute', 'gcp memory compute', 160]]),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView
+        comparison={computeResult}
+        form={{
+          ...defaultWorkloadForm,
+          instanceTier: 'memory',
+          processorArchitecture: 'arm64',
+          computeTenancy: 'dedicated-host',
+          vcpu: '4',
+          memoryGb: '16',
+          instanceCount: '3',
+        }}
+        interval="monthly"
+      />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain('Compute specification matrix');
+    expect(text(container)).toContain(
+      'Family, capacity, network/disk baseline, and architecture economics',
+    );
+    expect(text(container)).toContain('R7g Graviton3');
+    expect(text(container)).toContain('Epsv5 Ampere Altra');
+    expect(text(container)).toContain('Tau T2A');
+    expect(text(container)).toContain('3 nodes · 12 vCPU / 48GB');
+    expect(text(container)).toContain('GB per $');
+    expect(text(container)).toContain('Selected ARM vs x86');
+    expect(text(container)).toContain('Dedicated host · 16 instance(s) per 64-vCPU reference host');
+    expect(text(container)).toContain(
+      'Validate host density and license/compliance placement before accepting the per-instance comparison.',
+    );
+
+    unmount();
+  });
+
   it('surfaces Windows license optimization detail from licensing line items', async () => {
     const windowsResult: ComparisonResult = {
       ...comparisonResult,
