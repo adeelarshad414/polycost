@@ -4805,6 +4805,15 @@ select:disabled {
   padding: var(--pc-space-1);
 }
 
+.license-optimization-panel {
+  display: grid;
+  gap: var(--pc-space-1);
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface) 94%, var(--pc-bg-surface-2));
+  padding: var(--pc-space-1);
+}
+
 .architecture-risk-panel {
   display: grid;
   gap: var(--pc-space-1);
@@ -5032,6 +5041,10 @@ select:disabled {
   max-height: 340px;
 }
 
+.license-optimization-wrap {
+  max-height: 340px;
+}
+
 .scenario-sensitivity-table {
   min-width: 1080px;
 }
@@ -5046,6 +5059,10 @@ select:disabled {
 
 .commitment-coverage-table {
   min-width: 1040px;
+}
+
+.license-optimization-table {
+  min-width: 980px;
 }
 
 .scenario-sensitivity-table th {
@@ -5072,6 +5089,12 @@ select:disabled {
   z-index: 1;
 }
 
+.license-optimization-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
 .scenario-sensitivity-table td {
   vertical-align: top;
 }
@@ -5085,6 +5108,10 @@ select:disabled {
 }
 
 .commitment-coverage-table td {
+  vertical-align: top;
+}
+
+.license-optimization-table td {
   vertical-align: top;
 }
 
@@ -5102,6 +5129,10 @@ select:disabled {
 
 .commitment-coverage-table td:first-child {
   min-width: 170px;
+}
+
+.license-optimization-table td:first-child {
+  min-width: 180px;
 }
 
 .scenario-sensitivity-table td:nth-child(2) {
@@ -5128,6 +5159,12 @@ select:disabled {
   white-space: normal;
 }
 
+.license-optimization-table td:nth-child(5) {
+  min-width: 330px;
+  max-width: 460px;
+  white-space: normal;
+}
+
 .scenario-sensitivity-table td strong,
 .scenario-sensitivity-table td small,
 .provider-delta-table td strong,
@@ -5135,14 +5172,17 @@ select:disabled {
 .region-variance-table td strong,
 .region-variance-table td small,
 .commitment-coverage-table td strong,
-.commitment-coverage-table td small {
+.commitment-coverage-table td small,
+.license-optimization-table td strong,
+.license-optimization-table td small {
   display: block;
 }
 
 .scenario-sensitivity-table td small,
 .provider-delta-table td small,
 .region-variance-table td small,
-.commitment-coverage-table td small {
+.commitment-coverage-table td small,
+.license-optimization-table td small {
   margin-top: 3px;
   color: var(--pc-text-secondary);
   font-size: var(--pc-text-xs);

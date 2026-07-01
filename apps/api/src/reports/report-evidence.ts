@@ -582,14 +582,22 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
     const licensingMonthly = componentMonthly(provider, 'licensing');
 
     if (licensingMonthly > 0) {
+      const linuxEquivalentMonthly = Math.max(0, provider.totals.monthly - licensingMonthly);
+      const licensePath =
+        provider.providerId === 'azure' ? 'Azure Hybrid Benefit/BYOL' : 'Linux equivalent or BYOL';
+
       rows.push([
         'License optimization',
-        `${provider.providerId} includes Windows/licensing cost; validate Linux equivalent or BYOL eligibility.`,
+        `${provider.providerId} includes Windows/licensing cost; validate ${licensePath} eligibility before committing.`,
         formatNumber(licensingMonthly),
         formatNumber(licensingMonthly * 12),
         'Medium',
         'Medium',
-        `Licensing modeled as explicit $${formatNumber(licensingMonthly)}/mo line item.`,
+        `Windows run-rate $${formatNumber(
+          provider.totals.monthly,
+        )}/mo vs Linux/BYOL-equivalent $${formatNumber(
+          linuxEquivalentMonthly,
+        )}/mo; explicit licensing uplift is $${formatNumber(licensingMonthly)}/mo.`,
       ]);
     }
   }

@@ -5957,6 +5957,7 @@ function ProductionDepthAnalytics({
   const regionVariance = regionVarianceRows(comparison, form);
   const commitmentCoverage = commitmentCoverageGapRows(comparison, form);
   const tcoSignals = crossProviderTcoRows(comparison, form);
+  const licenseRows = licenseOptimizationRows(comparison, form);
   const architectureRisks = architectureRiskFlags(comparison, form);
   const scenarios = sensitivityScenarioRows(comparison, form);
 
@@ -5988,6 +5989,7 @@ function ProductionDepthAnalytics({
       <RegionVariancePanel rows={regionVariance} />
       <CommitmentCoverageGapPanel rows={commitmentCoverage} />
       <CrossProviderTcoPanel rows={tcoSignals} />
+      <LicenseOptimizationPanel rows={licenseRows} operatingSystem={form.operatingSystem} />
       <ArchitectureRiskFlagsPanel flags={architectureRisks} />
       <ScenarioSensitivityTable rows={scenarios} />
     </section>
@@ -6249,6 +6251,75 @@ function CrossProviderTcoPanel({ rows }: { rows: CrossProviderTcoRow[] }) {
       ) : (
         <div className="scenario-sensitivity-empty" role="status">
           Run a comparison to populate TCO signals beyond infrastructure run-rate.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LicenseOptimizationPanel({
+  operatingSystem,
+  rows,
+}: {
+  operatingSystem: WorkloadFormState['operatingSystem'];
+  rows: LicenseOptimizationRow[];
+}) {
+  return (
+    <div className="license-optimization-panel" aria-label="License optimization detail">
+      <div className="scenario-sensitivity-heading">
+        <div>
+          <span>License optimization detail</span>
+          <h4>Windows uplift, Linux-equivalent run-rate, and BYOL savings</h4>
+        </div>
+      </div>
+
+      {rows.length > 0 ? (
+        <div className="table-wrap license-optimization-wrap">
+          <table className="ranking-table license-optimization-table">
+            <thead>
+              <tr>
+                <th scope="col">Provider</th>
+                <th scope="col">Windows run-rate</th>
+                <th scope="col">Linux/BYOL equivalent</th>
+                <th scope="col">License uplift</th>
+                <th scope="col">Optimization note</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.providerId}>
+                  <td>
+                    <span className={`scenario-low-label scenario-low-${row.providerId}`}>
+                      {providerLabel(row.providerId)}
+                    </span>
+                    <small>{row.licensePath}</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.windowsMonthly)}</strong>
+                    <small>Current modeled total</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.linuxEquivalentMonthly)}</strong>
+                    <small>Remove Windows line item</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.monthlySavings)}/mo</strong>
+                    <small>{formatCurrency(row.annualSavings)}/yr</small>
+                  </td>
+                  <td>
+                    <strong>{row.recommendation}</strong>
+                    <small>{row.evidence}</small>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="scenario-sensitivity-empty" role="status">
+          {operatingSystem === 'windows'
+            ? 'Windows was selected, but this comparison did not expose separate licensing line items.'
+            : 'Linux/BYOL selected; no Windows licensing uplift is modeled for this workload.'}
         </div>
       )}
     </div>
@@ -6896,6 +6967,17 @@ interface CrossProviderTcoRow {
   evidence: string;
 }
 
+interface LicenseOptimizationRow {
+  providerId: ProviderId;
+  windowsMonthly: number;
+  linuxEquivalentMonthly: number;
+  monthlySavings: number;
+  annualSavings: number;
+  licensePath: string;
+  recommendation: string;
+  evidence: string;
+}
+
 interface ArchitectureRiskFlag {
   id: string;
   title: string;
@@ -7019,6 +7101,48 @@ function regionVarianceRows(
       lowestProviderId: lowest?.providerId,
     };
   });
+}
+
+function licenseOptimizationRows(
+  comparison: ComparisonResult | null,
+  form: WorkloadFormState,
+): LicenseOptimizationRow[] {
+  if (!comparison || form.operatingSystem !== 'windows') {
+    return [];
+  }
+
+  return comparison.providers
+    .flatMap((provider) => {
+      const licensingMonthly = roundCurrency(componentMonthly(provider, 'licensing'));
+
+      if (licensingMonthly <= 0) {
+        return [];
+      }
+
+      const linuxEquivalentMonthly = roundCurrency(
+        Math.max(0, provider.totals.monthly - licensingMonthly),
+      );
+      const recommendation =
+        provider.providerId === 'azure'
+          ? 'Validate Azure Hybrid Benefit or BYOL entitlement before committing.'
+          : 'Validate Linux migration or BYOL license mobility before committing.';
+
+      return [
+        {
+          providerId: provider.providerId,
+          windowsMonthly: roundCurrency(provider.totals.monthly),
+          linuxEquivalentMonthly,
+          monthlySavings: licensingMonthly,
+          annualSavings: roundCurrency(licensingMonthly * 12),
+          licensePath: provider.providerId === 'azure' ? 'Hybrid Benefit / BYOL' : 'Linux / BYOL',
+          recommendation,
+          evidence: `${providerLabel(provider.providerId)} exposes ${formatCurrency(
+            licensingMonthly,
+          )}/mo as an explicit Windows licensing line item.`,
+        },
+      ];
+    })
+    .sort((left, right) => right.monthlySavings - left.monthlySavings);
 }
 
 function architectureRiskFlags(

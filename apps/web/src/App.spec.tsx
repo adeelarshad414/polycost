@@ -1054,6 +1054,46 @@ describe('ComparisonView', () => {
     unmount();
   });
 
+  it('surfaces Windows license optimization detail from licensing line items', async () => {
+    const windowsResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'azure',
+      providers: [
+        providerWithItems('aws', [
+          ['compute', 'aws compute', 80],
+          ['licensing', 'aws Windows license', 24],
+        ]),
+        providerWithItems('azure', [
+          ['compute', 'azure compute', 70],
+          ['licensing', 'azure Windows license', 20],
+        ]),
+        providerWithItems('gcp', [
+          ['compute', 'gcp compute', 85],
+          ['licensing', 'gcp Windows license', 22],
+        ]),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView
+        comparison={windowsResult}
+        form={{ ...defaultWorkloadForm, operatingSystem: 'windows' }}
+        interval="monthly"
+      />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain('License optimization detail');
+    expect(text(container)).toContain(
+      'Windows uplift, Linux-equivalent run-rate, and BYOL savings',
+    );
+    expect(text(container)).toContain('Hybrid Benefit / BYOL');
+    expect(text(container)).toContain('$24.00/mo');
+    expect(text(container)).toContain('$288.00/yr');
+    expect(text(container)).toContain('Linux/BYOL equivalent');
+
+    unmount();
+  });
+
   it('renders FinOps feature additions without fabricating unsupported backend data', async () => {
     const awsRichProvider = providerWithItems('aws', [
       ['compute', 'aws compute', 50],

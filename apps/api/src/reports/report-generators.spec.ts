@@ -686,6 +686,43 @@ describe('report generators', () => {
         expect.arrayContaining(['aws', 'Reserved 3-year', '71', '42', '360', '29', '13']),
       ]),
     );
+
+    expect(
+      optimizationOpportunityRows({
+        ...comparison,
+        providers: [
+          {
+            ...comparison.providers[0],
+            lineItems: [
+              ...comparison.providers[0].lineItems,
+              {
+                category: 'licensing',
+                costComponent: 'licensing',
+                description: 'AWS Windows OS licensing estimate',
+                isApproximate: true,
+                baseMonthlyCostUsd: 24,
+              },
+            ],
+            totals: {
+              ...comparison.providers[0].totals,
+              monthly: 95,
+            },
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'License optimization',
+          'aws includes Windows/licensing cost; validate Linux equivalent or BYOL eligibility before committing.',
+          '24',
+          '288',
+          'Medium',
+          'Medium',
+          'Windows run-rate $95/mo vs Linux/BYOL-equivalent $71/mo; explicit licensing uplift is $24/mo.',
+        ]),
+      ]),
+    );
   });
 
   it('builds fallback service requirement rows when comparison requirements are absent', () => {
