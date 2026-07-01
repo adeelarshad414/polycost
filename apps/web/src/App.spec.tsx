@@ -66,6 +66,7 @@ describe('App', () => {
     );
 
     await click(buttonByText(container, 'Compare costs'));
+    await settleAsyncEffects();
 
     expect(text(container)).toContain('Requirements');
     expect(text(container)).toContain('Manual entry');
@@ -92,7 +93,11 @@ describe('App', () => {
       }),
     );
     expect(client.createComparison).toHaveBeenCalled();
+    expect(client.getComparisonAnalytics).toHaveBeenCalledWith(comparisonResult.comparisonId);
     expect(text(container)).not.toContain('Comparison ready.');
+    expect(text(container)).toContain('Server analytics');
+    expect(text(container)).toContain('Deltas');
+    expect(text(container)).toContain('Findings');
     expect(text(container)).toContain('AWS');
     expect(text(container)).toContain('Azure');
     expect(text(container)).toContain('GCP');
@@ -1949,6 +1954,13 @@ async function click(element: HTMLElement): Promise<void> {
   });
 }
 
+async function settleAsyncEffects(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
 async function changeInput(input: HTMLInputElement, value: string): Promise<void> {
   await act(async () => {
     const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
@@ -2129,6 +2141,7 @@ function clearClientCalls(client: PolyCostClient): void {
     client.parseWorkload,
     client.validateWorkload,
     client.createComparison,
+    client.getComparisonAnalytics,
     client.refreshLiveComparison,
     client.createExportJob,
     client.getExportJob,

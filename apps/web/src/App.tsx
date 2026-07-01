@@ -29,6 +29,7 @@ import {
 import { applyTheme, ResolvedTheme, resolveTheme, storedTheme, ThemeChoice } from './theme';
 import {
   ComparisonProviderResult,
+  ComparisonAnalyticsResponse,
   ComparisonResult,
   DataHealthResponse,
   INTERVALS,
@@ -594,6 +595,10 @@ export function App({ client = polyCostClient }: AppProps) {
   const [submittedForm, setSubmittedForm] = useState<WorkloadFormState>(INITIAL_HOME_FORM);
   const [submittedInputMode, setSubmittedInputMode] = useState<InputMode>('form');
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
+  const [comparisonAnalytics, setComparisonAnalytics] =
+    useState<ComparisonAnalyticsResponse | null>(null);
+  const [comparisonAnalyticsError, setComparisonAnalyticsError] = useState<string | null>(null);
+  const [isComparisonAnalyticsLoading, setIsComparisonAnalyticsLoading] = useState(false);
   const [comparisonHistory, setComparisonHistory] = useState<ComparisonHistoryEntry[]>(() =>
     readStoredComparisonHistory(),
   );
@@ -656,6 +661,50 @@ export function App({ client = polyCostClient }: AppProps) {
       isMounted = false;
     };
   }, [client]);
+
+  useEffect(() => {
+    if (!comparison) {
+      setComparisonAnalytics(null);
+      setComparisonAnalyticsError(null);
+      setIsComparisonAnalyticsLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    setIsComparisonAnalyticsLoading(true);
+    setComparisonAnalyticsError(null);
+
+    void client
+      .getComparisonAnalytics(comparison.comparisonId)
+      .then((analytics) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setComparisonAnalytics(analytics);
+        setComparisonAnalyticsError(null);
+      })
+      .catch((analyticsError) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setComparisonAnalytics(null);
+        setComparisonAnalyticsError(formatApiError(analyticsError));
+      })
+      .finally(() => {
+        if (!isMounted) {
+          return;
+        }
+
+        setIsComparisonAnalyticsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [client, comparison]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1077,6 +1126,8 @@ export function App({ client = polyCostClient }: AppProps) {
         <ProgressiveComparisonPage
           client={client}
           comparison={comparison}
+          comparisonAnalytics={comparisonAnalytics}
+          comparisonAnalyticsError={comparisonAnalyticsError}
           form={form}
           submittedForm={submittedForm}
           submittedInputMode={submittedInputMode}
@@ -1095,6 +1146,7 @@ export function App({ client = polyCostClient }: AppProps) {
           validationIssues={formValidationIssues}
           dataHealth={dataHealth}
           dataHealthError={dataHealthError}
+          isComparisonAnalyticsLoading={isComparisonAnalyticsLoading}
           onClear={handleClearComparison}
           onEdit={handleEditComparison}
           onInputModeChange={setInputMode}
@@ -1765,6 +1817,8 @@ function InitialHomePage({
 function ProgressiveComparisonPage({
   client,
   comparison,
+  comparisonAnalytics,
+  comparisonAnalyticsError,
   form,
   submittedForm,
   submittedInputMode,
@@ -1783,6 +1837,7 @@ function ProgressiveComparisonPage({
   validationIssues,
   dataHealth,
   dataHealthError,
+  isComparisonAnalyticsLoading,
   onClear,
   onEdit,
   onInputModeChange,
@@ -1801,6 +1856,8 @@ function ProgressiveComparisonPage({
 }: {
   client: PolyCostClient;
   comparison: ComparisonResult;
+  comparisonAnalytics: ComparisonAnalyticsResponse | null;
+  comparisonAnalyticsError: string | null;
   form: WorkloadFormState;
   submittedForm: WorkloadFormState;
   submittedInputMode: InputMode;
@@ -1819,6 +1876,7 @@ function ProgressiveComparisonPage({
   validationIssues: WorkloadFormIssue[];
   dataHealth: DataHealthResponse | null;
   dataHealthError: string | null;
+  isComparisonAnalyticsLoading: boolean;
   onClear: () => void;
   onEdit: () => void;
   onInputModeChange: (mode: InputMode) => void;
@@ -1890,6 +1948,12 @@ function ProgressiveComparisonPage({
 
             <StatusMessage notice={resultStatusNotice(notice)} error={error} />
 
+            <ServerAnalyticsStatusStrip
+              analytics={comparisonAnalytics}
+              error={comparisonAnalyticsError}
+              isLoading={isComparisonAnalyticsLoading}
+            />
+
             <ProviderSummaryCards comparison={comparison} interval={interval} />
 
             <div
@@ -1955,6 +2019,68 @@ function PricingModelRecommendationCallout({ comparison }: { comparison: Compari
         <span>{capitalize(recommendation.sourceSignals.flexibilityBias)}</span>
       </div>
     </section>
+  );
+}
+
+function ServerAnalyticsStatusStrip({
+  analytics,
+  error,
+  isLoading,
+}: {
+  analytics: ComparisonAnalyticsResponse | null;
+  error: string | null;
+  isLoading: boolean;
+}) {
+  if (!analytics && !error && !isLoading) {
+    return null;
+  }
+
+  const tone = error ? 'error' : isLoading ? 'loading' : 'ready';
+
+  return (
+    <section
+      className={`server-analytics-strip server-analytics-${tone}`}
+      aria-label="Backend analytics status"
+    >
+      <div className="server-analytics-main">
+        <span>{isLoading ? 'Server analytics syncing' : 'Server analytics'}</span>
+        <strong>
+          {error
+            ? 'Backend intelligence unavailable'
+            : analytics
+              ? `Generated ${formatDateTime(analytics.generatedAt)}`
+              : 'Preparing deterministic insights'}
+        </strong>
+        {error ? <p>{error}</p> : null}
+      </div>
+      <div className="server-analytics-metrics" aria-label="Backend analytics coverage">
+        <ServerAnalyticsMetric
+          label="Deltas"
+          value={analytics ? String(analytics.providerDeltaAnalysis.length) : '...'}
+        />
+        <ServerAnalyticsMetric
+          label="Sensitivity"
+          value={analytics ? String(analytics.sensitivityScenarios.length) : '...'}
+        />
+        <ServerAnalyticsMetric
+          label="Findings"
+          value={analytics ? String(analytics.finOpsFindings.length) : '...'}
+        />
+        <ServerAnalyticsMetric
+          label="ROI"
+          value={analytics ? String(analytics.commitmentRoiTimelines.length) : '...'}
+        />
+      </div>
+    </section>
+  );
+}
+
+function ServerAnalyticsMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <span>
+      <strong>{value}</strong>
+      <small>{label}</small>
+    </span>
   );
 }
 

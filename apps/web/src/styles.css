@@ -433,6 +433,7 @@ textarea:focus-visible {
 .requirement-summary-strip,
 .result-quick-actions,
 .pricing-model-recommendation,
+.server-analytics-strip,
 .requirements-edit-panel,
 .result-disclosure {
   min-width: 0;
@@ -568,6 +569,88 @@ textarea:focus-visible {
   font-size: var(--pc-text-xs);
   font-weight: 850;
   white-space: nowrap;
+}
+
+.server-analytics-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--pc-space-2);
+  border-color: color-mix(in srgb, var(--brand-green) 22%, var(--pc-border));
+  padding: var(--pc-space-2);
+}
+
+.server-analytics-loading {
+  border-color: color-mix(in srgb, var(--brand-blue) 28%, var(--pc-border));
+}
+
+.server-analytics-error {
+  border-color: color-mix(in srgb, var(--pc-danger) 28%, var(--pc-border));
+}
+
+.server-analytics-main {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.server-analytics-main span {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.server-analytics-main strong {
+  color: var(--pc-text-primary);
+  font-family: var(--pc-font-display);
+  font-size: var(--pc-text-base);
+  line-height: 1.2;
+}
+
+.server-analytics-main p {
+  margin: 0;
+  color: var(--pc-danger);
+  font-size: var(--pc-text-sm);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.server-analytics-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(58px, 1fr));
+  gap: 8px;
+}
+
+.server-analytics-metrics span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  border-left: 3px solid var(--brand-blue);
+  background: color-mix(in srgb, var(--pc-bg-surface-2) 68%, transparent);
+  padding: 6px 10px;
+}
+
+.server-analytics-metrics span:nth-child(1) {
+  border-left-color: var(--brand-orange);
+}
+
+.server-analytics-metrics span:nth-child(3) {
+  border-left-color: var(--brand-green);
+}
+
+.server-analytics-metrics strong {
+  color: var(--pc-text-primary);
+  font-family: var(--pc-font-mono);
+  font-size: var(--pc-text-base);
+  line-height: 1;
+}
+
+.server-analytics-metrics small {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 800;
 }
 
 .summary-strip-main {
@@ -7036,6 +7119,7 @@ select:disabled {
 
   .requirement-summary-strip,
   .result-quick-actions,
+  .server-analytics-strip,
   .requirements-edit-header,
   .progressive-export-panel {
     align-items: stretch;
@@ -7048,6 +7132,14 @@ select:disabled {
 
   .pricing-model-recommendation {
     grid-template-columns: 1fr;
+  }
+
+  .server-analytics-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .server-analytics-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .pricing-model-recommendation-signals {
