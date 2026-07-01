@@ -5955,6 +5955,7 @@ function ProductionDepthAnalytics({
   const insights = productionDepthInsights(comparison, form);
   const providerDeltas = providerDeltaRows(comparison);
   const regionVariance = regionVarianceRows(comparison, form);
+  const commitmentCoverage = commitmentCoverageGapRows(comparison, form);
   const scenarios = sensitivityScenarioRows(comparison, form);
 
   return (
@@ -5983,6 +5984,7 @@ function ProductionDepthAnalytics({
       </div>
       <ProviderDeltaAnalysisTable rows={providerDeltas} />
       <RegionVariancePanel rows={regionVariance} />
+      <CommitmentCoverageGapPanel rows={commitmentCoverage} />
       <ScenarioSensitivityTable rows={scenarios} />
     </section>
   );
@@ -6128,6 +6130,75 @@ function RegionVariancePanel({ rows }: { rows: RegionVarianceRow[] }) {
       ) : (
         <div className="scenario-sensitivity-empty" role="status">
           Region variance is unavailable until a comparison is run for at least one provider.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CommitmentCoverageGapPanel({ rows }: { rows: CommitmentCoverageGapRow[] }) {
+  return (
+    <div className="commitment-coverage-panel" aria-label="Commitment coverage gap">
+      <div className="scenario-sensitivity-heading">
+        <div>
+          <span>Commitment coverage gap</span>
+          <h4>0% on-demand vs target blend vs 100% committed</h4>
+        </div>
+      </div>
+
+      {rows.length > 0 ? (
+        <div className="table-wrap commitment-coverage-wrap">
+          <table className="ranking-table commitment-coverage-table">
+            <thead>
+              <tr>
+                <th scope="col">Provider</th>
+                <th scope="col">0% covered</th>
+                <th scope="col">Target blend</th>
+                <th scope="col">100% covered</th>
+                <th scope="col">Open gap</th>
+                <th scope="col">Evidence</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.providerId}>
+                  <td>
+                    <span className={`scenario-low-label scenario-low-${row.providerId}`}>
+                      {providerLabel(row.providerId)}
+                    </span>
+                    <small>{row.coverageLabel}</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.onDemandMonthly)}</strong>
+                    <small>All on-demand</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.targetBlendMonthly)}</strong>
+                    <small>{formatPercent(row.targetCoveragePercent)} target coverage</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.committedMonthly)}</strong>
+                    <small>{row.commitmentLabel}</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.openGapMonthly)}/mo</strong>
+                    <small>{formatPercent(row.exposedPercent)} exposed</small>
+                  </td>
+                  <td>
+                    <strong>{row.evidence}</strong>
+                    <small>
+                      {formatCurrency(row.fullCoverageSavingsMonthly)}/mo max opportunity.
+                    </small>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="scenario-sensitivity-empty" role="status">
+          Commitment coverage gap requires at least one provider with reserved, Savings Plan, or CUD
+          pricing evidence.
         </div>
       )}
     </div>
@@ -6725,6 +6796,20 @@ interface RegionVarianceRow {
   lowestProviderId?: ProviderId;
 }
 
+interface CommitmentCoverageGapRow {
+  providerId: ProviderId;
+  onDemandMonthly: number;
+  targetBlendMonthly: number;
+  committedMonthly: number;
+  targetCoveragePercent: number;
+  exposedPercent: number;
+  openGapMonthly: number;
+  fullCoverageSavingsMonthly: number;
+  commitmentLabel: string;
+  coverageLabel: string;
+  evidence: string;
+}
+
 function providerDeltaRows(comparison: ComparisonResult | null): ProviderDeltaRow[] {
   if (!comparison) {
     return [];
@@ -6840,6 +6925,68 @@ function regionVarianceRows(
       lowestProviderId: lowest?.providerId,
     };
   });
+}
+
+function commitmentCoverageGapRows(
+  comparison: ComparisonResult | null,
+  form: WorkloadFormState,
+): CommitmentCoverageGapRow[] {
+  if (!comparison) {
+    return [];
+  }
+
+  const targetCoveragePercent = clampNumber(
+    parseInputNumber(form.commitmentPreferencePercent) ?? 0,
+    0,
+    100,
+  );
+  const targetCoverageRate = targetCoveragePercent / 100;
+  const exposedPercent = 100 - targetCoveragePercent;
+
+  return comparison.providers
+    .flatMap((provider) => {
+      const commitment = bestCommitmentModel(provider);
+      const onDemandMonthly =
+        executiveModelMonthlyCost(provider, 'on-demand') ?? provider.totals.monthly;
+
+      if (
+        !commitment ||
+        commitment.model.monthlyCostUsd === undefined ||
+        onDemandMonthly <= commitment.model.monthlyCostUsd
+      ) {
+        return [];
+      }
+
+      const committedMonthly = commitment.model.monthlyCostUsd;
+      const targetBlendMonthly = roundCurrency(
+        onDemandMonthly * (1 - targetCoverageRate) + committedMonthly * targetCoverageRate,
+      );
+      const fullCoverageSavingsMonthly = roundCurrency(onDemandMonthly - committedMonthly);
+      const openGapMonthly = roundCurrency(targetBlendMonthly - committedMonthly);
+
+      return [
+        {
+          providerId: provider.providerId,
+          onDemandMonthly: roundCurrency(onDemandMonthly),
+          targetBlendMonthly,
+          committedMonthly: roundCurrency(committedMonthly),
+          targetCoveragePercent,
+          exposedPercent,
+          openGapMonthly,
+          fullCoverageSavingsMonthly,
+          commitmentLabel:
+            commitment.model.displayName ?? pricingModelSummaryLabel(commitment.model.model),
+          coverageLabel:
+            targetCoveragePercent === 100
+              ? 'Fully covered target'
+              : `${formatPercent(exposedPercent)} on-demand exposure remains`,
+          evidence: `${providerLabel(provider.providerId)} can move from ${formatCurrency(
+            onDemandMonthly,
+          )}/mo on-demand to ${formatCurrency(committedMonthly)}/mo at 100% eligible coverage.`,
+        },
+      ];
+    })
+    .sort((left, right) => right.openGapMonthly - left.openGapMonthly);
 }
 
 function productionDepthInsights(

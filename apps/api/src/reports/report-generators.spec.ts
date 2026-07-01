@@ -651,9 +651,9 @@ describe('report generators', () => {
       expect.arrayContaining([
         expect.arrayContaining([
           'Commitment coverage',
-          'aws Reserved 3-year lowers recurring run rate.',
-          '29',
-          '348',
+          'aws Reserved 3-year lowers recurring run rate; 35% remains exposed at the target coverage setting.',
+          '10.15',
+          '121.8',
         ]),
         expect.arrayContaining([
           'Right-sizing',

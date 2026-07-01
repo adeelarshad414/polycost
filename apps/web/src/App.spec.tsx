@@ -1182,6 +1182,10 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Region variance heat map');
     expect(text(container)).toContain('Modeled monthly sensitivity by compliant region');
     expect(text(container)).toContain('Europe West');
+    expect(text(container)).toContain('Commitment coverage gap');
+    expect(text(container)).toContain('0% on-demand vs target blend vs 100% committed');
+    expect(text(container)).toContain('$20.30/mo');
+    expect(text(container)).toContain('35% exposed');
     expect(text(container)).toContain('Scenario sensitivity');
     expect(text(container)).toContain('Provider winner under operational shocks');
     expect(text(container)).toContain('Demand +25%');

@@ -478,6 +478,8 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
 
   for (const provider of result.providers) {
     const onDemand = modelCostForProvider(provider, 'on-demand');
+    const targetCoveragePercent = commitmentPreferencePercent(result);
+    const targetCoverageRate = targetCoveragePercent / 100;
     const bestCommitment = ['reserved-3yr', 'reserved-1yr', 'savings-plan']
       .map((pricingModel) => modelCostForProvider(provider, pricingModel as ReportPricingModel))
       .filter(
@@ -491,16 +493,34 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
 
     if (bestCommitment?.monthlyCostUsd !== undefined && onDemand.monthlyCostUsd !== undefined) {
       const monthlySavings = onDemand.monthlyCostUsd - bestCommitment.monthlyCostUsd;
+      const targetBlendMonthly =
+        onDemand.monthlyCostUsd * (1 - targetCoverageRate) +
+        bestCommitment.monthlyCostUsd * targetCoverageRate;
+      const openGapMonthly = Math.max(0, targetBlendMonthly - bestCommitment.monthlyCostUsd);
+      const remainingOpportunity = roundCurrency(openGapMonthly);
+
+      if (remainingOpportunity <= 0) {
+        continue;
+      }
+
       rows.push([
         'Commitment coverage',
-        `${provider.providerId} ${labelForPricingModel(bestCommitment.model)} lowers recurring run rate.`,
-        formatNumber(monthlySavings),
-        formatNumber(monthlySavings * 12),
-        monthlySavings > 100 ? 'High' : 'Medium',
+        `${provider.providerId} ${labelForPricingModel(
+          bestCommitment.model,
+        )} lowers recurring run rate; ${formatNumber(
+          100 - targetCoveragePercent,
+        )}% remains exposed at the target coverage setting.`,
+        formatNumber(remainingOpportunity),
+        formatNumber(remainingOpportunity * 12),
+        remainingOpportunity > 100 ? 'High' : 'Medium',
         bestCommitment.model === 'reserved-3yr' ? 'High' : 'Medium',
         `${provider.providerId} on-demand $${formatNumber(
           onDemand.monthlyCostUsd,
-        )}/mo vs ${bestCommitment.model} $${formatNumber(bestCommitment.monthlyCostUsd)}/mo.`,
+        )}/mo vs ${bestCommitment.model} $${formatNumber(
+          bestCommitment.monthlyCostUsd,
+        )}/mo; ${formatNumber(targetCoveragePercent)}% target blend is $${formatNumber(
+          targetBlendMonthly,
+        )}/mo and 100% coverage would save $${formatNumber(monthlySavings)}/mo.`,
       ]);
     }
   }
@@ -1078,6 +1098,16 @@ function rightSizingSavingsRate(averageUtilizationPercent?: number): number {
   }
 
   return 0;
+}
+
+function commitmentPreferencePercent(result: ComparisonResult): number {
+  const percent = result.requirements?.workloadProfile?.commitmentPreferencePercent;
+
+  if (percent === undefined || !Number.isFinite(percent)) {
+    return 0;
+  }
+
+  return Math.min(100, Math.max(0, Math.round(percent)));
 }
 
 function costComponentForCategory(
