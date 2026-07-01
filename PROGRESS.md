@@ -21,20 +21,21 @@ say so explicitly rather than marking it done.
 
 ## Phase status overview
 
-| Phase                                                  | Status                               | Last updated |
-| ------------------------------------------------------ | ------------------------------------ | ------------ |
-| 0 - Build plan & approval                              | Complete                             | 2026-06-28   |
-| 1 - Repo scaffold                                      | Complete                             | 2026-06-28   |
-| 2 - Data layer (Postgres schema, NWS types, validator) | Complete                             | 2026-06-28   |
-| 3 - Cloud provider adapters                            | Complete                             | 2026-06-28   |
-| 4 - Pricing ETL job                                    | Complete                             | 2026-06-28   |
-| 5 - NWS Parser Module                                  | Complete                             | 2026-06-28   |
-| 6 - Comparison Engine                                  | Complete                             | 2026-06-29   |
-| 7 - Report Module                                      | Complete                             | 2026-06-29   |
-| 8 - API layer                                          | Complete                             | 2026-06-29   |
-| 9 - Frontend                                           | Complete                             | 2026-06-29   |
-| 10 - E2E verification against MVP acceptance criteria  | Complete with known gaps (see notes) | 2026-06-29   |
-| Post-Phase 10 report export evidence polish            | Complete                             | 2026-07-01   |
+| Phase                                                  | Status   | Last updated |
+| ------------------------------------------------------ | -------- | ------------ |
+| 0 - Build plan & approval                              | Complete | 2026-06-28   |
+| 1 - Repo scaffold                                      | Complete | 2026-06-28   |
+| 2 - Data layer (Postgres schema, NWS types, validator) | Complete | 2026-06-28   |
+| 3 - Cloud provider adapters                            | Complete | 2026-06-28   |
+| 4 - Pricing ETL job                                    | Complete | 2026-06-28   |
+| 5 - NWS Parser Module                                  | Complete | 2026-06-28   |
+| 6 - Comparison Engine                                  | Complete | 2026-06-29   |
+| 7 - Report Module                                      | Complete | 2026-06-29   |
+| 8 - API layer                                          | Complete | 2026-06-29   |
+| 9 - Frontend                                           | Complete | 2026-06-29   |
+| 10 - E2E verification against MVP acceptance criteria  | Complete | 2026-07-01   |
+| Post-Phase 10 report export evidence polish            | Complete | 2026-07-01   |
+| Post-Phase 10 Playwright browser journey coverage      | Complete | 2026-07-01   |
 
 ## Phase 0 - Build plan & approval
 
@@ -743,10 +744,11 @@ destructively reset existing Docker volumes.
   global branch threshold gap below.
 
 All required Playwright E2E journeys from `10-TESTING-STRATEGY.md` section 5 passing:
-[ ] Not yet. This checkpoint adds a Jest public-API/Compose acceptance suite for the
-core MVP criteria. Browser-driven Playwright journeys for theme switching, responsive
-carousel behavior, partial provider failure warning, and keyboard-only navigation
-remain carried-forward UI automation work.
+[x] Completed in the 2026-07-01 Post-Phase 10 Playwright browser journey coverage
+checkpoint. The formal browser suite now covers theme switching/persistence,
+responsive mobile comparison without page-level horizontal overflow, partial provider
+warning surfacing, export requests, and keyboard-only comparison/disclosure/interval
+controls.
 
 ## Post-Phase 10 FinOps dashboard and report polish
 
@@ -849,6 +851,43 @@ remain carried-forward UI automation work.
 - `npm run lint --workspace @polycost/api` still reports only the existing 15 API
   security warnings already tracked in known issues.
 
+## Post-Phase 10 Playwright browser journey coverage
+
+**Status:** Complete
+**Date:** 2026-07-01
+
+- Browser test harness: added `@playwright/test` to the web workspace, introduced
+  `apps/web/playwright.config.ts`, and changed `@polycost/web` `test:e2e` from the
+  old Jest placeholder pattern to Playwright browser execution.
+- CI hardening: the GitHub quality workflow now installs the Playwright Chrome
+  channel before running the E2E step, matching the browser channel used locally.
+- Formal journeys added under `apps/web/e2e`: theme switching and reload
+  persistence, mobile default-workload comparison with page-level horizontal
+  overflow checks, partial provider pricing-warning surfacing, PDF/CSV/XLSX export
+  request context, and keyboard-only compare/disclosure/interval controls.
+- Backend wiring coverage: the mobile journey runs against the real local Compose
+  API/web stack; warning/export/keyboard journeys mock only the targeted network
+  edges needed to deterministically exercise browser UI states.
+- Root E2E gate: existing API MVP acceptance tests continue to run through Jest, and
+  the web workspace now contributes the Playwright browser journeys through
+  `npm run ci:e2e`.
+- Tests/checks passing locally:
+  `npm run format:check`,
+  `npm run ci:lint`,
+  `npm run test:unit`,
+  `npm run build`,
+  `npm run security:audit`,
+  `npm run lint --workspace @polycost/web`,
+  `npm run typecheck --workspace @polycost/web`,
+  `npm run build --workspace @polycost/web`,
+  `npm run test:e2e --workspace @polycost/web`, and
+  `POLYCOST_E2E_SKIP_COMPOSE=1 npm run ci:e2e` against the already-running Compose
+  stack with localhost network access.
+- Notes: the current UI no longer uses the older mobile provider carousel mentioned
+  in the original carried-forward item, so the responsive browser journey validates
+  the current progressive-disclosure mobile layout and no-horizontal-overflow
+  requirement instead.
+
 ## Known issues / carried-forward items
 
 Running list. Add here whenever a phase completes with known gaps. Remove an item only
@@ -867,10 +906,6 @@ when it is actually resolved in a later phase, with a note on which phase resolv
   threshold: all API tests pass, but aggregate API branch coverage reports 81.56%
   against the configured 85% target. The focused web coverage gate for the frontend
   polish passes.
-- Phase 10's automated acceptance gate is a Jest public-API/Compose suite rather than
-  the full Playwright journey set requested by `10-TESTING-STRATEGY.md`. Prior browser
-  smokes covered responsive UI behavior, but formal Playwright tests for theme,
-  mobile carousel, provider failure warning, and keyboard-only flows remain open.
 - Phase 10 refresh-live acceptance verifies that a comparison is re-run into a fresh
   snapshot from current catalog data. Deterministic proof that a changed catalog row
   changes the refreshed result still needs either a test-only catalog fixture path or
@@ -901,10 +936,11 @@ the reasoning, even if approved in a phase checkpoint.
   `LIVE_REFRESH_UNAVAILABLE` until initial live provider refresh has an explicit
   implementation path. This avoids silently returning cached-catalog results for a
   request that asked for live pricing.
-- Phase 10 automated E2E uses Jest public-API/Compose tests instead of Playwright.
-  This keeps the checkpoint inside the current dependency set while verifying the
-  core MVP acceptance criteria against the running stack. The formal Playwright
-  journey set remains carried forward.
+- Phase 10 initially used Jest public-API/Compose tests for MVP acceptance while the
+  formal browser journey set remained carried forward. The 2026-07-01
+  Post-Phase 10 Playwright browser journey coverage checkpoint resolved that gap by
+  adding web Playwright coverage for theme, responsive mobile comparison, provider
+  warnings, exports, and keyboard-only controls.
 - Post-Phase 9 audit remediation seeds a local baseline pricing catalog so clean
   self-hosted Compose stacks can produce first-run comparisons before provider ETL
   credentials are configured. Seed rows are marked `attributes.source = local_seed`,

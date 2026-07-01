@@ -1,0 +1,388 @@
+import { expect, Page, test } from '@playwright/test';
+import type {
+  ComparisonResult,
+  ProviderId,
+  RegionCatalogResponse,
+  ReportFormat,
+} from '../src/types';
+
+test('persists light and dark theme choices across reloads', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto('/');
+
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('html')).toHaveAttribute('data-theme-choice', 'dark');
+
+  await page.getByRole('button', { name: /switch to light mode/i }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await expect(page.locator('html')).toHaveAttribute('data-theme-choice', 'light');
+  await expect(page.getByRole('button', { name: /switch to dark mode/i })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
+
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await expect(page.locator('html')).toHaveAttribute('data-theme-choice', 'light');
+
+  await page.getByRole('button', { name: /switch to dark mode/i }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.getByRole('button', { name: /switch to light mode/i })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+});
+
+test('compares the default workload on mobile without page-level horizontal overflow', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+
+  await expect(page.getByRole('tab', { name: /guided form/i })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expectNoHorizontalOverflow(page);
+
+  await page.getByRole('button', { name: /compare costs/i }).click();
+  await expect(page.getByLabel('Provider cost summary')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('Executive monthly baseline')).toBeVisible();
+  await expect(page.getByText('Engineering service spend')).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+
+  const disclosure = page.getByRole('button', { name: /show full breakdown/i });
+  await expect(disclosure).toBeVisible();
+  await disclosure.click();
+  await expect(page.getByRole('button', { name: /hide full breakdown/i })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+  await expect(page.getByLabel('Engineering cost controls')).toBeVisible();
+  await expect(page.getByLabel('Architecture and engineering evidence')).toBeVisible();
+  await expect(page.getByLabel('Official cloud pricing and region references')).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
+test('surfaces provider pricing warnings in the engineering evidence view', async ({ page }) => {
+  await mockRegionCatalog(page);
+  await mockComparisonCreation(
+    page,
+    browserComparison({
+      warnings: [
+        {
+          providerId: 'azure',
+          code: 'provider_pricing_failed',
+          message: 'Azure pricing unavailable; using cached comparison evidence.',
+        },
+      ],
+    }),
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: /compare costs/i }).click();
+  await expect(page.getByLabel('Provider cost summary')).toBeVisible();
+
+  await page.getByRole('button', { name: /show full breakdown/i }).click();
+  const pricingWarning = page.getByRole('alert').filter({ hasText: 'Pricing warnings:' });
+
+  await expect(pricingWarning).toBeVisible();
+  await expect(pricingWarning).toContainText(
+    'Azure pricing unavailable; using cached comparison evidence.',
+  );
+});
+
+test('requests PDF, CSV, and Excel exports with the selected scenario context', async ({
+  page,
+}) => {
+  const exportRequests: URL[] = [];
+
+  await mockRegionCatalog(page);
+  await mockComparisonCreation(page, browserComparison());
+  await page.route('**/api/v1/comparisons/e2e-browser/export?**', async (route) => {
+    const url = new URL(route.request().url());
+    const format = url.searchParams.get('format') as ReportFormat | null;
+
+    if (!format) {
+      await route.fulfill({ status: 400, body: 'missing format' });
+      return;
+    }
+
+    exportRequests.push(url);
+    await route.fulfill({
+      status: 200,
+      contentType: exportContentType(format),
+      body: exportBody(format),
+    });
+  });
+
+  await page.goto('/');
+  await page.getByRole('button', { name: /reserved 3yr/i }).click();
+  await page.getByRole('button', { name: /compare costs/i }).click();
+  await expect(page.getByLabel('Comparison quick actions')).toBeVisible();
+
+  const quickActions = page.getByLabel('Comparison quick actions');
+  for (const [buttonName, notice] of [
+    [/^PDF$/, 'PDF export downloaded.'],
+    [/^CSV$/, 'CSV export downloaded.'],
+    [/^Excel$/, 'XLSX export downloaded.'],
+  ] as const) {
+    await quickActions.getByRole('button', { name: buttonName }).click();
+    await expect(page.locator('.status-message').filter({ hasText: notice })).toBeVisible();
+  }
+
+  expect(exportRequests.map((url) => url.searchParams.get('format'))).toEqual([
+    'pdf',
+    'csv',
+    'xlsx',
+  ]);
+  for (const url of exportRequests) {
+    expect(url.searchParams.get('interval')).toBe('monthly');
+    expect(url.searchParams.get('pricingModel')).toBe('reserved-3yr');
+  }
+});
+
+test('supports keyboard-only comparison, disclosure, and interval controls', async ({ page }) => {
+  await mockRegionCatalog(page);
+  await mockComparisonCreation(page, browserComparison());
+
+  await page.goto('/');
+
+  const compareButton = page.getByRole('button', { name: /compare costs/i });
+  await compareButton.focus();
+  await expect(compareButton).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByLabel('Provider cost summary')).toBeVisible();
+
+  const disclosure = page.getByRole('button', { name: /show full breakdown/i });
+  await disclosure.focus();
+  await expect(disclosure).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: /hide full breakdown/i })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+
+  const yearly = page.getByRole('button', { name: /^Yearly$/ });
+  await yearly.focus();
+  await expect(yearly).toBeFocused();
+  await page.keyboard.press('Space');
+  await expect(yearly).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByText('Yearly estimate').first()).toBeVisible();
+});
+
+async function mockRegionCatalog(page: Page): Promise<void> {
+  await page.route('**/api/v1/regions', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(regionCatalog()),
+    });
+  });
+}
+
+async function mockComparisonCreation(page: Page, comparison: ComparisonResult): Promise<void> {
+  await page.route('**/api/v1/workload/validate', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ valid: true }),
+    });
+  });
+  await page.route('**/api/v1/comparisons', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(comparison),
+    });
+  });
+}
+
+async function expectNoHorizontalOverflow(page: Page): Promise<void> {
+  const overflowPixels = await page.evaluate(() => {
+    const root = document.documentElement;
+    const body = document.body;
+    const scrollWidth = Math.max(root.scrollWidth, body.scrollWidth);
+    const viewportWidth = Math.max(root.clientWidth, window.innerWidth);
+
+    return scrollWidth - viewportWidth;
+  });
+
+  expect(overflowPixels).toBeLessThanOrEqual(1);
+}
+
+function browserComparison(overrides: Partial<ComparisonResult> = {}): ComparisonResult {
+  return {
+    comparisonId: 'e2e-browser',
+    pricingAsOf: '2026-07-01T00:00:00.000Z',
+    cheapestProviderId: 'gcp',
+    requirements: {
+      sourceType: 'structured_form',
+      workloadName: 'Customer portal',
+      workloadType: 'web_app',
+      regionPreference: 'us-east',
+      serviceRequirements: [
+        {
+          serviceCategory: 'compute',
+          serviceType: 'vm-compute',
+          tier: 'balanced',
+          region: 'us-east',
+          az: '2 zones',
+          quantity: 2,
+        },
+      ],
+    },
+    providers: [
+      provider('aws', 124.5, [
+        lineItem('compute', 'Amazon EC2 equivalent web tier', 84.5, 'us-east-1'),
+        lineItem('storage', 'Amazon S3 object storage', 40, 'us-east-1'),
+      ]),
+      provider('azure', 138.25, [
+        lineItem('compute', 'Azure Virtual Machines web tier', 92.25, 'eastus', true),
+        lineItem('database', 'Azure Database for PostgreSQL', 46, 'eastus', true),
+      ]),
+      provider('gcp', 110.75, [
+        lineItem('compute', 'Google Compute Engine web tier', 72.75, 'us-east1'),
+        lineItem('storage', 'Cloud Storage object storage', 38, 'us-east1'),
+      ]),
+    ],
+    ...overrides,
+  };
+}
+
+function provider(
+  providerId: ProviderId,
+  monthly: number,
+  lineItems: ComparisonResult['providers'][number]['lineItems'],
+): ComparisonResult['providers'][number] {
+  const hourly = round(monthly / 730);
+
+  return {
+    providerId,
+    lineItems,
+    totals: {
+      hourly,
+      daily: round(hourly * 24),
+      weekly: round(hourly * 168),
+      monthly,
+      quarterly: round(monthly * 3),
+      yearly: round(monthly * 12),
+    },
+    pricingModels: [
+      {
+        model: 'on-demand',
+        available: true,
+        monthlyCostUsd: monthly,
+        hourlyCostUsd: hourly,
+      },
+      {
+        model: 'reserved-3yr',
+        available: true,
+        monthlyCostUsd: round(monthly * 0.68),
+        hourlyCostUsd: round((monthly * 0.68) / 730),
+        caveat: 'Modeled three-year commitment.',
+      },
+    ],
+    breakdown: {
+      computeMonthlyCostUsd: round(
+        lineItems
+          .filter((item) => item.category === 'compute')
+          .reduce((sum, item) => sum + item.baseMonthlyCostUsd, 0),
+      ),
+      storageMonthlyCostUsd: round(
+        lineItems
+          .filter((item) => item.category === 'storage')
+          .reduce((sum, item) => sum + item.baseMonthlyCostUsd, 0),
+      ),
+      databaseMonthlyCostUsd: round(
+        lineItems
+          .filter((item) => item.category === 'database')
+          .reduce((sum, item) => sum + item.baseMonthlyCostUsd, 0),
+      ),
+      egressMonthlyCostUsd: round(
+        lineItems
+          .filter((item) => item.category === 'network')
+          .reduce((sum, item) => sum + item.baseMonthlyCostUsd, 0),
+      ),
+      scopedMonthlyCostUsd: monthly,
+    },
+  };
+}
+
+function lineItem(
+  category: ComparisonResult['providers'][number]['lineItems'][number]['category'],
+  description: string,
+  monthly: number,
+  region: string,
+  isApproximate = false,
+): ComparisonResult['providers'][number]['lineItems'][number] {
+  return {
+    category,
+    description,
+    isApproximate,
+    baseHourlyCostUsd: round(monthly / 730),
+    baseMonthlyCostUsd: monthly,
+    region,
+    unit: 'hour',
+    unitPriceUsd: round(monthly / 730),
+  };
+}
+
+function regionCatalog(): RegionCatalogResponse {
+  return {
+    generatedAt: '2026-07-01T00:00:00.000Z',
+    providers: [
+      {
+        providerId: 'aws',
+        calculatorUrl: 'https://calculator.aws/#/',
+        regionsUrl: 'https://aws.amazon.com/about-aws/global-infrastructure/regions_az/',
+        regions: [{ id: 'us-east-1', label: 'US East (N. Virginia)', geography: 'North America' }],
+      },
+      {
+        providerId: 'azure',
+        calculatorUrl: 'https://azure.microsoft.com/en-us/pricing/calculator/',
+        regionsUrl: 'https://azure.microsoft.com/en-us/explore/global-infrastructure/geographies/',
+        regions: [{ id: 'eastus', label: 'East US', geography: 'North America' }],
+      },
+      {
+        providerId: 'gcp',
+        calculatorUrl: 'https://cloud.google.com/products/calculator',
+        regionsUrl: 'https://cloud.google.com/compute/docs/regions-zones',
+        regions: [{ id: 'us-east1', label: 'South Carolina', geography: 'North America' }],
+      },
+    ],
+  };
+}
+
+function exportContentType(format: ReportFormat): string {
+  if (format === 'pdf') {
+    return 'application/pdf';
+  }
+
+  if (format === 'csv') {
+    return 'text/csv';
+  }
+
+  return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+}
+
+function exportBody(format: ReportFormat): string {
+  if (format === 'pdf') {
+    return '%PDF-1.4 e2e';
+  }
+
+  if (format === 'csv') {
+    return 'Comparison ID,e2e-browser\n';
+  }
+
+  return 'PK e2e';
+}
+
+function round(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}

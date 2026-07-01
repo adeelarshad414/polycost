@@ -16,6 +16,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - name: Install Playwright Chrome
+        run: npx playwright install --with-deps chrome
       - name: Format check
         run: npm run format:check
       - name: Lint and typecheck
