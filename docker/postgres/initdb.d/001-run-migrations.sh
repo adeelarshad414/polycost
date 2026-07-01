@@ -42,7 +42,8 @@ for migration in \
   010_share_link_context.sql \
   011_seed_local_commitment_pricing_catalog.sql \
   012_production_depth_audit_analytics.sql \
-  013_report_export_jobs.sql
+  013_report_export_jobs.sql \
+  014_comparison_prewarm_jobs.sql
 do
   psql \
     --username "$POSTGRES_USER" \

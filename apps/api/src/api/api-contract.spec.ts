@@ -16,6 +16,7 @@ import { AdminApiKeyGuard } from './admin-api-key.guard';
 import { ApiExceptionFilter } from './api-exception.filter';
 import { ApiRateLimitService } from './rate-limit.service';
 import { ComparisonApplicationService } from './comparison-application.service';
+import { ComparisonPrewarmService } from './comparison-prewarm.service';
 import { ComparisonsController } from './comparisons.controller';
 import {
   AlertsController,
@@ -839,10 +840,14 @@ describe('API contracts', () => {
     const liveRefresh = {
       refreshSnapshot: jest.fn(async () => []),
     };
+    const prewarm = {
+      enqueue: jest.fn(),
+    };
     const service = new ComparisonApplicationService(
       orchestrator as never,
       repository as never,
       liveRefresh as never,
+      prewarm as unknown as ComparisonPrewarmService,
     );
 
     await expect(service.createComparison(validNws, { useLivePricing: false })).resolves.toEqual(
@@ -850,6 +855,7 @@ describe('API contracts', () => {
     );
     expect(repository.saveComparison).toHaveBeenCalledWith(validNws, comparisonResult);
     expect(repository.recordComparisonAuditLog).toHaveBeenCalledWith(comparisonResult);
+    expect(prewarm.enqueue).toHaveBeenCalledWith(comparisonResult);
     await expect(service.getComparison(comparisonResult.comparisonId)).resolves.toEqual({
       nwsSnapshot: validNws,
       resultSnapshot: comparisonResult,

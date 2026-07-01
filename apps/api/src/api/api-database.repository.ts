@@ -62,6 +62,21 @@ export interface ComparisonSnapshot {
   resultSnapshot: ComparisonResult;
 }
 
+export type ComparisonPrewarmJobStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+export interface ComparisonPrewarmJobRecord {
+  jobId: string;
+  comparisonId: string;
+  status: ComparisonPrewarmJobStatus;
+  requestedCombinations: number;
+  warmedCombinations: number;
+  failedCombinations: number;
+  errorMessage?: string;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
 interface ComparisonSnapshotRow {
   nws_snapshot: NormalizedWorkloadSpec;
   result_snapshot: ComparisonResult;
@@ -201,6 +216,19 @@ interface ReportExportJobRow {
   file_name: string | null;
   content_type: string | null;
   artifact?: Buffer | null;
+  error_message: string | null;
+  created_at: Date;
+  started_at: Date | null;
+  completed_at: Date | null;
+}
+
+interface ComparisonPrewarmJobRow {
+  id: string;
+  comparison_id: string;
+  status: ComparisonPrewarmJobStatus;
+  requested_combinations: number;
+  warmed_combinations: number;
+  failed_combinations: number;
   error_message: string | null;
   created_at: Date;
   started_at: Date | null;
@@ -615,6 +643,85 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
       job: toReportExportJobRecord(row),
       content: row.artifact,
     };
+  }
+
+  async createComparisonPrewarmJob(input: {
+    comparisonId: string;
+    requestedCombinations: number;
+  }): Promise<ComparisonPrewarmJobRecord> {
+    const result = await (
+      await this.getPool()
+    ).query<ComparisonPrewarmJobRow>(
+      `
+        INSERT INTO comparison_prewarm_jobs (
+          comparison_id,
+          requested_combinations
+        )
+        VALUES ($1, $2)
+        RETURNING id,
+                  comparison_id,
+                  status,
+                  requested_combinations,
+                  warmed_combinations,
+                  failed_combinations,
+                  error_message,
+                  created_at,
+                  started_at,
+                  completed_at
+      `,
+      [input.comparisonId, input.requestedCombinations],
+    );
+
+    return toComparisonPrewarmJobRecord(result.rows[0]);
+  }
+
+  async markComparisonPrewarmJobRunning(jobId: string, startedAt: string): Promise<void> {
+    await (
+      await this.getPool()
+    ).query(
+      `
+        UPDATE comparison_prewarm_jobs
+        SET status = 'running',
+            started_at = $2,
+            error_message = NULL
+        WHERE id = $1
+          AND status = 'pending'
+      `,
+      [jobId, startedAt],
+    );
+  }
+
+  async finishComparisonPrewarmJob(
+    jobId: string,
+    input: {
+      status: Exclude<ComparisonPrewarmJobStatus, 'pending' | 'running'>;
+      warmedCombinations: number;
+      failedCombinations: number;
+      completedAt: string;
+      errorMessage?: string;
+    },
+  ): Promise<void> {
+    await (
+      await this.getPool()
+    ).query(
+      `
+        UPDATE comparison_prewarm_jobs
+        SET status = $2,
+            warmed_combinations = $3,
+            failed_combinations = $4,
+            error_message = $5,
+            completed_at = $6
+        WHERE id = $1
+      `,
+      [
+        jobId,
+        input.status,
+        input.warmedCombinations,
+        input.failedCombinations,
+        input.errorMessage ?? null,
+        input.completedAt,
+      ],
+    );
   }
 
   async createWorkload(input: WorkloadInput): Promise<WorkloadRecord> {
@@ -1516,6 +1623,21 @@ function toReportExportJobRecord(row: ReportExportJobRow): ReportExportJobRecord
     status: row.status,
     ...(row.file_name ? { fileName: row.file_name } : {}),
     ...(row.content_type ? { contentType: row.content_type } : {}),
+    ...(row.error_message ? { errorMessage: row.error_message } : {}),
+    createdAt: row.created_at.toISOString(),
+    ...(row.started_at ? { startedAt: row.started_at.toISOString() } : {}),
+    ...(row.completed_at ? { completedAt: row.completed_at.toISOString() } : {}),
+  };
+}
+
+function toComparisonPrewarmJobRecord(row: ComparisonPrewarmJobRow): ComparisonPrewarmJobRecord {
+  return {
+    jobId: row.id,
+    comparisonId: row.comparison_id,
+    status: row.status,
+    requestedCombinations: row.requested_combinations,
+    warmedCombinations: row.warmed_combinations,
+    failedCombinations: row.failed_combinations,
     ...(row.error_message ? { errorMessage: row.error_message } : {}),
     createdAt: row.created_at.toISOString(),
     ...(row.started_at ? { startedAt: row.started_at.toISOString() } : {}),

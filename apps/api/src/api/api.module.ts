@@ -10,6 +10,8 @@ import { ComparisonModule } from '../comparison/comparison.module';
 import { AppConfig } from '../config/config.schema';
 import { PostgresPricingCatalogRepository } from '../database/pricing-catalog.repository';
 import { NwsParserModule } from '../nws-parser/nws-parser.module';
+import { PricingModelsModule } from '../pricing-models/pricing-models.module';
+import { PricingMatrixService } from '../pricing-models/pricing-matrix.service';
 import { ReportModule } from '../reports/report.module';
 import { ReportService } from '../reports/report.service';
 import { SecretsService } from '../secrets/secrets.service';
@@ -18,6 +20,7 @@ import { ApiDatabaseRepository } from './api-database.repository';
 import { ApiExceptionFilter } from './api-exception.filter';
 import { ApiRateLimitService } from './rate-limit.service';
 import { ComparisonApplicationService } from './comparison-application.service';
+import { ComparisonPrewarmService } from './comparison-prewarm.service';
 import { ComparisonsController } from './comparisons.controller';
 import {
   AlertsController,
@@ -38,7 +41,13 @@ import { ReportExportJobsService } from './report-export-jobs.service';
 import { WorkloadController } from './workload.controller';
 
 @Module({
-  imports: [NwsParserModule, ComparisonModule, ProviderAdaptersModule, ReportModule],
+  imports: [
+    NwsParserModule,
+    ComparisonModule,
+    ProviderAdaptersModule,
+    ReportModule,
+    PricingModelsModule,
+  ],
   controllers: [
     WorkloadController,
     ComparisonsController,
@@ -75,6 +84,14 @@ import { WorkloadController } from './workload.controller';
       ) => new LivePricingRefreshService(adapters, pricingRepository, pricingRepository),
     },
     ComparisonApplicationService,
+    {
+      provide: ComparisonPrewarmService,
+      inject: [ApiDatabaseRepository, PricingMatrixService],
+      useFactory: (
+        apiDatabaseRepository: ApiDatabaseRepository,
+        pricingMatrixService: PricingMatrixService,
+      ) => new ComparisonPrewarmService(apiDatabaseRepository, pricingMatrixService),
+    },
     {
       provide: ReportExportJobsService,
       inject: [ComparisonApplicationService, ApiDatabaseRepository, ReportService],

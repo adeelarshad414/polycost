@@ -4,6 +4,7 @@ import { ComparisonResult, ComparisonWarning } from '../comparison/comparison.ty
 import { NWSValidator } from '../nws/nws-validator';
 import { ApiNotFoundError, LiveRefreshUnavailableError } from './api-errors';
 import { ApiDatabaseRepository, ComparisonSnapshot } from './api-database.repository';
+import { ComparisonPrewarmService } from './comparison-prewarm.service';
 import { LivePricingRefreshService } from './live-pricing-refresh.service';
 
 export interface CreateComparisonOptions {
@@ -16,6 +17,7 @@ export class ComparisonApplicationService {
     private readonly comparisonOrchestratorService: ComparisonOrchestratorService,
     private readonly apiDatabaseRepository: ApiDatabaseRepository,
     private readonly livePricingRefreshService?: LivePricingRefreshService,
+    private readonly comparisonPrewarmService?: ComparisonPrewarmService,
   ) {}
 
   async createComparison(
@@ -33,6 +35,7 @@ export class ComparisonApplicationService {
 
     await this.apiDatabaseRepository.saveComparison(nws, result);
     await this.apiDatabaseRepository.recordComparisonAuditLog(result);
+    this.comparisonPrewarmService?.enqueue(result);
 
     return result;
   }

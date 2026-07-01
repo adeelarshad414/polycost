@@ -456,6 +456,81 @@ describe('ApiDatabaseRepository', () => {
     ]);
   });
 
+  it('creates, starts, and finishes comparison prewarm jobs', async () => {
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: '77777777-7777-4777-8777-777777777777',
+            comparison_id: comparisonResult.comparisonId,
+            status: 'pending',
+            requested_combinations: 8,
+            warmed_combinations: 0,
+            failed_combinations: 0,
+            error_message: null,
+            created_at: new Date('2026-07-01T00:00:00.000Z'),
+            started_at: null,
+            completed_at: null,
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [],
+        rowCount: 1,
+      });
+    const repository = createRepository(query);
+
+    await expect(
+      repository.createComparisonPrewarmJob({
+        comparisonId: comparisonResult.comparisonId,
+        requestedCombinations: 8,
+      }),
+    ).resolves.toEqual({
+      jobId: '77777777-7777-4777-8777-777777777777',
+      comparisonId: comparisonResult.comparisonId,
+      status: 'pending',
+      requestedCombinations: 8,
+      warmedCombinations: 0,
+      failedCombinations: 0,
+      createdAt: '2026-07-01T00:00:00.000Z',
+    });
+    await repository.markComparisonPrewarmJobRunning(
+      '77777777-7777-4777-8777-777777777777',
+      '2026-07-01T00:00:01.000Z',
+    );
+    await repository.finishComparisonPrewarmJob('77777777-7777-4777-8777-777777777777', {
+      status: 'completed',
+      warmedCombinations: 7,
+      failedCombinations: 1,
+      completedAt: '2026-07-01T00:00:02.000Z',
+      errorMessage: 'reserved rate missing',
+    });
+
+    expect(query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('INSERT INTO comparison_prewarm_jobs'),
+      [comparisonResult.comparisonId, 8],
+    );
+    expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining("SET status = 'running'"), [
+      '77777777-7777-4777-8777-777777777777',
+      '2026-07-01T00:00:01.000Z',
+    ]);
+    expect(query).toHaveBeenNthCalledWith(3, expect.stringContaining('warmed_combinations = $3'), [
+      '77777777-7777-4777-8777-777777777777',
+      'completed',
+      7,
+      1,
+      'reserved rate missing',
+      '2026-07-01T00:00:02.000Z',
+    ]);
+  });
+
   it('creates normalized workload records through the app DB role', async () => {
     const repository = createRepository(
       jest.fn(async () => ({
