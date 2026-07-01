@@ -1821,8 +1821,14 @@ describe('ComparisonView', () => {
     const client = clientMock({
       createComparison: jest.fn(async () => whatIfResult),
     });
+    const analytics = await client.getComparisonAnalytics(richResult.comparisonId);
     const { container, unmount } = render(
-      <ComparisonView client={client} comparison={richResult} interval="monthly" />,
+      <ComparisonView
+        analytics={analytics}
+        client={client}
+        comparison={richResult}
+        interval="monthly"
+      />,
     );
     await act(async () => undefined);
 
@@ -1851,7 +1857,7 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Azure is 33% lower than GCP for compute.');
     expect(text(container)).toContain('Region variance heat map');
     expect(text(container)).toContain('Modeled monthly sensitivity by compliant region');
-    expect(text(container)).toContain('Baseline North America pricing sensitivity.');
+    expect(text(container)).toContain('Backend-modeled baseline region sensitivity.');
     expect(text(container)).toContain('Commitment coverage gap');
     expect(text(container)).toContain('0% on-demand vs target blend vs 100% committed');
     expect(text(container)).toContain('$20.30/mo');
@@ -1875,11 +1881,17 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('High interruption risk');
     expect(text(container)).toContain('Architecture risk flags');
     expect(text(container)).toContain('Cost behaviors to validate before commitment');
+    expect(text(container)).toContain('Backend egress driver');
+    expect(text(container)).toContain(
+      'Backend FinOps finding: Backend identified egress driver from cached totals.',
+    );
     expect(text(container)).toContain('Data-transfer concentration');
     expect(text(container)).toContain('Scenario sensitivity');
     expect(text(container)).toContain('Provider winner under operational shocks');
-    expect(text(container)).toContain('Demand +25%');
-    expect(text(container)).toContain('Best commitment path');
+    expect(text(container)).toContain('Egress traffic +50%');
+    expect(text(container)).toContain(
+      'Backend analytics varied egress traffic by +50% against cached dimension totals.',
+    );
     expect(text(container)).toContain('Payment and TCO detail');
     expect(text(container)).toContain('Commitment scenario monthly, hourly, and term view');
     expect(text(container)).toContain('Upfront cash');
@@ -2509,7 +2521,17 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
           evidence: 'Backend-ranked provider delta from current cached comparison.',
         },
       ],
-      finOpsFindings: [],
+      finOpsFindings: [
+        {
+          id: 'gcp-egress-driver',
+          severity: 'warning' as const,
+          category: 'egress' as const,
+          title: 'Backend egress driver',
+          recommendation: 'Backend identified egress driver from cached totals.',
+          estimatedMonthlyImpactUsd: 8,
+          providerId: 'gcp' as const,
+        },
+      ],
     })),
     refreshLiveComparison: jest.fn(async () => comparisonResult),
     createExportJob: jest.fn(async () => reportExportJob),

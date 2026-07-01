@@ -5267,6 +5267,7 @@ function ComparisonToolbar({
 }
 
 export function ComparisonView({
+  analytics = null,
   client = polyCostClient,
   comparison,
   error = null,
@@ -5277,6 +5278,7 @@ export function ComparisonView({
   pricingModel = 'on-demand',
   onExport,
 }: {
+  analytics?: ComparisonAnalyticsResponse | null;
   client?: PolyCostClient;
   comparison: ComparisonResult | null;
   error?: string | null;
@@ -5350,7 +5352,11 @@ export function ComparisonView({
           <EngineeringAnalyticsDashboard comparison={comparison} interval={interval} />
           <ArchitectureWorkspace comparison={comparison} interval={interval} form={form} />
           <ServiceCheapestMatrix comparison={comparison} interval={interval} />
-          <ProductionDepthAnalytics comparison={comparison} form={form} />
+          <ProductionDepthAnalytics
+            comparison={comparison}
+            form={form}
+            serverAnalytics={analytics}
+          />
           <FullCostMatrixTable comparison={comparison} />
           <CostFormulaEvidence comparison={comparison} />
           <FinOpsFeatureLayer
@@ -6460,7 +6466,11 @@ function ProductionDepthAnalytics({
   const networkingCosts = networkingCostRows(comparison, serverAnalytics?.egressNetworkingDetails);
   const spotBlendRows = spotBlendOptimizerRows(comparison, form);
   const licenseRows = licenseOptimizationRows(comparison, form);
-  const architectureRisks = architectureRiskFlags(comparison, form);
+  const architectureRisks = architectureRiskFlags(
+    comparison,
+    form,
+    serverAnalytics?.finOpsFindings,
+  );
   const scenarios = sensitivityScenarioRows(
     comparison,
     form,
@@ -11955,6 +11965,7 @@ function licenseOptimizationRows(
 function architectureRiskFlags(
   comparison: ComparisonResult | null,
   form: WorkloadFormState,
+  serverFindings?: ComparisonAnalyticsResponse['finOpsFindings'],
 ): ArchitectureRiskFlag[] {
   const flags: ArchitectureRiskFlag[] = [];
   const egressGb = parseInputNumber(form.monthlyEgressGb) ?? 0;
@@ -12086,18 +12097,79 @@ function architectureRiskFlags(
     });
   }
 
-  return flags.length > 0
-    ? flags
-    : [
-        {
-          id: 'no-material-risk',
-          title: 'No material architecture risk flags',
-          severity: 'low',
-          signal: 'Low',
-          evidence:
-            'Current inputs do not cross the deterministic thresholds for NoSQL throughput, egress concentration, fast data growth, or cross-region transfer.',
-        },
-      ];
+  return mergedArchitectureRiskFlags(flags, serverFindings);
+}
+
+function mergedArchitectureRiskFlags(
+  localFlags: ArchitectureRiskFlag[],
+  serverFindings?: ComparisonAnalyticsResponse['finOpsFindings'],
+): ArchitectureRiskFlag[] {
+  const backendFlags = (serverFindings ?? []).map(finOpsFindingRiskFlag);
+  const localSignalFlags =
+    backendFlags.length > 0
+      ? localFlags.filter((flag) => flag.id !== 'no-material-risk')
+      : localFlags;
+  const merged = [...backendFlags, ...localSignalFlags].sort(
+    (left, right) => riskSeverityRank(right.severity) - riskSeverityRank(left.severity),
+  );
+
+  if (merged.length > 0) {
+    return merged.slice(0, 6);
+  }
+
+  return [
+    {
+      id: 'no-material-risk',
+      title: 'No material architecture risk flags',
+      severity: 'low',
+      signal: 'Low',
+      evidence:
+        'Current inputs do not cross deterministic thresholds for NoSQL throughput, egress concentration, fast data growth, cross-region transfer, or backend FinOps findings.',
+    },
+  ];
+}
+
+function finOpsFindingRiskFlag(
+  finding: ComparisonAnalyticsResponse['finOpsFindings'][number],
+): ArchitectureRiskFlag {
+  const impact =
+    finding.estimatedMonthlyImpactUsd !== undefined
+      ? `${formatCurrency(finding.estimatedMonthlyImpactUsd)}/mo`
+      : finding.category;
+  const providerSignal = finding.providerId ? providerLabel(finding.providerId) : 'All providers';
+
+  return {
+    id: `backend-${finding.id}`,
+    title: finding.title,
+    severity: finOpsRiskSeverity(finding.severity),
+    signal: `${providerSignal} · ${impact}`,
+    evidence: `Backend FinOps finding: ${finding.recommendation}`,
+  };
+}
+
+function finOpsRiskSeverity(
+  severity: ComparisonAnalyticsResponse['finOpsFindings'][number]['severity'],
+): ArchitectureRiskFlag['severity'] {
+  switch (severity) {
+    case 'critical':
+    case 'warning':
+      return 'high';
+    case 'review':
+      return 'medium';
+    case 'info':
+      return 'low';
+  }
+}
+
+function riskSeverityRank(severity: ArchitectureRiskFlag['severity']): number {
+  switch (severity) {
+    case 'high':
+      return 3;
+    case 'medium':
+      return 2;
+    case 'low':
+      return 1;
+  }
 }
 
 function commitmentCoverageGapRows(
