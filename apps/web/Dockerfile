@@ -6,9 +6,11 @@ ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 COPY package.json package-lock.json* ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
+COPY packages/types/package.json packages/types/package.json
 RUN npm ci
 
 COPY tsconfig.base.json ./
+COPY packages/types packages/types
 COPY apps/web apps/web
 WORKDIR /app/apps/web
 RUN npm run build
