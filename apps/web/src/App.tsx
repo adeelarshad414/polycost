@@ -65,6 +65,7 @@ type CostMatrixCategoryFilter = ServiceCategory | 'all';
 type CostMatrixProviderFilter = ProviderId | 'all';
 type CostMatrixPricingModelFilter = PricingModelKey | 'all';
 type CostMatrixSortKey = 'service' | `${ProviderId}:${PricingModelKey}`;
+type CostMatrixColumnMode = 'summary' | 'technical';
 
 const INPUT_MODE_OPTIONS: Array<{
   key: InputMode;
@@ -7419,6 +7420,8 @@ function FullCostMatrixTable({ comparison }: { comparison: ComparisonResult | nu
   const [providerFilter, setProviderFilter] = useState<CostMatrixProviderFilter>('all');
   const [pricingModelFilter, setPricingModelFilter] = useState<CostMatrixPricingModelFilter>('all');
   const [sortBy, setSortBy] = useState<CostMatrixSortKey>('service');
+  const [columnMode, setColumnMode] = useState<CostMatrixColumnMode>('technical');
+  const showTechnicalColumns = columnMode === 'technical';
   const visibleProviders =
     providerFilter === 'all'
       ? PROVIDER_ORDER
@@ -7509,6 +7512,16 @@ function FullCostMatrixTable({ comparison }: { comparison: ComparisonResult | nu
             )}
           </select>
         </label>
+        <label>
+          <span>Columns</span>
+          <select
+            value={columnMode}
+            onChange={(event) => setColumnMode(event.target.value as CostMatrixColumnMode)}
+          >
+            <option value="technical">Technical detail</option>
+            <option value="summary">Compact cost view</option>
+          </select>
+        </label>
       </div>
 
       <div className="table-wrap cost-matrix-wrap">
@@ -7516,8 +7529,12 @@ function FullCostMatrixTable({ comparison }: { comparison: ComparisonResult | nu
           <thead>
             <tr>
               <th scope="col">Service</th>
-              <th scope="col">Category</th>
-              <th scope="col">Confidence</th>
+              {showTechnicalColumns ? (
+                <>
+                  <th scope="col">Category</th>
+                  <th scope="col">Confidence</th>
+                </>
+              ) : null}
               {visibleProviders.flatMap((providerId) =>
                 visiblePricingModels.map((model) => (
                   <th scope="col" key={`${providerId}-${model.key}`}>
@@ -7534,8 +7551,14 @@ function FullCostMatrixTable({ comparison }: { comparison: ComparisonResult | nu
                   <td>
                     <span className="matrix-service-label">{row.service}</span>
                   </td>
-                  <td>{capitalize(row.category)}</td>
-                  <td>{row.approximate ? 'Approximate' : 'Mapped'}</td>
+                  {showTechnicalColumns ? (
+                    <>
+                      <td>{capitalize(row.category)}</td>
+                      <td className="cost-matrix-confidence">
+                        {row.approximate ? 'Approximate' : 'Mapped'}
+                      </td>
+                    </>
+                  ) : null}
                   {visibleProviders.flatMap((providerId) =>
                     visiblePricingModels.map((model) => (
                       <td key={`${row.key}-${providerId}-${model.key}`}>
@@ -7547,7 +7570,12 @@ function FullCostMatrixTable({ comparison }: { comparison: ComparisonResult | nu
               ))
             ) : (
               <tr>
-                <td colSpan={3 + visibleProviders.length * visiblePricingModels.length}>
+                <td
+                  colSpan={
+                    (showTechnicalColumns ? 3 : 1) +
+                    visibleProviders.length * visiblePricingModels.length
+                  }
+                >
                   No services match this filter.
                 </td>
               </tr>

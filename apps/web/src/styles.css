@@ -5467,7 +5467,7 @@ select:disabled {
   white-space: normal;
 }
 
-.cost-matrix-table td:nth-child(3) {
+.cost-matrix-confidence {
   color: var(--pc-text-secondary);
   font-family: var(--pc-font-body);
   font-size: var(--pc-text-xs);

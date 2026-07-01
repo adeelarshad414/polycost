@@ -1813,6 +1813,11 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Full cost matrix');
     expect(text(container)).toContain('AWS On-demand');
     expect(text(container)).toContain('Azure 1yr');
+    expect(text(container)).toContain('Columns');
+    expect(text(container)).toContain('Compact cost view');
+    const columnModeSelect = selectByOptionValue(container, 'summary');
+    await changeSelect(columnModeSelect, 'summary');
+    expect(columnModeSelect.value).toBe('summary');
     expect(text(container)).toContain('$24.00 est.');
     expect(text(container)).toContain('$42.00');
     expect(text(container)).toContain('Production-depth analytics');
@@ -2007,6 +2012,20 @@ function selectById(container: HTMLElement, id: string): HTMLSelectElement {
 
   if (!(select instanceof HTMLSelectElement)) {
     throw new Error(`Select not found: ${id}`);
+  }
+
+  return select;
+}
+
+function selectByOptionValue(container: HTMLElement, value: string): HTMLSelectElement {
+  const select = Array.from(container.querySelectorAll('select')).find(
+    (candidate): candidate is HTMLSelectElement =>
+      candidate instanceof HTMLSelectElement &&
+      Array.from(candidate.options).some((option) => option.value === value),
+  );
+
+  if (!select) {
+    throw new Error(`Select not found for option value: ${value}`);
   }
 
   return select;
