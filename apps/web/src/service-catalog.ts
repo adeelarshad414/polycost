@@ -136,27 +136,27 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Azure Cosmos DB Gremlin API'],
     gcp: ['Spanner Graph', 'Dataplex metadata'],
   }),
-  family('data-warehouse', 'analytics', 'Data warehouse', 'roadmap', {
+  family('data-warehouse', 'analytics', 'Data warehouse', 'mapped', {
     aws: ['Amazon Redshift'],
     azure: ['Azure Synapse Analytics', 'Microsoft Fabric'],
     gcp: ['BigQuery'],
   }),
-  family('data-lake', 'analytics', 'Data lake', 'roadmap', {
+  family('data-lake', 'analytics', 'Data lake', 'mapped', {
     aws: ['AWS Lake Formation', 'AWS Glue Data Catalog'],
     azure: ['Azure Data Lake Storage', 'Microsoft Purview'],
     gcp: ['Dataplex', 'Cloud Storage'],
   }),
-  family('data-integration', 'analytics', 'Data integration', 'roadmap', {
+  family('data-integration', 'analytics', 'Data integration', 'mapped', {
     aws: ['AWS Glue'],
     azure: ['Azure Data Factory'],
     gcp: ['Dataflow', 'Cloud Data Fusion'],
   }),
-  family('streaming-analytics', 'analytics', 'Streaming analytics', 'roadmap', {
+  family('streaming-analytics', 'analytics', 'Streaming analytics', 'mapped', {
     aws: ['Amazon Kinesis', 'Amazon Managed Service for Apache Flink'],
     azure: ['Event Hubs', 'Azure Stream Analytics'],
     gcp: ['Pub/Sub', 'Dataflow'],
   }),
-  family('business-intelligence', 'analytics', 'Business intelligence', 'roadmap', {
+  family('business-intelligence', 'analytics', 'Business intelligence', 'mapped', {
     aws: ['Amazon QuickSight'],
     azure: ['Power BI', 'Microsoft Fabric'],
     gcp: ['Looker'],

@@ -104,6 +104,15 @@ interface RuntimeServicesRates {
   registryEgressPerGb: number;
 }
 
+interface AnalyticsServicesRates {
+  warehouseStoragePerGbMonth: number;
+  warehouseQueryPerTb: number;
+  dataLakeStoragePerGbMonth: number;
+  integrationJobHour: number;
+  streamingIngestPerGb: number;
+  biUserMonthly: number;
+}
+
 type StorageClassKey = NonNullable<NormalizedWorkloadSpec['storage'][number]['storageClass']>;
 
 export class ComparisonUnavailableError extends Error {
@@ -442,6 +451,7 @@ export class ComparisonOrchestratorService {
     const databaseLineItems = this.databaseDimensionLineItems(nws, providerId, lineItems);
     const supportingServicesLineItems = this.supportingServicesLineItems(nws, providerId);
     const runtimeServicesLineItems = this.runtimeServicesLineItems(nws, providerId);
+    const analyticsServicesLineItems = this.analyticsServicesLineItems(nws, providerId);
     const networkLineItems = this.networkDimensionLineItems(nws, providerId);
 
     return [
@@ -452,6 +462,7 @@ export class ComparisonOrchestratorService {
       ...databaseLineItems,
       ...supportingServicesLineItems,
       ...runtimeServicesLineItems,
+      ...analyticsServicesLineItems,
       ...networkLineItems,
     ].filter((lineItem): lineItem is ComparisonLineItem => lineItem !== undefined);
   }
@@ -1545,6 +1556,104 @@ export class ComparisonOrchestratorService {
     return lineItems;
   }
 
+  private analyticsServicesLineItems(
+    nws: NormalizedWorkloadSpec,
+    providerId: ProviderId,
+  ): ComparisonLineItem[] {
+    const requirements = nws.serviceRequirements ?? [];
+    const serviceTypes = new Set(requirements.map((requirement) => requirement.serviceType));
+    const rates = analyticsServicesRates(providerId);
+    const regionLabel = nws.workload.region.preference ?? 'default region';
+    const values = analyticsServicesAssumptions(requirements);
+    const lineItems: ComparisonLineItem[] = [];
+
+    if (serviceTypes.has('data-warehouse') && values.analyticsWarehouseStorageGb > 0) {
+      lineItems.push(
+        this.storageLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-analytics-warehouse-storage',
+          description: `${providerLabel(providerId)} data warehouse storage estimate`,
+          quantity: values.analyticsWarehouseStorageGb,
+          unit: 'GB-month',
+          unitPriceUsd: rates.warehouseStoragePerGbMonth,
+        }),
+      );
+    }
+
+    if (serviceTypes.has('data-warehouse') && values.analyticsWarehouseQueryTb > 0) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-analytics-warehouse-query',
+          description: `${providerLabel(providerId)} data warehouse query processing estimate`,
+          quantity: values.analyticsWarehouseQueryTb,
+          unit: 'TB queried',
+          unitPriceUsd: rates.warehouseQueryPerTb,
+        }),
+      );
+    }
+
+    if (serviceTypes.has('data-lake') && values.analyticsDataLakeStorageGb > 0) {
+      lineItems.push(
+        this.storageLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-analytics-data-lake-storage',
+          description: `${providerLabel(providerId)} data lake storage/catalog estimate`,
+          quantity: values.analyticsDataLakeStorageGb,
+          unit: 'GB-month',
+          unitPriceUsd: rates.dataLakeStoragePerGbMonth,
+        }),
+      );
+    }
+
+    if (serviceTypes.has('data-integration') && values.analyticsIntegrationJobHours > 0) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-analytics-integration-job-hours',
+          description: `${providerLabel(providerId)} data integration job-hour estimate`,
+          quantity: values.analyticsIntegrationJobHours,
+          unit: 'job-hour',
+          unitPriceUsd: rates.integrationJobHour,
+        }),
+      );
+    }
+
+    if (serviceTypes.has('streaming-analytics') && values.analyticsStreamingIngestGb > 0) {
+      lineItems.push(
+        this.networkLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-analytics-streaming-ingest',
+          description: `${providerLabel(providerId)} streaming analytics ingest estimate`,
+          quantity: values.analyticsStreamingIngestGb,
+          unit: 'GB ingested',
+          unitPriceUsd: rates.streamingIngestPerGb,
+        }),
+      );
+    }
+
+    if (serviceTypes.has('business-intelligence') && values.analyticsBiUsers > 0) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-analytics-bi-users',
+          description: `${providerLabel(providerId)} business intelligence user estimate`,
+          quantity: values.analyticsBiUsers,
+          unit: 'user-month',
+          unitPriceUsd: rates.biUserMonthly,
+        }),
+      );
+    }
+
+    return lineItems;
+  }
+
   private computeModeledLineItem(input: {
     providerId: ProviderId;
     regionLabel: string;
@@ -2165,6 +2274,59 @@ function runtimeServicesAssumptions(
     kubernetesWorkerNodeCount: maxScaleParam(requirements, 'kubernetesWorkerNodeCount'),
     registryStorageGb: maxScaleParam(requirements, 'registryStorageGb'),
     registryEgressGb: maxScaleParam(requirements, 'registryEgressGb'),
+  };
+}
+
+function analyticsServicesRates(providerId: ProviderId): AnalyticsServicesRates {
+  switch (providerId) {
+    case 'aws':
+      return {
+        warehouseStoragePerGbMonth: 0.024,
+        warehouseQueryPerTb: 5,
+        dataLakeStoragePerGbMonth: 0.023,
+        integrationJobHour: 0.44,
+        streamingIngestPerGb: 0.014,
+        biUserMonthly: 24,
+      };
+    case 'azure':
+      return {
+        warehouseStoragePerGbMonth: 0.024,
+        warehouseQueryPerTb: 5,
+        dataLakeStoragePerGbMonth: 0.0208,
+        integrationJobHour: 0.25,
+        streamingIngestPerGb: 0.03,
+        biUserMonthly: 10,
+      };
+    case 'gcp':
+      return {
+        warehouseStoragePerGbMonth: 0.02,
+        warehouseQueryPerTb: 6.25,
+        dataLakeStoragePerGbMonth: 0.02,
+        integrationJobHour: 0.18,
+        streamingIngestPerGb: 0.04,
+        biUserMonthly: 30,
+      };
+  }
+}
+
+function analyticsServicesAssumptions(
+  requirements: ServiceRequirement[],
+): Record<
+  | 'analyticsWarehouseStorageGb'
+  | 'analyticsWarehouseQueryTb'
+  | 'analyticsDataLakeStorageGb'
+  | 'analyticsIntegrationJobHours'
+  | 'analyticsStreamingIngestGb'
+  | 'analyticsBiUsers',
+  number
+> {
+  return {
+    analyticsWarehouseStorageGb: maxScaleParam(requirements, 'analyticsWarehouseStorageGb'),
+    analyticsWarehouseQueryTb: maxScaleParam(requirements, 'analyticsWarehouseQueryTb'),
+    analyticsDataLakeStorageGb: maxScaleParam(requirements, 'analyticsDataLakeStorageGb'),
+    analyticsIntegrationJobHours: maxScaleParam(requirements, 'analyticsIntegrationJobHours'),
+    analyticsStreamingIngestGb: maxScaleParam(requirements, 'analyticsStreamingIngestGb'),
+    analyticsBiUsers: maxScaleParam(requirements, 'analyticsBiUsers'),
   };
 }
 

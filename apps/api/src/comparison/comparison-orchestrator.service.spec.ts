@@ -946,6 +946,122 @@ describe('ComparisonOrchestratorService', () => {
     );
   });
 
+  it('adds modeled analytics platform line items', async () => {
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async (): Promise<ProviderPricingResult> => ({
+          providerId: 'aws',
+          baseMonthlyCostUsd: 10,
+          lineItems: [
+            {
+              category: 'compute',
+              costComponent: 'compute',
+              description: 'aws compute',
+              isApproximate: false,
+              baseMonthlyCostUsd: 10,
+              skuId: 'aws-compute',
+              region: 'us-east-1',
+              unit: 'hour',
+              unitPriceUsd: 0.01,
+            },
+          ],
+        })),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      serviceRequirements: [
+        {
+          serviceCategory: 'analytics',
+          serviceType: 'data-warehouse',
+          quantity: 1,
+          scaleParams: {
+            analyticsWarehouseStorageGb: 500,
+            analyticsWarehouseQueryTb: 20,
+          },
+        },
+        {
+          serviceCategory: 'analytics',
+          serviceType: 'data-lake',
+          quantity: 1,
+          scaleParams: {
+            analyticsDataLakeStorageGb: 5000,
+          },
+        },
+        {
+          serviceCategory: 'analytics',
+          serviceType: 'data-integration',
+          quantity: 1,
+          scaleParams: {
+            analyticsIntegrationJobHours: 120,
+          },
+        },
+        {
+          serviceCategory: 'analytics',
+          serviceType: 'streaming-analytics',
+          quantity: 1,
+          scaleParams: {
+            analyticsStreamingIngestGb: 1000,
+          },
+        },
+        {
+          serviceCategory: 'analytics',
+          serviceType: 'business-intelligence',
+          quantity: 1,
+          scaleParams: {
+            analyticsBiUsers: 25,
+          },
+        },
+      ],
+    });
+
+    expect(result.providers[0].lineItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'storage',
+          skuId: 'modeled-analytics-warehouse-storage',
+          baseMonthlyCostUsd: 12,
+          isApproximate: true,
+        }),
+        expect.objectContaining({
+          category: 'operations',
+          skuId: 'modeled-analytics-warehouse-query',
+          baseMonthlyCostUsd: 100,
+        }),
+        expect.objectContaining({
+          category: 'storage',
+          skuId: 'modeled-analytics-data-lake-storage',
+          baseMonthlyCostUsd: 115,
+        }),
+        expect.objectContaining({
+          category: 'operations',
+          skuId: 'modeled-analytics-integration-job-hours',
+          baseMonthlyCostUsd: 52.8,
+        }),
+        expect.objectContaining({
+          category: 'network',
+          skuId: 'modeled-analytics-streaming-ingest',
+          baseMonthlyCostUsd: 14,
+        }),
+        expect.objectContaining({
+          category: 'operations',
+          skuId: 'modeled-analytics-bi-users',
+          baseMonthlyCostUsd: 600,
+        }),
+      ]),
+    );
+    expect(result.providers[0].breakdown).toEqual(
+      expect.objectContaining({
+        computeMonthlyCostUsd: 10,
+        storageMonthlyCostUsd: 127,
+        egressMonthlyCostUsd: 14,
+        operationsMonthlyCostUsd: 752.8,
+      }),
+    );
+  });
+
   it('uses a safe warning when a provider fails without an Error object', async () => {
     const service = createService([
       adapter(

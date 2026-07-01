@@ -502,6 +502,70 @@ describe('workload helpers', () => {
     );
   });
 
+  it('serializes analytics platform assumptions into service requirements', () => {
+    const nws = buildNwsFromForm({
+      ...defaultWorkloadForm,
+      selectedServiceFamilyIds: [],
+      analyticsWarehouseStorageGb: '500',
+      analyticsWarehouseQueryTb: '20',
+      analyticsDataLakeStorageGb: '5000',
+      analyticsIntegrationJobHours: '120',
+      analyticsStreamingIngestGb: '1000',
+      analyticsBiUsers: '25',
+    });
+
+    expect(nws.serviceRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceCategory: 'analytics',
+          serviceType: 'data-warehouse',
+          scaleParams: expect.objectContaining({
+            analyticsWarehouseStorageGb: 500,
+            analyticsWarehouseQueryTb: 20,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'analytics',
+          serviceType: 'data-lake',
+          scaleParams: expect.objectContaining({
+            analyticsDataLakeStorageGb: 5000,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'analytics',
+          serviceType: 'data-integration',
+          scaleParams: expect.objectContaining({
+            analyticsIntegrationJobHours: 120,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'analytics',
+          serviceType: 'streaming-analytics',
+          scaleParams: expect.objectContaining({
+            analyticsStreamingIngestGb: 1000,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'analytics',
+          serviceType: 'business-intelligence',
+          scaleParams: expect.objectContaining({
+            analyticsBiUsers: 25,
+          }),
+        }),
+      ]),
+    );
+    expect(formFromNws(nws)).toEqual(
+      expect.objectContaining({
+        analyticsWarehouseStorageGb: '500',
+        analyticsWarehouseQueryTb: '20',
+        analyticsDataLakeStorageGb: '5000',
+        analyticsIntegrationJobHours: '120',
+        analyticsStreamingIngestGb: '1000',
+        analyticsBiUsers: '25',
+      }),
+    );
+  });
+
   it('maps an NWS back into editable form values', () => {
     const nws = buildNwsFromForm(defaultWorkloadForm, 'natural_language', 'web app');
     const form = formFromNws(nws);
@@ -562,6 +626,12 @@ describe('workload helpers', () => {
         observabilityTracesMillion: '-1',
         secretsCount: '3.5',
         secretApiCallsTenThousand: '-1',
+        analyticsWarehouseStorageGb: '-1',
+        analyticsWarehouseQueryTb: '-1',
+        analyticsDataLakeStorageGb: '-1',
+        analyticsIntegrationJobHours: '-1',
+        analyticsStreamingIngestGb: '-1',
+        analyticsBiUsers: '1.5',
         functionInvocationsMillion: '-1',
         functionDurationMs: '0',
         functionMemoryMb: '512.5',
@@ -579,6 +649,12 @@ describe('workload helpers', () => {
       'memoryGb',
       'instanceCount',
       'storageSizeGb',
+      'analyticsWarehouseStorageGb',
+      'analyticsWarehouseQueryTb',
+      'analyticsDataLakeStorageGb',
+      'analyticsIntegrationJobHours',
+      'analyticsStreamingIngestGb',
+      'analyticsBiUsers',
       'monthlyEgressGb',
       'crossAzTransferGb',
       'interRegionTransferGb',

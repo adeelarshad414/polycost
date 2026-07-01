@@ -1552,6 +1552,38 @@ function InitialHomePage({
                   onChange={(value) => update('observabilityTracesMillion', value)}
                 />
                 <TextField
+                  label="Warehouse query"
+                  value={form.analyticsWarehouseQueryTb}
+                  inputMode="decimal"
+                  suffix="TB/mo"
+                  error={fieldErrors.analyticsWarehouseQueryTb}
+                  onChange={(value) => update('analyticsWarehouseQueryTb', value)}
+                />
+                <TextField
+                  label="Lake storage"
+                  value={form.analyticsDataLakeStorageGb}
+                  inputMode="decimal"
+                  suffix="GB"
+                  error={fieldErrors.analyticsDataLakeStorageGb}
+                  onChange={(value) => update('analyticsDataLakeStorageGb', value)}
+                />
+                <TextField
+                  label="Streaming ingest"
+                  value={form.analyticsStreamingIngestGb}
+                  inputMode="decimal"
+                  suffix="GB/mo"
+                  error={fieldErrors.analyticsStreamingIngestGb}
+                  onChange={(value) => update('analyticsStreamingIngestGb', value)}
+                />
+                <TextField
+                  label="BI users"
+                  value={form.analyticsBiUsers}
+                  inputMode="numeric"
+                  suffix="users"
+                  error={fieldErrors.analyticsBiUsers}
+                  onChange={(value) => update('analyticsBiUsers', value)}
+                />
+                <TextField
                   label="Secrets"
                   value={form.secretsCount}
                   inputMode="numeric"
@@ -3209,6 +3241,59 @@ function WorkloadForm({
               />
             </div>
           </details>
+        </div>
+      </FormSection>
+
+      <FormSection title="Analytics" tone="data">
+        <div className="form-grid secondary-grid">
+          <TextField
+            label="Warehouse storage"
+            value={form.analyticsWarehouseStorageGb}
+            inputMode="decimal"
+            suffix="GB"
+            error={fieldErrors.analyticsWarehouseStorageGb}
+            onChange={(value) => update('analyticsWarehouseStorageGb', value)}
+          />
+          <TextField
+            label="Warehouse query"
+            value={form.analyticsWarehouseQueryTb}
+            inputMode="decimal"
+            suffix="TB/mo"
+            error={fieldErrors.analyticsWarehouseQueryTb}
+            onChange={(value) => update('analyticsWarehouseQueryTb', value)}
+          />
+          <TextField
+            label="Data lake storage"
+            value={form.analyticsDataLakeStorageGb}
+            inputMode="decimal"
+            suffix="GB"
+            error={fieldErrors.analyticsDataLakeStorageGb}
+            onChange={(value) => update('analyticsDataLakeStorageGb', value)}
+          />
+          <TextField
+            label="Integration jobs"
+            value={form.analyticsIntegrationJobHours}
+            inputMode="decimal"
+            suffix="hrs/mo"
+            error={fieldErrors.analyticsIntegrationJobHours}
+            onChange={(value) => update('analyticsIntegrationJobHours', value)}
+          />
+          <TextField
+            label="Streaming ingest"
+            value={form.analyticsStreamingIngestGb}
+            inputMode="decimal"
+            suffix="GB/mo"
+            error={fieldErrors.analyticsStreamingIngestGb}
+            onChange={(value) => update('analyticsStreamingIngestGb', value)}
+          />
+          <TextField
+            label="BI users"
+            value={form.analyticsBiUsers}
+            inputMode="numeric"
+            suffix="users"
+            error={fieldErrors.analyticsBiUsers}
+            onChange={(value) => update('analyticsBiUsers', value)}
+          />
         </div>
       </FormSection>
 

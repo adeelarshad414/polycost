@@ -86,6 +86,12 @@ export interface WorkloadFormState {
   databaseQueryDataTb: string;
   databaseCacheReplicaCount: string;
   databaseStorageGrowthGbPerMonth: string;
+  analyticsWarehouseStorageGb: string;
+  analyticsWarehouseQueryTb: string;
+  analyticsDataLakeStorageGb: string;
+  analyticsIntegrationJobHours: string;
+  analyticsStreamingIngestGb: string;
+  analyticsBiUsers: string;
   monthlyEgressGb: string;
   crossAzTransferGb: string;
   interRegionTransferGb: string;
@@ -177,6 +183,12 @@ type NumericWorkloadFormField =
   | 'databaseQueryDataTb'
   | 'databaseCacheReplicaCount'
   | 'databaseStorageGrowthGbPerMonth'
+  | 'analyticsWarehouseStorageGb'
+  | 'analyticsWarehouseQueryTb'
+  | 'analyticsDataLakeStorageGb'
+  | 'analyticsIntegrationJobHours'
+  | 'analyticsStreamingIngestGb'
+  | 'analyticsBiUsers'
   | 'monthlyEgressGb'
   | 'crossAzTransferGb'
   | 'interRegionTransferGb'
@@ -273,6 +285,12 @@ export const defaultWorkloadForm: WorkloadFormState = {
   databaseQueryDataTb: '0',
   databaseCacheReplicaCount: '0',
   databaseStorageGrowthGbPerMonth: '0',
+  analyticsWarehouseStorageGb: '0',
+  analyticsWarehouseQueryTb: '0',
+  analyticsDataLakeStorageGb: '0',
+  analyticsIntegrationJobHours: '0',
+  analyticsStreamingIngestGb: '0',
+  analyticsBiUsers: '0',
   monthlyEgressGb: '750',
   crossAzTransferGb: '0',
   interRegionTransferGb: '0',
@@ -372,6 +390,12 @@ export const ARCHITECTURE_TEMPLATES: ArchitectureTemplate[] = [
       usageHoursPerDay: '10',
       usageDaysPerWeek: '5',
       monthlyEgressGb: '1500',
+      analyticsWarehouseStorageGb: '500',
+      analyticsWarehouseQueryTb: '20',
+      analyticsDataLakeStorageGb: '5000',
+      analyticsIntegrationJobHours: '120',
+      analyticsStreamingIngestGb: '1000',
+      analyticsBiUsers: '25',
       selectedServiceCategory: 'analytics',
       selectedServiceFamilyId: 'data-integration',
       selectedServiceFamilyIds: [
@@ -780,6 +804,43 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
     );
   }
 
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'analyticsWarehouseStorageGb',
+    'Warehouse storage must be 0 GB or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'analyticsWarehouseQueryTb',
+    'Warehouse query volume must be 0 TB or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'analyticsDataLakeStorageGb',
+    'Data lake storage must be 0 GB or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'analyticsIntegrationJobHours',
+    'Data integration job hours must be 0 or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'analyticsStreamingIngestGb',
+    'Streaming ingest must be 0 GB or higher.',
+  );
+  optionalNonNegativeIntegerField(
+    issues,
+    form,
+    'analyticsBiUsers',
+    'BI users must be a whole number 0 or higher.',
+  );
+
   optionalNonNegativeNumberField(issues, form, 'monthlyEgressGb', 'Egress must be 0 GB or higher.');
   optionalNonNegativeNumberField(
     issues,
@@ -1123,6 +1184,7 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
   const database = nws.database[0];
   const supportingServices = supportingServiceScaleParamsFromNws(nws);
   const runtimeServices = runtimeScaleParamsFromNws(nws);
+  const analyticsServices = analyticsScaleParamsFromNws(nws);
 
   return {
     ...defaultWorkloadForm,
@@ -1252,6 +1314,29 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
     databaseStorageGrowthGbPerMonth: numberToInput(
       database?.storageGrowthGbPerMonth ??
         Number(defaultWorkloadForm.databaseStorageGrowthGbPerMonth),
+    ),
+    analyticsWarehouseStorageGb: numberToInput(
+      analyticsServices.analyticsWarehouseStorageGb ??
+        Number(defaultWorkloadForm.analyticsWarehouseStorageGb),
+    ),
+    analyticsWarehouseQueryTb: numberToInput(
+      analyticsServices.analyticsWarehouseQueryTb ??
+        Number(defaultWorkloadForm.analyticsWarehouseQueryTb),
+    ),
+    analyticsDataLakeStorageGb: numberToInput(
+      analyticsServices.analyticsDataLakeStorageGb ??
+        Number(defaultWorkloadForm.analyticsDataLakeStorageGb),
+    ),
+    analyticsIntegrationJobHours: numberToInput(
+      analyticsServices.analyticsIntegrationJobHours ??
+        Number(defaultWorkloadForm.analyticsIntegrationJobHours),
+    ),
+    analyticsStreamingIngestGb: numberToInput(
+      analyticsServices.analyticsStreamingIngestGb ??
+        Number(defaultWorkloadForm.analyticsStreamingIngestGb),
+    ),
+    analyticsBiUsers: numberToInput(
+      analyticsServices.analyticsBiUsers ?? Number(defaultWorkloadForm.analyticsBiUsers),
     ),
     monthlyEgressGb: numberToInput(nws.network.estimatedMonthlyEgressGb),
     crossAzTransferGb: numberToInput(
@@ -1436,6 +1521,7 @@ export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceReq
         serviceType === 'container-registry'
           ? runtimeScaleParamsFromForm(form)
           : {}),
+        ...(isAnalyticsServiceFamily(serviceType) ? analyticsScaleParamsFromForm(form) : {}),
         ...(serviceType.includes('storage') ? storageScaleParamsFromForm(form) : {}),
         ...(serviceType.includes('database') || serviceType === 'cache'
           ? databaseScaleParamsFromForm(form)
@@ -1476,6 +1562,7 @@ function orderedRequirementIds(form: WorkloadFormState): string[] {
     ...(form.databaseEnabled ? [databaseServiceFamilyId(form)] : []),
     ...supportingServiceFamilyIds(form),
     ...runtimeServiceFamilyIds(form),
+    ...analyticsServiceFamilyIds(form),
     ...(form.cdn ? ['cdn-edge'] : []),
     ...(form.loadBalancer ? ['load-balancing'] : []),
   ]);
@@ -1552,6 +1639,45 @@ function runtimeServiceFamilyIds(form: WorkloadFormState): string[] {
   return ids;
 }
 
+function analyticsServiceFamilyIds(form: WorkloadFormState): string[] {
+  const ids: string[] = [];
+
+  if (
+    hasPositiveFormNumber(form.analyticsWarehouseStorageGb) ||
+    hasPositiveFormNumber(form.analyticsWarehouseQueryTb)
+  ) {
+    ids.push('data-warehouse');
+  }
+
+  if (hasPositiveFormNumber(form.analyticsDataLakeStorageGb)) {
+    ids.push('data-lake');
+  }
+
+  if (hasPositiveFormNumber(form.analyticsIntegrationJobHours)) {
+    ids.push('data-integration');
+  }
+
+  if (hasPositiveFormNumber(form.analyticsStreamingIngestGb)) {
+    ids.push('streaming-analytics');
+  }
+
+  if (hasPositiveFormNumber(form.analyticsBiUsers)) {
+    ids.push('business-intelligence');
+  }
+
+  return ids;
+}
+
+function isAnalyticsServiceFamily(serviceType: string): boolean {
+  return [
+    'data-warehouse',
+    'data-lake',
+    'data-integration',
+    'streaming-analytics',
+    'business-intelligence',
+  ].includes(serviceType);
+}
+
 function hasPositiveFormNumber(value: string): boolean {
   const parsed = parseOptionalNumber(value);
 
@@ -1623,6 +1749,30 @@ function runtimeScaleParamsFromNws(nws: NormalizedWorkloadSpec): Record<string, 
     keys.map((key) => [
       key,
       runtimeRequirements
+        .map((requirement) => numericScaleParam(requirement.scaleParams, key))
+        .find((value) => value !== undefined),
+    ]),
+  ) as Record<string, number>;
+}
+
+function analyticsScaleParamsFromNws(nws: NormalizedWorkloadSpec): Record<string, number> {
+  const analyticsRequirements =
+    nws.serviceRequirements?.filter((requirement) =>
+      isAnalyticsServiceFamily(requirement.serviceType),
+    ) ?? [];
+  const keys = [
+    'analyticsWarehouseStorageGb',
+    'analyticsWarehouseQueryTb',
+    'analyticsDataLakeStorageGb',
+    'analyticsIntegrationJobHours',
+    'analyticsStreamingIngestGb',
+    'analyticsBiUsers',
+  ];
+
+  return Object.fromEntries(
+    keys.map((key) => [
+      key,
+      analyticsRequirements
         .map((requirement) => numericScaleParam(requirement.scaleParams, key))
         .find((value) => value !== undefined),
     ]),
@@ -1836,6 +1986,17 @@ function runtimeScaleParamsFromForm(form: WorkloadFormState): ServiceRequirement
     kubernetesWorkerNodeCount: parseNonNegativeInteger(form.kubernetesWorkerNodeCount, 0),
     registryStorageGb: parseOptionalNumber(form.registryStorageGb) ?? 0,
     registryEgressGb: parseOptionalNumber(form.registryEgressGb) ?? 0,
+  };
+}
+
+function analyticsScaleParamsFromForm(form: WorkloadFormState): ServiceRequirement['scaleParams'] {
+  return {
+    analyticsWarehouseStorageGb: parseOptionalNumber(form.analyticsWarehouseStorageGb) ?? 0,
+    analyticsWarehouseQueryTb: parseOptionalNumber(form.analyticsWarehouseQueryTb) ?? 0,
+    analyticsDataLakeStorageGb: parseOptionalNumber(form.analyticsDataLakeStorageGb) ?? 0,
+    analyticsIntegrationJobHours: parseOptionalNumber(form.analyticsIntegrationJobHours) ?? 0,
+    analyticsStreamingIngestGb: parseOptionalNumber(form.analyticsStreamingIngestGb) ?? 0,
+    analyticsBiUsers: parseNonNegativeInteger(form.analyticsBiUsers, 0),
   };
 }
 
@@ -2295,6 +2456,18 @@ function formNumericValue(form: WorkloadFormState, field: NumericWorkloadFormFie
       return form.databaseCacheReplicaCount;
     case 'databaseStorageGrowthGbPerMonth':
       return form.databaseStorageGrowthGbPerMonth;
+    case 'analyticsWarehouseStorageGb':
+      return form.analyticsWarehouseStorageGb;
+    case 'analyticsWarehouseQueryTb':
+      return form.analyticsWarehouseQueryTb;
+    case 'analyticsDataLakeStorageGb':
+      return form.analyticsDataLakeStorageGb;
+    case 'analyticsIntegrationJobHours':
+      return form.analyticsIntegrationJobHours;
+    case 'analyticsStreamingIngestGb':
+      return form.analyticsStreamingIngestGb;
+    case 'analyticsBiUsers':
+      return form.analyticsBiUsers;
     case 'monthlyEgressGb':
       return form.monthlyEgressGb;
     case 'crossAzTransferGb':
