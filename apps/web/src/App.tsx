@@ -146,6 +146,19 @@ const INSTANCE_TIER_OPTIONS: Array<[WorkloadFormState['instanceTier'], string]> 
   ['custom', 'Custom - use vCPU and memory fields'],
 ];
 
+const PROCESSOR_ARCHITECTURE_OPTIONS: Array<[WorkloadFormState['processorArchitecture'], string]> =
+  [
+    ['x86_64', 'x86 - Intel / AMD'],
+    ['arm64', 'ARM - Graviton / Ampere / Tau'],
+    ['gpu', 'GPU - accelerator attached'],
+  ];
+
+const COMPUTE_TENANCY_OPTIONS: Array<[WorkloadFormState['computeTenancy'], string]> = [
+  ['shared', 'Shared cloud tenancy'],
+  ['dedicated-host', 'Dedicated host'],
+  ['sole-tenant', 'Sole-tenant node'],
+];
+
 const SERVICE_CATEGORIES: ServiceCategory[] = [
   'compute',
   'storage',
@@ -1371,6 +1384,18 @@ function InitialHomePage({
                 value={form.instanceTier}
                 options={INSTANCE_TIER_OPTIONS}
                 onChange={(value) => update('instanceTier', value)}
+              />
+              <SelectField
+                label="Architecture"
+                value={form.processorArchitecture}
+                options={PROCESSOR_ARCHITECTURE_OPTIONS}
+                onChange={(value) => update('processorArchitecture', value)}
+              />
+              <SelectField
+                label="Tenancy"
+                value={form.computeTenancy}
+                options={COMPUTE_TENANCY_OPTIONS}
+                onChange={(value) => update('computeTenancy', value)}
               />
               <TextField
                 label="vCPU"
@@ -2677,6 +2702,18 @@ function WorkloadForm({
             value={form.instanceTier}
             options={INSTANCE_TIER_OPTIONS}
             onChange={(value) => update('instanceTier', value)}
+          />
+          <SelectField
+            label="Architecture"
+            value={form.processorArchitecture}
+            options={PROCESSOR_ARCHITECTURE_OPTIONS}
+            onChange={(value) => update('processorArchitecture', value)}
+          />
+          <SelectField
+            label="Tenancy"
+            value={form.computeTenancy}
+            options={COMPUTE_TENANCY_OPTIONS}
+            onChange={(value) => update('computeTenancy', value)}
           />
           <TextField
             label="Availability zones"

@@ -118,6 +118,14 @@ export const NWS_PARSE_RESULT_JSON_SCHEMA = {
                   'accelerated-computing',
                 ],
               },
+              processorArchitecture: {
+                type: 'string',
+                enum: ['x86_64', 'arm64', 'gpu'],
+              },
+              tenancy: {
+                type: 'string',
+                enum: ['shared', 'dedicated-host', 'sole-tenant'],
+              },
               vcpu: {
                 type: 'number',
                 exclusiveMinimum: 0,

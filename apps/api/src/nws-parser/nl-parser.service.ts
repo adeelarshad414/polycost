@@ -105,6 +105,8 @@ export class NLParserService {
       : 'fixed';
     const instanceTier = inferInstanceTier(lowerInput);
     const instanceFamily = instanceFamilyForTier(instanceTier);
+    const processorArchitecture = inferProcessorArchitecture(lowerInput, instanceTier);
+    const tenancy = inferTenancy(lowerInput);
 
     if (!instanceCount) {
       fieldsRequiringReview.push('compute[0].instanceCount');
@@ -149,6 +151,8 @@ export class NLParserService {
         {
           role: inferComputeRole(lowerInput),
           instanceFamily,
+          processorArchitecture,
+          tenancy,
           vcpu: vcpu ?? 2,
           memoryGb: memoryGb ?? 4,
           instanceCount: instanceCount ?? 1,
@@ -202,6 +206,8 @@ export class NLParserService {
         memoryGb: memoryGb ?? 4,
         instanceTier,
         instanceFamily,
+        processorArchitecture,
+        tenancy,
         scalingType,
         multiAz: /\b(multi[- ]?az|high availability|ha|zone redundant)\b/i.test(input),
         storageType: inferStorageType(lowerInput),
@@ -354,6 +360,10 @@ function inferServiceRequirements(input: {
   memoryGb: number;
   instanceTier: ParsedInstanceTier;
   instanceFamily: NonNullable<NormalizedWorkloadSpec['compute'][number]['instanceFamily']>;
+  processorArchitecture: NonNullable<
+    NormalizedWorkloadSpec['compute'][number]['processorArchitecture']
+  >;
+  tenancy: NonNullable<NormalizedWorkloadSpec['compute'][number]['tenancy']>;
   scalingType: 'fixed' | 'autoscaling';
   multiAz: boolean;
   storageType: 'object' | 'block' | 'file';
@@ -367,7 +377,7 @@ function inferServiceRequirements(input: {
     {
       serviceCategory: 'compute',
       serviceType: input.scalingType === 'autoscaling' ? 'autoscaling-compute' : 'vm-compute',
-      instanceType: `${input.instanceFamily} / ${input.vcpu} vCPU / ${input.memoryGb}GB`,
+      instanceType: `${input.instanceFamily} / ${input.processorArchitecture} / ${input.tenancy} / ${input.vcpu} vCPU / ${input.memoryGb}GB`,
       tier: input.instanceTier,
       ...(input.regionPreference ? { region: input.regionPreference } : {}),
       az,
@@ -375,6 +385,8 @@ function inferServiceRequirements(input: {
       scaleParams: {
         scalingType: input.scalingType,
         instanceFamily: input.instanceFamily,
+        processorArchitecture: input.processorArchitecture,
+        tenancy: input.tenancy,
         min: input.scalingType === 'autoscaling' ? 1 : input.instanceCount,
         max:
           input.scalingType === 'autoscaling'
@@ -485,6 +497,35 @@ function instanceFamilyForTier(
     case 'balanced':
       return 'general-purpose';
   }
+}
+
+function inferProcessorArchitecture(
+  input: string,
+  tier: ParsedInstanceTier,
+): NonNullable<NormalizedWorkloadSpec['compute'][number]['processorArchitecture']> {
+  if (tier === 'accelerated' || /\b(gpu|cuda|nvidia|a100|h100)\b/i.test(input)) {
+    return 'gpu';
+  }
+
+  if (/\b(arm|arm64|aarch64|graviton|ampere|tau t2a|t2a)\b/i.test(input)) {
+    return 'arm64';
+  }
+
+  return 'x86_64';
+}
+
+function inferTenancy(
+  input: string,
+): NonNullable<NormalizedWorkloadSpec['compute'][number]['tenancy']> {
+  if (/\b(sole[- ]tenant|sole tenant|dedicated node|single tenant)\b/i.test(input)) {
+    return 'sole-tenant';
+  }
+
+  if (/\b(dedicated host|dedicated hosts|dedicated tenancy|dedicated instance)\b/i.test(input)) {
+    return 'dedicated-host';
+  }
+
+  return 'shared';
 }
 
 function storageServiceType(storageType: 'object' | 'block' | 'file', input: string): string {

@@ -26,6 +26,8 @@ export type NormalizedInstanceFamily =
   | 'memory-optimized'
   | 'storage-optimized'
   | 'accelerated-computing';
+export type ProcessorArchitecture = 'x86_64' | 'arm64' | 'gpu';
+export type ComputeTenancy = 'shared' | 'dedicated-host' | 'sole-tenant';
 export type CachedPricingTerm =
   'on_demand' | 'reserved_1yr' | 'reserved_3yr' | 'spot' | 'savings_plan';
 export type PricingTermCode =
@@ -76,6 +78,8 @@ export interface NormalizedWorkloadSpec {
   compute: Array<{
     role: string;
     instanceFamily?: NormalizedInstanceFamily;
+    processorArchitecture?: ProcessorArchitecture;
+    tenancy?: ComputeTenancy;
     vcpu?: number;
     memoryGb?: number;
     instanceCount?: number;

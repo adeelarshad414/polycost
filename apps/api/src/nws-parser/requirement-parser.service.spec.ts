@@ -66,6 +66,8 @@ describe('AI-native requirement parser adapters', () => {
         {
           role: 'web',
           instanceFamily: 'memory-optimized',
+          processorArchitecture: 'arm64',
+          tenancy: 'dedicated-host',
           vcpu: 4,
           memoryGb: 16,
           instanceCount: 2,
@@ -100,10 +102,12 @@ describe('AI-native requirement parser adapters', () => {
           quantity: 2,
           region: 'us-east',
           config: expect.objectContaining({
-            instanceType: 'memory-optimized / 4 vCPU / 16 GB',
+            instanceType: 'memory-optimized / arm64 / dedicated-host / 4 vCPU / 16 GB',
           }),
           scaleParams: expect.objectContaining({
             instanceFamily: 'memory-optimized',
+            processorArchitecture: 'arm64',
+            tenancy: 'dedicated-host',
           }),
         }),
         expect.objectContaining({

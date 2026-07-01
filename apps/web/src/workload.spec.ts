@@ -30,6 +30,8 @@ describe('workload helpers', () => {
       vcpu: 2,
       memoryGb: 4,
       instanceFamily: 'general-purpose',
+      processorArchitecture: 'x86_64',
+      tenancy: 'shared',
       instanceCount: 2,
       scalingType: 'autoscaling',
       autoscalingRange: {
@@ -92,6 +94,11 @@ describe('workload helpers', () => {
           serviceType: 'vm-compute',
           quantity: 2,
           tier: 'balanced',
+          scaleParams: expect.objectContaining({
+            instanceFamily: 'general-purpose',
+            processorArchitecture: 'x86_64',
+            tenancy: 'shared',
+          }),
         }),
         expect.objectContaining({
           serviceCategory: 'database',
@@ -110,19 +117,52 @@ describe('workload helpers', () => {
 
     expect(nws.compute[0]).toMatchObject({
       instanceFamily: 'accelerated-computing',
+      processorArchitecture: 'gpu',
+      tenancy: 'shared',
     });
     expect(nws.serviceRequirements).toContainEqual(
       expect.objectContaining({
         serviceCategory: 'compute',
         serviceType: 'vm-compute',
-        instanceType: 'GPU / accelerated tier - 2 vCPU - 4GB',
+        instanceType: 'GPU / accelerated tier / GPU / shared tenancy - 2 vCPU - 4GB',
         tier: 'accelerated',
         scaleParams: expect.objectContaining({
           instanceFamily: 'accelerated-computing',
+          processorArchitecture: 'gpu',
+          tenancy: 'shared',
         }),
       }),
     );
     expect(formFromNws(nws).instanceTier).toBe('accelerated');
+  });
+
+  it('round-trips ARM and dedicated-host compute intent through the NWS', () => {
+    const nws = buildNwsFromForm({
+      ...defaultWorkloadForm,
+      processorArchitecture: 'arm64',
+      computeTenancy: 'dedicated-host',
+    });
+
+    expect(nws.compute[0]).toMatchObject({
+      processorArchitecture: 'arm64',
+      tenancy: 'dedicated-host',
+    });
+    expect(nws.serviceRequirements).toContainEqual(
+      expect.objectContaining({
+        serviceCategory: 'compute',
+        instanceType: 'balanced general-purpose tier / ARM / dedicated host - 2 vCPU - 4GB',
+        scaleParams: expect.objectContaining({
+          processorArchitecture: 'arm64',
+          tenancy: 'dedicated-host',
+        }),
+      }),
+    );
+    expect(formFromNws(nws)).toEqual(
+      expect.objectContaining({
+        processorArchitecture: 'arm64',
+        computeTenancy: 'dedicated-host',
+      }),
+    );
   });
 
   it('ships valid quick-start architecture templates', () => {
@@ -220,6 +260,8 @@ describe('workload helpers', () => {
     expect(form.databaseEngine).toBe(defaultWorkloadForm.databaseEngine);
     expect(form.environment).toBe(defaultWorkloadForm.environment);
     expect(form.supportTier).toBe(defaultWorkloadForm.supportTier);
+    expect(form.processorArchitecture).toBe(defaultWorkloadForm.processorArchitecture);
+    expect(form.computeTenancy).toBe(defaultWorkloadForm.computeTenancy);
     expect(form.faultTolerance).toBe(defaultWorkloadForm.faultTolerance);
     expect(form.cdnCacheHitRatioPercent).toBe(defaultWorkloadForm.cdnCacheHitRatioPercent);
     expect(form.natGatewayHours).toBe(defaultWorkloadForm.natGatewayHours);
@@ -350,6 +392,8 @@ describe('workload helpers', () => {
     expect(nws.compute[0]).toEqual({
       role: 'web',
       instanceFamily: 'general-purpose',
+      processorArchitecture: 'x86_64',
+      tenancy: 'shared',
       scalingType: 'fixed',
     });
     expect(nws.storage).toEqual([]);

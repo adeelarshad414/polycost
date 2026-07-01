@@ -806,8 +806,14 @@ export class ComparisonOrchestratorService {
       serviceCategory: 'compute',
       serviceType: compute.scalingType === 'autoscaling' ? 'autoscaling-compute' : 'vm-compute',
       instanceType:
-        compute.vcpu !== undefined || compute.memoryGb !== undefined || compute.instanceFamily
-          ? `${compute.instanceFamily ?? 'general-purpose'} / ${compute.vcpu ?? '?'} vCPU / ${
+        compute.vcpu !== undefined ||
+        compute.memoryGb !== undefined ||
+        compute.instanceFamily ||
+        compute.processorArchitecture ||
+        compute.tenancy
+          ? `${compute.instanceFamily ?? 'general-purpose'} / ${
+              compute.processorArchitecture ?? 'x86_64'
+            } / ${compute.tenancy ?? 'shared'} / ${compute.vcpu ?? '?'} vCPU / ${
               compute.memoryGb ?? '?'
             } GB`
           : undefined,
@@ -817,6 +823,10 @@ export class ComparisonOrchestratorService {
       scaleParams: {
         role: compute.role,
         ...(compute.instanceFamily ? { instanceFamily: compute.instanceFamily } : {}),
+        ...(compute.processorArchitecture
+          ? { processorArchitecture: compute.processorArchitecture }
+          : {}),
+        ...(compute.tenancy ? { tenancy: compute.tenancy } : {}),
         scalingType: compute.scalingType,
         ...(compute.autoscalingRange
           ? {

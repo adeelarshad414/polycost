@@ -15,6 +15,10 @@ import {
 export type WorkloadType = NormalizedWorkloadSpec['workload']['type'];
 export type StorageType = NormalizedWorkloadSpec['storage'][number]['type'];
 export type DatabaseEngine = NormalizedWorkloadSpec['database'][number]['engine'];
+export type ProcessorArchitecture = NonNullable<
+  NormalizedWorkloadSpec['compute'][number]['processorArchitecture']
+>;
+export type ComputeTenancy = NonNullable<NormalizedWorkloadSpec['compute'][number]['tenancy']>;
 export type InstanceTier =
   'small' | 'balanced' | 'compute' | 'memory' | 'storage' | 'accelerated' | 'custom';
 
@@ -43,6 +47,8 @@ export interface WorkloadFormState {
   scalingType: 'fixed' | 'autoscaling';
   autoscaleMin: string;
   autoscaleMax: string;
+  processorArchitecture: ProcessorArchitecture;
+  computeTenancy: ComputeTenancy;
   storageEnabled: boolean;
   storageRole: string;
   storageType: StorageType;
@@ -154,6 +160,8 @@ export const defaultWorkloadForm: WorkloadFormState = {
   scalingType: 'fixed',
   autoscaleMin: '2',
   autoscaleMax: '6',
+  processorArchitecture: 'x86_64',
+  computeTenancy: 'shared',
   storageEnabled: true,
   storageRole: 'uploads',
   storageType: 'object',
@@ -274,6 +282,7 @@ export const ARCHITECTURE_TEMPLATES: ArchitectureTemplate[] = [
       vcpu: '16',
       memoryGb: '64',
       instanceCount: '2',
+      instanceTier: 'accelerated',
       scalingType: 'autoscaling',
       autoscaleMin: '1',
       autoscaleMax: '6',
@@ -656,6 +665,8 @@ export function buildNwsFromForm(
   const compute = {
     role: form.computeRole.trim() || 'web',
     ...instanceFamilyForTier(form.instanceTier),
+    processorArchitecture: processorArchitectureForForm(form),
+    tenancy: form.computeTenancy,
     ...optionalPositiveNumber('vcpu', form.vcpu),
     ...optionalPositiveNumber('memoryGb', form.memoryGb),
     ...optionalPositiveInteger('instanceCount', form.instanceCount),
@@ -816,6 +827,9 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
     scalingType: compute?.scalingType ?? defaultWorkloadForm.scalingType,
     autoscaleMin: numberToInput(compute?.autoscalingRange?.min),
     autoscaleMax: numberToInput(compute?.autoscalingRange?.max),
+    processorArchitecture:
+      compute?.processorArchitecture ?? defaultWorkloadForm.processorArchitecture,
+    computeTenancy: compute?.tenancy ?? defaultWorkloadForm.computeTenancy,
     storageEnabled: Boolean(storage),
     storageRole: storage?.role ?? defaultWorkloadForm.storageRole,
     storageType: storage?.type ?? defaultWorkloadForm.storageType,
@@ -947,7 +961,11 @@ export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceReq
         loadBalancerProcessedGb: parseOptionalNumber(form.loadBalancerProcessedGb) ?? 0,
         loadBalancerHours: parseBoundedNumber(form.loadBalancerHours, 0, 730, 0),
         ...(serviceType === 'vm-compute' || serviceType === 'autoscaling-compute'
-          ? instanceFamilyForTier(form.instanceTier)
+          ? {
+              ...instanceFamilyForTier(form.instanceTier),
+              processorArchitecture: processorArchitectureForForm(form),
+              tenancy: form.computeTenancy,
+            }
           : {}),
         ...(bulkRow
           ? {
@@ -1044,7 +1062,9 @@ function instanceTypeForServiceRequirement(
   form: WorkloadFormState,
 ): string | undefined {
   if (serviceType === 'vm-compute' || serviceType === 'autoscaling-compute') {
-    return `${instanceTierLabel(form.instanceTier)} - ${form.vcpu || '?'} vCPU - ${
+    return `${instanceTierLabel(form.instanceTier)} / ${processorArchitectureLabel(
+      processorArchitectureForForm(form),
+    )} / ${tenancyLabel(form.computeTenancy)} - ${form.vcpu || '?'} vCPU - ${
       form.memoryGb || '?'
     }GB`;
   }
@@ -1101,6 +1121,32 @@ function instanceFamilyForTier(
       return { instanceFamily: 'accelerated-computing' };
     case 'custom':
       return {};
+  }
+}
+
+function processorArchitectureForForm(form: WorkloadFormState): ProcessorArchitecture {
+  return form.instanceTier === 'accelerated' ? 'gpu' : form.processorArchitecture;
+}
+
+function processorArchitectureLabel(architecture: ProcessorArchitecture): string {
+  switch (architecture) {
+    case 'x86_64':
+      return 'x86';
+    case 'arm64':
+      return 'ARM';
+    case 'gpu':
+      return 'GPU';
+  }
+}
+
+function tenancyLabel(tenancy: ComputeTenancy): string {
+  switch (tenancy) {
+    case 'shared':
+      return 'shared tenancy';
+    case 'dedicated-host':
+      return 'dedicated host';
+    case 'sole-tenant':
+      return 'sole tenant';
   }
 }
 

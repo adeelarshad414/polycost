@@ -27,10 +27,15 @@ export const instanceFamilySchema = z.enum([
   'accelerated-computing',
 ]);
 
+export const processorArchitectureSchema = z.enum(['x86_64', 'arm64', 'gpu']);
+export const computeTenancySchema = z.enum(['shared', 'dedicated-host', 'sole-tenant']);
+
 export const computeComponentSchema = z
   .object({
     role: z.string().min(1),
     instanceFamily: instanceFamilySchema.optional(),
+    processorArchitecture: processorArchitectureSchema.optional(),
+    tenancy: computeTenancySchema.optional(),
     vcpu: z.number().positive().optional(),
     memoryGb: z.number().positive().optional(),
     instanceCount: z.number().int().positive().optional(),

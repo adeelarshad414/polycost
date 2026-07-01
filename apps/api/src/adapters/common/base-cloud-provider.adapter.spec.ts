@@ -417,6 +417,182 @@ describe('BaseCloudProviderAdapter', () => {
     );
   });
 
+  it('prefers matching processor architecture when catalog rows expose architecture metadata', async () => {
+    const adapter = new TestProviderAdapter(
+      new InMemoryPricingCatalogReader([
+        {
+          provider: 'aws',
+          serviceCategory: 'compute',
+          serviceName: 'x86 general purpose compute',
+          skuId: 'm6i.large',
+          region: 'test-region',
+          unit: 'hour',
+          unitPriceUsd: 0.02,
+          attributes: {
+            vcpu: 2,
+            memoryGb: 8,
+            processorArchitecture: 'x86_64',
+          },
+          effectiveDate: '2026-01-01T00:00:00Z',
+          fetchedAt: '2026-06-28T00:00:00.000Z',
+        },
+        {
+          provider: 'aws',
+          serviceCategory: 'compute',
+          serviceName: 'arm general purpose compute',
+          skuId: 'm7g.large',
+          region: 'test-region',
+          unit: 'hour',
+          unitPriceUsd: 0.03,
+          attributes: {
+            vcpu: 2,
+            memoryGb: 8,
+            processorArchitecture: 'arm64',
+          },
+          effectiveDate: '2026-01-01T00:00:00Z',
+          fetchedAt: '2026-06-28T00:00:00.000Z',
+        },
+      ]),
+      'fallback-region',
+    );
+
+    const result = await adapter.priceWorkload({
+      ...fullWorkload,
+      storage: [],
+      database: [],
+      network: {
+        cdn: false,
+        loadBalancer: false,
+      },
+      compute: [
+        {
+          role: 'web',
+          instanceFamily: 'general-purpose',
+          processorArchitecture: 'arm64',
+          tenancy: 'shared',
+          vcpu: 2,
+          memoryGb: 8,
+          scalingType: 'fixed',
+          instanceCount: 1,
+        },
+      ],
+    });
+
+    expect(result.lineItems[0]).toEqual(
+      expect.objectContaining({
+        skuId: 'm7g.large',
+        baseMonthlyCostUsd: 21.9,
+      }),
+    );
+  });
+
+  it('falls back approximately when dedicated tenancy is requested but unavailable', async () => {
+    const adapter = new TestProviderAdapter(
+      new InMemoryPricingCatalogReader([
+        {
+          provider: 'aws',
+          serviceCategory: 'compute',
+          serviceName: 'shared x86 compute',
+          skuId: 'm6i.large',
+          region: 'test-region',
+          unit: 'hour',
+          unitPriceUsd: 0.02,
+          attributes: {
+            vcpu: 2,
+            memoryGb: 8,
+            processorArchitecture: 'x86_64',
+            tenancy: 'shared',
+          },
+          effectiveDate: '2026-01-01T00:00:00Z',
+          fetchedAt: '2026-06-28T00:00:00.000Z',
+        },
+      ]),
+      'fallback-region',
+    );
+
+    const result = await adapter.priceWorkload({
+      ...fullWorkload,
+      storage: [],
+      database: [],
+      network: {
+        cdn: false,
+        loadBalancer: false,
+      },
+      compute: [
+        {
+          role: 'licensed-db',
+          instanceFamily: 'general-purpose',
+          processorArchitecture: 'x86_64',
+          tenancy: 'dedicated-host',
+          vcpu: 2,
+          memoryGb: 8,
+          scalingType: 'fixed',
+          instanceCount: 1,
+        },
+      ],
+    });
+
+    expect(result.lineItems[0]).toEqual(
+      expect.objectContaining({
+        skuId: 'm6i.large',
+        isApproximate: true,
+        baseMonthlyCostUsd: 14.6,
+      }),
+    );
+  });
+
+  it('marks rows without architecture metadata as approximate for non-default architecture intent', async () => {
+    const adapter = new TestProviderAdapter(
+      new InMemoryPricingCatalogReader([
+        {
+          provider: 'aws',
+          serviceCategory: 'compute',
+          serviceName: 'generic compute without architecture metadata',
+          skuId: 'generic.large',
+          region: 'test-region',
+          unit: 'hour',
+          unitPriceUsd: 0.02,
+          attributes: {
+            vcpu: 2,
+            memoryGb: 8,
+          },
+          effectiveDate: '2026-01-01T00:00:00Z',
+          fetchedAt: '2026-06-28T00:00:00.000Z',
+        },
+      ]),
+      'fallback-region',
+    );
+
+    const result = await adapter.priceWorkload({
+      ...fullWorkload,
+      storage: [],
+      database: [],
+      network: {
+        cdn: false,
+        loadBalancer: false,
+      },
+      compute: [
+        {
+          role: 'arm-worker',
+          instanceFamily: 'general-purpose',
+          processorArchitecture: 'arm64',
+          tenancy: 'shared',
+          vcpu: 2,
+          memoryGb: 8,
+          scalingType: 'fixed',
+          instanceCount: 1,
+        },
+      ],
+    });
+
+    expect(result.lineItems[0]).toEqual(
+      expect.objectContaining({
+        skuId: 'generic.large',
+        isApproximate: true,
+      }),
+    );
+  });
+
   it('uses the adapter default region when the workload marks its region as default', async () => {
     const adapter = new TestProviderAdapter(
       new InMemoryPricingCatalogReader([

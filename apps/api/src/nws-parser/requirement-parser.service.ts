@@ -100,9 +100,15 @@ function serviceRequirementsFromNws(nws: NormalizedWorkloadSpec): ServiceRequire
     ...nws.compute.map((compute): ServiceRequirement => ({
       serviceCategory: 'compute',
       serviceType: compute.scalingType === 'autoscaling' ? 'autoscaling-compute' : 'vm-compute',
-      ...(compute.vcpu !== undefined || compute.memoryGb !== undefined || compute.instanceFamily
+      ...(compute.vcpu !== undefined ||
+      compute.memoryGb !== undefined ||
+      compute.instanceFamily ||
+      compute.processorArchitecture ||
+      compute.tenancy
         ? {
             instanceType: `${compute.instanceFamily ?? 'general-purpose'} / ${
+              compute.processorArchitecture ?? 'x86_64'
+            } / ${compute.tenancy ?? 'shared'} / ${
               compute.vcpu ?? '?'
             } vCPU / ${compute.memoryGb ?? '?'} GB`,
           }
@@ -113,6 +119,10 @@ function serviceRequirementsFromNws(nws: NormalizedWorkloadSpec): ServiceRequire
       scaleParams: {
         role: compute.role,
         ...(compute.instanceFamily ? { instanceFamily: compute.instanceFamily } : {}),
+        ...(compute.processorArchitecture
+          ? { processorArchitecture: compute.processorArchitecture }
+          : {}),
+        ...(compute.tenancy ? { tenancy: compute.tenancy } : {}),
         scalingType: compute.scalingType,
         ...(compute.autoscalingRange
           ? {

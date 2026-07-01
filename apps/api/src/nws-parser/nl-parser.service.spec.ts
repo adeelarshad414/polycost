@@ -273,10 +273,12 @@ describe('NLParserService', () => {
         expect.objectContaining({
           serviceCategory: 'compute',
           serviceType: 'vm-compute',
-          instanceType: 'general-purpose / 2 vCPU / 4GB',
+          instanceType: 'general-purpose / x86_64 / shared / 2 vCPU / 4GB',
           quantity: 2,
           scaleParams: expect.objectContaining({
             instanceFamily: 'general-purpose',
+            processorArchitecture: 'x86_64',
+            tenancy: 'shared',
           }),
         }),
         expect.objectContaining({
@@ -304,6 +306,8 @@ describe('NLParserService', () => {
     expect(result.draftNws.compute[0]).toEqual(
       expect.objectContaining({
         instanceFamily: 'accelerated-computing',
+        processorArchitecture: 'gpu',
+        tenancy: 'shared',
         vcpu: 8,
         memoryGb: 32,
         instanceCount: 2,
@@ -315,9 +319,43 @@ describe('NLParserService', () => {
           serviceCategory: 'compute',
           serviceType: 'vm-compute',
           tier: 'accelerated',
-          instanceType: 'accelerated-computing / 8 vCPU / 32GB',
+          instanceType: 'accelerated-computing / gpu / shared / 8 vCPU / 32GB',
           scaleParams: expect.objectContaining({
             instanceFamily: 'accelerated-computing',
+            processorArchitecture: 'gpu',
+            tenancy: 'shared',
+          }),
+        }),
+      ]),
+    );
+  });
+
+  it('infers ARM architecture and dedicated tenancy from natural language', async () => {
+    const client: StructuredLlmClient = {
+      createStructuredOutput: jest.fn(),
+    };
+    const service = new NLParserService(configService(4000, false), client, fixedNow);
+
+    const result = await service.parse(
+      'A web app with two Graviton ARM 4 vCPU 16GB dedicated host servers, Postgres database, and 250GB object storage.',
+    );
+
+    expect(result.draftNws.compute[0]).toEqual(
+      expect.objectContaining({
+        processorArchitecture: 'arm64',
+        tenancy: 'dedicated-host',
+        vcpu: 4,
+        memoryGb: 16,
+      }),
+    );
+    expect(result.draftNws.serviceRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceCategory: 'compute',
+          instanceType: 'general-purpose / arm64 / dedicated-host / 4 vCPU / 16GB',
+          scaleParams: expect.objectContaining({
+            processorArchitecture: 'arm64',
+            tenancy: 'dedicated-host',
           }),
         }),
       ]),
