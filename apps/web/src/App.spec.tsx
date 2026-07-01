@@ -105,6 +105,8 @@ describe('App', () => {
     });
     expect(text(container)).toContain('Executive monthly baseline');
     expect(text(container)).toContain('Provider mix');
+    expect(text(container)).toContain('Cost composition waterfall');
+    expect(text(container)).toContain('Compute base');
     expect(text(container)).toContain('Pricing model comparison');
     expect(text(container)).toContain('On-demand vs commitments');
     expect(container.querySelectorAll('.executive-provider-card')).toHaveLength(3);

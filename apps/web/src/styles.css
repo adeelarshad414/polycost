@@ -4006,6 +4006,7 @@ select:disabled {
 
 .executive-headline-card,
 .executive-provider-mix-card,
+.executive-waterfall-card,
 .executive-provider-card,
 .executive-pricing-bars,
 .executive-recommendation-card,
@@ -4020,6 +4021,7 @@ select:disabled {
 
 .executive-headline-card,
 .executive-provider-mix-card,
+.executive-waterfall-card,
 .executive-pricing-bars {
   display: grid;
   gap: var(--pc-space-2);
@@ -4081,6 +4083,62 @@ select:disabled {
 
 .executive-pricing-bars {
   grid-column: 1 / -1;
+}
+
+.executive-waterfall-card {
+  grid-column: 1 / -1;
+}
+
+.executive-waterfall {
+  display: grid;
+  gap: 9px;
+}
+
+.waterfall-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.55fr) minmax(120px, 1fr) minmax(86px, auto);
+  align-items: center;
+  gap: var(--pc-space-1);
+}
+
+.waterfall-row span,
+.waterfall-total span {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.waterfall-row strong,
+.waterfall-total strong {
+  color: var(--pc-text-primary);
+  font-family: var(--pc-font-mono);
+  font-size: var(--pc-text-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.waterfall-track {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--pc-bg-surface-2) 84%, var(--pc-border));
+}
+
+.waterfall-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--brand-orange), var(--brand-blue), var(--brand-green));
+}
+
+.waterfall-total {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--pc-space-1);
+  border-top: 1px solid var(--pc-border);
+  padding-top: 9px;
 }
 
 .executive-pricing-bar-grid {
@@ -6375,6 +6433,14 @@ select:disabled {
 
   .executive-pricing-row {
     grid-template-columns: 1fr;
+  }
+
+  .waterfall-row {
+    grid-template-columns: 1fr;
+  }
+
+  .waterfall-row strong {
+    text-align: left;
   }
 
   .initial-home-action-hint {

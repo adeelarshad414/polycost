@@ -5143,6 +5143,8 @@ function ExecutiveAnalyticsPreview({
         <ProviderMixDonut data={analytics.providerMix} />
       </article>
 
+      <ExecutiveCostWaterfall comparison={comparison} />
+
       <ExecutivePricingModelBars comparison={comparison} />
 
       <div className="executive-stat-grid" aria-label="Executive compact stats">
@@ -5425,6 +5427,105 @@ function ProviderMixDonut({ data }: { data: ProviderMixDatum[] }) {
       </div>
     </div>
   );
+}
+
+function ExecutiveCostWaterfall({ comparison }: { comparison: ComparisonResult | null }) {
+  const provider = comparison?.providers.find(
+    (candidate) => candidate.providerId === comparison.cheapestProviderId,
+  );
+  const steps = costWaterfallSteps(provider);
+  const total = provider?.totals.monthly ?? 0;
+
+  return (
+    <article className="executive-waterfall-card">
+      <div className="executive-card-heading">
+        <span>Cost composition waterfall</span>
+        <strong>
+          {provider ? `${providerLabel(provider.providerId)} monthly build-up` : 'Pending'}
+        </strong>
+      </div>
+      {provider && steps.length > 0 ? (
+        <div className="executive-waterfall" aria-label="Cost composition waterfall bars">
+          {steps.map((step) => (
+            <div className="waterfall-row" key={step.label}>
+              <span>{step.label}</span>
+              <div className="waterfall-track" aria-hidden="true">
+                <i style={{ width: `${step.percent}%` }} />
+              </div>
+              <strong>{formatCurrency(step.value)}</strong>
+            </div>
+          ))}
+          <div className="waterfall-total">
+            <span>Total</span>
+            <strong>{formatCurrency(total)}</strong>
+          </div>
+        </div>
+      ) : (
+        <div className="provider-mix-empty" role="status">
+          Run a comparison to populate cost composition.
+        </div>
+      )}
+    </article>
+  );
+}
+
+function costWaterfallSteps(provider?: ComparisonProviderResult): Array<{
+  label: string;
+  value: number;
+  percent: number;
+}> {
+  if (!provider || provider.totals.monthly <= 0) {
+    return [];
+  }
+
+  const breakdown = provider.breakdown;
+  const values = [
+    [
+      'Compute base',
+      breakdown?.computeMonthlyCostUsd ?? componentMonthlyTotal(provider, 'compute'),
+    ],
+    ['Storage', breakdown?.storageMonthlyCostUsd ?? componentMonthlyTotal(provider, 'storage')],
+    ['Database', breakdown?.databaseMonthlyCostUsd ?? componentMonthlyTotal(provider, 'database')],
+    ['Egress', breakdown?.egressMonthlyCostUsd ?? componentMonthlyTotal(provider, 'egress')],
+    ['Support', breakdown?.supportMonthlyCostUsd ?? componentMonthlyTotal(provider, 'support')],
+    [
+      'Licensing',
+      breakdown?.licensingMonthlyCostUsd ?? componentMonthlyTotal(provider, 'licensing'),
+    ],
+    [
+      'Operations',
+      breakdown?.operationsMonthlyCostUsd ?? componentMonthlyTotal(provider, 'operations'),
+    ],
+  ] as const;
+  const accounted = values.reduce((sum, [, value]) => sum + value, 0);
+  const other = Math.max(0, provider.totals.monthly - accounted);
+  const steps = other > 0.005 ? [...values, ['Other', other] as const] : values;
+
+  return steps
+    .filter(([, value]) => value > 0.005)
+    .map(([label, value]) => ({
+      label,
+      value: roundCurrency(value),
+      percent: Math.max(4, Math.min(100, (value / provider.totals.monthly) * 100)),
+    }));
+}
+
+function componentMonthlyTotal(
+  provider: ComparisonProviderResult,
+  component: CostComponent,
+): number {
+  return roundCurrency(
+    provider.lineItems
+      .filter(
+        (lineItem) =>
+          (lineItem.costComponent ?? costComponentForCategory(lineItem.category)) === component,
+      )
+      .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0),
+  );
+}
+
+function costComponentForCategory(category: ServiceCategory): CostComponent {
+  return category === 'network' ? 'egress' : category;
 }
 
 function ExecutiveStatTile({
