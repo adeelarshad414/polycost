@@ -157,6 +157,35 @@ describe('workload helpers', () => {
     );
   });
 
+  it('serializes advanced networking assumptions only when they affect cost', () => {
+    const nws = buildNwsFromForm({
+      ...defaultWorkloadForm,
+      crossAzTransferGb: '100',
+      interRegionTransferGb: '200',
+      cdnTrafficGb: '1000',
+      cdnCacheHitRatioPercent: '80',
+      natGatewayGb: '500',
+      natGatewayHours: '730',
+      dnsHostedZones: '2',
+      dnsQueriesMillion: '3',
+      loadBalancerProcessedGb: '250',
+      loadBalancerHours: '730',
+    });
+
+    expect(nws.network).toMatchObject({
+      crossAzTransferGb: 100,
+      interRegionTransferGb: 200,
+      cdnTrafficGb: 1000,
+      cdnCacheHitRatioPercent: 80,
+      natGatewayGb: 500,
+      natGatewayHours: 730,
+      dnsHostedZones: 2,
+      dnsQueriesMillion: 3,
+      loadBalancerProcessedGb: 250,
+      loadBalancerHours: 730,
+    });
+  });
+
   it('maps an NWS back into editable form values', () => {
     const nws = buildNwsFromForm(defaultWorkloadForm, 'natural_language', 'web app');
     const form = formFromNws(nws);
@@ -168,6 +197,9 @@ describe('workload helpers', () => {
     expect(form.environment).toBe(defaultWorkloadForm.environment);
     expect(form.supportTier).toBe(defaultWorkloadForm.supportTier);
     expect(form.faultTolerance).toBe(defaultWorkloadForm.faultTolerance);
+    expect(form.cdnCacheHitRatioPercent).toBe(defaultWorkloadForm.cdnCacheHitRatioPercent);
+    expect(form.natGatewayHours).toBe(defaultWorkloadForm.natGatewayHours);
+    expect(form.loadBalancerHours).toBe(defaultWorkloadForm.loadBalancerHours);
     expect(form.selectedServiceCategory).toBe('compute');
     expect(form.selectedServiceFamilyId).toBe('vm-compute');
     expect(form.selectedServiceFamilyIds).toEqual(DEFAULT_SELECTED_SERVICE_FAMILY_IDS);
@@ -194,6 +226,16 @@ describe('workload helpers', () => {
         instanceCount: '2.5',
         storageSizeGb: '',
         monthlyEgressGb: '-1',
+        crossAzTransferGb: '-1',
+        interRegionTransferGb: '-1',
+        cdnTrafficGb: '-1',
+        cdnCacheHitRatioPercent: '101',
+        natGatewayGb: '-1',
+        natGatewayHours: '731',
+        dnsHostedZones: '1.5',
+        dnsQueriesMillion: '-1',
+        loadBalancerProcessedGb: '-1',
+        loadBalancerHours: '731',
         commitmentPreferencePercent: '101',
         usagePattern: 'scheduled',
         usageHoursPerDay: '0',
@@ -205,6 +247,16 @@ describe('workload helpers', () => {
       'instanceCount',
       'storageSizeGb',
       'monthlyEgressGb',
+      'crossAzTransferGb',
+      'interRegionTransferGb',
+      'cdnTrafficGb',
+      'cdnCacheHitRatioPercent',
+      'natGatewayGb',
+      'natGatewayHours',
+      'dnsHostedZones',
+      'dnsQueriesMillion',
+      'loadBalancerProcessedGb',
+      'loadBalancerHours',
       'commitmentPreferencePercent',
       'usageHoursPerDay',
       'usageDaysPerWeek',

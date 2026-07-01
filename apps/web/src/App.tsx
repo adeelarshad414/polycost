@@ -2811,6 +2811,87 @@ function WorkloadForm({
             onChange={(value) => update('monthlyEgressGb', value)}
           />
           <TextField
+            label="Cross-AZ GB/mo"
+            value={form.crossAzTransferGb}
+            inputMode="decimal"
+            suffix="GB"
+            error={fieldErrors.crossAzTransferGb}
+            onChange={(value) => update('crossAzTransferGb', value)}
+          />
+          <TextField
+            label="Inter-region GB/mo"
+            value={form.interRegionTransferGb}
+            inputMode="decimal"
+            suffix="GB"
+            error={fieldErrors.interRegionTransferGb}
+            onChange={(value) => update('interRegionTransferGb', value)}
+          />
+          <TextField
+            label="CDN traffic GB/mo"
+            value={form.cdnTrafficGb}
+            inputMode="decimal"
+            suffix="GB"
+            error={fieldErrors.cdnTrafficGb}
+            onChange={(value) => update('cdnTrafficGb', value)}
+          />
+          <RangeField
+            label="CDN cache hit"
+            value={form.cdnCacheHitRatioPercent}
+            min={0}
+            max={100}
+            suffix="%"
+            error={fieldErrors.cdnCacheHitRatioPercent}
+            onChange={(value) => update('cdnCacheHitRatioPercent', value)}
+          />
+          <TextField
+            label="NAT GB/mo"
+            value={form.natGatewayGb}
+            inputMode="decimal"
+            suffix="GB"
+            error={fieldErrors.natGatewayGb}
+            onChange={(value) => update('natGatewayGb', value)}
+          />
+          <TextField
+            label="NAT hours/mo"
+            value={form.natGatewayHours}
+            inputMode="decimal"
+            suffix="hrs"
+            error={fieldErrors.natGatewayHours}
+            onChange={(value) => update('natGatewayHours', value)}
+          />
+          <TextField
+            label="DNS zones"
+            value={form.dnsHostedZones}
+            inputMode="numeric"
+            suffix="zones"
+            error={fieldErrors.dnsHostedZones}
+            onChange={(value) => update('dnsHostedZones', value)}
+          />
+          <TextField
+            label="DNS queries"
+            value={form.dnsQueriesMillion}
+            inputMode="decimal"
+            suffix="M/mo"
+            error={fieldErrors.dnsQueriesMillion}
+            onChange={(value) => update('dnsQueriesMillion', value)}
+          />
+          <TextField
+            label="LB processed GB"
+            value={form.loadBalancerProcessedGb}
+            inputMode="decimal"
+            suffix="GB"
+            error={fieldErrors.loadBalancerProcessedGb}
+            onChange={(value) => update('loadBalancerProcessedGb', value)}
+          />
+          <TextField
+            label="LB hours/mo"
+            value={form.loadBalancerHours}
+            inputMode="decimal"
+            suffix="hrs"
+            error={fieldErrors.loadBalancerHours}
+            onChange={(value) => update('loadBalancerHours', value)}
+          />
+          <TextField
             label="SLA target"
             value={form.slaTarget}
             onChange={(value) => update('slaTarget', value)}

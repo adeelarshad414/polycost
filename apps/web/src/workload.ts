@@ -52,6 +52,16 @@ export interface WorkloadFormState {
   databaseSizeGb: string;
   databaseHighAvailability: boolean;
   monthlyEgressGb: string;
+  crossAzTransferGb: string;
+  interRegionTransferGb: string;
+  cdnTrafficGb: string;
+  cdnCacheHitRatioPercent: string;
+  natGatewayGb: string;
+  natGatewayHours: string;
+  dnsHostedZones: string;
+  dnsQueriesMillion: string;
+  loadBalancerProcessedGb: string;
+  loadBalancerHours: string;
   cdn: boolean;
   loadBalancer: boolean;
   selectedServiceCategory: string;
@@ -97,6 +107,16 @@ type NumericWorkloadFormField =
   | 'storageSizeGb'
   | 'databaseSizeGb'
   | 'monthlyEgressGb'
+  | 'crossAzTransferGb'
+  | 'interRegionTransferGb'
+  | 'cdnTrafficGb'
+  | 'cdnCacheHitRatioPercent'
+  | 'natGatewayGb'
+  | 'natGatewayHours'
+  | 'dnsHostedZones'
+  | 'dnsQueriesMillion'
+  | 'loadBalancerProcessedGb'
+  | 'loadBalancerHours'
   | 'commitmentPreferencePercent'
   | 'usageHoursPerDay'
   | 'usageDaysPerWeek'
@@ -143,6 +163,16 @@ export const defaultWorkloadForm: WorkloadFormState = {
   databaseSizeGb: '100',
   databaseHighAvailability: true,
   monthlyEgressGb: '750',
+  crossAzTransferGb: '0',
+  interRegionTransferGb: '0',
+  cdnTrafficGb: '0',
+  cdnCacheHitRatioPercent: '85',
+  natGatewayGb: '0',
+  natGatewayHours: '0',
+  dnsHostedZones: '0',
+  dnsQueriesMillion: '0',
+  loadBalancerProcessedGb: '0',
+  loadBalancerHours: '0',
   cdn: true,
   loadBalancer: true,
   selectedServiceCategory: 'compute',
@@ -494,6 +524,72 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
   }
 
   optionalNonNegativeNumberField(issues, form, 'monthlyEgressGb', 'Egress must be 0 GB or higher.');
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'crossAzTransferGb',
+    'Cross-AZ transfer must be 0 GB or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'interRegionTransferGb',
+    'Inter-region transfer must be 0 GB or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'cdnTrafficGb',
+    'CDN-served traffic must be 0 GB or higher.',
+  );
+  requireBoundedNumber(
+    issues,
+    form,
+    'cdnCacheHitRatioPercent',
+    0,
+    100,
+    'CDN cache hit ratio must be between 0 and 100.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'natGatewayGb',
+    'NAT processed data must be 0 GB or higher.',
+  );
+  requireBoundedNumber(
+    issues,
+    form,
+    'natGatewayHours',
+    0,
+    730,
+    'NAT hours must be between 0 and 730.',
+  );
+  optionalNonNegativeIntegerField(
+    issues,
+    form,
+    'dnsHostedZones',
+    'DNS hosted zones must be a whole number 0 or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'dnsQueriesMillion',
+    'DNS queries must be 0 million or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'loadBalancerProcessedGb',
+    'Load balancer data processed must be 0 GB or higher.',
+  );
+  requireBoundedNumber(
+    issues,
+    form,
+    'loadBalancerHours',
+    0,
+    730,
+    'Load balancer hours must be between 0 and 730.',
+  );
   requireBoundedNumber(
     issues,
     form,
@@ -610,6 +706,20 @@ export function buildNwsFromForm(
       : [],
     network: {
       ...optionalNonNegativeNumber('estimatedMonthlyEgressGb', form.monthlyEgressGb),
+      ...optionalPositiveNumber('crossAzTransferGb', form.crossAzTransferGb),
+      ...optionalPositiveNumber('interRegionTransferGb', form.interRegionTransferGb),
+      ...optionalPositiveNumber('cdnTrafficGb', form.cdnTrafficGb),
+      ...(parsePositiveNumber(form.cdnTrafficGb, 0) > 0
+        ? {
+            cdnCacheHitRatioPercent: parseBoundedNumber(form.cdnCacheHitRatioPercent, 0, 100, 85),
+          }
+        : {}),
+      ...optionalPositiveNumber('natGatewayGb', form.natGatewayGb),
+      ...optionalPositiveNumber('natGatewayHours', form.natGatewayHours),
+      ...optionalPositiveInteger('dnsHostedZones', form.dnsHostedZones),
+      ...optionalPositiveNumber('dnsQueriesMillion', form.dnsQueriesMillion),
+      ...optionalPositiveNumber('loadBalancerProcessedGb', form.loadBalancerProcessedGb),
+      ...optionalPositiveNumber('loadBalancerHours', form.loadBalancerHours),
       cdn: form.cdn,
       loadBalancer: form.loadBalancer,
     },
@@ -715,6 +825,36 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
     databaseHighAvailability:
       database?.highAvailability ?? defaultWorkloadForm.databaseHighAvailability,
     monthlyEgressGb: numberToInput(nws.network.estimatedMonthlyEgressGb),
+    crossAzTransferGb: numberToInput(
+      nws.network.crossAzTransferGb ?? Number(defaultWorkloadForm.crossAzTransferGb),
+    ),
+    interRegionTransferGb: numberToInput(
+      nws.network.interRegionTransferGb ?? Number(defaultWorkloadForm.interRegionTransferGb),
+    ),
+    cdnTrafficGb: numberToInput(
+      nws.network.cdnTrafficGb ?? Number(defaultWorkloadForm.cdnTrafficGb),
+    ),
+    cdnCacheHitRatioPercent: numberToInput(
+      nws.network.cdnCacheHitRatioPercent ?? Number(defaultWorkloadForm.cdnCacheHitRatioPercent),
+    ),
+    natGatewayGb: numberToInput(
+      nws.network.natGatewayGb ?? Number(defaultWorkloadForm.natGatewayGb),
+    ),
+    natGatewayHours: numberToInput(
+      nws.network.natGatewayHours ?? Number(defaultWorkloadForm.natGatewayHours),
+    ),
+    dnsHostedZones: numberToInput(
+      nws.network.dnsHostedZones ?? Number(defaultWorkloadForm.dnsHostedZones),
+    ),
+    dnsQueriesMillion: numberToInput(
+      nws.network.dnsQueriesMillion ?? Number(defaultWorkloadForm.dnsQueriesMillion),
+    ),
+    loadBalancerProcessedGb: numberToInput(
+      nws.network.loadBalancerProcessedGb ?? Number(defaultWorkloadForm.loadBalancerProcessedGb),
+    ),
+    loadBalancerHours: numberToInput(
+      nws.network.loadBalancerHours ?? Number(defaultWorkloadForm.loadBalancerHours),
+    ),
     cdn: nws.network.cdn,
     loadBalancer: nws.network.loadBalancer,
     selectedServiceCategory: primaryServiceRequirement(nws)?.serviceCategory ?? 'compute',
@@ -789,6 +929,17 @@ export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceReq
         ),
         usagePattern: form.usagePattern,
         faultTolerance: form.faultTolerance,
+        internetEgressGb: parseOptionalNumber(form.monthlyEgressGb) ?? 0,
+        crossAzTransferGb: parseOptionalNumber(form.crossAzTransferGb) ?? 0,
+        interRegionTransferGb: parseOptionalNumber(form.interRegionTransferGb) ?? 0,
+        cdnTrafficGb: parseOptionalNumber(form.cdnTrafficGb) ?? 0,
+        cdnCacheHitRatioPercent: parseBoundedNumber(form.cdnCacheHitRatioPercent, 0, 100, 85),
+        natGatewayGb: parseOptionalNumber(form.natGatewayGb) ?? 0,
+        natGatewayHours: parseBoundedNumber(form.natGatewayHours, 0, 730, 0),
+        dnsHostedZones: parseNonNegativeInteger(form.dnsHostedZones, 0),
+        dnsQueriesMillion: parseOptionalNumber(form.dnsQueriesMillion) ?? 0,
+        loadBalancerProcessedGb: parseOptionalNumber(form.loadBalancerProcessedGb) ?? 0,
+        loadBalancerHours: parseBoundedNumber(form.loadBalancerHours, 0, 730, 0),
         ...(bulkRow
           ? {
               bulkImport: true,
@@ -1196,6 +1347,26 @@ function formNumericValue(form: WorkloadFormState, field: NumericWorkloadFormFie
       return form.databaseSizeGb;
     case 'monthlyEgressGb':
       return form.monthlyEgressGb;
+    case 'crossAzTransferGb':
+      return form.crossAzTransferGb;
+    case 'interRegionTransferGb':
+      return form.interRegionTransferGb;
+    case 'cdnTrafficGb':
+      return form.cdnTrafficGb;
+    case 'cdnCacheHitRatioPercent':
+      return form.cdnCacheHitRatioPercent;
+    case 'natGatewayGb':
+      return form.natGatewayGb;
+    case 'natGatewayHours':
+      return form.natGatewayHours;
+    case 'dnsHostedZones':
+      return form.dnsHostedZones;
+    case 'dnsQueriesMillion':
+      return form.dnsQueriesMillion;
+    case 'loadBalancerProcessedGb':
+      return form.loadBalancerProcessedGb;
+    case 'loadBalancerHours':
+      return form.loadBalancerHours;
     case 'commitmentPreferencePercent':
       return form.commitmentPreferencePercent;
     case 'usageHoursPerDay':

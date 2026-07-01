@@ -43,6 +43,19 @@ interface UsageAdjustment {
   monthlyHours: number;
 }
 
+interface NetworkDimensionRates {
+  crossAzPerGb: number;
+  interRegionPerGb: number;
+  cdnViewerPerGb: number;
+  cdnOriginPerGb: number;
+  natHourly: number;
+  natPerGb: number;
+  dnsZoneMonthly: number;
+  dnsPerMillionQueries: number;
+  loadBalancerHourly: number;
+  loadBalancerPerGb: number;
+}
+
 export class ComparisonUnavailableError extends Error {
   constructor(readonly failures: ComparisonWarning[]) {
     super('No provider pricing results were available');
@@ -375,8 +388,9 @@ export class ComparisonOrchestratorService {
     const supportLineItem = this.supportLineItem(nws, providerId, lineItems);
     const licensingLineItem = this.licensingLineItem(nws, providerId);
     const resilienceLineItem = this.resilienceLineItem(nws, providerId, lineItems);
+    const networkLineItems = this.networkDimensionLineItems(nws, providerId);
 
-    return [supportLineItem, licensingLineItem, resilienceLineItem].filter(
+    return [supportLineItem, licensingLineItem, resilienceLineItem, ...networkLineItems].filter(
       (lineItem): lineItem is ComparisonLineItem => lineItem !== undefined,
     );
   }
@@ -501,6 +515,174 @@ export class ComparisonOrchestratorService {
       baseHourlyCostUsd: monthlyCostUsd / HOURS_PER_MONTH,
       unit: 'month',
       unitPriceUsd: monthlyCostUsd,
+      pricingBasis: 'flat',
+    });
+  }
+
+  private networkDimensionLineItems(
+    nws: NormalizedWorkloadSpec,
+    providerId: ProviderId,
+  ): ComparisonLineItem[] {
+    const rates = networkDimensionRates(providerId);
+    const lineItems: ComparisonLineItem[] = [];
+    const network = nws.network;
+    const regionLabel = nws.workload.region.preference ?? 'default region';
+
+    if (network.crossAzTransferGb && network.crossAzTransferGb > 0) {
+      lineItems.push(
+        this.networkLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-cross-az-transfer',
+          description: `${providerLabel(providerId)} cross-AZ data transfer estimate`,
+          quantity: network.crossAzTransferGb,
+          unit: 'GB',
+          unitPriceUsd: rates.crossAzPerGb,
+        }),
+      );
+    }
+
+    if (network.interRegionTransferGb && network.interRegionTransferGb > 0) {
+      lineItems.push(
+        this.networkLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-inter-region-transfer',
+          description: `${providerLabel(providerId)} inter-region data transfer estimate`,
+          quantity: network.interRegionTransferGb,
+          unit: 'GB',
+          unitPriceUsd: rates.interRegionPerGb,
+        }),
+      );
+    }
+
+    if (network.cdn && network.cdnTrafficGb && network.cdnTrafficGb > 0) {
+      const cacheHitRatio = network.cdnCacheHitRatioPercent ?? 85;
+      const originMissGb = network.cdnTrafficGb * ((100 - cacheHitRatio) / 100);
+      const monthlyCostUsd = this.roundCurrency(
+        network.cdnTrafficGb * rates.cdnViewerPerGb + originMissGb * rates.cdnOriginPerGb,
+      );
+
+      lineItems.push(
+        this.networkLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-cdn-delivery',
+          description: `${providerLabel(
+            providerId,
+          )} CDN delivery estimate (${Math.round(cacheHitRatio)}% cache hit, ${this.roundCurrency(
+            originMissGb,
+          )} GB origin miss)`,
+          monthlyCostUsd,
+          unit: 'month',
+          unitPriceUsd: monthlyCostUsd,
+        }),
+      );
+    }
+
+    if ((network.natGatewayGb && network.natGatewayGb > 0) || network.natGatewayHours) {
+      const hours = network.natGatewayHours ?? 0;
+      const processedGb = network.natGatewayGb ?? 0;
+      const monthlyCostUsd = this.roundCurrency(
+        hours * rates.natHourly + processedGb * rates.natPerGb,
+      );
+
+      if (monthlyCostUsd > 0) {
+        lineItems.push(
+          this.networkLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-nat-gateway',
+            description: `${providerLabel(
+              providerId,
+            )} NAT gateway estimate (${hours} hrs, ${processedGb} GB processed)`,
+            monthlyCostUsd,
+            unit: 'month',
+            unitPriceUsd: monthlyCostUsd,
+          }),
+        );
+      }
+    }
+
+    if ((network.dnsHostedZones && network.dnsHostedZones > 0) || network.dnsQueriesMillion) {
+      const zones = network.dnsHostedZones ?? 0;
+      const queryMillions = network.dnsQueriesMillion ?? 0;
+      const monthlyCostUsd = this.roundCurrency(
+        zones * rates.dnsZoneMonthly + queryMillions * rates.dnsPerMillionQueries,
+      );
+
+      if (monthlyCostUsd > 0) {
+        lineItems.push(
+          this.networkLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-dns',
+            description: `${providerLabel(
+              providerId,
+            )} DNS estimate (${zones} hosted zones, ${queryMillions}M queries)`,
+            monthlyCostUsd,
+            unit: 'month',
+            unitPriceUsd: monthlyCostUsd,
+          }),
+        );
+      }
+    }
+
+    if (
+      network.loadBalancer &&
+      ((network.loadBalancerProcessedGb && network.loadBalancerProcessedGb > 0) ||
+        network.loadBalancerHours)
+    ) {
+      const hours = network.loadBalancerHours ?? 0;
+      const processedGb = network.loadBalancerProcessedGb ?? 0;
+      const monthlyCostUsd = this.roundCurrency(
+        hours * rates.loadBalancerHourly + processedGb * rates.loadBalancerPerGb,
+      );
+
+      if (monthlyCostUsd > 0) {
+        lineItems.push(
+          this.networkLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-load-balancer-capacity',
+            description: `${providerLabel(
+              providerId,
+            )} load balancer capacity estimate (${hours} hrs, ${processedGb} GB processed)`,
+            monthlyCostUsd,
+            unit: 'month',
+            unitPriceUsd: monthlyCostUsd,
+          }),
+        );
+      }
+    }
+
+    return lineItems;
+  }
+
+  private networkLineItem(input: {
+    providerId: ProviderId;
+    regionLabel: string;
+    skuId: string;
+    description: string;
+    quantity?: number;
+    monthlyCostUsd?: number;
+    unit: string;
+    unitPriceUsd: number;
+  }): ComparisonLineItem {
+    const monthlyCostUsd =
+      input.monthlyCostUsd ?? this.roundCurrency((input.quantity ?? 0) * input.unitPriceUsd);
+
+    return this.normalizeLineItem({
+      category: 'network',
+      costComponent: 'egress',
+      description: input.description,
+      isApproximate: true,
+      baseMonthlyCostUsd: monthlyCostUsd,
+      baseHourlyCostUsd: monthlyCostUsd / HOURS_PER_MONTH,
+      skuId: input.skuId,
+      region: input.regionLabel,
+      unit: input.unit,
+      unitPriceUsd: input.unitPriceUsd,
       pricingBasis: 'flat',
     });
   }
@@ -788,5 +970,49 @@ function faultToleranceLabel(
       return 'multi-region';
     case 'active-active':
       return 'active-active';
+  }
+}
+
+function networkDimensionRates(providerId: ProviderId): NetworkDimensionRates {
+  switch (providerId) {
+    case 'aws':
+      return {
+        crossAzPerGb: 0.01,
+        interRegionPerGb: 0.02,
+        cdnViewerPerGb: 0.085,
+        cdnOriginPerGb: 0.01,
+        natHourly: 0.045,
+        natPerGb: 0.045,
+        dnsZoneMonthly: 0.5,
+        dnsPerMillionQueries: 0.4,
+        loadBalancerHourly: 0.0225,
+        loadBalancerPerGb: 0.008,
+      };
+    case 'azure':
+      return {
+        crossAzPerGb: 0.01,
+        interRegionPerGb: 0.02,
+        cdnViewerPerGb: 0.081,
+        cdnOriginPerGb: 0.01,
+        natHourly: 0.045,
+        natPerGb: 0.045,
+        dnsZoneMonthly: 0.5,
+        dnsPerMillionQueries: 0.4,
+        loadBalancerHourly: 0.025,
+        loadBalancerPerGb: 0.005,
+      };
+    case 'gcp':
+      return {
+        crossAzPerGb: 0.01,
+        interRegionPerGb: 0.02,
+        cdnViewerPerGb: 0.08,
+        cdnOriginPerGb: 0.01,
+        natHourly: 0.0014,
+        natPerGb: 0.045,
+        dnsZoneMonthly: 0.2,
+        dnsPerMillionQueries: 0.4,
+        loadBalancerHourly: 0.025,
+        loadBalancerPerGb: 0.008,
+      };
   }
 }

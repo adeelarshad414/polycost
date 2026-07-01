@@ -99,6 +99,16 @@ export interface NormalizedWorkloadSpec {
   }>;
   network: {
     estimatedMonthlyEgressGb?: number;
+    crossAzTransferGb?: number;
+    interRegionTransferGb?: number;
+    cdnTrafficGb?: number;
+    cdnCacheHitRatioPercent?: number;
+    natGatewayGb?: number;
+    natGatewayHours?: number;
+    dnsHostedZones?: number;
+    dnsQueriesMillion?: number;
+    loadBalancerProcessedGb?: number;
+    loadBalancerHours?: number;
     cdn: boolean;
     loadBalancer: boolean;
   };

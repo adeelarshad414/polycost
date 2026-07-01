@@ -184,6 +184,16 @@ export const normalizedWorkloadSpecSchema = z
     network: z
       .object({
         estimatedMonthlyEgressGb: z.number().nonnegative().optional(),
+        crossAzTransferGb: z.number().nonnegative().optional(),
+        interRegionTransferGb: z.number().nonnegative().optional(),
+        cdnTrafficGb: z.number().nonnegative().optional(),
+        cdnCacheHitRatioPercent: z.number().min(0).max(100).optional(),
+        natGatewayGb: z.number().nonnegative().optional(),
+        natGatewayHours: z.number().min(0).max(730).optional(),
+        dnsHostedZones: z.number().int().nonnegative().optional(),
+        dnsQueriesMillion: z.number().nonnegative().optional(),
+        loadBalancerProcessedGb: z.number().nonnegative().optional(),
+        loadBalancerHours: z.number().min(0).max(730).optional(),
         cdn: z.boolean(),
         loadBalancer: z.boolean(),
       })

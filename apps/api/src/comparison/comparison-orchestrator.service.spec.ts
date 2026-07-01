@@ -454,6 +454,84 @@ describe('ComparisonOrchestratorService', () => {
     );
   });
 
+  it('adds explicit modeled network dimension line items when advanced traffic assumptions exist', async () => {
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async (): Promise<ProviderPricingResult> => ({
+          providerId: 'aws',
+          baseMonthlyCostUsd: 10,
+          lineItems: [
+            {
+              category: 'compute',
+              costComponent: 'compute',
+              description: 'aws compute',
+              isApproximate: false,
+              baseMonthlyCostUsd: 10,
+              skuId: 'aws-compute',
+              region: 'us-east-1',
+              unit: 'hour',
+              unitPriceUsd: 0.01,
+            },
+          ],
+        })),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      network: {
+        estimatedMonthlyEgressGb: 0,
+        crossAzTransferGb: 100,
+        interRegionTransferGb: 200,
+        cdn: true,
+        cdnTrafficGb: 1000,
+        cdnCacheHitRatioPercent: 80,
+        natGatewayGb: 500,
+        natGatewayHours: 730,
+        dnsHostedZones: 2,
+        dnsQueriesMillion: 3,
+        loadBalancer: true,
+        loadBalancerProcessedGb: 250,
+        loadBalancerHours: 730,
+      },
+    });
+
+    expect(result.providers[0].lineItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'network',
+          costComponent: 'egress',
+          skuId: 'modeled-cross-az-transfer',
+          baseMonthlyCostUsd: 1,
+          isApproximate: true,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-inter-region-transfer',
+          baseMonthlyCostUsd: 4,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-cdn-delivery',
+          description: expect.stringContaining('80% cache hit'),
+          baseMonthlyCostUsd: 87,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-nat-gateway',
+          baseMonthlyCostUsd: 55.35,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-dns',
+          baseMonthlyCostUsd: 2.2,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-load-balancer-capacity',
+          baseMonthlyCostUsd: 18.43,
+        }),
+      ]),
+    );
+    expect(result.providers[0].breakdown?.egressMonthlyCostUsd).toBe(167.98);
+  });
+
   it('uses a safe warning when a provider fails without an Error object', async () => {
     const service = createService([
       adapter(
