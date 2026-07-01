@@ -105,6 +105,10 @@ describe('App', () => {
     });
     expect(text(container)).toContain('Executive monthly baseline');
     expect(text(container)).toContain('Provider mix');
+    expect(text(container)).toContain('Pricing model comparison');
+    expect(text(container)).toContain('On-demand vs commitments');
+    expect(container.querySelectorAll('.executive-provider-card')).toHaveLength(3);
+    expect(container.querySelector('.executive-pricing-bars')).toBeInstanceOf(HTMLElement);
     expect(text(container)).toContain('Trend pending');
     expect(container.querySelector('.recharts-wrapper')).toBeInstanceOf(HTMLElement);
     expect(text(container)).toContain('Show full breakdown, pricing models & export options');

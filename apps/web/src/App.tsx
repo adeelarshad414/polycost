@@ -1645,7 +1645,11 @@ function ProgressiveComparisonPage({
               className="progressive-analytics-stack"
               aria-label="Executive and engineering analytics"
             >
-              <ExecutiveAnalyticsPreview comparison={comparison} form={submittedForm} />
+              <ExecutiveAnalyticsPreview
+                comparison={comparison}
+                form={submittedForm}
+                pricingModel={pricingModel}
+              />
               <EngineeringAnalyticsPreview comparison={comparison} interval={interval} />
             </div>
 
@@ -4072,6 +4076,7 @@ export function ComparisonView({
   form = defaultWorkloadForm,
   interval,
   isLoading = false,
+  pricingModel = 'on-demand',
   onExport,
 }: {
   client?: PolyCostClient;
@@ -4081,6 +4086,7 @@ export function ComparisonView({
   interval: IntervalKey;
   form?: WorkloadFormState;
   isLoading?: boolean;
+  pricingModel?: PricingModelKey;
   onExport?: (format: ReportFormat) => void;
 }) {
   const providerResults = new Map<ProviderId, ComparisonProviderResult>(
@@ -4126,6 +4132,7 @@ export function ComparisonView({
             exportingFormat={exportingFormat}
             form={form}
             isLoading={isLoading}
+            pricingModel={pricingModel}
             onExport={onExport}
           />
           <ProviderCostWorkspace comparison={comparison} interval={interval} />
@@ -4199,17 +4206,19 @@ function ExecutiveOverview({
   exportingFormat,
   form,
   isLoading,
+  pricingModel,
   onExport,
 }: {
   comparison: ComparisonResult | null;
   exportingFormat?: ReportFormat | null;
   form: WorkloadFormState;
   isLoading?: boolean;
+  pricingModel: PricingModelKey;
   onExport?: (format: ReportFormat) => void;
 }) {
   return (
     <section className="demo-overview" aria-label="Executive analytics overview">
-      <ExecutiveAnalyticsPreview comparison={comparison} form={form} />
+      <ExecutiveAnalyticsPreview comparison={comparison} form={form} pricingModel={pricingModel} />
       <ExecutiveDecisionDashboard
         comparison={comparison}
         form={form}
@@ -4225,9 +4234,11 @@ function ExecutiveOverview({
 function ExecutiveAnalyticsPreview({
   comparison,
   form,
+  pricingModel,
 }: {
   comparison: ComparisonResult | null;
   form: WorkloadFormState;
+  pricingModel: PricingModelKey;
 }) {
   const analytics = executiveAnalyticsModel(comparison, form);
   const pricedCount = analytics.pricedMonthlySummaries.length;
@@ -4235,6 +4246,8 @@ function ExecutiveAnalyticsPreview({
 
   return (
     <section className="executive-analytics-preview" aria-label="Executive analytics dashboard">
+      <ExecutiveProviderHero comparison={comparison} pricingModel={pricingModel} />
+
       <article className="executive-headline-card">
         <div className="executive-card-heading">
           <span>Executive monthly baseline</span>
@@ -4268,6 +4281,8 @@ function ExecutiveAnalyticsPreview({
         </div>
         <ProviderMixDonut data={analytics.providerMix} />
       </article>
+
+      <ExecutivePricingModelBars comparison={comparison} />
 
       <div className="executive-stat-grid" aria-label="Executive compact stats">
         <ExecutiveStatTile
@@ -4382,6 +4397,126 @@ function ExecutiveDecisionDashboard({
       </div>
     </section>
   );
+}
+
+function ExecutiveProviderHero({
+  comparison,
+  pricingModel,
+}: {
+  comparison: ComparisonResult | null;
+  pricingModel: PricingModelKey;
+}) {
+  const providers = PROVIDER_ORDER.map((providerId) =>
+    comparison?.providers.find((provider) => provider.providerId === providerId),
+  );
+  const pricedProviders = providers.filter((provider): provider is ComparisonProviderResult =>
+    Boolean(provider),
+  );
+  const monthlyCosts = pricedProviders
+    .map((provider) => executiveModelMonthlyCost(provider, pricingModel))
+    .filter((cost): cost is number => cost !== undefined);
+  const highest = Math.max(...monthlyCosts, 0);
+  const lowest = Math.min(...monthlyCosts, highest || 0);
+
+  return (
+    <section className="executive-provider-hero" aria-label="Executive provider monthly cards">
+      {PROVIDER_ORDER.map((providerId) => {
+        const provider = providers.find((candidate) => candidate?.providerId === providerId);
+        const monthly = provider ? executiveModelMonthlyCost(provider, pricingModel) : undefined;
+        const isLowest = monthly !== undefined && monthly === lowest && monthlyCosts.length > 0;
+        const deltaPercent =
+          monthly !== undefined && lowest > 0 ? ((monthly - lowest) / lowest) * 100 : undefined;
+
+        return (
+          <article
+            key={providerId}
+            className={`executive-provider-card executive-provider-card-${providerId}`}
+          >
+            <span>{providerLabel(providerId)}</span>
+            <strong>{monthly !== undefined ? formatCurrency(monthly) : 'Unavailable'}</strong>
+            <small>
+              {isLowest
+                ? 'Best value'
+                : deltaPercent !== undefined
+                  ? `${formatPercent(deltaPercent)} over lowest`
+                  : 'Pricing pending'}
+            </small>
+            <em>{pricingModelSummaryLabel(pricingModel)}</em>
+          </article>
+        );
+      })}
+    </section>
+  );
+}
+
+function ExecutivePricingModelBars({ comparison }: { comparison: ComparisonResult | null }) {
+  const models: PricingModelKey[] = ['on-demand', 'reserved-1yr', 'reserved-3yr'];
+  const rows =
+    comparison?.providers.map((provider) => ({
+      providerId: provider.providerId,
+      values: models.map((model) => ({
+        model,
+        monthly: executiveModelMonthlyCost(provider, model),
+      })),
+    })) ?? [];
+  const maxMonthly = Math.max(
+    ...rows.flatMap((row) =>
+      row.values.map((value) => (value.monthly !== undefined ? value.monthly : 0)),
+    ),
+    1,
+  );
+
+  return (
+    <article className="executive-pricing-bars" aria-label="Pricing model comparison bar">
+      <div className="executive-card-heading">
+        <span>Pricing model comparison</span>
+        <strong>On-demand vs commitments</strong>
+      </div>
+      <div className="executive-pricing-bar-grid">
+        {rows.length > 0 ? (
+          rows.map((row) => (
+            <div className="executive-pricing-row" key={row.providerId}>
+              <span>{providerLabel(row.providerId)}</span>
+              <div className="executive-pricing-bar-stack">
+                {row.values.map((value) => (
+                  <span
+                    key={`${row.providerId}-${value.model}`}
+                    className={`executive-pricing-bar executive-pricing-${row.providerId}`}
+                    style={{
+                      inlineSize: `${Math.max(6, ((value.monthly ?? 0) / maxMonthly) * 100)}%`,
+                    }}
+                    title={`${providerLabel(row.providerId)} ${pricingModelSummaryLabel(
+                      value.model,
+                    )}: ${
+                      value.monthly !== undefined ? formatCurrency(value.monthly) : 'Unavailable'
+                    } monthly`}
+                  >
+                    <i>{costMatrixPricingModelLabel(value.model)}</i>
+                    <b>{value.monthly !== undefined ? formatCurrency(value.monthly) : 'N/A'}</b>
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))
+        ) : (
+          <p>Run a comparison to populate pricing-model bars.</p>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function executiveModelMonthlyCost(
+  provider: ComparisonProviderResult,
+  pricingModel: PricingModelKey,
+): number | undefined {
+  if (pricingModel === 'on-demand') {
+    return provider.totals.monthly;
+  }
+
+  const model = provider.pricingModels?.find((candidate) => candidate.model === pricingModel);
+
+  return model?.available ? model.monthlyCostUsd : undefined;
 }
 
 function ProviderMixDonut({ data }: { data: ProviderMixDatum[] }) {
