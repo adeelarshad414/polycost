@@ -1,10 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { ComparisonResult } from '../comparison/comparison.types';
 import {
+  decisionSummaryRows,
   lineItemEvidenceRows,
+  pricingModelAvailabilityRows,
+  providerRankingRows,
+  reportAssumptionRows,
   reportContextRows,
   selectedScenarioRows,
   serviceRequirementRows,
+  workloadScopeRows,
 } from './report-evidence';
 import { buildReportInsights } from './report-insights';
 import { escapeXml, sanitizeSpreadsheetText } from './report-security';
@@ -64,10 +69,43 @@ export class ExcelReportGenerator {
         cells: ['Pricing As Of', sanitizeSpreadsheetText(result.pricingAsOf)],
       },
       {
-        cells: ['Cheapest Provider', result.cheapestProviderId],
+        cells: ['Cheapest provider (on-demand baseline)', result.cheapestProviderId],
       },
       ...reportContextRows(options).map((row) => ({
         cells: row,
+      })),
+      {
+        cells: [],
+      },
+      {
+        cells: ['Decision Summary'],
+        style: 2,
+      },
+      ...decisionSummaryRows(result, options).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
+      {
+        cells: [],
+      },
+      {
+        cells: ['Provider Ranking'],
+        style: 2,
+      },
+      ...providerRankingRows(result, options).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
+      {
+        cells: [],
+      },
+      {
+        cells: ['Workload Scope'],
+        style: 2,
+      },
+      ...workloadScopeRows(result).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
       })),
       {
         cells: [],
@@ -119,6 +157,17 @@ export class ExcelReportGenerator {
         cells: [],
       },
       {
+        cells: ['Pricing Model Availability'],
+        style: 2,
+      },
+      ...pricingModelAvailabilityRows(result).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
+      {
+        cells: [],
+      },
+      {
         cells: ['Normalized Service Requirements'],
         style: 2,
       },
@@ -159,6 +208,17 @@ export class ExcelReportGenerator {
         cells: row.map(sanitizeSpreadsheetText),
         ...(index === 0 ? { style: 2 } : {}),
       })),
+      {
+        cells: [],
+      },
+      {
+        cells: ['Report Assumptions'],
+        style: 2,
+      },
+      ...reportAssumptionRows(result).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
     ];
 
     if (result.warnings && result.warnings.length > 0) {
@@ -193,9 +253,9 @@ function worksheetXml(rows: WorksheetRow[]): string {
     <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
       <cols>
         <col min="1" max="1" width="18" customWidth="1"/>
-        <col min="2" max="2" width="16" customWidth="1"/>
-        <col min="3" max="3" width="56" customWidth="1"/>
-        <col min="4" max="6" width="16" customWidth="1"/>
+        <col min="2" max="2" width="28" customWidth="1"/>
+        <col min="3" max="3" width="42" customWidth="1"/>
+        <col min="4" max="10" width="18" customWidth="1"/>
       </cols>
       <sheetData>
         ${rows.map((row, rowIndex) => rowXml(row, rowIndex + 1)).join('')}

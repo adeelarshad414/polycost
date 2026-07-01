@@ -1,11 +1,203 @@
 import { PricingModelCost } from '../adapters/common/cloud-provider-adapter';
-import { ComparisonLineItem, ComparisonResult } from '../comparison/comparison.types';
+import {
+  ComparisonLineItem,
+  ComparisonProviderResult,
+  ComparisonResult,
+} from '../comparison/comparison.types';
 import { ReportInterval, ReportOptions, ReportPricingModel } from './report.types';
+
+const REPORT_PRICING_MODELS: ReportPricingModel[] = [
+  'on-demand',
+  'reserved-1yr',
+  'reserved-3yr',
+  'savings-plan',
+  'spot',
+];
+
+interface ProviderScenario {
+  providerId: string;
+  available: boolean;
+  intervalCostUsd?: number;
+  monthlyCostUsd?: number;
+  yearlyCostUsd?: number;
+  caveat: string;
+  approximateLineItemCount: number;
+}
+
+interface RankedProviderScenario extends ProviderScenario {
+  rank?: number;
+  deltaVsLowestMonthlyUsd?: number;
+  annualAvoidableSpendUsd?: number;
+}
 
 export function reportContextRows(options: ReportOptions): string[][] {
   return [
     ['Selected interval', labelForInterval(options.interval ?? 'monthly')],
     ['Selected pricing model', labelForPricingModel(options.pricingModel ?? 'on-demand')],
+  ];
+}
+
+export function workloadScopeRows(result: ComparisonResult): string[][] {
+  const requirements = result.requirements;
+
+  if (!requirements) {
+    return [
+      ['Field', 'Value'],
+      ['Workload scope', 'No normalized workload summary was attached to this comparison.'],
+    ];
+  }
+
+  return [
+    ['Field', 'Value'],
+    ['Workload name', requirements.workloadName ?? 'Unnamed workload'],
+    ['Workload type', requirements.workloadType],
+    ['Input source', requirements.sourceType],
+    ['Region preference', requirements.regionPreference ?? 'Not specified'],
+    ['Normalized service requirements', requirements.serviceRequirements.length.toString()],
+  ];
+}
+
+export function decisionSummaryRows(
+  result: ComparisonResult,
+  options: ReportOptions,
+): string[][] {
+  const interval = options.interval ?? 'monthly';
+  const pricingModel = options.pricingModel ?? 'on-demand';
+  const rankedScenarios = rankedProviderScenarios(result, options);
+  const best = rankedScenarios.find((scenario) => scenario.rank === 1);
+  const eligible = rankedScenarios.filter((scenario) => scenario.rank !== undefined);
+  const highest = eligible.at(-1);
+  const approximateLineItems = result.providers.reduce(
+    (count, provider) =>
+      count + provider.lineItems.filter((lineItem) => lineItem.isApproximate).length,
+    0,
+  );
+  const warningCount = result.warnings?.length ?? 0;
+
+  return [
+    ['Signal', 'Detail'],
+    [
+      'Cost baseline',
+      best
+        ? `${best.providerId} ranks #1 for ${labelForPricingModel(pricingModel)} at $${formatNumber(
+            best.intervalCostUsd ?? 0,
+          )} ${labelForInterval(interval).toLowerCase()} / $${formatNumber(
+            best.monthlyCostUsd ?? 0,
+          )} monthly.`
+        : `No provider is eligible for the selected ${labelForPricingModel(pricingModel)} scenario.`,
+    ],
+    ['Selected scenario', `${labelForPricingModel(pricingModel)} viewed at ${labelForInterval(interval)} cadence.`],
+    [
+      'Savings spread',
+      best && highest && highest.providerId !== best.providerId
+        ? `$${formatNumber(
+            (highest.monthlyCostUsd ?? 0) - (best.monthlyCostUsd ?? 0),
+          )} monthly / $${formatNumber(
+            (highest.yearlyCostUsd ?? 0) - (best.yearlyCostUsd ?? 0),
+          )} annual separates the highest and lowest eligible provider.`
+        : 'Not enough eligible providers to calculate a provider-to-provider spread.',
+    ],
+    ['Evidence confidence', evidenceConfidence(result.providers.length, approximateLineItems, warningCount)],
+    [
+      'Architecture validation',
+      best
+        ? `${best.providerId} still needs regional SKU, quota, resilience, data-transfer path, and service-equivalence validation before target-cloud commitment.`
+        : 'Validate pricing model availability before this scenario is used for target-cloud commitment.',
+    ],
+  ];
+}
+
+export function providerRankingRows(
+  result: ComparisonResult,
+  options: ReportOptions,
+): string[][] {
+  const interval = options.interval ?? 'monthly';
+
+  return [
+    [
+      'Provider',
+      'Rank',
+      'Selected model eligible',
+      `${labelForInterval(interval)} USD`,
+      'Monthly USD',
+      'Yearly USD',
+      'Delta vs lowest monthly USD',
+      'Annual avoidable spend USD',
+      'Approximate line items',
+      'Evidence note',
+    ],
+    ...rankedProviderScenarios(result, options).map((scenario) => [
+      scenario.providerId,
+      scenario.rank !== undefined ? `#${scenario.rank}` : 'Not eligible',
+      scenario.available ? 'yes' : 'no',
+      scenario.intervalCostUsd !== undefined ? formatNumber(scenario.intervalCostUsd) : '',
+      scenario.monthlyCostUsd !== undefined ? formatNumber(scenario.monthlyCostUsd) : '',
+      scenario.yearlyCostUsd !== undefined ? formatNumber(scenario.yearlyCostUsd) : '',
+      scenario.deltaVsLowestMonthlyUsd !== undefined
+        ? formatNumber(scenario.deltaVsLowestMonthlyUsd)
+        : '',
+      scenario.annualAvoidableSpendUsd !== undefined
+        ? formatNumber(scenario.annualAvoidableSpendUsd)
+        : '',
+      scenario.approximateLineItemCount.toString(),
+      scenario.caveat,
+    ]),
+  ];
+}
+
+export function pricingModelAvailabilityRows(result: ComparisonResult): string[][] {
+  return [
+    [
+      'Provider',
+      ...REPORT_PRICING_MODELS.map((pricingModel) => labelForPricingModel(pricingModel)),
+      'Evidence note',
+    ],
+    ...result.providers.map((provider) => [
+      provider.providerId,
+      ...REPORT_PRICING_MODELS.map((pricingModel) => pricingModelStatus(provider, pricingModel)),
+      providerAvailabilityNote(provider),
+    ]),
+  ];
+}
+
+export function reportAssumptionRows(result: ComparisonResult): string[][] {
+  const warningCount = result.warnings?.length ?? 0;
+  const approximateLineItems = result.providers.reduce(
+    (count, provider) =>
+      count + provider.lineItems.filter((lineItem) => lineItem.isApproximate).length,
+    0,
+  );
+
+  return [
+    ['Assumption', 'How to read it'],
+    [
+      'Currency',
+      'All values are USD estimates; taxes, support plans, credits, and private enterprise discounts are excluded unless present in the pricing catalog.',
+    ],
+    [
+      'Time normalization',
+      'Monthly cost uses 730 hours. Quarterly and yearly figures are arithmetic projections from the selected monthly run rate.',
+    ],
+    [
+      'Pricing source',
+      warningCount > 0
+        ? `Cached provider catalog rates with ${warningCount} warning(s) captured in this export.`
+        : 'Cached provider catalog rates; live refresh results are reflected only when the comparison was refreshed successfully.',
+    ],
+    [
+      'Commitment scenarios',
+      'Reserved, Savings Plan/CUD, and Spot scenarios are ranked only when provider evidence is available. Non-compute line items remain on-demand in commitment views.',
+    ],
+    [
+      'Approximate mappings',
+      approximateLineItems > 0
+        ? `${approximateLineItems} line item(s) are approximate and should be reviewed by a solution architect before commitment.`
+        : 'No approximate line items were flagged by the service-equivalence mapper.',
+    ],
+    [
+      'Decision use',
+      'This report is designed for directional, decision-grade comparison, not invoice reconciliation to the cent.',
+    ],
   ];
 }
 
@@ -122,6 +314,126 @@ function selectedMonthlyCost(model: PricingModelCost | undefined, fallbackMonthl
     : fallbackMonthly;
 }
 
+function rankedProviderScenarios(
+  result: ComparisonResult,
+  options: ReportOptions,
+): RankedProviderScenario[] {
+  const scenarios = result.providers.map((provider) => providerScenario(provider, options));
+  const eligible = scenarios
+    .filter(
+      (scenario): scenario is ProviderScenario & Required<Pick<ProviderScenario, 'monthlyCostUsd'>> =>
+        scenario.available && scenario.monthlyCostUsd !== undefined,
+    )
+    .sort((left, right) => left.monthlyCostUsd - right.monthlyCostUsd);
+  const lowestMonthly = eligible[0]?.monthlyCostUsd;
+  const rankByProvider = new Map(
+    eligible.map((scenario, index) => [scenario.providerId, index + 1]),
+  );
+
+  return [...eligible, ...scenarios.filter((scenario) => !scenario.available)].map(
+    (scenario) => {
+      const rank = rankByProvider.get(scenario.providerId);
+      const deltaVsLowestMonthlyUsd =
+        lowestMonthly !== undefined && scenario.monthlyCostUsd !== undefined
+          ? roundCurrency(scenario.monthlyCostUsd - lowestMonthly)
+          : undefined;
+
+      return {
+        ...scenario,
+        ...(rank !== undefined ? { rank } : {}),
+        ...(deltaVsLowestMonthlyUsd !== undefined
+          ? {
+              deltaVsLowestMonthlyUsd,
+              annualAvoidableSpendUsd: roundCurrency(deltaVsLowestMonthlyUsd * 12),
+            }
+          : {}),
+      };
+    },
+  );
+}
+
+function providerScenario(
+  provider: ComparisonProviderResult,
+  options: ReportOptions,
+): ProviderScenario {
+  const pricingModel = options.pricingModel ?? 'on-demand';
+  const interval = options.interval ?? 'monthly';
+  const model = provider.pricingModels?.find((candidate) => candidate.model === pricingModel);
+  const available = pricingModel === 'on-demand' || model?.available === true;
+  const monthlyCostUsd = available ? selectedMonthlyCost(model, provider.totals.monthly) : undefined;
+
+  return {
+    providerId: provider.providerId,
+    available,
+    ...(monthlyCostUsd !== undefined
+      ? {
+          intervalCostUsd: costForInterval(monthlyCostUsd, interval),
+          monthlyCostUsd,
+          yearlyCostUsd: monthlyCostUsd * 12,
+        }
+      : {}),
+    caveat: scenarioCaveat(pricingModel, model),
+    approximateLineItemCount: provider.lineItems.filter((lineItem) => lineItem.isApproximate)
+      .length,
+  };
+}
+
+function evidenceConfidence(
+  providerCount: number,
+  approximateLineItems: number,
+  warningCount: number,
+): string {
+  if (providerCount === 3 && approximateLineItems === 0 && warningCount === 0) {
+    return 'High - all three providers priced with exact mappings and no export warnings.';
+  }
+
+  if (providerCount >= 2 && warningCount === 0) {
+    return `Medium - ${providerCount}/3 providers priced with ${approximateLineItems} approximate mapping(s).`;
+  }
+
+  return `Review required - ${providerCount}/3 providers priced, ${approximateLineItems} approximate mapping(s), ${warningCount} warning(s).`;
+}
+
+function pricingModelStatus(
+  provider: ComparisonProviderResult,
+  pricingModel: ReportPricingModel,
+): string {
+  const model = provider.pricingModels?.find((candidate) => candidate.model === pricingModel);
+
+  if (!model) {
+    return pricingModel === 'on-demand' ? 'available' : 'not modeled';
+  }
+
+  if (!model.available) {
+    return `unavailable: ${model.unavailableReason ?? 'not offered for this configuration'}`;
+  }
+
+  const savings =
+    model.savingsPercentVsOnDemand !== undefined
+      ? `; ${formatNumber(model.savingsPercentVsOnDemand)}% vs on-demand`
+      : '';
+
+  return `available${savings}`;
+}
+
+function providerAvailabilityNote(provider: ComparisonProviderResult): string {
+  if (!provider.pricingModels || provider.pricingModels.length === 0) {
+    return 'Only on-demand totals are modeled for this provider.';
+  }
+
+  const unavailableModels =
+    provider.pricingModels
+      ?.filter((model) => !model.available)
+      .map((model) => `${labelForPricingModel(model.model)}: ${model.unavailableReason ?? 'unavailable'}`) ??
+    [];
+
+  if (unavailableModels.length === 0) {
+    return 'All modeled pricing scenarios are eligible for ranking.';
+  }
+
+  return unavailableModels.join('; ');
+}
+
 function scenarioCaveat(
   pricingModel: ReportPricingModel,
   model: PricingModelCost | undefined,
@@ -196,4 +508,8 @@ function scaleParamsText(scaleParams: Record<string, string | number | boolean>)
 
 function formatNumber(value: number): string {
   return (Math.round((value + Number.EPSILON) * 100) / 100).toString();
+}
+
+function roundCurrency(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
