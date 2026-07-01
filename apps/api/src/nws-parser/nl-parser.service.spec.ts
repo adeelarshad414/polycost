@@ -284,13 +284,61 @@ describe('NLParserService', () => {
         expect.objectContaining({
           serviceCategory: 'storage',
           serviceType: 'object-storage',
-          instanceType: 'object - 250GB',
+          instanceType: 'object / standard - 250GB',
         }),
       ]),
     );
     expect(result.fieldsRequiringReview).not.toContain('compute[0].vcpu');
     expect(result.fieldsRequiringReview).not.toContain('compute[0].memoryGb');
     expect(result.fieldsRequiringReview).toEqual(['database[0].sizeGb']);
+  });
+
+  it('infers advanced storage dimensions from natural language', async () => {
+    const client: StructuredLlmClient = {
+      createStructuredOutput: jest.fn(),
+    };
+    const service = new NLParserService(configService(4000, false), client, fixedNow);
+
+    const result = await service.parse(
+      'A web app with 500GB archive object storage, 100k PUT, 250k GET, 25k LIST, 40GB retrieval, cross-region replication, 200GB snapshots, 3000 IOPS, 125MB/s throughput, and two 4 vCPU 16GB servers.',
+    );
+
+    expect(result.draftNws.storage[0]).toEqual(
+      expect.objectContaining({
+        type: 'object',
+        sizeGb: 500,
+        accessPattern: 'archive',
+        storageClass: 'archive',
+        monthlyPutRequestsThousand: 100,
+        monthlyGetRequestsThousand: 250,
+        monthlyListRequestsThousand: 25,
+        monthlyRetrievalGb: 40,
+        replication: 'cross-region',
+        snapshotSizeGb: 200,
+        snapshotRetentionDays: 30,
+        provisionedIops: 3000,
+        provisionedThroughputMbps: 125,
+      }),
+    );
+    expect(result.draftNws.serviceRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceCategory: 'storage',
+          serviceType: 'archive-storage',
+          tier: 'archive',
+          scaleParams: expect.objectContaining({
+            storageClass: 'archive',
+            monthlyPutRequestsThousand: 100,
+            monthlyGetRequestsThousand: 250,
+            monthlyRetrievalGb: 40,
+            storageReplication: 'cross-region',
+            snapshotSizeGb: 200,
+            provisionedIops: 3000,
+            provisionedThroughputMbps: 125,
+          }),
+        }),
+      ]),
+    );
   });
 
   it('infers accelerated compute families for GPU and ML workloads', async () => {

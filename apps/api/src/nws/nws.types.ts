@@ -29,6 +29,23 @@ export const instanceFamilySchema = z.enum([
 
 export const processorArchitectureSchema = z.enum(['x86_64', 'arm64', 'gpu']);
 export const computeTenancySchema = z.enum(['shared', 'dedicated-host', 'sole-tenant']);
+export const storageClassSchema = z.enum([
+  'standard',
+  'hot',
+  'cool',
+  'cold',
+  'nearline',
+  'coldline',
+  'intelligent-tiering',
+  'infrequent-access',
+  'one-zone-infrequent-access',
+  'archive-instant',
+  'archive',
+  'deep-archive',
+  'premium',
+  'ultra',
+]);
+export const storageReplicationSchema = z.enum(['none', 'same-region', 'cross-region']);
 
 export const computeComponentSchema = z
   .object({
@@ -60,6 +77,18 @@ export const storageComponentSchema = z
     type: z.enum(['object', 'block', 'file']),
     sizeGb: z.number().positive(),
     accessPattern: z.enum(['frequent', 'infrequent', 'archive']).optional(),
+    storageClass: storageClassSchema.optional(),
+    monthlyPutRequestsThousand: z.number().nonnegative().optional(),
+    monthlyGetRequestsThousand: z.number().nonnegative().optional(),
+    monthlyDeleteRequestsThousand: z.number().nonnegative().optional(),
+    monthlyListRequestsThousand: z.number().nonnegative().optional(),
+    monthlyRetrievalGb: z.number().nonnegative().optional(),
+    replication: storageReplicationSchema.optional(),
+    lifecycleTransitionsThousand: z.number().nonnegative().optional(),
+    snapshotSizeGb: z.number().nonnegative().optional(),
+    snapshotRetentionDays: z.number().int().nonnegative().optional(),
+    provisionedIops: z.number().int().nonnegative().optional(),
+    provisionedThroughputMbps: z.number().nonnegative().optional(),
   })
   .strict();
 

@@ -182,6 +182,69 @@ export const NWS_PARSE_RESULT_JSON_SCHEMA = {
                 type: 'string',
                 enum: ['frequent', 'infrequent', 'archive'],
               },
+              storageClass: {
+                type: 'string',
+                enum: [
+                  'standard',
+                  'hot',
+                  'cool',
+                  'cold',
+                  'nearline',
+                  'coldline',
+                  'intelligent-tiering',
+                  'infrequent-access',
+                  'one-zone-infrequent-access',
+                  'archive-instant',
+                  'archive',
+                  'deep-archive',
+                  'premium',
+                  'ultra',
+                ],
+              },
+              monthlyPutRequestsThousand: {
+                type: 'number',
+                minimum: 0,
+              },
+              monthlyGetRequestsThousand: {
+                type: 'number',
+                minimum: 0,
+              },
+              monthlyDeleteRequestsThousand: {
+                type: 'number',
+                minimum: 0,
+              },
+              monthlyListRequestsThousand: {
+                type: 'number',
+                minimum: 0,
+              },
+              monthlyRetrievalGb: {
+                type: 'number',
+                minimum: 0,
+              },
+              replication: {
+                type: 'string',
+                enum: ['none', 'same-region', 'cross-region'],
+              },
+              lifecycleTransitionsThousand: {
+                type: 'number',
+                minimum: 0,
+              },
+              snapshotSizeGb: {
+                type: 'number',
+                minimum: 0,
+              },
+              snapshotRetentionDays: {
+                type: 'integer',
+                minimum: 0,
+              },
+              provisionedIops: {
+                type: 'integer',
+                minimum: 0,
+              },
+              provisionedThroughputMbps: {
+                type: 'number',
+                minimum: 0,
+              },
             },
           },
         },

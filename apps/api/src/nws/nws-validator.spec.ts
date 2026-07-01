@@ -83,6 +83,39 @@ describe('NWSValidator', () => {
     expect(NWSValidator.validate(spec).storage).toHaveLength(1);
   });
 
+  it('accepts advanced storage cost dimensions', () => {
+    const spec = {
+      ...baseSpec(),
+      compute: [],
+      storage: [
+        {
+          role: 'assets',
+          type: 'object',
+          sizeGb: 500,
+          accessPattern: 'archive',
+          storageClass: 'archive',
+          monthlyPutRequestsThousand: 100,
+          monthlyGetRequestsThousand: 250,
+          monthlyDeleteRequestsThousand: 10,
+          monthlyListRequestsThousand: 25,
+          monthlyRetrievalGb: 40,
+          replication: 'cross-region',
+          lifecycleTransitionsThousand: 20,
+          snapshotSizeGb: 200,
+          snapshotRetentionDays: 45,
+          provisionedIops: 3000,
+          provisionedThroughputMbps: 125,
+        },
+      ],
+    };
+
+    expect(NWSValidator.validate(spec).storage[0]).toMatchObject({
+      storageClass: 'archive',
+      replication: 'cross-region',
+      provisionedIops: 3000,
+    });
+  });
+
   it('accepts a valid database-only workload', () => {
     const spec = {
       ...baseSpec(),

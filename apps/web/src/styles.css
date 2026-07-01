@@ -2478,6 +2478,52 @@ select:hover {
   text-transform: uppercase;
 }
 
+.advanced-service-fields {
+  display: grid;
+  gap: var(--pc-space-2);
+  border: 1px solid color-mix(in srgb, var(--pc-border) 82%, transparent);
+  border-radius: 8px;
+  background: var(--pc-bg-surface-2);
+}
+
+.advanced-service-fields summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pc-space-2);
+  background: linear-gradient(var(--brand-orange), var(--brand-blue), var(--brand-green)) left / 3px
+    100% no-repeat;
+  cursor: pointer;
+  list-style: none;
+  padding: 10px 12px;
+}
+
+.advanced-service-fields summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-service-fields summary span {
+  color: var(--pc-text-primary);
+  font-size: var(--pc-text-sm);
+  font-weight: 850;
+}
+
+.advanced-service-fields summary small {
+  color: var(--pc-text-tertiary);
+  font-size: var(--pc-text-xs);
+  font-weight: 750;
+  text-align: right;
+}
+
+.advanced-service-fields[open] {
+  padding-bottom: 12px;
+}
+
+.advanced-service-fields[open] .form-grid {
+  padding: 0 12px;
+}
+
 .form-switches {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

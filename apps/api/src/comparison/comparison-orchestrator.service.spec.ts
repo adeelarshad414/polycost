@@ -532,6 +532,100 @@ describe('ComparisonOrchestratorService', () => {
     expect(result.providers[0].breakdown?.egressMonthlyCostUsd).toBe(167.98);
   });
 
+  it('adds explicit modeled storage dimension line items when advanced storage assumptions exist', async () => {
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async (): Promise<ProviderPricingResult> => ({
+          providerId: 'aws',
+          baseMonthlyCostUsd: 10,
+          lineItems: [
+            {
+              category: 'compute',
+              costComponent: 'compute',
+              description: 'aws compute',
+              isApproximate: false,
+              baseMonthlyCostUsd: 10,
+              skuId: 'aws-compute',
+              region: 'us-east-1',
+              unit: 'hour',
+              unitPriceUsd: 0.01,
+            },
+          ],
+        })),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      storage: [
+        {
+          role: 'assets',
+          type: 'object',
+          sizeGb: 500,
+          accessPattern: 'archive',
+          storageClass: 'archive',
+          monthlyPutRequestsThousand: 100,
+          monthlyGetRequestsThousand: 250,
+          monthlyDeleteRequestsThousand: 10,
+          monthlyListRequestsThousand: 25,
+          monthlyRetrievalGb: 40,
+          replication: 'cross-region',
+          lifecycleTransitionsThousand: 20,
+          snapshotSizeGb: 200,
+          snapshotRetentionDays: 45,
+          provisionedIops: 3000,
+          provisionedThroughputMbps: 125,
+        },
+      ],
+    });
+
+    expect(result.providers[0].lineItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'storage',
+          costComponent: 'storage',
+          skuId: 'modeled-storage-put-requests',
+          baseMonthlyCostUsd: 0.5,
+          isApproximate: true,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-storage-get-requests',
+          baseMonthlyCostUsd: 0.1,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-storage-list-requests',
+          baseMonthlyCostUsd: 0.13,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-storage-retrieval',
+          baseMonthlyCostUsd: 1.2,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-storage-cross-region-replication',
+          baseMonthlyCostUsd: 10,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-storage-lifecycle-transitions',
+          baseMonthlyCostUsd: 0.2,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-storage-snapshots',
+          baseMonthlyCostUsd: 15,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-storage-provisioned-iops',
+          baseMonthlyCostUsd: 15,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-storage-provisioned-throughput',
+          baseMonthlyCostUsd: 5,
+        }),
+      ]),
+    );
+    expect(result.providers[0].breakdown?.storageMonthlyCostUsd).toBe(47.13);
+  });
+
   it('uses a safe warning when a provider fails without an Error object', async () => {
     const service = createService([
       adapter(

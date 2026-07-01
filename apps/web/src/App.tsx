@@ -159,6 +159,29 @@ const COMPUTE_TENANCY_OPTIONS: Array<[WorkloadFormState['computeTenancy'], strin
   ['sole-tenant', 'Sole-tenant node'],
 ];
 
+const STORAGE_CLASS_OPTIONS: Array<[WorkloadFormState['storageClass'], string]> = [
+  ['standard', 'Standard / hot default'],
+  ['hot', 'Azure Hot'],
+  ['cool', 'Azure Cool'],
+  ['cold', 'Azure Cold'],
+  ['nearline', 'GCS Nearline'],
+  ['coldline', 'GCS Coldline'],
+  ['intelligent-tiering', 'S3 Intelligent-Tiering'],
+  ['infrequent-access', 'Infrequent access'],
+  ['one-zone-infrequent-access', 'S3 One Zone-IA'],
+  ['archive-instant', 'Archive instant'],
+  ['archive', 'Archive'],
+  ['deep-archive', 'Deep archive'],
+  ['premium', 'Premium disk / file'],
+  ['ultra', 'Ultra disk'],
+];
+
+const STORAGE_REPLICATION_OPTIONS: Array<[WorkloadFormState['storageReplication'], string]> = [
+  ['none', 'No replication modeled'],
+  ['same-region', 'Same-region replication'],
+  ['cross-region', 'Cross-region replication'],
+];
+
 const SERVICE_CATEGORIES: ServiceCategory[] = [
   'compute',
   'storage',
@@ -2784,6 +2807,124 @@ function WorkloadForm({
               onChange={(value) => update('storageAccessPattern', value)}
             />
           </div>
+          <details className="advanced-service-fields">
+            <summary>
+              <span>Advanced storage cost drivers</span>
+              <small>Requests, retrieval, replication, snapshots, IOPS</small>
+            </summary>
+            <div
+              className={
+                form.storageEnabled
+                  ? 'form-grid form-grid-data'
+                  : 'form-grid form-grid-data is-muted'
+              }
+            >
+              <SelectField
+                label="Storage class"
+                value={form.storageClass}
+                disabled={!form.storageEnabled}
+                options={STORAGE_CLASS_OPTIONS}
+                onChange={(value) => update('storageClass', value)}
+              />
+              <SelectField
+                label="Replication"
+                value={form.storageReplication}
+                disabled={!form.storageEnabled}
+                options={STORAGE_REPLICATION_OPTIONS}
+                onChange={(value) => update('storageReplication', value)}
+              />
+              <TextField
+                label="PUT requests"
+                value={form.monthlyPutRequestsThousand}
+                inputMode="decimal"
+                suffix="k/mo"
+                disabled={!form.storageEnabled}
+                error={fieldErrors.monthlyPutRequestsThousand}
+                onChange={(value) => update('monthlyPutRequestsThousand', value)}
+              />
+              <TextField
+                label="GET requests"
+                value={form.monthlyGetRequestsThousand}
+                inputMode="decimal"
+                suffix="k/mo"
+                disabled={!form.storageEnabled}
+                error={fieldErrors.monthlyGetRequestsThousand}
+                onChange={(value) => update('monthlyGetRequestsThousand', value)}
+              />
+              <TextField
+                label="DELETE requests"
+                value={form.monthlyDeleteRequestsThousand}
+                inputMode="decimal"
+                suffix="k/mo"
+                disabled={!form.storageEnabled}
+                error={fieldErrors.monthlyDeleteRequestsThousand}
+                onChange={(value) => update('monthlyDeleteRequestsThousand', value)}
+              />
+              <TextField
+                label="LIST requests"
+                value={form.monthlyListRequestsThousand}
+                inputMode="decimal"
+                suffix="k/mo"
+                disabled={!form.storageEnabled}
+                error={fieldErrors.monthlyListRequestsThousand}
+                onChange={(value) => update('monthlyListRequestsThousand', value)}
+              />
+              <TextField
+                label="Retrieval"
+                value={form.monthlyRetrievalGb}
+                inputMode="decimal"
+                suffix="GB/mo"
+                disabled={!form.storageEnabled}
+                error={fieldErrors.monthlyRetrievalGb}
+                onChange={(value) => update('monthlyRetrievalGb', value)}
+              />
+              <TextField
+                label="Lifecycle ops"
+                value={form.lifecycleTransitionsThousand}
+                inputMode="decimal"
+                suffix="k/mo"
+                disabled={!form.storageEnabled}
+                error={fieldErrors.lifecycleTransitionsThousand}
+                onChange={(value) => update('lifecycleTransitionsThousand', value)}
+              />
+              <TextField
+                label="Snapshot storage"
+                value={form.snapshotSizeGb}
+                inputMode="decimal"
+                suffix="GB"
+                disabled={!form.storageEnabled}
+                error={fieldErrors.snapshotSizeGb}
+                onChange={(value) => update('snapshotSizeGb', value)}
+              />
+              <TextField
+                label="Snapshot days"
+                value={form.snapshotRetentionDays}
+                inputMode="numeric"
+                suffix="days"
+                disabled={!form.storageEnabled}
+                error={fieldErrors.snapshotRetentionDays}
+                onChange={(value) => update('snapshotRetentionDays', value)}
+              />
+              <TextField
+                label="Provisioned IOPS"
+                value={form.provisionedIops}
+                inputMode="numeric"
+                suffix="IOPS"
+                disabled={!form.storageEnabled}
+                error={fieldErrors.provisionedIops}
+                onChange={(value) => update('provisionedIops', value)}
+              />
+              <TextField
+                label="Throughput"
+                value={form.provisionedThroughputMbps}
+                inputMode="decimal"
+                suffix="MB/s"
+                disabled={!form.storageEnabled}
+                error={fieldErrors.provisionedThroughputMbps}
+                onChange={(value) => update('provisionedThroughputMbps', value)}
+              />
+            </div>
+          </details>
         </div>
 
         <div className="form-subsection">

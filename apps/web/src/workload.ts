@@ -14,6 +14,10 @@ import {
 
 export type WorkloadType = NormalizedWorkloadSpec['workload']['type'];
 export type StorageType = NormalizedWorkloadSpec['storage'][number]['type'];
+export type StorageClass = NonNullable<NormalizedWorkloadSpec['storage'][number]['storageClass']>;
+export type StorageReplication = NonNullable<
+  NormalizedWorkloadSpec['storage'][number]['replication']
+>;
 export type DatabaseEngine = NormalizedWorkloadSpec['database'][number]['engine'];
 export type ProcessorArchitecture = NonNullable<
   NormalizedWorkloadSpec['compute'][number]['processorArchitecture']
@@ -54,6 +58,18 @@ export interface WorkloadFormState {
   storageType: StorageType;
   storageSizeGb: string;
   storageAccessPattern: 'frequent' | 'infrequent' | 'archive';
+  storageClass: StorageClass;
+  monthlyPutRequestsThousand: string;
+  monthlyGetRequestsThousand: string;
+  monthlyDeleteRequestsThousand: string;
+  monthlyListRequestsThousand: string;
+  monthlyRetrievalGb: string;
+  storageReplication: StorageReplication;
+  lifecycleTransitionsThousand: string;
+  snapshotSizeGb: string;
+  snapshotRetentionDays: string;
+  provisionedIops: string;
+  provisionedThroughputMbps: string;
   databaseEnabled: boolean;
   databaseRole: string;
   databaseEngine: DatabaseEngine;
@@ -113,6 +129,16 @@ type NumericWorkloadFormField =
   | 'autoscaleMin'
   | 'autoscaleMax'
   | 'storageSizeGb'
+  | 'monthlyPutRequestsThousand'
+  | 'monthlyGetRequestsThousand'
+  | 'monthlyDeleteRequestsThousand'
+  | 'monthlyListRequestsThousand'
+  | 'monthlyRetrievalGb'
+  | 'lifecycleTransitionsThousand'
+  | 'snapshotSizeGb'
+  | 'snapshotRetentionDays'
+  | 'provisionedIops'
+  | 'provisionedThroughputMbps'
   | 'databaseSizeGb'
   | 'monthlyEgressGb'
   | 'crossAzTransferGb'
@@ -167,6 +193,18 @@ export const defaultWorkloadForm: WorkloadFormState = {
   storageType: 'object',
   storageSizeGb: '250',
   storageAccessPattern: 'frequent',
+  storageClass: 'standard',
+  monthlyPutRequestsThousand: '0',
+  monthlyGetRequestsThousand: '0',
+  monthlyDeleteRequestsThousand: '0',
+  monthlyListRequestsThousand: '0',
+  monthlyRetrievalGb: '0',
+  storageReplication: 'none',
+  lifecycleTransitionsThousand: '0',
+  snapshotSizeGb: '0',
+  snapshotRetentionDays: '30',
+  provisionedIops: '0',
+  provisionedThroughputMbps: '0',
   databaseEnabled: true,
   databaseRole: 'primary',
   databaseEngine: 'postgres',
@@ -523,6 +561,68 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
 
   if (form.storageEnabled) {
     requirePositiveNumber(issues, form, 'storageSizeGb', 'Storage must be greater than 0 GB.');
+    optionalNonNegativeNumberField(
+      issues,
+      form,
+      'monthlyPutRequestsThousand',
+      'PUT/write requests must be 0 thousand or higher.',
+    );
+    optionalNonNegativeNumberField(
+      issues,
+      form,
+      'monthlyGetRequestsThousand',
+      'GET/read requests must be 0 thousand or higher.',
+    );
+    optionalNonNegativeNumberField(
+      issues,
+      form,
+      'monthlyDeleteRequestsThousand',
+      'DELETE requests must be 0 thousand or higher.',
+    );
+    optionalNonNegativeNumberField(
+      issues,
+      form,
+      'monthlyListRequestsThousand',
+      'LIST requests must be 0 thousand or higher.',
+    );
+    optionalNonNegativeNumberField(
+      issues,
+      form,
+      'monthlyRetrievalGb',
+      'Retrieval volume must be 0 GB or higher.',
+    );
+    optionalNonNegativeNumberField(
+      issues,
+      form,
+      'lifecycleTransitionsThousand',
+      'Lifecycle transitions must be 0 thousand or higher.',
+    );
+    optionalNonNegativeNumberField(
+      issues,
+      form,
+      'snapshotSizeGb',
+      'Snapshot storage must be 0 GB or higher.',
+    );
+    requireBoundedInteger(
+      issues,
+      form,
+      'snapshotRetentionDays',
+      0,
+      3650,
+      'Snapshot retention must be a whole number from 0 to 3650 days.',
+    );
+    optionalNonNegativeIntegerField(
+      issues,
+      form,
+      'provisionedIops',
+      'Provisioned IOPS must be a whole number 0 or higher.',
+    );
+    optionalNonNegativeNumberField(
+      issues,
+      form,
+      'provisionedThroughputMbps',
+      'Provisioned throughput must be 0 MB/s or higher.',
+    );
   }
 
   if (form.databaseEnabled) {
@@ -705,6 +805,7 @@ export function buildNwsFromForm(
             type: form.storageType,
             sizeGb: parsePositiveNumber(form.storageSizeGb, 1),
             accessPattern: form.storageAccessPattern,
+            ...storageAdvancedAssumptionsFromForm(form),
           },
         ]
       : [],
@@ -835,6 +936,41 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
     storageType: storage?.type ?? defaultWorkloadForm.storageType,
     storageSizeGb: numberToInput(storage?.sizeGb),
     storageAccessPattern: storage?.accessPattern ?? defaultWorkloadForm.storageAccessPattern,
+    storageClass: storage?.storageClass ?? defaultWorkloadForm.storageClass,
+    monthlyPutRequestsThousand: numberToInput(
+      storage?.monthlyPutRequestsThousand ?? Number(defaultWorkloadForm.monthlyPutRequestsThousand),
+    ),
+    monthlyGetRequestsThousand: numberToInput(
+      storage?.monthlyGetRequestsThousand ?? Number(defaultWorkloadForm.monthlyGetRequestsThousand),
+    ),
+    monthlyDeleteRequestsThousand: numberToInput(
+      storage?.monthlyDeleteRequestsThousand ??
+        Number(defaultWorkloadForm.monthlyDeleteRequestsThousand),
+    ),
+    monthlyListRequestsThousand: numberToInput(
+      storage?.monthlyListRequestsThousand ??
+        Number(defaultWorkloadForm.monthlyListRequestsThousand),
+    ),
+    monthlyRetrievalGb: numberToInput(
+      storage?.monthlyRetrievalGb ?? Number(defaultWorkloadForm.monthlyRetrievalGb),
+    ),
+    storageReplication: storage?.replication ?? defaultWorkloadForm.storageReplication,
+    lifecycleTransitionsThousand: numberToInput(
+      storage?.lifecycleTransitionsThousand ??
+        Number(defaultWorkloadForm.lifecycleTransitionsThousand),
+    ),
+    snapshotSizeGb: numberToInput(
+      storage?.snapshotSizeGb ?? Number(defaultWorkloadForm.snapshotSizeGb),
+    ),
+    snapshotRetentionDays: numberToInput(
+      storage?.snapshotRetentionDays ?? Number(defaultWorkloadForm.snapshotRetentionDays),
+    ),
+    provisionedIops: numberToInput(
+      storage?.provisionedIops ?? Number(defaultWorkloadForm.provisionedIops),
+    ),
+    provisionedThroughputMbps: numberToInput(
+      storage?.provisionedThroughputMbps ?? Number(defaultWorkloadForm.provisionedThroughputMbps),
+    ),
     databaseEnabled: Boolean(database),
     databaseRole: database?.role ?? defaultWorkloadForm.databaseRole,
     databaseEngine: database?.engine ?? defaultWorkloadForm.databaseEngine,
@@ -960,6 +1096,7 @@ export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceReq
         dnsQueriesMillion: parseOptionalNumber(form.dnsQueriesMillion) ?? 0,
         loadBalancerProcessedGb: parseOptionalNumber(form.loadBalancerProcessedGb) ?? 0,
         loadBalancerHours: parseBoundedNumber(form.loadBalancerHours, 0, 730, 0),
+        ...(serviceType.includes('storage') ? storageScaleParamsFromForm(form) : {}),
         ...(serviceType === 'vm-compute' || serviceType === 'autoscaling-compute'
           ? {
               ...instanceFamilyForTier(form.instanceTier),
@@ -1070,7 +1207,9 @@ function instanceTypeForServiceRequirement(
   }
 
   if (serviceType.includes('storage')) {
-    return `${form.storageType} - ${form.storageSizeGb || '0'}GB`;
+    return `${form.storageType} / ${storageClassLabel(form.storageClass)} - ${
+      form.storageSizeGb || '0'
+    }GB`;
   }
 
   if (serviceType.includes('database') || serviceType === 'cache') {
@@ -1094,7 +1233,7 @@ function tierForServiceRequirement(
   }
 
   if (serviceType.includes('storage')) {
-    return form.storageAccessPattern;
+    return form.storageClass === 'standard' ? form.storageAccessPattern : form.storageClass;
   }
 
   if (serviceType.includes('database') || serviceType === 'cache') {
@@ -1102,6 +1241,50 @@ function tierForServiceRequirement(
   }
 
   return undefined;
+}
+
+function storageAdvancedAssumptionsFromForm(
+  form: WorkloadFormState,
+): Partial<NormalizedWorkloadSpec['storage'][number]> {
+  const snapshotSizeGb = parseOptionalNumber(form.snapshotSizeGb);
+
+  return {
+    ...(form.storageClass !== 'standard' ? { storageClass: form.storageClass } : {}),
+    ...optionalPositiveNumber('monthlyPutRequestsThousand', form.monthlyPutRequestsThousand),
+    ...optionalPositiveNumber('monthlyGetRequestsThousand', form.monthlyGetRequestsThousand),
+    ...optionalPositiveNumber('monthlyDeleteRequestsThousand', form.monthlyDeleteRequestsThousand),
+    ...optionalPositiveNumber('monthlyListRequestsThousand', form.monthlyListRequestsThousand),
+    ...optionalPositiveNumber('monthlyRetrievalGb', form.monthlyRetrievalGb),
+    ...(form.storageReplication !== 'none' ? { replication: form.storageReplication } : {}),
+    ...optionalPositiveNumber('lifecycleTransitionsThousand', form.lifecycleTransitionsThousand),
+    ...optionalPositiveNumber('snapshotSizeGb', form.snapshotSizeGb),
+    ...(snapshotSizeGb !== undefined && snapshotSizeGb > 0
+      ? optionalNonNegativeInteger('snapshotRetentionDays', form.snapshotRetentionDays)
+      : {}),
+    ...optionalPositiveInteger('provisionedIops', form.provisionedIops),
+    ...optionalPositiveNumber('provisionedThroughputMbps', form.provisionedThroughputMbps),
+  };
+}
+
+function storageScaleParamsFromForm(form: WorkloadFormState): ServiceRequirement['scaleParams'] {
+  return {
+    storageRole: form.storageRole.trim() || 'storage',
+    storageType: form.storageType,
+    storageSizeGb: parsePositiveNumber(form.storageSizeGb, 1),
+    storageAccessPattern: form.storageAccessPattern,
+    storageClass: form.storageClass,
+    monthlyPutRequestsThousand: parseOptionalNumber(form.monthlyPutRequestsThousand) ?? 0,
+    monthlyGetRequestsThousand: parseOptionalNumber(form.monthlyGetRequestsThousand) ?? 0,
+    monthlyDeleteRequestsThousand: parseOptionalNumber(form.monthlyDeleteRequestsThousand) ?? 0,
+    monthlyListRequestsThousand: parseOptionalNumber(form.monthlyListRequestsThousand) ?? 0,
+    monthlyRetrievalGb: parseOptionalNumber(form.monthlyRetrievalGb) ?? 0,
+    storageReplication: form.storageReplication,
+    lifecycleTransitionsThousand: parseOptionalNumber(form.lifecycleTransitionsThousand) ?? 0,
+    snapshotSizeGb: parseOptionalNumber(form.snapshotSizeGb) ?? 0,
+    snapshotRetentionDays: parseNonNegativeInteger(form.snapshotRetentionDays, 0),
+    provisionedIops: parseNonNegativeInteger(form.provisionedIops, 0),
+    provisionedThroughputMbps: parseOptionalNumber(form.provisionedThroughputMbps) ?? 0,
+  };
 }
 
 function instanceFamilyForTier(
@@ -1202,6 +1385,39 @@ function instanceTierLabel(instanceTier: WorkloadFormState['instanceTier']): str
       return 'GPU / accelerated tier';
     case 'custom':
       return 'custom tier';
+  }
+}
+
+function storageClassLabel(storageClass: StorageClass): string {
+  switch (storageClass) {
+    case 'standard':
+      return 'Standard';
+    case 'hot':
+      return 'Hot';
+    case 'cool':
+      return 'Cool';
+    case 'cold':
+      return 'Cold';
+    case 'nearline':
+      return 'Nearline';
+    case 'coldline':
+      return 'Coldline';
+    case 'intelligent-tiering':
+      return 'Intelligent tiering';
+    case 'infrequent-access':
+      return 'Infrequent access';
+    case 'one-zone-infrequent-access':
+      return 'One Zone-IA';
+    case 'archive-instant':
+      return 'Archive instant';
+    case 'archive':
+      return 'Archive';
+    case 'deep-archive':
+      return 'Deep archive';
+    case 'premium':
+      return 'Premium';
+    case 'ultra':
+      return 'Ultra';
   }
 }
 
@@ -1475,6 +1691,26 @@ function formNumericValue(form: WorkloadFormState, field: NumericWorkloadFormFie
       return form.autoscaleMax;
     case 'storageSizeGb':
       return form.storageSizeGb;
+    case 'monthlyPutRequestsThousand':
+      return form.monthlyPutRequestsThousand;
+    case 'monthlyGetRequestsThousand':
+      return form.monthlyGetRequestsThousand;
+    case 'monthlyDeleteRequestsThousand':
+      return form.monthlyDeleteRequestsThousand;
+    case 'monthlyListRequestsThousand':
+      return form.monthlyListRequestsThousand;
+    case 'monthlyRetrievalGb':
+      return form.monthlyRetrievalGb;
+    case 'lifecycleTransitionsThousand':
+      return form.lifecycleTransitionsThousand;
+    case 'snapshotSizeGb':
+      return form.snapshotSizeGb;
+    case 'snapshotRetentionDays':
+      return form.snapshotRetentionDays;
+    case 'provisionedIops':
+      return form.provisionedIops;
+    case 'provisionedThroughputMbps':
+      return form.provisionedThroughputMbps;
     case 'databaseSizeGb':
       return form.databaseSizeGb;
     case 'monthlyEgressGb':

@@ -36,6 +36,7 @@ type ComputeProcessorArchitecture = NonNullable<
   NormalizedWorkloadSpec['compute'][number]['processorArchitecture']
 >;
 type ComputeTenancy = NonNullable<NormalizedWorkloadSpec['compute'][number]['tenancy']>;
+type StorageClass = NonNullable<NormalizedWorkloadSpec['storage'][number]['storageClass']>;
 
 interface CostCalculation {
   hourlyCostUsd: number;
@@ -95,19 +96,47 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     }
 
     for (const component of nws.storage) {
-      const record = await this.selectRecord('storage', region, (candidate) => {
+      const storageRecordPredicate = (candidate: PricingCatalogRecord): boolean => {
         const type = candidate.attributes?.type;
         const accessPattern = candidate.attributes?.accessPattern;
+        const storageClass = candidate.attributes?.storageClass;
+        const normalizedStorageClass =
+          typeof storageClass === 'string' ? normalizeStorageClass(storageClass) : undefined;
+
         return (
           (type === undefined || type === component.type) &&
           (accessPattern === undefined ||
             component.accessPattern === undefined ||
-            accessPattern === component.accessPattern)
+            accessPattern === component.accessPattern) &&
+          (storageClass === undefined ||
+            component.storageClass === undefined ||
+            normalizedStorageClass === undefined ||
+            normalizedStorageClass === component.storageClass)
         );
-      });
+      };
+      const typeCompatibleStoragePredicate = (candidate: PricingCatalogRecord): boolean => {
+        const type = candidate.attributes?.type;
+        return type === undefined || type === component.type;
+      };
+      const preciseRecord = await this.selectOptionalRecord(
+        'storage',
+        region,
+        storageRecordPredicate,
+      );
+      const record =
+        preciseRecord ??
+        (await this.selectRecord('storage', region, typeCompatibleStoragePredicate));
 
       lineItems.push(
-        this.toLineItem('storage', record, component.sizeGb, `${component.role} storage`),
+        this.toLineItem(
+          'storage',
+          record,
+          component.sizeGb,
+          `${component.role} ${component.storageClass ?? component.accessPattern ?? component.type} storage`,
+          {
+            ...(preciseRecord === undefined ? { isApproximate: true } : {}),
+          },
+        ),
       );
     }
 
@@ -466,6 +495,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     descriptionPrefix: string,
     options: {
       costComponent?: CostComponent;
+      isApproximate?: boolean;
       pricingModels?: PricingModelCost[];
     } = {},
   ): ProviderPricingLineItem {
@@ -475,7 +505,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       category,
       costComponent: options.costComponent ?? this.costComponentForCategory(category),
       description: `${descriptionPrefix}: ${record.serviceName}`,
-      isApproximate: record.attributes?.isApproximate === true,
+      isApproximate: options.isApproximate ?? record.attributes?.isApproximate === true,
       baseHourlyCostUsd: cost.hourlyCostUsd,
       baseMonthlyCostUsd: cost.monthlyCostUsd,
       skuId: record.skuId,
@@ -986,6 +1016,75 @@ function isComputeProcessorArchitecture(
 
 function isComputeTenancy(value: string | undefined): value is ComputeTenancy {
   return value === 'shared' || value === 'dedicated-host' || value === 'sole-tenant';
+}
+
+function normalizeStorageClass(value: string): StorageClass | undefined {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, '-');
+
+  if (!normalized) {
+    return undefined;
+  }
+
+  if (normalized.includes('deep') && normalized.includes('archive')) {
+    return 'deep-archive';
+  }
+
+  if (normalized.includes('instant') && normalized.includes('archive')) {
+    return 'archive-instant';
+  }
+
+  if (normalized.includes('archive') || normalized.includes('glacier')) {
+    return 'archive';
+  }
+
+  if (normalized.includes('one-zone')) {
+    return 'one-zone-infrequent-access';
+  }
+
+  if (normalized.includes('intelligent')) {
+    return 'intelligent-tiering';
+  }
+
+  if (normalized.includes('nearline')) {
+    return 'nearline';
+  }
+
+  if (normalized.includes('coldline')) {
+    return 'coldline';
+  }
+
+  if (normalized.includes('cold')) {
+    return 'cold';
+  }
+
+  if (normalized.includes('cool')) {
+    return 'cool';
+  }
+
+  if (normalized.includes('infrequent') || normalized.includes('standard-ia')) {
+    return 'infrequent-access';
+  }
+
+  if (normalized.includes('ultra')) {
+    return 'ultra';
+  }
+
+  if (normalized.includes('premium')) {
+    return 'premium';
+  }
+
+  if (normalized.includes('hot')) {
+    return 'hot';
+  }
+
+  if (normalized.includes('standard')) {
+    return 'standard';
+  }
+
+  return undefined;
 }
 
 function providerPricingModelMetadata(

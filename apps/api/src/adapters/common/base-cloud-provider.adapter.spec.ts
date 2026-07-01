@@ -183,6 +183,45 @@ describe('BaseCloudProviderAdapter', () => {
     expect(result.lineItems[1].isApproximate).toBe(true);
   });
 
+  it('falls back to type-compatible storage when class-specific catalog rows are unavailable', async () => {
+    const shallowStorageCatalog = catalog.map((record) =>
+      record.skuId === 'STORAGE'
+        ? {
+            ...record,
+            attributes: {
+              type: 'object',
+              accessPattern: 'frequent',
+            },
+          }
+        : record,
+    );
+    const adapter = new TestProviderAdapter(
+      new InMemoryPricingCatalogReader(shallowStorageCatalog),
+      'fallback-region',
+    );
+
+    const result = await adapter.priceWorkload({
+      ...fullWorkload,
+      storage: [
+        {
+          role: 'archive assets',
+          type: 'object',
+          sizeGb: 100,
+          accessPattern: 'archive',
+          storageClass: 'archive',
+        },
+      ],
+    });
+
+    expect(result.lineItems[1]).toEqual(
+      expect.objectContaining({
+        skuId: 'STORAGE',
+        isApproximate: true,
+        description: expect.stringContaining('archive assets archive storage'),
+      }),
+    );
+  });
+
   it('uses cached commitment rows and walks egress tier bands', async () => {
     const tieredAndCommittedCatalog: PricingCatalogRecord[] = [
       ...catalog.map((record) =>

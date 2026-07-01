@@ -250,6 +250,68 @@ describe('workload helpers', () => {
     });
   });
 
+  it('serializes advanced storage assumptions only when they affect cost', () => {
+    const nws = buildNwsFromForm({
+      ...defaultWorkloadForm,
+      storageClass: 'archive',
+      monthlyPutRequestsThousand: '100',
+      monthlyGetRequestsThousand: '250',
+      monthlyDeleteRequestsThousand: '10',
+      monthlyListRequestsThousand: '25',
+      monthlyRetrievalGb: '40',
+      storageReplication: 'cross-region',
+      lifecycleTransitionsThousand: '20',
+      snapshotSizeGb: '200',
+      snapshotRetentionDays: '45',
+      provisionedIops: '3000',
+      provisionedThroughputMbps: '125',
+    });
+
+    expect(nws.storage[0]).toMatchObject({
+      storageClass: 'archive',
+      monthlyPutRequestsThousand: 100,
+      monthlyGetRequestsThousand: 250,
+      monthlyDeleteRequestsThousand: 10,
+      monthlyListRequestsThousand: 25,
+      monthlyRetrievalGb: 40,
+      replication: 'cross-region',
+      lifecycleTransitionsThousand: 20,
+      snapshotSizeGb: 200,
+      snapshotRetentionDays: 45,
+      provisionedIops: 3000,
+      provisionedThroughputMbps: 125,
+    });
+    expect(nws.serviceRequirements).toContainEqual(
+      expect.objectContaining({
+        serviceCategory: 'storage',
+        tier: 'archive',
+        scaleParams: expect.objectContaining({
+          storageClass: 'archive',
+          monthlyPutRequestsThousand: 100,
+          monthlyGetRequestsThousand: 250,
+          monthlyRetrievalGb: 40,
+          storageReplication: 'cross-region',
+          snapshotSizeGb: 200,
+          provisionedIops: 3000,
+          provisionedThroughputMbps: 125,
+        }),
+      }),
+    );
+    expect(formFromNws(nws)).toEqual(
+      expect.objectContaining({
+        storageClass: 'archive',
+        monthlyPutRequestsThousand: '100',
+        monthlyGetRequestsThousand: '250',
+        monthlyRetrievalGb: '40',
+        storageReplication: 'cross-region',
+        snapshotSizeGb: '200',
+        snapshotRetentionDays: '45',
+        provisionedIops: '3000',
+        provisionedThroughputMbps: '125',
+      }),
+    );
+  });
+
   it('maps an NWS back into editable form values', () => {
     const nws = buildNwsFromForm(defaultWorkloadForm, 'natural_language', 'web app');
     const form = formFromNws(nws);

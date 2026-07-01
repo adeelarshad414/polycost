@@ -39,6 +39,22 @@ export type PricingTermCode =
   | 'spot_estimate';
 export type PaymentOptionCode = 'no_upfront' | 'partial_upfront' | 'all_upfront' | 'n_a';
 export type StoragePricingTier = 'standard' | 'infrequent_access' | 'archive';
+export type StorageClass =
+  | 'standard'
+  | 'hot'
+  | 'cool'
+  | 'cold'
+  | 'nearline'
+  | 'coldline'
+  | 'intelligent-tiering'
+  | 'infrequent-access'
+  | 'one-zone-infrequent-access'
+  | 'archive-instant'
+  | 'archive'
+  | 'deep-archive'
+  | 'premium'
+  | 'ultra';
+export type StorageReplication = 'none' | 'same-region' | 'cross-region';
 
 export const INTERVALS: Array<{ key: IntervalKey; label: string }> = [
   { key: 'hourly', label: 'Hourly' },
@@ -94,6 +110,18 @@ export interface NormalizedWorkloadSpec {
     type: 'object' | 'block' | 'file';
     sizeGb: number;
     accessPattern?: 'frequent' | 'infrequent' | 'archive';
+    storageClass?: StorageClass;
+    monthlyPutRequestsThousand?: number;
+    monthlyGetRequestsThousand?: number;
+    monthlyDeleteRequestsThousand?: number;
+    monthlyListRequestsThousand?: number;
+    monthlyRetrievalGb?: number;
+    replication?: StorageReplication;
+    lifecycleTransitionsThousand?: number;
+    snapshotSizeGb?: number;
+    snapshotRetentionDays?: number;
+    provisionedIops?: number;
+    provisionedThroughputMbps?: number;
   }>;
   database: Array<{
     role: string;

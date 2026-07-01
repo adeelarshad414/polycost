@@ -142,12 +142,47 @@ function serviceRequirementsFromNws(nws: NormalizedWorkloadSpec): ServiceRequire
             : storage.accessPattern === 'archive'
               ? 'archive-storage'
               : 'object-storage',
+      instanceType: `${storage.type} / ${
+        storage.storageClass ?? storage.accessPattern ?? 'standard'
+      } - ${storage.sizeGb} GB`,
       ...(storage.accessPattern ? { tier: storage.accessPattern } : {}),
+      ...(storage.storageClass ? { tier: storage.storageClass } : {}),
       ...(region ? { region } : {}),
       quantity: 1,
       scaleParams: {
         role: storage.role,
         sizeGb: storage.sizeGb,
+        ...(storage.accessPattern ? { storageAccessPattern: storage.accessPattern } : {}),
+        ...(storage.storageClass ? { storageClass: storage.storageClass } : {}),
+        ...(storage.monthlyPutRequestsThousand !== undefined
+          ? { monthlyPutRequestsThousand: storage.monthlyPutRequestsThousand }
+          : {}),
+        ...(storage.monthlyGetRequestsThousand !== undefined
+          ? { monthlyGetRequestsThousand: storage.monthlyGetRequestsThousand }
+          : {}),
+        ...(storage.monthlyDeleteRequestsThousand !== undefined
+          ? { monthlyDeleteRequestsThousand: storage.monthlyDeleteRequestsThousand }
+          : {}),
+        ...(storage.monthlyListRequestsThousand !== undefined
+          ? { monthlyListRequestsThousand: storage.monthlyListRequestsThousand }
+          : {}),
+        ...(storage.monthlyRetrievalGb !== undefined
+          ? { monthlyRetrievalGb: storage.monthlyRetrievalGb }
+          : {}),
+        ...(storage.replication ? { replication: storage.replication } : {}),
+        ...(storage.lifecycleTransitionsThousand !== undefined
+          ? { lifecycleTransitionsThousand: storage.lifecycleTransitionsThousand }
+          : {}),
+        ...(storage.snapshotSizeGb !== undefined ? { snapshotSizeGb: storage.snapshotSizeGb } : {}),
+        ...(storage.snapshotRetentionDays !== undefined
+          ? { snapshotRetentionDays: storage.snapshotRetentionDays }
+          : {}),
+        ...(storage.provisionedIops !== undefined
+          ? { provisionedIops: storage.provisionedIops }
+          : {}),
+        ...(storage.provisionedThroughputMbps !== undefined
+          ? { provisionedThroughputMbps: storage.provisionedThroughputMbps }
+          : {}),
       },
     })),
     ...nws.database.map((database): ServiceRequirement => ({

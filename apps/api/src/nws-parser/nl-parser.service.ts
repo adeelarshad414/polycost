@@ -107,6 +107,25 @@ export class NLParserService {
     const instanceFamily = instanceFamilyForTier(instanceTier);
     const processorArchitecture = inferProcessorArchitecture(lowerInput, instanceTier);
     const tenancy = inferTenancy(lowerInput);
+    const storageType = inferStorageType(lowerInput);
+    const storageClass = inferStorageClass(lowerInput);
+    const storageAccessPattern = storageAccessPatternForClass(storageClass, lowerInput);
+    const storageReplication = inferStorageReplication(lowerInput);
+    const monthlyPutRequestsThousand = extractStorageRequestThousand(input, 'put');
+    const monthlyGetRequestsThousand = extractStorageRequestThousand(input, 'get');
+    const monthlyDeleteRequestsThousand = extractStorageRequestThousand(input, 'delete');
+    const monthlyListRequestsThousand = extractStorageRequestThousand(input, 'list');
+    const lifecycleTransitionsThousand = extractStorageRequestThousand(input, 'lifecycle');
+    const monthlyRetrievalGb = extractContextGb(input, [
+      'retrieval',
+      'retrieve',
+      'retrieved',
+      'rehydration',
+      'rehydrate',
+    ]);
+    const snapshotSizeGb = extractContextGb(input, ['snapshot', 'snapshots', 'backup', 'backups']);
+    const provisionedIops = extractIops(input);
+    const provisionedThroughputMbps = extractThroughputMbps(input);
 
     if (!instanceCount) {
       fieldsRequiringReview.push('compute[0].instanceCount');
@@ -171,9 +190,29 @@ export class NLParserService {
         ? [
             {
               role: 'uploads',
-              type: inferStorageType(lowerInput),
+              type: storageType,
               sizeGb: storageSizeGb ?? 100,
-              accessPattern: lowerInput.includes('archive') ? 'archive' : 'frequent',
+              accessPattern: storageAccessPattern,
+              ...optionalStorageClass(storageClass),
+              ...optionalPositiveNumber('monthlyPutRequestsThousand', monthlyPutRequestsThousand),
+              ...optionalPositiveNumber('monthlyGetRequestsThousand', monthlyGetRequestsThousand),
+              ...optionalPositiveNumber(
+                'monthlyDeleteRequestsThousand',
+                monthlyDeleteRequestsThousand,
+              ),
+              ...optionalPositiveNumber('monthlyListRequestsThousand', monthlyListRequestsThousand),
+              ...optionalPositiveNumber('monthlyRetrievalGb', monthlyRetrievalGb),
+              ...(storageReplication !== 'none' ? { replication: storageReplication } : {}),
+              ...optionalPositiveNumber(
+                'lifecycleTransitionsThousand',
+                lifecycleTransitionsThousand,
+              ),
+              ...optionalPositiveNumber('snapshotSizeGb', snapshotSizeGb),
+              ...(snapshotSizeGb !== undefined && snapshotSizeGb > 0
+                ? { snapshotRetentionDays: 30 }
+                : {}),
+              ...optionalPositiveNumber('provisionedIops', provisionedIops),
+              ...optionalPositiveNumber('provisionedThroughputMbps', provisionedThroughputMbps),
             },
           ]
         : [],
@@ -210,7 +249,19 @@ export class NLParserService {
         tenancy,
         scalingType,
         multiAz: /\b(multi[- ]?az|high availability|ha|zone redundant)\b/i.test(input),
-        storageType: inferStorageType(lowerInput),
+        storageType,
+        storageClass,
+        storageAccessPattern,
+        storageReplication,
+        monthlyPutRequestsThousand,
+        monthlyGetRequestsThousand,
+        monthlyDeleteRequestsThousand,
+        monthlyListRequestsThousand,
+        monthlyRetrievalGb,
+        lifecycleTransitionsThousand,
+        snapshotSizeGb,
+        provisionedIops,
+        provisionedThroughputMbps,
         databaseEngine: inferDatabaseEngine(lowerInput),
         monthlyEgressGb: extractEgressGb(input),
         cdn: /\bcdn|content delivery\b/i.test(input),
@@ -325,6 +376,104 @@ function inferStorageType(input: string): 'object' | 'block' | 'file' {
   return 'object';
 }
 
+function inferStorageClass(input: string): ParsedStorageClass {
+  if (/\b(deep archive|deep-archive|glacier deep|archive coldline)\b/i.test(input)) {
+    return 'deep-archive';
+  }
+
+  if (/\b(archive instant|instant retrieval|glacier instant)\b/i.test(input)) {
+    return 'archive-instant';
+  }
+
+  if (/\b(archive|glacier|rehydrat|cold archive)\b/i.test(input)) {
+    return 'archive';
+  }
+
+  if (/\b(one zone|one-zone|onezone)\b/i.test(input)) {
+    return 'one-zone-infrequent-access';
+  }
+
+  if (/\b(intelligent[- ]?tiering|auto[- ]?tiering)\b/i.test(input)) {
+    return 'intelligent-tiering';
+  }
+
+  if (/\b(coldline)\b/i.test(input)) {
+    return 'coldline';
+  }
+
+  if (/\b(nearline)\b/i.test(input)) {
+    return 'nearline';
+  }
+
+  if (/\b(cold)\b/i.test(input)) {
+    return 'cold';
+  }
+
+  if (/\b(cool)\b/i.test(input)) {
+    return 'cool';
+  }
+
+  if (/\b(infrequent|standard[- ]?ia|ia storage)\b/i.test(input)) {
+    return 'infrequent-access';
+  }
+
+  if (/\b(ultra disk|ultra storage|ultra)\b/i.test(input)) {
+    return 'ultra';
+  }
+
+  if (/\b(premium disk|premium storage|premium)\b/i.test(input)) {
+    return 'premium';
+  }
+
+  if (/\b(hot)\b/i.test(input)) {
+    return 'hot';
+  }
+
+  return 'standard';
+}
+
+function storageAccessPatternForClass(
+  storageClass: ParsedStorageClass,
+  input: string,
+): 'frequent' | 'infrequent' | 'archive' {
+  if (
+    storageClass === 'archive' ||
+    storageClass === 'archive-instant' ||
+    storageClass === 'deep-archive' ||
+    /\barchive\b/i.test(input)
+  ) {
+    return 'archive';
+  }
+
+  if (
+    storageClass === 'infrequent-access' ||
+    storageClass === 'one-zone-infrequent-access' ||
+    storageClass === 'cool' ||
+    storageClass === 'cold' ||
+    storageClass === 'nearline' ||
+    storageClass === 'coldline' ||
+    /\b(infrequent|cool|cold|nearline|coldline)\b/i.test(input)
+  ) {
+    return 'infrequent';
+  }
+
+  return 'frequent';
+}
+
+function inferStorageReplication(input: string): ParsedStorageReplication {
+  if (
+    /\b(cross[- ]?region replication|geo[- ]?replication|grs|global replication)\b/i.test(input)
+  ) {
+    return 'cross-region';
+  }
+
+  if (/\b(replication|same[- ]?region replication|zrs|lrs)\b/i.test(input)) {
+    return 'same-region';
+  }
+
+  return 'none';
+}
+
 function inferDatabaseEngine(input: string): NormalizedWorkloadSpec['database'][number]['engine'] {
   if (input.includes('postgres') || input.includes('postgresql')) {
     return 'postgres';
@@ -367,6 +516,18 @@ function inferServiceRequirements(input: {
   scalingType: 'fixed' | 'autoscaling';
   multiAz: boolean;
   storageType: 'object' | 'block' | 'file';
+  storageClass: ParsedStorageClass;
+  storageAccessPattern: 'frequent' | 'infrequent' | 'archive';
+  storageReplication: ParsedStorageReplication;
+  monthlyPutRequestsThousand?: number;
+  monthlyGetRequestsThousand?: number;
+  monthlyDeleteRequestsThousand?: number;
+  monthlyListRequestsThousand?: number;
+  monthlyRetrievalGb?: number;
+  lifecycleTransitionsThousand?: number;
+  snapshotSizeGb?: number;
+  provisionedIops?: number;
+  provisionedThroughputMbps?: number;
   databaseEngine: NormalizedWorkloadSpec['database'][number]['engine'];
   monthlyEgressGb?: number;
   cdn: boolean;
@@ -400,13 +561,27 @@ function inferServiceRequirements(input: {
     requirements.push({
       serviceCategory: 'storage',
       serviceType: storageServiceType(input.storageType, input.input),
-      instanceType: `${input.storageType} - ${input.storageSizeGb ?? 100}GB`,
-      tier: input.input.includes('archive') ? 'archive' : 'frequent',
+      instanceType: `${input.storageType} / ${storageClassLabel(input.storageClass)} - ${
+        input.storageSizeGb ?? 100
+      }GB`,
+      tier: input.storageClass === 'standard' ? input.storageAccessPattern : input.storageClass,
       ...(input.regionPreference ? { region: input.regionPreference } : {}),
       az,
       quantity: 1,
       scaleParams: {
         sizeGb: input.storageSizeGb ?? 100,
+        storageClass: input.storageClass,
+        storageAccessPattern: input.storageAccessPattern,
+        monthlyPutRequestsThousand: input.monthlyPutRequestsThousand ?? 0,
+        monthlyGetRequestsThousand: input.monthlyGetRequestsThousand ?? 0,
+        monthlyDeleteRequestsThousand: input.monthlyDeleteRequestsThousand ?? 0,
+        monthlyListRequestsThousand: input.monthlyListRequestsThousand ?? 0,
+        monthlyRetrievalGb: input.monthlyRetrievalGb ?? 0,
+        storageReplication: input.storageReplication,
+        lifecycleTransitionsThousand: input.lifecycleTransitionsThousand ?? 0,
+        snapshotSizeGb: input.snapshotSizeGb ?? 0,
+        provisionedIops: input.provisionedIops ?? 0,
+        provisionedThroughputMbps: input.provisionedThroughputMbps ?? 0,
       },
     });
   }
@@ -452,6 +627,10 @@ function inferServiceRequirements(input: {
 }
 
 type ParsedInstanceTier = 'small' | 'balanced' | 'compute' | 'memory' | 'storage' | 'accelerated';
+type ParsedStorageClass = NonNullable<NormalizedWorkloadSpec['storage'][number]['storageClass']>;
+type ParsedStorageReplication = NonNullable<
+  NormalizedWorkloadSpec['storage'][number]['replication']
+>;
 
 function inferInstanceTier(input: string): ParsedInstanceTier {
   if (
@@ -538,6 +717,39 @@ function storageServiceType(storageType: 'object' | 'block' | 'file', input: str
   }
 
   return input.includes('archive') ? 'archive-storage' : 'object-storage';
+}
+
+function storageClassLabel(storageClass: ParsedStorageClass): string {
+  switch (storageClass) {
+    case 'standard':
+      return 'standard';
+    case 'hot':
+      return 'hot';
+    case 'cool':
+      return 'cool';
+    case 'cold':
+      return 'cold';
+    case 'nearline':
+      return 'nearline';
+    case 'coldline':
+      return 'coldline';
+    case 'intelligent-tiering':
+      return 'intelligent-tiering';
+    case 'infrequent-access':
+      return 'infrequent access';
+    case 'one-zone-infrequent-access':
+      return 'one-zone infrequent access';
+    case 'archive-instant':
+      return 'archive instant';
+    case 'archive':
+      return 'archive';
+    case 'deep-archive':
+      return 'deep archive';
+    case 'premium':
+      return 'premium';
+    case 'ultra':
+      return 'ultra';
+  }
 }
 
 function extractRegionPreference(input: string): string | undefined {
@@ -660,6 +872,95 @@ function extractEgressGb(input: string): number | undefined {
   return undefined;
 }
 
+function extractStorageRequestThousand(
+  input: string,
+  operation: 'put' | 'get' | 'delete' | 'list' | 'lifecycle',
+): number | undefined {
+  const operationPattern =
+    operation === 'lifecycle'
+      ? '(?:lifecycle|transition|transitions)'
+      : operation === 'get'
+        ? '(?:get|read|reads)'
+        : operation === 'put'
+          ? '(?:put|write|writes|upload|uploads)'
+          : operation;
+  const beforeOperation = new RegExp(
+    `([\\d,.]+)\\s*(k|thousand|m|million)?\\s*(?:${operationPattern})\\b`,
+    'i',
+  ).exec(input);
+
+  if (beforeOperation) {
+    return requestMatchToThousand(beforeOperation[1], beforeOperation[2]);
+  }
+
+  const afterOperation = new RegExp(
+    `(?:${operationPattern})\\s*(?:requests?|ops|operations?)?\\s*[:=-]?\\s*([\\d,.]+)\\s*(k|thousand|m|million)?`,
+    'i',
+  ).exec(input);
+
+  return afterOperation ? requestMatchToThousand(afterOperation[1], afterOperation[2]) : undefined;
+}
+
+function requestMatchToThousand(value: string, unit: string | undefined): number {
+  const parsed = Number.parseFloat(value.replace(/,/g, ''));
+
+  if (!Number.isFinite(parsed)) {
+    return 0;
+  }
+
+  if (unit === 'm' || unit === 'million') {
+    return parsed * 1000;
+  }
+
+  if (unit === 'k' || unit === 'thousand') {
+    return parsed;
+  }
+
+  return parsed / 1000;
+}
+
+function extractContextGb(input: string, contextWords: string[]): number | undefined {
+  const matches = Array.from(input.matchAll(/([\d,.]+)\s*(gb|tb)\b/gi));
+
+  for (const match of matches) {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 36), index + 48).toLowerCase();
+
+    if (contextWords.some((word) => context.includes(word))) {
+      return toGb(match[1], match[2]);
+    }
+  }
+
+  return undefined;
+}
+
+function extractIops(input: string): number | undefined {
+  const match = input.match(/([\d,.]+)\s*(k|thousand|m|million)?\s*iops\b/i);
+
+  if (!match) {
+    return undefined;
+  }
+
+  const value = requestMatchToThousand(match[1], match[2]);
+  return Math.round(value * 1000);
+}
+
+function extractThroughputMbps(input: string): number | undefined {
+  const match = input.match(/([\d,.]+)\s*(mbps|mb\/s|gbps|gb\/s)\b/i);
+
+  if (!match) {
+    return undefined;
+  }
+
+  const value = Number.parseFloat(match[1].replace(/,/g, ''));
+
+  if (!Number.isFinite(value)) {
+    return undefined;
+  }
+
+  return match[2].toLowerCase().startsWith('gb') ? value * 1024 : value;
+}
+
 function parseHumanNumber(value: string): number {
   const wordNumber = WORD_NUMBERS.get(value.toLowerCase());
 
@@ -703,6 +1004,19 @@ function optionalNumber<K extends string>(
   value: number | undefined,
 ): Partial<Record<K, number>> {
   return value === undefined ? {} : ({ [key]: value } as Record<K, number>);
+}
+
+function optionalPositiveNumber<K extends string>(
+  key: K,
+  value: number | undefined,
+): Partial<Record<K, number>> {
+  return value !== undefined && value > 0 ? ({ [key]: value } as Record<K, number>) : {};
+}
+
+function optionalStorageClass(
+  storageClass: ParsedStorageClass,
+): Partial<Pick<NormalizedWorkloadSpec['storage'][number], 'storageClass'>> {
+  return storageClass === 'standard' ? {} : { storageClass };
 }
 
 const WORD_NUMBERS = new Map<string, number>([

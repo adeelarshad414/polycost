@@ -56,6 +56,22 @@ interface NetworkDimensionRates {
   loadBalancerPerGb: number;
 }
 
+interface StorageDimensionRates {
+  putPerThousand: number;
+  getPerThousand: number;
+  deletePerThousand: number;
+  listPerThousand: number;
+  retrievalPerGb: Partial<Record<StorageClassKey, number>>;
+  replicationSameRegionPerGb: number;
+  replicationCrossRegionPerGb: number;
+  lifecyclePerThousand: number;
+  snapshotPerGbMonth: number;
+  iopsMonth: number;
+  throughputMbpsMonth: number;
+}
+
+type StorageClassKey = NonNullable<NormalizedWorkloadSpec['storage'][number]['storageClass']>;
+
 export class ComparisonUnavailableError extends Error {
   constructor(readonly failures: ComparisonWarning[]) {
     super('No provider pricing results were available');
@@ -388,11 +404,16 @@ export class ComparisonOrchestratorService {
     const supportLineItem = this.supportLineItem(nws, providerId, lineItems);
     const licensingLineItem = this.licensingLineItem(nws, providerId);
     const resilienceLineItem = this.resilienceLineItem(nws, providerId, lineItems);
+    const storageLineItems = this.storageDimensionLineItems(nws, providerId);
     const networkLineItems = this.networkDimensionLineItems(nws, providerId);
 
-    return [supportLineItem, licensingLineItem, resilienceLineItem, ...networkLineItems].filter(
-      (lineItem): lineItem is ComparisonLineItem => lineItem !== undefined,
-    );
+    return [
+      supportLineItem,
+      licensingLineItem,
+      resilienceLineItem,
+      ...storageLineItems,
+      ...networkLineItems,
+    ].filter((lineItem): lineItem is ComparisonLineItem => lineItem !== undefined);
   }
 
   private supportLineItem(
@@ -762,6 +783,212 @@ export class ComparisonOrchestratorService {
     return 'single-zone';
   }
 
+  private storageDimensionLineItems(
+    nws: NormalizedWorkloadSpec,
+    providerId: ProviderId,
+  ): ComparisonLineItem[] {
+    const rates = storageDimensionRates(providerId);
+    const lineItems: ComparisonLineItem[] = [];
+    const regionLabel = nws.workload.region.preference ?? 'default region';
+
+    for (const storage of nws.storage) {
+      const storageClass =
+        storage.storageClass ?? storageClassFromAccessPattern(storage.accessPattern);
+      const role = storage.role;
+
+      const requestDimensions: Array<{
+        quantity: number | undefined;
+        rate: number;
+        skuId: string;
+        label: string;
+      }> = [
+        {
+          quantity: storage.monthlyPutRequestsThousand,
+          rate: rates.putPerThousand,
+          skuId: 'modeled-storage-put-requests',
+          label: 'PUT/write',
+        },
+        {
+          quantity: storage.monthlyGetRequestsThousand,
+          rate: rates.getPerThousand,
+          skuId: 'modeled-storage-get-requests',
+          label: 'GET/read',
+        },
+        {
+          quantity: storage.monthlyDeleteRequestsThousand,
+          rate: rates.deletePerThousand,
+          skuId: 'modeled-storage-delete-requests',
+          label: 'DELETE',
+        },
+        {
+          quantity: storage.monthlyListRequestsThousand,
+          rate: rates.listPerThousand,
+          skuId: 'modeled-storage-list-requests',
+          label: 'LIST',
+        },
+      ];
+
+      for (const dimension of requestDimensions) {
+        if (dimension.quantity !== undefined && dimension.quantity > 0 && dimension.rate > 0) {
+          lineItems.push(
+            this.storageLineItem({
+              providerId,
+              regionLabel,
+              skuId: dimension.skuId,
+              description: `${providerLabel(providerId)} ${role} ${dimension.label} storage operation estimate`,
+              quantity: dimension.quantity,
+              unit: '1K requests',
+              unitPriceUsd: dimension.rate,
+            }),
+          );
+        }
+      }
+
+      const retrievalGb = storage.monthlyRetrievalGb ?? 0;
+      const retrievalRate = rates.retrievalPerGb[storageClass] ?? 0;
+      if (retrievalGb > 0 && retrievalRate > 0) {
+        lineItems.push(
+          this.storageLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-storage-retrieval',
+            description: `${providerLabel(providerId)} ${role} ${storageClassLabel(
+              storageClass,
+            )} retrieval estimate`,
+            quantity: retrievalGb,
+            unit: 'GB retrieved',
+            unitPriceUsd: retrievalRate,
+          }),
+        );
+      }
+
+      if (storage.replication && storage.replication !== 'none') {
+        const unitPriceUsd =
+          storage.replication === 'cross-region'
+            ? rates.replicationCrossRegionPerGb
+            : rates.replicationSameRegionPerGb;
+
+        if (storage.sizeGb > 0 && unitPriceUsd > 0) {
+          lineItems.push(
+            this.storageLineItem({
+              providerId,
+              regionLabel,
+              skuId: `modeled-storage-${storage.replication}-replication`,
+              description: `${providerLabel(providerId)} ${role} ${storage.replication} replication estimate`,
+              quantity: storage.sizeGb,
+              unit: 'GB replicated',
+              unitPriceUsd,
+            }),
+          );
+        }
+      }
+
+      if (
+        storage.lifecycleTransitionsThousand !== undefined &&
+        storage.lifecycleTransitionsThousand > 0 &&
+        rates.lifecyclePerThousand > 0
+      ) {
+        lineItems.push(
+          this.storageLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-storage-lifecycle-transitions',
+            description: `${providerLabel(providerId)} ${role} lifecycle transition estimate`,
+            quantity: storage.lifecycleTransitionsThousand,
+            unit: '1K transitions',
+            unitPriceUsd: rates.lifecyclePerThousand,
+          }),
+        );
+      }
+
+      if (storage.snapshotSizeGb !== undefined && storage.snapshotSizeGb > 0) {
+        const retentionFactor =
+          storage.snapshotRetentionDays !== undefined
+            ? Math.max(0, storage.snapshotRetentionDays) / 30
+            : 1;
+        const snapshotGbMonth = storage.snapshotSizeGb * retentionFactor;
+
+        if (snapshotGbMonth > 0 && rates.snapshotPerGbMonth > 0) {
+          lineItems.push(
+            this.storageLineItem({
+              providerId,
+              regionLabel,
+              skuId: 'modeled-storage-snapshots',
+              description: `${providerLabel(providerId)} ${role} snapshot retention estimate`,
+              quantity: snapshotGbMonth,
+              unit: 'GB-month',
+              unitPriceUsd: rates.snapshotPerGbMonth,
+            }),
+          );
+        }
+      }
+
+      if (
+        storage.provisionedIops !== undefined &&
+        storage.provisionedIops > 0 &&
+        rates.iopsMonth > 0
+      ) {
+        lineItems.push(
+          this.storageLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-storage-provisioned-iops',
+            description: `${providerLabel(providerId)} ${role} provisioned IOPS estimate`,
+            quantity: storage.provisionedIops,
+            unit: 'IOPS-month',
+            unitPriceUsd: rates.iopsMonth,
+          }),
+        );
+      }
+
+      if (
+        storage.provisionedThroughputMbps !== undefined &&
+        storage.provisionedThroughputMbps > 0 &&
+        rates.throughputMbpsMonth > 0
+      ) {
+        lineItems.push(
+          this.storageLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-storage-provisioned-throughput',
+            description: `${providerLabel(providerId)} ${role} provisioned throughput estimate`,
+            quantity: storage.provisionedThroughputMbps,
+            unit: 'MB/s-month',
+            unitPriceUsd: rates.throughputMbpsMonth,
+          }),
+        );
+      }
+    }
+
+    return lineItems;
+  }
+
+  private storageLineItem(input: {
+    providerId: ProviderId;
+    regionLabel: string;
+    skuId: string;
+    description: string;
+    quantity: number;
+    unit: string;
+    unitPriceUsd: number;
+  }): ComparisonLineItem {
+    const monthlyCostUsd = this.roundCurrency(input.quantity * input.unitPriceUsd);
+
+    return this.normalizeLineItem({
+      category: 'storage',
+      costComponent: 'storage',
+      description: input.description,
+      isApproximate: true,
+      baseMonthlyCostUsd: monthlyCostUsd,
+      baseHourlyCostUsd: monthlyCostUsd / HOURS_PER_MONTH,
+      skuId: input.skuId,
+      region: input.regionLabel,
+      unit: input.unit,
+      unitPriceUsd: input.unitPriceUsd,
+      pricingBasis: 'flat',
+    });
+  }
+
   private componentTotal(lineItems: ComparisonLineItem[], component: CostComponent): number {
     return this.roundCurrency(
       lineItems
@@ -846,12 +1073,46 @@ export class ComparisonOrchestratorService {
             : storage.accessPattern === 'archive'
               ? 'archive-storage'
               : 'object-storage',
-      tier: storage.accessPattern,
+      instanceType: `${storage.type} / ${storageClassLabel(
+        storage.storageClass ?? storageClassFromAccessPattern(storage.accessPattern),
+      )} - ${storage.sizeGb} GB`,
+      tier: storage.storageClass ?? storage.accessPattern,
       region,
       quantity: 1,
       scaleParams: {
         role: storage.role,
         sizeGb: storage.sizeGb,
+        ...(storage.accessPattern ? { storageAccessPattern: storage.accessPattern } : {}),
+        ...(storage.storageClass ? { storageClass: storage.storageClass } : {}),
+        ...(storage.monthlyPutRequestsThousand !== undefined
+          ? { monthlyPutRequestsThousand: storage.monthlyPutRequestsThousand }
+          : {}),
+        ...(storage.monthlyGetRequestsThousand !== undefined
+          ? { monthlyGetRequestsThousand: storage.monthlyGetRequestsThousand }
+          : {}),
+        ...(storage.monthlyDeleteRequestsThousand !== undefined
+          ? { monthlyDeleteRequestsThousand: storage.monthlyDeleteRequestsThousand }
+          : {}),
+        ...(storage.monthlyListRequestsThousand !== undefined
+          ? { monthlyListRequestsThousand: storage.monthlyListRequestsThousand }
+          : {}),
+        ...(storage.monthlyRetrievalGb !== undefined
+          ? { monthlyRetrievalGb: storage.monthlyRetrievalGb }
+          : {}),
+        ...(storage.replication ? { replication: storage.replication } : {}),
+        ...(storage.lifecycleTransitionsThousand !== undefined
+          ? { lifecycleTransitionsThousand: storage.lifecycleTransitionsThousand }
+          : {}),
+        ...(storage.snapshotSizeGb !== undefined ? { snapshotSizeGb: storage.snapshotSizeGb } : {}),
+        ...(storage.snapshotRetentionDays !== undefined
+          ? { snapshotRetentionDays: storage.snapshotRetentionDays }
+          : {}),
+        ...(storage.provisionedIops !== undefined
+          ? { provisionedIops: storage.provisionedIops }
+          : {}),
+        ...(storage.provisionedThroughputMbps !== undefined
+          ? { provisionedThroughputMbps: storage.provisionedThroughputMbps }
+          : {}),
       },
     }));
     const databaseRequirements: ServiceRequirement[] = nws.database.map((database) => ({
@@ -983,6 +1244,127 @@ function faultToleranceLabel(
       return 'multi-region';
     case 'active-active':
       return 'active-active';
+  }
+}
+
+function storageClassFromAccessPattern(
+  accessPattern: NormalizedWorkloadSpec['storage'][number]['accessPattern'],
+): StorageClassKey {
+  switch (accessPattern) {
+    case 'archive':
+      return 'archive';
+    case 'infrequent':
+      return 'infrequent-access';
+    case 'frequent':
+    case undefined:
+      return 'standard';
+  }
+}
+
+function storageClassLabel(storageClass: StorageClassKey): string {
+  switch (storageClass) {
+    case 'standard':
+      return 'standard';
+    case 'hot':
+      return 'hot';
+    case 'cool':
+      return 'cool';
+    case 'cold':
+      return 'cold';
+    case 'nearline':
+      return 'nearline';
+    case 'coldline':
+      return 'coldline';
+    case 'intelligent-tiering':
+      return 'intelligent-tiering';
+    case 'infrequent-access':
+      return 'infrequent access';
+    case 'one-zone-infrequent-access':
+      return 'one-zone infrequent access';
+    case 'archive-instant':
+      return 'archive instant';
+    case 'archive':
+      return 'archive';
+    case 'deep-archive':
+      return 'deep archive';
+    case 'premium':
+      return 'premium';
+    case 'ultra':
+      return 'ultra';
+  }
+}
+
+function storageDimensionRates(providerId: ProviderId): StorageDimensionRates {
+  switch (providerId) {
+    case 'aws':
+      return {
+        putPerThousand: 0.005,
+        getPerThousand: 0.0004,
+        deletePerThousand: 0,
+        listPerThousand: 0.005,
+        retrievalPerGb: {
+          'intelligent-tiering': 0.003,
+          'infrequent-access': 0.01,
+          'one-zone-infrequent-access': 0.01,
+          'archive-instant': 0.03,
+          archive: 0.03,
+          'deep-archive': 0.02,
+          cool: 0.01,
+          cold: 0.02,
+          nearline: 0.01,
+          coldline: 0.02,
+        },
+        replicationSameRegionPerGb: 0.01,
+        replicationCrossRegionPerGb: 0.02,
+        lifecyclePerThousand: 0.01,
+        snapshotPerGbMonth: 0.05,
+        iopsMonth: 0.005,
+        throughputMbpsMonth: 0.04,
+      };
+    case 'azure':
+      return {
+        putPerThousand: 0.004,
+        getPerThousand: 0.0004,
+        deletePerThousand: 0,
+        listPerThousand: 0.004,
+        retrievalPerGb: {
+          cool: 0.01,
+          cold: 0.02,
+          archive: 0.02,
+          'deep-archive': 0.02,
+          'infrequent-access': 0.01,
+          nearline: 0.01,
+          coldline: 0.02,
+        },
+        replicationSameRegionPerGb: 0.008,
+        replicationCrossRegionPerGb: 0.018,
+        lifecyclePerThousand: 0.01,
+        snapshotPerGbMonth: 0.045,
+        iopsMonth: 0.004,
+        throughputMbpsMonth: 0.035,
+      };
+    case 'gcp':
+      return {
+        putPerThousand: 0.005,
+        getPerThousand: 0.0004,
+        deletePerThousand: 0,
+        listPerThousand: 0.005,
+        retrievalPerGb: {
+          nearline: 0.01,
+          coldline: 0.02,
+          archive: 0.05,
+          'deep-archive': 0.05,
+          cool: 0.01,
+          cold: 0.02,
+          'infrequent-access': 0.01,
+        },
+        replicationSameRegionPerGb: 0.01,
+        replicationCrossRegionPerGb: 0.02,
+        lifecyclePerThousand: 0.01,
+        snapshotPerGbMonth: 0.026,
+        iopsMonth: 0.0045,
+        throughputMbpsMonth: 0.032,
+      };
   }
 }
 
