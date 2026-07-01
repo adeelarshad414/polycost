@@ -2,6 +2,13 @@ import { ComparisonResult } from '../comparison/comparison.types';
 import { CsvReportGenerator } from './csv-report.generator';
 import { ExcelReportGenerator } from './excel-report.generator';
 import { PdfReportGenerator } from './pdf-report.generator';
+import {
+  labelForInterval,
+  labelForPricingModel,
+  lineItemEvidenceRows,
+  selectedScenarioRows,
+  serviceRequirementRows,
+} from './report-evidence';
 import { sanitizeSpreadsheetText } from './report-security';
 import { ReportService } from './report.service';
 
@@ -126,6 +133,37 @@ describe('report generators', () => {
     expect(csv).toContain("azure,provider_pricing_failed,'+pricing temporarily unavailable");
   });
 
+  it('creates a default CSV report without warnings when none are present', () => {
+    const csv = new CsvReportGenerator()
+      .generate({
+        ...comparison,
+        requirements: undefined,
+        warnings: undefined,
+      })
+      .toString('utf8');
+
+    expect(csv).toContain('Selected interval,Monthly');
+    expect(csv).toContain('Selected pricing model,On-demand');
+    expect(csv).toContain('No normalized service requirements were attached to this comparison.');
+    expect(csv).not.toContain('Warnings');
+  });
+
+  it('creates CSV warning rows for general warnings without provider IDs', () => {
+    const csv = new CsvReportGenerator()
+      .generate({
+        ...comparison,
+        warnings: [
+          {
+            code: 'live_refresh_failed',
+            message: '@refresh unavailable',
+          },
+        ],
+      })
+      .toString('utf8');
+
+    expect(csv).toContain("Warnings\nProvider,Code,Message\n,live_refresh_failed,'@refresh unavailable");
+  });
+
   it('creates a real XLSX package with matching totals and spreadsheet injection mitigation', () => {
     const xlsx = new ExcelReportGenerator().generate(comparison, {
       interval: 'quarterly',
@@ -212,6 +250,123 @@ describe('report generators', () => {
     });
 
     expect(pdf.toString('utf8')).not.toContain('Warnings');
+  });
+
+  it('builds selected scenario rows for unavailable commitments and spot estimates', () => {
+    const rows = selectedScenarioRows(
+      {
+        ...comparison,
+        providers: [
+          {
+            ...comparison.providers[0],
+            pricingModels: [
+              {
+                model: 'spot',
+                available: true,
+                monthlyCostUsd: 35,
+                hourlyCostUsd: 0.05,
+                caveat: 'Interruptible capacity.',
+              },
+            ],
+          },
+          comparison.providers[1],
+        ],
+      },
+      { interval: 'yearly', pricingModel: 'spot' },
+    );
+
+    expect(rows[0]).toEqual([
+      'Provider',
+      'Available',
+      'Yearly USD',
+      'Monthly USD',
+      'Hourly USD',
+      'Caveat',
+    ]);
+    expect(rows[1]).toEqual(['aws', 'yes', '420', '35', '0.05', 'Interruptible capacity.']);
+    expect(rows[2]).toEqual([
+      'gcp',
+      'no',
+      '',
+      '',
+      '',
+      'Not available for this SKU/region.',
+    ]);
+  });
+
+  it('labels every report interval and pricing model', () => {
+    const intervals = ['hourly', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly'] as const;
+    const pricingModels = [
+      'on-demand',
+      'reserved-1yr',
+      'reserved-3yr',
+      'savings-plan',
+      'spot',
+    ] as const;
+
+    expect(intervals.map((interval) => labelForInterval(interval))).toEqual([
+      'Hourly',
+      'Daily',
+      'Weekly',
+      'Monthly',
+      'Quarterly',
+      'Yearly',
+    ]);
+    expect(pricingModels.map((pricingModel) => labelForPricingModel(pricingModel))).toEqual([
+      'On-demand',
+      'Reserved 1-year',
+      'Reserved 3-year',
+      'Savings Plan / CUD',
+      'Spot estimate range',
+    ]);
+  });
+
+  it('builds evidence rows for line item pricing model availability', () => {
+    const rows = lineItemEvidenceRows({
+      ...comparison,
+      providers: [
+        {
+          ...comparison.providers[0],
+          lineItems: [
+            {
+              category: 'compute',
+              description: 'priced compute',
+              isApproximate: false,
+              baseHourlyCostUsd: 0.1,
+              baseMonthlyCostUsd: 73,
+              region: 'us-east-1',
+              unit: 'hour',
+              unitPriceUsd: 0.1,
+              pricingModels: [
+                {
+                  model: 'reserved-1yr',
+                  available: true,
+                  monthlyCostUsd: 50,
+                },
+                {
+                  model: 'reserved-3yr',
+                  available: false,
+                  unavailableReason: 'No term for SKU.',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(rows[1][8]).toBe('$0.1 hourly x 730 hours = $73 monthly');
+    expect(rows[1][9]).toContain('reserved-1yr: $50 monthly');
+    expect(rows[1][9]).toContain('reserved-3yr: unavailable (No term for SKU.)');
+  });
+
+  it('builds fallback service requirement rows when comparison requirements are absent', () => {
+    expect(
+      serviceRequirementRows({
+        ...comparison,
+        requirements: undefined,
+      }),
+    ).toEqual([['No normalized service requirements were attached to this comparison.']]);
   });
 
   it('returns API export metadata from ReportService', () => {
