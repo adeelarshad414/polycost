@@ -14,6 +14,34 @@ const REPORT_PRICING_MODELS: ReportPricingModel[] = [
   'spot',
 ];
 
+const REGION_VARIANCE_PROFILES = [
+  {
+    region: 'us-east',
+    multiplier: 1,
+    evidence: 'Baseline North America pricing sensitivity.',
+  },
+  {
+    region: 'us-west',
+    multiplier: 1.03,
+    evidence: 'Modeled 3% regional premium for west-coast capacity sensitivity.',
+  },
+  {
+    region: 'eu-west',
+    multiplier: 1.08,
+    evidence: 'Modeled 8% regional premium for EU residency/compliance sensitivity.',
+  },
+  {
+    region: 'ap-southeast',
+    multiplier: 1.12,
+    evidence: 'Modeled 12% regional premium for APAC latency/residency sensitivity.',
+  },
+  {
+    region: 'ap-south',
+    multiplier: 0.96,
+    evidence: 'Modeled 4% discount sensitivity for lower-cost APAC alternatives.',
+  },
+] as const;
+
 interface ProviderScenario {
   providerId: string;
   available: boolean;
@@ -388,6 +416,273 @@ export function lineItemEvidenceRows(result: ComparisonResult): string[][] {
   ];
 }
 
+export function optimizationOpportunityRows(result: ComparisonResult): string[][] {
+  const rows: string[][] = [];
+  const rankedOnDemand = rankedProviderScenarios(result, {
+    interval: 'monthly',
+    pricingModel: 'on-demand',
+  }).filter((scenario) => scenario.available && scenario.monthlyCostUsd !== undefined);
+  const cheapest = rankedOnDemand.find((scenario) => scenario.rank === 1);
+  const highest = rankedOnDemand.at(-1);
+
+  if (
+    cheapest?.monthlyCostUsd !== undefined &&
+    highest?.monthlyCostUsd !== undefined &&
+    highest.providerId !== cheapest.providerId
+  ) {
+    const monthlySavings = highest.monthlyCostUsd - cheapest.monthlyCostUsd;
+    rows.push([
+      'Provider selection',
+      `Shortlist ${cheapest.providerId} before committing to ${highest.providerId}.`,
+      formatNumber(monthlySavings),
+      formatNumber(monthlySavings * 12),
+      'High',
+      'Medium',
+      `Provider delta from current cached comparison: ${highest.providerId} $${formatNumber(
+        highest.monthlyCostUsd,
+      )}/mo vs ${cheapest.providerId} $${formatNumber(cheapest.monthlyCostUsd)}/mo.`,
+    ]);
+  }
+
+  for (const provider of result.providers) {
+    const onDemand = modelCostForProvider(provider, 'on-demand');
+    const bestCommitment = ['reserved-3yr', 'reserved-1yr', 'savings-plan']
+      .map((pricingModel) => modelCostForProvider(provider, pricingModel as ReportPricingModel))
+      .filter(
+        (model) =>
+          model.available &&
+          model.monthlyCostUsd !== undefined &&
+          onDemand.monthlyCostUsd !== undefined &&
+          model.monthlyCostUsd < onDemand.monthlyCostUsd,
+      )
+      .sort((left, right) => (left.monthlyCostUsd ?? 0) - (right.monthlyCostUsd ?? 0))[0];
+
+    if (bestCommitment?.monthlyCostUsd !== undefined && onDemand.monthlyCostUsd !== undefined) {
+      const monthlySavings = onDemand.monthlyCostUsd - bestCommitment.monthlyCostUsd;
+      rows.push([
+        'Commitment coverage',
+        `${provider.providerId} ${labelForPricingModel(bestCommitment.model)} lowers recurring run rate.`,
+        formatNumber(monthlySavings),
+        formatNumber(monthlySavings * 12),
+        monthlySavings > 100 ? 'High' : 'Medium',
+        bestCommitment.model === 'reserved-3yr' ? 'High' : 'Medium',
+        `${provider.providerId} on-demand $${formatNumber(
+          onDemand.monthlyCostUsd,
+        )}/mo vs ${bestCommitment.model} $${formatNumber(bestCommitment.monthlyCostUsd)}/mo.`,
+      ]);
+    }
+  }
+
+  for (const provider of result.providers) {
+    const egressMonthly = componentMonthly(provider, 'egress');
+    const providerMonthly = provider.totals.monthly;
+
+    if (providerMonthly > 0 && egressMonthly / providerMonthly >= 0.2) {
+      const estimatedSavings = egressMonthly * 0.3;
+      rows.push([
+        'Egress optimization',
+        `${provider.providerId} egress is ${formatNumber(
+          (egressMonthly / providerMonthly) * 100,
+        )}% of monthly spend; evaluate CDN offload and same-region data access.`,
+        formatNumber(estimatedSavings),
+        formatNumber(estimatedSavings * 12),
+        'High',
+        'Medium',
+        `Rule-based 30% egress-reduction opportunity from $${formatNumber(egressMonthly)}/mo egress baseline.`,
+      ]);
+    }
+  }
+
+  for (const provider of result.providers) {
+    const licensingMonthly = componentMonthly(provider, 'licensing');
+
+    if (licensingMonthly > 0) {
+      rows.push([
+        'License optimization',
+        `${provider.providerId} includes Windows/licensing cost; validate Linux equivalent or BYOL eligibility.`,
+        formatNumber(licensingMonthly),
+        formatNumber(licensingMonthly * 12),
+        'Medium',
+        'Medium',
+        `Licensing modeled as explicit $${formatNumber(licensingMonthly)}/mo line item.`,
+      ]);
+    }
+  }
+
+  for (const provider of result.providers) {
+    const approximateCount = provider.lineItems.filter((lineItem) => lineItem.isApproximate).length;
+
+    if (approximateCount > 0) {
+      rows.push([
+        'Mapping validation',
+        `${provider.providerId} has ${approximateCount} approximate mapped line item(s); review equivalence before proposal finalization.`,
+        '',
+        '',
+        'Medium',
+        'Low',
+        'Approximate service mappings can change the recommended provider when SKUs are not truly equivalent.',
+      ]);
+    }
+  }
+
+  return [
+    [
+      'Opportunity',
+      'Recommendation',
+      'Estimated monthly savings USD',
+      'Estimated annual savings USD',
+      'Priority',
+      'Effort',
+      'Evidence',
+    ],
+    ...(rows.length > 0
+      ? rows
+      : [
+          [
+            'No material optimization opportunity detected',
+            'Current comparison does not expose provider spread, commitment, egress, licensing, or mapping signals above thresholds.',
+            '',
+            '',
+            'Low',
+            'Low',
+            'Continue validating SKU equivalence and private-discount assumptions.',
+          ],
+        ]),
+  ];
+}
+
+export function egressNetworkingDetailRows(result: ComparisonResult): string[][] {
+  const rows = result.providers.flatMap((provider) =>
+    provider.lineItems
+      .filter(
+        (lineItem) =>
+          lineItem.category === 'network' ||
+          lineItem.costComponent === 'egress' ||
+          networkDescription(lineItem.description),
+      )
+      .map((lineItem) => [
+        provider.providerId,
+        lineItem.costComponent ?? lineItem.category,
+        lineItem.description,
+        lineItem.region ?? '',
+        formatNumber(lineItem.baseMonthlyCostUsd),
+        provider.totals.monthly > 0
+          ? `${formatNumber((lineItem.baseMonthlyCostUsd / provider.totals.monthly) * 100)}%`
+          : '',
+        lineItem.unit ?? '',
+        lineItem.unitPriceUsd !== undefined ? formatNumber(lineItem.unitPriceUsd) : '',
+        lineItem.egressTiers?.length
+          ? `${lineItem.egressTiers.length} tier(s): ${lineItem.egressTiers
+              .map((tier) => `${tierBandLabel(tier.tierFromGb, tier.tierToGb)} @ $${formatNumber(tier.pricePerGb)}/GB`)
+              .join('; ')}`
+          : `${lineItem.pricingBasis ?? 'flat'} network cost evidence`,
+      ]),
+  );
+
+  return [
+    [
+      'Provider',
+      'Network component',
+      'Description',
+      'Region',
+      'Monthly USD',
+      'Share of provider total',
+      'Unit',
+      'Rate USD',
+      'Evidence',
+    ],
+    ...(rows.length > 0
+      ? rows
+      : [['No networking or egress line items were attached to this comparison.', '', '', '', '', '', '', '', '']]),
+  ];
+}
+
+export function regionComparisonRows(result: ComparisonResult): string[][] {
+  const rows = result.providers.flatMap((provider) =>
+    REGION_VARIANCE_PROFILES.map((profile) => {
+      const modeledMonthly = roundCurrency(provider.totals.monthly * profile.multiplier);
+      const delta = roundCurrency(modeledMonthly - provider.totals.monthly);
+
+      return [
+        provider.providerId,
+        profile.region,
+        providerRegionLabel(provider.providerId, profile.region),
+        formatNumber(modeledMonthly),
+        formatNumber(delta),
+        formatNumber(profile.multiplier),
+        profile.evidence,
+      ];
+    }),
+  );
+
+  return [
+    [
+      'Provider',
+      'Comparison region',
+      'Provider region',
+      'Modeled monthly USD',
+      'Delta vs selected region USD',
+      'Multiplier',
+      'Evidence',
+    ],
+    ...rows,
+  ];
+}
+
+export function breakEvenSummaryRows(result: ComparisonResult): string[][] {
+  const rows = result.providers.flatMap((provider) => {
+    const onDemand = modelCostForProvider(provider, 'on-demand');
+
+    if (onDemand.monthlyCostUsd === undefined) {
+      return [];
+    }
+
+    const onDemandMonthly = onDemand.monthlyCostUsd;
+
+    return ['reserved-1yr', 'reserved-3yr', 'savings-plan'].flatMap((pricingModel) => {
+      const model = modelCostForProvider(provider, pricingModel as ReportPricingModel);
+
+      if (!model.available || model.monthlyCostUsd === undefined) {
+        return [];
+      }
+
+      const monthlySavings = onDemandMonthly - model.monthlyCostUsd;
+      const upfront = model.upfrontCostUsd ?? 0;
+      const breakEvenMonth =
+        monthlySavings > 0 ? Math.max(0, Math.ceil(upfront / monthlySavings)) : undefined;
+
+      return [
+        [
+          provider.providerId,
+          labelForPricingModel(model.model),
+          formatNumber(onDemandMonthly),
+          formatNumber(model.monthlyCostUsd),
+          formatNumber(upfront),
+          monthlySavings > 0 ? formatNumber(monthlySavings) : '',
+          breakEvenMonth !== undefined ? breakEvenMonth.toString() : 'No break-even',
+          model.caveat ?? commitmentEvidence(model),
+        ],
+      ];
+    });
+  });
+
+  return [
+    [
+      'Provider',
+      'Pricing model',
+      'On-demand monthly USD',
+      'Committed monthly USD',
+      'Upfront USD',
+      'Monthly savings USD',
+      'Break-even month',
+      'Evidence',
+    ],
+    ...(rows.length > 0
+      ? rows
+      : [['No commitment model has enough pricing evidence for break-even analysis.', '', '', '', '', '', '', '']]),
+  ];
+}
+
 export function labelForInterval(interval: ReportInterval): string {
   switch (interval) {
     case 'hourly':
@@ -691,6 +986,60 @@ function pricingModelEvidence(lineItem: ComparisonLineItem): string {
         : `${model.model}: unavailable (${model.unavailableReason ?? 'not offered'})`,
     )
     .join('; ');
+}
+
+function componentMonthly(
+  provider: ComparisonProviderResult,
+  component: NonNullable<ComparisonLineItem['costComponent']>,
+): number {
+  return provider.lineItems
+    .filter((lineItem) => lineItem.costComponent === component)
+    .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+}
+
+function networkDescription(description: string): boolean {
+  const normalized = description.toLowerCase();
+
+  return [
+    'egress',
+    'load balancer',
+    'nat',
+    'cdn',
+    'vpn',
+    'direct connect',
+    'interconnect',
+    'dns',
+    'cross-az',
+    'inter-region',
+  ].some((needle) => normalized.includes(needle));
+}
+
+function providerRegionLabel(providerId: string, comparisonRegion: string): string {
+  const regionMap: Record<string, Record<string, string>> = {
+    aws: {
+      'us-east': 'us-east-1',
+      'us-west': 'us-west-2',
+      'eu-west': 'eu-west-1',
+      'ap-southeast': 'ap-southeast-1',
+      'ap-south': 'ap-south-1',
+    },
+    azure: {
+      'us-east': 'eastus',
+      'us-west': 'westus2',
+      'eu-west': 'westeurope',
+      'ap-southeast': 'southeastasia',
+      'ap-south': 'centralindia',
+    },
+    gcp: {
+      'us-east': 'us-east1',
+      'us-west': 'us-west1',
+      'eu-west': 'europe-west1',
+      'ap-southeast': 'asia-southeast1',
+      'ap-south': 'asia-south1',
+    },
+  };
+
+  return regionMap[providerId]?.[comparisonRegion] ?? comparisonRegion;
 }
 
 function costForInterval(monthly: number, interval: ReportInterval): number {

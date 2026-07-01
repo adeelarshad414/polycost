@@ -3,14 +3,18 @@ import { CsvReportGenerator } from './csv-report.generator';
 import { ExcelReportGenerator } from './excel-report.generator';
 import { PdfReportGenerator } from './pdf-report.generator';
 import {
+  breakEvenSummaryRows,
   commitmentTcoRows,
   decisionSummaryRows,
+  egressNetworkingDetailRows,
   egressTierBreakdownRows,
   labelForInterval,
   labelForPricingModel,
   lineItemEvidenceRows,
+  optimizationOpportunityRows,
   pricingModelAvailabilityRows,
   providerRankingRows,
+  regionComparisonRows,
   reportAssumptionRows,
   selectedScenarioRows,
   serviceRequirementRows,
@@ -174,6 +178,14 @@ describe('report generators', () => {
     expect(csv).toContain('aws,Reserved 3-year,yes,0.06,42,360,All upfront,36 months,1872');
     expect(csv).toContain('Egress Tiered Breakdown');
     expect(csv).toContain('aws,us-east-1,0-512 GB,512,0.09,46.08,0.09');
+    expect(csv).toContain('Egress & Networking Detail');
+    expect(csv).toContain('aws,egress,internet egress,us-east-1,46.08');
+    expect(csv).toContain('Optimization Opportunities');
+    expect(csv).toContain('Commitment coverage,aws Reserved 3-year lowers recurring run rate.');
+    expect(csv).toContain('Region Comparison');
+    expect(csv).toContain('aws,eu-west,eu-west-1,76.68,5.68,1.08');
+    expect(csv).toContain('Break-Even Analysis');
+    expect(csv).toContain('aws,Reserved 3-year,71,42,360,29,13,Three-year commitment.');
     expect(csv).toContain('Normalized Service Requirements');
     expect(csv).toContain('compute,vm-compute,balanced tier - 2 vCPU - 4GB / balanced');
     expect(csv).toContain('Rate Math Evidence');
@@ -232,12 +244,20 @@ describe('report generators', () => {
     expect(xlsxText).toContain('xl/worksheets/sheet2.xml');
     expect(xlsxText).toContain('<sheet name="Comparison"');
     expect(xlsxText).toContain('<sheet name="What If" sheetId="2"');
+    expect(xlsxText).toContain('<sheet name="Optimization Opportunities" sheetId="3"');
+    expect(xlsxText).toContain('<sheet name="Egress &amp; Networking Detail" sheetId="4"');
+    expect(xlsxText).toContain('<sheet name="Region Comparison" sheetId="5"');
+    expect(xlsxText).toContain('<sheet name="Break-Even Analysis" sheetId="6"');
+    expect(xlsxText).toContain('<sheet name="Break-Even Summary" sheetId="7"');
     expect(xlsxText).toContain('<calcPr calcMode="auto" fullCalcOnLoad="1"/>');
     expect(xlsxText).toContain(
       '<definedName name="WhatIfScaleFactor">&apos;What If&apos;!$B$5</definedName>',
     );
     expect(xlsxText).toContain(
       '<definedName name="WhatIfRegionMultiplier">&apos;What If&apos;!$B$6</definedName>',
+    );
+    expect(xlsxText).toContain(
+      '<definedName name="BreakEvenOnDemandMultiplier">&apos;Break-Even Analysis&apos;!$B$5</definedName>',
     );
     expect(xlsxText).toMatch(
       /<definedName name="ComparisonMonthlyTotals">&apos;Comparison&apos;!\$D\$\d+:\$D\$\d+<\/definedName>/,
@@ -266,6 +286,13 @@ describe('report generators', () => {
     expect(xlsxText).toContain('<t>360</t>');
     expect(xlsxText).toContain('<t>1872</t>');
     expect(xlsxText).toContain('Egress Tiered Breakdown');
+    expect(xlsxText).toContain('Optimization Opportunities');
+    expect(xlsxText).toContain('Egress &amp; Networking Detail');
+    expect(xlsxText).toContain('Region Comparison');
+    expect(xlsxText).toContain('PolyCost Break-Even Analysis');
+    expect(xlsxText).toContain('<f>D9*C9*BreakEvenOnDemandMultiplier</f><v>0</v>');
+    expect(xlsxText).toContain('<f>F9+E9*C9</f><v>360</v>');
+    expect(xlsxText).toContain('<f>IF(H9&lt;=G9,1,0)</f><v>0</v>');
     expect(xlsxText).toContain('Normalized Service Requirements');
     expect(xlsxText).toContain('Rate Math Evidence');
     expect(xlsxText).toContain('Report Assumptions');
@@ -361,6 +388,14 @@ describe('report generators', () => {
     expect(pdfText).toContain('upfront $360');
     expect(pdfText).toContain('Egress tiered breakdown');
     expect(pdfText).toContain('aws | us-east-1 | 0-512 GB | billable 512 GB');
+    expect(pdfText).toContain('Egress and networking detail');
+    expect(pdfText).toContain('aws | egress | internet egress | monthly $46.08');
+    expect(pdfText).toContain('Optimization opportunities');
+    expect(pdfText).toContain('Commitment coverage | aws Reserved 3-year lowers recurring run rate');
+    expect(pdfText).toContain('Region comparison');
+    expect(pdfText).toContain('aws | eu-west \\(eu-west-1\\) | modeled monthly $76.68');
+    expect(pdfText).toContain('Break-even analysis');
+    expect(pdfText).toContain('aws | Reserved 3-year | on-demand $71/mo | committed $42/mo');
     expect(pdfText).toContain('Normalized service requirements');
     expect(pdfText).toContain('Rate math evidence');
     expect(pdfText).toContain('Report assumptions');
@@ -581,6 +616,34 @@ describe('report generators', () => {
     expect(egressRows[0]).toContain('Effective blended USD/GB');
     expect(egressRows).toContainEqual(
       expect.arrayContaining(['aws', 'us-east-1', '0-512 GB', '512', '0.09', '46.08']),
+    );
+  });
+
+  it('builds production-grade optimization, network, region, and break-even rows', () => {
+    expect(optimizationOpportunityRows(comparison)).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'Commitment coverage',
+          'aws Reserved 3-year lowers recurring run rate.',
+          '29',
+          '348',
+        ]),
+      ]),
+    );
+    expect(egressNetworkingDetailRows(comparison)).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining(['aws', 'egress', 'internet egress', 'us-east-1', '46.08']),
+      ]),
+    );
+    expect(regionComparisonRows(comparison)).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining(['aws', 'eu-west', 'eu-west-1', '76.68', '5.68', '1.08']),
+      ]),
+    );
+    expect(breakEvenSummaryRows(comparison)).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining(['aws', 'Reserved 3-year', '71', '42', '360', '29', '13']),
+      ]),
     );
   });
 

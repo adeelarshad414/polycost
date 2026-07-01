@@ -1,12 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { ComparisonLineItem, ComparisonResult } from '../comparison/comparison.types';
 import {
+  breakEvenSummaryRows,
   commitmentTcoRows,
   decisionSummaryRows,
+  egressNetworkingDetailRows,
   egressTierBreakdownRows,
   lineItemEvidenceRows,
+  optimizationOpportunityRows,
   pricingModelAvailabilityRows,
   providerRankingRows,
+  regionComparisonRows,
   reportAssumptionRows,
   reportContextRows,
   selectedScenarioRows,
@@ -165,6 +169,44 @@ export class PdfReportGenerator {
     for (const row of egressTierBreakdownRows(result).slice(1)) {
       lines.push({
         text: `${row[0]} | ${row[1]} | ${row[2]} | billable ${row[3]} GB | rate $${row[4]}/GB | subtotal $${row[5]} | blended $${row[6] || 'n/a'}/GB`,
+        fontSize: 10,
+      });
+    }
+
+    lines.push(
+      { text: '', fontSize: 10 },
+      { text: 'Egress and networking detail', fontSize: 14 },
+    );
+    for (const row of egressNetworkingDetailRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]} | ${row[1]} | ${row[2]} | monthly $${row[4]} | share ${row[5]} | ${row[8]}`,
+        fontSize: 10,
+      });
+    }
+
+    lines.push(
+      { text: '', fontSize: 10 },
+      { text: 'Optimization opportunities', fontSize: 14 },
+    );
+    for (const row of optimizationOpportunityRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]} | ${row[1]} | monthly savings $${row[2] || 'n/a'} | priority ${row[4]} | effort ${row[5]}`,
+        fontSize: 10,
+      });
+    }
+
+    lines.push({ text: '', fontSize: 10 }, { text: 'Region comparison', fontSize: 14 });
+    for (const row of regionComparisonRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]} | ${row[1]} (${row[2]}) | modeled monthly $${row[3]} | delta $${row[4]} | ${row[6]}`,
+        fontSize: 10,
+      });
+    }
+
+    lines.push({ text: '', fontSize: 10 }, { text: 'Break-even analysis', fontSize: 14 });
+    for (const row of breakEvenSummaryRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]} | ${row[1]} | on-demand $${row[2]}/mo | committed $${row[3]}/mo | upfront $${row[4]} | break-even ${row[6]}`,
         fontSize: 10,
       });
     }
