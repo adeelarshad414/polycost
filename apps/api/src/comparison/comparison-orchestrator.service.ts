@@ -2470,6 +2470,14 @@ export class ComparisonOrchestratorService {
       ...(nws.workload.region.preference
         ? { regionPreference: nws.workload.region.preference }
         : {}),
+      availability: {
+        multiAz: nws.availability.multiAz,
+        multiRegion: nws.availability.multiRegion,
+        ...(nws.availability.slaTarget ? { slaTarget: nws.availability.slaTarget } : {}),
+        ...(nws.availability.faultTolerance
+          ? { faultTolerance: nws.availability.faultTolerance }
+          : {}),
+      },
       ...(profile
         ? {
             workloadProfile: {

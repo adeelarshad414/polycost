@@ -132,6 +132,10 @@ describe('ComparisonOrchestratorService', () => {
       requirements: {
         sourceType: 'structured_form',
         workloadType: 'web_app',
+        availability: {
+          multiAz: false,
+          multiRegion: false,
+        },
         serviceRequirements: expect.arrayContaining([
           expect.objectContaining({
             serviceCategory: 'compute',

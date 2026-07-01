@@ -39,6 +39,12 @@ const comparison: ComparisonResult = {
     workloadName: 'Client portal',
     workloadType: 'web_app',
     regionPreference: 'us-east',
+    availability: {
+      multiAz: true,
+      multiRegion: false,
+      slaTarget: '99.9%',
+      faultTolerance: 'multi-az',
+    },
     workloadProfile: {
       environment: 'production',
       commitmentPreferencePercent: 65,
@@ -801,6 +807,8 @@ describe('report generators', () => {
     expect(workloadScopeRows(comparison)).toEqual(
       expect.arrayContaining([
         ['Workload name', 'Client portal'],
+        ['Availability posture', 'multi-AZ (99.9% SLA target)'],
+        ['Fault tolerance', 'multi-az'],
         ['Environment', 'production'],
         ['Data residency', 'eu (locked)'],
         ['Usage pattern', 'bursty (25% average utilization)'],

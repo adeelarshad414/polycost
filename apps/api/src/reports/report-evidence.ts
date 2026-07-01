@@ -591,6 +591,7 @@ export function workloadScopeRows(result: ComparisonResult): string[][] {
   }
 
   const workloadProfile = requirements.workloadProfile;
+  const availability = requirements.availability;
   const dataResidency = workloadProfile?.dataResidency;
   const usagePattern = workloadProfile?.usagePattern;
   const costAllocationTags =
@@ -602,6 +603,8 @@ export function workloadScopeRows(result: ComparisonResult): string[][] {
     ['Workload type', requirements.workloadType],
     ['Input source', requirements.sourceType],
     ['Region preference', requirements.regionPreference ?? 'Not specified'],
+    ['Availability posture', availabilitySummary(availability)],
+    ['Fault tolerance', availability?.faultTolerance ?? 'Not specified'],
     ['Environment', workloadProfile?.environment ?? 'Not specified'],
     ['Operating system / license', workloadProfile?.operatingSystem ?? 'Not specified'],
     ['Support tier', workloadProfile?.supportTier ?? 'Not specified'],
@@ -630,6 +633,26 @@ export function workloadScopeRows(result: ComparisonResult): string[][] {
     ['Cost allocation tags', costAllocationTags],
     ['Normalized service requirements', requirements.serviceRequirements.length.toString()],
   ];
+}
+
+function availabilitySummary(
+  availability: NonNullable<ComparisonResult['requirements']>['availability'],
+): string {
+  if (!availability) {
+    return 'Not specified';
+  }
+
+  if (availability.multiRegion) {
+    return availability.slaTarget
+      ? `multi-region (${availability.slaTarget} SLA target)`
+      : 'multi-region';
+  }
+
+  if (availability.multiAz) {
+    return availability.slaTarget ? `multi-AZ (${availability.slaTarget} SLA target)` : 'multi-AZ';
+  }
+
+  return availability.slaTarget ? `single-zone (${availability.slaTarget} SLA target)` : 'single-zone';
 }
 
 export function decisionSummaryRows(

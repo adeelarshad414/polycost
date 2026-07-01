@@ -69,6 +69,10 @@ export interface ComparisonRequirementSummary {
   workloadName?: string;
   workloadType: WorkloadType;
   regionPreference?: string;
+  availability?: Pick<
+    NormalizedWorkloadSpec['availability'],
+    'multiAz' | 'multiRegion' | 'slaTarget' | 'faultTolerance'
+  >;
   workloadProfile?: Pick<
     NonNullable<NormalizedWorkloadSpec['workloadProfile']>,
     | 'environment'
