@@ -12,6 +12,10 @@ import { HOURS_PER_MONTH } from '../cost-time';
 import { NormalizedWorkloadSpec, ServiceRequirement } from '../nws/nws.types';
 import { NWSValidator } from '../nws/nws-validator';
 import {
+  canonicalRegionForPreference,
+  canonicalRegionForResidencyLock,
+} from '../pricing-normalization/region-map';
+import {
   COMPARISON_CLOCK,
   COMPARISON_ID_FACTORY,
   COMPARISON_PROVIDER_ADAPTERS,
@@ -177,7 +181,10 @@ export class ComparisonOrchestratorService {
       .filter(isProviderSuccess)
       .map((success) => this.toComparisonProviderResult(nws, success.result));
 
-    const warnings = failures.map((failure) => this.toWarning(failure));
+    const warnings = [
+      ...failures.map((failure) => this.toWarning(failure)),
+      ...this.dataResidencyWarnings(nws),
+    ];
 
     if (providers.length === 0) {
       throw new ComparisonUnavailableError(warnings);
@@ -2251,6 +2258,36 @@ export class ComparisonOrchestratorService {
     }
 
     return `Defaulting to spot pricing for a ${environmentLabel} workload with ${commitmentLabel}; verify interruption tolerance before using this as the operating scenario.${fallbackCopy}`;
+  }
+
+  private dataResidencyWarnings(nws: NormalizedWorkloadSpec): ComparisonWarning[] {
+    const dataResidency = nws.workloadProfile?.dataResidency;
+
+    if (!dataResidency?.complianceLocked) {
+      return [];
+    }
+
+    const effectiveRegion = canonicalRegionForResidencyLock(
+      nws.workload.region.preference,
+      dataResidency.scope,
+    );
+
+    if (!effectiveRegion) {
+      return [];
+    }
+
+    const requestedRegion = canonicalRegionForPreference(nws.workload.region.preference);
+
+    if (requestedRegion === effectiveRegion) {
+      return [];
+    }
+
+    return [
+      {
+        code: 'data_residency_region_adjusted',
+        message: `Data residency lock '${dataResidency.scope}' constrained pricing to ${effectiveRegion}; requested region '${nws.workload.region.preference ?? 'provider default'}' is outside the allowed geography.`,
+      },
+    ];
   }
 
   private requirementSummary(nws: NormalizedWorkloadSpec): ComparisonResult['requirements'] {

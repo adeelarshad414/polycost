@@ -60,7 +60,7 @@ export interface ComparisonProviderResult {
 
 export interface ComparisonWarning {
   providerId?: ProviderId;
-  code: 'provider_pricing_failed' | 'live_refresh_failed';
+  code: 'provider_pricing_failed' | 'live_refresh_failed' | 'data_residency_region_adjusted';
   message: string;
 }
 

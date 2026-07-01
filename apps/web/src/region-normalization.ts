@@ -61,6 +61,33 @@ export const COMPARISON_REGION_GROUPS: ComparisonRegionGroup[] = [
       gcp: 'asia-south1',
     },
   },
+  {
+    id: 'ap-southeast',
+    label: 'Asia Pacific Southeast',
+    providerRegions: {
+      aws: 'ap-southeast-1',
+      azure: 'southeastasia',
+      gcp: 'asia-southeast1',
+    },
+  },
+  {
+    id: 'uk',
+    label: 'United Kingdom',
+    providerRegions: {
+      aws: 'eu-west-2',
+      azure: 'uksouth',
+      gcp: 'europe-west2',
+    },
+  },
+  {
+    id: 'canada',
+    label: 'Canada',
+    providerRegions: {
+      aws: 'ca-central-1',
+      azure: 'canadacentral',
+      gcp: 'northamerica-northeast1',
+    },
+  },
 ];
 
 export const DEFAULT_COMPARISON_REGION = COMPARISON_REGION_GROUPS[0].id;
@@ -96,6 +123,108 @@ export function comparisonRegionLabel(regionPreference: string): string | undefi
   return `${group.label} (${providerRegionSummary(group)})`;
 }
 
+export function canonicalRegionsForResidencyScope(scope: string): string[] | undefined {
+  switch (normalizedResidencyScope(scope)) {
+    case 'us':
+      return ['us-east', 'us-central', 'us-west'];
+    case 'eu':
+      return ['eu-west', 'eu-central'];
+    case 'uk':
+      return ['uk'];
+    case 'apac':
+      return ['ap-south', 'ap-southeast'];
+    case 'canada':
+      return ['canada'];
+    default:
+      return undefined;
+  }
+}
+
+export function isRegionPreferenceAllowedForResidency(
+  regionPreference: string,
+  scope: string,
+): boolean {
+  const allowedRegions = canonicalRegionsForResidencyScope(scope);
+
+  if (!allowedRegions) {
+    return true;
+  }
+
+  const canonicalRegion = canonicalRegionForRegionPreference(regionPreference);
+
+  return canonicalRegion !== undefined && allowedRegions.includes(canonicalRegion);
+}
+
+export function regionPreferenceForResidencyLock(
+  regionPreference: string,
+  scope: string,
+): string | undefined {
+  const allowedRegions = canonicalRegionsForResidencyScope(scope);
+
+  if (!allowedRegions || allowedRegions.length === 0) {
+    return undefined;
+  }
+
+  return isRegionPreferenceAllowedForResidency(regionPreference, scope)
+    ? (canonicalRegionForRegionPreference(regionPreference) ?? regionPreference)
+    : allowedRegions[0];
+}
+
 export function providerRegionSummary(group: ComparisonRegionGroup): string {
   return `AWS ${group.providerRegions.aws} · Azure ${group.providerRegions.azure} · GCP ${group.providerRegions.gcp}`;
+}
+
+function normalizedResidencyScope(
+  scope: string,
+): 'us' | 'eu' | 'uk' | 'apac' | 'canada' | undefined {
+  const normalizedScope = scope
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z]/g, '');
+
+  if (!normalizedScope || normalizedScope === 'global' || normalizedScope === 'anywhere') {
+    return undefined;
+  }
+
+  if (
+    normalizedScope === 'us' ||
+    normalizedScope === 'usa' ||
+    normalizedScope === 'unitedstates' ||
+    normalizedScope === 'america'
+  ) {
+    return 'us';
+  }
+
+  if (
+    normalizedScope === 'eu' ||
+    normalizedScope === 'europe' ||
+    normalizedScope === 'europeanunion' ||
+    normalizedScope === 'eea' ||
+    normalizedScope === 'gdpr'
+  ) {
+    return 'eu';
+  }
+
+  if (
+    normalizedScope === 'uk' ||
+    normalizedScope === 'gb' ||
+    normalizedScope === 'greatbritain' ||
+    normalizedScope === 'unitedkingdom'
+  ) {
+    return 'uk';
+  }
+
+  if (
+    normalizedScope === 'apac' ||
+    normalizedScope === 'asia' ||
+    normalizedScope === 'asiapacific'
+  ) {
+    return 'apac';
+  }
+
+  if (normalizedScope === 'canada' || normalizedScope === 'ca') {
+    return 'canada';
+  }
+
+  return undefined;
 }

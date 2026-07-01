@@ -701,6 +701,23 @@ describe('workload helpers', () => {
     });
   });
 
+  it('constrains NWS region output when data residency lock is enabled', () => {
+    const nws = buildNwsFromForm({
+      ...defaultWorkloadForm,
+      regionPreference: 'us-east',
+      dataResidency: 'eu',
+      complianceLocked: true,
+    });
+
+    expect(nws.workload.region).toEqual({
+      preference: 'eu-west',
+      isDefault: false,
+    });
+    expect(nws.serviceRequirements?.every((requirement) => requirement.region === 'eu-west')).toBe(
+      true,
+    );
+  });
+
   it('flags invalid numeric form values before NWS generation can fall back silently', () => {
     expect(
       validateWorkloadForm({

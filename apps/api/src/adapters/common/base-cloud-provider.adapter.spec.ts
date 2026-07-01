@@ -183,6 +183,99 @@ describe('BaseCloudProviderAdapter', () => {
     expect(result.lineItems[1].isApproximate).toBe(true);
   });
 
+  it('uses residency-locked canonical regions before querying provider pricing', async () => {
+    const adapter = new TestProviderAdapter(
+      new InMemoryPricingCatalogReader([
+        {
+          ...catalog[1],
+          serviceName: 'eu west compute',
+          skuId: 'COMPUTE-EU',
+          region: 'eu-west-1',
+        },
+      ]),
+      'fallback-region',
+    );
+
+    const result = await adapter.priceWorkload({
+      ...fullWorkload,
+      workload: {
+        ...fullWorkload.workload,
+        region: {
+          preference: 'us-east',
+          isDefault: false,
+        },
+      },
+      workloadProfile: {
+        dataResidency: {
+          scope: 'eu',
+          complianceLocked: true,
+        },
+      },
+      storage: [],
+      database: [],
+      network: {
+        cdn: false,
+        loadBalancer: false,
+      },
+      compute: [
+        {
+          role: 'api',
+          vcpu: 2,
+          memoryGb: 4,
+          scalingType: 'fixed',
+          instanceCount: 1,
+        },
+      ],
+    });
+
+    expect(result.lineItems[0]).toEqual(
+      expect.objectContaining({
+        skuId: 'COMPUTE-EU',
+        region: 'eu-west-1',
+      }),
+    );
+  });
+
+  it('labels approximate fallback rows with the requested provider region', async () => {
+    const adapter = new TestProviderAdapter(
+      new InMemoryPricingCatalogReader(catalog),
+      'test-region',
+    );
+
+    const result = await adapter.priceWorkload({
+      ...fullWorkload,
+      workload: {
+        ...fullWorkload.workload,
+        region: {
+          preference: 'eu-west',
+          isDefault: false,
+        },
+      },
+      storage: [],
+      database: [],
+      network: {
+        cdn: false,
+        loadBalancer: false,
+      },
+      compute: [
+        {
+          role: 'api',
+          vcpu: 2,
+          memoryGb: 4,
+          scalingType: 'fixed',
+          instanceCount: 1,
+        },
+      ],
+    });
+
+    expect(result.lineItems[0]).toEqual(
+      expect.objectContaining({
+        isApproximate: true,
+        region: 'eu-west-1',
+      }),
+    );
+  });
+
   it('falls back to type-compatible storage when class-specific catalog rows are unavailable', async () => {
     const shallowStorageCatalog = catalog.map((record) =>
       record.skuId === 'STORAGE'

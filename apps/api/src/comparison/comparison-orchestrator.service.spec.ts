@@ -232,6 +232,40 @@ describe('ComparisonOrchestratorService', () => {
     ]);
   });
 
+  it('warns when a data residency lock adjusts the requested comparison region', async () => {
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async () => providerResult('aws', [20])),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      workload: {
+        ...validWorkload.workload,
+        region: {
+          preference: 'us-east',
+          isDefault: false,
+        },
+      },
+      workloadProfile: {
+        dataResidency: {
+          scope: 'eu',
+          complianceLocked: true,
+        },
+      },
+    });
+
+    expect(result.warnings).toEqual([
+      {
+        code: 'data_residency_region_adjusted',
+        message:
+          "Data residency lock 'eu' constrained pricing to eu-west; requested region 'us-east' is outside the allowed geography.",
+      },
+    ]);
+  });
+
   it('returns pricing-model availability and a scoped workload breakdown', async () => {
     const richProviderResult: ProviderPricingResult = {
       providerId: 'aws',

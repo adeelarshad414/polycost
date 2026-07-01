@@ -9,9 +9,12 @@ import { ThemeSwitcher } from './components/ThemeSwitcher';
 import { TopLoadingBar } from './components/TopLoadingBar';
 import { hourlyFromMonthly, intervalMultiplierFromMonthly } from './cost-time';
 import {
+  canonicalRegionsForResidencyScope,
   COMPARISON_REGION_GROUPS,
   comparisonRegionLabel,
+  isRegionPreferenceAllowedForResidency,
   providerRegionSummary,
+  regionPreferenceForResidencyLock,
 } from './region-normalization';
 import {
   CLOUD_SERVICE_CATALOG,
@@ -1305,10 +1308,7 @@ function InitialHomePage({
   requirementsFileName: string | null;
 }) {
   function update<K extends keyof WorkloadFormState>(key: K, value: WorkloadFormState[K]) {
-    onChange({
-      ...form,
-      [key]: value,
-    });
+    onChange(applyResidencyRegionLock({ ...form, [key]: value }));
   }
 
   function updateServiceCategory(value: string) {
@@ -1446,6 +1446,8 @@ function InitialHomePage({
               />
               <RegionSelectField
                 value={form.regionPreference}
+                dataResidency={form.dataResidency}
+                complianceLocked={form.complianceLocked}
                 regionCatalog={regionCatalog}
                 regionCatalogError={regionCatalogError}
                 compact
@@ -2592,10 +2594,7 @@ function WorkloadForm({
   onSubmit: (event: FormEvent) => void;
 }) {
   function update<K extends keyof WorkloadFormState>(key: K, value: WorkloadFormState[K]) {
-    onChange({
-      ...form,
-      [key]: value,
-    });
+    onChange(applyResidencyRegionLock({ ...form, [key]: value }));
   }
 
   function updateServiceCategory(value: string) {
@@ -2675,6 +2674,8 @@ function WorkloadForm({
           />
           <RegionSelectField
             value={form.regionPreference}
+            dataResidency={form.dataResidency}
+            complianceLocked={form.complianceLocked}
             regionCatalog={regionCatalog}
             regionCatalogError={regionCatalogError}
             onChange={(value) => update('regionPreference', value)}
@@ -3990,26 +3991,45 @@ function SelectField<T extends string>({
 
 function RegionSelectField({
   value,
+  dataResidency,
+  complianceLocked,
   regionCatalog,
   regionCatalogError,
   compact = false,
   onChange,
 }: {
   value: string;
+  dataResidency: string;
+  complianceLocked: boolean;
   regionCatalog: RegionCatalogResponse | null;
   regionCatalogError: string | null;
   compact?: boolean;
   onChange: (value: string) => void;
 }) {
   const catalog = regionCatalog ?? FALLBACK_REGION_CATALOG;
+  const allowedComparisonRegions = complianceLocked
+    ? canonicalRegionsForResidencyScope(dataResidency)
+    : undefined;
   const providerCatalogs = PROVIDER_ORDER.map((providerId) =>
     catalog.providers.find((provider) => provider.providerId === providerId),
-  ).filter((provider): provider is RegionCatalogResponse['providers'][number] => Boolean(provider));
+  )
+    .filter((provider): provider is RegionCatalogResponse['providers'][number] => Boolean(provider))
+    .map((provider) => ({
+      ...provider,
+      regions: complianceLocked
+        ? provider.regions.filter((region) =>
+            isRegionPreferenceAllowedForResidency(region.id, dataResidency),
+          )
+        : provider.regions,
+    }));
   const regionCount = providerCatalogs.reduce(
     (count, provider) => count + provider.regions.length,
     0,
   );
-  const selectedComparisonRegion = COMPARISON_REGION_GROUPS.find((group) => group.id === value);
+  const comparisonRegionGroups = allowedComparisonRegions
+    ? COMPARISON_REGION_GROUPS.filter((group) => allowedComparisonRegions.includes(group.id))
+    : COMPARISON_REGION_GROUPS;
+  const selectedComparisonRegion = comparisonRegionGroups.find((group) => group.id === value);
   const selectedRegion = providerCatalogs
     .flatMap((provider) => provider.regions)
     .find((region) => region.id === value);
@@ -4046,7 +4066,7 @@ function RegionSelectField({
           <option value={value}>Current selection: {value}</option>
         ) : null}
         <optgroup label="Comparable regions (priced peer groups)">
-          {COMPARISON_REGION_GROUPS.map((group) => (
+          {comparisonRegionGroups.map((group) => (
             <option key={group.id} value={group.id}>
               {group.label} - {providerRegionSummary(group)}
             </option>
@@ -4067,12 +4087,34 @@ function RegionSelectField({
       </select>
       {compact ? null : (
         <span className="field-help">
-          {catalogLabel} · {regionCount} provider regions · comparable groups normalize AWS, Azure,
-          and GCP pricing.
+          {catalogLabel} · {regionCount} provider regions ·{' '}
+          {complianceLocked && allowedComparisonRegions
+            ? `${dataResidency.toUpperCase()} residency lock filters non-compliant regions.`
+            : 'comparable groups normalize AWS, Azure, and GCP pricing.'}
         </span>
       )}
     </label>
   );
+}
+
+function applyResidencyRegionLock(form: WorkloadFormState): WorkloadFormState {
+  if (!form.complianceLocked) {
+    return form;
+  }
+
+  const lockedRegionPreference = regionPreferenceForResidencyLock(
+    form.regionPreference,
+    form.dataResidency,
+  );
+
+  if (!lockedRegionPreference || lockedRegionPreference === form.regionPreference) {
+    return form;
+  }
+
+  return {
+    ...form,
+    regionPreference: lockedRegionPreference,
+  };
 }
 
 function CheckboxField({

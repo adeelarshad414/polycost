@@ -10,6 +10,7 @@ import {
 import {
   canonicalRegionForRegionPreference,
   DEFAULT_COMPARISON_REGION,
+  regionPreferenceForResidencyLock,
 } from './region-normalization';
 
 export type WorkloadType = NormalizedWorkloadSpec['workload']['type'];
@@ -1198,7 +1199,11 @@ export function buildNwsFromForm(
         ...optionalNonNegativeInteger('dailyActiveUsers', form.dailyActiveUsers),
         ...optionalNonNegativeInteger('peakConcurrentUsers', form.peakConcurrentUsers),
       },
-      region: normalizedRegionPreference(form.regionPreference),
+      region: normalizedRegionPreference(
+        form.regionPreference,
+        form.dataResidency,
+        form.complianceLocked,
+      ),
     },
     compute: [compute],
     storage: form.storageEnabled
@@ -1599,7 +1604,11 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
 
 export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceRequirement[] {
   const selectedIds = orderedRequirementIds(form);
-  const region = normalizedRegionPreference(form.regionPreference).preference;
+  const region = normalizedRegionPreference(
+    form.regionPreference,
+    form.dataResidency,
+    form.complianceLocked,
+  ).preference;
   const availabilityZones = form.multiAz
     ? `${Math.max(2, parseNonNegativeInteger(form.availabilityZoneCount, 2))} zones`
     : 'single-zone';
@@ -2424,9 +2433,16 @@ function databaseServiceFamilyId(form: WorkloadFormState): string {
 
 function normalizedRegionPreference(
   regionPreference: string,
+  dataResidency = 'global',
+  complianceLocked = false,
 ): NormalizedWorkloadSpec['workload']['region'] {
   const trimmedPreference = regionPreference.trim();
-  const canonicalPreference = canonicalRegionForRegionPreference(trimmedPreference);
+  const lockedPreference = complianceLocked
+    ? regionPreferenceForResidencyLock(trimmedPreference, dataResidency)
+    : undefined;
+  const canonicalPreference = canonicalRegionForRegionPreference(
+    lockedPreference ?? trimmedPreference,
+  );
   const preference = canonicalPreference ?? trimmedPreference;
 
   return {

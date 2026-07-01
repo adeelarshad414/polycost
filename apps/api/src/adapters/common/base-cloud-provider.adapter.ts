@@ -5,6 +5,7 @@ import {
   EgressTierRate,
 } from '../../pricing-normalization/egress-tier-calculator';
 import {
+  canonicalRegionForResidencyLock,
   canonicalRegionForProviderRegion,
   providerRegionForCanonicalRegion,
 } from '../../pricing-normalization/region-map';
@@ -37,6 +38,9 @@ type ComputeProcessorArchitecture = NonNullable<
 >;
 type ComputeTenancy = NonNullable<NormalizedWorkloadSpec['compute'][number]['tenancy']>;
 type StorageClass = NonNullable<NormalizedWorkloadSpec['storage'][number]['storageClass']>;
+type WorkloadDataResidency = NonNullable<
+  NormalizedWorkloadSpec['workloadProfile']
+>['dataResidency'];
 
 interface CostCalculation {
   hourlyCostUsd: number;
@@ -61,7 +65,10 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
 
   async priceWorkload(input: unknown): Promise<ProviderPricingResult> {
     const nws = NWSValidator.validate(input);
-    const region = this.providerRegionForPreference(nws.workload.region.preference);
+    const region = this.providerRegionForPreference(
+      nws.workload.region.preference,
+      nws.workloadProfile?.dataResidency,
+    );
     const lineItems: ProviderPricingLineItem[] = [];
 
     for (const component of nws.compute) {
@@ -205,7 +212,23 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     options?: RefreshPricingCatalogOptions,
   ): Promise<PricingCatalogRecord[]>;
 
-  private providerRegionForPreference(regionPreference: string | undefined): string {
+  private providerRegionForPreference(
+    regionPreference: string | undefined,
+    dataResidency: WorkloadDataResidency | undefined,
+  ): string {
+    if (dataResidency?.complianceLocked) {
+      const residencyRegion = canonicalRegionForResidencyLock(
+        regionPreference,
+        dataResidency.scope,
+      );
+
+      if (residencyRegion) {
+        return (
+          providerRegionForCanonicalRegion(residencyRegion, this.providerId) ?? this.defaultRegion
+        );
+      }
+    }
+
     const preference = regionPreference?.trim();
 
     if (!preference) {
@@ -500,6 +523,10 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     } = {},
   ): ProviderPricingLineItem {
     const cost = this.monthlyCost(record, quantity);
+    const displayRegion =
+      typeof record.attributes?.regionFallbackFrom === 'string'
+        ? record.attributes.regionFallbackFrom
+        : record.region;
 
     return {
       category,
@@ -509,7 +536,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       baseHourlyCostUsd: cost.hourlyCostUsd,
       baseMonthlyCostUsd: cost.monthlyCostUsd,
       skuId: record.skuId,
-      region: record.region,
+      region: displayRegion,
       unit: record.unit,
       unitPriceUsd: record.unitPriceUsd,
       pricingBasis: cost.pricingBasis,
