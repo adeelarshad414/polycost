@@ -6,7 +6,7 @@ import {
   systemTheme,
   THEME_STORAGE_KEY,
 } from './theme';
-import { DEFAULT_SELECTED_SERVICE_FAMILY_IDS } from './service-catalog';
+import { CLOUD_SERVICE_CATALOG, DEFAULT_SELECTED_SERVICE_FAMILY_IDS } from './service-catalog';
 import { NormalizedWorkloadSpec } from './types';
 import {
   ARCHITECTURE_TEMPLATES,
@@ -17,6 +17,14 @@ import {
 } from './workload';
 
 describe('workload helpers', () => {
+  it('marks archive storage as priced because class, retrieval, lifecycle, and snapshot dimensions are modeled', () => {
+    expect(CLOUD_SERVICE_CATALOG.find((family) => family.id === 'archive-storage')).toEqual(
+      expect.objectContaining({
+        supportStatus: 'priced',
+      }),
+    );
+  });
+
   it('builds a valid NWS from the structured form', () => {
     const nws = buildNwsFromForm({
       ...defaultWorkloadForm,

@@ -111,7 +111,7 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Azure Files'],
     gcp: ['Filestore'],
   }),
-  family('archive-storage', 'storage', 'Archive storage', 'mapped', {
+  family('archive-storage', 'storage', 'Archive storage', 'priced', {
     aws: ['Amazon S3 Glacier'],
     azure: ['Blob Storage Archive'],
     gcp: ['Cloud Storage Archive'],
