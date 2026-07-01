@@ -75,12 +75,27 @@ export function workloadScopeRows(result: ComparisonResult): string[][] {
     ];
   }
 
+  const workloadProfile = requirements.workloadProfile;
+  const dataResidency = workloadProfile?.dataResidency;
+  const costAllocationTags =
+    workloadProfile?.tags?.map((tag) => `${tag.key}:${tag.value}`).join(', ') ?? 'None supplied';
+
   return [
     ['Field', 'Value'],
     ['Workload name', requirements.workloadName ?? 'Unnamed workload'],
     ['Workload type', requirements.workloadType],
     ['Input source', requirements.sourceType],
     ['Region preference', requirements.regionPreference ?? 'Not specified'],
+    ['Environment', workloadProfile?.environment ?? 'Not specified'],
+    ['Operating system / license', workloadProfile?.operatingSystem ?? 'Not specified'],
+    ['Support tier', workloadProfile?.supportTier ?? 'Not specified'],
+    [
+      'Data residency',
+      dataResidency
+        ? `${dataResidency.scope}${dataResidency.complianceLocked ? ' (locked)' : ''}`
+        : 'Not specified',
+    ],
+    ['Cost allocation tags', costAllocationTags],
     ['Normalized service requirements', requirements.serviceRequirements.length.toString()],
   ];
 }

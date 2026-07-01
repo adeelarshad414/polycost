@@ -32,6 +32,19 @@ const comparison: ComparisonResult = {
     workloadName: 'Client portal',
     workloadType: 'web_app',
     regionPreference: 'us-east',
+    workloadProfile: {
+      environment: 'production',
+      operatingSystem: 'linux',
+      supportTier: 'business',
+      dataResidency: {
+        scope: 'eu',
+        complianceLocked: true,
+      },
+      tags: [
+        { key: 'team', value: 'platform' },
+        { key: 'project', value: 'migration-q3' },
+      ],
+    },
     serviceRequirements: [
       {
         serviceCategory: 'compute',
@@ -487,6 +500,9 @@ describe('report generators', () => {
     expect(workloadScopeRows(comparison)).toEqual(
       expect.arrayContaining([
         ['Workload name', 'Client portal'],
+        ['Environment', 'production'],
+        ['Data residency', 'eu (locked)'],
+        ['Cost allocation tags', 'team:platform, project:migration-q3'],
         ['Normalized service requirements', '1'],
       ]),
     );

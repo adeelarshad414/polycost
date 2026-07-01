@@ -2291,12 +2291,25 @@ export class ComparisonOrchestratorService {
   }
 
   private requirementSummary(nws: NormalizedWorkloadSpec): ComparisonResult['requirements'] {
+    const profile = nws.workloadProfile;
+
     return {
       sourceType: nws.metadata.sourceType,
       workloadType: nws.workload.type,
       ...(nws.workload.name ? { workloadName: nws.workload.name } : {}),
       ...(nws.workload.region.preference
         ? { regionPreference: nws.workload.region.preference }
+        : {}),
+      ...(profile
+        ? {
+            workloadProfile: {
+              ...(profile.environment ? { environment: profile.environment } : {}),
+              ...(profile.dataResidency ? { dataResidency: profile.dataResidency } : {}),
+              ...(profile.operatingSystem ? { operatingSystem: profile.operatingSystem } : {}),
+              ...(profile.supportTier ? { supportTier: profile.supportTier } : {}),
+              ...(profile.tags && profile.tags.length > 0 ? { tags: profile.tags } : {}),
+            },
+          }
         : {}),
       serviceRequirements: nws.serviceRequirements ?? this.serviceRequirementsFromNws(nws),
     };

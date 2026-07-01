@@ -69,6 +69,10 @@ export interface ComparisonRequirementSummary {
   workloadName?: string;
   workloadType: WorkloadType;
   regionPreference?: string;
+  workloadProfile?: Pick<
+    NonNullable<NormalizedWorkloadSpec['workloadProfile']>,
+    'environment' | 'dataResidency' | 'operatingSystem' | 'supportTier' | 'tags'
+  >;
   serviceRequirements: ServiceRequirement[];
 }
 

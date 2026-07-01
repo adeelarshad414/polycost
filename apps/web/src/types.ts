@@ -312,6 +312,10 @@ export interface ComparisonResult {
     workloadName?: string;
     workloadType: NormalizedWorkloadSpec['workload']['type'];
     regionPreference?: string;
+    workloadProfile?: Pick<
+      NonNullable<NormalizedWorkloadSpec['workloadProfile']>,
+      'environment' | 'dataResidency' | 'operatingSystem' | 'supportTier' | 'tags'
+    >;
     serviceRequirements: ServiceRequirement[];
   };
   providers: ComparisonProviderResult[];

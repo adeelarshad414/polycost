@@ -205,10 +205,13 @@ export function usePersonaComparisonData(
       })
       .sort((left, right) => left.monthlyTotal - right.monthlyTotal);
     const activeRegion = form.regionPreference.trim() || 'Provider default region';
+    const workloadTags =
+      comparison?.requirements?.workloadProfile?.tags?.map((tag) => `${tag.key}:${tag.value}`) ??
+      [];
     const rows =
       comparison?.providers.flatMap((provider) =>
         provider.lineItems.map((lineItem, index) =>
-          engineeringRowFromLineItem(provider.providerId, lineItem, index),
+          engineeringRowFromLineItem(provider.providerId, lineItem, index, workloadTags),
         ),
       ) ?? [];
     const cheapest = pricedSummaries[0];
@@ -243,7 +246,8 @@ export function usePersonaComparisonData(
       annualForecast: cheapest ? roundCurrency(cheapest.monthlyTotal * 12) : undefined,
       activeRegion,
       warningMessages: comparison?.warnings?.map((warning) => warning.message) ?? [],
-      missingEngineeringFields: ['Tags are not present in the comparison response yet.'],
+      missingEngineeringFields:
+        workloadTags.length > 0 ? [] : ['Tags are not present in the comparison response yet.'],
       confidence,
       confidenceDetail: confidenceDetail(confidence, pricedProviderCount, totalApproximateCount),
       pricedProviderCount,
@@ -684,6 +688,7 @@ function engineeringRowFromLineItem(
   providerId: ProviderId,
   lineItem: ComparisonLineItem,
   index: number,
+  tags: string[],
 ): EngineeringCostRow {
   const resourceName = `${providerId}-${lineItem.category}-${String(index + 1).padStart(2, '0')}`;
 
@@ -698,7 +703,7 @@ function engineeringRowFromLineItem(
     monthlyCost: lineItem.baseMonthlyCostUsd,
     description: lineItem.description,
     isApproximate: lineItem.isApproximate,
-    tags: [],
+    tags,
   };
 }
 
