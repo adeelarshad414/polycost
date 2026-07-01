@@ -761,6 +761,25 @@ export function lineItemEvidenceRows(result: ComparisonResult): string[][] {
   ];
 }
 
+export function providerCostDetailRows(result: ComparisonResult): string[][] {
+  return [
+    [
+      'Row type',
+      'Provider',
+      'Category',
+      'Cost component',
+      'Description',
+      'SKU',
+      'Region',
+      'Monthly USD',
+      'Share of provider total',
+      'Confidence',
+      'Calculation',
+    ],
+    ...result.providers.flatMap((provider) => providerCostDetailRowsForProvider(provider)),
+  ];
+}
+
 export function methodologySourceRows(result: ComparisonResult): string[][] {
   const warningCount = result.warnings?.length ?? 0;
   const lineItems = result.providers.flatMap((provider) => provider.lineItems);
@@ -1582,6 +1601,80 @@ function architectureReviewCue(requirement: ServiceRequirement, confidence: stri
   }
 
   return `Map ${requirement.serviceCategory}/${requirement.serviceType} before publishing the report.`;
+}
+
+function providerCostDetailRowsForProvider(provider: ComparisonProviderResult): string[][] {
+  const categoryTotals = new Map<string, number>();
+
+  for (const lineItem of provider.lineItems) {
+    const key = `${lineItem.category}:${lineItem.costComponent ?? lineItem.category}`;
+    categoryTotals.set(key, (categoryTotals.get(key) ?? 0) + lineItem.baseMonthlyCostUsd);
+  }
+
+  return [
+    [
+      'Provider total',
+      provider.providerId,
+      'all',
+      'all',
+      `${provider.providerId} monthly total`,
+      '',
+      '',
+      formatNumber(provider.totals.monthly),
+      '100%',
+      provider.lineItems.some((lineItem) => lineItem.isApproximate)
+        ? 'Review required'
+        : 'Mapped',
+      `${provider.lineItems.length} line item(s) roll up to $${formatNumber(
+        provider.totals.monthly,
+      )}/mo.`,
+    ],
+    ...[...categoryTotals.entries()].map(([key, monthly]) => {
+      const [category, component] = key.split(':');
+
+      return [
+        'Category subtotal',
+        provider.providerId,
+        category,
+        component,
+        `${category} / ${component} subtotal`,
+        '',
+        '',
+        formatNumber(monthly),
+        provider.totals.monthly > 0
+          ? `${formatNumber((monthly / provider.totals.monthly) * 100)}%`
+          : '',
+        provider.lineItems.some(
+          (lineItem) =>
+            lineItem.category === category &&
+            (lineItem.costComponent ?? lineItem.category) === component &&
+            lineItem.isApproximate,
+        )
+          ? 'Approximate'
+          : 'Mapped',
+        `${provider.providerId} subtotal across ${provider.lineItems.filter(
+          (lineItem) =>
+            lineItem.category === category &&
+            (lineItem.costComponent ?? lineItem.category) === component,
+        ).length} row(s).`,
+      ];
+    }),
+    ...provider.lineItems.map((lineItem) => [
+      'Line item',
+      provider.providerId,
+      lineItem.category,
+      lineItem.costComponent ?? lineItem.category,
+      lineItem.description,
+      lineItem.skuId ?? '',
+      lineItem.region ?? '',
+      formatNumber(lineItem.baseMonthlyCostUsd),
+      provider.totals.monthly > 0
+        ? `${formatNumber((lineItem.baseMonthlyCostUsd / provider.totals.monthly) * 100)}%`
+        : '',
+      lineItem.isApproximate ? 'Approximate' : 'Mapped',
+      calculationText(lineItem),
+    ]),
+  ];
 }
 
 function selectedMonthlyCost(model: PricingModelCost | undefined, fallbackMonthly: number): number {

@@ -12,6 +12,7 @@ import {
   methodologySourceRows,
   optimizationOpportunityRows,
   pricingModelAvailabilityRows,
+  providerCostDetailRows,
   providerRankingRows,
   regionComparisonRows,
   reportAssumptionRows,
@@ -135,6 +136,7 @@ export class ExcelReportGenerator {
           rows: whatIfSheet.rows,
         },
         evidenceSheet('Architecture Overview', architectureOverviewRows(result)),
+        evidenceSheet('Provider Cost Detail', providerCostDetailRows(result)),
         evidenceSheet('Optimization Opportunities', optimizationOpportunityRows(result)),
         evidenceSheet('Egress & Networking Detail', egressNetworkingDetailRows(result)),
         evidenceSheet('Region Comparison', regionComparisonRows(result)),
@@ -244,6 +246,17 @@ export class ExcelReportGenerator {
           provider.totals.quarterly,
           provider.totals.yearly,
         ],
+      })),
+      {
+        cells: [],
+      },
+      {
+        cells: ['Provider Cost Detail'],
+        style: 2,
+      },
+      ...providerCostDetailRows(result).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
       })),
       {
         cells: [],

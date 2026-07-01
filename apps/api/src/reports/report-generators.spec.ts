@@ -15,6 +15,7 @@ import {
   methodologySourceRows,
   optimizationOpportunityRows,
   pricingModelAvailabilityRows,
+  providerCostDetailRows,
   providerRankingRows,
   regionComparisonRows,
   reportAssumptionRows,
@@ -204,6 +205,9 @@ describe('report generators', () => {
     expect(csv).toContain('Lowest monthly run rate,gcp $20');
     expect(csv).toContain('Annual avoidable spread,$612');
     expect(csv).toContain('Dominant cost driver,storage $20');
+    expect(csv).toContain('Provider Cost Detail');
+    expect(csv).toContain('Provider total,aws,all,all,aws monthly total');
+    expect(csv).toContain('Category subtotal,aws,network,egress,network / egress subtotal');
     expect(csv).toContain('Selected Pricing Scenario');
     expect(csv).toContain('aws,yes,126,42,0.06,Three-year commitment.');
     expect(csv).toContain('Pricing Model Availability');
@@ -289,13 +293,14 @@ describe('report generators', () => {
     expect(xlsxText).toContain('<sheet name="Comparison"');
     expect(xlsxText).toContain('<sheet name="What If" sheetId="2"');
     expect(xlsxText).toContain('<sheet name="Architecture Overview" sheetId="3"');
-    expect(xlsxText).toContain('<sheet name="Optimization Opportunities" sheetId="4"');
-    expect(xlsxText).toContain('<sheet name="Egress &amp; Networking Detail" sheetId="5"');
-    expect(xlsxText).toContain('<sheet name="Region Comparison" sheetId="6"');
-    expect(xlsxText).toContain('<sheet name="Break-Even Analysis" sheetId="7"');
-    expect(xlsxText).toContain('<sheet name="Break-Even Summary" sheetId="8"');
-    expect(xlsxText).toContain('<sheet name="Methodology &amp; Sources" sheetId="9"');
-    expect(xlsxText).toContain('<sheet name="SKU Mapping Appendix" sheetId="10"');
+    expect(xlsxText).toContain('<sheet name="Provider Cost Detail" sheetId="4"');
+    expect(xlsxText).toContain('<sheet name="Optimization Opportunities" sheetId="5"');
+    expect(xlsxText).toContain('<sheet name="Egress &amp; Networking Detail" sheetId="6"');
+    expect(xlsxText).toContain('<sheet name="Region Comparison" sheetId="7"');
+    expect(xlsxText).toContain('<sheet name="Break-Even Analysis" sheetId="8"');
+    expect(xlsxText).toContain('<sheet name="Break-Even Summary" sheetId="9"');
+    expect(xlsxText).toContain('<sheet name="Methodology &amp; Sources" sheetId="10"');
+    expect(xlsxText).toContain('<sheet name="SKU Mapping Appendix" sheetId="11"');
     expect(xlsxText).toContain('<calcPr calcMode="auto" fullCalcOnLoad="1"/>');
     expect(xlsxText).toContain(
       '<definedName name="WhatIfScaleFactor">&apos;What If&apos;!$B$5</definedName>',
@@ -326,6 +331,9 @@ describe('report generators', () => {
     expect(xlsxText).toContain('Architecture Overview');
     expect(xlsxText).toContain('AWS mapping');
     expect(xlsxText).toContain('compute/vm-compute');
+    expect(xlsxText).toContain('Provider Cost Detail');
+    expect(xlsxText).toContain('Provider total');
+    expect(xlsxText).toContain('Category subtotal');
     expect(xlsxText).toContain('FinOps Summary');
     expect(xlsxText).toContain('Executive recommendation');
     expect(xlsxText).toContain('Decision confidence');
@@ -447,6 +455,8 @@ describe('report generators', () => {
     expect(pdfText).toContain('Architecture risk: Medium');
     expect(pdfText).toContain('Lowest monthly run rate: gcp $20');
     expect(pdfText).toContain('aws: daily $2.33, weekly $16.34, monthly $71');
+    expect(pdfText).toContain('Provider cost detail');
+    expect(pdfText).toContain('Provider total | aws | all / all | monthly $71');
     expect(pdfText).toContain('Selected pricing scenario');
     expect(pdfText).toContain('Pricing model availability');
     expect(pdfText).toContain('Commitment payment and TCO');
@@ -572,6 +582,50 @@ describe('report generators', () => {
           'Partial',
           expect.stringContaining('Complete missing provider mappings'),
         ],
+      ]),
+    );
+
+    expect(providerCostDetailRows(comparison)).toEqual(
+      expect.arrayContaining([
+        [
+          'Provider total',
+          'aws',
+          'all',
+          'all',
+          'aws monthly total',
+          '',
+          '',
+          '71',
+          '100%',
+          'Review required',
+          '3 line item(s) roll up to $71/mo.',
+        ],
+        [
+          'Category subtotal',
+          'aws',
+          'network',
+          'egress',
+          'network / egress subtotal',
+          '',
+          '',
+          '46.08',
+          '64.9%',
+          'Mapped',
+          'aws subtotal across 1 row(s).',
+        ],
+        expect.arrayContaining([
+          'Line item',
+          'aws',
+          'network',
+          'egress',
+          'internet egress',
+          '',
+          'us-east-1',
+          '46.08',
+          '64.9%',
+          'Mapped',
+          expect.stringContaining('$0.09 per GB rolled into $46.08 monthly'),
+        ]),
       ]),
     );
 

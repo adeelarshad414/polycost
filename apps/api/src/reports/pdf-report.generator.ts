@@ -11,6 +11,7 @@ import {
   methodologySourceRows,
   optimizationOpportunityRows,
   pricingModelAvailabilityRows,
+  providerCostDetailRows,
   providerRankingRows,
   regionComparisonRows,
   reportAssumptionRows,
@@ -147,6 +148,14 @@ export class PdfReportGenerator {
     for (const provider of result.providers) {
       lines.push({
         text: `${provider.providerId}: daily $${provider.totals.daily}, weekly $${provider.totals.weekly}, monthly $${provider.totals.monthly}, quarterly $${provider.totals.quarterly}, yearly $${provider.totals.yearly}`,
+        fontSize: 10,
+      });
+    }
+
+    lines.push({ text: '', fontSize: 10 }, { text: 'Provider cost detail', fontSize: 14 });
+    for (const row of providerCostDetailRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]} | ${row[1]} | ${row[2]} / ${row[3]} | monthly $${row[7]} | share ${row[8]} | ${row[10]}`,
         fontSize: 10,
       });
     }
