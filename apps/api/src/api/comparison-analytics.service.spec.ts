@@ -324,6 +324,19 @@ describe('ComparisonAnalyticsService', () => {
         ],
       }),
     ]);
+    expect(analytics.egressNetworkingDetails).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'aws-egress-1',
+          providerId: 'aws',
+          networkComponent: 'egress',
+          description: 'internet egress',
+          monthlyCostUsd: 250,
+          shareOfProviderTotalPercent: 25,
+          evidence: 'flat network cost evidence',
+        }),
+      ]),
+    );
     expect(analytics.sensitivityScenarios).toEqual(
       expect.arrayContaining([
         {

@@ -136,6 +136,20 @@ describe('api client', () => {
           ],
         },
       ],
+      egressNetworkingDetails: [
+        {
+          id: 'aws-egress-1',
+          providerId: 'aws',
+          networkComponent: 'egress',
+          description: 'Backend AWS internet egress',
+          region: 'us-east-1',
+          monthlyCostUsd: 12,
+          shareOfProviderTotalPercent: 12,
+          unit: 'GB',
+          rateUsd: 0.09,
+          evidence: 'Backend network tier evidence.',
+        },
+      ],
       sensitivityScenarios: [],
       commitmentRoiTimelines: [],
       commitmentCoverage: [

@@ -376,6 +376,7 @@ describe('API contracts', () => {
             ],
           }),
         ]),
+        egressNetworkingDetails: expect.any(Array),
         optimizationOpportunities: expect.arrayContaining([
           expect.objectContaining({
             id: expect.any(String),

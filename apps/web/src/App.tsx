@@ -6337,7 +6337,7 @@ function ProductionDepthAnalytics({
   const appPlatformModels = appPlatformModelRows(comparison, form);
   const operationsOptimizations = operationsOptimizationRows(comparison, form);
   const egressOptimizations = egressOptimizationRows(comparison, form);
-  const networkingCosts = networkingCostRows(comparison);
+  const networkingCosts = networkingCostRows(comparison, serverAnalytics?.egressNetworkingDetails);
   const spotBlendRows = spotBlendOptimizerRows(comparison, form);
   const licenseRows = licenseOptimizationRows(comparison, form);
   const architectureRisks = architectureRiskFlags(comparison, form);
@@ -11299,7 +11299,34 @@ function networkLineItems(provider: ComparisonProviderResult): ComparisonLineIte
   );
 }
 
-function networkingCostRows(comparison: ComparisonResult | null): NetworkingCostRow[] {
+function networkingCostRows(
+  comparison: ComparisonResult | null,
+  serverRows?: ComparisonAnalyticsResponse['egressNetworkingDetails'],
+): NetworkingCostRow[] {
+  if (serverRows && serverRows.length > 0) {
+    return serverRows
+      .map((row) => ({
+        id: row.id,
+        providerId: row.providerId,
+        component: row.networkComponent,
+        monthly: row.monthlyCostUsd,
+        sharePercent: row.shareOfProviderTotalPercent,
+        rateEvidence:
+          row.rateUsd !== undefined
+            ? `${formatCurrency(row.rateUsd)} per ${row.unit ?? 'unit'}`
+            : row.evidence,
+        volumeEvidence: [row.region, row.unit].filter(Boolean).join(' · ') || 'Provider default',
+        validationAction: networkingValidationAction(row.networkComponent),
+        evidence: row.description || row.evidence,
+      }))
+      .sort((left, right) => {
+        const providerDelta =
+          PROVIDER_ORDER.indexOf(left.providerId) - PROVIDER_ORDER.indexOf(right.providerId);
+
+        return providerDelta !== 0 ? providerDelta : right.monthly - left.monthly;
+      });
+  }
+
   if (!comparison) {
     return [];
   }

@@ -402,6 +402,19 @@ export interface RegionVarianceHeatMapRow {
   providers: RegionVarianceProviderCost[];
 }
 
+export interface EgressNetworkingDetailRow {
+  id: string;
+  providerId: ProviderId;
+  networkComponent: string;
+  description: string;
+  region?: string;
+  monthlyCostUsd: number;
+  shareOfProviderTotalPercent: number;
+  unit?: string;
+  rateUsd?: number;
+  evidence: string;
+}
+
 export interface SensitivityScenarioRow {
   variable: 'compute_capacity' | 'storage_volume' | 'egress_traffic' | 'database_capacity';
   label: string;
@@ -516,6 +529,7 @@ export interface ComparisonAnalyticsResponse {
   costComposition: ProviderCostComposition[];
   providerDeltaAnalysis: ProviderDeltaAnalysis[];
   regionVarianceHeatMap: RegionVarianceHeatMapRow[];
+  egressNetworkingDetails: EgressNetworkingDetailRow[];
   sensitivityScenarios: SensitivityScenarioRow[];
   commitmentRoiTimelines: CommitmentRoiTimeline[];
   commitmentCoverage: CommitmentCoverageRow[];

@@ -377,6 +377,7 @@ describe('App', () => {
     expect(text(container)).toContain(
       'Backend-ranked provider delta from current cached comparison.',
     );
+    expect(text(container)).toContain('Backend AWS internet egress');
     expect(text(container)).toContain('Service driver split');
     expect(text(container)).toContain('EC2');
     expect(text(container)).toContain('VM');
@@ -2366,6 +2367,20 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
               isLowest: true,
             },
           ],
+        },
+      ],
+      egressNetworkingDetails: [
+        {
+          id: 'aws-egress-1',
+          providerId: 'aws' as const,
+          networkComponent: 'egress',
+          description: 'Backend AWS internet egress',
+          region: 'us-east-1',
+          monthlyCostUsd: 12,
+          shareOfProviderTotalPercent: 12,
+          unit: 'GB',
+          rateUsd: 0.09,
+          evidence: 'Backend network tier evidence.',
         },
       ],
       sensitivityScenarios: [],

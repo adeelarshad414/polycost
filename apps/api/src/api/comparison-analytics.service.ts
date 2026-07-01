@@ -7,6 +7,7 @@ import {
 } from '../comparison/comparison.types';
 import {
   costCoverageMapRows,
+  egressNetworkingDetailRows,
   optimizationOpportunityRows,
   regionComparisonEvidenceRows,
 } from '../reports/report-evidence';
@@ -73,6 +74,19 @@ export interface RegionVarianceHeatMapRow {
   complianceEligible: boolean;
   lowestProviderId?: ProviderId;
   providers: RegionVarianceProviderCost[];
+}
+
+export interface EgressNetworkingDetailRow {
+  id: string;
+  providerId: ProviderId;
+  networkComponent: string;
+  description: string;
+  region?: string;
+  monthlyCostUsd: number;
+  shareOfProviderTotalPercent: number;
+  unit?: string;
+  rateUsd?: number;
+  evidence: string;
 }
 
 export interface SensitivityScenarioRow {
@@ -193,6 +207,7 @@ export interface ComparisonAnalyticsResponse {
   costComposition: ProviderCostComposition[];
   providerDeltaAnalysis: ProviderDeltaAnalysis[];
   regionVarianceHeatMap: RegionVarianceHeatMapRow[];
+  egressNetworkingDetails: EgressNetworkingDetailRow[];
   sensitivityScenarios: SensitivityScenarioRow[];
   commitmentRoiTimelines: CommitmentRoiTimeline[];
   commitmentCoverage: CommitmentCoverageRow[];
@@ -299,6 +314,7 @@ export class ComparisonAnalyticsService {
       ),
       providerDeltaAnalysis: providerDeltaAnalysis(providerDimensionAmounts),
       regionVarianceHeatMap: regionVarianceHeatMap(result),
+      egressNetworkingDetails: egressNetworkingDetails(result),
       sensitivityScenarios: sensitivityScenarios(providerDimensionAmounts),
       commitmentRoiTimelines: commitmentRoiTimelines(result.providers),
       commitmentCoverage: commitmentCoverage(result),
@@ -307,6 +323,33 @@ export class ComparisonAnalyticsService {
       finOpsFindings: finOpsFindings(result, providerDimensionAmounts),
     };
   }
+}
+
+function egressNetworkingDetails(result: ComparisonResult): EgressNetworkingDetailRow[] {
+  return egressNetworkingDetailRows(result)
+    .slice(1)
+    .flatMap((row, index): EgressNetworkingDetailRow[] => {
+      const providerId = providerIdFromCell(row[0]);
+
+      if (!providerId) {
+        return [];
+      }
+
+      return [
+        {
+          id: `${providerId}-${slugify(row[1] ?? 'network')}-${index + 1}`,
+          providerId,
+          networkComponent: row[1] ?? 'network',
+          description: row[2] ?? '',
+          ...(row[3] ? { region: row[3] } : {}),
+          monthlyCostUsd: numberFromCell(row[4]) ?? 0,
+          shareOfProviderTotalPercent: percentFromCell(row[5]) ?? 0,
+          ...(row[6] ? { unit: row[6] } : {}),
+          ...(numberFromCell(row[7]) !== undefined ? { rateUsd: numberFromCell(row[7]) } : {}),
+          evidence: row[8] ?? '',
+        },
+      ];
+    });
 }
 
 function regionVarianceHeatMap(result: ComparisonResult): RegionVarianceHeatMapRow[] {
@@ -1019,6 +1062,21 @@ function numberFromCell(value: string | undefined): number | undefined {
   const parsed = Number(value.replace(/,/g, ''));
 
   return Number.isFinite(parsed) ? roundCurrency(parsed) : undefined;
+}
+
+function percentFromCell(value: string | undefined): number | undefined {
+  return numberFromCell(value?.replace('%', ''));
+}
+
+function providerIdFromCell(value: string | undefined): ProviderId | undefined {
+  switch (value) {
+    case 'aws':
+    case 'azure':
+    case 'gcp':
+      return value;
+    default:
+      return undefined;
+  }
 }
 
 function slugify(value: string): string {
