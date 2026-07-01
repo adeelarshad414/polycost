@@ -228,6 +228,11 @@ const SERVICE_CATEGORIES: ServiceCategory[] = [
 
 const SERVICE_FAMILY_ALIASES: Record<string, string> = {
   s3: 'object-storage',
+  t3: 'burstable-compute',
+  t4g: 'burstable-compute',
+  bseries: 'burstable-compute',
+  bsv2: 'burstable-compute',
+  e2shared: 'burstable-compute',
   amazons3: 'object-storage',
   blob: 'object-storage',
   azureblob: 'object-storage',

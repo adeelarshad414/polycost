@@ -29,6 +29,7 @@ export type PricingSource = 'catalog' | 'modeled-estimate';
 export type IntervalKey = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 export type NormalizedInstanceFamily =
   | 'general-purpose'
+  | 'burstable'
   | 'compute-optimized'
   | 'memory-optimized'
   | 'storage-optimized'

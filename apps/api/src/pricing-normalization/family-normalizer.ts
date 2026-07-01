@@ -2,6 +2,7 @@ import { ProviderId } from '../adapters/common/cloud-provider-adapter';
 
 export type NormalizedInstanceFamily =
   | 'general-purpose'
+  | 'burstable'
   | 'compute-optimized'
   | 'memory-optimized'
   | 'storage-optimized'
@@ -21,12 +22,12 @@ const AWS_FAMILY_RULES: FamilyRule[] = [
   { prefix: 'm', family: 'general-purpose' },
   { prefix: 'p', family: 'accelerated-computing' },
   { prefix: 'r', family: 'memory-optimized' },
-  { prefix: 't', family: 'general-purpose' },
+  { prefix: 't', family: 'burstable' },
   { prefix: 'x', family: 'memory-optimized' },
 ];
 
 const AZURE_FAMILY_RULES: FamilyRule[] = [
-  { prefix: 'b', family: 'general-purpose' },
+  { prefix: 'b', family: 'burstable' },
   { prefix: 'd', family: 'general-purpose' },
   { prefix: 'e', family: 'memory-optimized' },
   { prefix: 'f', family: 'compute-optimized' },
@@ -39,6 +40,9 @@ const GCP_FAMILY_RULES: FamilyRule[] = [
   { prefix: 'a2', family: 'accelerated-computing' },
   { prefix: 'c2', family: 'compute-optimized' },
   { prefix: 'c3', family: 'compute-optimized' },
+  { prefix: 'e2-micro', family: 'burstable' },
+  { prefix: 'e2-small', family: 'burstable' },
+  { prefix: 'e2-medium', family: 'burstable' },
   { prefix: 'e2', family: 'general-purpose' },
   { prefix: 'm1', family: 'memory-optimized' },
   { prefix: 'm2', family: 'memory-optimized' },

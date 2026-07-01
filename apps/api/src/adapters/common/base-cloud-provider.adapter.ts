@@ -1028,6 +1028,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
 function isNormalizedInstanceFamily(value: string | undefined): value is NormalizedInstanceFamily {
   return (
     value === 'general-purpose' ||
+    value === 'burstable' ||
     value === 'compute-optimized' ||
     value === 'memory-optimized' ||
     value === 'storage-optimized' ||

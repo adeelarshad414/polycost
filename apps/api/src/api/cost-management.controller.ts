@@ -22,6 +22,7 @@ interface RequestLike {
 
 const INSTANCE_FAMILIES = [
   'general-purpose',
+  'burstable',
   'compute-optimized',
   'memory-optimized',
   'storage-optimized',

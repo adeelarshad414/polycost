@@ -63,6 +63,12 @@ const SERVICE_FAMILY_ALIASES = new Map<string, string>([
   ['compute-engine', 'general-purpose'],
   ['general-purpose', 'general-purpose'],
   ['general', 'general-purpose'],
+  ['burstable', 'burstable'],
+  ['burst', 'burstable'],
+  ['shared-core', 'burstable'],
+  ['sharedcore', 'burstable'],
+  ['t-family', 'burstable'],
+  ['tfamily', 'burstable'],
   ['compute-optimized', 'compute-optimized'],
   ['computeoptimized', 'compute-optimized'],
   ['memory-optimized', 'memory-optimized'],
@@ -207,17 +213,20 @@ function fallbackPricingRate(
   query: PricingRateQuery,
   reasonCode: 'not_cached' | 'schema_or_connection_unavailable',
 ): PricingRateRecord {
+  const serviceFamily = serviceFamilyFromSlug(query.service);
   const hourlyRateUsd = roundRate(
-    baselineHourlyRate(query.provider) * pricingTermFactor(query.termCode, query.paymentOptionCode),
+    baselineHourlyRate(query.provider) *
+      serviceFamilyFactor(serviceFamily) *
+      pricingTermFactor(query.termCode, query.paymentOptionCode),
   );
   const isSpot = query.termCode === 'spot_estimate';
   const now = new Date().toISOString();
 
   return {
     provider: query.provider,
-    service: serviceFamilyFromSlug(query.service),
-    skuId: `fallback:${query.provider}:${serviceFamilyFromSlug(query.service)}`,
-    providerSkuId: `fallback-${query.provider}-${serviceFamilyFromSlug(query.service)}`,
+    service: serviceFamily,
+    skuId: `fallback:${query.provider}:${serviceFamily}`,
+    providerSkuId: `fallback-${query.provider}-${serviceFamily}`,
     region: query.region,
     termCode: query.termCode,
     ...(query.paymentOptionCode ? { paymentOptionCode: query.paymentOptionCode } : {}),
@@ -254,6 +263,24 @@ function baselineHourlyRate(provider: ProviderId): number {
       return PROVIDER_BASELINE_HOURLY_RATE_USD.azure;
     case 'gcp':
       return PROVIDER_BASELINE_HOURLY_RATE_USD.gcp;
+  }
+}
+
+function serviceFamilyFactor(serviceFamily: string): number {
+  switch (serviceFamily) {
+    case 'burstable':
+      return 0.58;
+    case 'compute-optimized':
+      return 1.18;
+    case 'memory-optimized':
+      return 1.45;
+    case 'storage-optimized':
+      return 1.65;
+    case 'accelerated-computing':
+      return 42;
+    case 'general-purpose':
+    default:
+      return 1;
   }
 }
 

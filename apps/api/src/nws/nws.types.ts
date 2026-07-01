@@ -21,6 +21,7 @@ export const workloadTypeSchema = z.enum([
 
 export const instanceFamilySchema = z.enum([
   'general-purpose',
+  'burstable',
   'compute-optimized',
   'memory-optimized',
   'storage-optimized',

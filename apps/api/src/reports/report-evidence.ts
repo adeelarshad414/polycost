@@ -93,6 +93,7 @@ interface ComputeSpecEvidenceProfile {
 
 type ComputeSpecTier =
   | 'small'
+  | 'burstable'
   | 'balanced'
   | 'compute'
   | 'memory'
@@ -165,6 +166,29 @@ const COMPUTE_SPEC_EVIDENCE: Record<
   Record<ComparisonProviderResult['providerId'], ComputeSpecEvidenceProfile>
 > = {
   small: {
+    aws: {
+      x86Family: 'T3',
+      armFamily: 'T4g',
+      useCase: 'burstable/shared-core compute',
+      networkBaseline: 'low-to-moderate burst network with CPU-credit caveat',
+      diskBaseline: 'gp3/EBS baseline IOPS must be validated',
+    },
+    azure: {
+      x86Family: 'Bsv2',
+      armFamily: 'Bpsv2',
+      useCase: 'burstable/shared-core compute',
+      networkBaseline: 'variable burst network with CPU-credit caveat',
+      diskBaseline: 'Managed Disk baseline depends on chosen VM size',
+    },
+    gcp: {
+      x86Family: 'E2 shared-core',
+      armFamily: 'Tau T2A',
+      useCase: 'shared-core small compute',
+      networkBaseline: 'shared-core network profile; validate sustained CPU',
+      diskBaseline: 'Persistent Disk baseline depends on disk type and size',
+    },
+  },
+  burstable: {
     aws: {
       x86Family: 'T3',
       armFamily: 'T4g',
@@ -2371,6 +2395,8 @@ function computeSpecTierForRequirement(
   const source = tier || instanceFamily;
 
   switch (source) {
+    case 'burstable':
+      return 'burstable';
     case 'small':
       return 'small';
     case 'compute':

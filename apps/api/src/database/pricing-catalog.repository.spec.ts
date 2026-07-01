@@ -277,7 +277,7 @@ describe('PostgresPricingCatalogRepository', () => {
     expect(query).toHaveBeenNthCalledWith(
       1,
       expect.stringContaining('INSERT INTO provider_skus'),
-      expect.arrayContaining(['aws', 't3.small', 'general-purpose', 2, 2, 'us-east-1']),
+      expect.arrayContaining(['aws', 't3.small', 'burstable', 2, 2, 'us-east-1']),
     );
     expect(query).toHaveBeenNthCalledWith(
       2,

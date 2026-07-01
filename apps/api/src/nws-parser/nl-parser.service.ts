@@ -1475,7 +1475,8 @@ function hasPositiveNumber(value: number | undefined): boolean {
   return value !== undefined && value > 0;
 }
 
-type ParsedInstanceTier = 'small' | 'balanced' | 'compute' | 'memory' | 'storage' | 'accelerated';
+type ParsedInstanceTier =
+  'burstable' | 'small' | 'balanced' | 'compute' | 'memory' | 'storage' | 'accelerated';
 type ParsedStorageClass = NonNullable<NormalizedWorkloadSpec['storage'][number]['storageClass']>;
 type ParsedStorageReplication = NonNullable<
   NormalizedWorkloadSpec['storage'][number]['replication']
@@ -1502,6 +1503,14 @@ function inferInstanceTier(input: string): ParsedInstanceTier {
     return 'storage';
   }
 
+  if (
+    /\b(burstable|shared[- ]?core|cpu credit|cpu credits|t3|t4g|bsv2|bpsv2|e2[- ]?(?:micro|small|medium|shared))\b/i.test(
+      input,
+    )
+  ) {
+    return 'burstable';
+  }
+
   if (/\b(small|dev|test|light)\b/i.test(input)) {
     return 'small';
   }
@@ -1513,6 +1522,9 @@ function instanceFamilyForTier(
   tier: ParsedInstanceTier,
 ): NonNullable<NormalizedWorkloadSpec['compute'][number]['instanceFamily']> {
   switch (tier) {
+    case 'burstable':
+    case 'small':
+      return 'burstable';
     case 'compute':
       return 'compute-optimized';
     case 'memory':
@@ -1521,7 +1533,6 @@ function instanceFamilyForTier(
       return 'storage-optimized';
     case 'accelerated':
       return 'accelerated-computing';
-    case 'small':
     case 'balanced':
       return 'general-purpose';
   }

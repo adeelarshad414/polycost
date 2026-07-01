@@ -136,6 +136,35 @@ describe('workload helpers', () => {
     expect(formFromNws(nws).instanceTier).toBe('accelerated');
   });
 
+  it('round-trips burstable compute intent through the NWS', () => {
+    const nws = buildNwsFromForm({
+      ...defaultWorkloadForm,
+      selectedServiceFamilyId: 'burstable-compute',
+      selectedServiceFamilyIds: ['burstable-compute'],
+      instanceTier: 'balanced',
+    });
+
+    expect(nws.compute[0]).toMatchObject({
+      instanceFamily: 'burstable',
+      processorArchitecture: 'x86_64',
+      tenancy: 'shared',
+    });
+    expect(nws.serviceRequirements).toContainEqual(
+      expect.objectContaining({
+        serviceCategory: 'compute',
+        serviceType: 'burstable-compute',
+        instanceType: 'burstable / shared-core tier / x86 / shared tenancy - 2 vCPU - 4GB',
+        tier: 'small',
+        scaleParams: expect.objectContaining({
+          instanceFamily: 'burstable',
+          processorArchitecture: 'x86_64',
+          tenancy: 'shared',
+        }),
+      }),
+    );
+    expect(formFromNws(nws).instanceTier).toBe('small');
+  });
+
   it('round-trips ARM and dedicated-host compute intent through the NWS', () => {
     const nws = buildNwsFromForm({
       ...defaultWorkloadForm,

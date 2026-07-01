@@ -1833,6 +1833,7 @@ function instanceFamilyForWorkload(
     case 'accelerated':
       return 'accelerated-computing';
     case 'small':
+      return 'burstable';
     case 'balanced':
       return 'general-purpose';
     case 'custom':

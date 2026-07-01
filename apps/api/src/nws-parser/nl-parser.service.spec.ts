@@ -333,6 +333,36 @@ describe('NLParserService', () => {
     expect(result.fieldsRequiringReview).toEqual(['database[0].sizeGb']);
   });
 
+  it('parses burstable and shared-core compute intent explicitly', async () => {
+    const client: StructuredLlmClient = {
+      createStructuredOutput: jest.fn(),
+    };
+    const service = new NLParserService(configService(4000, false), client, fixedNow);
+
+    const result = await service.parse(
+      'A lightweight LAMP stack on burstable T4g or B-series shared-core VMs with two 2 vCPU 4GB servers and 100GB MySQL database.',
+    );
+
+    expect(result.draftNws.compute[0]).toEqual(
+      expect.objectContaining({
+        instanceFamily: 'burstable',
+        instanceCount: 2,
+        vcpu: 2,
+        memoryGb: 4,
+      }),
+    );
+    expect(result.draftNws.serviceRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceCategory: 'compute',
+          scaleParams: expect.objectContaining({
+            instanceFamily: 'burstable',
+          }),
+        }),
+      ]),
+    );
+  });
+
   it('infers advanced storage dimensions from natural language', async () => {
     const client: StructuredLlmClient = {
       createStructuredOutput: jest.fn(),

@@ -612,6 +612,7 @@ export const ARCHITECTURE_TEMPLATES: ArchitectureTemplate[] = [
       vcpu: '2',
       memoryGb: '4',
       instanceCount: '2',
+      instanceTier: 'small',
       scalingType: 'fixed',
       storageType: 'block',
       storageSizeGb: '200',
@@ -622,7 +623,7 @@ export const ARCHITECTURE_TEMPLATES: ArchitectureTemplate[] = [
       dnsQueriesMillion: '5',
       monthlyEgressGb: '400',
       selectedServiceFamilyIds: [
-        'vm-compute',
+        'burstable-compute',
         'block-storage',
         'relational-database',
         'load-balancing',
@@ -1405,7 +1406,7 @@ export function buildNwsFromForm(
 ): NormalizedWorkloadSpec {
   const compute = {
     role: form.computeRole.trim() || 'web',
-    ...instanceFamilyForTier(form.instanceTier),
+    ...primaryComputeFamilyForForm(form),
     processorArchitecture: processorArchitectureForForm(form),
     tenancy: form.computeTenancy,
     ...optionalPositiveNumber('vcpu', form.vcpu),
@@ -2014,9 +2015,9 @@ export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceReq
         serviceType === 'managed-search'
           ? databaseScaleParamsFromForm(form)
           : {}),
-        ...(serviceType === 'vm-compute' || serviceType === 'autoscaling-compute'
+        ...(isComputeServiceFamily(serviceType)
           ? {
-              ...instanceFamilyForTier(form.instanceTier),
+              ...instanceFamilyForServiceRequirement(serviceType, form),
               processorArchitecture: processorArchitectureForForm(form),
               tenancy: form.computeTenancy,
             }
@@ -2470,7 +2471,7 @@ function quantityForServiceRequirement(
     return parsePositiveInteger(bulkRow.quantity, 1);
   }
 
-  if (serviceType === 'vm-compute' || serviceType === 'autoscaling-compute') {
+  if (isComputeServiceFamily(serviceType)) {
     return form.scalingType === 'autoscaling'
       ? Math.max(1, parseNonNegativeInteger(form.autoscaleMin, 1))
       : Math.max(1, parseNonNegativeInteger(form.instanceCount, 1));
@@ -2483,8 +2484,8 @@ function instanceTypeForServiceRequirement(
   serviceType: string,
   form: WorkloadFormState,
 ): string | undefined {
-  if (serviceType === 'vm-compute' || serviceType === 'autoscaling-compute') {
-    return `${instanceTierLabel(form.instanceTier)} / ${processorArchitectureLabel(
+  if (isComputeServiceFamily(serviceType)) {
+    return `${instanceTierLabel(tierForComputeServiceRequirement(serviceType, form))} / ${processorArchitectureLabel(
       processorArchitectureForForm(form),
     )} / ${tenancyLabel(form.computeTenancy)} - ${form.vcpu || '?'} vCPU - ${
       form.memoryGb || '?'
@@ -2535,8 +2536,8 @@ function tierForServiceRequirement(
     return bulkRow.tier.trim();
   }
 
-  if (serviceType === 'vm-compute' || serviceType === 'autoscaling-compute') {
-    return form.instanceTier;
+  if (isComputeServiceFamily(serviceType)) {
+    return tierForComputeServiceRequirement(serviceType, form);
   }
 
   if (serviceType.includes('storage')) {
@@ -2747,6 +2748,7 @@ function instanceFamilyForTier(
 ): Pick<NormalizedWorkloadSpec['compute'][number], 'instanceFamily'> {
   switch (instanceTier) {
     case 'small':
+      return { instanceFamily: 'burstable' };
     case 'balanced':
       return { instanceFamily: 'general-purpose' };
     case 'compute':
@@ -2760,6 +2762,39 @@ function instanceFamilyForTier(
     case 'custom':
       return {};
   }
+}
+
+function instanceFamilyForServiceRequirement(
+  serviceType: string,
+  form: WorkloadFormState,
+): Pick<NormalizedWorkloadSpec['compute'][number], 'instanceFamily'> {
+  return serviceType === 'burstable-compute'
+    ? { instanceFamily: 'burstable' }
+    : instanceFamilyForTier(form.instanceTier);
+}
+
+function primaryComputeFamilyForForm(
+  form: WorkloadFormState,
+): Pick<NormalizedWorkloadSpec['compute'][number], 'instanceFamily'> {
+  return form.selectedServiceFamilyId === 'burstable-compute' ||
+    form.selectedServiceFamilyIds.includes('burstable-compute')
+    ? { instanceFamily: 'burstable' }
+    : instanceFamilyForTier(form.instanceTier);
+}
+
+function tierForComputeServiceRequirement(
+  serviceType: string,
+  form: WorkloadFormState,
+): WorkloadFormState['instanceTier'] {
+  return serviceType === 'burstable-compute' ? 'small' : form.instanceTier;
+}
+
+function isComputeServiceFamily(serviceType: string): boolean {
+  return (
+    serviceType === 'vm-compute' ||
+    serviceType === 'autoscaling-compute' ||
+    serviceType === 'burstable-compute'
+  );
 }
 
 function processorArchitectureForForm(form: WorkloadFormState): ProcessorArchitecture {
@@ -2792,6 +2827,8 @@ function tierForInstanceFamily(
   instanceFamily: NormalizedWorkloadSpec['compute'][number]['instanceFamily'],
 ): WorkloadFormState['instanceTier'] | undefined {
   switch (instanceFamily) {
+    case 'burstable':
+      return 'small';
     case 'general-purpose':
       return 'balanced';
     case 'compute-optimized':
@@ -2811,6 +2848,8 @@ function instanceTierFromValue(
   value: string | undefined,
 ): WorkloadFormState['instanceTier'] | undefined {
   switch (value) {
+    case 'burstable':
+      return 'small';
     case 'small':
     case 'balanced':
     case 'compute':
@@ -2827,7 +2866,7 @@ function instanceTierFromValue(
 function instanceTierLabel(instanceTier: WorkloadFormState['instanceTier']): string {
   switch (instanceTier) {
     case 'small':
-      return 'small general-purpose tier';
+      return 'burstable / shared-core tier';
     case 'balanced':
       return 'balanced general-purpose tier';
     case 'compute':

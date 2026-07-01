@@ -112,6 +112,7 @@ export const NWS_PARSE_RESULT_JSON_SCHEMA = {
                 type: 'string',
                 enum: [
                   'general-purpose',
+                  'burstable',
                   'compute-optimized',
                   'memory-optimized',
                   'storage-optimized',

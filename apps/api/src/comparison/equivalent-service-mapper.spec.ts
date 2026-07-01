@@ -186,6 +186,37 @@ describe('EquivalentServiceMapper', () => {
     ]);
   });
 
+  it('maps burstable compute to reviewed shared-core provider patterns', () => {
+    const mappings = mapper.mapWorkload({
+      ...workload,
+      compute: [
+        {
+          role: 'lamp-web',
+          scalingType: 'fixed',
+          instanceCount: 2,
+          instanceFamily: 'burstable',
+        },
+      ],
+      storage: [],
+      database: [],
+      network: {
+        cdn: false,
+        loadBalancer: false,
+      },
+    });
+
+    expect(mappings).toEqual([
+      expect.objectContaining({
+        tierLabel: 'compute-fixed-burstable',
+        providerSkuPatterns: expect.objectContaining({
+          aws: 'EC2 T3/T4g burstable instances',
+          azure: 'Virtual Machines B-series burstable instances',
+          gcp: 'Compute Engine E2 shared-core machine types',
+        }),
+      }),
+    ]);
+  });
+
   it('maps all database engine tiers that V1 accepts', () => {
     const mappings = mapper.mapWorkload({
       ...workload,

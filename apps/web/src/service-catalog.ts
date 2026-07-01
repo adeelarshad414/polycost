@@ -41,6 +41,11 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Azure Virtual Machines'],
     gcp: ['Compute Engine'],
   }),
+  family('burstable-compute', 'compute', 'Burstable / shared-core VMs', 'priced', {
+    aws: ['Amazon EC2 T3/T4g'],
+    azure: ['Azure B-series'],
+    gcp: ['Compute Engine E2 shared-core'],
+  }),
   family('autoscaling-compute', 'compute', 'Autoscaling fleets', 'priced', {
     aws: ['EC2 Auto Scaling'],
     azure: ['Virtual Machine Scale Sets'],

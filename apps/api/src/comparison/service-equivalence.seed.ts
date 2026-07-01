@@ -33,6 +33,26 @@ export const SERVICE_EQUIVALENCE_SEED: ServiceEquivalenceRule[] = [
   },
   {
     category: 'compute',
+    tierLabel: 'compute-fixed-burstable',
+    awsSkuPattern: 'EC2 T3/T4g burstable instances',
+    azureSkuPattern: 'Virtual Machines B-series burstable instances',
+    gcpSkuPattern: 'Compute Engine E2 shared-core machine types',
+    notes:
+      'Burstable/shared-core capacity for light or variable workloads. CPU credits and sustained-utilization caveats differ by provider.',
+    isApproximate: false,
+  },
+  {
+    category: 'compute',
+    tierLabel: 'compute-autoscaling-burstable',
+    awsSkuPattern: 'EC2 Auto Scaling with T3/T4g burstable instances',
+    azureSkuPattern: 'Virtual Machine Scale Sets with B-series burstable instances',
+    gcpSkuPattern: 'Managed Instance Groups with E2 shared-core machine types',
+    notes:
+      'Autoscaling burstable/shared-core capacity. Validate CPU credits, baseline utilization, and sustained-load throttling before production use.',
+    isApproximate: false,
+  },
+  {
+    category: 'compute',
     tierLabel: 'compute-fixed-compute-optimized',
     awsSkuPattern: 'EC2 C-family compute optimized instances',
     azureSkuPattern: 'Virtual Machines Fsv2 compute optimized instances',

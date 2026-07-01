@@ -8,11 +8,11 @@
     "m": "general-purpose",
     "p": "accelerated-computing",
     "r": "memory-optimized",
-    "t": "general-purpose",
+    "t": "burstable",
     "x": "memory-optimized"
   },
   "azure": {
-    "b": "general-purpose",
+    "b": "burstable",
     "d": "general-purpose",
     "e": "memory-optimized",
     "f": "compute-optimized",
@@ -24,6 +24,9 @@
     "a2": "accelerated-computing",
     "c2": "compute-optimized",
     "c3": "compute-optimized",
+    "e2-micro": "burstable",
+    "e2-small": "burstable",
+    "e2-medium": "burstable",
     "e2": "general-purpose",
     "m1": "memory-optimized",
     "m2": "memory-optimized",
