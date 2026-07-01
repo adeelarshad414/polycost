@@ -222,6 +222,7 @@ describe('NLParserService', () => {
         availability: {
           multiAz: true,
           multiRegion: false,
+          faultTolerance: 'multi-az',
         },
         serviceRequirements: expect.arrayContaining([
           expect.objectContaining({
@@ -243,6 +244,45 @@ describe('NLParserService', () => {
       }),
     );
     expect(result.fieldsRequiringReview).not.toContain('compute[0].instanceCount');
+  });
+
+  it('infers production workload profile signals from natural language', async () => {
+    const client: StructuredLlmClient = {
+      createStructuredOutput: jest.fn(),
+    };
+    const service = new NLParserService(configService(4000, false), client, fixedNow);
+
+    const result = await service.parse(
+      'Production web app with two 4 vCPU 16GB servers, Postgres database size 100GB, active-active multi-region availability, EU data residency must stay locked for GDPR and SOC 2, Windows BYOL, business support, commitment preference 85%, scheduled 10 hours per day 5 days per week, tags team:platform project:migration-q3.',
+    );
+
+    expect(result.draftNws.availability).toEqual(
+      expect.objectContaining({
+        multiAz: false,
+        multiRegion: true,
+        faultTolerance: 'active-active',
+      }),
+    );
+    expect(result.draftNws.workloadProfile).toEqual({
+      environment: 'production',
+      commitmentPreferencePercent: 85,
+      dataResidency: {
+        scope: 'eu',
+        complianceLocked: true,
+        frameworks: ['GDPR', 'SOC 2'],
+      },
+      operatingSystem: 'byol',
+      supportTier: 'business',
+      usagePattern: {
+        type: 'scheduled',
+        hoursPerDay: 10,
+        daysPerWeek: 5,
+      },
+      tags: [
+        { key: 'team', value: 'platform' },
+        { key: 'project', value: 'migration-q3' },
+      ],
+    });
   });
 
   it('parses common vCPU and GB server shorthand without confusing storage size', async () => {
