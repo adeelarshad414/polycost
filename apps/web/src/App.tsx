@@ -5924,6 +5924,7 @@ function ProductionDepthAnalytics({
   form: WorkloadFormState;
 }) {
   const insights = productionDepthInsights(comparison, form);
+  const providerDeltas = providerDeltaRows(comparison);
   const scenarios = sensitivityScenarioRows(comparison, form);
 
   return (
@@ -5950,8 +5951,66 @@ function ProductionDepthAnalytics({
           </article>
         ))}
       </div>
+      <ProviderDeltaAnalysisTable rows={providerDeltas} />
       <ScenarioSensitivityTable rows={scenarios} />
     </section>
+  );
+}
+
+function ProviderDeltaAnalysisTable({ rows }: { rows: ProviderDeltaRow[] }) {
+  return (
+    <div className="provider-delta-analysis" aria-label="Provider delta analysis">
+      <div className="scenario-sensitivity-heading">
+        <div>
+          <span>Provider delta analysis</span>
+          <h4>Why each service is cheaper</h4>
+        </div>
+      </div>
+
+      {rows.length > 0 ? (
+        <div className="table-wrap provider-delta-wrap">
+          <table className="ranking-table provider-delta-table">
+            <thead>
+              <tr>
+                <th scope="col">Service</th>
+                <th scope="col">Lowest</th>
+                <th scope="col">Gap</th>
+                <th scope="col">Evidence</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.category}>
+                  <td>
+                    <strong>{capitalize(row.category)}</strong>
+                    <small>{row.coverage}</small>
+                  </td>
+                  <td>
+                    <span className={`scenario-low-label scenario-low-${row.lowProviderId}`}>
+                      {providerLabel(row.lowProviderId)}
+                    </span>
+                    <small>{formatCurrency(row.lowMonthly)}/mo</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.monthlyDelta)}/mo</strong>
+                    <small>{formatPercent(row.savingsPercent)} below highest</small>
+                  </td>
+                  <td>
+                    <strong>{row.insight}</strong>
+                    <small>{row.evidence}</small>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="scenario-sensitivity-empty" role="status">
+          Run a comparison with at least two priced providers per service to explain provider
+          deltas.
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -6512,6 +6571,83 @@ interface SensitivityScenarioRow {
   assumption: string;
   providers: SensitivityScenarioProviderCost[];
   lowestProviderId?: ProviderId;
+}
+
+interface ProviderDeltaRow {
+  category: ServiceCategory;
+  lowProviderId: ProviderId;
+  highProviderId: ProviderId;
+  lowMonthly: number;
+  highMonthly: number;
+  monthlyDelta: number;
+  savingsPercent: number;
+  coverage: string;
+  insight: string;
+  evidence: string;
+}
+
+function providerDeltaRows(comparison: ComparisonResult | null): ProviderDeltaRow[] {
+  if (!comparison) {
+    return [];
+  }
+
+  return SERVICE_CATEGORIES.flatMap((category) => {
+    const categoryCosts = comparison.providers
+      .map((provider) => {
+        const lineItems = provider.lineItems.filter((lineItem) => lineItem.category === category);
+        const monthly = lineItems.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+
+        return {
+          providerId: provider.providerId,
+          monthly: roundCurrency(monthly),
+          lineItemCount: lineItems.length,
+          approximate: lineItems.some((lineItem) => lineItem.isApproximate),
+        };
+      })
+      .filter((provider) => provider.monthly > 0)
+      .sort((left, right) => left.monthly - right.monthly);
+
+    if (categoryCosts.length < 2) {
+      return [];
+    }
+
+    const lowest = categoryCosts[0];
+    const highest = categoryCosts.at(-1);
+
+    if (!highest || highest.monthly <= lowest.monthly) {
+      return [];
+    }
+
+    const monthlyDelta = roundCurrency(highest.monthly - lowest.monthly);
+    const savingsPercent = ((highest.monthly - lowest.monthly) / highest.monthly) * 100;
+    const approximateCount = categoryCosts.filter((provider) => provider.approximate).length;
+    const lineItemCount = categoryCosts.reduce(
+      (count, provider) => count + provider.lineItemCount,
+      0,
+    );
+
+    return [
+      {
+        category,
+        lowProviderId: lowest.providerId,
+        highProviderId: highest.providerId,
+        lowMonthly: lowest.monthly,
+        highMonthly: highest.monthly,
+        monthlyDelta,
+        savingsPercent,
+        coverage: `${categoryCosts.length}/3 providers · ${lineItemCount} line items`,
+        insight: `${providerLabel(lowest.providerId)} is ${formatPercent(
+          savingsPercent,
+        )} lower than ${providerLabel(highest.providerId)} for ${category}.`,
+        evidence:
+          approximateCount > 0
+            ? `${approximateCount} provider mapping(s) are approximate; validate architecture fit before procurement.`
+            : `Derived from cached ${category} line items: ${formatCurrency(
+                lowest.monthly,
+              )}/mo vs ${formatCurrency(highest.monthly)}/mo.`,
+      },
+    ];
+  }).sort((left, right) => right.monthlyDelta - left.monthlyDelta);
 }
 
 function productionDepthInsights(

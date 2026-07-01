@@ -1176,6 +1176,9 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('AWS commitment ROI');
     expect(text(container)).toContain('Month 3');
     expect(text(container)).toContain('Break-even');
+    expect(text(container)).toContain('Provider delta analysis');
+    expect(text(container)).toContain('Why each service is cheaper');
+    expect(text(container)).toContain('Azure is 33% lower than GCP for compute.');
     expect(text(container)).toContain('Scenario sensitivity');
     expect(text(container)).toContain('Provider winner under operational shocks');
     expect(text(container)).toContain('Demand +25%');

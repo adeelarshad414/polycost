@@ -4769,6 +4769,15 @@ select:disabled {
   padding: var(--pc-space-1);
 }
 
+.provider-delta-analysis {
+  display: grid;
+  gap: var(--pc-space-1);
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface) 94%, var(--pc-bg-surface-2));
+  padding: var(--pc-space-1);
+}
+
 .scenario-sensitivity-heading {
   display: flex;
   flex-wrap: wrap;
@@ -4834,11 +4843,25 @@ select:disabled {
   max-height: 420px;
 }
 
+.provider-delta-wrap {
+  max-height: 360px;
+}
+
 .scenario-sensitivity-table {
   min-width: 1080px;
 }
 
+.provider-delta-table {
+  min-width: 920px;
+}
+
 .scenario-sensitivity-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.provider-delta-table th {
   position: sticky;
   top: 0;
   z-index: 1;
@@ -4848,8 +4871,16 @@ select:disabled {
   vertical-align: top;
 }
 
+.provider-delta-table td {
+  vertical-align: top;
+}
+
 .scenario-sensitivity-table td:first-child {
   min-width: 180px;
+}
+
+.provider-delta-table td:first-child {
+  min-width: 160px;
 }
 
 .scenario-sensitivity-table td:nth-child(2) {
@@ -4858,12 +4889,21 @@ select:disabled {
   white-space: normal;
 }
 
+.provider-delta-table td:nth-child(4) {
+  min-width: 340px;
+  max-width: 460px;
+  white-space: normal;
+}
+
 .scenario-sensitivity-table td strong,
-.scenario-sensitivity-table td small {
+.scenario-sensitivity-table td small,
+.provider-delta-table td strong,
+.provider-delta-table td small {
   display: block;
 }
 
-.scenario-sensitivity-table td small {
+.scenario-sensitivity-table td small,
+.provider-delta-table td small {
   margin-top: 3px;
   color: var(--pc-text-secondary);
   font-size: var(--pc-text-xs);
