@@ -119,6 +119,38 @@ describe('App', () => {
     unmount();
   });
 
+  it('applies quick-start architecture templates to the structured form', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    expect(text(container)).toContain('Quick starts');
+    await click(templateButtonByText(container, 'Microservices'));
+
+    expect(inputById(container, 'vcpu').value).toBe('4');
+    expect(inputById(container, 'memory-gb').value).toBe('16');
+
+    await click(buttonByText(container, 'Compare costs'));
+
+    expect(client.validateWorkload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workload: expect.objectContaining({
+          name: 'Microservices platform',
+          type: 'api_backend',
+        }),
+        serviceRequirements: expect.arrayContaining([
+          expect.objectContaining({
+            serviceType: 'container-orchestration',
+          }),
+          expect.objectContaining({
+            serviceType: 'cicd',
+          }),
+        ]),
+      }),
+    );
+
+    unmount();
+  });
+
   it('blocks invalid guided form values before backend comparison', async () => {
     const client = clientMock();
     const { container, unmount } = render(<App client={client} />);
@@ -1175,6 +1207,18 @@ function buttonByText(container: HTMLElement, label: string): HTMLButtonElement 
 
   if (!(button instanceof HTMLButtonElement)) {
     throw new Error(`Button not found: ${label}`);
+  }
+
+  return button;
+}
+
+function templateButtonByText(container: HTMLElement, label: string): HTMLButtonElement {
+  const button = Array.from(
+    container.querySelectorAll<HTMLButtonElement>('.architecture-template-button'),
+  ).find((candidate) => candidate.textContent?.includes(label));
+
+  if (!(button instanceof HTMLButtonElement)) {
+    throw new Error(`Template button not found: ${label}`);
   }
 
   return button;

@@ -9,6 +9,7 @@ import {
 import { DEFAULT_SELECTED_SERVICE_FAMILY_IDS } from './service-catalog';
 import { NormalizedWorkloadSpec } from './types';
 import {
+  ARCHITECTURE_TEMPLATES,
   buildNwsFromForm,
   defaultWorkloadForm,
   formFromNws,
@@ -98,6 +99,23 @@ describe('workload helpers', () => {
         }),
       ]),
     );
+  });
+
+  it('ships valid quick-start architecture templates', () => {
+    expect(ARCHITECTURE_TEMPLATES.map((template) => template.id)).toEqual([
+      'web-application-tier',
+      'data-analytics-pipeline',
+      'machine-learning-training',
+      'high-traffic-api',
+      'lamp-stack',
+      'three-tier-enterprise-app',
+      'microservices-platform',
+    ]);
+
+    for (const template of ARCHITECTURE_TEMPLATES) {
+      expect(validateWorkloadForm(template.form)).toEqual([]);
+      expect(buildNwsFromForm(template.form).serviceRequirements ?? []).not.toHaveLength(0);
+    }
   });
 
   it('maps an NWS back into editable form values', () => {

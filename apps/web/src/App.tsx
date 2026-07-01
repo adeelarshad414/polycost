@@ -37,6 +37,8 @@ import {
   ReportFormat,
 } from './types';
 import {
+  ARCHITECTURE_TEMPLATES,
+  ArchitectureTemplate,
   buildNwsFromForm,
   defaultWorkloadForm,
   formFromNws,
@@ -1189,6 +1191,10 @@ function InitialHomePage({
     });
   }
 
+  function applyTemplate(template: ArchitectureTemplate) {
+    onChange(template.form);
+  }
+
   const fieldErrors = validationIssueMap(validationIssues);
 
   return (
@@ -1208,6 +1214,7 @@ function InitialHomePage({
 
         {inputMode === 'form' ? (
           <form className="initial-guided-form" onSubmit={onSubmit}>
+            <ArchitectureTemplatePicker onApply={applyTemplate} compact />
             <FormValidationSummary issues={validationIssues} />
             {requirementsAwaitingReview ? <RequirementReviewCards form={form} /> : null}
             <div className="initial-home-actions initial-home-actions-primary">
@@ -2300,11 +2307,16 @@ function WorkloadForm({
     update('selectedServiceFamilyIds', orderedServiceFamilyIds([...selected]));
   }
 
+  function applyTemplate(template: ArchitectureTemplate) {
+    onChange(template.form);
+  }
+
   const sizingSummary = formSizingSummary(form);
   const fieldErrors = validationIssueMap(validationIssues);
 
   return (
     <form className="structured-form" onSubmit={onSubmit}>
+      <ArchitectureTemplatePicker onApply={applyTemplate} />
       <FormValidationSummary issues={validationIssues} />
       <div className="form-overview-strip" aria-label="Workload sizing summary">
         <FormSummaryChip label="Profile" value={sizingSummary.profile} tone="profile" />
@@ -2763,6 +2775,43 @@ function FormSummaryChip({
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
+  );
+}
+
+function ArchitectureTemplatePicker({
+  compact = false,
+  onApply,
+}: {
+  compact?: boolean;
+  onApply: (template: ArchitectureTemplate) => void;
+}) {
+  return (
+    <section
+      className={
+        compact
+          ? 'architecture-template-picker architecture-template-picker-compact'
+          : 'architecture-template-picker'
+      }
+      aria-label="Architecture templates"
+    >
+      <div className="architecture-template-heading">
+        <span>Quick starts</span>
+        <strong>Choose a complete architecture baseline</strong>
+      </div>
+      <div className="architecture-template-grid">
+        {ARCHITECTURE_TEMPLATES.map((template) => (
+          <button
+            key={template.id}
+            type="button"
+            className="architecture-template-button"
+            onClick={() => onApply(template)}
+          >
+            <span>{template.label}</span>
+            <small>{template.summary}</small>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 
