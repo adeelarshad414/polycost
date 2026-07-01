@@ -395,6 +395,78 @@ describe('NLParserService', () => {
     expect(result.fieldsRequiringReview).not.toContain('database[0].sizeGb');
   });
 
+  it('infers analytics platform dimensions from natural language', async () => {
+    const client: StructuredLlmClient = {
+      createStructuredOutput: jest.fn(),
+    };
+    const service = new NLParserService(configService(4000, false), client, fixedNow);
+
+    const result = await service.parse(
+      'A data analytics pipeline with two 8 vCPU 32GB ETL servers, 500GB warehouse storage, 20TB warehouse queries, 5TB data lake storage, 120 ETL job hours, 1000GB streaming ingest, and 25 BI users in us-east-1.',
+    );
+
+    expect(result.draftNws.workload).toEqual(
+      expect.objectContaining({
+        name: 'Analytics workload',
+        type: 'data_pipeline',
+      }),
+    );
+    expect(result.draftNws.compute[0]).toEqual(
+      expect.objectContaining({
+        instanceCount: 2,
+        vcpu: 8,
+        memoryGb: 32,
+      }),
+    );
+    expect(result.draftNws.serviceRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceCategory: 'analytics',
+          serviceType: 'data-warehouse',
+          instanceType: 'warehouse - 500GB storage, 20TB queried',
+          scaleParams: expect.objectContaining({
+            analyticsWarehouseStorageGb: 500,
+            analyticsWarehouseQueryTb: 20,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'analytics',
+          serviceType: 'data-lake',
+          instanceType: 'data lake - 5120GB storage',
+          scaleParams: expect.objectContaining({
+            analyticsDataLakeStorageGb: 5120,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'analytics',
+          serviceType: 'data-integration',
+          instanceType: 'data integration - 120 job-hours',
+          scaleParams: expect.objectContaining({
+            analyticsIntegrationJobHours: 120,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'analytics',
+          serviceType: 'streaming-analytics',
+          instanceType: 'streaming analytics - 1000GB ingested',
+          scaleParams: expect.objectContaining({
+            analyticsStreamingIngestGb: 1000,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'analytics',
+          serviceType: 'business-intelligence',
+          instanceType: 'business intelligence - 25 users',
+          scaleParams: expect.objectContaining({
+            analyticsBiUsers: 25,
+          }),
+        }),
+      ]),
+    );
+    expect(result.fieldsRequiringReview).not.toContain('compute[0].vcpu');
+    expect(result.fieldsRequiringReview).not.toContain('compute[0].memoryGb');
+  });
+
   it('infers accelerated compute families for GPU and ML workloads', async () => {
     const client: StructuredLlmClient = {
       createStructuredOutput: jest.fn(),

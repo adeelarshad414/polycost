@@ -12,7 +12,7 @@ import {
 } from './nws-parser.types';
 
 const WORKLOAD_SIGNAL_PATTERN =
-  /\b(api|app|aurora|batch|cdn|container|cosmos|database|db|dynamodb|ec2|egress|file|firestore|kubernetes|load balancer|ml|mongo|mysql|nosql|postgres|redis|server|service|spanner|storage|traffic|upload|users|vm|web|website|workload)\b/i;
+  /\b(analytics|api|app|aurora|batch|bigquery|bi|cdn|container|cosmos|data lake|data warehouse|database|db|dynamodb|ec2|egress|etl|file|firestore|kubernetes|load balancer|looker|ml|mongo|mysql|nosql|postgres|power bi|pub\/sub|redis|redshift|server|service|spanner|storage|streaming|synapse|traffic|upload|users|vm|warehouse|web|website|workload)\b/i;
 
 export class NWSParseInputError extends Error {
   constructor(message: string) {
@@ -144,6 +144,12 @@ export class NLParserService {
     const databaseQueryDataTb = extractQueryDataTb(input);
     const databaseCacheReplicaCount = extractCacheReplicaCount(input);
     const databaseStorageGrowthGbPerMonth = extractDatabaseStorageGrowthGbPerMonth(input);
+    const analyticsWarehouseStorageGb = extractAnalyticsWarehouseStorageGb(input);
+    const analyticsWarehouseQueryTb = extractAnalyticsWarehouseQueryTb(input);
+    const analyticsDataLakeStorageGb = extractAnalyticsDataLakeStorageGb(input);
+    const analyticsIntegrationJobHours = extractAnalyticsIntegrationJobHours(input);
+    const analyticsStreamingIngestGb = extractAnalyticsStreamingIngestGb(input);
+    const analyticsBiUsers = extractAnalyticsBiUsers(input);
 
     if (!instanceCount) {
       fieldsRequiringReview.push('compute[0].instanceCount');
@@ -314,6 +320,12 @@ export class NLParserService {
         databaseQueryDataTb,
         databaseCacheReplicaCount,
         databaseStorageGrowthGbPerMonth,
+        analyticsWarehouseStorageGb,
+        analyticsWarehouseQueryTb,
+        analyticsDataLakeStorageGb,
+        analyticsIntegrationJobHours,
+        analyticsStreamingIngestGb,
+        analyticsBiUsers,
         monthlyEgressGb: extractEgressGb(input),
         cdn: /\bcdn|content delivery\b/i.test(input),
         loadBalancer: /\bload balanc|alb|elb|application gateway\b/i.test(input),
@@ -350,6 +362,7 @@ export const NWS_PARSE_SYSTEM_PROMPT = [
   'Return only JSON that matches the provided schema. Do not include markdown, prose, comments, or extra keys.',
   'Do not invent exact SKU names or prices. Capture uncertain fields in fieldsRequiringReview.',
   'Populate serviceRequirements as cloud-neutral selected services with category, serviceType, region, az, quantity, tier, and scaleParams when the input supports it.',
+  'For analytics workloads, capture data-warehouse, data-lake, data-integration, streaming-analytics, and business-intelligence requirements with analyticsWarehouseStorageGb, analyticsWarehouseQueryTb, analyticsDataLakeStorageGb, analyticsIntegrationJobHours, analyticsStreamingIngestGb, and analyticsBiUsers scaleParams when stated.',
   'Prefer partial valid NWS drafts over guessing. The user can edit the structured form before pricing.',
 ].join('\n');
 
@@ -364,6 +377,10 @@ function buildUserPrompt(input: string): string {
 }
 
 function inferWorkloadName(input: string): string {
+  if (input.includes('warehouse') || input.includes('analytics')) {
+    return 'Analytics workload';
+  }
+
   if (input.includes('api')) {
     return 'API workload';
   }
@@ -380,6 +397,16 @@ function inferWorkloadName(input: string): string {
 }
 
 function inferWorkloadType(input: string): NormalizedWorkloadSpec['workload']['type'] {
+  if (
+    input.includes('data pipeline') ||
+    input.includes('analytics') ||
+    input.includes('warehouse') ||
+    input.includes('data lake') ||
+    input.includes('etl')
+  ) {
+    return 'data_pipeline';
+  }
+
   if (input.includes('api')) {
     return 'api_backend';
   }
@@ -390,10 +417,6 @@ function inferWorkloadType(input: string): NormalizedWorkloadSpec['workload']['t
 
   if (input.includes('batch')) {
     return 'batch_processing';
-  }
-
-  if (input.includes('data pipeline')) {
-    return 'data_pipeline';
   }
 
   if (input.includes('ml') || input.includes('machine learning')) {
@@ -598,6 +621,12 @@ function inferServiceRequirements(input: {
   databaseQueryDataTb?: number;
   databaseCacheReplicaCount?: number;
   databaseStorageGrowthGbPerMonth?: number;
+  analyticsWarehouseStorageGb?: number;
+  analyticsWarehouseQueryTb?: number;
+  analyticsDataLakeStorageGb?: number;
+  analyticsIntegrationJobHours?: number;
+  analyticsStreamingIngestGb?: number;
+  analyticsBiUsers?: number;
   monthlyEgressGb?: number;
   cdn: boolean;
   loadBalancer: boolean;
@@ -682,6 +711,113 @@ function inferServiceRequirements(input: {
     });
   }
 
+  if (
+    hasAnalyticsWarehouseContext(input.input) ||
+    hasPositiveNumber(input.analyticsWarehouseStorageGb) ||
+    hasPositiveNumber(input.analyticsWarehouseQueryTb)
+  ) {
+    requirements.push({
+      serviceCategory: 'analytics',
+      serviceType: 'data-warehouse',
+      instanceType: analyticsInstanceType('warehouse', [
+        input.analyticsWarehouseStorageGb !== undefined
+          ? `${input.analyticsWarehouseStorageGb}GB storage`
+          : undefined,
+        input.analyticsWarehouseQueryTb !== undefined
+          ? `${input.analyticsWarehouseQueryTb}TB queried`
+          : undefined,
+      ]),
+      tier: 'warehouse',
+      ...(input.regionPreference ? { region: input.regionPreference } : {}),
+      az,
+      quantity: 1,
+      scaleParams: {
+        analyticsWarehouseStorageGb: input.analyticsWarehouseStorageGb ?? 0,
+        analyticsWarehouseQueryTb: input.analyticsWarehouseQueryTb ?? 0,
+      },
+    });
+  }
+
+  if (hasDataLakeContext(input.input) || hasPositiveNumber(input.analyticsDataLakeStorageGb)) {
+    requirements.push({
+      serviceCategory: 'analytics',
+      serviceType: 'data-lake',
+      instanceType: analyticsInstanceType('data lake', [
+        input.analyticsDataLakeStorageGb !== undefined
+          ? `${input.analyticsDataLakeStorageGb}GB storage`
+          : undefined,
+      ]),
+      tier: 'lake',
+      ...(input.regionPreference ? { region: input.regionPreference } : {}),
+      az,
+      quantity: 1,
+      scaleParams: {
+        analyticsDataLakeStorageGb: input.analyticsDataLakeStorageGb ?? 0,
+      },
+    });
+  }
+
+  if (
+    hasDataIntegrationContext(input.input) ||
+    hasPositiveNumber(input.analyticsIntegrationJobHours)
+  ) {
+    requirements.push({
+      serviceCategory: 'analytics',
+      serviceType: 'data-integration',
+      instanceType: analyticsInstanceType('data integration', [
+        input.analyticsIntegrationJobHours !== undefined
+          ? `${input.analyticsIntegrationJobHours} job-hours`
+          : undefined,
+      ]),
+      tier: 'etl',
+      ...(input.regionPreference ? { region: input.regionPreference } : {}),
+      az,
+      quantity: 1,
+      scaleParams: {
+        analyticsIntegrationJobHours: input.analyticsIntegrationJobHours ?? 0,
+      },
+    });
+  }
+
+  if (
+    hasStreamingAnalyticsContext(input.input) ||
+    hasPositiveNumber(input.analyticsStreamingIngestGb)
+  ) {
+    requirements.push({
+      serviceCategory: 'analytics',
+      serviceType: 'streaming-analytics',
+      instanceType: analyticsInstanceType('streaming analytics', [
+        input.analyticsStreamingIngestGb !== undefined
+          ? `${input.analyticsStreamingIngestGb}GB ingested`
+          : undefined,
+      ]),
+      tier: 'streaming',
+      ...(input.regionPreference ? { region: input.regionPreference } : {}),
+      az,
+      quantity: 1,
+      scaleParams: {
+        analyticsStreamingIngestGb: input.analyticsStreamingIngestGb ?? 0,
+      },
+    });
+  }
+
+  if (hasBiAnalyticsContext(input.input) || hasPositiveNumber(input.analyticsBiUsers)) {
+    requirements.push({
+      serviceCategory: 'analytics',
+      serviceType: 'business-intelligence',
+      instanceType: analyticsInstanceType('business intelligence', [
+        input.analyticsBiUsers !== undefined ? `${input.analyticsBiUsers} users` : undefined,
+      ]),
+      tier: 'bi',
+      ...(input.regionPreference ? { region: input.regionPreference } : {}),
+      az,
+      quantity: 1,
+      scaleParams: {
+        analyticsBiUsers: input.analyticsBiUsers ?? 0,
+      },
+    });
+  }
+
   if (input.cdn) {
     requirements.push({
       serviceCategory: 'networking',
@@ -705,6 +841,16 @@ function inferServiceRequirements(input: {
   }
 
   return requirements;
+}
+
+function analyticsInstanceType(label: string, details: Array<string | undefined>): string {
+  const statedDetails = details.filter((detail): detail is string => Boolean(detail));
+
+  return statedDetails.length > 0 ? `${label} - ${statedDetails.join(', ')}` : label;
+}
+
+function hasPositiveNumber(value: number | undefined): boolean {
+  return value !== undefined && value > 0;
 }
 
 type ParsedInstanceTier = 'small' | 'balanced' | 'compute' | 'memory' | 'storage' | 'accelerated';
@@ -868,9 +1014,25 @@ function extractUserCount(input: string, mode: 'daily' | 'peak'): number | undef
 }
 
 function extractInstanceCount(input: string): number | undefined {
+  const sizedServerPattern = input.match(
+    /\b(one|two|three|four|five|six|seven|eight|nine|ten|\d[\d,.]*)(?:\s+(?![\d,.]+\s*(?:vcpus?|cpu cores?|cores)\b)[a-z][a-z0-9-]*){0,5}\s+[\d,.]+\s*(?:vcpus?|cpu cores?|cores)\s+[\d,.]+\s*(?:gb|tb)(?:\s+(?:ram|memory))?(?:\s+\w+){0,3}\s+(?:servers|instances|vms|machines)\b/i,
+  );
+
+  if (sizedServerPattern) {
+    const parsed = parseHumanNumber(sizedServerPattern[1]);
+
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
   const tokens = tokenize(input);
 
   for (const [index, token] of tokens.entries()) {
+    if (/^\d[\d,.]*(?:gb|tb)$/.test(token)) {
+      continue;
+    }
+
     const value = parseTokenNumber(token);
 
     if (value === undefined) {
@@ -878,6 +1040,10 @@ function extractInstanceCount(input: string): number | undefined {
     }
 
     const nextWords = tokens.slice(index + 1, index + 4);
+
+    if (nextWords[0] === 'gb' || nextWords[0] === 'tb') {
+      continue;
+    }
 
     if (hasAny(nextWords, ['servers', 'instances', 'vms', 'machines'])) {
       return value;
@@ -1118,6 +1284,204 @@ function extractDatabaseStorageGrowthGbPerMonth(input: string): number | undefin
   });
 
   return growthMatch ? toGb(growthMatch[1], growthMatch[2]) : undefined;
+}
+
+function extractAnalyticsWarehouseStorageGb(input: string): number | undefined {
+  const explicitBefore = input.match(
+    /([\d,.]+)\s*(gb|tb)\s*(?:data\s+)?(?:warehouse|redshift|synapse|bigquery|fabric)\s*(?:storage|stored|capacity)\b/i,
+  );
+
+  if (explicitBefore) {
+    return toGb(explicitBefore[1], explicitBefore[2]);
+  }
+
+  const explicitAfter = input.match(
+    /\b(?:data\s+)?(?:warehouse|redshift|synapse|bigquery|fabric)\s*(?:storage|stored|capacity)\s*[:=-]?\s*([\d,.]+)\s*(gb|tb)\b/i,
+  );
+
+  if (explicitAfter) {
+    return toGb(explicitAfter[1], explicitAfter[2]);
+  }
+
+  return extractContextSizeGb(input, {
+    contextPattern: /\b(warehouse|data warehouse|redshift|synapse|bigquery|fabric)\b/,
+    includePattern: /\b(storage|stored|capacity|warehouse)\b/,
+    excludePattern: /\b(query|queries|queried|scan|scanned|read|reads|data lake|lakehouse)\b/,
+    unit: 'gb',
+  });
+}
+
+function extractAnalyticsWarehouseQueryTb(input: string): number | undefined {
+  const explicitBefore = input.match(
+    /([\d,.]+)\s*(gb|tb)\s*(?:data\s+)?(?:warehouse|redshift|synapse|bigquery|fabric)\s*(?:queries|query|queried|scans?|scanned|processed|processing)\b/i,
+  );
+
+  if (explicitBefore) {
+    return toTb(explicitBefore[1], explicitBefore[2]);
+  }
+
+  const explicitAfter = input.match(
+    /\b(?:data\s+)?(?:warehouse|redshift|synapse|bigquery|fabric)\s*(?:queries|query|queried|scans?|scanned|processed|processing)\s*[:=-]?\s*([\d,.]+)\s*(gb|tb)\b/i,
+  );
+
+  if (explicitAfter) {
+    return toTb(explicitAfter[1], explicitAfter[2]);
+  }
+
+  return extractContextSizeGb(input, {
+    contextPattern: /\b(warehouse|data warehouse|redshift|synapse|bigquery|fabric|analytics)\b/,
+    includePattern: /\b(query|queries|queried|scan|scanned|processed|processing)\b/,
+    excludePattern: /\b(storage|stored|data lake|lakehouse)\b/,
+    unit: 'tb',
+  });
+}
+
+function extractAnalyticsDataLakeStorageGb(input: string): number | undefined {
+  const explicitBefore = input.match(
+    /([\d,.]+)\s*(gb|tb)\s*(?:data lake|lakehouse|lake formation|dataplex|raw zone|curated zone)\s*(?:storage|stored|capacity)\b/i,
+  );
+
+  if (explicitBefore) {
+    return toGb(explicitBefore[1], explicitBefore[2]);
+  }
+
+  const explicitAfter = input.match(
+    /\b(?:data lake|lakehouse|lake formation|dataplex|raw zone|curated zone)\s*(?:storage|stored|capacity)\s*[:=-]?\s*([\d,.]+)\s*(gb|tb)\b/i,
+  );
+
+  if (explicitAfter) {
+    return toGb(explicitAfter[1], explicitAfter[2]);
+  }
+
+  return extractContextSizeGb(input, {
+    contextPattern: /\b(data lake|lakehouse|lake formation|dataplex|raw zone|curated zone)\b/,
+    includePattern: /\b(storage|stored|capacity|data lake|lakehouse)\b/,
+    excludePattern: /\b(query|queries|queried|scan|scanned)\b/,
+    unit: 'gb',
+  });
+}
+
+function extractAnalyticsStreamingIngestGb(input: string): number | undefined {
+  const explicitBefore = input.match(
+    /([\d,.]+)\s*(gb|tb)\s*(?:streaming|stream|kinesis|event hubs?|pub\/sub|pubsub|flink)\s*(?:ingest|ingestion|events?|messages?)\b/i,
+  );
+
+  if (explicitBefore) {
+    return toGb(explicitBefore[1], explicitBefore[2]);
+  }
+
+  const explicitAfter = input.match(
+    /\b(?:streaming|stream|kinesis|event hubs?|pub\/sub|pubsub|flink)\s*(?:ingest|ingestion|events?|messages?)\s*[:=-]?\s*([\d,.]+)\s*(gb|tb)\b/i,
+  );
+
+  if (explicitAfter) {
+    return toGb(explicitAfter[1], explicitAfter[2]);
+  }
+
+  return extractContextSizeGb(input, {
+    contextPattern: /\b(streaming|stream|kinesis|event hubs?|pub\/sub|pubsub|flink)\b/,
+    includePattern: /\b(ingest|ingestion|streaming|stream|events?|messages?)\b/,
+    unit: 'gb',
+  });
+}
+
+function extractAnalyticsIntegrationJobHours(input: string): number | undefined {
+  const matches = Array.from(
+    input.matchAll(
+      /([\d,.]+)\s*(?:etl|elt|glue|data factory|dataflow|integration)?\s*(?:job[- ]?)?hours?\b/gi,
+    ),
+  );
+  const matched = matches.find((match) => {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 52), index + 64).toLowerCase();
+
+    return hasDataIntegrationContext(context);
+  });
+
+  if (matched) {
+    return parseHumanNumber(matched[1]);
+  }
+
+  const afterLabel = input.match(
+    /\b(?:etl|elt|glue|data factory|dataflow|data integration|integration jobs?)\s*(?:job[- ]?hours?|hours?)?\s*[:=-]?\s*([\d,.]+)\s*(?:hours?|hrs?)\b/i,
+  );
+
+  return afterLabel ? parseHumanNumber(afterLabel[1]) : undefined;
+}
+
+function extractAnalyticsBiUsers(input: string): number | undefined {
+  const beforeUsers = Array.from(
+    input.matchAll(
+      /([a-z\d,.]+)\s*(?:bi|business intelligence|power bi|looker|quicksight)?\s*(?:users?|seats?|viewers?)\b/gi,
+    ),
+  ).find((match) => {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 44), index + 64).toLowerCase();
+
+    return hasBiAnalyticsContext(context);
+  });
+
+  if (beforeUsers) {
+    return parseHumanNumber(beforeUsers[1]);
+  }
+
+  const afterLabel = input.match(
+    /\b(?:bi|business intelligence|power bi|looker|quicksight)\s*(?:users?|seats?|viewers?)?\s*[:=-]?\s*([a-z\d,.]+)\b/i,
+  );
+
+  return afterLabel ? parseHumanNumber(afterLabel[1]) : undefined;
+}
+
+function extractContextSizeGb(
+  input: string,
+  options: {
+    contextPattern: RegExp;
+    includePattern: RegExp;
+    excludePattern?: RegExp;
+    unit: 'gb' | 'tb';
+  },
+): number | undefined {
+  const matches = Array.from(input.matchAll(/([\d,.]+)\s*(gb|tb)\b/gi));
+  const match = matches.find((candidate) => {
+    const index = candidate.index ?? 0;
+    const context = input.slice(Math.max(0, index - 64), index + 72).toLowerCase();
+
+    return (
+      options.contextPattern.test(context) &&
+      options.includePattern.test(context) &&
+      !(options.excludePattern?.test(context) ?? false)
+    );
+  });
+
+  if (!match) {
+    return undefined;
+  }
+
+  return options.unit === 'gb' ? toGb(match[1], match[2]) : toTb(match[1], match[2]);
+}
+
+function hasAnalyticsWarehouseContext(input: string): boolean {
+  return /\b(warehouse|data warehouse|redshift|synapse|bigquery|fabric)\b/i.test(input);
+}
+
+function hasDataLakeContext(input: string): boolean {
+  return /\b(data lake|lakehouse|lake formation|dataplex|raw zone|curated zone)\b/i.test(input);
+}
+
+function hasDataIntegrationContext(input: string): boolean {
+  return /\b(etl|elt|glue|data factory|dataflow|data fusion|data integration|integration job|pipeline job)\b/i.test(
+    input,
+  );
+}
+
+function hasStreamingAnalyticsContext(input: string): boolean {
+  return /\b(streaming|stream analytics|kinesis|event hubs?|pub\/sub|pubsub|flink)\b/i.test(input);
+}
+
+function hasBiAnalyticsContext(input: string): boolean {
+  return /\b(bi|business intelligence|power bi|looker|quicksight|dashboard users?|report users?)\b/i.test(
+    input,
+  );
 }
 
 function extractEgressGb(input: string): number | undefined {
