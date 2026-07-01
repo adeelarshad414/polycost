@@ -543,6 +543,69 @@ describe('NLParserService', () => {
     expect(result.fieldsRequiringReview).toEqual([]);
   });
 
+  it('infers integration and API gateway dimensions from natural language', async () => {
+    const client: StructuredLlmClient = {
+      createStructuredOutput: jest.fn(),
+    };
+    const service = new NLParserService(configService(4000, false), client, fixedNow);
+
+    const result = await service.parse(
+      'An integration API platform with two 4 vCPU 8GB servers, 50M queue messages, 20M event bus events, 100k workflow transitions, and 10M API gateway requests in us-east-1.',
+    );
+
+    expect(result.draftNws.workload).toEqual(
+      expect.objectContaining({
+        type: 'api_backend',
+        expectedUsers: {},
+      }),
+    );
+    expect(result.draftNws.compute[0]).toEqual(
+      expect.objectContaining({
+        role: 'api',
+        instanceCount: 2,
+        vcpu: 4,
+        memoryGb: 8,
+      }),
+    );
+    expect(result.draftNws.serviceRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceCategory: 'integration',
+          serviceType: 'queues-messaging',
+          instanceType: 'queues + messaging - 50M messages',
+          scaleParams: expect.objectContaining({
+            integrationQueueMessagesMillion: 50,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'integration',
+          serviceType: 'eventing',
+          instanceType: 'event routing - 20M events',
+          scaleParams: expect.objectContaining({
+            integrationEventsMillion: 20,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'integration',
+          serviceType: 'workflow-orchestration',
+          instanceType: 'workflow orchestration - 100K transitions',
+          scaleParams: expect.objectContaining({
+            integrationWorkflowTransitionsThousand: 100,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'application',
+          serviceType: 'api-gateway',
+          instanceType: 'API gateway - 10M requests',
+          scaleParams: expect.objectContaining({
+            integrationApiGatewayRequestsMillion: 10,
+          }),
+        }),
+      ]),
+    );
+    expect(result.fieldsRequiringReview).toEqual([]);
+  });
+
   it('infers accelerated compute families for GPU and ML workloads', async () => {
     const client: StructuredLlmClient = {
       createStructuredOutput: jest.fn(),

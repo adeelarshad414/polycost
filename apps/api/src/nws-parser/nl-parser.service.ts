@@ -12,7 +12,7 @@ import {
 } from './nws-parser.types';
 
 const WORKLOAD_SIGNAL_PATTERN =
-  /\b(ai|analytics|api|app|aurora|azure ml|batch|bedrock|bigquery|bi|cdn|container|cosmos|data lake|data warehouse|database|db|dynamodb|ec2|egress|embedding|embeddings|etl|file|firestore|generative ai|gpu|inference|kubernetes|llm|load balancer|looker|machine learning|ml|model|mongo|mysql|nosql|openai|postgres|power bi|pub\/sub|redis|redshift|sagemaker|server|service|spanner|storage|streaming|synapse|tokens|traffic|upload|users|vector|vertex ai|vm|warehouse|web|website|workload)\b/i;
+  /\b(ai|analytics|api|api gateway|app|aurora|azure ml|batch|bedrock|bigquery|bi|cdn|container|cosmos|data lake|data warehouse|database|db|dynamodb|ec2|egress|embedding|embeddings|etl|event bus|event grid|eventbridge|file|firestore|generative ai|gpu|inference|kubernetes|llm|load balancer|looker|machine learning|message queue|ml|model|mongo|mysql|nosql|openai|postgres|power bi|pub\/sub|pubsub|queue|redis|redshift|sagemaker|server|service|service bus|spanner|step functions|storage|streaming|synapse|tokens|traffic|upload|users|vector|vertex ai|vm|warehouse|web|website|workflow|workload)\b/i;
 
 export class NWSParseInputError extends Error {
   constructor(message: string) {
@@ -157,6 +157,11 @@ export class NLParserService {
     const aiVectorQueriesMillion = extractAiVectorQueriesMillion(input);
     const aiApiInputTokensMillion = extractAiApiTokensMillion(input, 'input');
     const aiApiOutputTokensMillion = extractAiApiTokensMillion(input, 'output');
+    const integrationQueueMessagesMillion = extractIntegrationQueueMessagesMillion(input);
+    const integrationEventsMillion = extractIntegrationEventsMillion(input);
+    const integrationWorkflowTransitionsThousand =
+      extractIntegrationWorkflowTransitionsThousand(input);
+    const integrationApiGatewayRequestsMillion = extractIntegrationApiGatewayRequestsMillion(input);
 
     if (!instanceCount) {
       fieldsRequiringReview.push('compute[0].instanceCount');
@@ -340,6 +345,10 @@ export class NLParserService {
         aiVectorQueriesMillion,
         aiApiInputTokensMillion,
         aiApiOutputTokensMillion,
+        integrationQueueMessagesMillion,
+        integrationEventsMillion,
+        integrationWorkflowTransitionsThousand,
+        integrationApiGatewayRequestsMillion,
         monthlyEgressGb: extractEgressGb(input),
         cdn: /\bcdn|content delivery\b/i.test(input),
         loadBalancer: /\bload balanc|alb|elb|application gateway\b/i.test(input),
@@ -378,6 +387,7 @@ export const NWS_PARSE_SYSTEM_PROMPT = [
   'Populate serviceRequirements as cloud-neutral selected services with category, serviceType, region, az, quantity, tier, and scaleParams when the input supports it.',
   'For analytics workloads, capture data-warehouse, data-lake, data-integration, streaming-analytics, and business-intelligence requirements with analyticsWarehouseStorageGb, analyticsWarehouseQueryTb, analyticsDataLakeStorageGb, analyticsIntegrationJobHours, analyticsStreamingIngestGb, and analyticsBiUsers scaleParams when stated.',
   'For AI/ML workloads, capture ml-training, model-hosting, ai-inference, vector-search, and generative-ai-api requirements with aiTrainingGpuHours, aiModelHostingHours, aiInferenceRequestsMillion, aiVectorStorageGb, aiVectorQueriesMillion, aiApiInputTokensMillion, and aiApiOutputTokensMillion scaleParams when stated.',
+  'For integration workloads, capture queues-messaging, eventing, workflow-orchestration, and api-gateway requirements with integrationQueueMessagesMillion, integrationEventsMillion, integrationWorkflowTransitionsThousand, and integrationApiGatewayRequestsMillion scaleParams when stated.',
   'Prefer partial valid NWS drafts over guessing. The user can edit the structured form before pricing.',
 ].join('\n');
 
@@ -657,6 +667,10 @@ function inferServiceRequirements(input: {
   aiVectorQueriesMillion?: number;
   aiApiInputTokensMillion?: number;
   aiApiOutputTokensMillion?: number;
+  integrationQueueMessagesMillion?: number;
+  integrationEventsMillion?: number;
+  integrationWorkflowTransitionsThousand?: number;
+  integrationApiGatewayRequestsMillion?: number;
   monthlyEgressGb?: number;
   cdn: boolean;
   loadBalancer: boolean;
@@ -957,6 +971,91 @@ function inferServiceRequirements(input: {
     });
   }
 
+  if (
+    hasQueueMessagingContext(input.input) ||
+    hasPositiveNumber(input.integrationQueueMessagesMillion)
+  ) {
+    requirements.push({
+      serviceCategory: 'integration',
+      serviceType: 'queues-messaging',
+      instanceType: integrationInstanceType('queues + messaging', [
+        input.integrationQueueMessagesMillion !== undefined
+          ? `${input.integrationQueueMessagesMillion}M messages`
+          : undefined,
+      ]),
+      tier: 'messaging',
+      ...(input.regionPreference ? { region: input.regionPreference } : {}),
+      az,
+      quantity: 1,
+      scaleParams: {
+        integrationQueueMessagesMillion: input.integrationQueueMessagesMillion ?? 0,
+      },
+    });
+  }
+
+  if (hasEventRoutingContext(input.input) || hasPositiveNumber(input.integrationEventsMillion)) {
+    requirements.push({
+      serviceCategory: 'integration',
+      serviceType: 'eventing',
+      instanceType: integrationInstanceType('event routing', [
+        input.integrationEventsMillion !== undefined
+          ? `${input.integrationEventsMillion}M events`
+          : undefined,
+      ]),
+      tier: 'event-bus',
+      ...(input.regionPreference ? { region: input.regionPreference } : {}),
+      az,
+      quantity: 1,
+      scaleParams: {
+        integrationEventsMillion: input.integrationEventsMillion ?? 0,
+      },
+    });
+  }
+
+  if (
+    hasWorkflowOrchestrationContext(input.input) ||
+    hasPositiveNumber(input.integrationWorkflowTransitionsThousand)
+  ) {
+    requirements.push({
+      serviceCategory: 'integration',
+      serviceType: 'workflow-orchestration',
+      instanceType: integrationInstanceType('workflow orchestration', [
+        input.integrationWorkflowTransitionsThousand !== undefined
+          ? `${input.integrationWorkflowTransitionsThousand}K transitions`
+          : undefined,
+      ]),
+      tier: 'workflow',
+      ...(input.regionPreference ? { region: input.regionPreference } : {}),
+      az,
+      quantity: 1,
+      scaleParams: {
+        integrationWorkflowTransitionsThousand: input.integrationWorkflowTransitionsThousand ?? 0,
+      },
+    });
+  }
+
+  if (
+    hasApiGatewayContext(input.input) ||
+    hasPositiveNumber(input.integrationApiGatewayRequestsMillion)
+  ) {
+    requirements.push({
+      serviceCategory: 'application',
+      serviceType: 'api-gateway',
+      instanceType: integrationInstanceType('API gateway', [
+        input.integrationApiGatewayRequestsMillion !== undefined
+          ? `${input.integrationApiGatewayRequestsMillion}M requests`
+          : undefined,
+      ]),
+      tier: 'gateway',
+      ...(input.regionPreference ? { region: input.regionPreference } : {}),
+      az,
+      quantity: 1,
+      scaleParams: {
+        integrationApiGatewayRequestsMillion: input.integrationApiGatewayRequestsMillion ?? 0,
+      },
+    });
+  }
+
   if (input.cdn) {
     requirements.push({
       serviceCategory: 'networking',
@@ -989,6 +1088,12 @@ function analyticsInstanceType(label: string, details: Array<string | undefined>
 }
 
 function aiInstanceType(label: string, details: Array<string | undefined>): string {
+  const statedDetails = details.filter((detail): detail is string => Boolean(detail));
+
+  return statedDetails.length > 0 ? `${label} - ${statedDetails.join(', ')}` : label;
+}
+
+function integrationInstanceType(label: string, details: Array<string | undefined>): string {
   const statedDetails = details.filter((detail): detail is string => Boolean(detail));
 
   return statedDetails.length > 0 ? `${label} - ${statedDetails.join(', ')}` : label;
@@ -1727,6 +1832,98 @@ function extractAiApiTokensMillion(
     : undefined;
 }
 
+function extractIntegrationQueueMessagesMillion(input: string): number | undefined {
+  const beforeMessages = Array.from(
+    input.matchAll(
+      /([\d,.]+)\s*(k|thousand|m|million)?\s*(?:queue|queued|message queue|sqs|service bus|pub\/sub|pubsub)?\s*(?:messages?|operations?)\b/gi,
+    ),
+  ).find((match) => {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 56), index + 76).toLowerCase();
+
+    return hasQueueMessagingContext(context);
+  });
+
+  if (beforeMessages) {
+    return requestMatchToMillion(beforeMessages[1], beforeMessages[2]);
+  }
+
+  const afterLabel = input.match(
+    /\b(?:queue|message queue|sqs|service bus|pub\/sub|pubsub)\s*(?:messages?|operations?)\s*[:=-]?\s*([\d,.]+)\s*(k|thousand|m|million)?\b/i,
+  );
+
+  return afterLabel ? requestMatchToMillion(afterLabel[1], afterLabel[2]) : undefined;
+}
+
+function extractIntegrationEventsMillion(input: string): number | undefined {
+  const beforeEvents = Array.from(
+    input.matchAll(
+      /([\d,.]+)\s*(k|thousand|m|million)?\s*(?:event bus|eventbridge|event grid|eventarc|event routing)?\s*(?:events?|notifications?)\b/gi,
+    ),
+  ).find((match) => {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 56), index + 76).toLowerCase();
+
+    return hasEventRoutingContext(context);
+  });
+
+  if (beforeEvents) {
+    return requestMatchToMillion(beforeEvents[1], beforeEvents[2]);
+  }
+
+  const afterLabel = input.match(
+    /\b(?:event bus|eventbridge|event grid|eventarc|event routing)\s*(?:events?|notifications?)\s*[:=-]?\s*([\d,.]+)\s*(k|thousand|m|million)?\b/i,
+  );
+
+  return afterLabel ? requestMatchToMillion(afterLabel[1], afterLabel[2]) : undefined;
+}
+
+function extractIntegrationWorkflowTransitionsThousand(input: string): number | undefined {
+  const beforeTransitions = Array.from(
+    input.matchAll(
+      /([\d,.]+)\s*(k|thousand|m|million)?\s*(?:workflow|workflows|step functions|logic apps?|cloud workflows)?\s*(?:transitions?|steps?|actions?|executions?)\b/gi,
+    ),
+  ).find((match) => {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 58), index + 80).toLowerCase();
+
+    return hasWorkflowOrchestrationContext(context);
+  });
+
+  if (beforeTransitions) {
+    return requestMatchToThousand(beforeTransitions[1], beforeTransitions[2]);
+  }
+
+  const afterLabel = input.match(
+    /\b(?:workflow|workflows|step functions|logic apps?|cloud workflows)\s*(?:transitions?|steps?|actions?|executions?)\s*[:=-]?\s*([\d,.]+)\s*(k|thousand|m|million)?\b/i,
+  );
+
+  return afterLabel ? requestMatchToThousand(afterLabel[1], afterLabel[2]) : undefined;
+}
+
+function extractIntegrationApiGatewayRequestsMillion(input: string): number | undefined {
+  const beforeRequests = Array.from(
+    input.matchAll(
+      /([\d,.]+)\s*(k|thousand|m|million)?\s*(?:api gateway|gateway|apim|api management)?\s*(?:requests?|calls?)\b/gi,
+    ),
+  ).find((match) => {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 56), index + 76).toLowerCase();
+
+    return hasApiGatewayContext(context);
+  });
+
+  if (beforeRequests) {
+    return requestMatchToMillion(beforeRequests[1], beforeRequests[2]);
+  }
+
+  const afterLabel = input.match(
+    /\b(?:api gateway|gateway|apim|api management)\s*(?:requests?|calls?)\s*[:=-]?\s*([\d,.]+)\s*(k|thousand|m|million)?\b/i,
+  );
+
+  return afterLabel ? requestMatchToMillion(afterLabel[1], afterLabel[2]) : undefined;
+}
+
 function extractContextSizeGb(
   input: string,
   options: {
@@ -1811,6 +2008,30 @@ function hasAiVectorSearchContext(input: string): boolean {
 
 function hasGenerativeAiContext(input: string): boolean {
   return /\b(generative ai|genai|llm|large language model|bedrock|openai|azure openai|vertex ai|foundation model|prompt tokens?|completion tokens?|input tokens?|output tokens?)\b/i.test(
+    input,
+  );
+}
+
+function hasQueueMessagingContext(input: string): boolean {
+  return /\b(queue|queues|message queue|messaging|sqs|service bus|pub\/sub|pubsub|cloud tasks)\b/i.test(
+    input,
+  );
+}
+
+function hasEventRoutingContext(input: string): boolean {
+  return /\b(event bus|event buses|eventbridge|event grid|eventarc|event routing|events?)\b/i.test(
+    input,
+  );
+}
+
+function hasWorkflowOrchestrationContext(input: string): boolean {
+  return /\b(workflow|workflows|workflow orchestration|step functions|logic apps?|durable functions|cloud workflows)\b/i.test(
+    input,
+  );
+}
+
+function hasApiGatewayContext(input: string): boolean {
+  return /\b(api gateway|gateway requests?|apim|api management|cloud endpoints|amazon api gateway|azure api management)\b/i.test(
     input,
   );
 }

@@ -1183,6 +1183,101 @@ describe('ComparisonOrchestratorService', () => {
     );
   });
 
+  it('adds modeled integration and API gateway line items', async () => {
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async (): Promise<ProviderPricingResult> => ({
+          providerId: 'aws',
+          baseMonthlyCostUsd: 10,
+          lineItems: [
+            {
+              category: 'compute',
+              costComponent: 'compute',
+              description: 'aws compute',
+              isApproximate: false,
+              baseMonthlyCostUsd: 10,
+              skuId: 'aws-compute',
+              region: 'us-east-1',
+              unit: 'hour',
+              unitPriceUsd: 0.01,
+            },
+          ],
+        })),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      serviceRequirements: [
+        {
+          serviceCategory: 'integration',
+          serviceType: 'queues-messaging',
+          quantity: 1,
+          scaleParams: {
+            integrationQueueMessagesMillion: 50,
+          },
+        },
+        {
+          serviceCategory: 'integration',
+          serviceType: 'eventing',
+          quantity: 1,
+          scaleParams: {
+            integrationEventsMillion: 20,
+          },
+        },
+        {
+          serviceCategory: 'integration',
+          serviceType: 'workflow-orchestration',
+          quantity: 1,
+          scaleParams: {
+            integrationWorkflowTransitionsThousand: 100,
+          },
+        },
+        {
+          serviceCategory: 'application',
+          serviceType: 'api-gateway',
+          quantity: 1,
+          scaleParams: {
+            integrationApiGatewayRequestsMillion: 10,
+          },
+        },
+      ],
+    });
+
+    expect(result.providers[0].lineItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'operations',
+          skuId: 'modeled-integration-queue-messages',
+          baseMonthlyCostUsd: 20,
+          isApproximate: true,
+        }),
+        expect.objectContaining({
+          category: 'operations',
+          skuId: 'modeled-integration-event-routing',
+          baseMonthlyCostUsd: 20,
+        }),
+        expect.objectContaining({
+          category: 'operations',
+          skuId: 'modeled-integration-workflow-transitions',
+          baseMonthlyCostUsd: 2.5,
+        }),
+        expect.objectContaining({
+          category: 'operations',
+          skuId: 'modeled-application-api-gateway-requests',
+          baseMonthlyCostUsd: 35,
+        }),
+      ]),
+    );
+    expect(result.providers[0].breakdown).toEqual(
+      expect.objectContaining({
+        computeMonthlyCostUsd: 10,
+        operationsMonthlyCostUsd: 77.5,
+      }),
+    );
+  });
+
   it('uses a safe warning when a provider fails without an Error object', async () => {
     const service = createService([
       adapter(

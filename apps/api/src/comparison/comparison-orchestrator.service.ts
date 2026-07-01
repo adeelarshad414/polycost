@@ -123,6 +123,13 @@ interface AiServicesRates {
   apiOutputTokenPerMillion: number;
 }
 
+interface IntegrationServicesRates {
+  queueMessagePerMillion: number;
+  eventRoutingPerMillion: number;
+  workflowTransitionPerThousand: number;
+  apiGatewayRequestPerMillion: number;
+}
+
 type StorageClassKey = NonNullable<NormalizedWorkloadSpec['storage'][number]['storageClass']>;
 
 export class ComparisonUnavailableError extends Error {
@@ -463,6 +470,7 @@ export class ComparisonOrchestratorService {
     const runtimeServicesLineItems = this.runtimeServicesLineItems(nws, providerId);
     const analyticsServicesLineItems = this.analyticsServicesLineItems(nws, providerId);
     const aiServicesLineItems = this.aiServicesLineItems(nws, providerId);
+    const integrationServicesLineItems = this.integrationServicesLineItems(nws, providerId);
     const networkLineItems = this.networkDimensionLineItems(nws, providerId);
 
     return [
@@ -475,6 +483,7 @@ export class ComparisonOrchestratorService {
       ...runtimeServicesLineItems,
       ...analyticsServicesLineItems,
       ...aiServicesLineItems,
+      ...integrationServicesLineItems,
       ...networkLineItems,
     ].filter((lineItem): lineItem is ComparisonLineItem => lineItem !== undefined);
   }
@@ -1799,6 +1808,89 @@ export class ComparisonOrchestratorService {
     return lineItems;
   }
 
+  private integrationServicesLineItems(
+    nws: NormalizedWorkloadSpec,
+    providerId: ProviderId,
+  ): ComparisonLineItem[] {
+    const requirements = nws.serviceRequirements ?? [];
+    const serviceTypes = new Set(requirements.map((requirement) => requirement.serviceType));
+    const rates = integrationServicesRates(providerId);
+    const regionLabel = nws.workload.region.preference ?? 'default region';
+    const values = integrationServicesAssumptions(requirements);
+    const lineItems: ComparisonLineItem[] = [];
+
+    if (
+      (serviceTypes.has('queues-messaging') || values.integrationQueueMessagesMillion > 0) &&
+      values.integrationQueueMessagesMillion > 0
+    ) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-integration-queue-messages',
+          description: `${providerLabel(providerId)} queue and messaging operation estimate`,
+          quantity: values.integrationQueueMessagesMillion,
+          unit: '1M messages',
+          unitPriceUsd: rates.queueMessagePerMillion,
+        }),
+      );
+    }
+
+    if (
+      (serviceTypes.has('eventing') || values.integrationEventsMillion > 0) &&
+      values.integrationEventsMillion > 0
+    ) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-integration-event-routing',
+          description: `${providerLabel(providerId)} event routing estimate`,
+          quantity: values.integrationEventsMillion,
+          unit: '1M events',
+          unitPriceUsd: rates.eventRoutingPerMillion,
+        }),
+      );
+    }
+
+    if (
+      (serviceTypes.has('workflow-orchestration') ||
+        values.integrationWorkflowTransitionsThousand > 0) &&
+      values.integrationWorkflowTransitionsThousand > 0
+    ) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-integration-workflow-transitions',
+          description: `${providerLabel(providerId)} workflow transition estimate`,
+          quantity: values.integrationWorkflowTransitionsThousand,
+          unit: '1K transitions',
+          unitPriceUsd: rates.workflowTransitionPerThousand,
+        }),
+      );
+    }
+
+    if (
+      (serviceTypes.has('api-gateway') || values.integrationApiGatewayRequestsMillion > 0) &&
+      values.integrationApiGatewayRequestsMillion > 0
+    ) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-application-api-gateway-requests',
+          description: `${providerLabel(providerId)} API gateway request estimate`,
+          quantity: values.integrationApiGatewayRequestsMillion,
+          unit: '1M requests',
+          unitPriceUsd: rates.apiGatewayRequestPerMillion,
+        }),
+      );
+    }
+
+    return lineItems;
+  }
+
   private computeModeledLineItem(input: {
     providerId: ProviderId;
     regionLabel: string;
@@ -2530,6 +2622,55 @@ function aiServicesAssumptions(
     aiVectorQueriesMillion: maxScaleParam(requirements, 'aiVectorQueriesMillion'),
     aiApiInputTokensMillion: maxScaleParam(requirements, 'aiApiInputTokensMillion'),
     aiApiOutputTokensMillion: maxScaleParam(requirements, 'aiApiOutputTokensMillion'),
+  };
+}
+
+function integrationServicesRates(providerId: ProviderId): IntegrationServicesRates {
+  switch (providerId) {
+    case 'aws':
+      return {
+        queueMessagePerMillion: 0.4,
+        eventRoutingPerMillion: 1,
+        workflowTransitionPerThousand: 0.025,
+        apiGatewayRequestPerMillion: 3.5,
+      };
+    case 'azure':
+      return {
+        queueMessagePerMillion: 0.05,
+        eventRoutingPerMillion: 0.6,
+        workflowTransitionPerThousand: 0.025,
+        apiGatewayRequestPerMillion: 3.5,
+      };
+    case 'gcp':
+      return {
+        queueMessagePerMillion: 0.4,
+        eventRoutingPerMillion: 0.6,
+        workflowTransitionPerThousand: 0.025,
+        apiGatewayRequestPerMillion: 3,
+      };
+  }
+}
+
+function integrationServicesAssumptions(
+  requirements: ServiceRequirement[],
+): Record<
+  | 'integrationQueueMessagesMillion'
+  | 'integrationEventsMillion'
+  | 'integrationWorkflowTransitionsThousand'
+  | 'integrationApiGatewayRequestsMillion',
+  number
+> {
+  return {
+    integrationQueueMessagesMillion: maxScaleParam(requirements, 'integrationQueueMessagesMillion'),
+    integrationEventsMillion: maxScaleParam(requirements, 'integrationEventsMillion'),
+    integrationWorkflowTransitionsThousand: maxScaleParam(
+      requirements,
+      'integrationWorkflowTransitionsThousand',
+    ),
+    integrationApiGatewayRequestsMillion: maxScaleParam(
+      requirements,
+      'integrationApiGatewayRequestsMillion',
+    ),
   };
 }
 
