@@ -40,6 +40,7 @@ import {
   defaultWorkloadForm,
   formFromNws,
   sampleNaturalLanguageInput,
+  serviceRequirementsFromForm,
   validateWorkloadForm,
   WorkloadFormIssue,
   WorkloadFormState,
@@ -72,6 +73,7 @@ const INPUT_MODE_OPTIONS: Array<{
 ];
 
 const PRICING_MODEL_STORAGE_KEY = 'polycost-pricing-model';
+const REQUIREMENT_SESSION_STORAGE_KEY = 'polycost-current-requirements-v1';
 const PRICING_MODEL_OPTIONS: Array<{
   key: PricingModelKey;
   label: string;
@@ -265,6 +267,14 @@ const INITIAL_HOME_FORM: WorkloadFormState = {
   slaTarget: '',
 };
 
+interface StoredRequirementSession {
+  inputMode: InputMode;
+  naturalLanguageInput: string;
+  form: WorkloadFormState;
+  pricingModel: PricingModelKey;
+  requirementsAwaitingReview: boolean;
+}
+
 interface CategoryCostSummary {
   category: ServiceCategory;
   total: number;
@@ -394,18 +404,30 @@ export function App({ client = polyCostClient }: AppProps) {
   const shareToken = shareTokenFromLocation();
   const isPageLoading = usePageLoadingState();
   const activeAsyncActionId = useRef(0);
+  const initialRequirementSession = useRef(readStoredRequirementSession()).current;
   const [themeChoice, setThemeChoice] = useState<ThemeChoice>(() => storedTheme());
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
     resolveTheme(storedTheme()),
   );
-  const [inputMode, setInputMode] = useState<InputMode>('form');
-  const [naturalLanguageInput, setNaturalLanguageInput] = useState(sampleNaturalLanguageInput);
-  const [form, setForm] = useState<WorkloadFormState>(INITIAL_HOME_FORM);
+  const [inputMode, setInputMode] = useState<InputMode>(
+    () => initialRequirementSession?.inputMode ?? 'form',
+  );
+  const [naturalLanguageInput, setNaturalLanguageInput] = useState(
+    () => initialRequirementSession?.naturalLanguageInput ?? sampleNaturalLanguageInput,
+  );
+  const [form, setForm] = useState<WorkloadFormState>(
+    () => initialRequirementSession?.form ?? INITIAL_HOME_FORM,
+  );
   const [submittedForm, setSubmittedForm] = useState<WorkloadFormState>(INITIAL_HOME_FORM);
   const [submittedInputMode, setSubmittedInputMode] = useState<InputMode>('form');
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
   const [interval, setInterval] = useState<IntervalKey>('monthly');
-  const [pricingModel, setPricingModel] = useState<PricingModelKey>(() => readStoredPricingModel());
+  const [pricingModel, setPricingModel] = useState<PricingModelKey>(
+    () => initialRequirementSession?.pricingModel ?? readStoredPricingModel(),
+  );
+  const [requirementsAwaitingReview, setRequirementsAwaitingReview] = useState(
+    () => initialRequirementSession?.requirementsAwaitingReview ?? false,
+  );
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [exportingFormat, setExportingFormat] = useState<ReportFormat | null>(null);
   const [isEditingRequirements, setIsEditingRequirements] = useState(false);
@@ -418,6 +440,16 @@ export function App({ client = polyCostClient }: AppProps) {
   useEffect(() => {
     setResolvedTheme(applyTheme(themeChoice));
   }, [themeChoice]);
+
+  useEffect(() => {
+    storeRequirementSession({
+      inputMode,
+      naturalLanguageInput,
+      form,
+      pricingModel,
+      requirementsAwaitingReview,
+    });
+  }, [form, inputMode, naturalLanguageInput, pricingModel, requirementsAwaitingReview]);
 
   useEffect(() => {
     let isMounted = true;
@@ -471,7 +503,13 @@ export function App({ client = polyCostClient }: AppProps) {
       setForm(formFromNws(parsed.draftNws));
       setFormValidationIssues([]);
       setInputMode('form');
-      setNotice(reviewMessage(parsed.parserConfidence, parsed.fieldsRequiringReview));
+      setRequirementsAwaitingReview(true);
+      setNotice(
+        `${reviewMessage(
+          parsed.parserConfidence,
+          parsed.fieldsRequiringReview,
+        )} Review the interpreted services, edit anything, then compare.`,
+      );
     } catch (parseError) {
       if (isCurrentAsyncAction(actionId)) {
         setError(formatApiError(parseError));
@@ -485,13 +523,13 @@ export function App({ client = polyCostClient }: AppProps) {
 
   async function handleCompare(event?: FormEvent) {
     event?.preventDefault();
-    const validationIssues = inputMode === 'form' ? validateWorkloadForm(form) : [];
 
-    if (inputMode === 'describe' && !naturalLanguageInput.trim()) {
-      setError('Enter workload requirements before comparing.');
-      setNotice(null);
+    if (inputMode === 'describe') {
+      await handleParse();
       return;
     }
+
+    const validationIssues = inputMode === 'form' ? validateWorkloadForm(form) : [];
 
     if (validationIssues.length > 0) {
       setFormValidationIssues(validationIssues);
@@ -537,6 +575,7 @@ export function App({ client = polyCostClient }: AppProps) {
       setSubmittedForm(submittedComparisonForm);
       setSubmittedInputMode(submittedComparisonInputMode);
       setIsEditingRequirements(false);
+      setRequirementsAwaitingReview(false);
       setNotice(parserNotice ? `${parserNotice} Comparison ready.` : 'Comparison ready.');
     } catch (comparisonError) {
       if (isCurrentAsyncAction(actionId)) {
@@ -560,7 +599,7 @@ export function App({ client = polyCostClient }: AppProps) {
       return {
         nws: buildNwsFromForm(form, 'structured_form'),
         submittedComparisonForm: form,
-        submittedComparisonInputMode: 'form',
+        submittedComparisonInputMode: requirementsAwaitingReview ? 'describe' : 'form',
       };
     }
 
@@ -654,6 +693,8 @@ export function App({ client = polyCostClient }: AppProps) {
   function handleClearComparison() {
     cancelAsyncActions();
     setForm(INITIAL_HOME_FORM);
+    setRequirementsAwaitingReview(false);
+    clearRequirementSession();
     setSubmittedForm(INITIAL_HOME_FORM);
     setSubmittedInputMode('form');
     setInputMode('form');
@@ -680,6 +721,7 @@ export function App({ client = polyCostClient }: AppProps) {
     setForm(submittedForm);
     setFormValidationIssues([]);
     setInputMode(submittedInputMode);
+    setRequirementsAwaitingReview(false);
     setIsEditingRequirements(true);
   }
 
@@ -732,6 +774,7 @@ export function App({ client = polyCostClient }: AppProps) {
           pricingModel={pricingModel}
           interval={interval}
           isEditingRequirements={isEditingRequirements}
+          requirementsAwaitingReview={requirementsAwaitingReview}
           busyAction={busyAction}
           exportingFormat={exportingFormat}
           notice={notice}
@@ -759,6 +802,7 @@ export function App({ client = polyCostClient }: AppProps) {
           form={form}
           inputMode={inputMode}
           pricingModel={pricingModel}
+          requirementsAwaitingReview={requirementsAwaitingReview}
           naturalLanguageInput={naturalLanguageInput}
           regionCatalog={regionCatalog}
           regionCatalogError={regionCatalogError}
@@ -930,6 +974,7 @@ function InitialHomePage({
   error,
   validationIssues,
   isComparing,
+  requirementsAwaitingReview,
   onInputModeChange,
   onPricingModelChange,
   onNaturalLanguageChange,
@@ -948,6 +993,7 @@ function InitialHomePage({
   error: string | null;
   validationIssues: WorkloadFormIssue[];
   isComparing: boolean;
+  requirementsAwaitingReview: boolean;
   onInputModeChange: (mode: InputMode) => void;
   onPricingModelChange: (model: PricingModelKey) => void;
   onNaturalLanguageChange: (value: string) => void;
@@ -999,9 +1045,12 @@ function InitialHomePage({
         {inputMode === 'form' ? (
           <form className="initial-guided-form" onSubmit={onSubmit}>
             <FormValidationSummary issues={validationIssues} />
+            {requirementsAwaitingReview ? <RequirementReviewCards form={form} /> : null}
             <div className="initial-home-actions initial-home-actions-primary">
               <span className="initial-home-action-hint">
-                Adjust the workload below, or run the default estimate now.
+                {requirementsAwaitingReview
+                  ? 'Review the interpreted workload below, edit anything, then confirm.'
+                  : 'Adjust the workload below, or run the default estimate now.'}
               </span>
               <Button
                 type="submit"
@@ -1011,10 +1060,17 @@ function InitialHomePage({
                 disabled={isComparing}
               >
                 <CompareIcon />
-                Compare costs
+                {requirementsAwaitingReview ? 'Confirm & compare' : 'Compare costs'}
               </Button>
             </div>
             <div className="initial-home-fields">
+              {requirementsAwaitingReview ? (
+                <TextField
+                  label="Name"
+                  value={form.workloadName}
+                  onChange={(value) => update('workloadName', value)}
+                />
+              ) : null}
               <SelectField
                 label="Service category"
                 value={form.selectedServiceCategory}
@@ -1146,6 +1202,7 @@ function ProgressiveComparisonPage({
   pricingModel,
   interval,
   isEditingRequirements,
+  requirementsAwaitingReview,
   busyAction,
   exportingFormat,
   notice,
@@ -1177,6 +1234,7 @@ function ProgressiveComparisonPage({
   pricingModel: PricingModelKey;
   interval: IntervalKey;
   isEditingRequirements: boolean;
+  requirementsAwaitingReview: boolean;
   busyAction: BusyAction;
   exportingFormat: ReportFormat | null;
   notice: string | null;
@@ -1212,6 +1270,7 @@ function ProgressiveComparisonPage({
               regionCatalog={regionCatalog}
               regionCatalogError={regionCatalogError}
               validationIssues={validationIssues}
+              requirementsAwaitingReview={requirementsAwaitingReview}
               busyAction={busyAction}
               onClearRequirements={onClearRequirements}
               onFormChange={onFormChange}
@@ -1602,6 +1661,7 @@ function RequirementsEditPanel({
   regionCatalog,
   regionCatalogError,
   validationIssues,
+  requirementsAwaitingReview,
   busyAction,
   onClearRequirements,
   onFormChange,
@@ -1619,6 +1679,7 @@ function RequirementsEditPanel({
   regionCatalog: RegionCatalogResponse | null;
   regionCatalogError: string | null;
   validationIssues: WorkloadFormIssue[];
+  requirementsAwaitingReview: boolean;
   busyAction: BusyAction;
   onClearRequirements: () => void;
   onFormChange: (form: WorkloadFormState) => void;
@@ -1661,6 +1722,9 @@ function RequirementsEditPanel({
           onSubmit={onSubmit}
         />
       )}
+      {inputMode === 'form' && requirementsAwaitingReview ? (
+        <RequirementReviewCards form={form} compact />
+      ) : null}
       <div className="requirements-edit-actions">
         <Button
           type="button"
@@ -1671,7 +1735,9 @@ function RequirementsEditPanel({
           disabled={busyAction !== null && busyAction !== 'compare'}
         >
           <CompareIcon />
-          {compareButtonLabel(inputMode)}
+          {inputMode === 'form' && requirementsAwaitingReview
+            ? 'Confirm & compare'
+            : compareButtonLabel(inputMode)}
         </Button>
       </div>
     </section>
@@ -2277,6 +2343,44 @@ function FormValidationSummary({ issues }: { issues: WorkloadFormIssue[] }) {
       </strong>{' '}
       <span>{issues.map((issue) => issue.message).join(' ')}</span>
     </div>
+  );
+}
+
+function RequirementReviewCards({
+  form,
+  compact = false,
+}: {
+  form: WorkloadFormState;
+  compact?: boolean;
+}) {
+  const requirements = serviceRequirementsFromForm(form);
+
+  return (
+    <section
+      className={compact ? 'requirement-review-cards is-compact' : 'requirement-review-cards'}
+      aria-label="Interpreted requirement review"
+    >
+      <div className="requirement-review-heading">
+        <span>Review checkpoint</span>
+        <strong>Interpreted services ready to price</strong>
+      </div>
+      <div className="requirement-review-grid">
+        {requirements.map((requirement, index) => (
+          <article
+            key={`${requirement.serviceCategory}-${requirement.serviceType}-${index}`}
+            className={`requirement-review-card requirement-review-card-${requirement.serviceCategory}`}
+          >
+            <span>{requirement.serviceCategory}</span>
+            <strong>{requirement.serviceType}</strong>
+            <small>
+              Qty {requirement.quantity}
+              {requirement.region ? ` · ${requirement.region}` : ''}
+              {requirement.az ? ` · ${requirement.az}` : ''}
+            </small>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -5489,11 +5593,11 @@ function intervalCostMultiplier(interval: IntervalKey): number {
 }
 
 function compareButtonLabel(inputMode: InputMode): string {
-  return inputMode === 'describe' ? 'Parse & compare' : 'Compare';
+  return inputMode === 'describe' ? 'Parse requirements' : 'Compare';
 }
 
 function compareLoadingLabel(inputMode: InputMode): string {
-  return inputMode === 'describe' ? 'Parsing...' : 'Comparing...';
+  return inputMode === 'describe' ? 'Parsing requirements...' : 'Comparing...';
 }
 
 function inputModeSummaryLabel(inputMode: InputMode): string {
@@ -5518,6 +5622,49 @@ function readStoredPricingModel(): PricingModelKey {
 
 function storePricingModel(pricingModel: PricingModelKey): void {
   window.localStorage.setItem(PRICING_MODEL_STORAGE_KEY, pricingModel);
+}
+
+function readStoredRequirementSession(): StoredRequirementSession | undefined {
+  try {
+    const stored = window.sessionStorage.getItem(REQUIREMENT_SESSION_STORAGE_KEY);
+    if (!stored) {
+      return undefined;
+    }
+
+    const parsed = JSON.parse(stored) as Partial<StoredRequirementSession>;
+    const inputMode: InputMode = parsed.inputMode === 'describe' ? 'describe' : 'form';
+    const pricingModel = PRICING_MODEL_OPTIONS.some((option) => option.key === parsed.pricingModel)
+      ? (parsed.pricingModel as PricingModelKey)
+      : 'on-demand';
+
+    if (!parsed.form || typeof parsed.form !== 'object') {
+      return undefined;
+    }
+
+    return {
+      inputMode,
+      pricingModel,
+      form: {
+        ...INITIAL_HOME_FORM,
+        ...parsed.form,
+      },
+      naturalLanguageInput:
+        typeof parsed.naturalLanguageInput === 'string'
+          ? parsed.naturalLanguageInput
+          : sampleNaturalLanguageInput,
+      requirementsAwaitingReview: Boolean(parsed.requirementsAwaitingReview),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function storeRequirementSession(session: StoredRequirementSession): void {
+  window.sessionStorage.setItem(REQUIREMENT_SESSION_STORAGE_KEY, JSON.stringify(session));
+}
+
+function clearRequirementSession(): void {
+  window.sessionStorage.removeItem(REQUIREMENT_SESSION_STORAGE_KEY);
 }
 
 function reportFormatLabel(format: ReportFormat): string {

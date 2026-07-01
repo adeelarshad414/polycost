@@ -6,6 +6,7 @@ coverage/
 .turbo/
 .vite/
 apps/web/tsconfig.tsbuildinfo
+*.tsbuildinfo
 .DS_Store
 
 .env

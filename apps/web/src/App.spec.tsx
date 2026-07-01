@@ -29,6 +29,7 @@ describe('App', () => {
   beforeEach(() => {
     window.localStorage.removeItem('polycost-persona-view');
     window.localStorage.removeItem('polycost-dismissed-budget-alerts');
+    window.sessionStorage.removeItem('polycost-current-requirements-v1');
     window.URL.createObjectURL = jest.fn(() => 'blob:polycost-report');
     window.URL.revokeObjectURL = jest.fn();
     HTMLAnchorElement.prototype.click = jest.fn();
@@ -42,6 +43,7 @@ describe('App', () => {
     document.documentElement.dataset.themeChoice = 'light';
     window.localStorage.removeItem('polycost-persona-view');
     window.localStorage.removeItem('polycost-dismissed-budget-alerts');
+    window.sessionStorage.removeItem('polycost-current-requirements-v1');
   });
 
   it('runs the structured-form comparison flow', async () => {
@@ -573,13 +575,36 @@ describe('App', () => {
     const { container, unmount } = render(<App client={client} />);
 
     await click(buttonByText(container, 'Paste / parse'));
-    await click(buttonByText(container, 'Parse & compare'));
+    await click(buttonByText(container, 'Parse requirements'));
 
     expect(client.parseWorkload).toHaveBeenCalledWith(expect.stringContaining('web app'));
-    expect(client.validateWorkload).toHaveBeenCalledWith(parsedNws);
-    expect(client.createComparison).toHaveBeenCalledWith(parsedNws);
-    expect(text(container)).toContain('Parsed from text');
+    expect(client.validateWorkload).not.toHaveBeenCalled();
+    expect(client.createComparison).not.toHaveBeenCalled();
+    expect(text(container)).toContain('Review checkpoint');
+    expect(text(container)).toContain('Interpreted services ready to price');
+    expect((container.querySelector('#name') as HTMLInputElement).value).toBe(
+      'Parsed and compared portal',
+    );
     expect(text(container)).toContain('Parsed with medium confidence. Review 1 field.');
+
+    await click(buttonByText(container, 'Confirm & compare'));
+
+    expect(client.validateWorkload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ sourceType: 'structured_form' }),
+        workload: expect.objectContaining({
+          name: 'Parsed and compared portal',
+        }),
+      }),
+    );
+    expect(client.createComparison).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workload: expect.objectContaining({
+          name: 'Parsed and compared portal',
+        }),
+      }),
+    );
+    expect(text(container)).toContain('Parsed from text');
 
     await click(buttonByText(container, 'Edit'));
     expect(buttonByText(container, 'Paste / parse').getAttribute('aria-selected')).toBe('true');
@@ -589,7 +614,6 @@ describe('App', () => {
     expect((container.querySelector('#name') as HTMLInputElement).value).toBe(
       'Parsed and compared portal',
     );
-    expect(text(container)).toContain('Parsed with medium confidence. Review 1 field.');
     expect(text(container)).not.toContain('Comparison ready.');
 
     unmount();
@@ -645,7 +669,7 @@ describe('App', () => {
     const { container, unmount } = render(<App client={client} />);
 
     await click(buttonByText(container, 'Paste / parse'));
-    await click(buttonByText(container, 'Parse & compare'));
+    await click(buttonByText(container, 'Parse requirements'));
 
     expect(text(container)).toContain('Input was not understood');
     expect(container.querySelector('.initial-home-form')).toBeInstanceOf(HTMLElement);

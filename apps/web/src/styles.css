@@ -1710,6 +1710,91 @@ select:hover {
   color: var(--pc-error);
 }
 
+.requirement-review-cards {
+  display: grid;
+  gap: var(--pc-space-1);
+  border: 1px solid color-mix(in srgb, var(--pc-action-primary) 34%, var(--pc-border));
+  border-radius: var(--pc-radius-card);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--pc-action-primary-soft) 62%, transparent),
+      transparent 48%
+    ),
+    var(--pc-bg-surface);
+  padding: var(--pc-space-2);
+}
+
+.requirement-review-cards.is-compact {
+  padding: var(--pc-space-1);
+}
+
+.requirement-review-heading {
+  display: grid;
+  gap: 3px;
+}
+
+.requirement-review-heading span {
+  color: var(--pc-action-primary);
+  font-size: var(--pc-text-xs);
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.requirement-review-heading strong {
+  font-size: var(--pc-text-base);
+}
+
+.requirement-review-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+  gap: var(--pc-space-1);
+}
+
+.requirement-review-card {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border-left: 3px solid var(--pc-action-primary);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface-2) 72%, var(--pc-bg-surface));
+  padding: 10px 12px;
+}
+
+.requirement-review-card span {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.requirement-review-card strong {
+  overflow-wrap: anywhere;
+  font-size: var(--pc-text-sm);
+}
+
+.requirement-review-card small {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  line-height: 1.4;
+}
+
+.requirement-review-card-compute {
+  border-left-color: var(--brand-orange);
+}
+
+.requirement-review-card-storage,
+.requirement-review-card-database {
+  border-left-color: var(--brand-green);
+}
+
+.requirement-review-card-networking,
+.requirement-review-card-edge {
+  border-left-color: var(--brand-blue);
+}
+
 .form-summary-chip-profile,
 .form-section-profile .form-section-icon {
   border-color: var(--pc-info);
