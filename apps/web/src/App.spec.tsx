@@ -371,6 +371,7 @@ describe('App', () => {
     expect(detailGate.dataset.open).toBe('true');
     expect(text(container)).toContain('Engineering cost controls');
     expect(text(container)).toContain('Engineering service spend');
+    expect(text(container)).toContain('Backend commitment exposure');
     expect(text(container)).toContain('Service driver split');
     expect(text(container)).toContain('EC2');
     expect(text(container)).toContain('VM');
@@ -2329,7 +2330,26 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       providerDeltaAnalysis: [],
       sensitivityScenarios: [],
       commitmentRoiTimelines: [],
-      commitmentCoverage: [],
+      commitmentCoverage: [
+        {
+          providerId: 'gcp' as const,
+          eligibleMonthlyUsd: 30,
+          coveredPercentOfSpend: 100,
+          onDemandExposureMonthlyUsd: 0,
+          zeroCommitmentMonthlyUsd: 30,
+          targetCoveragePercent: 70,
+          targetBlendMonthlyUsd: 24,
+          fullyCommittedMonthlyUsd: 21,
+          ineligibleMonthlyUsd: 0,
+          targetOnDemandExposureMonthlyUsd: 9,
+          exposedPercentOfSpend: 30,
+          targetSavingsMonthlyUsd: 6,
+          remainingOpportunityMonthlyUsd: 3,
+          maxMonthlySavingsUsd: 9,
+          recommendation:
+            'gcp can move from $30/mo at 0% commitment coverage to $21/mo at 100%; target blend is $24/mo.',
+        },
+      ],
       tcoSignals: [],
       finOpsFindings: [],
     })),

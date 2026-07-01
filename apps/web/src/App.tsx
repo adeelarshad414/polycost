@@ -2251,7 +2251,11 @@ function StateDetailContent({
         />
         <EngineeringAnalyticsDashboard comparison={comparison} interval={interval} />
         <ServiceCheapestMatrix comparison={comparison} interval={interval} />
-        <ProductionDepthAnalytics comparison={comparison} form={form} />
+        <ProductionDepthAnalytics
+          comparison={comparison}
+          form={form}
+          serverAnalytics={comparisonAnalytics}
+        />
         <FullCostMatrixTable comparison={comparison} />
         <CostFormulaEvidence comparison={comparison} />
         <ComparisonToolbar interval={interval} onIntervalChange={onIntervalChange} />
@@ -6308,9 +6312,11 @@ function ServiceCheapestMatrix({
 function ProductionDepthAnalytics({
   comparison,
   form,
+  serverAnalytics,
 }: {
   comparison: ComparisonResult | null;
   form: WorkloadFormState;
+  serverAnalytics?: ComparisonAnalyticsResponse | null;
 }) {
   const insights = productionDepthInsights(comparison, form);
   const providerDeltas = providerDeltaRows(comparison);
@@ -6360,6 +6366,7 @@ function ProductionDepthAnalytics({
       <ProviderDeltaAnalysisTable rows={providerDeltas} />
       <ComputeSpecificationPanel rows={computeSpecifications} />
       <RegionVariancePanel rows={regionVariance} />
+      <ServerCommitmentExposurePanel rows={serverAnalytics?.commitmentCoverage ?? []} />
       <CommitmentCoverageGapPanel rows={commitmentCoverage} />
       <CrossProviderTcoPanel rows={tcoSignals} />
       <StorageOptimizationPanel rows={storageOptimizations} />
@@ -6590,6 +6597,73 @@ function RegionVariancePanel({ rows }: { rows: RegionVarianceRow[] }) {
           Region variance is unavailable until a comparison is run for at least one provider.
         </div>
       )}
+    </div>
+  );
+}
+
+function ServerCommitmentExposurePanel({
+  rows,
+}: {
+  rows: ComparisonAnalyticsResponse['commitmentCoverage'];
+}) {
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="commitment-coverage-panel" aria-label="Backend commitment exposure">
+      <div className="scenario-sensitivity-heading">
+        <div>
+          <span>Backend commitment exposure</span>
+          <h4>0% covered vs target blend vs 100% committed</h4>
+        </div>
+      </div>
+      <div className="table-wrap commitment-coverage-wrap">
+        <table className="ranking-table commitment-coverage-table">
+          <thead>
+            <tr>
+              <th scope="col">Provider</th>
+              <th scope="col">0% covered</th>
+              <th scope="col">Target blend</th>
+              <th scope="col">100% covered</th>
+              <th scope="col">Exposure</th>
+              <th scope="col">Backend recommendation</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.providerId}>
+                <td>
+                  <span className={`scenario-low-label scenario-low-${row.providerId}`}>
+                    {providerLabel(row.providerId)}
+                  </span>
+                  <small>{formatCurrency(row.eligibleMonthlyUsd)}/mo eligible</small>
+                </td>
+                <td>
+                  <strong>{formatCurrency(row.zeroCommitmentMonthlyUsd)}</strong>
+                  <small>All on-demand</small>
+                </td>
+                <td>
+                  <strong>{formatCurrency(row.targetBlendMonthlyUsd)}</strong>
+                  <small>{formatPercent(row.targetCoveragePercent)} target coverage</small>
+                </td>
+                <td>
+                  <strong>{formatCurrency(row.fullyCommittedMonthlyUsd)}</strong>
+                  <small>{formatCurrency(row.maxMonthlySavingsUsd)}/mo max savings</small>
+                </td>
+                <td>
+                  <strong>{formatCurrency(row.targetOnDemandExposureMonthlyUsd)}/mo</strong>
+                  <small>{formatPercent(row.exposedPercentOfSpend)} exposed</small>
+                </td>
+                <td>
+                  <strong>{formatCurrency(row.remainingOpportunityMonthlyUsd)}/mo open</strong>
+                  <small>{row.recommendation}</small>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

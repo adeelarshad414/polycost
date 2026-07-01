@@ -322,13 +322,24 @@ describe('ComparisonAnalyticsService', () => {
     );
     expect(analytics.commitmentCoverage).toEqual(
       expect.arrayContaining([
-        {
+        expect.objectContaining({
           providerId: 'aws',
           eligibleMonthlyUsd: 400,
           coveredPercentOfSpend: 40,
           onDemandExposureMonthlyUsd: 600,
+          zeroCommitmentMonthlyUsd: 1000,
+          targetCoveragePercent: 80,
+          targetBlendMonthlyUsd: 920,
+          fullyCommittedMonthlyUsd: 900,
+          ineligibleMonthlyUsd: 600,
+          targetOnDemandExposureMonthlyUsd: 680,
+          exposedPercentOfSpend: 68,
+          targetSavingsMonthlyUsd: 80,
+          remainingOpportunityMonthlyUsd: 20,
           maxMonthlySavingsUsd: 100,
-        },
+          recommendation:
+            'aws can move from $1,000/mo at 0% commitment coverage to $900/mo at 100%; target blend is $920/mo.',
+        }),
       ]),
     );
     expect(analytics.tcoSignals).toEqual(

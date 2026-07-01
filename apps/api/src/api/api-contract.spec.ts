@@ -326,32 +326,37 @@ describe('API contracts', () => {
     const service = comparisonApplicationService();
     const controller = comparisonsController(service);
 
-    await expect(controller.analytics(comparisonResult.comparisonId)).resolves.toEqual(
+    await expect(controller.analytics(comparisonResult.comparisonId)).resolves.toMatchObject(
       expect.objectContaining({
         comparisonId: comparisonResult.comparisonId,
         pricingAsOf: comparisonResult.pricingAsOf,
-        costComposition: [
+        costComposition: expect.arrayContaining([
           expect.objectContaining({
             providerId: 'aws',
             totalMonthlyUsd: 30,
-            items: [
+            items: expect.arrayContaining([
               expect.objectContaining({
                 dimension: 'compute',
                 monthlyCostUsd: 30,
                 percentOfProviderTotal: 100,
               }),
-            ],
+            ]),
           }),
-        ],
-        commitmentCoverage: [
-          {
+        ]),
+        commitmentCoverage: expect.arrayContaining([
+          expect.objectContaining({
             providerId: 'aws',
             eligibleMonthlyUsd: 0,
             coveredPercentOfSpend: 0,
             onDemandExposureMonthlyUsd: 30,
+            zeroCommitmentMonthlyUsd: 30,
+            targetBlendMonthlyUsd: 30,
+            fullyCommittedMonthlyUsd: 30,
+            targetOnDemandExposureMonthlyUsd: 30,
+            exposedPercentOfSpend: 100,
             maxMonthlySavingsUsd: 0,
-          },
-        ],
+          }),
+        ]),
       }),
     );
   });

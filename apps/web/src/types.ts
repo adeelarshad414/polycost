@@ -414,7 +414,17 @@ export interface CommitmentCoverageRow {
   eligibleMonthlyUsd: number;
   coveredPercentOfSpend: number;
   onDemandExposureMonthlyUsd: number;
+  zeroCommitmentMonthlyUsd: number;
+  targetCoveragePercent: number;
+  targetBlendMonthlyUsd: number;
+  fullyCommittedMonthlyUsd: number;
+  ineligibleMonthlyUsd: number;
+  targetOnDemandExposureMonthlyUsd: number;
+  exposedPercentOfSpend: number;
+  targetSavingsMonthlyUsd: number;
+  remainingOpportunityMonthlyUsd: number;
   maxMonthlySavingsUsd: number;
+  recommendation: string;
 }
 
 export interface TcoSignal {

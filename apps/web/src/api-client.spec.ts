@@ -117,7 +117,26 @@ describe('api client', () => {
       providerDeltaAnalysis: [],
       sensitivityScenarios: [],
       commitmentRoiTimelines: [],
-      commitmentCoverage: [],
+      commitmentCoverage: [
+        {
+          providerId: 'aws',
+          eligibleMonthlyUsd: 80,
+          coveredPercentOfSpend: 80,
+          onDemandExposureMonthlyUsd: 20,
+          zeroCommitmentMonthlyUsd: 100,
+          targetCoveragePercent: 70,
+          targetBlendMonthlyUsd: 86,
+          fullyCommittedMonthlyUsd: 80,
+          ineligibleMonthlyUsd: 20,
+          targetOnDemandExposureMonthlyUsd: 44,
+          exposedPercentOfSpend: 44,
+          targetSavingsMonthlyUsd: 14,
+          remainingOpportunityMonthlyUsd: 6,
+          maxMonthlySavingsUsd: 20,
+          recommendation:
+            'aws can move from $100/mo at 0% commitment coverage to $80/mo at 100%; target blend is $86/mo.',
+        },
+      ],
       tcoSignals: [],
       finOpsFindings: [],
     };

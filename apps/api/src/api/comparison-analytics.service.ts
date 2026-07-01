@@ -85,7 +85,17 @@ export interface CommitmentCoverageRow {
   eligibleMonthlyUsd: number;
   coveredPercentOfSpend: number;
   onDemandExposureMonthlyUsd: number;
+  zeroCommitmentMonthlyUsd: number;
+  targetCoveragePercent: number;
+  targetBlendMonthlyUsd: number;
+  fullyCommittedMonthlyUsd: number;
+  ineligibleMonthlyUsd: number;
+  targetOnDemandExposureMonthlyUsd: number;
+  exposedPercentOfSpend: number;
+  targetSavingsMonthlyUsd: number;
+  remainingOpportunityMonthlyUsd: number;
   maxMonthlySavingsUsd: number;
+  recommendation: string;
 }
 
 export interface TcoSignal {
@@ -235,7 +245,7 @@ export class ComparisonAnalyticsService {
       providerDeltaAnalysis: providerDeltaAnalysis(providerDimensionAmounts),
       sensitivityScenarios: sensitivityScenarios(providerDimensionAmounts),
       commitmentRoiTimelines: commitmentRoiTimelines(result.providers),
-      commitmentCoverage: commitmentCoverage(result.providers),
+      commitmentCoverage: commitmentCoverage(result),
       tcoSignals: tcoSignals(providerDimensionAmounts),
       finOpsFindings: finOpsFindings(result, providerDimensionAmounts),
     };
@@ -435,8 +445,17 @@ function commitmentRoiTimelines(providers: ComparisonProviderResult[]): Commitme
   });
 }
 
-function commitmentCoverage(providers: ComparisonProviderResult[]): CommitmentCoverageRow[] {
-  return providers.map((provider) => {
+function commitmentCoverage(result: ComparisonResult): CommitmentCoverageRow[] {
+  const targetCoveragePercent = clampPercent(
+    result.requirements?.workloadProfile?.commitmentPreferencePercent ?? 0,
+  );
+  const targetCoverageRate = targetCoveragePercent / 100;
+
+  return result.providers.map((provider) => {
+    const zeroCommitmentMonthlyUsd = roundCurrency(
+      provider.pricingModels?.find((model) => model.model === 'on-demand' && model.available)
+        ?.monthlyCostUsd ?? provider.totals.monthly,
+    );
     const eligibleMonthlyUsd = roundCurrency(
       provider.lineItems
         .filter((lineItem) =>
@@ -453,6 +472,26 @@ function commitmentCoverage(providers: ComparisonProviderResult[]): CommitmentCo
     const maxMonthlySavingsUsd = roundCurrency(
       provider.lineItems.reduce((sum, lineItem) => sum + lineItemCommitmentSavings(lineItem), 0),
     );
+    const ineligibleMonthlyUsd = roundCurrency(
+      Math.max(0, zeroCommitmentMonthlyUsd - eligibleMonthlyUsd),
+    );
+    const fullyCommittedMonthlyUsd = roundCurrency(
+      Math.max(0, zeroCommitmentMonthlyUsd - maxMonthlySavingsUsd),
+    );
+    const targetSavingsMonthlyUsd = roundCurrency(maxMonthlySavingsUsd * targetCoverageRate);
+    const targetBlendMonthlyUsd = roundCurrency(
+      Math.max(0, zeroCommitmentMonthlyUsd - targetSavingsMonthlyUsd),
+    );
+    const remainingOpportunityMonthlyUsd = roundCurrency(
+      Math.max(0, maxMonthlySavingsUsd - targetSavingsMonthlyUsd),
+    );
+    const targetOnDemandExposureMonthlyUsd = roundCurrency(
+      ineligibleMonthlyUsd + eligibleMonthlyUsd * (1 - targetCoverageRate),
+    );
+    const exposedPercentOfSpend = percent(
+      targetOnDemandExposureMonthlyUsd,
+      zeroCommitmentMonthlyUsd,
+    );
 
     return {
       providerId: provider.providerId,
@@ -461,7 +500,24 @@ function commitmentCoverage(providers: ComparisonProviderResult[]): CommitmentCo
       onDemandExposureMonthlyUsd: roundCurrency(
         Math.max(0, provider.totals.monthly - eligibleMonthlyUsd),
       ),
+      zeroCommitmentMonthlyUsd,
+      targetCoveragePercent,
+      targetBlendMonthlyUsd,
+      fullyCommittedMonthlyUsd,
+      ineligibleMonthlyUsd,
+      targetOnDemandExposureMonthlyUsd,
+      exposedPercentOfSpend,
+      targetSavingsMonthlyUsd,
+      remainingOpportunityMonthlyUsd,
       maxMonthlySavingsUsd,
+      recommendation:
+        maxMonthlySavingsUsd > 0
+          ? `${provider.providerId} can move from $${formatNumber(
+              zeroCommitmentMonthlyUsd,
+            )}/mo at 0% commitment coverage to $${formatNumber(
+              fullyCommittedMonthlyUsd,
+            )}/mo at 100%; target blend is $${formatNumber(targetBlendMonthlyUsd)}/mo.`
+          : `${provider.providerId} has no modeled commitment discount for the current service mix.`,
     };
   });
 }
@@ -605,7 +661,7 @@ function finOpsFindings(
   const commitmentPreference =
     result.requirements?.workloadProfile?.commitmentPreferencePercent ?? 0;
   if (commitmentPreference >= 65) {
-    for (const coverage of commitmentCoverage(result.providers)) {
+    for (const coverage of commitmentCoverage(result)) {
       if (coverage.coveredPercentOfSpend < 60 && coverage.maxMonthlySavingsUsd > 0) {
         findings.push({
           id: `${coverage.providerId}-commitment-gap`,
@@ -726,6 +782,10 @@ function percent(numerator: number, denominator: number): number {
   }
 
   return roundCurrency((numerator / denominator) * 100);
+}
+
+function clampPercent(value: number): number {
+  return Math.min(100, Math.max(0, value));
 }
 
 function roundCurrency(value: number): number {
