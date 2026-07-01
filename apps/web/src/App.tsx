@@ -5503,7 +5503,7 @@ function ExecutiveAnalyticsPreview({
 
       <ExecutivePricingModelBars comparison={comparison} />
 
-      <ExecutiveBreakEvenTimeline comparison={comparison} />
+      <ExecutiveBreakEvenTimeline analytics={serverAnalytics} comparison={comparison} />
 
       <div className="executive-stat-grid" aria-label="Executive compact stats">
         <ExecutiveStatTile
@@ -5764,8 +5764,14 @@ function ExecutivePricingModelBars({ comparison }: { comparison: ComparisonResul
   );
 }
 
-function ExecutiveBreakEvenTimeline({ comparison }: { comparison: ComparisonResult | null }) {
-  const timeline = breakEvenTimelineModel(comparison);
+function ExecutiveBreakEvenTimeline({
+  analytics,
+  comparison,
+}: {
+  analytics?: ComparisonAnalyticsResponse | null;
+  comparison: ComparisonResult | null;
+}) {
+  const timeline = breakEvenTimelineModel(comparison, analytics?.commitmentRoiTimelines);
 
   return (
     <article className="executive-break-even-card">
@@ -5888,7 +5894,17 @@ interface BreakEvenTimelineModel {
 
 function breakEvenTimelineModel(
   comparison: ComparisonResult | null,
+  serverTimelines?: ComparisonAnalyticsResponse['commitmentRoiTimelines'],
 ): BreakEvenTimelineModel | null {
+  const serverTimeline = serverBreakEvenTimelineModel(
+    serverTimelines,
+    comparison?.cheapestProviderId,
+  );
+
+  if (serverTimeline) {
+    return serverTimeline;
+  }
+
   const candidates =
     comparison?.providers
       .map((provider) => {
@@ -5965,6 +5981,75 @@ function breakEvenTimelineModel(
     breakEvenPoint:
       breakEvenMonth > 0 && breakEvenMonth <= horizonMonths
         ? pointFor(breakEvenMonth, onDemandMonthly * breakEvenMonth)
+        : undefined,
+  };
+}
+
+function serverBreakEvenTimelineModel(
+  timelines: ComparisonAnalyticsResponse['commitmentRoiTimelines'] | undefined,
+  preferredProviderId: ProviderId | undefined,
+): BreakEvenTimelineModel | null {
+  const selected = [...(timelines ?? [])]
+    .filter((timeline) => timeline.monthlySavingsUsd > 0 && timeline.points.length > 0)
+    .sort((left, right) => {
+      const preferredDelta =
+        Number(right.providerId === preferredProviderId) -
+        Number(left.providerId === preferredProviderId);
+
+      return (
+        preferredDelta ||
+        right.monthlySavingsUsd - left.monthlySavingsUsd ||
+        left.committedMonthlyUsd - right.committedMonthlyUsd
+      );
+    })[0];
+
+  if (!selected) {
+    return null;
+  }
+
+  const horizonMonths = Math.max(
+    12,
+    selected.breakEvenMonth ?? 0,
+    ...selected.points.map((point) => point.month),
+  );
+  const points = [
+    {
+      month: 0,
+      onDemandCumulativeUsd: 0,
+      committedCumulativeUsd: selected.upfrontCostUsd,
+    },
+    ...selected.points,
+  ];
+  const yMax = roundCurrency(
+    Math.max(
+      ...points.flatMap((point) => [point.onDemandCumulativeUsd, point.committedCumulativeUsd]),
+    ) * 1.08,
+  );
+  const pointFor = (month: number, cost: number) => chartPoint(month, cost, horizonMonths, yMax);
+  const breakEvenMonth = selected.breakEvenMonth ?? 0;
+
+  return {
+    providerId: selected.providerId,
+    providerLabel: providerLabel(selected.providerId),
+    pricingLabel: selected.label,
+    horizonMonths,
+    breakEvenMonth,
+    yMax,
+    onDemandMonthly: selected.baselineMonthlyUsd,
+    committedMonthly: selected.committedMonthlyUsd,
+    monthlySavings: selected.monthlySavingsUsd,
+    upfront: selected.upfrontCostUsd,
+    onDemandPoints: points
+      .map((point) => pointFor(point.month, point.onDemandCumulativeUsd))
+      .map((point) => `${point.x},${point.y}`)
+      .join(' '),
+    committedPoints: points
+      .map((point) => pointFor(point.month, point.committedCumulativeUsd))
+      .map((point) => `${point.x},${point.y}`)
+      .join(' '),
+    breakEvenPoint:
+      breakEvenMonth > 0 && breakEvenMonth <= horizonMonths
+        ? pointFor(breakEvenMonth, selected.baselineMonthlyUsd * breakEvenMonth)
         : undefined,
   };
 }

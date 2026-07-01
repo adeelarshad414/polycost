@@ -116,7 +116,7 @@ describe('App', () => {
     expect(text(container)).toContain('Pricing model comparison');
     expect(text(container)).toContain('On-demand vs commitments');
     expect(text(container)).toContain('Break-even timeline');
-    expect(text(container)).toContain('Commitment data pending');
+    expect(text(container)).toContain('Backend committed use');
     expect(container.querySelectorAll('.executive-provider-card')).toHaveLength(3);
     expect(container.querySelector('.executive-pricing-bars')).toBeInstanceOf(HTMLElement);
     expect(container.querySelector('.executive-break-even-card')).toBeInstanceOf(HTMLElement);
@@ -2430,7 +2430,38 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
           deltaMonthlyUsd: 5,
         },
       ],
-      commitmentRoiTimelines: [],
+      commitmentRoiTimelines: [
+        {
+          providerId: 'gcp' as const,
+          pricingModel: 'savings-plan' as const,
+          label: 'Backend committed use',
+          baselineMonthlyUsd: 30,
+          committedMonthlyUsd: 24,
+          upfrontCostUsd: 12,
+          monthlySavingsUsd: 6,
+          breakEvenMonth: 2,
+          points: [
+            {
+              month: 1,
+              onDemandCumulativeUsd: 30,
+              committedCumulativeUsd: 36,
+              savingsUsd: -6,
+            },
+            {
+              month: 6,
+              onDemandCumulativeUsd: 180,
+              committedCumulativeUsd: 156,
+              savingsUsd: 24,
+            },
+            {
+              month: 12,
+              onDemandCumulativeUsd: 360,
+              committedCumulativeUsd: 300,
+              savingsUsd: 60,
+            },
+          ],
+        },
+      ],
       commitmentCoverage: [
         {
           providerId: 'gcp' as const,
