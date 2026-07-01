@@ -227,7 +227,25 @@ describe('report generators', () => {
     expect(xlsxText).toContain('[Content_Types].xml');
     expect(xlsxText).toContain('xl/workbook.xml');
     expect(xlsxText).toContain('xl/worksheets/sheet1.xml');
+    expect(xlsxText).toContain('xl/worksheets/sheet2.xml');
     expect(xlsxText).toContain('<sheet name="Comparison"');
+    expect(xlsxText).toContain('<sheet name="What If" sheetId="2"');
+    expect(xlsxText).toContain('<calcPr calcMode="auto" fullCalcOnLoad="1"/>');
+    expect(xlsxText).toContain(
+      '<definedName name="WhatIfScaleFactor">&apos;What If&apos;!$B$5</definedName>',
+    );
+    expect(xlsxText).toContain(
+      '<definedName name="WhatIfRegionMultiplier">&apos;What If&apos;!$B$6</definedName>',
+    );
+    expect(xlsxText).toMatch(
+      /<definedName name="ComparisonMonthlyTotals">&apos;Comparison&apos;!\$D\$\d+:\$D\$\d+<\/definedName>/,
+    );
+    expect(xlsxText).toContain(
+      '<definedName name="WhatIfScenarioMonthlyTotals">&apos;What If&apos;!$E$11:$E$11</definedName>',
+    );
+    expect(xlsxText).toContain(
+      '<definedName name="WhatIfMonthlyDeltas">&apos;What If&apos;!$G$11:$G$11</definedName>',
+    );
     expect(xlsxText).toContain('Decision Summary');
     expect(xlsxText).toContain('Cost baseline');
     expect(xlsxText).toContain('Provider Ranking');
@@ -247,8 +265,40 @@ describe('report generators', () => {
     expect(xlsxText).toContain('Rate Math Evidence');
     expect(xlsxText).toContain('Report Assumptions');
     expect(xlsxText).toContain('<v>71</v>');
+    expect(xlsxText).toContain('PolyCost What-If Model');
+    expect(xlsxText).toContain('Editable assumption');
+    expect(xlsxText).toContain('<f>WhatIfScaleFactor</f><v>1.25</v>');
+    expect(xlsxText).toContain('<f>WhatIfRegionMultiplier</f><v>1</v>');
+    expect(xlsxText).toContain('<f>B11*C11*D11</f><v>52.5</v>');
+    expect(xlsxText).toContain('<f>SUM(WhatIfScenarioMonthlyTotals)</f><v>52.5</v>');
+    expect(xlsxText).toContain('<f>SUM(WhatIfMonthlyDeltas)</f><v>10.5</v>');
     expect(xlsxText).toContain('&apos;=cmd(1)\\risky compute');
     expect(xlsxText).toContain('&apos;+pricing temporarily unavailable');
+  });
+
+  it('keeps the XLSX what-if sheet valid when no provider supports the selected scenario', () => {
+    const xlsx = new ExcelReportGenerator().generate(
+      {
+        ...comparison,
+        providers: comparison.providers.map((provider) => ({
+          ...provider,
+          pricingModels: undefined,
+        })),
+      },
+      {
+        pricingModel: 'savings-plan',
+      },
+    );
+    const xlsxText = xlsx.toString('utf8');
+
+    expect(xlsxText).toContain('PolyCost What-If Model');
+    expect(xlsxText).toContain('No provider has an eligible selected pricing model');
+    expect(xlsxText).toContain('<f>0</f><v>0</v>');
+    expect(xlsxText).not.toContain('WhatIfScenarioMonthlyTotals');
+    expect(xlsxText).not.toContain('WhatIfMonthlyDeltas');
+    expect(xlsxText).toContain(
+      '<definedName name="WhatIfScaleFactor">&apos;What If&apos;!$B$5</definedName>',
+    );
   });
 
   it('creates a PDF report with matching totals and escaped interpolated text', () => {

@@ -926,6 +926,10 @@ controls.
   scale fields, calls the cached comparison endpoint directly, and displays the
   before/after monthly and annualized delta without invoking natural-language
   parsing again.
+- Excel what-if workbook: XLSX exports now include a second `What If` worksheet
+  with editable scale and region-multiplier assumptions, workbook-level named
+  ranges, auto-recalculation metadata, and formula-driven scenario monthly/yearly
+  and delta totals.
 - Verification passing locally:
   `npm run check`, `npm run build`, `npm run test:coverage`,
   `npm run test:e2e --workspace @polycost/web`,
@@ -960,9 +964,8 @@ when it is actually resolved in a later phase, with a note on which phase resolv
 - The AI-native reimagining prompt's most aggressive DoD is not fully product-complete
   yet: file upload remains a documented Phase 2 hook, account-level requirement
   persistence is not implemented, PDF chart pages are evidence/report sections rather
-  than server-rendered chart-image pages, Excel does not yet provide named ranges and
-  formula-driven what-if sheets, and reserved/Savings upfront cash charges are shown
-  only when provider catalog evidence publishes them.
+  than server-rendered chart-image pages, and reserved/Savings upfront cash charges
+  are shown only when provider catalog evidence publishes them.
 - The engineering matrix now filters by category/provider/pricing model and sorts by
   every provider/model column, but the backend still needs richer service-level
   pricing-model coverage for every provider/service combination before every cell can
