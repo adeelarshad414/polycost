@@ -32,22 +32,18 @@ psql \
   --dbname "$POSTGRES_DB" \
   --file /polycost-migrations/003_seed_service_equivalence_map.sql
 
-psql \
-  --username "$POSTGRES_USER" \
-  --dbname "$POSTGRES_DB" \
-  --file /polycost-migrations/004_seed_local_pricing_catalog.sql
-
-psql \
-  --username "$POSTGRES_USER" \
-  --dbname "$POSTGRES_DB" \
-  --file /polycost-migrations/005_backend_architecture_tables.sql
-
-psql \
-  --username "$POSTGRES_USER" \
-  --dbname "$POSTGRES_DB" \
-  --file /polycost-migrations/006_cost_management_jobs.sql
-
-psql \
-  --username "$POSTGRES_USER" \
-  --dbname "$POSTGRES_DB" \
-  --file /polycost-migrations/007_pricing_etl_run_counters.sql
+for migration in \
+  004_seed_local_pricing_catalog.sql \
+  005_backend_architecture_tables.sql \
+  006_cost_management_jobs.sql \
+  007_pricing_etl_run_counters.sql \
+  008_pricing_model_terms.sql \
+  009_pricing_rates_matrix.sql \
+  010_share_link_context.sql \
+  011_seed_local_commitment_pricing_catalog.sql
+do
+  psql \
+    --username "$POSTGRES_USER" \
+    --dbname "$POSTGRES_DB" \
+    --file "/polycost-migrations/$migration"
+done

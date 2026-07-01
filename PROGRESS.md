@@ -942,6 +942,10 @@ controls.
   Markdown, JSON, and YAML requirement files client-side, loads the content into
   the same natural-language parser/review/edit flow, and explicitly keeps CSV,
   Excel, and DrawIO structured import behind the documented Phase 2 parser hook.
+- Fresh-stack pricing-model seed hardening: Postgres bootstrap now runs migrations
+  008-011, `db:validate` enforces them, and migration 011 adds local seed reserved
+  1-year / 3-year compute rows for all three providers and seeded compute sizes so
+  clean self-hosted demos show commitment scenario cells without live provider calls.
 - Focused verification passing locally:
   `npm run typecheck --workspace @polycost/web` and
   `npm run test:unit --workspace @polycost/web -- --runTestsByPath src/App.spec.tsx`.
@@ -983,9 +987,9 @@ when it is actually resolved in a later phase, with a note on which phase resolv
   of this Phase 1 codebase. Session-level requirement persistence is implemented for
   what-if reruns and pricing-model switches.
 - The engineering matrix now filters by category/provider/pricing model and sorts by
-  every provider/model column, but the backend still needs richer service-level
-  pricing-model coverage for every provider/service combination before every cell can
-  be populated beyond on-demand.
+  every provider/model column. Fresh local seed data now includes reserved compute
+  scenarios; non-compute commitment cells still render `N/A` where that pricing model
+  is not applicable or not available from provider/catalog data.
 
 ## Deviations from spec log
 

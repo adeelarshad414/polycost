@@ -5,6 +5,19 @@ import path from 'node:path';
 
 const command = process.argv[2] ?? 'validate';
 const root = process.cwd();
+const expectedMigrations = [
+  '001_core_schema.sql',
+  '002_least_privilege_roles.sql',
+  '003_seed_service_equivalence_map.sql',
+  '004_seed_local_pricing_catalog.sql',
+  '005_backend_architecture_tables.sql',
+  '006_cost_management_jobs.sql',
+  '007_pricing_etl_run_counters.sql',
+  '008_pricing_model_terms.sql',
+  '009_pricing_rates_matrix.sql',
+  '010_share_link_context.sql',
+  '011_seed_local_commitment_pricing_catalog.sql',
+];
 
 if (!['migrate', 'seed', 'reset', 'validate'].includes(command)) {
   console.error(`Unknown db command: ${command}`);
@@ -32,15 +45,7 @@ async function validateMigrations() {
     fail('Missing database/migrations directory.');
   }
 
-  for (const migration of [
-    '001_core_schema.sql',
-    '002_least_privilege_roles.sql',
-    '003_seed_service_equivalence_map.sql',
-    '004_seed_local_pricing_catalog.sql',
-    '005_backend_architecture_tables.sql',
-    '006_cost_management_jobs.sql',
-    '007_pricing_etl_run_counters.sql',
-  ]) {
+  for (const migration of expectedMigrations) {
     const migrationPath = path.join(migrationsDir, migration);
     if (!existsSync(migrationPath)) {
       fail(`Missing migration: ${migration}`);
@@ -88,15 +93,11 @@ async function validateMigrations() {
     fail(`Live schema_migrations check failed:\n${result.stderr || result.stdout}`);
   }
 
-  if (
-    !result.stdout.includes('001') ||
-    !result.stdout.includes('002') ||
-    !result.stdout.includes('003') ||
-    !result.stdout.includes('004') ||
-    !result.stdout.includes('005') ||
-    !result.stdout.includes('006') ||
-    !result.stdout.includes('007')
-  ) {
+  const missingVersions = expectedMigrations
+    .map((migration) => migration.slice(0, 3))
+    .filter((version) => !result.stdout.includes(version));
+
+  if (missingVersions.length > 0) {
     fail(`Live schema_migrations output is missing expected versions:\n${result.stdout}`);
   }
 }

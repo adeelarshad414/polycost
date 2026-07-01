@@ -41,6 +41,9 @@ downstream comparison pipeline without redesigning the API.
 
 - Provider pricing APIs are never called per user comparison. Scheduled ETL writes
   cached pricing data; user requests read the cache.
+- Fresh self-hosted demo stacks seed on-demand and reserved 1-year / 3-year compute
+  pricing rows for the baseline compute sizes. Real ETL rows sort ahead of local
+  seed rows, so provider data replaces seed estimates without API behavior changes.
 - Spot pricing is an estimate range only and must stay clearly labeled as
   interruptible, volatile, and not a precise committed total.
 - Reports and dashboards should present the same evidence: normalized
