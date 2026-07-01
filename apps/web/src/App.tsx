@@ -5499,7 +5499,7 @@ function ExecutiveAnalyticsPreview({
         <ProviderMixDonut data={analytics.providerMix} />
       </article>
 
-      <ExecutiveCostWaterfall comparison={comparison} />
+      <ExecutiveCostWaterfall analytics={serverAnalytics} comparison={comparison} />
 
       <ExecutivePricingModelBars comparison={comparison} />
 
@@ -6053,11 +6053,20 @@ function ProviderMixDonut({ data }: { data: ProviderMixDatum[] }) {
   );
 }
 
-function ExecutiveCostWaterfall({ comparison }: { comparison: ComparisonResult | null }) {
+function ExecutiveCostWaterfall({
+  analytics,
+  comparison,
+}: {
+  analytics?: ComparisonAnalyticsResponse | null;
+  comparison: ComparisonResult | null;
+}) {
   const provider = comparison?.providers.find(
     (candidate) => candidate.providerId === comparison.cheapestProviderId,
   );
-  const steps = costWaterfallSteps(provider);
+  const serverComposition = analytics?.costComposition.find(
+    (composition) => composition.providerId === provider?.providerId,
+  );
+  const steps = costWaterfallSteps(provider, serverComposition);
   const total = provider?.totals.monthly ?? 0;
 
   return (
@@ -6097,9 +6106,35 @@ function costWaterfallSteps(provider?: ComparisonProviderResult): Array<{
   label: string;
   value: number;
   percent: number;
+}>;
+function costWaterfallSteps(
+  provider: ComparisonProviderResult | undefined,
+  serverComposition: ComparisonAnalyticsResponse['costComposition'][number] | undefined,
+): Array<{
+  label: string;
+  value: number;
+  percent: number;
+}>;
+function costWaterfallSteps(
+  provider?: ComparisonProviderResult,
+  serverComposition?: ComparisonAnalyticsResponse['costComposition'][number],
+): Array<{
+  label: string;
+  value: number;
+  percent: number;
 }> {
   if (!provider || provider.totals.monthly <= 0) {
     return [];
+  }
+
+  if (serverComposition && serverComposition.items.length > 0) {
+    return serverComposition.items
+      .filter((item) => item.monthlyCostUsd > 0.005)
+      .map((item) => ({
+        label: item.label,
+        value: roundCurrency(item.monthlyCostUsd),
+        percent: Math.max(4, Math.min(100, item.percentOfProviderTotal)),
+      }));
   }
 
   const breakdown = provider.breakdown;

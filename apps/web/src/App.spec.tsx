@@ -112,7 +112,7 @@ describe('App', () => {
     expect(text(container)).toContain('Executive monthly baseline');
     expect(text(container)).toContain('Provider mix');
     expect(text(container)).toContain('Cost composition waterfall');
-    expect(text(container)).toContain('Compute base');
+    expect(text(container)).toContain('Backend compute base');
     expect(text(container)).toContain('Pricing model comparison');
     expect(text(container)).toContain('On-demand vs commitments');
     expect(text(container)).toContain('Break-even timeline');
@@ -2335,7 +2335,22 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
           reviewCue: 'Validate family.',
         },
       ],
-      costComposition: [],
+      costComposition: [
+        {
+          providerId: 'gcp' as const,
+          totalMonthlyUsd: 30,
+          items: [
+            {
+              dimension: 'compute' as const,
+              label: 'Backend compute base',
+              monthlyCostUsd: 30,
+              percentOfProviderTotal: 100,
+              runningMonthlyUsd: 30,
+              topDriver: 'gcp compute',
+            },
+          ],
+        },
+      ],
       providerDeltaAnalysis: [],
       regionVarianceHeatMap: [
         {
