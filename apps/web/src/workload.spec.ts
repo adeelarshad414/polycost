@@ -118,6 +118,45 @@ describe('workload helpers', () => {
     }
   });
 
+  it('maps bulk service rows into service requirements with row-level quantities', () => {
+    const nws = buildNwsFromForm({
+      ...defaultWorkloadForm,
+      selectedServiceFamilyIds: [],
+      storageEnabled: false,
+      databaseEnabled: false,
+      cdn: false,
+      loadBalancer: false,
+      bulkServiceRows: [
+        {
+          id: 'bulk-1',
+          serviceFamilyId: 'container-orchestration',
+          quantity: '3',
+          tier: 'production',
+          note: 'shared platform cluster',
+        },
+      ],
+    });
+
+    expect(nws.sourceTraceability).toContainEqual({
+      nwsPath: 'metadata.serviceCatalog',
+      sourceRef: 'serviceCatalog:container-orchestration',
+    });
+    expect(nws.serviceRequirements).toContainEqual(
+      expect.objectContaining({
+        serviceCategory: 'containers',
+        serviceType: 'container-orchestration',
+        quantity: 3,
+        tier: 'production',
+        scaleParams: expect.objectContaining({
+          bulkImport: true,
+          bulkQuantity: 3,
+          bulkTier: 'production',
+          bulkNote: 'shared platform cluster',
+        }),
+      }),
+    );
+  });
+
   it('maps an NWS back into editable form values', () => {
     const nws = buildNwsFromForm(defaultWorkloadForm, 'natural_language', 'web app');
     const form = formFromNws(nws);

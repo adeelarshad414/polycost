@@ -57,12 +57,21 @@ export interface WorkloadFormState {
   selectedServiceCategory: string;
   selectedServiceFamilyId: string;
   instanceTier: string;
+  bulkServiceRows: BulkServiceRow[];
   availabilityZoneCount: string;
   selectedServiceFamilyIds: string[];
   multiAz: boolean;
   multiRegion: boolean;
   slaTarget: string;
   faultTolerance: 'single-zone' | 'multi-az' | 'multi-region' | 'active-active';
+}
+
+export interface BulkServiceRow {
+  id: string;
+  serviceFamilyId: string;
+  quantity: string;
+  tier: string;
+  note: string;
 }
 
 export interface WorkloadFormIssue {
@@ -139,6 +148,7 @@ export const defaultWorkloadForm: WorkloadFormState = {
   selectedServiceCategory: 'compute',
   selectedServiceFamilyId: 'vm-compute',
   instanceTier: 'balanced',
+  bulkServiceRows: [],
   availabilityZoneCount: '2',
   selectedServiceFamilyIds: DEFAULT_SELECTED_SERVICE_FAMILY_IDS,
   multiAz: true,
@@ -523,6 +533,20 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
     );
   }
 
+  for (const row of form.bulkServiceRows) {
+    const serviceExists = CLOUD_SERVICE_CATALOG.some((family) => family.id === row.serviceFamilyId);
+    const quantity = parseOptionalNumber(row.quantity);
+
+    if (!serviceExists || quantity === undefined || quantity <= 0 || !Number.isInteger(quantity)) {
+      issues.push({
+        field: 'bulkServiceRows',
+        message:
+          'Bulk service rows must match a supported cloud service and use whole-number quantities above 0.',
+      });
+      break;
+    }
+  }
+
   return issues;
 }
 
@@ -627,7 +651,7 @@ export function buildNwsFromForm(
       ...optionalTagList('tags', form.tags),
     },
     serviceRequirements: serviceRequirementsFromForm(form),
-    sourceTraceability: serviceCatalogTraceability(form.selectedServiceFamilyIds),
+    sourceTraceability: serviceCatalogTraceability(traceableServiceFamilyIds(form)),
   };
 }
 
@@ -725,19 +749,21 @@ export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceReq
   const availabilityZones = form.multiAz
     ? `${Math.max(2, parseNonNegativeInteger(form.availabilityZoneCount, 2))} zones`
     : 'single-zone';
+  const bulkRows = bulkServiceRowsByFamily(form.bulkServiceRows);
 
   return selectedIds.map((serviceType) => {
     const family = CLOUD_SERVICE_CATALOG.find((candidate) => candidate.id === serviceType);
     const serviceCategory = serviceCategoryForFamily(serviceType);
+    const bulkRow = bulkRows.get(serviceType);
 
     return {
       serviceCategory,
       serviceType,
       instanceType: instanceTypeForServiceRequirement(serviceType, form),
-      tier: tierForServiceRequirement(serviceType, form),
+      tier: tierForServiceRequirement(serviceType, form, bulkRow),
       ...(region ? { region } : {}),
       az: availabilityZones,
-      quantity: quantityForServiceRequirement(serviceType, form),
+      quantity: quantityForServiceRequirement(serviceType, form, bulkRow),
       scaleParams: {
         categoryLabel:
           SERVICE_CATALOG_CATEGORIES.find((category) => category.id === serviceCategory)?.label ??
@@ -763,6 +789,14 @@ export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceReq
         ),
         usagePattern: form.usagePattern,
         faultTolerance: form.faultTolerance,
+        ...(bulkRow
+          ? {
+              bulkImport: true,
+              bulkQuantity: parsePositiveInteger(bulkRow.quantity, 1),
+              ...(bulkRow.tier.trim() ? { bulkTier: bulkRow.tier.trim() } : {}),
+              ...(bulkRow.note.trim() ? { bulkNote: bulkRow.note.trim() } : {}),
+            }
+          : {}),
         ...(form.scalingType === 'autoscaling'
           ? {
               scalingType: form.scalingType,
@@ -779,6 +813,7 @@ function orderedRequirementIds(form: WorkloadFormState): string[] {
   const ids = new Set([
     form.selectedServiceFamilyId,
     ...form.selectedServiceFamilyIds,
+    ...validBulkServiceRows(form.bulkServiceRows).map((row) => row.serviceFamilyId),
     ...(form.storageEnabled ? [storageServiceFamilyId(form)] : []),
     ...(form.databaseEnabled ? [databaseServiceFamilyId(form)] : []),
     ...(form.cdn ? ['cdn-edge'] : []),
@@ -786,6 +821,23 @@ function orderedRequirementIds(form: WorkloadFormState): string[] {
   ]);
 
   return CLOUD_SERVICE_CATALOG.filter((family) => ids.has(family.id)).map((family) => family.id);
+}
+
+function traceableServiceFamilyIds(form: WorkloadFormState): string[] {
+  return orderedServiceFamilyIds([
+    ...form.selectedServiceFamilyIds,
+    ...validBulkServiceRows(form.bulkServiceRows).map((row) => row.serviceFamilyId),
+  ]);
+}
+
+function validBulkServiceRows(rows: BulkServiceRow[]): BulkServiceRow[] {
+  return rows.filter((row) =>
+    CLOUD_SERVICE_CATALOG.some((family) => family.id === row.serviceFamilyId),
+  );
+}
+
+function bulkServiceRowsByFamily(rows: BulkServiceRow[]): Map<string, BulkServiceRow> {
+  return new Map(validBulkServiceRows(rows).map((row) => [row.serviceFamilyId, row]));
 }
 
 function orderedRequirementFamilyIds(requirements: ServiceRequirement[]): string[] {
@@ -809,7 +861,15 @@ function serviceCategoryForFamily(serviceType: string): ServiceRequirement['serv
     : 'compute';
 }
 
-function quantityForServiceRequirement(serviceType: string, form: WorkloadFormState): number {
+function quantityForServiceRequirement(
+  serviceType: string,
+  form: WorkloadFormState,
+  bulkRow?: BulkServiceRow,
+): number {
+  if (bulkRow) {
+    return parsePositiveInteger(bulkRow.quantity, 1);
+  }
+
   if (serviceType === 'vm-compute' || serviceType === 'autoscaling-compute') {
     return form.scalingType === 'autoscaling'
       ? Math.max(1, parseNonNegativeInteger(form.autoscaleMin, 1))
@@ -841,7 +901,12 @@ function instanceTypeForServiceRequirement(
 function tierForServiceRequirement(
   serviceType: string,
   form: WorkloadFormState,
+  bulkRow?: BulkServiceRow,
 ): string | undefined {
+  if (bulkRow?.tier.trim()) {
+    return bulkRow.tier.trim();
+  }
+
   if (serviceType === 'vm-compute' || serviceType === 'autoscaling-compute') {
     return form.instanceTier;
   }
@@ -923,6 +988,11 @@ function optionalNonNegativeInteger<K extends string>(
 function parsePositiveNumber(value: string, fallback: number): number {
   const parsed = parseOptionalNumber(value);
   return parsed && parsed > 0 ? parsed : fallback;
+}
+
+function parsePositiveInteger(value: string, fallback: number): number {
+  const parsed = parseOptionalNumber(value);
+  return parsed && parsed > 0 ? Math.round(parsed) : fallback;
 }
 
 function parseNonNegativeInteger(value: string, fallback: number): number {

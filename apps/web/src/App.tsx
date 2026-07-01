@@ -40,6 +40,7 @@ import {
   ARCHITECTURE_TEMPLATES,
   ArchitectureTemplate,
   buildNwsFromForm,
+  BulkServiceRow,
   defaultWorkloadForm,
   formFromNws,
   sampleNaturalLanguageInput,
@@ -153,6 +154,30 @@ const SERVICE_CATEGORIES: ServiceCategory[] = [
   'licensing',
   'operations',
 ];
+
+const SERVICE_FAMILY_ALIASES: Record<string, string> = {
+  s3: 'object-storage',
+  amazons3: 'object-storage',
+  blob: 'object-storage',
+  azureblob: 'object-storage',
+  gcs: 'object-storage',
+  cloudstorage: 'object-storage',
+  eks: 'container-orchestration',
+  aks: 'container-orchestration',
+  gke: 'container-orchestration',
+  kubernetes: 'container-orchestration',
+  lambda: 'serverless-functions',
+  cloudfunctions: 'serverless-functions',
+  rds: 'relational-database',
+  aurora: 'relational-database',
+  cloudsql: 'relational-database',
+  dynamodb: 'nosql-database',
+  cosmosdb: 'nosql-database',
+  redis: 'cache',
+  cloudfront: 'cdn-edge',
+  cdn: 'cdn-edge',
+  dns: 'dns',
+};
 
 const ENVIRONMENT_OPTIONS: Array<[WorkloadFormState['environment'], string]> = [
   ['production', 'Production'],
@@ -2379,6 +2404,10 @@ function WorkloadForm({
     update('selectedServiceFamilyIds', orderedServiceFamilyIds([...selected]));
   }
 
+  function updateBulkServiceRows(rows: BulkServiceRow[]) {
+    onChange(formWithBulkServiceRows(form, rows));
+  }
+
   function applyTemplate(template: ArchitectureTemplate) {
     onChange(template.form);
   }
@@ -2655,6 +2684,12 @@ function WorkloadForm({
         <ServiceCatalogPicker
           selectedIds={form.selectedServiceFamilyIds}
           onToggle={toggleServiceFamily}
+        />
+        <BulkServiceImporter
+          rows={form.bulkServiceRows}
+          selectedIds={form.selectedServiceFamilyIds}
+          error={fieldErrors.bulkServiceRows}
+          onRowsChange={updateBulkServiceRows}
         />
       </FormSection>
 
@@ -3318,6 +3353,198 @@ function ServiceCatalogPicker({
   );
 }
 
+interface BulkServiceDraftRow {
+  line: string;
+  query: string;
+  quantity: string;
+  tier: string;
+  note: string;
+  family?: CloudServiceFamily;
+  status: 'matched' | 'unmatched';
+}
+
+function BulkServiceImporter({
+  rows,
+  selectedIds,
+  error,
+  onRowsChange,
+}: {
+  rows: BulkServiceRow[];
+  selectedIds: string[];
+  error?: string;
+  onRowsChange: (rows: BulkServiceRow[]) => void;
+}) {
+  const [draft, setDraft] = useState('');
+  const previewRows = parseBulkServiceRows(draft);
+  const matchedRows = previewRows.filter((row) => row.family);
+  const selected = new Set(selectedIds);
+
+  function addMatchedRows() {
+    const nextRowsByFamily = new Map(rows.map((row) => [row.serviceFamilyId, row]));
+
+    for (const row of matchedRows) {
+      if (!row.family) {
+        continue;
+      }
+
+      nextRowsByFamily.set(row.family.id, {
+        id: nextRowsByFamily.get(row.family.id)?.id ?? bulkServiceRowId(),
+        serviceFamilyId: row.family.id,
+        quantity: positiveIntegerInput(row.quantity),
+        tier: row.tier.trim(),
+        note: row.note.trim(),
+      });
+    }
+
+    onRowsChange(orderBulkServiceRows([...nextRowsByFamily.values()]));
+    setDraft('');
+  }
+
+  function updateRow(id: string, patch: Partial<BulkServiceRow>) {
+    onRowsChange(
+      orderBulkServiceRows(rows.map((row) => (row.id === id ? { ...row, ...patch } : row))),
+    );
+  }
+
+  function removeRow(id: string) {
+    onRowsChange(rows.filter((row) => row.id !== id));
+  }
+
+  return (
+    <section className={error ? 'bulk-service-importer is-invalid' : 'bulk-service-importer'}>
+      <div className="bulk-service-heading">
+        <div>
+          <span>Bulk service import</span>
+          <strong>Paste service rows from a spreadsheet</strong>
+        </div>
+        <small>Format: service, quantity, tier, notes</small>
+      </div>
+
+      <label className="bulk-service-input" htmlFor="bulk-service-input">
+        <span className="field-caption">Paste service rows</span>
+        <textarea
+          id="bulk-service-input"
+          value={draft}
+          placeholder={'Managed Kubernetes, 3, production\nS3, 1, standard\nCloud CDN, 1'}
+          aria-invalid={error ? 'true' : undefined}
+          onChange={(event) => setDraft(event.currentTarget.value)}
+        />
+      </label>
+
+      {error ? <span className="field-error">{error}</span> : null}
+
+      {previewRows.length > 0 ? (
+        <div className="bulk-service-preview" aria-label="Bulk service import preview">
+          <div className="bulk-service-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Input</th>
+                  <th>Matched service</th>
+                  <th>Qty</th>
+                  <th>Tier</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {previewRows.map((row) => (
+                  <tr key={row.line} className={row.family ? 'is-matched' : 'is-unmatched'}>
+                    <td>{row.query}</td>
+                    <td>{row.family?.label ?? 'No catalog match'}</td>
+                    <td>{positiveIntegerInput(row.quantity)}</td>
+                    <td>{row.tier || 'default'}</td>
+                    <td>
+                      {row.family ? (selected.has(row.family.id) ? 'Selected' : 'Ready') : 'Review'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <button
+            type="button"
+            className="bulk-service-add"
+            disabled={matchedRows.length === 0}
+            onClick={addMatchedRows}
+          >
+            Add matched services
+          </button>
+        </div>
+      ) : null}
+
+      <div className="bulk-service-current" aria-label="Imported service rows">
+        <div className="bulk-service-current-heading">
+          <span>Imported rows</span>
+          <strong>{rows.length}</strong>
+        </div>
+        {rows.length > 0 ? (
+          <div className="bulk-service-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Service</th>
+                  <th>Quantity</th>
+                  <th>Tier</th>
+                  <th>Notes</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const family = CLOUD_SERVICE_CATALOG.find(
+                    (candidate) => candidate.id === row.serviceFamilyId,
+                  );
+
+                  return (
+                    <tr key={row.id}>
+                      <td>{family?.label ?? row.serviceFamilyId}</td>
+                      <td>
+                        <input
+                          aria-label={`${family?.label ?? row.serviceFamilyId} quantity`}
+                          value={row.quantity}
+                          inputMode="numeric"
+                          onChange={(event) =>
+                            updateRow(row.id, { quantity: event.currentTarget.value })
+                          }
+                        />
+                      </td>
+                      <td>
+                        <input
+                          aria-label={`${family?.label ?? row.serviceFamilyId} tier`}
+                          value={row.tier}
+                          onChange={(event) =>
+                            updateRow(row.id, { tier: event.currentTarget.value })
+                          }
+                        />
+                      </td>
+                      <td>
+                        <input
+                          aria-label={`${family?.label ?? row.serviceFamilyId} notes`}
+                          value={row.note}
+                          onChange={(event) =>
+                            updateRow(row.id, { note: event.currentTarget.value })
+                          }
+                        />
+                      </td>
+                      <td>
+                        <button type="button" onClick={() => removeRow(row.id)}>
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p>No imported rows yet. Paste services above to add many catalog items at once.</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function ServiceCatalogStat({
   label,
   value,
@@ -3377,6 +3604,132 @@ function providerServicesForFamily(family: CloudServiceFamily, providerId: Provi
     case 'gcp':
       return family.providerServices.gcp;
   }
+}
+
+function formWithBulkServiceRows(
+  form: WorkloadFormState,
+  rows: BulkServiceRow[],
+): WorkloadFormState {
+  const previousBulkIds = new Set(form.bulkServiceRows.map((row) => row.serviceFamilyId));
+  const nextBulkIds = rows.map((row) => row.serviceFamilyId);
+  const nextSelectedIds = orderedServiceFamilyIds([
+    ...form.selectedServiceFamilyIds.filter((id) => !previousBulkIds.has(id)),
+    ...nextBulkIds,
+  ]);
+  const primaryServiceFamilyId = nextSelectedIds.includes(form.selectedServiceFamilyId)
+    ? form.selectedServiceFamilyId
+    : (nextBulkIds[0] ?? nextSelectedIds[0] ?? form.selectedServiceFamilyId);
+  const primaryFamily = CLOUD_SERVICE_CATALOG.find(
+    (family) => family.id === primaryServiceFamilyId,
+  );
+
+  return {
+    ...form,
+    bulkServiceRows: rows,
+    selectedServiceFamilyIds: nextSelectedIds,
+    selectedServiceFamilyId: primaryServiceFamilyId,
+    selectedServiceCategory: primaryFamily?.categoryId ?? form.selectedServiceCategory,
+  };
+}
+
+function parseBulkServiceRows(input: string): BulkServiceDraftRow[] {
+  return input
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line, index) => !isBulkServiceHeader(line, index))
+    .map((line) => {
+      const columns = splitBulkServiceLine(line);
+      const query = columns[0]?.trim() ?? '';
+      const quantity = columns[1]?.trim() ?? '1';
+      const tier = columns[2]?.trim() ?? '';
+      const note = columns.slice(3).join(' / ').trim();
+      const family = matchServiceFamily(query);
+
+      return {
+        line,
+        query,
+        quantity,
+        tier,
+        note,
+        family,
+        status: family ? 'matched' : 'unmatched',
+      };
+    });
+}
+
+function isBulkServiceHeader(line: string, index: number): boolean {
+  return index === 0 && /\bservice\b/i.test(line) && /\b(qty|quantity|tier)\b/i.test(line);
+}
+
+function splitBulkServiceLine(line: string): string[] {
+  if (line.includes('\t')) {
+    return line.split('\t');
+  }
+
+  if (line.includes('|')) {
+    return line.split('|');
+  }
+
+  return line.split(',');
+}
+
+function matchServiceFamily(query: string): CloudServiceFamily | undefined {
+  const normalizedQuery = normalizeServiceSearchText(query);
+
+  if (!normalizedQuery) {
+    return undefined;
+  }
+
+  const aliasId = SERVICE_FAMILY_ALIASES[normalizedQuery];
+  if (aliasId) {
+    return CLOUD_SERVICE_CATALOG.find((family) => family.id === aliasId);
+  }
+
+  return (
+    CLOUD_SERVICE_CATALOG.find((family) =>
+      [
+        family.id,
+        family.label,
+        ...PROVIDER_ORDER.flatMap((providerId) => providerServicesForFamily(family, providerId)),
+      ]
+        .map(normalizeServiceSearchText)
+        .some((candidate) => candidate === normalizedQuery),
+    ) ??
+    CLOUD_SERVICE_CATALOG.find((family) =>
+      normalizeServiceSearchText(serviceFamilySearchText(family)).includes(normalizedQuery),
+    )
+  );
+}
+
+function serviceFamilySearchText(family: CloudServiceFamily): string {
+  return [
+    family.id,
+    family.label,
+    family.categoryId,
+    ...PROVIDER_ORDER.flatMap((providerId) => providerServicesForFamily(family, providerId)),
+  ].join(' ');
+}
+
+function normalizeServiceSearchText(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function orderBulkServiceRows(rows: BulkServiceRow[]): BulkServiceRow[] {
+  const rowsByFamily = new Map(rows.map((row) => [row.serviceFamilyId, row]));
+
+  return orderedServiceFamilyIds([...rowsByFamily.keys()])
+    .map((id) => rowsByFamily.get(id))
+    .filter((row): row is BulkServiceRow => Boolean(row));
+}
+
+function positiveIntegerInput(value: string): string {
+  const parsed = Number(value.replace(/,/g, '').trim());
+  return Number.isInteger(parsed) && parsed > 0 ? String(parsed) : '1';
+}
+
+function bulkServiceRowId(): string {
+  return `bulk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function serviceCategoryOptions(): Array<[string, string]> {

@@ -618,6 +618,55 @@ describe('App', () => {
     unmount();
   });
 
+  it('imports bulk service rows into the editable guided form', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Compare costs'));
+    await click(buttonByText(container, 'Edit'));
+
+    await changeTextarea(
+      textareaById(container, 'bulk-service-input'),
+      'Managed Kubernetes, 3, production, shared platform cluster\nS3, 2, standard',
+    );
+
+    expect(text(container)).toContain('Bulk service import');
+    expect(text(container)).toContain('Managed Kubernetes');
+    expect(text(container)).toContain('Object storage');
+
+    await click(buttonByText(container, 'Add matched services'));
+
+    expect(text(container)).toContain('Imported rows');
+    expect(text(container)).toContain('Managed Kubernetes');
+
+    await click(buttonByText(container, 'Compare'));
+
+    expect(client.validateWorkload).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        serviceRequirements: expect.arrayContaining([
+          expect.objectContaining({
+            serviceCategory: 'containers',
+            serviceType: 'container-orchestration',
+            quantity: 3,
+            tier: 'production',
+            scaleParams: expect.objectContaining({
+              bulkImport: true,
+              bulkNote: 'shared platform cluster',
+            }),
+          }),
+          expect.objectContaining({
+            serviceCategory: 'storage',
+            serviceType: 'object-storage',
+            quantity: 2,
+            tier: 'standard',
+          }),
+        ]),
+      }),
+    );
+
+    unmount();
+  });
+
   it('hides submitted results while editing draft requirements', async () => {
     const client = clientMock();
     const { container, unmount } = render(<App client={client} />);
@@ -1174,6 +1223,17 @@ async function changeInput(input: HTMLInputElement, value: string): Promise<void
     const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
     valueSetter?.call(input, value);
     input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+async function changeTextarea(textarea: HTMLTextAreaElement, value: string): Promise<void> {
+  await act(async () => {
+    const valueSetter = Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      'value',
+    )?.set;
+    valueSetter?.call(textarea, value);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
 
