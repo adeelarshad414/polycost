@@ -767,6 +767,54 @@ describe('report generators', () => {
         ]),
       ]),
     );
+
+    expect(
+      optimizationOpportunityRows({
+        ...comparison,
+        providers: [
+          {
+            providerId: 'aws',
+            lineItems: [
+              {
+                category: 'storage',
+                costComponent: 'storage',
+                description: 'AWS snapshot retention estimate',
+                skuId: 'modeled-storage-snapshots',
+                isApproximate: false,
+                baseMonthlyCostUsd: 40,
+              },
+              {
+                category: 'storage',
+                costComponent: 'storage',
+                description: 'AWS archive retrieval estimate',
+                skuId: 'modeled-storage-retrieval',
+                isApproximate: false,
+                baseMonthlyCostUsd: 15,
+              },
+            ],
+            totals: {
+              daily: 3.95,
+              weekly: 27.69,
+              monthly: 120,
+              quarterly: 360,
+              yearly: 1440,
+            },
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'Storage optimization',
+          'aws storage is 45.83% of monthly spend; tune snapshot retention and deduplicate backup copies before approving the storage run-rate.',
+          '12',
+          '144',
+          'Low',
+          'Low',
+          'aws dominant storage row is "AWS snapshot retention estimate" at $40/mo; retention pruning is modeled as a 30% reduction of that row.',
+        ]),
+      ]),
+    );
   });
 
   it('builds fallback service requirement rows when comparison requirements are absent', () => {

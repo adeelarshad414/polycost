@@ -1094,6 +1094,65 @@ describe('ComparisonView', () => {
     unmount();
   });
 
+  it('surfaces storage optimization detail from modeled storage dimensions', async () => {
+    const awsProvider = providerWithItems('aws', [
+      ['compute', 'aws compute', 40],
+      ['storage', 'AWS snapshot retention estimate', 24],
+      ['storage', 'AWS archive retrieval estimate', 12],
+    ]);
+    awsProvider.lineItems[1] = {
+      ...awsProvider.lineItems[1],
+      costComponent: 'storage',
+      skuId: 'modeled-storage-snapshots',
+    };
+    awsProvider.lineItems[2] = {
+      ...awsProvider.lineItems[2],
+      costComponent: 'storage',
+      skuId: 'modeled-storage-retrieval',
+    };
+    const storageResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'aws',
+      providers: [
+        awsProvider,
+        providerWithItems('azure', [['compute', 'azure compute', 70]]),
+        providerWithItems('gcp', [['compute', 'gcp compute', 75]]),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView
+        comparison={storageResult}
+        form={{
+          ...defaultWorkloadForm,
+          storageEnabled: true,
+          storageSizeGb: '1000',
+          storageClass: 'archive',
+          monthlyRetrievalGb: '250',
+          snapshotSizeGb: '500',
+          snapshotRetentionDays: '60',
+          storageReplication: 'cross-region',
+        }}
+        interval="monthly"
+      />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain('Storage optimization detail');
+    expect(text(container)).toContain(
+      'Storage class, retrieval, snapshots, replication, and performance tuning',
+    );
+    expect(text(container)).toContain('Snapshot retention');
+    expect(text(container)).toContain('1,000GB archive · 250GB retrieval · cross region');
+    expect(text(container)).toContain('$7.20/mo');
+    expect(text(container)).toContain('$86.40/yr');
+    expect(text(container)).toContain(
+      'Reduce retention, deduplicate snapshots, or move older copies to colder tiers.',
+    );
+    expect(text(container)).toContain('500GB snapshots · 60 days');
+
+    unmount();
+  });
+
   it('renders FinOps feature additions without fabricating unsupported backend data', async () => {
     const awsRichProvider = providerWithItems('aws', [
       ['compute', 'aws compute', 50],

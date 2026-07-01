@@ -578,6 +578,31 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
     ]);
   }
 
+  for (const provider of result.providers) {
+    const storageMonthly = componentMonthly(provider, 'storage');
+    const providerMonthly = provider.totals.monthly;
+    const storageShare = providerMonthly > 0 ? storageMonthly / providerMonthly : 0;
+    const insight = storageOptimizationInsight(provider);
+    const isMaterial =
+      storageMonthly >= 10 || storageShare >= 0.1 || Boolean(insight?.hasAdvancedSignal);
+
+    if (!insight || !isMaterial) {
+      continue;
+    }
+
+    rows.push([
+      'Storage optimization',
+      `${provider.providerId} storage is ${formatNumber(
+        storageShare * 100,
+      )}% of monthly spend; ${insight.recommendation}`,
+      formatNumber(insight.monthlySavings),
+      formatNumber(insight.monthlySavings * 12),
+      insight.monthlySavings > 100 ? 'High' : insight.monthlySavings > 20 ? 'Medium' : 'Low',
+      insight.effort,
+      insight.evidence,
+    ]);
+  }
+
   rows.push(...architectureRiskOpportunityRows(result));
 
   for (const provider of result.providers) {
@@ -655,7 +680,7 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
       : [
           [
             'No material optimization opportunity detected',
-            'Current comparison does not expose provider spread, commitment, egress, licensing, or mapping signals above thresholds.',
+            'Current comparison does not expose provider spread, commitment, storage, egress, licensing, or mapping signals above thresholds.',
             '',
             '',
             'Low',
@@ -1246,6 +1271,14 @@ interface EgressOptimizationInsight {
   evidence: string;
 }
 
+interface StorageOptimizationInsight {
+  recommendation: string;
+  monthlySavings: number;
+  effort: 'Low' | 'Medium' | 'High';
+  evidence: string;
+  hasAdvancedSignal: boolean;
+}
+
 interface SpotBlendInsight {
   spotPercent: number;
   onDemandPercent: number;
@@ -1354,6 +1387,151 @@ function spotBlendRisk(
   }
 
   return 'Low';
+}
+
+function storageOptimizationInsight(
+  provider: ComparisonProviderResult,
+): StorageOptimizationInsight | undefined {
+  const storageMonthly = componentMonthly(provider, 'storage');
+
+  if (storageMonthly <= 0) {
+    return undefined;
+  }
+
+  const storageRows = provider.lineItems
+    .filter(
+      (lineItem) =>
+        lineItem.category === 'storage' ||
+        lineItem.costComponent === 'storage' ||
+        storageDescription(lineItem.description) ||
+        storageDescription(lineItem.skuId ?? ''),
+    )
+    .sort((left, right) => right.baseMonthlyCostUsd - left.baseMonthlyCostUsd);
+
+  if (storageRows.length === 0) {
+    return undefined;
+  }
+
+  const advancedRows = storageRows.filter((lineItem) =>
+    storageAdvancedDescription(`${lineItem.skuId ?? ''} ${lineItem.description}`),
+  );
+  const primary = advancedRows[0] ?? storageRows[0];
+  const primaryMonthly = primary.baseMonthlyCostUsd || storageMonthly;
+  const primaryDescription = primary.description;
+  const normalizedPrimary = `${primary.skuId ?? ''} ${primaryDescription}`.toLowerCase();
+
+  if (normalizedPrimary.includes('snapshot')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.3);
+
+    return {
+      recommendation:
+        'tune snapshot retention and deduplicate backup copies before approving the storage run-rate.',
+      monthlySavings,
+      effort: 'Low',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant storage row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; retention pruning is modeled as a 30% reduction of that row.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('retrieval') || normalizedPrimary.includes('archive')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.25);
+
+    return {
+      recommendation:
+        'validate archive retrieval frequency and split warm/cold tiers before moving data deeper into archive.',
+      monthlySavings,
+      effort: 'Medium',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant storage row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; retrieval and archive-tier tuning is modeled at 25% of that row.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('replication')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.35);
+
+    return {
+      recommendation:
+        'validate same-region vs cross-region replication policy against the actual DR requirement.',
+      monthlySavings,
+      effort: 'Medium',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant storage row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; replication policy review is modeled as a 35% reduction of that row.`,
+    };
+  }
+
+  if (
+    normalizedPrimary.includes('iops') ||
+    normalizedPrimary.includes('throughput') ||
+    normalizedPrimary.includes('performance')
+  ) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.25);
+
+    return {
+      recommendation:
+        'right-size provisioned IOPS and throughput after measuring baseline storage latency.',
+      monthlySavings,
+      effort: 'Medium',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant storage row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; performance right-sizing is modeled at 25% of that row.`,
+    };
+  }
+
+  if (
+    normalizedPrimary.includes('request') ||
+    normalizedPrimary.includes('put') ||
+    normalizedPrimary.includes('get') ||
+    normalizedPrimary.includes('list') ||
+    normalizedPrimary.includes('delete')
+  ) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      recommendation:
+        'batch object operations and reduce LIST-heavy access patterns before scaling request volume.',
+      monthlySavings,
+      effort: 'Medium',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant storage row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; request-shape optimization is modeled at 20% of that row.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('lifecycle')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.15);
+
+    return {
+      recommendation:
+        'validate lifecycle transition frequency, minimum-duration rules, and tiering break-even before proposal sign-off.',
+      monthlySavings,
+      effort: 'Low',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant storage row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; lifecycle-rule cleanup is modeled at 15% of that row.`,
+    };
+  }
+
+  const monthlySavings = roundCurrency(storageMonthly * 0.15);
+
+  return {
+    recommendation:
+      'review storage class, lifecycle policy, and growth assumptions before committing to the baseline tier.',
+    monthlySavings,
+    effort: 'Low',
+    hasAdvancedSignal: false,
+    evidence: `${provider.providerId} storage baseline is $${formatNumber(
+      storageMonthly,
+    )}/mo across ${storageRows.length} storage row(s); tiering review is modeled at 15% of storage spend.`,
+  };
 }
 
 function egressOptimizationInsight(provider: ComparisonProviderResult): EgressOptimizationInsight {
@@ -1524,6 +1702,45 @@ function networkDescription(description: string): boolean {
     'dns',
     'cross-az',
     'inter-region',
+  ].some((needle) => normalized.includes(needle));
+}
+
+function storageDescription(description: string): boolean {
+  const normalized = description.toLowerCase();
+
+  return [
+    'storage',
+    'snapshot',
+    'archive',
+    'retrieval',
+    'replication',
+    'lifecycle',
+    'iops',
+    'throughput',
+    'object request',
+    'put request',
+    'get request',
+    'list request',
+    'delete request',
+  ].some((needle) => normalized.includes(needle));
+}
+
+function storageAdvancedDescription(description: string): boolean {
+  const normalized = description.toLowerCase();
+
+  return [
+    'snapshot',
+    'archive',
+    'retrieval',
+    'replication',
+    'lifecycle',
+    'iops',
+    'throughput',
+    'object request',
+    'put request',
+    'get request',
+    'list request',
+    'delete request',
   ].some((needle) => normalized.includes(needle));
 }
 

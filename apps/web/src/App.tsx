@@ -5957,6 +5957,7 @@ function ProductionDepthAnalytics({
   const regionVariance = regionVarianceRows(comparison, form);
   const commitmentCoverage = commitmentCoverageGapRows(comparison, form);
   const tcoSignals = crossProviderTcoRows(comparison, form);
+  const storageOptimizations = storageOptimizationRows(comparison, form);
   const egressOptimizations = egressOptimizationRows(comparison, form);
   const spotBlendRows = spotBlendOptimizerRows(comparison, form);
   const licenseRows = licenseOptimizationRows(comparison, form);
@@ -5991,6 +5992,7 @@ function ProductionDepthAnalytics({
       <RegionVariancePanel rows={regionVariance} />
       <CommitmentCoverageGapPanel rows={commitmentCoverage} />
       <CrossProviderTcoPanel rows={tcoSignals} />
+      <StorageOptimizationPanel rows={storageOptimizations} />
       <EgressOptimizationPanel rows={egressOptimizations} />
       <SpotBlendOptimizerPanel rows={spotBlendRows} />
       <LicenseOptimizationPanel rows={licenseRows} operatingSystem={form.operatingSystem} />
@@ -6255,6 +6257,70 @@ function CrossProviderTcoPanel({ rows }: { rows: CrossProviderTcoRow[] }) {
       ) : (
         <div className="scenario-sensitivity-empty" role="status">
           Run a comparison to populate TCO signals beyond infrastructure run-rate.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StorageOptimizationPanel({ rows }: { rows: StorageOptimizationRow[] }) {
+  return (
+    <div className="storage-optimization-panel" aria-label="Storage optimization detail">
+      <div className="scenario-sensitivity-heading">
+        <div>
+          <span>Storage optimization detail</span>
+          <h4>Storage class, retrieval, snapshots, replication, and performance tuning</h4>
+        </div>
+      </div>
+
+      {rows.length > 0 ? (
+        <div className="table-wrap storage-optimization-wrap">
+          <table className="ranking-table storage-optimization-table">
+            <thead>
+              <tr>
+                <th scope="col">Provider</th>
+                <th scope="col">Storage share</th>
+                <th scope="col">Dominant driver</th>
+                <th scope="col">Opportunity</th>
+                <th scope="col">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.providerId}>
+                  <td>
+                    <span className={`scenario-low-label scenario-low-${row.providerId}`}>
+                      {providerLabel(row.providerId)}
+                    </span>
+                    <small>{row.usageSignal}</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.storageMonthly)}/mo</strong>
+                    <small>{formatPercent(row.storageSharePercent)} of provider total</small>
+                  </td>
+                  <td>
+                    <strong>{row.primaryDriver}</strong>
+                    <small>{row.driverEvidence}</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.monthlySavings)}/mo</strong>
+                    <small>
+                      {formatCurrency(row.annualSavings)}/yr · {row.effort} effort
+                    </small>
+                  </td>
+                  <td>
+                    <strong>{row.recommendation}</strong>
+                    <small>{row.evidence}</small>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="scenario-sensitivity-empty" role="status">
+          Storage optimization appears when storage classes, operations, retrieval, snapshots,
+          replication, or performance line items become material.
         </div>
       )}
     </div>
@@ -7116,6 +7182,20 @@ interface EgressOptimizationRow {
   evidence: string;
 }
 
+interface StorageOptimizationRow {
+  providerId: ProviderId;
+  storageMonthly: number;
+  storageSharePercent: number;
+  primaryDriver: string;
+  usageSignal: string;
+  monthlySavings: number;
+  annualSavings: number;
+  effort: 'Low' | 'Medium' | 'High';
+  recommendation: string;
+  driverEvidence: string;
+  evidence: string;
+}
+
 interface SpotBlendOptimizerRow {
   providerId: ProviderId;
   onDemandMonthly: number;
@@ -7214,6 +7294,269 @@ function providerDeltaRows(comparison: ComparisonResult | null): ProviderDeltaRo
       },
     ];
   }).sort((left, right) => right.monthlyDelta - left.monthlyDelta);
+}
+
+function storageOptimizationRows(
+  comparison: ComparisonResult | null,
+  form: WorkloadFormState,
+): StorageOptimizationRow[] {
+  if (!comparison) {
+    return [];
+  }
+
+  const storageGb = parseInputNumber(form.storageSizeGb) ?? 0;
+  const retrievalGb = parseInputNumber(form.monthlyRetrievalGb) ?? 0;
+  const requestThousands =
+    (parseInputNumber(form.monthlyPutRequestsThousand) ?? 0) +
+    (parseInputNumber(form.monthlyGetRequestsThousand) ?? 0) +
+    (parseInputNumber(form.monthlyDeleteRequestsThousand) ?? 0) +
+    (parseInputNumber(form.monthlyListRequestsThousand) ?? 0);
+  const lifecycleTransitions = parseInputNumber(form.lifecycleTransitionsThousand) ?? 0;
+  const snapshotSizeGb = parseInputNumber(form.snapshotSizeGb) ?? 0;
+  const snapshotRetentionDays = parseInputNumber(form.snapshotRetentionDays) ?? 0;
+  const provisionedIops = parseInputNumber(form.provisionedIops) ?? 0;
+  const provisionedThroughputMbps = parseInputNumber(form.provisionedThroughputMbps) ?? 0;
+  const storageClassLabel = form.storageClass.replace(/-/g, ' ');
+  const usageSignalParts = [
+    storageGb > 0 ? `${formatDecimal(storageGb)}GB ${storageClassLabel}` : undefined,
+    retrievalGb > 0 ? `${formatDecimal(retrievalGb)}GB retrieval` : undefined,
+    requestThousands > 0 ? `${formatDecimal(requestThousands)}K operations` : undefined,
+    form.storageReplication !== 'none' ? form.storageReplication.replace('-', ' ') : undefined,
+  ].filter(Boolean);
+  const usageSignal = usageSignalParts.join(' · ') || 'Storage rows only';
+  const hasAdvancedFormSignal =
+    form.storageClass !== 'standard' ||
+    retrievalGb > 0 ||
+    requestThousands > 0 ||
+    lifecycleTransitions > 0 ||
+    snapshotSizeGb > 0 ||
+    form.storageReplication !== 'none' ||
+    provisionedIops > 0 ||
+    provisionedThroughputMbps > 0;
+
+  return comparison.providers
+    .flatMap((provider) => {
+      const storageMonthly = roundCurrency(componentMonthly(provider, 'storage'));
+      const storageSharePercent =
+        provider.totals.monthly > 0 ? (storageMonthly / provider.totals.monthly) * 100 : 0;
+      const storageRows = storageLineItems(provider).sort(
+        (left, right) => right.baseMonthlyCostUsd - left.baseMonthlyCostUsd,
+      );
+      const advancedRows = storageRows.filter((lineItem) =>
+        storageAdvancedDescriptionMatches(`${lineItem.skuId ?? ''} ${lineItem.description}`),
+      );
+      const primary = advancedRows[0] ?? storageRows[0];
+      const material =
+        storageMonthly >= 10 ||
+        storageSharePercent >= 10 ||
+        hasAdvancedFormSignal ||
+        advancedRows.length > 0;
+
+      if (!primary || storageMonthly <= 0 || !material) {
+        return [];
+      }
+
+      const signal = storageOptimizationSignal(primary, storageMonthly, {
+        lifecycleTransitions,
+        provisionedIops,
+        provisionedThroughputMbps,
+        requestThousands,
+        retrievalGb,
+        snapshotRetentionDays,
+        snapshotSizeGb,
+        storageClassLabel,
+        storageReplication: form.storageReplication,
+      });
+
+      return [
+        {
+          providerId: provider.providerId,
+          storageMonthly,
+          storageSharePercent,
+          usageSignal,
+          annualSavings: roundCurrency(signal.monthlySavings * 12),
+          ...signal,
+        },
+      ];
+    })
+    .sort((left, right) => right.monthlySavings - left.monthlySavings);
+}
+
+function storageLineItems(provider: ComparisonProviderResult): ComparisonLineItem[] {
+  return provider.lineItems.filter(
+    (lineItem) =>
+      lineItem.category === 'storage' ||
+      lineItemCostComponent(lineItem) === 'storage' ||
+      storageDescriptionMatches(lineItem.description) ||
+      storageDescriptionMatches(lineItem.skuId ?? ''),
+  );
+}
+
+function storageOptimizationSignal(
+  primary: ComparisonLineItem,
+  storageMonthly: number,
+  context: {
+    lifecycleTransitions: number;
+    provisionedIops: number;
+    provisionedThroughputMbps: number;
+    requestThousands: number;
+    retrievalGb: number;
+    snapshotRetentionDays: number;
+    snapshotSizeGb: number;
+    storageClassLabel: string;
+    storageReplication: WorkloadFormState['storageReplication'];
+  },
+): Omit<
+  StorageOptimizationRow,
+  'providerId' | 'storageMonthly' | 'storageSharePercent' | 'usageSignal' | 'annualSavings'
+> {
+  const normalizedPrimary = `${primary.skuId ?? ''} ${primary.description}`.toLowerCase();
+  const primaryMonthly =
+    primary.baseMonthlyCostUsd > 0 ? primary.baseMonthlyCostUsd : storageMonthly;
+  const baseEvidence = `${primary.description} is the largest storage row at ${formatCurrency(
+    primaryMonthly,
+  )}/mo.`;
+
+  if (normalizedPrimary.includes('snapshot')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.3);
+
+    return {
+      primaryDriver: 'Snapshot retention',
+      monthlySavings,
+      effort: 'Low',
+      recommendation:
+        'Reduce retention, deduplicate snapshots, or move older copies to colder tiers.',
+      driverEvidence:
+        context.snapshotSizeGb > 0
+          ? `${formatDecimal(context.snapshotSizeGb)}GB snapshots · ${formatDecimal(
+              context.snapshotRetentionDays,
+            )} days`
+          : 'Snapshot line item surfaced by backend',
+      evidence: `${baseEvidence} Retention pruning models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('retrieval') || normalizedPrimary.includes('archive')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.25);
+
+    return {
+      primaryDriver: 'Retrieval / archive access',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation: 'Validate retrieval frequency before moving warm data into archive classes.',
+      driverEvidence:
+        context.retrievalGb > 0
+          ? `${formatDecimal(context.retrievalGb)}GB monthly retrieval · ${
+              context.storageClassLabel
+            }`
+          : `${context.storageClassLabel} storage class`,
+      evidence: `${baseEvidence} Retrieval and archive tuning models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('replication')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.35);
+
+    return {
+      primaryDriver: 'Replication policy',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation: 'Re-check cross-region replication scope against the actual DR requirement.',
+      driverEvidence:
+        context.storageReplication !== 'none'
+          ? `${context.storageReplication.replace('-', ' ')} configured`
+          : 'Replication line item surfaced by backend',
+      evidence: `${baseEvidence} Replication policy review models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (
+    normalizedPrimary.includes('iops') ||
+    normalizedPrimary.includes('throughput') ||
+    normalizedPrimary.includes('performance')
+  ) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.25);
+
+    return {
+      primaryDriver: 'Provisioned performance',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation:
+        'Right-size provisioned IOPS and throughput after observing baseline latency.',
+      driverEvidence:
+        context.provisionedIops > 0 || context.provisionedThroughputMbps > 0
+          ? `${formatDecimal(context.provisionedIops)} IOPS · ${formatDecimal(
+              context.provisionedThroughputMbps,
+            )} MB/s`
+          : 'Performance line item surfaced by backend',
+      evidence: `${baseEvidence} Performance right-sizing models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (
+    normalizedPrimary.includes('request') ||
+    normalizedPrimary.includes('put') ||
+    normalizedPrimary.includes('get') ||
+    normalizedPrimary.includes('list') ||
+    normalizedPrimary.includes('delete')
+  ) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      primaryDriver: 'Request operations',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation: 'Batch object operations and reduce LIST-heavy access paths before scaling.',
+      driverEvidence:
+        context.requestThousands > 0
+          ? `${formatDecimal(context.requestThousands)}K monthly operations`
+          : 'Request operation line item surfaced by backend',
+      evidence: `${baseEvidence} Request-shape tuning models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('lifecycle')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.15);
+
+    return {
+      primaryDriver: 'Lifecycle transitions',
+      monthlySavings,
+      effort: 'Low',
+      recommendation: 'Validate lifecycle transition frequency and minimum-duration break-even.',
+      driverEvidence:
+        context.lifecycleTransitions > 0
+          ? `${formatDecimal(context.lifecycleTransitions)}K transitions/month`
+          : 'Lifecycle line item surfaced by backend',
+      evidence: `${baseEvidence} Lifecycle-rule cleanup models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  const monthlySavings = roundCurrency(storageMonthly * 0.15);
+
+  return {
+    primaryDriver: 'Storage tiering',
+    monthlySavings,
+    effort: 'Low',
+    recommendation: 'Review storage class, lifecycle policy, and growth assumptions.',
+    driverEvidence: `${context.storageClassLabel} baseline · ${formatCurrency(
+      storageMonthly,
+    )}/mo storage`,
+    evidence: `Storage class review models ${formatCurrency(
+      monthlySavings,
+    )}/mo opportunity at 15% of the storage baseline.`,
+  };
 }
 
 function regionVarianceRows(
@@ -8209,6 +8552,45 @@ function networkDescriptionMatches(description: string): boolean {
     'dns',
     'cross-az',
     'inter-region',
+  ].some((needle) => normalized.includes(needle));
+}
+
+function storageDescriptionMatches(description: string): boolean {
+  const normalized = description.toLowerCase();
+
+  return [
+    'storage',
+    'snapshot',
+    'archive',
+    'retrieval',
+    'replication',
+    'lifecycle',
+    'iops',
+    'throughput',
+    'object request',
+    'put request',
+    'get request',
+    'list request',
+    'delete request',
+  ].some((needle) => normalized.includes(needle));
+}
+
+function storageAdvancedDescriptionMatches(description: string): boolean {
+  const normalized = description.toLowerCase();
+
+  return [
+    'snapshot',
+    'archive',
+    'retrieval',
+    'replication',
+    'lifecycle',
+    'iops',
+    'throughput',
+    'object request',
+    'put request',
+    'get request',
+    'list request',
+    'delete request',
   ].some((needle) => normalized.includes(needle));
 }
 
