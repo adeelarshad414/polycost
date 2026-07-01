@@ -2,11 +2,17 @@ import {
   CostComponent,
   EgressTierBreakdown,
   PricingBasis,
+  PricingModelKey,
   PricingModelCost,
   ProviderId,
   ServiceCategory,
 } from '../adapters/common/cloud-provider-adapter';
-import { ServiceRequirement, WorkloadSourceType, WorkloadType } from '../nws/nws.types';
+import {
+  NormalizedWorkloadSpec,
+  ServiceRequirement,
+  WorkloadSourceType,
+  WorkloadType,
+} from '../nws/nws.types';
 
 export interface CostIntervals {
   hourly?: number;
@@ -66,11 +72,25 @@ export interface ComparisonRequirementSummary {
   serviceRequirements: ServiceRequirement[];
 }
 
+type ComparisonWorkloadProfile = NormalizedWorkloadSpec['workloadProfile'];
+
+export interface PricingModelRecommendation {
+  preferredModel: PricingModelKey;
+  confidence: 'high' | 'medium' | 'low';
+  rationale: string;
+  sourceSignals: {
+    environment?: NonNullable<ComparisonWorkloadProfile>['environment'];
+    commitmentPreferencePercent?: number;
+    flexibilityBias: 'flexibility' | 'balanced' | 'cost-optimized';
+  };
+}
+
 export interface ComparisonResult {
   comparisonId: string;
   pricingAsOf: string;
   requirements?: ComparisonRequirementSummary;
   providers: ComparisonProviderResult[];
   cheapestProviderId: ProviderId;
+  pricingModelRecommendation?: PricingModelRecommendation;
   warnings?: ComparisonWarning[];
 }

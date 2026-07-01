@@ -64,6 +64,31 @@ const providerResult = (providerId: ProviderId, monthlyCosts: number[]): Provide
   })),
 });
 
+const commitmentProviderResult = (providerId: ProviderId): ProviderPricingResult => ({
+  providerId,
+  baseMonthlyCostUsd: 100,
+  lineItems: [
+    {
+      category: 'compute',
+      costComponent: 'compute',
+      description: `${providerId} commitment compute`,
+      isApproximate: false,
+      baseMonthlyCostUsd: 100,
+      skuId: `${providerId}-commitment-compute`,
+      region: 'us-test-1',
+      unit: 'hour',
+      unitPriceUsd: 0.14,
+      pricingBasis: 'flat',
+      pricingModels: [
+        { model: 'on-demand', available: true, monthlyCostUsd: 100 },
+        { model: 'reserved-1yr', available: true, monthlyCostUsd: 72 },
+        { model: 'reserved-3yr', available: true, monthlyCostUsd: 55 },
+        { model: 'savings-plan', available: true, monthlyCostUsd: 68 },
+      ],
+    },
+  ],
+});
+
 const adapter = (
   providerId: ProviderId,
   priceWorkload: CloudProviderAdapter['priceWorkload'],
@@ -145,6 +170,15 @@ describe('ComparisonOrchestratorService', () => {
           }),
         }),
       ],
+      pricingModelRecommendation: {
+        preferredModel: 'on-demand',
+        confidence: 'high',
+        rationale:
+          'Defaulting to on-demand for an unspecified workload with no commitment preference signal, preserving flexibility and avoiding unsupported long-term commitments.',
+        sourceSignals: {
+          flexibilityBias: 'flexibility',
+        },
+      },
     });
     expect(aws.priceWorkload).toHaveBeenCalledWith(validWorkload);
     expect(azure.priceWorkload).toHaveBeenCalledWith(validWorkload);
@@ -334,6 +368,70 @@ describe('ComparisonOrchestratorService', () => {
         monthlyCostUsd: 15,
       },
     ]);
+  });
+
+  it('recommends 3-year reserved pricing for production workloads with high commitment appetite', async () => {
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async () => commitmentProviderResult('aws')),
+      ),
+      adapter(
+        'azure',
+        jest.fn(async () => commitmentProviderResult('azure')),
+      ),
+      adapter(
+        'gcp',
+        jest.fn(async () => commitmentProviderResult('gcp')),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      workloadProfile: {
+        environment: 'production',
+        commitmentPreferencePercent: 90,
+      },
+    });
+
+    expect(result.pricingModelRecommendation).toEqual({
+      preferredModel: 'reserved-3yr',
+      confidence: 'high',
+      rationale: expect.stringContaining('production workload with 90% commitment preference'),
+      sourceSignals: {
+        environment: 'production',
+        commitmentPreferencePercent: 90,
+        flexibilityBias: 'cost-optimized',
+      },
+    });
+  });
+
+  it('keeps development workloads on-demand unless commitment appetite is explicit and extreme', async () => {
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async () => commitmentProviderResult('aws')),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      workloadProfile: {
+        environment: 'development',
+        commitmentPreferencePercent: 70,
+      },
+    });
+
+    expect(result.pricingModelRecommendation).toEqual({
+      preferredModel: 'on-demand',
+      confidence: 'high',
+      rationale: expect.stringContaining('development workload with 70% commitment preference'),
+      sourceSignals: {
+        environment: 'development',
+        commitmentPreferencePercent: 70,
+        flexibilityBias: 'balanced',
+      },
+    });
   });
 
   it('adds production-depth modeled line items from workload profile assumptions', async () => {

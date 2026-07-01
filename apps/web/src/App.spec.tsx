@@ -164,6 +164,42 @@ describe('App', () => {
     unmount();
   });
 
+  it('adopts the backend pricing model recommendation after comparison', async () => {
+    const recommendedResult: ComparisonResult = {
+      ...comparisonResult,
+      pricingModelRecommendation: {
+        preferredModel: 'reserved-3yr',
+        confidence: 'high',
+        rationale:
+          'Defaulting to 3-year reserved pricing because this is a production workload with 90% commitment preference and all priced providers expose comparable long-term commitment data.',
+        sourceSignals: {
+          environment: 'production',
+          commitmentPreferencePercent: 90,
+          flexibilityBias: 'cost-optimized',
+        },
+      },
+    };
+    const client = clientMock({
+      createComparison: jest.fn(async () => recommendedResult),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Compare costs'));
+
+    expect(window.localStorage.getItem('polycost-pricing-model')).toBe('reserved-3yr');
+    expect(text(container)).toContain('Recommended scenario');
+    expect(text(container)).toContain('Reserved 3yr');
+    expect(text(container)).toContain('Production');
+    expect(text(container)).toContain('90% commitment');
+    expect(
+      JSON.parse(window.localStorage.getItem('polycost-comparison-history-v1') ?? '[]')[0],
+    ).toMatchObject({
+      pricingModel: 'reserved-3yr',
+    });
+
+    unmount();
+  });
+
   it('restores recent comparison history into the guided form', async () => {
     window.localStorage.setItem(
       'polycost-comparison-history-v1',

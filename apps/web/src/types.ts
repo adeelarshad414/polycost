@@ -293,6 +293,17 @@ export interface ComparisonProviderResult {
   breakdown?: ComparisonCostBreakdown;
 }
 
+export interface PricingModelRecommendation {
+  preferredModel: PricingModelKey;
+  confidence: 'high' | 'medium' | 'low';
+  rationale: string;
+  sourceSignals: {
+    environment?: NonNullable<NormalizedWorkloadSpec['workloadProfile']>['environment'];
+    commitmentPreferencePercent?: number;
+    flexibilityBias: 'flexibility' | 'balanced' | 'cost-optimized';
+  };
+}
+
 export interface ComparisonResult {
   comparisonId: string;
   pricingAsOf: string;
@@ -305,6 +316,7 @@ export interface ComparisonResult {
   };
   providers: ComparisonProviderResult[];
   cheapestProviderId: ProviderId;
+  pricingModelRecommendation?: PricingModelRecommendation;
   warnings?: Array<{
     providerId?: ProviderId;
     code?: string;

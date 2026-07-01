@@ -744,7 +744,11 @@ export function App({ client = polyCostClient }: AppProps) {
         return;
       }
 
+      const recommendedPricingModel =
+        result.pricingModelRecommendation?.preferredModel ?? pricingModel;
       setComparison(result);
+      setPricingModel(recommendedPricingModel);
+      storePricingModel(recommendedPricingModel);
       setSubmittedForm(submittedComparisonForm);
       setSubmittedInputMode(submittedComparisonInputMode);
       setComparisonHistory((currentHistory) =>
@@ -754,7 +758,7 @@ export function App({ client = polyCostClient }: AppProps) {
             comparison: result,
             form: submittedComparisonForm,
             inputMode: submittedComparisonInputMode,
-            pricingModel,
+            pricingModel: recommendedPricingModel,
           }),
         ),
       );
@@ -820,7 +824,11 @@ export function App({ client = polyCostClient }: AppProps) {
         return;
       }
 
+      const recommendedPricingModel =
+        result.pricingModelRecommendation?.preferredModel ?? pricingModel;
       setComparison(result);
+      setPricingModel(recommendedPricingModel);
+      storePricingModel(recommendedPricingModel);
       setNotice('Live refresh snapshot created.');
     } catch (refreshError) {
       if (isCurrentAsyncAction(actionId)) {
@@ -1822,6 +1830,8 @@ function ProgressiveComparisonPage({
               onRefreshLive={onRefreshLive}
             />
 
+            <PricingModelRecommendationCallout comparison={comparison} />
+
             <StatusMessage notice={resultStatusNotice(notice)} error={error} />
 
             <ProviderSummaryCards comparison={comparison} interval={interval} />
@@ -1862,6 +1872,31 @@ function ProgressiveComparisonPage({
             </div>
           </>
         )}
+      </div>
+    </section>
+  );
+}
+
+function PricingModelRecommendationCallout({ comparison }: { comparison: ComparisonResult }) {
+  const recommendation = comparison.pricingModelRecommendation;
+
+  if (!recommendation) {
+    return null;
+  }
+
+  return (
+    <section className="pricing-model-recommendation" aria-label="Pricing model recommendation">
+      <div className="pricing-model-recommendation-main">
+        <span className="pricing-model-recommendation-kicker">
+          Recommended scenario · {capitalize(recommendation.confidence)} confidence
+        </span>
+        <strong>{pricingModelSummaryLabel(recommendation.preferredModel)}</strong>
+        <p>{recommendation.rationale}</p>
+      </div>
+      <div className="pricing-model-recommendation-signals" aria-label="Recommendation signals">
+        <span>{capitalize(recommendation.sourceSignals.environment ?? 'unspecified env')}</span>
+        <span>{recommendation.sourceSignals.commitmentPreferencePercent ?? 0}% commitment</span>
+        <span>{capitalize(recommendation.sourceSignals.flexibilityBias)}</span>
       </div>
     </section>
   );

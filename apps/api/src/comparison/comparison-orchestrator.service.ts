@@ -24,6 +24,7 @@ import {
   ComparisonProviderResult,
   ComparisonResult,
   ComparisonWarning,
+  PricingModelRecommendation,
 } from './comparison.types';
 import { EquivalentServiceMapper } from './equivalent-service-mapper';
 import { IntervalCostCalculator } from './interval-cost-calculator';
@@ -143,6 +144,7 @@ interface IntegrationServicesRates {
 }
 
 type StorageClassKey = NonNullable<NormalizedWorkloadSpec['storage'][number]['storageClass']>;
+type WorkloadEnvironment = NonNullable<NormalizedWorkloadSpec['workloadProfile']>['environment'];
 
 export class ComparisonUnavailableError extends Error {
   constructor(readonly failures: ComparisonWarning[]) {
@@ -187,6 +189,7 @@ export class ComparisonOrchestratorService {
       requirements: this.requirementSummary(nws),
       providers,
       cheapestProviderId: this.cheapestProvider(providers),
+      pricingModelRecommendation: this.pricingModelRecommendation(nws, providers),
       ...(warnings.length > 0 ? { warnings } : {}),
     };
   }
@@ -2099,6 +2102,155 @@ export class ComparisonOrchestratorService {
     return providers.reduce((cheapest, current) =>
       current.totals.monthly < cheapest.totals.monthly ? current : cheapest,
     ).providerId;
+  }
+
+  private pricingModelRecommendation(
+    nws: NormalizedWorkloadSpec,
+    providers: ComparisonProviderResult[],
+  ): PricingModelRecommendation {
+    const environment = nws.workloadProfile?.environment;
+    const commitmentPreferencePercent =
+      nws.workloadProfile?.commitmentPreferencePercent !== undefined
+        ? Math.min(100, Math.max(0, nws.workloadProfile.commitmentPreferencePercent))
+        : undefined;
+    const flexibilityBias = this.flexibilityBias(commitmentPreferencePercent);
+    const candidates = this.pricingModelRecommendationCandidates(
+      environment,
+      commitmentPreferencePercent,
+    );
+    const preferredModel =
+      candidates.find((model) => this.pricingModelAvailableAcrossProviders(providers, model)) ??
+      'on-demand';
+    const candidateWasUnavailable = preferredModel !== candidates[0];
+    const confidence = this.pricingModelRecommendationConfidence(
+      preferredModel,
+      candidateWasUnavailable,
+    );
+
+    return {
+      preferredModel,
+      confidence,
+      rationale: this.pricingModelRecommendationRationale({
+        environment,
+        commitmentPreferencePercent,
+        preferredModel,
+        candidateWasUnavailable,
+      }),
+      sourceSignals: {
+        ...(environment ? { environment } : {}),
+        ...(commitmentPreferencePercent !== undefined ? { commitmentPreferencePercent } : {}),
+        flexibilityBias,
+      },
+    };
+  }
+
+  private pricingModelRecommendationCandidates(
+    environment: WorkloadEnvironment | undefined,
+    commitmentPreferencePercent?: number,
+  ): PricingModelKey[] {
+    if (commitmentPreferencePercent === undefined || commitmentPreferencePercent < 35) {
+      return ['on-demand'];
+    }
+
+    const isProduction = environment === 'production';
+    const isNonProduction =
+      environment === 'development' || environment === 'test' || environment === 'staging';
+
+    if (isNonProduction) {
+      if (commitmentPreferencePercent >= 85) {
+        return ['savings-plan', 'reserved-1yr', 'on-demand'];
+      }
+
+      return ['on-demand'];
+    }
+
+    if (isProduction && commitmentPreferencePercent >= 85) {
+      return ['reserved-3yr', 'savings-plan', 'reserved-1yr', 'on-demand'];
+    }
+
+    if (commitmentPreferencePercent >= 65) {
+      return ['reserved-1yr', 'savings-plan', 'on-demand'];
+    }
+
+    return ['savings-plan', 'reserved-1yr', 'on-demand'];
+  }
+
+  private pricingModelAvailableAcrossProviders(
+    providers: ComparisonProviderResult[],
+    pricingModel: PricingModelKey,
+  ): boolean {
+    if (pricingModel === 'on-demand') {
+      return providers.length > 0;
+    }
+
+    return providers.every((provider) =>
+      provider.pricingModels?.some((model) => model.model === pricingModel && model.available),
+    );
+  }
+
+  private pricingModelRecommendationConfidence(
+    preferredModel: PricingModelKey,
+    candidateWasUnavailable: boolean,
+  ): PricingModelRecommendation['confidence'] {
+    if (candidateWasUnavailable) {
+      return preferredModel === 'on-demand' ? 'low' : 'medium';
+    }
+
+    return 'high';
+  }
+
+  private flexibilityBias(
+    commitmentPreferencePercent?: number,
+  ): PricingModelRecommendation['sourceSignals']['flexibilityBias'] {
+    if (commitmentPreferencePercent === undefined || commitmentPreferencePercent < 35) {
+      return 'flexibility';
+    }
+
+    if (commitmentPreferencePercent >= 75) {
+      return 'cost-optimized';
+    }
+
+    return 'balanced';
+  }
+
+  private pricingModelRecommendationRationale({
+    environment,
+    commitmentPreferencePercent,
+    preferredModel,
+    candidateWasUnavailable,
+  }: {
+    environment?: WorkloadEnvironment;
+    commitmentPreferencePercent?: number;
+    preferredModel: PricingModelKey;
+    candidateWasUnavailable: boolean;
+  }): string {
+    const environmentLabel = environment ? environment.replace('-', ' ') : 'unspecified';
+    const environmentArticle = environment ? 'a' : 'an';
+    const commitmentLabel =
+      commitmentPreferencePercent !== undefined
+        ? `${commitmentPreferencePercent}% commitment preference`
+        : 'no commitment preference signal';
+    const fallbackCopy = candidateWasUnavailable
+      ? ' The first-choice commitment model was not available across all priced providers, so PolyCost selected the nearest comparable option.'
+      : '';
+
+    if (preferredModel === 'on-demand') {
+      return `Defaulting to on-demand for ${environmentArticle} ${environmentLabel} workload with ${commitmentLabel}, preserving flexibility and avoiding unsupported long-term commitments.${fallbackCopy}`;
+    }
+
+    if (preferredModel === 'reserved-3yr') {
+      return `Defaulting to 3-year reserved pricing because this is a production workload with ${commitmentLabel} and all priced providers expose comparable long-term commitment data.${fallbackCopy}`;
+    }
+
+    if (preferredModel === 'reserved-1yr') {
+      return `Defaulting to 1-year reserved pricing for a ${environmentLabel} workload with ${commitmentLabel}, balancing savings with a shorter commitment window.${fallbackCopy}`;
+    }
+
+    if (preferredModel === 'savings-plan') {
+      return `Defaulting to savings-plan style pricing for a ${environmentLabel} workload with ${commitmentLabel}, prioritizing commitment savings while keeping more flexibility than 3-year reservations.${fallbackCopy}`;
+    }
+
+    return `Defaulting to spot pricing for a ${environmentLabel} workload with ${commitmentLabel}; verify interruption tolerance before using this as the operating scenario.${fallbackCopy}`;
   }
 
   private requirementSummary(nws: NormalizedWorkloadSpec): ComparisonResult['requirements'] {
