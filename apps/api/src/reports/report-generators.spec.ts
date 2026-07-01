@@ -361,6 +361,13 @@ describe('report generators', () => {
     expect(pdfText).toContain('=cmd\\(1\\)\\\\risky compute');
     expect(pdfText).toContain('general | provider_pricing_failed | general warning');
     expect(pdfText).toContain('this is a deliberately long line item description');
+    expect(pdfText).toContain('PolyCost Visual Decision Deck');
+    expect(pdfText).toContain('Provider monthly run-rate chart');
+    expect(pdfText).toContain('Engineering Cost Evidence Deck');
+    expect(pdfText).toContain('Service mix stacked chart');
+    expect(pdfText).toContain('$71 monthly');
+    expect(pdfText).toContain('Line-item source: same evidence rows used by CSV and XLSX exports');
+    expect(pdfText).toContain(' re f');
     expect(pdfText).toContain('xref');
     expect(pdfText).toContain('%%EOF');
   });

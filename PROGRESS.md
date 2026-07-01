@@ -930,6 +930,10 @@ controls.
   with editable scale and region-multiplier assumptions, workbook-level named
   ranges, auto-recalculation metadata, and formula-driven scenario monthly/yearly
   and delta totals.
+- PDF visual deck: PDF exports now append server-rendered vector chart pages for
+  executive provider monthly run-rate comparison and engineering service-mix
+  evidence, using the same comparison totals and line-item data as the CSV/XLSX
+  exports.
 - Verification passing locally:
   `npm run check`, `npm run build`, `npm run test:coverage`,
   `npm run test:e2e --workspace @polycost/web`,
@@ -963,9 +967,8 @@ when it is actually resolved in a later phase, with a note on which phase resolv
   internal SKU traceability for safe mutation.
 - The AI-native reimagining prompt's most aggressive DoD is not fully product-complete
   yet: file upload remains a documented Phase 2 hook, account-level requirement
-  persistence is not implemented, PDF chart pages are evidence/report sections rather
-  than server-rendered chart-image pages, and reserved/Savings upfront cash charges
-  are shown only when provider catalog evidence publishes them.
+  persistence is not implemented, and reserved/Savings upfront cash charges are
+  shown only when provider catalog evidence publishes them.
 - The engineering matrix now filters by category/provider/pricing model and sorts by
   every provider/model column, but the backend still needs richer service-level
   pricing-model coverage for every provider/service combination before every cell can
