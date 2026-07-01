@@ -19,6 +19,7 @@ import { AdminApiKeyGuard } from './admin-api-key.guard';
 import { ApiDatabaseRepository } from './api-database.repository';
 import { ApiExceptionFilter } from './api-exception.filter';
 import { ApiRateLimitService } from './rate-limit.service';
+import { ComparisonAnalyticsService } from './comparison-analytics.service';
 import { ComparisonApplicationService } from './comparison-application.service';
 import { ComparisonPrewarmService } from './comparison-prewarm.service';
 import { ComparisonsController } from './comparisons.controller';
@@ -75,6 +76,7 @@ import { WorkloadController } from './workload.controller';
       useFactory: () => new ApiRateLimitService(),
     },
     AdminApiKeyGuard,
+    ComparisonAnalyticsService,
     {
       provide: LivePricingRefreshService,
       inject: [CLOUD_PROVIDER_ADAPTERS, PostgresPricingCatalogRepository],

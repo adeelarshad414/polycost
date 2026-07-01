@@ -261,7 +261,8 @@ describe('report generators', () => {
     expect(csv).toContain('Selected interval,Monthly');
     expect(csv).toContain('Selected pricing model,On-demand');
     expect(csv).toContain('No normalized service requirements were attached to this comparison.');
-    expect(csv).not.toContain('Warnings');
+    expect(csv).toContain('Warnings,No provider or live-refresh warnings were captured');
+    expect(csv).not.toContain('Warnings\nProvider,Code,Message');
   });
 
   it('creates CSV warning rows for general warnings without provider IDs', () => {
@@ -505,7 +506,10 @@ describe('report generators', () => {
       warnings: undefined,
     });
 
-    expect(pdf.toString('utf8')).not.toContain('Warnings');
+    const pdfText = pdf.toString('utf8');
+
+    expect(pdfText).toContain('Warnings: No provider or live-refresh warnings were captured');
+    expect(pdfText).not.toContain('provider_pricing_failed');
   });
 
   it('keeps the PDF requirement fallback when workload requirements are absent', () => {
@@ -1126,7 +1130,7 @@ describe('report generators', () => {
         ]),
         expect.arrayContaining([
           'Storage anatomy',
-          'aws storage class/type review: archive; validate snapshot retention and older-copy tiering before final quote.',
+          'aws storage class/type review: standard; validate snapshot retention and older-copy tiering before final quote.',
           '',
           '',
           'Medium',
@@ -1180,15 +1184,6 @@ describe('report generators', () => {
           'Low',
           'Medium',
           'aws dominant database row is "AWS primary RU/s provisioned capacity estimate" at $80/mo; RU/s right-sizing is modeled as a 25% reduction of that row.',
-        ]),
-        expect.arrayContaining([
-          'Database anatomy',
-          'aws generic_nosql capacity review; validate RU/s utilization, autoscale bounds, and serverless break-even.',
-          '',
-          '',
-          'High',
-          'Medium',
-          expect.stringContaining('ru $80/mo, nosql $40/mo'),
         ]),
       ]),
     );

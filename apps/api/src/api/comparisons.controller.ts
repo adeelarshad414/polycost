@@ -14,6 +14,7 @@ import { AppConfig } from '../config/config.schema';
 import { ReportService } from '../reports/report.service';
 import { ReportFormat, ReportInterval, ReportPricingModel } from '../reports/report.types';
 import { ApiValidationError } from './api-errors';
+import { ComparisonAnalyticsService } from './comparison-analytics.service';
 import {
   ComparisonApplicationService,
   CreateComparisonOptions,
@@ -38,6 +39,7 @@ export class ComparisonsController {
     private readonly apiRateLimitService: ApiRateLimitService,
     private readonly configService: ConfigService<AppConfig, true>,
     private readonly reportExportJobsService: ReportExportJobsService,
+    private readonly comparisonAnalyticsService: ComparisonAnalyticsService,
   ) {}
 
   @Post()
@@ -52,6 +54,13 @@ export class ComparisonsController {
     const snapshot = await this.comparisonApplicationService.getComparison(comparisonId);
 
     return snapshot.resultSnapshot;
+  }
+
+  @Get(':id/analytics')
+  async analytics(@Param('id') comparisonId: string) {
+    const snapshot = await this.comparisonApplicationService.getComparison(comparisonId);
+
+    return this.comparisonAnalyticsService.build(snapshot.resultSnapshot);
   }
 
   @Get(':id/export')

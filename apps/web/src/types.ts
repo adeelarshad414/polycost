@@ -344,6 +344,119 @@ export interface ComparisonResult {
   }>;
 }
 
+export type AnalyticsDimension =
+  | 'compute'
+  | 'storage'
+  | 'egress'
+  | 'networking'
+  | 'database'
+  | 'support'
+  | 'licensing'
+  | 'operations'
+  | 'other';
+
+export interface CostCompositionItem {
+  dimension: AnalyticsDimension;
+  label: string;
+  monthlyCostUsd: number;
+  percentOfProviderTotal: number;
+  runningMonthlyUsd: number;
+  topDriver?: string;
+}
+
+export interface ProviderCostComposition {
+  providerId: ProviderId;
+  totalMonthlyUsd: number;
+  items: CostCompositionItem[];
+}
+
+export interface ProviderDeltaAnalysis {
+  dimension: AnalyticsDimension;
+  label: string;
+  cheapestProviderId: ProviderId;
+  mostExpensiveProviderId: ProviderId;
+  cheapestMonthlyUsd: number;
+  mostExpensiveMonthlyUsd: number;
+  deltaMonthlyUsd: number;
+  deltaPercentVsMostExpensive: number;
+  explanation: string;
+}
+
+export interface SensitivityScenarioRow {
+  variable: 'compute_capacity' | 'storage_volume' | 'egress_traffic' | 'database_capacity';
+  label: string;
+  changePercent: number;
+  providerId: ProviderId;
+  baselineMonthlyUsd: number;
+  adjustedMonthlyUsd: number;
+  deltaMonthlyUsd: number;
+}
+
+export interface CommitmentRoiTimeline {
+  providerId: ProviderId;
+  pricingModel: Exclude<PricingModelKey, 'on-demand' | 'spot'>;
+  label: string;
+  baselineMonthlyUsd: number;
+  committedMonthlyUsd: number;
+  upfrontCostUsd: number;
+  monthlySavingsUsd: number;
+  breakEvenMonth?: number;
+  points: Array<{
+    month: number;
+    onDemandCumulativeUsd: number;
+    committedCumulativeUsd: number;
+    savingsUsd: number;
+  }>;
+}
+
+export interface CommitmentCoverageRow {
+  providerId: ProviderId;
+  eligibleMonthlyUsd: number;
+  coveredPercentOfSpend: number;
+  onDemandExposureMonthlyUsd: number;
+  maxMonthlySavingsUsd: number;
+}
+
+export interface TcoSignal {
+  providerId: ProviderId;
+  egressLockInMonthlyUsd: number;
+  supportMonthlyUsd: number;
+  licensingMonthlyUsd: number;
+  freeTierApplicability: 'possible' | 'unlikely';
+  note: string;
+}
+
+export interface FinOpsFinding {
+  id: string;
+  severity: 'info' | 'review' | 'warning' | 'critical';
+  category:
+    | 'cost-driver'
+    | 'right-sizing'
+    | 'commitment'
+    | 'egress'
+    | 'licensing'
+    | 'support'
+    | 'mapping'
+    | 'risk';
+  title: string;
+  recommendation: string;
+  estimatedMonthlyImpactUsd?: number;
+  providerId?: ProviderId;
+}
+
+export interface ComparisonAnalyticsResponse {
+  comparisonId: string;
+  generatedAt: string;
+  pricingAsOf: string;
+  costComposition: ProviderCostComposition[];
+  providerDeltaAnalysis: ProviderDeltaAnalysis[];
+  sensitivityScenarios: SensitivityScenarioRow[];
+  commitmentRoiTimelines: CommitmentRoiTimeline[];
+  commitmentCoverage: CommitmentCoverageRow[];
+  tcoSignals: TcoSignal[];
+  finOpsFindings: FinOpsFinding[];
+}
+
 export interface PricingStatusResponse {
   providers: Array<{
     providerId: ProviderId;

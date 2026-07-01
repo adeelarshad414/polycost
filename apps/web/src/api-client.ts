@@ -4,6 +4,7 @@ import {
   BackendHealthResponse,
   BudgetInput,
   BudgetRecord,
+  ComparisonAnalyticsResponse,
   ComparisonResult,
   DataHealthResponse,
   ExchangeRatesResponse,
@@ -60,6 +61,7 @@ export interface PolyCostClient {
   parseWorkload(input: string): Promise<ParsedNwsDraft>;
   validateWorkload(nws: NormalizedWorkloadSpec): Promise<{ valid: true }>;
   createComparison(nws: NormalizedWorkloadSpec): Promise<ComparisonResult>;
+  getComparisonAnalytics(comparisonId: string): Promise<ComparisonAnalyticsResponse>;
   refreshLiveComparison(comparisonId: string): Promise<ComparisonResult>;
   createExportJob(
     comparisonId: string,
@@ -141,6 +143,12 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
           },
         }),
       });
+    },
+    getComparisonAnalytics(comparisonId) {
+      return requestJson<ComparisonAnalyticsResponse>(
+        baseUrl,
+        `/comparisons/${encodeURIComponent(comparisonId)}/analytics`,
+      );
     },
     refreshLiveComparison(comparisonId) {
       return requestJson<ComparisonResult>(baseUrl, `/comparisons/${comparisonId}/refresh-live`, {

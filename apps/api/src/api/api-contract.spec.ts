@@ -47,6 +47,7 @@ import {
   LiveRefreshUnavailableError,
   RateLimitExceededError,
 } from './api-errors';
+import { ComparisonAnalyticsService } from './comparison-analytics.service';
 import { PricingStatusController } from './pricing-status.controller';
 import { RegionsController } from './regions.controller';
 import { WorkloadController } from './workload.controller';
@@ -319,6 +320,40 @@ describe('API contracts', () => {
     const controller = comparisonsController(service);
 
     await expect(controller.get(comparisonResult.comparisonId)).resolves.toEqual(comparisonResult);
+  });
+
+  it('GET /comparisons/:id/analytics returns deterministic comparison intelligence', async () => {
+    const service = comparisonApplicationService();
+    const controller = comparisonsController(service);
+
+    await expect(controller.analytics(comparisonResult.comparisonId)).resolves.toEqual(
+      expect.objectContaining({
+        comparisonId: comparisonResult.comparisonId,
+        pricingAsOf: comparisonResult.pricingAsOf,
+        costComposition: [
+          expect.objectContaining({
+            providerId: 'aws',
+            totalMonthlyUsd: 30,
+            items: [
+              expect.objectContaining({
+                dimension: 'compute',
+                monthlyCostUsd: 30,
+                percentOfProviderTotal: 100,
+              }),
+            ],
+          }),
+        ],
+        commitmentCoverage: [
+          {
+            providerId: 'aws',
+            eligibleMonthlyUsd: 0,
+            coveredPercentOfSpend: 0,
+            onDemandExposureMonthlyUsd: 30,
+            maxMonthlySavingsUsd: 0,
+          },
+        ],
+      }),
+    );
   });
 
   it('GET /comparisons/:id/export returns a binary download with content headers', async () => {
@@ -1046,6 +1081,7 @@ function comparisonsController(
     new ApiRateLimitService(() => 0),
     configService,
     exportJobs,
+    new ComparisonAnalyticsService(),
   );
 }
 

@@ -70,6 +70,48 @@ describe('api client', () => {
     );
   });
 
+  it('fetches backend comparison analytics for saved results', async () => {
+    const analytics = {
+      comparisonId: 'comparison-1',
+      generatedAt: '2026-07-02T12:00:00.000Z',
+      pricingAsOf: '2026-07-02T00:00:00.000Z',
+      costComposition: [
+        {
+          providerId: 'aws',
+          totalMonthlyUsd: 100,
+          items: [
+            {
+              dimension: 'compute',
+              label: 'Compute',
+              monthlyCostUsd: 80,
+              percentOfProviderTotal: 80,
+              runningMonthlyUsd: 80,
+            },
+          ],
+        },
+      ],
+      providerDeltaAnalysis: [],
+      sensitivityScenarios: [],
+      commitmentRoiTimelines: [],
+      commitmentCoverage: [],
+      tcoSignals: [],
+      finOpsFindings: [],
+    };
+    const fetchMock = jest.fn(async () => jsonResponse(analytics));
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(client.getComparisonAnalytics('comparison-1')).resolves.toEqual(analytics);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/comparisons/comparison-1/analytics',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+  });
+
   it('maps API error envelopes', async () => {
     global.fetch = jest.fn(async () =>
       jsonResponse(
