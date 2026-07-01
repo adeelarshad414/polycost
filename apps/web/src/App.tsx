@@ -5957,6 +5957,7 @@ function ProductionDepthAnalytics({
   const regionVariance = regionVarianceRows(comparison, form);
   const commitmentCoverage = commitmentCoverageGapRows(comparison, form);
   const tcoSignals = crossProviderTcoRows(comparison, form);
+  const architectureRisks = architectureRiskFlags(comparison, form);
   const scenarios = sensitivityScenarioRows(comparison, form);
 
   return (
@@ -5987,6 +5988,7 @@ function ProductionDepthAnalytics({
       <RegionVariancePanel rows={regionVariance} />
       <CommitmentCoverageGapPanel rows={commitmentCoverage} />
       <CrossProviderTcoPanel rows={tcoSignals} />
+      <ArchitectureRiskFlagsPanel flags={architectureRisks} />
       <ScenarioSensitivityTable rows={scenarios} />
     </section>
   );
@@ -6249,6 +6251,33 @@ function CrossProviderTcoPanel({ rows }: { rows: CrossProviderTcoRow[] }) {
           Run a comparison to populate TCO signals beyond infrastructure run-rate.
         </div>
       )}
+    </div>
+  );
+}
+
+function ArchitectureRiskFlagsPanel({ flags }: { flags: ArchitectureRiskFlag[] }) {
+  return (
+    <div className="architecture-risk-panel" aria-label="Architecture risk flags">
+      <div className="scenario-sensitivity-heading">
+        <div>
+          <span>Architecture risk flags</span>
+          <h4>Cost behaviors to validate before commitment</h4>
+        </div>
+      </div>
+
+      <div className="architecture-risk-grid">
+        {flags.map((flag) => (
+          <article
+            className={`architecture-risk-card architecture-risk-${flag.severity}`}
+            key={flag.id}
+          >
+            <span>{flag.severity} risk</span>
+            <strong>{flag.title}</strong>
+            <b>{flag.signal}</b>
+            <p>{flag.evidence}</p>
+          </article>
+        ))}
+      </div>
     </div>
   );
 }
@@ -6867,6 +6896,14 @@ interface CrossProviderTcoRow {
   evidence: string;
 }
 
+interface ArchitectureRiskFlag {
+  id: string;
+  title: string;
+  severity: 'low' | 'medium' | 'high';
+  signal: string;
+  evidence: string;
+}
+
 function providerDeltaRows(comparison: ComparisonResult | null): ProviderDeltaRow[] {
   if (!comparison) {
     return [];
@@ -6982,6 +7019,137 @@ function regionVarianceRows(
       lowestProviderId: lowest?.providerId,
     };
   });
+}
+
+function architectureRiskFlags(
+  comparison: ComparisonResult | null,
+  form: WorkloadFormState,
+): ArchitectureRiskFlag[] {
+  const flags: ArchitectureRiskFlag[] = [];
+  const egressGb = parseInputNumber(form.monthlyEgressGb) ?? 0;
+  const crossAzGb = parseInputNumber(form.crossAzTransferGb) ?? 0;
+  const interRegionGb = parseInputNumber(form.interRegionTransferGb) ?? 0;
+  const natGb = parseInputNumber(form.natGatewayGb) ?? 0;
+  const ruPerSecond = parseInputNumber(form.databaseRuPerSecond) ?? 0;
+  const nosqlReads = parseInputNumber(form.databaseNosqlReadRequestUnitsMillion) ?? 0;
+  const nosqlWrites = parseInputNumber(form.databaseNosqlWriteRequestUnitsMillion) ?? 0;
+  const databaseSizeGb = parseInputNumber(form.databaseSizeGb) ?? 0;
+  const databaseGrowthGb = parseInputNumber(form.databaseStorageGrowthGbPerMonth) ?? 0;
+  const databaseReplicaTransferGb =
+    parseInputNumber(form.databaseCrossRegionReplicaTransferGb) ?? 0;
+  const maxEgressShare = maxComponentShare(comparison, 'egress');
+
+  if (egressGb >= 500 || maxEgressShare >= 20) {
+    flags.push({
+      id: 'data-transfer-concentration',
+      title: 'Data-transfer concentration',
+      severity: egressGb >= 1000 || maxEgressShare >= 35 ? 'high' : 'medium',
+      signal:
+        maxEgressShare > 0
+          ? `${formatDecimal(maxEgressShare)}% of provider spend`
+          : `${formatDecimal(egressGb)}GB/mo`,
+      evidence: form.cdn
+        ? 'Egress is material even with CDN enabled; validate cache hit ratio, origin paths, NAT, and cross-region traffic.'
+        : 'Egress is material and CDN is off; direct internet data transfer can dominate the bill as usage grows.',
+    });
+  }
+
+  if (crossAzGb > 0 || interRegionGb > 0 || natGb > 0) {
+    flags.push({
+      id: 'private-network-transfer',
+      title: 'Private network transfer exposure',
+      severity: interRegionGb >= 500 || natGb >= 1000 ? 'high' : 'medium',
+      signal: `${formatDecimal(crossAzGb + interRegionGb + natGb)}GB/mo`,
+      evidence:
+        'Cross-AZ, inter-region, and NAT-processed traffic are separate cost paths; validate routing before HA design sign-off.',
+    });
+  }
+
+  if (
+    form.databaseEnabled &&
+    (form.databaseEngine === 'generic_nosql' ||
+      form.databaseEngine === 'mongodb' ||
+      ruPerSecond > 0 ||
+      nosqlReads + nosqlWrites > 0)
+  ) {
+    flags.push({
+      id: 'nosql-throughput-model',
+      title: 'NoSQL throughput model',
+      severity: ruPerSecond >= 4000 || nosqlReads + nosqlWrites >= 100 ? 'high' : 'medium',
+      signal:
+        ruPerSecond > 0
+          ? `${formatDecimal(ruPerSecond)} RU/s`
+          : `${formatDecimal(nosqlReads + nosqlWrites)}M units/mo`,
+      evidence:
+        'DynamoDB on-demand and Cosmos DB RU/s pricing can spike or waste capacity; validate provisioned-vs-on-demand break-even with observed traffic.',
+    });
+  }
+
+  if (databaseGrowthGb > 0 && databaseSizeGb > 0) {
+    const annualGrowthPercent = (databaseGrowthGb * 12 * 100) / databaseSizeGb;
+
+    if (annualGrowthPercent >= 50) {
+      flags.push({
+        id: 'database-growth-pressure',
+        title: 'Database storage growth pressure',
+        severity: annualGrowthPercent >= 100 ? 'high' : 'medium',
+        signal: `${formatPercent(annualGrowthPercent)} annual growth`,
+        evidence:
+          'Storage autoscaling, backup retention, replica transfer, and IOPS can grow faster than the base database instance cost.',
+      });
+    }
+  }
+
+  if (
+    form.multiRegion ||
+    form.storageReplication === 'cross-region' ||
+    databaseReplicaTransferGb > 0
+  ) {
+    flags.push({
+      id: 'cross-region-resilience',
+      title: 'Cross-region resilience premium',
+      severity: form.multiRegion || databaseReplicaTransferGb >= 500 ? 'high' : 'medium',
+      signal:
+        databaseReplicaTransferGb > 0
+          ? `${formatDecimal(databaseReplicaTransferGb)}GB replica transfer`
+          : form.multiRegion
+            ? 'Multi-region enabled'
+            : 'Cross-region replication',
+      evidence:
+        'Active-active, cross-region replication, and replica data transfer can multiply network and storage costs beyond the base service price.',
+    });
+  }
+
+  const approximateRows =
+    comparison?.providers.reduce(
+      (count, provider) =>
+        count + provider.lineItems.filter((lineItem) => lineItem.isApproximate).length,
+      0,
+    ) ?? 0;
+
+  if (approximateRows > 0) {
+    flags.push({
+      id: 'mapping-equivalence',
+      title: 'Approximate provider equivalence',
+      severity: 'medium',
+      signal: `${approximateRows} mapping(s)`,
+      evidence:
+        'Approximate mappings should be reviewed by a solution architect before using the comparison in a client proposal.',
+    });
+  }
+
+  return flags.length > 0
+    ? flags
+    : [
+        {
+          id: 'no-material-risk',
+          title: 'No material architecture risk flags',
+          severity: 'low',
+          signal: 'Low',
+          evidence:
+            'Current inputs do not cross the deterministic thresholds for NoSQL throughput, egress concentration, fast data growth, or cross-region transfer.',
+        },
+      ];
 }
 
 function commitmentCoverageGapRows(
@@ -7429,6 +7597,22 @@ function componentMonthly(provider: ComparisonProviderResult, component: CostCom
   return provider.lineItems
     .filter((lineItem) => lineItemCostComponent(lineItem) === component)
     .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+}
+
+function maxComponentShare(comparison: ComparisonResult | null, component: CostComponent): number {
+  if (!comparison) {
+    return 0;
+  }
+
+  return comparison.providers.reduce((maxShare, provider) => {
+    if (provider.totals.monthly <= 0) {
+      return maxShare;
+    }
+
+    const share = (componentMonthly(provider, component) / provider.totals.monthly) * 100;
+
+    return Math.max(maxShare, share);
+  }, 0);
 }
 
 function rightSizingSavingsRate(averageUtilizationPercent?: number): number {

@@ -1190,6 +1190,9 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Egress exit proxy');
     expect(text(container)).toContain('Free-tier signal');
     expect(text(container)).toContain('Data-out proxy');
+    expect(text(container)).toContain('Architecture risk flags');
+    expect(text(container)).toContain('Cost behaviors to validate before commitment');
+    expect(text(container)).toContain('Data-transfer concentration');
     expect(text(container)).toContain('Scenario sensitivity');
     expect(text(container)).toContain('Provider winner under operational shocks');
     expect(text(container)).toContain('Demand +25%');

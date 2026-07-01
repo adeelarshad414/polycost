@@ -661,6 +661,14 @@ describe('report generators', () => {
           '21.28',
           '255.36',
         ]),
+        expect.arrayContaining([
+          'Architecture risk',
+          'aws data-transfer line items are 64.9% of monthly spend; validate CDN, NAT, cross-AZ, and inter-region paths before sign-off.',
+          '',
+          '',
+          'High',
+          'Medium',
+        ]),
       ]),
     );
     expect(egressNetworkingDetailRows(comparison)).toEqual(

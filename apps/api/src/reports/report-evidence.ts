@@ -556,6 +556,8 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
     }
   }
 
+  rows.push(...architectureRiskOpportunityRows(result));
+
   for (const provider of result.providers) {
     const egressMonthly = componentMonthly(provider, 'egress');
     const providerMonthly = provider.totals.monthly;
@@ -1100,6 +1102,113 @@ function rightSizingSavingsRate(averageUtilizationPercent?: number): number {
   return 0;
 }
 
+function architectureRiskOpportunityRows(result: ComparisonResult): string[][] {
+  const rows: string[][] = [];
+
+  for (const provider of result.providers) {
+    const egressMonthly = componentMonthly(provider, 'egress');
+    const providerMonthly = provider.totals.monthly;
+
+    if (providerMonthly > 0 && egressMonthly / providerMonthly >= 0.35) {
+      rows.push([
+        'Architecture risk',
+        `${provider.providerId} data-transfer line items are ${formatNumber(
+          (egressMonthly / providerMonthly) * 100,
+        )}% of monthly spend; validate CDN, NAT, cross-AZ, and inter-region paths before sign-off.`,
+        '',
+        '',
+        'High',
+        'Medium',
+        `Egress/networking risk from cached line items: $${formatNumber(
+          egressMonthly,
+        )}/mo of $${formatNumber(providerMonthly)}/mo.`,
+      ]);
+    }
+  }
+
+  for (const requirement of result.requirements?.serviceRequirements ?? []) {
+    const scaleParams = requirement.scaleParams ?? {};
+
+    if (requirement.serviceCategory === 'database') {
+      const engine = String(scaleParams.engine ?? requirement.serviceType).toLowerCase();
+      const ruPerSecond = numericScaleParam(scaleParams, 'ruPerSecond');
+      const readUnits = numericScaleParam(scaleParams, 'nosqlReadRequestUnitsMillion');
+      const writeUnits = numericScaleParam(scaleParams, 'nosqlWriteRequestUnitsMillion');
+      const storageGrowthGb = numericScaleParam(scaleParams, 'storageGrowthGbPerMonth');
+      const sizeGb = numericScaleParam(scaleParams, 'sizeGb');
+      const replicaTransferGb = numericScaleParam(scaleParams, 'crossRegionReplicaTransferGb');
+      const isNoSql =
+        engine.includes('nosql') ||
+        engine.includes('mongo') ||
+        engine.includes('dynamo') ||
+        engine.includes('cosmos') ||
+        ruPerSecond > 0 ||
+        readUnits + writeUnits > 0;
+
+      if (isNoSql) {
+        rows.push([
+          'Architecture risk',
+          `${requirement.serviceType} uses NoSQL/RU-style throughput; validate provisioned vs on-demand break-even before production traffic.`,
+          '',
+          '',
+          ruPerSecond >= 4000 || readUnits + writeUnits >= 100 ? 'High' : 'Medium',
+          'Medium',
+          `Requirement evidence: engine ${engine}, ${formatNumber(
+            ruPerSecond,
+          )} RU/s, ${formatNumber(readUnits + writeUnits)}M request units/month.`,
+        ]);
+      }
+
+      if (sizeGb > 0 && storageGrowthGb > 0 && (storageGrowthGb * 12) / sizeGb >= 0.5) {
+        rows.push([
+          'Architecture risk',
+          `${requirement.serviceType} database storage may grow ${formatNumber(
+            (storageGrowthGb * 12 * 100) / sizeGb,
+          )}% annually; validate autoscaling, backup retention, and IOPS implications.`,
+          '',
+          '',
+          (storageGrowthGb * 12) / sizeGb >= 1 ? 'High' : 'Medium',
+          'Medium',
+          `Requirement evidence: ${formatNumber(sizeGb)}GB current size and ${formatNumber(
+            storageGrowthGb,
+          )}GB/month growth.`,
+        ]);
+      }
+
+      if (replicaTransferGb > 0) {
+        rows.push([
+          'Architecture risk',
+          `${requirement.serviceType} includes ${formatNumber(
+            replicaTransferGb,
+          )}GB/month cross-region replica transfer; validate DR topology and data-transfer rates.`,
+          '',
+          '',
+          replicaTransferGb >= 500 ? 'High' : 'Medium',
+          'Medium',
+          'Cross-region read replicas can create recurring data-transfer and storage duplication costs.',
+        ]);
+      }
+    }
+
+    if (
+      requirement.serviceCategory === 'storage' &&
+      String(scaleParams.replication ?? '').toLowerCase() === 'cross-region'
+    ) {
+      rows.push([
+        'Architecture risk',
+        `${requirement.serviceType} uses cross-region replication; validate replication transfer and minimum-duration storage charges.`,
+        '',
+        '',
+        'Medium',
+        'Medium',
+        'Cross-region object/block/file replication can multiply storage and data-transfer spend.',
+      ]);
+    }
+  }
+
+  return rows;
+}
+
 function commitmentPreferencePercent(result: ComparisonResult): number {
   const percent = result.requirements?.workloadProfile?.commitmentPreferencePercent;
 
@@ -1108,6 +1217,22 @@ function commitmentPreferencePercent(result: ComparisonResult): number {
   }
 
   return Math.min(100, Math.max(0, Math.round(percent)));
+}
+
+function numericScaleParam(params: Record<string, string | number | boolean>, key: string): number {
+  const value = params[key];
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
 }
 
 function costComponentForCategory(

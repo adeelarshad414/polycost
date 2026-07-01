@@ -4805,6 +4805,81 @@ select:disabled {
   padding: var(--pc-space-1);
 }
 
+.architecture-risk-panel {
+  display: grid;
+  gap: var(--pc-space-1);
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface) 94%, var(--pc-bg-surface-2));
+  padding: var(--pc-space-1);
+}
+
+.architecture-risk-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--pc-space-1);
+}
+
+.architecture-risk-card {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  border: 1px solid var(--pc-border);
+  border-left: 4px solid var(--pc-info);
+  border-radius: 8px;
+  background: var(--pc-bg-surface);
+  padding: 12px;
+}
+
+.architecture-risk-low {
+  border-left-color: var(--pc-success);
+}
+
+.architecture-risk-medium {
+  border-left-color: var(--pc-warning);
+}
+
+.architecture-risk-high {
+  border-left-color: var(--pc-error);
+}
+
+.architecture-risk-card span {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.architecture-risk-card strong,
+.architecture-risk-card b,
+.architecture-risk-card p {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.architecture-risk-card strong {
+  color: var(--pc-text-primary);
+  font-family: var(--pc-font-display);
+  font-size: var(--pc-text-base);
+  line-height: 1.2;
+}
+
+.architecture-risk-card b {
+  color: var(--pc-text-primary);
+  font-family: var(--pc-font-mono);
+  font-size: var(--pc-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.architecture-risk-card p {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-sm);
+  font-weight: 650;
+  line-height: 1.45;
+}
+
 .tco-signal-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -6624,6 +6699,10 @@ select:disabled {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .architecture-risk-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .engineering-chart-grid,
   .engineering-signal-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -6782,6 +6861,10 @@ select:disabled {
   }
 
   .tco-signal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .architecture-risk-grid {
     grid-template-columns: 1fr;
   }
 
