@@ -20,6 +20,7 @@ const expectedMigrations = [
   '012_production_depth_audit_analytics.sql',
   '013_report_export_jobs.sql',
   '014_comparison_prewarm_jobs.sql',
+  '015_seed_accelerated_compute_pricing_catalog.sql',
 ];
 
 if (!['migrate', 'seed', 'reset', 'validate'].includes(command)) {

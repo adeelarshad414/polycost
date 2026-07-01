@@ -1062,6 +1062,127 @@ describe('ComparisonOrchestratorService', () => {
     );
   });
 
+  it('adds modeled AI and machine-learning platform line items', async () => {
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async (): Promise<ProviderPricingResult> => ({
+          providerId: 'aws',
+          baseMonthlyCostUsd: 10,
+          lineItems: [
+            {
+              category: 'compute',
+              costComponent: 'compute',
+              description: 'aws compute',
+              isApproximate: false,
+              baseMonthlyCostUsd: 10,
+              skuId: 'aws-compute',
+              region: 'us-east-1',
+              unit: 'hour',
+              unitPriceUsd: 0.01,
+            },
+          ],
+        })),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      serviceRequirements: [
+        {
+          serviceCategory: 'ai',
+          serviceType: 'ml-training',
+          quantity: 1,
+          scaleParams: {
+            aiTrainingGpuHours: 300,
+          },
+        },
+        {
+          serviceCategory: 'ai',
+          serviceType: 'model-hosting',
+          quantity: 1,
+          scaleParams: {
+            aiModelHostingHours: 730,
+          },
+        },
+        {
+          serviceCategory: 'ai',
+          serviceType: 'ai-inference',
+          quantity: 1,
+          scaleParams: {
+            aiInferenceRequestsMillion: 2,
+          },
+        },
+        {
+          serviceCategory: 'ai',
+          serviceType: 'vector-search',
+          quantity: 1,
+          scaleParams: {
+            aiVectorStorageGb: 200,
+            aiVectorQueriesMillion: 5,
+          },
+        },
+        {
+          serviceCategory: 'ai',
+          serviceType: 'generative-ai-api',
+          quantity: 1,
+          scaleParams: {
+            aiApiInputTokensMillion: 500,
+            aiApiOutputTokensMillion: 100,
+          },
+        },
+      ],
+    });
+
+    expect(result.providers[0].lineItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'compute',
+          skuId: 'modeled-ai-training-gpu-hours',
+          baseMonthlyCostUsd: 918,
+          isApproximate: true,
+        }),
+        expect.objectContaining({
+          category: 'compute',
+          skuId: 'modeled-ai-model-hosting-hours',
+          baseMonthlyCostUsd: 175.2,
+        }),
+        expect.objectContaining({
+          category: 'operations',
+          skuId: 'modeled-ai-inference-requests',
+          baseMonthlyCostUsd: 0.4,
+        }),
+        expect.objectContaining({
+          category: 'storage',
+          skuId: 'modeled-ai-vector-storage',
+          baseMonthlyCostUsd: 50,
+        }),
+        expect.objectContaining({
+          category: 'operations',
+          skuId: 'modeled-ai-vector-queries',
+          baseMonthlyCostUsd: 0.5,
+        }),
+        expect.objectContaining({
+          category: 'operations',
+          skuId: 'modeled-ai-api-input-tokens',
+          baseMonthlyCostUsd: 400,
+        }),
+        expect.objectContaining({
+          category: 'operations',
+          skuId: 'modeled-ai-api-output-tokens',
+          baseMonthlyCostUsd: 240,
+        }),
+      ]),
+    );
+    expect(result.providers[0].breakdown).toEqual(
+      expect.objectContaining({
+        computeMonthlyCostUsd: 1103.2,
+        storageMonthlyCostUsd: 50,
+        operationsMonthlyCostUsd: 640.9,
+      }),
+    );
+  });
+
   it('uses a safe warning when a provider fails without an Error object', async () => {
     const service = createService([
       adapter(

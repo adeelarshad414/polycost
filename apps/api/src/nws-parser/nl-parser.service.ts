@@ -12,7 +12,7 @@ import {
 } from './nws-parser.types';
 
 const WORKLOAD_SIGNAL_PATTERN =
-  /\b(analytics|api|app|aurora|batch|bigquery|bi|cdn|container|cosmos|data lake|data warehouse|database|db|dynamodb|ec2|egress|etl|file|firestore|kubernetes|load balancer|looker|ml|mongo|mysql|nosql|postgres|power bi|pub\/sub|redis|redshift|server|service|spanner|storage|streaming|synapse|traffic|upload|users|vm|warehouse|web|website|workload)\b/i;
+  /\b(ai|analytics|api|app|aurora|azure ml|batch|bedrock|bigquery|bi|cdn|container|cosmos|data lake|data warehouse|database|db|dynamodb|ec2|egress|embedding|embeddings|etl|file|firestore|generative ai|gpu|inference|kubernetes|llm|load balancer|looker|machine learning|ml|model|mongo|mysql|nosql|openai|postgres|power bi|pub\/sub|redis|redshift|sagemaker|server|service|spanner|storage|streaming|synapse|tokens|traffic|upload|users|vector|vertex ai|vm|warehouse|web|website|workload)\b/i;
 
 export class NWSParseInputError extends Error {
   constructor(message: string) {
@@ -150,6 +150,13 @@ export class NLParserService {
     const analyticsIntegrationJobHours = extractAnalyticsIntegrationJobHours(input);
     const analyticsStreamingIngestGb = extractAnalyticsStreamingIngestGb(input);
     const analyticsBiUsers = extractAnalyticsBiUsers(input);
+    const aiTrainingGpuHours = extractAiTrainingGpuHours(input);
+    const aiModelHostingHours = extractAiModelHostingHours(input);
+    const aiInferenceRequestsMillion = extractAiInferenceRequestsMillion(input);
+    const aiVectorStorageGb = extractAiVectorStorageGb(input);
+    const aiVectorQueriesMillion = extractAiVectorQueriesMillion(input);
+    const aiApiInputTokensMillion = extractAiApiTokensMillion(input, 'input');
+    const aiApiOutputTokensMillion = extractAiApiTokensMillion(input, 'output');
 
     if (!instanceCount) {
       fieldsRequiringReview.push('compute[0].instanceCount');
@@ -326,6 +333,13 @@ export class NLParserService {
         analyticsIntegrationJobHours,
         analyticsStreamingIngestGb,
         analyticsBiUsers,
+        aiTrainingGpuHours,
+        aiModelHostingHours,
+        aiInferenceRequestsMillion,
+        aiVectorStorageGb,
+        aiVectorQueriesMillion,
+        aiApiInputTokensMillion,
+        aiApiOutputTokensMillion,
         monthlyEgressGb: extractEgressGb(input),
         cdn: /\bcdn|content delivery\b/i.test(input),
         loadBalancer: /\bload balanc|alb|elb|application gateway\b/i.test(input),
@@ -363,6 +377,7 @@ export const NWS_PARSE_SYSTEM_PROMPT = [
   'Do not invent exact SKU names or prices. Capture uncertain fields in fieldsRequiringReview.',
   'Populate serviceRequirements as cloud-neutral selected services with category, serviceType, region, az, quantity, tier, and scaleParams when the input supports it.',
   'For analytics workloads, capture data-warehouse, data-lake, data-integration, streaming-analytics, and business-intelligence requirements with analyticsWarehouseStorageGb, analyticsWarehouseQueryTb, analyticsDataLakeStorageGb, analyticsIntegrationJobHours, analyticsStreamingIngestGb, and analyticsBiUsers scaleParams when stated.',
+  'For AI/ML workloads, capture ml-training, model-hosting, ai-inference, vector-search, and generative-ai-api requirements with aiTrainingGpuHours, aiModelHostingHours, aiInferenceRequestsMillion, aiVectorStorageGb, aiVectorQueriesMillion, aiApiInputTokensMillion, and aiApiOutputTokensMillion scaleParams when stated.',
   'Prefer partial valid NWS drafts over guessing. The user can edit the structured form before pricing.',
 ].join('\n');
 
@@ -377,6 +392,10 @@ function buildUserPrompt(input: string): string {
 }
 
 function inferWorkloadName(input: string): string {
+  if (hasAiWorkloadContext(input)) {
+    return 'AI/ML workload';
+  }
+
   if (input.includes('warehouse') || input.includes('analytics')) {
     return 'Analytics workload';
   }
@@ -397,6 +416,10 @@ function inferWorkloadName(input: string): string {
 }
 
 function inferWorkloadType(input: string): NormalizedWorkloadSpec['workload']['type'] {
+  if (hasAiWorkloadContext(input)) {
+    return 'ml_workload';
+  }
+
   if (
     input.includes('data pipeline') ||
     input.includes('analytics') ||
@@ -419,14 +442,14 @@ function inferWorkloadType(input: string): NormalizedWorkloadSpec['workload']['t
     return 'batch_processing';
   }
 
-  if (input.includes('ml') || input.includes('machine learning')) {
-    return 'ml_workload';
-  }
-
   return 'web_app';
 }
 
 function inferComputeRole(input: string): string {
+  if (hasAiWorkloadContext(input)) {
+    return 'ml';
+  }
+
   if (input.includes('api')) {
     return 'api';
   }
@@ -627,6 +650,13 @@ function inferServiceRequirements(input: {
   analyticsIntegrationJobHours?: number;
   analyticsStreamingIngestGb?: number;
   analyticsBiUsers?: number;
+  aiTrainingGpuHours?: number;
+  aiModelHostingHours?: number;
+  aiInferenceRequestsMillion?: number;
+  aiVectorStorageGb?: number;
+  aiVectorQueriesMillion?: number;
+  aiApiInputTokensMillion?: number;
+  aiApiOutputTokensMillion?: number;
   monthlyEgressGb?: number;
   cdn: boolean;
   loadBalancer: boolean;
@@ -818,6 +848,115 @@ function inferServiceRequirements(input: {
     });
   }
 
+  if (hasAiTrainingContext(input.input) || hasPositiveNumber(input.aiTrainingGpuHours)) {
+    requirements.push({
+      serviceCategory: 'ai',
+      serviceType: 'ml-training',
+      instanceType: aiInstanceType('ML training', [
+        input.aiTrainingGpuHours !== undefined
+          ? `${input.aiTrainingGpuHours} GPU-hours`
+          : undefined,
+      ]),
+      tier: 'training',
+      ...(input.regionPreference ? { region: input.regionPreference } : {}),
+      az,
+      quantity: 1,
+      scaleParams: {
+        aiTrainingGpuHours: input.aiTrainingGpuHours ?? 0,
+      },
+    });
+  }
+
+  if (hasAiModelHostingContext(input.input) || hasPositiveNumber(input.aiModelHostingHours)) {
+    requirements.push({
+      serviceCategory: 'ai',
+      serviceType: 'model-hosting',
+      instanceType: aiInstanceType('model hosting', [
+        input.aiModelHostingHours !== undefined
+          ? `${input.aiModelHostingHours} endpoint-hours`
+          : undefined,
+      ]),
+      tier: 'serving',
+      ...(input.regionPreference ? { region: input.regionPreference } : {}),
+      az,
+      quantity: 1,
+      scaleParams: {
+        aiModelHostingHours: input.aiModelHostingHours ?? 0,
+      },
+    });
+  }
+
+  if (hasAiInferenceContext(input.input) || hasPositiveNumber(input.aiInferenceRequestsMillion)) {
+    requirements.push({
+      serviceCategory: 'ai',
+      serviceType: 'ai-inference',
+      instanceType: aiInstanceType('AI inference', [
+        input.aiInferenceRequestsMillion !== undefined
+          ? `${input.aiInferenceRequestsMillion}M requests`
+          : undefined,
+      ]),
+      tier: 'inference',
+      ...(input.regionPreference ? { region: input.regionPreference } : {}),
+      az,
+      quantity: 1,
+      scaleParams: {
+        aiInferenceRequestsMillion: input.aiInferenceRequestsMillion ?? 0,
+      },
+    });
+  }
+
+  if (
+    hasAiVectorSearchContext(input.input) ||
+    hasPositiveNumber(input.aiVectorStorageGb) ||
+    hasPositiveNumber(input.aiVectorQueriesMillion)
+  ) {
+    requirements.push({
+      serviceCategory: 'ai',
+      serviceType: 'vector-search',
+      instanceType: aiInstanceType('vector search', [
+        input.aiVectorStorageGb !== undefined ? `${input.aiVectorStorageGb}GB index` : undefined,
+        input.aiVectorQueriesMillion !== undefined
+          ? `${input.aiVectorQueriesMillion}M queries`
+          : undefined,
+      ]),
+      tier: 'retrieval',
+      ...(input.regionPreference ? { region: input.regionPreference } : {}),
+      az,
+      quantity: 1,
+      scaleParams: {
+        aiVectorStorageGb: input.aiVectorStorageGb ?? 0,
+        aiVectorQueriesMillion: input.aiVectorQueriesMillion ?? 0,
+      },
+    });
+  }
+
+  if (
+    hasGenerativeAiContext(input.input) ||
+    hasPositiveNumber(input.aiApiInputTokensMillion) ||
+    hasPositiveNumber(input.aiApiOutputTokensMillion)
+  ) {
+    requirements.push({
+      serviceCategory: 'ai',
+      serviceType: 'generative-ai-api',
+      instanceType: aiInstanceType('generative AI API', [
+        input.aiApiInputTokensMillion !== undefined
+          ? `${input.aiApiInputTokensMillion}M input tokens`
+          : undefined,
+        input.aiApiOutputTokensMillion !== undefined
+          ? `${input.aiApiOutputTokensMillion}M output tokens`
+          : undefined,
+      ]),
+      tier: 'api',
+      ...(input.regionPreference ? { region: input.regionPreference } : {}),
+      az,
+      quantity: 1,
+      scaleParams: {
+        aiApiInputTokensMillion: input.aiApiInputTokensMillion ?? 0,
+        aiApiOutputTokensMillion: input.aiApiOutputTokensMillion ?? 0,
+      },
+    });
+  }
+
   if (input.cdn) {
     requirements.push({
       serviceCategory: 'networking',
@@ -844,6 +983,12 @@ function inferServiceRequirements(input: {
 }
 
 function analyticsInstanceType(label: string, details: Array<string | undefined>): string {
+  const statedDetails = details.filter((detail): detail is string => Boolean(detail));
+
+  return statedDetails.length > 0 ? `${label} - ${statedDetails.join(', ')}` : label;
+}
+
+function aiInstanceType(label: string, details: Array<string | undefined>): string {
   const statedDetails = details.filter((detail): detail is string => Boolean(detail));
 
   return statedDetails.length > 0 ? `${label} - ${statedDetails.join(', ')}` : label;
@@ -998,7 +1143,7 @@ function extractUserCount(input: string, mode: 'daily' | 'peak'): number | undef
     }
 
     const nextWords = tokens.slice(index + 1, index + 5);
-    const hasUserNoun = hasAny(nextWords, ['users', 'people', 'visitors', 'requests']);
+    const hasUserNoun = hasAny(nextWords, ['users', 'people', 'visitors']);
     const hasPeakQualifier = hasAny(nextWords, ['peak', 'concurrent']);
 
     if (mode === 'daily' && hasUserNoun && !hasPeakQualifier) {
@@ -1432,6 +1577,156 @@ function extractAnalyticsBiUsers(input: string): number | undefined {
   return afterLabel ? parseHumanNumber(afterLabel[1]) : undefined;
 }
 
+function extractAiTrainingGpuHours(input: string): number | undefined {
+  const matches = Array.from(input.matchAll(/([\d,.]+)\s*(?:gpu[- ]?)?(?:training\s*)?hours?\b/gi));
+  const matched = matches.find((match) => {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 64), index + 72).toLowerCase();
+
+    return hasAiTrainingContext(context) && /\b(gpu|training|fine[- ]?tun|ml|ai)\b/.test(context);
+  });
+
+  if (matched) {
+    return parseHumanNumber(matched[1]);
+  }
+
+  const afterLabel = input.match(
+    /\b(?:ml|machine learning|ai|sagemaker|vertex ai|azure ml|training|fine[- ]?tuning)\s*(?:gpu[- ]?)?hours?\s*[:=-]?\s*([\d,.]+)\b/i,
+  );
+
+  return afterLabel ? parseHumanNumber(afterLabel[1]) : undefined;
+}
+
+function extractAiModelHostingHours(input: string): number | undefined {
+  const beforeHours = Array.from(
+    input.matchAll(
+      /([\d,.]+)\s*(?:model\s+hosting|model\s+serving|endpoint|hosting|serving|inference)?\s*hours?\b/gi,
+    ),
+  ).find((match) => {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 56), index + 72).toLowerCase();
+
+    return hasAiModelHostingContext(context);
+  });
+
+  if (beforeHours) {
+    return parseHumanNumber(beforeHours[1]);
+  }
+
+  const afterLabel = input.match(
+    /\b(?:model hosting|model serving|endpoint|online inference|sagemaker endpoint|vertex endpoint)\s*(?:hours?)?\s*[:=-]?\s*([\d,.]+)\s*(?:hours?|hrs?)\b/i,
+  );
+
+  return afterLabel ? parseHumanNumber(afterLabel[1]) : undefined;
+}
+
+function extractAiInferenceRequestsMillion(input: string): number | undefined {
+  const beforeRequests = Array.from(
+    input.matchAll(
+      /([\d,.]+)\s*(k|thousand|m|million)?\s*(?:ai|ml|model|inference|prediction|predictions|invocations?)?\s*(?:requests?|inferences?|predictions?|invocations?)\b/gi,
+    ),
+  ).find((match) => {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 56), index + 80).toLowerCase();
+
+    return hasAiInferenceContext(context);
+  });
+
+  if (beforeRequests) {
+    return requestMatchToMillion(beforeRequests[1], beforeRequests[2]);
+  }
+
+  const afterLabel = input.match(
+    /\b(?:ai|ml|model|inference|prediction|predictions|invocations?)\s*(?:requests?|inferences?|predictions?|invocations?)\s*[:=-]?\s*([\d,.]+)\s*(k|thousand|m|million)?\b/i,
+  );
+
+  return afterLabel ? requestMatchToMillion(afterLabel[1], afterLabel[2]) : undefined;
+}
+
+function extractAiVectorStorageGb(input: string): number | undefined {
+  const explicitBefore = input.match(
+    /([\d,.]+)\s*(gb|tb)\s*(?:vector|embedding|embeddings|semantic|rag)\s*(?:storage|index|database|db)\b/i,
+  );
+
+  if (explicitBefore) {
+    return toGb(explicitBefore[1], explicitBefore[2]);
+  }
+
+  const explicitAfter = input.match(
+    /\b(?:vector|embedding|embeddings|semantic|rag)\s*(?:storage|index|database|db)\s*[:=-]?\s*([\d,.]+)\s*(gb|tb)\b/i,
+  );
+
+  if (explicitAfter) {
+    return toGb(explicitAfter[1], explicitAfter[2]);
+  }
+
+  return extractContextSizeGb(input, {
+    contextPattern: /\b(vector|vectors|embedding|embeddings|semantic|rag)\b/,
+    includePattern: /\b(storage|index|database|db|vector)\b/,
+    excludePattern: /\b(query|queries|search|searches|requests?)\b/,
+    unit: 'gb',
+  });
+}
+
+function extractAiVectorQueriesMillion(input: string): number | undefined {
+  const beforeQueries = Array.from(
+    input.matchAll(
+      /([\d,.]+)\s*(k|thousand|m|million)?\s*(?:vector|embedding|semantic|rag)?\s*(?:queries|query|searches|search|lookups?)\b/gi,
+    ),
+  ).find((match) => {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 54), index + 72).toLowerCase();
+
+    return hasAiVectorSearchContext(context);
+  });
+
+  if (beforeQueries) {
+    return requestMatchToMillion(beforeQueries[1], beforeQueries[2]);
+  }
+
+  const afterLabel = input.match(
+    /\b(?:vector|embedding|semantic|rag)\s*(?:queries|query|searches|search|lookups?)\s*[:=-]?\s*([\d,.]+)\s*(k|thousand|m|million)?\b/i,
+  );
+
+  return afterLabel ? requestMatchToMillion(afterLabel[1], afterLabel[2]) : undefined;
+}
+
+function extractAiApiTokensMillion(
+  input: string,
+  tokenKind: 'input' | 'output',
+): number | undefined {
+  const tokenPattern =
+    tokenKind === 'input'
+      ? '(?:input|prompt|request|ingress)'
+      : '(?:output|completion|response|generated)';
+  const beforeTokens = Array.from(
+    input.matchAll(
+      new RegExp(
+        `([\\d,.]+)\\s*(k|thousand|m|million)?\\s*(?:${tokenPattern})\\s*(?:tokens?)\\b`,
+        'gi',
+      ),
+    ),
+  ).find((match) => {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 64), index + 80).toLowerCase();
+
+    return hasGenerativeAiContext(context);
+  });
+
+  if (beforeTokens) {
+    return requestMatchToMillion(beforeTokens[1], beforeTokens[2]);
+  }
+
+  const afterLabel = new RegExp(
+    `\\b(?:${tokenPattern})\\s*(?:tokens?)\\s*[:=-]?\\s*([\\d,.]+)\\s*(k|thousand|m|million)?\\b`,
+    'i',
+  ).exec(input);
+
+  return afterLabel && hasGenerativeAiContext(input)
+    ? requestMatchToMillion(afterLabel[1], afterLabel[2])
+    : undefined;
+}
+
 function extractContextSizeGb(
   input: string,
   options: {
@@ -1480,6 +1775,42 @@ function hasStreamingAnalyticsContext(input: string): boolean {
 
 function hasBiAnalyticsContext(input: string): boolean {
   return /\b(bi|business intelligence|power bi|looker|quicksight|dashboard users?|report users?)\b/i.test(
+    input,
+  );
+}
+
+function hasAiWorkloadContext(input: string): boolean {
+  return /\b(ai|ml|machine learning|deep learning|llm|generative ai|bedrock|openai|sagemaker|vertex ai|azure ml|model training|model hosting|inference|vector search|embeddings?)\b/i.test(
+    input,
+  );
+}
+
+function hasAiTrainingContext(input: string): boolean {
+  return /\b(ml training|machine learning training|model training|ai training|deep learning|fine[- ]?tuning|sagemaker training|vertex ai training|azure ml training|gpu training)\b/i.test(
+    input,
+  );
+}
+
+function hasAiModelHostingContext(input: string): boolean {
+  return /\b(model hosting|model serving|hosted model|endpoint|online inference|sagemaker endpoint|vertex endpoint|managed inference endpoint)\b/i.test(
+    input,
+  );
+}
+
+function hasAiInferenceContext(input: string): boolean {
+  return /\b(ai inference|ml inference|model inference|inference requests?|prediction requests?|model invocations?|predictions?|bedrock invocations?|vertex predictions?)\b/i.test(
+    input,
+  );
+}
+
+function hasAiVectorSearchContext(input: string): boolean {
+  return /\b(vector search|vector queries?|vector database|vector db|vector index|embedding index|embeddings?|semantic search|rag)\b/i.test(
+    input,
+  );
+}
+
+function hasGenerativeAiContext(input: string): boolean {
+  return /\b(generative ai|genai|llm|large language model|bedrock|openai|azure openai|vertex ai|foundation model|prompt tokens?|completion tokens?|input tokens?|output tokens?)\b/i.test(
     input,
   );
 }
@@ -1601,7 +1932,18 @@ function parseTokenNumber(value: string): number | undefined {
     return wordNumber;
   }
 
-  const parsed = Number.parseFloat(value.replace(/,/g, ''));
+  const normalized = value.replace(/,/g, '');
+  const compactScaled = normalized.match(/^(\d+(?:\.\d+)?)(k|m)$/i);
+
+  if (compactScaled) {
+    return Math.round(parseScaledNumber(compactScaled[1], compactScaled[2]));
+  }
+
+  if (!/^\d+(?:\.\d+)?$/.test(normalized)) {
+    return undefined;
+  }
+
+  const parsed = Number.parseFloat(normalized);
   return Number.isFinite(parsed) ? Math.round(parsed) : undefined;
 }
 

@@ -43,7 +43,8 @@ for migration in \
   011_seed_local_commitment_pricing_catalog.sql \
   012_production_depth_audit_analytics.sql \
   013_report_export_jobs.sql \
-  014_comparison_prewarm_jobs.sql
+  014_comparison_prewarm_jobs.sql \
+  015_seed_accelerated_compute_pricing_catalog.sql
 do
   psql \
     --username "$POSTGRES_USER" \

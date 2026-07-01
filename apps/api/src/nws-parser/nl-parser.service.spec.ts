@@ -467,6 +467,82 @@ describe('NLParserService', () => {
     expect(result.fieldsRequiringReview).not.toContain('compute[0].memoryGb');
   });
 
+  it('infers AI and machine-learning platform dimensions from natural language', async () => {
+    const client: StructuredLlmClient = {
+      createStructuredOutput: jest.fn(),
+    };
+    const service = new NLParserService(configService(4000, false), client, fixedNow);
+
+    const result = await service.parse(
+      'A machine learning platform with two 16 vCPU 64GB GPU servers, 300 GPU training hours, 730 model hosting hours, 2M inference requests, 200GB vector storage, 5M vector queries, and an LLM with 500M input tokens and 100M output tokens in us-east-1.',
+    );
+
+    expect(result.draftNws.workload).toEqual(
+      expect.objectContaining({
+        name: 'AI/ML workload',
+        type: 'ml_workload',
+        expectedUsers: {},
+      }),
+    );
+    expect(result.draftNws.compute[0]).toEqual(
+      expect.objectContaining({
+        role: 'ml',
+        instanceFamily: 'accelerated-computing',
+        processorArchitecture: 'gpu',
+        instanceCount: 2,
+        vcpu: 16,
+        memoryGb: 64,
+      }),
+    );
+    expect(result.draftNws.serviceRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceCategory: 'ai',
+          serviceType: 'ml-training',
+          instanceType: 'ML training - 300 GPU-hours',
+          scaleParams: expect.objectContaining({
+            aiTrainingGpuHours: 300,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'ai',
+          serviceType: 'model-hosting',
+          instanceType: 'model hosting - 730 endpoint-hours',
+          scaleParams: expect.objectContaining({
+            aiModelHostingHours: 730,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'ai',
+          serviceType: 'ai-inference',
+          instanceType: 'AI inference - 2M requests',
+          scaleParams: expect.objectContaining({
+            aiInferenceRequestsMillion: 2,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'ai',
+          serviceType: 'vector-search',
+          instanceType: 'vector search - 200GB index, 5M queries',
+          scaleParams: expect.objectContaining({
+            aiVectorStorageGb: 200,
+            aiVectorQueriesMillion: 5,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'ai',
+          serviceType: 'generative-ai-api',
+          instanceType: 'generative AI API - 500M input tokens, 100M output tokens',
+          scaleParams: expect.objectContaining({
+            aiApiInputTokensMillion: 500,
+            aiApiOutputTokensMillion: 100,
+          }),
+        }),
+      ]),
+    );
+    expect(result.fieldsRequiringReview).toEqual([]);
+  });
+
   it('infers accelerated compute families for GPU and ML workloads', async () => {
     const client: StructuredLlmClient = {
       createStructuredOutput: jest.fn(),

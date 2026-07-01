@@ -113,6 +113,16 @@ interface AnalyticsServicesRates {
   biUserMonthly: number;
 }
 
+interface AiServicesRates {
+  trainingGpuHour: number;
+  modelHostingHour: number;
+  inferenceRequestPerMillion: number;
+  vectorStoragePerGbMonth: number;
+  vectorQueryPerMillion: number;
+  apiInputTokenPerMillion: number;
+  apiOutputTokenPerMillion: number;
+}
+
 type StorageClassKey = NonNullable<NormalizedWorkloadSpec['storage'][number]['storageClass']>;
 
 export class ComparisonUnavailableError extends Error {
@@ -452,6 +462,7 @@ export class ComparisonOrchestratorService {
     const supportingServicesLineItems = this.supportingServicesLineItems(nws, providerId);
     const runtimeServicesLineItems = this.runtimeServicesLineItems(nws, providerId);
     const analyticsServicesLineItems = this.analyticsServicesLineItems(nws, providerId);
+    const aiServicesLineItems = this.aiServicesLineItems(nws, providerId);
     const networkLineItems = this.networkDimensionLineItems(nws, providerId);
 
     return [
@@ -463,6 +474,7 @@ export class ComparisonOrchestratorService {
       ...supportingServicesLineItems,
       ...runtimeServicesLineItems,
       ...analyticsServicesLineItems,
+      ...aiServicesLineItems,
       ...networkLineItems,
     ].filter((lineItem): lineItem is ComparisonLineItem => lineItem !== undefined);
   }
@@ -1654,6 +1666,139 @@ export class ComparisonOrchestratorService {
     return lineItems;
   }
 
+  private aiServicesLineItems(
+    nws: NormalizedWorkloadSpec,
+    providerId: ProviderId,
+  ): ComparisonLineItem[] {
+    const requirements = nws.serviceRequirements ?? [];
+    const serviceTypes = new Set(requirements.map((requirement) => requirement.serviceType));
+    const rates = aiServicesRates(providerId);
+    const regionLabel = nws.workload.region.preference ?? 'default region';
+    const values = aiServicesAssumptions(requirements);
+    const lineItems: ComparisonLineItem[] = [];
+
+    if (
+      (serviceTypes.has('ml-training') || values.aiTrainingGpuHours > 0) &&
+      values.aiTrainingGpuHours > 0
+    ) {
+      lineItems.push(
+        this.computeModeledLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-ai-training-gpu-hours',
+          description: `${providerLabel(providerId)} AI/ML training GPU-hour estimate`,
+          monthlyCostUsd: this.roundCurrency(values.aiTrainingGpuHours * rates.trainingGpuHour),
+          unit: 'GPU-hour',
+          unitPriceUsd: rates.trainingGpuHour,
+        }),
+      );
+    }
+
+    if (
+      (serviceTypes.has('model-hosting') || values.aiModelHostingHours > 0) &&
+      values.aiModelHostingHours > 0
+    ) {
+      lineItems.push(
+        this.computeModeledLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-ai-model-hosting-hours',
+          description: `${providerLabel(providerId)} managed model hosting endpoint estimate`,
+          monthlyCostUsd: this.roundCurrency(values.aiModelHostingHours * rates.modelHostingHour),
+          unit: 'endpoint-hour',
+          unitPriceUsd: rates.modelHostingHour,
+        }),
+      );
+    }
+
+    if (
+      (serviceTypes.has('ai-inference') || values.aiInferenceRequestsMillion > 0) &&
+      values.aiInferenceRequestsMillion > 0
+    ) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-ai-inference-requests',
+          description: `${providerLabel(providerId)} AI inference request estimate`,
+          quantity: values.aiInferenceRequestsMillion,
+          unit: '1M requests',
+          unitPriceUsd: rates.inferenceRequestPerMillion,
+        }),
+      );
+    }
+
+    if (
+      (serviceTypes.has('vector-search') || values.aiVectorStorageGb > 0) &&
+      values.aiVectorStorageGb > 0
+    ) {
+      lineItems.push(
+        this.storageLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-ai-vector-storage',
+          description: `${providerLabel(providerId)} vector index storage estimate`,
+          quantity: values.aiVectorStorageGb,
+          unit: 'GB-month',
+          unitPriceUsd: rates.vectorStoragePerGbMonth,
+        }),
+      );
+    }
+
+    if (
+      (serviceTypes.has('vector-search') || values.aiVectorQueriesMillion > 0) &&
+      values.aiVectorQueriesMillion > 0
+    ) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-ai-vector-queries',
+          description: `${providerLabel(providerId)} vector search query estimate`,
+          quantity: values.aiVectorQueriesMillion,
+          unit: '1M vector queries',
+          unitPriceUsd: rates.vectorQueryPerMillion,
+        }),
+      );
+    }
+
+    if (
+      (serviceTypes.has('generative-ai-api') || values.aiApiInputTokensMillion > 0) &&
+      values.aiApiInputTokensMillion > 0
+    ) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-ai-api-input-tokens',
+          description: `${providerLabel(providerId)} generative AI input token estimate`,
+          quantity: values.aiApiInputTokensMillion,
+          unit: '1M input tokens',
+          unitPriceUsd: rates.apiInputTokenPerMillion,
+        }),
+      );
+    }
+
+    if (
+      (serviceTypes.has('generative-ai-api') || values.aiApiOutputTokensMillion > 0) &&
+      values.aiApiOutputTokensMillion > 0
+    ) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-ai-api-output-tokens',
+          description: `${providerLabel(providerId)} generative AI output token estimate`,
+          quantity: values.aiApiOutputTokensMillion,
+          unit: '1M output tokens',
+          unitPriceUsd: rates.apiOutputTokenPerMillion,
+        }),
+      );
+    }
+
+    return lineItems;
+  }
+
   private computeModeledLineItem(input: {
     providerId: ProviderId;
     regionLabel: string;
@@ -2327,6 +2472,64 @@ function analyticsServicesAssumptions(
     analyticsIntegrationJobHours: maxScaleParam(requirements, 'analyticsIntegrationJobHours'),
     analyticsStreamingIngestGb: maxScaleParam(requirements, 'analyticsStreamingIngestGb'),
     analyticsBiUsers: maxScaleParam(requirements, 'analyticsBiUsers'),
+  };
+}
+
+function aiServicesRates(providerId: ProviderId): AiServicesRates {
+  switch (providerId) {
+    case 'aws':
+      return {
+        trainingGpuHour: 3.06,
+        modelHostingHour: 0.24,
+        inferenceRequestPerMillion: 0.2,
+        vectorStoragePerGbMonth: 0.25,
+        vectorQueryPerMillion: 0.1,
+        apiInputTokenPerMillion: 0.8,
+        apiOutputTokenPerMillion: 2.4,
+      };
+    case 'azure':
+      return {
+        trainingGpuHour: 3.67,
+        modelHostingHour: 0.28,
+        inferenceRequestPerMillion: 0.18,
+        vectorStoragePerGbMonth: 0.23,
+        vectorQueryPerMillion: 0.12,
+        apiInputTokenPerMillion: 0.5,
+        apiOutputTokenPerMillion: 1.5,
+      };
+    case 'gcp':
+      return {
+        trainingGpuHour: 2.93,
+        modelHostingHour: 0.22,
+        inferenceRequestPerMillion: 0.25,
+        vectorStoragePerGbMonth: 0.2,
+        vectorQueryPerMillion: 0.08,
+        apiInputTokenPerMillion: 0.35,
+        apiOutputTokenPerMillion: 1.05,
+      };
+  }
+}
+
+function aiServicesAssumptions(
+  requirements: ServiceRequirement[],
+): Record<
+  | 'aiTrainingGpuHours'
+  | 'aiModelHostingHours'
+  | 'aiInferenceRequestsMillion'
+  | 'aiVectorStorageGb'
+  | 'aiVectorQueriesMillion'
+  | 'aiApiInputTokensMillion'
+  | 'aiApiOutputTokensMillion',
+  number
+> {
+  return {
+    aiTrainingGpuHours: maxScaleParam(requirements, 'aiTrainingGpuHours'),
+    aiModelHostingHours: maxScaleParam(requirements, 'aiModelHostingHours'),
+    aiInferenceRequestsMillion: maxScaleParam(requirements, 'aiInferenceRequestsMillion'),
+    aiVectorStorageGb: maxScaleParam(requirements, 'aiVectorStorageGb'),
+    aiVectorQueriesMillion: maxScaleParam(requirements, 'aiVectorQueriesMillion'),
+    aiApiInputTokensMillion: maxScaleParam(requirements, 'aiApiInputTokensMillion'),
+    aiApiOutputTokensMillion: maxScaleParam(requirements, 'aiApiOutputTokensMillion'),
   };
 }
 
