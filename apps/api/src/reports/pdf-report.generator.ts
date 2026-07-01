@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ComparisonLineItem, ComparisonResult } from '../comparison/comparison.types';
 import {
+  architectureOverviewRows,
   breakEvenSummaryRows,
   commitmentTcoRows,
   decisionSummaryRows,
@@ -14,6 +15,7 @@ import {
   regionComparisonRows,
   reportAssumptionRows,
   reportContextRows,
+  reportCoverRows,
   selectedScenarioRows,
   serviceRequirementRows,
   skuMappingAppendixRows,
@@ -82,8 +84,12 @@ export class PdfReportGenerator {
   private lines(result: ComparisonResult, options: ReportOptions): PdfLine[] {
     const lines: PdfLine[] = [
       { text: 'PolyCost Comparison Report', fontSize: 18 },
-      { text: `Comparison ID: ${result.comparisonId}`, fontSize: 10 },
-      { text: `Pricing as of: ${result.pricingAsOf}`, fontSize: 10 },
+      ...reportCoverRows(result, options)
+        .slice(1)
+        .map((row) => ({
+          text: `${row[0]}: ${row[1]}`,
+          fontSize: 10,
+        })),
       {
         text: `Cheapest provider (on-demand baseline): ${result.cheapestProviderId}`,
         fontSize: 10,
@@ -114,6 +120,18 @@ export class PdfReportGenerator {
         .slice(1)
         .map((row) => ({
           text: `${row[0]}: ${row[1]}`,
+          fontSize: 10,
+        })),
+      { text: '', fontSize: 10 },
+      { text: 'Architecture overview', fontSize: 14 },
+      {
+        text: 'Category | Requirement | AWS mapping | Azure mapping | GCP mapping | Confidence',
+        fontSize: 10,
+      },
+      ...architectureOverviewRows(result)
+        .slice(1)
+        .map((row) => ({
+          text: `${row[0]} | ${row[1]} | AWS ${row[2]} | Azure ${row[3]} | GCP ${row[4]} | confidence ${row[5]}`,
           fontSize: 10,
         })),
       { text: '', fontSize: 10 },

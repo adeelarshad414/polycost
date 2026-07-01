@@ -3,6 +3,7 @@ import { CsvReportGenerator } from './csv-report.generator';
 import { ExcelReportGenerator } from './excel-report.generator';
 import { PdfReportGenerator } from './pdf-report.generator';
 import {
+  architectureOverviewRows,
   breakEvenSummaryRows,
   commitmentTcoRows,
   decisionSummaryRows,
@@ -17,6 +18,7 @@ import {
   providerRankingRows,
   regionComparisonRows,
   reportAssumptionRows,
+  reportCoverRows,
   selectedScenarioRows,
   serviceRequirementRows,
   skuMappingAppendixRows,
@@ -163,10 +165,18 @@ const comparison: ComparisonResult = {
 describe('report generators', () => {
   it('creates a CSV report with matching totals and spreadsheet injection mitigation', () => {
     const csv = new CsvReportGenerator()
-      .generate(comparison, { interval: 'quarterly', pricingModel: 'reserved-3yr' })
+      .generate(comparison, {
+        interval: 'quarterly',
+        pricingModel: 'reserved-3yr',
+        generatedAt: '2026-07-02T00:00:00.000Z',
+      })
       .toString('utf8');
 
     expect(csv).toContain('Comparison ID,comparison-123');
+    expect(csv).toContain('Generated at,2026-07-02T00:00:00.000Z');
+    expect(csv).toContain(
+      'Data freshness notice,Pricing data as of 2026-06-29T00:00:00.000Z; refresh cached pricing before final commitment.',
+    );
     expect(csv).toContain('Cheapest provider (on-demand baseline),gcp');
     expect(csv).toContain('Selected interval,Quarterly');
     expect(csv).toContain('Selected pricing model,Reserved 3-year');
@@ -182,6 +192,9 @@ describe('report generators', () => {
     expect(csv).toContain('gcp,Not eligible,no,,,,,,0,Not available for this SKU/region.');
     expect(csv).toContain('Workload Scope');
     expect(csv).toContain('Workload name,Client portal');
+    expect(csv).toContain('Architecture Overview');
+    expect(csv).toContain('AWS mapping,Azure mapping,GCP mapping');
+    expect(csv).toContain('compute/vm-compute');
     expect(csv).toContain('FinOps Summary');
     expect(csv).toContain('Executive recommendation,gcp is the current cost baseline');
     expect(csv).toContain('Decision confidence,Medium - 2/3 providers priced; 1 approximate mappings');
@@ -264,6 +277,7 @@ describe('report generators', () => {
     const xlsx = new ExcelReportGenerator().generate(comparison, {
       interval: 'quarterly',
       pricingModel: 'reserved-3yr',
+      generatedAt: '2026-07-02T00:00:00.000Z',
     });
     const xlsxText = xlsx.toString('utf8');
 
@@ -274,13 +288,14 @@ describe('report generators', () => {
     expect(xlsxText).toContain('xl/worksheets/sheet2.xml');
     expect(xlsxText).toContain('<sheet name="Comparison"');
     expect(xlsxText).toContain('<sheet name="What If" sheetId="2"');
-    expect(xlsxText).toContain('<sheet name="Optimization Opportunities" sheetId="3"');
-    expect(xlsxText).toContain('<sheet name="Egress &amp; Networking Detail" sheetId="4"');
-    expect(xlsxText).toContain('<sheet name="Region Comparison" sheetId="5"');
-    expect(xlsxText).toContain('<sheet name="Break-Even Analysis" sheetId="6"');
-    expect(xlsxText).toContain('<sheet name="Break-Even Summary" sheetId="7"');
-    expect(xlsxText).toContain('<sheet name="Methodology &amp; Sources" sheetId="8"');
-    expect(xlsxText).toContain('<sheet name="SKU Mapping Appendix" sheetId="9"');
+    expect(xlsxText).toContain('<sheet name="Architecture Overview" sheetId="3"');
+    expect(xlsxText).toContain('<sheet name="Optimization Opportunities" sheetId="4"');
+    expect(xlsxText).toContain('<sheet name="Egress &amp; Networking Detail" sheetId="5"');
+    expect(xlsxText).toContain('<sheet name="Region Comparison" sheetId="6"');
+    expect(xlsxText).toContain('<sheet name="Break-Even Analysis" sheetId="7"');
+    expect(xlsxText).toContain('<sheet name="Break-Even Summary" sheetId="8"');
+    expect(xlsxText).toContain('<sheet name="Methodology &amp; Sources" sheetId="9"');
+    expect(xlsxText).toContain('<sheet name="SKU Mapping Appendix" sheetId="10"');
     expect(xlsxText).toContain('<calcPr calcMode="auto" fullCalcOnLoad="1"/>');
     expect(xlsxText).toContain(
       '<definedName name="WhatIfScaleFactor">&apos;What If&apos;!$B$5</definedName>',
@@ -305,6 +320,12 @@ describe('report generators', () => {
     expect(xlsxText).toContain('Provider Ranking');
     expect(xlsxText).toContain('Selected model eligible');
     expect(xlsxText).toContain('Workload Scope');
+    expect(xlsxText).toContain('Generated at');
+    expect(xlsxText).toContain('2026-07-02T00:00:00.000Z');
+    expect(xlsxText).toContain('Data freshness notice');
+    expect(xlsxText).toContain('Architecture Overview');
+    expect(xlsxText).toContain('AWS mapping');
+    expect(xlsxText).toContain('compute/vm-compute');
     expect(xlsxText).toContain('FinOps Summary');
     expect(xlsxText).toContain('Executive recommendation');
     expect(xlsxText).toContain('Decision confidence');
@@ -397,12 +418,18 @@ describe('report generators', () => {
           comparison.providers[1],
         ],
       },
-      { interval: 'quarterly', pricingModel: 'reserved-3yr' },
+      {
+        interval: 'quarterly',
+        pricingModel: 'reserved-3yr',
+        generatedAt: '2026-07-02T00:00:00.000Z',
+      },
     );
     const pdfText = pdf.toString('utf8');
 
     expect(pdf.subarray(0, 8).toString('utf8')).toBe('%PDF-1.4');
     expect(pdfText).toContain('Comparison ID: comparison-123');
+    expect(pdfText).toContain('Generated at: 2026-07-02T00:00:00.000Z');
+    expect(pdfText).toContain('Data freshness notice: Pricing data as of');
     expect(pdfText).toContain('Cheapest provider \\(on-demand baseline\\): gcp');
     expect(pdfText).toContain('Selected interval: Quarterly');
     expect(pdfText).toContain('Selected pricing model: Reserved 3-year');
@@ -411,6 +438,8 @@ describe('report generators', () => {
     expect(pdfText).toContain('Provider ranking');
     expect(pdfText).toContain('aws | #1 | eligible yes | selected $126');
     expect(pdfText).toContain('Workload scope');
+    expect(pdfText).toContain('Architecture overview');
+    expect(pdfText).toContain('compute | compute/vm-compute');
     expect(pdfText).toContain('FinOps summary');
     expect(pdfText).toContain('Executive recommendation: gcp is the current cost baseline');
     expect(pdfText).toContain('Decision confidence: Medium');
@@ -514,6 +543,34 @@ describe('report generators', () => {
         [
           'Approximate mappings',
           '1 line item(s) are approximate and should be reviewed by a solution architect before commitment.',
+        ],
+      ]),
+    );
+
+    expect(
+      reportCoverRows(comparison, {
+        interval: 'quarterly',
+        pricingModel: 'reserved-3yr',
+        generatedAt: '2026-07-02T00:00:00.000Z',
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        ['Generated at', '2026-07-02T00:00:00.000Z'],
+        ['Provider coverage', '2/2 providers priced'],
+        ['Line-item evidence', '4 line item(s), 1 approximate'],
+      ]),
+    );
+
+    expect(architectureOverviewRows(comparison)).toEqual(
+      expect.arrayContaining([
+        [
+          'compute',
+          expect.stringContaining('compute/vm-compute'),
+          expect.stringContaining('risky compute'),
+          'Not mapped',
+          'Not mapped',
+          'Partial',
+          expect.stringContaining('Complete missing provider mappings'),
         ],
       ]),
     );

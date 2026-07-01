@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ComparisonResult } from '../comparison/comparison.types';
 import {
+  architectureOverviewRows,
   breakEvenSummaryRows,
   commitmentTcoRows,
   decisionSummaryRows,
@@ -14,6 +15,7 @@ import {
   regionComparisonRows,
   reportAssumptionRows,
   reportContextRows,
+  reportCoverRows,
   selectedScenarioRows,
   serviceRequirementRows,
   skuMappingAppendixRows,
@@ -28,8 +30,7 @@ export class CsvReportGenerator {
   generate(result: ComparisonResult, options: ReportOptions = {}): Buffer {
     const rows: string[][] = [
       ['PolyCost Comparison Report'],
-      ['Comparison ID', result.comparisonId],
-      ['Pricing As Of', result.pricingAsOf],
+      ...reportCoverRows(result, options).map((row) => row.map(sanitizeSpreadsheetText)),
       ['Cheapest provider (on-demand baseline)', result.cheapestProviderId],
       ...reportContextRows(options),
       [],
@@ -41,6 +42,9 @@ export class CsvReportGenerator {
       [],
       ['Workload Scope'],
       ...workloadScopeRows(result).map((row) => row.map(sanitizeSpreadsheetText)),
+      [],
+      ['Architecture Overview'],
+      ...architectureOverviewRows(result).map((row) => row.map(sanitizeSpreadsheetText)),
       [],
       ['FinOps Summary'],
       ['Metric', 'Value'],

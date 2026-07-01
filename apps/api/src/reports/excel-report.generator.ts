@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ComparisonResult } from '../comparison/comparison.types';
 import {
+  architectureOverviewRows,
   breakEvenSummaryRows,
   commitmentTcoRows,
   decisionSummaryRows,
@@ -15,6 +16,7 @@ import {
   regionComparisonRows,
   reportAssumptionRows,
   reportContextRows,
+  reportCoverRows,
   selectedScenarioRows,
   serviceRequirementRows,
   skuMappingAppendixRows,
@@ -132,6 +134,7 @@ export class ExcelReportGenerator {
           name: 'What If',
           rows: whatIfSheet.rows,
         },
+        evidenceSheet('Architecture Overview', architectureOverviewRows(result)),
         evidenceSheet('Optimization Opportunities', optimizationOpportunityRows(result)),
         evidenceSheet('Egress & Networking Detail', egressNetworkingDetailRows(result)),
         evidenceSheet('Region Comparison', regionComparisonRows(result)),
@@ -153,12 +156,10 @@ export class ExcelReportGenerator {
         cells: ['PolyCost Comparison Report'],
         style: 1,
       },
-      {
-        cells: ['Comparison ID', sanitizeSpreadsheetText(result.comparisonId)],
-      },
-      {
-        cells: ['Pricing As Of', sanitizeSpreadsheetText(result.pricingAsOf)],
-      },
+      ...reportCoverRows(result, options).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
       {
         cells: ['Cheapest provider (on-demand baseline)', result.cheapestProviderId],
       },
@@ -195,6 +196,17 @@ export class ExcelReportGenerator {
         style: 2,
       },
       ...workloadScopeRows(result).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
+      {
+        cells: [],
+      },
+      {
+        cells: ['Architecture Overview'],
+        style: 2,
+      },
+      ...architectureOverviewRows(result).map((row, index) => ({
         cells: row.map(sanitizeSpreadsheetText),
         ...(index === 0 ? { style: 2 } : {}),
       })),

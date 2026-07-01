@@ -311,10 +311,70 @@ const COMPUTE_SPEC_EVIDENCE: Record<
   },
 };
 
+export function reportCoverRows(result: ComparisonResult, options: ReportOptions): string[][] {
+  const pricedProviders = result.providers.filter((provider) => provider.totals.monthly > 0).length;
+  const lineItemCount = result.providers.reduce(
+    (count, provider) => count + provider.lineItems.length,
+    0,
+  );
+  const approximateLineItems = result.providers.reduce(
+    (count, provider) =>
+      count + provider.lineItems.filter((lineItem) => lineItem.isApproximate).length,
+    0,
+  );
+
+  return [
+    ['Field', 'Value'],
+    ['Report title', 'PolyCost Comparison Report'],
+    ['Comparison ID', result.comparisonId],
+    ['Generated at', options.generatedAt ?? result.pricingAsOf],
+    ['Pricing data as of', result.pricingAsOf],
+    [
+      'Data freshness notice',
+      `Pricing data as of ${result.pricingAsOf}; refresh cached pricing before final commitment.`,
+    ],
+    ['Provider coverage', `${pricedProviders}/${result.providers.length} providers priced`],
+    ['Line-item evidence', `${lineItemCount} line item(s), ${approximateLineItems} approximate`],
+  ];
+}
+
 export function reportContextRows(options: ReportOptions): string[][] {
   return [
     ['Selected interval', labelForInterval(options.interval ?? 'monthly')],
     ['Selected pricing model', labelForPricingModel(options.pricingModel ?? 'on-demand')],
+  ];
+}
+
+export function architectureOverviewRows(result: ComparisonResult): string[][] {
+  const requirements = result.requirements?.serviceRequirements ?? [];
+  const rows =
+    requirements.length > 0
+      ? requirements.map((requirement) => architectureOverviewRow(result, requirement))
+      : fallbackArchitectureOverviewRows(result);
+
+  return [
+    [
+      'Category',
+      'User requirement',
+      'AWS mapping',
+      'Azure mapping',
+      'GCP mapping',
+      'Equivalence confidence',
+      'Review cue',
+    ],
+    ...(rows.length > 0
+      ? rows
+      : [
+          [
+            'No architecture services',
+            'No normalized requirements or provider line items were attached.',
+            '',
+            '',
+            '',
+            'Missing',
+            'Run a comparison with normalized workload requirements before proposal review.',
+          ],
+        ]),
   ];
 }
 
@@ -1394,7 +1454,7 @@ export function labelForPricingModel(pricingModel: ReportPricingModel): string {
 
 function serviceRequirementLabel(
   requirement: ServiceRequirement | undefined,
-  fallbackCategory: ComparisonLineItem['category'],
+  fallbackCategory: string,
 ): string {
   if (!requirement) {
     return `${fallbackCategory} (no normalized requirement row)`;
@@ -1408,6 +1468,120 @@ function serviceRequirementLabel(
   ]
     .filter(Boolean)
     .join(' / ');
+}
+
+function architectureOverviewRow(
+  result: ComparisonResult,
+  requirement: ServiceRequirement,
+): string[] {
+  const providerMappings = result.providers.map((provider) =>
+    architectureProviderMapping(provider, requirement.serviceCategory),
+  );
+  const confidence = architectureConfidence(providerMappings);
+
+  return [
+    requirement.serviceCategory,
+    serviceRequirementLabel(requirement, requirement.serviceCategory),
+    providerMappings.find((mapping) => mapping.providerId === 'aws')?.label ?? 'Not mapped',
+    providerMappings.find((mapping) => mapping.providerId === 'azure')?.label ?? 'Not mapped',
+    providerMappings.find((mapping) => mapping.providerId === 'gcp')?.label ?? 'Not mapped',
+    confidence,
+    architectureReviewCue(requirement, confidence),
+  ];
+}
+
+function fallbackArchitectureOverviewRows(result: ComparisonResult): string[][] {
+  const categories = [
+    ...new Set(
+      result.providers.flatMap((provider) => provider.lineItems.map((lineItem) => lineItem.category)),
+    ),
+  ];
+
+  return categories.map((category) => {
+    const providerMappings = result.providers.map((provider) =>
+      architectureProviderMapping(provider, category),
+    );
+    const confidence = architectureConfidence(providerMappings);
+
+    return [
+      category,
+      `${category} (derived from provider line items)`,
+      providerMappings.find((mapping) => mapping.providerId === 'aws')?.label ?? 'Not mapped',
+      providerMappings.find((mapping) => mapping.providerId === 'azure')?.label ?? 'Not mapped',
+      providerMappings.find((mapping) => mapping.providerId === 'gcp')?.label ?? 'Not mapped',
+      confidence,
+      'Attach normalized service requirements to verify equivalence beyond category-level evidence.',
+    ];
+  });
+}
+
+function architectureProviderMapping(
+  provider: ComparisonProviderResult,
+  category: string,
+): {
+  providerId: ComparisonProviderResult['providerId'];
+  label: string;
+  hasMapping: boolean;
+  hasApproximate: boolean;
+} {
+  const lineItems = provider.lineItems
+    .filter((lineItem) => lineItem.category === category)
+    .sort((left, right) => right.baseMonthlyCostUsd - left.baseMonthlyCostUsd);
+  const primary = lineItems[0];
+
+  if (!primary) {
+    return {
+      providerId: provider.providerId,
+      label: 'Not mapped',
+      hasMapping: false,
+      hasApproximate: false,
+    };
+  }
+
+  const sku = primary.skuId ? `SKU ${primary.skuId}` : 'no SKU';
+
+  return {
+    providerId: provider.providerId,
+    label: `${primary.description} (${sku}, $${formatNumber(primary.baseMonthlyCostUsd)}/mo)`,
+    hasMapping: true,
+    hasApproximate: lineItems.some((lineItem) => lineItem.isApproximate),
+  };
+}
+
+function architectureConfidence(
+  mappings: Array<ReturnType<typeof architectureProviderMapping>>,
+): string {
+  const mappedCount = mappings.filter((mapping) => mapping.hasMapping).length;
+
+  if (mappedCount === 0) {
+    return 'Missing';
+  }
+
+  if (mappedCount < mappings.length) {
+    return 'Partial';
+  }
+
+  if (mappings.some((mapping) => mapping.hasApproximate)) {
+    return 'Approximate';
+  }
+
+  return 'Mapped';
+}
+
+function architectureReviewCue(requirement: ServiceRequirement, confidence: string): string {
+  if (confidence === 'Mapped') {
+    return 'Validate regional availability, quotas, resilience, and final SKU sizing.';
+  }
+
+  if (confidence === 'Approximate') {
+    return 'Review approximate equivalence with a solution architect before proposal sign-off.';
+  }
+
+  if (confidence === 'Partial') {
+    return 'Complete missing provider mappings before using this service in a three-cloud decision.';
+  }
+
+  return `Map ${requirement.serviceCategory}/${requirement.serviceType} before publishing the report.`;
 }
 
 function selectedMonthlyCost(model: PricingModelCost | undefined, fallbackMonthly: number): number {

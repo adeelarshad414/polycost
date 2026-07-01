@@ -12,6 +12,7 @@ export type ReportPricingModel =
 export interface ReportOptions {
   interval?: ReportInterval;
   pricingModel?: ReportPricingModel;
+  generatedAt?: string;
 }
 
 export interface GeneratedReport {
