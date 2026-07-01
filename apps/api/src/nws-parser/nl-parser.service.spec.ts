@@ -606,6 +606,49 @@ describe('NLParserService', () => {
     expect(result.fieldsRequiringReview).toEqual([]);
   });
 
+  it('infers security posture and WAF dimensions from natural language', async () => {
+    const client: StructuredLlmClient = {
+      createStructuredOutput: jest.fn(),
+    };
+    const service = new NLParserService(configService(4000, false), client, fixedNow);
+
+    const result = await service.parse(
+      'An API workload with two 4 vCPU 8GB servers, Security Hub posture for 100 protected resources, 25k security findings, two WAF web ACLs, 10 WAF rules, 80M WAF requests, and one DDoS protected resource in us-east-1.',
+    );
+
+    expect(result.draftNws.workload).toEqual(
+      expect.objectContaining({
+        type: 'api_backend',
+        expectedUsers: {},
+      }),
+    );
+    expect(result.draftNws.serviceRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceCategory: 'security',
+          serviceType: 'security-posture',
+          instanceType: 'security posture - 100 protected resources, 25K findings',
+          scaleParams: expect.objectContaining({
+            securityProtectedResources: 100,
+            securityFindingsThousand: 25,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'security',
+          serviceType: 'waf-ddos',
+          instanceType: 'WAF + DDoS - 2 web ACLs, 10 rules, 80M requests, 1 DDoS resources',
+          scaleParams: expect.objectContaining({
+            wafWebAclCount: 2,
+            wafRuleCount: 10,
+            wafRequestsMillion: 80,
+            ddosProtectedResources: 1,
+          }),
+        }),
+      ]),
+    );
+    expect(result.fieldsRequiringReview).toEqual([]);
+  });
+
   it('infers accelerated compute families for GPU and ML workloads', async () => {
     const client: StructuredLlmClient = {
       createStructuredOutput: jest.fn(),

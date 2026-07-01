@@ -1592,6 +1592,54 @@ function InitialHomePage({
                   onChange={(value) => update('secretsCount', value)}
                 />
                 <TextField
+                  label="Security resources"
+                  value={form.securityProtectedResources}
+                  inputMode="numeric"
+                  suffix="items"
+                  error={fieldErrors.securityProtectedResources}
+                  onChange={(value) => update('securityProtectedResources', value)}
+                />
+                <TextField
+                  label="Security findings"
+                  value={form.securityFindingsThousand}
+                  inputMode="decimal"
+                  suffix="K/mo"
+                  error={fieldErrors.securityFindingsThousand}
+                  onChange={(value) => update('securityFindingsThousand', value)}
+                />
+                <TextField
+                  label="WAF ACLs"
+                  value={form.wafWebAclCount}
+                  inputMode="numeric"
+                  suffix="ACLs"
+                  error={fieldErrors.wafWebAclCount}
+                  onChange={(value) => update('wafWebAclCount', value)}
+                />
+                <TextField
+                  label="WAF rules"
+                  value={form.wafRuleCount}
+                  inputMode="numeric"
+                  suffix="rules"
+                  error={fieldErrors.wafRuleCount}
+                  onChange={(value) => update('wafRuleCount', value)}
+                />
+                <TextField
+                  label="WAF requests"
+                  value={form.wafRequestsMillion}
+                  inputMode="decimal"
+                  suffix="M/mo"
+                  error={fieldErrors.wafRequestsMillion}
+                  onChange={(value) => update('wafRequestsMillion', value)}
+                />
+                <TextField
+                  label="DDoS resources"
+                  value={form.ddosProtectedResources}
+                  inputMode="numeric"
+                  suffix="items"
+                  error={fieldErrors.ddosProtectedResources}
+                  onChange={(value) => update('ddosProtectedResources', value)}
+                />
+                <TextField
                   label="Function invokes"
                   value={form.functionInvocationsMillion}
                   inputMode="decimal"
@@ -3428,7 +3476,7 @@ function WorkloadForm({
           <details className="advanced-service-fields form-grid-span">
             <summary>
               <span>Operations cost drivers</span>
-              <small>Metrics, logs, alarms, traces, secrets</small>
+              <small>Metrics, logs, alarms, traces, secrets, posture, WAF</small>
             </summary>
             <div className="form-grid secondary-grid">
               <TextField
@@ -3494,6 +3542,54 @@ function WorkloadForm({
                 suffix="10k/mo"
                 error={fieldErrors.secretApiCallsTenThousand}
                 onChange={(value) => update('secretApiCallsTenThousand', value)}
+              />
+              <TextField
+                label="Security resources"
+                value={form.securityProtectedResources}
+                inputMode="numeric"
+                suffix="items"
+                error={fieldErrors.securityProtectedResources}
+                onChange={(value) => update('securityProtectedResources', value)}
+              />
+              <TextField
+                label="Security findings"
+                value={form.securityFindingsThousand}
+                inputMode="decimal"
+                suffix="K/mo"
+                error={fieldErrors.securityFindingsThousand}
+                onChange={(value) => update('securityFindingsThousand', value)}
+              />
+              <TextField
+                label="WAF ACLs"
+                value={form.wafWebAclCount}
+                inputMode="numeric"
+                suffix="ACLs"
+                error={fieldErrors.wafWebAclCount}
+                onChange={(value) => update('wafWebAclCount', value)}
+              />
+              <TextField
+                label="WAF rules"
+                value={form.wafRuleCount}
+                inputMode="numeric"
+                suffix="rules"
+                error={fieldErrors.wafRuleCount}
+                onChange={(value) => update('wafRuleCount', value)}
+              />
+              <TextField
+                label="WAF requests"
+                value={form.wafRequestsMillion}
+                inputMode="decimal"
+                suffix="M/mo"
+                error={fieldErrors.wafRequestsMillion}
+                onChange={(value) => update('wafRequestsMillion', value)}
+              />
+              <TextField
+                label="DDoS resources"
+                value={form.ddosProtectedResources}
+                inputMode="numeric"
+                suffix="items"
+                error={fieldErrors.ddosProtectedResources}
+                onChange={(value) => update('ddosProtectedResources', value)}
               />
             </div>
           </details>

@@ -93,6 +93,12 @@ interface SupportingServicesRates {
   tracePerMillion: number;
   secretMonthly: number;
   secretApiPerTenThousand: number;
+  securityResourceMonthly: number;
+  securityFindingPerThousand: number;
+  wafAclMonthly: number;
+  wafRuleMonthly: number;
+  wafRequestPerMillion: number;
+  ddosProtectedResourceMonthly: number;
 }
 
 interface RuntimeServicesRates {
@@ -1444,6 +1450,90 @@ export class ComparisonOrchestratorService {
       );
     }
 
+    if (serviceTypes.has('security-posture') && values.securityProtectedResources > 0) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-security-posture-resources',
+          description: `${providerLabel(providerId)} security posture protected resource estimate`,
+          quantity: values.securityProtectedResources,
+          unit: 'protected resource-month',
+          unitPriceUsd: rates.securityResourceMonthly,
+        }),
+      );
+    }
+
+    if (serviceTypes.has('security-posture') && values.securityFindingsThousand > 0) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-security-posture-findings',
+          description: `${providerLabel(providerId)} security finding ingestion estimate`,
+          quantity: values.securityFindingsThousand,
+          unit: '1k findings',
+          unitPriceUsd: rates.securityFindingPerThousand,
+        }),
+      );
+    }
+
+    if (serviceTypes.has('waf-ddos') && values.wafWebAclCount > 0) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-security-waf-acls',
+          description: `${providerLabel(providerId)} WAF web ACL estimate`,
+          quantity: values.wafWebAclCount,
+          unit: 'web ACL-month',
+          unitPriceUsd: rates.wafAclMonthly,
+        }),
+      );
+    }
+
+    if (serviceTypes.has('waf-ddos') && values.wafRuleCount > 0) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-security-waf-rules',
+          description: `${providerLabel(providerId)} WAF rule estimate`,
+          quantity: values.wafRuleCount,
+          unit: 'rule-month',
+          unitPriceUsd: rates.wafRuleMonthly,
+        }),
+      );
+    }
+
+    if (serviceTypes.has('waf-ddos') && values.wafRequestsMillion > 0) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-security-waf-requests',
+          description: `${providerLabel(providerId)} WAF request inspection estimate`,
+          quantity: values.wafRequestsMillion,
+          unit: '1M requests',
+          unitPriceUsd: rates.wafRequestPerMillion,
+        }),
+      );
+    }
+
+    if (serviceTypes.has('waf-ddos') && values.ddosProtectedResources > 0) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-security-ddos-protection',
+          description: `${providerLabel(providerId)} managed DDoS protection estimate`,
+          quantity: values.ddosProtectedResources,
+          unit: 'protected resource-month',
+          unitPriceUsd: rates.ddosProtectedResourceMonthly,
+        }),
+      );
+    }
+
     return lineItems;
   }
 
@@ -2397,6 +2487,12 @@ function supportingServicesRates(providerId: ProviderId): SupportingServicesRate
         tracePerMillion: 5,
         secretMonthly: 0.4,
         secretApiPerTenThousand: 0.05,
+        securityResourceMonthly: 0.03,
+        securityFindingPerThousand: 0.2,
+        wafAclMonthly: 5,
+        wafRuleMonthly: 1,
+        wafRequestPerMillion: 0.6,
+        ddosProtectedResourceMonthly: 3000,
       };
     case 'azure':
       return {
@@ -2408,6 +2504,12 @@ function supportingServicesRates(providerId: ProviderId): SupportingServicesRate
         tracePerMillion: 2.3,
         secretMonthly: 0.03,
         secretApiPerTenThousand: 0.03,
+        securityResourceMonthly: 0.02,
+        securityFindingPerThousand: 0.15,
+        wafAclMonthly: 20,
+        wafRuleMonthly: 1,
+        wafRequestPerMillion: 0.6,
+        ddosProtectedResourceMonthly: 199,
       };
     case 'gcp':
       return {
@@ -2419,6 +2521,12 @@ function supportingServicesRates(providerId: ProviderId): SupportingServicesRate
         tracePerMillion: 0.2,
         secretMonthly: 0.06,
         secretApiPerTenThousand: 0.03,
+        securityResourceMonthly: 0.02,
+        securityFindingPerThousand: 0.1,
+        wafAclMonthly: 5,
+        wafRuleMonthly: 1,
+        wafRequestPerMillion: 0.75,
+        ddosProtectedResourceMonthly: 3000,
       };
   }
 }
@@ -2433,7 +2541,13 @@ function supportingServicesAssumptions(
   | 'observabilityDashboards'
   | 'observabilityTracesMillion'
   | 'secretsCount'
-  | 'secretApiCallsTenThousand',
+  | 'secretApiCallsTenThousand'
+  | 'securityProtectedResources'
+  | 'securityFindingsThousand'
+  | 'wafWebAclCount'
+  | 'wafRuleCount'
+  | 'wafRequestsMillion'
+  | 'ddosProtectedResources',
   number
 > {
   return {
@@ -2445,6 +2559,12 @@ function supportingServicesAssumptions(
     observabilityTracesMillion: maxScaleParam(requirements, 'observabilityTracesMillion'),
     secretsCount: maxScaleParam(requirements, 'secretsCount'),
     secretApiCallsTenThousand: maxScaleParam(requirements, 'secretApiCallsTenThousand'),
+    securityProtectedResources: maxScaleParam(requirements, 'securityProtectedResources'),
+    securityFindingsThousand: maxScaleParam(requirements, 'securityFindingsThousand'),
+    wafWebAclCount: maxScaleParam(requirements, 'wafWebAclCount'),
+    wafRuleCount: maxScaleParam(requirements, 'wafRuleCount'),
+    wafRequestsMillion: maxScaleParam(requirements, 'wafRequestsMillion'),
+    ddosProtectedResources: maxScaleParam(requirements, 'ddosProtectedResources'),
   };
 }
 

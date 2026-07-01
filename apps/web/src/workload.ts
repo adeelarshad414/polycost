@@ -115,6 +115,12 @@ export interface WorkloadFormState {
   observabilityTracesMillion: string;
   secretsCount: string;
   secretApiCallsTenThousand: string;
+  securityProtectedResources: string;
+  securityFindingsThousand: string;
+  wafWebAclCount: string;
+  wafRuleCount: string;
+  wafRequestsMillion: string;
+  ddosProtectedResources: string;
   functionInvocationsMillion: string;
   functionDurationMs: string;
   functionMemoryMb: string;
@@ -216,6 +222,12 @@ type NumericWorkloadFormField =
   | 'observabilityTracesMillion'
   | 'secretsCount'
   | 'secretApiCallsTenThousand'
+  | 'securityProtectedResources'
+  | 'securityFindingsThousand'
+  | 'wafWebAclCount'
+  | 'wafRuleCount'
+  | 'wafRequestsMillion'
+  | 'ddosProtectedResources'
   | 'functionInvocationsMillion'
   | 'functionDurationMs'
   | 'functionMemoryMb'
@@ -322,6 +334,12 @@ export const defaultWorkloadForm: WorkloadFormState = {
   observabilityTracesMillion: '0',
   secretsCount: '0',
   secretApiCallsTenThousand: '0',
+  securityProtectedResources: '0',
+  securityFindingsThousand: '0',
+  wafWebAclCount: '0',
+  wafRuleCount: '0',
+  wafRequestsMillion: '0',
+  ddosProtectedResources: '0',
   functionInvocationsMillion: '0',
   functionDurationMs: '100',
   functionMemoryMb: '512',
@@ -480,6 +498,12 @@ export const ARCHITECTURE_TEMPLATES: ArchitectureTemplate[] = [
       monthlyEgressGb: '5000',
       commitmentPreferencePercent: '75',
       integrationApiGatewayRequestsMillion: '250',
+      securityProtectedResources: '120',
+      securityFindingsThousand: '30',
+      wafWebAclCount: '2',
+      wafRuleCount: '12',
+      wafRequestsMillion: '250',
+      ddosProtectedResources: '1',
       selectedServiceCategory: 'application',
       selectedServiceFamilyId: 'api-gateway',
       selectedServiceFamilyIds: [
@@ -548,6 +572,12 @@ export const ARCHITECTURE_TEMPLATES: ArchitectureTemplate[] = [
       storageSizeGb: '1000',
       databaseSizeGb: '500',
       monthlyEgressGb: '2500',
+      securityProtectedResources: '180',
+      securityFindingsThousand: '45',
+      wafWebAclCount: '2',
+      wafRuleCount: '16',
+      wafRequestsMillion: '120',
+      ddosProtectedResources: '1',
       selectedServiceCategory: 'application',
       selectedServiceFamilyId: 'app-platform',
       selectedServiceFamilyIds: [
@@ -995,6 +1025,42 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
     form,
     'secretApiCallsTenThousand',
     'Secret API calls must be 0 ten-thousand-call units or higher.',
+  );
+  optionalNonNegativeIntegerField(
+    issues,
+    form,
+    'securityProtectedResources',
+    'Security protected resources must be a whole number 0 or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'securityFindingsThousand',
+    'Security findings must be 0 thousand or higher.',
+  );
+  optionalNonNegativeIntegerField(
+    issues,
+    form,
+    'wafWebAclCount',
+    'WAF ACLs must be a whole number 0 or higher.',
+  );
+  optionalNonNegativeIntegerField(
+    issues,
+    form,
+    'wafRuleCount',
+    'WAF rules must be a whole number 0 or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'wafRequestsMillion',
+    'WAF requests must be 0 million or higher.',
+  );
+  optionalNonNegativeIntegerField(
+    issues,
+    form,
+    'ddosProtectedResources',
+    'DDoS protected resources must be a whole number 0 or higher.',
   );
   optionalNonNegativeNumberField(
     issues,
@@ -1456,6 +1522,27 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
       supportingServices.secretApiCallsTenThousand ??
         Number(defaultWorkloadForm.secretApiCallsTenThousand),
     ),
+    securityProtectedResources: numberToInput(
+      supportingServices.securityProtectedResources ??
+        Number(defaultWorkloadForm.securityProtectedResources),
+    ),
+    securityFindingsThousand: numberToInput(
+      supportingServices.securityFindingsThousand ??
+        Number(defaultWorkloadForm.securityFindingsThousand),
+    ),
+    wafWebAclCount: numberToInput(
+      supportingServices.wafWebAclCount ?? Number(defaultWorkloadForm.wafWebAclCount),
+    ),
+    wafRuleCount: numberToInput(
+      supportingServices.wafRuleCount ?? Number(defaultWorkloadForm.wafRuleCount),
+    ),
+    wafRequestsMillion: numberToInput(
+      supportingServices.wafRequestsMillion ?? Number(defaultWorkloadForm.wafRequestsMillion),
+    ),
+    ddosProtectedResources: numberToInput(
+      supportingServices.ddosProtectedResources ??
+        Number(defaultWorkloadForm.ddosProtectedResources),
+    ),
     functionInvocationsMillion: numberToInput(
       runtimeServices.functionInvocationsMillion ??
         Number(defaultWorkloadForm.functionInvocationsMillion),
@@ -1570,7 +1657,9 @@ export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceReq
         ...(serviceType === 'monitoring' ||
         serviceType === 'logging-audit' ||
         serviceType === 'tracing-apm' ||
-        serviceType === 'keys-secrets'
+        serviceType === 'keys-secrets' ||
+        serviceType === 'security-posture' ||
+        serviceType === 'waf-ddos'
           ? supportingServicesScaleParamsFromForm(form)
           : {}),
         ...(serviceType === 'serverless-functions' ||
@@ -1669,6 +1758,22 @@ function supportingServiceFamilyIds(form: WorkloadFormState): string[] {
     hasPositiveFormNumber(form.secretApiCallsTenThousand)
   ) {
     ids.push('keys-secrets');
+  }
+
+  if (
+    hasPositiveFormNumber(form.securityProtectedResources) ||
+    hasPositiveFormNumber(form.securityFindingsThousand)
+  ) {
+    ids.push('security-posture');
+  }
+
+  if (
+    hasPositiveFormNumber(form.wafWebAclCount) ||
+    hasPositiveFormNumber(form.wafRuleCount) ||
+    hasPositiveFormNumber(form.wafRequestsMillion) ||
+    hasPositiveFormNumber(form.ddosProtectedResources)
+  ) {
+    ids.push('waf-ddos');
   }
 
   return ids;
@@ -1790,9 +1895,14 @@ function primaryServiceRequirement(nws: NormalizedWorkloadSpec): ServiceRequirem
 function supportingServiceScaleParamsFromNws(nws: NormalizedWorkloadSpec): Record<string, number> {
   const supportingRequirements =
     nws.serviceRequirements?.filter((requirement) =>
-      ['monitoring', 'logging-audit', 'tracing-apm', 'keys-secrets'].includes(
-        requirement.serviceType,
-      ),
+      [
+        'monitoring',
+        'logging-audit',
+        'tracing-apm',
+        'keys-secrets',
+        'security-posture',
+        'waf-ddos',
+      ].includes(requirement.serviceType),
     ) ?? [];
   const keys = [
     'observabilityMetricsMillion',
@@ -1803,6 +1913,12 @@ function supportingServiceScaleParamsFromNws(nws: NormalizedWorkloadSpec): Recor
     'observabilityTracesMillion',
     'secretsCount',
     'secretApiCallsTenThousand',
+    'securityProtectedResources',
+    'securityFindingsThousand',
+    'wafWebAclCount',
+    'wafRuleCount',
+    'wafRequestsMillion',
+    'ddosProtectedResources',
   ];
 
   return Object.fromEntries(
@@ -1946,6 +2062,18 @@ function instanceTypeForServiceRequirement(
     return `${form.databaseEngine} - ${form.databaseSizeGb || 'provider default'}GB`;
   }
 
+  if (serviceType === 'security-posture') {
+    return `security posture - ${form.securityProtectedResources || '0'} resources, ${
+      form.securityFindingsThousand || '0'
+    }K findings`;
+  }
+
+  if (serviceType === 'waf-ddos') {
+    return `WAF + DDoS - ${form.wafWebAclCount || '0'} ACLs, ${
+      form.wafRuleCount || '0'
+    } rules, ${form.wafRequestsMillion || '0'}M requests`;
+  }
+
   return undefined;
 }
 
@@ -1968,6 +2096,14 @@ function tierForServiceRequirement(
 
   if (serviceType.includes('database') || serviceType === 'cache') {
     return form.databaseHighAvailability ? 'high-availability' : 'standard';
+  }
+
+  if (serviceType === 'security-posture') {
+    return 'posture';
+  }
+
+  if (serviceType === 'waf-ddos') {
+    return 'edge-protection';
   }
 
   return undefined;
@@ -2083,6 +2219,12 @@ function supportingServicesScaleParamsFromForm(
     observabilityTracesMillion: parseOptionalNumber(form.observabilityTracesMillion) ?? 0,
     secretsCount: parseNonNegativeInteger(form.secretsCount, 0),
     secretApiCallsTenThousand: parseOptionalNumber(form.secretApiCallsTenThousand) ?? 0,
+    securityProtectedResources: parseNonNegativeInteger(form.securityProtectedResources, 0),
+    securityFindingsThousand: parseOptionalNumber(form.securityFindingsThousand) ?? 0,
+    wafWebAclCount: parseNonNegativeInteger(form.wafWebAclCount, 0),
+    wafRuleCount: parseNonNegativeInteger(form.wafRuleCount, 0),
+    wafRequestsMillion: parseOptionalNumber(form.wafRequestsMillion) ?? 0,
+    ddosProtectedResources: parseNonNegativeInteger(form.ddosProtectedResources, 0),
   };
 }
 
@@ -2636,6 +2778,18 @@ function formNumericValue(form: WorkloadFormState, field: NumericWorkloadFormFie
       return form.secretsCount;
     case 'secretApiCallsTenThousand':
       return form.secretApiCallsTenThousand;
+    case 'securityProtectedResources':
+      return form.securityProtectedResources;
+    case 'securityFindingsThousand':
+      return form.securityFindingsThousand;
+    case 'wafWebAclCount':
+      return form.wafWebAclCount;
+    case 'wafRuleCount':
+      return form.wafRuleCount;
+    case 'wafRequestsMillion':
+      return form.wafRequestsMillion;
+    case 'ddosProtectedResources':
+      return form.ddosProtectedResources;
     case 'functionInvocationsMillion':
       return form.functionInvocationsMillion;
     case 'functionDurationMs':

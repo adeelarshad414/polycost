@@ -226,12 +226,12 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Azure Key Vault'],
     gcp: ['Cloud KMS', 'Secret Manager'],
   }),
-  family('security-posture', 'security', 'Security posture', 'roadmap', {
+  family('security-posture', 'security', 'Security posture', 'mapped', {
     aws: ['AWS Security Hub', 'Amazon GuardDuty'],
     azure: ['Microsoft Defender for Cloud', 'Microsoft Sentinel'],
     gcp: ['Security Command Center'],
   }),
-  family('waf-ddos', 'security', 'WAF + DDoS protection', 'roadmap', {
+  family('waf-ddos', 'security', 'WAF + DDoS protection', 'mapped', {
     aws: ['AWS WAF', 'AWS Shield'],
     azure: ['Azure Web Application Firewall', 'Azure DDoS Protection'],
     gcp: ['Cloud Armor'],

@@ -12,7 +12,7 @@ import {
 } from './nws-parser.types';
 
 const WORKLOAD_SIGNAL_PATTERN =
-  /\b(ai|analytics|api|api gateway|app|aurora|azure ml|batch|bedrock|bigquery|bi|cdn|container|cosmos|data lake|data warehouse|database|db|dynamodb|ec2|egress|embedding|embeddings|etl|event bus|event grid|eventbridge|file|firestore|generative ai|gpu|inference|kubernetes|llm|load balancer|looker|machine learning|message queue|ml|model|mongo|mysql|nosql|openai|postgres|power bi|pub\/sub|pubsub|queue|redis|redshift|sagemaker|server|service|service bus|spanner|step functions|storage|streaming|synapse|tokens|traffic|upload|users|vector|vertex ai|vm|warehouse|web|website|workflow|workload)\b/i;
+  /\b(ai|analytics|api|api gateway|app|aurora|azure ml|batch|bedrock|bigquery|bi|cdn|cloud armor|container|cosmos|data lake|data warehouse|database|db|ddos|defender|dynamodb|ec2|egress|embedding|embeddings|etl|event bus|event grid|eventbridge|file|firestore|generative ai|gpu|guardduty|inference|kubernetes|llm|load balancer|looker|machine learning|message queue|ml|model|mongo|mysql|nosql|openai|postgres|power bi|pub\/sub|pubsub|queue|redis|redshift|sagemaker|security command center|security hub|server|service|service bus|shield|spanner|step functions|storage|streaming|synapse|tokens|traffic|upload|users|vector|vertex ai|vm|waf|warehouse|web|website|workflow|workload)\b/i;
 
 export class NWSParseInputError extends Error {
   constructor(message: string) {
@@ -162,6 +162,12 @@ export class NLParserService {
     const integrationWorkflowTransitionsThousand =
       extractIntegrationWorkflowTransitionsThousand(input);
     const integrationApiGatewayRequestsMillion = extractIntegrationApiGatewayRequestsMillion(input);
+    const securityProtectedResources = extractSecurityProtectedResources(input);
+    const securityFindingsThousand = extractSecurityFindingsThousand(input);
+    const wafWebAclCount = extractWafWebAclCount(input);
+    const wafRuleCount = extractWafRuleCount(input);
+    const wafRequestsMillion = extractWafRequestsMillion(input);
+    const ddosProtectedResources = extractDdosProtectedResources(input);
 
     if (!instanceCount) {
       fieldsRequiringReview.push('compute[0].instanceCount');
@@ -349,6 +355,12 @@ export class NLParserService {
         integrationEventsMillion,
         integrationWorkflowTransitionsThousand,
         integrationApiGatewayRequestsMillion,
+        securityProtectedResources,
+        securityFindingsThousand,
+        wafWebAclCount,
+        wafRuleCount,
+        wafRequestsMillion,
+        ddosProtectedResources,
         monthlyEgressGb: extractEgressGb(input),
         cdn: /\bcdn|content delivery\b/i.test(input),
         loadBalancer: /\bload balanc|alb|elb|application gateway\b/i.test(input),
@@ -388,6 +400,7 @@ export const NWS_PARSE_SYSTEM_PROMPT = [
   'For analytics workloads, capture data-warehouse, data-lake, data-integration, streaming-analytics, and business-intelligence requirements with analyticsWarehouseStorageGb, analyticsWarehouseQueryTb, analyticsDataLakeStorageGb, analyticsIntegrationJobHours, analyticsStreamingIngestGb, and analyticsBiUsers scaleParams when stated.',
   'For AI/ML workloads, capture ml-training, model-hosting, ai-inference, vector-search, and generative-ai-api requirements with aiTrainingGpuHours, aiModelHostingHours, aiInferenceRequestsMillion, aiVectorStorageGb, aiVectorQueriesMillion, aiApiInputTokensMillion, and aiApiOutputTokensMillion scaleParams when stated.',
   'For integration workloads, capture queues-messaging, eventing, workflow-orchestration, and api-gateway requirements with integrationQueueMessagesMillion, integrationEventsMillion, integrationWorkflowTransitionsThousand, and integrationApiGatewayRequestsMillion scaleParams when stated.',
+  'For security workloads, capture security-posture and waf-ddos requirements with securityProtectedResources, securityFindingsThousand, wafWebAclCount, wafRuleCount, wafRequestsMillion, and ddosProtectedResources scaleParams when stated.',
   'Prefer partial valid NWS drafts over guessing. The user can edit the structured form before pricing.',
 ].join('\n');
 
@@ -671,6 +684,12 @@ function inferServiceRequirements(input: {
   integrationEventsMillion?: number;
   integrationWorkflowTransitionsThousand?: number;
   integrationApiGatewayRequestsMillion?: number;
+  securityProtectedResources?: number;
+  securityFindingsThousand?: number;
+  wafWebAclCount?: number;
+  wafRuleCount?: number;
+  wafRequestsMillion?: number;
+  ddosProtectedResources?: number;
   monthlyEgressGb?: number;
   cdn: boolean;
   loadBalancer: boolean;
@@ -1056,6 +1075,66 @@ function inferServiceRequirements(input: {
     });
   }
 
+  if (
+    hasSecurityPostureContext(input.input) ||
+    hasPositiveNumber(input.securityProtectedResources) ||
+    hasPositiveNumber(input.securityFindingsThousand)
+  ) {
+    requirements.push({
+      serviceCategory: 'security',
+      serviceType: 'security-posture',
+      instanceType: securityInstanceType('security posture', [
+        input.securityProtectedResources !== undefined
+          ? `${input.securityProtectedResources} protected resources`
+          : undefined,
+        input.securityFindingsThousand !== undefined
+          ? `${input.securityFindingsThousand}K findings`
+          : undefined,
+      ]),
+      tier: 'posture',
+      ...(input.regionPreference ? { region: input.regionPreference } : {}),
+      az,
+      quantity: 1,
+      scaleParams: {
+        securityProtectedResources: input.securityProtectedResources ?? 0,
+        securityFindingsThousand: input.securityFindingsThousand ?? 0,
+      },
+    });
+  }
+
+  if (
+    hasWafDdosContext(input.input) ||
+    hasPositiveNumber(input.wafWebAclCount) ||
+    hasPositiveNumber(input.wafRuleCount) ||
+    hasPositiveNumber(input.wafRequestsMillion) ||
+    hasPositiveNumber(input.ddosProtectedResources)
+  ) {
+    requirements.push({
+      serviceCategory: 'security',
+      serviceType: 'waf-ddos',
+      instanceType: securityInstanceType('WAF + DDoS', [
+        input.wafWebAclCount !== undefined ? `${input.wafWebAclCount} web ACLs` : undefined,
+        input.wafRuleCount !== undefined ? `${input.wafRuleCount} rules` : undefined,
+        input.wafRequestsMillion !== undefined
+          ? `${input.wafRequestsMillion}M requests`
+          : undefined,
+        input.ddosProtectedResources !== undefined
+          ? `${input.ddosProtectedResources} DDoS resources`
+          : undefined,
+      ]),
+      tier: 'edge-protection',
+      ...(input.regionPreference ? { region: input.regionPreference } : {}),
+      az,
+      quantity: 1,
+      scaleParams: {
+        wafWebAclCount: input.wafWebAclCount ?? 0,
+        wafRuleCount: input.wafRuleCount ?? 0,
+        wafRequestsMillion: input.wafRequestsMillion ?? 0,
+        ddosProtectedResources: input.ddosProtectedResources ?? 0,
+      },
+    });
+  }
+
   if (input.cdn) {
     requirements.push({
       serviceCategory: 'networking',
@@ -1094,6 +1173,12 @@ function aiInstanceType(label: string, details: Array<string | undefined>): stri
 }
 
 function integrationInstanceType(label: string, details: Array<string | undefined>): string {
+  const statedDetails = details.filter((detail): detail is string => Boolean(detail));
+
+  return statedDetails.length > 0 ? `${label} - ${statedDetails.join(', ')}` : label;
+}
+
+function securityInstanceType(label: string, details: Array<string | undefined>): string {
   const statedDetails = details.filter((detail): detail is string => Boolean(detail));
 
   return statedDetails.length > 0 ? `${label} - ${statedDetails.join(', ')}` : label;
@@ -1924,6 +2009,138 @@ function extractIntegrationApiGatewayRequestsMillion(input: string): number | un
   return afterLabel ? requestMatchToMillion(afterLabel[1], afterLabel[2]) : undefined;
 }
 
+function extractSecurityProtectedResources(input: string): number | undefined {
+  const beforeResources = Array.from(
+    input.matchAll(/([a-z\d,.]+)\s*(?:security\s+)?(?:protected\s+)?resources?\b/gi),
+  ).find((match) => {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 72), index + 84).toLowerCase();
+    const matchedPhrase = match[0].toLowerCase();
+
+    return (
+      hasSecurityPostureContext(context) &&
+      !/\b(ddos|waf|shield|cloud armor|web application firewall)\b/.test(matchedPhrase)
+    );
+  });
+
+  if (beforeResources) {
+    return parseHumanNumber(beforeResources[1]);
+  }
+
+  const afterLabel = input.match(
+    /\b(?:security posture|security hub|guardduty|defender for cloud|security command center|posture management)\s*(?:protected\s+)?resources?\s*[:=-]?\s*([a-z\d,.]+)\b/i,
+  );
+
+  return afterLabel ? parseHumanNumber(afterLabel[1]) : undefined;
+}
+
+function extractSecurityFindingsThousand(input: string): number | undefined {
+  const beforeFindings = Array.from(
+    input.matchAll(/([\d,.]+)\s*(k|thousand|m|million)?\s*(?:security\s+)?findings?\b/gi),
+  ).find((match) => {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 72), index + 80).toLowerCase();
+
+    return hasSecurityPostureContext(context);
+  });
+
+  if (beforeFindings) {
+    return requestMatchToThousand(beforeFindings[1], beforeFindings[2]);
+  }
+
+  const afterLabel = input.match(
+    /\b(?:security posture|security hub|guardduty|defender for cloud|security command center|security findings?)\s*(?:findings?)?\s*[:=-]?\s*([\d,.]+)\s*(k|thousand|m|million)?\b/i,
+  );
+
+  return afterLabel ? requestMatchToThousand(afterLabel[1], afterLabel[2]) : undefined;
+}
+
+function extractWafWebAclCount(input: string): number | undefined {
+  const beforeAcl = Array.from(
+    input.matchAll(/([a-z\d,.]+)\s*(?:waf\s+)?(?:web\s+)?acls?\b/gi),
+  ).find((match) => {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 56), index + 72).toLowerCase();
+
+    return hasWafDdosContext(context);
+  });
+
+  if (beforeAcl) {
+    return parseHumanNumber(beforeAcl[1]);
+  }
+
+  const afterLabel = input.match(
+    /\b(?:waf|web application firewall|web acl|web acls)\s*(?:web\s+)?acls?\s*[:=-]?\s*([a-z\d,.]+)\b/i,
+  );
+
+  return afterLabel ? parseHumanNumber(afterLabel[1]) : undefined;
+}
+
+function extractWafRuleCount(input: string): number | undefined {
+  const beforeRules = Array.from(input.matchAll(/([a-z\d,.]+)\s*(?:waf\s+)?rules?\b/gi)).find(
+    (match) => {
+      const index = match.index ?? 0;
+      const context = input.slice(Math.max(0, index - 56), index + 72).toLowerCase();
+
+      return hasWafDdosContext(context);
+    },
+  );
+
+  if (beforeRules) {
+    return parseHumanNumber(beforeRules[1]);
+  }
+
+  const afterLabel = input.match(
+    /\b(?:waf|web application firewall)\s*(?:rules?)\s*[:=-]?\s*([a-z\d,.]+)\b/i,
+  );
+
+  return afterLabel ? parseHumanNumber(afterLabel[1]) : undefined;
+}
+
+function extractWafRequestsMillion(input: string): number | undefined {
+  const beforeRequests = Array.from(
+    input.matchAll(
+      /([\d,.]+)\s*(k|thousand|m|million)?\s*(?:waf|web application firewall)?\s*(?:requests?|inspections?)\b/gi,
+    ),
+  ).find((match) => {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 64), index + 80).toLowerCase();
+
+    return hasWafDdosContext(context);
+  });
+
+  if (beforeRequests) {
+    return requestMatchToMillion(beforeRequests[1], beforeRequests[2]);
+  }
+
+  const afterLabel = input.match(
+    /\b(?:waf|web application firewall)\s*(?:requests?|inspections?)\s*[:=-]?\s*([\d,.]+)\s*(k|thousand|m|million)?\b/i,
+  );
+
+  return afterLabel ? requestMatchToMillion(afterLabel[1], afterLabel[2]) : undefined;
+}
+
+function extractDdosProtectedResources(input: string): number | undefined {
+  const beforeResources = Array.from(
+    input.matchAll(/([a-z\d,.]+)\s*(?:ddos|shield|cloud armor)?\s*(?:protected\s+)?resources?\b/gi),
+  ).find((match) => {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 72), index + 84).toLowerCase();
+
+    return /\b(ddos|shield|cloud armor)\b/.test(context);
+  });
+
+  if (beforeResources) {
+    return parseHumanNumber(beforeResources[1]);
+  }
+
+  const afterLabel = input.match(
+    /\b(?:ddos|shield|cloud armor)\s*(?:protected\s+)?resources?\s*[:=-]?\s*([a-z\d,.]+)\b/i,
+  );
+
+  return afterLabel ? parseHumanNumber(afterLabel[1]) : undefined;
+}
+
 function extractContextSizeGb(
   input: string,
   options: {
@@ -2032,6 +2249,18 @@ function hasWorkflowOrchestrationContext(input: string): boolean {
 
 function hasApiGatewayContext(input: string): boolean {
   return /\b(api gateway|gateway requests?|apim|api management|cloud endpoints|amazon api gateway|azure api management)\b/i.test(
+    input,
+  );
+}
+
+function hasSecurityPostureContext(input: string): boolean {
+  return /\b(security posture|posture management|security hub|guardduty|defender for cloud|microsoft defender|security command center|scc|cloud security posture|security findings?)\b/i.test(
+    input,
+  );
+}
+
+function hasWafDdosContext(input: string): boolean {
+  return /\b(waf|web application firewall|web acl|ddos|shield|cloud armor|edge protection)\b/i.test(
     input,
   );
 }

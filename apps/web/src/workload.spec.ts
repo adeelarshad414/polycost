@@ -447,6 +447,56 @@ describe('workload helpers', () => {
     );
   });
 
+  it('serializes security posture and WAF assumptions into service requirements', () => {
+    const nws = buildNwsFromForm({
+      ...defaultWorkloadForm,
+      selectedServiceFamilyIds: [],
+      securityProtectedResources: '100',
+      securityFindingsThousand: '25',
+      wafWebAclCount: '2',
+      wafRuleCount: '10',
+      wafRequestsMillion: '80',
+      ddosProtectedResources: '1',
+    });
+
+    expect(nws.serviceRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceCategory: 'security',
+          serviceType: 'security-posture',
+          instanceType: 'security posture - 100 resources, 25K findings',
+          tier: 'posture',
+          scaleParams: expect.objectContaining({
+            securityProtectedResources: 100,
+            securityFindingsThousand: 25,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'security',
+          serviceType: 'waf-ddos',
+          instanceType: 'WAF + DDoS - 2 ACLs, 10 rules, 80M requests',
+          tier: 'edge-protection',
+          scaleParams: expect.objectContaining({
+            wafWebAclCount: 2,
+            wafRuleCount: 10,
+            wafRequestsMillion: 80,
+            ddosProtectedResources: 1,
+          }),
+        }),
+      ]),
+    );
+    expect(formFromNws(nws)).toEqual(
+      expect.objectContaining({
+        securityProtectedResources: '100',
+        securityFindingsThousand: '25',
+        wafWebAclCount: '2',
+        wafRuleCount: '10',
+        wafRequestsMillion: '80',
+        ddosProtectedResources: '1',
+      }),
+    );
+  });
+
   it('serializes serverless and container runtime assumptions into service requirements', () => {
     const nws = buildNwsFromForm({
       ...defaultWorkloadForm,
@@ -678,6 +728,12 @@ describe('workload helpers', () => {
         observabilityTracesMillion: '-1',
         secretsCount: '3.5',
         secretApiCallsTenThousand: '-1',
+        securityProtectedResources: '2.5',
+        securityFindingsThousand: '-1',
+        wafWebAclCount: '1.5',
+        wafRuleCount: '2.5',
+        wafRequestsMillion: '-1',
+        ddosProtectedResources: '1.5',
         analyticsWarehouseStorageGb: '-1',
         analyticsWarehouseQueryTb: '-1',
         analyticsDataLakeStorageGb: '-1',
@@ -734,6 +790,12 @@ describe('workload helpers', () => {
       'observabilityTracesMillion',
       'secretsCount',
       'secretApiCallsTenThousand',
+      'securityProtectedResources',
+      'securityFindingsThousand',
+      'wafWebAclCount',
+      'wafRuleCount',
+      'wafRequestsMillion',
+      'ddosProtectedResources',
       'functionInvocationsMillion',
       'functionDurationMs',
       'functionMemoryMb',

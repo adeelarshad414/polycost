@@ -847,6 +847,90 @@ describe('ComparisonOrchestratorService', () => {
     expect(result.providers[0].breakdown?.operationsMonthlyCostUsd).toBe(63.8);
   });
 
+  it('adds modeled security posture and WAF line items', async () => {
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async (): Promise<ProviderPricingResult> => ({
+          providerId: 'aws',
+          baseMonthlyCostUsd: 10,
+          lineItems: [
+            {
+              category: 'compute',
+              costComponent: 'compute',
+              description: 'aws compute',
+              isApproximate: false,
+              baseMonthlyCostUsd: 10,
+              skuId: 'aws-compute',
+              region: 'us-east-1',
+              unit: 'hour',
+              unitPriceUsd: 0.01,
+            },
+          ],
+        })),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      serviceRequirements: [
+        {
+          serviceCategory: 'security',
+          serviceType: 'security-posture',
+          quantity: 1,
+          scaleParams: {
+            securityProtectedResources: 100,
+            securityFindingsThousand: 25,
+          },
+        },
+        {
+          serviceCategory: 'security',
+          serviceType: 'waf-ddos',
+          quantity: 1,
+          scaleParams: {
+            wafWebAclCount: 2,
+            wafRuleCount: 10,
+            wafRequestsMillion: 80,
+            ddosProtectedResources: 1,
+          },
+        },
+      ],
+    });
+
+    expect(result.providers[0].lineItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'operations',
+          costComponent: 'operations',
+          skuId: 'modeled-security-posture-resources',
+          baseMonthlyCostUsd: 3,
+          isApproximate: true,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-security-posture-findings',
+          baseMonthlyCostUsd: 5,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-security-waf-acls',
+          baseMonthlyCostUsd: 10,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-security-waf-rules',
+          baseMonthlyCostUsd: 10,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-security-waf-requests',
+          baseMonthlyCostUsd: 48,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-security-ddos-protection',
+          baseMonthlyCostUsd: 3000,
+        }),
+      ]),
+    );
+    expect(result.providers[0].breakdown?.operationsMonthlyCostUsd).toBe(3076);
+  });
+
   it('adds modeled serverless and container runtime line items', async () => {
     const service = createService([
       adapter(
