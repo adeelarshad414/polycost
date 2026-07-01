@@ -9,6 +9,7 @@ import {
   PricingStatusResponse,
   RegionCatalogResponse,
 } from './types';
+import { intervalMultiplierFromMonthly } from './cost-time';
 import { buildNwsFromForm, defaultWorkloadForm } from './workload';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -63,7 +64,7 @@ describe('App', () => {
     expect(text(container)).toContain('Requirements');
     expect(text(container)).toContain('Manual entry');
     expect(text(container)).toContain(
-      'Web app · 2 vCPU · 4GB · US East (AWS us-east-1 · Azure eastus · GCP us-east1)',
+      'Web app · Virtual machines · 2 vCPU · 4GB · US East (AWS us-east-1 · Azure eastus · GCP us-east1)',
     );
     expect(text(container)).toContain('Best value');
     expect(text(container)).toContain('Monthly estimate');
@@ -102,7 +103,9 @@ describe('App', () => {
     expect(text(container)).not.toContain('Official calculators & regions');
     expect(text(container)).not.toContain('Export report');
     expect(text(container)).not.toContain('GCP is the current executive cost baseline');
-    expect(container.querySelector<HTMLAnchorElement>('a[href="https://calculator.aws/#/"]')).toBeNull();
+    expect(
+      container.querySelector<HTMLAnchorElement>('a[href="https://calculator.aws/#/"]'),
+    ).toBeNull();
     expect(text(container)).not.toContain('Resource name');
     expect(text(container)).not.toContain('Spec / SKU');
     expect(text(container)).not.toContain('Export CSV');
@@ -195,9 +198,7 @@ describe('App', () => {
 
     await click(buttonByText(container, 'Compare costs'));
 
-    const disclosures = Array.from(
-      container.querySelectorAll<HTMLElement>('.result-disclosure'),
-    );
+    const disclosures = Array.from(container.querySelectorAll<HTMLElement>('.result-disclosure'));
     expect(disclosures).toHaveLength(1);
     expect(
       disclosures.every(
@@ -208,7 +209,9 @@ describe('App', () => {
       disclosures.every(
         (details) =>
           disclosureSummary(details).getAttribute('aria-expanded') === 'false' &&
-          Boolean(document.getElementById(disclosureSummary(details).getAttribute('aria-controls') ?? '')),
+          Boolean(
+            document.getElementById(disclosureSummary(details).getAttribute('aria-controls') ?? ''),
+          ),
       ),
     ).toBe(true);
 
@@ -275,7 +278,10 @@ describe('App', () => {
     ).toBeInstanceOf(HTMLAnchorElement);
 
     await click(buttonByText(container, 'PDF'));
-    expect(client.exportComparison).toHaveBeenCalledWith(comparisonResult.comparisonId, 'pdf');
+    expect(client.exportComparison).toHaveBeenCalledWith(comparisonResult.comparisonId, 'pdf', {
+      interval: 'hourly',
+      pricingModel: 'reserved-1yr',
+    });
 
     expect(detailGate.dataset.open).toBe('true');
     expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);
@@ -318,7 +324,10 @@ describe('App', () => {
 
       await click(
         disclosureSummary(
-          resultDisclosureByTitle(container, 'Show full breakdown, pricing models & export options'),
+          resultDisclosureByTitle(
+            container,
+            'Show full breakdown, pricing models & export options',
+          ),
         ),
       );
       await click(buttonByText(container, 'Refresh live'));
@@ -490,7 +499,10 @@ describe('App', () => {
       }),
     );
     expect(client.refreshLiveComparison).toHaveBeenCalledWith(comparisonResult.comparisonId);
-    expect(client.exportComparison).toHaveBeenCalledWith(comparisonResult.comparisonId, 'pdf');
+    expect(client.exportComparison).toHaveBeenCalledWith(comparisonResult.comparisonId, 'pdf', {
+      interval: 'yearly',
+      pricingModel: 'on-demand',
+    });
 
     unmount();
   });
@@ -504,7 +516,7 @@ describe('App', () => {
     await changeInput(inputById(container, 'memory-gb'), '8');
     await click(buttonByText(container, 'Compare costs'));
 
-    expect(text(container)).toContain('API backend · 4 vCPU · 8GB');
+    expect(text(container)).toContain('API backend · Virtual machines · 4 vCPU · 8GB');
 
     await click(buttonByText(container, 'Edit'));
     await changeInput(inputById(container, 'vcpu'), '16');
@@ -519,7 +531,7 @@ describe('App', () => {
 
     expect(container.querySelector('.requirements-edit-panel')).toBeNull();
     expect(container.querySelector('.requirement-summary-strip')).toBeInstanceOf(HTMLElement);
-    expect(text(container)).toContain('API backend · 16 vCPU · 64GB');
+    expect(text(container)).toContain('API backend · Virtual machines · 16 vCPU · 64GB');
     expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);
 
     unmount();
@@ -683,7 +695,9 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('EC2');
     expect(text(container)).toContain('VM');
     expect(text(container)).toContain('GCE');
-    expect(container.querySelectorAll('.engineering-bar-chart-shell .recharts-wrapper').length).toBeGreaterThanOrEqual(3);
+    expect(
+      container.querySelectorAll('.engineering-bar-chart-shell .recharts-wrapper').length,
+    ).toBeGreaterThanOrEqual(3);
     expect(text(container)).toContain('Filter by tag');
     expect(text(container)).toContain('Backend contract note');
     expect(text(container)).toContain('Resource name');
@@ -806,6 +820,9 @@ describe('ComparisonView', () => {
     expect(buttonByText(container, 'Spot').disabled).toBe(false);
     expect(buttonByText(container, 'Savings plan').disabled).toBe(false);
     expect(text(container)).toContain('Best:');
+    await click(buttonByText(container, 'Spot'));
+    expect(text(container)).toContain('Est. $38.00-$57.00');
+    expect(text(container)).toContain('estimated $38.00-$57.00/mo range');
     await click(buttonByText(container, '3yr reserved'));
     expect(text(container)).toContain('3yr reserved: Not available for this configuration.');
     expect(text(container)).toContain('Compute, storage, and data-transfer mix');
@@ -1062,6 +1079,54 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       generatedAt: '2026-06-30T00:00:00.000Z',
       models: [],
     })),
+    getPricingModelsForService: jest.fn(async () => ({
+      schemaVersion: 2 as const,
+      provider: 'aws' as const,
+      service: 'compute',
+      region: 'us-east-1',
+      generatedAt: '2026-06-30T00:00:00.000Z',
+      models: [
+        {
+          code: 'reserved_1yr' as const,
+          label: 'Reserved (1-Year)',
+          termMonths: 12,
+          requiresPaymentOption: true,
+          isEstimateOnly: false,
+          paymentOptions: [
+            { code: 'no_upfront' as const, label: 'No upfront' },
+            { code: 'partial_upfront' as const, label: 'Partial upfront' },
+            { code: 'all_upfront' as const, label: 'All upfront' },
+          ],
+          defaultPaymentOption: 'no_upfront' as const,
+        },
+        {
+          code: 'reserved_3yr' as const,
+          label: 'Reserved (3-Year)',
+          termMonths: 36,
+          requiresPaymentOption: true,
+          isEstimateOnly: false,
+          paymentOptions: [
+            { code: 'no_upfront' as const, label: 'No upfront' },
+            { code: 'partial_upfront' as const, label: 'Partial upfront' },
+            { code: 'all_upfront' as const, label: 'All upfront' },
+          ],
+          defaultPaymentOption: 'no_upfront' as const,
+        },
+        {
+          code: 'savings_plan_1yr' as const,
+          label: 'Savings Plan / CUD (1-Year)',
+          termMonths: 12,
+          requiresPaymentOption: true,
+          isEstimateOnly: false,
+          paymentOptions: [
+            { code: 'no_upfront' as const, label: 'No upfront' },
+            { code: 'partial_upfront' as const, label: 'Partial upfront' },
+            { code: 'all_upfront' as const, label: 'All upfront' },
+          ],
+          defaultPaymentOption: 'no_upfront' as const,
+        },
+      ],
+    })),
     getRegionCatalog: jest.fn(() => pendingRegionCatalog),
     createWorkload: jest.fn(async (input) => ({
       ...input,
@@ -1167,12 +1232,12 @@ function provider(
       },
     ],
     totals: {
-      hourly: monthly / 730,
-      daily: monthly / 30,
-      weekly: (monthly / 30) * 7,
+      hourly: monthly * intervalMultiplierFromMonthly('hourly'),
+      daily: monthly * intervalMultiplierFromMonthly('daily'),
+      weekly: monthly * intervalMultiplierFromMonthly('weekly'),
       monthly,
-      quarterly: monthly * 3,
-      yearly: monthly * 12,
+      quarterly: monthly * intervalMultiplierFromMonthly('quarterly'),
+      yearly: monthly * intervalMultiplierFromMonthly('yearly'),
     },
   };
 }
@@ -1199,12 +1264,12 @@ function providerWithItems(
       baseMonthlyCostUsd,
     })),
     totals: {
-      hourly: monthly / 730,
-      daily: monthly / 30,
-      weekly: (monthly / 30) * 7,
+      hourly: monthly * intervalMultiplierFromMonthly('hourly'),
+      daily: monthly * intervalMultiplierFromMonthly('daily'),
+      weekly: monthly * intervalMultiplierFromMonthly('weekly'),
       monthly,
-      quarterly: monthly * 3,
-      yearly: monthly * 12,
+      quarterly: monthly * intervalMultiplierFromMonthly('quarterly'),
+      yearly: monthly * intervalMultiplierFromMonthly('yearly'),
     },
   };
 }

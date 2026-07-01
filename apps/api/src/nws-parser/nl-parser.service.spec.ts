@@ -223,9 +223,69 @@ describe('NLParserService', () => {
           multiAz: true,
           multiRegion: false,
         },
+        serviceRequirements: expect.arrayContaining([
+          expect.objectContaining({
+            serviceCategory: 'compute',
+            serviceType: 'vm-compute',
+            quantity: 2,
+          }),
+          expect.objectContaining({
+            serviceCategory: 'storage',
+            serviceType: 'object-storage',
+            quantity: 1,
+          }),
+          expect.objectContaining({
+            serviceCategory: 'database',
+            serviceType: 'relational-database',
+            tier: 'high-availability',
+          }),
+        ]),
       }),
     );
     expect(result.fieldsRequiringReview).not.toContain('compute[0].instanceCount');
+  });
+
+  it('parses common vCPU and GB server shorthand without confusing storage size', async () => {
+    const client: StructuredLlmClient = {
+      createStructuredOutput: jest.fn(),
+    };
+    const service = new NLParserService(configService(4000, false), client, fixedNow);
+
+    const result = await service.parse(
+      'A web app with two 2 vCPU 4GB servers, Postgres database, 250GB object storage, CDN, load balancer, and multi-AZ in us-east-1.',
+    );
+
+    expect(result.draftNws.compute[0]).toEqual(
+      expect.objectContaining({
+        instanceCount: 2,
+        vcpu: 2,
+        memoryGb: 4,
+      }),
+    );
+    expect(result.draftNws.storage[0]).toEqual(
+      expect.objectContaining({
+        type: 'object',
+        sizeGb: 250,
+      }),
+    );
+    expect(result.draftNws.serviceRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceCategory: 'compute',
+          serviceType: 'vm-compute',
+          instanceType: 'balanced tier - 2 vCPU - 4GB',
+          quantity: 2,
+        }),
+        expect.objectContaining({
+          serviceCategory: 'storage',
+          serviceType: 'object-storage',
+          instanceType: 'object - 250GB',
+        }),
+      ]),
+    );
+    expect(result.fieldsRequiringReview).not.toContain('compute[0].vcpu');
+    expect(result.fieldsRequiringReview).not.toContain('compute[0].memoryGb');
+    expect(result.fieldsRequiringReview).toEqual(['database[0].sizeGb']);
   });
 
   it('rejects invalid LLM output through the shared NWS validator', async () => {

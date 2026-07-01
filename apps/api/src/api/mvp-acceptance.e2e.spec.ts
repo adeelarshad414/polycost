@@ -136,14 +136,17 @@ describe('MVP acceptance criteria E2E', () => {
 });
 
 async function expectApiHealth(): Promise<void> {
-  const health = await requestJson<{ status: string; service: string }>(
-    'http://localhost:3001/health',
-  );
+  const health = await requestJson<{
+    status: string;
+    service: string;
+    dependencies?: unknown;
+  }>('http://localhost:3001/health');
 
-  expect(health).toEqual({
+  expect(health).toMatchObject({
     status: 'ok',
     service: 'polycost-api',
   });
+  expect(health.dependencies).toBeDefined();
 }
 
 async function createComparison(nws: NormalizedWorkloadSpec): Promise<ComparisonResult> {

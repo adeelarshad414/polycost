@@ -3,11 +3,7 @@ export type ProviderId = (typeof PROVIDER_ORDER)[number];
 export type ServiceCategory = 'compute' | 'storage' | 'database' | 'network';
 export type CostComponent = 'compute' | 'storage' | 'database' | 'egress';
 export type PricingModelKey =
-  | 'on-demand'
-  | 'reserved-1yr'
-  | 'reserved-3yr'
-  | 'spot'
-  | 'savings-plan';
+  'on-demand' | 'reserved-1yr' | 'reserved-3yr' | 'spot' | 'savings-plan';
 export type PricingBasis = 'flat' | 'tiered';
 export type PricingVolatility = 'stable' | 'variable' | 'volatile';
 export type PricingSource = 'catalog' | 'modeled-estimate';
@@ -19,11 +15,15 @@ export type NormalizedInstanceFamily =
   | 'storage-optimized'
   | 'accelerated-computing';
 export type CachedPricingTerm =
+  'on_demand' | 'reserved_1yr' | 'reserved_3yr' | 'spot' | 'savings_plan';
+export type PricingTermCode =
   | 'on_demand'
   | 'reserved_1yr'
   | 'reserved_3yr'
-  | 'spot'
-  | 'savings_plan';
+  | 'savings_plan_1yr'
+  | 'savings_plan_3yr'
+  | 'spot_estimate';
+export type PaymentOptionCode = 'no_upfront' | 'partial_upfront' | 'all_upfront' | 'n_a';
 export type StoragePricingTier = 'standard' | 'infrequent_access' | 'archive';
 
 export const INTERVALS: Array<{ key: IntervalKey; label: string }> = [
@@ -95,10 +95,37 @@ export interface NormalizedWorkloadSpec {
     multiRegion: boolean;
     slaTarget?: string;
   };
+  serviceRequirements?: ServiceRequirement[];
   sourceTraceability?: Array<{
     nwsPath: string;
     sourceRef: string;
   }>;
+}
+
+export interface ServiceRequirement {
+  serviceCategory:
+    | 'compute'
+    | 'containers'
+    | 'application'
+    | 'storage'
+    | 'database'
+    | 'analytics'
+    | 'ai'
+    | 'integration'
+    | 'networking'
+    | 'security'
+    | 'operations'
+    | 'devops'
+    | 'migration'
+    | 'edge'
+    | 'business';
+  serviceType: string;
+  instanceType?: string;
+  tier?: string;
+  region?: string;
+  az?: string;
+  quantity: number;
+  scaleParams?: Record<string, string | number | boolean>;
 }
 
 export interface ParsedNwsDraft {
@@ -168,6 +195,13 @@ export interface ComparisonProviderResult {
 export interface ComparisonResult {
   comparisonId: string;
   pricingAsOf: string;
+  requirements?: {
+    sourceType: NormalizedWorkloadSpec['metadata']['sourceType'];
+    workloadName?: string;
+    workloadType: NormalizedWorkloadSpec['workload']['type'];
+    regionPreference?: string;
+    serviceRequirements: ServiceRequirement[];
+  };
   providers: ComparisonProviderResult[];
   cheapestProviderId: ProviderId;
   warnings?: Array<{
@@ -202,6 +236,26 @@ export interface PricingModelCatalogResponse {
   models: PricingModelCatalogEntry[];
   defaultModel: PricingModelKey;
   generatedAt: string;
+}
+
+export interface PricingModelsForServiceResponse {
+  schemaVersion: 2;
+  provider: ProviderId;
+  service: string;
+  region: string;
+  generatedAt: string;
+  models: Array<{
+    code: PricingTermCode;
+    label: string;
+    termMonths?: number;
+    requiresPaymentOption: boolean;
+    isEstimateOnly: boolean;
+    paymentOptions: Array<{
+      code: PaymentOptionCode;
+      label: string;
+    }>;
+    defaultPaymentOption?: PaymentOptionCode;
+  }>;
 }
 
 export interface BackendHealthResponse {

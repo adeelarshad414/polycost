@@ -494,6 +494,45 @@ textarea:focus-visible {
   background: color-mix(in srgb, var(--pc-provider-azure-soft) 64%, var(--pc-bg-surface));
 }
 
+.pricing-model-badge {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid color-mix(in srgb, var(--brand-green) 28%, var(--pc-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-green) 10%, var(--pc-bg-surface));
+  color: var(--pc-text-primary);
+  padding: 0 9px;
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: none;
+}
+
+.pricing-model-badge .segment-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.pricing-model-badge-reserved-1yr,
+.pricing-model-badge-reserved-3yr {
+  border-color: color-mix(in srgb, var(--brand-orange) 30%, var(--pc-border));
+  background: color-mix(in srgb, var(--brand-orange) 10%, var(--pc-bg-surface));
+}
+
+.pricing-model-badge-savings-plan {
+  border-color: color-mix(in srgb, var(--brand-blue) 30%, var(--pc-border));
+  background: color-mix(in srgb, var(--brand-blue) 10%, var(--pc-bg-surface));
+}
+
+.pricing-model-badge-spot {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--pc-text-muted) 50%, var(--pc-border));
+  background: color-mix(in srgb, var(--pc-bg-surface-2) 78%, transparent);
+}
+
 .summary-strip-actions,
 .requirements-edit-actions,
 .progressive-export-panel {
@@ -1232,7 +1271,8 @@ textarea:focus-visible {
 }
 
 .mode-tabs,
-.interval-toggle {
+.interval-toggle,
+.pricing-model-preference-options {
   display: inline-flex;
   min-height: 44px;
   border: 1px solid var(--pc-border);
@@ -1247,7 +1287,8 @@ textarea:focus-visible {
 }
 
 .mode-tabs button,
-.interval-toggle button {
+.interval-toggle button,
+.pricing-model-preference-options button {
   display: inline-flex;
   min-width: 72px;
   min-height: 34px;
@@ -1375,7 +1416,8 @@ textarea:focus-visible {
 }
 
 .mode-tabs button[aria-selected='true'],
-.interval-toggle button[aria-pressed='true'] {
+.interval-toggle button[aria-pressed='true'],
+.pricing-model-preference-options button[aria-pressed='true'] {
   background: color-mix(in srgb, var(--pc-action-primary-soft) 62%, var(--pc-bg-surface));
   box-shadow:
     inset 0 0 0 1px color-mix(in srgb, var(--pc-action-primary) 24%, transparent),
@@ -1384,9 +1426,34 @@ textarea:focus-visible {
 }
 
 .mode-tabs button:hover:not([aria-selected='true']),
-.interval-toggle button:hover:not([aria-pressed='true']) {
+.interval-toggle button:hover:not([aria-pressed='true']),
+.pricing-model-preference-options button:hover:not([aria-pressed='true']) {
   background: color-mix(in srgb, var(--pc-action-primary-soft) 42%, transparent);
   color: var(--pc-text-primary);
+}
+
+.pricing-model-preference {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.pricing-model-preference-label {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.pricing-model-preference-options {
+  width: 100%;
+}
+
+.pricing-model-preference-options button {
+  flex: 1;
+  min-width: 112px;
+  white-space: nowrap;
 }
 
 .landing-theme-switcher {
@@ -1403,7 +1470,8 @@ textarea:focus-visible {
 
 .theme-switch-button:active,
 .mode-tabs button:active,
-.interval-toggle button:active {
+.interval-toggle button:active,
+.pricing-model-preference-options button:active {
   transform: translateY(1px);
 }
 
@@ -1927,6 +1995,16 @@ select:hover {
 .service-catalog {
   display: grid;
   gap: var(--pc-space-2);
+}
+
+.service-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--pc-space-1);
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface-2) 68%, var(--pc-bg-surface));
+  padding: var(--pc-space-1);
 }
 
 .service-catalog-stats {
@@ -3050,8 +3128,16 @@ select:disabled {
   border-top: 4px solid var(--pc-action-primary);
   padding: var(--pc-space-2);
   background:
-    linear-gradient(120deg, color-mix(in srgb, var(--pc-provider-aws-soft) 48%, transparent), transparent 36%),
-    linear-gradient(240deg, color-mix(in srgb, var(--pc-provider-azure-soft) 46%, transparent), transparent 34%),
+    linear-gradient(
+      120deg,
+      color-mix(in srgb, var(--pc-provider-aws-soft) 48%, transparent),
+      transparent 36%
+    ),
+    linear-gradient(
+      240deg,
+      color-mix(in srgb, var(--pc-provider-azure-soft) 46%, transparent),
+      transparent 34%
+    ),
     var(--pc-bg-surface);
 }
 
@@ -3295,7 +3381,11 @@ select:disabled {
   border-top: 4px solid var(--pc-action-primary);
   padding: var(--pc-space-2);
   background:
-    linear-gradient(115deg, color-mix(in srgb, var(--pc-action-primary-soft) 46%, transparent), transparent 34%),
+    linear-gradient(
+      115deg,
+      color-mix(in srgb, var(--pc-action-primary-soft) 46%, transparent),
+      transparent 34%
+    ),
     var(--pc-bg-surface);
 }
 
@@ -3378,8 +3468,16 @@ select:disabled {
   border-top: 4px solid var(--pc-provider-azure);
   padding: var(--pc-space-2);
   background:
-    linear-gradient(116deg, color-mix(in srgb, var(--pc-provider-azure-soft) 48%, transparent), transparent 36%),
-    linear-gradient(244deg, color-mix(in srgb, var(--pc-provider-gcp-soft) 38%, transparent), transparent 34%),
+    linear-gradient(
+      116deg,
+      color-mix(in srgb, var(--pc-provider-azure-soft) 48%, transparent),
+      transparent 36%
+    ),
+    linear-gradient(
+      244deg,
+      color-mix(in srgb, var(--pc-provider-gcp-soft) 38%, transparent),
+      transparent 34%
+    ),
     var(--pc-bg-surface);
 }
 
@@ -3432,6 +3530,80 @@ select:disabled {
   font-size: var(--pc-text-sm);
   font-weight: 650;
   line-height: 1.55;
+}
+
+.service-cheapest-matrix,
+.cost-formula-evidence {
+  display: grid;
+  gap: var(--pc-space-2);
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface) 90%, var(--pc-bg-surface-2));
+  padding: var(--pc-space-2);
+}
+
+.service-matrix-table td:last-child {
+  min-width: 180px;
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-sm);
+  line-height: 1.35;
+}
+
+.formula-evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--pc-space-1);
+}
+
+.formula-evidence-card {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  border: 1px solid var(--pc-border);
+  border-top: 4px solid var(--pc-border-strong);
+  border-radius: 8px;
+  background: var(--pc-bg-surface);
+  padding: 12px;
+}
+
+.formula-aws {
+  border-top-color: var(--pc-provider-aws);
+}
+
+.formula-azure {
+  border-top-color: var(--pc-provider-azure);
+}
+
+.formula-gcp {
+  border-top-color: var(--pc-provider-gcp);
+}
+
+.formula-evidence-card span {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.formula-evidence-card strong,
+.formula-evidence-card p {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.formula-evidence-card strong {
+  color: var(--pc-text-primary);
+  font-size: var(--pc-text-sm);
+  line-height: 1.35;
+}
+
+.formula-evidence-card p {
+  color: var(--pc-text-secondary);
+  font-family: var(--pc-font-mono);
+  font-size: var(--pc-text-xs);
+  line-height: 1.45;
 }
 
 .engineering-chart-grid {
@@ -4736,7 +4908,6 @@ select:disabled {
     box-shadow: var(--pc-shadow-strong);
     transform: translateY(-1px);
   }
-
 }
 
 .warning-list {
@@ -5053,11 +5224,13 @@ select:disabled {
 
   .theme-toggle,
   .interval-toggle,
-  .mode-tabs {
+  .mode-tabs,
+  .pricing-model-preference-options {
     width: 100%;
   }
 
-  .interval-toggle {
+  .interval-toggle,
+  .pricing-model-preference-options {
     flex-wrap: wrap;
     overflow-x: visible;
   }
@@ -5106,13 +5279,15 @@ select:disabled {
 
   .theme-toggle button,
   .interval-toggle button,
-  .mode-tabs button {
+  .mode-tabs button,
+  .pricing-model-preference-options button {
     flex: 1;
     min-height: 44px;
     min-width: 0;
   }
 
-  .interval-toggle button {
+  .interval-toggle button,
+  .pricing-model-preference-options button {
     font-size: var(--pc-text-xs);
     min-width: 64px;
   }
@@ -5299,13 +5474,17 @@ select:disabled {
   .landing-hero-actions .pc-button {
     width: 100%;
   }
+
+  .service-selector-grid,
+  .formula-evidence-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 420px) {
   .provider-card {
     flex-basis: 92%;
   }
-
 }
 
 @media (max-width: 359px) {

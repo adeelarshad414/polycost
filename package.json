@@ -49,7 +49,7 @@
     "ci:unit": "npm run test:coverage",
     "ci:integration": "npm run test:integration",
     "ci:build": "npm run build",
-    "ci:e2e": "npm run test:e2e",
+    "ci:e2e": "node scripts/ci-e2e.mjs",
     "ci:security": "npm run security:audit"
   },
   "devDependencies": {

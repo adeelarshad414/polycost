@@ -9,6 +9,7 @@ import {
   NormalizedWorkloadSpec,
   ParsedNwsDraft,
   PricingModelCatalogResponse,
+  PricingModelsForServiceResponse,
   PricingStatusResponse,
   RegionCatalogResponse,
   ReportFormat,
@@ -47,9 +48,18 @@ export interface PolyCostClient {
   validateWorkload(nws: NormalizedWorkloadSpec): Promise<{ valid: true }>;
   createComparison(nws: NormalizedWorkloadSpec): Promise<ComparisonResult>;
   refreshLiveComparison(comparisonId: string): Promise<ComparisonResult>;
-  exportComparison(comparisonId: string, format: ReportFormat): Promise<Blob>;
+  exportComparison(
+    comparisonId: string,
+    format: ReportFormat,
+    options?: { interval?: string; pricingModel?: string },
+  ): Promise<Blob>;
   getPricingStatus(): Promise<PricingStatusResponse>;
   getPricingModels(): Promise<PricingModelCatalogResponse>;
+  getPricingModelsForService(
+    provider: string,
+    service: string,
+    region: string,
+  ): Promise<PricingModelsForServiceResponse>;
   getRegionCatalog(): Promise<RegionCatalogResponse>;
   createWorkload(input: WorkloadInput): Promise<WorkloadRecord>;
   createShareLink(input: {
@@ -109,10 +119,18 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         method: 'POST',
       });
     },
-    async exportComparison(comparisonId, format) {
-      const response = await fetch(
-        `${baseUrl}/comparisons/${comparisonId}/export?format=${format}`,
-      );
+    async exportComparison(comparisonId, format, options = {}) {
+      const query = new URLSearchParams({ format });
+
+      if (options.interval) {
+        query.set('interval', options.interval);
+      }
+
+      if (options.pricingModel) {
+        query.set('pricingModel', options.pricingModel);
+      }
+
+      const response = await fetch(`${baseUrl}/comparisons/${comparisonId}/export?${query}`);
 
       if (!response.ok) {
         throw await toApiError(response);
@@ -125,6 +143,14 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
     },
     getPricingModels() {
       return requestJson<PricingModelCatalogResponse>(baseUrl, '/pricing/models');
+    },
+    getPricingModelsForService(provider, service, region) {
+      return requestJson<PricingModelsForServiceResponse>(
+        baseUrl,
+        `/pricing/${encodeURIComponent(provider)}/${encodeURIComponent(
+          service,
+        )}/models?region=${encodeURIComponent(region)}`,
+      );
     },
     getRegionCatalog() {
       return requestJson<RegionCatalogResponse>(baseUrl, '/regions');

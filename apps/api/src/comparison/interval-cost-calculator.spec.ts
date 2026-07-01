@@ -6,8 +6,8 @@ describe('IntervalCostCalculator', () => {
   it('derives daily, weekly, quarterly, and yearly costs from a monthly base', () => {
     expect(calculator.calculate(71)).toEqual({
       hourly: 0.1,
-      daily: 2.37,
-      weekly: 16.59,
+      daily: 2.33,
+      weekly: 16.34,
       monthly: 71,
       quarterly: 213,
       yearly: 852,
@@ -29,7 +29,7 @@ describe('IntervalCostCalculator', () => {
     expect(calculator.calculate(10.005)).toEqual({
       hourly: 0.01,
       daily: 0.33,
-      weekly: 2.31,
+      weekly: 2.3,
       monthly: 10.01,
       quarterly: 30.03,
       yearly: 120.12,

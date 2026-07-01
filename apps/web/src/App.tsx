@@ -7,6 +7,7 @@ import { FinOpsFeatureLayer, SharedReportPlaceholder } from './components/FinOps
 import { PersonaComparisonWorkspace } from './components/PersonaComparisonWorkspace';
 import { ThemeSwitcher } from './components/ThemeSwitcher';
 import { TopLoadingBar } from './components/TopLoadingBar';
+import { hourlyFromMonthly, intervalMultiplierFromMonthly } from './cost-time';
 import {
   COMPARISON_REGION_GROUPS,
   comparisonRegionLabel,
@@ -29,6 +30,7 @@ import {
   IntervalKey,
   NormalizedWorkloadSpec,
   PROVIDER_ORDER,
+  PricingModelKey,
   ProviderId,
   RegionCatalogResponse,
   ReportFormat,
@@ -67,6 +69,54 @@ const INPUT_MODE_OPTIONS: Array<{
     summaryLabel: 'Parsed from text',
     description: 'Natural language or pasted bill text',
   },
+];
+
+const PRICING_MODEL_STORAGE_KEY = 'polycost-pricing-model';
+const PRICING_MODEL_OPTIONS: Array<{
+  key: PricingModelKey;
+  label: string;
+  shortLabel: string;
+  description: string;
+}> = [
+  {
+    key: 'on-demand',
+    label: 'On-demand',
+    shortLabel: 'On-demand',
+    description: 'Baseline cached pay-as-you-go pricing.',
+  },
+  {
+    key: 'reserved-1yr',
+    label: 'Reserved 1yr',
+    shortLabel: 'Reserved 1yr',
+    description: 'One-year commitment scenario.',
+  },
+  {
+    key: 'reserved-3yr',
+    label: 'Reserved 3yr',
+    shortLabel: 'Reserved 3yr',
+    description: 'Three-year commitment scenario.',
+  },
+  {
+    key: 'savings-plan',
+    label: 'Savings/CUD',
+    shortLabel: 'Savings/CUD',
+    description: 'Savings Plans, Azure reservations, or GCP committed-use discounts.',
+  },
+  {
+    key: 'spot',
+    label: 'Spot estimate',
+    shortLabel: 'Spot estimate',
+    description: 'Interruptible compute shown as an estimate range.',
+  },
+];
+
+const INSTANCE_TIER_OPTIONS: Array<[string, string]> = [
+  ['small', 'Small - dev/test or light production'],
+  ['balanced', 'Balanced - general production'],
+  ['compute', 'Compute optimized - CPU-heavy'],
+  ['memory', 'Memory optimized - data-heavy'],
+  ['storage', 'Storage optimized - high I/O'],
+  ['custom', 'Custom - use vCPU and memory fields'],
 ];
 
 const SERVICE_CATEGORIES: ServiceCategory[] = ['compute', 'storage', 'database', 'network'];
@@ -205,6 +255,10 @@ const INITIAL_HOME_FORM: WorkloadFormState = {
   monthlyEgressGb: '',
   cdn: false,
   loadBalancer: false,
+  selectedServiceCategory: 'compute',
+  selectedServiceFamilyId: 'vm-compute',
+  instanceTier: 'small',
+  availabilityZoneCount: '1',
   selectedServiceFamilyIds: [],
   multiAz: false,
   multiRegion: false,
@@ -351,6 +405,7 @@ export function App({ client = polyCostClient }: AppProps) {
   const [submittedInputMode, setSubmittedInputMode] = useState<InputMode>('form');
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
   const [interval, setInterval] = useState<IntervalKey>('monthly');
+  const [pricingModel, setPricingModel] = useState<PricingModelKey>(() => readStoredPricingModel());
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [exportingFormat, setExportingFormat] = useState<ReportFormat | null>(null);
   const [isEditingRequirements, setIsEditingRequirements] = useState(false);
@@ -452,8 +507,13 @@ export function App({ client = polyCostClient }: AppProps) {
     setBusyAction('compare');
 
     try {
-      const { nws, parserNotice, parsedForm, submittedComparisonForm, submittedComparisonInputMode } =
-        await prepareNwsForComparison();
+      const {
+        nws,
+        parserNotice,
+        parsedForm,
+        submittedComparisonForm,
+        submittedComparisonInputMode,
+      } = await prepareNwsForComparison();
       if (!isCurrentAsyncAction(actionId)) {
         return;
       }
@@ -562,7 +622,10 @@ export function App({ client = polyCostClient }: AppProps) {
     setExportingFormat(format);
 
     try {
-      const blob = await client.exportComparison(comparison.comparisonId, format);
+      const blob = await client.exportComparison(comparison.comparisonId, format, {
+        interval,
+        pricingModel,
+      });
       if (!isCurrentAsyncAction(actionId)) {
         return;
       }
@@ -598,6 +661,7 @@ export function App({ client = polyCostClient }: AppProps) {
     setComparison(null);
     setIsEditingRequirements(false);
     setInterval('monthly');
+    handlePricingModelChange('on-demand');
     setBusyAction(null);
     setExportingFormat(null);
     setNotice(null);
@@ -617,6 +681,11 @@ export function App({ client = polyCostClient }: AppProps) {
     setFormValidationIssues([]);
     setInputMode(submittedInputMode);
     setIsEditingRequirements(true);
+  }
+
+  function handlePricingModelChange(nextPricingModel: PricingModelKey) {
+    setPricingModel(nextPricingModel);
+    storePricingModel(nextPricingModel);
   }
 
   function handleSignIn() {
@@ -660,6 +729,7 @@ export function App({ client = polyCostClient }: AppProps) {
           submittedForm={submittedForm}
           submittedInputMode={submittedInputMode}
           inputMode={inputMode}
+          pricingModel={pricingModel}
           interval={interval}
           isEditingRequirements={isEditingRequirements}
           busyAction={busyAction}
@@ -673,6 +743,7 @@ export function App({ client = polyCostClient }: AppProps) {
           onClear={handleClearComparison}
           onEdit={handleEditComparison}
           onInputModeChange={setInputMode}
+          onPricingModelChange={handlePricingModelChange}
           onNaturalLanguageChange={setNaturalLanguageInput}
           onFormChange={handleFormChange}
           onSubmit={handleCompare}
@@ -687,6 +758,7 @@ export function App({ client = polyCostClient }: AppProps) {
         <InitialHomePage
           form={form}
           inputMode={inputMode}
+          pricingModel={pricingModel}
           naturalLanguageInput={naturalLanguageInput}
           regionCatalog={regionCatalog}
           regionCatalogError={regionCatalogError}
@@ -695,6 +767,7 @@ export function App({ client = polyCostClient }: AppProps) {
           validationIssues={formValidationIssues}
           isComparing={busyAction === 'compare'}
           onInputModeChange={setInputMode}
+          onPricingModelChange={handlePricingModelChange}
           onNaturalLanguageChange={setNaturalLanguageInput}
           onChange={handleFormChange}
           onClearRequirements={handleClearRequirements}
@@ -849,6 +922,7 @@ function AppHeader({
 function InitialHomePage({
   form,
   inputMode,
+  pricingModel,
   naturalLanguageInput,
   regionCatalog,
   regionCatalogError,
@@ -857,6 +931,7 @@ function InitialHomePage({
   validationIssues,
   isComparing,
   onInputModeChange,
+  onPricingModelChange,
   onNaturalLanguageChange,
   onChange,
   onClearRequirements,
@@ -865,6 +940,7 @@ function InitialHomePage({
 }: {
   form: WorkloadFormState;
   inputMode: InputMode;
+  pricingModel: PricingModelKey;
   naturalLanguageInput: string;
   regionCatalog: RegionCatalogResponse | null;
   regionCatalogError: string | null;
@@ -873,6 +949,7 @@ function InitialHomePage({
   validationIssues: WorkloadFormIssue[];
   isComparing: boolean;
   onInputModeChange: (mode: InputMode) => void;
+  onPricingModelChange: (model: PricingModelKey) => void;
   onNaturalLanguageChange: (value: string) => void;
   onChange: (form: WorkloadFormState) => void;
   onClearRequirements: () => void;
@@ -883,6 +960,15 @@ function InitialHomePage({
     onChange({
       ...form,
       [key]: value,
+    });
+  }
+
+  function updateServiceCategory(value: string) {
+    onChange({
+      ...form,
+      selectedServiceCategory: value,
+      selectedServiceFamilyId:
+        firstServiceFamilyIdForCategory(value) ?? form.selectedServiceFamilyId,
     });
   }
 
@@ -905,11 +991,27 @@ function InitialHomePage({
 
       <div className="initial-home-form" aria-label="Compare cloud costs">
         <InputModeTabs inputMode={inputMode} onInputModeChange={onInputModeChange} />
+        <PricingModelPreferenceControl
+          pricingModel={pricingModel}
+          onPricingModelChange={onPricingModelChange}
+        />
 
         {inputMode === 'form' ? (
           <form className="initial-guided-form" onSubmit={onSubmit}>
             <FormValidationSummary issues={validationIssues} />
             <div className="initial-home-fields">
+              <SelectField
+                label="Service category"
+                value={form.selectedServiceCategory}
+                options={serviceCategoryOptions()}
+                onChange={updateServiceCategory}
+              />
+              <SelectField
+                label="Specific service"
+                value={form.selectedServiceFamilyId}
+                options={serviceFamilyOptions(form.selectedServiceCategory)}
+                onChange={(value) => update('selectedServiceFamilyId', value)}
+              />
               <SelectField
                 label="Workload type"
                 value={form.workloadType}
@@ -923,6 +1025,12 @@ function InitialHomePage({
                   ['other', 'Other'],
                 ]}
                 onChange={(value) => update('workloadType', value)}
+              />
+              <SelectField
+                label="Instance tier"
+                value={form.instanceTier}
+                options={INSTANCE_TIER_OPTIONS}
+                onChange={(value) => update('instanceTier', value)}
               />
               <TextField
                 label="vCPU"
@@ -946,6 +1054,13 @@ function InitialHomePage({
                 regionCatalogError={regionCatalogError}
                 compact
                 onChange={(value) => update('regionPreference', value)}
+              />
+              <TextField
+                label="Availability zones"
+                value={form.availabilityZoneCount}
+                inputMode="numeric"
+                suffix="AZs"
+                onChange={(value) => update('availabilityZoneCount', value)}
               />
             </div>
 
@@ -1026,6 +1141,7 @@ function ProgressiveComparisonPage({
   submittedForm,
   submittedInputMode,
   inputMode,
+  pricingModel,
   interval,
   isEditingRequirements,
   busyAction,
@@ -1039,6 +1155,7 @@ function ProgressiveComparisonPage({
   onClear,
   onEdit,
   onInputModeChange,
+  onPricingModelChange,
   onNaturalLanguageChange,
   onFormChange,
   onSubmit,
@@ -1055,6 +1172,7 @@ function ProgressiveComparisonPage({
   submittedForm: WorkloadFormState;
   submittedInputMode: InputMode;
   inputMode: InputMode;
+  pricingModel: PricingModelKey;
   interval: IntervalKey;
   isEditingRequirements: boolean;
   busyAction: BusyAction;
@@ -1068,6 +1186,7 @@ function ProgressiveComparisonPage({
   onClear: () => void;
   onEdit: () => void;
   onInputModeChange: (mode: InputMode) => void;
+  onPricingModelChange: (model: PricingModelKey) => void;
   onNaturalLanguageChange: (value: string) => void;
   onFormChange: (form: WorkloadFormState) => void;
   onSubmit: (event?: FormEvent) => void;
@@ -1087,6 +1206,7 @@ function ProgressiveComparisonPage({
               form={form}
               inputMode={inputMode}
               naturalLanguageInput={naturalLanguageInput}
+              pricingModel={pricingModel}
               regionCatalog={regionCatalog}
               regionCatalogError={regionCatalogError}
               validationIssues={validationIssues}
@@ -1094,6 +1214,7 @@ function ProgressiveComparisonPage({
               onClearRequirements={onClearRequirements}
               onFormChange={onFormChange}
               onInputModeChange={onInputModeChange}
+              onPricingModelChange={onPricingModelChange}
               onNaturalLanguageChange={onNaturalLanguageChange}
               onParse={onParse}
               onSubmit={onSubmit}
@@ -1106,6 +1227,7 @@ function ProgressiveComparisonPage({
             <RequirementSummaryStrip
               form={submittedForm}
               inputMode={submittedInputMode}
+              pricingModel={pricingModel}
               regionCatalog={regionCatalog}
               onClear={onClear}
               onEdit={onEdit}
@@ -1136,16 +1258,17 @@ function ProgressiveComparisonPage({
                   exportingFormat={exportingFormat}
                   form={submittedForm}
                   interval={interval}
+                  pricingModel={pricingModel}
                   regionCatalog={regionCatalog}
                   onExport={onExport}
                   onIntervalChange={onIntervalChange}
+                  onPricingModelChange={onPricingModelChange}
                   onRefreshLive={onRefreshLive}
                 />
               </ResultDisclosureSection>
             </div>
           </>
         )}
-
       </div>
     </section>
   );
@@ -1154,12 +1277,14 @@ function ProgressiveComparisonPage({
 function RequirementSummaryStrip({
   form,
   inputMode,
+  pricingModel,
   regionCatalog,
   onClear,
   onEdit,
 }: {
   form: WorkloadFormState;
   inputMode: InputMode;
+  pricingModel: PricingModelKey;
   regionCatalog: RegionCatalogResponse | null;
   onClear: () => void;
   onEdit: () => void;
@@ -1169,6 +1294,7 @@ function RequirementSummaryStrip({
       <div className="summary-strip-main">
         <span className="summary-strip-kicker">
           <InputModeBadge mode={inputMode} />
+          <PricingModelBadge pricingModel={pricingModel} />
           <span>Requirements</span>
         </span>
         <strong>{compactRequirementSummary(form, regionCatalog)}</strong>
@@ -1193,9 +1319,11 @@ function StateDetailContent({
   exportingFormat,
   form,
   interval,
+  pricingModel,
   regionCatalog,
   onExport,
   onIntervalChange,
+  onPricingModelChange,
   onRefreshLive,
 }: {
   busyAction: BusyAction;
@@ -1205,9 +1333,11 @@ function StateDetailContent({
   exportingFormat: ReportFormat | null;
   form: WorkloadFormState;
   interval: IntervalKey;
+  pricingModel: PricingModelKey;
   regionCatalog: RegionCatalogResponse | null;
   onExport: (format: ReportFormat) => void;
   onIntervalChange: (interval: IntervalKey) => void;
+  onPricingModelChange: (model: PricingModelKey) => void;
   onRefreshLive: () => void;
 }) {
   const isLoading = busyAction === 'compare' || busyAction === 'refresh';
@@ -1235,6 +1365,8 @@ function StateDetailContent({
           description="Cost periods, commitment scenarios, compute/storage/egress mix, budget alerts, currency, and share workflow."
         />
         <EngineeringAnalyticsDashboard comparison={comparison} interval={interval} />
+        <ServiceCheapestMatrix comparison={comparison} interval={interval} />
+        <CostFormulaEvidence comparison={comparison} />
         <ComparisonToolbar interval={interval} onIntervalChange={onIntervalChange} />
         <FinOpsFeatureLayer
           client={client}
@@ -1242,6 +1374,8 @@ function StateDetailContent({
           form={form}
           interval={interval}
           isLoading={isLoading}
+          pricingModelPreference={pricingModel}
+          onPricingModelPreferenceChange={onPricingModelChange}
         />
       </section>
 
@@ -1265,7 +1399,10 @@ function StateDetailContent({
         />
       </section>
 
-      <section className="state-detail-panel" aria-label="Official calculators, regions, and exports">
+      <section
+        className="state-detail-panel"
+        aria-label="Official calculators, regions, and exports"
+      >
         <ResultDetailHeading
           title="Official calculators, regions & exports"
           description="Provider calculator links, official region references, refresh, and PDF/CSV/Excel report downloads."
@@ -1344,10 +1481,48 @@ function InputModeBadge({ mode }: { mode: InputMode }) {
   );
 }
 
+function PricingModelPreferenceControl({
+  pricingModel,
+  onPricingModelChange,
+}: {
+  pricingModel: PricingModelKey;
+  onPricingModelChange: (model: PricingModelKey) => void;
+}) {
+  return (
+    <div className="pricing-model-preference" aria-label="Pricing model preference">
+      <span className="pricing-model-preference-label">Scenario</span>
+      <div className="pricing-model-preference-options" role="group" aria-label="Pricing model">
+        {PRICING_MODEL_OPTIONS.map((option) => (
+          <button
+            type="button"
+            key={option.key}
+            title={option.description}
+            aria-pressed={pricingModel === option.key}
+            onClick={() => onPricingModelChange(option.key)}
+          >
+            <PricingModelMiniIcon pricingModel={option.key} />
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PricingModelBadge({ pricingModel }: { pricingModel: PricingModelKey }) {
+  return (
+    <span className={`pricing-model-badge pricing-model-badge-${pricingModel}`}>
+      <PricingModelMiniIcon pricingModel={pricingModel} />
+      {pricingModelSummaryLabel(pricingModel)}
+    </span>
+  );
+}
+
 function RequirementsEditPanel({
   form,
   inputMode,
   naturalLanguageInput,
+  pricingModel,
   regionCatalog,
   regionCatalogError,
   validationIssues,
@@ -1355,6 +1530,7 @@ function RequirementsEditPanel({
   onClearRequirements,
   onFormChange,
   onInputModeChange,
+  onPricingModelChange,
   onNaturalLanguageChange,
   onParse,
   onSubmit,
@@ -1363,6 +1539,7 @@ function RequirementsEditPanel({
   form: WorkloadFormState;
   inputMode: InputMode;
   naturalLanguageInput: string;
+  pricingModel: PricingModelKey;
   regionCatalog: RegionCatalogResponse | null;
   regionCatalogError: string | null;
   validationIssues: WorkloadFormIssue[];
@@ -1370,6 +1547,7 @@ function RequirementsEditPanel({
   onClearRequirements: () => void;
   onFormChange: (form: WorkloadFormState) => void;
   onInputModeChange: (mode: InputMode) => void;
+  onPricingModelChange: (model: PricingModelKey) => void;
   onNaturalLanguageChange: (value: string) => void;
   onParse: () => void;
   onSubmit: (event?: FormEvent) => void;
@@ -1384,6 +1562,10 @@ function RequirementsEditPanel({
         </div>
       </div>
       <InputModeTabs inputMode={inputMode} onInputModeChange={onInputModeChange} />
+      <PricingModelPreferenceControl
+        pricingModel={pricingModel}
+        onPricingModelChange={onPricingModelChange}
+      />
       {inputMode === 'describe' ? (
         <DescribePanel
           value={naturalLanguageInput}
@@ -1508,9 +1690,7 @@ function ResultDisclosureSection({
         onClick={handleToggle}
       >
         <span>
-          <strong id={headingId}>{actionLabel}</strong>
-          {' '}
-          <small>{actionDescription}</small>
+          <strong id={headingId}>{actionLabel}</strong> <small>{actionDescription}</small>
         </span>
         <span className="result-disclosure-chevron" aria-hidden="true">
           {isOpen ? '-' : '+'}
@@ -1528,13 +1708,7 @@ function ResultDisclosureSection({
   );
 }
 
-function ResultDetailHeading({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
+function ResultDetailHeading({ title, description }: { title: string; description: string }) {
   return (
     <div className="state-detail-heading">
       <h3>{title}</h3>
@@ -1619,6 +1793,15 @@ function WorkloadForm({
     onChange({
       ...form,
       [key]: value,
+    });
+  }
+
+  function updateServiceCategory(value: string) {
+    onChange({
+      ...form,
+      selectedServiceCategory: value,
+      selectedServiceFamilyId:
+        firstServiceFamilyIdForCategory(value) ?? form.selectedServiceFamilyId,
     });
   }
 
@@ -1793,6 +1976,33 @@ function WorkloadForm({
       </FormSection>
 
       <FormSection title="Cloud services" tone="portfolio">
+        <div className="service-selector-grid" aria-label="Primary cloud-neutral service selector">
+          <SelectField
+            label="Service category"
+            value={form.selectedServiceCategory}
+            options={serviceCategoryOptions()}
+            onChange={updateServiceCategory}
+          />
+          <SelectField
+            label="Specific service"
+            value={form.selectedServiceFamilyId}
+            options={serviceFamilyOptions(form.selectedServiceCategory)}
+            onChange={(value) => update('selectedServiceFamilyId', value)}
+          />
+          <SelectField
+            label="Instance tier"
+            value={form.instanceTier}
+            options={INSTANCE_TIER_OPTIONS}
+            onChange={(value) => update('instanceTier', value)}
+          />
+          <TextField
+            label="Availability zones"
+            value={form.availabilityZoneCount}
+            inputMode="numeric"
+            suffix="AZs"
+            onChange={(value) => update('availabilityZoneCount', value)}
+          />
+        </div>
         <ServiceCatalogPicker
           selectedIds={form.selectedServiceFamilyIds}
           onToggle={toggleServiceFamily}
@@ -1986,8 +2196,9 @@ function FormValidationSummary({ issues }: { issues: WorkloadFormIssue[] }) {
 
   return (
     <div className="form-validation-summary" role="alert">
-      <strong>Fix {issues.length} requirement field{issues.length === 1 ? '' : 's'}.</strong>
-      {' '}
+      <strong>
+        Fix {issues.length} requirement field{issues.length === 1 ? '' : 's'}.
+      </strong>{' '}
       <span>{issues.map((issue) => issue.message).join(' ')}</span>
     </div>
   );
@@ -2113,7 +2324,9 @@ function RegionSelectField({
 
   return (
     <label
-      className={compact ? 'form-field region-field region-field-compact' : 'form-field region-field'}
+      className={
+        compact ? 'form-field region-field region-field-compact' : 'form-field region-field'
+      }
       htmlFor="region"
     >
       <span className="region-field-header">
@@ -2157,8 +2370,8 @@ function RegionSelectField({
       </select>
       {compact ? null : (
         <span className="field-help">
-          {catalogLabel} · {regionCount} provider regions · comparable groups normalize AWS,
-          Azure, and GCP pricing.
+          {catalogLabel} · {regionCount} provider regions · comparable groups normalize AWS, Azure,
+          and GCP pricing.
         </span>
       )}
     </label>
@@ -2326,6 +2539,30 @@ function providerServicesForFamily(family: CloudServiceFamily, providerId: Provi
   }
 }
 
+function serviceCategoryOptions(): Array<[string, string]> {
+  return SERVICE_CATALOG_CATEGORIES.map((category) => [category.id, category.label]);
+}
+
+function serviceFamilyOptions(categoryId: string): Array<[string, string]> {
+  return CLOUD_SERVICE_CATALOG.filter((family) => family.categoryId === categoryId).map(
+    (family) => [family.id, serviceFamilyOptionLabel(family)],
+  );
+}
+
+function firstServiceFamilyIdForCategory(categoryId: string): string | undefined {
+  return CLOUD_SERVICE_CATALOG.find((family) => family.categoryId === categoryId)?.id;
+}
+
+function serviceFamilyOptionLabel(family: CloudServiceFamily): string {
+  const secondary = PROVIDER_ORDER.map(
+    (providerId) => providerServicesForFamily(family, providerId)[0],
+  )
+    .filter(Boolean)
+    .join(' / ');
+
+  return `${family.label} - ${secondary}`;
+}
+
 function SupportBadge({ status }: { status: ServiceSupportStatus }) {
   return <span className={`support-badge support-badge-${status}`}>{supportLabel(status)}</span>;
 }
@@ -2386,6 +2623,10 @@ function formSizingSummary(
     ? `${formatCompactInput(form.storageSizeGb)}GB`
     : 'No storage';
   const databaseText = form.databaseEnabled ? form.databaseEngine : 'No database';
+  const selectedServiceCount = new Set([
+    form.selectedServiceFamilyId,
+    ...form.selectedServiceFamilyIds,
+  ]).size;
 
   return {
     traffic: `${dailyUsers} daily / ${peakUsers} peak`,
@@ -2394,7 +2635,7 @@ function formSizingSummary(
       form.scalingType === 'autoscaling'
         ? `${formatDecimal(scaleMin)}-${formatDecimal(scaleMax)} nodes`
         : `${formatDecimal(instances)} fixed`,
-    services: `${form.selectedServiceFamilyIds.length}/${CLOUD_SERVICE_CATALOG.length} families`,
+    services: `${selectedServiceCount}/${CLOUD_SERVICE_CATALOG.length} families`,
     data: `${storageText} / ${databaseText}`,
   };
 }
@@ -2407,8 +2648,16 @@ function compactRequirementSummary(
   const vcpu = form.vcpu.trim() || '0';
   const memory = form.memoryGb.trim() || '0';
   const region = regionLabelForSummary(form.regionPreference, regionCatalog);
+  const service = serviceFamilyShortLabel(form.selectedServiceFamilyId);
 
-  return `${workload} · ${vcpu} vCPU · ${memory}GB · ${region}`;
+  return `${workload} · ${service} · ${vcpu} vCPU · ${memory}GB · ${region}`;
+}
+
+function serviceFamilyShortLabel(serviceFamilyId: string): string {
+  return (
+    CLOUD_SERVICE_CATALOG.find((family) => family.id === serviceFamilyId)?.label ??
+    'Selected service'
+  );
 }
 
 function workloadTypeLabel(type: WorkloadFormState['workloadType']): string {
@@ -2430,10 +2679,7 @@ function workloadTypeLabel(type: WorkloadFormState['workloadType']): string {
   }
 }
 
-function regionLabelForSummary(
-  value: string,
-  regionCatalog: RegionCatalogResponse | null,
-): string {
+function regionLabelForSummary(value: string, regionCatalog: RegionCatalogResponse | null): string {
   const comparisonLabel = comparisonRegionLabel(value);
 
   if (comparisonLabel) {
@@ -2808,9 +3054,7 @@ function ExecutiveAnalyticsPreview({
       <div className="executive-stat-grid" aria-label="Executive compact stats">
         <ExecutiveStatTile
           label="Cheapest provider"
-          value={
-            analytics.cheapest ? providerLabel(analytics.cheapest.providerId) : 'Pending'
-          }
+          value={analytics.cheapest ? providerLabel(analytics.cheapest.providerId) : 'Pending'}
           detail={
             analytics.cheapest?.total !== undefined
               ? `${formatCurrency(analytics.cheapest.total)} monthly`
@@ -2908,7 +3152,10 @@ function ExecutiveDecisionDashboard({
 
       <div className="executive-lens-grid" aria-label="Executive decision lenses">
         {decision.lenses.slice(0, 3).map((lens) => (
-          <article className={`executive-lens-card lens-${roleClassName(lens.role)}`} key={lens.role}>
+          <article
+            className={`executive-lens-card lens-${roleClassName(lens.role)}`}
+            key={lens.role}
+          >
             <span>{lens.label}</span>
             <strong>{lens.value}</strong>
             <p>{lens.detail}</p>
@@ -2978,11 +3225,13 @@ function ExecutiveStatTile({
   value: string;
 }) {
   return (
-    <article className={providerId ? `executive-stat-tile executive-stat-${providerId}` : 'executive-stat-tile'}>
+    <article
+      className={
+        providerId ? `executive-stat-tile executive-stat-${providerId}` : 'executive-stat-tile'
+      }
+    >
       <span>{label}</span>
-      <strong>
-        {value}
-      </strong>
+      <strong>{value}</strong>
       <small>{detail}</small>
     </article>
   );
@@ -3072,6 +3321,162 @@ function EngineeringAnalyticsDashboard({
   );
 }
 
+function ServiceCheapestMatrix({
+  comparison,
+  interval,
+}: {
+  comparison: ComparisonResult | null;
+  interval: IntervalKey;
+}) {
+  const rows = serviceCheapestRows(comparison, interval);
+
+  return (
+    <section className="service-cheapest-matrix" aria-label="Cheapest provider by service">
+      <div className="engineering-dashboard-heading">
+        <div>
+          <span>Cheapest by service</span>
+          <h3>Per-service decision matrix</h3>
+        </div>
+        <p>
+          Each row uses the same provider line items as the dashboard and flags approximate service
+          mappings for architecture review.
+        </p>
+      </div>
+      <div className="table-wrap">
+        <table className="ranking-table service-matrix-table">
+          <thead>
+            <tr>
+              <th scope="col">Service</th>
+              <th scope="col">Cheapest</th>
+              <th scope="col">Cost</th>
+              <th scope="col">Coverage</th>
+              <th scope="col">Caveat</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.category}>
+                <td>{capitalize(row.category)}</td>
+                <td>{row.providerId ? providerLabel(row.providerId) : 'Pending'}</td>
+                <td>{row.cost !== undefined ? formatCurrency(row.cost) : 'Pending'}</td>
+                <td>{row.coverage}</td>
+                <td>{row.caveat}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function CostFormulaEvidence({ comparison }: { comparison: ComparisonResult | null }) {
+  const rows = costFormulaRows(comparison);
+
+  return (
+    <section className="cost-formula-evidence" aria-label="Cost calculation evidence">
+      <div className="engineering-dashboard-heading">
+        <div>
+          <span>Calculation evidence</span>
+          <h3>Rate x quantity x time</h3>
+        </div>
+        <p>
+          Monthly totals are derived from cached rates and the shared 730-hours/month constant; no
+          request-time cloud calculator calls are made.
+        </p>
+      </div>
+      <div className="formula-evidence-grid">
+        {rows.map((row) => (
+          <article className={`formula-evidence-card formula-${row.providerId}`} key={row.key}>
+            <span>
+              {providerLabel(row.providerId)} · {capitalize(row.category)}
+            </span>
+            <strong>{row.description}</strong>
+            <p>{row.formula}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function serviceCheapestRows(
+  comparison: ComparisonResult | null,
+  interval: IntervalKey,
+): Array<{
+  category: ServiceCategory;
+  providerId?: ProviderId;
+  cost?: number;
+  coverage: string;
+  caveat: string;
+}> {
+  return SERVICE_CATEGORIES.map((category) => {
+    const candidates =
+      comparison?.providers
+        .map((provider) => {
+          const categoryCost = provider.lineItems
+            .filter((lineItem) => lineItem.category === category)
+            .reduce(
+              (sum, lineItem) =>
+                sum + lineItem.baseMonthlyCostUsd * intervalMultiplierFromMonthly(interval),
+              0,
+            );
+          const approximate = provider.lineItems.some(
+            (lineItem) => lineItem.category === category && lineItem.isApproximate,
+          );
+
+          return {
+            providerId: provider.providerId,
+            cost: categoryCost,
+            approximate,
+          };
+        })
+        .filter((candidate) => candidate.cost > 0) ?? [];
+    const cheapest = [...candidates].sort((left, right) => left.cost - right.cost)[0];
+
+    return {
+      category,
+      providerId: cheapest?.providerId,
+      cost: cheapest?.cost,
+      coverage: `${candidates.length}/3 providers`,
+      caveat: cheapest
+        ? cheapest.approximate
+          ? 'Approximate service mapping; validate fit.'
+          : 'Exact mapped line item.'
+        : 'No priced line item for this service.',
+    };
+  });
+}
+
+function costFormulaRows(comparison: ComparisonResult | null): Array<{
+  key: string;
+  providerId: ProviderId;
+  category: ServiceCategory;
+  description: string;
+  formula: string;
+}> {
+  return (
+    comparison?.providers.flatMap((provider) =>
+      provider.lineItems.slice(0, 4).map((lineItem, index) => ({
+        key: `${provider.providerId}-${lineItem.category}-${index}`,
+        providerId: provider.providerId,
+        category: lineItem.category,
+        description: lineItem.description,
+        formula:
+          lineItem.baseHourlyCostUsd !== undefined
+            ? `${formatCurrency(lineItem.baseHourlyCostUsd)} hourly x 730 hours = ${formatCurrency(
+                lineItem.baseMonthlyCostUsd,
+              )} monthly`
+            : lineItem.unitPriceUsd !== undefined
+              ? `${formatCurrency(lineItem.unitPriceUsd)} per ${lineItem.unit ?? 'unit'} rolled into ${formatCurrency(
+                  lineItem.baseMonthlyCostUsd,
+                )} monthly`
+              : `Provider adapter subtotal = ${formatCurrency(lineItem.baseMonthlyCostUsd)} monthly`,
+      })),
+    ) ?? []
+  );
+}
+
 function EngineeringServiceChartGrid({
   analytics,
   compact = false,
@@ -3081,7 +3486,9 @@ function EngineeringServiceChartGrid({
 }) {
   return (
     <div
-      className={compact ? 'engineering-chart-grid engineering-chart-grid-compact' : 'engineering-chart-grid'}
+      className={
+        compact ? 'engineering-chart-grid engineering-chart-grid-compact' : 'engineering-chart-grid'
+      }
       aria-label="Provider service cost charts"
     >
       {analytics.providers.map((provider) => (
@@ -3112,9 +3519,7 @@ function EngineeringProviderServiceChart({
   return (
     <article className={`engineering-chart-card engineering-chart-${provider.providerId}`}>
       <div className="engineering-chart-title">
-        <span>
-          {providerLabel(provider.providerId)}
-        </span>
+        <span>{providerLabel(provider.providerId)}</span>
         <strong>{hasData ? formatCurrency(provider.total ?? 0) : 'Pending'}</strong>
       </div>
 
@@ -3127,11 +3532,7 @@ function EngineeringProviderServiceChart({
               data={provider.services}
               margin={{ top: 10, right: 4, bottom: 0, left: -20 }}
             >
-              <CartesianGrid
-                stroke="var(--pc-chart-grid)"
-                strokeDasharray="3 3"
-                vertical={false}
-              />
+              <CartesianGrid stroke="var(--pc-chart-grid)" strokeDasharray="3 3" vertical={false} />
               <XAxis
                 dataKey="serviceLabel"
                 interval={0}
@@ -3246,9 +3647,7 @@ function EngineeringSignal({
   return (
     <article className={className}>
       <span>{label}</span>
-      <strong>
-        {value}
-      </strong>
+      <strong>{value}</strong>
       <small>{detail}</small>
     </article>
   );
@@ -3679,9 +4078,7 @@ function FinOpsReviewPanel({ review }: { review: FinOpsReview }) {
           <div className="provider-fit-list">
             {review.providerFit.map((fit) => (
               <div className={`provider-fit provider-fit-${fit.tone}`} key={fit.providerId}>
-                <span>
-                  {providerLabel(fit.providerId)}
-                </span>
+                <span>{providerLabel(fit.providerId)}</span>
                 <strong>{fit.label}</strong>
                 <small>{fit.detail}</small>
               </div>
@@ -3824,9 +4221,7 @@ function ProviderRanking({
               <tr key={summary.providerId}>
                 <td>{summary.total !== undefined ? `#${index + 1}` : '-'}</td>
                 <td>
-                  <span className="rank-provider">
-                    {providerLabel(summary.providerId)}
-                  </span>
+                  <span className="rank-provider">{providerLabel(summary.providerId)}</span>
                 </td>
                 <td>{summary.total !== undefined ? formatCurrency(summary.total) : 'Pending'}</td>
                 <td>
@@ -4013,6 +4408,20 @@ function ModeIcon({ mode }: { mode: InputMode }) {
   );
 }
 
+function PricingModelMiniIcon({ pricingModel }: { pricingModel: PricingModelKey }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="segment-icon">
+      {pricingModel === 'spot' ? (
+        <path d="M5 17l4-8 4 5 3-6 3 9M5 20h14" />
+      ) : pricingModel === 'on-demand' ? (
+        <path d="M6 7h12M6 12h12M6 17h8" />
+      ) : (
+        <path d="M7 20V9M12 20V5M17 20v-8M5 20h14" />
+      )}
+    </svg>
+  );
+}
+
 function SampleIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon">
@@ -4121,7 +4530,7 @@ function roleClassName(role: ExecutiveLens['role']): string {
 function costForInterval(provider: ComparisonProviderResult, interval: IntervalKey): number {
   switch (interval) {
     case 'hourly':
-      return provider.totals.hourly ?? provider.totals.monthly / 730;
+      return provider.totals.hourly ?? hourlyFromMonthly(provider.totals.monthly);
     case 'daily':
       return provider.totals.daily;
     case 'weekly':
@@ -4190,11 +4599,13 @@ function executiveAnalyticsModel(
   form: WorkloadFormState,
 ): ExecutiveAnalyticsModel {
   const monthlySummaries = providerCostSummaries(comparison, 'monthly');
-  const summaryByProvider = new Map(monthlySummaries.map((summary) => [summary.providerId, summary]));
-  const pricedMonthlySummaries = monthlySummaries.filter(
-    (summary) => summary.total !== undefined,
+  const summaryByProvider = new Map(
+    monthlySummaries.map((summary) => [summary.providerId, summary]),
   );
-  const pricedInProviderOrder = PROVIDER_ORDER.map((providerId) => summaryByProvider.get(providerId))
+  const pricedMonthlySummaries = monthlySummaries.filter((summary) => summary.total !== undefined);
+  const pricedInProviderOrder = PROVIDER_ORDER.map((providerId) =>
+    summaryByProvider.get(providerId),
+  )
     .filter((summary): summary is ProviderCostSummary => Boolean(summary))
     .filter((summary) => summary.total !== undefined);
   const totalMonthlyAcrossProviders =
@@ -4208,7 +4619,9 @@ function executiveAnalyticsModel(
   const monthlyPotentialSavings = review.monthlySpread;
   const annualPotentialSavings =
     review.executiveDecision.avoidableAnnualSpend ??
-    (monthlyPotentialSavings !== undefined ? roundCurrency(monthlyPotentialSavings * 12) : undefined);
+    (monthlyPotentialSavings !== undefined
+      ? roundCurrency(monthlyPotentialSavings * 12)
+      : undefined);
 
   return {
     review,
@@ -4996,20 +5409,7 @@ function categoryHeatmapRows(summaries: ProviderCostSummary[]): Array<{
 }
 
 function intervalCostMultiplier(interval: IntervalKey): number {
-  switch (interval) {
-    case 'hourly':
-      return 1 / 730;
-    case 'daily':
-      return 1 / 30;
-    case 'weekly':
-      return 7 / 30;
-    case 'monthly':
-      return 1;
-    case 'quarterly':
-      return 3;
-    case 'yearly':
-      return 12;
-  }
+  return intervalMultiplierFromMonthly(interval);
 }
 
 function compareButtonLabel(inputMode: InputMode): string {
@@ -5021,7 +5421,27 @@ function compareLoadingLabel(inputMode: InputMode): string {
 }
 
 function inputModeSummaryLabel(inputMode: InputMode): string {
-  return INPUT_MODE_OPTIONS.find((option) => option.key === inputMode)?.summaryLabel ?? 'Manual entry';
+  return (
+    INPUT_MODE_OPTIONS.find((option) => option.key === inputMode)?.summaryLabel ?? 'Manual entry'
+  );
+}
+
+function pricingModelSummaryLabel(pricingModel: PricingModelKey): string {
+  return (
+    PRICING_MODEL_OPTIONS.find((option) => option.key === pricingModel)?.shortLabel ?? 'On-demand'
+  );
+}
+
+function readStoredPricingModel(): PricingModelKey {
+  const stored = window.localStorage.getItem(PRICING_MODEL_STORAGE_KEY);
+
+  return PRICING_MODEL_OPTIONS.some((option) => option.key === stored)
+    ? (stored as PricingModelKey)
+    : 'on-demand';
+}
+
+function storePricingModel(pricingModel: PricingModelKey): void {
+  window.localStorage.setItem(PRICING_MODEL_STORAGE_KEY, pricingModel);
 }
 
 function reportFormatLabel(format: ReportFormat): string {

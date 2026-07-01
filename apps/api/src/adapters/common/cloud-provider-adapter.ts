@@ -4,11 +4,7 @@ export type ProviderId = 'aws' | 'azure' | 'gcp';
 export type ServiceCategory = 'compute' | 'storage' | 'database' | 'network';
 export type CostComponent = 'compute' | 'storage' | 'database' | 'egress';
 export type PricingModelKey =
-  | 'on-demand'
-  | 'reserved-1yr'
-  | 'reserved-3yr'
-  | 'spot'
-  | 'savings-plan';
+  'on-demand' | 'reserved-1yr' | 'reserved-3yr' | 'spot' | 'savings-plan';
 export type PricingBasis = 'flat' | 'tiered';
 export type PricingVolatility = 'stable' | 'variable' | 'volatile';
 export type PricingSource = 'catalog' | 'modeled-estimate';

@@ -24,6 +24,7 @@ describe('config schema', () => {
     expect(config.PRICING_ETL_DEFAULT_REGION_AZURE).toBe('eastus');
     expect(config.PRICING_ETL_DEFAULT_REGION_GCP).toBe('us-central1');
     expect(config.NL_PARSE_MAX_INPUT_CHARS).toBe(4000);
+    expect(config.FEATURE_RESERVED_PRICING).toBe(true);
   });
 
   it('fails fast for invalid config', () => {

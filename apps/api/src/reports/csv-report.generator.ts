@@ -1,16 +1,24 @@
 import { Injectable } from '@nestjs/common';
 import { ComparisonResult } from '../comparison/comparison.types';
+import {
+  lineItemEvidenceRows,
+  reportContextRows,
+  selectedScenarioRows,
+  serviceRequirementRows,
+} from './report-evidence';
 import { buildReportInsights } from './report-insights';
 import { sanitizeSpreadsheetText } from './report-security';
+import { ReportOptions } from './report.types';
 
 @Injectable()
 export class CsvReportGenerator {
-  generate(result: ComparisonResult): Buffer {
+  generate(result: ComparisonResult, options: ReportOptions = {}): Buffer {
     const rows: string[][] = [
       ['PolyCost Comparison Report'],
       ['Comparison ID', result.comparisonId],
       ['Pricing As Of', result.pricingAsOf],
       ['Cheapest Provider', result.cheapestProviderId],
+      ...reportContextRows(options),
       [],
       ['FinOps Summary'],
       ['Metric', 'Value'],
@@ -30,6 +38,12 @@ export class CsvReportGenerator {
         provider.totals.yearly.toString(),
       ]),
       [],
+      ['Selected Pricing Scenario'],
+      ...selectedScenarioRows(result, options).map((row) => row.map(sanitizeSpreadsheetText)),
+      [],
+      ['Normalized Service Requirements'],
+      ...serviceRequirementRows(result).map((row) => row.map(sanitizeSpreadsheetText)),
+      [],
       ['Line Items'],
       ['Provider', 'Category', 'Description', 'Approximate', 'Monthly USD'],
       ...result.providers.flatMap((provider) =>
@@ -41,6 +55,9 @@ export class CsvReportGenerator {
           lineItem.baseMonthlyCostUsd.toString(),
         ]),
       ),
+      [],
+      ['Rate Math Evidence'],
+      ...lineItemEvidenceRows(result).map((row) => row.map(sanitizeSpreadsheetText)),
     ];
 
     if (result.warnings && result.warnings.length > 0) {

@@ -79,7 +79,9 @@ export function canonicalRegionForRegionPreference(regionPreference: string): st
   }
 
   return COMPARISON_REGION_GROUPS.find((group) =>
-    Object.values(group.providerRegions).some((providerRegion) => providerRegion === normalizedRegion),
+    Object.values(group.providerRegions).some(
+      (providerRegion) => providerRegion === normalizedRegion,
+    ),
   )?.id;
 }
 

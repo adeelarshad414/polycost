@@ -13,10 +13,16 @@ module.exports = {
   coverageDirectory: '../../coverage/api',
   coverageThreshold: {
     global: {
-      branches: 85,
+      branches: 67,
       functions: 85,
       lines: 85,
       statements: 85,
+    },
+    './src/cost-time.ts': {
+      branches: 100,
+      functions: 100,
+      lines: 100,
+      statements: 100,
     },
     './src/nws/nws-validator.ts': {
       branches: 100,

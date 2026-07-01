@@ -6,11 +6,7 @@ import {
 import { normalizeInstanceFamily, NormalizedInstanceFamily } from './family-normalizer';
 
 export type NormalizedPricingTerm =
-  | 'on_demand'
-  | 'reserved_1yr'
-  | 'reserved_3yr'
-  | 'spot'
-  | 'savings_plan';
+  'on_demand' | 'reserved_1yr' | 'reserved_3yr' | 'spot' | 'savings_plan';
 export type NormalizedStorageTier = 'standard' | 'infrequent_access' | 'archive';
 
 export interface NormalizedComputePricingRecord {

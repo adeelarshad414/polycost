@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import {
   configuredApiBaseUrl,
   createPolyCostClient,
@@ -31,6 +33,12 @@ describe('api client', () => {
     document.head.appendChild(meta);
 
     expect(configuredApiBaseUrl()).toBe('/api/v1');
+  });
+
+  it('exposes the Docker build API base through Vite HTML env replacement', () => {
+    const html = readFileSync('index.html', 'utf8');
+
+    expect(html).toContain('name="polycost-api-base-url" content="%VITE_API_BASE_URL%"');
   });
 
   it('sends comparison requests with cached-pricing options', async () => {
@@ -100,9 +108,14 @@ describe('api client', () => {
     global.fetch = fetchMock as typeof fetch;
     const client = createPolyCostClient('http://api.test/api/v1');
 
-    await expect(client.exportComparison('comparison-1', 'csv')).resolves.toBe(blob);
+    await expect(
+      client.exportComparison('comparison-1', 'csv', {
+        interval: 'quarterly',
+        pricingModel: 'reserved-3yr',
+      }),
+    ).resolves.toBe(blob);
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://api.test/api/v1/comparisons/comparison-1/export?format=csv',
+      'http://api.test/api/v1/comparisons/comparison-1/export?format=csv&interval=quarterly&pricingModel=reserved-3yr',
     );
   });
 
@@ -215,6 +228,50 @@ describe('api client', () => {
     );
     expect(fetchMock).toHaveBeenCalledWith(
       'http://api.test/api/v1/pricing/models',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+  });
+
+  it('fetches provider/service pricing model metadata for dynamic selectors', async () => {
+    const fetchMock = jest.fn(async () =>
+      jsonResponse({
+        schemaVersion: 2,
+        provider: 'aws',
+        service: 'compute',
+        region: 'us-east-1',
+        generatedAt: '2026-06-30T00:00:00.000Z',
+        models: [
+          {
+            code: 'reserved_3yr',
+            label: 'Reserved (3-Year)',
+            termMonths: 36,
+            requiresPaymentOption: true,
+            isEstimateOnly: false,
+            paymentOptions: [{ code: 'no_upfront', label: 'No upfront' }],
+            defaultPaymentOption: 'no_upfront',
+          },
+        ],
+      }),
+    );
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(client.getPricingModelsForService('aws', 'compute', 'us-east-1')).resolves.toEqual(
+      expect.objectContaining({
+        schemaVersion: 2,
+        models: expect.arrayContaining([
+          expect.objectContaining({
+            code: 'reserved_3yr',
+          }),
+        ]),
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/pricing/aws/compute/models?region=us-east-1',
       expect.objectContaining({
         headers: expect.objectContaining({
           'Content-Type': 'application/json',

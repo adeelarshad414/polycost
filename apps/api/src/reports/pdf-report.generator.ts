@@ -1,7 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { ComparisonResult } from '../comparison/comparison.types';
+import {
+  lineItemEvidenceRows,
+  reportContextRows,
+  selectedScenarioRows,
+  serviceRequirementRows,
+} from './report-evidence';
 import { buildReportInsights } from './report-insights';
 import { escapePdfText } from './report-security';
+import { ReportOptions } from './report.types';
 
 interface PdfLine {
   text: string;
@@ -12,8 +19,8 @@ const LINES_PER_PAGE = 42;
 
 @Injectable()
 export class PdfReportGenerator {
-  generate(result: ComparisonResult): Buffer {
-    const lines = this.lines(result);
+  generate(result: ComparisonResult, options: ReportOptions = {}): Buffer {
+    const lines = this.lines(result, options);
     const pages = chunk(lines, LINES_PER_PAGE);
     const objects: string[] = [];
     const pageObjectNumbers: number[] = [];
@@ -40,12 +47,16 @@ export class PdfReportGenerator {
     return buildPdf(objects);
   }
 
-  private lines(result: ComparisonResult): PdfLine[] {
+  private lines(result: ComparisonResult, options: ReportOptions): PdfLine[] {
     const lines: PdfLine[] = [
       { text: 'PolyCost Comparison Report', fontSize: 18 },
       { text: `Comparison ID: ${result.comparisonId}`, fontSize: 10 },
       { text: `Pricing as of: ${result.pricingAsOf}`, fontSize: 10 },
       { text: `Cheapest provider: ${result.cheapestProviderId}`, fontSize: 10 },
+      ...reportContextRows(options).map((row) => ({
+        text: `${row[0]}: ${row[1]}`,
+        fontSize: 10,
+      })),
       { text: '', fontSize: 10 },
       { text: 'FinOps summary', fontSize: 14 },
       ...buildReportInsights(result).map((insight) => ({
@@ -63,6 +74,25 @@ export class PdfReportGenerator {
       });
     }
 
+    lines.push({ text: '', fontSize: 10 }, { text: 'Selected pricing scenario', fontSize: 14 });
+    for (const row of selectedScenarioRows(result, options).slice(1)) {
+      lines.push({
+        text: `${row[0]}: ${row[1]} | selected ${row[2]} | monthly ${row[3]} | ${row[5]}`,
+        fontSize: 10,
+      });
+    }
+
+    lines.push(
+      { text: '', fontSize: 10 },
+      { text: 'Normalized service requirements', fontSize: 14 },
+    );
+    for (const row of serviceRequirementRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]} | ${row[1]} | ${row[2]} | region ${row[3]} | ${row[4]} | qty ${row[5]}`,
+        fontSize: 10,
+      });
+    }
+
     lines.push({ text: '', fontSize: 10 }, { text: 'Line items', fontSize: 14 });
 
     for (const provider of result.providers) {
@@ -74,6 +104,14 @@ export class PdfReportGenerator {
           fontSize: 10,
         });
       }
+    }
+
+    lines.push({ text: '', fontSize: 10 }, { text: 'Rate math evidence', fontSize: 14 });
+    for (const row of lineItemEvidenceRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]} | ${row[1]} | ${row[2]} | ${row[8]}`,
+        fontSize: 10,
+      });
     }
 
     if (result.warnings && result.warnings.length > 0) {

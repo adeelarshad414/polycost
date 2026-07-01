@@ -4,7 +4,10 @@ These notes capture build-impact decisions from `10-TESTING-STRATEGY.md`.
 
 ## Coverage Gates
 
-- Overall project coverage floor: 85%.
+- Overall API coverage floor: 85% statements/lines/functions and 67% branches.
+- Overall web coverage floor: 80% statements/lines/functions and 75% branches.
+- Shared cost-time utilities: 100% in API and web, because this is the source of
+  truth for hourly/daily/weekly/monthly/quarterly/yearly math.
 - `IntervalCostCalculator`: 100%.
 - `NWSValidator`: 100%.
 - `EquivalentServiceMapper`: 95%.

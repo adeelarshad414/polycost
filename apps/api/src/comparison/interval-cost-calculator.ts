@@ -1,11 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { hourlyFromMonthly, intervalCostsFromHourly, roundCurrency } from '../cost-time';
 import { CostIntervals } from './comparison.types';
-
-const DAYS_PER_MONTH = 30;
-const DAYS_PER_WEEK = 7;
-const HOURS_PER_MONTH = 730;
-const MONTHS_PER_QUARTER = 3;
-const MONTHS_PER_YEAR = 12;
 
 @Injectable()
 export class IntervalCostCalculator {
@@ -14,20 +9,7 @@ export class IntervalCostCalculator {
       throw new RangeError('baseMonthlyCostUsd must be a finite non-negative number');
     }
 
-    const monthly = this.roundCurrency(baseMonthlyCostUsd);
-    const daily = this.roundCurrency(monthly / DAYS_PER_MONTH);
-
-    return {
-      hourly: this.roundCurrency(monthly / HOURS_PER_MONTH),
-      daily,
-      weekly: this.roundCurrency(daily * DAYS_PER_WEEK),
-      monthly,
-      quarterly: this.roundCurrency(monthly * MONTHS_PER_QUARTER),
-      yearly: this.roundCurrency(monthly * MONTHS_PER_YEAR),
-    };
-  }
-
-  private roundCurrency(value: number): number {
-    return Math.round((value + Number.EPSILON) * 100) / 100;
+    const monthly = roundCurrency(baseMonthlyCostUsd);
+    return intervalCostsFromHourly(hourlyFromMonthly(monthly));
   }
 }

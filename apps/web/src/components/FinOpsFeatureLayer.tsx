@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { formatApiError, polyCostClient, PolyCostClient } from '../api-client';
 import { Button } from './Button';
+import { hourlyFromMonthly, intervalMultiplierFromMonthly } from '../cost-time';
 import {
   AlertRecord,
   BudgetRecord,
@@ -13,6 +14,7 @@ import {
   PROVIDER_ORDER,
   PricingModelCost,
   PricingModelKey,
+  PricingModelsForServiceResponse,
   ProviderId,
   SharedReportResponse,
   StoragePricingTier,
@@ -31,6 +33,14 @@ interface PricingModelOption {
   label: string;
   detail: string;
   caveat: string;
+}
+
+type PaymentOptionKey = 'no_upfront' | 'partial_upfront' | 'all_upfront';
+
+interface PaymentOption {
+  key: PaymentOptionKey;
+  label: string;
+  detail: string;
 }
 
 interface CurrencyOption {
@@ -93,6 +103,24 @@ const PRICING_MODELS: PricingModelOption[] = [
   },
 ];
 
+const PAYMENT_OPTIONS: PaymentOption[] = [
+  {
+    key: 'no_upfront',
+    label: 'No upfront',
+    detail: 'No initial payment; higher effective hourly commitment rate.',
+  },
+  {
+    key: 'partial_upfront',
+    label: 'Partial upfront',
+    detail: 'Balances cash timing with a lower effective hourly rate.',
+  },
+  {
+    key: 'all_upfront',
+    label: 'All upfront',
+    detail: 'Lowest effective rate when capital commitment is acceptable.',
+  },
+];
+
 const USD_CURRENCY: CurrencyOption = {
   code: 'USD',
   label: 'USD',
@@ -116,14 +144,19 @@ export function FinOpsFeatureLayer({
   form,
   interval,
   isLoading = false,
+  pricingModelPreference = 'on-demand',
+  onPricingModelPreferenceChange,
 }: {
   client?: PolyCostClient;
   comparison: ComparisonResult | null;
   form: WorkloadFormState;
   interval: IntervalKey;
   isLoading?: boolean;
+  pricingModelPreference?: PricingModelKey;
+  onPricingModelPreferenceChange?: (model: PricingModelKey) => void;
 }) {
-  const [pricingModel, setPricingModel] = useState<PricingModelKey>('on-demand');
+  const [pricingModel, setPricingModel] = useState<PricingModelKey>(pricingModelPreference);
+  const [paymentOption, setPaymentOption] = useState<PaymentOptionKey>('no_upfront');
   const [budgetThreshold, setBudgetThreshold] = useState('');
   const [dismissedAlerts, setDismissedAlerts] = useState<string[]>(() => readDismissedAlerts());
   const [watermarkEnabled, setWatermarkEnabled] = useState(true);
@@ -134,6 +167,10 @@ export function FinOpsFeatureLayer({
   const [exchangeRates, setExchangeRates] = useState<ExchangeRatesResponse | null>(null);
   const [exchangeRateError, setExchangeRateError] = useState<string | null>(null);
   const [isLoadingExchangeRates, setIsLoadingExchangeRates] = useState(true);
+  const [pricingModelsForService, setPricingModelsForService] =
+    useState<PricingModelsForServiceResponse | null>(null);
+  const [pricingModelsError, setPricingModelsError] = useState<string | null>(null);
+  const [isLoadingPricingModels, setIsLoadingPricingModels] = useState(false);
   const [budgetRecord, setBudgetRecord] = useState<BudgetRecord | null>(null);
   const [backendAlerts, setBackendAlerts] = useState<AlertRecord[]>([]);
   const [budgetStatus, setBudgetStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -166,6 +203,60 @@ export function FinOpsFeatureLayer({
     cheapestMonthly !== undefined &&
     cheapestMonthly > parsedThreshold &&
     !dismissedAlerts.includes(budgetAlertId);
+  const paymentOptionRequired = requiresPaymentOption(pricingModel);
+  const dynamicPaymentOptions = useMemo(
+    () => paymentOptionsForModel(pricingModelsForService, pricingModel),
+    [pricingModelsForService, pricingModel],
+  );
+  const paymentOptions = dynamicPaymentOptions.length > 0 ? dynamicPaymentOptions : PAYMENT_OPTIONS;
+  const selectedPaymentOption =
+    paymentOptions.find((option) => option.key === paymentOption) ?? paymentOptions[0];
+
+  useEffect(() => {
+    setPricingModel(pricingModelPreference);
+  }, [pricingModelPreference]);
+
+  useEffect(() => {
+    const region =
+      canonicalRegionForRegionPreference(form.regionPreference) ?? DEFAULT_COMPARISON_REGION;
+    let isActive = true;
+
+    setIsLoadingPricingModels(true);
+    setPricingModelsError(null);
+
+    client
+      .getPricingModelsForService('aws', 'compute', region)
+      .then((metadata) => {
+        if (!isActive) {
+          return;
+        }
+
+        setPricingModelsForService(metadata);
+      })
+      .catch((error) => {
+        if (!isActive) {
+          return;
+        }
+
+        setPricingModelsForService(null);
+        setPricingModelsError(formatApiError(error));
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsLoadingPricingModels(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [client, form.regionPreference]);
+
+  useEffect(() => {
+    if (!paymentOptions.some((option) => option.key === paymentOption)) {
+      setPaymentOption(paymentOptions[0]?.key ?? 'no_upfront');
+    }
+  }, [paymentOption, paymentOptions]);
 
   useEffect(() => {
     setShareLink(null);
@@ -295,6 +386,11 @@ export function FinOpsFeatureLayer({
     }
   }
 
+  function updatePricingModel(nextPricingModel: PricingModelKey) {
+    setPricingModel(nextPricingModel);
+    onPricingModelPreferenceChange?.(nextPricingModel);
+  }
+
   return (
     <section className="mt-4 grid min-w-0 gap-4" aria-label="FinOps feature controls">
       <div className="grid gap-3 rounded-lg border border-border bg-surface-1 p-3 shadow-sm">
@@ -318,7 +414,7 @@ export function FinOpsFeatureLayer({
                 type="button"
                 aria-pressed={pricingModel === model.key}
                 title={model.detail}
-                onClick={() => setPricingModel(model.key)}
+                onClick={() => updatePricingModel(model.key)}
                 className={[
                   'inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary',
                   pricingModel === model.key
@@ -337,7 +433,62 @@ export function FinOpsFeatureLayer({
         <p className="rounded-lg border border-border bg-surface-0 px-3 py-2 text-sm leading-5 text-text-secondary">
           <strong className="text-text-primary">{selectedPricingModelOption.label}:</strong>{' '}
           {selectedPricingModelOption.caveat}
+          {paymentOptionRequired ? (
+            <>
+              {' '}
+              Payment option:{' '}
+              <strong className="text-text-primary">{selectedPaymentOption.label}</strong>.
+            </>
+          ) : null}
         </p>
+
+        {paymentOptionRequired ? (
+          <div
+            className="grid gap-2 rounded-lg border border-border bg-surface-0 p-3"
+            aria-label="Payment option"
+          >
+            <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <strong className="text-sm font-semibold text-text-primary">Payment option</strong>
+              <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+                {isLoadingPricingModels
+                  ? 'Loading model metadata'
+                  : pricingModelsError
+                    ? 'Fallback options'
+                    : 'Dynamic model metadata'}
+              </span>
+            </div>
+            <div
+              className="grid min-h-11 grid-cols-1 rounded-lg border border-border bg-surface-1 p-1 shadow-inner sm:grid-cols-3"
+              role="group"
+              aria-label="Reserved payment option"
+            >
+              {paymentOptions.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  aria-pressed={paymentOption === option.key}
+                  title={option.detail}
+                  onClick={() => setPaymentOption(option.key)}
+                  className={[
+                    'inline-flex min-h-10 items-center justify-center rounded-md px-3 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary',
+                    paymentOption === option.key
+                      ? 'bg-text-primary text-surface-1 shadow-sm'
+                      : 'text-text-secondary hover:bg-surface-0 hover:text-text-primary',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            {pricingModelsError ? (
+              <p className="text-xs font-semibold text-text-muted">
+                Backend model metadata unavailable: {pricingModelsError}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="grid gap-3 lg:grid-cols-3">
           {PROVIDER_ORDER.map((providerId) => {
@@ -346,11 +497,11 @@ export function FinOpsFeatureLayer({
               ? providerModelCost(provider, pricingModel)
               : undefined;
 
-          return (
-            <article
-              key={providerId}
-              className="min-w-0 rounded-lg border border-border bg-surface-0 p-3"
-            >
+            return (
+              <article
+                key={providerId}
+                className="min-w-0 rounded-lg border border-border bg-surface-0 p-3"
+              >
                 <div className="flex min-w-0 items-center justify-between gap-3">
                   <ProviderTextHeading providerId={providerId} />
                   <strong className="font-mono text-base text-text-primary">
@@ -664,8 +815,9 @@ function PricingModelSavingsCue({
     <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2 text-xs font-semibold">
       {bestModel?.savingsPercentVsOnDemand !== undefined ? (
         <span className="rounded-full border border-[color:var(--pc-success)] bg-[color:var(--pc-success-soft)] px-2 py-1 text-text-primary">
-          Best: {bestModel.providerTerm ?? bestModel.displayName ?? pricingModelLabel(bestModel.model)} saves{' '}
-          {formatPercent(bestModel.savingsPercentVsOnDemand)}
+          Best:{' '}
+          {bestModel.providerTerm ?? bestModel.displayName ?? pricingModelLabel(bestModel.model)}{' '}
+          saves {formatPercent(bestModel.savingsPercentVsOnDemand)}
         </span>
       ) : null}
       {selectedModel?.caveat ? (
@@ -818,10 +970,7 @@ function workloadInputFromForm(form: WorkloadFormState): WorkloadInput {
   };
 }
 
-function instanceFamilyForWorkload(
-  vcpu: number,
-  memoryGb: number,
-): NormalizedInstanceFamily {
+function instanceFamilyForWorkload(vcpu: number, memoryGb: number): NormalizedInstanceFamily {
   if (memoryGb / Math.max(vcpu, 1) >= 6) {
     return 'memory-optimized';
   }
@@ -1159,7 +1308,7 @@ function providerModelCost(
     return {
       model: 'on-demand',
       available: true,
-      hourlyCostUsd: provider.totals.hourly ?? provider.totals.monthly / 730,
+      hourlyCostUsd: provider.totals.hourly ?? hourlyFromMonthly(provider.totals.monthly),
       monthlyCostUsd: provider.totals.monthly,
     };
   }
@@ -1197,11 +1346,31 @@ function formatModelCost(
     return 'Not available';
   }
 
+  if (modelCost.model === 'spot' && modelCost.estimated) {
+    return formatSpotEstimateRange(modelCost, interval, currency);
+  }
+
   if (interval === 'hourly') {
-    return formatMoney(modelCost.hourlyCostUsd ?? modelCost.monthlyCostUsd / 730, currency);
+    return formatMoney(
+      modelCost.hourlyCostUsd ?? hourlyFromMonthly(modelCost.monthlyCostUsd),
+      currency,
+    );
   }
 
   return formatMoney(modelCost.monthlyCostUsd * intervalCostMultiplier(interval), currency);
+}
+
+function formatSpotEstimateRange(
+  modelCost: PricingModelCost,
+  interval: IntervalKey,
+  currency: CurrencyOption,
+): string {
+  const baseCost =
+    interval === 'hourly'
+      ? (modelCost.hourlyCostUsd ?? hourlyFromMonthly(modelCost.monthlyCostUsd ?? 0))
+      : (modelCost.monthlyCostUsd ?? 0) * intervalCostMultiplier(interval);
+
+  return `Est. ${formatMoney(baseCost * 0.8, currency)}-${formatMoney(baseCost * 1.2, currency)}`;
 }
 
 function pricingModelSummary(
@@ -1215,6 +1384,13 @@ function pricingModelSummary(
 
   if (!selected.available || selected.monthlyCostUsd === undefined) {
     return `${label}: ${selected.unavailableReason ?? 'Not available for this configuration.'}`;
+  }
+
+  if (selected.model === 'spot' && selected.estimated) {
+    const low = selected.monthlyCostUsd * 0.8;
+    const high = selected.monthlyCostUsd * 1.2;
+
+    return `${label}: estimated ${formatMoney(low, currency)}-${formatMoney(high, currency)}/mo range · volatile interruptible capacity`;
   }
 
   if (
@@ -1275,6 +1451,55 @@ function pricingModelLabel(model: PricingModelKey): string {
   return PRICING_MODELS.find((option) => option.key === model)?.label ?? model;
 }
 
+function requiresPaymentOption(model: PricingModelKey): boolean {
+  return model === 'reserved-1yr' || model === 'reserved-3yr' || model === 'savings-plan';
+}
+
+function paymentOptionsForModel(
+  metadata: PricingModelsForServiceResponse | null,
+  model: PricingModelKey,
+): PaymentOption[] {
+  const termCode = pricingTermCodeForModel(model);
+  const options = metadata?.models.find((item) => item.code === termCode)?.paymentOptions ?? [];
+
+  return options
+    .filter(
+      (option): option is { code: PaymentOptionKey; label: string } =>
+        option.code === 'no_upfront' ||
+        option.code === 'partial_upfront' ||
+        option.code === 'all_upfront',
+    )
+    .map((option) => ({
+      key: option.code,
+      label: option.label,
+      detail: paymentOptionDetail(option.code),
+    }));
+}
+
+function pricingTermCodeForModel(
+  model: PricingModelKey,
+): PricingModelsForServiceResponse['models'][number]['code'] {
+  switch (model) {
+    case 'reserved-1yr':
+      return 'reserved_1yr';
+    case 'reserved-3yr':
+      return 'reserved_3yr';
+    case 'savings-plan':
+      return 'savings_plan_1yr';
+    case 'spot':
+      return 'spot_estimate';
+    case 'on-demand':
+      return 'on_demand';
+  }
+}
+
+function paymentOptionDetail(option: PaymentOptionKey): string {
+  return (
+    PAYMENT_OPTIONS.find((item) => item.key === option)?.detail ??
+    'Provider-specific commitment payment option.'
+  );
+}
+
 function ShareIcon() {
   return <IconPath path="M8 12h8M15 8l4 4-4 4M5 5h6M5 19h6M5 5v14" />;
 }
@@ -1323,20 +1548,7 @@ function providerLabel(provider: ProviderId): string {
 }
 
 function intervalCostMultiplier(interval: IntervalKey): number {
-  switch (interval) {
-    case 'hourly':
-      return 1 / 730;
-    case 'daily':
-      return 1 / 30;
-    case 'weekly':
-      return 7 / 30;
-    case 'monthly':
-      return 1;
-    case 'quarterly':
-      return 3;
-    case 'yearly':
-      return 12;
-  }
+  return intervalMultiplierFromMonthly(interval);
 }
 
 function currencyOptionsFromRates(rates: ExchangeRatesResponse | null): CurrencyOption[] {

@@ -234,6 +234,61 @@ export const NWS_PARSE_RESULT_JSON_SCHEMA = {
             },
           },
         },
+        serviceRequirements: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['serviceCategory', 'serviceType', 'quantity'],
+            properties: {
+              serviceCategory: {
+                type: 'string',
+                enum: [
+                  'compute',
+                  'containers',
+                  'application',
+                  'storage',
+                  'database',
+                  'analytics',
+                  'ai',
+                  'integration',
+                  'networking',
+                  'security',
+                  'operations',
+                  'devops',
+                  'migration',
+                  'edge',
+                  'business',
+                ],
+              },
+              serviceType: {
+                type: 'string',
+              },
+              instanceType: {
+                type: 'string',
+              },
+              tier: {
+                type: 'string',
+              },
+              region: {
+                type: 'string',
+              },
+              az: {
+                type: 'string',
+              },
+              quantity: {
+                type: 'integer',
+                minimum: 1,
+              },
+              scaleParams: {
+                type: 'object',
+                additionalProperties: {
+                  anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }],
+                },
+              },
+            },
+          },
+        },
         sourceTraceability: {
           type: 'array',
           items: {
