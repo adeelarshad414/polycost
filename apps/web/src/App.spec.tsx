@@ -1661,7 +1661,7 @@ describe('ComparisonView', () => {
     };
     awsProvider.lineItems[2] = {
       ...awsProvider.lineItems[2],
-      costComponent: 'egress',
+      costComponent: 'networking',
       skuId: 'modeled-private-circuit',
     };
     const networkResult: ComparisonResult = {

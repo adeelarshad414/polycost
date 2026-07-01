@@ -206,17 +206,17 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Azure Load Balancer', 'Application Gateway'],
     gcp: ['Cloud Load Balancing'],
   }),
-  family('dns', 'networking', 'DNS', 'roadmap', {
+  family('dns', 'networking', 'DNS', 'priced', {
     aws: ['Amazon Route 53'],
     azure: ['Azure DNS'],
     gcp: ['Cloud DNS'],
   }),
-  family('private-networking', 'networking', 'Private networking', 'roadmap', {
-    aws: ['Amazon VPC'],
-    azure: ['Azure Virtual Network'],
-    gcp: ['Virtual Private Cloud'],
+  family('private-networking', 'networking', 'Private networking + NAT/VPN', 'priced', {
+    aws: ['Amazon VPC', 'NAT Gateway', 'Site-to-Site VPN'],
+    azure: ['Azure Virtual Network', 'NAT Gateway', 'VPN Gateway'],
+    gcp: ['Virtual Private Cloud', 'Cloud NAT', 'Cloud VPN'],
   }),
-  family('dedicated-connectivity', 'networking', 'Dedicated connectivity', 'roadmap', {
+  family('dedicated-connectivity', 'networking', 'Dedicated connectivity', 'priced', {
     aws: ['AWS Direct Connect'],
     azure: ['ExpressRoute'],
     gcp: ['Cloud Interconnect'],

@@ -248,6 +248,17 @@ const SERVICE_FAMILY_ALIASES: Record<string, string> = {
   cloudfront: 'cdn-edge',
   cdn: 'cdn-edge',
   dns: 'dns',
+  route53: 'dns',
+  azuredns: 'dns',
+  clouddns: 'dns',
+  nat: 'private-networking',
+  natgateway: 'private-networking',
+  vpn: 'private-networking',
+  vpngateway: 'private-networking',
+  directconnect: 'dedicated-connectivity',
+  expressroute: 'dedicated-connectivity',
+  cloudinterconnect: 'dedicated-connectivity',
+  interconnect: 'dedicated-connectivity',
 };
 
 const ENVIRONMENT_OPTIONS: Array<[WorkloadFormState['environment'], string]> = [
