@@ -1131,6 +1131,11 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Azure 1yr');
     expect(text(container)).toContain('$24.00 est.');
     expect(text(container)).toContain('$42.00');
+    expect(text(container)).toContain('Production-depth analytics');
+    expect(text(container)).toContain('Scenario sensitivity');
+    expect(text(container)).toContain('Provider winner under operational shocks');
+    expect(text(container)).toContain('Demand +25%');
+    expect(text(container)).toContain('Best commitment path');
     expect(text(container)).toContain('Payment and TCO detail');
     expect(text(container)).toContain('Commitment scenario monthly, hourly, and term view');
     expect(text(container)).toContain('Upfront cash');

@@ -4717,6 +4717,7 @@ export function ComparisonView({
           <EngineeringAnalyticsDashboard comparison={comparison} interval={interval} />
           <ArchitectureWorkspace comparison={comparison} interval={interval} form={form} />
           <ServiceCheapestMatrix comparison={comparison} interval={interval} />
+          <ProductionDepthAnalytics comparison={comparison} form={form} />
           <FullCostMatrixTable comparison={comparison} />
           <CostFormulaEvidence comparison={comparison} />
           <FinOpsFeatureLayer
@@ -5296,6 +5297,7 @@ function ProductionDepthAnalytics({
   form: WorkloadFormState;
 }) {
   const insights = productionDepthInsights(comparison, form);
+  const scenarios = sensitivityScenarioRows(comparison, form);
 
   return (
     <section className="production-depth-analytics" aria-label="Production-depth analytics">
@@ -5321,7 +5323,98 @@ function ProductionDepthAnalytics({
           </article>
         ))}
       </div>
+      <ScenarioSensitivityTable rows={scenarios} />
     </section>
+  );
+}
+
+function ScenarioSensitivityTable({ rows }: { rows: SensitivityScenarioRow[] }) {
+  const winCounts = scenarioWinCounts(rows);
+
+  return (
+    <div className="scenario-sensitivity" aria-label="Scenario sensitivity analysis">
+      <div className="scenario-sensitivity-heading">
+        <div>
+          <span>Scenario sensitivity</span>
+          <h4>Provider winner under operational shocks</h4>
+        </div>
+        <div className="scenario-win-strip" aria-label="Scenario win count">
+          {PROVIDER_ORDER.map((providerId) => (
+            <span className={`scenario-win scenario-win-${providerId}`} key={providerId}>
+              {providerLabel(providerId)}
+              <strong>{winCounts.get(providerId) ?? 0}</strong>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {rows.length > 0 ? (
+        <div className="table-wrap scenario-sensitivity-wrap">
+          <table className="ranking-table scenario-sensitivity-table">
+            <thead>
+              <tr>
+                <th scope="col">Scenario</th>
+                <th scope="col">Assumption</th>
+                {PROVIDER_ORDER.map((providerId) => (
+                  <th scope="col" key={providerId}>
+                    {providerLabel(providerId)}
+                  </th>
+                ))}
+                <th scope="col">Low</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id}>
+                  <td>
+                    <strong>{row.label}</strong>
+                  </td>
+                  <td>{row.assumption}</td>
+                  {PROVIDER_ORDER.map((providerId) => {
+                    const provider = row.providers.find(
+                      (candidate) => candidate.providerId === providerId,
+                    );
+
+                    return (
+                      <td
+                        className={
+                          provider?.isLowest
+                            ? `scenario-low scenario-low-${provider.providerId}`
+                            : undefined
+                        }
+                        key={`${row.id}-${providerId}`}
+                      >
+                        {provider ? (
+                          <>
+                            <strong>{formatCurrency(provider.monthlyCostUsd)}</strong>
+                            <small>{formatSignedCurrency(provider.deltaVsBaselineUsd)}</small>
+                          </>
+                        ) : (
+                          'N/A'
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td>
+                    {row.lowestProviderId ? (
+                      <span className={`scenario-low-label scenario-low-${row.lowestProviderId}`}>
+                        {providerLabel(row.lowestProviderId)}
+                      </span>
+                    ) : (
+                      'Pending'
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="scenario-sensitivity-empty" role="status">
+          Run a comparison to populate provider-by-provider sensitivity analysis.
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -5779,6 +5872,21 @@ interface ProductionDepthInsight {
   tone: 'good' | 'review' | 'risk';
 }
 
+interface SensitivityScenarioProviderCost {
+  providerId: ProviderId;
+  monthlyCostUsd: number;
+  deltaVsBaselineUsd: number;
+  isLowest: boolean;
+}
+
+interface SensitivityScenarioRow {
+  id: string;
+  label: string;
+  assumption: string;
+  providers: SensitivityScenarioProviderCost[];
+  lowestProviderId?: ProviderId;
+}
+
 function productionDepthInsights(
   comparison: ComparisonResult | null,
   form: WorkloadFormState,
@@ -5944,6 +6052,148 @@ function productionDepthInsights(
       tone: form.complianceLocked ? 'risk' : 'review',
     },
   ];
+}
+
+function sensitivityScenarioRows(
+  comparison: ComparisonResult | null,
+  form: WorkloadFormState,
+): SensitivityScenarioRow[] {
+  if (!comparison) {
+    return [];
+  }
+
+  const providersById = new Map<ProviderId, ComparisonProviderResult>(
+    comparison.providers.map((provider) => [provider.providerId, provider]),
+  );
+  const providers = PROVIDER_ORDER.map((providerId) => providersById.get(providerId)).filter(
+    (provider): provider is ComparisonProviderResult => Boolean(provider),
+  );
+
+  if (providers.length === 0) {
+    return [];
+  }
+
+  const demandGrowthPercent = form.usagePattern === 'bursty' ? 35 : 25;
+  const dataGrowthPercent = storageGrowthSensitivityPercent(form);
+  const egressShockPercent = form.cdn ? 25 : 50;
+  const peakBufferPercent = form.scalingType === 'autoscaling' ? 10 : 18;
+
+  return [
+    scenarioSensitivityRow(
+      'baseline',
+      'Baseline run-rate',
+      'Current on-demand monthly comparison payload.',
+      providers,
+      (provider) => provider.totals.monthly,
+    ),
+    scenarioSensitivityRow(
+      'demand-growth',
+      `Demand +${demandGrowthPercent}%`,
+      `Compute scales ${demandGrowthPercent}%; database and operations scale at half rate.`,
+      providers,
+      (provider) =>
+        provider.totals.monthly +
+        componentMonthly(provider, 'compute') * (demandGrowthPercent / 100) +
+        componentMonthly(provider, 'database') * (demandGrowthPercent / 200) +
+        componentMonthly(provider, 'operations') * (demandGrowthPercent / 200),
+    ),
+    scenarioSensitivityRow(
+      'data-growth',
+      `Data growth +${dataGrowthPercent}%`,
+      'Storage, database capacity, and observability retention growth pressure.',
+      providers,
+      (provider) =>
+        provider.totals.monthly +
+        (componentMonthly(provider, 'storage') +
+          componentMonthly(provider, 'database') +
+          componentMonthly(provider, 'operations') * 0.35) *
+          (dataGrowthPercent / 100),
+    ),
+    scenarioSensitivityRow(
+      'egress-shock',
+      `Egress +${egressShockPercent}%`,
+      form.cdn
+        ? 'CDN enabled; public egress shock is dampened by cache coverage.'
+        : 'No CDN flag; public and inter-region transfer shock is fully applied.',
+      providers,
+      (provider) =>
+        provider.totals.monthly + componentMonthly(provider, 'egress') * (egressShockPercent / 100),
+    ),
+    scenarioSensitivityRow(
+      'commitment-path',
+      'Best commitment path',
+      'Uses published reserved/Savings Plan/CUD monthly model when present; otherwise baseline.',
+      providers,
+      (provider) => bestCommitmentModel(provider)?.model.monthlyCostUsd ?? provider.totals.monthly,
+    ),
+    scenarioSensitivityRow(
+      'peak-buffer',
+      `Peak buffer +${peakBufferPercent}%`,
+      `${form.scalingType === 'autoscaling' ? 'Autoscaling' : 'Fixed'} capacity buffer on compute, network, and operations.`,
+      providers,
+      (provider) =>
+        provider.totals.monthly +
+        (componentMonthly(provider, 'compute') +
+          componentMonthly(provider, 'egress') * 0.5 +
+          componentMonthly(provider, 'operations') * 0.4) *
+          (peakBufferPercent / 100),
+    ),
+  ];
+}
+
+function scenarioSensitivityRow(
+  id: string,
+  label: string,
+  assumption: string,
+  providers: ComparisonProviderResult[],
+  monthlyCost: (provider: ComparisonProviderResult) => number,
+): SensitivityScenarioRow {
+  const providerCosts = providers.map((provider) => ({
+    providerId: provider.providerId,
+    monthlyCostUsd: roundCurrency(monthlyCost(provider)),
+    deltaVsBaselineUsd: roundCurrency(monthlyCost(provider) - provider.totals.monthly),
+    isLowest: false,
+  }));
+  const lowest = [...providerCosts].sort(
+    (left, right) => left.monthlyCostUsd - right.monthlyCostUsd,
+  )[0];
+
+  return {
+    id,
+    label,
+    assumption,
+    providers: providerCosts.map((provider) => ({
+      ...provider,
+      isLowest: lowest?.providerId === provider.providerId,
+    })),
+    lowestProviderId: lowest?.providerId,
+  };
+}
+
+function scenarioWinCounts(rows: SensitivityScenarioRow[]): Map<ProviderId, number> {
+  return rows.reduce((counts, row) => {
+    if (row.lowestProviderId) {
+      counts.set(row.lowestProviderId, (counts.get(row.lowestProviderId) ?? 0) + 1);
+    }
+
+    return counts;
+  }, new Map<ProviderId, number>());
+}
+
+function storageGrowthSensitivityPercent(form: WorkloadFormState): number {
+  const storageGrowthGb = parseInputNumber(form.databaseStorageGrowthGbPerMonth) ?? 0;
+  const databaseSizeGb = parseInputNumber(form.databaseSizeGb) ?? 0;
+  const storageSizeGb = parseInputNumber(form.storageSizeGb) ?? 0;
+  const currentDataFootprintGb = databaseSizeGb + storageSizeGb;
+
+  if (storageGrowthGb <= 0 || currentDataFootprintGb <= 0) {
+    return 40;
+  }
+
+  return Math.min(
+    120,
+    Math.max(20, Math.round((storageGrowthGb * 12 * 100) / currentDataFootprintGb)),
+  );
 }
 
 function componentMonthly(provider: ComparisonProviderResult, component: CostComponent): number {
