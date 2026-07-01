@@ -29,6 +29,7 @@ import {
 } from './cost-management.controller';
 import { CostManagementService } from './cost-management.service';
 import { LivePricingRefreshService } from './live-pricing-refresh.service';
+import { DataHealthController } from './data-health.controller';
 import { PricingStatusController } from './pricing-status.controller';
 import { RegionsController } from './regions.controller';
 import { RegionsService } from './regions.service';
@@ -39,6 +40,7 @@ import { WorkloadController } from './workload.controller';
   controllers: [
     WorkloadController,
     ComparisonsController,
+    DataHealthController,
     PricingStatusController,
     RegionsController,
     CachedPricingController,

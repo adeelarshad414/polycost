@@ -8,7 +8,7 @@ import { NormalizedWorkloadSpec } from '../nws/nws.types';
 import { calculateEgressCost } from '../pricing-normalization/egress-tier-calculator';
 import { providerRegionForCanonicalRegion } from '../pricing-normalization/region-map';
 import { SecretsReader, SecretsService } from '../secrets/secrets.service';
-import { PricingStatusResponse } from './api-errors';
+import { DataHealthResponse, PricingStatusResponse } from './api-errors';
 import {
   AlertRecord,
   BudgetInput,
@@ -22,6 +22,8 @@ import {
   CreateAlertInput,
   ExchangeRatesResponse,
   ExchangeRateUpsertInput,
+  ShareLinkAnalyticsResponse,
+  ShareLinkEventInput,
   ShareLinkRecord,
   WorkloadCostBreakdown,
   WorkloadInput,
@@ -158,6 +160,13 @@ interface ShareLinkRow {
   created_at: Date;
 }
 
+interface ShareLinkEventRollupRow {
+  country_code: string | null;
+  section: string | null;
+  views: string;
+  last_viewed_at: Date | null;
+}
+
 interface ExchangeRateRow {
   quote_currency: string;
   rate: string;
@@ -176,6 +185,7 @@ interface CostObservationRow {
 }
 
 const PROVIDERS: ProviderId[] = ['aws', 'azure', 'gcp'];
+const DATA_FRESHNESS_POLICY_HOURS = 24;
 
 const defaultPgPoolFactory: PgPoolFactory = (config) => new Pool(config);
 
@@ -212,6 +222,81 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         JSON.stringify(resultSnapshot),
         resultSnapshot.pricingAsOf,
       ],
+    );
+  }
+
+  async recordComparisonAuditLog(resultSnapshot: ComparisonResult): Promise<void> {
+    const rows = resultSnapshot.providers.flatMap((provider) =>
+      provider.lineItems.map((lineItem) => ({
+        comparison_id: resultSnapshot.comparisonId,
+        provider: provider.providerId,
+        service_category: lineItem.category,
+        cost_component: lineItem.costComponent ?? lineItem.category,
+        service_label: lineItem.description,
+        resolved_sku_id: lineItem.skuId ?? null,
+        provider_region: lineItem.region ?? null,
+        confidence: lineItem.isApproximate ? 'approximate' : 'direct',
+        rate_used_usd: lineItem.unitPriceUsd ?? lineItem.baseHourlyCostUsd ?? null,
+        monthly_cost_usd: lineItem.baseMonthlyCostUsd,
+        pricing_basis: lineItem.pricingBasis ?? null,
+        is_approximate: lineItem.isApproximate,
+        raw_line_item: lineItem,
+      })),
+    );
+
+    if (rows.length === 0) {
+      return;
+    }
+
+    await (
+      await this.getPool()
+    ).query(
+      `
+        INSERT INTO comparison_audit_logs (
+          comparison_id,
+          provider,
+          service_category,
+          cost_component,
+          service_label,
+          resolved_sku_id,
+          provider_region,
+          confidence,
+          rate_used_usd,
+          monthly_cost_usd,
+          pricing_basis,
+          is_approximate,
+          raw_line_item
+        )
+        SELECT comparison_id,
+               provider,
+               service_category,
+               cost_component,
+               service_label,
+               resolved_sku_id,
+               provider_region,
+               confidence,
+               rate_used_usd,
+               monthly_cost_usd,
+               pricing_basis,
+               is_approximate,
+               raw_line_item
+        FROM jsonb_to_recordset($1::jsonb) AS audit_rows(
+          comparison_id UUID,
+          provider TEXT,
+          service_category TEXT,
+          cost_component TEXT,
+          service_label TEXT,
+          resolved_sku_id TEXT,
+          provider_region TEXT,
+          confidence TEXT,
+          rate_used_usd NUMERIC,
+          monthly_cost_usd NUMERIC,
+          pricing_basis TEXT,
+          is_approximate BOOLEAN,
+          raw_line_item JSONB
+        )
+      `,
+      [JSON.stringify(rows)],
     );
   }
 
@@ -288,6 +373,62 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
             : {}),
         };
       }),
+    };
+  }
+
+  async getDataHealth(now: Date = new Date()): Promise<DataHealthResponse> {
+    const status = await this.getPricingStatus();
+    const providers = status.providers.map((provider) => {
+      const ageHours = provider.lastSuccessfulRun
+        ? roundHours((now.getTime() - Date.parse(provider.lastSuccessfulRun)) / 3_600_000)
+        : undefined;
+      const freshness: DataHealthResponse['providers'][number]['freshness'] =
+        provider.status === 'failed'
+          ? 'failed'
+          : ageHours === undefined
+            ? 'missing'
+            : ageHours > DATA_FRESHNESS_POLICY_HOURS
+              ? 'stale'
+              : 'fresh';
+      const message =
+        freshness === 'fresh'
+          ? `Pricing cache refreshed ${ageHours}h ago.`
+          : freshness === 'stale'
+            ? `Pricing cache is ${ageHours}h old; refresh before production decisions.`
+            : freshness === 'failed'
+              ? 'Latest provider sync failed; use cached data with caution.'
+              : 'No successful provider sync has been recorded.';
+
+      return {
+        ...provider,
+        freshness,
+        ...(ageHours !== undefined ? { ageHours } : {}),
+        message,
+      };
+    });
+    const alerts = providers
+      .filter((provider) => provider.freshness !== 'fresh')
+      .map((provider) => ({
+        providerId: provider.providerId,
+        severity:
+          provider.freshness === 'failed' || provider.freshness === 'missing'
+            ? ('critical' as const)
+            : ('warning' as const),
+        message: provider.message,
+      }));
+    const overallStatus = alerts.some((alert) => alert.severity === 'critical')
+      ? 'degraded'
+      : alerts.length > 0
+        ? 'stale'
+        : 'fresh';
+
+    return {
+      generatedAt: now.toISOString(),
+      freshnessPolicyHours: DATA_FRESHNESS_POLICY_HOURS,
+      overallStatus,
+      alertCount: alerts.length,
+      alerts,
+      providers,
     };
   }
 
@@ -800,6 +941,89 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     return result.rows[0] ? toShareLinkRecord(result.rows[0]) : undefined;
   }
 
+  async recordShareLinkEvent(input: ShareLinkEventInput): Promise<void> {
+    await (
+      await this.getPool()
+    ).query(
+      `
+        INSERT INTO share_link_events (
+          token,
+          country_code,
+          section,
+          user_agent_hash,
+          viewed_at
+        )
+        VALUES ($1, $2, $3, $4, $5)
+      `,
+      [
+        input.token,
+        input.countryCode ?? null,
+        input.section,
+        input.userAgentHash ?? null,
+        input.viewedAt,
+      ],
+    );
+  }
+
+  async getShareLinkAnalytics(token: string): Promise<ShareLinkAnalyticsResponse | undefined> {
+    const linkResult = await (
+      await this.getPool()
+    ).query<{ token: string }>(
+      `
+        SELECT token
+        FROM share_links
+        WHERE token = $1
+      `,
+      [token],
+    );
+
+    if (!linkResult.rows[0]) {
+      return undefined;
+    }
+
+    const rollupResult = await (
+      await this.getPool()
+    ).query<ShareLinkEventRollupRow>(
+      `
+        SELECT country_code,
+               section,
+               COUNT(*) AS views,
+               MAX(viewed_at) AS last_viewed_at
+        FROM share_link_events
+        WHERE token = $1
+        GROUP BY country_code, section
+        ORDER BY views DESC, last_viewed_at DESC
+      `,
+      [token],
+    );
+    const totalViews = rollupResult.rows.reduce(
+      (sum, row) => sum + Number.parseInt(row.views, 10),
+      0,
+    );
+    const lastViewedAt = latestDate(rollupResult.rows.map((row) => row.last_viewed_at));
+    const countryViews = rollupViewsByKey(rollupResult.rows, (row) => row.country_code, 'Unknown')
+      .filter((entry) => entry.countryCode !== 'Unknown')
+      .map((entry) => ({
+        countryCode: entry.countryCode,
+        views: entry.views,
+      }));
+    const sectionViews = rollupViewsByKey(rollupResult.rows, (row) => row.section, 'summary').map(
+      (entry) => ({
+        section: entry.countryCode,
+        views: entry.views,
+        ...(entry.lastViewedAt ? { lastViewedAt: entry.lastViewedAt } : {}),
+      }),
+    );
+
+    return {
+      token,
+      totalViews,
+      ...(lastViewedAt ? { lastViewedAt } : {}),
+      countryViews,
+      sectionViews,
+    };
+  }
+
   async revokeShareLink(token: string, revokedAt: string): Promise<ShareLinkRecord | undefined> {
     const result = await (
       await this.getPool()
@@ -1095,4 +1319,59 @@ function toCostObservationRecord(row: CostObservationRow): CostObservationRecord
     source: row.source,
     observedAt: row.observed_at.toISOString(),
   };
+}
+
+function latestDate(dates: Array<Date | null>): string | undefined {
+  const timestamps = dates
+    .filter((date): date is Date => date instanceof Date)
+    .map((date) => date.getTime());
+
+  if (timestamps.length === 0) {
+    return undefined;
+  }
+
+  return new Date(Math.max(...timestamps)).toISOString();
+}
+
+function rollupViewsByKey(
+  rows: ShareLinkEventRollupRow[],
+  keySelector: (row: ShareLinkEventRollupRow) => string | null,
+  fallbackKey: string,
+): Array<{ countryCode: string; views: number; lastViewedAt?: string }> {
+  const rollups = new Map<string, { views: number; lastViewedAt?: string }>();
+
+  for (const row of rows) {
+    const key = keySelector(row) ?? fallbackKey;
+    const views = Number.parseInt(row.views, 10);
+    const lastViewedAt = row.last_viewed_at?.toISOString();
+    const existing = rollups.get(key);
+
+    if (existing) {
+      existing.views += views;
+      if (lastViewedAt && (!existing.lastViewedAt || lastViewedAt > existing.lastViewedAt)) {
+        existing.lastViewedAt = lastViewedAt;
+      }
+      continue;
+    }
+
+    rollups.set(key, {
+      views,
+      ...(lastViewedAt ? { lastViewedAt } : {}),
+    });
+  }
+
+  return [...rollups.entries()]
+    .map(([countryCode, value]) => ({
+      countryCode,
+      views: value.views,
+      ...(value.lastViewedAt ? { lastViewedAt: value.lastViewedAt } : {}),
+    }))
+    .sort(
+      (left, right) =>
+        right.views - left.views || left.countryCode.localeCompare(right.countryCode),
+    );
+}
+
+function roundHours(value: number): number {
+  return Math.max(0, Math.round(value * 10) / 10);
 }

@@ -38,6 +38,9 @@ export interface ComparisonCostBreakdown {
   storageMonthlyCostUsd: number;
   egressMonthlyCostUsd: number;
   databaseMonthlyCostUsd: number;
+  supportMonthlyCostUsd: number;
+  licensingMonthlyCostUsd: number;
+  operationsMonthlyCostUsd: number;
   scopedMonthlyCostUsd: number;
 }
 

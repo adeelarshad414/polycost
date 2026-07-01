@@ -5,6 +5,7 @@ import { PolyCostClient, PolyCostApiError } from './api-client';
 import {
   BackendHealthResponse,
   ComparisonResult,
+  DataHealthResponse,
   ParsedNwsDraft,
   PricingStatusResponse,
   RegionCatalogResponse,
@@ -1277,10 +1278,53 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     status: 'ok',
     service: 'polycost-api',
   };
+  const dataHealth: DataHealthResponse = {
+    generatedAt: '2026-07-01T00:00:00.000Z',
+    freshnessPolicyHours: 24,
+    overallStatus: 'fresh',
+    alertCount: 0,
+    alerts: [],
+    providers: [
+      {
+        providerId: 'aws',
+        status: 'success',
+        freshness: 'fresh',
+        ageHours: 1,
+        recordsUpdated: 12,
+        recordsRejected: 0,
+        recordsSkipped: 3,
+        lastSuccessfulRun: '2026-06-30T23:00:00.000Z',
+        message: 'Pricing cache refreshed 1h ago.',
+      },
+      {
+        providerId: 'azure',
+        status: 'success',
+        freshness: 'fresh',
+        ageHours: 1,
+        recordsUpdated: 10,
+        recordsRejected: 0,
+        recordsSkipped: 2,
+        lastSuccessfulRun: '2026-06-30T23:00:00.000Z',
+        message: 'Pricing cache refreshed 1h ago.',
+      },
+      {
+        providerId: 'gcp',
+        status: 'success',
+        freshness: 'fresh',
+        ageHours: 1,
+        recordsUpdated: 8,
+        recordsRejected: 0,
+        recordsSkipped: 1,
+        lastSuccessfulRun: '2026-06-30T23:00:00.000Z',
+        message: 'Pricing cache refreshed 1h ago.',
+      },
+    ],
+  };
   const pendingRegionCatalog = new Promise<RegionCatalogResponse>(() => undefined);
 
   return {
     getHealth: jest.fn(async () => backendHealth),
+    getDataHealth: jest.fn(async () => dataHealth),
     parseWorkload: jest.fn(async () => parsed),
     validateWorkload: jest.fn(async () => ({ valid: true as const })),
     createComparison: jest.fn(async () => comparisonResult),
@@ -1354,6 +1398,12 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     revokeShareLink: jest.fn(async () => ({
       token: 'public-token-123',
       url: '/api/v1/share/public-token-123',
+    })),
+    getShareLinkAnalytics: jest.fn(async () => ({
+      token: 'public-token-123',
+      totalViews: 0,
+      countryViews: [],
+      sectionViews: [],
     })),
     getSharedReport: jest.fn(async () => ({
       token: 'public-token-123',

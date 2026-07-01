@@ -5,6 +5,7 @@ import {
   BudgetInput,
   BudgetRecord,
   ComparisonResult,
+  DataHealthResponse,
   ExchangeRatesResponse,
   NormalizedWorkloadSpec,
   ParsedNwsDraft,
@@ -14,6 +15,7 @@ import {
   RegionCatalogResponse,
   ReportFormat,
   SharedReportResponse,
+  ShareLinkAnalyticsResponse,
   ShareLinkResponse,
   WorkloadInput,
   WorkloadRecord,
@@ -44,6 +46,7 @@ export class PolyCostApiError extends Error {
 
 export interface PolyCostClient {
   getHealth(): Promise<BackendHealthResponse>;
+  getDataHealth(): Promise<DataHealthResponse>;
   parseWorkload(input: string): Promise<ParsedNwsDraft>;
   validateWorkload(nws: NormalizedWorkloadSpec): Promise<{ valid: true }>;
   createComparison(nws: NormalizedWorkloadSpec): Promise<ComparisonResult>;
@@ -71,6 +74,7 @@ export interface PolyCostClient {
     password?: string;
   }): Promise<ShareLinkResponse>;
   revokeShareLink(token: string): Promise<ShareLinkResponse>;
+  getShareLinkAnalytics(token: string): Promise<ShareLinkAnalyticsResponse>;
   getSharedReport(token: string, password?: string): Promise<SharedReportResponse>;
   createBudget(input: BudgetInput): Promise<BudgetRecord>;
   listAlerts(workloadId?: string): Promise<AlertRecord[]>;
@@ -94,6 +98,9 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
   return {
     getHealth() {
       return requestJson<BackendHealthResponse>(apiRootHealthUrl(baseUrl));
+    },
+    getDataHealth() {
+      return requestJson<DataHealthResponse>(baseUrl, '/data-health');
     },
     parseWorkload(input) {
       return requestJson<ParsedNwsDraft>(baseUrl, '/workload/parse', {
@@ -178,6 +185,12 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         {
           method: 'POST',
         },
+      );
+    },
+    getShareLinkAnalytics(token) {
+      return requestJson<ShareLinkAnalyticsResponse>(
+        baseUrl,
+        `/share-links/${encodeURIComponent(token)}/analytics`,
       );
     },
     getSharedReport(token, password) {

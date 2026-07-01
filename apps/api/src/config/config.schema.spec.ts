@@ -18,6 +18,7 @@ describe('config schema', () => {
     expect(config.CURRENCY_SYNC_SCHEDULE_CRON).toBe('0 * * * *');
     expect(config.ALERT_EVALUATOR_SCHEDULE_CRON).toBe('*/15 * * * *');
     expect(config.SHARE_LINK_CLEANUP_SCHEDULE_CRON).toBe('0 3 * * *');
+    expect(config.PRICING_SYNC_ALERT_WEBHOOK_URL).toBeUndefined();
     expect(config.EXCHANGE_RATE_API_URL).toBe('https://api.frankfurter.app/latest');
     expect(config.EXCHANGE_RATE_TARGET_CURRENCIES).toContain('EUR');
     expect(config.PRICING_ETL_DEFAULT_REGION_AWS).toBe('us-east-1');
@@ -34,6 +35,26 @@ describe('config schema', () => {
         NODE_ENV: 'local',
       }),
     ).toThrow();
+  });
+
+  it('accepts optional pricing sync alert webhooks', () => {
+    const config = validateConfig({
+      ...baseConfig,
+      PRICING_SYNC_ALERT_WEBHOOK_URL: 'https://hooks.example.com/polycost-pricing-sync',
+    });
+
+    expect(config.PRICING_SYNC_ALERT_WEBHOOK_URL).toBe(
+      'https://hooks.example.com/polycost-pricing-sync',
+    );
+  });
+
+  it('treats blank optional webhooks as unset', () => {
+    const config = validateConfig({
+      ...baseConfig,
+      PRICING_SYNC_ALERT_WEBHOOK_URL: '',
+    });
+
+    expect(config.PRICING_SYNC_ALERT_WEBHOOK_URL).toBeUndefined();
   });
 
   it('keeps secret-shaped values out of the schema', () => {

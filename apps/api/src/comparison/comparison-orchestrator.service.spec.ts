@@ -320,7 +320,10 @@ describe('ComparisonOrchestratorService', () => {
       storageMonthlyCostUsd: 10,
       egressMonthlyCostUsd: 15,
       databaseMonthlyCostUsd: 20,
-      scopedMonthlyCostUsd: 125,
+      supportMonthlyCostUsd: 0,
+      licensingMonthlyCostUsd: 0,
+      operationsMonthlyCostUsd: 0,
+      scopedMonthlyCostUsd: 145,
     });
     expect(result.providers[0].lineItems[2].egressTiers).toEqual([
       {
@@ -331,6 +334,124 @@ describe('ComparisonOrchestratorService', () => {
         monthlyCostUsd: 15,
       },
     ]);
+  });
+
+  it('adds production-depth modeled line items from workload profile assumptions', async () => {
+    const profiledProviderResult: ProviderPricingResult = {
+      providerId: 'aws',
+      baseMonthlyCostUsd: 100,
+      lineItems: [
+        {
+          category: 'compute',
+          costComponent: 'compute',
+          description: 'aws compute',
+          isApproximate: false,
+          baseMonthlyCostUsd: 73,
+          skuId: 'aws-compute',
+          region: 'us-east-1',
+          unit: 'hour',
+          unitPriceUsd: 0.1,
+          pricingBasis: 'flat',
+          pricingModels: [
+            { model: 'on-demand', available: true, monthlyCostUsd: 73, hourlyCostUsd: 0.1 },
+            { model: 'reserved-1yr', available: true, monthlyCostUsd: 50 },
+          ],
+        },
+        {
+          category: 'storage',
+          costComponent: 'storage',
+          description: 'aws storage',
+          isApproximate: false,
+          baseMonthlyCostUsd: 20,
+          skuId: 'aws-storage',
+          region: 'us-east-1',
+          unit: 'GB-Mo',
+          unitPriceUsd: 0.02,
+          pricingBasis: 'flat',
+        },
+        {
+          category: 'database',
+          costComponent: 'database',
+          description: 'aws database',
+          isApproximate: false,
+          baseMonthlyCostUsd: 80,
+          skuId: 'aws-database',
+          region: 'us-east-1',
+          unit: 'hour',
+          unitPriceUsd: 0.11,
+          pricingBasis: 'flat',
+        },
+      ],
+    };
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async () => profiledProviderResult),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      availability: {
+        multiAz: true,
+        multiRegion: true,
+        faultTolerance: 'multi-region',
+      },
+      compute: [
+        {
+          role: 'web',
+          vcpu: 2,
+          scalingType: 'fixed',
+          instanceCount: 1,
+        },
+      ],
+      workloadProfile: {
+        environment: 'production',
+        operatingSystem: 'windows',
+        supportTier: 'business',
+        usagePattern: {
+          type: 'scheduled',
+          hoursPerDay: 12,
+          daysPerWeek: 5,
+        },
+      },
+    });
+
+    expect(result.providers[0].lineItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'compute',
+          description: expect.stringContaining('scheduled duty cycle'),
+          baseMonthlyCostUsd: 26,
+        }),
+        expect.objectContaining({
+          category: 'support',
+          costComponent: 'support',
+          baseMonthlyCostUsd: 100,
+          isApproximate: true,
+        }),
+        expect.objectContaining({
+          category: 'licensing',
+          costComponent: 'licensing',
+          baseMonthlyCostUsd: 23.92,
+          isApproximate: true,
+        }),
+        expect.objectContaining({
+          category: 'operations',
+          costComponent: 'operations',
+          baseMonthlyCostUsd: 81.9,
+          isApproximate: true,
+        }),
+      ]),
+    );
+    expect(result.providers[0].breakdown).toEqual(
+      expect.objectContaining({
+        computeMonthlyCostUsd: 26,
+        supportMonthlyCostUsd: 100,
+        licensingMonthlyCostUsd: 23.92,
+        operationsMonthlyCostUsd: 81.9,
+      }),
+    );
   });
 
   it('uses a safe warning when a provider fails without an Error object', async () => {

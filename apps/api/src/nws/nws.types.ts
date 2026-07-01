@@ -66,6 +66,42 @@ export const databaseComponentSchema = z
   })
   .strict();
 
+export const workloadProfileSchema = z
+  .object({
+    environment: z.enum(['production', 'staging', 'development', 'test']).optional(),
+    commitmentPreferencePercent: z.number().min(0).max(100).optional(),
+    dataResidency: z
+      .object({
+        scope: z.string().min(1),
+        complianceLocked: z.boolean(),
+        frameworks: z.array(z.string().min(1)).optional(),
+      })
+      .strict()
+      .optional(),
+    operatingSystem: z.enum(['linux', 'windows', 'byol']).optional(),
+    supportTier: z.enum(['none', 'developer', 'business', 'enterprise']).optional(),
+    usagePattern: z
+      .object({
+        type: z.enum(['always_on', 'scheduled', 'bursty']),
+        hoursPerDay: z.number().min(1).max(24).optional(),
+        daysPerWeek: z.number().int().min(1).max(7).optional(),
+        averageUtilizationPercent: z.number().min(1).max(100).optional(),
+      })
+      .strict()
+      .optional(),
+    tags: z
+      .array(
+        z
+          .object({
+            key: z.string().min(1),
+            value: z.string().min(1),
+          })
+          .strict(),
+      )
+      .optional(),
+  })
+  .strict();
+
 export const sourceTraceabilitySchema = z
   .object({
     nwsPath: z.string().min(1),
@@ -157,8 +193,12 @@ export const normalizedWorkloadSpecSchema = z
         multiAz: z.boolean(),
         multiRegion: z.boolean(),
         slaTarget: z.string().min(1).optional(),
+        faultTolerance: z
+          .enum(['single-zone', 'multi-az', 'multi-region', 'active-active'])
+          .optional(),
       })
       .strict(),
+    workloadProfile: workloadProfileSchema.optional(),
     serviceRequirements: z.array(serviceRequirementSchema).optional(),
     sourceTraceability: z.array(sourceTraceabilitySchema).optional(),
   })
@@ -181,6 +221,7 @@ export type WorkloadType = z.infer<typeof workloadTypeSchema>;
 export type ComputeComponent = z.infer<typeof computeComponentSchema>;
 export type StorageComponent = z.infer<typeof storageComponentSchema>;
 export type DatabaseComponent = z.infer<typeof databaseComponentSchema>;
+export type WorkloadProfile = z.infer<typeof workloadProfileSchema>;
 export type SourceTraceability = z.infer<typeof sourceTraceabilitySchema>;
 export type ServiceRequirement = z.infer<typeof serviceRequirementSchema>;
 export type NormalizedWorkloadSpec = z.infer<typeof normalizedWorkloadSpecSchema>;

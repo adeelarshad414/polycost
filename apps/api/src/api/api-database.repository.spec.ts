@@ -107,6 +107,67 @@ describe('ApiDatabaseRepository', () => {
     await expect(repository.getComparison(comparisonResult.comparisonId)).resolves.toBeUndefined();
   });
 
+  it('records comparison audit rows from provider line items', async () => {
+    const query = jest.fn(async () => ({
+      rows: [],
+      rowCount: 1,
+    }));
+    const repository = createRepository(query);
+
+    await repository.recordComparisonAuditLog({
+      ...comparisonResult,
+      providers: [
+        {
+          providerId: 'aws',
+          totals: {
+            daily: 1,
+            weekly: 7,
+            monthly: 30,
+            quarterly: 90,
+            yearly: 360,
+          },
+          lineItems: [
+            {
+              category: 'compute',
+              costComponent: 'compute',
+              description: 'web compute',
+              isApproximate: false,
+              baseMonthlyCostUsd: 30,
+              baseHourlyCostUsd: 0.0411,
+              skuId: 'm7i.large',
+              region: 'us-east-1',
+              unitPriceUsd: 0.0411,
+              pricingBasis: 'flat',
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('comparison_audit_logs'), [
+      expect.any(String),
+    ]);
+    const firstCall = query.mock.calls[0] as unknown as [string, unknown[]];
+    const auditRows = JSON.parse(String(firstCall[1][0]));
+
+    expect(auditRows).toEqual([
+      expect.objectContaining({
+        comparison_id: comparisonResult.comparisonId,
+        provider: 'aws',
+        service_category: 'compute',
+        cost_component: 'compute',
+        service_label: 'web compute',
+        resolved_sku_id: 'm7i.large',
+        provider_region: 'us-east-1',
+        confidence: 'direct',
+        rate_used_usd: 0.0411,
+        monthly_cost_usd: 30,
+        pricing_basis: 'flat',
+        is_approximate: false,
+      }),
+    ]);
+  });
+
   it('returns latest pricing status for every provider', async () => {
     const repository = createRepository(
       jest.fn(async () => ({
@@ -156,6 +217,75 @@ describe('ApiDatabaseRepository', () => {
           recordsRejected: 0,
           recordsSkipped: 0,
         },
+      ],
+    });
+  });
+
+  it('summarizes provider freshness through the data-health response', async () => {
+    const repository = createRepository(
+      jest.fn(async () => ({
+        rows: [
+          {
+            provider: 'aws',
+            status: 'success',
+            records_updated: 12,
+            records_rejected: 0,
+            records_skipped: 7,
+            last_successful_run: new Date('2026-06-30T12:00:00.000Z'),
+          },
+          {
+            provider: 'azure',
+            status: 'success',
+            records_updated: 9,
+            records_rejected: 1,
+            records_skipped: 0,
+            last_successful_run: new Date('2026-06-28T00:00:00.000Z'),
+          },
+          {
+            provider: 'gcp',
+            status: 'failed',
+            records_updated: 0,
+            records_rejected: 3,
+            records_skipped: 0,
+            last_successful_run: null,
+          },
+        ],
+        rowCount: 3,
+      })),
+    );
+
+    await expect(repository.getDataHealth(new Date('2026-07-01T00:00:00.000Z'))).resolves.toEqual({
+      generatedAt: '2026-07-01T00:00:00.000Z',
+      freshnessPolicyHours: 24,
+      overallStatus: 'degraded',
+      alertCount: 2,
+      alerts: [
+        {
+          providerId: 'azure',
+          severity: 'warning',
+          message: 'Pricing cache is 72h old; refresh before production decisions.',
+        },
+        {
+          providerId: 'gcp',
+          severity: 'critical',
+          message: 'Latest provider sync failed; use cached data with caution.',
+        },
+      ],
+      providers: [
+        expect.objectContaining({
+          providerId: 'aws',
+          freshness: 'fresh',
+          ageHours: 12,
+        }),
+        expect.objectContaining({
+          providerId: 'azure',
+          freshness: 'stale',
+          ageHours: 72,
+        }),
+        expect.objectContaining({
+          providerId: 'gcp',
+          freshness: 'failed',
+        }),
       ],
     });
   });
@@ -356,6 +486,67 @@ describe('ApiDatabaseRepository', () => {
     );
     expect(query).toHaveBeenNthCalledWith(3, expect.stringContaining('UPDATE share_links'), [
       '2026-06-30T00:00:00.000Z',
+    ]);
+  });
+
+  it('records and summarizes non-PII share-link analytics', async () => {
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [{ token: 'share-token-12345678901234567890' }],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            country_code: 'US',
+            section: 'summary',
+            views: '2',
+            last_viewed_at: new Date('2026-07-01T00:00:00.000Z'),
+          },
+          {
+            country_code: 'CA',
+            section: 'engineering',
+            views: '1',
+            last_viewed_at: new Date('2026-06-30T00:00:00.000Z'),
+          },
+        ],
+        rowCount: 2,
+      });
+    const repository = createRepository(query);
+
+    await repository.recordShareLinkEvent({
+      token: 'share-token-12345678901234567890',
+      countryCode: 'US',
+      section: 'summary',
+      userAgentHash: 'hash',
+      viewedAt: '2026-07-01T00:00:00.000Z',
+    });
+    await expect(
+      repository.getShareLinkAnalytics('share-token-12345678901234567890'),
+    ).resolves.toEqual({
+      token: 'share-token-12345678901234567890',
+      totalViews: 3,
+      lastViewedAt: '2026-07-01T00:00:00.000Z',
+      countryViews: [
+        { countryCode: 'US', views: 2 },
+        { countryCode: 'CA', views: 1 },
+      ],
+      sectionViews: [
+        { section: 'summary', views: 2, lastViewedAt: '2026-07-01T00:00:00.000Z' },
+        { section: 'engineering', views: 1, lastViewedAt: '2026-06-30T00:00:00.000Z' },
+      ],
+    });
+    expect(query).toHaveBeenNthCalledWith(1, expect.stringContaining('share_link_events'), [
+      'share-token-12345678901234567890',
+      'US',
+      'summary',
+      'hash',
+      '2026-07-01T00:00:00.000Z',
     ]);
   });
 });

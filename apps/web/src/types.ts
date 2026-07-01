@@ -10,8 +10,10 @@ export type AiCostNarrative = SharedAiCostNarrative;
 
 export const PROVIDER_ORDER = ['aws', 'azure', 'gcp'] as const;
 export type ProviderId = (typeof PROVIDER_ORDER)[number];
-export type ServiceCategory = 'compute' | 'storage' | 'database' | 'network';
-export type CostComponent = 'compute' | 'storage' | 'database' | 'egress';
+export type ServiceCategory =
+  'compute' | 'storage' | 'database' | 'network' | 'support' | 'licensing' | 'operations';
+export type CostComponent =
+  'compute' | 'storage' | 'database' | 'egress' | 'support' | 'licensing' | 'operations';
 export type PricingModelKey =
   'on-demand' | 'reserved-1yr' | 'reserved-3yr' | 'spot' | 'savings-plan';
 export type PricingBasis = 'flat' | 'tiered';
@@ -104,6 +106,28 @@ export interface NormalizedWorkloadSpec {
     multiAz: boolean;
     multiRegion: boolean;
     slaTarget?: string;
+    faultTolerance?: 'single-zone' | 'multi-az' | 'multi-region' | 'active-active';
+  };
+  workloadProfile?: {
+    environment?: 'production' | 'staging' | 'development' | 'test';
+    commitmentPreferencePercent?: number;
+    dataResidency?: {
+      scope: string;
+      complianceLocked: boolean;
+      frameworks?: string[];
+    };
+    operatingSystem?: 'linux' | 'windows' | 'byol';
+    supportTier?: 'none' | 'developer' | 'business' | 'enterprise';
+    usagePattern?: {
+      type: 'always_on' | 'scheduled' | 'bursty';
+      hoursPerDay?: number;
+      daysPerWeek?: number;
+      averageUtilizationPercent?: number;
+    };
+    tags?: Array<{
+      key: string;
+      value: string;
+    }>;
   };
   serviceRequirements?: ServiceRequirement[];
   sourceTraceability?: Array<{
@@ -201,6 +225,9 @@ export interface ComparisonCostBreakdown {
   storageMonthlyCostUsd: number;
   egressMonthlyCostUsd: number;
   databaseMonthlyCostUsd: number;
+  supportMonthlyCostUsd: number;
+  licensingMonthlyCostUsd: number;
+  operationsMonthlyCostUsd: number;
   scopedMonthlyCostUsd: number;
 }
 
@@ -239,6 +266,29 @@ export interface PricingStatusResponse {
     recordsUpdated: number;
     recordsRejected: number;
     recordsSkipped: number;
+  }>;
+}
+
+export interface DataHealthResponse {
+  generatedAt: string;
+  freshnessPolicyHours: number;
+  overallStatus: 'fresh' | 'stale' | 'degraded';
+  alertCount: number;
+  alerts: Array<{
+    providerId?: ProviderId;
+    severity: 'warning' | 'critical';
+    message: string;
+  }>;
+  providers: Array<{
+    providerId: ProviderId;
+    status: 'success' | 'partial' | 'failed';
+    freshness: 'fresh' | 'stale' | 'missing' | 'failed';
+    lastSuccessfulRun?: string;
+    ageHours?: number;
+    recordsUpdated: number;
+    recordsRejected: number;
+    recordsSkipped: number;
+    message: string;
   }>;
 }
 
@@ -382,6 +432,21 @@ export interface SharedReportResponse {
   passwordProtected: boolean;
   workload: WorkloadRecord;
   breakdown: WorkloadCostBreakdown;
+}
+
+export interface ShareLinkAnalyticsResponse {
+  token: string;
+  totalViews: number;
+  lastViewedAt?: string;
+  countryViews: Array<{
+    countryCode: string;
+    views: number;
+  }>;
+  sectionViews: Array<{
+    section: string;
+    views: number;
+    lastViewedAt?: string;
+  }>;
 }
 
 export interface ExchangeRatesResponse {

@@ -190,6 +190,52 @@ describe('api client', () => {
     );
   });
 
+  it('fetches public pricing data health', async () => {
+    const fetchMock = jest.fn(async () =>
+      jsonResponse({
+        generatedAt: '2026-07-01T00:00:00.000Z',
+        freshnessPolicyHours: 24,
+        overallStatus: 'fresh',
+        alertCount: 0,
+        alerts: [],
+        providers: [
+          {
+            providerId: 'aws',
+            status: 'success',
+            freshness: 'fresh',
+            ageHours: 1,
+            recordsUpdated: 12,
+            recordsRejected: 0,
+            recordsSkipped: 3,
+            message: 'Pricing cache refreshed 1h ago.',
+          },
+        ],
+      }),
+    );
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(client.getDataHealth()).resolves.toEqual(
+      expect.objectContaining({
+        overallStatus: 'fresh',
+        providers: expect.arrayContaining([
+          expect.objectContaining({
+            providerId: 'aws',
+            freshness: 'fresh',
+          }),
+        ]),
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/data-health',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+  });
+
   it('fetches pricing model metadata', async () => {
     const fetchMock = jest.fn(async () =>
       jsonResponse({
@@ -316,6 +362,21 @@ describe('api client', () => {
           workload: {},
           breakdown: {},
         }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          token: 'public-token',
+          totalViews: 2,
+          lastViewedAt: '2026-07-01T00:00:00.000Z',
+          countryViews: [{ countryCode: 'US', views: 2 }],
+          sectionViews: [
+            {
+              section: 'summary',
+              views: 2,
+              lastViewedAt: '2026-07-01T00:00:00.000Z',
+            },
+          ],
+        }),
       );
     global.fetch = fetchMock as typeof fetch;
     const client = createPolyCostClient('http://api.test/api/v1');
@@ -340,6 +401,7 @@ describe('api client', () => {
       password: 'client-demo',
     });
     await client.getSharedReport('public-token', 'client-demo');
+    await client.getShareLinkAnalytics('public-token');
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -366,6 +428,15 @@ describe('api client', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
       'http://api.test/api/v1/share/public-token?password=client-demo',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      'http://api.test/api/v1/share-links/public-token/analytics',
       expect.objectContaining({
         headers: expect.objectContaining({
           'Content-Type': 'application/json',

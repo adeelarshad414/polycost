@@ -280,7 +280,7 @@ export function reportAssumptionRows(result: ComparisonResult): string[][] {
     ['Assumption', 'How to read it'],
     [
       'Currency',
-      'All values are USD estimates; taxes, support plans, credits, and private enterprise discounts are excluded unless present in the pricing catalog.',
+      'All values are USD estimates; taxes, credits, and private enterprise discounts are excluded unless present in the pricing catalog or modeled as explicit line items.',
     ],
     [
       'Time normalization',
@@ -301,6 +301,10 @@ export function reportAssumptionRows(result: ComparisonResult): string[][] {
       approximateLineItems > 0
         ? `${approximateLineItems} line item(s) are approximate and should be reviewed by a solution architect before commitment.`
         : 'No approximate line items were flagged by the service-equivalence mapper.',
+    ],
+    [
+      'Production-depth assumptions',
+      'Support plans, Windows licensing, scheduled/bursty utilization, and resilience premiums appear as modeled line items when provided in the workload profile.',
     ],
     [
       'Decision use',

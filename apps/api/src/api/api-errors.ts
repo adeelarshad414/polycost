@@ -61,3 +61,26 @@ export interface PricingStatusResponse {
     recordsSkipped: number;
   }>;
 }
+
+export interface DataHealthResponse {
+  generatedAt: string;
+  freshnessPolicyHours: number;
+  overallStatus: 'fresh' | 'stale' | 'degraded';
+  alertCount: number;
+  alerts: Array<{
+    providerId?: ProviderId;
+    severity: 'warning' | 'critical';
+    message: string;
+  }>;
+  providers: Array<{
+    providerId: ProviderId;
+    status: 'success' | 'partial' | 'failed';
+    freshness: 'fresh' | 'stale' | 'missing' | 'failed';
+    lastSuccessfulRun?: string;
+    ageHours?: number;
+    recordsUpdated: number;
+    recordsRejected: number;
+    recordsSkipped: number;
+    message: string;
+  }>;
+}

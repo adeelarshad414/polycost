@@ -5,6 +5,7 @@ import {
   PricingCatalogWriter,
   PricingEtlRunRepository,
 } from '../database/pricing-repository.types';
+import { PricingSyncFailureNotifier } from './pricing-sync-alert.service';
 import { PricingEtlProviderResult, PricingEtlSummary } from './pricing-etl.types';
 
 const MAX_ERROR_DETAIL_LENGTH = 2000;
@@ -17,6 +18,7 @@ export class PricingEtlService {
     private readonly runRepository: PricingEtlRunRepository,
     private readonly now: () => Date = () => new Date(),
     private readonly normalizedPricingWriter?: NormalizedPricingWriter,
+    private readonly failureNotifier?: PricingSyncFailureNotifier,
   ) {}
 
   async refreshAllProviders(): Promise<PricingEtlSummary> {
@@ -82,12 +84,21 @@ export class PricingEtlService {
       recordsSkipped: result.recordsSkipped,
       errorDetail: result.errorDetail,
     });
+    await this.notifyPricingSyncIssue(result);
 
     return result;
   }
 
   private timestamp(): string {
     return this.now().toISOString();
+  }
+
+  private async notifyPricingSyncIssue(result: PricingEtlProviderResult): Promise<void> {
+    if (!this.failureNotifier || result.status === 'success') {
+      return;
+    }
+
+    await this.failureNotifier.notifyProviderResult(result);
   }
 }
 

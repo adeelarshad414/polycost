@@ -10,6 +10,8 @@ import {
   CachedPricingCompareRow,
   CachedPricingTerm,
   ExchangeRatesResponse,
+  ShareLinkAnalyticsResponse,
+  ShareLinkEventInput,
   ShareLinkInput,
   ShareLinkResponse,
   SharedReportResponse,
@@ -17,6 +19,12 @@ import {
   WorkloadInput,
   WorkloadRecord,
 } from './cost-management.types';
+
+export interface ShareLinkViewContext {
+  countryCode?: string;
+  section?: string;
+  userAgent?: string;
+}
 
 @Injectable()
 export class CostManagementService {
@@ -90,7 +98,11 @@ export class CostManagementService {
     };
   }
 
-  async getSharedReport(token: string, password?: string): Promise<SharedReportResponse> {
+  async getSharedReport(
+    token: string,
+    password?: string,
+    viewContext: ShareLinkViewContext = {},
+  ): Promise<SharedReportResponse> {
     const shareLink = await this.repository.getActiveShareLink(token);
 
     if (!shareLink) {
@@ -107,6 +119,10 @@ export class CostManagementService {
       cachedPricingTermForShareModel(shareLink.pricingModel),
     );
 
+    await this.repository.recordShareLinkEvent(
+      toShareLinkEvent(shareLink.token, viewContext, this.now()),
+    );
+
     return {
       token: shareLink.token,
       watermark: shareLink.watermark,
@@ -117,6 +133,16 @@ export class CostManagementService {
       workload,
       breakdown,
     };
+  }
+
+  async getShareLinkAnalytics(token: string): Promise<ShareLinkAnalyticsResponse> {
+    const analytics = await this.repository.getShareLinkAnalytics(token);
+
+    if (!analytics) {
+      throw new ApiNotFoundError('Share link was not found');
+    }
+
+    return analytics;
   }
 
   async revokeShareLink(token: string): Promise<ShareLinkResponse> {
@@ -149,6 +175,30 @@ export class CostManagementService {
 
 function hashSharePassword(password: string): string {
   return createHash('sha256').update(password, 'utf8').digest('hex');
+}
+
+function toShareLinkEvent(
+  token: string,
+  context: ShareLinkViewContext,
+  viewedAt: Date,
+): ShareLinkEventInput {
+  const countryCode = context.countryCode?.trim().toUpperCase();
+  const section =
+    context.section
+      ?.trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, '-') ?? 'summary';
+  const normalizedSection = section.replace(/^-+|-+$/g, '').slice(0, 64) || 'summary';
+
+  return {
+    token,
+    ...(countryCode && /^[A-Z]{2}$/.test(countryCode) ? { countryCode } : {}),
+    section: normalizedSection,
+    ...(context.userAgent
+      ? { userAgentHash: createHash('sha256').update(context.userAgent, 'utf8').digest('hex') }
+      : {}),
+    viewedAt: viewedAt.toISOString(),
+  };
 }
 
 function passwordMatches(password: string | undefined, expectedHash: string): boolean {

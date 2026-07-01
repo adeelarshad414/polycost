@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import {
   providerRegionsForCanonicalRegion,
   supportedCanonicalRegions,
@@ -16,6 +16,9 @@ import {
 } from './cost-management.types';
 
 type QueryValue = string | string[] | undefined;
+interface RequestLike {
+  headers?: Record<string, unknown>;
+}
 
 const INSTANCE_FAMILIES = [
   'general-purpose',
@@ -104,6 +107,11 @@ export class ShareLinksController {
   revoke(@Param('token') token: string) {
     return this.costManagementService.revokeShareLink(token);
   }
+
+  @Get(':token/analytics')
+  analytics(@Param('token') token: string) {
+    return this.costManagementService.getShareLinkAnalytics(token);
+  }
 }
 
 @Controller('api/v1/share')
@@ -111,8 +119,17 @@ export class SharedReportsController {
   constructor(private readonly costManagementService: CostManagementService) {}
 
   @Get(':token')
-  get(@Param('token') token: string, @Query('password') password?: QueryValue) {
-    return this.costManagementService.getSharedReport(token, optionalSingleString(password));
+  get(
+    @Param('token') token: string,
+    @Query('password') password: QueryValue,
+    @Query('section') section: QueryValue,
+    @Req() request: RequestLike,
+  ) {
+    return this.costManagementService.getSharedReport(token, optionalSingleString(password), {
+      countryCode: countryCodeFromHeaders(request.headers ?? {}),
+      section: optionalSingleString(section) ?? 'summary',
+      userAgent: optionalSingleString(request.headers?.['user-agent']),
+    });
   }
 }
 
@@ -182,6 +199,14 @@ function parseShareLinkInput(body: unknown): ShareLinkInput {
       ? { password: record.password.trim() }
       : {}),
   };
+}
+
+function countryCodeFromHeaders(headers: Record<string, unknown>): string | undefined {
+  return (
+    optionalSingleString(headers['cloudfront-viewer-country']) ??
+    optionalSingleString(headers['cf-ipcountry']) ??
+    optionalSingleString(headers['x-vercel-ip-country'])
+  );
 }
 
 function parseSharePricingModel(value: unknown): ShareLinkInput['pricingModel'] {

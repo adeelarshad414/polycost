@@ -32,6 +32,7 @@ export class ComparisonApplicationService {
     const result = await this.comparisonOrchestratorService.compare(nws);
 
     await this.apiDatabaseRepository.saveComparison(nws, result);
+    await this.apiDatabaseRepository.recordComparisonAuditLog(result);
 
     return result;
   }
@@ -64,6 +65,7 @@ export class ComparisonApplicationService {
     );
 
     await this.apiDatabaseRepository.saveComparison(snapshot.nwsSnapshot, refreshed);
+    await this.apiDatabaseRepository.recordComparisonAuditLog(refreshed);
 
     return refreshed;
   }
@@ -77,6 +79,10 @@ export class ComparisonApplicationService {
 
   async getPricingStatus() {
     return this.apiDatabaseRepository.getPricingStatus();
+  }
+
+  async getDataHealth() {
+    return this.apiDatabaseRepository.getDataHealth();
   }
 }
 

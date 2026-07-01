@@ -327,6 +327,10 @@ textarea:focus-visible {
   grid-column: 2 / span 4;
 }
 
+.initial-home-fields .range-field {
+  grid-column: span 2;
+}
+
 .initial-optional-estimate {
   display: grid;
   gap: var(--pc-space-2);
@@ -614,6 +618,99 @@ textarea:focus-visible {
   border-style: dashed;
   border-color: color-mix(in srgb, var(--pc-text-muted) 50%, var(--pc-border));
   background: color-mix(in srgb, var(--pc-bg-surface-2) 78%, transparent);
+}
+
+.data-health-banner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--pc-space-2);
+  border: 1px solid var(--pc-border);
+  border-left: 4px solid var(--pc-success);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface-2) 70%, var(--pc-bg-surface));
+  padding: 10px 12px;
+}
+
+.data-health-banner.is-compact {
+  margin-top: calc(-1 * var(--pc-space-1));
+}
+
+.data-health-stale {
+  border-left-color: var(--pc-warning);
+}
+
+.data-health-degraded {
+  border-left-color: var(--pc-error);
+}
+
+.data-health-main {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.data-health-main span,
+.data-health-main small {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.data-health-main span {
+  color: var(--pc-action-primary);
+  text-transform: uppercase;
+}
+
+.data-health-main strong {
+  color: var(--pc-text-primary);
+  font-family: var(--pc-font-display);
+  font-size: var(--pc-text-base);
+  line-height: 1.25;
+}
+
+.data-health-main small {
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.data-health-providers {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 6px;
+}
+
+.data-health-provider {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid color-mix(in srgb, var(--pc-success) 42%, var(--pc-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--pc-success-soft) 72%, var(--pc-bg-surface));
+  color: var(--pc-text-primary);
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+  padding: 0 10px;
+}
+
+.data-health-provider small {
+  color: var(--pc-text-secondary);
+  font-family: var(--pc-font-mono);
+  font-size: 11px;
+}
+
+.data-health-provider-stale {
+  border-color: color-mix(in srgb, var(--pc-warning) 50%, var(--pc-border));
+  background: color-mix(in srgb, var(--pc-warning-soft) 68%, var(--pc-bg-surface));
+}
+
+.data-health-provider-failed,
+.data-health-provider-missing {
+  border-color: color-mix(in srgb, var(--pc-error) 50%, var(--pc-border));
+  background: color-mix(in srgb, var(--pc-error-soft) 70%, var(--pc-bg-surface));
 }
 
 .summary-strip-actions,
@@ -2000,6 +2097,44 @@ select:hover {
 .form-field {
   display: grid;
   gap: var(--pc-space-1);
+}
+
+.range-field-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 44px;
+  align-items: center;
+  gap: var(--pc-space-1);
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: var(--pc-bg-surface);
+  padding: 0 10px;
+}
+
+.range-field-control input {
+  min-height: auto;
+  border: 0;
+  background: linear-gradient(90deg, var(--brand-orange), var(--brand-blue), var(--brand-green));
+  accent-color: var(--brand-blue);
+  padding: 0;
+}
+
+.range-field-control input:focus,
+.range-field-control input:hover {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.range-field-control strong {
+  min-width: 48px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-action-primary-soft) 72%, transparent);
+  color: var(--pc-text-primary);
+  font-family: var(--pc-font-mono);
+  font-size: var(--pc-text-sm);
+  font-variant-numeric: tabular-nums;
+  padding: 6px 8px;
+  text-align: center;
 }
 
 .form-field.is-invalid input {
@@ -3753,6 +3888,7 @@ select:disabled {
 }
 
 .service-cheapest-matrix,
+.production-depth-analytics,
 .full-cost-matrix,
 .cost-formula-evidence {
   display: grid;
@@ -3761,6 +3897,64 @@ select:disabled {
   border-radius: 8px;
   background: color-mix(in srgb, var(--pc-bg-surface) 90%, var(--pc-bg-surface-2));
   padding: var(--pc-space-2);
+}
+
+.production-depth-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--pc-space-1);
+}
+
+.production-depth-card {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  border: 1px solid var(--pc-border);
+  border-left: 4px solid var(--pc-info);
+  border-radius: 8px;
+  background: var(--pc-bg-surface);
+  padding: 12px;
+}
+
+.production-depth-good {
+  border-left-color: var(--pc-success);
+}
+
+.production-depth-review {
+  border-left-color: var(--pc-warning);
+}
+
+.production-depth-risk {
+  border-left-color: var(--pc-error);
+}
+
+.production-depth-card span {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.production-depth-card strong,
+.production-depth-card p {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.production-depth-card strong {
+  color: var(--pc-text-primary);
+  font-family: var(--pc-font-display);
+  font-size: var(--pc-text-lg);
+  line-height: 1.15;
+}
+
+.production-depth-card p {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-sm);
+  font-weight: 650;
+  line-height: 1.45;
 }
 
 .cost-matrix-controls {
@@ -5274,6 +5468,18 @@ select:disabled {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .data-health-banner {
+    grid-template-columns: 1fr;
+  }
+
+  .data-health-providers {
+    justify-content: start;
+  }
+
+  .production-depth-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .engineering-chart-grid,
   .engineering-signal-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5808,6 +6014,7 @@ select:disabled {
   }
 
   .service-selector-grid,
+  .production-depth-grid,
   .formula-evidence-grid {
     grid-template-columns: 1fr;
   }

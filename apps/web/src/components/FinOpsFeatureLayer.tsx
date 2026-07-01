@@ -16,6 +16,7 @@ import {
   PricingModelKey,
   PricingModelsForServiceResponse,
   ProviderId,
+  ShareLinkAnalyticsResponse,
   SharedReportResponse,
   StoragePricingTier,
   WorkloadInput,
@@ -53,7 +54,7 @@ interface CurrencyOption {
 }
 
 interface BreakdownPart {
-  key: 'compute' | 'storage' | 'egress';
+  key: 'compute' | 'storage' | 'egress' | 'support' | 'licensing' | 'operations';
   label: string;
   total: number;
   percent: number;
@@ -177,6 +178,10 @@ export function FinOpsFeatureLayer({
   const [shareLink, setShareLink] = useState<GeneratedShareLink | null>(null);
   const [shareStatus, setShareStatus] = useState<'idle' | 'creating' | 'ready' | 'copied'>('idle');
   const [shareError, setShareError] = useState<string | null>(null);
+  const [shareCopyWarning, setShareCopyWarning] = useState<string | null>(null);
+  const [shareAnalytics, setShareAnalytics] = useState<ShareLinkAnalyticsResponse | null>(null);
+  const [shareAnalyticsError, setShareAnalyticsError] = useState<string | null>(null);
+  const [isLoadingShareAnalytics, setIsLoadingShareAnalytics] = useState(false);
   const [exchangeRates, setExchangeRates] = useState<ExchangeRatesResponse | null>(null);
   const [exchangeRateError, setExchangeRateError] = useState<string | null>(null);
   const [isLoadingExchangeRates, setIsLoadingExchangeRates] = useState(true);
@@ -396,6 +401,7 @@ export function FinOpsFeatureLayer({
 
     setShareStatus('creating');
     setShareError(null);
+    setShareCopyWarning(null);
 
     try {
       const workload = await client.createWorkload(workloadInputFromForm(form));
@@ -409,12 +415,33 @@ export function FinOpsFeatureLayer({
       });
       const publicUrl = publicShareUrl(share.url, share.token, interval, pricingModel);
 
-      await copyToClipboard(publicUrl);
       setShareLink({ token: share.token, publicUrl });
-      setShareStatus('copied');
+      void refreshShareAnalytics(share.token);
+      try {
+        await copyToClipboard(publicUrl);
+        setShareStatus('copied');
+      } catch {
+        setShareStatus('ready');
+        setShareCopyWarning(
+          'Link created, but the browser blocked clipboard copy. Use the report link above.',
+        );
+      }
     } catch (error) {
       setShareStatus('idle');
       setShareError(formatApiError(error));
+    }
+  }
+
+  async function refreshShareAnalytics(token: string) {
+    setIsLoadingShareAnalytics(true);
+    setShareAnalyticsError(null);
+
+    try {
+      setShareAnalytics(await client.getShareLinkAnalytics(token));
+    } catch (error) {
+      setShareAnalyticsError(formatApiError(error));
+    } finally {
+      setIsLoadingShareAnalytics(false);
     }
   }
 
@@ -425,10 +452,13 @@ export function FinOpsFeatureLayer({
 
     setShareStatus('creating');
     setShareError(null);
+    setShareCopyWarning(null);
 
     try {
       await client.revokeShareLink(shareLink.token);
       setShareLink(null);
+      setShareAnalytics(null);
+      setShareAnalyticsError(null);
       setShareStatus('idle');
     } catch (error) {
       setShareStatus('ready');
@@ -810,12 +840,40 @@ export function FinOpsFeatureLayer({
               </>
             )}
           </div>
+          {shareLink ? (
+            <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface-0 p-3 text-xs font-semibold text-text-muted sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                Recipient activity:{' '}
+                <strong className="text-text-primary">
+                  {isLoadingShareAnalytics
+                    ? 'refreshing...'
+                    : shareAnalytics
+                      ? shareAnalyticsSummary(shareAnalytics)
+                      : 'no views recorded yet'}
+                </strong>
+                {shareAnalyticsError ? ` · analytics unavailable: ${shareAnalyticsError}` : ''}
+              </span>
+              <button
+                type="button"
+                className="self-start text-action-primary underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:text-text-muted sm:self-auto"
+                disabled={isLoadingShareAnalytics}
+                onClick={() => void refreshShareAnalytics(shareLink.token)}
+              >
+                Refresh views
+              </button>
+            </div>
+          ) : null}
           {shareError ? (
             <div
               className="rounded-lg border border-action-destructive bg-surface-0 p-3 text-sm text-text-primary"
               role="alert"
             >
               <strong>Share link failed.</strong> {shareError}
+            </div>
+          ) : null}
+          {shareCopyWarning ? (
+            <div className="rounded-lg border border-border bg-surface-0 p-3 text-sm text-text-secondary">
+              <strong className="text-text-primary">Link ready.</strong> {shareCopyWarning}
             </div>
           ) : null}
           <div className="flex flex-wrap gap-2">
@@ -1814,6 +1872,15 @@ function publicShareUrl(
   return url.toString();
 }
 
+function shareAnalyticsSummary(analytics: ShareLinkAnalyticsResponse): string {
+  const viewLabel = analytics.totalViews === 1 ? 'view' : 'views';
+  const lastViewed = analytics.lastViewedAt
+    ? `, last viewed ${formatReportDate(analytics.lastViewedAt)}`
+    : '';
+
+  return `${analytics.totalViews} ${viewLabel}${lastViewed}`;
+}
+
 function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
@@ -2026,17 +2093,32 @@ function breakdownParts(
   const egressMonthly =
     provider.breakdown?.egressMonthlyCostUsd ?? componentTotal(provider, 'egress');
   const databaseMonthly = databaseMonthlyCost(provider);
+  const supportMonthly =
+    provider.breakdown?.supportMonthlyCostUsd ?? componentTotal(provider, 'support');
+  const licensingMonthly =
+    provider.breakdown?.licensingMonthlyCostUsd ?? componentTotal(provider, 'licensing');
+  const operationsMonthly =
+    provider.breakdown?.operationsMonthlyCostUsd ?? componentTotal(provider, 'operations');
   const selectedModelCost = providerModelCost(provider, pricingModel);
   const selectedComputeMonthly =
     selectedModelCost.available && selectedModelCost.monthlyCostUsd !== undefined
       ? Math.max(
           0,
-          selectedModelCost.monthlyCostUsd - storageMonthly - egressMonthly - databaseMonthly,
+          selectedModelCost.monthlyCostUsd -
+            storageMonthly -
+            egressMonthly -
+            databaseMonthly -
+            supportMonthly -
+            licensingMonthly -
+            operationsMonthly,
         )
       : (provider.breakdown?.computeMonthlyCostUsd ?? componentTotal(provider, 'compute'));
   const compute = selectedComputeMonthly * multiplier;
   const storage = storageMonthly * multiplier;
   const egress = egressMonthly * multiplier;
+  const support = supportMonthly * multiplier;
+  const licensing = licensingMonthly * multiplier;
+  const operations = operationsMonthly * multiplier;
   const parts = [
     {
       key: 'compute',
@@ -2055,6 +2137,24 @@ function breakdownParts(
       label: 'Egress/data transfer',
       total: roundCurrency(egress),
       className: 'bg-brand-green',
+    },
+    {
+      key: 'support',
+      label: 'Support plan',
+      total: roundCurrency(support),
+      className: 'bg-amber-500',
+    },
+    {
+      key: 'licensing',
+      label: 'OS licensing',
+      total: roundCurrency(licensing),
+      className: 'bg-sky-500',
+    },
+    {
+      key: 'operations',
+      label: 'Resilience ops',
+      total: roundCurrency(operations),
+      className: 'bg-emerald-500',
     },
   ] satisfies Array<Omit<BreakdownPart, 'percent'>>;
   const total = parts.reduce((sum, part) => sum + part.total, 0);

@@ -26,6 +26,7 @@ import {
   WorkloadsController,
 } from './cost-management.controller';
 import { CostManagementService } from './cost-management.service';
+import { DataHealthController } from './data-health.controller';
 import {
   AlertRecord,
   BudgetRecord,
@@ -184,6 +185,25 @@ const sharedReportResponse: SharedReportResponse = {
   breakdown: workloadBreakdown,
 };
 
+const shareLinkAnalyticsResponse = {
+  token: shareLinkResponse.token,
+  totalViews: 3,
+  lastViewedAt: '2026-07-01T00:00:00.000Z',
+  countryViews: [
+    {
+      countryCode: 'US',
+      views: 2,
+    },
+  ],
+  sectionViews: [
+    {
+      section: 'summary',
+      views: 3,
+      lastViewedAt: '2026-07-01T00:00:00.000Z',
+    },
+  ],
+};
+
 const exchangeRatesResponse: ExchangeRatesResponse = {
   base: 'USD',
   lastUpdated: '2026-06-29T00:00:00.000Z',
@@ -336,6 +356,32 @@ describe('API contracts', () => {
           recordsRejected: 0,
           recordsSkipped: 3,
           lastSuccessfulRun: '2026-06-29T00:00:00.000Z',
+        },
+      ],
+    });
+  });
+
+  it('GET /data-health returns public pricing freshness through the controller', async () => {
+    const service = comparisonApplicationService();
+    const controller = new DataHealthController(service as never);
+
+    await expect(controller.getDataHealth()).resolves.toEqual({
+      generatedAt: '2026-07-01T00:00:00.000Z',
+      freshnessPolicyHours: 24,
+      overallStatus: 'fresh',
+      alertCount: 0,
+      alerts: [],
+      providers: [
+        {
+          providerId: 'aws',
+          status: 'success',
+          freshness: 'fresh',
+          ageHours: 1,
+          recordsUpdated: 12,
+          recordsRejected: 0,
+          recordsSkipped: 3,
+          lastSuccessfulRun: '2026-06-30T23:00:00.000Z',
+          message: 'Pricing cache refreshed 1h ago.',
         },
       ],
     });
@@ -496,9 +542,21 @@ describe('API contracts', () => {
       password: 'client-demo',
     });
     await expect(
-      sharedReportsController.get(shareLinkResponse.token, 'client-demo'),
+      sharedReportsController.get(shareLinkResponse.token, 'client-demo', 'summary', {
+        headers: {
+          'cf-ipcountry': 'US',
+          'user-agent': 'jest',
+        },
+      }),
     ).resolves.toEqual(sharedReportResponse);
-    expect(service.getSharedReport).toHaveBeenCalledWith(shareLinkResponse.token, 'client-demo');
+    expect(service.getSharedReport).toHaveBeenCalledWith(shareLinkResponse.token, 'client-demo', {
+      countryCode: 'US',
+      section: 'summary',
+      userAgent: 'jest',
+    });
+    await expect(shareLinksController.analytics(shareLinkResponse.token)).resolves.toEqual(
+      shareLinkAnalyticsResponse,
+    );
     await expect(shareLinksController.revoke(shareLinkResponse.token)).resolves.toEqual(
       shareLinkResponse,
     );
@@ -713,6 +771,7 @@ describe('API contracts', () => {
     };
     const repository = {
       saveComparison: jest.fn(async () => undefined),
+      recordComparisonAuditLog: jest.fn(async () => undefined),
       getComparison: jest.fn(async () => ({
         nwsSnapshot: validNws,
         resultSnapshot: comparisonResult,
@@ -734,6 +793,7 @@ describe('API contracts', () => {
       comparisonResult,
     );
     expect(repository.saveComparison).toHaveBeenCalledWith(validNws, comparisonResult);
+    expect(repository.recordComparisonAuditLog).toHaveBeenCalledWith(comparisonResult);
     await expect(service.getComparison(comparisonResult.comparisonId)).resolves.toEqual({
       nwsSnapshot: validNws,
       resultSnapshot: comparisonResult,
@@ -756,6 +816,7 @@ describe('API contracts', () => {
     };
     const repository = {
       saveComparison: jest.fn(async () => undefined),
+      recordComparisonAuditLog: jest.fn(async () => undefined),
       getComparison: jest.fn(async () => ({
         nwsSnapshot: validNws,
         resultSnapshot: comparisonResult,
@@ -800,6 +861,16 @@ describe('API contracts', () => {
         },
       ],
     });
+    expect(repository.recordComparisonAuditLog).toHaveBeenCalledWith({
+      ...refreshedResult,
+      warnings: [
+        {
+          providerId: 'azure',
+          code: 'live_refresh_failed',
+          message: 'azure live refresh failed: provider throttled',
+        },
+      ],
+    });
   });
 
   it('reports comparison application not-found and disabled live-refresh failures', async () => {
@@ -809,6 +880,7 @@ describe('API contracts', () => {
       } as never,
       {
         saveComparison: jest.fn(),
+        recordComparisonAuditLog: jest.fn(),
         getComparison: jest.fn(async () => undefined),
         getPricingStatus: jest.fn(),
       } as never,
@@ -846,6 +918,26 @@ function comparisonApplicationService() {
         },
       ],
     })),
+    getDataHealth: jest.fn(async () => ({
+      generatedAt: '2026-07-01T00:00:00.000Z',
+      freshnessPolicyHours: 24,
+      overallStatus: 'fresh' as const,
+      alertCount: 0,
+      alerts: [],
+      providers: [
+        {
+          providerId: 'aws' as const,
+          status: 'success' as const,
+          freshness: 'fresh' as const,
+          ageHours: 1,
+          recordsUpdated: 12,
+          recordsRejected: 0,
+          recordsSkipped: 3,
+          lastSuccessfulRun: '2026-06-30T23:00:00.000Z',
+          message: 'Pricing cache refreshed 1h ago.',
+        },
+      ],
+    })),
   } as unknown as jest.Mocked<ComparisonApplicationService>;
 }
 
@@ -859,6 +951,7 @@ function costManagementService() {
     updateAlertDismissed: jest.fn(async () => alertRecord),
     createShareLink: jest.fn(async () => shareLinkResponse),
     getSharedReport: jest.fn(async () => sharedReportResponse),
+    getShareLinkAnalytics: jest.fn(async () => shareLinkAnalyticsResponse),
     revokeShareLink: jest.fn(async () => shareLinkResponse),
     getExchangeRates: jest.fn(async () => exchangeRatesResponse),
   } as unknown as jest.Mocked<CostManagementService>;

@@ -36,7 +36,10 @@ interface AzureRetailPriceItem {
 
 const AZURE_RETAIL_PRICES_ENDPOINT = 'https://prices.azure.com/api/retail/prices';
 
-const CATEGORY_FILTERS: Record<ServiceCategory, string[]> = {
+const CATALOG_REFRESH_CATEGORIES = ['compute', 'storage', 'database', 'network'] as const;
+type CatalogRefreshCategory = (typeof CATALOG_REFRESH_CATEGORIES)[number];
+
+const CATEGORY_FILTERS: Record<CatalogRefreshCategory, string[]> = {
   compute: [
     "serviceFamily eq 'Compute' and priceType eq 'Consumption'",
     "serviceFamily eq 'Compute' and priceType eq 'Reservation'",
@@ -61,7 +64,7 @@ export class AzureProviderAdapter extends BaseCloudProviderAdapter {
   async refreshPricingCatalog(
     options: RefreshPricingCatalogOptions = {},
   ): Promise<PricingCatalogRecord[]> {
-    const categories = options.categories ?? ['compute', 'storage', 'database', 'network'];
+    const categories = catalogRefreshCategories(options.categories);
     const fetchedAt = options.fetchedAt ?? this.now().toISOString();
     const records: PricingCatalogRecord[] = [];
 
@@ -85,7 +88,7 @@ export class AzureProviderAdapter extends BaseCloudProviderAdapter {
   }
 
   private async fetchCategory(
-    category: ServiceCategory,
+    category: CatalogRefreshCategory,
     fetchedAt: string,
     region?: string,
   ): Promise<PricingCatalogRecord[]> {
@@ -147,6 +150,18 @@ export class AzureProviderAdapter extends BaseCloudProviderAdapter {
       fetchedAt,
     };
   }
+}
+
+function catalogRefreshCategories(
+  categories: ServiceCategory[] | undefined,
+): CatalogRefreshCategory[] {
+  if (!categories) {
+    return [...CATALOG_REFRESH_CATEGORIES];
+  }
+
+  return categories.filter((category): category is CatalogRefreshCategory =>
+    CATALOG_REFRESH_CATEGORIES.includes(category as CatalogRefreshCategory),
+  );
 }
 
 function uniqueSkuRecords(records: PricingCatalogRecord[]): PricingCatalogRecord[] {

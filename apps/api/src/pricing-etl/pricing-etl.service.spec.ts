@@ -201,6 +201,54 @@ describe('PricingEtlService', () => {
     expect(runRepository.recordProviderRun).toHaveBeenCalledTimes(3);
   });
 
+  it('notifies configured alerting when a provider sync fails', async () => {
+    const writer: PricingCatalogWriter = {
+      upsertPricingRecords: jest.fn(async (records) => ({
+        recordsUpdated: records.length,
+        recordsRejected: 0,
+      })),
+    };
+    const runRepository: PricingEtlRunRepository = {
+      recordProviderRun: jest.fn(async () => undefined),
+    };
+    const notifier = {
+      notifyProviderResult: jest.fn(async () => undefined),
+    };
+    const service = new PricingEtlService(
+      [
+        adapter(
+          'aws',
+          jest.fn(async () => [createCatalogRecord('aws', 'AWS-1')]),
+        ),
+        adapter(
+          'gcp',
+          jest.fn(async () => {
+            throw new Error('GCP catalog unavailable');
+          }),
+        ),
+      ],
+      writer,
+      runRepository,
+      fixedClock(),
+      undefined,
+      notifier,
+    );
+
+    await expect(service.refreshAllProviders()).resolves.toEqual(
+      expect.objectContaining({
+        status: 'partial',
+      }),
+    );
+    expect(notifier.notifyProviderResult).toHaveBeenCalledTimes(1);
+    expect(notifier.notifyProviderResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'gcp',
+        status: 'failed',
+        errorDetail: 'GCP catalog unavailable',
+      }),
+    );
+  });
+
   it('marks a provider run partial when some catalog rows are rejected', async () => {
     const writer: PricingCatalogWriter = {
       upsertPricingRecords: jest.fn(async () => ({

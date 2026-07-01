@@ -137,6 +137,29 @@ export interface SharedReportResponse {
   breakdown: WorkloadCostBreakdown;
 }
 
+export interface ShareLinkEventInput {
+  token: string;
+  countryCode?: string;
+  section: string;
+  userAgentHash?: string;
+  viewedAt: string;
+}
+
+export interface ShareLinkAnalyticsResponse {
+  token: string;
+  totalViews: number;
+  lastViewedAt?: string;
+  countryViews: Array<{
+    countryCode: string;
+    views: number;
+  }>;
+  sectionViews: Array<{
+    section: string;
+    views: number;
+    lastViewedAt?: string;
+  }>;
+}
+
 export interface ExchangeRatesResponse {
   base: string;
   lastUpdated?: string;

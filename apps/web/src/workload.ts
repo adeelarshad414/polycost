@@ -19,6 +19,18 @@ export interface WorkloadFormState {
   workloadName: string;
   workloadType: WorkloadType;
   regionPreference: string;
+  environment: 'production' | 'staging' | 'development' | 'test';
+  commitmentPreferencePercent: string;
+  dataResidency: string;
+  complianceLocked: boolean;
+  complianceFrameworks: string;
+  operatingSystem: 'linux' | 'windows' | 'byol';
+  supportTier: 'none' | 'developer' | 'business' | 'enterprise';
+  usagePattern: 'always_on' | 'scheduled' | 'bursty';
+  usageHoursPerDay: string;
+  usageDaysPerWeek: string;
+  averageUtilizationPercent: string;
+  tags: string;
   dailyActiveUsers: string;
   peakConcurrentUsers: string;
   computeRole: string;
@@ -49,6 +61,7 @@ export interface WorkloadFormState {
   multiAz: boolean;
   multiRegion: boolean;
   slaTarget: string;
+  faultTolerance: 'single-zone' | 'multi-az' | 'multi-region' | 'active-active';
 }
 
 export interface WorkloadFormIssue {
@@ -66,7 +79,11 @@ type NumericWorkloadFormField =
   | 'autoscaleMax'
   | 'storageSizeGb'
   | 'databaseSizeGb'
-  | 'monthlyEgressGb';
+  | 'monthlyEgressGb'
+  | 'commitmentPreferencePercent'
+  | 'usageHoursPerDay'
+  | 'usageDaysPerWeek'
+  | 'averageUtilizationPercent';
 
 const serviceCategoryIds = new Set(SERVICE_CATALOG_CATEGORIES.map((category) => category.id));
 
@@ -77,6 +94,18 @@ export const defaultWorkloadForm: WorkloadFormState = {
   workloadName: 'Customer portal',
   workloadType: 'web_app',
   regionPreference: DEFAULT_COMPARISON_REGION,
+  environment: 'production',
+  commitmentPreferencePercent: '65',
+  dataResidency: 'global',
+  complianceLocked: false,
+  complianceFrameworks: 'SOC 2',
+  operatingSystem: 'linux',
+  supportTier: 'business',
+  usagePattern: 'always_on',
+  usageHoursPerDay: '24',
+  usageDaysPerWeek: '7',
+  averageUtilizationPercent: '85',
+  tags: 'team:platform, project:polycost-demo',
   dailyActiveUsers: '5000',
   peakConcurrentUsers: '600',
   computeRole: 'web',
@@ -107,6 +136,7 @@ export const defaultWorkloadForm: WorkloadFormState = {
   multiAz: true,
   multiRegion: false,
   slaTarget: '99.9%',
+  faultTolerance: 'multi-az',
 };
 
 export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue[] {
@@ -180,6 +210,44 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
   }
 
   optionalNonNegativeNumberField(issues, form, 'monthlyEgressGb', 'Egress must be 0 GB or higher.');
+  requireBoundedNumber(
+    issues,
+    form,
+    'commitmentPreferencePercent',
+    0,
+    100,
+    'Commitment preference must be between 0 and 100.',
+  );
+
+  if (form.usagePattern === 'scheduled') {
+    requireBoundedNumber(
+      issues,
+      form,
+      'usageHoursPerDay',
+      1,
+      24,
+      'Usage hours/day must be between 1 and 24.',
+    );
+    requireBoundedInteger(
+      issues,
+      form,
+      'usageDaysPerWeek',
+      1,
+      7,
+      'Usage days/week must be a whole number from 1 to 7.',
+    );
+  }
+
+  if (form.usagePattern === 'bursty') {
+    requireBoundedNumber(
+      issues,
+      form,
+      'averageUtilizationPercent',
+      1,
+      100,
+      'Average utilization must be between 1 and 100.',
+    );
+  }
 
   return issues;
 }
@@ -251,6 +319,38 @@ export function buildNwsFromForm(
       multiAz: form.multiAz,
       multiRegion: form.multiRegion,
       ...(form.slaTarget.trim() ? { slaTarget: form.slaTarget.trim() } : {}),
+      faultTolerance: form.faultTolerance,
+    },
+    workloadProfile: {
+      environment: form.environment,
+      commitmentPreferencePercent: parseBoundedNumber(form.commitmentPreferencePercent, 0, 100, 0),
+      dataResidency: {
+        scope: form.dataResidency.trim() || 'global',
+        complianceLocked: form.complianceLocked,
+        ...optionalStringList('frameworks', form.complianceFrameworks),
+      },
+      operatingSystem: form.operatingSystem,
+      supportTier: form.supportTier,
+      usagePattern: {
+        type: form.usagePattern,
+        ...(form.usagePattern === 'scheduled'
+          ? {
+              hoursPerDay: parseBoundedNumber(form.usageHoursPerDay, 1, 24, 24),
+              daysPerWeek: parseBoundedInteger(form.usageDaysPerWeek, 1, 7, 7),
+            }
+          : {}),
+        ...(form.usagePattern === 'bursty'
+          ? {
+              averageUtilizationPercent: parseBoundedNumber(
+                form.averageUtilizationPercent,
+                1,
+                100,
+                55,
+              ),
+            }
+          : {}),
+      },
+      ...optionalTagList('tags', form.tags),
     },
     serviceRequirements: serviceRequirementsFromForm(form),
     sourceTraceability: serviceCatalogTraceability(form.selectedServiceFamilyIds),
@@ -267,6 +367,35 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
     workloadName: nws.workload.name ?? defaultWorkloadForm.workloadName,
     workloadType: nws.workload.type,
     regionPreference: nws.workload.region.preference ?? '',
+    environment: nws.workloadProfile?.environment ?? defaultWorkloadForm.environment,
+    commitmentPreferencePercent: numberToInput(
+      nws.workloadProfile?.commitmentPreferencePercent ??
+        Number(defaultWorkloadForm.commitmentPreferencePercent),
+    ),
+    dataResidency: nws.workloadProfile?.dataResidency?.scope ?? defaultWorkloadForm.dataResidency,
+    complianceLocked:
+      nws.workloadProfile?.dataResidency?.complianceLocked ?? defaultWorkloadForm.complianceLocked,
+    complianceFrameworks:
+      nws.workloadProfile?.dataResidency?.frameworks?.join(', ') ??
+      defaultWorkloadForm.complianceFrameworks,
+    operatingSystem: nws.workloadProfile?.operatingSystem ?? defaultWorkloadForm.operatingSystem,
+    supportTier: nws.workloadProfile?.supportTier ?? defaultWorkloadForm.supportTier,
+    usagePattern: nws.workloadProfile?.usagePattern?.type ?? defaultWorkloadForm.usagePattern,
+    usageHoursPerDay: numberToInput(
+      nws.workloadProfile?.usagePattern?.hoursPerDay ??
+        Number(defaultWorkloadForm.usageHoursPerDay),
+    ),
+    usageDaysPerWeek: numberToInput(
+      nws.workloadProfile?.usagePattern?.daysPerWeek ??
+        Number(defaultWorkloadForm.usageDaysPerWeek),
+    ),
+    averageUtilizationPercent: numberToInput(
+      nws.workloadProfile?.usagePattern?.averageUtilizationPercent ??
+        Number(defaultWorkloadForm.averageUtilizationPercent),
+    ),
+    tags:
+      nws.workloadProfile?.tags?.map((tag) => `${tag.key}:${tag.value}`).join(', ') ??
+      defaultWorkloadForm.tags,
     dailyActiveUsers: numberToInput(nws.workload.expectedUsers?.dailyActiveUsers),
     peakConcurrentUsers: numberToInput(nws.workload.expectedUsers?.peakConcurrentUsers),
     computeRole: compute?.role ?? defaultWorkloadForm.computeRole,
@@ -306,6 +435,13 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
     multiAz: nws.availability.multiAz,
     multiRegion: nws.availability.multiRegion,
     slaTarget: nws.availability.slaTarget ?? '',
+    faultTolerance:
+      nws.availability.faultTolerance ??
+      (nws.availability.multiRegion
+        ? 'multi-region'
+        : nws.availability.multiAz
+          ? 'multi-az'
+          : 'single-zone'),
   };
 }
 
@@ -340,6 +476,19 @@ export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceReq
             ].join(' | ')
           : serviceType,
         supportStatus: family?.supportStatus ?? 'mapped',
+        environment: form.environment,
+        supportTier: form.supportTier,
+        operatingSystem: form.operatingSystem,
+        dataResidency: form.dataResidency,
+        complianceLocked: form.complianceLocked,
+        commitmentPreferencePercent: parseBoundedNumber(
+          form.commitmentPreferencePercent,
+          0,
+          100,
+          0,
+        ),
+        usagePattern: form.usagePattern,
+        faultTolerance: form.faultTolerance,
         ...(form.scalingType === 'autoscaling'
           ? {
               scalingType: form.scalingType,
@@ -507,6 +656,20 @@ function parseNonNegativeInteger(value: string, fallback: number): number {
   return parsed !== undefined && parsed >= 0 ? Math.round(parsed) : fallback;
 }
 
+function parseBoundedNumber(value: string, min: number, max: number, fallback: number): number {
+  const parsed = parseOptionalNumber(value);
+
+  if (parsed === undefined || parsed < min || parsed > max) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
+function parseBoundedInteger(value: string, min: number, max: number, fallback: number): number {
+  return Math.round(parseBoundedNumber(value, min, max, fallback));
+}
+
 function parseOptionalNumber(value: string): number | undefined {
   const trimmed = value.replace(/,/g, '').trim();
 
@@ -520,6 +683,38 @@ function parseOptionalNumber(value: string): number | undefined {
 
 function numberToInput(value: number | undefined): string {
   return value === undefined ? '' : value.toString();
+}
+
+function optionalStringList<K extends string>(key: K, value: string): Partial<Record<K, string[]>> {
+  const parsed = value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return parsed.length > 0 ? ({ [key]: parsed } as Record<K, string[]>) : {};
+}
+
+function optionalTagList<K extends string>(
+  key: K,
+  value: string,
+): Partial<Record<K, Array<{ key: string; value: string }>>> {
+  const tags = value
+    .split(',')
+    .map((item) => item.trim())
+    .map((item) => {
+      const [tagKey, ...tagValueParts] = item.split(':');
+      const tagValue = tagValueParts.join(':').trim();
+
+      return {
+        key: tagKey?.trim() ?? '',
+        value: tagValue || 'true',
+      };
+    })
+    .filter((tag) => tag.key && tag.value);
+
+  return tags.length > 0
+    ? ({ [key]: tags } as Record<K, Array<{ key: string; value: string }>>)
+    : {};
 }
 
 function requirePositiveNumber(
@@ -605,6 +800,36 @@ function optionalNonNegativeIntegerField(
   }
 }
 
+function requireBoundedNumber(
+  issues: WorkloadFormIssue[],
+  form: WorkloadFormState,
+  field: NumericWorkloadFormField,
+  min: number,
+  max: number,
+  message: string,
+): void {
+  const parsed = parseOptionalNumber(formNumericValue(form, field));
+
+  if (parsed === undefined || parsed < min || parsed > max) {
+    issues.push({ field, message });
+  }
+}
+
+function requireBoundedInteger(
+  issues: WorkloadFormIssue[],
+  form: WorkloadFormState,
+  field: NumericWorkloadFormField,
+  min: number,
+  max: number,
+  message: string,
+): void {
+  const parsed = parseOptionalNumber(formNumericValue(form, field));
+
+  if (parsed === undefined || parsed < min || parsed > max || !Number.isInteger(parsed)) {
+    issues.push({ field, message });
+  }
+}
+
 function formNumericValue(form: WorkloadFormState, field: NumericWorkloadFormField): string {
   switch (field) {
     case 'dailyActiveUsers':
@@ -627,5 +852,13 @@ function formNumericValue(form: WorkloadFormState, field: NumericWorkloadFormFie
       return form.databaseSizeGb;
     case 'monthlyEgressGb':
       return form.monthlyEgressGb;
+    case 'commitmentPreferencePercent':
+      return form.commitmentPreferencePercent;
+    case 'usageHoursPerDay':
+      return form.usageHoursPerDay;
+    case 'usageDaysPerWeek':
+      return form.usageDaysPerWeek;
+    case 'averageUtilizationPercent':
+      return form.averageUtilizationPercent;
   }
 }

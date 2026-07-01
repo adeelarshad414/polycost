@@ -37,6 +37,12 @@ interface ProviderFailure {
   error: unknown;
 }
 
+interface UsageAdjustment {
+  factor: number;
+  label: string;
+  monthlyHours: number;
+}
+
 export class ComparisonUnavailableError extends Error {
   constructor(readonly failures: ComparisonWarning[]) {
     super('No provider pricing results were available');
@@ -104,7 +110,7 @@ export class ComparisonOrchestratorService {
     nws: NormalizedWorkloadSpec,
     result: ProviderPricingResult,
   ): ComparisonProviderResult {
-    const lineItems = result.lineItems.map((lineItem): ComparisonLineItem => {
+    const catalogLineItems = result.lineItems.map((lineItem): ComparisonLineItem => {
       const annotatedLineItem = this.equivalentServiceMapper.annotateLineItem(
         nws,
         result.providerId,
@@ -114,16 +120,15 @@ export class ComparisonOrchestratorService {
         annotatedLineItem.costComponent ??
         this.costComponentForCategory(annotatedLineItem.category);
 
-      return {
+      return this.normalizeLineItem({
         category: annotatedLineItem.category,
         costComponent,
         description: annotatedLineItem.description,
         isApproximate: annotatedLineItem.isApproximate,
-        baseHourlyCostUsd: this.roundCurrency(
+        baseHourlyCostUsd:
           annotatedLineItem.baseHourlyCostUsd ??
-            annotatedLineItem.baseMonthlyCostUsd / HOURS_PER_MONTH,
-        ),
-        baseMonthlyCostUsd: this.roundCurrency(annotatedLineItem.baseMonthlyCostUsd),
+          annotatedLineItem.baseMonthlyCostUsd / HOURS_PER_MONTH,
+        baseMonthlyCostUsd: annotatedLineItem.baseMonthlyCostUsd,
         skuId: annotatedLineItem.skuId,
         region: annotatedLineItem.region,
         unit: annotatedLineItem.unit,
@@ -131,26 +136,15 @@ export class ComparisonOrchestratorService {
         pricingBasis: annotatedLineItem.pricingBasis ?? 'flat',
         ...(annotatedLineItem.egressTiers ? { egressTiers: annotatedLineItem.egressTiers } : {}),
         ...(annotatedLineItem.pricingModels
-          ? {
-              pricingModels: annotatedLineItem.pricingModels.map((model) => ({
-                ...model,
-                ...(model.monthlyCostUsd !== undefined && model.hourlyCostUsd === undefined
-                  ? { hourlyCostUsd: this.roundCurrency(model.monthlyCostUsd / HOURS_PER_MONTH) }
-                  : {}),
-                ...(model.hourlyCostUsd !== undefined
-                  ? { hourlyCostUsd: this.roundCurrency(model.hourlyCostUsd) }
-                  : {}),
-                ...(model.monthlyCostUsd !== undefined
-                  ? { monthlyCostUsd: this.roundCurrency(model.monthlyCostUsd) }
-                  : {}),
-                ...(model.upfrontCostUsd !== undefined
-                  ? { upfrontCostUsd: this.roundCurrency(model.upfrontCostUsd) }
-                  : {}),
-              })),
-            }
+          ? { pricingModels: this.normalizePricingModels(annotatedLineItem.pricingModels) }
           : {}),
-      };
+      });
     });
+    const usageAdjustedLineItems = this.applyUsageProfile(nws, catalogLineItems);
+    const lineItems = [
+      ...usageAdjustedLineItems,
+      ...this.modeledLineItems(nws, result.providerId, usageAdjustedLineItems),
+    ];
 
     const monthlyCostUsd = this.roundCurrency(
       lineItems.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0),
@@ -277,16 +271,313 @@ export class ComparisonOrchestratorService {
     const storageMonthlyCostUsd = this.componentTotal(lineItems, 'storage');
     const egressMonthlyCostUsd = this.componentTotal(lineItems, 'egress');
     const databaseMonthlyCostUsd = this.componentTotal(lineItems, 'database');
+    const supportMonthlyCostUsd = this.componentTotal(lineItems, 'support');
+    const licensingMonthlyCostUsd = this.componentTotal(lineItems, 'licensing');
+    const operationsMonthlyCostUsd = this.componentTotal(lineItems, 'operations');
 
     return {
       computeMonthlyCostUsd,
       storageMonthlyCostUsd,
       egressMonthlyCostUsd,
       databaseMonthlyCostUsd,
+      supportMonthlyCostUsd,
+      licensingMonthlyCostUsd,
+      operationsMonthlyCostUsd,
       scopedMonthlyCostUsd: this.roundCurrency(
-        computeMonthlyCostUsd + storageMonthlyCostUsd + egressMonthlyCostUsd,
+        computeMonthlyCostUsd +
+          storageMonthlyCostUsd +
+          egressMonthlyCostUsd +
+          databaseMonthlyCostUsd +
+          supportMonthlyCostUsd +
+          licensingMonthlyCostUsd +
+          operationsMonthlyCostUsd,
       ),
     };
+  }
+
+  private normalizeLineItem(lineItem: ComparisonLineItem): ComparisonLineItem {
+    return {
+      ...lineItem,
+      baseHourlyCostUsd:
+        lineItem.baseHourlyCostUsd !== undefined
+          ? this.roundCurrency(lineItem.baseHourlyCostUsd)
+          : this.roundCurrency(lineItem.baseMonthlyCostUsd / HOURS_PER_MONTH),
+      baseMonthlyCostUsd: this.roundCurrency(lineItem.baseMonthlyCostUsd),
+      ...(lineItem.pricingModels
+        ? { pricingModels: this.normalizePricingModels(lineItem.pricingModels) }
+        : {}),
+    };
+  }
+
+  private normalizePricingModels(pricingModels: PricingModelCost[]): PricingModelCost[] {
+    return pricingModels.map((model) => ({
+      ...model,
+      ...(model.monthlyCostUsd !== undefined && model.hourlyCostUsd === undefined
+        ? { hourlyCostUsd: this.roundCurrency(model.monthlyCostUsd / HOURS_PER_MONTH) }
+        : {}),
+      ...(model.hourlyCostUsd !== undefined
+        ? { hourlyCostUsd: this.roundCurrency(model.hourlyCostUsd) }
+        : {}),
+      ...(model.monthlyCostUsd !== undefined
+        ? { monthlyCostUsd: this.roundCurrency(model.monthlyCostUsd) }
+        : {}),
+      ...(model.upfrontCostUsd !== undefined
+        ? { upfrontCostUsd: this.roundCurrency(model.upfrontCostUsd) }
+        : {}),
+    }));
+  }
+
+  private applyUsageProfile(
+    nws: NormalizedWorkloadSpec,
+    lineItems: ComparisonLineItem[],
+  ): ComparisonLineItem[] {
+    const usageAdjustment = this.usageAdjustment(nws);
+
+    if (!usageAdjustment || usageAdjustment.factor >= 0.995) {
+      return lineItems;
+    }
+
+    return lineItems.map((lineItem) => {
+      if (this.lineItemComponent(lineItem) !== 'compute') {
+        return lineItem;
+      }
+
+      const adjustedMonthlyCostUsd = this.roundCurrency(
+        lineItem.baseMonthlyCostUsd * usageAdjustment.factor,
+      );
+
+      return this.normalizeLineItem({
+        ...lineItem,
+        description: `${lineItem.description} (${usageAdjustment.label})`,
+        baseMonthlyCostUsd: adjustedMonthlyCostUsd,
+        baseHourlyCostUsd: this.roundCurrency(adjustedMonthlyCostUsd / HOURS_PER_MONTH),
+        pricingModels: lineItem.pricingModels?.map((model) =>
+          model.available && model.monthlyCostUsd !== undefined
+            ? {
+                ...model,
+                monthlyCostUsd: this.roundCurrency(model.monthlyCostUsd * usageAdjustment.factor),
+                hourlyCostUsd: this.roundCurrency(
+                  (model.monthlyCostUsd * usageAdjustment.factor) / HOURS_PER_MONTH,
+                ),
+                caveat: [model.caveat, usageAdjustment.label].filter(Boolean).join(' '),
+              }
+            : model,
+        ),
+      });
+    });
+  }
+
+  private modeledLineItems(
+    nws: NormalizedWorkloadSpec,
+    providerId: ProviderId,
+    lineItems: ComparisonLineItem[],
+  ): ComparisonLineItem[] {
+    const supportLineItem = this.supportLineItem(nws, providerId, lineItems);
+    const licensingLineItem = this.licensingLineItem(nws, providerId);
+    const resilienceLineItem = this.resilienceLineItem(nws, providerId, lineItems);
+
+    return [supportLineItem, licensingLineItem, resilienceLineItem].filter(
+      (lineItem): lineItem is ComparisonLineItem => lineItem !== undefined,
+    );
+  }
+
+  private supportLineItem(
+    nws: NormalizedWorkloadSpec,
+    providerId: ProviderId,
+    lineItems: ComparisonLineItem[],
+  ): ComparisonLineItem | undefined {
+    const supportTier = nws.workloadProfile?.supportTier ?? 'none';
+
+    if (supportTier === 'none') {
+      return undefined;
+    }
+
+    const subtotal = lineItems.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+    const supportCost = this.supportCost(providerId, supportTier, subtotal);
+
+    if (supportCost <= 0) {
+      return undefined;
+    }
+
+    return this.normalizeLineItem({
+      category: 'support',
+      costComponent: 'support',
+      description: `${providerLabel(providerId)} ${supportTierLabel(supportTier)} support estimate`,
+      isApproximate: true,
+      baseMonthlyCostUsd: supportCost,
+      baseHourlyCostUsd: supportCost / HOURS_PER_MONTH,
+      unit: 'month',
+      unitPriceUsd: supportCost,
+      pricingBasis: 'flat',
+    });
+  }
+
+  private supportCost(
+    providerId: ProviderId,
+    supportTier: NonNullable<NormalizedWorkloadSpec['workloadProfile']>['supportTier'],
+    subtotal: number,
+  ): number {
+    switch (supportTier) {
+      case 'developer':
+        return providerId === 'gcp' ? 29 : 29;
+      case 'business':
+        return this.roundCurrency(Math.max(100, subtotal * 0.1));
+      case 'enterprise':
+        return this.roundCurrency(Math.max(providerId === 'azure' ? 1000 : 1500, subtotal * 0.15));
+      case 'none':
+      case undefined:
+        return 0;
+    }
+  }
+
+  private licensingLineItem(
+    nws: NormalizedWorkloadSpec,
+    providerId: ProviderId,
+  ): ComparisonLineItem | undefined {
+    const operatingSystem = nws.workloadProfile?.operatingSystem ?? 'linux';
+
+    if (operatingSystem !== 'windows') {
+      return undefined;
+    }
+
+    const vcpuHours = this.computeVcpuHours(nws);
+    const unitPriceUsd = this.windowsLicenseRate(providerId);
+    const monthlyCostUsd = this.roundCurrency(vcpuHours * unitPriceUsd);
+
+    if (monthlyCostUsd <= 0) {
+      return undefined;
+    }
+
+    return this.normalizeLineItem({
+      category: 'licensing',
+      costComponent: 'licensing',
+      description: `${providerLabel(providerId)} Windows OS licensing estimate`,
+      isApproximate: true,
+      baseMonthlyCostUsd: monthlyCostUsd,
+      baseHourlyCostUsd: monthlyCostUsd / HOURS_PER_MONTH,
+      unit: 'vCPU-hour',
+      unitPriceUsd,
+      pricingBasis: 'flat',
+    });
+  }
+
+  private resilienceLineItem(
+    nws: NormalizedWorkloadSpec,
+    providerId: ProviderId,
+    lineItems: ComparisonLineItem[],
+  ): ComparisonLineItem | undefined {
+    const faultTolerance = this.faultTolerance(nws);
+
+    if (faultTolerance === 'single-zone') {
+      return undefined;
+    }
+
+    const subtotal = lineItems.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+    const statefulSubtotal = lineItems
+      .filter((lineItem) =>
+        ['database', 'storage', 'egress'].includes(this.lineItemComponent(lineItem)),
+      )
+      .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+    const monthlyCostUsd = this.roundCurrency(
+      faultTolerance === 'active-active'
+        ? subtotal
+        : faultTolerance === 'multi-region'
+          ? subtotal * 0.65
+          : statefulSubtotal * 0.08,
+    );
+
+    if (monthlyCostUsd <= 0) {
+      return undefined;
+    }
+
+    return this.normalizeLineItem({
+      category: 'operations',
+      costComponent: 'operations',
+      description: `${providerLabel(providerId)} ${faultToleranceLabel(
+        faultTolerance,
+      )} resilience premium estimate`,
+      isApproximate: true,
+      baseMonthlyCostUsd: monthlyCostUsd,
+      baseHourlyCostUsd: monthlyCostUsd / HOURS_PER_MONTH,
+      unit: 'month',
+      unitPriceUsd: monthlyCostUsd,
+      pricingBasis: 'flat',
+    });
+  }
+
+  private usageAdjustment(nws: NormalizedWorkloadSpec): UsageAdjustment | undefined {
+    const usagePattern = nws.workloadProfile?.usagePattern;
+
+    if (!usagePattern || usagePattern.type === 'always_on') {
+      return undefined;
+    }
+
+    if (usagePattern.type === 'scheduled') {
+      const hoursPerDay = usagePattern.hoursPerDay ?? 24;
+      const daysPerWeek = usagePattern.daysPerWeek ?? 7;
+      const monthlyHours = Math.min(HOURS_PER_MONTH, (hoursPerDay * daysPerWeek * 52) / 12);
+      const factor = Math.max(0.05, monthlyHours / HOURS_PER_MONTH);
+
+      return {
+        factor,
+        monthlyHours,
+        label: `scheduled duty cycle ${Math.round(factor * 100)}% (${Math.round(
+          monthlyHours,
+        )} hrs/mo)`,
+      };
+    }
+
+    const utilization = usagePattern.averageUtilizationPercent ?? 55;
+    const factor = Math.max(0.1, utilization / 100);
+
+    return {
+      factor,
+      monthlyHours: HOURS_PER_MONTH * factor,
+      label: `bursty utilization model ${Math.round(factor * 100)}% average`,
+    };
+  }
+
+  private computeVcpuHours(nws: NormalizedWorkloadSpec): number {
+    const usageAdjustment = this.usageAdjustment(nws);
+    const monthlyHours = usageAdjustment?.monthlyHours ?? HOURS_PER_MONTH;
+
+    return nws.compute.reduce((sum, compute) => {
+      const quantity =
+        compute.scalingType === 'autoscaling' && compute.autoscalingRange
+          ? (compute.autoscalingRange.min + compute.autoscalingRange.max) / 2
+          : (compute.instanceCount ?? 1);
+
+      return sum + (compute.vcpu ?? 2) * quantity * monthlyHours;
+    }, 0);
+  }
+
+  private windowsLicenseRate(providerId: ProviderId): number {
+    switch (providerId) {
+      case 'aws':
+        return 0.046;
+      case 'azure':
+        return 0.041;
+      case 'gcp':
+        return 0.04;
+    }
+  }
+
+  private faultTolerance(
+    nws: NormalizedWorkloadSpec,
+  ): NonNullable<NormalizedWorkloadSpec['availability']['faultTolerance']> {
+    if (nws.availability.faultTolerance) {
+      return nws.availability.faultTolerance;
+    }
+
+    if (nws.availability.multiRegion) {
+      return 'multi-region';
+    }
+
+    if (nws.availability.multiAz) {
+      return 'multi-az';
+    }
+
+    return 'single-zone';
   }
 
   private componentTotal(lineItems: ComparisonLineItem[], component: CostComponent): number {
@@ -456,4 +747,46 @@ function isProviderSuccess(outcome: ProviderSuccess | ProviderFailure): outcome 
 
 function isProviderFailure(outcome: ProviderSuccess | ProviderFailure): outcome is ProviderFailure {
   return 'error' in outcome;
+}
+
+function providerLabel(providerId: ProviderId): string {
+  switch (providerId) {
+    case 'aws':
+      return 'AWS';
+    case 'azure':
+      return 'Azure';
+    case 'gcp':
+      return 'GCP';
+  }
+}
+
+function supportTierLabel(
+  supportTier: NonNullable<NormalizedWorkloadSpec['workloadProfile']>['supportTier'],
+): string {
+  switch (supportTier) {
+    case 'developer':
+      return 'Developer';
+    case 'business':
+      return 'Business';
+    case 'enterprise':
+      return 'Enterprise';
+    case 'none':
+    case undefined:
+      return 'No';
+  }
+}
+
+function faultToleranceLabel(
+  faultTolerance: NonNullable<NormalizedWorkloadSpec['availability']['faultTolerance']>,
+): string {
+  switch (faultTolerance) {
+    case 'single-zone':
+      return 'single-zone';
+    case 'multi-az':
+      return 'multi-AZ';
+    case 'multi-region':
+      return 'multi-region';
+    case 'active-active':
+      return 'active-active';
+  }
 }

@@ -26,6 +26,7 @@ import { applyTheme, ResolvedTheme, resolveTheme, storedTheme, ThemeChoice } fro
 import {
   ComparisonProviderResult,
   ComparisonResult,
+  DataHealthResponse,
   INTERVALS,
   IntervalKey,
   NormalizedWorkloadSpec,
@@ -50,6 +51,7 @@ type InputMode = 'describe' | 'form';
 type BusyAction = 'parse' | 'compare' | 'refresh' | 'export' | null;
 type ServiceCategory = ComparisonProviderResult['lineItems'][number]['category'];
 type ComparisonLineItem = ComparisonProviderResult['lineItems'][number];
+type CostComponent = NonNullable<ComparisonLineItem['costComponent']>;
 type FormSectionTone = 'profile' | 'compute' | 'services' | 'portfolio' | 'data' | 'network';
 type ToggleIconKind = 'storage' | 'database' | 'cdn' | 'loadBalancer' | 'multiAz' | 'multiRegion';
 type CostMatrixCategoryFilter = ServiceCategory | 'all';
@@ -138,7 +140,48 @@ const INSTANCE_TIER_OPTIONS: Array<[string, string]> = [
   ['custom', 'Custom - use vCPU and memory fields'],
 ];
 
-const SERVICE_CATEGORIES: ServiceCategory[] = ['compute', 'storage', 'database', 'network'];
+const SERVICE_CATEGORIES: ServiceCategory[] = [
+  'compute',
+  'storage',
+  'database',
+  'network',
+  'support',
+  'licensing',
+  'operations',
+];
+
+const ENVIRONMENT_OPTIONS: Array<[WorkloadFormState['environment'], string]> = [
+  ['production', 'Production'],
+  ['staging', 'Staging'],
+  ['development', 'Development'],
+  ['test', 'Test'],
+];
+
+const OPERATING_SYSTEM_OPTIONS: Array<[WorkloadFormState['operatingSystem'], string]> = [
+  ['linux', 'Linux'],
+  ['windows', 'Windows'],
+  ['byol', 'BYOL'],
+];
+
+const SUPPORT_TIER_OPTIONS: Array<[WorkloadFormState['supportTier'], string]> = [
+  ['none', 'No support'],
+  ['developer', 'Developer'],
+  ['business', 'Business'],
+  ['enterprise', 'Enterprise'],
+];
+
+const USAGE_PATTERN_OPTIONS: Array<[WorkloadFormState['usagePattern'], string]> = [
+  ['always_on', 'Always on'],
+  ['scheduled', 'Scheduled'],
+  ['bursty', 'Bursty'],
+];
+
+const FAULT_TOLERANCE_OPTIONS: Array<[WorkloadFormState['faultTolerance'], string]> = [
+  ['single-zone', 'Single-zone'],
+  ['multi-az', 'Multi-AZ'],
+  ['multi-region', 'Multi-region'],
+  ['active-active', 'Active-active'],
+];
 
 const DEFAULT_CALCULATOR_URLS: Record<ProviderId, string> = {
   aws: 'https://calculator.aws/#/',
@@ -453,6 +496,8 @@ export function App({ client = polyCostClient }: AppProps) {
   const [requirementsFileName, setRequirementsFileName] = useState<string | null>(null);
   const [regionCatalog, setRegionCatalog] = useState<RegionCatalogResponse | null>(null);
   const [regionCatalogError, setRegionCatalogError] = useState<string | null>(null);
+  const [dataHealth, setDataHealth] = useState<DataHealthResponse | null>(null);
+  const [dataHealthError, setDataHealthError] = useState<string | null>(null);
   const [formValidationIssues, setFormValidationIssues] = useState<WorkloadFormIssue[]>([]);
 
   useEffect(() => {
@@ -489,6 +534,33 @@ export function App({ client = polyCostClient }: AppProps) {
 
         setRegionCatalog(null);
         setRegionCatalogError(formatApiError(catalogError));
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [client]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    void client
+      .getDataHealth()
+      .then((health) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setDataHealth(health);
+        setDataHealthError(null);
+      })
+      .catch((healthError) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setDataHealth(null);
+        setDataHealthError(formatApiError(healthError));
       });
 
     return () => {
@@ -858,6 +930,8 @@ export function App({ client = polyCostClient }: AppProps) {
           regionCatalog={regionCatalog}
           regionCatalogError={regionCatalogError}
           validationIssues={formValidationIssues}
+          dataHealth={dataHealth}
+          dataHealthError={dataHealthError}
           onClear={handleClearComparison}
           onEdit={handleEditComparison}
           onInputModeChange={setInputMode}
@@ -886,6 +960,8 @@ export function App({ client = polyCostClient }: AppProps) {
           notice={notice}
           error={error}
           validationIssues={formValidationIssues}
+          dataHealth={dataHealth}
+          dataHealthError={dataHealthError}
           isComparing={busyAction === 'compare' || busyAction === 'parse'}
           onInputModeChange={setInputMode}
           onPricingModelChange={handlePricingModelChange}
@@ -1052,6 +1128,8 @@ function InitialHomePage({
   notice,
   error,
   validationIssues,
+  dataHealth,
+  dataHealthError,
   isComparing,
   requirementsAwaitingReview,
   onInputModeChange,
@@ -1073,6 +1151,8 @@ function InitialHomePage({
   notice: string | null;
   error: string | null;
   validationIssues: WorkloadFormIssue[];
+  dataHealth: DataHealthResponse | null;
+  dataHealthError: string | null;
   isComparing: boolean;
   requirementsAwaitingReview: boolean;
   onInputModeChange: (mode: InputMode) => void;
@@ -1119,6 +1199,7 @@ function InitialHomePage({
       </div>
 
       <div className="initial-home-form" aria-label="Compare cloud costs">
+        <DataHealthBanner health={dataHealth} error={dataHealthError} />
         <InputModeTabs inputMode={inputMode} onInputModeChange={onInputModeChange} />
         <PricingModelPreferenceControl
           pricingModel={pricingModel}
@@ -1209,6 +1290,30 @@ function InitialHomePage({
                 compact
                 onChange={(value) => update('regionPreference', value)}
               />
+              <SelectField
+                label="Environment"
+                value={form.environment}
+                options={ENVIRONMENT_OPTIONS}
+                onChange={(value) => update('environment', value)}
+              />
+              <SelectField
+                label="OS / license"
+                value={form.operatingSystem}
+                options={OPERATING_SYSTEM_OPTIONS}
+                onChange={(value) => update('operatingSystem', value)}
+              />
+              <SelectField
+                label="Support"
+                value={form.supportTier}
+                options={SUPPORT_TIER_OPTIONS}
+                onChange={(value) => update('supportTier', value)}
+              />
+              <SelectField
+                label="Usage"
+                value={form.usagePattern}
+                options={USAGE_PATTERN_OPTIONS}
+                onChange={(value) => update('usagePattern', value)}
+              />
               <TextField
                 label="Availability zones"
                 value={form.availabilityZoneCount}
@@ -1216,11 +1321,20 @@ function InitialHomePage({
                 suffix="AZs"
                 onChange={(value) => update('availabilityZoneCount', value)}
               />
+              <RangeField
+                label="Commitment fit"
+                value={form.commitmentPreferencePercent}
+                min={0}
+                max={100}
+                suffix="%"
+                error={fieldErrors.commitmentPreferencePercent}
+                onChange={(value) => update('commitmentPreferencePercent', value)}
+              />
             </div>
 
             <details className="initial-optional-estimate">
               <summary>
-                <span>Add storage & egress estimate</span>
+                <span>Add storage, egress & governance assumptions</span>
                 <span className="initial-optional-chevron" aria-hidden="true">
                   +
                 </span>
@@ -1241,6 +1355,24 @@ function InitialHomePage({
                   suffix="GB"
                   error={fieldErrors.monthlyEgressGb}
                   onChange={(value) => update('monthlyEgressGb', value)}
+                />
+                <SelectField
+                  label="Fault tolerance"
+                  value={form.faultTolerance}
+                  options={FAULT_TOLERANCE_OPTIONS}
+                  onChange={(value) =>
+                    onChange({
+                      ...form,
+                      faultTolerance: value,
+                      multiAz: value !== 'single-zone',
+                      multiRegion: value === 'multi-region' || value === 'active-active',
+                    })
+                  }
+                />
+                <TextField
+                  label="Data residency"
+                  value={form.dataResidency}
+                  onChange={(value) => update('dataResidency', value)}
                 />
               </div>
             </details>
@@ -1296,6 +1428,8 @@ function ProgressiveComparisonPage({
   regionCatalog,
   regionCatalogError,
   validationIssues,
+  dataHealth,
+  dataHealthError,
   onClear,
   onEdit,
   onInputModeChange,
@@ -1330,6 +1464,8 @@ function ProgressiveComparisonPage({
   regionCatalog: RegionCatalogResponse | null;
   regionCatalogError: string | null;
   validationIssues: WorkloadFormIssue[];
+  dataHealth: DataHealthResponse | null;
+  dataHealthError: string | null;
   onClear: () => void;
   onEdit: () => void;
   onInputModeChange: (mode: InputMode) => void;
@@ -1384,6 +1520,8 @@ function ProgressiveComparisonPage({
               onClear={onClear}
               onEdit={onEdit}
             />
+
+            <DataHealthBanner health={dataHealth} error={dataHealthError} compact />
 
             <ResultQuickActions
               comparison={comparison}
@@ -1592,6 +1730,7 @@ function StateDetailContent({
         />
         <EngineeringAnalyticsDashboard comparison={comparison} interval={interval} />
         <ServiceCheapestMatrix comparison={comparison} interval={interval} />
+        <ProductionDepthAnalytics comparison={comparison} form={form} />
         <FullCostMatrixTable comparison={comparison} />
         <CostFormulaEvidence comparison={comparison} />
         <ComparisonToolbar interval={interval} onIntervalChange={onIntervalChange} />
@@ -1742,6 +1881,65 @@ function PricingModelBadge({ pricingModel }: { pricingModel: PricingModelKey }) 
       <PricingModelMiniIcon pricingModel={pricingModel} />
       {pricingModelSummaryLabel(pricingModel)}
     </span>
+  );
+}
+
+function DataHealthBanner({
+  health,
+  error,
+  compact = false,
+}: {
+  health: DataHealthResponse | null;
+  error: string | null;
+  compact?: boolean;
+}) {
+  if (!health && !error) {
+    return null;
+  }
+
+  const tone = error ? 'degraded' : (health?.overallStatus ?? 'degraded');
+  const summary = error
+    ? 'Pricing data health unavailable'
+    : health?.overallStatus === 'fresh'
+      ? `Pricing cache fresh across ${health.providers.length} providers`
+      : `${health?.alertCount ?? 0} pricing data alert${health?.alertCount === 1 ? '' : 's'}`;
+
+  return (
+    <section
+      className={
+        compact
+          ? `data-health-banner data-health-${tone} is-compact`
+          : `data-health-banner data-health-${tone}`
+      }
+      aria-label="Pricing data health"
+    >
+      <div className="data-health-main">
+        <span>Data health</span>
+        <strong>{summary}</strong>
+        <small>
+          {error ??
+            `Freshness policy ${health?.freshnessPolicyHours ?? 24}h · generated ${formatDateTime(
+              health?.generatedAt,
+            )}`}
+        </small>
+      </div>
+      {health ? (
+        <div className="data-health-providers" aria-label="Provider data freshness">
+          {health.providers.map((provider) => (
+            <span
+              className={`data-health-provider data-health-provider-${provider.freshness}`}
+              key={provider.providerId}
+              title={provider.message}
+            >
+              {providerLabel(provider.providerId)}
+              <small>
+                {provider.ageHours !== undefined ? `${provider.ageHours}h` : provider.freshness}
+              </small>
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -2081,6 +2279,15 @@ function WorkloadForm({
     });
   }
 
+  function updateFaultTolerance(value: WorkloadFormState['faultTolerance']) {
+    onChange({
+      ...form,
+      faultTolerance: value,
+      multiAz: value !== 'single-zone',
+      multiRegion: value === 'multi-region' || value === 'active-active',
+    });
+  }
+
   function toggleServiceFamily(id: string) {
     const selected = new Set(form.selectedServiceFamilyIds);
 
@@ -2100,6 +2307,7 @@ function WorkloadForm({
     <form className="structured-form" onSubmit={onSubmit}>
       <FormValidationSummary issues={validationIssues} />
       <div className="form-overview-strip" aria-label="Workload sizing summary">
+        <FormSummaryChip label="Profile" value={sizingSummary.profile} tone="profile" />
         <FormSummaryChip label="Traffic" value={sizingSummary.traffic} tone="profile" />
         <FormSummaryChip label="Compute" value={sizingSummary.compute} tone="compute" />
         <FormSummaryChip label="Scale" value={sizingSummary.scale} tone="services" />
@@ -2133,6 +2341,37 @@ function WorkloadForm({
             regionCatalog={regionCatalog}
             regionCatalogError={regionCatalogError}
             onChange={(value) => update('regionPreference', value)}
+          />
+          <SelectField
+            label="Environment"
+            value={form.environment}
+            options={ENVIRONMENT_OPTIONS}
+            onChange={(value) => update('environment', value)}
+          />
+          <SelectField
+            label="Data residency"
+            value={form.dataResidency}
+            options={[
+              ['global', 'Global'],
+              ['us', 'United States'],
+              ['eu', 'European Union'],
+              ['uk', 'United Kingdom'],
+              ['apac', 'APAC'],
+              ['canada', 'Canada'],
+            ]}
+            onChange={(value) => update('dataResidency', value)}
+          />
+          <SelectField
+            label="Support"
+            value={form.supportTier}
+            options={SUPPORT_TIER_OPTIONS}
+            onChange={(value) => update('supportTier', value)}
+          />
+          <SelectField
+            label="OS / license"
+            value={form.operatingSystem}
+            options={OPERATING_SYSTEM_OPTIONS}
+            onChange={(value) => update('operatingSystem', value)}
           />
           <TextField
             label="Daily users"
@@ -2207,10 +2446,60 @@ function WorkloadForm({
             error={fieldErrors.autoscaleMax}
             onChange={(value) => update('autoscaleMax', value)}
           />
+          <SelectField
+            label="Usage pattern"
+            value={form.usagePattern}
+            options={USAGE_PATTERN_OPTIONS}
+            onChange={(value) => update('usagePattern', value)}
+          />
+          <TextField
+            label="Hours/day"
+            value={form.usageHoursPerDay}
+            inputMode="decimal"
+            suffix="hrs"
+            disabled={form.usagePattern !== 'scheduled'}
+            error={fieldErrors.usageHoursPerDay}
+            onChange={(value) => update('usageHoursPerDay', value)}
+          />
+          <TextField
+            label="Days/week"
+            value={form.usageDaysPerWeek}
+            inputMode="numeric"
+            suffix="days"
+            disabled={form.usagePattern !== 'scheduled'}
+            error={fieldErrors.usageDaysPerWeek}
+            onChange={(value) => update('usageDaysPerWeek', value)}
+          />
+          <TextField
+            label="Avg utilization"
+            value={form.averageUtilizationPercent}
+            inputMode="decimal"
+            suffix="%"
+            disabled={form.usagePattern !== 'bursty'}
+            error={fieldErrors.averageUtilizationPercent}
+            onChange={(value) => update('averageUtilizationPercent', value)}
+          />
+          <RangeField
+            label="Commitment fit"
+            value={form.commitmentPreferencePercent}
+            min={0}
+            max={100}
+            suffix="%"
+            error={fieldErrors.commitmentPreferencePercent}
+            onChange={(value) => update('commitmentPreferencePercent', value)}
+          />
         </div>
       </FormSection>
 
       <FormSection title="Services" tone="services" defaultOpen>
+        <div className="service-selector-grid">
+          <SelectField
+            label="Fault tolerance"
+            value={form.faultTolerance}
+            options={FAULT_TOLERANCE_OPTIONS}
+            onChange={updateFaultTolerance}
+          />
+        </div>
         <div className="form-switches" aria-label="Workload options">
           <CheckboxField
             label="Object storage"
@@ -2403,6 +2692,18 @@ function WorkloadForm({
             value={form.slaTarget}
             onChange={(value) => update('slaTarget', value)}
           />
+          <TextField
+            label="Compliance"
+            value={form.complianceFrameworks}
+            onChange={(value) => update('complianceFrameworks', value)}
+          />
+          <TextField label="Tags" value={form.tags} onChange={(value) => update('tags', value)} />
+          <CheckboxField
+            label="Residency lock"
+            icon="multiRegion"
+            checked={form.complianceLocked}
+            onChange={(checked) => update('complianceLocked', checked)}
+          />
         </div>
       </FormSection>
 
@@ -2563,6 +2864,57 @@ function TextField({
         />
         {suffix ? <span className="field-suffix">{suffix}</span> : null}
       </span>
+      {error ? (
+        <span id={errorId} className="field-error">
+          {error}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function RangeField({
+  label,
+  value,
+  min,
+  max,
+  suffix,
+  error,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  min: number;
+  max: number;
+  suffix?: string;
+  error?: string;
+  onChange: (value: string) => void;
+}) {
+  const id = toId(label);
+  const errorId = `${id}-error`;
+  const numericValue = clampNumber(Number(value), min, max);
+
+  return (
+    <div className={error ? 'form-field range-field is-invalid' : 'form-field range-field'}>
+      <label className="field-caption" htmlFor={id}>
+        {label}
+      </label>
+      <div className="range-field-control">
+        <input
+          id={id}
+          type="range"
+          min={min}
+          max={max}
+          value={numericValue}
+          aria-invalid={error ? 'true' : undefined}
+          aria-describedby={error ? errorId : undefined}
+          onChange={(event) => onChange(event.currentTarget.value)}
+        />
+        <strong>
+          {numericValue}
+          {suffix}
+        </strong>
+      </div>
       {error ? (
         <span id={errorId} className="field-error">
           {error}
@@ -2923,7 +3275,7 @@ function ToggleIcon({ icon }: { icon: ToggleIconKind }) {
 
 function formSizingSummary(
   form: WorkloadFormState,
-): Record<'traffic' | 'compute' | 'scale' | 'services' | 'data', string> {
+): Record<'profile' | 'traffic' | 'compute' | 'scale' | 'services' | 'data', string> {
   const dailyUsers = formatCompactInput(form.dailyActiveUsers);
   const peakUsers = formatCompactInput(form.peakConcurrentUsers);
   const vcpu = parseFormNumber(form.vcpu) ?? 0;
@@ -2943,6 +3295,7 @@ function formSizingSummary(
   ]).size;
 
   return {
+    profile: `${capitalize(form.environment)} / ${supportTierLabel(form.supportTier)}`,
     traffic: `${dailyUsers} daily / ${peakUsers} peak`,
     compute: `${formatDecimal(totalVcpu)} vCPU / ${formatDecimal(totalMemory)}GB`,
     scale:
@@ -2993,6 +3346,19 @@ function workloadTypeLabel(type: WorkloadFormState['workloadType']): string {
   }
 }
 
+function supportTierLabel(supportTier: WorkloadFormState['supportTier']): string {
+  switch (supportTier) {
+    case 'none':
+      return 'No support';
+    case 'developer':
+      return 'Developer support';
+    case 'business':
+      return 'Business support';
+    case 'enterprise':
+      return 'Enterprise support';
+  }
+}
+
 function regionLabelForSummary(value: string, regionCatalog: RegionCatalogResponse | null): string {
   const comparisonLabel = comparisonRegionLabel(value);
 
@@ -3012,6 +3378,14 @@ function parseFormNumber(value: string): number | undefined {
   const parsed = Number(value.replace(/,/g, '').trim());
 
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+
+  return Math.min(max, Math.max(min, Math.round(value)));
 }
 
 function formatCompactInput(value: string): string {
@@ -3687,6 +4061,43 @@ function ServiceCheapestMatrix({
   );
 }
 
+function ProductionDepthAnalytics({
+  comparison,
+  form,
+}: {
+  comparison: ComparisonResult | null;
+  form: WorkloadFormState;
+}) {
+  const insights = productionDepthInsights(comparison, form);
+
+  return (
+    <section className="production-depth-analytics" aria-label="Production-depth analytics">
+      <div className="engineering-dashboard-heading">
+        <div>
+          <span>Production-depth analytics</span>
+          <h3>FinOps, architecture, and finance decision signals</h3>
+        </div>
+        <p>
+          These cards are derived from the current comparison, workload profile, pricing models,
+          line items, and explicit modeled assumptions.
+        </p>
+      </div>
+      <div className="production-depth-grid">
+        {insights.map((insight) => (
+          <article
+            className={`production-depth-card production-depth-${insight.tone}`}
+            key={insight.label}
+          >
+            <span>{insight.label}</span>
+            <strong>{insight.value}</strong>
+            <p>{insight.detail}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function FullCostMatrixTable({ comparison }: { comparison: ComparisonResult | null }) {
   const [categoryFilter, setCategoryFilter] = useState<CostMatrixCategoryFilter>('all');
   const [providerFilter, setProviderFilter] = useState<CostMatrixProviderFilter>('all');
@@ -4132,6 +4543,232 @@ function serviceCheapestRows(
         : 'No priced line item for this service.',
     };
   });
+}
+
+interface ProductionDepthInsight {
+  label: string;
+  value: string;
+  detail: string;
+  tone: 'good' | 'review' | 'risk';
+}
+
+function productionDepthInsights(
+  comparison: ComparisonResult | null,
+  form: WorkloadFormState,
+): ProductionDepthInsight[] {
+  const providers = comparison?.providers ?? [];
+  const pricedProviders = [...providers].sort(
+    (left, right) => left.totals.monthly - right.totals.monthly,
+  );
+  const lowest = pricedProviders[0];
+  const highest = pricedProviders.at(-1);
+
+  if (!lowest) {
+    return [
+      {
+        label: 'Production model',
+        value: 'Pending',
+        detail: 'Run a comparison to populate executive, engineering, and finance signals.',
+        tone: 'review',
+      },
+    ];
+  }
+
+  const spread =
+    highest && highest.providerId !== lowest.providerId
+      ? highest.totals.monthly - lowest.totals.monthly
+      : 0;
+  const modeledAssumptions =
+    componentMonthly(lowest, 'support') +
+    componentMonthly(lowest, 'licensing') +
+    componentMonthly(lowest, 'operations');
+  const bestCommitment = bestCommitmentModel(lowest);
+  const breakEvenMonths =
+    bestCommitment?.model.upfrontCostUsd && bestCommitment.monthlySavings > 0
+      ? bestCommitment.model.upfrontCostUsd / bestCommitment.monthlySavings
+      : undefined;
+  const spotModel = lowest.pricingModels?.find((model) => model.model === 'spot');
+  const spotBlendMonthly =
+    spotModel?.available && spotModel.monthlyCostUsd !== undefined
+      ? lowest.totals.monthly * 0.7 + spotModel.monthlyCostUsd * 0.3
+      : undefined;
+  const computeMonthly = componentMonthly(lowest, 'compute');
+  const storageMonthly = componentMonthly(lowest, 'storage');
+  const egressMonthly = componentMonthly(lowest, 'egress');
+  const sensitivityMonthly =
+    lowest.totals.monthly + computeMonthly * 0.2 + storageMonthly * 0.5 + egressMonthly * 0.25;
+  const approximateRows = providers.reduce(
+    (count, provider) =>
+      count + provider.lineItems.filter((lineItem) => lineItem.isApproximate).length,
+    0,
+  );
+  const threeYearTco = bestCommitment?.model.monthlyCostUsd
+    ? bestCommitment.model.monthlyCostUsd * 36 + (bestCommitment.model.upfrontCostUsd ?? 0)
+    : lowest.totals.monthly * 36;
+  const egressGb = parseInputNumber(form.monthlyEgressGb) ?? 0;
+  const utilization = parseInputNumber(form.averageUtilizationPercent);
+  const rightsizingSignal =
+    form.usagePattern === 'bursty' && utilization !== undefined && utilization < 55
+      ? 'Downsize or autoscale'
+      : form.scalingType === 'fixed'
+        ? 'Load-test fixed nodes'
+        : 'Autoscaling ready';
+
+  return [
+    {
+      label: 'Waterfall',
+      value: `${formatCurrency(lowest.totals.monthly)} baseline`,
+      detail: `${formatCurrency(modeledAssumptions)} of support, licensing, and resilience assumptions are explicit modeled line items.`,
+      tone: modeledAssumptions > 0 ? 'review' : 'good',
+    },
+    {
+      label: 'Provider delta',
+      value: spread > 0 ? `${formatCurrency(spread)}/mo` : 'Tight spread',
+      detail:
+        spread > 0
+          ? `${providerLabel(lowest.providerId)} is lower than ${providerLabel(
+              highest?.providerId ?? lowest.providerId,
+            )} by ${formatCurrency(spread * 12)}/yr before private discounts.`
+          : 'Provider totals are clustered; architecture fit should drive selection.',
+      tone: spread > lowest.totals.monthly * 0.2 ? 'review' : 'good',
+    },
+    {
+      label: 'Break-even',
+      value:
+        breakEvenMonths !== undefined
+          ? `${formatDecimal(breakEvenMonths)} mo`
+          : bestCommitment
+            ? 'No upfront'
+            : 'Unavailable',
+      detail: bestCommitment
+        ? `${bestCommitment.model.displayName ?? bestCommitment.model.model} saves ${formatCurrency(
+            bestCommitment.monthlySavings,
+          )}/mo versus on-demand.`
+        : 'No eligible commitment model is published for the current provider baseline.',
+      tone: bestCommitment ? 'good' : 'review',
+    },
+    {
+      label: 'Sensitivity',
+      value: formatCurrency(sensitivityMonthly),
+      detail:
+        '+20% compute, +50% storage, and +25% egress stress case against the current low provider.',
+      tone: sensitivityMonthly > lowest.totals.monthly * 1.35 ? 'risk' : 'review',
+    },
+    {
+      label: 'Spot blend',
+      value: spotBlendMonthly !== undefined ? formatCurrency(spotBlendMonthly) : 'Estimate only',
+      detail:
+        spotBlendMonthly !== undefined
+          ? 'Modeled as 30% interruptible compute and 70% on-demand baseline.'
+          : 'Spot/preemptible rows are not available for this comparison response.',
+      tone: spotBlendMonthly !== undefined ? 'review' : 'risk',
+    },
+    {
+      label: 'Rightsizing',
+      value: rightsizingSignal,
+      detail: `${capitalize(form.usagePattern.replace('_', ' '))} usage with ${form.scalingType} capacity. Validate CPU, memory, and peak concurrency before commitment.`,
+      tone: rightsizingSignal === 'Autoscaling ready' ? 'good' : 'review',
+    },
+    {
+      label: 'Commitment coverage',
+      value: `${form.commitmentPreferencePercent || '0'}% fit`,
+      detail: `${supportTierLabel(form.supportTier)} and ${form.operatingSystem.toUpperCase()} assumptions are included in the workload profile.`,
+      tone: Number(form.commitmentPreferencePercent) >= 70 ? 'good' : 'review',
+    },
+    {
+      label: 'Egress optimization',
+      value: egressGb > 0 ? `${formatDecimal(egressGb)}GB/mo` : 'Not stated',
+      detail: form.cdn
+        ? 'CDN is enabled; validate cache hit ratio and cross-region transfer paths.'
+        : 'CDN is off; review public egress and inter-service transfer before production.',
+      tone: egressGb >= 500 && !form.cdn ? 'risk' : 'review',
+    },
+    {
+      label: 'License optimization',
+      value: form.operatingSystem.toUpperCase(),
+      detail:
+        form.operatingSystem === 'windows'
+          ? 'Windows licensing is modeled separately; validate BYOL eligibility and provider hybrid benefits.'
+          : 'Linux/BYOL setting avoids a modeled Windows license premium.',
+      tone: form.operatingSystem === 'windows' ? 'review' : 'good',
+    },
+    {
+      label: '3-year TCO',
+      value: formatCurrency(threeYearTco),
+      detail:
+        'Projection uses the best available commitment model when eligible, otherwise current on-demand monthly run rate.',
+      tone: bestCommitment ? 'good' : 'review',
+    },
+    {
+      label: 'Risk flags',
+      value: approximateRows > 0 ? `${approximateRows} review` : 'Low',
+      detail:
+        approximateRows > 0
+          ? 'Approximate service mappings require solution-architecture review.'
+          : 'No approximate provider mappings are flagged in the comparison response.',
+      tone: approximateRows > 0 ? 'review' : 'good',
+    },
+    {
+      label: 'Region variance',
+      value: regionLabelForSummary(form.regionPreference, null),
+      detail: form.complianceLocked
+        ? `Residency lock enabled for ${form.dataResidency}; verify regional SKU coverage before procurement.`
+        : 'Region can still be adjusted for price, latency, residency, and availability tradeoffs.',
+      tone: form.complianceLocked ? 'risk' : 'review',
+    },
+  ];
+}
+
+function componentMonthly(provider: ComparisonProviderResult, component: CostComponent): number {
+  return provider.lineItems
+    .filter((lineItem) => lineItemCostComponent(lineItem) === component)
+    .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+}
+
+function lineItemCostComponent(lineItem: ComparisonLineItem): CostComponent {
+  if (lineItem.costComponent) {
+    return lineItem.costComponent;
+  }
+
+  switch (lineItem.category) {
+    case 'network':
+      return 'egress';
+    case 'support':
+    case 'licensing':
+    case 'operations':
+      return lineItem.category;
+    case 'compute':
+    case 'storage':
+    case 'database':
+      return lineItem.category;
+  }
+}
+
+function bestCommitmentModel(provider: ComparisonProviderResult): {
+  model: NonNullable<ComparisonProviderResult['pricingModels']>[number];
+  monthlySavings: number;
+} | null {
+  const onDemand = provider.pricingModels?.find((model) => model.model === 'on-demand');
+  const onDemandMonthly = onDemand?.monthlyCostUsd ?? provider.totals.monthly;
+  const candidates =
+    provider.pricingModels?.filter(
+      (model) =>
+        model.available &&
+        model.monthlyCostUsd !== undefined &&
+        model.model !== 'on-demand' &&
+        model.model !== 'spot' &&
+        model.monthlyCostUsd < onDemandMonthly,
+    ) ?? [];
+  const best = [...candidates].sort(
+    (left, right) => (left.monthlyCostUsd ?? Infinity) - (right.monthlyCostUsd ?? Infinity),
+  )[0];
+
+  return best && best.monthlyCostUsd !== undefined
+    ? {
+        model: best,
+        monthlySavings: onDemandMonthly - best.monthlyCostUsd,
+      }
+    : null;
 }
 
 function costFormulaRows(comparison: ComparisonResult | null): Array<{
@@ -5438,6 +6075,18 @@ function engineeringAnalyticsModel(
 }
 
 function providerServiceLabel(providerId: ProviderId, category: ServiceCategory): string {
+  if (category === 'support') {
+    return 'Support plan';
+  }
+
+  if (category === 'licensing') {
+    return 'OS licensing';
+  }
+
+  if (category === 'operations') {
+    return 'Resilience ops';
+  }
+
   if (providerId === 'aws') {
     switch (category) {
       case 'compute':
@@ -6235,6 +6884,23 @@ function formatPercent(value: number): string {
   return `${value.toLocaleString('en-US', {
     maximumFractionDigits: value > 0 && value < 10 ? 1 : 0,
   })}%`;
+}
+
+function formatDateTime(value: string | undefined): string {
+  if (!value) {
+    return 'pending';
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return 'pending';
+  }
+
+  return date.toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
 }
 
 function capitalize(value: string): string {

@@ -48,6 +48,33 @@ describe('workload helpers', () => {
       loadBalancer: true,
       estimatedMonthlyEgressGb: 750,
     });
+    expect(nws.availability).toMatchObject({
+      faultTolerance: 'multi-az',
+    });
+    expect(nws.workloadProfile).toMatchObject({
+      environment: 'production',
+      commitmentPreferencePercent: 65,
+      operatingSystem: 'linux',
+      supportTier: 'business',
+      usagePattern: {
+        type: 'always_on',
+      },
+      dataResidency: {
+        scope: 'global',
+        complianceLocked: false,
+        frameworks: ['SOC 2'],
+      },
+      tags: [
+        {
+          key: 'team',
+          value: 'platform',
+        },
+        {
+          key: 'project',
+          value: 'polycost-demo',
+        },
+      ],
+    });
     expect(nws.sourceTraceability).toContainEqual({
       nwsPath: 'metadata.serviceCatalog',
       sourceRef: 'serviceCatalog:vm-compute',
@@ -81,6 +108,9 @@ describe('workload helpers', () => {
     expect(form.regionPreference).toBe(defaultWorkloadForm.regionPreference);
     expect(form.dailyActiveUsers).toBe(defaultWorkloadForm.dailyActiveUsers);
     expect(form.databaseEngine).toBe(defaultWorkloadForm.databaseEngine);
+    expect(form.environment).toBe(defaultWorkloadForm.environment);
+    expect(form.supportTier).toBe(defaultWorkloadForm.supportTier);
+    expect(form.faultTolerance).toBe(defaultWorkloadForm.faultTolerance);
     expect(form.selectedServiceCategory).toBe('compute');
     expect(form.selectedServiceFamilyId).toBe('vm-compute');
     expect(form.selectedServiceFamilyIds).toEqual(DEFAULT_SELECTED_SERVICE_FAMILY_IDS);
@@ -107,8 +137,21 @@ describe('workload helpers', () => {
         instanceCount: '2.5',
         storageSizeGb: '',
         monthlyEgressGb: '-1',
+        commitmentPreferencePercent: '101',
+        usagePattern: 'scheduled',
+        usageHoursPerDay: '0',
+        usageDaysPerWeek: '8',
       }).map((issue) => issue.field),
-    ).toEqual(['vcpu', 'memoryGb', 'instanceCount', 'storageSizeGb', 'monthlyEgressGb']);
+    ).toEqual([
+      'vcpu',
+      'memoryGb',
+      'instanceCount',
+      'storageSizeGb',
+      'monthlyEgressGb',
+      'commitmentPreferencePercent',
+      'usageHoursPerDay',
+      'usageDaysPerWeek',
+    ]);
   });
 
   it('requires valid autoscaling ranges when autoscaling is selected', () => {

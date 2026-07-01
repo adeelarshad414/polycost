@@ -13,6 +13,10 @@ export const configSchema = z.object({
   CURRENCY_SYNC_SCHEDULE_CRON: z.string().default('0 * * * *'),
   ALERT_EVALUATOR_SCHEDULE_CRON: z.string().default('*/15 * * * *'),
   SHARE_LINK_CLEANUP_SCHEDULE_CRON: z.string().default('0 3 * * *'),
+  PRICING_SYNC_ALERT_WEBHOOK_URL: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.string().url().optional(),
+  ),
   EXCHANGE_RATE_API_URL: z.string().url().default('https://api.frankfurter.app/latest'),
   EXCHANGE_RATE_TARGET_CURRENCIES: z.string().default('EUR,GBP,CAD,AUD,PKR,INR,JPY'),
   PRICING_ETL_DEFAULT_REGION_AWS: z.string().default('us-east-1'),

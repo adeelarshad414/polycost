@@ -40,7 +40,8 @@ for migration in \
   008_pricing_model_terms.sql \
   009_pricing_rates_matrix.sql \
   010_share_link_context.sql \
-  011_seed_local_commitment_pricing_catalog.sql
+  011_seed_local_commitment_pricing_catalog.sql \
+  012_production_depth_audit_analytics.sql
 do
   psql \
     --username "$POSTGRES_USER" \
