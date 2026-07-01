@@ -371,6 +371,7 @@ describe('App', () => {
     expect(detailGate.dataset.open).toBe('true');
     expect(text(container)).toContain('Engineering cost controls');
     expect(text(container)).toContain('Engineering service spend');
+    expect(text(container)).toContain('Backend cost coverage map');
     expect(text(container)).toContain('Backend-modeled baseline region sensitivity.');
     expect(text(container)).toContain('Backend commitment exposure');
     expect(text(container)).toContain('Backend optimization opportunities');

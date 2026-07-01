@@ -6491,6 +6491,7 @@ function ProductionDepthAnalytics({
           </article>
         ))}
       </div>
+      <ServerCostCoverageMapPanel rows={serverAnalytics?.costCoverageMap ?? []} />
       <ProviderDeltaAnalysisTable rows={providerDeltas} />
       <ComputeSpecificationPanel rows={computeSpecifications} />
       <RegionVariancePanel rows={regionVariance} />
@@ -6573,6 +6574,69 @@ function ProviderDeltaAnalysisTable({ rows }: { rows: ProviderDeltaRow[] }) {
           deltas.
         </div>
       )}
+    </div>
+  );
+}
+
+function ServerCostCoverageMapPanel({
+  rows,
+}: {
+  rows: ComparisonAnalyticsResponse['costCoverageMap'];
+}) {
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="provider-delta-analysis" aria-label="Backend cost coverage map">
+      <div className="scenario-sensitivity-heading">
+        <div>
+          <span>Backend cost coverage map</span>
+          <h4>Priced, approximate, and missing cost dimensions</h4>
+        </div>
+      </div>
+
+      <div className="table-wrap provider-delta-wrap">
+        <table className="ranking-table provider-delta-table">
+          <thead>
+            <tr>
+              <th scope="col">Provider</th>
+              <th scope="col">Dimension</th>
+              <th scope="col">Status</th>
+              <th scope="col">Evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={`${row.providerId}-${row.dimension}`}>
+                <td>
+                  <span className={`scenario-low-label scenario-low-${row.providerId}`}>
+                    {providerLabel(row.providerId)}
+                  </span>
+                  <small>
+                    {row.pricedRows} priced · {row.approximateRows} approximate
+                  </small>
+                </td>
+                <td>
+                  <strong>{row.dimension}</strong>
+                  <small>
+                    {row.monthlyUsd !== undefined
+                      ? `${formatCurrency(row.monthlyUsd)}/mo`
+                      : 'No priced monthly total'}
+                  </small>
+                </td>
+                <td>
+                  <strong>{row.status}</strong>
+                  <small>{row.reviewCue}</small>
+                </td>
+                <td>
+                  <small>{row.evidence}</small>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
