@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { ComparisonResult } from '../comparison/comparison.types';
 import {
+  commitmentTcoRows,
   decisionSummaryRows,
+  egressTierBreakdownRows,
   lineItemEvidenceRows,
   pricingModelAvailabilityRows,
   providerRankingRows,
@@ -125,6 +127,25 @@ export class PdfReportGenerator {
       });
       lines.push({
         text: `Evidence note: ${row[6]}`,
+        fontSize: 10,
+      });
+    }
+
+    lines.push(
+      { text: '', fontSize: 10 },
+      { text: 'Commitment payment and TCO', fontSize: 14 },
+    );
+    for (const row of commitmentTcoRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]} | ${row[1]} | available ${row[2]} | monthly $${row[4]} | payment ${row[5]} | term ${row[6]} | TCO $${row[7] || 'n/a'} | savings ${row[8] || 'n/a'}`,
+        fontSize: 10,
+      });
+    }
+
+    lines.push({ text: '', fontSize: 10 }, { text: 'Egress tiered breakdown', fontSize: 14 });
+    for (const row of egressTierBreakdownRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]} | ${row[1]} | ${row[2]} | billable ${row[3]} GB | rate $${row[4]}/GB | subtotal $${row[5]} | blended $${row[6] || 'n/a'}/GB`,
         fontSize: 10,
       });
     }

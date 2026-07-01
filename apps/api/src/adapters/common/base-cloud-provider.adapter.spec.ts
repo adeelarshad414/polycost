@@ -269,6 +269,15 @@ describe('BaseCloudProviderAdapter', () => {
         baseMonthlyCostUsd: 0.5,
         costComponent: 'egress',
         pricingBasis: 'tiered',
+        egressTiers: expect.arrayContaining([
+          expect.objectContaining({
+            tierFromGb: 5,
+            tierToGb: 10,
+            pricePerGb: 0.1,
+            billableGb: 5,
+            monthlyCostUsd: 0.5,
+          }),
+        ]),
       }),
     );
   });

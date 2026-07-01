@@ -1,5 +1,6 @@
 import {
   CostComponent,
+  EgressTierBreakdown,
   PricingBasis,
   PricingModelCost,
   ProviderId,
@@ -28,6 +29,7 @@ export interface ComparisonLineItem {
   unit?: string;
   unitPriceUsd?: number;
   pricingBasis?: PricingBasis;
+  egressTiers?: EgressTierBreakdown[];
   pricingModels?: PricingModelCost[];
 }
 

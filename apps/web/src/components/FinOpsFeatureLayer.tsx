@@ -554,11 +554,18 @@ export function FinOpsFeatureLayer({
             );
           })}
         </div>
+
+        <CommitmentTcoPanel
+          comparison={comparison}
+          currency={currency}
+          selectedPaymentOption={selectedPaymentOption}
+        />
       </div>
 
       <WorkloadBreakdown
         currency={currency}
         comparison={comparison}
+        form={form}
         interval={interval}
         pricingModel={pricingModel}
         isLoading={isLoading}
@@ -918,15 +925,121 @@ function PricingModelDeltaCue({
   );
 }
 
+function CommitmentTcoPanel({
+  comparison,
+  currency,
+  selectedPaymentOption,
+}: {
+  comparison: ComparisonResult | null;
+  currency: CurrencyOption;
+  selectedPaymentOption?: PaymentOption;
+}) {
+  const rows = comparison ? commitmentTcoRows(comparison) : [];
+
+  return (
+    <section
+      className="grid gap-3 rounded-lg border border-border bg-surface-0 p-3"
+      aria-label="Commitment payment and total cost of ownership"
+    >
+      <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+            Payment and TCO detail
+          </p>
+          <h3 className="mt-1 text-base font-semibold text-text-primary">
+            Commitment scenario monthly, hourly, and term view
+          </h3>
+        </div>
+        <span className="rounded-full border border-border bg-surface-1 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
+          Payment lens: {selectedPaymentOption?.label ?? 'Provider default'}
+        </span>
+      </div>
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="min-w-[980px] w-full border-separate border-spacing-0 text-sm">
+          <thead>
+            <tr className="bg-surface-1 text-left text-xs font-bold uppercase tracking-wide text-text-muted">
+              <th className="border-b border-border px-3 py-2">Provider</th>
+              <th className="border-b border-border px-3 py-2">Model</th>
+              <th className="border-b border-border px-3 py-2 text-right">Effective hourly</th>
+              <th className="border-b border-border px-3 py-2 text-right">Monthly recurring</th>
+              <th className="border-b border-border px-3 py-2">Payment option</th>
+              <th className="border-b border-border px-3 py-2">Term</th>
+              <th className="border-b border-border px-3 py-2 text-right">Term TCO</th>
+              <th className="border-b border-border px-3 py-2 text-right">Savings</th>
+              <th className="border-b border-border px-3 py-2">Evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length > 0 ? (
+              rows.map((row) => (
+                <tr key={`${row.providerId}-${row.model}`}>
+                  <td className="border-b border-border px-3 py-2 font-semibold text-text-primary">
+                    {providerLabel(row.providerId)}
+                  </td>
+                  <td className="border-b border-border px-3 py-2 text-text-secondary">
+                    {pricingModelLabel(row.model)}
+                  </td>
+                  <td className="border-b border-border px-3 py-2 text-right font-mono text-text-primary">
+                    {row.available && row.hourlyCostUsd !== undefined
+                      ? formatMoney(row.hourlyCostUsd, currency)
+                      : 'N/A'}
+                  </td>
+                  <td className="border-b border-border px-3 py-2 text-right font-mono text-text-primary">
+                    {row.available && row.monthlyCostUsd !== undefined
+                      ? formatMoney(row.monthlyCostUsd, currency)
+                      : 'N/A'}
+                  </td>
+                  <td className="border-b border-border px-3 py-2 text-text-secondary">
+                    {row.paymentOption}
+                  </td>
+                  <td className="border-b border-border px-3 py-2 text-text-secondary">
+                    {row.term}
+                  </td>
+                  <td className="border-b border-border px-3 py-2 text-right font-mono text-text-primary">
+                    {row.termTotalUsd !== undefined
+                      ? formatMoney(row.termTotalUsd, currency)
+                      : 'N/A'}
+                  </td>
+                  <td className="border-b border-border px-3 py-2 text-right font-mono text-text-primary">
+                    {row.savingsPercentVsOnDemand !== undefined
+                      ? formatPercent(row.savingsPercentVsOnDemand)
+                      : 'N/A'}
+                  </td>
+                  <td className="border-b border-border px-3 py-2 text-text-secondary">
+                    {row.evidence}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td className="px-3 py-3 text-text-secondary" colSpan={9}>
+                  Run a comparison to populate commitment payment and TCO evidence.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs leading-5 text-text-muted">
+        Upfront cash amounts are shown only when provider catalog evidence exposes them. Otherwise
+        PolyCost reports the selected payment option and effective recurring run-rate without
+        inventing an upfront charge.
+      </p>
+    </section>
+  );
+}
+
 function WorkloadBreakdown({
   comparison,
   currency,
+  form,
   interval,
   pricingModel,
   isLoading,
 }: {
   comparison: ComparisonResult | null;
   currency: CurrencyOption;
+  form: WorkloadFormState;
   interval: IntervalKey;
   pricingModel: PricingModelKey;
   isLoading: boolean;
@@ -1030,12 +1143,293 @@ function WorkloadBreakdown({
         })}
       </div>
 
+      <EgressTierAudit comparison={comparison} currency={currency} form={form} />
+
       <p className="text-xs leading-5 text-text-muted">
         Egress covers direct public-internet transfer only. Inter-region transfer, cross-service
         transfer, CDN edge pricing, and archive retrieval fees stay outside this v1 scoped model.
       </p>
     </section>
   );
+}
+
+function EgressTierAudit({
+  comparison,
+  currency,
+  form,
+}: {
+  comparison: ComparisonResult | null;
+  currency: CurrencyOption;
+  form: WorkloadFormState;
+}) {
+  const rows = egressTierAuditRows(comparison, form);
+
+  return (
+    <section
+      className="grid gap-3 rounded-lg border border-border bg-surface-0 p-3"
+      aria-label="Egress tiered breakdown"
+    >
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+          Egress tiered breakdown
+        </p>
+        <h4 className="mt-1 text-base font-semibold text-text-primary">
+          Provider transfer tiers and effective blended rate
+        </h4>
+      </div>
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="min-w-[860px] w-full border-separate border-spacing-0 text-sm">
+          <thead>
+            <tr className="bg-surface-1 text-left text-xs font-bold uppercase tracking-wide text-text-muted">
+              <th className="border-b border-border px-3 py-2">Provider</th>
+              <th className="border-b border-border px-3 py-2">Region</th>
+              <th className="border-b border-border px-3 py-2">Tier band</th>
+              <th className="border-b border-border px-3 py-2 text-right">Billable GB</th>
+              <th className="border-b border-border px-3 py-2 text-right">Rate / GB</th>
+              <th className="border-b border-border px-3 py-2 text-right">Tier subtotal</th>
+              <th className="border-b border-border px-3 py-2 text-right">Effective blended</th>
+              <th className="border-b border-border px-3 py-2">Evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length > 0 ? (
+              rows.map((row) => (
+                <tr key={row.key}>
+                  <td className="border-b border-border px-3 py-2 font-semibold text-text-primary">
+                    {providerLabel(row.providerId)}
+                  </td>
+                  <td className="border-b border-border px-3 py-2 text-text-secondary">
+                    {row.region}
+                  </td>
+                  <td className="border-b border-border px-3 py-2 text-text-secondary">
+                    {row.tierBand}
+                  </td>
+                  <td className="border-b border-border px-3 py-2 text-right font-mono text-text-primary">
+                    {formatRate(row.billableGb)}
+                  </td>
+                  <td className="border-b border-border px-3 py-2 text-right font-mono text-text-primary">
+                    {formatMoney(row.pricePerGb, currency)}
+                  </td>
+                  <td className="border-b border-border px-3 py-2 text-right font-mono text-text-primary">
+                    {formatMoney(row.monthlyCostUsd, currency)}
+                  </td>
+                  <td className="border-b border-border px-3 py-2 text-right font-mono text-text-primary">
+                    {row.effectiveBlendedRateUsd !== undefined
+                      ? formatMoney(row.effectiveBlendedRateUsd, currency)
+                      : 'N/A'}
+                  </td>
+                  <td className="border-b border-border px-3 py-2 text-text-secondary">
+                    {row.evidence}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td className="px-3 py-3 text-text-secondary" colSpan={8}>
+                  No tiered egress rows were published for this comparison. Flat egress line items
+                  still appear in the provider cost breakdown above.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+interface CommitmentTcoRow {
+  providerId: ProviderId;
+  model: PricingModelKey;
+  available: boolean;
+  hourlyCostUsd?: number;
+  monthlyCostUsd?: number;
+  paymentOption: string;
+  term: string;
+  termTotalUsd?: number;
+  savingsPercentVsOnDemand?: number;
+  evidence: string;
+}
+
+interface EgressTierAuditRow {
+  key: string;
+  providerId: ProviderId;
+  region: string;
+  tierBand: string;
+  billableGb: number;
+  pricePerGb: number;
+  monthlyCostUsd: number;
+  effectiveBlendedRateUsd?: number;
+  evidence: string;
+}
+
+function commitmentTcoRows(comparison: ComparisonResult): CommitmentTcoRow[] {
+  return PROVIDER_ORDER.flatMap((providerId) => {
+    const provider = comparison.providers.find((candidate) => candidate.providerId === providerId);
+
+    if (!provider) {
+      return [];
+    }
+
+    return PRICING_MODELS.map((pricingModel) => {
+      const modelCost = providerModelCost(provider, pricingModel.key);
+      const termMonths = termMonthsForModel(modelCost);
+      const monthlyCostUsd = modelCost.available ? modelCost.monthlyCostUsd : undefined;
+      const hourlyCostUsd =
+        modelCost.available && monthlyCostUsd !== undefined
+          ? (modelCost.hourlyCostUsd ?? hourlyFromMonthly(monthlyCostUsd))
+          : undefined;
+      const termTotalUsd =
+        monthlyCostUsd !== undefined && termMonths !== undefined
+          ? roundCurrency(monthlyCostUsd * termMonths)
+          : undefined;
+
+      return {
+        providerId,
+        model: pricingModel.key,
+        available: modelCost.available,
+        ...(hourlyCostUsd !== undefined ? { hourlyCostUsd } : {}),
+        ...(monthlyCostUsd !== undefined ? { monthlyCostUsd } : {}),
+        paymentOption: paymentOptionEvidence(modelCost),
+        term: termMonths !== undefined ? `${termMonths} months` : termEvidence(pricingModel.key),
+        ...(termTotalUsd !== undefined ? { termTotalUsd } : {}),
+        ...(modelCost.savingsPercentVsOnDemand !== undefined
+          ? { savingsPercentVsOnDemand: modelCost.savingsPercentVsOnDemand }
+          : {}),
+        evidence: commitmentEvidence(modelCost),
+      };
+    });
+  });
+}
+
+function termMonthsForModel(modelCost: PricingModelCost): number | undefined {
+  if (modelCost.commitmentTermMonths !== undefined) {
+    return modelCost.commitmentTermMonths;
+  }
+
+  if (modelCost.model === 'reserved-1yr' || modelCost.model === 'savings-plan') {
+    return 12;
+  }
+
+  if (modelCost.model === 'reserved-3yr') {
+    return 36;
+  }
+
+  return undefined;
+}
+
+function paymentOptionEvidence(modelCost: PricingModelCost): string {
+  if (!modelCost.available) {
+    return 'N/A';
+  }
+
+  if (modelCost.upfrontOption === 'all') {
+    return 'All upfront';
+  }
+
+  if (modelCost.upfrontOption === 'partial') {
+    return 'Partial upfront';
+  }
+
+  if (modelCost.upfrontOption === 'none') {
+    return 'No upfront';
+  }
+
+  if (requiresPaymentOption(modelCost.model)) {
+    return 'Provider default / not published';
+  }
+
+  return 'No commitment';
+}
+
+function termEvidence(model: PricingModelKey): string {
+  if (model === 'spot') {
+    return 'Interruptible';
+  }
+
+  return 'No fixed term';
+}
+
+function commitmentEvidence(modelCost: PricingModelCost): string {
+  if (!modelCost.available) {
+    return modelCost.unavailableReason ?? 'Not available for this configuration.';
+  }
+
+  const evidence = [
+    modelCost.providerTerm ?? modelCost.displayName ?? pricingModelLabel(modelCost.model),
+    modelCost.estimated ? 'estimate' : undefined,
+    modelCost.volatility === 'volatile' ? 'volatile' : undefined,
+    modelCost.caveat,
+  ].filter(Boolean);
+
+  return evidence.join(' · ');
+}
+
+function egressTierAuditRows(
+  comparison: ComparisonResult | null,
+  form: WorkloadFormState,
+): EgressTierAuditRow[] {
+  const requestedGb = nonNegativeNumberOrDefault(form.monthlyEgressGb, 0);
+
+  return (
+    comparison?.providers.flatMap((provider) =>
+      provider.lineItems
+        .filter((lineItem) => lineItemComponent(lineItem) === 'egress')
+        .flatMap((lineItem, lineItemIndex) => {
+          const tierRows =
+            lineItem.egressTiers?.map((tier, tierIndex) => ({
+              key: `${provider.providerId}-${lineItemIndex}-${tierIndex}`,
+              providerId: provider.providerId,
+              region: lineItem.region ?? 'Provider default',
+              tierBand: tierBandLabel(tier.tierFromGb, tier.tierToGb),
+              billableGb: tier.billableGb,
+              pricePerGb: tier.pricePerGb,
+              monthlyCostUsd: tier.monthlyCostUsd,
+              effectiveBlendedRateUsd:
+                requestedGb > 0
+                  ? roundCurrency(lineItem.baseMonthlyCostUsd / requestedGb)
+                  : undefined,
+              evidence: `${lineItem.pricingBasis ?? 'tiered'} catalog tier · ${lineItem.description}`,
+            })) ?? [];
+
+          if (tierRows.length > 0) {
+            return tierRows;
+          }
+
+          if (lineItem.baseMonthlyCostUsd <= 0) {
+            return [];
+          }
+
+          const effectiveRate =
+            requestedGb > 0 ? lineItem.baseMonthlyCostUsd / requestedGb : undefined;
+
+          return [
+            {
+              key: `${provider.providerId}-${lineItemIndex}-flat`,
+              providerId: provider.providerId,
+              region: lineItem.region ?? 'Provider default',
+              tierBand: lineItem.pricingBasis === 'tiered' ? 'Tier subtotal' : 'Flat / blended',
+              billableGb: requestedGb,
+              pricePerGb: lineItem.unitPriceUsd ?? effectiveRate ?? 0,
+              monthlyCostUsd: lineItem.baseMonthlyCostUsd,
+              ...(effectiveRate !== undefined
+                ? { effectiveBlendedRateUsd: roundCurrency(effectiveRate) }
+                : {}),
+              evidence:
+                lineItem.pricingBasis === 'tiered'
+                  ? 'Tiered subtotal published without tier-band trace rows.'
+                  : `${lineItem.unit ?? 'unit'} line item · ${lineItem.description}`,
+            },
+          ];
+        }),
+    ) ?? []
+  );
+}
+
+function tierBandLabel(tierFromGb: number, tierToGb?: number): string {
+  return tierToGb !== undefined
+    ? `${formatRate(tierFromGb)}-${formatRate(tierToGb)} GB`
+    : `${formatRate(tierFromGb)}+ GB`;
 }
 
 function workloadInputFromForm(form: WorkloadFormState): WorkloadInput {

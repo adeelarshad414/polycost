@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { ComparisonResult } from '../comparison/comparison.types';
 import {
+  commitmentTcoRows,
   decisionSummaryRows,
+  egressTierBreakdownRows,
   lineItemEvidenceRows,
   pricingModelAvailabilityRows,
   providerRankingRows,
@@ -57,6 +59,12 @@ export class CsvReportGenerator {
       [],
       ['Pricing Model Availability'],
       ...pricingModelAvailabilityRows(result).map((row) => row.map(sanitizeSpreadsheetText)),
+      [],
+      ['Commitment Payment and TCO'],
+      ...commitmentTcoRows(result).map((row) => row.map(sanitizeSpreadsheetText)),
+      [],
+      ['Egress Tiered Breakdown'],
+      ...egressTierBreakdownRows(result).map((row) => row.map(sanitizeSpreadsheetText)),
       [],
       ['Normalized Service Requirements'],
       ...serviceRequirementRows(result).map((row) => row.map(sanitizeSpreadsheetText)),

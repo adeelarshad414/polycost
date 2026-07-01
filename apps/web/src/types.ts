@@ -153,6 +153,14 @@ export interface CostIntervals {
   yearly: number;
 }
 
+export interface EgressTierBreakdown {
+  tierFromGb: number;
+  tierToGb?: number;
+  pricePerGb: number;
+  billableGb: number;
+  monthlyCostUsd: number;
+}
+
 export interface ComparisonLineItem {
   category: ServiceCategory;
   costComponent?: CostComponent;
@@ -165,6 +173,7 @@ export interface ComparisonLineItem {
   unit?: string;
   unitPriceUsd?: number;
   pricingBasis?: PricingBasis;
+  egressTiers?: EgressTierBreakdown[];
   pricingModels?: PricingModelCost[];
 }
 

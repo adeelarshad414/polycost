@@ -3,7 +3,9 @@ import { CsvReportGenerator } from './csv-report.generator';
 import { ExcelReportGenerator } from './excel-report.generator';
 import { PdfReportGenerator } from './pdf-report.generator';
 import {
+  commitmentTcoRows,
   decisionSummaryRows,
+  egressTierBreakdownRows,
   labelForInterval,
   labelForPricingModel,
   lineItemEvidenceRows,
@@ -56,6 +58,26 @@ const comparison: ComparisonResult = {
           description: 'primary "postgres", managed',
           isApproximate: true,
           baseMonthlyCostUsd: 10.2,
+        },
+        {
+          category: 'network',
+          costComponent: 'egress',
+          description: 'internet egress',
+          isApproximate: false,
+          baseMonthlyCostUsd: 46.08,
+          region: 'us-east-1',
+          unit: 'GB',
+          unitPriceUsd: 0.09,
+          pricingBasis: 'tiered',
+          egressTiers: [
+            {
+              tierFromGb: 0,
+              tierToGb: 512,
+              pricePerGb: 0.09,
+              billableGb: 512,
+              monthlyCostUsd: 46.08,
+            },
+          ],
         },
       ],
       totals: {
@@ -146,6 +168,10 @@ describe('report generators', () => {
     expect(csv).toContain(
       'gcp,available,not modeled,not modeled,not modeled,not modeled,Only on-demand totals are modeled for this provider.',
     );
+    expect(csv).toContain('Commitment Payment and TCO');
+    expect(csv).toContain('aws,Reserved 3-year,yes,0.06,42');
+    expect(csv).toContain('Egress Tiered Breakdown');
+    expect(csv).toContain('aws,us-east-1,0-512 GB,512,0.09,46.08,0.09');
     expect(csv).toContain('Normalized Service Requirements');
     expect(csv).toContain('compute,vm-compute,balanced tier - 2 vCPU - 4GB / balanced');
     expect(csv).toContain('Rate Math Evidence');
@@ -215,6 +241,8 @@ describe('report generators', () => {
     expect(xlsxText).toContain('Lowest monthly run rate');
     expect(xlsxText).toContain('Selected Pricing Scenario');
     expect(xlsxText).toContain('Pricing Model Availability');
+    expect(xlsxText).toContain('Commitment Payment and TCO');
+    expect(xlsxText).toContain('Egress Tiered Breakdown');
     expect(xlsxText).toContain('Normalized Service Requirements');
     expect(xlsxText).toContain('Rate Math Evidence');
     expect(xlsxText).toContain('Report Assumptions');
@@ -274,6 +302,9 @@ describe('report generators', () => {
     expect(pdfText).toContain('aws: daily $2.33, weekly $16.34, monthly $71');
     expect(pdfText).toContain('Selected pricing scenario');
     expect(pdfText).toContain('Pricing model availability');
+    expect(pdfText).toContain('Commitment payment and TCO');
+    expect(pdfText).toContain('Egress tiered breakdown');
+    expect(pdfText).toContain('aws | us-east-1 | 0-512 GB | billable 512 GB');
     expect(pdfText).toContain('Normalized service requirements');
     expect(pdfText).toContain('Rate math evidence');
     expect(pdfText).toContain('Report assumptions');
@@ -464,6 +495,20 @@ describe('report generators', () => {
     expect(rows[1][8]).toBe('$0.1 hourly x 730 hours = $73 monthly');
     expect(rows[1][9]).toContain('reserved-1yr: $50 monthly');
     expect(rows[1][9]).toContain('reserved-3yr: unavailable (No term for SKU.)');
+  });
+
+  it('builds payment TCO and egress tier audit rows', () => {
+    const tcoRows = commitmentTcoRows(comparison);
+    const egressRows = egressTierBreakdownRows(comparison);
+
+    expect(tcoRows[0]).toContain('Term TCO USD');
+    expect(tcoRows).toContainEqual(
+      expect.arrayContaining(['aws', 'Reserved 3-year', 'yes', '0.06', '42']),
+    );
+    expect(egressRows[0]).toContain('Effective blended USD/GB');
+    expect(egressRows).toContainEqual(
+      expect.arrayContaining(['aws', 'us-east-1', '0-512 GB', '512', '0.09', '46.08']),
+    );
   });
 
   it('builds fallback service requirement rows when comparison requirements are absent', () => {

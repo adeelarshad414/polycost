@@ -160,6 +160,108 @@ export function pricingModelAvailabilityRows(result: ComparisonResult): string[]
   ];
 }
 
+export function commitmentTcoRows(result: ComparisonResult): string[][] {
+  return [
+    [
+      'Provider',
+      'Pricing model',
+      'Available',
+      'Effective hourly USD',
+      'Monthly recurring USD',
+      'Payment option',
+      'Term',
+      'Term TCO USD',
+      'Savings vs on-demand',
+      'Evidence',
+    ],
+    ...result.providers.flatMap((provider) =>
+      REPORT_PRICING_MODELS.map((pricingModel) => {
+        const model = modelCostForProvider(provider, pricingModel);
+        const termMonths = termMonthsForModel(model, pricingModel);
+        const monthly = model.available ? model.monthlyCostUsd : undefined;
+        const hourly =
+          model.available && monthly !== undefined ? (model.hourlyCostUsd ?? monthly / 730) : undefined;
+        const termTco = monthly !== undefined && termMonths !== undefined ? monthly * termMonths : undefined;
+
+        return [
+          provider.providerId,
+          labelForPricingModel(pricingModel),
+          model.available ? 'yes' : 'no',
+          hourly !== undefined ? formatNumber(hourly) : '',
+          monthly !== undefined ? formatNumber(monthly) : '',
+          paymentOptionEvidence(model),
+          termMonths !== undefined ? `${termMonths} months` : termEvidence(pricingModel),
+          termTco !== undefined ? formatNumber(termTco) : '',
+          model.savingsPercentVsOnDemand !== undefined
+            ? `${formatNumber(model.savingsPercentVsOnDemand)}%`
+            : '',
+          commitmentEvidence(model),
+        ];
+      }),
+    ),
+  ];
+}
+
+export function egressTierBreakdownRows(result: ComparisonResult): string[][] {
+  const rows = result.providers.flatMap((provider) =>
+    provider.lineItems
+      .filter((lineItem) => lineItem.costComponent === 'egress' || lineItem.category === 'network')
+      .flatMap((lineItem) => {
+        const tiers = lineItem.egressTiers ?? [];
+
+        if (tiers.length > 0) {
+          const totalBillableGb = tiers.reduce((sum, tier) => sum + tier.billableGb, 0);
+          const effectiveRate =
+            totalBillableGb > 0 ? lineItem.baseMonthlyCostUsd / totalBillableGb : undefined;
+
+          return tiers.map((tier) => [
+            provider.providerId,
+            lineItem.region ?? '',
+            tierBandLabel(tier.tierFromGb, tier.tierToGb),
+            formatNumber(tier.billableGb),
+            formatNumber(tier.pricePerGb),
+            formatNumber(tier.monthlyCostUsd),
+            effectiveRate !== undefined ? formatNumber(effectiveRate) : '',
+            `${lineItem.pricingBasis ?? 'tiered'} catalog tier: ${lineItem.description}`,
+          ]);
+        }
+
+        if (lineItem.baseMonthlyCostUsd <= 0) {
+          return [];
+        }
+
+        return [
+          [
+            provider.providerId,
+            lineItem.region ?? '',
+            lineItem.pricingBasis === 'tiered' ? 'Tier subtotal' : 'Flat / blended',
+            '',
+            lineItem.unitPriceUsd !== undefined ? formatNumber(lineItem.unitPriceUsd) : '',
+            formatNumber(lineItem.baseMonthlyCostUsd),
+            '',
+            `${lineItem.pricingBasis ?? 'flat'} egress line item without tier trace rows: ${lineItem.description}`,
+          ],
+        ];
+      }),
+  );
+
+  return [
+    [
+      'Provider',
+      'Region',
+      'Tier band',
+      'Billable GB',
+      'Rate per GB USD',
+      'Tier subtotal USD',
+      'Effective blended USD/GB',
+      'Evidence',
+    ],
+    ...(rows.length > 0
+      ? rows
+      : [['No egress tier rows were attached to this comparison.', '', '', '', '', '', '', '']]),
+  ];
+}
+
 export function reportAssumptionRows(result: ComparisonResult): string[][] {
   const warningCount = result.warnings?.length ?? 0;
   const approximateLineItems = result.providers.reduce(
@@ -312,6 +414,103 @@ function selectedMonthlyCost(model: PricingModelCost | undefined, fallbackMonthl
   return model?.available === true && model.monthlyCostUsd !== undefined
     ? model.monthlyCostUsd
     : fallbackMonthly;
+}
+
+function modelCostForProvider(
+  provider: ComparisonProviderResult,
+  pricingModel: ReportPricingModel,
+): PricingModelCost {
+  const model = provider.pricingModels?.find((candidate) => candidate.model === pricingModel);
+
+  if (model) {
+    return model;
+  }
+
+  if (pricingModel === 'on-demand') {
+    return {
+      model: 'on-demand',
+      available: true,
+      monthlyCostUsd: provider.totals.monthly,
+      hourlyCostUsd: provider.totals.hourly ?? provider.totals.monthly / 730,
+      savingsPercentVsOnDemand: 0,
+    };
+  }
+
+  return {
+    model: pricingModel,
+    available: false,
+    unavailableReason: 'Not available for this configuration.',
+  };
+}
+
+function termMonthsForModel(
+  model: PricingModelCost,
+  pricingModel: ReportPricingModel,
+): number | undefined {
+  if (model.commitmentTermMonths !== undefined) {
+    return model.commitmentTermMonths;
+  }
+
+  if (pricingModel === 'reserved-1yr' || pricingModel === 'savings-plan') {
+    return 12;
+  }
+
+  if (pricingModel === 'reserved-3yr') {
+    return 36;
+  }
+
+  return undefined;
+}
+
+function paymentOptionEvidence(model: PricingModelCost): string {
+  if (!model.available) {
+    return 'N/A';
+  }
+
+  if (model.upfrontOption === 'all') {
+    return 'All upfront';
+  }
+
+  if (model.upfrontOption === 'partial') {
+    return 'Partial upfront';
+  }
+
+  if (model.upfrontOption === 'none') {
+    return 'No upfront';
+  }
+
+  if (
+    model.model === 'reserved-1yr' ||
+    model.model === 'reserved-3yr' ||
+    model.model === 'savings-plan'
+  ) {
+    return 'Provider default / not published';
+  }
+
+  return 'No commitment';
+}
+
+function termEvidence(pricingModel: ReportPricingModel): string {
+  if (pricingModel === 'spot') {
+    return 'Interruptible';
+  }
+
+  return 'No fixed term';
+}
+
+function commitmentEvidence(model: PricingModelCost): string {
+  if (!model.available) {
+    return model.unavailableReason ?? 'Not available for this configuration.';
+  }
+
+  return [
+    model.providerTerm ?? model.displayName ?? labelForPricingModel(model.model),
+    model.estimated ? 'estimate' : undefined,
+    model.volatility === 'volatile' ? 'volatile' : undefined,
+    model.caveat,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 function rankedProviderScenarios(
@@ -504,6 +703,12 @@ function scaleParamsText(scaleParams: Record<string, string | number | boolean>)
   return Object.entries(scaleParams)
     .map(([key, value]) => `${key}=${value}`)
     .join('; ');
+}
+
+function tierBandLabel(tierFromGb: number, tierToGb?: number): string {
+  return tierToGb !== undefined
+    ? `${formatNumber(tierFromGb)}-${formatNumber(tierToGb)} GB`
+    : `${formatNumber(tierFromGb)}+ GB`;
 }
 
 function formatNumber(value: number): string {

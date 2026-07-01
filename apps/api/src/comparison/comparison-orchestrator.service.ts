@@ -129,6 +129,7 @@ export class ComparisonOrchestratorService {
         unit: annotatedLineItem.unit,
         unitPriceUsd: annotatedLineItem.unitPriceUsd,
         pricingBasis: annotatedLineItem.pricingBasis ?? 'flat',
+        ...(annotatedLineItem.egressTiers ? { egressTiers: annotatedLineItem.egressTiers } : {}),
         ...(annotatedLineItem.pricingModels
           ? {
               pricingModels: annotatedLineItem.pricingModels.map((model) => ({

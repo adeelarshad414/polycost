@@ -243,6 +243,15 @@ describe('ComparisonOrchestratorService', () => {
           unit: 'GB',
           unitPriceUsd: 0.09,
           pricingBasis: 'tiered',
+          egressTiers: [
+            {
+              tierFromGb: 0,
+              tierToGb: 200,
+              pricePerGb: 0.075,
+              billableGb: 200,
+              monthlyCostUsd: 15,
+            },
+          ],
         },
         {
           category: 'database',
@@ -305,6 +314,15 @@ describe('ComparisonOrchestratorService', () => {
       databaseMonthlyCostUsd: 20,
       scopedMonthlyCostUsd: 125,
     });
+    expect(result.providers[0].lineItems[2].egressTiers).toEqual([
+      {
+        tierFromGb: 0,
+        tierToGb: 200,
+        pricePerGb: 0.075,
+        billableGb: 200,
+        monthlyCostUsd: 15,
+      },
+    ]);
   });
 
   it('uses a safe warning when a provider fails without an Error object', async () => {

@@ -830,6 +830,23 @@ describe('ComparisonView', () => {
         monthlyCostUsd: 42,
       },
     ];
+    awsRichProvider.lineItems[3] = {
+      ...awsRichProvider.lineItems[3],
+      costComponent: 'egress',
+      region: 'us-east-1',
+      unit: 'GB',
+      unitPriceUsd: 0.1,
+      pricingBasis: 'tiered',
+      egressTiers: [
+        {
+          tierFromGb: 0,
+          tierToGb: 300,
+          pricePerGb: 0.1,
+          billableGb: 300,
+          monthlyCostUsd: 30,
+        },
+      ],
+    };
     const richResult: ComparisonResult = {
       ...comparisonResult,
       cheapestProviderId: 'azure',
@@ -886,6 +903,10 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Azure 1yr');
     expect(text(container)).toContain('$24.00 est.');
     expect(text(container)).toContain('$42.00');
+    expect(text(container)).toContain('Payment and TCO detail');
+    expect(text(container)).toContain('Commitment scenario monthly, hourly, and term view');
+    expect(text(container)).toContain('Egress tiered breakdown');
+    expect(text(container)).toContain('0-300 GB');
     expect(text(container)).toContain('Best:');
     await click(buttonByText(container, 'Spot'));
     expect(text(container)).toContain('Est. $38.00-$57.00');

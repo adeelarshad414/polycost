@@ -917,6 +917,10 @@ controls.
   sticky headers, category/provider/pricing-model filters, and sort options for
   every provider/model column. Missing service-level pricing-model data is shown as
   `N/A` instead of `$0`.
+- Follow-up hardening: comparison results now preserve exact cached egress tier rows
+  on network line items when provider catalog data exposes them. The engineering
+  dashboard, CSV, XLSX, and PDF reports now include commitment payment/TCO evidence
+  and egress tier audit sections.
 - Verification passing locally:
   `npm run check`, `npm run build`, `npm run test:coverage`,
   `npm run test:e2e --workspace @polycost/web`,
@@ -941,10 +945,9 @@ when it is actually resolved in a later phase, with a note on which phase resolv
 - `eslint-plugin-security` reports warnings for controlled fixture reads,
   provider-response dictionary access, and the local Vault token-file read. These are
   non-blocking under the current lint config and were reviewed during Phase 3.
-- Full all-workspace `npm run test:coverage` currently fails the API global branch
-  threshold: all API tests pass, but aggregate API branch coverage reports 81.56%
-  against the configured 85% target. The focused web coverage gate for the frontend
-  polish passes.
+- Resolved on 2026-07-01: full all-workspace `npm run test:coverage` passes after
+  the later API/web coverage additions. Keep watching branch coverage as new shared
+  pricing and report paths are added.
 - Phase 10 refresh-live acceptance verifies that a comparison is re-run into a fresh
   snapshot from current catalog data. Deterministic proof that a changed catalog row
   changes the refreshed result still needs either a test-only catalog fixture path or
@@ -953,8 +956,8 @@ when it is actually resolved in a later phase, with a note on which phase resolv
   yet: file upload remains a documented Phase 2 hook, account-level requirement
   persistence is not implemented, PDF chart pages are evidence/report sections rather
   than server-rendered chart-image pages, Excel does not yet provide named ranges and
-  formula-driven what-if sheets, and reserved/Savings payment options are modeled at
-  scenario level but not yet exposed as a full upfront/monthly/term TCO panel.
+  formula-driven what-if sheets, and reserved/Savings upfront cash charges are shown
+  only when provider catalog evidence publishes them.
 - The engineering matrix now filters by category/provider/pricing model and sorts by
   every provider/model column, but the backend still needs richer service-level
   pricing-model coverage for every provider/service combination before every cell can

@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { ComparisonResult } from '../comparison/comparison.types';
 import {
+  commitmentTcoRows,
   decisionSummaryRows,
+  egressTierBreakdownRows,
   lineItemEvidenceRows,
   pricingModelAvailabilityRows,
   providerRankingRows,
@@ -161,6 +163,28 @@ export class ExcelReportGenerator {
         style: 2,
       },
       ...pricingModelAvailabilityRows(result).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
+      {
+        cells: [],
+      },
+      {
+        cells: ['Commitment Payment and TCO'],
+        style: 2,
+      },
+      ...commitmentTcoRows(result).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
+      {
+        cells: [],
+      },
+      {
+        cells: ['Egress Tiered Breakdown'],
+        style: 2,
+      },
+      ...egressTierBreakdownRows(result).map((row, index) => ({
         cells: row.map(sanitizeSpreadsheetText),
         ...(index === 0 ? { style: 2 } : {}),
       })),
