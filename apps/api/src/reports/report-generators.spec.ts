@@ -738,6 +738,56 @@ describe('report generators', () => {
         ...comparison,
         providers: [
           {
+            providerId: 'aws',
+            lineItems: [
+              {
+                category: 'network',
+                costComponent: 'egress',
+                description:
+                  'AWS VPN connectivity estimate (2 connection(s), 730 hrs, 1000 GB transfer)',
+                skuId: 'modeled-vpn-connectivity',
+                isApproximate: true,
+                baseMonthlyCostUsd: 163,
+              },
+              {
+                category: 'network',
+                costComponent: 'egress',
+                description:
+                  'AWS private circuit estimate (1 circuit(s), 730 port hrs, 2000 GB transfer)',
+                skuId: 'modeled-private-circuit',
+                isApproximate: true,
+                baseMonthlyCostUsd: 259,
+              },
+            ],
+            totals: {
+              daily: 15.4,
+              weekly: 107.8,
+              monthly: 462,
+              quarterly: 1386,
+              yearly: 5544,
+            },
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'Egress optimization',
+          'aws egress is 91.34% of monthly spend; validate port speed, redundancy, metered-vs-unlimited transfer, and VPN-to-private-circuit break-even before final network design.',
+          '64.75',
+          '777',
+          'High',
+          'High',
+          'aws largest network row is "AWS private circuit estimate (1 circuit(s), 730 port hrs, 2000 GB transfer)" at $259/mo; private-connectivity architecture review is modeled as a 25% reduction of that baseline.',
+        ]),
+      ]),
+    );
+
+    expect(
+      optimizationOpportunityRows({
+        ...comparison,
+        providers: [
+          {
             ...comparison.providers[0],
             pricingModels: [
               ...(comparison.providers[0].pricingModels ?? []),

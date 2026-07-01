@@ -65,6 +65,10 @@ interface NetworkDimensionRates {
   dnsPerMillionQueries: number;
   loadBalancerHourly: number;
   loadBalancerPerGb: number;
+  vpnConnectionHourly: number;
+  vpnDataTransferPerGb: number;
+  privateCircuitPortHourly: number;
+  privateCircuitDataTransferPerGb: number;
 }
 
 interface StorageDimensionRates {
@@ -820,6 +824,65 @@ export class ComparisonOrchestratorService {
             description: `${providerLabel(
               providerId,
             )} load balancer capacity estimate (${hours} hrs, ${processedGb} GB processed)`,
+            monthlyCostUsd,
+            unit: 'month',
+            unitPriceUsd: monthlyCostUsd,
+          }),
+        );
+      }
+    }
+
+    if (
+      (network.vpnConnectionCount && network.vpnConnectionCount > 0) ||
+      (network.vpnConnectionHours && network.vpnConnectionHours > 0) ||
+      (network.vpnDataTransferGb && network.vpnDataTransferGb > 0)
+    ) {
+      const connections = network.vpnConnectionCount ?? 1;
+      const hours = network.vpnConnectionHours ?? 0;
+      const transferGb = network.vpnDataTransferGb ?? 0;
+      const monthlyCostUsd = this.roundCurrency(
+        connections * hours * rates.vpnConnectionHourly + transferGb * rates.vpnDataTransferPerGb,
+      );
+
+      if (monthlyCostUsd > 0) {
+        lineItems.push(
+          this.networkLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-vpn-connectivity',
+            description: `${providerLabel(
+              providerId,
+            )} VPN connectivity estimate (${connections} connection(s), ${hours} hrs, ${transferGb} GB transfer)`,
+            monthlyCostUsd,
+            unit: 'month',
+            unitPriceUsd: monthlyCostUsd,
+          }),
+        );
+      }
+    }
+
+    if (
+      (network.privateCircuitCount && network.privateCircuitCount > 0) ||
+      (network.privateCircuitPortHours && network.privateCircuitPortHours > 0) ||
+      (network.privateCircuitDataTransferGb && network.privateCircuitDataTransferGb > 0)
+    ) {
+      const circuits = network.privateCircuitCount ?? 1;
+      const portHours = network.privateCircuitPortHours ?? 0;
+      const transferGb = network.privateCircuitDataTransferGb ?? 0;
+      const monthlyCostUsd = this.roundCurrency(
+        circuits * portHours * rates.privateCircuitPortHourly +
+          transferGb * rates.privateCircuitDataTransferPerGb,
+      );
+
+      if (monthlyCostUsd > 0) {
+        lineItems.push(
+          this.networkLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-private-circuit',
+            description: `${providerLabel(
+              providerId,
+            )} private circuit estimate (${circuits} circuit(s), ${portHours} port hrs, ${transferGb} GB transfer)`,
             monthlyCostUsd,
             unit: 'month',
             unitPriceUsd: monthlyCostUsd,
@@ -3329,6 +3392,10 @@ function networkDimensionRates(providerId: ProviderId): NetworkDimensionRates {
         dnsPerMillionQueries: 0.4,
         loadBalancerHourly: 0.0225,
         loadBalancerPerGb: 0.008,
+        vpnConnectionHourly: 0.05,
+        vpnDataTransferPerGb: 0.09,
+        privateCircuitPortHourly: 0.3,
+        privateCircuitDataTransferPerGb: 0.02,
       };
     case 'azure':
       return {
@@ -3342,6 +3409,10 @@ function networkDimensionRates(providerId: ProviderId): NetworkDimensionRates {
         dnsPerMillionQueries: 0.4,
         loadBalancerHourly: 0.025,
         loadBalancerPerGb: 0.005,
+        vpnConnectionHourly: 0.05,
+        vpnDataTransferPerGb: 0.087,
+        privateCircuitPortHourly: 0.42,
+        privateCircuitDataTransferPerGb: 0.025,
       };
     case 'gcp':
       return {
@@ -3355,6 +3426,10 @@ function networkDimensionRates(providerId: ProviderId): NetworkDimensionRates {
         dnsPerMillionQueries: 0.4,
         loadBalancerHourly: 0.025,
         loadBalancerPerGb: 0.008,
+        vpnConnectionHourly: 0.05,
+        vpnDataTransferPerGb: 0.12,
+        privateCircuitPortHourly: 2.428,
+        privateCircuitDataTransferPerGb: 0.02,
       };
   }
 }

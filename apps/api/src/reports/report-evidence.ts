@@ -2372,6 +2372,26 @@ function egressOptimizationInsight(provider: ComparisonProviderResult): EgressOp
     };
   }
 
+  if (
+    normalizedPrimary.includes('vpn') ||
+    normalizedPrimary.includes('private circuit') ||
+    normalizedPrimary.includes('direct connect') ||
+    normalizedPrimary.includes('expressroute') ||
+    normalizedPrimary.includes('interconnect')
+  ) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.25);
+
+    return {
+      recommendation:
+        'validate port speed, redundancy, metered-vs-unlimited transfer, and VPN-to-private-circuit break-even before final network design.',
+      monthlySavings,
+      effort: 'High',
+      evidence: `${provider.providerId} largest network row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; private-connectivity architecture review is modeled as a 25% reduction of that baseline.`,
+    };
+  }
+
   if (normalizedPrimary.includes('cross-az') || normalizedPrimary.includes('inter-region')) {
     const monthlySavings = roundCurrency(primaryMonthly * 0.5);
 
@@ -2477,7 +2497,9 @@ function networkDescription(description: string): boolean {
     'nat',
     'cdn',
     'vpn',
+    'private circuit',
     'direct connect',
+    'expressroute',
     'interconnect',
     'dns',
     'cross-az',

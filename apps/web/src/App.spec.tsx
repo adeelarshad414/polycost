@@ -1414,6 +1414,70 @@ describe('ComparisonView', () => {
     unmount();
   });
 
+  it('surfaces private connectivity optimization from VPN and circuit network rows', async () => {
+    const awsProvider = providerWithItems('aws', [
+      ['compute', 'aws compute', 40],
+      [
+        'network',
+        'AWS VPN connectivity estimate (2 connection(s), 730 hrs, 1000 GB transfer)',
+        163,
+      ],
+      [
+        'network',
+        'AWS private circuit estimate (1 circuit(s), 730 port hrs, 2000 GB transfer)',
+        259,
+      ],
+    ]);
+    awsProvider.lineItems[1] = {
+      ...awsProvider.lineItems[1],
+      costComponent: 'egress',
+      skuId: 'modeled-vpn-connectivity',
+    };
+    awsProvider.lineItems[2] = {
+      ...awsProvider.lineItems[2],
+      costComponent: 'egress',
+      skuId: 'modeled-private-circuit',
+    };
+    const networkResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'aws',
+      providers: [
+        awsProvider,
+        providerWithItems('azure', [['compute', 'azure compute', 500]]),
+        providerWithItems('gcp', [['compute', 'gcp compute', 520]]),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView
+        comparison={networkResult}
+        form={{
+          ...defaultWorkloadForm,
+          vpnConnectionCount: '2',
+          vpnConnectionHours: '730',
+          vpnDataTransferGb: '1000',
+          privateCircuitCount: '1',
+          privateCircuitPortHours: '730',
+          privateCircuitDataTransferGb: '2000',
+        }}
+        interval="monthly"
+      />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain('Egress optimization detail');
+    expect(text(container)).toContain('Private circuit');
+    expect(text(container)).toContain('3,000GB private path');
+    expect(text(container)).toContain('$64.75/mo');
+    expect(text(container)).toContain(
+      'Validate port speed, redundancy, metered-vs-unlimited transfer, and VPN-to-private-circuit break-even before final network design.',
+    );
+    expect(text(container)).toContain(
+      'Connectivity architecture review models $64.75/mo opportunity at 25% of that private-connectivity baseline.',
+    );
+
+    unmount();
+  });
+
   it('renders FinOps feature additions without fabricating unsupported backend data', async () => {
     const awsRichProvider = providerWithItems('aws', [
       ['compute', 'aws compute', 50],

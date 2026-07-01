@@ -757,6 +757,12 @@ describe('ComparisonOrchestratorService', () => {
         loadBalancer: true,
         loadBalancerProcessedGb: 250,
         loadBalancerHours: 730,
+        vpnConnectionCount: 2,
+        vpnConnectionHours: 730,
+        vpnDataTransferGb: 1000,
+        privateCircuitCount: 1,
+        privateCircuitPortHours: 730,
+        privateCircuitDataTransferGb: 2000,
       },
     });
 
@@ -790,9 +796,19 @@ describe('ComparisonOrchestratorService', () => {
           skuId: 'modeled-load-balancer-capacity',
           baseMonthlyCostUsd: 18.43,
         }),
+        expect.objectContaining({
+          skuId: 'modeled-vpn-connectivity',
+          description: expect.stringContaining('2 connection(s), 730 hrs, 1000 GB transfer'),
+          baseMonthlyCostUsd: 163,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-private-circuit',
+          description: expect.stringContaining('1 circuit(s), 730 port hrs, 2000 GB transfer'),
+          baseMonthlyCostUsd: 259,
+        }),
       ]),
     );
-    expect(result.providers[0].breakdown?.egressMonthlyCostUsd).toBe(167.98);
+    expect(result.providers[0].breakdown?.egressMonthlyCostUsd).toBe(589.98);
   });
 
   it('adds explicit modeled storage dimension line items when advanced storage assumptions exist', async () => {

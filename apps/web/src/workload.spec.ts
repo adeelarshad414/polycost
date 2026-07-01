@@ -234,6 +234,12 @@ describe('workload helpers', () => {
       dnsQueriesMillion: '3',
       loadBalancerProcessedGb: '250',
       loadBalancerHours: '730',
+      vpnConnectionCount: '2',
+      vpnConnectionHours: '730',
+      vpnDataTransferGb: '1000',
+      privateCircuitCount: '1',
+      privateCircuitPortHours: '730',
+      privateCircuitDataTransferGb: '2000',
     });
 
     expect(nws.network).toMatchObject({
@@ -247,7 +253,23 @@ describe('workload helpers', () => {
       dnsQueriesMillion: 3,
       loadBalancerProcessedGb: 250,
       loadBalancerHours: 730,
+      vpnConnectionCount: 2,
+      vpnConnectionHours: 730,
+      vpnDataTransferGb: 1000,
+      privateCircuitCount: 1,
+      privateCircuitPortHours: 730,
+      privateCircuitDataTransferGb: 2000,
     });
+    expect(formFromNws(nws)).toEqual(
+      expect.objectContaining({
+        vpnConnectionCount: '2',
+        vpnConnectionHours: '730',
+        vpnDataTransferGb: '1000',
+        privateCircuitCount: '1',
+        privateCircuitPortHours: '730',
+        privateCircuitDataTransferGb: '2000',
+      }),
+    );
   });
 
   it('serializes advanced storage assumptions only when they affect cost', () => {
@@ -761,6 +783,12 @@ describe('workload helpers', () => {
         dnsQueriesMillion: '-1',
         loadBalancerProcessedGb: '-1',
         loadBalancerHours: '731',
+        vpnConnectionCount: '1.5',
+        vpnConnectionHours: '731',
+        vpnDataTransferGb: '-1',
+        privateCircuitCount: '1.5',
+        privateCircuitPortHours: '731',
+        privateCircuitDataTransferGb: '-1',
         observabilityMetricsMillion: '-1',
         observabilityLogsIngestGb: '-1',
         observabilityLogRetentionGb: '-1',
@@ -829,6 +857,12 @@ describe('workload helpers', () => {
       'dnsQueriesMillion',
       'loadBalancerProcessedGb',
       'loadBalancerHours',
+      'vpnConnectionCount',
+      'vpnConnectionHours',
+      'vpnDataTransferGb',
+      'privateCircuitCount',
+      'privateCircuitPortHours',
+      'privateCircuitDataTransferGb',
       'observabilityMetricsMillion',
       'observabilityLogsIngestGb',
       'observabilityLogRetentionGb',

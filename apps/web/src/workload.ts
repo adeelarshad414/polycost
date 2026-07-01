@@ -108,6 +108,12 @@ export interface WorkloadFormState {
   dnsQueriesMillion: string;
   loadBalancerProcessedGb: string;
   loadBalancerHours: string;
+  vpnConnectionCount: string;
+  vpnConnectionHours: string;
+  vpnDataTransferGb: string;
+  privateCircuitCount: string;
+  privateCircuitPortHours: string;
+  privateCircuitDataTransferGb: string;
   observabilityMetricsMillion: string;
   observabilityLogsIngestGb: string;
   observabilityLogRetentionGb: string;
@@ -221,6 +227,12 @@ type NumericWorkloadFormField =
   | 'dnsQueriesMillion'
   | 'loadBalancerProcessedGb'
   | 'loadBalancerHours'
+  | 'vpnConnectionCount'
+  | 'vpnConnectionHours'
+  | 'vpnDataTransferGb'
+  | 'privateCircuitCount'
+  | 'privateCircuitPortHours'
+  | 'privateCircuitDataTransferGb'
   | 'observabilityMetricsMillion'
   | 'observabilityLogsIngestGb'
   | 'observabilityLogRetentionGb'
@@ -339,6 +351,12 @@ export const defaultWorkloadForm: WorkloadFormState = {
   dnsQueriesMillion: '0',
   loadBalancerProcessedGb: '0',
   loadBalancerHours: '0',
+  vpnConnectionCount: '0',
+  vpnConnectionHours: '0',
+  vpnDataTransferGb: '0',
+  privateCircuitCount: '0',
+  privateCircuitPortHours: '0',
+  privateCircuitDataTransferGb: '0',
   observabilityMetricsMillion: '0',
   observabilityLogsIngestGb: '0',
   observabilityLogRetentionGb: '0',
@@ -997,6 +1015,46 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
     730,
     'Load balancer hours must be between 0 and 730.',
   );
+  optionalNonNegativeIntegerField(
+    issues,
+    form,
+    'vpnConnectionCount',
+    'VPN connections must be a whole number 0 or higher.',
+  );
+  requireBoundedNumber(
+    issues,
+    form,
+    'vpnConnectionHours',
+    0,
+    730,
+    'VPN hours must be between 0 and 730.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'vpnDataTransferGb',
+    'VPN data transfer must be 0 GB or higher.',
+  );
+  optionalNonNegativeIntegerField(
+    issues,
+    form,
+    'privateCircuitCount',
+    'Private circuits must be a whole number 0 or higher.',
+  );
+  requireBoundedNumber(
+    issues,
+    form,
+    'privateCircuitPortHours',
+    0,
+    730,
+    'Private circuit port hours must be between 0 and 730.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'privateCircuitDataTransferGb',
+    'Private circuit data transfer must be 0 GB or higher.',
+  );
   optionalNonNegativeNumberField(
     issues,
     form,
@@ -1300,6 +1358,12 @@ export function buildNwsFromForm(
       ...optionalPositiveNumber('dnsQueriesMillion', form.dnsQueriesMillion),
       ...optionalPositiveNumber('loadBalancerProcessedGb', form.loadBalancerProcessedGb),
       ...optionalPositiveNumber('loadBalancerHours', form.loadBalancerHours),
+      ...optionalPositiveInteger('vpnConnectionCount', form.vpnConnectionCount),
+      ...optionalPositiveNumber('vpnConnectionHours', form.vpnConnectionHours),
+      ...optionalPositiveNumber('vpnDataTransferGb', form.vpnDataTransferGb),
+      ...optionalPositiveInteger('privateCircuitCount', form.privateCircuitCount),
+      ...optionalPositiveNumber('privateCircuitPortHours', form.privateCircuitPortHours),
+      ...optionalPositiveNumber('privateCircuitDataTransferGb', form.privateCircuitDataTransferGb),
       cdn: form.cdn,
       loadBalancer: form.loadBalancer,
     },
@@ -1552,6 +1616,25 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
     ),
     loadBalancerHours: numberToInput(
       nws.network.loadBalancerHours ?? Number(defaultWorkloadForm.loadBalancerHours),
+    ),
+    vpnConnectionCount: numberToInput(
+      nws.network.vpnConnectionCount ?? Number(defaultWorkloadForm.vpnConnectionCount),
+    ),
+    vpnConnectionHours: numberToInput(
+      nws.network.vpnConnectionHours ?? Number(defaultWorkloadForm.vpnConnectionHours),
+    ),
+    vpnDataTransferGb: numberToInput(
+      nws.network.vpnDataTransferGb ?? Number(defaultWorkloadForm.vpnDataTransferGb),
+    ),
+    privateCircuitCount: numberToInput(
+      nws.network.privateCircuitCount ?? Number(defaultWorkloadForm.privateCircuitCount),
+    ),
+    privateCircuitPortHours: numberToInput(
+      nws.network.privateCircuitPortHours ?? Number(defaultWorkloadForm.privateCircuitPortHours),
+    ),
+    privateCircuitDataTransferGb: numberToInput(
+      nws.network.privateCircuitDataTransferGb ??
+        Number(defaultWorkloadForm.privateCircuitDataTransferGb),
     ),
     observabilityMetricsMillion: numberToInput(
       supportingServices.observabilityMetricsMillion ??
@@ -2876,6 +2959,18 @@ function formNumericValue(form: WorkloadFormState, field: NumericWorkloadFormFie
       return form.loadBalancerProcessedGb;
     case 'loadBalancerHours':
       return form.loadBalancerHours;
+    case 'vpnConnectionCount':
+      return form.vpnConnectionCount;
+    case 'vpnConnectionHours':
+      return form.vpnConnectionHours;
+    case 'vpnDataTransferGb':
+      return form.vpnDataTransferGb;
+    case 'privateCircuitCount':
+      return form.privateCircuitCount;
+    case 'privateCircuitPortHours':
+      return form.privateCircuitPortHours;
+    case 'privateCircuitDataTransferGb':
+      return form.privateCircuitDataTransferGb;
     case 'observabilityMetricsMillion':
       return form.observabilityMetricsMillion;
     case 'observabilityLogsIngestGb':

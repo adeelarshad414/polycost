@@ -248,6 +248,12 @@ export const normalizedWorkloadSpecSchema = z
         dnsQueriesMillion: z.number().nonnegative().optional(),
         loadBalancerProcessedGb: z.number().nonnegative().optional(),
         loadBalancerHours: z.number().min(0).max(730).optional(),
+        vpnConnectionCount: z.number().int().nonnegative().optional(),
+        vpnConnectionHours: z.number().min(0).max(730).optional(),
+        vpnDataTransferGb: z.number().nonnegative().optional(),
+        privateCircuitCount: z.number().int().nonnegative().optional(),
+        privateCircuitPortHours: z.number().min(0).max(730).optional(),
+        privateCircuitDataTransferGb: z.number().nonnegative().optional(),
         cdn: z.boolean(),
         loadBalancer: z.boolean(),
       })

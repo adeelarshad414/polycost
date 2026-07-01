@@ -3612,6 +3612,62 @@ function WorkloadForm({
           />
           <details className="advanced-service-fields form-grid-span">
             <summary>
+              <span>Private connectivity</span>
+              <small>Site-to-site VPN, private circuits, and private data transfer</small>
+            </summary>
+            <div className="form-grid secondary-grid">
+              <TextField
+                label="VPN connections"
+                value={form.vpnConnectionCount}
+                inputMode="numeric"
+                suffix="connections"
+                error={fieldErrors.vpnConnectionCount}
+                onChange={(value) => update('vpnConnectionCount', value)}
+              />
+              <TextField
+                label="VPN hours/mo"
+                value={form.vpnConnectionHours}
+                inputMode="decimal"
+                suffix="hrs"
+                error={fieldErrors.vpnConnectionHours}
+                onChange={(value) => update('vpnConnectionHours', value)}
+              />
+              <TextField
+                label="VPN transfer"
+                value={form.vpnDataTransferGb}
+                inputMode="decimal"
+                suffix="GB"
+                error={fieldErrors.vpnDataTransferGb}
+                onChange={(value) => update('vpnDataTransferGb', value)}
+              />
+              <TextField
+                label="Private circuits"
+                value={form.privateCircuitCount}
+                inputMode="numeric"
+                suffix="circuits"
+                error={fieldErrors.privateCircuitCount}
+                onChange={(value) => update('privateCircuitCount', value)}
+              />
+              <TextField
+                label="Circuit port hours"
+                value={form.privateCircuitPortHours}
+                inputMode="decimal"
+                suffix="hrs"
+                error={fieldErrors.privateCircuitPortHours}
+                onChange={(value) => update('privateCircuitPortHours', value)}
+              />
+              <TextField
+                label="Circuit transfer"
+                value={form.privateCircuitDataTransferGb}
+                inputMode="decimal"
+                suffix="GB"
+                error={fieldErrors.privateCircuitDataTransferGb}
+                onChange={(value) => update('privateCircuitDataTransferGb', value)}
+              />
+            </div>
+          </details>
+          <details className="advanced-service-fields form-grid-span">
+            <summary>
               <span>Operations cost drivers</span>
               <small>Metrics, logs, alarms, traces, secrets, posture, WAF</small>
             </summary>
@@ -9179,12 +9235,16 @@ function egressOptimizationRows(
   const crossAzGb = parseInputNumber(form.crossAzTransferGb) ?? 0;
   const interRegionGb = parseInputNumber(form.interRegionTransferGb) ?? 0;
   const natGb = parseInputNumber(form.natGatewayGb) ?? 0;
+  const vpnTransferGb = parseInputNumber(form.vpnDataTransferGb) ?? 0;
+  const privateCircuitTransferGb = parseInputNumber(form.privateCircuitDataTransferGb) ?? 0;
   const cacheHit = clampNumber(parseInputNumber(form.cdnCacheHitRatioPercent) ?? 85, 0, 100);
   const trafficSignalParts = [
     configuredEgressGb > 0 ? `${formatDecimal(configuredEgressGb)}GB internet` : undefined,
     cdnTrafficGb > 0 ? `${formatDecimal(cdnTrafficGb)}GB CDN` : undefined,
-    crossAzGb + interRegionGb + natGb > 0
-      ? `${formatDecimal(crossAzGb + interRegionGb + natGb)}GB private path`
+    crossAzGb + interRegionGb + natGb + vpnTransferGb + privateCircuitTransferGb > 0
+      ? `${formatDecimal(
+          crossAzGb + interRegionGb + natGb + vpnTransferGb + privateCircuitTransferGb,
+        )}GB private path`
       : undefined,
   ].filter(Boolean);
   const trafficSignal = trafficSignalParts.join(' · ') || 'Network rows only';
@@ -9203,7 +9263,7 @@ function egressOptimizationRows(
         egressSharePercent >= 15 ||
         configuredEgressGb >= 500 ||
         cdnTrafficGb >= 500 ||
-        crossAzGb + interRegionGb + natGb >= 500;
+        crossAzGb + interRegionGb + natGb + vpnTransferGb + privateCircuitTransferGb >= 500;
 
       if (!primary || !material) {
         return [];
@@ -9213,7 +9273,8 @@ function egressOptimizationRows(
         cacheHit,
         cdnTrafficGb,
         configuredEgressGb,
-        privateTransferGb: crossAzGb + interRegionGb + natGb,
+        privateTransferGb:
+          crossAzGb + interRegionGb + natGb + vpnTransferGb + privateCircuitTransferGb,
         tieredGb: networkRows.reduce((sum, lineItem) => sum + lineItemTierBillableGb(lineItem), 0),
       });
 
@@ -9294,6 +9355,36 @@ function egressOptimizationSignal(
           ? `${formatDecimal(context.privateTransferGb)}GB private-path traffic`
           : 'NAT line item surfaced by backend',
       evidence: `${baseEvidence} Route review models a 40% reduction of the NAT baseline.`,
+    };
+  }
+
+  if (
+    normalizedPrimary.includes('vpn') ||
+    normalizedPrimary.includes('private circuit') ||
+    normalizedPrimary.includes('direct connect') ||
+    normalizedPrimary.includes('expressroute') ||
+    normalizedPrimary.includes('interconnect')
+  ) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.25);
+    const isCircuit =
+      normalizedPrimary.includes('private circuit') ||
+      normalizedPrimary.includes('direct connect') ||
+      normalizedPrimary.includes('expressroute') ||
+      normalizedPrimary.includes('interconnect');
+
+    return {
+      primaryDriver: isCircuit ? 'Private circuit' : 'VPN connectivity',
+      monthlySavings,
+      effort: 'High',
+      recommendation:
+        'Validate port speed, redundancy, metered-vs-unlimited transfer, and VPN-to-private-circuit break-even before final network design.',
+      driverEvidence:
+        context.privateTransferGb > 0
+          ? `${formatDecimal(context.privateTransferGb)}GB private-path traffic`
+          : 'Private connectivity line item surfaced by backend',
+      evidence: `${baseEvidence} Connectivity architecture review models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity at 25% of that private-connectivity baseline.`,
     };
   }
 
@@ -10101,7 +10192,9 @@ function networkDescriptionMatches(description: string): boolean {
     'nat',
     'cdn',
     'vpn',
+    'private circuit',
     'direct connect',
+    'expressroute',
     'interconnect',
     'dns',
     'cross-az',
