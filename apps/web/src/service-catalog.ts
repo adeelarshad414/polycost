@@ -166,17 +166,17 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Power BI', 'Microsoft Fabric'],
     gcp: ['Looker'],
   }),
-  family('ml-platform', 'ai', 'Machine learning platform', 'roadmap', {
+  family('ml-platform', 'ai', 'Machine learning platform', 'mapped', {
     aws: ['Amazon SageMaker AI'],
     azure: ['Azure Machine Learning'],
     gcp: ['Vertex AI'],
   }),
-  family('generative-ai', 'ai', 'Generative AI', 'roadmap', {
+  family('generative-ai', 'ai', 'Generative AI', 'mapped', {
     aws: ['Amazon Bedrock', 'Amazon Q'],
     azure: ['Azure OpenAI in Foundry Models', 'Microsoft Foundry'],
     gcp: ['Gemini Enterprise', 'Vertex AI'],
   }),
-  family('ai-apis', 'ai', 'Vision, speech + language APIs', 'roadmap', {
+  family('ai-apis', 'ai', 'Vision, speech + language APIs', 'mapped', {
     aws: ['Amazon Rekognition', 'Amazon Transcribe', 'Amazon Comprehend'],
     azure: ['Azure AI Vision', 'Azure Speech', 'Azure Language'],
     gcp: ['Cloud Vision', 'Speech-to-Text', 'Natural Language AI'],

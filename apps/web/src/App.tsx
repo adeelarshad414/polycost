@@ -259,6 +259,19 @@ const SERVICE_FAMILY_ALIASES: Record<string, string> = {
   expressroute: 'dedicated-connectivity',
   cloudinterconnect: 'dedicated-connectivity',
   interconnect: 'dedicated-connectivity',
+  sagemaker: 'ml-platform',
+  azureml: 'ml-platform',
+  azuremachinelearning: 'ml-platform',
+  vertexai: 'ml-platform',
+  bedrock: 'generative-ai',
+  azureopenai: 'generative-ai',
+  openai: 'generative-ai',
+  gemini: 'generative-ai',
+  rekognition: 'ai-apis',
+  transcribe: 'ai-apis',
+  comprehend: 'ai-apis',
+  visionai: 'ai-apis',
+  speech: 'ai-apis',
 };
 
 const ENVIRONMENT_OPTIONS: Array<[WorkloadFormState['environment'], string]> = [
@@ -1789,6 +1802,46 @@ function InitialHomePage({
                   suffix="GB"
                   error={fieldErrors.registryStorageGb}
                   onChange={(value) => update('registryStorageGb', value)}
+                />
+                <TextField
+                  label="AI training"
+                  value={form.aiTrainingGpuHours}
+                  inputMode="decimal"
+                  suffix="GPU hrs"
+                  error={fieldErrors.aiTrainingGpuHours}
+                  onChange={(value) => update('aiTrainingGpuHours', value)}
+                />
+                <TextField
+                  label="AI hosting"
+                  value={form.aiModelHostingHours}
+                  inputMode="decimal"
+                  suffix="hrs"
+                  error={fieldErrors.aiModelHostingHours}
+                  onChange={(value) => update('aiModelHostingHours', value)}
+                />
+                <TextField
+                  label="AI inference"
+                  value={form.aiInferenceRequestsMillion}
+                  inputMode="decimal"
+                  suffix="M/mo"
+                  error={fieldErrors.aiInferenceRequestsMillion}
+                  onChange={(value) => update('aiInferenceRequestsMillion', value)}
+                />
+                <TextField
+                  label="GenAI input"
+                  value={form.aiApiInputTokensMillion}
+                  inputMode="decimal"
+                  suffix="M tokens"
+                  error={fieldErrors.aiApiInputTokensMillion}
+                  onChange={(value) => update('aiApiInputTokensMillion', value)}
+                />
+                <TextField
+                  label="GenAI output"
+                  value={form.aiApiOutputTokensMillion}
+                  inputMode="decimal"
+                  suffix="M tokens"
+                  error={fieldErrors.aiApiOutputTokensMillion}
+                  onChange={(value) => update('aiApiOutputTokensMillion', value)}
                 />
               </div>
             </details>
@@ -3670,6 +3723,67 @@ function WorkloadForm({
             suffix="users"
             error={fieldErrors.analyticsBiUsers}
             onChange={(value) => update('analyticsBiUsers', value)}
+          />
+        </div>
+      </FormSection>
+
+      <FormSection title="AI + ML" tone="data">
+        <div className="form-grid secondary-grid">
+          <TextField
+            label="Training GPU hours"
+            value={form.aiTrainingGpuHours}
+            inputMode="decimal"
+            suffix="GPU hrs"
+            error={fieldErrors.aiTrainingGpuHours}
+            onChange={(value) => update('aiTrainingGpuHours', value)}
+          />
+          <TextField
+            label="Model hosting"
+            value={form.aiModelHostingHours}
+            inputMode="decimal"
+            suffix="hrs/mo"
+            error={fieldErrors.aiModelHostingHours}
+            onChange={(value) => update('aiModelHostingHours', value)}
+          />
+          <TextField
+            label="Inference requests"
+            value={form.aiInferenceRequestsMillion}
+            inputMode="decimal"
+            suffix="M/mo"
+            error={fieldErrors.aiInferenceRequestsMillion}
+            onChange={(value) => update('aiInferenceRequestsMillion', value)}
+          />
+          <TextField
+            label="Vector storage"
+            value={form.aiVectorStorageGb}
+            inputMode="decimal"
+            suffix="GB"
+            error={fieldErrors.aiVectorStorageGb}
+            onChange={(value) => update('aiVectorStorageGb', value)}
+          />
+          <TextField
+            label="Vector queries"
+            value={form.aiVectorQueriesMillion}
+            inputMode="decimal"
+            suffix="M/mo"
+            error={fieldErrors.aiVectorQueriesMillion}
+            onChange={(value) => update('aiVectorQueriesMillion', value)}
+          />
+          <TextField
+            label="GenAI input"
+            value={form.aiApiInputTokensMillion}
+            inputMode="decimal"
+            suffix="M tokens"
+            error={fieldErrors.aiApiInputTokensMillion}
+            onChange={(value) => update('aiApiInputTokensMillion', value)}
+          />
+          <TextField
+            label="GenAI output"
+            value={form.aiApiOutputTokensMillion}
+            inputMode="decimal"
+            suffix="M tokens"
+            error={fieldErrors.aiApiOutputTokensMillion}
+            onChange={(value) => update('aiApiOutputTokensMillion', value)}
           />
         </div>
       </FormSection>

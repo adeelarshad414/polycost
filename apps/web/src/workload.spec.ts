@@ -272,6 +272,60 @@ describe('workload helpers', () => {
     );
   });
 
+  it('serializes AI and ML cost drivers into mapped service requirements', () => {
+    const nws = buildNwsFromForm({
+      ...defaultWorkloadForm,
+      aiTrainingGpuHours: '180',
+      aiModelHostingHours: '730',
+      aiInferenceRequestsMillion: '25',
+      aiVectorStorageGb: '500',
+      aiVectorQueriesMillion: '10',
+      aiApiInputTokensMillion: '80',
+      aiApiOutputTokensMillion: '20',
+    });
+
+    expect(nws.serviceRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceCategory: 'ai',
+          serviceType: 'ml-platform',
+          scaleParams: expect.objectContaining({
+            aiTrainingGpuHours: 180,
+            aiModelHostingHours: 730,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'ai',
+          serviceType: 'ai-apis',
+          scaleParams: expect.objectContaining({
+            aiInferenceRequestsMillion: 25,
+            aiVectorStorageGb: 500,
+            aiVectorQueriesMillion: 10,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'ai',
+          serviceType: 'generative-ai',
+          scaleParams: expect.objectContaining({
+            aiApiInputTokensMillion: 80,
+            aiApiOutputTokensMillion: 20,
+          }),
+        }),
+      ]),
+    );
+    expect(formFromNws(nws)).toEqual(
+      expect.objectContaining({
+        aiTrainingGpuHours: '180',
+        aiModelHostingHours: '730',
+        aiInferenceRequestsMillion: '25',
+        aiVectorStorageGb: '500',
+        aiVectorQueriesMillion: '10',
+        aiApiInputTokensMillion: '80',
+        aiApiOutputTokensMillion: '20',
+      }),
+    );
+  });
+
   it('serializes advanced storage assumptions only when they affect cost', () => {
     const nws = buildNwsFromForm({
       ...defaultWorkloadForm,
@@ -851,6 +905,13 @@ describe('workload helpers', () => {
         analyticsIntegrationJobHours: '-1',
         analyticsStreamingIngestGb: '-1',
         analyticsBiUsers: '1.5',
+        aiTrainingGpuHours: '-1',
+        aiModelHostingHours: '-1',
+        aiInferenceRequestsMillion: '-1',
+        aiVectorStorageGb: '-1',
+        aiVectorQueriesMillion: '-1',
+        aiApiInputTokensMillion: '-1',
+        aiApiOutputTokensMillion: '-1',
         integrationQueueMessagesMillion: '-1',
         integrationEventsMillion: '-1',
         integrationWorkflowTransitionsThousand: '-1',
@@ -884,6 +945,13 @@ describe('workload helpers', () => {
       'analyticsIntegrationJobHours',
       'analyticsStreamingIngestGb',
       'analyticsBiUsers',
+      'aiTrainingGpuHours',
+      'aiModelHostingHours',
+      'aiInferenceRequestsMillion',
+      'aiVectorStorageGb',
+      'aiVectorQueriesMillion',
+      'aiApiInputTokensMillion',
+      'aiApiOutputTokensMillion',
       'integrationQueueMessagesMillion',
       'integrationEventsMillion',
       'integrationWorkflowTransitionsThousand',

@@ -97,6 +97,13 @@ export interface WorkloadFormState {
   analyticsIntegrationJobHours: string;
   analyticsStreamingIngestGb: string;
   analyticsBiUsers: string;
+  aiTrainingGpuHours: string;
+  aiModelHostingHours: string;
+  aiInferenceRequestsMillion: string;
+  aiVectorStorageGb: string;
+  aiVectorQueriesMillion: string;
+  aiApiInputTokensMillion: string;
+  aiApiOutputTokensMillion: string;
   integrationQueueMessagesMillion: string;
   integrationEventsMillion: string;
   integrationWorkflowTransitionsThousand: string;
@@ -220,6 +227,13 @@ type NumericWorkloadFormField =
   | 'analyticsIntegrationJobHours'
   | 'analyticsStreamingIngestGb'
   | 'analyticsBiUsers'
+  | 'aiTrainingGpuHours'
+  | 'aiModelHostingHours'
+  | 'aiInferenceRequestsMillion'
+  | 'aiVectorStorageGb'
+  | 'aiVectorQueriesMillion'
+  | 'aiApiInputTokensMillion'
+  | 'aiApiOutputTokensMillion'
   | 'integrationQueueMessagesMillion'
   | 'integrationEventsMillion'
   | 'integrationWorkflowTransitionsThousand'
@@ -348,6 +362,13 @@ export const defaultWorkloadForm: WorkloadFormState = {
   analyticsIntegrationJobHours: '0',
   analyticsStreamingIngestGb: '0',
   analyticsBiUsers: '0',
+  aiTrainingGpuHours: '0',
+  aiModelHostingHours: '0',
+  aiInferenceRequestsMillion: '0',
+  aiVectorStorageGb: '0',
+  aiVectorQueriesMillion: '0',
+  aiApiInputTokensMillion: '0',
+  aiApiOutputTokensMillion: '0',
   integrationQueueMessagesMillion: '0',
   integrationEventsMillion: '0',
   integrationWorkflowTransitionsThousand: '0',
@@ -512,6 +533,13 @@ export const ARCHITECTURE_TEMPLATES: ArchitectureTemplate[] = [
       usagePattern: 'bursty',
       averageUtilizationPercent: '60',
       monthlyEgressGb: '1000',
+      aiTrainingGpuHours: '180',
+      aiModelHostingHours: '730',
+      aiInferenceRequestsMillion: '25',
+      aiVectorStorageGb: '500',
+      aiVectorQueriesMillion: '10',
+      aiApiInputTokensMillion: '80',
+      aiApiOutputTokensMillion: '20',
       selectedServiceCategory: 'ai',
       selectedServiceFamilyId: 'ml-platform',
       selectedServiceFamilyIds: [
@@ -519,6 +547,8 @@ export const ARCHITECTURE_TEMPLATES: ArchitectureTemplate[] = [
         'object-storage',
         'data-lake',
         'ml-platform',
+        'ai-apis',
+        'generative-ai',
         'monitoring',
         'keys-secrets',
       ],
@@ -973,6 +1003,48 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
     form,
     'analyticsBiUsers',
     'BI users must be a whole number 0 or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'aiTrainingGpuHours',
+    'AI training GPU hours must be 0 or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'aiModelHostingHours',
+    'AI model hosting hours must be 0 or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'aiInferenceRequestsMillion',
+    'AI inference requests must be 0 million or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'aiVectorStorageGb',
+    'AI vector storage must be 0 GB or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'aiVectorQueriesMillion',
+    'AI vector queries must be 0 million or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'aiApiInputTokensMillion',
+    'Generative AI input tokens must be 0 million or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'aiApiOutputTokensMillion',
+    'Generative AI output tokens must be 0 million or higher.',
   );
   optionalNonNegativeNumberField(
     issues,
@@ -1468,6 +1540,7 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
   const supportingServices = supportingServiceScaleParamsFromNws(nws);
   const runtimeServices = runtimeScaleParamsFromNws(nws);
   const analyticsServices = analyticsScaleParamsFromNws(nws);
+  const aiServices = aiScaleParamsFromNws(nws);
   const integrationServices = integrationScaleParamsFromNws(nws);
 
   return {
@@ -1641,6 +1714,28 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
     ),
     analyticsBiUsers: numberToInput(
       analyticsServices.analyticsBiUsers ?? Number(defaultWorkloadForm.analyticsBiUsers),
+    ),
+    aiTrainingGpuHours: numberToInput(
+      aiServices.aiTrainingGpuHours ?? Number(defaultWorkloadForm.aiTrainingGpuHours),
+    ),
+    aiModelHostingHours: numberToInput(
+      aiServices.aiModelHostingHours ?? Number(defaultWorkloadForm.aiModelHostingHours),
+    ),
+    aiInferenceRequestsMillion: numberToInput(
+      aiServices.aiInferenceRequestsMillion ??
+        Number(defaultWorkloadForm.aiInferenceRequestsMillion),
+    ),
+    aiVectorStorageGb: numberToInput(
+      aiServices.aiVectorStorageGb ?? Number(defaultWorkloadForm.aiVectorStorageGb),
+    ),
+    aiVectorQueriesMillion: numberToInput(
+      aiServices.aiVectorQueriesMillion ?? Number(defaultWorkloadForm.aiVectorQueriesMillion),
+    ),
+    aiApiInputTokensMillion: numberToInput(
+      aiServices.aiApiInputTokensMillion ?? Number(defaultWorkloadForm.aiApiInputTokensMillion),
+    ),
+    aiApiOutputTokensMillion: numberToInput(
+      aiServices.aiApiOutputTokensMillion ?? Number(defaultWorkloadForm.aiApiOutputTokensMillion),
     ),
     integrationQueueMessagesMillion: numberToInput(
       integrationServices.integrationQueueMessagesMillion ??
@@ -1911,6 +2006,7 @@ export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceReq
           ? runtimeScaleParamsFromForm(form)
           : {}),
         ...(isAnalyticsServiceFamily(serviceType) ? analyticsScaleParamsFromForm(form) : {}),
+        ...(isAiServiceFamily(serviceType) ? aiScaleParamsFromForm(form) : {}),
         ...(isIntegrationServiceFamily(serviceType) ? integrationScaleParamsFromForm(form) : {}),
         ...(serviceType.includes('storage') ? storageScaleParamsFromForm(form) : {}),
         ...(serviceType.includes('database') ||
@@ -1955,6 +2051,7 @@ function orderedRequirementIds(form: WorkloadFormState): string[] {
     ...supportingServiceFamilyIds(form),
     ...runtimeServiceFamilyIds(form),
     ...analyticsServiceFamilyIds(form),
+    ...aiServiceFamilyIds(form),
     ...integrationServiceFamilyIds(form),
     ...(form.cdn ? ['cdn-edge'] : []),
     ...(form.loadBalancer ? ['load-balancing'] : []),
@@ -2081,6 +2178,34 @@ function analyticsServiceFamilyIds(form: WorkloadFormState): string[] {
   return ids;
 }
 
+function aiServiceFamilyIds(form: WorkloadFormState): string[] {
+  const ids: string[] = [];
+
+  if (
+    hasPositiveFormNumber(form.aiTrainingGpuHours) ||
+    hasPositiveFormNumber(form.aiModelHostingHours)
+  ) {
+    ids.push('ml-platform');
+  }
+
+  if (
+    hasPositiveFormNumber(form.aiInferenceRequestsMillion) ||
+    hasPositiveFormNumber(form.aiVectorStorageGb) ||
+    hasPositiveFormNumber(form.aiVectorQueriesMillion)
+  ) {
+    ids.push('ai-apis');
+  }
+
+  if (
+    hasPositiveFormNumber(form.aiApiInputTokensMillion) ||
+    hasPositiveFormNumber(form.aiApiOutputTokensMillion)
+  ) {
+    ids.push('generative-ai');
+  }
+
+  return ids;
+}
+
 function integrationServiceFamilyIds(form: WorkloadFormState): string[] {
   const ids: string[] = [];
 
@@ -2111,6 +2236,10 @@ function isAnalyticsServiceFamily(serviceType: string): boolean {
     'streaming-analytics',
     'business-intelligence',
   ].includes(serviceType);
+}
+
+function isAiServiceFamily(serviceType: string): boolean {
+  return ['ml-platform', 'generative-ai', 'ai-apis'].includes(serviceType);
 }
 
 function isIntegrationServiceFamily(serviceType: string): boolean {
@@ -2252,6 +2381,30 @@ function analyticsScaleParamsFromNws(nws: NormalizedWorkloadSpec): Record<string
     keys.map((key) => [
       key,
       analyticsRequirements
+        .map((requirement) => numericScaleParam(requirement.scaleParams, key))
+        .find((value) => value !== undefined),
+    ]),
+  ) as Record<string, number>;
+}
+
+function aiScaleParamsFromNws(nws: NormalizedWorkloadSpec): Record<string, number> {
+  const aiRequirements =
+    nws.serviceRequirements?.filter((requirement) => isAiServiceFamily(requirement.serviceType)) ??
+    [];
+  const keys = [
+    'aiTrainingGpuHours',
+    'aiModelHostingHours',
+    'aiInferenceRequestsMillion',
+    'aiVectorStorageGb',
+    'aiVectorQueriesMillion',
+    'aiApiInputTokensMillion',
+    'aiApiOutputTokensMillion',
+  ];
+
+  return Object.fromEntries(
+    keys.map((key) => [
+      key,
+      aiRequirements
         .map((requirement) => numericScaleParam(requirement.scaleParams, key))
         .find((value) => value !== undefined),
     ]),
@@ -2561,6 +2714,18 @@ function analyticsScaleParamsFromForm(form: WorkloadFormState): ServiceRequireme
     analyticsIntegrationJobHours: parseOptionalNumber(form.analyticsIntegrationJobHours) ?? 0,
     analyticsStreamingIngestGb: parseOptionalNumber(form.analyticsStreamingIngestGb) ?? 0,
     analyticsBiUsers: parseNonNegativeInteger(form.analyticsBiUsers, 0),
+  };
+}
+
+function aiScaleParamsFromForm(form: WorkloadFormState): ServiceRequirement['scaleParams'] {
+  return {
+    aiTrainingGpuHours: parseOptionalNumber(form.aiTrainingGpuHours) ?? 0,
+    aiModelHostingHours: parseOptionalNumber(form.aiModelHostingHours) ?? 0,
+    aiInferenceRequestsMillion: parseOptionalNumber(form.aiInferenceRequestsMillion) ?? 0,
+    aiVectorStorageGb: parseOptionalNumber(form.aiVectorStorageGb) ?? 0,
+    aiVectorQueriesMillion: parseOptionalNumber(form.aiVectorQueriesMillion) ?? 0,
+    aiApiInputTokensMillion: parseOptionalNumber(form.aiApiInputTokensMillion) ?? 0,
+    aiApiOutputTokensMillion: parseOptionalNumber(form.aiApiOutputTokensMillion) ?? 0,
   };
 }
 
@@ -3068,6 +3233,20 @@ function formNumericValue(form: WorkloadFormState, field: NumericWorkloadFormFie
       return form.analyticsStreamingIngestGb;
     case 'analyticsBiUsers':
       return form.analyticsBiUsers;
+    case 'aiTrainingGpuHours':
+      return form.aiTrainingGpuHours;
+    case 'aiModelHostingHours':
+      return form.aiModelHostingHours;
+    case 'aiInferenceRequestsMillion':
+      return form.aiInferenceRequestsMillion;
+    case 'aiVectorStorageGb':
+      return form.aiVectorStorageGb;
+    case 'aiVectorQueriesMillion':
+      return form.aiVectorQueriesMillion;
+    case 'aiApiInputTokensMillion':
+      return form.aiApiInputTokensMillion;
+    case 'aiApiOutputTokensMillion':
+      return form.aiApiOutputTokensMillion;
     case 'integrationQueueMessagesMillion':
       return form.integrationQueueMessagesMillion;
     case 'integrationEventsMillion':

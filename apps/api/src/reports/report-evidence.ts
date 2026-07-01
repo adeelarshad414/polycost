@@ -382,6 +382,17 @@ const COST_COVERAGE_DIMENSIONS: CostCoverageDimension[] = [
       ),
   },
   {
+    key: 'ai-ml',
+    label: 'AI/ML training, inference, vectors, and generative AI',
+    requirementCategories: ['ai'],
+    reviewCue:
+      'Validate GPU hours, hosted model hours, inference requests, vector storage/query volume, token volume, model region, and provider model availability.',
+    matches: (lineItem) =>
+      /ai\/ml|machine learning|model hosting|gpu-hour|ai inference|vector|generative ai|input token|output token/i.test(
+        lineItem.description,
+      ),
+  },
+  {
     key: 'operations',
     label: 'Monitoring, observability, secrets, WAF, and security operations',
     requirementCategories: ['operations', 'security', 'devops'],
