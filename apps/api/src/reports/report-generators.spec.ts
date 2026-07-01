@@ -863,6 +863,54 @@ describe('report generators', () => {
         ]),
       ]),
     );
+
+    expect(
+      optimizationOpportunityRows({
+        ...comparison,
+        providers: [
+          {
+            providerId: 'aws',
+            lineItems: [
+              {
+                category: 'compute',
+                costComponent: 'compute',
+                description: 'AWS serverless function GB-second estimate',
+                skuId: 'modeled-serverless-function-duration',
+                isApproximate: false,
+                baseMonthlyCostUsd: 90,
+              },
+              {
+                category: 'operations',
+                costComponent: 'operations',
+                description: 'AWS managed Kubernetes control plane estimate',
+                skuId: 'modeled-kubernetes-control-plane',
+                isApproximate: false,
+                baseMonthlyCostUsd: 72,
+              },
+            ],
+            totals: {
+              daily: 7.89,
+              weekly: 55.38,
+              monthly: 240,
+              quarterly: 720,
+              yearly: 2880,
+            },
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'Runtime optimization',
+          'aws serverless/container runtime is 67.5% of monthly spend; tune function memory-duration settings and compare functions with always-on containers for steady traffic.',
+          '22.5',
+          '270',
+          'Medium',
+          'Medium',
+          'aws dominant runtime row is "AWS serverless function GB-second estimate" at $90/mo; function runtime tuning is modeled as a 25% reduction of that row.',
+        ]),
+      ]),
+    );
   });
 
   it('builds fallback service requirement rows when comparison requirements are absent', () => {

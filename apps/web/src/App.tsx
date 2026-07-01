@@ -5959,6 +5959,7 @@ function ProductionDepthAnalytics({
   const tcoSignals = crossProviderTcoRows(comparison, form);
   const storageOptimizations = storageOptimizationRows(comparison, form);
   const databaseOptimizations = databaseOptimizationRows(comparison, form);
+  const runtimeOptimizations = runtimeOptimizationRows(comparison, form);
   const egressOptimizations = egressOptimizationRows(comparison, form);
   const spotBlendRows = spotBlendOptimizerRows(comparison, form);
   const licenseRows = licenseOptimizationRows(comparison, form);
@@ -5995,6 +5996,7 @@ function ProductionDepthAnalytics({
       <CrossProviderTcoPanel rows={tcoSignals} />
       <StorageOptimizationPanel rows={storageOptimizations} />
       <DatabaseOptimizationPanel rows={databaseOptimizations} />
+      <RuntimeOptimizationPanel rows={runtimeOptimizations} />
       <EgressOptimizationPanel rows={egressOptimizations} />
       <SpotBlendOptimizerPanel rows={spotBlendRows} />
       <LicenseOptimizationPanel rows={licenseRows} operatingSystem={form.operatingSystem} />
@@ -6387,6 +6389,70 @@ function DatabaseOptimizationPanel({ rows }: { rows: DatabaseOptimizationRow[] }
         <div className="scenario-sensitivity-empty" role="status">
           Database optimization appears when NoSQL units, RU/s, replicas, backups, IOPS, cache, or
           warehouse query line items become material.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RuntimeOptimizationPanel({ rows }: { rows: RuntimeOptimizationRow[] }) {
+  return (
+    <div className="runtime-optimization-panel" aria-label="Runtime optimization detail">
+      <div className="scenario-sensitivity-heading">
+        <div>
+          <span>Runtime optimization detail</span>
+          <h4>Functions, Kubernetes overhead, container registry, and platform fit</h4>
+        </div>
+      </div>
+
+      {rows.length > 0 ? (
+        <div className="table-wrap runtime-optimization-wrap">
+          <table className="ranking-table runtime-optimization-table">
+            <thead>
+              <tr>
+                <th scope="col">Provider</th>
+                <th scope="col">Runtime share</th>
+                <th scope="col">Dominant driver</th>
+                <th scope="col">Opportunity</th>
+                <th scope="col">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.providerId}>
+                  <td>
+                    <span className={`scenario-low-label scenario-low-${row.providerId}`}>
+                      {providerLabel(row.providerId)}
+                    </span>
+                    <small>{row.usageSignal}</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.runtimeMonthly)}/mo</strong>
+                    <small>{formatPercent(row.runtimeSharePercent)} of provider total</small>
+                  </td>
+                  <td>
+                    <strong>{row.primaryDriver}</strong>
+                    <small>{row.driverEvidence}</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.monthlySavings)}/mo</strong>
+                    <small>
+                      {formatCurrency(row.annualSavings)}/yr · {row.effort} effort
+                    </small>
+                  </td>
+                  <td>
+                    <strong>{row.recommendation}</strong>
+                    <small>{row.evidence}</small>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="scenario-sensitivity-empty" role="status">
+          Runtime optimization appears when function duration, invocation volume, Kubernetes
+          control-plane/node overhead, or container registry transfer becomes material.
         </div>
       )}
     </div>
@@ -7276,6 +7342,20 @@ interface DatabaseOptimizationRow {
   evidence: string;
 }
 
+interface RuntimeOptimizationRow {
+  providerId: ProviderId;
+  runtimeMonthly: number;
+  runtimeSharePercent: number;
+  primaryDriver: string;
+  usageSignal: string;
+  monthlySavings: number;
+  annualSavings: number;
+  effort: 'Low' | 'Medium' | 'High';
+  recommendation: string;
+  driverEvidence: string;
+  evidence: string;
+}
+
 interface SpotBlendOptimizerRow {
   providerId: ProviderId;
   onDemandMonthly: number;
@@ -7946,6 +8026,255 @@ function databaseOptimizationSignal(
     evidence: `Database tier review models ${formatCurrency(
       monthlySavings,
     )}/mo opportunity at 15% of the database baseline.`,
+  };
+}
+
+function runtimeOptimizationRows(
+  comparison: ComparisonResult | null,
+  form: WorkloadFormState,
+): RuntimeOptimizationRow[] {
+  if (!comparison) {
+    return [];
+  }
+
+  const functionInvocationsMillion = parseInputNumber(form.functionInvocationsMillion) ?? 0;
+  const functionDurationMs = parseInputNumber(form.functionDurationMs) ?? 0;
+  const functionMemoryMb = parseInputNumber(form.functionMemoryMb) ?? 0;
+  const kubernetesClusterCount = parseInputNumber(form.kubernetesClusterCount) ?? 0;
+  const kubernetesWorkerNodeCount = parseInputNumber(form.kubernetesWorkerNodeCount) ?? 0;
+  const registryStorageGb = parseInputNumber(form.registryStorageGb) ?? 0;
+  const registryEgressGb = parseInputNumber(form.registryEgressGb) ?? 0;
+  const usageSignalParts = [
+    functionInvocationsMillion > 0
+      ? `${formatDecimal(functionInvocationsMillion)}M invocations`
+      : undefined,
+    functionInvocationsMillion > 0 && functionDurationMs > 0 && functionMemoryMb > 0
+      ? `${formatDecimal(functionDurationMs)}ms @ ${formatDecimal(functionMemoryMb)}MB`
+      : undefined,
+    kubernetesClusterCount + kubernetesWorkerNodeCount > 0
+      ? `${formatDecimal(kubernetesClusterCount)} clusters / ${formatDecimal(
+          kubernetesWorkerNodeCount,
+        )} nodes`
+      : undefined,
+    registryStorageGb > 0 ? `${formatDecimal(registryStorageGb)}GB registry` : undefined,
+    registryEgressGb > 0 ? `${formatDecimal(registryEgressGb)}GB image egress` : undefined,
+  ].filter(Boolean);
+  const usageSignal = usageSignalParts.join(' · ') || 'Runtime rows only';
+  const hasAdvancedFormSignal =
+    functionInvocationsMillion > 0 ||
+    kubernetesClusterCount > 0 ||
+    kubernetesWorkerNodeCount > 0 ||
+    registryStorageGb > 0 ||
+    registryEgressGb > 0;
+
+  return comparison.providers
+    .flatMap((provider) => {
+      const runtimeRows = runtimeIntelligenceLineItems(provider).sort(
+        (left, right) => right.baseMonthlyCostUsd - left.baseMonthlyCostUsd,
+      );
+      const advancedRows = runtimeRows.filter((lineItem) =>
+        runtimeAdvancedDescriptionMatches(`${lineItem.skuId ?? ''} ${lineItem.description}`),
+      );
+      const primary = advancedRows[0] ?? runtimeRows[0];
+      const runtimeMonthly = roundCurrency(
+        runtimeRows.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0),
+      );
+      const runtimeSharePercent =
+        provider.totals.monthly > 0 ? (runtimeMonthly / provider.totals.monthly) * 100 : 0;
+      const material =
+        runtimeMonthly >= 10 ||
+        runtimeSharePercent >= 10 ||
+        hasAdvancedFormSignal ||
+        advancedRows.length > 0;
+
+      if (!primary || runtimeMonthly <= 0 || !material) {
+        return [];
+      }
+
+      const signal = runtimeOptimizationSignal(primary, runtimeMonthly, {
+        functionDurationMs,
+        functionInvocationsMillion,
+        functionMemoryMb,
+        kubernetesClusterCount,
+        kubernetesWorkerNodeCount,
+        registryEgressGb,
+        registryStorageGb,
+      });
+
+      return [
+        {
+          providerId: provider.providerId,
+          runtimeMonthly,
+          runtimeSharePercent,
+          usageSignal,
+          annualSavings: roundCurrency(signal.monthlySavings * 12),
+          ...signal,
+        },
+      ];
+    })
+    .sort((left, right) => right.monthlySavings - left.monthlySavings);
+}
+
+function runtimeIntelligenceLineItems(provider: ComparisonProviderResult): ComparisonLineItem[] {
+  return provider.lineItems.filter((lineItem) =>
+    runtimeDescriptionMatches(`${lineItem.skuId ?? ''} ${lineItem.description}`),
+  );
+}
+
+function runtimeOptimizationSignal(
+  primary: ComparisonLineItem,
+  runtimeMonthly: number,
+  context: {
+    functionDurationMs: number;
+    functionInvocationsMillion: number;
+    functionMemoryMb: number;
+    kubernetesClusterCount: number;
+    kubernetesWorkerNodeCount: number;
+    registryEgressGb: number;
+    registryStorageGb: number;
+  },
+): Omit<
+  RuntimeOptimizationRow,
+  'providerId' | 'runtimeMonthly' | 'runtimeSharePercent' | 'usageSignal' | 'annualSavings'
+> {
+  const normalizedPrimary = `${primary.skuId ?? ''} ${primary.description}`.toLowerCase();
+  const primaryMonthly =
+    primary.baseMonthlyCostUsd > 0 ? primary.baseMonthlyCostUsd : runtimeMonthly;
+  const baseEvidence = `${primary.description} is the largest runtime row at ${formatCurrency(
+    primaryMonthly,
+  )}/mo.`;
+
+  if (normalizedPrimary.includes('gb-second') || normalizedPrimary.includes('duration')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.25);
+
+    return {
+      primaryDriver: 'Function duration / memory',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation:
+        'Tune the memory-duration knee and compare functions with always-on containers for steady traffic.',
+      driverEvidence:
+        context.functionInvocationsMillion > 0
+          ? `${formatDecimal(context.functionInvocationsMillion)}M invocations · ${formatDecimal(
+              context.functionDurationMs,
+            )}ms @ ${formatDecimal(context.functionMemoryMb)}MB`
+          : 'Function duration line item surfaced by backend',
+      evidence: `${baseEvidence} Function runtime tuning models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('request') || normalizedPrimary.includes('invocation')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      primaryDriver: 'Function invocations',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation:
+        'Batch event triggers, reduce retries, and reserve provisioned concurrency only for latency-critical paths.',
+      driverEvidence:
+        context.functionInvocationsMillion > 0
+          ? `${formatDecimal(context.functionInvocationsMillion)}M monthly invocations`
+          : 'Function request line item surfaced by backend',
+      evidence: `${baseEvidence} Invocation-shape tuning models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('control plane')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.3);
+
+    return {
+      primaryDriver: 'Kubernetes control plane',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation:
+        'Validate cluster count and shared platform model before accepting per-cluster overhead.',
+      driverEvidence:
+        context.kubernetesClusterCount > 0
+          ? `${formatDecimal(context.kubernetesClusterCount)} managed clusters`
+          : 'Kubernetes control-plane line item surfaced by backend',
+      evidence: `${baseEvidence} Cluster consolidation review models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (
+    normalizedPrimary.includes('node overhead') ||
+    normalizedPrimary.includes('kubernetes node') ||
+    normalizedPrimary.includes('networking/operations')
+  ) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      primaryDriver: 'Kubernetes node overhead',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation:
+        'Right-size worker nodes and autoscaling, or compare managed serverless containers for small services.',
+      driverEvidence:
+        context.kubernetesWorkerNodeCount > 0
+          ? `${formatDecimal(context.kubernetesWorkerNodeCount)} worker nodes`
+          : 'Kubernetes node overhead line item surfaced by backend',
+      evidence: `${baseEvidence} Node overhead tuning models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('registry egress')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.35);
+
+    return {
+      primaryDriver: 'Registry image egress',
+      monthlySavings,
+      effort: 'Low',
+      recommendation:
+        'Keep image pulls regional, use pull-through cache, and avoid cross-region image transfer.',
+      driverEvidence:
+        context.registryEgressGb > 0
+          ? `${formatDecimal(context.registryEgressGb)}GB registry egress`
+          : 'Registry egress line item surfaced by backend',
+      evidence: `${baseEvidence} Registry locality review models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('registry storage')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.3);
+
+    return {
+      primaryDriver: 'Registry image retention',
+      monthlySavings,
+      effort: 'Low',
+      recommendation: 'Enforce image lifecycle retention for old tags, digests, and build caches.',
+      driverEvidence:
+        context.registryStorageGb > 0
+          ? `${formatDecimal(context.registryStorageGb)}GB registry storage`
+          : 'Registry storage line item surfaced by backend',
+      evidence: `${baseEvidence} Registry cleanup models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  const monthlySavings = roundCurrency(runtimeMonthly * 0.15);
+
+  return {
+    primaryDriver: 'Runtime platform fit',
+    monthlySavings,
+    effort: 'Medium',
+    recommendation:
+      'Review function, container, and orchestration fit against traffic shape before standardizing the platform.',
+    driverEvidence: `${formatCurrency(runtimeMonthly)}/mo serverless/container spend`,
+    evidence: `Runtime platform review models ${formatCurrency(
+      monthlySavings,
+    )}/mo opportunity at 15% of the runtime baseline.`,
   };
 }
 
@@ -9038,6 +9367,40 @@ function databaseAdvancedDescriptionMatches(description: string): boolean {
     'cache',
     'redis',
     'growth',
+  ].some((needle) => normalized.includes(needle));
+}
+
+function runtimeDescriptionMatches(description: string): boolean {
+  const normalized = description.toLowerCase();
+
+  return [
+    'serverless function',
+    'function request',
+    'function duration',
+    'gb-second',
+    'lambda',
+    'cloud functions',
+    'azure functions',
+    'kubernetes',
+    'container registry',
+    'registry storage',
+    'registry egress',
+    'control plane',
+    'node overhead',
+  ].some((needle) => normalized.includes(needle));
+}
+
+function runtimeAdvancedDescriptionMatches(description: string): boolean {
+  const normalized = description.toLowerCase();
+
+  return [
+    'gb-second',
+    'duration',
+    'function request',
+    'control plane',
+    'node overhead',
+    'registry storage',
+    'registry egress',
   ].some((needle) => normalized.includes(needle));
 }
 

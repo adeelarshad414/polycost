@@ -1211,6 +1211,79 @@ describe('ComparisonView', () => {
     unmount();
   });
 
+  it('surfaces runtime optimization detail from serverless and container dimensions', async () => {
+    const awsProvider = providerWithItems('aws', [
+      ['compute', 'aws compute', 40],
+      ['compute', 'AWS serverless function GB-second estimate', 90],
+      ['operations', 'AWS managed Kubernetes control plane estimate', 72],
+      ['storage', 'AWS container registry storage estimate', 4],
+      ['network', 'AWS container registry egress estimate', 9],
+    ]);
+    awsProvider.lineItems[1] = {
+      ...awsProvider.lineItems[1],
+      costComponent: 'compute',
+      skuId: 'modeled-serverless-function-duration',
+    };
+    awsProvider.lineItems[2] = {
+      ...awsProvider.lineItems[2],
+      costComponent: 'operations',
+      skuId: 'modeled-kubernetes-control-plane',
+    };
+    awsProvider.lineItems[3] = {
+      ...awsProvider.lineItems[3],
+      costComponent: 'storage',
+      skuId: 'modeled-container-registry-storage',
+    };
+    awsProvider.lineItems[4] = {
+      ...awsProvider.lineItems[4],
+      costComponent: 'egress',
+      skuId: 'modeled-container-registry-egress',
+    };
+    const runtimeResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'aws',
+      providers: [
+        awsProvider,
+        providerWithItems('azure', [['compute', 'azure compute', 220]]),
+        providerWithItems('gcp', [['compute', 'gcp compute', 230]]),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView
+        comparison={runtimeResult}
+        form={{
+          ...defaultWorkloadForm,
+          functionInvocationsMillion: '5',
+          functionDurationMs: '200',
+          functionMemoryMb: '512',
+          kubernetesClusterCount: '2',
+          kubernetesWorkerNodeCount: '6',
+          registryStorageGb: '40',
+          registryEgressGb: '100',
+        }}
+        interval="monthly"
+      />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain('Runtime optimization detail');
+    expect(text(container)).toContain(
+      'Functions, Kubernetes overhead, container registry, and platform fit',
+    );
+    expect(text(container)).toContain('Function duration / memory');
+    expect(text(container)).toContain(
+      '5M invocations · 200ms @ 512MB · 2 clusters / 6 nodes · 40GB registry · 100GB image egress',
+    );
+    expect(text(container)).toContain('$22.50/mo');
+    expect(text(container)).toContain('$270.00/yr');
+    expect(text(container)).toContain(
+      'Tune the memory-duration knee and compare functions with always-on containers for steady traffic.',
+    );
+    expect(text(container)).toContain('5M invocations · 200ms @ 512MB');
+
+    unmount();
+  });
+
   it('renders FinOps feature additions without fabricating unsupported backend data', async () => {
     const awsRichProvider = providerWithItems('aws', [
       ['compute', 'aws compute', 50],

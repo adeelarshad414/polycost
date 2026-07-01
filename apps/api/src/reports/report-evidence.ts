@@ -628,6 +628,31 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
     ]);
   }
 
+  for (const provider of result.providers) {
+    const runtimeMonthly = runtimeIntelligenceMonthly(provider);
+    const providerMonthly = provider.totals.monthly;
+    const runtimeShare = providerMonthly > 0 ? runtimeMonthly / providerMonthly : 0;
+    const insight = runtimeOptimizationInsight(provider);
+    const isMaterial =
+      runtimeMonthly >= 10 || runtimeShare >= 0.1 || Boolean(insight?.hasAdvancedSignal);
+
+    if (!insight || !isMaterial) {
+      continue;
+    }
+
+    rows.push([
+      'Runtime optimization',
+      `${provider.providerId} serverless/container runtime is ${formatNumber(
+        runtimeShare * 100,
+      )}% of monthly spend; ${insight.recommendation}`,
+      formatNumber(insight.monthlySavings),
+      formatNumber(insight.monthlySavings * 12),
+      insight.monthlySavings > 100 ? 'High' : insight.monthlySavings > 20 ? 'Medium' : 'Low',
+      insight.effort,
+      insight.evidence,
+    ]);
+  }
+
   rows.push(...architectureRiskOpportunityRows(result));
 
   for (const provider of result.providers) {
@@ -705,7 +730,7 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
       : [
           [
             'No material optimization opportunity detected',
-            'Current comparison does not expose provider spread, commitment, storage, database, egress, licensing, or mapping signals above thresholds.',
+            'Current comparison does not expose provider spread, commitment, storage, database, runtime, egress, licensing, or mapping signals above thresholds.',
             '',
             '',
             'Low',
@@ -1169,6 +1194,13 @@ function databaseIntelligenceMonthly(provider: ComparisonProviderResult): number
   );
 }
 
+function runtimeIntelligenceMonthly(provider: ComparisonProviderResult): number {
+  return runtimeIntelligenceLineItems(provider).reduce(
+    (sum, lineItem) => sum + lineItem.baseMonthlyCostUsd,
+    0,
+  );
+}
+
 function databaseIntelligenceLineItems(provider: ComparisonProviderResult): ComparisonLineItem[] {
   return provider.lineItems.filter(
     (lineItem) =>
@@ -1176,6 +1208,12 @@ function databaseIntelligenceLineItems(provider: ComparisonProviderResult): Comp
       lineItem.costComponent === 'database' ||
       databaseDescription(lineItem.description) ||
       databaseDescription(lineItem.skuId ?? ''),
+  );
+}
+
+function runtimeIntelligenceLineItems(provider: ComparisonProviderResult): ComparisonLineItem[] {
+  return provider.lineItems.filter((lineItem) =>
+    runtimeDescription(`${lineItem.skuId ?? ''} ${lineItem.description}`),
   );
 }
 
@@ -1322,6 +1360,14 @@ interface StorageOptimizationInsight {
 }
 
 interface DatabaseOptimizationInsight {
+  recommendation: string;
+  monthlySavings: number;
+  effort: 'Low' | 'Medium' | 'High';
+  evidence: string;
+  hasAdvancedSignal: boolean;
+}
+
+interface RuntimeOptimizationInsight {
   recommendation: string;
   monthlySavings: number;
   effort: 'Low' | 'Medium' | 'High';
@@ -1736,6 +1782,136 @@ function databaseOptimizationInsight(
   };
 }
 
+function runtimeOptimizationInsight(
+  provider: ComparisonProviderResult,
+): RuntimeOptimizationInsight | undefined {
+  const runtimeRows = runtimeIntelligenceLineItems(provider).sort(
+    (left, right) => right.baseMonthlyCostUsd - left.baseMonthlyCostUsd,
+  );
+  const runtimeMonthly = runtimeRows.reduce(
+    (sum, lineItem) => sum + lineItem.baseMonthlyCostUsd,
+    0,
+  );
+
+  if (runtimeMonthly <= 0 || runtimeRows.length === 0) {
+    return undefined;
+  }
+
+  const advancedRows = runtimeRows.filter((lineItem) =>
+    runtimeAdvancedDescription(`${lineItem.skuId ?? ''} ${lineItem.description}`),
+  );
+  const primary = advancedRows[0] ?? runtimeRows[0];
+  const primaryMonthly = primary.baseMonthlyCostUsd || runtimeMonthly;
+  const primaryDescription = primary.description;
+  const normalizedPrimary = `${primary.skuId ?? ''} ${primaryDescription}`.toLowerCase();
+
+  if (normalizedPrimary.includes('gb-second') || normalizedPrimary.includes('duration')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.25);
+
+    return {
+      recommendation:
+        'tune function memory-duration settings and compare functions with always-on containers for steady traffic.',
+      monthlySavings,
+      effort: 'Medium',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant runtime row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; function runtime tuning is modeled as a 25% reduction of that row.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('request') || normalizedPrimary.includes('invocation')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      recommendation:
+        'batch event triggers, reduce retry noise, and reserve provisioned concurrency only for latency-critical paths.',
+      monthlySavings,
+      effort: 'Medium',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant runtime row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; invocation-shape tuning is modeled as a 20% reduction of that row.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('control plane')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.3);
+
+    return {
+      recommendation:
+        'validate cluster count and shared platform model before accepting per-cluster Kubernetes overhead.',
+      monthlySavings,
+      effort: 'Medium',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant runtime row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; cluster consolidation review is modeled as a 30% reduction of that row.`,
+    };
+  }
+
+  if (
+    normalizedPrimary.includes('node overhead') ||
+    normalizedPrimary.includes('kubernetes node') ||
+    normalizedPrimary.includes('networking/operations')
+  ) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      recommendation:
+        'right-size worker nodes and autoscaling, or compare managed serverless containers for smaller services.',
+      monthlySavings,
+      effort: 'Medium',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant runtime row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; node overhead tuning is modeled as a 20% reduction of that row.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('registry egress')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.35);
+
+    return {
+      recommendation:
+        'keep image pulls regional, use pull-through cache, and avoid cross-region registry transfer.',
+      monthlySavings,
+      effort: 'Low',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant runtime row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; registry locality review is modeled as a 35% reduction of that row.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('registry storage')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.3);
+
+    return {
+      recommendation: 'enforce image lifecycle retention for old tags, digests, and build caches.',
+      monthlySavings,
+      effort: 'Low',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant runtime row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; registry cleanup is modeled as a 30% reduction of that row.`,
+    };
+  }
+
+  const monthlySavings = roundCurrency(runtimeMonthly * 0.15);
+
+  return {
+    recommendation:
+      'review function, container, and orchestration fit against workload traffic shape before standardizing the platform.',
+    monthlySavings,
+    effort: 'Medium',
+    hasAdvancedSignal: false,
+    evidence: `${provider.providerId} runtime baseline is $${formatNumber(
+      runtimeMonthly,
+    )}/mo across ${runtimeRows.length} serverless/container row(s); platform-fit review is modeled at 15% of spend.`,
+  };
+}
+
 function egressOptimizationInsight(provider: ComparisonProviderResult): EgressOptimizationInsight {
   const egressMonthly = componentMonthly(provider, 'egress');
   const egressRows = provider.lineItems
@@ -2000,6 +2176,40 @@ function databaseAdvancedDescription(description: string): boolean {
     'cache',
     'redis',
     'growth',
+  ].some((needle) => normalized.includes(needle));
+}
+
+function runtimeDescription(description: string): boolean {
+  const normalized = description.toLowerCase();
+
+  return [
+    'serverless function',
+    'function request',
+    'function duration',
+    'gb-second',
+    'lambda',
+    'cloud functions',
+    'azure functions',
+    'kubernetes',
+    'container registry',
+    'registry storage',
+    'registry egress',
+    'control plane',
+    'node overhead',
+  ].some((needle) => normalized.includes(needle));
+}
+
+function runtimeAdvancedDescription(description: string): boolean {
+  const normalized = description.toLowerCase();
+
+  return [
+    'gb-second',
+    'duration',
+    'function request',
+    'control plane',
+    'node overhead',
+    'registry storage',
+    'registry egress',
   ].some((needle) => normalized.includes(needle));
 }
 
