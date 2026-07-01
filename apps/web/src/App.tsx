@@ -2038,6 +2038,8 @@ function ServerAnalyticsStatusStrip({
   }
 
   const tone = error ? 'error' : isLoading ? 'loading' : 'ready';
+  const coveredDimensionCount =
+    analytics?.costCoverageMap.filter((entry) => entry.status === 'Covered').length ?? 0;
 
   return (
     <section
@@ -2056,6 +2058,10 @@ function ServerAnalyticsStatusStrip({
         {error ? <p>{error}</p> : null}
       </div>
       <div className="server-analytics-metrics" aria-label="Backend analytics coverage">
+        <ServerAnalyticsMetric
+          label="Coverage"
+          value={analytics ? String(coveredDimensionCount) : '...'}
+        />
         <ServerAnalyticsMetric
           label="Deltas"
           value={analytics ? String(analytics.providerDeltaAnalysis.length) : '...'}

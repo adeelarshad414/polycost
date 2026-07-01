@@ -87,6 +87,18 @@ describe('api client', () => {
           },
         ],
       },
+      costCoverageMap: [
+        {
+          providerId: 'aws',
+          dimension: 'Compute families and sizing',
+          status: 'Covered',
+          pricedRows: 1,
+          approximateRows: 0,
+          monthlyUsd: 80,
+          evidence: 'aws compute row is priced.',
+          reviewCue: 'Validate family.',
+        },
+      ],
       costComposition: [
         {
           providerId: 'aws',

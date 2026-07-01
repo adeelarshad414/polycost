@@ -619,7 +619,7 @@ textarea:focus-visible {
 
 .server-analytics-metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(58px, 1fr));
+  grid-template-columns: repeat(5, minmax(58px, 1fr));
   gap: 8px;
 }
 

@@ -5,6 +5,7 @@ import {
   ComparisonProviderResult,
   ComparisonResult,
 } from '../comparison/comparison.types';
+import { costCoverageMapRows } from '../reports/report-evidence';
 
 type AnalyticsDimension =
   | 'compute'
@@ -127,11 +128,23 @@ export interface ExecutiveForecast {
   providerForecasts: ExecutiveForecastProvider[];
 }
 
+export interface CostCoverageMapEntry {
+  providerId: ProviderId;
+  dimension: string;
+  status: string;
+  pricedRows: number;
+  approximateRows: number;
+  monthlyUsd?: number;
+  evidence: string;
+  reviewCue: string;
+}
+
 export interface ComparisonAnalyticsResponse {
   comparisonId: string;
   generatedAt: string;
   pricingAsOf: string;
   executiveForecast: ExecutiveForecast;
+  costCoverageMap: CostCoverageMapEntry[];
   costComposition: ProviderCostComposition[];
   providerDeltaAnalysis: ProviderDeltaAnalysis[];
   sensitivityScenarios: SensitivityScenarioRow[];
@@ -215,6 +228,7 @@ export class ComparisonAnalyticsService {
       generatedAt: generatedAt.toISOString(),
       pricingAsOf: result.pricingAsOf,
       executiveForecast: executiveForecast(result.providers),
+      costCoverageMap: costCoverageMap(result),
       costComposition: providerDimensionAmounts.map(({ provider, amounts }) =>
         costComposition(provider, amounts),
       ),
@@ -226,6 +240,21 @@ export class ComparisonAnalyticsService {
       finOpsFindings: finOpsFindings(result, providerDimensionAmounts),
     };
   }
+}
+
+function costCoverageMap(result: ComparisonResult): CostCoverageMapEntry[] {
+  return costCoverageMapRows(result)
+    .slice(1)
+    .map((row) => ({
+      providerId: row[0] as ProviderId,
+      dimension: row[1],
+      status: row[2],
+      pricedRows: Number(row[3]),
+      approximateRows: Number(row[4]),
+      ...(row[5] ? { monthlyUsd: Number(row[5]) } : {}),
+      evidence: row[6],
+      reviewCue: row[7],
+    }));
 }
 
 function executiveForecast(providers: ComparisonProviderResult[]): ExecutiveForecast {

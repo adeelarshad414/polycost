@@ -455,11 +455,23 @@ export interface ExecutiveForecast {
   }>;
 }
 
+export interface CostCoverageMapEntry {
+  providerId: ProviderId;
+  dimension: string;
+  status: string;
+  pricedRows: number;
+  approximateRows: number;
+  monthlyUsd?: number;
+  evidence: string;
+  reviewCue: string;
+}
+
 export interface ComparisonAnalyticsResponse {
   comparisonId: string;
   generatedAt: string;
   pricingAsOf: string;
   executiveForecast: ExecutiveForecast;
+  costCoverageMap: CostCoverageMapEntry[];
   costComposition: ProviderCostComposition[];
   providerDeltaAnalysis: ProviderDeltaAnalysis[];
   sensitivityScenarios: SensitivityScenarioRow[];

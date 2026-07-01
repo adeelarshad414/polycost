@@ -96,6 +96,7 @@ describe('App', () => {
     expect(client.getComparisonAnalytics).toHaveBeenCalledWith(comparisonResult.comparisonId);
     expect(text(container)).not.toContain('Comparison ready.');
     expect(text(container)).toContain('Server analytics');
+    expect(text(container)).toContain('Coverage');
     expect(text(container)).toContain('Deltas');
     expect(text(container)).toContain('Findings');
     expect(text(container)).toContain('AWS');
@@ -2290,6 +2291,18 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
           },
         ],
       },
+      costCoverageMap: [
+        {
+          providerId: 'gcp' as const,
+          dimension: 'Compute families and sizing',
+          status: 'Covered',
+          pricedRows: 1,
+          approximateRows: 0,
+          monthlyUsd: 30,
+          evidence: 'gcp compute row is priced.',
+          reviewCue: 'Validate family.',
+        },
+      ],
       costComposition: [],
       providerDeltaAnalysis: [],
       sensitivityScenarios: [],

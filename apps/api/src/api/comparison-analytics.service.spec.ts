@@ -251,6 +251,30 @@ describe('ComparisonAnalyticsService', () => {
         },
       ]),
     });
+    expect(analytics.costCoverageMap).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          providerId: 'aws',
+          dimension: 'Compute families and sizing',
+          status: 'Covered',
+          pricedRows: 1,
+          approximateRows: 0,
+          monthlyUsd: 400,
+        }),
+        expect.objectContaining({
+          providerId: 'aws',
+          dimension: 'Support plans and OS/licensing',
+          status: 'Partial',
+          pricedRows: 2,
+          approximateRows: 2,
+        }),
+        expect.objectContaining({
+          providerId: 'gcp',
+          dimension: 'Pricing models, commitments, and spot estimates',
+          status: 'Missing priced row',
+        }),
+      ]),
+    );
     expect(analytics.providerDeltaAnalysis).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
