@@ -427,7 +427,8 @@ describe('ComparisonOrchestratorService', () => {
         expect.objectContaining({
           category: 'support',
           costComponent: 'support',
-          baseMonthlyCostUsd: 100,
+          description: 'AWS Business Support+ support estimate',
+          baseMonthlyCostUsd: 29,
           isApproximate: true,
         }),
         expect.objectContaining({
@@ -447,10 +448,76 @@ describe('ComparisonOrchestratorService', () => {
     expect(result.providers[0].breakdown).toEqual(
       expect.objectContaining({
         computeMonthlyCostUsd: 26,
-        supportMonthlyCostUsd: 100,
+        supportMonthlyCostUsd: 29,
         licensingMonthlyCostUsd: 23.92,
         operationsMonthlyCostUsd: 81.9,
       }),
+    );
+  });
+
+  it('uses provider-specific public support rate cards', async () => {
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async () => providerResult('aws', [300_000])),
+      ),
+      adapter(
+        'azure',
+        jest.fn(async () => providerResult('azure', [300_000])),
+      ),
+      adapter(
+        'gcp',
+        jest.fn(async () => providerResult('gcp', [300_000])),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      workloadProfile: {
+        supportTier: 'business',
+      },
+    });
+
+    expect(result.providers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          providerId: 'aws',
+          breakdown: expect.objectContaining({
+            supportMonthlyCostUsd: 15_800,
+          }),
+          lineItems: expect.arrayContaining([
+            expect.objectContaining({
+              description: 'AWS Business Support+ support estimate',
+              skuId: 'modeled-support-business',
+              baseMonthlyCostUsd: 15_800,
+            }),
+          ]),
+        }),
+        expect.objectContaining({
+          providerId: 'azure',
+          breakdown: expect.objectContaining({
+            supportMonthlyCostUsd: 100,
+          }),
+          lineItems: expect.arrayContaining([
+            expect.objectContaining({
+              description: 'Azure Standard support estimate',
+              baseMonthlyCostUsd: 100,
+            }),
+          ]),
+        }),
+        expect.objectContaining({
+          providerId: 'gcp',
+          breakdown: expect.objectContaining({
+            supportMonthlyCostUsd: 15_900,
+          }),
+          lineItems: expect.arrayContaining([
+            expect.objectContaining({
+              description: 'GCP Enhanced support estimate',
+              baseMonthlyCostUsd: 15_900,
+            }),
+          ]),
+        }),
+      ]),
     );
   });
 

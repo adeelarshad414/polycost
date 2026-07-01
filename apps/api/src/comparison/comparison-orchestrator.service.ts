@@ -515,10 +515,14 @@ export class ComparisonOrchestratorService {
     return this.normalizeLineItem({
       category: 'support',
       costComponent: 'support',
-      description: `${providerLabel(providerId)} ${supportTierLabel(supportTier)} support estimate`,
+      description: `${providerLabel(providerId)} ${providerSupportPlanLabel(
+        providerId,
+        supportTier,
+      )} support estimate`,
       isApproximate: true,
       baseMonthlyCostUsd: supportCost,
       baseHourlyCostUsd: supportCost / HOURS_PER_MONTH,
+      skuId: `modeled-support-${supportTier}`,
       unit: 'month',
       unitPriceUsd: supportCost,
       pricingBasis: 'flat',
@@ -530,17 +534,19 @@ export class ComparisonOrchestratorService {
     supportTier: NonNullable<NormalizedWorkloadSpec['workloadProfile']>['supportTier'],
     subtotal: number,
   ): number {
-    switch (supportTier) {
-      case 'developer':
-        return providerId === 'gcp' ? 29 : 29;
-      case 'business':
-        return this.roundCurrency(Math.max(100, subtotal * 0.1));
-      case 'enterprise':
-        return this.roundCurrency(Math.max(providerId === 'azure' ? 1000 : 1500, subtotal * 0.15));
-      case 'none':
-      case undefined:
-        return 0;
+    if (!supportTier || supportTier === 'none') {
+      return 0;
     }
+
+    if (providerId === 'azure') {
+      return azureSupportCost(supportTier);
+    }
+
+    if (providerId === 'gcp') {
+      return this.roundCurrency(gcpSupportCost(supportTier, subtotal));
+    }
+
+    return this.roundCurrency(awsSupportCost(supportTier, subtotal));
   }
 
   private licensingLineItem(
@@ -2262,16 +2268,156 @@ function providerLabel(providerId: ProviderId): string {
   }
 }
 
-function supportTierLabel(
-  supportTier: NonNullable<NormalizedWorkloadSpec['workloadProfile']>['supportTier'],
-): string {
+type SupportTier = NonNullable<NormalizedWorkloadSpec['workloadProfile']>['supportTier'];
+
+interface TieredSupportBracket {
+  upTo?: number;
+  rate: number;
+}
+
+const AWS_BUSINESS_SUPPORT_BRACKETS: TieredSupportBracket[] = [
+  { upTo: 10_000, rate: 0.09 },
+  { upTo: 80_000, rate: 0.07 },
+  { upTo: 250_000, rate: 0.05 },
+  { rate: 0.03 },
+];
+
+const AWS_ENTERPRISE_SUPPORT_BRACKETS: TieredSupportBracket[] = [
+  { upTo: 150_000, rate: 0.1 },
+  { upTo: 500_000, rate: 0.07 },
+  { upTo: 1_000_000, rate: 0.05 },
+  { rate: 0.03 },
+];
+
+const GCP_ENHANCED_SUPPORT_BRACKETS: TieredSupportBracket[] = [
+  { upTo: 10_000, rate: 0.1 },
+  { upTo: 80_000, rate: 0.07 },
+  { upTo: 250_000, rate: 0.05 },
+  { rate: 0.03 },
+];
+
+const GCP_PREMIUM_SUPPORT_BRACKETS: TieredSupportBracket[] = [
+  { upTo: 150_000, rate: 0.1 },
+  { upTo: 500_000, rate: 0.07 },
+  { upTo: 1_000_000, rate: 0.05 },
+  { rate: 0.03 },
+];
+
+function awsSupportCost(supportTier: SupportTier, subtotal: number): number {
+  switch (supportTier) {
+    case 'developer':
+      return 29;
+    case 'business':
+      return Math.max(29, tieredSupportCharge(subtotal, AWS_BUSINESS_SUPPORT_BRACKETS));
+    case 'enterprise':
+      return Math.max(5_000, tieredSupportCharge(subtotal, AWS_ENTERPRISE_SUPPORT_BRACKETS));
+    case 'none':
+    case undefined:
+      return 0;
+  }
+}
+
+function azureSupportCost(supportTier: SupportTier): number {
+  switch (supportTier) {
+    case 'developer':
+      return 29;
+    case 'business':
+      return 100;
+    case 'enterprise':
+      return 1_000;
+    case 'none':
+    case undefined:
+      return 0;
+  }
+}
+
+function gcpSupportCost(supportTier: SupportTier, subtotal: number): number {
+  switch (supportTier) {
+    case 'developer':
+      return Math.max(29, subtotal * 0.03);
+    case 'business':
+      return Math.max(100, tieredSupportCharge(subtotal, GCP_ENHANCED_SUPPORT_BRACKETS));
+    case 'enterprise':
+      return Math.max(15_000, tieredSupportCharge(subtotal, GCP_PREMIUM_SUPPORT_BRACKETS));
+    case 'none':
+    case undefined:
+      return 0;
+  }
+}
+
+function tieredSupportCharge(subtotal: number, brackets: TieredSupportBracket[]): number {
+  const chargeableSubtotal = Math.max(0, subtotal);
+  let previousLimit = 0;
+  let remaining = chargeableSubtotal;
+  let charge = 0;
+
+  for (const bracket of brackets) {
+    if (remaining <= 0) {
+      break;
+    }
+
+    const bracketSize =
+      bracket.upTo === undefined ? remaining : Math.max(0, bracket.upTo - previousLimit);
+    const taxableAmount = Math.min(remaining, bracketSize);
+
+    charge += taxableAmount * bracket.rate;
+    remaining -= taxableAmount;
+
+    if (bracket.upTo !== undefined) {
+      previousLimit = bracket.upTo;
+    }
+  }
+
+  return charge;
+}
+
+function providerSupportPlanLabel(providerId: ProviderId, supportTier: SupportTier): string {
+  switch (providerId) {
+    case 'aws':
+      return awsSupportPlanLabel(supportTier);
+    case 'azure':
+      return azureSupportPlanLabel(supportTier);
+    case 'gcp':
+      return gcpSupportPlanLabel(supportTier);
+  }
+}
+
+function awsSupportPlanLabel(supportTier: SupportTier): string {
+  switch (supportTier) {
+    case 'developer':
+      return 'Business Support+ minimum';
+    case 'business':
+      return 'Business Support+';
+    case 'enterprise':
+      return 'Enterprise Support';
+    case 'none':
+    case undefined:
+      return 'No';
+  }
+}
+
+function azureSupportPlanLabel(supportTier: SupportTier): string {
   switch (supportTier) {
     case 'developer':
       return 'Developer';
     case 'business':
-      return 'Business';
+      return 'Standard';
     case 'enterprise':
-      return 'Enterprise';
+      return 'Professional Direct';
+    case 'none':
+    case undefined:
+      return 'No';
+  }
+}
+
+function gcpSupportPlanLabel(supportTier: SupportTier): string {
+  switch (supportTier) {
+    case 'developer':
+      return 'Standard';
+    case 'business':
+      return 'Enhanced';
+    case 'enterprise':
+      return 'Premium';
     case 'none':
     case undefined:
       return 'No';
