@@ -2419,10 +2419,12 @@ function DataHealthBanner({
   }
 
   const tone = error ? 'degraded' : (health?.overallStatus ?? 'degraded');
+  const currentRateRows =
+    health?.providers.reduce((total, provider) => total + provider.cache.currentRateRows, 0) ?? 0;
   const summary = error
     ? 'Pricing data health unavailable'
     : health?.overallStatus === 'fresh'
-      ? `Pricing cache fresh across ${health.providers.length} providers`
+      ? `Pricing cache fresh across ${health.providers.length} providers · ${currentRateRows} current rates`
       : `${health?.alertCount ?? 0} pricing data alert${health?.alertCount === 1 ? '' : 's'}`;
 
   return (
@@ -2439,7 +2441,7 @@ function DataHealthBanner({
         <strong>{summary}</strong>
         <small>
           {error ??
-            `Freshness policy ${health?.freshnessPolicyHours ?? 24}h · generated ${formatDateTime(
+            `Freshness policy ${health?.freshnessPolicyHours ?? 48}h · generated ${formatDateTime(
               health?.generatedAt,
             )}`}
         </small>
@@ -2455,6 +2457,7 @@ function DataHealthBanner({
               {providerLabel(provider.providerId)}
               <small>
                 {provider.ageHours !== undefined ? `${provider.ageHours}h` : provider.freshness}
+                {` · ${provider.cache.currentRateRows} rates`}
               </small>
             </span>
           ))}

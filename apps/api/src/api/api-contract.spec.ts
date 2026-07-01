@@ -459,7 +459,7 @@ describe('API contracts', () => {
 
     await expect(controller.getDataHealth()).resolves.toEqual({
       generatedAt: '2026-07-01T00:00:00.000Z',
-      freshnessPolicyHours: 24,
+      freshnessPolicyHours: 48,
       overallStatus: 'fresh',
       alertCount: 0,
       alerts: [],
@@ -473,7 +473,21 @@ describe('API contracts', () => {
           recordsRejected: 0,
           recordsSkipped: 3,
           lastSuccessfulRun: '2026-06-30T23:00:00.000Z',
-          message: 'Pricing cache refreshed 1h ago.',
+          cache: {
+            catalogRows: 30,
+            currentRateRows: 18,
+            latestCatalogSyncAt: '2026-06-30T23:00:00.000Z',
+            latestRateSyncAt: '2026-06-30T23:00:00.000Z',
+            ageHours: 1,
+            freshness: 'fresh',
+            syncStatusCounts: {
+              success: 48,
+              partial: 0,
+              failed: 0,
+            },
+          },
+          message:
+            'Pricing cache refreshed 1h ago across 30 catalog rows and 18 current rate rows.',
         },
       ],
     });
@@ -1017,7 +1031,7 @@ function comparisonApplicationService() {
     })),
     getDataHealth: jest.fn(async () => ({
       generatedAt: '2026-07-01T00:00:00.000Z',
-      freshnessPolicyHours: 24,
+      freshnessPolicyHours: 48,
       overallStatus: 'fresh' as const,
       alertCount: 0,
       alerts: [],
@@ -1031,7 +1045,21 @@ function comparisonApplicationService() {
           recordsRejected: 0,
           recordsSkipped: 3,
           lastSuccessfulRun: '2026-06-30T23:00:00.000Z',
-          message: 'Pricing cache refreshed 1h ago.',
+          cache: {
+            catalogRows: 30,
+            currentRateRows: 18,
+            latestCatalogSyncAt: '2026-06-30T23:00:00.000Z',
+            latestRateSyncAt: '2026-06-30T23:00:00.000Z',
+            ageHours: 1,
+            freshness: 'fresh' as const,
+            syncStatusCounts: {
+              success: 48,
+              partial: 0,
+              failed: 0,
+            },
+          },
+          message:
+            'Pricing cache refreshed 1h ago across 30 catalog rows and 18 current rate rows.',
         },
       ],
     })),

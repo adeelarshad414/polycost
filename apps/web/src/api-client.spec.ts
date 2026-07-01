@@ -350,7 +350,7 @@ describe('api client', () => {
     const fetchMock = jest.fn(async () =>
       jsonResponse({
         generatedAt: '2026-07-01T00:00:00.000Z',
-        freshnessPolicyHours: 24,
+        freshnessPolicyHours: 48,
         overallStatus: 'fresh',
         alertCount: 0,
         alerts: [],
@@ -363,7 +363,21 @@ describe('api client', () => {
             recordsUpdated: 12,
             recordsRejected: 0,
             recordsSkipped: 3,
-            message: 'Pricing cache refreshed 1h ago.',
+            cache: {
+              catalogRows: 30,
+              currentRateRows: 18,
+              latestCatalogSyncAt: '2026-06-30T23:00:00.000Z',
+              latestRateSyncAt: '2026-06-30T23:00:00.000Z',
+              ageHours: 1,
+              freshness: 'fresh',
+              syncStatusCounts: {
+                success: 48,
+                partial: 0,
+                failed: 0,
+              },
+            },
+            message:
+              'Pricing cache refreshed 1h ago across 30 catalog rows and 18 current rate rows.',
           },
         ],
       }),

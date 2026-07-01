@@ -511,6 +511,19 @@ export interface DataHealthResponse {
     recordsUpdated: number;
     recordsRejected: number;
     recordsSkipped: number;
+    cache: {
+      catalogRows: number;
+      currentRateRows: number;
+      latestCatalogSyncAt?: string;
+      latestRateSyncAt?: string;
+      ageHours?: number;
+      freshness: 'fresh' | 'stale' | 'missing';
+      syncStatusCounts: {
+        success: number;
+        partial: number;
+        failed: number;
+      };
+    };
     message: string;
   }>;
 }

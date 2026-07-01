@@ -91,6 +91,20 @@ interface PricingStatusRow {
   records_skipped: number | null;
 }
 
+interface PricingCacheHealthRow {
+  provider: ProviderId;
+  catalog_rows: string | number | null;
+  current_rate_rows: string | number | null;
+  latest_catalog_sync_at: Date | null;
+  latest_rate_sync_at: Date | null;
+  catalog_success_rows: string | number | null;
+  catalog_partial_rows: string | number | null;
+  catalog_failed_rows: string | number | null;
+  rate_success_rows: string | number | null;
+  rate_partial_rows: string | number | null;
+  rate_failed_rows: string | number | null;
+}
+
 interface WorkloadRow {
   id: string;
   instance_family: WorkloadRecord['instanceFamily'];
@@ -236,7 +250,7 @@ interface ComparisonPrewarmJobRow {
 }
 
 const PROVIDERS: ProviderId[] = ['aws', 'azure', 'gcp'];
-const DATA_FRESHNESS_POLICY_HOURS = 24;
+const DATA_FRESHNESS_POLICY_HOURS = 48;
 
 const defaultPgPoolFactory: PgPoolFactory = (config) => new Pool(config);
 
@@ -428,32 +442,78 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
   }
 
   async getDataHealth(now: Date = new Date()): Promise<DataHealthResponse> {
-    const status = await this.getPricingStatus();
+    const [status, cacheHealth] = await Promise.all([
+      this.getPricingStatus(),
+      this.getPricingCacheHealth(),
+    ]);
+    const cacheByProvider = new Map(cacheHealth.map((row) => [row.provider, row]));
     const providers = status.providers.map((provider) => {
-      const ageHours = provider.lastSuccessfulRun
+      const providerAgeHours = provider.lastSuccessfulRun
         ? roundHours((now.getTime() - Date.parse(provider.lastSuccessfulRun)) / 3_600_000)
         : undefined;
+      const cacheRow = cacheByProvider.get(provider.providerId);
+      const latestCacheSyncAt = latestDate([
+        cacheRow?.latest_catalog_sync_at ?? null,
+        cacheRow?.latest_rate_sync_at ?? null,
+      ]);
+      const cacheAgeHours = latestCacheSyncAt
+        ? roundHours((now.getTime() - Date.parse(latestCacheSyncAt)) / 3_600_000)
+        : undefined;
+      const catalogRows = toCount(cacheRow?.catalog_rows);
+      const currentRateRows = toCount(cacheRow?.current_rate_rows);
+      const cacheFreshness: DataHealthResponse['providers'][number]['cache']['freshness'] =
+        cacheAgeHours === undefined
+          ? 'missing'
+          : cacheAgeHours > DATA_FRESHNESS_POLICY_HOURS
+            ? 'stale'
+            : 'fresh';
+      const ageHours = maxDefined(providerAgeHours, cacheAgeHours);
       const freshness: DataHealthResponse['providers'][number]['freshness'] =
         provider.status === 'failed'
           ? 'failed'
-          : ageHours === undefined
-            ? 'missing'
-            : ageHours > DATA_FRESHNESS_POLICY_HOURS
-              ? 'stale'
-              : 'fresh';
+          : provider.status === 'partial'
+            ? 'stale'
+            : ageHours === undefined || (catalogRows === 0 && currentRateRows === 0)
+              ? 'missing'
+              : providerAgeHours !== undefined && providerAgeHours > DATA_FRESHNESS_POLICY_HOURS
+                ? 'stale'
+                : cacheFreshness === 'stale'
+                  ? 'stale'
+                  : 'fresh';
       const message =
         freshness === 'fresh'
-          ? `Pricing cache refreshed ${ageHours}h ago.`
+          ? `Pricing cache refreshed ${ageHours}h ago across ${catalogRows} catalog rows and ${currentRateRows} current rate rows.`
           : freshness === 'stale'
-            ? `Pricing cache is ${ageHours}h old; refresh before production decisions.`
+            ? provider.status === 'partial'
+              ? `Latest provider sync was partial; review ${provider.recordsRejected} rejected and ${provider.recordsSkipped} skipped rows.`
+              : `Pricing data is ${ageHours}h old against the ${DATA_FRESHNESS_POLICY_HOURS}h policy; refresh before production decisions.`
             : freshness === 'failed'
               ? 'Latest provider sync failed; use cached data with caution.'
-              : 'No successful provider sync has been recorded.';
+              : catalogRows === 0 && currentRateRows === 0
+                ? 'No cached pricing rows are available for this provider.'
+                : 'No successful provider sync has been recorded.';
 
       return {
         ...provider,
         freshness,
         ...(ageHours !== undefined ? { ageHours } : {}),
+        cache: {
+          catalogRows,
+          currentRateRows,
+          ...(cacheRow?.latest_catalog_sync_at
+            ? { latestCatalogSyncAt: cacheRow.latest_catalog_sync_at.toISOString() }
+            : {}),
+          ...(cacheRow?.latest_rate_sync_at
+            ? { latestRateSyncAt: cacheRow.latest_rate_sync_at.toISOString() }
+            : {}),
+          ...(cacheAgeHours !== undefined ? { ageHours: cacheAgeHours } : {}),
+          freshness: cacheFreshness,
+          syncStatusCounts: {
+            success: toCount(cacheRow?.catalog_success_rows) + toCount(cacheRow?.rate_success_rows),
+            partial: toCount(cacheRow?.catalog_partial_rows) + toCount(cacheRow?.rate_partial_rows),
+            failed: toCount(cacheRow?.catalog_failed_rows) + toCount(cacheRow?.rate_failed_rows),
+          },
+        },
         message,
       };
     });
@@ -481,6 +541,64 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
       alerts,
       providers,
     };
+  }
+
+  private async getPricingCacheHealth(): Promise<PricingCacheHealthRow[]> {
+    const result = await (
+      await this.getPool()
+    ).query<PricingCacheHealthRow>(
+      `
+        WITH catalog AS (
+          SELECT provider,
+                 COUNT(*) AS catalog_rows,
+                 MAX(fetched_at) AS latest_catalog_sync_at,
+                 COUNT(*) FILTER (WHERE sync_status = 'success') AS catalog_success_rows,
+                 COUNT(*) FILTER (WHERE sync_status = 'partial') AS catalog_partial_rows,
+                 COUNT(*) FILTER (WHERE sync_status = 'failed') AS catalog_failed_rows
+          FROM pricing_catalog
+          GROUP BY provider
+        ),
+        rates AS (
+          SELECT provider_skus.provider,
+                 COUNT(*) FILTER (WHERE pricing_rates.valid_to IS NULL) AS current_rate_rows,
+                 MAX(pricing_rates.source_fetched_at) FILTER (
+                   WHERE pricing_rates.valid_to IS NULL
+                 ) AS latest_rate_sync_at,
+                 COUNT(*) FILTER (
+                   WHERE pricing_rates.valid_to IS NULL
+                     AND pricing_rates.sync_status = 'success'
+                 ) AS rate_success_rows,
+                 COUNT(*) FILTER (
+                   WHERE pricing_rates.valid_to IS NULL
+                     AND pricing_rates.sync_status = 'partial'
+                 ) AS rate_partial_rows,
+                 COUNT(*) FILTER (
+                   WHERE pricing_rates.valid_to IS NULL
+                     AND pricing_rates.sync_status = 'failed'
+                 ) AS rate_failed_rows
+          FROM provider_skus
+          JOIN pricing_rates
+            ON pricing_rates.sku_id = provider_skus.id
+          GROUP BY provider_skus.provider
+        )
+        SELECT COALESCE(catalog.provider, rates.provider) AS provider,
+               COALESCE(catalog.catalog_rows, 0) AS catalog_rows,
+               COALESCE(rates.current_rate_rows, 0) AS current_rate_rows,
+               catalog.latest_catalog_sync_at,
+               rates.latest_rate_sync_at,
+               COALESCE(catalog.catalog_success_rows, 0) AS catalog_success_rows,
+               COALESCE(catalog.catalog_partial_rows, 0) AS catalog_partial_rows,
+               COALESCE(catalog.catalog_failed_rows, 0) AS catalog_failed_rows,
+               COALESCE(rates.rate_success_rows, 0) AS rate_success_rows,
+               COALESCE(rates.rate_partial_rows, 0) AS rate_partial_rows,
+               COALESCE(rates.rate_failed_rows, 0) AS rate_failed_rows
+        FROM catalog
+        FULL OUTER JOIN rates
+          ON rates.provider = catalog.provider
+      `,
+    );
+
+    return result.rows;
   }
 
   async createReportExportJob(input: {
@@ -1698,4 +1816,18 @@ function rollupViewsByKey(
 
 function roundHours(value: number): number {
   return Math.max(0, Math.round(value * 10) / 10);
+}
+
+function toCount(value: string | number | null | undefined): number {
+  if (value === undefined || value === null) {
+    return 0;
+  }
+
+  return typeof value === 'number' ? value : Number.parseInt(value, 10);
+}
+
+function maxDefined(...values: Array<number | undefined>): number | undefined {
+  const defined = values.filter((value): value is number => value !== undefined);
+
+  return defined.length > 0 ? Math.max(...defined) : undefined;
 }

@@ -71,9 +71,12 @@ describe('ReportExportJobsService', () => {
     const scheduled: Array<() => void> = [];
     const comparisonApplicationService = comparisonServiceMock();
     const apiDatabaseRepository = repositoryMock({
-      createReportExportJob: jest.fn(
-        async (_input: Parameters<ApiDatabaseRepository['createReportExportJob']>[0]) => pendingJob,
-      ),
+      createReportExportJob: jest
+        .fn<
+          ReturnType<ApiDatabaseRepository['createReportExportJob']>,
+          Parameters<ApiDatabaseRepository['createReportExportJob']>
+        >()
+        .mockResolvedValue(pendingJob),
     });
     const service = createService(comparisonApplicationService, apiDatabaseRepository, undefined, {
       scheduler: (task) => {
@@ -102,12 +105,12 @@ describe('ReportExportJobsService', () => {
 
   it('generates and stores the report artifact for pending jobs', async () => {
     const apiDatabaseRepository = repositoryMock({
-      getReportExportJob: jest.fn(
-        async (
-          _comparisonId: Parameters<ApiDatabaseRepository['getReportExportJob']>[0],
-          _jobId: Parameters<ApiDatabaseRepository['getReportExportJob']>[1],
-        ) => pendingJob,
-      ),
+      getReportExportJob: jest
+        .fn<
+          ReturnType<ApiDatabaseRepository['getReportExportJob']>,
+          Parameters<ApiDatabaseRepository['getReportExportJob']>
+        >()
+        .mockResolvedValue(pendingJob),
     });
     const reportService = reportServiceMock();
     const service = createService(undefined, apiDatabaseRepository, reportService);
@@ -131,12 +134,12 @@ describe('ReportExportJobsService', () => {
 
   it('marks export jobs failed when report generation throws', async () => {
     const apiDatabaseRepository = repositoryMock({
-      getReportExportJob: jest.fn(
-        async (
-          _comparisonId: Parameters<ApiDatabaseRepository['getReportExportJob']>[0],
-          _jobId: Parameters<ApiDatabaseRepository['getReportExportJob']>[1],
-        ) => pendingJob,
-      ),
+      getReportExportJob: jest
+        .fn<
+          ReturnType<ApiDatabaseRepository['getReportExportJob']>,
+          Parameters<ApiDatabaseRepository['getReportExportJob']>
+        >()
+        .mockResolvedValue(pendingJob),
     });
     const reportService = reportServiceMock();
     reportService.generate.mockImplementation(() => {

@@ -136,9 +136,10 @@ export class PostgresPricingCatalogRepository
               unit_price_usd,
               attributes,
               effective_date,
-              fetched_at
+              fetched_at,
+              sync_status
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12)
             ON CONFLICT (provider, sku_id, region, effective_date)
             DO UPDATE SET
               service_category = EXCLUDED.service_category,
@@ -147,7 +148,8 @@ export class PostgresPricingCatalogRepository
               unit = EXCLUDED.unit,
               unit_price_usd = EXCLUDED.unit_price_usd,
               attributes = EXCLUDED.attributes,
-              fetched_at = EXCLUDED.fetched_at
+              fetched_at = EXCLUDED.fetched_at,
+              sync_status = EXCLUDED.sync_status
           `,
           [
             record.provider,
@@ -161,6 +163,7 @@ export class PostgresPricingCatalogRepository
             JSON.stringify(record.attributes ?? {}),
             record.effectiveDate,
             record.fetchedAt,
+            'success',
           ],
         );
 
@@ -198,9 +201,10 @@ export class PostgresPricingCatalogRepository
                 region,
                 os,
                 raw_payload,
-                last_synced_at
+                last_synced_at,
+                sync_status
               )
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)
               ON CONFLICT (provider, provider_sku_id, region)
               DO UPDATE SET
                 family = EXCLUDED.family,
@@ -208,7 +212,8 @@ export class PostgresPricingCatalogRepository
                 memory_gb = EXCLUDED.memory_gb,
                 os = EXCLUDED.os,
                 raw_payload = EXCLUDED.raw_payload,
-                last_synced_at = EXCLUDED.last_synced_at
+                last_synced_at = EXCLUDED.last_synced_at,
+                sync_status = EXCLUDED.sync_status
               RETURNING id
             )
             INSERT INTO pricing_snapshots (
@@ -218,7 +223,7 @@ export class PostgresPricingCatalogRepository
               currency,
               effective_date
             )
-            SELECT id, $10, $11, $12, $13
+            SELECT id, $11, $12, $13, $14
             FROM upserted_sku
             ON CONFLICT (sku_id, term, effective_date)
             DO UPDATE SET
@@ -235,6 +240,7 @@ export class PostgresPricingCatalogRepository
             record.os,
             JSON.stringify(record.rawPayload),
             record.lastSyncedAt,
+            'success',
             record.term,
             record.pricePerHour,
             record.currency,

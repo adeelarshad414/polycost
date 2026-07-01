@@ -2175,6 +2175,25 @@ function deferred<T>(): {
   return { promise, resolve, reject };
 }
 
+function freshCacheSummary(
+  catalogRows: number,
+  currentRateRows: number,
+): DataHealthResponse['providers'][number]['cache'] {
+  return {
+    catalogRows,
+    currentRateRows,
+    latestCatalogSyncAt: '2026-06-30T23:00:00.000Z',
+    latestRateSyncAt: '2026-06-30T23:00:00.000Z',
+    ageHours: 1,
+    freshness: 'fresh',
+    syncStatusCounts: {
+      success: catalogRows + currentRateRows,
+      partial: 0,
+      failed: 0,
+    },
+  };
+}
+
 function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
   const parsed: ParsedNwsDraft = {
     draftNws: buildNwsFromForm(defaultWorkloadForm),
@@ -2212,7 +2231,7 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
   };
   const dataHealth: DataHealthResponse = {
     generatedAt: '2026-07-01T00:00:00.000Z',
-    freshnessPolicyHours: 24,
+    freshnessPolicyHours: 48,
     overallStatus: 'fresh',
     alertCount: 0,
     alerts: [],
@@ -2226,7 +2245,8 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
         recordsRejected: 0,
         recordsSkipped: 3,
         lastSuccessfulRun: '2026-06-30T23:00:00.000Z',
-        message: 'Pricing cache refreshed 1h ago.',
+        cache: freshCacheSummary(30, 18),
+        message: 'Pricing cache refreshed 1h ago across 30 catalog rows and 18 current rate rows.',
       },
       {
         providerId: 'azure',
@@ -2237,7 +2257,8 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
         recordsRejected: 0,
         recordsSkipped: 2,
         lastSuccessfulRun: '2026-06-30T23:00:00.000Z',
-        message: 'Pricing cache refreshed 1h ago.',
+        cache: freshCacheSummary(24, 15),
+        message: 'Pricing cache refreshed 1h ago across 24 catalog rows and 15 current rate rows.',
       },
       {
         providerId: 'gcp',
@@ -2248,7 +2269,8 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
         recordsRejected: 0,
         recordsSkipped: 1,
         lastSuccessfulRun: '2026-06-30T23:00:00.000Z',
-        message: 'Pricing cache refreshed 1h ago.',
+        cache: freshCacheSummary(20, 12),
+        message: 'Pricing cache refreshed 1h ago across 20 catalog rows and 12 current rate rows.',
       },
     ],
   };

@@ -223,47 +223,81 @@ describe('ApiDatabaseRepository', () => {
 
   it('summarizes provider freshness through the data-health response', async () => {
     const repository = createRepository(
-      jest.fn(async () => ({
-        rows: [
-          {
-            provider: 'aws',
-            status: 'success',
-            records_updated: 12,
-            records_rejected: 0,
-            records_skipped: 7,
-            last_successful_run: new Date('2026-06-30T12:00:00.000Z'),
-          },
-          {
-            provider: 'azure',
-            status: 'success',
-            records_updated: 9,
-            records_rejected: 1,
-            records_skipped: 0,
-            last_successful_run: new Date('2026-06-28T00:00:00.000Z'),
-          },
-          {
-            provider: 'gcp',
-            status: 'failed',
-            records_updated: 0,
-            records_rejected: 3,
-            records_skipped: 0,
-            last_successful_run: null,
-          },
-        ],
-        rowCount: 3,
-      })),
+      jest
+        .fn()
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              provider: 'aws',
+              status: 'success',
+              records_updated: 12,
+              records_rejected: 0,
+              records_skipped: 7,
+              last_successful_run: new Date('2026-06-30T12:00:00.000Z'),
+            },
+            {
+              provider: 'azure',
+              status: 'success',
+              records_updated: 9,
+              records_rejected: 1,
+              records_skipped: 0,
+              last_successful_run: new Date('2026-06-28T00:00:00.000Z'),
+            },
+            {
+              provider: 'gcp',
+              status: 'failed',
+              records_updated: 0,
+              records_rejected: 3,
+              records_skipped: 0,
+              last_successful_run: null,
+            },
+          ],
+          rowCount: 3,
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              provider: 'aws',
+              catalog_rows: '30',
+              current_rate_rows: '18',
+              latest_catalog_sync_at: new Date('2026-06-30T11:00:00.000Z'),
+              latest_rate_sync_at: new Date('2026-06-30T12:00:00.000Z'),
+              catalog_success_rows: '30',
+              catalog_partial_rows: '0',
+              catalog_failed_rows: '0',
+              rate_success_rows: '18',
+              rate_partial_rows: '0',
+              rate_failed_rows: '0',
+            },
+            {
+              provider: 'azure',
+              catalog_rows: '20',
+              current_rate_rows: '9',
+              latest_catalog_sync_at: new Date('2026-06-28T00:00:00.000Z'),
+              latest_rate_sync_at: new Date('2026-06-28T00:00:00.000Z'),
+              catalog_success_rows: '18',
+              catalog_partial_rows: '2',
+              catalog_failed_rows: '0',
+              rate_success_rows: '9',
+              rate_partial_rows: '0',
+              rate_failed_rows: '0',
+            },
+          ],
+          rowCount: 2,
+        }),
     );
 
     await expect(repository.getDataHealth(new Date('2026-07-01T00:00:00.000Z'))).resolves.toEqual({
       generatedAt: '2026-07-01T00:00:00.000Z',
-      freshnessPolicyHours: 24,
+      freshnessPolicyHours: 48,
       overallStatus: 'degraded',
       alertCount: 2,
       alerts: [
         {
           providerId: 'azure',
           severity: 'warning',
-          message: 'Pricing cache is 72h old; refresh before production decisions.',
+          message:
+            'Pricing data is 72h old against the 48h policy; refresh before production decisions.',
         },
         {
           providerId: 'gcp',
@@ -276,15 +310,42 @@ describe('ApiDatabaseRepository', () => {
           providerId: 'aws',
           freshness: 'fresh',
           ageHours: 12,
+          cache: expect.objectContaining({
+            catalogRows: 30,
+            currentRateRows: 18,
+            ageHours: 12,
+            freshness: 'fresh',
+            syncStatusCounts: {
+              success: 48,
+              partial: 0,
+              failed: 0,
+            },
+          }),
         }),
         expect.objectContaining({
           providerId: 'azure',
           freshness: 'stale',
           ageHours: 72,
+          cache: expect.objectContaining({
+            catalogRows: 20,
+            currentRateRows: 9,
+            ageHours: 72,
+            freshness: 'stale',
+            syncStatusCounts: {
+              success: 27,
+              partial: 2,
+              failed: 0,
+            },
+          }),
         }),
         expect.objectContaining({
           providerId: 'gcp',
           freshness: 'failed',
+          cache: expect.objectContaining({
+            catalogRows: 0,
+            currentRateRows: 0,
+            freshness: 'missing',
+          }),
         }),
       ],
     });

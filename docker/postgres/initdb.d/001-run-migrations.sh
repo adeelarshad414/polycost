@@ -44,7 +44,8 @@ for migration in \
   012_production_depth_audit_analytics.sql \
   013_report_export_jobs.sql \
   014_comparison_prewarm_jobs.sql \
-  015_seed_accelerated_compute_pricing_catalog.sql
+  015_seed_accelerated_compute_pricing_catalog.sql \
+  016_pricing_cache_sync_status.sql
 do
   psql \
     --username "$POSTGRES_USER" \
