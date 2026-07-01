@@ -421,8 +421,10 @@ describe('ComparisonOrchestratorService', () => {
       expect.arrayContaining([
         expect.objectContaining({
           category: 'compute',
-          description: expect.stringContaining('scheduled duty cycle'),
-          baseMonthlyCostUsd: 26,
+          description: expect.stringMatching(
+            /scheduled duty cycle .*multi-region resilience capacity x1\.65/,
+          ),
+          baseMonthlyCostUsd: 42.9,
         }),
         expect.objectContaining({
           category: 'support',
@@ -434,23 +436,85 @@ describe('ComparisonOrchestratorService', () => {
         expect.objectContaining({
           category: 'licensing',
           costComponent: 'licensing',
-          baseMonthlyCostUsd: 23.92,
+          baseMonthlyCostUsd: 39.47,
           isApproximate: true,
         }),
         expect.objectContaining({
           category: 'operations',
           costComponent: 'operations',
-          baseMonthlyCostUsd: 81.9,
+          baseMonthlyCostUsd: 35,
           isApproximate: true,
         }),
       ]),
     );
     expect(result.providers[0].breakdown).toEqual(
       expect.objectContaining({
-        computeMonthlyCostUsd: 26,
+        computeMonthlyCostUsd: 42.9,
         supportMonthlyCostUsd: 29,
-        licensingMonthlyCostUsd: 23.92,
-        operationsMonthlyCostUsd: 81.9,
+        licensingMonthlyCostUsd: 39.47,
+        operationsMonthlyCostUsd: 35,
+      }),
+    );
+  });
+
+  it('applies HA resource capacity multipliers to compute pricing models', async () => {
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async (): Promise<ProviderPricingResult> => ({
+          providerId: 'aws',
+          baseMonthlyCostUsd: 100,
+          lineItems: [
+            {
+              category: 'compute',
+              costComponent: 'compute',
+              description: 'aws compute',
+              isApproximate: false,
+              baseMonthlyCostUsd: 100,
+              skuId: 'aws-compute',
+              region: 'us-east-1',
+              unit: 'hour',
+              unitPriceUsd: 0.137,
+              pricingBasis: 'flat',
+              pricingModels: [
+                { model: 'on-demand', available: true, monthlyCostUsd: 100 },
+                { model: 'reserved-1yr', available: true, monthlyCostUsd: 60 },
+              ],
+            },
+          ],
+        })),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      availability: {
+        multiAz: true,
+        multiRegion: false,
+        faultTolerance: 'multi-az',
+      },
+    });
+
+    expect(result.providers[0].lineItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'compute',
+          description: 'aws compute (multi-AZ resilience capacity x1.20)',
+          baseMonthlyCostUsd: 120,
+          pricingModels: expect.arrayContaining([
+            expect.objectContaining({
+              model: 'reserved-1yr',
+              monthlyCostUsd: 72,
+              caveat: 'multi-AZ resilience capacity x1.20',
+            }),
+          ]),
+        }),
+      ]),
+    );
+    expect(result.providers[0].breakdown).toEqual(
+      expect.objectContaining({
+        computeMonthlyCostUsd: 120,
+        operationsMonthlyCostUsd: 0,
       }),
     );
   });

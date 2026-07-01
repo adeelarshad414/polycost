@@ -43,6 +43,12 @@ interface UsageAdjustment {
   monthlyHours: number;
 }
 
+interface ResilienceCapacityProfile {
+  faultTolerance: NonNullable<NormalizedWorkloadSpec['availability']['faultTolerance']>;
+  factor: number;
+  label: string;
+}
+
 interface NetworkDimensionRates {
   crossAzPerGb: number;
   interRegionPerGb: number;
@@ -236,9 +242,13 @@ export class ComparisonOrchestratorService {
       });
     });
     const usageAdjustedLineItems = this.applyUsageProfile(nws, catalogLineItems);
+    const resilienceAdjustedLineItems = this.applyResilienceCapacityProfile(
+      nws,
+      usageAdjustedLineItems,
+    );
     const lineItems = [
-      ...usageAdjustedLineItems,
-      ...this.modeledLineItems(nws, result.providerId, usageAdjustedLineItems),
+      ...resilienceAdjustedLineItems,
+      ...this.modeledLineItems(nws, result.providerId, resilienceAdjustedLineItems),
     ];
 
     const monthlyCostUsd = this.roundCurrency(
@@ -462,6 +472,53 @@ export class ComparisonOrchestratorService {
     });
   }
 
+  private applyResilienceCapacityProfile(
+    nws: NormalizedWorkloadSpec,
+    lineItems: ComparisonLineItem[],
+  ): ComparisonLineItem[] {
+    const resilienceProfile = this.resilienceCapacityProfile(nws);
+
+    if (resilienceProfile.factor <= 1) {
+      return lineItems;
+    }
+
+    return lineItems.map((lineItem) => {
+      if (this.lineItemComponent(lineItem) !== 'compute') {
+        return lineItem;
+      }
+
+      const adjustedMonthlyCostUsd = this.roundCurrency(
+        lineItem.baseMonthlyCostUsd * resilienceProfile.factor,
+      );
+
+      return this.normalizeLineItem({
+        ...lineItem,
+        description: `${lineItem.description} (${resilienceProfile.label})`,
+        baseMonthlyCostUsd: adjustedMonthlyCostUsd,
+        baseHourlyCostUsd: this.roundCurrency(adjustedMonthlyCostUsd / HOURS_PER_MONTH),
+        pricingModels: lineItem.pricingModels?.map((model) =>
+          model.available && model.monthlyCostUsd !== undefined
+            ? {
+                ...model,
+                monthlyCostUsd: this.roundCurrency(model.monthlyCostUsd * resilienceProfile.factor),
+                hourlyCostUsd: this.roundCurrency(
+                  (model.monthlyCostUsd * resilienceProfile.factor) / HOURS_PER_MONTH,
+                ),
+                ...(model.upfrontCostUsd !== undefined
+                  ? {
+                      upfrontCostUsd: this.roundCurrency(
+                        model.upfrontCostUsd * resilienceProfile.factor,
+                      ),
+                    }
+                  : {}),
+                caveat: [model.caveat, resilienceProfile.label].filter(Boolean).join(' '),
+              }
+            : model,
+        ),
+      });
+    });
+  }
+
   private modeledLineItems(
     nws: NormalizedWorkloadSpec,
     providerId: ProviderId,
@@ -591,18 +648,13 @@ export class ComparisonOrchestratorService {
       return undefined;
     }
 
-    const subtotal = lineItems.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
     const statefulSubtotal = lineItems
       .filter((lineItem) =>
         ['database', 'storage', 'egress'].includes(this.lineItemComponent(lineItem)),
       )
       .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
     const monthlyCostUsd = this.roundCurrency(
-      faultTolerance === 'active-active'
-        ? subtotal
-        : faultTolerance === 'multi-region'
-          ? subtotal * 0.65
-          : statefulSubtotal * 0.08,
+      statefulSubtotal * resilienceStatefulOverheadFactor(faultTolerance),
     );
 
     if (monthlyCostUsd <= 0) {
@@ -827,6 +879,7 @@ export class ComparisonOrchestratorService {
   private computeVcpuHours(nws: NormalizedWorkloadSpec): number {
     const usageAdjustment = this.usageAdjustment(nws);
     const monthlyHours = usageAdjustment?.monthlyHours ?? HOURS_PER_MONTH;
+    const resilienceMultiplier = this.resilienceCapacityProfile(nws).factor;
 
     return nws.compute.reduce((sum, compute) => {
       const quantity =
@@ -834,8 +887,19 @@ export class ComparisonOrchestratorService {
           ? (compute.autoscalingRange.min + compute.autoscalingRange.max) / 2
           : (compute.instanceCount ?? 1);
 
-      return sum + (compute.vcpu ?? 2) * quantity * monthlyHours;
+      return sum + (compute.vcpu ?? 2) * quantity * monthlyHours * resilienceMultiplier;
     }, 0);
+  }
+
+  private resilienceCapacityProfile(nws: NormalizedWorkloadSpec): ResilienceCapacityProfile {
+    const faultTolerance = this.faultTolerance(nws);
+    const factor = resilienceCapacityMultiplier(faultTolerance);
+
+    return {
+      faultTolerance,
+      factor,
+      label: `${faultToleranceLabel(faultTolerance)} resilience capacity x${factor.toFixed(2)}`,
+    };
   }
 
   private windowsLicenseRate(providerId: ProviderId): number {
@@ -2436,6 +2500,36 @@ function faultToleranceLabel(
       return 'multi-region';
     case 'active-active':
       return 'active-active';
+  }
+}
+
+function resilienceCapacityMultiplier(
+  faultTolerance: NonNullable<NormalizedWorkloadSpec['availability']['faultTolerance']>,
+): number {
+  switch (faultTolerance) {
+    case 'single-zone':
+      return 1;
+    case 'multi-az':
+      return 1.2;
+    case 'multi-region':
+      return 1.65;
+    case 'active-active':
+      return 2;
+  }
+}
+
+function resilienceStatefulOverheadFactor(
+  faultTolerance: NonNullable<NormalizedWorkloadSpec['availability']['faultTolerance']>,
+): number {
+  switch (faultTolerance) {
+    case 'single-zone':
+      return 0;
+    case 'multi-az':
+      return 0.08;
+    case 'multi-region':
+      return 0.35;
+    case 'active-active':
+      return 1;
   }
 }
 
