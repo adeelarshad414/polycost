@@ -5956,6 +5956,7 @@ function ProductionDepthAnalytics({
   const providerDeltas = providerDeltaRows(comparison);
   const regionVariance = regionVarianceRows(comparison, form);
   const commitmentCoverage = commitmentCoverageGapRows(comparison, form);
+  const tcoSignals = crossProviderTcoRows(comparison, form);
   const scenarios = sensitivityScenarioRows(comparison, form);
 
   return (
@@ -5985,6 +5986,7 @@ function ProductionDepthAnalytics({
       <ProviderDeltaAnalysisTable rows={providerDeltas} />
       <RegionVariancePanel rows={regionVariance} />
       <CommitmentCoverageGapPanel rows={commitmentCoverage} />
+      <CrossProviderTcoPanel rows={tcoSignals} />
       <ScenarioSensitivityTable rows={scenarios} />
     </section>
   );
@@ -6199,6 +6201,52 @@ function CommitmentCoverageGapPanel({ rows }: { rows: CommitmentCoverageGapRow[]
         <div className="scenario-sensitivity-empty" role="status">
           Commitment coverage gap requires at least one provider with reserved, Savings Plan, or CUD
           pricing evidence.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CrossProviderTcoPanel({ rows }: { rows: CrossProviderTcoRow[] }) {
+  return (
+    <div className="cross-provider-tco-panel" aria-label="Cross-provider TCO signals">
+      <div className="scenario-sensitivity-heading">
+        <div>
+          <span>Cross-provider TCO signals</span>
+          <h4>Egress exit proxy, support plan, and free-tier fit</h4>
+        </div>
+      </div>
+
+      {rows.length > 0 ? (
+        <div className="tco-signal-grid">
+          {rows.map((row) => (
+            <article
+              className={`tco-signal-card tco-signal-${row.providerId}`}
+              key={row.providerId}
+            >
+              <span>{providerLabel(row.providerId)}</span>
+              <strong>{formatCurrency(row.threeYearRunRate)}</strong>
+              <div className="tco-signal-metrics">
+                <small>
+                  Egress exit proxy
+                  <b>{formatCurrency(row.egressExitProxy)}</b>
+                </small>
+                <small>
+                  Support plan
+                  <b>{formatCurrency(row.supportMonthly)}/mo</b>
+                </small>
+                <small>
+                  Free-tier signal
+                  <b>{row.freeTierSignal}</b>
+                </small>
+              </div>
+              <p>{row.evidence}</p>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="scenario-sensitivity-empty" role="status">
+          Run a comparison to populate TCO signals beyond infrastructure run-rate.
         </div>
       )}
     </div>
@@ -6810,6 +6858,15 @@ interface CommitmentCoverageGapRow {
   evidence: string;
 }
 
+interface CrossProviderTcoRow {
+  providerId: ProviderId;
+  threeYearRunRate: number;
+  egressExitProxy: number;
+  supportMonthly: number;
+  freeTierSignal: string;
+  evidence: string;
+}
+
 function providerDeltaRows(comparison: ComparisonResult | null): ProviderDeltaRow[] {
   if (!comparison) {
     return [];
@@ -6987,6 +7044,61 @@ function commitmentCoverageGapRows(
       ];
     })
     .sort((left, right) => right.openGapMonthly - left.openGapMonthly);
+}
+
+function crossProviderTcoRows(
+  comparison: ComparisonResult | null,
+  form: WorkloadFormState,
+): CrossProviderTcoRow[] {
+  if (!comparison) {
+    return [];
+  }
+
+  const environment = form.environment;
+  const storageGb = parseInputNumber(form.storageSizeGb) ?? 0;
+  const egressGb = parseInputNumber(form.monthlyEgressGb) ?? 0;
+  const instanceCount = parseInputNumber(form.instanceCount) ?? 0;
+  const freeTierCandidate =
+    environment !== 'production' && instanceCount <= 1 && storageGb <= 30 && egressGb <= 100;
+
+  return comparison.providers.map((provider) => {
+    const egressExitProxy = roundCurrency(componentMonthly(provider, 'egress'));
+    const supportMonthly = roundCurrency(componentMonthly(provider, 'support'));
+    const bestCommitment = bestCommitmentModel(provider);
+    const committedMonthly = bestCommitment?.model.monthlyCostUsd;
+    const monthlyRunRate =
+      committedMonthly !== undefined && committedMonthly < provider.totals.monthly
+        ? committedMonthly
+        : provider.totals.monthly;
+    const threeYearRunRate = roundCurrency(
+      monthlyRunRate * 36 + (bestCommitment?.model.upfrontCostUsd ?? 0),
+    );
+    const freeTierSignal = freeTierCandidate
+      ? 'Candidate'
+      : environment === 'production'
+        ? 'Unlikely'
+        : 'Limited';
+    const evidence = [
+      egressExitProxy > provider.totals.monthly * 0.2
+        ? 'Data-out is a material migration-away cost proxy.'
+        : 'Data-out proxy is not the dominant TCO driver.',
+      supportMonthly > 0
+        ? 'Support is modeled as an explicit provider line item.'
+        : 'Support plan is not priced for this provider response.',
+      freeTierCandidate
+        ? 'Small non-production profile may qualify for introductory/free-tier review.'
+        : 'Scale, production posture, or data transfer likely exceeds free-tier assumptions.',
+    ].join(' ');
+
+    return {
+      providerId: provider.providerId,
+      threeYearRunRate,
+      egressExitProxy,
+      supportMonthly,
+      freeTierSignal,
+      evidence,
+    };
+  });
 }
 
 function productionDepthInsights(

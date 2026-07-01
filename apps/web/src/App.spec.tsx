@@ -1186,6 +1186,10 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('0% on-demand vs target blend vs 100% committed');
     expect(text(container)).toContain('$20.30/mo');
     expect(text(container)).toContain('35% exposed');
+    expect(text(container)).toContain('Cross-provider TCO signals');
+    expect(text(container)).toContain('Egress exit proxy');
+    expect(text(container)).toContain('Free-tier signal');
+    expect(text(container)).toContain('Data-out proxy');
     expect(text(container)).toContain('Scenario sensitivity');
     expect(text(container)).toContain('Provider winner under operational shocks');
     expect(text(container)).toContain('Demand +25%');

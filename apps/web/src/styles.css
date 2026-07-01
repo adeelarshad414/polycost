@@ -4796,6 +4796,90 @@ select:disabled {
   padding: var(--pc-space-1);
 }
 
+.cross-provider-tco-panel {
+  display: grid;
+  gap: var(--pc-space-1);
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface) 94%, var(--pc-bg-surface-2));
+  padding: var(--pc-space-1);
+}
+
+.tco-signal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--pc-space-1);
+}
+
+.tco-signal-card {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+  border: 1px solid var(--pc-border);
+  border-top: 4px solid var(--pc-border-strong);
+  border-radius: 8px;
+  background: var(--pc-bg-surface);
+  padding: 12px;
+}
+
+.tco-signal-aws {
+  border-top-color: var(--pc-provider-aws);
+}
+
+.tco-signal-azure {
+  border-top-color: var(--pc-provider-azure);
+}
+
+.tco-signal-gcp {
+  border-top-color: var(--pc-provider-gcp);
+}
+
+.tco-signal-card > span {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.tco-signal-card > strong {
+  color: var(--pc-text-primary);
+  font-family: var(--pc-font-mono);
+  font-size: var(--pc-text-xl);
+  font-variant-numeric: tabular-nums;
+}
+
+.tco-signal-metrics {
+  display: grid;
+  gap: 6px;
+}
+
+.tco-signal-metrics small {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 800;
+}
+
+.tco-signal-metrics b {
+  color: var(--pc-text-primary);
+  font-family: var(--pc-font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.tco-signal-card p {
+  margin: 0;
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-sm);
+  font-weight: 650;
+  line-height: 1.45;
+}
+
 .scenario-sensitivity-heading {
   display: flex;
   flex-wrap: wrap;
@@ -6536,6 +6620,10 @@ select:disabled {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .tco-signal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .engineering-chart-grid,
   .engineering-signal-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -6690,6 +6778,10 @@ select:disabled {
   }
 
   .break-even-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .tco-signal-grid {
     grid-template-columns: 1fr;
   }
 
