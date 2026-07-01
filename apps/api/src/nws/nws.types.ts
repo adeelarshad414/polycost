@@ -19,9 +19,18 @@ export const workloadTypeSchema = z.enum([
   'other',
 ]);
 
+export const instanceFamilySchema = z.enum([
+  'general-purpose',
+  'compute-optimized',
+  'memory-optimized',
+  'storage-optimized',
+  'accelerated-computing',
+]);
+
 export const computeComponentSchema = z
   .object({
     role: z.string().min(1),
+    instanceFamily: instanceFamilySchema.optional(),
     vcpu: z.number().positive().optional(),
     memoryGb: z.number().positive().optional(),
     instanceCount: z.number().int().positive().optional(),

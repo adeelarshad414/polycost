@@ -806,14 +806,17 @@ export class ComparisonOrchestratorService {
       serviceCategory: 'compute',
       serviceType: compute.scalingType === 'autoscaling' ? 'autoscaling-compute' : 'vm-compute',
       instanceType:
-        compute.vcpu !== undefined || compute.memoryGb !== undefined
-          ? `${compute.vcpu ?? '?'} vCPU / ${compute.memoryGb ?? '?'} GB`
+        compute.vcpu !== undefined || compute.memoryGb !== undefined || compute.instanceFamily
+          ? `${compute.instanceFamily ?? 'general-purpose'} / ${compute.vcpu ?? '?'} vCPU / ${
+              compute.memoryGb ?? '?'
+            } GB`
           : undefined,
       region,
       az: nws.availability.multiAz ? 'multi-az' : 'single-az',
       quantity: compute.instanceCount ?? compute.autoscalingRange?.min ?? 1,
       scaleParams: {
         role: compute.role,
+        ...(compute.instanceFamily ? { instanceFamily: compute.instanceFamily } : {}),
         scalingType: compute.scalingType,
         ...(compute.autoscalingRange
           ? {

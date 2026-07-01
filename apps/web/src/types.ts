@@ -75,6 +75,7 @@ export interface NormalizedWorkloadSpec {
   };
   compute: Array<{
     role: string;
+    instanceFamily?: NormalizedInstanceFamily;
     vcpu?: number;
     memoryGb?: number;
     instanceCount?: number;

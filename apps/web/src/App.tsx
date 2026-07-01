@@ -136,12 +136,13 @@ const PRICING_MODEL_OPTIONS: Array<{
   },
 ];
 
-const INSTANCE_TIER_OPTIONS: Array<[string, string]> = [
+const INSTANCE_TIER_OPTIONS: Array<[WorkloadFormState['instanceTier'], string]> = [
   ['small', 'Small - dev/test or light production'],
   ['balanced', 'Balanced - general production'],
   ['compute', 'Compute optimized - CPU-heavy'],
   ['memory', 'Memory optimized - data-heavy'],
   ['storage', 'Storage optimized - high I/O'],
+  ['accelerated', 'GPU / accelerated - ML and CUDA'],
   ['custom', 'Custom - use vCPU and memory fields'],
 ];
 

@@ -273,8 +273,11 @@ describe('NLParserService', () => {
         expect.objectContaining({
           serviceCategory: 'compute',
           serviceType: 'vm-compute',
-          instanceType: 'balanced tier - 2 vCPU - 4GB',
+          instanceType: 'general-purpose / 2 vCPU / 4GB',
           quantity: 2,
+          scaleParams: expect.objectContaining({
+            instanceFamily: 'general-purpose',
+          }),
         }),
         expect.objectContaining({
           serviceCategory: 'storage',
@@ -286,6 +289,39 @@ describe('NLParserService', () => {
     expect(result.fieldsRequiringReview).not.toContain('compute[0].vcpu');
     expect(result.fieldsRequiringReview).not.toContain('compute[0].memoryGb');
     expect(result.fieldsRequiringReview).toEqual(['database[0].sizeGb']);
+  });
+
+  it('infers accelerated compute families for GPU and ML workloads', async () => {
+    const client: StructuredLlmClient = {
+      createStructuredOutput: jest.fn(),
+    };
+    const service = new NLParserService(configService(4000, false), client, fixedNow);
+
+    const result = await service.parse(
+      'A machine learning web app with two servers using GPU acceleration, 8 vCPU, 32GB RAM, 250GB object storage, and load balancing.',
+    );
+
+    expect(result.draftNws.compute[0]).toEqual(
+      expect.objectContaining({
+        instanceFamily: 'accelerated-computing',
+        vcpu: 8,
+        memoryGb: 32,
+        instanceCount: 2,
+      }),
+    );
+    expect(result.draftNws.serviceRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceCategory: 'compute',
+          serviceType: 'vm-compute',
+          tier: 'accelerated',
+          instanceType: 'accelerated-computing / 8 vCPU / 32GB',
+          scaleParams: expect.objectContaining({
+            instanceFamily: 'accelerated-computing',
+          }),
+        }),
+      ]),
+    );
   });
 
   it('rejects invalid LLM output through the shared NWS validator', async () => {

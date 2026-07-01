@@ -29,6 +29,7 @@ describe('workload helpers', () => {
       role: 'web',
       vcpu: 2,
       memoryGb: 4,
+      instanceFamily: 'general-purpose',
       instanceCount: 2,
       scalingType: 'autoscaling',
       autoscalingRange: {
@@ -99,6 +100,29 @@ describe('workload helpers', () => {
         }),
       ]),
     );
+  });
+
+  it('round-trips accelerated compute intent through the NWS', () => {
+    const nws = buildNwsFromForm({
+      ...defaultWorkloadForm,
+      instanceTier: 'accelerated',
+    });
+
+    expect(nws.compute[0]).toMatchObject({
+      instanceFamily: 'accelerated-computing',
+    });
+    expect(nws.serviceRequirements).toContainEqual(
+      expect.objectContaining({
+        serviceCategory: 'compute',
+        serviceType: 'vm-compute',
+        instanceType: 'GPU / accelerated tier - 2 vCPU - 4GB',
+        tier: 'accelerated',
+        scaleParams: expect.objectContaining({
+          instanceFamily: 'accelerated-computing',
+        }),
+      }),
+    );
+    expect(formFromNws(nws).instanceTier).toBe('accelerated');
   });
 
   it('ships valid quick-start architecture templates', () => {
@@ -325,6 +349,7 @@ describe('workload helpers', () => {
     expect(nws.workload.expectedUsers).toEqual({});
     expect(nws.compute[0]).toEqual({
       role: 'web',
+      instanceFamily: 'general-purpose',
       scalingType: 'fixed',
     });
     expect(nws.storage).toEqual([]);

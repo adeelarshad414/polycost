@@ -286,6 +286,137 @@ describe('BaseCloudProviderAdapter', () => {
     );
   });
 
+  it('prefers matching compute instance family when the workload asks for it', async () => {
+    const adapter = new TestProviderAdapter(
+      new InMemoryPricingCatalogReader([
+        {
+          provider: 'aws',
+          serviceCategory: 'compute',
+          serviceName: 'generic compute without family metadata',
+          skuId: 'generic.cheap',
+          region: 'test-region',
+          unit: 'hour',
+          unitPriceUsd: 0.01,
+          attributes: {
+            vcpu: 2,
+            memoryGb: 8,
+          },
+          effectiveDate: '2026-01-01T00:00:00Z',
+          fetchedAt: '2026-06-28T00:00:00.000Z',
+        },
+        {
+          provider: 'aws',
+          serviceCategory: 'compute',
+          serviceName: 'general purpose compute',
+          skuId: 'm6i.large',
+          region: 'test-region',
+          unit: 'hour',
+          unitPriceUsd: 0.02,
+          attributes: {
+            vcpu: 2,
+            memoryGb: 8,
+          },
+          effectiveDate: '2026-01-01T00:00:00Z',
+          fetchedAt: '2026-06-28T00:00:00.000Z',
+        },
+        {
+          provider: 'aws',
+          serviceCategory: 'compute',
+          serviceName: 'memory optimized compute',
+          skuId: 'r6i.large',
+          region: 'test-region',
+          unit: 'hour',
+          unitPriceUsd: 0.05,
+          attributes: {
+            vcpu: 2,
+            memoryGb: 8,
+          },
+          effectiveDate: '2026-01-01T00:00:00Z',
+          fetchedAt: '2026-06-28T00:00:00.000Z',
+        },
+      ]),
+      'fallback-region',
+    );
+
+    const result = await adapter.priceWorkload({
+      ...fullWorkload,
+      storage: [],
+      database: [],
+      network: {
+        cdn: false,
+        loadBalancer: false,
+      },
+      compute: [
+        {
+          role: 'cache',
+          instanceFamily: 'memory-optimized',
+          vcpu: 2,
+          memoryGb: 8,
+          scalingType: 'fixed',
+          instanceCount: 1,
+        },
+      ],
+    });
+
+    expect(result.lineItems[0]).toEqual(
+      expect.objectContaining({
+        skuId: 'r6i.large',
+        baseMonthlyCostUsd: 36.5,
+      }),
+    );
+  });
+
+  it('falls back to approximate nearest compute when a requested family is unavailable', async () => {
+    const adapter = new TestProviderAdapter(
+      new InMemoryPricingCatalogReader([
+        {
+          provider: 'aws',
+          serviceCategory: 'compute',
+          serviceName: 'general purpose compute',
+          skuId: 'm6i.large',
+          region: 'test-region',
+          unit: 'hour',
+          unitPriceUsd: 0.02,
+          attributes: {
+            vcpu: 2,
+            memoryGb: 8,
+          },
+          effectiveDate: '2026-01-01T00:00:00Z',
+          fetchedAt: '2026-06-28T00:00:00.000Z',
+        },
+      ]),
+      'fallback-region',
+    );
+
+    const result = await adapter.priceWorkload({
+      ...fullWorkload,
+      storage: [],
+      database: [],
+      network: {
+        cdn: false,
+        loadBalancer: false,
+      },
+      compute: [
+        {
+          role: 'training',
+          instanceFamily: 'accelerated-computing',
+          vcpu: 2,
+          memoryGb: 8,
+          scalingType: 'fixed',
+          instanceCount: 1,
+        },
+      ],
+    });
+
+    expect(result.lineItems[0]).toEqual(
+      expect.objectContaining({
+        skuId: 'm6i.large',
+        isApproximate: true,
+        baseMonthlyCostUsd: 14.6,
+      }),
+    );
+  });
+
   it('uses the adapter default region when the workload marks its region as default', async () => {
     const adapter = new TestProviderAdapter(
       new InMemoryPricingCatalogReader([

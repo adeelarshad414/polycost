@@ -36,13 +36,14 @@ const comparison: ComparisonResult = {
       {
         serviceCategory: 'compute',
         serviceType: 'vm-compute',
-        instanceType: 'balanced tier - 2 vCPU - 4GB',
+        instanceType: 'balanced general-purpose tier - 2 vCPU - 4GB',
         tier: 'balanced',
         region: 'us-east',
         az: '2 zones',
         quantity: 2,
         scaleParams: {
           scalingType: 'fixed',
+          instanceFamily: 'general-purpose',
         },
       },
     ],
@@ -187,7 +188,9 @@ describe('report generators', () => {
     expect(csv).toContain('Break-Even Analysis');
     expect(csv).toContain('aws,Reserved 3-year,71,42,360,29,13,Three-year commitment.');
     expect(csv).toContain('Normalized Service Requirements');
-    expect(csv).toContain('compute,vm-compute,balanced tier - 2 vCPU - 4GB / balanced');
+    expect(csv).toContain(
+      'compute,vm-compute,balanced general-purpose tier - 2 vCPU - 4GB / balanced',
+    );
     expect(csv).toContain('Rate Math Evidence');
     expect(csv).toContain('Report Assumptions');
     expect(csv).toContain(

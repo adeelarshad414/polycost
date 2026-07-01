@@ -22,6 +22,10 @@ import {
 } from './cloud-provider-adapter';
 import { AdapterPricingError } from './adapter-errors';
 import { HOURS_PER_MONTH } from '../../cost-time';
+import {
+  normalizeInstanceFamily,
+  NormalizedInstanceFamily,
+} from '../../pricing-normalization/family-normalizer';
 
 const CATALOG_COMMITMENT_PRICING_MODELS: PricingModelKey[] = ['reserved-1yr', 'reserved-3yr'];
 const ESTIMATED_COMPUTE_PRICING_MODELS: PricingModelKey[] = ['spot', 'savings-plan'];
@@ -59,6 +63,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
         component.vcpu,
         component.memoryGb,
         'on-demand',
+        component.instanceFamily,
       );
       const quantity =
         component.scalingType === 'autoscaling' && component.autoscalingRange
@@ -73,6 +78,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
             component.memoryGb,
             quantity,
             record,
+            component.instanceFamily,
           ),
         }),
       );
@@ -208,12 +214,24 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     vcpu?: number,
     memoryGb?: number,
     pricingModel: PricingModelKey = 'on-demand',
+    instanceFamily?: NormalizedInstanceFamily,
   ): Promise<PricingCatalogRecord> {
-    return this.selectRecord(
-      'compute',
+    const record = await this.selectOptionalComputeRecord(
       region,
-      this.computeRecordPredicate(vcpu, memoryGb, pricingModel),
+      vcpu,
+      memoryGb,
+      pricingModel,
+      instanceFamily,
     );
+
+    if (!record) {
+      throw new AdapterPricingError(
+        this.providerId,
+        `no compute pricing catalog record found for region ${region}`,
+      );
+    }
+
+    return record;
   }
 
   private async selectOptionalComputeRecord(
@@ -221,25 +239,62 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     vcpu: number | undefined,
     memoryGb: number | undefined,
     pricingModel: PricingModelKey,
+    instanceFamily?: NormalizedInstanceFamily,
   ): Promise<PricingCatalogRecord | undefined> {
-    return this.selectOptionalRecord(
-      'compute',
-      region,
-      this.computeRecordPredicate(vcpu, memoryGb, pricingModel),
+    const records = await this.findCatalogRecords('compute', region);
+    let candidates = records.filter(
+      this.computeRecordPredicate(vcpu, memoryGb, pricingModel, instanceFamily),
     );
+
+    if (candidates.length === 0 && instanceFamily) {
+      candidates = records
+        .filter(this.computeRecordPredicate(vcpu, memoryGb, pricingModel))
+        .map((record) => ({
+          ...record,
+          attributes: {
+            ...(record.attributes ?? {}),
+            isApproximate: true,
+            familyFallbackFrom: instanceFamily,
+            familyFallbackTo: this.recordInstanceFamily(record) ?? 'unspecified',
+          },
+        }));
+    }
+
+    return candidates.sort((left, right) => {
+      const leftFamilyRank = this.instanceFamilyFitRank(left, instanceFamily);
+      const rightFamilyRank = this.instanceFamilyFitRank(right, instanceFamily);
+
+      if (leftFamilyRank !== rightFamilyRank) {
+        return leftFamilyRank - rightFamilyRank;
+      }
+
+      const leftRank = this.resourceFitRank(left);
+      const rightRank = this.resourceFitRank(right);
+
+      if (leftRank !== rightRank) {
+        return leftRank - rightRank;
+      }
+
+      return left.unitPriceUsd - right.unitPriceUsd;
+    })[0];
   }
 
   private computeRecordPredicate(
     vcpu: number | undefined,
     memoryGb: number | undefined,
     pricingModel: PricingModelKey,
+    instanceFamily?: NormalizedInstanceFamily,
   ): (record: PricingCatalogRecord) => boolean {
     return (candidate) => {
       const candidateVcpu = this.numberAttribute(candidate, 'vcpu');
       const candidateMemoryGb = this.numberAttribute(candidate, 'memoryGb');
+      const candidateFamily = this.recordInstanceFamily(candidate);
 
       return (
         this.matchesPricingModel(candidate, pricingModel) &&
+        (instanceFamily === undefined ||
+          candidateFamily === undefined ||
+          candidateFamily === instanceFamily) &&
         (vcpu === undefined || candidateVcpu === undefined || candidateVcpu >= vcpu) &&
         (memoryGb === undefined || candidateMemoryGb === undefined || candidateMemoryGb >= memoryGb)
       );
@@ -252,6 +307,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     memoryGb: number | undefined,
     quantity: number,
     onDemandRecord: PricingCatalogRecord,
+    instanceFamily?: NormalizedInstanceFamily,
   ): Promise<PricingModelCost[]> {
     const models: PricingModelCost[] = [
       {
@@ -263,7 +319,13 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     ];
 
     for (const pricingModel of CATALOG_COMMITMENT_PRICING_MODELS) {
-      const record = await this.selectOptionalComputeRecord(region, vcpu, memoryGb, pricingModel);
+      const record = await this.selectOptionalComputeRecord(
+        region,
+        vcpu,
+        memoryGb,
+        pricingModel,
+        instanceFamily,
+      );
 
       if (!record) {
         models.push({
@@ -608,8 +670,62 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     );
   }
 
+  private recordInstanceFamily(record: PricingCatalogRecord): NormalizedInstanceFamily | undefined {
+    const explicitFamily =
+      this.stringAttribute(record, 'family') ??
+      this.stringAttribute(record, 'instanceFamily') ??
+      this.stringAttribute(record, 'normalizedFamily');
+
+    if (isNormalizedInstanceFamily(explicitFamily)) {
+      return explicitFamily;
+    }
+
+    const descriptors = [
+      record.skuId,
+      record.serviceName,
+      record.skuDescription,
+      this.stringAttribute(record, 'instanceType'),
+      this.stringAttribute(record, 'skuName'),
+      this.stringAttribute(record, 'armSkuName'),
+      this.stringAttribute(record, 'machineType'),
+    ].filter((value): value is string => typeof value === 'string' && value.length > 0);
+
+    for (const descriptor of descriptors) {
+      const family = normalizeInstanceFamily(this.providerId, descriptor);
+
+      if (family) {
+        return family;
+      }
+    }
+
+    return undefined;
+  }
+
+  private instanceFamilyFitRank(
+    record: PricingCatalogRecord,
+    requestedFamily: NormalizedInstanceFamily | undefined,
+  ): number {
+    if (!requestedFamily) {
+      return 0;
+    }
+
+    const candidateFamily = this.recordInstanceFamily(record);
+
+    if (candidateFamily === requestedFamily) {
+      return 0;
+    }
+
+    return candidateFamily === undefined ? 1 : 2;
+  }
+
   private numberAttribute(record: PricingCatalogRecord, key: string): number | undefined {
     return this.numberValue(record.attributes?.[key]);
+  }
+
+  private stringAttribute(record: PricingCatalogRecord, key: string): string | undefined {
+    const value = record.attributes?.[key];
+
+    return typeof value === 'string' && value.trim() ? value.trim() : undefined;
   }
 
   private numberValue(value: unknown): number | undefined {
@@ -628,6 +744,16 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
   protected roundCurrency(value: number): number {
     return Math.round((value + Number.EPSILON) * 100) / 100;
   }
+}
+
+function isNormalizedInstanceFamily(value: string | undefined): value is NormalizedInstanceFamily {
+  return (
+    value === 'general-purpose' ||
+    value === 'compute-optimized' ||
+    value === 'memory-optimized' ||
+    value === 'storage-optimized' ||
+    value === 'accelerated-computing'
+  );
 }
 
 function providerPricingModelMetadata(

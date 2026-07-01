@@ -108,6 +108,16 @@ export const NWS_PARSE_RESULT_JSON_SCHEMA = {
               role: {
                 type: 'string',
               },
+              instanceFamily: {
+                type: 'string',
+                enum: [
+                  'general-purpose',
+                  'compute-optimized',
+                  'memory-optimized',
+                  'storage-optimized',
+                  'accelerated-computing',
+                ],
+              },
               vcpu: {
                 type: 'number',
                 exclusiveMinimum: 0,

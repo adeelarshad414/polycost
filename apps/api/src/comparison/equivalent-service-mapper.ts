@@ -125,11 +125,13 @@ export class EquivalentServiceMapper {
   }
 
   private computeTierLabel(component: ComputeComponent): string {
+    const familySegment = component.instanceFamily ?? 'general-purpose';
+
     if (component.scalingType === 'autoscaling') {
-      return 'compute-autoscaling-general-purpose';
+      return `compute-autoscaling-${familySegment}`;
     }
 
-    return 'compute-fixed-general-purpose';
+    return `compute-fixed-${familySegment}`;
   }
 
   private storageTierLabel(component: StorageComponent): string {

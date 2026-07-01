@@ -65,6 +65,7 @@ describe('AI-native requirement parser adapters', () => {
       compute: [
         {
           role: 'web',
+          instanceFamily: 'memory-optimized',
           vcpu: 4,
           memoryGb: 16,
           instanceCount: 2,
@@ -98,6 +99,12 @@ describe('AI-native requirement parser adapters', () => {
           serviceType: 'vm-compute',
           quantity: 2,
           region: 'us-east',
+          config: expect.objectContaining({
+            instanceType: 'memory-optimized / 4 vCPU / 16 GB',
+          }),
+          scaleParams: expect.objectContaining({
+            instanceFamily: 'memory-optimized',
+          }),
         }),
         expect.objectContaining({
           source: 'guided_form',

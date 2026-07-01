@@ -1806,7 +1806,7 @@ function workloadInputFromForm(form: WorkloadFormState): WorkloadInput {
   const memoryGb = positiveNumberOrDefault(form.memoryGb, 4);
 
   return {
-    instanceFamily: instanceFamilyForWorkload(vcpu, memoryGb),
+    instanceFamily: instanceFamilyForWorkload(form.instanceTier, vcpu, memoryGb),
     vcpu,
     memoryGb,
     region: canonicalRegionForRegionPreference(form.regionPreference) ?? DEFAULT_COMPARISON_REGION,
@@ -1818,7 +1818,27 @@ function workloadInputFromForm(form: WorkloadFormState): WorkloadInput {
   };
 }
 
-function instanceFamilyForWorkload(vcpu: number, memoryGb: number): NormalizedInstanceFamily {
+function instanceFamilyForWorkload(
+  instanceTier: WorkloadFormState['instanceTier'],
+  vcpu: number,
+  memoryGb: number,
+): NormalizedInstanceFamily {
+  switch (instanceTier) {
+    case 'compute':
+      return 'compute-optimized';
+    case 'memory':
+      return 'memory-optimized';
+    case 'storage':
+      return 'storage-optimized';
+    case 'accelerated':
+      return 'accelerated-computing';
+    case 'small':
+    case 'balanced':
+      return 'general-purpose';
+    case 'custom':
+      break;
+  }
+
   if (memoryGb / Math.max(vcpu, 1) >= 6) {
     return 'memory-optimized';
   }

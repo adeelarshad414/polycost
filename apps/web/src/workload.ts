@@ -15,6 +15,8 @@ import {
 export type WorkloadType = NormalizedWorkloadSpec['workload']['type'];
 export type StorageType = NormalizedWorkloadSpec['storage'][number]['type'];
 export type DatabaseEngine = NormalizedWorkloadSpec['database'][number]['engine'];
+export type InstanceTier =
+  'small' | 'balanced' | 'compute' | 'memory' | 'storage' | 'accelerated' | 'custom';
 
 export interface WorkloadFormState {
   workloadName: string;
@@ -66,7 +68,7 @@ export interface WorkloadFormState {
   loadBalancer: boolean;
   selectedServiceCategory: string;
   selectedServiceFamilyId: string;
-  instanceTier: string;
+  instanceTier: InstanceTier;
   bulkServiceRows: BulkServiceRow[];
   availabilityZoneCount: string;
   selectedServiceFamilyIds: string[];
@@ -653,6 +655,7 @@ export function buildNwsFromForm(
 ): NormalizedWorkloadSpec {
   const compute = {
     role: form.computeRole.trim() || 'web',
+    ...instanceFamilyForTier(form.instanceTier),
     ...optionalPositiveNumber('vcpu', form.vcpu),
     ...optionalPositiveNumber('memoryGb', form.memoryGb),
     ...optionalPositiveInteger('instanceCount', form.instanceCount),
@@ -862,7 +865,10 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
       primaryServiceRequirement(nws)?.serviceType ??
       serviceFamilyIdsFromTraceability(nws.sourceTraceability)[0] ??
       'vm-compute',
-    instanceTier: primaryServiceRequirement(nws)?.tier ?? defaultWorkloadForm.instanceTier,
+    instanceTier:
+      tierForInstanceFamily(compute?.instanceFamily) ??
+      instanceTierFromValue(primaryServiceRequirement(nws)?.tier) ??
+      defaultWorkloadForm.instanceTier,
     availabilityZoneCount:
       primaryServiceRequirement(nws)?.az?.match(/\d+/)?.[0] ??
       (nws.availability.multiAz ? '2' : '1'),
@@ -940,6 +946,9 @@ export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceReq
         dnsQueriesMillion: parseOptionalNumber(form.dnsQueriesMillion) ?? 0,
         loadBalancerProcessedGb: parseOptionalNumber(form.loadBalancerProcessedGb) ?? 0,
         loadBalancerHours: parseBoundedNumber(form.loadBalancerHours, 0, 730, 0),
+        ...(serviceType === 'vm-compute' || serviceType === 'autoscaling-compute'
+          ? instanceFamilyForTier(form.instanceTier)
+          : {}),
         ...(bulkRow
           ? {
               bulkImport: true,
@@ -1035,7 +1044,9 @@ function instanceTypeForServiceRequirement(
   form: WorkloadFormState,
 ): string | undefined {
   if (serviceType === 'vm-compute' || serviceType === 'autoscaling-compute') {
-    return `${form.instanceTier} tier - ${form.vcpu || '?'} vCPU - ${form.memoryGb || '?'}GB`;
+    return `${instanceTierLabel(form.instanceTier)} - ${form.vcpu || '?'} vCPU - ${
+      form.memoryGb || '?'
+    }GB`;
   }
 
   if (serviceType.includes('storage')) {
@@ -1071,6 +1082,81 @@ function tierForServiceRequirement(
   }
 
   return undefined;
+}
+
+function instanceFamilyForTier(
+  instanceTier: WorkloadFormState['instanceTier'],
+): Pick<NormalizedWorkloadSpec['compute'][number], 'instanceFamily'> {
+  switch (instanceTier) {
+    case 'small':
+    case 'balanced':
+      return { instanceFamily: 'general-purpose' };
+    case 'compute':
+      return { instanceFamily: 'compute-optimized' };
+    case 'memory':
+      return { instanceFamily: 'memory-optimized' };
+    case 'storage':
+      return { instanceFamily: 'storage-optimized' };
+    case 'accelerated':
+      return { instanceFamily: 'accelerated-computing' };
+    case 'custom':
+      return {};
+  }
+}
+
+function tierForInstanceFamily(
+  instanceFamily: NormalizedWorkloadSpec['compute'][number]['instanceFamily'],
+): WorkloadFormState['instanceTier'] | undefined {
+  switch (instanceFamily) {
+    case 'general-purpose':
+      return 'balanced';
+    case 'compute-optimized':
+      return 'compute';
+    case 'memory-optimized':
+      return 'memory';
+    case 'storage-optimized':
+      return 'storage';
+    case 'accelerated-computing':
+      return 'accelerated';
+    case undefined:
+      return undefined;
+  }
+}
+
+function instanceTierFromValue(
+  value: string | undefined,
+): WorkloadFormState['instanceTier'] | undefined {
+  switch (value) {
+    case 'small':
+    case 'balanced':
+    case 'compute':
+    case 'memory':
+    case 'storage':
+    case 'accelerated':
+    case 'custom':
+      return value;
+    default:
+      return undefined;
+  }
+}
+
+function instanceTierLabel(instanceTier: WorkloadFormState['instanceTier']): string {
+  switch (instanceTier) {
+    case 'small':
+      return 'small general-purpose tier';
+    case 'balanced':
+      return 'balanced general-purpose tier';
+    case 'compute':
+      return 'compute-optimized tier';
+    case 'memory':
+      return 'memory-optimized tier';
+    case 'storage':
+      return 'storage-optimized tier';
+    case 'accelerated':
+      return 'GPU / accelerated tier';
+    case 'custom':
+      return 'custom tier';
+  }
 }
 
 function storageServiceFamilyId(form: WorkloadFormState): string {

@@ -103,6 +103,8 @@ export class NLParserService {
     const scalingType = /\b(auto[- ]?scal|autoscal|scale out)\b/i.test(input)
       ? 'autoscaling'
       : 'fixed';
+    const instanceTier = inferInstanceTier(lowerInput);
+    const instanceFamily = instanceFamilyForTier(instanceTier);
 
     if (!instanceCount) {
       fieldsRequiringReview.push('compute[0].instanceCount');
@@ -146,6 +148,7 @@ export class NLParserService {
       compute: [
         {
           role: inferComputeRole(lowerInput),
+          instanceFamily,
           vcpu: vcpu ?? 2,
           memoryGb: memoryGb ?? 4,
           instanceCount: instanceCount ?? 1,
@@ -197,6 +200,8 @@ export class NLParserService {
         instanceCount: instanceCount ?? 1,
         vcpu: vcpu ?? 2,
         memoryGb: memoryGb ?? 4,
+        instanceTier,
+        instanceFamily,
         scalingType,
         multiAz: /\b(multi[- ]?az|high availability|ha|zone redundant)\b/i.test(input),
         storageType: inferStorageType(lowerInput),
@@ -347,6 +352,8 @@ function inferServiceRequirements(input: {
   instanceCount: number;
   vcpu: number;
   memoryGb: number;
+  instanceTier: ParsedInstanceTier;
+  instanceFamily: NonNullable<NormalizedWorkloadSpec['compute'][number]['instanceFamily']>;
   scalingType: 'fixed' | 'autoscaling';
   multiAz: boolean;
   storageType: 'object' | 'block' | 'file';
@@ -360,13 +367,14 @@ function inferServiceRequirements(input: {
     {
       serviceCategory: 'compute',
       serviceType: input.scalingType === 'autoscaling' ? 'autoscaling-compute' : 'vm-compute',
-      instanceType: `${inferInstanceTier(input.input)} tier - ${input.vcpu} vCPU - ${input.memoryGb}GB`,
-      tier: inferInstanceTier(input.input),
+      instanceType: `${input.instanceFamily} / ${input.vcpu} vCPU / ${input.memoryGb}GB`,
+      tier: input.instanceTier,
       ...(input.regionPreference ? { region: input.regionPreference } : {}),
       az,
       quantity: input.instanceCount,
       scaleParams: {
         scalingType: input.scalingType,
+        instanceFamily: input.instanceFamily,
         min: input.scalingType === 'autoscaling' ? 1 : input.instanceCount,
         max:
           input.scalingType === 'autoscaling'
@@ -431,7 +439,17 @@ function inferServiceRequirements(input: {
   return requirements;
 }
 
-function inferInstanceTier(input: string): string {
+type ParsedInstanceTier = 'small' | 'balanced' | 'compute' | 'memory' | 'storage' | 'accelerated';
+
+function inferInstanceTier(input: string): ParsedInstanceTier {
+  if (
+    /\b(gpu|cuda|accelerated|ml|machine learning|ml training|machine learning training)\b/i.test(
+      input,
+    )
+  ) {
+    return 'accelerated';
+  }
+
   if (/\b(memory|ram|cache)\b/i.test(input)) {
     return 'memory';
   }
@@ -449,6 +467,24 @@ function inferInstanceTier(input: string): string {
   }
 
   return 'balanced';
+}
+
+function instanceFamilyForTier(
+  tier: ParsedInstanceTier,
+): NonNullable<NormalizedWorkloadSpec['compute'][number]['instanceFamily']> {
+  switch (tier) {
+    case 'compute':
+      return 'compute-optimized';
+    case 'memory':
+      return 'memory-optimized';
+    case 'storage':
+      return 'storage-optimized';
+    case 'accelerated':
+      return 'accelerated-computing';
+    case 'small':
+    case 'balanced':
+      return 'general-purpose';
+  }
 }
 
 function storageServiceType(storageType: 'object' | 'block' | 'file', input: string): string {
