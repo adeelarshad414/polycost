@@ -31,6 +31,7 @@ describe('App', () => {
   beforeEach(() => {
     window.localStorage.removeItem('polycost-persona-view');
     window.localStorage.removeItem('polycost-dismissed-budget-alerts');
+    window.localStorage.removeItem('polycost-comparison-history-v1');
     window.sessionStorage.removeItem('polycost-current-requirements-v1');
     window.URL.createObjectURL = jest.fn(() => 'blob:polycost-report');
     window.URL.revokeObjectURL = jest.fn();
@@ -45,6 +46,7 @@ describe('App', () => {
     document.documentElement.dataset.themeChoice = 'light';
     window.localStorage.removeItem('polycost-persona-view');
     window.localStorage.removeItem('polycost-dismissed-budget-alerts');
+    window.localStorage.removeItem('polycost-comparison-history-v1');
     window.sessionStorage.removeItem('polycost-current-requirements-v1');
   });
 
@@ -94,6 +96,13 @@ describe('App', () => {
     expect(text(container)).toContain('AWS');
     expect(text(container)).toContain('Azure');
     expect(text(container)).toContain('GCP');
+    expect(
+      JSON.parse(window.localStorage.getItem('polycost-comparison-history-v1') ?? '[]')[0],
+    ).toMatchObject({
+      comparisonId: comparisonResult.comparisonId,
+      cheapestProviderId: 'gcp',
+      providerCount: 3,
+    });
     expect(text(container)).toContain('Executive monthly baseline');
     expect(text(container)).toContain('Provider mix');
     expect(text(container)).toContain('Trend pending');
@@ -146,6 +155,49 @@ describe('App', () => {
           }),
         ]),
       }),
+    );
+
+    unmount();
+  });
+
+  it('restores recent comparison history into the guided form', async () => {
+    window.localStorage.setItem(
+      'polycost-comparison-history-v1',
+      JSON.stringify([
+        {
+          id: 'history-1',
+          comparisonId: 'history-1',
+          createdAt: '2026-07-01T08:30:00.000Z',
+          form: {
+            ...defaultWorkloadForm,
+            workloadName: 'Restored API',
+            workloadType: 'api_backend',
+            vcpu: '8',
+            memoryGb: '32',
+            selectedServiceCategory: 'compute',
+            selectedServiceFamilyId: 'vm-compute',
+          },
+          inputMode: 'describe',
+          pricingModel: 'reserved-1yr',
+          cheapestProviderId: 'azure',
+          serviceCount: 2,
+          providerCount: 3,
+          monthlyLowestUsd: 123.45,
+          summary: 'Restored API · API backend',
+        },
+      ]),
+    );
+    const { container, unmount } = render(<App client={clientMock()} />);
+
+    expect(text(container)).toContain('Recent comparisons');
+    await click(comparisonHistoryButtonByText(container, 'Restored API'));
+
+    expect(buttonByText(container, 'Guided form').getAttribute('aria-selected')).toBe('true');
+    expect(inputById(container, 'vcpu').value).toBe('8');
+    expect(inputById(container, 'memory-gb').value).toBe('32');
+    expect(window.localStorage.getItem('polycost-pricing-model')).toBe('reserved-1yr');
+    expect(text(container)).toContain(
+      'Loaded Restored API · API backend. Compare again to refresh pricing.',
     );
 
     unmount();
@@ -1219,6 +1271,18 @@ function templateButtonByText(container: HTMLElement, label: string): HTMLButton
 
   if (!(button instanceof HTMLButtonElement)) {
     throw new Error(`Template button not found: ${label}`);
+  }
+
+  return button;
+}
+
+function comparisonHistoryButtonByText(container: HTMLElement, label: string): HTMLButtonElement {
+  const button = Array.from(
+    container.querySelectorAll<HTMLButtonElement>('.comparison-history-row'),
+  ).find((candidate) => candidate.textContent?.includes(label));
+
+  if (!(button instanceof HTMLButtonElement)) {
+    throw new Error(`Comparison history button not found: ${label}`);
   }
 
   return button;

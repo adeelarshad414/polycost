@@ -83,6 +83,8 @@ const INPUT_MODE_OPTIONS: Array<{
 
 const PRICING_MODEL_STORAGE_KEY = 'polycost-pricing-model';
 const REQUIREMENT_SESSION_STORAGE_KEY = 'polycost-current-requirements-v1';
+const COMPARISON_HISTORY_STORAGE_KEY = 'polycost-comparison-history-v1';
+const MAX_COMPARISON_HISTORY_ENTRIES = 8;
 const REQUIREMENTS_FILE_MAX_BYTES = 128 * 1024;
 const REQUIREMENTS_FILE_ACCEPT =
   '.txt,.md,.markdown,.json,.yaml,.yml,text/plain,text/markdown,application/json,application/yaml,application/x-yaml,text/yaml';
@@ -337,6 +339,20 @@ interface StoredRequirementSession {
   requirementsAwaitingReview: boolean;
 }
 
+interface ComparisonHistoryEntry {
+  id: string;
+  comparisonId: string;
+  createdAt: string;
+  form: WorkloadFormState;
+  inputMode: InputMode;
+  pricingModel: PricingModelKey;
+  cheapestProviderId: ProviderId;
+  serviceCount: number;
+  providerCount: number;
+  monthlyLowestUsd: number;
+  summary: string;
+}
+
 interface CategoryCostSummary {
   category: ServiceCategory;
   total: number;
@@ -483,6 +499,9 @@ export function App({ client = polyCostClient }: AppProps) {
   const [submittedForm, setSubmittedForm] = useState<WorkloadFormState>(INITIAL_HOME_FORM);
   const [submittedInputMode, setSubmittedInputMode] = useState<InputMode>('form');
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
+  const [comparisonHistory, setComparisonHistory] = useState<ComparisonHistoryEntry[]>(() =>
+    readStoredComparisonHistory(),
+  );
   const [interval, setInterval] = useState<IntervalKey>('monthly');
   const [pricingModel, setPricingModel] = useState<PricingModelKey>(
     () => initialRequirementSession?.pricingModel ?? readStoredPricingModel(),
@@ -666,6 +685,17 @@ export function App({ client = polyCostClient }: AppProps) {
       setComparison(result);
       setSubmittedForm(submittedComparisonForm);
       setSubmittedInputMode(submittedComparisonInputMode);
+      setComparisonHistory((currentHistory) =>
+        saveComparisonHistoryEntry(
+          currentHistory,
+          createComparisonHistoryEntry({
+            comparison: result,
+            form: submittedComparisonForm,
+            inputMode: submittedComparisonInputMode,
+            pricingModel,
+          }),
+        ),
+      );
       setIsEditingRequirements(false);
       setRequirementsAwaitingReview(false);
       setNotice(parserNotice ? `${parserNotice} Comparison ready.` : 'Comparison ready.');
@@ -859,6 +889,34 @@ export function App({ client = polyCostClient }: AppProps) {
     setFormValidationIssues([]);
   }
 
+  function handleRestoreComparisonHistory(entry: ComparisonHistoryEntry) {
+    cancelAsyncActions();
+    setForm(entry.form);
+    setSubmittedForm(entry.form);
+    setSubmittedInputMode(entry.inputMode);
+    setInputMode('form');
+    setNaturalLanguageInput(sampleNaturalLanguageInput);
+    setRequirementsFileName(null);
+    setPricingModel(entry.pricingModel);
+    storePricingModel(entry.pricingModel);
+    setComparison(null);
+    setIsEditingRequirements(false);
+    setRequirementsAwaitingReview(false);
+    setInterval('monthly');
+    setBusyAction(null);
+    setExportingFormat(null);
+    setFormValidationIssues([]);
+    setError(null);
+    setNotice(`Loaded ${entry.summary}. Compare again to refresh pricing.`);
+  }
+
+  function handleClearComparisonHistory() {
+    setComparisonHistory([]);
+    clearComparisonHistory();
+    setError(null);
+    setNotice('Recent comparison history cleared.');
+  }
+
   function handleFormChange(nextForm: WorkloadFormState) {
     setForm(nextForm);
     setFormValidationIssues((currentIssues) =>
@@ -964,6 +1022,7 @@ export function App({ client = polyCostClient }: AppProps) {
           validationIssues={formValidationIssues}
           dataHealth={dataHealth}
           dataHealthError={dataHealthError}
+          comparisonHistory={comparisonHistory}
           isComparing={busyAction === 'compare' || busyAction === 'parse'}
           onInputModeChange={setInputMode}
           onPricingModelChange={handlePricingModelChange}
@@ -971,6 +1030,8 @@ export function App({ client = polyCostClient }: AppProps) {
           onChange={handleFormChange}
           onClearRequirements={handleClearRequirements}
           onSubmit={handleCompare}
+          onRestoreHistory={handleRestoreComparisonHistory}
+          onClearHistory={handleClearComparisonHistory}
           onUseSample={handleUseSampleRequirements}
           onRequirementsFileLoad={handleRequirementsFileLoad}
           requirementsFileName={requirementsFileName}
@@ -1132,6 +1193,7 @@ function InitialHomePage({
   validationIssues,
   dataHealth,
   dataHealthError,
+  comparisonHistory,
   isComparing,
   requirementsAwaitingReview,
   onInputModeChange,
@@ -1140,6 +1202,8 @@ function InitialHomePage({
   onChange,
   onClearRequirements,
   onSubmit,
+  onRestoreHistory,
+  onClearHistory,
   onUseSample,
   onRequirementsFileLoad,
   requirementsFileName,
@@ -1155,6 +1219,7 @@ function InitialHomePage({
   validationIssues: WorkloadFormIssue[];
   dataHealth: DataHealthResponse | null;
   dataHealthError: string | null;
+  comparisonHistory: ComparisonHistoryEntry[];
   isComparing: boolean;
   requirementsAwaitingReview: boolean;
   onInputModeChange: (mode: InputMode) => void;
@@ -1163,6 +1228,8 @@ function InitialHomePage({
   onChange: (form: WorkloadFormState) => void;
   onClearRequirements: () => void;
   onSubmit: (event: FormEvent) => void;
+  onRestoreHistory: (entry: ComparisonHistoryEntry) => void;
+  onClearHistory: () => void;
   onUseSample: () => void;
   onRequirementsFileLoad: (file: File | null) => void | Promise<void>;
   requirementsFileName: string | null;
@@ -1210,6 +1277,11 @@ function InitialHomePage({
         <PricingModelPreferenceControl
           pricingModel={pricingModel}
           onPricingModelChange={onPricingModelChange}
+        />
+        <ComparisonHistoryPanel
+          entries={comparisonHistory}
+          onRestore={onRestoreHistory}
+          onClear={onClearHistory}
         />
 
         {inputMode === 'form' ? (
@@ -2808,6 +2880,59 @@ function ArchitectureTemplatePicker({
           >
             <span>{template.label}</span>
             <small>{template.summary}</small>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ComparisonHistoryPanel({
+  entries,
+  onRestore,
+  onClear,
+}: {
+  entries: ComparisonHistoryEntry[];
+  onRestore: (entry: ComparisonHistoryEntry) => void;
+  onClear: () => void;
+}) {
+  if (entries.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="comparison-history-panel" aria-label="Recent comparisons">
+      <div className="comparison-history-heading">
+        <div>
+          <span>Recent comparisons</span>
+          <strong>Resume a saved workload shape</strong>
+        </div>
+        <button type="button" className="comparison-history-clear" onClick={onClear}>
+          Clear history
+        </button>
+      </div>
+      <div className="comparison-history-list">
+        {entries.map((entry) => (
+          <button
+            key={entry.id}
+            type="button"
+            className="comparison-history-row"
+            onClick={() => onRestore(entry)}
+          >
+            <span className="comparison-history-main">
+              <strong>{entry.summary}</strong>
+              <small>
+                {formatHistoryTimestamp(entry.createdAt)} · {entry.serviceCount} service
+                {entry.serviceCount === 1 ? '' : 's'} · {entry.providerCount} providers
+              </small>
+            </span>
+            <span
+              className={`comparison-history-best comparison-history-best-${entry.cheapestProviderId}`}
+            >
+              {providerLabel(entry.cheapestProviderId)} best ·{' '}
+              {formatCurrency(entry.monthlyLowestUsd)}
+              /mo
+            </span>
           </button>
         ))}
       </div>
@@ -6836,6 +6961,155 @@ function storePricingModel(pricingModel: PricingModelKey): void {
   window.localStorage.setItem(PRICING_MODEL_STORAGE_KEY, pricingModel);
 }
 
+function createComparisonHistoryEntry({
+  comparison,
+  form,
+  inputMode,
+  pricingModel,
+}: {
+  comparison: ComparisonResult;
+  form: WorkloadFormState;
+  inputMode: InputMode;
+  pricingModel: PricingModelKey;
+}): ComparisonHistoryEntry {
+  const cheapestProvider =
+    comparison.providers.find(
+      (provider) => provider.providerId === comparison.cheapestProviderId,
+    ) ??
+    comparison.providers.reduce<ComparisonProviderResult | undefined>((lowest, provider) => {
+      if (!lowest || provider.totals.monthly < lowest.totals.monthly) {
+        return provider;
+      }
+
+      return lowest;
+    }, undefined);
+  const cheapestProviderId = cheapestProvider?.providerId ?? comparison.cheapestProviderId;
+
+  return {
+    id: comparison.comparisonId,
+    comparisonId: comparison.comparisonId,
+    createdAt: new Date().toISOString(),
+    form,
+    inputMode,
+    pricingModel,
+    cheapestProviderId,
+    serviceCount: serviceRequirementsFromForm(form).length,
+    providerCount: comparison.providers.length,
+    monthlyLowestUsd: cheapestProvider?.totals.monthly ?? 0,
+    summary: comparisonHistorySummary(form),
+  };
+}
+
+function saveComparisonHistoryEntry(
+  currentHistory: ComparisonHistoryEntry[],
+  entry: ComparisonHistoryEntry,
+): ComparisonHistoryEntry[] {
+  const nextHistory = [
+    entry,
+    ...currentHistory.filter((candidate) => candidate.comparisonId !== entry.comparisonId),
+  ].slice(0, MAX_COMPARISON_HISTORY_ENTRIES);
+
+  storeComparisonHistory(nextHistory);
+  return nextHistory;
+}
+
+function readStoredComparisonHistory(): ComparisonHistoryEntry[] {
+  try {
+    const stored = window.localStorage.getItem(COMPARISON_HISTORY_STORAGE_KEY);
+    if (!stored) {
+      return [];
+    }
+
+    const parsed = JSON.parse(stored);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .map(sanitizeComparisonHistoryEntry)
+      .filter((entry): entry is ComparisonHistoryEntry => Boolean(entry))
+      .slice(0, MAX_COMPARISON_HISTORY_ENTRIES);
+  } catch {
+    return [];
+  }
+}
+
+function sanitizeComparisonHistoryEntry(
+  entry: Partial<ComparisonHistoryEntry>,
+): ComparisonHistoryEntry | undefined {
+  if (!entry || typeof entry !== 'object' || !entry.form || typeof entry.form !== 'object') {
+    return undefined;
+  }
+
+  const cheapestProviderId = PROVIDER_ORDER.includes(entry.cheapestProviderId as ProviderId)
+    ? (entry.cheapestProviderId as ProviderId)
+    : 'aws';
+  const pricingModel = PRICING_MODEL_OPTIONS.some((option) => option.key === entry.pricingModel)
+    ? (entry.pricingModel as PricingModelKey)
+    : 'on-demand';
+  const form = {
+    ...INITIAL_HOME_FORM,
+    ...entry.form,
+  };
+
+  return {
+    id: typeof entry.id === 'string' && entry.id.trim() ? entry.id : comparisonHistoryId(),
+    comparisonId:
+      typeof entry.comparisonId === 'string' && entry.comparisonId.trim()
+        ? entry.comparisonId
+        : typeof entry.id === 'string'
+          ? entry.id
+          : comparisonHistoryId(),
+    createdAt:
+      typeof entry.createdAt === 'string' && !Number.isNaN(new Date(entry.createdAt).getTime())
+        ? entry.createdAt
+        : new Date().toISOString(),
+    form,
+    inputMode: entry.inputMode === 'describe' ? 'describe' : 'form',
+    pricingModel,
+    cheapestProviderId,
+    serviceCount:
+      typeof entry.serviceCount === 'number' && entry.serviceCount > 0
+        ? entry.serviceCount
+        : serviceRequirementsFromForm(form).length,
+    providerCount:
+      typeof entry.providerCount === 'number' && entry.providerCount > 0
+        ? entry.providerCount
+        : PROVIDER_ORDER.length,
+    monthlyLowestUsd:
+      typeof entry.monthlyLowestUsd === 'number' && entry.monthlyLowestUsd >= 0
+        ? entry.monthlyLowestUsd
+        : 0,
+    summary:
+      typeof entry.summary === 'string' && entry.summary.trim()
+        ? entry.summary
+        : comparisonHistorySummary(form),
+  };
+}
+
+function comparisonHistoryId(): string {
+  return (
+    globalThis.crypto?.randomUUID?.() ??
+    `history-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  );
+}
+
+function storeComparisonHistory(history: ComparisonHistoryEntry[]): void {
+  window.localStorage.setItem(COMPARISON_HISTORY_STORAGE_KEY, JSON.stringify(history));
+}
+
+function clearComparisonHistory(): void {
+  window.localStorage.removeItem(COMPARISON_HISTORY_STORAGE_KEY);
+}
+
+function comparisonHistorySummary(form: WorkloadFormState): string {
+  const name = form.workloadName.trim();
+  const workload = workloadTypeLabel(form.workloadType);
+  const service = serviceFamilyShortLabel(form.selectedServiceFamilyId);
+
+  return name ? `${name} · ${workload}` : `${workload} · ${service}`;
+}
+
 function readStoredRequirementSession(): StoredRequirementSession | undefined {
   try {
     const stored = window.sessionStorage.getItem(REQUIREMENT_SESSION_STORAGE_KEY);
@@ -6949,6 +7223,21 @@ function formatDateTime(value: string | undefined): string {
   return date.toLocaleString('en-US', {
     dateStyle: 'medium',
     timeStyle: 'short',
+  });
+}
+
+function formatHistoryTimestamp(value: string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Recent';
+  }
+
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
   });
 }
 
