@@ -5147,6 +5147,8 @@ function ExecutiveAnalyticsPreview({
 
       <ExecutivePricingModelBars comparison={comparison} />
 
+      <ExecutiveBreakEvenTimeline comparison={comparison} />
+
       <div className="executive-stat-grid" aria-label="Executive compact stats">
         <ExecutiveStatTile
           label="Cheapest provider"
@@ -5369,6 +5371,96 @@ function ExecutivePricingModelBars({ comparison }: { comparison: ComparisonResul
   );
 }
 
+function ExecutiveBreakEvenTimeline({ comparison }: { comparison: ComparisonResult | null }) {
+  const timeline = breakEvenTimelineModel(comparison);
+
+  return (
+    <article className="executive-break-even-card">
+      <div className="executive-card-heading">
+        <span>Break-even timeline</span>
+        <strong>
+          {timeline ? `${timeline.providerLabel} commitment ROI` : 'Commitment data pending'}
+        </strong>
+      </div>
+
+      {timeline ? (
+        <>
+          <div className="break-even-chart-wrap">
+            <svg
+              className="break-even-chart"
+              viewBox="0 0 360 180"
+              role="img"
+              aria-label={`${timeline.providerLabel} ${timeline.pricingLabel} break-even at month ${timeline.breakEvenMonth}`}
+            >
+              <title>
+                {timeline.providerLabel} {timeline.pricingLabel} cumulative cost versus on-demand
+              </title>
+              <line className="break-even-axis" x1="42" x2="334" y1="142" y2="142" />
+              <line className="break-even-grid" x1="42" x2="334" y1="86" y2="86" />
+              <polyline
+                className="break-even-line break-even-line-demand"
+                points={timeline.onDemandPoints}
+              />
+              <polyline
+                className="break-even-line break-even-line-commit"
+                points={timeline.committedPoints}
+              />
+              {timeline.breakEvenPoint ? (
+                <g className="break-even-point">
+                  <circle cx={timeline.breakEvenPoint.x} cy={timeline.breakEvenPoint.y} r="5" />
+                  <text x={timeline.breakEvenPoint.x + 8} y={timeline.breakEvenPoint.y - 8}>
+                    Month {timeline.breakEvenMonth}
+                  </text>
+                </g>
+              ) : null}
+              <text className="break-even-axis-label" x="42" y="164">
+                Month 0
+              </text>
+              <text className="break-even-axis-label" x="292" y="164">
+                Month {timeline.horizonMonths}
+              </text>
+              <text className="break-even-axis-label" x="42" y="20">
+                {formatCurrency(timeline.yMax)}
+              </text>
+            </svg>
+          </div>
+          <div className="break-even-legend" aria-label="Break-even series">
+            <span>
+              <i className="break-even-dot-demand" aria-hidden="true" />
+              On-demand {formatCurrency(timeline.onDemandMonthly)}/mo
+            </span>
+            <span>
+              <i className="break-even-dot-commit" aria-hidden="true" />
+              {timeline.pricingLabel} {formatCurrency(timeline.committedMonthly)}/mo
+            </span>
+          </div>
+          <div className="break-even-metrics" aria-label="Break-even metrics">
+            <span>
+              <strong>
+                {timeline.breakEvenMonth === 0 ? 'Immediate' : `Month ${timeline.breakEvenMonth}`}
+              </strong>
+              <small>Break-even</small>
+            </span>
+            <span>
+              <strong>{formatCurrency(timeline.monthlySavings)}</strong>
+              <small>Monthly savings</small>
+            </span>
+            <span>
+              <strong>{formatCurrency(timeline.upfront)}</strong>
+              <small>Upfront cash</small>
+            </span>
+          </div>
+        </>
+      ) : (
+        <div className="provider-mix-empty" role="status">
+          Run a comparison with reserved, Savings Plan, or CUD evidence to populate the ROI
+          timeline.
+        </div>
+      )}
+    </article>
+  );
+}
+
 function executiveModelMonthlyCost(
   provider: ComparisonProviderResult,
   pricingModel: PricingModelKey,
@@ -5380,6 +5472,145 @@ function executiveModelMonthlyCost(
   const model = provider.pricingModels?.find((candidate) => candidate.model === pricingModel);
 
   return model?.available ? model.monthlyCostUsd : undefined;
+}
+
+interface BreakEvenTimelineModel {
+  providerId: ProviderId;
+  providerLabel: string;
+  pricingLabel: string;
+  horizonMonths: number;
+  breakEvenMonth: number;
+  yMax: number;
+  onDemandMonthly: number;
+  committedMonthly: number;
+  monthlySavings: number;
+  upfront: number;
+  onDemandPoints: string;
+  committedPoints: string;
+  breakEvenPoint?: {
+    x: number;
+    y: number;
+  };
+}
+
+function breakEvenTimelineModel(
+  comparison: ComparisonResult | null,
+): BreakEvenTimelineModel | null {
+  const candidates =
+    comparison?.providers
+      .map((provider) => {
+        const commitment = bestCommitmentModel(provider);
+        const onDemandMonthly =
+          executiveModelMonthlyCost(provider, 'on-demand') ?? provider.totals.monthly;
+
+        return {
+          provider,
+          commitment,
+          onDemandMonthly,
+          committedMonthly: commitment?.model.monthlyCostUsd,
+        };
+      })
+      .filter(
+        (
+          candidate,
+        ): candidate is {
+          provider: ComparisonProviderResult;
+          commitment: NonNullable<ReturnType<typeof bestCommitmentModel>>;
+          onDemandMonthly: number;
+          committedMonthly: number;
+        } =>
+          Boolean(candidate.commitment) &&
+          candidate.committedMonthly !== undefined &&
+          candidate.onDemandMonthly > candidate.committedMonthly,
+      ) ?? [];
+  const selected = [...candidates].sort(
+    (left, right) => left.committedMonthly - right.committedMonthly,
+  )[0];
+
+  if (!selected) {
+    return null;
+  }
+
+  const { commitment, onDemandMonthly, provider } = selected;
+  const committedMonthly = selected.committedMonthly;
+  const monthlySavings = onDemandMonthly - committedMonthly;
+
+  if (monthlySavings <= 0) {
+    return null;
+  }
+
+  const upfront = commitment.model.upfrontCostUsd ?? 0;
+  const breakEvenMonth = upfront > 0 ? Math.ceil(upfront / monthlySavings) : 0;
+  const termMonths =
+    commitment.model.commitmentTermMonths ?? commitmentTermMonths(commitment.model.model);
+  const horizonMonths = Math.min(36, Math.max(termMonths, breakEvenMonth, 12));
+  const yMax = roundCurrency(
+    Math.max(onDemandMonthly * horizonMonths, upfront + committedMonthly * horizonMonths) * 1.08,
+  );
+  const months = breakEvenMonthsForHorizon(horizonMonths);
+  const pointFor = (month: number, cost: number) => chartPoint(month, cost, horizonMonths, yMax);
+
+  return {
+    providerId: provider.providerId,
+    providerLabel: providerLabel(provider.providerId),
+    pricingLabel: commitment.model.displayName ?? pricingModelSummaryLabel(commitment.model.model),
+    horizonMonths,
+    breakEvenMonth,
+    yMax,
+    onDemandMonthly: roundCurrency(onDemandMonthly),
+    committedMonthly: roundCurrency(committedMonthly),
+    monthlySavings: roundCurrency(monthlySavings),
+    upfront: roundCurrency(upfront),
+    onDemandPoints: months
+      .map((month) => pointFor(month, onDemandMonthly * month))
+      .map((point) => `${point.x},${point.y}`)
+      .join(' '),
+    committedPoints: months
+      .map((month) => pointFor(month, upfront + committedMonthly * month))
+      .map((point) => `${point.x},${point.y}`)
+      .join(' '),
+    breakEvenPoint:
+      breakEvenMonth > 0 && breakEvenMonth <= horizonMonths
+        ? pointFor(breakEvenMonth, onDemandMonthly * breakEvenMonth)
+        : undefined,
+  };
+}
+
+function breakEvenMonthsForHorizon(horizonMonths: number): number[] {
+  return Array.from(
+    new Set([0, Math.round(horizonMonths / 3), Math.round((horizonMonths * 2) / 3), horizonMonths]),
+  );
+}
+
+function chartPoint(
+  month: number,
+  cost: number,
+  horizonMonths: number,
+  maxCost: number,
+): { x: number; y: number } {
+  const left = 42;
+  const right = 334;
+  const top = 28;
+  const bottom = 142;
+  const x = left + (month / horizonMonths) * (right - left);
+  const y = bottom - (cost / maxCost) * (bottom - top);
+
+  return {
+    x: roundChartCoordinate(x),
+    y: roundChartCoordinate(y),
+  };
+}
+
+function roundChartCoordinate(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+function commitmentTermMonths(pricingModel: PricingModelKey): number {
+  if (pricingModel === 'reserved-3yr') {
+    return 36;
+  }
+
+  return 12;
 }
 
 function ProviderMixDonut({ data }: { data: ProviderMixDatum[] }) {

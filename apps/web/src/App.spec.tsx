@@ -109,8 +109,11 @@ describe('App', () => {
     expect(text(container)).toContain('Compute base');
     expect(text(container)).toContain('Pricing model comparison');
     expect(text(container)).toContain('On-demand vs commitments');
+    expect(text(container)).toContain('Break-even timeline');
+    expect(text(container)).toContain('Commitment data pending');
     expect(container.querySelectorAll('.executive-provider-card')).toHaveLength(3);
     expect(container.querySelector('.executive-pricing-bars')).toBeInstanceOf(HTMLElement);
+    expect(container.querySelector('.executive-break-even-card')).toBeInstanceOf(HTMLElement);
     expect(text(container)).toContain('Trend pending');
     expect(container.querySelector('.recharts-wrapper')).toBeInstanceOf(HTMLElement);
     expect(text(container)).toContain('Show full breakdown, pricing models & export options');
@@ -1170,6 +1173,9 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('$24.00 est.');
     expect(text(container)).toContain('$42.00');
     expect(text(container)).toContain('Production-depth analytics');
+    expect(text(container)).toContain('AWS commitment ROI');
+    expect(text(container)).toContain('Month 3');
+    expect(text(container)).toContain('Break-even');
     expect(text(container)).toContain('Scenario sensitivity');
     expect(text(container)).toContain('Provider winner under operational shocks');
     expect(text(container)).toContain('Demand +25%');

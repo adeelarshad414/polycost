@@ -4007,6 +4007,7 @@ select:disabled {
 .executive-headline-card,
 .executive-provider-mix-card,
 .executive-waterfall-card,
+.executive-break-even-card,
 .executive-provider-card,
 .executive-pricing-bars,
 .executive-recommendation-card,
@@ -4022,6 +4023,7 @@ select:disabled {
 .executive-headline-card,
 .executive-provider-mix-card,
 .executive-waterfall-card,
+.executive-break-even-card,
 .executive-pricing-bars {
   display: grid;
   gap: var(--pc-space-2);
@@ -4089,6 +4091,10 @@ select:disabled {
   grid-column: 1 / -1;
 }
 
+.executive-break-even-card {
+  grid-column: 1 / -1;
+}
+
 .executive-waterfall {
   display: grid;
   gap: 9px;
@@ -4139,6 +4145,126 @@ select:disabled {
   gap: var(--pc-space-1);
   border-top: 1px solid var(--pc-border);
   padding-top: 9px;
+}
+
+.break-even-chart-wrap {
+  overflow: hidden;
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface) 94%, var(--pc-bg-surface-2));
+}
+
+.break-even-chart {
+  display: block;
+  width: 100%;
+  min-height: 190px;
+}
+
+.break-even-axis,
+.break-even-grid {
+  stroke: var(--pc-border-strong);
+  stroke-width: 1;
+}
+
+.break-even-grid {
+  opacity: 0.55;
+  stroke-dasharray: 4 5;
+}
+
+.break-even-line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+}
+
+.break-even-line-demand {
+  stroke: var(--pc-text-secondary);
+}
+
+.break-even-line-commit {
+  stroke: var(--brand-green);
+}
+
+.break-even-point circle {
+  fill: var(--pc-bg-surface);
+  stroke: var(--brand-blue);
+  stroke-width: 3;
+}
+
+.break-even-point text,
+.break-even-axis-label {
+  fill: var(--pc-text-secondary);
+  font-family: var(--pc-font-mono);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.break-even-legend,
+.break-even-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.break-even-legend span {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--pc-border);
+  border-radius: 999px;
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+  padding: 0 12px;
+}
+
+.break-even-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.break-even-dot-demand {
+  background: var(--pc-text-secondary);
+}
+
+.break-even-dot-commit {
+  background: var(--brand-green);
+}
+
+.break-even-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.break-even-metrics span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: var(--pc-bg-surface);
+  padding: 10px 12px;
+}
+
+.break-even-metrics strong {
+  overflow: hidden;
+  color: var(--pc-text-primary);
+  font-family: var(--pc-font-mono);
+  font-size: var(--pc-text-base);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.break-even-metrics small {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 .executive-pricing-bar-grid {
@@ -6441,6 +6567,10 @@ select:disabled {
 
   .waterfall-row strong {
     text-align: left;
+  }
+
+  .break-even-metrics {
+    grid-template-columns: 1fr;
   }
 
   .initial-home-action-hint {
