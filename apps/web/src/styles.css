@@ -390,11 +390,35 @@ textarea:focus-visible {
 
 .initial-home-actions {
   display: flex;
-  justify-content: center;
+  align-items: center;
+  gap: var(--pc-space-2);
+  justify-content: space-between;
 }
 
 .initial-home-actions .pc-button {
   min-width: min(100%, 220px);
+}
+
+.initial-home-actions-primary {
+  border: 1px solid color-mix(in srgb, var(--pc-action-primary) 22%, var(--pc-border));
+  border-radius: 8px;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--brand-orange) 8%, transparent),
+      color-mix(in srgb, var(--brand-blue) 7%, transparent) 48%,
+      color-mix(in srgb, var(--brand-green) 8%, transparent)
+    ),
+    color-mix(in srgb, var(--pc-bg-surface-2) 62%, var(--pc-bg-surface));
+  padding: 10px;
+}
+
+.initial-home-action-hint {
+  min-width: 0;
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-sm);
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .progressive-results {
@@ -416,6 +440,7 @@ textarea:focus-visible {
 }
 
 .requirement-summary-strip,
+.result-quick-actions,
 .requirements-edit-panel,
 .result-disclosure {
   min-width: 0;
@@ -432,6 +457,64 @@ textarea:focus-visible {
   gap: var(--pc-space-2);
   animation: progressive-panel-enter 180ms ease-out both;
   padding: var(--pc-space-2);
+}
+
+.result-quick-actions {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: center;
+  gap: var(--pc-space-2);
+  animation: progressive-panel-enter 180ms ease-out both;
+  border-color: color-mix(in srgb, var(--pc-action-primary) 26%, var(--pc-border));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--brand-orange) 9%, transparent),
+      color-mix(in srgb, var(--brand-blue) 8%, transparent) 48%,
+      color-mix(in srgb, var(--brand-green) 9%, transparent)
+    ),
+    color-mix(in srgb, var(--pc-bg-surface) 94%, var(--pc-bg-surface-2));
+  padding: var(--pc-space-2);
+}
+
+.result-quick-actions-copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.result-quick-actions-kicker {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.result-quick-actions-copy strong {
+  color: var(--pc-text-primary);
+  font-family: var(--pc-font-display);
+  font-size: var(--pc-text-lg);
+  line-height: 1.15;
+}
+
+.result-quick-actions-copy span:last-child {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-sm);
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.result-quick-actions-controls {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: var(--pc-space-1);
+}
+
+.result-quick-actions-controls .export-bar {
+  display: inline-flex;
 }
 
 .summary-strip-main {
@@ -5073,14 +5156,31 @@ select:disabled {
   }
 
   .requirement-summary-strip,
+  .result-quick-actions,
   .requirements-edit-header,
   .progressive-export-panel {
     align-items: stretch;
     flex-direction: column;
   }
 
+  .result-quick-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .initial-home-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .initial-home-action-hint {
+    text-align: center;
+  }
+
   .summary-strip-actions,
   .summary-strip-actions .pc-button,
+  .result-quick-actions-controls,
+  .result-quick-actions-controls .export-bar,
+  .result-quick-actions-controls .pc-button,
   .requirements-edit-actions,
   .requirements-edit-actions .pc-button,
   .progressive-export-panel .pc-button {
@@ -5088,6 +5188,7 @@ select:disabled {
   }
 
   .summary-strip-actions .pc-button,
+  .result-quick-actions-controls .pc-button,
   .requirements-edit-actions .pc-button,
   .progressive-export-panel .pc-button {
     justify-content: center;
@@ -5235,6 +5336,11 @@ select:disabled {
     overflow-x: visible;
   }
 
+  .pricing-model-preference-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .readiness-pill-row {
     grid-template-columns: 1fr;
   }
@@ -5290,6 +5396,17 @@ select:disabled {
   .pricing-model-preference-options button {
     font-size: var(--pc-text-xs);
     min-width: 64px;
+  }
+
+  .pricing-model-preference-options button {
+    font-size: 11px;
+    gap: 4px;
+    white-space: normal;
+  }
+
+  .pricing-model-preference-options .segment-icon {
+    width: 12px;
+    height: 12px;
   }
 
   .form-grid,
