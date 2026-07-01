@@ -603,6 +603,31 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
     ]);
   }
 
+  for (const provider of result.providers) {
+    const databaseMonthly = databaseIntelligenceMonthly(provider);
+    const providerMonthly = provider.totals.monthly;
+    const databaseShare = providerMonthly > 0 ? databaseMonthly / providerMonthly : 0;
+    const insight = databaseOptimizationInsight(provider);
+    const isMaterial =
+      databaseMonthly >= 10 || databaseShare >= 0.1 || Boolean(insight?.hasAdvancedSignal);
+
+    if (!insight || !isMaterial) {
+      continue;
+    }
+
+    rows.push([
+      'Database optimization',
+      `${provider.providerId} database and analytics data services are ${formatNumber(
+        databaseShare * 100,
+      )}% of monthly spend; ${insight.recommendation}`,
+      formatNumber(insight.monthlySavings),
+      formatNumber(insight.monthlySavings * 12),
+      insight.monthlySavings > 100 ? 'High' : insight.monthlySavings > 20 ? 'Medium' : 'Low',
+      insight.effort,
+      insight.evidence,
+    ]);
+  }
+
   rows.push(...architectureRiskOpportunityRows(result));
 
   for (const provider of result.providers) {
@@ -680,7 +705,7 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
       : [
           [
             'No material optimization opportunity detected',
-            'Current comparison does not expose provider spread, commitment, storage, egress, licensing, or mapping signals above thresholds.',
+            'Current comparison does not expose provider spread, commitment, storage, database, egress, licensing, or mapping signals above thresholds.',
             '',
             '',
             'Low',
@@ -1137,6 +1162,23 @@ function componentMonthly(
     .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
 }
 
+function databaseIntelligenceMonthly(provider: ComparisonProviderResult): number {
+  return databaseIntelligenceLineItems(provider).reduce(
+    (sum, lineItem) => sum + lineItem.baseMonthlyCostUsd,
+    0,
+  );
+}
+
+function databaseIntelligenceLineItems(provider: ComparisonProviderResult): ComparisonLineItem[] {
+  return provider.lineItems.filter(
+    (lineItem) =>
+      lineItem.category === 'database' ||
+      lineItem.costComponent === 'database' ||
+      databaseDescription(lineItem.description) ||
+      databaseDescription(lineItem.skuId ?? ''),
+  );
+}
+
 function rightSizingSavingsRate(averageUtilizationPercent?: number): number {
   if (averageUtilizationPercent === undefined) {
     return 0;
@@ -1272,6 +1314,14 @@ interface EgressOptimizationInsight {
 }
 
 interface StorageOptimizationInsight {
+  recommendation: string;
+  monthlySavings: number;
+  effort: 'Low' | 'Medium' | 'High';
+  evidence: string;
+  hasAdvancedSignal: boolean;
+}
+
+interface DatabaseOptimizationInsight {
   recommendation: string;
   monthlySavings: number;
   effort: 'Low' | 'Medium' | 'High';
@@ -1534,6 +1584,158 @@ function storageOptimizationInsight(
   };
 }
 
+function databaseOptimizationInsight(
+  provider: ComparisonProviderResult,
+): DatabaseOptimizationInsight | undefined {
+  const databaseRows = databaseIntelligenceLineItems(provider).sort(
+    (left, right) => right.baseMonthlyCostUsd - left.baseMonthlyCostUsd,
+  );
+  const databaseMonthly = databaseRows.reduce(
+    (sum, lineItem) => sum + lineItem.baseMonthlyCostUsd,
+    0,
+  );
+
+  if (databaseMonthly <= 0 || databaseRows.length === 0) {
+    return undefined;
+  }
+
+  const advancedRows = databaseRows.filter((lineItem) =>
+    databaseAdvancedDescription(`${lineItem.skuId ?? ''} ${lineItem.description}`),
+  );
+  const primary = advancedRows[0] ?? databaseRows[0];
+  const primaryMonthly = primary.baseMonthlyCostUsd || databaseMonthly;
+  const primaryDescription = primary.description;
+  const normalizedPrimary = `${primary.skuId ?? ''} ${primaryDescription}`.toLowerCase();
+
+  if (normalizedPrimary.includes('ru') || normalizedPrimary.includes('cosmos')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.25);
+
+    return {
+      recommendation:
+        'validate RU/s utilization, autoscale limits, and serverless/provisioned break-even before production traffic.',
+      monthlySavings,
+      effort: 'Medium',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant database row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; RU/s right-sizing is modeled as a 25% reduction of that row.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('nosql') || normalizedPrimary.includes('read unit') || normalizedPrimary.includes('write unit')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      recommendation:
+        'model on-demand vs provisioned NoSQL capacity and write-heavy partition design before choosing the default pricing mode.',
+      monthlySavings,
+      effort: 'Medium',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant database row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; NoSQL capacity-mode tuning is modeled as a 20% reduction of that row.`,
+    };
+  }
+
+  if (
+    normalizedPrimary.includes('query') ||
+    normalizedPrimary.includes('warehouse') ||
+    normalizedPrimary.includes('bigquery') ||
+    normalizedPrimary.includes('redshift') ||
+    normalizedPrimary.includes('synapse')
+  ) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.25);
+
+    return {
+      recommendation:
+        'separate storage from query compute, partition hot datasets, and compare on-demand query spend with committed warehouse capacity.',
+      monthlySavings,
+      effort: 'Medium',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant database row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; warehouse/query tuning is modeled as a 25% reduction of that row.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('iops') || normalizedPrimary.includes('performance')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.25);
+
+    return {
+      recommendation:
+        'right-size provisioned database IOPS after measuring storage latency, queue depth, and peak transaction windows.',
+      monthlySavings,
+      effort: 'Medium',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant database row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; database IOPS right-sizing is modeled as a 25% reduction of that row.`,
+    };
+  }
+
+  if (
+    normalizedPrimary.includes('replica') ||
+    normalizedPrimary.includes('standby') ||
+    normalizedPrimary.includes('multi-az')
+  ) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      recommendation:
+        'validate read-replica count, standby policy, and read-routing targets against actual RPO/RTO and read scaling needs.',
+      monthlySavings,
+      effort: 'Medium',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant database row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; replica and standby review is modeled as a 20% reduction of that row.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('backup') || normalizedPrimary.includes('growth')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.25);
+
+    return {
+      recommendation:
+        'tune backup retention, storage autoscaling thresholds, and archive policy before database growth compounds.',
+      monthlySavings,
+      effort: 'Low',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant database row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; backup/growth policy tuning is modeled as a 25% reduction of that row.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('cache') || normalizedPrimary.includes('redis')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      recommendation:
+        'right-size cache replicas, TTL policy, and failover topology before scaling managed Redis capacity.',
+      monthlySavings,
+      effort: 'Low',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant database row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; cache topology tuning is modeled as a 20% reduction of that row.`,
+    };
+  }
+
+  const monthlySavings = roundCurrency(databaseMonthly * 0.15);
+
+  return {
+    recommendation:
+      'review managed database tier, storage growth, HA posture, and query profile before committing to the baseline.',
+    monthlySavings,
+    effort: 'Low',
+    hasAdvancedSignal: false,
+    evidence: `${provider.providerId} database baseline is $${formatNumber(
+      databaseMonthly,
+    )}/mo across ${databaseRows.length} database/analytics row(s); tier review is modeled at 15% of spend.`,
+  };
+}
+
 function egressOptimizationInsight(provider: ComparisonProviderResult): EgressOptimizationInsight {
   const egressMonthly = componentMonthly(provider, 'egress');
   const egressRows = provider.lineItems
@@ -1741,6 +1943,63 @@ function storageAdvancedDescription(description: string): boolean {
     'get request',
     'list request',
     'delete request',
+  ].some((needle) => normalized.includes(needle));
+}
+
+function databaseDescription(description: string): boolean {
+  const normalized = description.toLowerCase();
+
+  return [
+    'database',
+    'db ',
+    'nosql',
+    'dynamodb',
+    'cosmos',
+    'firestore',
+    'bigtable',
+    'ru/s',
+    'read unit',
+    'write unit',
+    'query processing',
+    'warehouse',
+    'bigquery',
+    'redshift',
+    'synapse',
+    'replica',
+    'standby',
+    'backup',
+    'iops',
+    'cache',
+    'redis',
+    'growth',
+  ].some((needle) => normalized.includes(needle));
+}
+
+function databaseAdvancedDescription(description: string): boolean {
+  const normalized = description.toLowerCase();
+
+  return [
+    'nosql',
+    'dynamodb',
+    'cosmos',
+    'firestore',
+    'bigtable',
+    'ru/s',
+    'read unit',
+    'write unit',
+    'query processing',
+    'warehouse',
+    'bigquery',
+    'redshift',
+    'synapse',
+    'replica',
+    'standby',
+    'multi-az',
+    'backup',
+    'iops',
+    'cache',
+    'redis',
+    'growth',
   ].some((needle) => normalized.includes(needle));
 }
 

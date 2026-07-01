@@ -4814,6 +4814,15 @@ select:disabled {
   padding: var(--pc-space-1);
 }
 
+.database-optimization-panel {
+  display: grid;
+  gap: var(--pc-space-1);
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface) 94%, var(--pc-bg-surface-2));
+  padding: var(--pc-space-1);
+}
+
 .egress-optimization-panel {
   display: grid;
   gap: var(--pc-space-1);

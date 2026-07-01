@@ -5958,6 +5958,7 @@ function ProductionDepthAnalytics({
   const commitmentCoverage = commitmentCoverageGapRows(comparison, form);
   const tcoSignals = crossProviderTcoRows(comparison, form);
   const storageOptimizations = storageOptimizationRows(comparison, form);
+  const databaseOptimizations = databaseOptimizationRows(comparison, form);
   const egressOptimizations = egressOptimizationRows(comparison, form);
   const spotBlendRows = spotBlendOptimizerRows(comparison, form);
   const licenseRows = licenseOptimizationRows(comparison, form);
@@ -5993,6 +5994,7 @@ function ProductionDepthAnalytics({
       <CommitmentCoverageGapPanel rows={commitmentCoverage} />
       <CrossProviderTcoPanel rows={tcoSignals} />
       <StorageOptimizationPanel rows={storageOptimizations} />
+      <DatabaseOptimizationPanel rows={databaseOptimizations} />
       <EgressOptimizationPanel rows={egressOptimizations} />
       <SpotBlendOptimizerPanel rows={spotBlendRows} />
       <LicenseOptimizationPanel rows={licenseRows} operatingSystem={form.operatingSystem} />
@@ -6321,6 +6323,70 @@ function StorageOptimizationPanel({ rows }: { rows: StorageOptimizationRow[] }) 
         <div className="scenario-sensitivity-empty" role="status">
           Storage optimization appears when storage classes, operations, retrieval, snapshots,
           replication, or performance line items become material.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DatabaseOptimizationPanel({ rows }: { rows: DatabaseOptimizationRow[] }) {
+  return (
+    <div className="database-optimization-panel" aria-label="Database optimization detail">
+      <div className="scenario-sensitivity-heading">
+        <div>
+          <span>Database optimization detail</span>
+          <h4>NoSQL capacity, RU/s, replicas, backups, cache, and warehouse query tuning</h4>
+        </div>
+      </div>
+
+      {rows.length > 0 ? (
+        <div className="table-wrap database-optimization-wrap">
+          <table className="ranking-table database-optimization-table">
+            <thead>
+              <tr>
+                <th scope="col">Provider</th>
+                <th scope="col">Database share</th>
+                <th scope="col">Dominant driver</th>
+                <th scope="col">Opportunity</th>
+                <th scope="col">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.providerId}>
+                  <td>
+                    <span className={`scenario-low-label scenario-low-${row.providerId}`}>
+                      {providerLabel(row.providerId)}
+                    </span>
+                    <small>{row.usageSignal}</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.databaseMonthly)}/mo</strong>
+                    <small>{formatPercent(row.databaseSharePercent)} of provider total</small>
+                  </td>
+                  <td>
+                    <strong>{row.primaryDriver}</strong>
+                    <small>{row.driverEvidence}</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.monthlySavings)}/mo</strong>
+                    <small>
+                      {formatCurrency(row.annualSavings)}/yr · {row.effort} effort
+                    </small>
+                  </td>
+                  <td>
+                    <strong>{row.recommendation}</strong>
+                    <small>{row.evidence}</small>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="scenario-sensitivity-empty" role="status">
+          Database optimization appears when NoSQL units, RU/s, replicas, backups, IOPS, cache, or
+          warehouse query line items become material.
         </div>
       )}
     </div>
@@ -7196,6 +7262,20 @@ interface StorageOptimizationRow {
   evidence: string;
 }
 
+interface DatabaseOptimizationRow {
+  providerId: ProviderId;
+  databaseMonthly: number;
+  databaseSharePercent: number;
+  primaryDriver: string;
+  usageSignal: string;
+  monthlySavings: number;
+  annualSavings: number;
+  effort: 'Low' | 'Medium' | 'High';
+  recommendation: string;
+  driverEvidence: string;
+  evidence: string;
+}
+
 interface SpotBlendOptimizerRow {
   providerId: ProviderId;
   onDemandMonthly: number;
@@ -7556,6 +7636,316 @@ function storageOptimizationSignal(
     evidence: `Storage class review models ${formatCurrency(
       monthlySavings,
     )}/mo opportunity at 15% of the storage baseline.`,
+  };
+}
+
+function databaseOptimizationRows(
+  comparison: ComparisonResult | null,
+  form: WorkloadFormState,
+): DatabaseOptimizationRow[] {
+  if (!comparison) {
+    return [];
+  }
+
+  const databaseSizeGb = parseInputNumber(form.databaseSizeGb) ?? 0;
+  const backupGb = parseInputNumber(form.databaseBackupStorageGb) ?? 0;
+  const backupDays = parseInputNumber(form.databaseBackupRetentionDays) ?? 0;
+  const provisionedIops = parseInputNumber(form.databaseProvisionedIops) ?? 0;
+  const readReplicas = parseInputNumber(form.databaseReadReplicaCount) ?? 0;
+  const replicaTransferGb = parseInputNumber(form.databaseCrossRegionReplicaTransferGb) ?? 0;
+  const nosqlReadsMillion = parseInputNumber(form.databaseNosqlReadRequestUnitsMillion) ?? 0;
+  const nosqlWritesMillion = parseInputNumber(form.databaseNosqlWriteRequestUnitsMillion) ?? 0;
+  const ruPerSecond = parseInputNumber(form.databaseRuPerSecond) ?? 0;
+  const queryDataTb = parseInputNumber(form.databaseQueryDataTb) ?? 0;
+  const cacheReplicas = parseInputNumber(form.databaseCacheReplicaCount) ?? 0;
+  const storageGrowthGb = parseInputNumber(form.databaseStorageGrowthGbPerMonth) ?? 0;
+  const warehouseStorageGb = parseInputNumber(form.analyticsWarehouseStorageGb) ?? 0;
+  const warehouseQueryTb = parseInputNumber(form.analyticsWarehouseQueryTb) ?? 0;
+  const databaseEngineLabel = form.databaseEngine.replace(/_/g, ' ');
+  const usageSignalParts = [
+    form.databaseEnabled ? databaseEngineLabel : undefined,
+    databaseSizeGb > 0 ? `${formatDecimal(databaseSizeGb)}GB data` : undefined,
+    ruPerSecond > 0 ? `${formatDecimal(ruPerSecond)} RU/s` : undefined,
+    nosqlReadsMillion + nosqlWritesMillion > 0
+      ? `${formatDecimal(nosqlReadsMillion + nosqlWritesMillion)}M NoSQL units`
+      : undefined,
+    queryDataTb + warehouseQueryTb > 0
+      ? `${formatDecimal(queryDataTb + warehouseQueryTb)}TB query`
+      : undefined,
+    readReplicas + cacheReplicas > 0
+      ? `${formatDecimal(readReplicas + cacheReplicas)} replica nodes`
+      : undefined,
+  ].filter(Boolean);
+  const usageSignal = usageSignalParts.join(' · ') || 'Database rows only';
+  const hasAdvancedFormSignal =
+    backupGb > 0 ||
+    provisionedIops > 0 ||
+    readReplicas > 0 ||
+    replicaTransferGb > 0 ||
+    nosqlReadsMillion + nosqlWritesMillion > 0 ||
+    ruPerSecond > 0 ||
+    queryDataTb > 0 ||
+    cacheReplicas > 0 ||
+    storageGrowthGb > 0 ||
+    warehouseStorageGb > 0 ||
+    warehouseQueryTb > 0;
+
+  return comparison.providers
+    .flatMap((provider) => {
+      const databaseRows = databaseIntelligenceLineItems(provider).sort(
+        (left, right) => right.baseMonthlyCostUsd - left.baseMonthlyCostUsd,
+      );
+      const advancedRows = databaseRows.filter((lineItem) =>
+        databaseAdvancedDescriptionMatches(`${lineItem.skuId ?? ''} ${lineItem.description}`),
+      );
+      const primary = advancedRows[0] ?? databaseRows[0];
+      const databaseMonthly = roundCurrency(
+        databaseRows.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0),
+      );
+      const databaseSharePercent =
+        provider.totals.monthly > 0 ? (databaseMonthly / provider.totals.monthly) * 100 : 0;
+      const material =
+        databaseMonthly >= 10 ||
+        databaseSharePercent >= 10 ||
+        hasAdvancedFormSignal ||
+        advancedRows.length > 0;
+
+      if (!primary || databaseMonthly <= 0 || !material) {
+        return [];
+      }
+
+      const signal = databaseOptimizationSignal(primary, databaseMonthly, {
+        backupDays,
+        backupGb,
+        cacheReplicas,
+        databaseEngineLabel,
+        nosqlReadsMillion,
+        nosqlWritesMillion,
+        provisionedIops,
+        queryDataTb: queryDataTb + warehouseQueryTb,
+        readReplicas,
+        replicaTransferGb,
+        ruPerSecond,
+        storageGrowthGb,
+        warehouseStorageGb,
+      });
+
+      return [
+        {
+          providerId: provider.providerId,
+          databaseMonthly,
+          databaseSharePercent,
+          usageSignal,
+          annualSavings: roundCurrency(signal.monthlySavings * 12),
+          ...signal,
+        },
+      ];
+    })
+    .sort((left, right) => right.monthlySavings - left.monthlySavings);
+}
+
+function databaseIntelligenceLineItems(provider: ComparisonProviderResult): ComparisonLineItem[] {
+  return provider.lineItems.filter(
+    (lineItem) =>
+      lineItem.category === 'database' ||
+      lineItemCostComponent(lineItem) === 'database' ||
+      databaseDescriptionMatches(lineItem.description) ||
+      databaseDescriptionMatches(lineItem.skuId ?? ''),
+  );
+}
+
+function databaseOptimizationSignal(
+  primary: ComparisonLineItem,
+  databaseMonthly: number,
+  context: {
+    backupDays: number;
+    backupGb: number;
+    cacheReplicas: number;
+    databaseEngineLabel: string;
+    nosqlReadsMillion: number;
+    nosqlWritesMillion: number;
+    provisionedIops: number;
+    queryDataTb: number;
+    readReplicas: number;
+    replicaTransferGb: number;
+    ruPerSecond: number;
+    storageGrowthGb: number;
+    warehouseStorageGb: number;
+  },
+): Omit<
+  DatabaseOptimizationRow,
+  'providerId' | 'databaseMonthly' | 'databaseSharePercent' | 'usageSignal' | 'annualSavings'
+> {
+  const normalizedPrimary = `${primary.skuId ?? ''} ${primary.description}`.toLowerCase();
+  const primaryMonthly =
+    primary.baseMonthlyCostUsd > 0 ? primary.baseMonthlyCostUsd : databaseMonthly;
+  const baseEvidence = `${primary.description} is the largest database row at ${formatCurrency(
+    primaryMonthly,
+  )}/mo.`;
+
+  if (normalizedPrimary.includes('ru') || normalizedPrimary.includes('cosmos')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.25);
+
+    return {
+      primaryDriver: 'RU/s provisioned capacity',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation: 'Validate RU/s utilization, autoscale limits, and serverless break-even.',
+      driverEvidence:
+        context.ruPerSecond > 0
+          ? `${formatDecimal(context.ruPerSecond)} RU/s configured`
+          : 'RU/s line item surfaced by backend',
+      evidence: `${baseEvidence} RU/s right-sizing models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (
+    normalizedPrimary.includes('nosql') ||
+    normalizedPrimary.includes('read unit') ||
+    normalizedPrimary.includes('write unit')
+  ) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      primaryDriver: 'NoSQL capacity units',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation: 'Compare on-demand and provisioned capacity before choosing NoSQL mode.',
+      driverEvidence:
+        context.nosqlReadsMillion + context.nosqlWritesMillion > 0
+          ? `${formatDecimal(context.nosqlReadsMillion)}M reads · ${formatDecimal(
+              context.nosqlWritesMillion,
+            )}M writes`
+          : `${context.databaseEngineLabel} capacity line item`,
+      evidence: `${baseEvidence} Capacity-mode review models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (
+    normalizedPrimary.includes('query') ||
+    normalizedPrimary.includes('warehouse') ||
+    normalizedPrimary.includes('bigquery') ||
+    normalizedPrimary.includes('redshift') ||
+    normalizedPrimary.includes('synapse')
+  ) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.25);
+
+    return {
+      primaryDriver: 'Warehouse query processing',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation:
+        'Partition hot datasets and compare on-demand query spend with committed slots.',
+      driverEvidence:
+        context.queryDataTb > 0
+          ? `${formatDecimal(context.queryDataTb)}TB query · ${formatDecimal(
+              context.warehouseStorageGb,
+            )}GB warehouse storage`
+          : 'Query processing line item surfaced by backend',
+      evidence: `${baseEvidence} Warehouse/query tuning models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('iops') || normalizedPrimary.includes('performance')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.25);
+
+    return {
+      primaryDriver: 'Database IOPS',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation: 'Right-size provisioned IOPS using observed latency and queue-depth data.',
+      driverEvidence:
+        context.provisionedIops > 0
+          ? `${formatDecimal(context.provisionedIops)} provisioned IOPS`
+          : 'IOPS line item surfaced by backend',
+      evidence: `${baseEvidence} IOPS tuning models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (
+    normalizedPrimary.includes('replica') ||
+    normalizedPrimary.includes('standby') ||
+    normalizedPrimary.includes('multi-az')
+  ) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      primaryDriver: 'Replicas / HA standby',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation: 'Validate read-replica count and standby topology against RPO/RTO needs.',
+      driverEvidence:
+        context.readReplicas + context.cacheReplicas > 0 || context.replicaTransferGb > 0
+          ? `${formatDecimal(context.readReplicas)} read replicas · ${formatDecimal(
+              context.replicaTransferGb,
+            )}GB transfer`
+          : 'Replica or standby line item surfaced by backend',
+      evidence: `${baseEvidence} Replica and standby review models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('backup') || normalizedPrimary.includes('growth')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.25);
+
+    return {
+      primaryDriver: 'Backup / growth policy',
+      monthlySavings,
+      effort: 'Low',
+      recommendation: 'Tune backup retention, archive policy, and storage autoscaling thresholds.',
+      driverEvidence:
+        context.backupGb > 0 || context.storageGrowthGb > 0
+          ? `${formatDecimal(context.backupGb)}GB backup · ${formatDecimal(
+              context.backupDays,
+            )} days · ${formatDecimal(context.storageGrowthGb)}GB/mo growth`
+          : 'Backup or growth line item surfaced by backend',
+      evidence: `${baseEvidence} Backup/growth policy tuning models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('cache') || normalizedPrimary.includes('redis')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      primaryDriver: 'Cache topology',
+      monthlySavings,
+      effort: 'Low',
+      recommendation:
+        'Right-size cache replicas, TTLs, and failover topology before scaling Redis.',
+      driverEvidence:
+        context.cacheReplicas > 0
+          ? `${formatDecimal(context.cacheReplicas)} cache replicas`
+          : 'Cache line item surfaced by backend',
+      evidence: `${baseEvidence} Cache topology tuning models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  const monthlySavings = roundCurrency(databaseMonthly * 0.15);
+
+  return {
+    primaryDriver: 'Managed database tiering',
+    monthlySavings,
+    effort: 'Low',
+    recommendation: 'Review managed tier, HA posture, storage growth, and query profile.',
+    driverEvidence: `${context.databaseEngineLabel} baseline · ${formatCurrency(
+      databaseMonthly,
+    )}/mo database/analytics spend`,
+    evidence: `Database tier review models ${formatCurrency(
+      monthlySavings,
+    )}/mo opportunity at 15% of the database baseline.`,
   };
 }
 
@@ -8591,6 +8981,63 @@ function storageAdvancedDescriptionMatches(description: string): boolean {
     'get request',
     'list request',
     'delete request',
+  ].some((needle) => normalized.includes(needle));
+}
+
+function databaseDescriptionMatches(description: string): boolean {
+  const normalized = description.toLowerCase();
+
+  return [
+    'database',
+    'db ',
+    'nosql',
+    'dynamodb',
+    'cosmos',
+    'firestore',
+    'bigtable',
+    'ru/s',
+    'read unit',
+    'write unit',
+    'query processing',
+    'warehouse',
+    'bigquery',
+    'redshift',
+    'synapse',
+    'replica',
+    'standby',
+    'backup',
+    'iops',
+    'cache',
+    'redis',
+    'growth',
+  ].some((needle) => normalized.includes(needle));
+}
+
+function databaseAdvancedDescriptionMatches(description: string): boolean {
+  const normalized = description.toLowerCase();
+
+  return [
+    'nosql',
+    'dynamodb',
+    'cosmos',
+    'firestore',
+    'bigtable',
+    'ru/s',
+    'read unit',
+    'write unit',
+    'query processing',
+    'warehouse',
+    'bigquery',
+    'redshift',
+    'synapse',
+    'replica',
+    'standby',
+    'multi-az',
+    'backup',
+    'iops',
+    'cache',
+    'redis',
+    'growth',
   ].some((needle) => normalized.includes(needle));
 }
 

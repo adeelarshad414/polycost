@@ -1153,6 +1153,64 @@ describe('ComparisonView', () => {
     unmount();
   });
 
+  it('surfaces database optimization detail from modeled database dimensions', async () => {
+    const awsProvider = providerWithItems('aws', [
+      ['compute', 'aws compute', 40],
+      ['database', 'AWS primary RU/s provisioned capacity estimate', 32],
+      ['database', 'AWS primary NoSQL write unit estimate', 20],
+    ]);
+    awsProvider.lineItems[1] = {
+      ...awsProvider.lineItems[1],
+      costComponent: 'database',
+      skuId: 'modeled-database-ru-capacity',
+    };
+    awsProvider.lineItems[2] = {
+      ...awsProvider.lineItems[2],
+      costComponent: 'database',
+      skuId: 'modeled-database-nosql-write-units',
+    };
+    const databaseResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'aws',
+      providers: [
+        awsProvider,
+        providerWithItems('azure', [['compute', 'azure compute', 70]]),
+        providerWithItems('gcp', [['compute', 'gcp compute', 75]]),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView
+        comparison={databaseResult}
+        form={{
+          ...defaultWorkloadForm,
+          databaseEnabled: true,
+          databaseEngine: 'generic_nosql',
+          databaseSizeGb: '250',
+          databaseNosqlReadRequestUnitsMillion: '50',
+          databaseNosqlWriteRequestUnitsMillion: '20',
+          databaseRuPerSecond: '4000',
+        }}
+        interval="monthly"
+      />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain('Database optimization detail');
+    expect(text(container)).toContain(
+      'NoSQL capacity, RU/s, replicas, backups, cache, and warehouse query tuning',
+    );
+    expect(text(container)).toContain('RU/s provisioned capacity');
+    expect(text(container)).toContain('generic nosql · 250GB data · 4,000 RU/s · 70M NoSQL units');
+    expect(text(container)).toContain('$8.00/mo');
+    expect(text(container)).toContain('$96.00/yr');
+    expect(text(container)).toContain(
+      'Validate RU/s utilization, autoscale limits, and serverless break-even.',
+    );
+    expect(text(container)).toContain('4,000 RU/s configured');
+
+    unmount();
+  });
+
   it('renders FinOps feature additions without fabricating unsupported backend data', async () => {
     const awsRichProvider = providerWithItems('aws', [
       ['compute', 'aws compute', 50],

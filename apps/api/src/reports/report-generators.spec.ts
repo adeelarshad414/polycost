@@ -815,6 +815,54 @@ describe('report generators', () => {
         ]),
       ]),
     );
+
+    expect(
+      optimizationOpportunityRows({
+        ...comparison,
+        providers: [
+          {
+            providerId: 'aws',
+            lineItems: [
+              {
+                category: 'database',
+                costComponent: 'database',
+                description: 'AWS primary RU/s provisioned capacity estimate',
+                skuId: 'modeled-database-ru-capacity',
+                isApproximate: false,
+                baseMonthlyCostUsd: 80,
+              },
+              {
+                category: 'database',
+                costComponent: 'database',
+                description: 'AWS primary NoSQL write unit estimate',
+                skuId: 'modeled-database-nosql-write-units',
+                isApproximate: false,
+                baseMonthlyCostUsd: 40,
+              },
+            ],
+            totals: {
+              daily: 6.58,
+              weekly: 46.15,
+              monthly: 200,
+              quarterly: 600,
+              yearly: 2400,
+            },
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'Database optimization',
+          'aws database and analytics data services are 60% of monthly spend; validate RU/s utilization, autoscale limits, and serverless/provisioned break-even before production traffic.',
+          '20',
+          '240',
+          'Low',
+          'Medium',
+          'aws dominant database row is "AWS primary RU/s provisioned capacity estimate" at $80/mo; RU/s right-sizing is modeled as a 25% reduction of that row.',
+        ]),
+      ]),
+    );
   });
 
   it('builds fallback service requirement rows when comparison requirements are absent', () => {
