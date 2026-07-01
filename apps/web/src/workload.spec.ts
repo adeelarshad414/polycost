@@ -383,6 +383,70 @@ describe('workload helpers', () => {
     );
   });
 
+  it('serializes observability and secrets assumptions into service requirements', () => {
+    const nws = buildNwsFromForm({
+      ...defaultWorkloadForm,
+      selectedServiceFamilyIds: [],
+      observabilityMetricsMillion: '10',
+      observabilityLogsIngestGb: '50',
+      observabilityLogRetentionGb: '100',
+      observabilityAlarms: '5',
+      observabilityDashboards: '2',
+      observabilityTracesMillion: '4',
+      secretsCount: '12',
+      secretApiCallsTenThousand: '30',
+    });
+
+    expect(nws.serviceRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceCategory: 'operations',
+          serviceType: 'monitoring',
+          scaleParams: expect.objectContaining({
+            observabilityMetricsMillion: 10,
+            observabilityAlarms: 5,
+            observabilityDashboards: 2,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'operations',
+          serviceType: 'logging-audit',
+          scaleParams: expect.objectContaining({
+            observabilityLogsIngestGb: 50,
+            observabilityLogRetentionGb: 100,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'operations',
+          serviceType: 'tracing-apm',
+          scaleParams: expect.objectContaining({
+            observabilityTracesMillion: 4,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'security',
+          serviceType: 'keys-secrets',
+          scaleParams: expect.objectContaining({
+            secretsCount: 12,
+            secretApiCallsTenThousand: 30,
+          }),
+        }),
+      ]),
+    );
+    expect(formFromNws(nws)).toEqual(
+      expect.objectContaining({
+        observabilityMetricsMillion: '10',
+        observabilityLogsIngestGb: '50',
+        observabilityLogRetentionGb: '100',
+        observabilityAlarms: '5',
+        observabilityDashboards: '2',
+        observabilityTracesMillion: '4',
+        secretsCount: '12',
+        secretApiCallsTenThousand: '30',
+      }),
+    );
+  });
+
   it('maps an NWS back into editable form values', () => {
     const nws = buildNwsFromForm(defaultWorkloadForm, 'natural_language', 'web app');
     const form = formFromNws(nws);
@@ -435,6 +499,14 @@ describe('workload helpers', () => {
         dnsQueriesMillion: '-1',
         loadBalancerProcessedGb: '-1',
         loadBalancerHours: '731',
+        observabilityMetricsMillion: '-1',
+        observabilityLogsIngestGb: '-1',
+        observabilityLogRetentionGb: '-1',
+        observabilityAlarms: '1.5',
+        observabilityDashboards: '2.5',
+        observabilityTracesMillion: '-1',
+        secretsCount: '3.5',
+        secretApiCallsTenThousand: '-1',
         commitmentPreferencePercent: '101',
         usagePattern: 'scheduled',
         usageHoursPerDay: '0',
@@ -456,6 +528,14 @@ describe('workload helpers', () => {
       'dnsQueriesMillion',
       'loadBalancerProcessedGb',
       'loadBalancerHours',
+      'observabilityMetricsMillion',
+      'observabilityLogsIngestGb',
+      'observabilityLogRetentionGb',
+      'observabilityAlarms',
+      'observabilityDashboards',
+      'observabilityTracesMillion',
+      'secretsCount',
+      'secretApiCallsTenThousand',
       'commitmentPreferencePercent',
       'usageHoursPerDay',
       'usageDaysPerWeek',

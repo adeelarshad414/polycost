@@ -97,6 +97,14 @@ export interface WorkloadFormState {
   dnsQueriesMillion: string;
   loadBalancerProcessedGb: string;
   loadBalancerHours: string;
+  observabilityMetricsMillion: string;
+  observabilityLogsIngestGb: string;
+  observabilityLogRetentionGb: string;
+  observabilityAlarms: string;
+  observabilityDashboards: string;
+  observabilityTracesMillion: string;
+  secretsCount: string;
+  secretApiCallsTenThousand: string;
   cdn: boolean;
   loadBalancer: boolean;
   selectedServiceCategory: string;
@@ -173,6 +181,14 @@ type NumericWorkloadFormField =
   | 'dnsQueriesMillion'
   | 'loadBalancerProcessedGb'
   | 'loadBalancerHours'
+  | 'observabilityMetricsMillion'
+  | 'observabilityLogsIngestGb'
+  | 'observabilityLogRetentionGb'
+  | 'observabilityAlarms'
+  | 'observabilityDashboards'
+  | 'observabilityTracesMillion'
+  | 'secretsCount'
+  | 'secretApiCallsTenThousand'
   | 'commitmentPreferencePercent'
   | 'usageHoursPerDay'
   | 'usageDaysPerWeek'
@@ -254,6 +270,14 @@ export const defaultWorkloadForm: WorkloadFormState = {
   dnsQueriesMillion: '0',
   loadBalancerProcessedGb: '0',
   loadBalancerHours: '0',
+  observabilityMetricsMillion: '0',
+  observabilityLogsIngestGb: '0',
+  observabilityLogRetentionGb: '0',
+  observabilityAlarms: '0',
+  observabilityDashboards: '0',
+  observabilityTracesMillion: '0',
+  secretsCount: '0',
+  secretApiCallsTenThousand: '0',
   cdn: true,
   loadBalancer: true,
   selectedServiceCategory: 'compute',
@@ -802,6 +826,54 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
     730,
     'Load balancer hours must be between 0 and 730.',
   );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'observabilityMetricsMillion',
+    'Metric samples must be 0 million or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'observabilityLogsIngestGb',
+    'Log ingestion must be 0 GB or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'observabilityLogRetentionGb',
+    'Log retention storage must be 0 GB or higher.',
+  );
+  optionalNonNegativeIntegerField(
+    issues,
+    form,
+    'observabilityAlarms',
+    'Alarms must be a whole number 0 or higher.',
+  );
+  optionalNonNegativeIntegerField(
+    issues,
+    form,
+    'observabilityDashboards',
+    'Dashboards must be a whole number 0 or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'observabilityTracesMillion',
+    'Trace spans must be 0 million or higher.',
+  );
+  optionalNonNegativeIntegerField(
+    issues,
+    form,
+    'secretsCount',
+    'Secrets must be a whole number 0 or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'secretApiCallsTenThousand',
+    'Secret API calls must be 0 ten-thousand-call units or higher.',
+  );
   requireBoundedNumber(
     issues,
     form,
@@ -986,6 +1058,7 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
   const compute = nws.compute[0];
   const storage = nws.storage[0];
   const database = nws.database[0];
+  const supportingServices = supportingServiceScaleParamsFromNws(nws);
 
   return {
     ...defaultWorkloadForm,
@@ -1147,6 +1220,36 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
     loadBalancerHours: numberToInput(
       nws.network.loadBalancerHours ?? Number(defaultWorkloadForm.loadBalancerHours),
     ),
+    observabilityMetricsMillion: numberToInput(
+      supportingServices.observabilityMetricsMillion ??
+        Number(defaultWorkloadForm.observabilityMetricsMillion),
+    ),
+    observabilityLogsIngestGb: numberToInput(
+      supportingServices.observabilityLogsIngestGb ??
+        Number(defaultWorkloadForm.observabilityLogsIngestGb),
+    ),
+    observabilityLogRetentionGb: numberToInput(
+      supportingServices.observabilityLogRetentionGb ??
+        Number(defaultWorkloadForm.observabilityLogRetentionGb),
+    ),
+    observabilityAlarms: numberToInput(
+      supportingServices.observabilityAlarms ?? Number(defaultWorkloadForm.observabilityAlarms),
+    ),
+    observabilityDashboards: numberToInput(
+      supportingServices.observabilityDashboards ??
+        Number(defaultWorkloadForm.observabilityDashboards),
+    ),
+    observabilityTracesMillion: numberToInput(
+      supportingServices.observabilityTracesMillion ??
+        Number(defaultWorkloadForm.observabilityTracesMillion),
+    ),
+    secretsCount: numberToInput(
+      supportingServices.secretsCount ?? Number(defaultWorkloadForm.secretsCount),
+    ),
+    secretApiCallsTenThousand: numberToInput(
+      supportingServices.secretApiCallsTenThousand ??
+        Number(defaultWorkloadForm.secretApiCallsTenThousand),
+    ),
     cdn: nws.network.cdn,
     loadBalancer: nws.network.loadBalancer,
     selectedServiceCategory: primaryServiceRequirement(nws)?.serviceCategory ?? 'compute',
@@ -1235,6 +1338,12 @@ export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceReq
         dnsQueriesMillion: parseOptionalNumber(form.dnsQueriesMillion) ?? 0,
         loadBalancerProcessedGb: parseOptionalNumber(form.loadBalancerProcessedGb) ?? 0,
         loadBalancerHours: parseBoundedNumber(form.loadBalancerHours, 0, 730, 0),
+        ...(serviceType === 'monitoring' ||
+        serviceType === 'logging-audit' ||
+        serviceType === 'tracing-apm' ||
+        serviceType === 'keys-secrets'
+          ? supportingServicesScaleParamsFromForm(form)
+          : {}),
         ...(serviceType.includes('storage') ? storageScaleParamsFromForm(form) : {}),
         ...(serviceType.includes('database') || serviceType === 'cache'
           ? databaseScaleParamsFromForm(form)
@@ -1273,6 +1382,7 @@ function orderedRequirementIds(form: WorkloadFormState): string[] {
     ...validBulkServiceRows(form.bulkServiceRows).map((row) => row.serviceFamilyId),
     ...(form.storageEnabled ? [storageServiceFamilyId(form)] : []),
     ...(form.databaseEnabled ? [databaseServiceFamilyId(form)] : []),
+    ...supportingServiceFamilyIds(form),
     ...(form.cdn ? ['cdn-edge'] : []),
     ...(form.loadBalancer ? ['load-balancing'] : []),
   ]);
@@ -1293,6 +1403,44 @@ function validBulkServiceRows(rows: BulkServiceRow[]): BulkServiceRow[] {
   );
 }
 
+function supportingServiceFamilyIds(form: WorkloadFormState): string[] {
+  const ids: string[] = [];
+
+  if (
+    hasPositiveFormNumber(form.observabilityMetricsMillion) ||
+    hasPositiveFormNumber(form.observabilityAlarms) ||
+    hasPositiveFormNumber(form.observabilityDashboards)
+  ) {
+    ids.push('monitoring');
+  }
+
+  if (
+    hasPositiveFormNumber(form.observabilityLogsIngestGb) ||
+    hasPositiveFormNumber(form.observabilityLogRetentionGb)
+  ) {
+    ids.push('logging-audit');
+  }
+
+  if (hasPositiveFormNumber(form.observabilityTracesMillion)) {
+    ids.push('tracing-apm');
+  }
+
+  if (
+    hasPositiveFormNumber(form.secretsCount) ||
+    hasPositiveFormNumber(form.secretApiCallsTenThousand)
+  ) {
+    ids.push('keys-secrets');
+  }
+
+  return ids;
+}
+
+function hasPositiveFormNumber(value: string): boolean {
+  const parsed = parseOptionalNumber(value);
+
+  return parsed !== undefined && parsed > 0;
+}
+
 function bulkServiceRowsByFamily(rows: BulkServiceRow[]): Map<string, BulkServiceRow> {
   return new Map(validBulkServiceRows(rows).map((row) => [row.serviceFamilyId, row]));
 }
@@ -1307,6 +1455,43 @@ function primaryServiceRequirement(nws: NormalizedWorkloadSpec): ServiceRequirem
   return nws.serviceRequirements?.find((requirement) =>
     CLOUD_SERVICE_CATALOG.some((family) => family.id === requirement.serviceType),
   );
+}
+
+function supportingServiceScaleParamsFromNws(nws: NormalizedWorkloadSpec): Record<string, number> {
+  const supportingRequirements =
+    nws.serviceRequirements?.filter((requirement) =>
+      ['monitoring', 'logging-audit', 'tracing-apm', 'keys-secrets'].includes(
+        requirement.serviceType,
+      ),
+    ) ?? [];
+  const keys = [
+    'observabilityMetricsMillion',
+    'observabilityLogsIngestGb',
+    'observabilityLogRetentionGb',
+    'observabilityAlarms',
+    'observabilityDashboards',
+    'observabilityTracesMillion',
+    'secretsCount',
+    'secretApiCallsTenThousand',
+  ];
+
+  return Object.fromEntries(
+    keys.map((key) => [
+      key,
+      supportingRequirements
+        .map((requirement) => numericScaleParam(requirement.scaleParams, key))
+        .find((value) => value !== undefined),
+    ]),
+  ) as Record<string, number>;
+}
+
+function numericScaleParam(
+  scaleParams: ServiceRequirement['scaleParams'],
+  key: string,
+): number | undefined {
+  const value = scaleParams?.[key];
+
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
 function serviceCategoryForFamily(serviceType: string): ServiceRequirement['serviceCategory'] {
@@ -1480,6 +1665,21 @@ function databaseScaleParamsFromForm(form: WorkloadFormState): ServiceRequiremen
     queryDataTb: parseOptionalNumber(form.databaseQueryDataTb) ?? 0,
     cacheReplicaCount: parseNonNegativeInteger(form.databaseCacheReplicaCount, 0),
     storageGrowthGbPerMonth: parseOptionalNumber(form.databaseStorageGrowthGbPerMonth) ?? 0,
+  };
+}
+
+function supportingServicesScaleParamsFromForm(
+  form: WorkloadFormState,
+): ServiceRequirement['scaleParams'] {
+  return {
+    observabilityMetricsMillion: parseOptionalNumber(form.observabilityMetricsMillion) ?? 0,
+    observabilityLogsIngestGb: parseOptionalNumber(form.observabilityLogsIngestGb) ?? 0,
+    observabilityLogRetentionGb: parseOptionalNumber(form.observabilityLogRetentionGb) ?? 0,
+    observabilityAlarms: parseNonNegativeInteger(form.observabilityAlarms, 0),
+    observabilityDashboards: parseNonNegativeInteger(form.observabilityDashboards, 0),
+    observabilityTracesMillion: parseOptionalNumber(form.observabilityTracesMillion) ?? 0,
+    secretsCount: parseNonNegativeInteger(form.secretsCount, 0),
+    secretApiCallsTenThousand: parseOptionalNumber(form.secretApiCallsTenThousand) ?? 0,
   };
 }
 
@@ -1961,6 +2161,22 @@ function formNumericValue(form: WorkloadFormState, field: NumericWorkloadFormFie
       return form.loadBalancerProcessedGb;
     case 'loadBalancerHours':
       return form.loadBalancerHours;
+    case 'observabilityMetricsMillion':
+      return form.observabilityMetricsMillion;
+    case 'observabilityLogsIngestGb':
+      return form.observabilityLogsIngestGb;
+    case 'observabilityLogRetentionGb':
+      return form.observabilityLogRetentionGb;
+    case 'observabilityAlarms':
+      return form.observabilityAlarms;
+    case 'observabilityDashboards':
+      return form.observabilityDashboards;
+    case 'observabilityTracesMillion':
+      return form.observabilityTracesMillion;
+    case 'secretsCount':
+      return form.secretsCount;
+    case 'secretApiCallsTenThousand':
+      return form.secretApiCallsTenThousand;
     case 'commitmentPreferencePercent':
       return form.commitmentPreferencePercent;
     case 'usageHoursPerDay':

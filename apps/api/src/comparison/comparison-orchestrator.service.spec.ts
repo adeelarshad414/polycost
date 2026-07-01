@@ -739,6 +739,114 @@ describe('ComparisonOrchestratorService', () => {
     expect(result.providers[0].breakdown?.databaseMonthlyCostUsd).toBe(804.2);
   });
 
+  it('adds modeled operations line items for observability and secrets assumptions', async () => {
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async (): Promise<ProviderPricingResult> => ({
+          providerId: 'aws',
+          baseMonthlyCostUsd: 10,
+          lineItems: [
+            {
+              category: 'compute',
+              costComponent: 'compute',
+              description: 'aws compute',
+              isApproximate: false,
+              baseMonthlyCostUsd: 10,
+              skuId: 'aws-compute',
+              region: 'us-east-1',
+              unit: 'hour',
+              unitPriceUsd: 0.01,
+            },
+          ],
+        })),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      serviceRequirements: [
+        {
+          serviceCategory: 'operations',
+          serviceType: 'monitoring',
+          quantity: 1,
+          scaleParams: {
+            observabilityMetricsMillion: 10,
+            observabilityAlarms: 5,
+            observabilityDashboards: 2,
+          },
+        },
+        {
+          serviceCategory: 'operations',
+          serviceType: 'logging-audit',
+          quantity: 1,
+          scaleParams: {
+            observabilityLogsIngestGb: 50,
+            observabilityLogRetentionGb: 100,
+          },
+        },
+        {
+          serviceCategory: 'operations',
+          serviceType: 'tracing-apm',
+          quantity: 1,
+          scaleParams: {
+            observabilityTracesMillion: 4,
+          },
+        },
+        {
+          serviceCategory: 'security',
+          serviceType: 'keys-secrets',
+          quantity: 1,
+          scaleParams: {
+            secretsCount: 12,
+            secretApiCallsTenThousand: 30,
+          },
+        },
+      ],
+    });
+
+    expect(result.providers[0].lineItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'operations',
+          costComponent: 'operations',
+          skuId: 'modeled-operations-metrics',
+          baseMonthlyCostUsd: 3,
+          isApproximate: true,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-operations-log-ingestion',
+          baseMonthlyCostUsd: 25,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-operations-log-retention',
+          baseMonthlyCostUsd: 3,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-operations-alarms',
+          baseMonthlyCostUsd: 0.5,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-operations-dashboards',
+          baseMonthlyCostUsd: 6,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-operations-traces',
+          baseMonthlyCostUsd: 20,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-security-secrets',
+          baseMonthlyCostUsd: 4.8,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-security-secret-api-calls',
+          baseMonthlyCostUsd: 1.5,
+        }),
+      ]),
+    );
+    expect(result.providers[0].breakdown?.operationsMonthlyCostUsd).toBe(63.8);
+  });
+
   it('uses a safe warning when a provider fails without an Error object', async () => {
     const service = createService([
       adapter(

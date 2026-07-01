@@ -2336,6 +2336,10 @@ select:hover {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
 }
 
+.form-grid-span {
+  grid-column: 1 / -1;
+}
+
 .form-field {
   display: grid;
   gap: var(--pc-space-1);

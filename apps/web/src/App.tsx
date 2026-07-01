@@ -1527,6 +1527,38 @@ function InitialHomePage({
                   value={form.dataResidency}
                   onChange={(value) => update('dataResidency', value)}
                 />
+                <TextField
+                  label="Metric samples"
+                  value={form.observabilityMetricsMillion}
+                  inputMode="decimal"
+                  suffix="M/mo"
+                  error={fieldErrors.observabilityMetricsMillion}
+                  onChange={(value) => update('observabilityMetricsMillion', value)}
+                />
+                <TextField
+                  label="Log ingest"
+                  value={form.observabilityLogsIngestGb}
+                  inputMode="decimal"
+                  suffix="GB/mo"
+                  error={fieldErrors.observabilityLogsIngestGb}
+                  onChange={(value) => update('observabilityLogsIngestGb', value)}
+                />
+                <TextField
+                  label="Trace spans"
+                  value={form.observabilityTracesMillion}
+                  inputMode="decimal"
+                  suffix="M/mo"
+                  error={fieldErrors.observabilityTracesMillion}
+                  onChange={(value) => update('observabilityTracesMillion', value)}
+                />
+                <TextField
+                  label="Secrets"
+                  value={form.secretsCount}
+                  inputMode="numeric"
+                  suffix="items"
+                  error={fieldErrors.secretsCount}
+                  onChange={(value) => update('secretsCount', value)}
+                />
               </div>
             </details>
           </form>
@@ -3183,6 +3215,78 @@ function WorkloadForm({
             error={fieldErrors.loadBalancerHours}
             onChange={(value) => update('loadBalancerHours', value)}
           />
+          <details className="advanced-service-fields form-grid-span">
+            <summary>
+              <span>Operations cost drivers</span>
+              <small>Metrics, logs, alarms, traces, secrets</small>
+            </summary>
+            <div className="form-grid secondary-grid">
+              <TextField
+                label="Metric samples"
+                value={form.observabilityMetricsMillion}
+                inputMode="decimal"
+                suffix="M/mo"
+                error={fieldErrors.observabilityMetricsMillion}
+                onChange={(value) => update('observabilityMetricsMillion', value)}
+              />
+              <TextField
+                label="Log ingest"
+                value={form.observabilityLogsIngestGb}
+                inputMode="decimal"
+                suffix="GB/mo"
+                error={fieldErrors.observabilityLogsIngestGb}
+                onChange={(value) => update('observabilityLogsIngestGb', value)}
+              />
+              <TextField
+                label="Log retention"
+                value={form.observabilityLogRetentionGb}
+                inputMode="decimal"
+                suffix="GB-mo"
+                error={fieldErrors.observabilityLogRetentionGb}
+                onChange={(value) => update('observabilityLogRetentionGb', value)}
+              />
+              <TextField
+                label="Alarms"
+                value={form.observabilityAlarms}
+                inputMode="numeric"
+                suffix="rules"
+                error={fieldErrors.observabilityAlarms}
+                onChange={(value) => update('observabilityAlarms', value)}
+              />
+              <TextField
+                label="Dashboards"
+                value={form.observabilityDashboards}
+                inputMode="numeric"
+                suffix="views"
+                error={fieldErrors.observabilityDashboards}
+                onChange={(value) => update('observabilityDashboards', value)}
+              />
+              <TextField
+                label="Trace spans"
+                value={form.observabilityTracesMillion}
+                inputMode="decimal"
+                suffix="M/mo"
+                error={fieldErrors.observabilityTracesMillion}
+                onChange={(value) => update('observabilityTracesMillion', value)}
+              />
+              <TextField
+                label="Secrets"
+                value={form.secretsCount}
+                inputMode="numeric"
+                suffix="items"
+                error={fieldErrors.secretsCount}
+                onChange={(value) => update('secretsCount', value)}
+              />
+              <TextField
+                label="Secret API calls"
+                value={form.secretApiCallsTenThousand}
+                inputMode="decimal"
+                suffix="10k/mo"
+                error={fieldErrors.secretApiCallsTenThousand}
+                onChange={(value) => update('secretApiCallsTenThousand', value)}
+              />
+            </div>
+          </details>
           <TextField
             label="SLA target"
             value={form.slaTarget}

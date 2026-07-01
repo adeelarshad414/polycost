@@ -221,7 +221,7 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Microsoft Entra ID', 'Managed identities'],
     gcp: ['Cloud IAM', 'Identity Platform'],
   }),
-  family('keys-secrets', 'security', 'Keys + secrets', 'roadmap', {
+  family('keys-secrets', 'security', 'Keys + secrets', 'mapped', {
     aws: ['AWS KMS', 'AWS Secrets Manager'],
     azure: ['Azure Key Vault'],
     gcp: ['Cloud KMS', 'Secret Manager'],
@@ -236,17 +236,17 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Azure Web Application Firewall', 'Azure DDoS Protection'],
     gcp: ['Cloud Armor'],
   }),
-  family('monitoring', 'operations', 'Monitoring', 'roadmap', {
+  family('monitoring', 'operations', 'Monitoring', 'mapped', {
     aws: ['Amazon CloudWatch'],
     azure: ['Azure Monitor'],
     gcp: ['Cloud Monitoring'],
   }),
-  family('logging-audit', 'operations', 'Logging + audit', 'roadmap', {
+  family('logging-audit', 'operations', 'Logging + audit', 'mapped', {
     aws: ['AWS CloudTrail', 'CloudWatch Logs'],
     azure: ['Azure Activity Log', 'Log Analytics'],
     gcp: ['Cloud Audit Logs', 'Cloud Logging'],
   }),
-  family('tracing-apm', 'operations', 'Tracing + APM', 'roadmap', {
+  family('tracing-apm', 'operations', 'Tracing + APM', 'mapped', {
     aws: ['AWS X-Ray'],
     azure: ['Application Insights'],
     gcp: ['Cloud Trace', 'Cloud Profiler'],

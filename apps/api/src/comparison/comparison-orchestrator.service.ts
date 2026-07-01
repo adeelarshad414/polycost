@@ -84,6 +84,17 @@ interface DatabaseDimensionRates {
   storageGrowthPerGbMonth: number;
 }
 
+interface SupportingServicesRates {
+  metricPerMillion: number;
+  logIngestPerGb: number;
+  logRetentionPerGbMonth: number;
+  alarmMonthly: number;
+  dashboardMonthly: number;
+  tracePerMillion: number;
+  secretMonthly: number;
+  secretApiPerTenThousand: number;
+}
+
 type StorageClassKey = NonNullable<NormalizedWorkloadSpec['storage'][number]['storageClass']>;
 
 export class ComparisonUnavailableError extends Error {
@@ -420,6 +431,7 @@ export class ComparisonOrchestratorService {
     const resilienceLineItem = this.resilienceLineItem(nws, providerId, lineItems);
     const storageLineItems = this.storageDimensionLineItems(nws, providerId);
     const databaseLineItems = this.databaseDimensionLineItems(nws, providerId, lineItems);
+    const supportingServicesLineItems = this.supportingServicesLineItems(nws, providerId);
     const networkLineItems = this.networkDimensionLineItems(nws, providerId);
 
     return [
@@ -428,6 +440,7 @@ export class ComparisonOrchestratorService {
       resilienceLineItem,
       ...storageLineItems,
       ...databaseLineItems,
+      ...supportingServicesLineItems,
       ...networkLineItems,
     ].filter((lineItem): lineItem is ComparisonLineItem => lineItem !== undefined);
   }
@@ -1265,6 +1278,158 @@ export class ComparisonOrchestratorService {
     });
   }
 
+  private supportingServicesLineItems(
+    nws: NormalizedWorkloadSpec,
+    providerId: ProviderId,
+  ): ComparisonLineItem[] {
+    const requirements = nws.serviceRequirements ?? [];
+    const serviceTypes = new Set(requirements.map((requirement) => requirement.serviceType));
+    const rates = supportingServicesRates(providerId);
+    const regionLabel = nws.workload.region.preference ?? 'default region';
+    const values = supportingServicesAssumptions(requirements);
+    const lineItems: ComparisonLineItem[] = [];
+
+    if (serviceTypes.has('monitoring') && values.observabilityMetricsMillion > 0) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-operations-metrics',
+          description: `${providerLabel(providerId)} monitoring custom metric sample estimate`,
+          quantity: values.observabilityMetricsMillion,
+          unit: '1M metric samples',
+          unitPriceUsd: rates.metricPerMillion,
+        }),
+      );
+    }
+
+    if (serviceTypes.has('logging-audit') && values.observabilityLogsIngestGb > 0) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-operations-log-ingestion',
+          description: `${providerLabel(providerId)} log ingestion estimate`,
+          quantity: values.observabilityLogsIngestGb,
+          unit: 'GB ingested',
+          unitPriceUsd: rates.logIngestPerGb,
+        }),
+      );
+    }
+
+    if (serviceTypes.has('logging-audit') && values.observabilityLogRetentionGb > 0) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-operations-log-retention',
+          description: `${providerLabel(providerId)} log retention storage estimate`,
+          quantity: values.observabilityLogRetentionGb,
+          unit: 'GB-month',
+          unitPriceUsd: rates.logRetentionPerGbMonth,
+        }),
+      );
+    }
+
+    if (serviceTypes.has('monitoring') && values.observabilityAlarms > 0) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-operations-alarms',
+          description: `${providerLabel(providerId)} monitoring alarm estimate`,
+          quantity: values.observabilityAlarms,
+          unit: 'alarm-month',
+          unitPriceUsd: rates.alarmMonthly,
+        }),
+      );
+    }
+
+    if (serviceTypes.has('monitoring') && values.observabilityDashboards > 0) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-operations-dashboards',
+          description: `${providerLabel(providerId)} dashboard estimate`,
+          quantity: values.observabilityDashboards,
+          unit: 'dashboard-month',
+          unitPriceUsd: rates.dashboardMonthly,
+        }),
+      );
+    }
+
+    if (serviceTypes.has('tracing-apm') && values.observabilityTracesMillion > 0) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-operations-traces',
+          description: `${providerLabel(providerId)} trace span estimate`,
+          quantity: values.observabilityTracesMillion,
+          unit: '1M traces',
+          unitPriceUsd: rates.tracePerMillion,
+        }),
+      );
+    }
+
+    if (serviceTypes.has('keys-secrets') && values.secretsCount > 0) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-security-secrets',
+          description: `${providerLabel(providerId)} managed secrets estimate`,
+          quantity: values.secretsCount,
+          unit: 'secret-month',
+          unitPriceUsd: rates.secretMonthly,
+        }),
+      );
+    }
+
+    if (serviceTypes.has('keys-secrets') && values.secretApiCallsTenThousand > 0) {
+      lineItems.push(
+        this.operationsLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-security-secret-api-calls',
+          description: `${providerLabel(providerId)} secret API call estimate`,
+          quantity: values.secretApiCallsTenThousand,
+          unit: '10k calls',
+          unitPriceUsd: rates.secretApiPerTenThousand,
+        }),
+      );
+    }
+
+    return lineItems;
+  }
+
+  private operationsLineItem(input: {
+    providerId: ProviderId;
+    regionLabel: string;
+    skuId: string;
+    description: string;
+    quantity: number;
+    unit: string;
+    unitPriceUsd: number;
+  }): ComparisonLineItem {
+    const monthlyCostUsd = this.roundCurrency(input.quantity * input.unitPriceUsd);
+
+    return this.normalizeLineItem({
+      category: 'operations',
+      costComponent: 'operations',
+      description: input.description,
+      isApproximate: true,
+      baseMonthlyCostUsd: monthlyCostUsd,
+      baseHourlyCostUsd: monthlyCostUsd / HOURS_PER_MONTH,
+      skuId: input.skuId,
+      region: input.regionLabel,
+      unit: input.unit,
+      unitPriceUsd: input.unitPriceUsd,
+      pricingBasis: 'flat',
+    });
+  }
+
   private componentTotal(lineItems: ComparisonLineItem[], component: CostComponent): number {
     return this.roundCurrency(
       lineItems
@@ -1733,6 +1898,80 @@ function databaseServiceType(
   }
 
   return 'relational-database';
+}
+
+function supportingServicesRates(providerId: ProviderId): SupportingServicesRates {
+  switch (providerId) {
+    case 'aws':
+      return {
+        metricPerMillion: 0.3,
+        logIngestPerGb: 0.5,
+        logRetentionPerGbMonth: 0.03,
+        alarmMonthly: 0.1,
+        dashboardMonthly: 3,
+        tracePerMillion: 5,
+        secretMonthly: 0.4,
+        secretApiPerTenThousand: 0.05,
+      };
+    case 'azure':
+      return {
+        metricPerMillion: 0.258,
+        logIngestPerGb: 2.76,
+        logRetentionPerGbMonth: 0.12,
+        alarmMonthly: 0.1,
+        dashboardMonthly: 3,
+        tracePerMillion: 2.3,
+        secretMonthly: 0.03,
+        secretApiPerTenThousand: 0.03,
+      };
+    case 'gcp':
+      return {
+        metricPerMillion: 0.258,
+        logIngestPerGb: 0.5,
+        logRetentionPerGbMonth: 0.01,
+        alarmMonthly: 0.1,
+        dashboardMonthly: 3,
+        tracePerMillion: 0.2,
+        secretMonthly: 0.06,
+        secretApiPerTenThousand: 0.03,
+      };
+  }
+}
+
+function supportingServicesAssumptions(
+  requirements: ServiceRequirement[],
+): Record<
+  | 'observabilityMetricsMillion'
+  | 'observabilityLogsIngestGb'
+  | 'observabilityLogRetentionGb'
+  | 'observabilityAlarms'
+  | 'observabilityDashboards'
+  | 'observabilityTracesMillion'
+  | 'secretsCount'
+  | 'secretApiCallsTenThousand',
+  number
+> {
+  return {
+    observabilityMetricsMillion: maxScaleParam(requirements, 'observabilityMetricsMillion'),
+    observabilityLogsIngestGb: maxScaleParam(requirements, 'observabilityLogsIngestGb'),
+    observabilityLogRetentionGb: maxScaleParam(requirements, 'observabilityLogRetentionGb'),
+    observabilityAlarms: maxScaleParam(requirements, 'observabilityAlarms'),
+    observabilityDashboards: maxScaleParam(requirements, 'observabilityDashboards'),
+    observabilityTracesMillion: maxScaleParam(requirements, 'observabilityTracesMillion'),
+    secretsCount: maxScaleParam(requirements, 'secretsCount'),
+    secretApiCallsTenThousand: maxScaleParam(requirements, 'secretApiCallsTenThousand'),
+  };
+}
+
+function maxScaleParam(requirements: ServiceRequirement[], key: string): number {
+  return Math.max(
+    0,
+    ...requirements.map((requirement) => {
+      const value = requirement.scaleParams?.[key];
+
+      return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+    }),
+  );
 }
 
 function networkDimensionRates(providerId: ProviderId): NetworkDimensionRates {
