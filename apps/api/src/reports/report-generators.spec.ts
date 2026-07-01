@@ -3,11 +3,16 @@ import { CsvReportGenerator } from './csv-report.generator';
 import { ExcelReportGenerator } from './excel-report.generator';
 import { PdfReportGenerator } from './pdf-report.generator';
 import {
+  decisionSummaryRows,
   labelForInterval,
   labelForPricingModel,
   lineItemEvidenceRows,
+  pricingModelAvailabilityRows,
+  providerRankingRows,
+  reportAssumptionRows,
   selectedScenarioRows,
   serviceRequirementRows,
+  workloadScopeRows,
 } from './report-evidence';
 import { sanitizeSpreadsheetText } from './report-security';
 import { ReportService } from './report.service';
@@ -111,8 +116,21 @@ describe('report generators', () => {
       .toString('utf8');
 
     expect(csv).toContain('Comparison ID,comparison-123');
+    expect(csv).toContain('Cheapest provider (on-demand baseline),gcp');
     expect(csv).toContain('Selected interval,Quarterly');
     expect(csv).toContain('Selected pricing model,Reserved 3-year');
+    expect(csv).toContain('Decision Summary');
+    expect(csv).toContain(
+      'Cost baseline,aws ranks #1 for Reserved 3-year at $126 quarterly / $42 monthly.',
+    );
+    expect(csv).toContain(
+      'Evidence confidence,"Review required - 2/3 providers priced, 1 approximate mapping(s), 1 warning(s)."',
+    );
+    expect(csv).toContain('Provider Ranking');
+    expect(csv).toContain('aws,#1,yes,126,42,504,0,0,1,Three-year commitment.');
+    expect(csv).toContain('gcp,Not eligible,no,,,,,,0,Not available for this SKU/region.');
+    expect(csv).toContain('Workload Scope');
+    expect(csv).toContain('Workload name,Client portal');
     expect(csv).toContain('FinOps Summary');
     expect(csv).toContain('Executive recommendation,gcp is the current cost baseline');
     expect(csv).toContain('Decision confidence,Medium - 2/3 providers priced; 1 approximate mappings');
@@ -124,9 +142,17 @@ describe('report generators', () => {
     expect(csv).toContain('Dominant cost driver,storage $20');
     expect(csv).toContain('Selected Pricing Scenario');
     expect(csv).toContain('aws,yes,126,42,0.06,Three-year commitment.');
+    expect(csv).toContain('Pricing Model Availability');
+    expect(csv).toContain(
+      'gcp,available,not modeled,not modeled,not modeled,not modeled,Only on-demand totals are modeled for this provider.',
+    );
     expect(csv).toContain('Normalized Service Requirements');
     expect(csv).toContain('compute,vm-compute,balanced tier - 2 vCPU - 4GB / balanced');
     expect(csv).toContain('Rate Math Evidence');
+    expect(csv).toContain('Report Assumptions');
+    expect(csv).toContain(
+      'Pricing source,Cached provider catalog rates with 1 warning(s) captured in this export.',
+    );
     expect(csv).toContain('aws,2.33,16.34,71,213,852');
     expect(csv).toContain("aws,compute,'=cmd(1)\\risky compute,no,60.8");
     expect(csv).toContain('"primary ""postgres"", managed"');
@@ -176,6 +202,11 @@ describe('report generators', () => {
     expect(xlsxText).toContain('xl/workbook.xml');
     expect(xlsxText).toContain('xl/worksheets/sheet1.xml');
     expect(xlsxText).toContain('<sheet name="Comparison"');
+    expect(xlsxText).toContain('Decision Summary');
+    expect(xlsxText).toContain('Cost baseline');
+    expect(xlsxText).toContain('Provider Ranking');
+    expect(xlsxText).toContain('Selected model eligible');
+    expect(xlsxText).toContain('Workload Scope');
     expect(xlsxText).toContain('FinOps Summary');
     expect(xlsxText).toContain('Executive recommendation');
     expect(xlsxText).toContain('Decision confidence');
@@ -183,8 +214,10 @@ describe('report generators', () => {
     expect(xlsxText).toContain('Architecture risk');
     expect(xlsxText).toContain('Lowest monthly run rate');
     expect(xlsxText).toContain('Selected Pricing Scenario');
+    expect(xlsxText).toContain('Pricing Model Availability');
     expect(xlsxText).toContain('Normalized Service Requirements');
     expect(xlsxText).toContain('Rate Math Evidence');
+    expect(xlsxText).toContain('Report Assumptions');
     expect(xlsxText).toContain('<v>71</v>');
     expect(xlsxText).toContain('&apos;=cmd(1)\\risky compute');
     expect(xlsxText).toContain('&apos;+pricing temporarily unavailable');
@@ -224,8 +257,14 @@ describe('report generators', () => {
 
     expect(pdf.subarray(0, 8).toString('utf8')).toBe('%PDF-1.4');
     expect(pdfText).toContain('Comparison ID: comparison-123');
+    expect(pdfText).toContain('Cheapest provider \\(on-demand baseline\\): gcp');
     expect(pdfText).toContain('Selected interval: Quarterly');
     expect(pdfText).toContain('Selected pricing model: Reserved 3-year');
+    expect(pdfText).toContain('Decision summary');
+    expect(pdfText).toContain('Cost baseline: aws ranks #1 for Reserved 3-year');
+    expect(pdfText).toContain('Provider ranking');
+    expect(pdfText).toContain('aws | #1 | eligible yes | selected $126');
+    expect(pdfText).toContain('Workload scope');
     expect(pdfText).toContain('FinOps summary');
     expect(pdfText).toContain('Executive recommendation: gcp is the current cost baseline');
     expect(pdfText).toContain('Decision confidence: Medium');
@@ -234,8 +273,10 @@ describe('report generators', () => {
     expect(pdfText).toContain('Lowest monthly run rate: gcp $20');
     expect(pdfText).toContain('aws: daily $2.33, weekly $16.34, monthly $71');
     expect(pdfText).toContain('Selected pricing scenario');
+    expect(pdfText).toContain('Pricing model availability');
     expect(pdfText).toContain('Normalized service requirements');
     expect(pdfText).toContain('Rate math evidence');
+    expect(pdfText).toContain('Report assumptions');
     expect(pdfText).toContain('=cmd\\(1\\)\\\\risky compute');
     expect(pdfText).toContain('general | provider_pricing_failed | general warning');
     expect(pdfText).toContain('this is a deliberately long line item description');
@@ -250,6 +291,71 @@ describe('report generators', () => {
     });
 
     expect(pdf.toString('utf8')).not.toContain('Warnings');
+  });
+
+  it('keeps the PDF requirement fallback when workload requirements are absent', () => {
+    const pdf = new PdfReportGenerator().generate({
+      ...comparison,
+      requirements: undefined,
+      warnings: undefined,
+    });
+
+    expect(pdf.toString('utf8')).toContain(
+      'No normalized service requirements were attached to this comparison.',
+    );
+  });
+
+  it('builds decision summary, ranking, availability, assumptions, and workload scope rows', () => {
+    expect(decisionSummaryRows(comparison, { interval: 'quarterly', pricingModel: 'reserved-3yr' })).toEqual(
+      expect.arrayContaining([
+        [
+          'Cost baseline',
+          'aws ranks #1 for Reserved 3-year at $126 quarterly / $42 monthly.',
+        ],
+        [
+          'Evidence confidence',
+          'Review required - 2/3 providers priced, 1 approximate mapping(s), 1 warning(s).',
+        ],
+      ]),
+    );
+
+    expect(providerRankingRows(comparison, { interval: 'quarterly', pricingModel: 'reserved-3yr' })).toEqual(
+      expect.arrayContaining([
+        ['aws', '#1', 'yes', '126', '42', '504', '0', '0', '1', 'Three-year commitment.'],
+        ['gcp', 'Not eligible', 'no', '', '', '', '', '', '0', 'Not available for this SKU/region.'],
+      ]),
+    );
+
+    expect(pricingModelAvailabilityRows(comparison)).toEqual(
+      expect.arrayContaining([
+        [
+          'gcp',
+          'available',
+          'not modeled',
+          'not modeled',
+          'not modeled',
+          'not modeled',
+          'Only on-demand totals are modeled for this provider.',
+        ],
+      ]),
+    );
+
+    expect(reportAssumptionRows(comparison)).toEqual(
+      expect.arrayContaining([
+        ['Pricing source', 'Cached provider catalog rates with 1 warning(s) captured in this export.'],
+        [
+          'Approximate mappings',
+          '1 line item(s) are approximate and should be reviewed by a solution architect before commitment.',
+        ],
+      ]),
+    );
+
+    expect(workloadScopeRows(comparison)).toEqual(
+      expect.arrayContaining([
+        ['Workload name', 'Client portal'],
+        ['Normalized service requirements', '1'],
+      ]),
+    );
   });
 
   it('builds selected scenario rows for unavailable commitments and spot estimates', () => {

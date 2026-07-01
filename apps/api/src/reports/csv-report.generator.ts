@@ -1,10 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { ComparisonResult } from '../comparison/comparison.types';
 import {
+  decisionSummaryRows,
   lineItemEvidenceRows,
+  pricingModelAvailabilityRows,
+  providerRankingRows,
+  reportAssumptionRows,
   reportContextRows,
   selectedScenarioRows,
   serviceRequirementRows,
+  workloadScopeRows,
 } from './report-evidence';
 import { buildReportInsights } from './report-insights';
 import { sanitizeSpreadsheetText } from './report-security';
@@ -17,8 +22,17 @@ export class CsvReportGenerator {
       ['PolyCost Comparison Report'],
       ['Comparison ID', result.comparisonId],
       ['Pricing As Of', result.pricingAsOf],
-      ['Cheapest Provider', result.cheapestProviderId],
+      ['Cheapest provider (on-demand baseline)', result.cheapestProviderId],
       ...reportContextRows(options),
+      [],
+      ['Decision Summary'],
+      ...decisionSummaryRows(result, options).map((row) => row.map(sanitizeSpreadsheetText)),
+      [],
+      ['Provider Ranking'],
+      ...providerRankingRows(result, options).map((row) => row.map(sanitizeSpreadsheetText)),
+      [],
+      ['Workload Scope'],
+      ...workloadScopeRows(result).map((row) => row.map(sanitizeSpreadsheetText)),
       [],
       ['FinOps Summary'],
       ['Metric', 'Value'],
@@ -41,6 +55,9 @@ export class CsvReportGenerator {
       ['Selected Pricing Scenario'],
       ...selectedScenarioRows(result, options).map((row) => row.map(sanitizeSpreadsheetText)),
       [],
+      ['Pricing Model Availability'],
+      ...pricingModelAvailabilityRows(result).map((row) => row.map(sanitizeSpreadsheetText)),
+      [],
       ['Normalized Service Requirements'],
       ...serviceRequirementRows(result).map((row) => row.map(sanitizeSpreadsheetText)),
       [],
@@ -58,6 +75,9 @@ export class CsvReportGenerator {
       [],
       ['Rate Math Evidence'],
       ...lineItemEvidenceRows(result).map((row) => row.map(sanitizeSpreadsheetText)),
+      [],
+      ['Report Assumptions'],
+      ...reportAssumptionRows(result).map((row) => row.map(sanitizeSpreadsheetText)),
     ];
 
     if (result.warnings && result.warnings.length > 0) {
