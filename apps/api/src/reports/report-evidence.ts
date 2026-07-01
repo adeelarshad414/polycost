@@ -857,6 +857,8 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
     ]);
   }
 
+  rows.push(...storageAnatomyOpportunityRows(result));
+
   for (const provider of result.providers) {
     const databaseMonthly = databaseIntelligenceMonthly(provider);
     const providerMonthly = provider.totals.monthly;
@@ -2224,6 +2226,230 @@ function storageOptimizationInsight(
       storageMonthly,
     )}/mo across ${storageRows.length} storage row(s); tiering review is modeled at 15% of storage spend.`,
   };
+}
+
+function storageAnatomyOpportunityRows(result: ComparisonResult): string[][] {
+  const storageRequirement = result.requirements?.serviceRequirements.find(
+    (requirement) => requirement.serviceCategory === 'storage',
+  );
+  const databaseRequirement = result.requirements?.serviceRequirements.find(
+    (requirement) => requirement.serviceCategory === 'database',
+  );
+
+  if (!storageRequirement && !databaseRequirement) {
+    return [];
+  }
+
+  const storageParams = storageRequirement ? requirementScaleParams(storageRequirement) : {};
+  const databaseParams = databaseRequirement ? requirementScaleParams(databaseRequirement) : {};
+  const storageClass = String(
+    storageParams.storageClass ?? storageRequirement?.tier ?? storageRequirement?.instanceType ?? 'standard',
+  ).replace(/-/g, ' ');
+  const requestThousands =
+    numericScaleParam(storageParams, 'monthlyPutRequestsThousand') +
+    numericScaleParam(storageParams, 'monthlyGetRequestsThousand') +
+    numericScaleParam(storageParams, 'monthlyDeleteRequestsThousand') +
+    numericScaleParam(storageParams, 'monthlyListRequestsThousand');
+  const retrievalGb = numericScaleParam(storageParams, 'monthlyRetrievalGb');
+  const replication = String(storageParams.replication ?? 'none');
+  const lifecycleTransitions = numericScaleParam(storageParams, 'lifecycleTransitionsThousand');
+  const snapshotSizeGb = numericScaleParam(storageParams, 'snapshotSizeGb');
+  const snapshotRetentionDays = numericScaleParam(storageParams, 'snapshotRetentionDays');
+  const provisionedIops = numericScaleParam(storageParams, 'provisionedIops');
+  const databaseGrowthGb = numericScaleParam(databaseParams, 'storageGrowthGbPerMonth');
+  const databaseSizeGb =
+    numericScaleParam(databaseParams, 'databaseSizeGb') || numericScaleParam(databaseParams, 'sizeGb');
+  const annualDatabaseGrowthPercent =
+    databaseSizeGb > 0 ? (databaseGrowthGb * 12 * 100) / databaseSizeGb : 0;
+
+  return result.providers.flatMap((provider) => {
+    const storageRows = storageEvidenceLineItems(provider);
+    const databaseStorageRows = databaseStorageEvidenceLineItems(provider);
+    const rows = [...storageRows, ...databaseStorageRows];
+
+    if (rows.length === 0) {
+      return [];
+    }
+
+    const dimensions = storageAnatomyDimensions(rows);
+    const monthly = rows.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+    const dimensionSummary = storageAnatomyDimensionSummary(dimensions);
+    const action = storageAnatomyReportAction(dimensions, {
+      databaseGrowthGb,
+      lifecycleTransitions,
+      provisionedIops,
+      requestThousands,
+      retrievalGb,
+      snapshotSizeGb,
+      replication,
+    });
+    const operationsEvidence =
+      requestThousands > 0 || retrievalGb > 0
+        ? `${formatNumber(requestThousands)}K operations and ${formatNumber(retrievalGb)}GB retrieval configured`
+        : 'request/retrieval dimensions not configured';
+    const resilienceEvidence = [
+      replication !== 'none' ? `${replication.replace('-', ' ')} replication` : undefined,
+      snapshotSizeGb > 0
+        ? `${formatNumber(snapshotSizeGb)}GB snapshots for ${formatNumber(snapshotRetentionDays)} days`
+        : undefined,
+      lifecycleTransitions > 0
+        ? `${formatNumber(lifecycleTransitions)}K lifecycle transitions/month`
+        : undefined,
+    ].filter(Boolean);
+    const performanceEvidence = [
+      provisionedIops > 0 ? `${formatNumber(provisionedIops)} provisioned IOPS` : undefined,
+      databaseGrowthGb > 0
+        ? `${formatNumber(databaseGrowthGb)}GB/month database growth (${formatNumber(
+            annualDatabaseGrowthPercent,
+          )}% annualized)`
+        : undefined,
+    ].filter(Boolean);
+
+    return [
+      [
+        'Storage anatomy',
+        `${provider.providerId} storage class/type review: ${storageClass}; ${action}`,
+        '',
+        '',
+        monthly > 100 ? 'High' : monthly > 25 ? 'Medium' : 'Low',
+        'Low',
+        `${provider.providerId} storage-related run-rate is $${formatNumber(
+          monthly,
+        )}/mo across ${rows.length} row(s): ${dimensionSummary}. ${operationsEvidence}. ${
+          resilienceEvidence.length ? resilienceEvidence.join('; ') : 'no replication/snapshot/lifecycle signal'
+        }. ${performanceEvidence.length ? performanceEvidence.join('; ') : 'baseline performance only'}.`,
+      ],
+    ];
+  });
+}
+
+function storageEvidenceLineItems(provider: ComparisonProviderResult): ComparisonLineItem[] {
+  return provider.lineItems.filter(
+    (lineItem) =>
+      lineItem.category === 'storage' ||
+      lineItem.costComponent === 'storage' ||
+      storageDescription(lineItem.description) ||
+      storageDescription(lineItem.skuId ?? ''),
+  );
+}
+
+function databaseStorageEvidenceLineItems(provider: ComparisonProviderResult): ComparisonLineItem[] {
+  return provider.lineItems.filter(
+    (lineItem) =>
+      lineItem.category === 'database' &&
+      ['storage', 'backup', 'growth', 'iops', 'replica transfer', 'replication'].some((needle) =>
+        `${lineItem.skuId ?? ''} ${lineItem.description}`.toLowerCase().includes(needle),
+      ),
+  );
+}
+
+function storageAnatomyDimensions(
+  lineItems: ComparisonLineItem[],
+): Record<'base' | 'operations' | 'retrieval' | 'replication' | 'lifecycle' | 'snapshot' | 'performance', number> {
+  return lineItems.reduce(
+    (totals, lineItem) => {
+      const normalized = `${lineItem.skuId ?? ''} ${lineItem.description}`.toLowerCase();
+      const monthly = lineItem.baseMonthlyCostUsd;
+
+      if (normalized.includes('snapshot') || normalized.includes('backup')) {
+        totals.snapshot += monthly;
+      } else if (normalized.includes('retrieval') || normalized.includes('rehydrat')) {
+        totals.retrieval += monthly;
+      } else if (normalized.includes('replication') || normalized.includes('replica transfer')) {
+        totals.replication += monthly;
+      } else if (normalized.includes('lifecycle') || normalized.includes('transition')) {
+        totals.lifecycle += monthly;
+      } else if (
+        normalized.includes('iops') ||
+        normalized.includes('throughput') ||
+        normalized.includes('performance')
+      ) {
+        totals.performance += monthly;
+      } else if (
+        normalized.includes('operation') ||
+        normalized.includes('request') ||
+        normalized.includes('put') ||
+        normalized.includes('get') ||
+        normalized.includes('list') ||
+        normalized.includes('delete')
+      ) {
+        totals.operations += monthly;
+      } else {
+        totals.base += monthly;
+      }
+
+      return totals;
+    },
+    {
+      base: 0,
+      operations: 0,
+      retrieval: 0,
+      replication: 0,
+      lifecycle: 0,
+      snapshot: 0,
+      performance: 0,
+    },
+  );
+}
+
+function storageAnatomyDimensionSummary(
+  dimensions: Record<
+    'base' | 'operations' | 'retrieval' | 'replication' | 'lifecycle' | 'snapshot' | 'performance',
+    number
+  >,
+): string {
+  return Object.entries(dimensions)
+    .filter(([, value]) => value > 0.005)
+    .map(([key, value]) => `${key} $${formatNumber(value)}/mo`)
+    .join(', ');
+}
+
+function storageAnatomyReportAction(
+  dimensions: Record<
+    'base' | 'operations' | 'retrieval' | 'replication' | 'lifecycle' | 'snapshot' | 'performance',
+    number
+  >,
+  signals: {
+    databaseGrowthGb: number;
+    lifecycleTransitions: number;
+    provisionedIops: number;
+    requestThousands: number;
+    retrievalGb: number;
+    snapshotSizeGb: number;
+    replication: string;
+  },
+): string {
+  const dominant = Object.entries(dimensions).sort((left, right) => right[1] - left[1])[0]?.[0];
+
+  if (dominant === 'snapshot' || signals.snapshotSizeGb > 0) {
+    return 'validate snapshot retention and older-copy tiering before final quote.';
+  }
+
+  if (dominant === 'retrieval' || signals.retrievalGb > 0) {
+    return 'validate retrieval frequency, rehydration windows, and warm/cold split.';
+  }
+
+  if (dominant === 'replication' || signals.replication !== 'none') {
+    return 'confirm same-region versus cross-region replication against the DR target.';
+  }
+
+  if (dominant === 'performance' || signals.provisionedIops > 0) {
+    return 'compare provisioned IOPS and throughput against measured latency needs.';
+  }
+
+  if (dominant === 'operations' || signals.requestThousands > 0) {
+    return 'batch request-heavy workflows and reduce LIST-heavy paths.';
+  }
+
+  if (dominant === 'lifecycle' || signals.lifecycleTransitions > 0) {
+    return 'validate lifecycle transition frequency and minimum-duration break-even.';
+  }
+
+  if (signals.databaseGrowthGb > 0) {
+    return 'model database storage autoscaling and backup growth.';
+  }
+
+  return 'validate storage class, minimum-duration rules, and access pattern.';
 }
 
 function databaseOptimizationInsight(

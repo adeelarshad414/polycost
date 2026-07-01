@@ -742,6 +742,29 @@ describe('report generators', () => {
     expect(
       optimizationOpportunityRows({
         ...comparison,
+        requirements: {
+          ...comparison.requirements!,
+          serviceRequirements: [
+            ...comparison.requirements!.serviceRequirements,
+            {
+              serviceCategory: 'storage',
+              serviceType: 'object-storage',
+              instanceType: 'object / archive - 1000 GB',
+              tier: 'archive',
+              region: 'us-east',
+              quantity: 1,
+              scaleParams: {
+                role: 'uploads',
+                sizeGb: 1000,
+                storageClass: 'archive',
+                monthlyRetrievalGb: 250,
+                snapshotSizeGb: 500,
+                snapshotRetentionDays: 60,
+                replication: 'none',
+              },
+            },
+          ],
+        },
         providers: [
           {
             providerId: 'aws',
@@ -868,6 +891,15 @@ describe('report generators', () => {
           'Low',
           'Low',
           'aws dominant storage row is "AWS snapshot retention estimate" at $40/mo; retention pruning is modeled as a 30% reduction of that row.',
+        ]),
+        expect.arrayContaining([
+          'Storage anatomy',
+          'aws storage class/type review: archive; validate snapshot retention and older-copy tiering before final quote.',
+          '',
+          '',
+          'Medium',
+          'Low',
+          expect.stringContaining('retrieval $15/mo, snapshot $40/mo'),
         ]),
       ]),
     );

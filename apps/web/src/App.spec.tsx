@@ -1144,6 +1144,10 @@ describe('ComparisonView', () => {
       ['compute', 'aws compute', 40],
       ['storage', 'AWS snapshot retention estimate', 24],
       ['storage', 'AWS archive retrieval estimate', 12],
+      ['storage', 'AWS storage operation estimate', 2],
+      ['storage', 'AWS cross-region replication estimate', 20],
+      ['storage', 'AWS lifecycle transition estimate', 1],
+      ['storage', 'AWS provisioned IOPS performance estimate', 15],
     ]);
     awsProvider.lineItems[1] = {
       ...awsProvider.lineItems[1],
@@ -1154,6 +1158,26 @@ describe('ComparisonView', () => {
       ...awsProvider.lineItems[2],
       costComponent: 'storage',
       skuId: 'modeled-storage-retrieval',
+    };
+    awsProvider.lineItems[3] = {
+      ...awsProvider.lineItems[3],
+      costComponent: 'storage',
+      skuId: 'modeled-storage-put-operations',
+    };
+    awsProvider.lineItems[4] = {
+      ...awsProvider.lineItems[4],
+      costComponent: 'storage',
+      skuId: 'modeled-storage-cross-region-replication',
+    };
+    awsProvider.lineItems[5] = {
+      ...awsProvider.lineItems[5],
+      costComponent: 'storage',
+      skuId: 'modeled-storage-lifecycle-transitions',
+    };
+    awsProvider.lineItems[6] = {
+      ...awsProvider.lineItems[6],
+      costComponent: 'storage',
+      skuId: 'modeled-storage-provisioned-iops',
     };
     const storageResult: ComparisonResult = {
       ...comparisonResult,
@@ -1172,10 +1196,15 @@ describe('ComparisonView', () => {
           storageEnabled: true,
           storageSizeGb: '1000',
           storageClass: 'archive',
+          monthlyPutRequestsThousand: '1',
+          monthlyGetRequestsThousand: '1',
           monthlyRetrievalGb: '250',
+          lifecycleTransitionsThousand: '20',
           snapshotSizeGb: '500',
           snapshotRetentionDays: '60',
           storageReplication: 'cross-region',
+          provisionedIops: '3000',
+          provisionedThroughputMbps: '125',
         }}
         interval="monthly"
       />,
@@ -1187,13 +1216,29 @@ describe('ComparisonView', () => {
       'Storage class, retrieval, snapshots, replication, and performance tuning',
     );
     expect(text(container)).toContain('Snapshot retention');
-    expect(text(container)).toContain('1,000GB archive · 250GB retrieval · cross region');
+    expect(text(container)).toContain(
+      '1,000GB archive · 250GB retrieval · 2K operations · cross region',
+    );
     expect(text(container)).toContain('$7.20/mo');
     expect(text(container)).toContain('$86.40/yr');
     expect(text(container)).toContain(
       'Reduce retention, deduplicate snapshots, or move older copies to colder tiers.',
     );
     expect(text(container)).toContain('500GB snapshots · 60 days');
+    expect(text(container)).toContain('Storage cost anatomy');
+    expect(text(container)).toContain(
+      'Classes, operations, retrieval, replication, snapshots, and IOPS',
+    );
+    expect(text(container)).toContain('Object · Archive');
+    expect(text(container)).toContain('2K ops ($2.00/mo)');
+    expect(text(container)).toContain('250GB retrieval ($12.00/mo)');
+    expect(text(container)).toContain('cross region ($20.00/mo)');
+    expect(text(container)).toContain('500GB snapshots / 60d ($24.00/mo)');
+    expect(text(container)).toContain('20K lifecycle transitions ($1.00/mo)');
+    expect(text(container)).toContain('3,000 IOPS / 125 MB/s ($15.00/mo)');
+    expect(text(container)).toContain(
+      'Review snapshot retention and older-copy tiering before finalizing storage run-rate.',
+    );
 
     unmount();
   });

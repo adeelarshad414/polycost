@@ -6123,6 +6123,7 @@ function ProductionDepthAnalytics({
   const commitmentCoverage = commitmentCoverageGapRows(comparison, form);
   const tcoSignals = crossProviderTcoRows(comparison, form);
   const storageOptimizations = storageOptimizationRows(comparison, form);
+  const storageAnatomy = storageAnatomyRows(comparison, form);
   const databaseOptimizations = databaseOptimizationRows(comparison, form);
   const runtimeOptimizations = runtimeOptimizationRows(comparison, form);
   const serverlessMemoryCurves = serverlessMemoryCurveRows(comparison, form);
@@ -6165,6 +6166,7 @@ function ProductionDepthAnalytics({
       <CommitmentCoverageGapPanel rows={commitmentCoverage} />
       <CrossProviderTcoPanel rows={tcoSignals} />
       <StorageOptimizationPanel rows={storageOptimizations} />
+      <StorageAnatomyPanel rows={storageAnatomy} />
       <DatabaseOptimizationPanel rows={databaseOptimizations} />
       <RuntimeOptimizationPanel
         rows={runtimeOptimizations}
@@ -6567,6 +6569,75 @@ function StorageOptimizationPanel({ rows }: { rows: StorageOptimizationRow[] }) 
         <div className="scenario-sensitivity-empty" role="status">
           Storage optimization appears when storage classes, operations, retrieval, snapshots,
           replication, or performance line items become material.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StorageAnatomyPanel({ rows }: { rows: StorageAnatomyRow[] }) {
+  return (
+    <div className="storage-anatomy-panel" aria-label="Storage cost anatomy matrix">
+      <div className="scenario-sensitivity-heading">
+        <div>
+          <span>Storage cost anatomy</span>
+          <h4>Classes, operations, retrieval, replication, snapshots, and IOPS</h4>
+        </div>
+      </div>
+
+      {rows.length > 0 ? (
+        <div className="table-wrap storage-anatomy-wrap">
+          <table className="ranking-table storage-anatomy-table">
+            <thead>
+              <tr>
+                <th scope="col">Provider</th>
+                <th scope="col">Class/type</th>
+                <th scope="col">Monthly cost</th>
+                <th scope="col">Operations & retrieval</th>
+                <th scope="col">Resilience & performance</th>
+                <th scope="col">Validation action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.providerId}>
+                  <td>
+                    <span className={`scenario-low-label scenario-low-${row.providerId}`}>
+                      {providerLabel(row.providerId)}
+                    </span>
+                    <small>{row.evidence}</small>
+                  </td>
+                  <td>
+                    <strong>{row.storageProfile}</strong>
+                    <small>{row.rateEvidence}</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.monthly)}/mo</strong>
+                    <small>{formatPercent(row.sharePercent)} of provider total</small>
+                  </td>
+                  <td>
+                    <strong>{row.operationsSignal}</strong>
+                    <small>Request and retrieval costs stay separate from stored GB.</small>
+                  </td>
+                  <td>
+                    <strong>{row.resilienceSignal}</strong>
+                    <small>{row.performanceSignal}</small>
+                  </td>
+                  <td>
+                    <strong>{row.recommendation}</strong>
+                    <small>
+                      Use provider calculators for final class minimums and rehydration SLAs.
+                    </small>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="scenario-sensitivity-empty" role="status">
+          Storage anatomy appears when storage, request, retrieval, replication, snapshot,
+          lifecycle, or database-growth rows are present.
         </div>
       )}
     </div>
@@ -7854,6 +7925,19 @@ interface StorageOptimizationRow {
   evidence: string;
 }
 
+interface StorageAnatomyRow {
+  providerId: ProviderId;
+  storageProfile: string;
+  monthly: number;
+  sharePercent: number;
+  operationsSignal: string;
+  resilienceSignal: string;
+  performanceSignal: string;
+  rateEvidence: string;
+  recommendation: string;
+  evidence: string;
+}
+
 interface DatabaseOptimizationRow {
   providerId: ProviderId;
   databaseMonthly: number;
@@ -8534,6 +8618,322 @@ function storageLineItems(provider: ComparisonProviderResult): ComparisonLineIte
       storageDescriptionMatches(lineItem.description) ||
       storageDescriptionMatches(lineItem.skuId ?? ''),
   );
+}
+
+function storageAnatomyRows(
+  comparison: ComparisonResult | null,
+  form: WorkloadFormState,
+): StorageAnatomyRow[] {
+  if (!comparison) {
+    return [];
+  }
+
+  const requestThousands =
+    (parseInputNumber(form.monthlyPutRequestsThousand) ?? 0) +
+    (parseInputNumber(form.monthlyGetRequestsThousand) ?? 0) +
+    (parseInputNumber(form.monthlyDeleteRequestsThousand) ?? 0) +
+    (parseInputNumber(form.monthlyListRequestsThousand) ?? 0);
+  const retrievalGb = parseInputNumber(form.monthlyRetrievalGb) ?? 0;
+  const snapshotSizeGb = parseInputNumber(form.snapshotSizeGb) ?? 0;
+  const snapshotRetentionDays = parseInputNumber(form.snapshotRetentionDays) ?? 0;
+  const lifecycleTransitions = parseInputNumber(form.lifecycleTransitionsThousand) ?? 0;
+  const provisionedIops = parseInputNumber(form.provisionedIops) ?? 0;
+  const provisionedThroughputMbps = parseInputNumber(form.provisionedThroughputMbps) ?? 0;
+  const databaseGrowthGb = parseInputNumber(form.databaseStorageGrowthGbPerMonth) ?? 0;
+  const databaseSizeGb = parseInputNumber(form.databaseSizeGb) ?? 0;
+
+  return comparison.providers
+    .flatMap((provider) => {
+      const storageRows = storageLineItems(provider);
+      const databaseStorageRows = databaseStorageLineItems(provider);
+      const rows = [...storageRows, ...databaseStorageRows];
+      const storageMonthly = roundCurrency(
+        rows.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0),
+      );
+
+      if (rows.length === 0 && databaseGrowthGb <= 0) {
+        return [];
+      }
+
+      const dimensionTotals = storageDimensionTotals(rows);
+      const sharePercent =
+        provider.totals.monthly > 0 ? (storageMonthly / provider.totals.monthly) * 100 : 0;
+      const primary = [...rows].sort(
+        (left, right) => right.baseMonthlyCostUsd - left.baseMonthlyCostUsd,
+      )[0];
+
+      return [
+        {
+          providerId: provider.providerId,
+          storageProfile: storageAnatomyProfile(form),
+          monthly: storageMonthly,
+          sharePercent,
+          operationsSignal: storageOperationsSignal({
+            operationMonthly: dimensionTotals.operations,
+            requestThousands,
+            retrievalGb,
+            retrievalMonthly: dimensionTotals.retrieval,
+          }),
+          resilienceSignal: storageResilienceSignal({
+            lifecycleMonthly: dimensionTotals.lifecycle,
+            lifecycleTransitions,
+            replicationMonthly: dimensionTotals.replication,
+            snapshotMonthly: dimensionTotals.snapshot,
+            snapshotRetentionDays,
+            snapshotSizeGb,
+            storageReplication: form.storageReplication,
+          }),
+          performanceSignal: storagePerformanceSignal({
+            databaseGrowthGb,
+            databaseSizeGb,
+            performanceMonthly: dimensionTotals.performance,
+            provisionedIops,
+            provisionedThroughputMbps,
+          }),
+          rateEvidence: storageRateEvidence(primary),
+          recommendation: storageAnatomyRecommendation(dimensionTotals, {
+            databaseGrowthGb,
+            lifecycleTransitions,
+            provisionedIops,
+            requestThousands,
+            retrievalGb,
+            snapshotSizeGb,
+            storageReplication: form.storageReplication,
+          }),
+          evidence: `${rows.length} storage-related line item(s); ${storageDimensionSummary(
+            dimensionTotals,
+          )}.`,
+        },
+      ];
+    })
+    .sort(
+      (left, right) =>
+        PROVIDER_ORDER.indexOf(left.providerId) - PROVIDER_ORDER.indexOf(right.providerId),
+    );
+}
+
+function databaseStorageLineItems(provider: ComparisonProviderResult): ComparisonLineItem[] {
+  return provider.lineItems.filter(
+    (lineItem) =>
+      lineItem.category === 'database' &&
+      ['storage', 'backup', 'growth', 'iops', 'replica transfer', 'replication'].some((needle) =>
+        `${lineItem.skuId ?? ''} ${lineItem.description}`.toLowerCase().includes(needle),
+      ),
+  );
+}
+
+function storageDimensionTotals(
+  lineItems: ComparisonLineItem[],
+): Record<
+  'base' | 'operations' | 'retrieval' | 'replication' | 'lifecycle' | 'snapshot' | 'performance',
+  number
+> {
+  return lineItems.reduce(
+    (totals, lineItem) => {
+      const normalized = `${lineItem.skuId ?? ''} ${lineItem.description}`.toLowerCase();
+      const amount = lineItem.baseMonthlyCostUsd;
+
+      if (normalized.includes('snapshot') || normalized.includes('backup')) {
+        totals.snapshot += amount;
+      } else if (normalized.includes('retrieval') || normalized.includes('rehydrat')) {
+        totals.retrieval += amount;
+      } else if (normalized.includes('replication') || normalized.includes('replica transfer')) {
+        totals.replication += amount;
+      } else if (normalized.includes('lifecycle') || normalized.includes('transition')) {
+        totals.lifecycle += amount;
+      } else if (
+        normalized.includes('iops') ||
+        normalized.includes('throughput') ||
+        normalized.includes('performance')
+      ) {
+        totals.performance += amount;
+      } else if (
+        normalized.includes('operation') ||
+        normalized.includes('request') ||
+        normalized.includes('put') ||
+        normalized.includes('get') ||
+        normalized.includes('list') ||
+        normalized.includes('delete')
+      ) {
+        totals.operations += amount;
+      } else {
+        totals.base += amount;
+      }
+
+      return totals;
+    },
+    {
+      base: 0,
+      operations: 0,
+      retrieval: 0,
+      replication: 0,
+      lifecycle: 0,
+      snapshot: 0,
+      performance: 0,
+    },
+  );
+}
+
+function storageAnatomyProfile(form: WorkloadFormState): string {
+  return `${capitalize(form.storageType.replace(/-/g, ' '))} · ${storageClassDisplayName(
+    form.storageClass,
+  )}`;
+}
+
+function storageClassDisplayName(storageClass: WorkloadFormState['storageClass']): string {
+  const option = STORAGE_CLASS_OPTIONS.find(([value]) => value === storageClass);
+
+  return option?.[1] ?? storageClass.replace(/-/g, ' ');
+}
+
+function storageOperationsSignal(input: {
+  operationMonthly: number;
+  requestThousands: number;
+  retrievalGb: number;
+  retrievalMonthly: number;
+}): string {
+  const parts = [
+    input.requestThousands > 0
+      ? `${formatDecimal(input.requestThousands)}K ops (${formatCurrency(input.operationMonthly)}/mo)`
+      : undefined,
+    input.retrievalGb > 0
+      ? `${formatDecimal(input.retrievalGb)}GB retrieval (${formatCurrency(input.retrievalMonthly)}/mo)`
+      : undefined,
+  ].filter(Boolean);
+
+  return parts.join(' · ') || 'No request/retrieval surcharge surfaced';
+}
+
+function storageResilienceSignal(input: {
+  lifecycleMonthly: number;
+  lifecycleTransitions: number;
+  replicationMonthly: number;
+  snapshotMonthly: number;
+  snapshotRetentionDays: number;
+  snapshotSizeGb: number;
+  storageReplication: WorkloadFormState['storageReplication'];
+}): string {
+  const parts = [
+    input.storageReplication !== 'none'
+      ? `${input.storageReplication.replace('-', ' ')} (${formatCurrency(
+          input.replicationMonthly,
+        )}/mo)`
+      : undefined,
+    input.snapshotSizeGb > 0
+      ? `${formatDecimal(input.snapshotSizeGb)}GB snapshots / ${formatDecimal(
+          input.snapshotRetentionDays,
+        )}d (${formatCurrency(input.snapshotMonthly)}/mo)`
+      : undefined,
+    input.lifecycleTransitions > 0
+      ? `${formatDecimal(input.lifecycleTransitions)}K lifecycle transitions (${formatCurrency(
+          input.lifecycleMonthly,
+        )}/mo)`
+      : undefined,
+  ].filter(Boolean);
+
+  return parts.join(' · ') || 'No replication/snapshot/lifecycle rows';
+}
+
+function storagePerformanceSignal(input: {
+  databaseGrowthGb: number;
+  databaseSizeGb: number;
+  performanceMonthly: number;
+  provisionedIops: number;
+  provisionedThroughputMbps: number;
+}): string {
+  const annualGrowthPercent =
+    input.databaseSizeGb > 0 ? (input.databaseGrowthGb * 12 * 100) / input.databaseSizeGb : 0;
+  const parts = [
+    input.provisionedIops > 0 || input.provisionedThroughputMbps > 0
+      ? `${formatDecimal(input.provisionedIops)} IOPS / ${formatDecimal(
+          input.provisionedThroughputMbps,
+        )} MB/s (${formatCurrency(input.performanceMonthly)}/mo)`
+      : undefined,
+    input.databaseGrowthGb > 0
+      ? `${formatDecimal(input.databaseGrowthGb)}GB/mo DB growth (${formatPercent(
+          annualGrowthPercent,
+        )} annualized)`
+      : undefined,
+  ].filter(Boolean);
+
+  return parts.join(' · ') || 'Baseline storage performance only';
+}
+
+function storageRateEvidence(lineItem: ComparisonLineItem | undefined): string {
+  if (!lineItem) {
+    return 'Storage pricing row pending';
+  }
+
+  if (lineItem.unitPriceUsd !== undefined) {
+    return `${formatCurrency(lineItem.unitPriceUsd)} per ${lineItem.unit ?? 'unit'}`;
+  }
+
+  if (lineItem.baseHourlyCostUsd !== undefined) {
+    return `${formatCurrency(lineItem.baseHourlyCostUsd)}/hr x 730 hrs`;
+  }
+
+  return `${lineItem.description} is the largest storage-related row`;
+}
+
+function storageDimensionSummary(
+  totals: Record<
+    'base' | 'operations' | 'retrieval' | 'replication' | 'lifecycle' | 'snapshot' | 'performance',
+    number
+  >,
+): string {
+  const active = Object.entries(totals)
+    .filter(([, value]) => value > 0.005)
+    .map(([key]) => key);
+
+  return active.length > 0 ? active.join(', ') : 'no priced dimensions above threshold';
+}
+
+function storageAnatomyRecommendation(
+  totals: Record<
+    'base' | 'operations' | 'retrieval' | 'replication' | 'lifecycle' | 'snapshot' | 'performance',
+    number
+  >,
+  signals: {
+    databaseGrowthGb: number;
+    lifecycleTransitions: number;
+    provisionedIops: number;
+    requestThousands: number;
+    retrievalGb: number;
+    snapshotSizeGb: number;
+    storageReplication: WorkloadFormState['storageReplication'];
+  },
+): string {
+  const dominant = Object.entries(totals).sort((left, right) => right[1] - left[1])[0]?.[0];
+
+  if (dominant === 'snapshot' || signals.snapshotSizeGb > 0) {
+    return 'Review snapshot retention and older-copy tiering before finalizing storage run-rate.';
+  }
+
+  if (dominant === 'retrieval' || signals.retrievalGb > 0) {
+    return 'Validate archive retrieval frequency, rehydration time, and warm/cold split.';
+  }
+
+  if (dominant === 'replication' || signals.storageReplication !== 'none') {
+    return 'Confirm same-region versus cross-region replication matches the DR requirement.';
+  }
+
+  if (dominant === 'performance' || signals.provisionedIops > 0) {
+    return 'Compare provisioned IOPS and throughput against measured latency requirements.';
+  }
+
+  if (dominant === 'operations' || signals.requestThousands > 0) {
+    return 'Batch request-heavy workflows and reduce LIST-heavy access paths.';
+  }
+
+  if (dominant === 'lifecycle' || signals.lifecycleTransitions > 0) {
+    return 'Validate lifecycle transition frequency and minimum-duration break-even.';
+  }
+
+  if (signals.databaseGrowthGb > 0) {
+    return 'Model database storage autoscaling and backup growth before year-one commitment.';
+  }
+
+  return 'Validate storage class, minimum-duration rules, and data-access pattern.';
 }
 
 function storageOptimizationSignal(
