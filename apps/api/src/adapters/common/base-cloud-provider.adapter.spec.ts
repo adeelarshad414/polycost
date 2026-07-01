@@ -208,6 +208,8 @@ describe('BaseCloudProviderAdapter', () => {
         attributes: {
           ...catalog[1].attributes,
           pricingModel: 'reserved-1yr',
+          upfrontOption: 'partial',
+          upfrontCostUsd: 240,
         },
       },
       {
@@ -242,6 +244,8 @@ describe('BaseCloudProviderAdapter', () => {
           available: true,
           hourlyCostUsd: 0.09,
           monthlyCostUsd: 65.7,
+          upfrontOption: 'partial',
+          upfrontCostUsd: 240,
         }),
         expect.objectContaining({
           model: 'reserved-3yr',

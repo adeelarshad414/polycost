@@ -99,6 +99,8 @@ const comparison: ComparisonResult = {
           available: true,
           monthlyCostUsd: 42,
           hourlyCostUsd: 0.06,
+          upfrontOption: 'all',
+          upfrontCostUsd: 360,
           caveat: 'Three-year commitment.',
         },
       ],
@@ -169,7 +171,7 @@ describe('report generators', () => {
       'gcp,available,not modeled,not modeled,not modeled,not modeled,Only on-demand totals are modeled for this provider.',
     );
     expect(csv).toContain('Commitment Payment and TCO');
-    expect(csv).toContain('aws,Reserved 3-year,yes,0.06,42');
+    expect(csv).toContain('aws,Reserved 3-year,yes,0.06,42,360,All upfront,36 months,1872');
     expect(csv).toContain('Egress Tiered Breakdown');
     expect(csv).toContain('aws,us-east-1,0-512 GB,512,0.09,46.08,0.09');
     expect(csv).toContain('Normalized Service Requirements');
@@ -260,6 +262,9 @@ describe('report generators', () => {
     expect(xlsxText).toContain('Selected Pricing Scenario');
     expect(xlsxText).toContain('Pricing Model Availability');
     expect(xlsxText).toContain('Commitment Payment and TCO');
+    expect(xlsxText).toContain('Upfront cash USD');
+    expect(xlsxText).toContain('<t>360</t>');
+    expect(xlsxText).toContain('<t>1872</t>');
     expect(xlsxText).toContain('Egress Tiered Breakdown');
     expect(xlsxText).toContain('Normalized Service Requirements');
     expect(xlsxText).toContain('Rate Math Evidence');
@@ -353,6 +358,7 @@ describe('report generators', () => {
     expect(pdfText).toContain('Selected pricing scenario');
     expect(pdfText).toContain('Pricing model availability');
     expect(pdfText).toContain('Commitment payment and TCO');
+    expect(pdfText).toContain('upfront $360');
     expect(pdfText).toContain('Egress tiered breakdown');
     expect(pdfText).toContain('aws | us-east-1 | 0-512 GB | billable 512 GB');
     expect(pdfText).toContain('Normalized service requirements');
@@ -560,7 +566,17 @@ describe('report generators', () => {
 
     expect(tcoRows[0]).toContain('Term TCO USD');
     expect(tcoRows).toContainEqual(
-      expect.arrayContaining(['aws', 'Reserved 3-year', 'yes', '0.06', '42']),
+      expect.arrayContaining([
+        'aws',
+        'Reserved 3-year',
+        'yes',
+        '0.06',
+        '42',
+        '360',
+        'All upfront',
+        '36 months',
+        '1872',
+      ]),
     );
     expect(egressRows[0]).toContain('Effective blended USD/GB');
     expect(egressRows).toContainEqual(

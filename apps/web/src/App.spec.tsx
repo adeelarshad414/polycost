@@ -827,6 +827,8 @@ describe('ComparisonView', () => {
         model: 'reserved-1yr',
         available: true,
         monthlyCostUsd: 42,
+        upfrontOption: 'partial',
+        upfrontCostUsd: 120,
       },
     ];
     awsRichProvider.lineItems[3] = {
@@ -868,6 +870,16 @@ describe('ComparisonView', () => {
               monthlyCostUsd: 47.5,
               savingsPercentVsOnDemand: 52.5,
               caveat: 'Spot pricing is interruptible and volatile.',
+            },
+            {
+              model: 'reserved-1yr',
+              available: true,
+              monthlyCostUsd: 42,
+              hourlyCostUsd: 0.06,
+              upfrontOption: 'partial',
+              upfrontCostUsd: 120,
+              commitmentTermMonths: 12,
+              savingsPercentVsOnDemand: 58,
             },
           ],
         },
@@ -916,6 +928,10 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('$42.00');
     expect(text(container)).toContain('Payment and TCO detail');
     expect(text(container)).toContain('Commitment scenario monthly, hourly, and term view');
+    expect(text(container)).toContain('Upfront cash');
+    expect(text(container)).toContain('$120.00');
+    expect(text(container)).toContain('$624.00');
+    expect(text(container)).toContain('upfront $120.00');
     expect(text(container)).toContain('Region and scale what-if');
     expect(text(container)).toContain('Cache-backed rerun without natural-language reparse');
     expect(text(container)).toContain('Egress tiered breakdown');

@@ -156,7 +156,7 @@ export class PdfReportGenerator {
     );
     for (const row of commitmentTcoRows(result).slice(1)) {
       lines.push({
-        text: `${row[0]} | ${row[1]} | available ${row[2]} | monthly $${row[4]} | payment ${row[5]} | term ${row[6]} | TCO $${row[7] || 'n/a'} | savings ${row[8] || 'n/a'}`,
+        text: `${row[0]} | ${row[1]} | available ${row[2]} | monthly $${row[4]} | upfront $${row[5] || 'n/a'} | payment ${row[6]} | term ${row[7]} | TCO $${row[8] || 'n/a'} | savings ${row[9] || 'n/a'}`,
         fontSize: 10,
       });
     }

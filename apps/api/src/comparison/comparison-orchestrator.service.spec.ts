@@ -216,7 +216,13 @@ describe('ComparisonOrchestratorService', () => {
           pricingBasis: 'flat',
           pricingModels: [
             { model: 'on-demand', available: true, monthlyCostUsd: 100, hourlyCostUsd: 0.14 },
-            { model: 'reserved-1yr', available: true, monthlyCostUsd: 80 },
+            {
+              model: 'reserved-1yr',
+              available: true,
+              monthlyCostUsd: 80,
+              upfrontOption: 'partial',
+              upfrontCostUsd: 240,
+            },
             { model: 'reserved-3yr', available: true, monthlyCostUsd: 50 },
           ],
         },
@@ -289,6 +295,8 @@ describe('ComparisonOrchestratorService', () => {
           model: 'reserved-1yr',
           available: true,
           monthlyCostUsd: 125,
+          upfrontOption: 'partial',
+          upfrontCostUsd: 240,
           savingsPercentVsOnDemand: 13.79,
         }),
         expect.objectContaining({

@@ -1018,13 +1018,14 @@ function CommitmentTcoPanel({
         </span>
       </div>
       <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="min-w-[980px] w-full border-separate border-spacing-0 text-sm">
+        <table className="min-w-[1080px] w-full border-separate border-spacing-0 text-sm">
           <thead>
             <tr className="bg-surface-1 text-left text-xs font-bold uppercase tracking-wide text-text-muted">
               <th className="border-b border-border px-3 py-2">Provider</th>
               <th className="border-b border-border px-3 py-2">Model</th>
               <th className="border-b border-border px-3 py-2 text-right">Effective hourly</th>
               <th className="border-b border-border px-3 py-2 text-right">Monthly recurring</th>
+              <th className="border-b border-border px-3 py-2 text-right">Upfront cash</th>
               <th className="border-b border-border px-3 py-2">Payment option</th>
               <th className="border-b border-border px-3 py-2">Term</th>
               <th className="border-b border-border px-3 py-2 text-right">Term TCO</th>
@@ -1052,6 +1053,11 @@ function CommitmentTcoPanel({
                       ? formatMoney(row.monthlyCostUsd, currency)
                       : 'N/A'}
                   </td>
+                  <td className="border-b border-border px-3 py-2 text-right font-mono text-text-primary">
+                    {row.available && row.upfrontCostUsd !== undefined
+                      ? formatMoney(row.upfrontCostUsd, currency)
+                      : 'N/A'}
+                  </td>
                   <td className="border-b border-border px-3 py-2 text-text-secondary">
                     {row.paymentOption}
                   </td>
@@ -1075,7 +1081,7 @@ function CommitmentTcoPanel({
               ))
             ) : (
               <tr>
-                <td className="px-3 py-3 text-text-secondary" colSpan={9}>
+                <td className="px-3 py-3 text-text-secondary" colSpan={10}>
                   Run a comparison to populate commitment payment and TCO evidence.
                 </td>
               </tr>
@@ -1464,6 +1470,7 @@ interface CommitmentTcoRow {
   available: boolean;
   hourlyCostUsd?: number;
   monthlyCostUsd?: number;
+  upfrontCostUsd?: number;
   paymentOption: string;
   term: string;
   termTotalUsd?: number;
@@ -1530,7 +1537,7 @@ function commitmentTcoRows(comparison: ComparisonResult): CommitmentTcoRow[] {
           : undefined;
       const termTotalUsd =
         monthlyCostUsd !== undefined && termMonths !== undefined
-          ? roundCurrency(monthlyCostUsd * termMonths)
+          ? roundCurrency(monthlyCostUsd * termMonths + (modelCost.upfrontCostUsd ?? 0))
           : undefined;
 
       return {
@@ -1539,6 +1546,9 @@ function commitmentTcoRows(comparison: ComparisonResult): CommitmentTcoRow[] {
         available: modelCost.available,
         ...(hourlyCostUsd !== undefined ? { hourlyCostUsd } : {}),
         ...(monthlyCostUsd !== undefined ? { monthlyCostUsd } : {}),
+        ...(modelCost.upfrontCostUsd !== undefined
+          ? { upfrontCostUsd: modelCost.upfrontCostUsd }
+          : {}),
         paymentOption: paymentOptionEvidence(modelCost),
         term: termMonths !== undefined ? `${termMonths} months` : termEvidence(pricingModel.key),
         ...(termTotalUsd !== undefined ? { termTotalUsd } : {}),
@@ -1606,6 +1616,9 @@ function commitmentEvidence(modelCost: PricingModelCost): string {
 
   const evidence = [
     modelCost.providerTerm ?? modelCost.displayName ?? pricingModelLabel(modelCost.model),
+    modelCost.upfrontCostUsd !== undefined
+      ? `upfront ${formatMoney(modelCost.upfrontCostUsd, USD_CURRENCY)}`
+      : undefined,
     modelCost.estimated ? 'estimate' : undefined,
     modelCost.volatility === 'volatile' ? 'volatile' : undefined,
     modelCost.caveat,

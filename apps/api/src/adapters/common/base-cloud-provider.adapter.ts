@@ -435,6 +435,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     record: PricingCatalogRecord,
   ): Omit<PricingModelCost, 'model' | 'available' | 'monthlyCostUsd' | 'hourlyCostUsd'> {
     const metadata = providerPricingModelMetadata(this.providerId, pricingModel);
+    const upfrontCostUsd = this.numberAttribute(record, 'upfrontCostUsd');
 
     return {
       displayName: metadata.displayName,
@@ -447,6 +448,9 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
         : {}),
       ...(typeof record.attributes?.upfrontOption === 'string'
         ? { upfrontOption: normalizeUpfrontOption(record.attributes.upfrontOption) }
+        : {}),
+      ...(upfrontCostUsd !== undefined && upfrontCostUsd >= 0
+        ? { upfrontCostUsd: this.roundCurrency(upfrontCostUsd) }
         : {}),
       lastFetchedAt: record.fetchedAt,
       caveat: metadata.caveat,

@@ -934,6 +934,10 @@ controls.
   executive provider monthly run-rate comparison and engineering service-mix
   evidence, using the same comparison totals and line-item data as the CSV/XLSX
   exports.
+- Upfront cash evidence: cached pricing records can now publish optional
+  `upfrontCostUsd`; the comparison rollup preserves and sums it for provider-level
+  Reserved/Savings scenarios, the engineering TCO table shows it separately from
+  recurring monthly cost, and CSV/XLSX/PDF reports include it in term TCO.
 - Verification passing locally:
   `npm run check`, `npm run build`, `npm run test:coverage`,
   `npm run test:e2e --workspace @polycost/web`,
@@ -966,9 +970,10 @@ when it is actually resolved in a later phase, with a note on which phase resolv
   changes the refreshed result still needs either a test-only catalog fixture path or
   internal SKU traceability for safe mutation.
 - The AI-native reimagining prompt's most aggressive DoD is not fully product-complete
-  yet: file upload remains a documented Phase 2 hook, account-level requirement
-  persistence is not implemented, and reserved/Savings upfront cash charges are
-  shown only when provider catalog evidence publishes them.
+  yet: file upload remains a documented Phase 2 hook, and account-level requirement
+  persistence is not implemented because auth/user accounts are not part of this
+  Phase 1 codebase. Session-level requirement persistence is implemented for
+  what-if reruns and pricing-model switches.
 - The engineering matrix now filters by category/provider/pricing model and sorts by
   every provider/model column, but the backend still needs richer service-level
   pricing-model coverage for every provider/service combination before every cell can

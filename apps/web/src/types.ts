@@ -189,6 +189,7 @@ export interface PricingModelCost {
   hourlyCostUsd?: number;
   savingsPercentVsOnDemand?: number;
   upfrontOption?: 'none' | 'partial' | 'all';
+  upfrontCostUsd?: number;
   commitmentTermMonths?: number;
   lastFetchedAt?: string;
   caveat?: string;

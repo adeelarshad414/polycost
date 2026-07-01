@@ -168,6 +168,7 @@ export function commitmentTcoRows(result: ComparisonResult): string[][] {
       'Available',
       'Effective hourly USD',
       'Monthly recurring USD',
+      'Upfront cash USD',
       'Payment option',
       'Term',
       'Term TCO USD',
@@ -181,7 +182,11 @@ export function commitmentTcoRows(result: ComparisonResult): string[][] {
         const monthly = model.available ? model.monthlyCostUsd : undefined;
         const hourly =
           model.available && monthly !== undefined ? (model.hourlyCostUsd ?? monthly / 730) : undefined;
-        const termTco = monthly !== undefined && termMonths !== undefined ? monthly * termMonths : undefined;
+        const upfront = model.available ? model.upfrontCostUsd : undefined;
+        const termTco =
+          monthly !== undefined && termMonths !== undefined
+            ? monthly * termMonths + (upfront ?? 0)
+            : undefined;
 
         return [
           provider.providerId,
@@ -189,6 +194,7 @@ export function commitmentTcoRows(result: ComparisonResult): string[][] {
           model.available ? 'yes' : 'no',
           hourly !== undefined ? formatNumber(hourly) : '',
           monthly !== undefined ? formatNumber(monthly) : '',
+          upfront !== undefined ? formatNumber(upfront) : '',
           paymentOptionEvidence(model),
           termMonths !== undefined ? `${termMonths} months` : termEvidence(pricingModel),
           termTco !== undefined ? formatNumber(termTco) : '',
@@ -505,6 +511,7 @@ function commitmentEvidence(model: PricingModelCost): string {
 
   return [
     model.providerTerm ?? model.displayName ?? labelForPricingModel(model.model),
+    model.upfrontCostUsd !== undefined ? `upfront $${formatNumber(model.upfrontCostUsd)}` : undefined,
     model.estimated ? 'estimate' : undefined,
     model.volatility === 'volatile' ? 'volatile' : undefined,
     model.caveat,
