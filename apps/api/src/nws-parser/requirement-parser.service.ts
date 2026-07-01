@@ -187,7 +187,8 @@ function serviceRequirementsFromNws(nws: NormalizedWorkloadSpec): ServiceRequire
     })),
     ...nws.database.map((database): ServiceRequirement => ({
       serviceCategory: 'database',
-      serviceType: database.engine === 'redis' ? 'cache' : 'relational-database',
+      serviceType: databaseServiceType(database.engine),
+      instanceType: `${database.engine} - ${database.sizeGb ?? 'provider default'}GB`,
       tier: database.highAvailability ? 'high-availability' : 'single-zone',
       ...(region ? { region } : {}),
       az: database.highAvailability ? 'multi-az' : 'single-az',
@@ -196,7 +197,50 @@ function serviceRequirementsFromNws(nws: NormalizedWorkloadSpec): ServiceRequire
         role: database.role,
         engine: database.engine,
         ...(database.sizeGb !== undefined ? { sizeGb: database.sizeGb } : {}),
+        ...(database.backupStorageGb !== undefined
+          ? { backupStorageGb: database.backupStorageGb }
+          : {}),
+        ...(database.backupRetentionDays !== undefined
+          ? { backupRetentionDays: database.backupRetentionDays }
+          : {}),
+        ...(database.provisionedIops !== undefined
+          ? { provisionedIops: database.provisionedIops }
+          : {}),
+        ...(database.readReplicaCount !== undefined
+          ? { readReplicaCount: database.readReplicaCount }
+          : {}),
+        ...(database.crossRegionReplicaTransferGb !== undefined
+          ? { crossRegionReplicaTransferGb: database.crossRegionReplicaTransferGb }
+          : {}),
+        ...(database.nosqlReadRequestUnitsMillion !== undefined
+          ? { nosqlReadRequestUnitsMillion: database.nosqlReadRequestUnitsMillion }
+          : {}),
+        ...(database.nosqlWriteRequestUnitsMillion !== undefined
+          ? { nosqlWriteRequestUnitsMillion: database.nosqlWriteRequestUnitsMillion }
+          : {}),
+        ...(database.ruPerSecond !== undefined ? { ruPerSecond: database.ruPerSecond } : {}),
+        ...(database.queryDataTb !== undefined ? { queryDataTb: database.queryDataTb } : {}),
+        ...(database.cacheReplicaCount !== undefined
+          ? { cacheReplicaCount: database.cacheReplicaCount }
+          : {}),
+        ...(database.storageGrowthGbPerMonth !== undefined
+          ? { storageGrowthGbPerMonth: database.storageGrowthGbPerMonth }
+          : {}),
       },
     })),
   ];
+}
+
+function databaseServiceType(
+  engine: NormalizedWorkloadSpec['database'][number]['engine'],
+): 'cache' | 'nosql-database' | 'relational-database' {
+  if (engine === 'redis') {
+    return 'cache';
+  }
+
+  if (engine === 'mongodb' || engine === 'generic_nosql') {
+    return 'nosql-database';
+  }
+
+  return 'relational-database';
 }

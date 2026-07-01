@@ -75,6 +75,17 @@ export interface WorkloadFormState {
   databaseEngine: DatabaseEngine;
   databaseSizeGb: string;
   databaseHighAvailability: boolean;
+  databaseBackupStorageGb: string;
+  databaseBackupRetentionDays: string;
+  databaseProvisionedIops: string;
+  databaseReadReplicaCount: string;
+  databaseCrossRegionReplicaTransferGb: string;
+  databaseNosqlReadRequestUnitsMillion: string;
+  databaseNosqlWriteRequestUnitsMillion: string;
+  databaseRuPerSecond: string;
+  databaseQueryDataTb: string;
+  databaseCacheReplicaCount: string;
+  databaseStorageGrowthGbPerMonth: string;
   monthlyEgressGb: string;
   crossAzTransferGb: string;
   interRegionTransferGb: string;
@@ -140,6 +151,17 @@ type NumericWorkloadFormField =
   | 'provisionedIops'
   | 'provisionedThroughputMbps'
   | 'databaseSizeGb'
+  | 'databaseBackupStorageGb'
+  | 'databaseBackupRetentionDays'
+  | 'databaseProvisionedIops'
+  | 'databaseReadReplicaCount'
+  | 'databaseCrossRegionReplicaTransferGb'
+  | 'databaseNosqlReadRequestUnitsMillion'
+  | 'databaseNosqlWriteRequestUnitsMillion'
+  | 'databaseRuPerSecond'
+  | 'databaseQueryDataTb'
+  | 'databaseCacheReplicaCount'
+  | 'databaseStorageGrowthGbPerMonth'
   | 'monthlyEgressGb'
   | 'crossAzTransferGb'
   | 'interRegionTransferGb'
@@ -210,6 +232,17 @@ export const defaultWorkloadForm: WorkloadFormState = {
   databaseEngine: 'postgres',
   databaseSizeGb: '100',
   databaseHighAvailability: true,
+  databaseBackupStorageGb: '0',
+  databaseBackupRetentionDays: '35',
+  databaseProvisionedIops: '0',
+  databaseReadReplicaCount: '0',
+  databaseCrossRegionReplicaTransferGb: '0',
+  databaseNosqlReadRequestUnitsMillion: '0',
+  databaseNosqlWriteRequestUnitsMillion: '0',
+  databaseRuPerSecond: '0',
+  databaseQueryDataTb: '0',
+  databaseCacheReplicaCount: '0',
+  databaseStorageGrowthGbPerMonth: '0',
   monthlyEgressGb: '750',
   crossAzTransferGb: '0',
   interRegionTransferGb: '0',
@@ -632,6 +665,74 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
       'databaseSizeGb',
       'Database size must be greater than 0 GB when provided.',
     );
+    optionalNonNegativeNumberField(
+      issues,
+      form,
+      'databaseBackupStorageGb',
+      'Backup storage must be 0 GB or higher.',
+    );
+    requireBoundedInteger(
+      issues,
+      form,
+      'databaseBackupRetentionDays',
+      0,
+      3650,
+      'Backup retention must be a whole number from 0 to 3650 days.',
+    );
+    optionalNonNegativeIntegerField(
+      issues,
+      form,
+      'databaseProvisionedIops',
+      'Database IOPS must be a whole number 0 or higher.',
+    );
+    optionalNonNegativeIntegerField(
+      issues,
+      form,
+      'databaseReadReplicaCount',
+      'Read replicas must be a whole number 0 or higher.',
+    );
+    optionalNonNegativeNumberField(
+      issues,
+      form,
+      'databaseCrossRegionReplicaTransferGb',
+      'Replica transfer must be 0 GB or higher.',
+    );
+    optionalNonNegativeNumberField(
+      issues,
+      form,
+      'databaseNosqlReadRequestUnitsMillion',
+      'NoSQL read units must be 0 million or higher.',
+    );
+    optionalNonNegativeNumberField(
+      issues,
+      form,
+      'databaseNosqlWriteRequestUnitsMillion',
+      'NoSQL write units must be 0 million or higher.',
+    );
+    optionalNonNegativeIntegerField(
+      issues,
+      form,
+      'databaseRuPerSecond',
+      'RU/s capacity must be a whole number 0 or higher.',
+    );
+    optionalNonNegativeNumberField(
+      issues,
+      form,
+      'databaseQueryDataTb',
+      'Query volume must be 0 TB or higher.',
+    );
+    optionalNonNegativeIntegerField(
+      issues,
+      form,
+      'databaseCacheReplicaCount',
+      'Cache replicas must be a whole number 0 or higher.',
+    );
+    optionalNonNegativeNumberField(
+      issues,
+      form,
+      'databaseStorageGrowthGbPerMonth',
+      'Database storage growth must be 0 GB/month or higher.',
+    );
   }
 
   optionalNonNegativeNumberField(issues, form, 'monthlyEgressGb', 'Egress must be 0 GB or higher.');
@@ -816,6 +917,7 @@ export function buildNwsFromForm(
             engine: form.databaseEngine,
             ...optionalPositiveNumber('sizeGb', form.databaseSizeGb),
             highAvailability: form.databaseHighAvailability,
+            ...databaseAdvancedAssumptionsFromForm(form),
           },
         ]
       : [],
@@ -977,6 +1079,43 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
     databaseSizeGb: numberToInput(database?.sizeGb),
     databaseHighAvailability:
       database?.highAvailability ?? defaultWorkloadForm.databaseHighAvailability,
+    databaseBackupStorageGb: numberToInput(
+      database?.backupStorageGb ?? Number(defaultWorkloadForm.databaseBackupStorageGb),
+    ),
+    databaseBackupRetentionDays: numberToInput(
+      database?.backupRetentionDays ?? Number(defaultWorkloadForm.databaseBackupRetentionDays),
+    ),
+    databaseProvisionedIops: numberToInput(
+      database?.provisionedIops ?? Number(defaultWorkloadForm.databaseProvisionedIops),
+    ),
+    databaseReadReplicaCount: numberToInput(
+      database?.readReplicaCount ?? Number(defaultWorkloadForm.databaseReadReplicaCount),
+    ),
+    databaseCrossRegionReplicaTransferGb: numberToInput(
+      database?.crossRegionReplicaTransferGb ??
+        Number(defaultWorkloadForm.databaseCrossRegionReplicaTransferGb),
+    ),
+    databaseNosqlReadRequestUnitsMillion: numberToInput(
+      database?.nosqlReadRequestUnitsMillion ??
+        Number(defaultWorkloadForm.databaseNosqlReadRequestUnitsMillion),
+    ),
+    databaseNosqlWriteRequestUnitsMillion: numberToInput(
+      database?.nosqlWriteRequestUnitsMillion ??
+        Number(defaultWorkloadForm.databaseNosqlWriteRequestUnitsMillion),
+    ),
+    databaseRuPerSecond: numberToInput(
+      database?.ruPerSecond ?? Number(defaultWorkloadForm.databaseRuPerSecond),
+    ),
+    databaseQueryDataTb: numberToInput(
+      database?.queryDataTb ?? Number(defaultWorkloadForm.databaseQueryDataTb),
+    ),
+    databaseCacheReplicaCount: numberToInput(
+      database?.cacheReplicaCount ?? Number(defaultWorkloadForm.databaseCacheReplicaCount),
+    ),
+    databaseStorageGrowthGbPerMonth: numberToInput(
+      database?.storageGrowthGbPerMonth ??
+        Number(defaultWorkloadForm.databaseStorageGrowthGbPerMonth),
+    ),
     monthlyEgressGb: numberToInput(nws.network.estimatedMonthlyEgressGb),
     crossAzTransferGb: numberToInput(
       nws.network.crossAzTransferGb ?? Number(defaultWorkloadForm.crossAzTransferGb),
@@ -1097,6 +1236,9 @@ export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceReq
         loadBalancerProcessedGb: parseOptionalNumber(form.loadBalancerProcessedGb) ?? 0,
         loadBalancerHours: parseBoundedNumber(form.loadBalancerHours, 0, 730, 0),
         ...(serviceType.includes('storage') ? storageScaleParamsFromForm(form) : {}),
+        ...(serviceType.includes('database') || serviceType === 'cache'
+          ? databaseScaleParamsFromForm(form)
+          : {}),
         ...(serviceType === 'vm-compute' || serviceType === 'autoscaling-compute'
           ? {
               ...instanceFamilyForTier(form.instanceTier),
@@ -1287,6 +1429,60 @@ function storageScaleParamsFromForm(form: WorkloadFormState): ServiceRequirement
   };
 }
 
+function databaseAdvancedAssumptionsFromForm(
+  form: WorkloadFormState,
+): Partial<NormalizedWorkloadSpec['database'][number]> {
+  const backupStorageGb = parseOptionalNumber(form.databaseBackupStorageGb);
+
+  return {
+    ...optionalPositiveNumber('backupStorageGb', form.databaseBackupStorageGb),
+    ...(backupStorageGb !== undefined && backupStorageGb > 0
+      ? optionalNonNegativeInteger('backupRetentionDays', form.databaseBackupRetentionDays)
+      : {}),
+    ...optionalPositiveInteger('provisionedIops', form.databaseProvisionedIops),
+    ...optionalPositiveInteger('readReplicaCount', form.databaseReadReplicaCount),
+    ...optionalPositiveNumber(
+      'crossRegionReplicaTransferGb',
+      form.databaseCrossRegionReplicaTransferGb,
+    ),
+    ...optionalPositiveNumber(
+      'nosqlReadRequestUnitsMillion',
+      form.databaseNosqlReadRequestUnitsMillion,
+    ),
+    ...optionalPositiveNumber(
+      'nosqlWriteRequestUnitsMillion',
+      form.databaseNosqlWriteRequestUnitsMillion,
+    ),
+    ...optionalPositiveInteger('ruPerSecond', form.databaseRuPerSecond),
+    ...optionalPositiveNumber('queryDataTb', form.databaseQueryDataTb),
+    ...optionalPositiveInteger('cacheReplicaCount', form.databaseCacheReplicaCount),
+    ...optionalPositiveNumber('storageGrowthGbPerMonth', form.databaseStorageGrowthGbPerMonth),
+  };
+}
+
+function databaseScaleParamsFromForm(form: WorkloadFormState): ServiceRequirement['scaleParams'] {
+  return {
+    databaseRole: form.databaseRole.trim() || 'database',
+    databaseEngine: form.databaseEngine,
+    databaseSizeGb: parseOptionalNumber(form.databaseSizeGb) ?? 0,
+    databaseHighAvailability: form.databaseHighAvailability,
+    backupStorageGb: parseOptionalNumber(form.databaseBackupStorageGb) ?? 0,
+    backupRetentionDays: parseNonNegativeInteger(form.databaseBackupRetentionDays, 0),
+    provisionedIops: parseNonNegativeInteger(form.databaseProvisionedIops, 0),
+    readReplicaCount: parseNonNegativeInteger(form.databaseReadReplicaCount, 0),
+    crossRegionReplicaTransferGb:
+      parseOptionalNumber(form.databaseCrossRegionReplicaTransferGb) ?? 0,
+    nosqlReadRequestUnitsMillion:
+      parseOptionalNumber(form.databaseNosqlReadRequestUnitsMillion) ?? 0,
+    nosqlWriteRequestUnitsMillion:
+      parseOptionalNumber(form.databaseNosqlWriteRequestUnitsMillion) ?? 0,
+    ruPerSecond: parseNonNegativeInteger(form.databaseRuPerSecond, 0),
+    queryDataTb: parseOptionalNumber(form.databaseQueryDataTb) ?? 0,
+    cacheReplicaCount: parseNonNegativeInteger(form.databaseCacheReplicaCount, 0),
+    storageGrowthGbPerMonth: parseOptionalNumber(form.databaseStorageGrowthGbPerMonth) ?? 0,
+  };
+}
+
 function instanceFamilyForTier(
   instanceTier: WorkloadFormState['instanceTier'],
 ): Pick<NormalizedWorkloadSpec['compute'][number], 'instanceFamily'> {
@@ -1434,7 +1630,15 @@ function storageServiceFamilyId(form: WorkloadFormState): string {
 }
 
 function databaseServiceFamilyId(form: WorkloadFormState): string {
-  return form.databaseEngine === 'redis' ? 'cache' : 'relational-database';
+  if (form.databaseEngine === 'redis') {
+    return 'cache';
+  }
+
+  if (form.databaseEngine === 'mongodb' || form.databaseEngine === 'generic_nosql') {
+    return 'nosql-database';
+  }
+
+  return 'relational-database';
 }
 
 function normalizedRegionPreference(
@@ -1713,6 +1917,28 @@ function formNumericValue(form: WorkloadFormState, field: NumericWorkloadFormFie
       return form.provisionedThroughputMbps;
     case 'databaseSizeGb':
       return form.databaseSizeGb;
+    case 'databaseBackupStorageGb':
+      return form.databaseBackupStorageGb;
+    case 'databaseBackupRetentionDays':
+      return form.databaseBackupRetentionDays;
+    case 'databaseProvisionedIops':
+      return form.databaseProvisionedIops;
+    case 'databaseReadReplicaCount':
+      return form.databaseReadReplicaCount;
+    case 'databaseCrossRegionReplicaTransferGb':
+      return form.databaseCrossRegionReplicaTransferGb;
+    case 'databaseNosqlReadRequestUnitsMillion':
+      return form.databaseNosqlReadRequestUnitsMillion;
+    case 'databaseNosqlWriteRequestUnitsMillion':
+      return form.databaseNosqlWriteRequestUnitsMillion;
+    case 'databaseRuPerSecond':
+      return form.databaseRuPerSecond;
+    case 'databaseQueryDataTb':
+      return form.databaseQueryDataTb;
+    case 'databaseCacheReplicaCount':
+      return form.databaseCacheReplicaCount;
+    case 'databaseStorageGrowthGbPerMonth':
+      return form.databaseStorageGrowthGbPerMonth;
     case 'monthlyEgressGb':
       return form.monthlyEgressGb;
     case 'crossAzTransferGb':

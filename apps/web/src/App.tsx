@@ -2976,6 +2976,119 @@ function WorkloadForm({
               onChange={(checked) => update('databaseHighAvailability', checked)}
             />
           </div>
+          <details className="advanced-service-fields">
+            <summary>
+              <span>Advanced database cost drivers</span>
+              <small>Backups, IOPS, replicas, NoSQL units, RU/s, query TB</small>
+            </summary>
+            <div
+              className={
+                form.databaseEnabled
+                  ? 'form-grid form-grid-data'
+                  : 'form-grid form-grid-data is-muted'
+              }
+            >
+              <TextField
+                label="Backup storage"
+                value={form.databaseBackupStorageGb}
+                inputMode="decimal"
+                suffix="GB"
+                disabled={!form.databaseEnabled}
+                error={fieldErrors.databaseBackupStorageGb}
+                onChange={(value) => update('databaseBackupStorageGb', value)}
+              />
+              <TextField
+                label="Backup days"
+                value={form.databaseBackupRetentionDays}
+                inputMode="numeric"
+                suffix="days"
+                disabled={!form.databaseEnabled}
+                error={fieldErrors.databaseBackupRetentionDays}
+                onChange={(value) => update('databaseBackupRetentionDays', value)}
+              />
+              <TextField
+                label="DB IOPS"
+                value={form.databaseProvisionedIops}
+                inputMode="numeric"
+                suffix="IOPS"
+                disabled={!form.databaseEnabled}
+                error={fieldErrors.databaseProvisionedIops}
+                onChange={(value) => update('databaseProvisionedIops', value)}
+              />
+              <TextField
+                label="Read replicas"
+                value={form.databaseReadReplicaCount}
+                inputMode="numeric"
+                suffix="nodes"
+                disabled={!form.databaseEnabled}
+                error={fieldErrors.databaseReadReplicaCount}
+                onChange={(value) => update('databaseReadReplicaCount', value)}
+              />
+              <TextField
+                label="Replica transfer"
+                value={form.databaseCrossRegionReplicaTransferGb}
+                inputMode="decimal"
+                suffix="GB/mo"
+                disabled={!form.databaseEnabled}
+                error={fieldErrors.databaseCrossRegionReplicaTransferGb}
+                onChange={(value) => update('databaseCrossRegionReplicaTransferGb', value)}
+              />
+              <TextField
+                label="NoSQL reads"
+                value={form.databaseNosqlReadRequestUnitsMillion}
+                inputMode="decimal"
+                suffix="M/mo"
+                disabled={!form.databaseEnabled}
+                error={fieldErrors.databaseNosqlReadRequestUnitsMillion}
+                onChange={(value) => update('databaseNosqlReadRequestUnitsMillion', value)}
+              />
+              <TextField
+                label="NoSQL writes"
+                value={form.databaseNosqlWriteRequestUnitsMillion}
+                inputMode="decimal"
+                suffix="M/mo"
+                disabled={!form.databaseEnabled}
+                error={fieldErrors.databaseNosqlWriteRequestUnitsMillion}
+                onChange={(value) => update('databaseNosqlWriteRequestUnitsMillion', value)}
+              />
+              <TextField
+                label="RU/s"
+                value={form.databaseRuPerSecond}
+                inputMode="numeric"
+                suffix="RU/s"
+                disabled={!form.databaseEnabled}
+                error={fieldErrors.databaseRuPerSecond}
+                onChange={(value) => update('databaseRuPerSecond', value)}
+              />
+              <TextField
+                label="Query volume"
+                value={form.databaseQueryDataTb}
+                inputMode="decimal"
+                suffix="TB/mo"
+                disabled={!form.databaseEnabled}
+                error={fieldErrors.databaseQueryDataTb}
+                onChange={(value) => update('databaseQueryDataTb', value)}
+              />
+              <TextField
+                label="Cache replicas"
+                value={form.databaseCacheReplicaCount}
+                inputMode="numeric"
+                suffix="nodes"
+                disabled={!form.databaseEnabled}
+                error={fieldErrors.databaseCacheReplicaCount}
+                onChange={(value) => update('databaseCacheReplicaCount', value)}
+              />
+              <TextField
+                label="Storage growth"
+                value={form.databaseStorageGrowthGbPerMonth}
+                inputMode="decimal"
+                suffix="GB/mo"
+                disabled={!form.databaseEnabled}
+                error={fieldErrors.databaseStorageGrowthGbPerMonth}
+                onChange={(value) => update('databaseStorageGrowthGbPerMonth', value)}
+              />
+            </div>
+          </details>
         </div>
       </FormSection>
 

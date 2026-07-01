@@ -279,6 +279,50 @@ export const NWS_PARSE_RESULT_JSON_SCHEMA = {
               managedServicePreference: {
                 type: 'string',
               },
+              backupStorageGb: {
+                type: 'number',
+                minimum: 0,
+              },
+              backupRetentionDays: {
+                type: 'integer',
+                minimum: 0,
+              },
+              provisionedIops: {
+                type: 'integer',
+                minimum: 0,
+              },
+              readReplicaCount: {
+                type: 'integer',
+                minimum: 0,
+              },
+              crossRegionReplicaTransferGb: {
+                type: 'number',
+                minimum: 0,
+              },
+              nosqlReadRequestUnitsMillion: {
+                type: 'number',
+                minimum: 0,
+              },
+              nosqlWriteRequestUnitsMillion: {
+                type: 'number',
+                minimum: 0,
+              },
+              ruPerSecond: {
+                type: 'integer',
+                minimum: 0,
+              },
+              queryDataTb: {
+                type: 'number',
+                minimum: 0,
+              },
+              cacheReplicaCount: {
+                type: 'integer',
+                minimum: 0,
+              },
+              storageGrowthGbPerMonth: {
+                type: 'number',
+                minimum: 0,
+              },
             },
           },
         },

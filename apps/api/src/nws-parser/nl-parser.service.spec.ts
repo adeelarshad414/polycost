@@ -341,6 +341,60 @@ describe('NLParserService', () => {
     );
   });
 
+  it('infers advanced database dimensions from natural language', async () => {
+    const client: StructuredLlmClient = {
+      createStructuredOutput: jest.fn(),
+    };
+    const service = new NLParserService(configService(4000, false), client, fixedNow);
+
+    const result = await service.parse(
+      'A web app with two 4 vCPU 16GB servers and DynamoDB NoSQL database size 250GB, 120GB database backups with backup retention 45 days, 3000 database IOPS, two read replicas, 150GB cross-region replica transfer, 50M NoSQL reads, 20M NoSQL writes, 4000 RU/s, 8TB queried, one cache replica, and database grows 40GB per month.',
+    );
+
+    expect(result.draftNws.database[0]).toEqual(
+      expect.objectContaining({
+        role: 'primary',
+        engine: 'generic_nosql',
+        sizeGb: 250,
+        highAvailability: false,
+        backupStorageGb: 120,
+        backupRetentionDays: 45,
+        provisionedIops: 3000,
+        readReplicaCount: 2,
+        crossRegionReplicaTransferGb: 150,
+        nosqlReadRequestUnitsMillion: 50,
+        nosqlWriteRequestUnitsMillion: 20,
+        ruPerSecond: 4000,
+        queryDataTb: 8,
+        cacheReplicaCount: 1,
+        storageGrowthGbPerMonth: 40,
+      }),
+    );
+    expect(result.draftNws.serviceRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceCategory: 'database',
+          serviceType: 'nosql-database',
+          instanceType: 'generic_nosql - 250GB',
+          scaleParams: expect.objectContaining({
+            backupStorageGb: 120,
+            backupRetentionDays: 45,
+            provisionedIops: 3000,
+            readReplicaCount: 2,
+            crossRegionReplicaTransferGb: 150,
+            nosqlReadRequestUnitsMillion: 50,
+            nosqlWriteRequestUnitsMillion: 20,
+            ruPerSecond: 4000,
+            queryDataTb: 8,
+            cacheReplicaCount: 1,
+            storageGrowthGbPerMonth: 40,
+          }),
+        }),
+      ]),
+    );
+    expect(result.fieldsRequiringReview).not.toContain('database[0].sizeGb');
+  });
+
   it('infers accelerated compute families for GPU and ML workloads', async () => {
     const client: StructuredLlmClient = {
       createStructuredOutput: jest.fn(),

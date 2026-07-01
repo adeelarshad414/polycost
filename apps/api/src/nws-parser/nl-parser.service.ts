@@ -12,7 +12,7 @@ import {
 } from './nws-parser.types';
 
 const WORKLOAD_SIGNAL_PATTERN =
-  /\b(api|app|aurora|batch|cdn|container|database|ec2|egress|file|kubernetes|load balancer|ml|mysql|postgres|redis|server|service|storage|traffic|upload|users|vm|web|website|workload)\b/i;
+  /\b(api|app|aurora|batch|cdn|container|cosmos|database|db|dynamodb|ec2|egress|file|firestore|kubernetes|load balancer|ml|mongo|mysql|nosql|postgres|redis|server|service|spanner|storage|traffic|upload|users|vm|web|website|workload)\b/i;
 
 export class NWSParseInputError extends Error {
   constructor(message: string) {
@@ -95,7 +95,9 @@ export class NLParserService {
       input,
     );
     const databaseRequested =
-      /\b(database|db|postgres|postgresql|mysql|mongo|mongodb|redis)\b/i.test(input);
+      /\b(database|db|postgres|postgresql|mysql|mongo|mongodb|redis|nosql|dynamodb|cosmos|firestore|spanner|bigtable)\b/i.test(
+        input,
+      );
     const storageSizeGb = extractSizeGb(input);
     const instanceCount = extractInstanceCount(input);
     const vcpu = extractVcpu(input);
@@ -126,6 +128,22 @@ export class NLParserService {
     const snapshotSizeGb = extractContextGb(input, ['snapshot', 'snapshots', 'backup', 'backups']);
     const provisionedIops = extractIops(input);
     const provisionedThroughputMbps = extractThroughputMbps(input);
+    const databaseEngine = inferDatabaseEngine(lowerInput);
+    const databaseSizeGb = extractDatabaseSizeGb(input);
+    const databaseBackupStorageGb = extractDatabaseBackupStorageGb(input);
+    const databaseBackupRetentionDays = extractDatabaseBackupRetentionDays(input);
+    const databaseProvisionedIops = extractDatabaseIops(input);
+    const databaseReadReplicaCount = extractReadReplicaCount(input);
+    const databaseCrossRegionReplicaTransferGb = extractDatabaseReplicaTransferGb(input);
+    const databaseNosqlReadRequestUnitsMillion = extractDatabaseRequestUnitsMillion(input, 'read');
+    const databaseNosqlWriteRequestUnitsMillion = extractDatabaseRequestUnitsMillion(
+      input,
+      'write',
+    );
+    const databaseRuPerSecond = extractRuPerSecond(input);
+    const databaseQueryDataTb = extractQueryDataTb(input);
+    const databaseCacheReplicaCount = extractCacheReplicaCount(input);
+    const databaseStorageGrowthGbPerMonth = extractDatabaseStorageGrowthGbPerMonth(input);
 
     if (!instanceCount) {
       fieldsRequiringReview.push('compute[0].instanceCount');
@@ -143,7 +161,7 @@ export class NLParserService {
       fieldsRequiringReview.push('storage[0].sizeGb');
     }
 
-    if (databaseRequested) {
+    if (databaseRequested && databaseSizeGb === undefined) {
       fieldsRequiringReview.push('database[0].sizeGb');
     }
 
@@ -220,8 +238,29 @@ export class NLParserService {
         ? [
             {
               role: 'primary',
-              engine: inferDatabaseEngine(lowerInput),
+              engine: databaseEngine,
+              ...optionalPositiveNumber('sizeGb', databaseSizeGb),
               highAvailability: /\b(multi[- ]?az|high availability|ha|redundant)\b/i.test(input),
+              ...optionalPositiveNumber('backupStorageGb', databaseBackupStorageGb),
+              ...optionalPositiveNumber('backupRetentionDays', databaseBackupRetentionDays),
+              ...optionalPositiveNumber('provisionedIops', databaseProvisionedIops),
+              ...optionalPositiveNumber('readReplicaCount', databaseReadReplicaCount),
+              ...optionalPositiveNumber(
+                'crossRegionReplicaTransferGb',
+                databaseCrossRegionReplicaTransferGb,
+              ),
+              ...optionalPositiveNumber(
+                'nosqlReadRequestUnitsMillion',
+                databaseNosqlReadRequestUnitsMillion,
+              ),
+              ...optionalPositiveNumber(
+                'nosqlWriteRequestUnitsMillion',
+                databaseNosqlWriteRequestUnitsMillion,
+              ),
+              ...optionalPositiveNumber('ruPerSecond', databaseRuPerSecond),
+              ...optionalPositiveNumber('queryDataTb', databaseQueryDataTb),
+              ...optionalPositiveNumber('cacheReplicaCount', databaseCacheReplicaCount),
+              ...optionalPositiveNumber('storageGrowthGbPerMonth', databaseStorageGrowthGbPerMonth),
             },
           ]
         : [],
@@ -262,7 +301,19 @@ export class NLParserService {
         snapshotSizeGb,
         provisionedIops,
         provisionedThroughputMbps,
-        databaseEngine: inferDatabaseEngine(lowerInput),
+        databaseEngine,
+        databaseSizeGb,
+        databaseBackupStorageGb,
+        databaseBackupRetentionDays,
+        databaseProvisionedIops,
+        databaseReadReplicaCount,
+        databaseCrossRegionReplicaTransferGb,
+        databaseNosqlReadRequestUnitsMillion,
+        databaseNosqlWriteRequestUnitsMillion,
+        databaseRuPerSecond,
+        databaseQueryDataTb,
+        databaseCacheReplicaCount,
+        databaseStorageGrowthGbPerMonth,
         monthlyEgressGb: extractEgressGb(input),
         cdn: /\bcdn|content delivery\b/i.test(input),
         loadBalancer: /\bload balanc|alb|elb|application gateway\b/i.test(input),
@@ -491,7 +542,13 @@ function inferDatabaseEngine(input: string): NormalizedWorkloadSpec['database'][
     return 'redis';
   }
 
-  if (input.includes('nosql')) {
+  if (
+    input.includes('nosql') ||
+    input.includes('dynamodb') ||
+    input.includes('cosmos') ||
+    input.includes('firestore') ||
+    input.includes('bigtable')
+  ) {
     return 'generic_nosql';
   }
 
@@ -529,6 +586,18 @@ function inferServiceRequirements(input: {
   provisionedIops?: number;
   provisionedThroughputMbps?: number;
   databaseEngine: NormalizedWorkloadSpec['database'][number]['engine'];
+  databaseSizeGb?: number;
+  databaseBackupStorageGb?: number;
+  databaseBackupRetentionDays?: number;
+  databaseProvisionedIops?: number;
+  databaseReadReplicaCount?: number;
+  databaseCrossRegionReplicaTransferGb?: number;
+  databaseNosqlReadRequestUnitsMillion?: number;
+  databaseNosqlWriteRequestUnitsMillion?: number;
+  databaseRuPerSecond?: number;
+  databaseQueryDataTb?: number;
+  databaseCacheReplicaCount?: number;
+  databaseStorageGrowthGbPerMonth?: number;
   monthlyEgressGb?: number;
   cdn: boolean;
   loadBalancer: boolean;
@@ -589,14 +658,26 @@ function inferServiceRequirements(input: {
   if (input.databaseRequested) {
     requirements.push({
       serviceCategory: 'database',
-      serviceType: input.databaseEngine === 'redis' ? 'cache' : 'relational-database',
-      instanceType: input.databaseEngine,
+      serviceType: databaseServiceType(input.databaseEngine),
+      instanceType: `${input.databaseEngine} - ${input.databaseSizeGb ?? 'provider default'}GB`,
       tier: input.multiAz ? 'high-availability' : 'standard',
       ...(input.regionPreference ? { region: input.regionPreference } : {}),
       az,
       quantity: 1,
       scaleParams: {
         engine: input.databaseEngine,
+        sizeGb: input.databaseSizeGb ?? 0,
+        backupStorageGb: input.databaseBackupStorageGb ?? 0,
+        backupRetentionDays: input.databaseBackupRetentionDays ?? 0,
+        provisionedIops: input.databaseProvisionedIops ?? 0,
+        readReplicaCount: input.databaseReadReplicaCount ?? 0,
+        crossRegionReplicaTransferGb: input.databaseCrossRegionReplicaTransferGb ?? 0,
+        nosqlReadRequestUnitsMillion: input.databaseNosqlReadRequestUnitsMillion ?? 0,
+        nosqlWriteRequestUnitsMillion: input.databaseNosqlWriteRequestUnitsMillion ?? 0,
+        ruPerSecond: input.databaseRuPerSecond ?? 0,
+        queryDataTb: input.databaseQueryDataTb ?? 0,
+        cacheReplicaCount: input.databaseCacheReplicaCount ?? 0,
+        storageGrowthGbPerMonth: input.databaseStorageGrowthGbPerMonth ?? 0,
       },
     });
   }
@@ -851,6 +932,194 @@ function extractSizeGb(input: string): number | undefined {
   return storageMatch ? toGb(storageMatch[1], storageMatch[2]) : undefined;
 }
 
+function extractDatabaseSizeGb(input: string): number | undefined {
+  const explicitAfter = input.match(
+    /\b(?:database|db|postgres|postgresql|mysql|aurora|mongo|mongodb|redis|nosql|dynamodb|cosmos|firestore|spanner|bigtable)\s*(?:size|storage)?\s*[:=-]?\s*([\d,.]+)\s*(gb|tb)\b/i,
+  );
+
+  if (explicitAfter) {
+    return toGb(explicitAfter[1], explicitAfter[2]);
+  }
+
+  const matches = Array.from(input.matchAll(/([\d,.]+)\s*(gb|tb)\b/gi));
+  const databaseMatch = matches.find((match) => {
+    const index = match.index ?? 0;
+    const immediateContext = input.slice(Math.max(0, index - 28), index + 42).toLowerCase();
+
+    return (
+      hasDatabaseContext(immediateContext) &&
+      !/\b(storage|upload|uploads|file|files|object|bucket|s3|blob|server|servers|instance|instances|vm|vms|ram|memory|vcpu|cpu|backup|backups|snapshot|snapshots|replica|replication|transfer|query|queried|growth|grows)\b/.test(
+        immediateContext,
+      )
+    );
+  });
+
+  return databaseMatch ? toGb(databaseMatch[1], databaseMatch[2]) : undefined;
+}
+
+function extractDatabaseBackupStorageGb(input: string): number | undefined {
+  const backupAfterSize = input.match(
+    /([\d,.]+)\s*(gb|tb)\s*(?:database|db|postgres|postgresql|mysql|mongo|mongodb|redis|nosql)?\s*backups?\b/i,
+  );
+
+  if (backupAfterSize) {
+    return toGb(backupAfterSize[1], backupAfterSize[2]);
+  }
+
+  const backupBeforeSize = input.match(
+    /\b(?:database|db|postgres|postgresql|mysql|mongo|mongodb|redis|nosql)?\s*backups?\s*(?:storage|retention)?\s*[:=-]?\s*([\d,.]+)\s*(gb|tb)\b/i,
+  );
+
+  return backupBeforeSize ? toGb(backupBeforeSize[1], backupBeforeSize[2]) : undefined;
+}
+
+function extractDatabaseBackupRetentionDays(input: string): number | undefined {
+  const beforeUnit = input.match(
+    /(?:database|db|postgres|postgresql|mysql|mongo|mongodb|redis|nosql)?\s*(?:backup|backups|retention)[^\d]*(\d[\d,.]*)\s*(?:days?|d)\b/i,
+  );
+
+  if (beforeUnit) {
+    return parseHumanNumber(beforeUnit[1]);
+  }
+
+  const afterUnit = input.match(
+    /(\d[\d,.]*)\s*(?:days?|d)\s*(?:database|db|postgres|postgresql|mysql|mongo|mongodb|redis|nosql)?\s*(?:backup|backups|retention)\b/i,
+  );
+
+  return afterUnit ? parseHumanNumber(afterUnit[1]) : undefined;
+}
+
+function extractDatabaseIops(input: string): number | undefined {
+  const matches = Array.from(
+    input.matchAll(
+      /([\d,.]+)\s*(k|thousand|m|million)?\s*(?:database|db|postgres|postgresql|mysql|mongo|mongodb|redis|nosql|dynamodb|cosmos)?\s*iops\b/gi,
+    ),
+  );
+  const databaseMatch = matches.find((match) => {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 48), index + 48).toLowerCase();
+
+    return hasDatabaseContext(context);
+  });
+
+  if (databaseMatch) {
+    return Math.round(parseScaledNumber(databaseMatch[1], databaseMatch[2]));
+  }
+
+  if (hasDatabaseContext(input.toLowerCase()) && !/\b(storage|bucket|volume|disk)\b/i.test(input)) {
+    return extractIops(input);
+  }
+
+  return undefined;
+}
+
+function extractReadReplicaCount(input: string): number | undefined {
+  const beforeReplica = input.match(/([a-z\d,.]+)\s+read\s+replicas?\b/i);
+
+  if (beforeReplica) {
+    return parseHumanNumber(beforeReplica[1]);
+  }
+
+  const afterReplica = input.match(/\bread\s+replicas?\s*[:=-]?\s*([a-z\d,.]+)\b/i);
+
+  return afterReplica ? parseHumanNumber(afterReplica[1]) : undefined;
+}
+
+function extractDatabaseReplicaTransferGb(input: string): number | undefined {
+  const matches = Array.from(input.matchAll(/([\d,.]+)\s*(gb|tb)\b/gi));
+  const transferMatch = matches.find((match) => {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 48), index + 64).toLowerCase();
+
+    return (
+      /\b(replica|replicas|replication|geo[- ]?replication|cross[- ]?region)\b/.test(context) &&
+      /\b(transfer|traffic|sync|replica|replication)\b/.test(context) &&
+      !/\b(storage|bucket|object)\b/.test(context)
+    );
+  });
+
+  return transferMatch ? toGb(transferMatch[1], transferMatch[2]) : undefined;
+}
+
+function extractDatabaseRequestUnitsMillion(
+  input: string,
+  operation: 'read' | 'write',
+): number | undefined {
+  const operationPattern = operation === 'read' ? '(?:read|reads)' : '(?:write|writes)';
+  const beforeMatches = Array.from(
+    input.matchAll(
+      new RegExp(
+        `([\\d,.]+)\\s*(k|thousand|m|million)?\\s*(?:nosql|dynamodb|cosmos|firestore|documentdb|mongodb)?\\s*${operationPattern}\\s*(?:request units|requests|ops|operations|rus)?\\b`,
+        'gi',
+      ),
+    ),
+  );
+  const beforeOperation = beforeMatches.find((match) => {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 42), index + 72).toLowerCase();
+
+    return hasDatabaseContext(context);
+  });
+
+  if (beforeOperation) {
+    return requestMatchToMillion(beforeOperation[1], beforeOperation[2]);
+  }
+
+  const afterOperation = new RegExp(
+    `(?:nosql|dynamodb|cosmos|firestore|documentdb|mongodb).*?${operationPattern}\\s*(?:request units|requests|ops|operations|rus)?\\s*[:=-]?\\s*([\\d,.]+)\\s*(k|thousand|m|million)?`,
+    'i',
+  ).exec(input);
+
+  return afterOperation ? requestMatchToMillion(afterOperation[1], afterOperation[2]) : undefined;
+}
+
+function extractRuPerSecond(input: string): number | undefined {
+  const match = input.match(
+    /([\d,.]+)\s*(k|thousand|m|million)?\s*(?:ru\/s|rus|request units per second)\b/i,
+  );
+
+  return match ? Math.round(parseScaledNumber(match[1], match[2])) : undefined;
+}
+
+function extractQueryDataTb(input: string): number | undefined {
+  const matches = Array.from(input.matchAll(/([\d,.]+)\s*(gb|tb)\b/gi));
+  const queryMatch = matches.find((match) => {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 42), index + 58).toLowerCase();
+
+    return /\b(query|queries|queried|scan|scanned|analytics|warehouse)\b/.test(context);
+  });
+
+  return queryMatch ? toTb(queryMatch[1], queryMatch[2]) : undefined;
+}
+
+function extractCacheReplicaCount(input: string): number | undefined {
+  const beforeReplica = input.match(/([a-z\d,.]+)\s+cache\s+replicas?\b/i);
+
+  if (beforeReplica) {
+    return parseHumanNumber(beforeReplica[1]);
+  }
+
+  const afterReplica = input.match(/\bcache\s+replicas?\s*[:=-]?\s*([a-z\d,.]+)\b/i);
+
+  return afterReplica ? parseHumanNumber(afterReplica[1]) : undefined;
+}
+
+function extractDatabaseStorageGrowthGbPerMonth(input: string): number | undefined {
+  const matches = Array.from(input.matchAll(/([\d,.]+)\s*(gb|tb)\b/gi));
+  const growthMatch = matches.find((match) => {
+    const index = match.index ?? 0;
+    const context = input.slice(Math.max(0, index - 36), index + 48).toLowerCase();
+
+    return (
+      hasDatabaseContext(context) &&
+      /\b(growth|grows|increase|increases|monthly growth|per month|\/month|\/mo)\b/.test(context)
+    );
+  });
+
+  return growthMatch ? toGb(growthMatch[1], growthMatch[2]) : undefined;
+}
+
 function extractEgressGb(input: string): number | undefined {
   const tokens = tokenize(input);
 
@@ -902,21 +1171,11 @@ function extractStorageRequestThousand(
 }
 
 function requestMatchToThousand(value: string, unit: string | undefined): number {
-  const parsed = Number.parseFloat(value.replace(/,/g, ''));
+  return parseScaledNumber(value, unit) / 1000;
+}
 
-  if (!Number.isFinite(parsed)) {
-    return 0;
-  }
-
-  if (unit === 'm' || unit === 'million') {
-    return parsed * 1000;
-  }
-
-  if (unit === 'k' || unit === 'thousand') {
-    return parsed;
-  }
-
-  return parsed / 1000;
+function requestMatchToMillion(value: string, unit: string | undefined): number {
+  return parseScaledNumber(value, unit) / 1_000_000;
 }
 
 function extractContextGb(input: string, contextWords: string[]): number | undefined {
@@ -994,9 +1253,39 @@ function hasAny(values: string[], candidates: string[]): boolean {
   return values.some((value) => candidates.includes(value));
 }
 
+function hasDatabaseContext(context: string): boolean {
+  return /\b(database|db|postgres|postgresql|mysql|aurora|mongo|mongodb|redis|nosql|dynamodb|cosmos|firestore|spanner|bigtable)\b/.test(
+    context,
+  );
+}
+
 function toGb(value: string, unit: string): number {
   const parsed = Number.parseFloat(value.replace(/,/g, ''));
   return unit.toLowerCase() === 'tb' ? parsed * 1024 : parsed;
+}
+
+function toTb(value: string, unit: string): number {
+  const parsed = Number.parseFloat(value.replace(/,/g, ''));
+  return unit.toLowerCase() === 'gb' ? parsed / 1024 : parsed;
+}
+
+function parseScaledNumber(value: string, unit: string | undefined): number {
+  const parsed = Number.parseFloat(value.replace(/,/g, ''));
+  const normalizedUnit = unit?.toLowerCase();
+
+  if (!Number.isFinite(parsed)) {
+    return 0;
+  }
+
+  if (normalizedUnit === 'm' || normalizedUnit === 'million') {
+    return parsed * 1_000_000;
+  }
+
+  if (normalizedUnit === 'k' || normalizedUnit === 'thousand') {
+    return parsed * 1000;
+  }
+
+  return parsed;
 }
 
 function optionalNumber<K extends string>(
@@ -1017,6 +1306,20 @@ function optionalStorageClass(
   storageClass: ParsedStorageClass,
 ): Partial<Pick<NormalizedWorkloadSpec['storage'][number], 'storageClass'>> {
   return storageClass === 'standard' ? {} : { storageClass };
+}
+
+function databaseServiceType(
+  engine: NormalizedWorkloadSpec['database'][number]['engine'],
+): 'cache' | 'nosql-database' | 'relational-database' {
+  if (engine === 'redis') {
+    return 'cache';
+  }
+
+  if (engine === 'mongodb' || engine === 'generic_nosql') {
+    return 'nosql-database';
+  }
+
+  return 'relational-database';
 }
 
 const WORD_NUMBERS = new Map<string, number>([

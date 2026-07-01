@@ -312,6 +312,77 @@ describe('workload helpers', () => {
     );
   });
 
+  it('serializes advanced database assumptions only when they affect cost', () => {
+    const nws = buildNwsFromForm({
+      ...defaultWorkloadForm,
+      databaseEngine: 'generic_nosql',
+      databaseSizeGb: '250',
+      databaseBackupStorageGb: '120',
+      databaseBackupRetentionDays: '45',
+      databaseProvisionedIops: '3000',
+      databaseReadReplicaCount: '2',
+      databaseCrossRegionReplicaTransferGb: '150',
+      databaseNosqlReadRequestUnitsMillion: '50',
+      databaseNosqlWriteRequestUnitsMillion: '20',
+      databaseRuPerSecond: '4000',
+      databaseQueryDataTb: '8',
+      databaseCacheReplicaCount: '1',
+      databaseStorageGrowthGbPerMonth: '40',
+    });
+
+    expect(nws.database[0]).toMatchObject({
+      engine: 'generic_nosql',
+      sizeGb: 250,
+      backupStorageGb: 120,
+      backupRetentionDays: 45,
+      provisionedIops: 3000,
+      readReplicaCount: 2,
+      crossRegionReplicaTransferGb: 150,
+      nosqlReadRequestUnitsMillion: 50,
+      nosqlWriteRequestUnitsMillion: 20,
+      ruPerSecond: 4000,
+      queryDataTb: 8,
+      cacheReplicaCount: 1,
+      storageGrowthGbPerMonth: 40,
+    });
+    expect(nws.serviceRequirements).toContainEqual(
+      expect.objectContaining({
+        serviceCategory: 'database',
+        serviceType: 'nosql-database',
+        scaleParams: expect.objectContaining({
+          backupStorageGb: 120,
+          backupRetentionDays: 45,
+          provisionedIops: 3000,
+          readReplicaCount: 2,
+          crossRegionReplicaTransferGb: 150,
+          nosqlReadRequestUnitsMillion: 50,
+          nosqlWriteRequestUnitsMillion: 20,
+          ruPerSecond: 4000,
+          queryDataTb: 8,
+          cacheReplicaCount: 1,
+          storageGrowthGbPerMonth: 40,
+        }),
+      }),
+    );
+    expect(formFromNws(nws)).toEqual(
+      expect.objectContaining({
+        databaseEngine: 'generic_nosql',
+        databaseSizeGb: '250',
+        databaseBackupStorageGb: '120',
+        databaseBackupRetentionDays: '45',
+        databaseProvisionedIops: '3000',
+        databaseReadReplicaCount: '2',
+        databaseCrossRegionReplicaTransferGb: '150',
+        databaseNosqlReadRequestUnitsMillion: '50',
+        databaseNosqlWriteRequestUnitsMillion: '20',
+        databaseRuPerSecond: '4000',
+        databaseQueryDataTb: '8',
+        databaseCacheReplicaCount: '1',
+        databaseStorageGrowthGbPerMonth: '40',
+      }),
+    );
+  });
+
   it('maps an NWS back into editable form values', () => {
     const nws = buildNwsFromForm(defaultWorkloadForm, 'natural_language', 'web app');
     const form = formFromNws(nws);

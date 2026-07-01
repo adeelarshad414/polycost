@@ -70,6 +70,20 @@ interface StorageDimensionRates {
   throughputMbpsMonth: number;
 }
 
+interface DatabaseDimensionRates {
+  backupPerGbMonth: number;
+  provisionedIopsMonth: number;
+  readReplicaMonthlyFactor: number;
+  highAvailabilityStandbyFactor: number;
+  crossRegionReplicaTransferPerGb: number;
+  nosqlReadPerMillion: number;
+  nosqlWritePerMillion: number;
+  ruPerSecondMonth: number;
+  queryPerTb: number;
+  cacheReplicaMonthly: number;
+  storageGrowthPerGbMonth: number;
+}
+
 type StorageClassKey = NonNullable<NormalizedWorkloadSpec['storage'][number]['storageClass']>;
 
 export class ComparisonUnavailableError extends Error {
@@ -405,6 +419,7 @@ export class ComparisonOrchestratorService {
     const licensingLineItem = this.licensingLineItem(nws, providerId);
     const resilienceLineItem = this.resilienceLineItem(nws, providerId, lineItems);
     const storageLineItems = this.storageDimensionLineItems(nws, providerId);
+    const databaseLineItems = this.databaseDimensionLineItems(nws, providerId, lineItems);
     const networkLineItems = this.networkDimensionLineItems(nws, providerId);
 
     return [
@@ -412,6 +427,7 @@ export class ComparisonOrchestratorService {
       licensingLineItem,
       resilienceLineItem,
       ...storageLineItems,
+      ...databaseLineItems,
       ...networkLineItems,
     ].filter((lineItem): lineItem is ComparisonLineItem => lineItem !== undefined);
   }
@@ -989,6 +1005,266 @@ export class ComparisonOrchestratorService {
     });
   }
 
+  private databaseDimensionLineItems(
+    nws: NormalizedWorkloadSpec,
+    providerId: ProviderId,
+    lineItems: ComparisonLineItem[],
+  ): ComparisonLineItem[] {
+    const rates = databaseDimensionRates(providerId);
+    const regionLabel = nws.workload.region.preference ?? 'default region';
+    const databaseComponents = nws.database;
+
+    if (databaseComponents.length === 0) {
+      return [];
+    }
+
+    const databaseBaseMonthlyCostUsd =
+      lineItems
+        .filter((lineItem) => this.lineItemComponent(lineItem) === 'database')
+        .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0) /
+      databaseComponents.length;
+    const representativeBaseCost = Number.isFinite(databaseBaseMonthlyCostUsd)
+      ? databaseBaseMonthlyCostUsd
+      : 0;
+    const modeledLineItems: ComparisonLineItem[] = [];
+
+    for (const database of databaseComponents) {
+      const role = database.role;
+
+      if (database.highAvailability && representativeBaseCost > 0) {
+        modeledLineItems.push(
+          this.databaseLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-database-ha-standby',
+            description: `${providerLabel(providerId)} ${role} multi-AZ standby estimate`,
+            monthlyCostUsd: this.roundCurrency(
+              representativeBaseCost * rates.highAvailabilityStandbyFactor,
+            ),
+            unit: 'month',
+            unitPriceUsd: this.roundCurrency(
+              representativeBaseCost * rates.highAvailabilityStandbyFactor,
+            ),
+          }),
+        );
+      }
+
+      if (database.backupStorageGb !== undefined && database.backupStorageGb > 0) {
+        const retentionFactor =
+          database.backupRetentionDays !== undefined
+            ? Math.max(0, database.backupRetentionDays) / 30
+            : 1;
+        const backupGbMonth = database.backupStorageGb * retentionFactor;
+
+        if (backupGbMonth > 0 && rates.backupPerGbMonth > 0) {
+          modeledLineItems.push(
+            this.databaseLineItem({
+              providerId,
+              regionLabel,
+              skuId: 'modeled-database-backup-storage',
+              description: `${providerLabel(providerId)} ${role} backup retention estimate`,
+              quantity: backupGbMonth,
+              unit: 'GB-month',
+              unitPriceUsd: rates.backupPerGbMonth,
+            }),
+          );
+        }
+      }
+
+      if (
+        database.provisionedIops !== undefined &&
+        database.provisionedIops > 0 &&
+        rates.provisionedIopsMonth > 0
+      ) {
+        modeledLineItems.push(
+          this.databaseLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-database-provisioned-iops',
+            description: `${providerLabel(providerId)} ${role} provisioned database IOPS estimate`,
+            quantity: database.provisionedIops,
+            unit: 'IOPS-month',
+            unitPriceUsd: rates.provisionedIopsMonth,
+          }),
+        );
+      }
+
+      if (
+        database.readReplicaCount !== undefined &&
+        database.readReplicaCount > 0 &&
+        representativeBaseCost > 0
+      ) {
+        const monthlyCostUsd = this.roundCurrency(
+          representativeBaseCost * database.readReplicaCount * rates.readReplicaMonthlyFactor,
+        );
+
+        modeledLineItems.push(
+          this.databaseLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-database-read-replicas',
+            description: `${providerLabel(providerId)} ${role} read replica capacity estimate`,
+            monthlyCostUsd,
+            unit: 'month',
+            unitPriceUsd: monthlyCostUsd,
+          }),
+        );
+      }
+
+      if (
+        database.crossRegionReplicaTransferGb !== undefined &&
+        database.crossRegionReplicaTransferGb > 0 &&
+        rates.crossRegionReplicaTransferPerGb > 0
+      ) {
+        modeledLineItems.push(
+          this.databaseLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-database-replica-transfer',
+            description: `${providerLabel(providerId)} ${role} cross-region replica transfer estimate`,
+            quantity: database.crossRegionReplicaTransferGb,
+            unit: 'GB',
+            unitPriceUsd: rates.crossRegionReplicaTransferPerGb,
+          }),
+        );
+      }
+
+      if (
+        database.nosqlReadRequestUnitsMillion !== undefined &&
+        database.nosqlReadRequestUnitsMillion > 0 &&
+        rates.nosqlReadPerMillion > 0
+      ) {
+        modeledLineItems.push(
+          this.databaseLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-database-nosql-read-units',
+            description: `${providerLabel(providerId)} ${role} NoSQL read unit estimate`,
+            quantity: database.nosqlReadRequestUnitsMillion,
+            unit: '1M read units',
+            unitPriceUsd: rates.nosqlReadPerMillion,
+          }),
+        );
+      }
+
+      if (
+        database.nosqlWriteRequestUnitsMillion !== undefined &&
+        database.nosqlWriteRequestUnitsMillion > 0 &&
+        rates.nosqlWritePerMillion > 0
+      ) {
+        modeledLineItems.push(
+          this.databaseLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-database-nosql-write-units',
+            description: `${providerLabel(providerId)} ${role} NoSQL write unit estimate`,
+            quantity: database.nosqlWriteRequestUnitsMillion,
+            unit: '1M write units',
+            unitPriceUsd: rates.nosqlWritePerMillion,
+          }),
+        );
+      }
+
+      if (
+        database.ruPerSecond !== undefined &&
+        database.ruPerSecond > 0 &&
+        rates.ruPerSecondMonth > 0
+      ) {
+        modeledLineItems.push(
+          this.databaseLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-database-ru-capacity',
+            description: `${providerLabel(providerId)} ${role} RU/s provisioned capacity estimate`,
+            quantity: database.ruPerSecond,
+            unit: 'RU/s-month',
+            unitPriceUsd: rates.ruPerSecondMonth,
+          }),
+        );
+      }
+
+      if (database.queryDataTb !== undefined && database.queryDataTb > 0 && rates.queryPerTb > 0) {
+        modeledLineItems.push(
+          this.databaseLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-database-query-processing',
+            description: `${providerLabel(providerId)} ${role} analytical query processing estimate`,
+            quantity: database.queryDataTb,
+            unit: 'TB queried',
+            unitPriceUsd: rates.queryPerTb,
+          }),
+        );
+      }
+
+      if (
+        database.cacheReplicaCount !== undefined &&
+        database.cacheReplicaCount > 0 &&
+        rates.cacheReplicaMonthly > 0
+      ) {
+        modeledLineItems.push(
+          this.databaseLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-database-cache-replicas',
+            description: `${providerLabel(providerId)} ${role} cache replica estimate`,
+            quantity: database.cacheReplicaCount,
+            unit: 'replica-month',
+            unitPriceUsd: rates.cacheReplicaMonthly,
+          }),
+        );
+      }
+
+      if (
+        database.storageGrowthGbPerMonth !== undefined &&
+        database.storageGrowthGbPerMonth > 0 &&
+        rates.storageGrowthPerGbMonth > 0
+      ) {
+        modeledLineItems.push(
+          this.databaseLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-database-storage-growth',
+            description: `${providerLabel(providerId)} ${role} projected storage growth estimate`,
+            quantity: database.storageGrowthGbPerMonth,
+            unit: 'GB-month',
+            unitPriceUsd: rates.storageGrowthPerGbMonth,
+          }),
+        );
+      }
+    }
+
+    return modeledLineItems;
+  }
+
+  private databaseLineItem(input: {
+    providerId: ProviderId;
+    regionLabel: string;
+    skuId: string;
+    description: string;
+    quantity?: number;
+    monthlyCostUsd?: number;
+    unit: string;
+    unitPriceUsd: number;
+  }): ComparisonLineItem {
+    const monthlyCostUsd =
+      input.monthlyCostUsd ?? this.roundCurrency((input.quantity ?? 0) * input.unitPriceUsd);
+
+    return this.normalizeLineItem({
+      category: 'database',
+      costComponent: 'database',
+      description: input.description,
+      isApproximate: true,
+      baseMonthlyCostUsd: monthlyCostUsd,
+      baseHourlyCostUsd: monthlyCostUsd / HOURS_PER_MONTH,
+      skuId: input.skuId,
+      region: input.regionLabel,
+      unit: input.unit,
+      unitPriceUsd: input.unitPriceUsd,
+      pricingBasis: 'flat',
+    });
+  }
+
   private componentTotal(lineItems: ComparisonLineItem[], component: CostComponent): number {
     return this.roundCurrency(
       lineItems
@@ -1117,7 +1393,8 @@ export class ComparisonOrchestratorService {
     }));
     const databaseRequirements: ServiceRequirement[] = nws.database.map((database) => ({
       serviceCategory: 'database',
-      serviceType: database.engine === 'redis' ? 'cache' : 'relational-database',
+      serviceType: databaseServiceType(database.engine),
+      instanceType: `${database.engine} - ${database.sizeGb ?? 'provider default'}GB`,
       tier: database.highAvailability ? 'high-availability' : 'single-zone',
       region,
       az: database.highAvailability ? 'multi-az' : 'single-az',
@@ -1126,6 +1403,35 @@ export class ComparisonOrchestratorService {
         role: database.role,
         engine: database.engine,
         ...(database.sizeGb !== undefined ? { sizeGb: database.sizeGb } : {}),
+        ...(database.backupStorageGb !== undefined
+          ? { backupStorageGb: database.backupStorageGb }
+          : {}),
+        ...(database.backupRetentionDays !== undefined
+          ? { backupRetentionDays: database.backupRetentionDays }
+          : {}),
+        ...(database.provisionedIops !== undefined
+          ? { provisionedIops: database.provisionedIops }
+          : {}),
+        ...(database.readReplicaCount !== undefined
+          ? { readReplicaCount: database.readReplicaCount }
+          : {}),
+        ...(database.crossRegionReplicaTransferGb !== undefined
+          ? { crossRegionReplicaTransferGb: database.crossRegionReplicaTransferGb }
+          : {}),
+        ...(database.nosqlReadRequestUnitsMillion !== undefined
+          ? { nosqlReadRequestUnitsMillion: database.nosqlReadRequestUnitsMillion }
+          : {}),
+        ...(database.nosqlWriteRequestUnitsMillion !== undefined
+          ? { nosqlWriteRequestUnitsMillion: database.nosqlWriteRequestUnitsMillion }
+          : {}),
+        ...(database.ruPerSecond !== undefined ? { ruPerSecond: database.ruPerSecond } : {}),
+        ...(database.queryDataTb !== undefined ? { queryDataTb: database.queryDataTb } : {}),
+        ...(database.cacheReplicaCount !== undefined
+          ? { cacheReplicaCount: database.cacheReplicaCount }
+          : {}),
+        ...(database.storageGrowthGbPerMonth !== undefined
+          ? { storageGrowthGbPerMonth: database.storageGrowthGbPerMonth }
+          : {}),
       },
     }));
     const networkRequirements: ServiceRequirement[] = [
@@ -1366,6 +1672,67 @@ function storageDimensionRates(providerId: ProviderId): StorageDimensionRates {
         throughputMbpsMonth: 0.032,
       };
   }
+}
+
+function databaseDimensionRates(providerId: ProviderId): DatabaseDimensionRates {
+  switch (providerId) {
+    case 'aws':
+      return {
+        backupPerGbMonth: 0.095,
+        provisionedIopsMonth: 0.1,
+        readReplicaMonthlyFactor: 0.85,
+        highAvailabilityStandbyFactor: 0.55,
+        crossRegionReplicaTransferPerGb: 0.02,
+        nosqlReadPerMillion: 0.25,
+        nosqlWritePerMillion: 1.25,
+        ruPerSecondMonth: 0.008,
+        queryPerTb: 5,
+        cacheReplicaMonthly: 45,
+        storageGrowthPerGbMonth: 0.115,
+      };
+    case 'azure':
+      return {
+        backupPerGbMonth: 0.1,
+        provisionedIopsMonth: 0.065,
+        readReplicaMonthlyFactor: 0.9,
+        highAvailabilityStandbyFactor: 0.6,
+        crossRegionReplicaTransferPerGb: 0.018,
+        nosqlReadPerMillion: 0.3,
+        nosqlWritePerMillion: 1.2,
+        ruPerSecondMonth: 0.008,
+        queryPerTb: 5,
+        cacheReplicaMonthly: 42,
+        storageGrowthPerGbMonth: 0.12,
+      };
+    case 'gcp':
+      return {
+        backupPerGbMonth: 0.08,
+        provisionedIopsMonth: 0.065,
+        readReplicaMonthlyFactor: 0.85,
+        highAvailabilityStandbyFactor: 0.55,
+        crossRegionReplicaTransferPerGb: 0.02,
+        nosqlReadPerMillion: 0.18,
+        nosqlWritePerMillion: 1.08,
+        ruPerSecondMonth: 0.0075,
+        queryPerTb: 5,
+        cacheReplicaMonthly: 40,
+        storageGrowthPerGbMonth: 0.17,
+      };
+  }
+}
+
+function databaseServiceType(
+  engine: NormalizedWorkloadSpec['database'][number]['engine'],
+): 'cache' | 'nosql-database' | 'relational-database' {
+  if (engine === 'redis') {
+    return 'cache';
+  }
+
+  if (engine === 'mongodb' || engine === 'generic_nosql') {
+    return 'nosql-database';
+  }
+
+  return 'relational-database';
 }
 
 function networkDimensionRates(providerId: ProviderId): NetworkDimensionRates {

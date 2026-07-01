@@ -120,6 +120,73 @@ describe('AI-native requirement parser adapters', () => {
     );
   });
 
+  it('normalizes advanced database dimensions into stable requirement scale params', () => {
+    const requirements = normalizedRequirementsFromNws(
+      {
+        schemaVersion: '1.0',
+        metadata: {
+          sourceType: 'structured_form',
+          createdAt: '2026-07-01T00:00:00.000Z',
+        },
+        workload: {
+          type: 'web_app',
+          region: { preference: 'us-east', isDefault: false },
+        },
+        compute: [],
+        storage: [],
+        database: [
+          {
+            role: 'primary',
+            engine: 'generic_nosql',
+            sizeGb: 250,
+            highAvailability: true,
+            backupStorageGb: 120,
+            backupRetentionDays: 45,
+            provisionedIops: 3000,
+            readReplicaCount: 2,
+            crossRegionReplicaTransferGb: 150,
+            nosqlReadRequestUnitsMillion: 50,
+            nosqlWriteRequestUnitsMillion: 20,
+            ruPerSecond: 4000,
+            queryDataTb: 8,
+            cacheReplicaCount: 1,
+            storageGrowthGbPerMonth: 40,
+          },
+        ],
+        network: { cdn: false, loadBalancer: false },
+        availability: { multiAz: true, multiRegion: false },
+      },
+      'guided_form',
+    );
+
+    expect(requirements).toEqual([
+      expect.objectContaining({
+        requirementId: 'req-1',
+        serviceCategory: 'database',
+        serviceType: 'nosql-database',
+        config: {
+          instanceType: 'generic_nosql - 250GB',
+          tier: 'high-availability',
+        },
+        region: 'us-east',
+        az: 'multi-az',
+        scaleParams: expect.objectContaining({
+          backupStorageGb: 120,
+          backupRetentionDays: 45,
+          provisionedIops: 3000,
+          readReplicaCount: 2,
+          crossRegionReplicaTransferGb: 150,
+          nosqlReadRequestUnitsMillion: 50,
+          nosqlWriteRequestUnitsMillion: 20,
+          ruPerSecond: 4000,
+          queryDataTb: 8,
+          cacheReplicaCount: 1,
+          storageGrowthGbPerMonth: 40,
+        }),
+      }),
+    ]);
+  });
+
   it('converts serviceRequirements to stable IDs when NWS already contains them', () => {
     const requirements = normalizedRequirementsFromNws(
       {

@@ -626,6 +626,119 @@ describe('ComparisonOrchestratorService', () => {
     expect(result.providers[0].breakdown?.storageMonthlyCostUsd).toBe(47.13);
   });
 
+  it('adds explicit modeled database dimension line items when advanced database assumptions exist', async () => {
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async (): Promise<ProviderPricingResult> => ({
+          providerId: 'aws',
+          baseMonthlyCostUsd: 100,
+          lineItems: [
+            {
+              category: 'database',
+              costComponent: 'database',
+              description: 'aws database',
+              isApproximate: false,
+              baseMonthlyCostUsd: 100,
+              skuId: 'aws-database',
+              region: 'us-east-1',
+              unit: 'hour',
+              unitPriceUsd: 0.14,
+            },
+          ],
+        })),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      database: [
+        {
+          role: 'primary',
+          engine: 'generic_nosql',
+          sizeGb: 250,
+          highAvailability: true,
+          backupStorageGb: 120,
+          backupRetentionDays: 45,
+          provisionedIops: 3000,
+          readReplicaCount: 2,
+          crossRegionReplicaTransferGb: 150,
+          nosqlReadRequestUnitsMillion: 50,
+          nosqlWriteRequestUnitsMillion: 20,
+          ruPerSecond: 4000,
+          queryDataTb: 8,
+          cacheReplicaCount: 1,
+          storageGrowthGbPerMonth: 40,
+        },
+      ],
+    });
+
+    expect(result.providers[0].lineItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'database',
+          costComponent: 'database',
+          skuId: 'modeled-database-ha-standby',
+          baseMonthlyCostUsd: 55,
+          isApproximate: true,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-database-backup-storage',
+          baseMonthlyCostUsd: 17.1,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-database-provisioned-iops',
+          baseMonthlyCostUsd: 300,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-database-read-replicas',
+          baseMonthlyCostUsd: 170,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-database-replica-transfer',
+          baseMonthlyCostUsd: 3,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-database-nosql-read-units',
+          baseMonthlyCostUsd: 12.5,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-database-nosql-write-units',
+          baseMonthlyCostUsd: 25,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-database-ru-capacity',
+          baseMonthlyCostUsd: 32,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-database-query-processing',
+          baseMonthlyCostUsd: 40,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-database-cache-replicas',
+          baseMonthlyCostUsd: 45,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-database-storage-growth',
+          baseMonthlyCostUsd: 4.6,
+        }),
+      ]),
+    );
+    expect(result.requirements?.serviceRequirements).toContainEqual(
+      expect.objectContaining({
+        serviceCategory: 'database',
+        serviceType: 'nosql-database',
+        instanceType: 'generic_nosql - 250GB',
+        scaleParams: expect.objectContaining({
+          backupStorageGb: 120,
+          readReplicaCount: 2,
+          ruPerSecond: 4000,
+        }),
+      }),
+    );
+    expect(result.providers[0].breakdown?.databaseMonthlyCostUsd).toBe(804.2);
+  });
+
   it('uses a safe warning when a provider fails without an Error object', async () => {
     const service = createService([
       adapter(

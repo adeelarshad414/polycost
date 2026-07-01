@@ -134,6 +134,39 @@ describe('NWSValidator', () => {
     expect(NWSValidator.validate(spec).database).toHaveLength(1);
   });
 
+  it('accepts advanced database cost dimensions', () => {
+    const spec = {
+      ...baseSpec(),
+      compute: [],
+      database: [
+        {
+          role: 'primary',
+          engine: 'generic_nosql',
+          sizeGb: 250,
+          highAvailability: true,
+          backupStorageGb: 120,
+          backupRetentionDays: 45,
+          provisionedIops: 3000,
+          readReplicaCount: 2,
+          crossRegionReplicaTransferGb: 150,
+          nosqlReadRequestUnitsMillion: 50,
+          nosqlWriteRequestUnitsMillion: 20,
+          ruPerSecond: 4000,
+          queryDataTb: 8,
+          cacheReplicaCount: 1,
+          storageGrowthGbPerMonth: 40,
+        },
+      ],
+    };
+
+    expect(NWSValidator.validate(spec).database[0]).toMatchObject({
+      engine: 'generic_nosql',
+      backupStorageGb: 120,
+      readReplicaCount: 2,
+      ruPerSecond: 4000,
+    });
+  });
+
   it('accepts a maximal valid workload with optional metadata and traceability', () => {
     const spec: NormalizedWorkloadSpec = {
       ...baseSpec(),

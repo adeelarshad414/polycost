@@ -129,6 +129,17 @@ export interface NormalizedWorkloadSpec {
     sizeGb?: number;
     highAvailability: boolean;
     managedServicePreference?: string;
+    backupStorageGb?: number;
+    backupRetentionDays?: number;
+    provisionedIops?: number;
+    readReplicaCount?: number;
+    crossRegionReplicaTransferGb?: number;
+    nosqlReadRequestUnitsMillion?: number;
+    nosqlWriteRequestUnitsMillion?: number;
+    ruPerSecond?: number;
+    queryDataTb?: number;
+    cacheReplicaCount?: number;
+    storageGrowthGbPerMonth?: number;
   }>;
   network: {
     estimatedMonthlyEgressGb?: number;

@@ -106,6 +106,17 @@ export const databaseComponentSchema = z
     sizeGb: z.number().positive().optional(),
     highAvailability: z.boolean(),
     managedServicePreference: z.string().min(1).optional(),
+    backupStorageGb: z.number().nonnegative().optional(),
+    backupRetentionDays: z.number().int().nonnegative().optional(),
+    provisionedIops: z.number().int().nonnegative().optional(),
+    readReplicaCount: z.number().int().nonnegative().optional(),
+    crossRegionReplicaTransferGb: z.number().nonnegative().optional(),
+    nosqlReadRequestUnitsMillion: z.number().nonnegative().optional(),
+    nosqlWriteRequestUnitsMillion: z.number().nonnegative().optional(),
+    ruPerSecond: z.number().int().nonnegative().optional(),
+    queryDataTb: z.number().nonnegative().optional(),
+    cacheReplicaCount: z.number().int().nonnegative().optional(),
+    storageGrowthGbPerMonth: z.number().nonnegative().optional(),
   })
   .strict();
 
