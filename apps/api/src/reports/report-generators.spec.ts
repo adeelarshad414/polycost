@@ -7,6 +7,7 @@ import {
   breakEvenSummaryRows,
   commitmentTcoRows,
   costCoverageMapRows,
+  dataFreshnessRows,
   decisionSummaryRows,
   egressNetworkingDetailRows,
   egressTierBreakdownRows,
@@ -164,6 +165,49 @@ const comparison: ComparisonResult = {
   ],
 };
 
+const reportDataHealth = {
+  generatedAt: '2026-07-02T00:00:00.000Z',
+  freshnessPolicyHours: 48,
+  overallStatus: 'stale' as const,
+  alertCount: 1,
+  providers: [
+    {
+      providerId: 'aws' as const,
+      freshness: 'fresh' as const,
+      ageHours: 4,
+      message: 'Pricing cache refreshed 4h ago across 30 catalog rows and 18 current rate rows.',
+      cache: {
+        catalogRows: 30,
+        currentRateRows: 18,
+        ageHours: 4,
+        freshness: 'fresh' as const,
+        syncStatusCounts: {
+          success: 48,
+          partial: 0,
+          failed: 0,
+        },
+      },
+    },
+    {
+      providerId: 'azure' as const,
+      freshness: 'stale' as const,
+      ageHours: 72,
+      message: 'Pricing data is 72h old against the 48h policy.',
+      cache: {
+        catalogRows: 22,
+        currentRateRows: 12,
+        ageHours: 72,
+        freshness: 'stale' as const,
+        syncStatusCounts: {
+          success: 32,
+          partial: 2,
+          failed: 0,
+        },
+      },
+    },
+  ],
+};
+
 describe('report generators', () => {
   it('creates a CSV report with matching totals and spreadsheet injection mitigation', () => {
     const csv = new CsvReportGenerator()
@@ -279,6 +323,48 @@ describe('report generators', () => {
       .toString('utf8');
 
     expect(csv).toContain("Warnings\nProvider,Code,Message\n,live_refresh_failed,'@refresh unavailable");
+  });
+
+  it('embeds data-health evidence across report formats when supplied', () => {
+    const options = {
+      generatedAt: '2026-07-02T00:00:00.000Z',
+      dataHealth: reportDataHealth,
+    };
+    const csv = new CsvReportGenerator().generate(comparison, options).toString('utf8');
+    const pdf = new PdfReportGenerator().generate(comparison, options).toString('utf8');
+    const xlsx = new ExcelReportGenerator().generate(comparison, options).toString('utf8');
+
+    expect(csv).toContain(
+      'Data freshness notice,1 data-health alert(s) at 2026-07-02T00:00:00.000Z; refresh cached pricing before final commitment.',
+    );
+    expect(csv).toContain(
+      'Data health status,"stale; policy 48h; aws fresh (4h, 18 current rates); azure stale (72h, 12 current rates)"',
+    );
+    expect(csv).toContain('Current rate rows,30');
+    expect(pdf).toContain('Data health status: stale; policy 48h; aws fresh');
+    expect(pdf).toContain('Current rate rows: 30');
+    expect(xlsx).toContain('<sheet name="Data Freshness" sheetId="13"');
+    expect(xlsx).toContain('Provider freshness');
+    expect(xlsx).toContain('success 80; partial 2; failed 0');
+    expect(dataFreshnessRows(options)).toEqual(
+      expect.arrayContaining([
+        ['Overall status', 'stale'],
+        ['Catalog rows', '52'],
+        ['Current rate rows', '30'],
+      ]),
+    );
+    expect(reportCoverRows(comparison, options)).toEqual(
+      expect.arrayContaining([
+        [
+          'Data freshness notice',
+          '1 data-health alert(s) at 2026-07-02T00:00:00.000Z; refresh cached pricing before final commitment.',
+        ],
+        [
+          'Data health status',
+          expect.stringContaining('stale; policy 48h; aws fresh'),
+        ],
+      ]),
+    );
   });
 
   it('creates a real XLSX package with matching totals and spreadsheet injection mitigation', () => {

@@ -5,6 +5,7 @@ import {
   breakEvenSummaryRows,
   commitmentTcoRows,
   costCoverageMapRows,
+  dataFreshnessRows,
   decisionSummaryRows,
   egressNetworkingDetailRows,
   egressTierBreakdownRows,
@@ -100,6 +101,14 @@ export class PdfReportGenerator {
         text: `${row[0]}: ${row[1]}`,
         fontSize: 10,
       })),
+      { text: '', fontSize: 10 },
+      { text: 'Data freshness', fontSize: 14 },
+      ...dataFreshnessRows(options)
+        .slice(1)
+        .map((row) => ({
+          text: `${row[0]}: ${row[1]}`,
+          fontSize: 10,
+        })),
       { text: '', fontSize: 10 },
       { text: 'Decision summary', fontSize: 14 },
       ...decisionSummaryRows(result, options)

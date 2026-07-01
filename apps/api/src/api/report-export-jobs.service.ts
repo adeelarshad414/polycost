@@ -100,10 +100,14 @@ export class ReportExportJobsService {
     await this.apiDatabaseRepository.markReportExportJobRunning(jobId, this.now().toISOString());
 
     try {
-      const snapshot = await this.comparisonApplicationService.getComparison(comparisonId);
+      const [snapshot, dataHealth] = await Promise.all([
+        this.comparisonApplicationService.getComparison(comparisonId),
+        this.comparisonApplicationService.getDataHealth(),
+      ]);
       const report = this.reportService.generate(snapshot.resultSnapshot, job.format, {
         interval: job.interval,
         pricingModel: job.pricingModel,
+        dataHealth,
       });
       await this.apiDatabaseRepository.completeReportExportJob(
         jobId,

@@ -76,8 +76,14 @@ export class ComparisonsController {
       interval: parseReportInterval(intervalQuery),
       pricingModel: parseReportPricingModel(pricingModelQuery),
     };
-    const snapshot = await this.comparisonApplicationService.getComparison(comparisonId);
-    const report = this.reportService.generate(snapshot.resultSnapshot, format, options);
+    const [snapshot, dataHealth] = await Promise.all([
+      this.comparisonApplicationService.getComparison(comparisonId),
+      this.comparisonApplicationService.getDataHealth(),
+    ]);
+    const report = this.reportService.generate(snapshot.resultSnapshot, format, {
+      ...options,
+      dataHealth,
+    });
     const fileName = report.fileName.replace(/"/g, '');
     const disposition = `attachment; filename="${fileName}"`;
 

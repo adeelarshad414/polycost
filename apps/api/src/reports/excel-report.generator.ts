@@ -5,6 +5,7 @@ import {
   breakEvenSummaryRows,
   commitmentTcoRows,
   costCoverageMapRows,
+  dataFreshnessRows,
   decisionSummaryRows,
   egressNetworkingDetailRows,
   egressTierBreakdownRows,
@@ -149,6 +150,7 @@ export class ExcelReportGenerator {
         evidenceSheet('Break-Even Summary', breakEvenSummaryRows(result)),
         evidenceSheet('Methodology & Sources', methodologySourceRows(result)),
         evidenceSheet('SKU Mapping Appendix', skuMappingAppendixRows(result)),
+        evidenceSheet('Data Freshness', dataFreshnessRows(options)),
       ],
       namedRanges,
     };

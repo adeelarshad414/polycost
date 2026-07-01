@@ -1,6 +1,6 @@
 import { ReportService } from '../reports/report.service';
 import { GeneratedReport, ReportExportJobRecord } from '../reports/report.types';
-import { ApiNotFoundError, ApiValidationError } from './api-errors';
+import { ApiNotFoundError, ApiValidationError, DataHealthResponse } from './api-errors';
 import { ApiDatabaseRepository, ComparisonSnapshot } from './api-database.repository';
 import { ComparisonApplicationService } from './comparison-application.service';
 import { ReportExportJobsService } from './report-export-jobs.service';
@@ -39,6 +39,37 @@ const snapshot: ComparisonSnapshot = {
     cheapestProviderId: 'aws',
     providers: [],
   },
+};
+
+const dataHealth: DataHealthResponse = {
+  generatedAt: '2026-07-01T00:00:00.000Z',
+  freshnessPolicyHours: 48,
+  overallStatus: 'fresh',
+  alertCount: 0,
+  alerts: [],
+  providers: [
+    {
+      providerId: 'aws',
+      status: 'success',
+      freshness: 'fresh',
+      ageHours: 1,
+      recordsUpdated: 12,
+      recordsRejected: 0,
+      recordsSkipped: 0,
+      message: 'Pricing cache refreshed 1h ago across 30 catalog rows and 18 current rate rows.',
+      cache: {
+        catalogRows: 30,
+        currentRateRows: 18,
+        ageHours: 1,
+        freshness: 'fresh',
+        syncStatusCounts: {
+          success: 48,
+          partial: 0,
+          failed: 0,
+        },
+      },
+    },
+  ],
 };
 
 const pendingJob: ReportExportJobRecord = {
@@ -124,6 +155,7 @@ describe('ReportExportJobsService', () => {
     expect(reportService.generate).toHaveBeenCalledWith(snapshot.resultSnapshot, 'pdf', {
       interval: 'monthly',
       pricingModel: 'on-demand',
+      dataHealth,
     });
     expect(apiDatabaseRepository.completeReportExportJob).toHaveBeenCalledWith(
       jobId,
@@ -223,6 +255,7 @@ function createService(
 function comparisonServiceMock(): jest.Mocked<ComparisonApplicationService> {
   return {
     getComparison: jest.fn(async () => snapshot),
+    getDataHealth: jest.fn(async () => dataHealth),
   } as unknown as jest.Mocked<ComparisonApplicationService>;
 }
 

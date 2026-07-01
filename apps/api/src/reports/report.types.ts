@@ -13,6 +13,31 @@ export interface ReportOptions {
   interval?: ReportInterval;
   pricingModel?: ReportPricingModel;
   generatedAt?: string;
+  dataHealth?: ReportDataHealthSnapshot;
+}
+
+export interface ReportDataHealthSnapshot {
+  generatedAt: string;
+  freshnessPolicyHours: number;
+  overallStatus: 'fresh' | 'stale' | 'degraded';
+  alertCount: number;
+  providers: Array<{
+    providerId: 'aws' | 'azure' | 'gcp';
+    freshness: 'fresh' | 'stale' | 'missing' | 'failed';
+    ageHours?: number;
+    message: string;
+    cache: {
+      catalogRows: number;
+      currentRateRows: number;
+      ageHours?: number;
+      freshness: 'fresh' | 'stale' | 'missing';
+      syncStatusCounts: {
+        success: number;
+        partial: number;
+        failed: number;
+      };
+    };
+  }>;
 }
 
 export interface GeneratedReport {

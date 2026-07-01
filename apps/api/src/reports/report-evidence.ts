@@ -441,10 +441,8 @@ export function reportCoverRows(result: ComparisonResult, options: ReportOptions
     ['Comparison ID', result.comparisonId],
     ['Generated at', options.generatedAt ?? result.pricingAsOf],
     ['Pricing data as of', result.pricingAsOf],
-    [
-      'Data freshness notice',
-      `Pricing data as of ${result.pricingAsOf}; refresh cached pricing before final commitment.`,
-    ],
+    ['Data freshness notice', dataFreshnessNotice(result, options)],
+    ['Data health status', dataHealthStatusSummary(options)],
     ['Provider coverage', `${pricedProviders}/${result.providers.length} providers priced`],
     ['Line-item evidence', `${lineItemCount} line item(s), ${approximateLineItems} approximate`],
   ];
@@ -455,6 +453,88 @@ export function reportContextRows(options: ReportOptions): string[][] {
     ['Selected interval', labelForInterval(options.interval ?? 'monthly')],
     ['Selected pricing model', labelForPricingModel(options.pricingModel ?? 'on-demand')],
   ];
+}
+
+export function dataFreshnessRows(options: ReportOptions): string[][] {
+  const health = options.dataHealth;
+
+  if (!health) {
+    return [
+      ['Metric', 'Value'],
+      [
+        'Data health status',
+        'Not supplied to report generator; use the Pricing data as of timestamp and refresh before commitment.',
+      ],
+    ];
+  }
+
+  const catalogRows = health.providers.reduce(
+    (total, provider) => total + provider.cache.catalogRows,
+    0,
+  );
+  const currentRateRows = health.providers.reduce(
+    (total, provider) => total + provider.cache.currentRateRows,
+    0,
+  );
+  const syncCounts = health.providers.reduce(
+    (totals, provider) => ({
+      success: totals.success + provider.cache.syncStatusCounts.success,
+      partial: totals.partial + provider.cache.syncStatusCounts.partial,
+      failed: totals.failed + provider.cache.syncStatusCounts.failed,
+    }),
+    { success: 0, partial: 0, failed: 0 },
+  );
+
+  return [
+    ['Metric', 'Value'],
+    ['Overall status', health.overallStatus],
+    ['Alert count', String(health.alertCount)],
+    ['Freshness policy', `${health.freshnessPolicyHours} hours`],
+    ['Health generated at', health.generatedAt],
+    ['Provider freshness', providerFreshnessSummary(health)],
+    ['Catalog rows', String(catalogRows)],
+    ['Current rate rows', String(currentRateRows)],
+    [
+      'Sync status counts',
+      `success ${syncCounts.success}; partial ${syncCounts.partial}; failed ${syncCounts.failed}`,
+    ],
+  ];
+}
+
+function dataFreshnessNotice(result: ComparisonResult, options: ReportOptions): string {
+  const health = options.dataHealth;
+
+  if (!health) {
+    return `Pricing data as of ${result.pricingAsOf}; refresh cached pricing before final commitment.`;
+  }
+
+  if (health.overallStatus === 'fresh') {
+    return `Pricing data health was fresh at ${health.generatedAt}; source comparison pricing data as of ${result.pricingAsOf}.`;
+  }
+
+  return `${health.alertCount} data-health alert(s) at ${health.generatedAt}; refresh cached pricing before final commitment.`;
+}
+
+function dataHealthStatusSummary(options: ReportOptions): string {
+  const health = options.dataHealth;
+
+  if (!health) {
+    return 'Not supplied with this export.';
+  }
+
+  return `${health.overallStatus}; policy ${health.freshnessPolicyHours}h; ${providerFreshnessSummary(
+    health,
+  )}`;
+}
+
+function providerFreshnessSummary(health: NonNullable<ReportOptions['dataHealth']>): string {
+  return health.providers
+    .map((provider) => {
+      const age =
+        provider.ageHours !== undefined ? `${provider.ageHours}h` : provider.freshness;
+      return `${provider.providerId} ${provider.freshness} (${age}, ${provider.cache.currentRateRows} current rates)`;
+    })
+    .join('; ');
 }
 
 export function architectureOverviewRows(result: ComparisonResult): string[][] {
