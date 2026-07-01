@@ -378,6 +378,10 @@ describe('App', () => {
     expect(text(container)).toContain(
       'Backend-ranked provider delta from current cached comparison.',
     );
+    expect(text(container)).toContain(
+      'Backend-modeled exit exposure starts with GCP egress transfer.',
+    );
+    expect(text(container)).toContain('Licensing');
     expect(text(container)).toContain('Backend AWS internet egress');
     expect(text(container)).toContain(
       'Backend analytics varied egress traffic by +50% against cached dimension totals.',
@@ -2483,7 +2487,16 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
             'gcp can move from $30/mo at 0% commitment coverage to $21/mo at 100%; target blend is $24/mo.',
         },
       ],
-      tcoSignals: [],
+      tcoSignals: [
+        {
+          providerId: 'gcp' as const,
+          egressLockInMonthlyUsd: 8,
+          supportMonthlyUsd: 3,
+          licensingMonthlyUsd: 2,
+          freeTierApplicability: 'possible' as const,
+          note: 'Backend-modeled exit exposure starts with GCP egress transfer.',
+        },
+      ],
       optimizationOpportunities: [
         {
           id: 'provider-selection-1',

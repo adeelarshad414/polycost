@@ -6447,7 +6447,7 @@ function ProductionDepthAnalytics({
     serverAnalytics?.regionVarianceHeatMap,
   );
   const commitmentCoverage = commitmentCoverageGapRows(comparison, form);
-  const tcoSignals = crossProviderTcoRows(comparison, form);
+  const tcoSignals = crossProviderTcoRows(comparison, form, serverAnalytics?.tcoSignals);
   const storageOptimizations = storageOptimizationRows(comparison, form);
   const storageAnatomy = storageAnatomyRows(comparison, form);
   const databaseOptimizations = databaseOptimizationRows(comparison, form);
@@ -7021,6 +7021,10 @@ function CrossProviderTcoPanel({ rows }: { rows: CrossProviderTcoRow[] }) {
                 <small>
                   Support plan
                   <b>{formatCurrency(row.supportMonthly)}/mo</b>
+                </small>
+                <small>
+                  Licensing
+                  <b>{formatCurrency(row.licensingMonthly)}/mo</b>
                 </small>
                 <small>
                   Free-tier signal
@@ -8512,6 +8516,7 @@ interface CrossProviderTcoRow {
   threeYearRunRate: number;
   egressExitProxy: number;
   supportMonthly: number;
+  licensingMonthly: number;
   freeTierSignal: string;
   evidence: string;
 }
@@ -12160,11 +12165,15 @@ function commitmentCoverageGapRows(
 function crossProviderTcoRows(
   comparison: ComparisonResult | null,
   form: WorkloadFormState,
+  serverSignals?: ComparisonAnalyticsResponse['tcoSignals'],
 ): CrossProviderTcoRow[] {
   if (!comparison) {
     return [];
   }
 
+  const serverSignalsByProvider = new Map(
+    (serverSignals ?? []).map((signal) => [signal.providerId, signal]),
+  );
   const environment = form.environment;
   const storageGb = parseInputNumber(form.storageSizeGb) ?? 0;
   const egressGb = parseInputNumber(form.monthlyEgressGb) ?? 0;
@@ -12173,8 +12182,16 @@ function crossProviderTcoRows(
     environment !== 'production' && instanceCount <= 1 && storageGb <= 30 && egressGb <= 100;
 
   return comparison.providers.map((provider) => {
-    const egressExitProxy = roundCurrency(componentMonthly(provider, 'egress'));
-    const supportMonthly = roundCurrency(componentMonthly(provider, 'support'));
+    const serverSignal = serverSignalsByProvider.get(provider.providerId);
+    const egressExitProxy = roundCurrency(
+      serverSignal?.egressLockInMonthlyUsd ?? componentMonthly(provider, 'egress'),
+    );
+    const supportMonthly = roundCurrency(
+      serverSignal?.supportMonthlyUsd ?? componentMonthly(provider, 'support'),
+    );
+    const licensingMonthly = roundCurrency(
+      serverSignal?.licensingMonthlyUsd ?? componentMonthly(provider, 'licensing'),
+    );
     const bestCommitment = bestCommitmentModel(provider);
     const committedMonthly = bestCommitment?.model.monthlyCostUsd;
     const monthlyRunRate =
@@ -12184,28 +12201,41 @@ function crossProviderTcoRows(
     const threeYearRunRate = roundCurrency(
       monthlyRunRate * 36 + (bestCommitment?.model.upfrontCostUsd ?? 0),
     );
-    const freeTierSignal = freeTierCandidate
-      ? 'Candidate'
-      : environment === 'production'
-        ? 'Unlikely'
-        : 'Limited';
-    const evidence = [
-      egressExitProxy > provider.totals.monthly * 0.2
-        ? 'Data-out is a material migration-away cost proxy.'
-        : 'Data-out proxy is not the dominant TCO driver.',
-      supportMonthly > 0
-        ? 'Support is modeled as an explicit provider line item.'
-        : 'Support plan is not priced for this provider response.',
-      freeTierCandidate
-        ? 'Small non-production profile may qualify for introductory/free-tier review.'
-        : 'Scale, production posture, or data transfer likely exceeds free-tier assumptions.',
-    ].join(' ');
+    const freeTierSignal = serverSignal
+      ? capitalize(serverSignal.freeTierApplicability)
+      : freeTierCandidate
+        ? 'Candidate'
+        : environment === 'production'
+          ? 'Unlikely'
+          : 'Limited';
+    const evidence = serverSignal
+      ? [
+          serverSignal.note,
+          supportMonthly > 0
+            ? 'Backend analytics includes support-plan exposure.'
+            : 'Backend analytics did not find material support-plan exposure.',
+          licensingMonthly > 0
+            ? 'OS/licensing exposure is modeled explicitly.'
+            : 'No material OS/licensing exposure is modeled.',
+        ].join(' ')
+      : [
+          egressExitProxy > provider.totals.monthly * 0.2
+            ? 'Data-out is a material migration-away cost proxy.'
+            : 'Data-out proxy is not the dominant TCO driver.',
+          supportMonthly > 0
+            ? 'Support is modeled as an explicit provider line item.'
+            : 'Support plan is not priced for this provider response.',
+          freeTierCandidate
+            ? 'Small non-production profile may qualify for introductory/free-tier review.'
+            : 'Scale, production posture, or data transfer likely exceeds free-tier assumptions.',
+        ].join(' ');
 
     return {
       providerId: provider.providerId,
       threeYearRunRate,
       egressExitProxy,
       supportMonthly,
+      licensingMonthly,
       freeTierSignal,
       evidence,
     };
