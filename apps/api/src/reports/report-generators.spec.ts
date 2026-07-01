@@ -34,8 +34,13 @@ const comparison: ComparisonResult = {
     regionPreference: 'us-east',
     workloadProfile: {
       environment: 'production',
+      commitmentPreferencePercent: 65,
       operatingSystem: 'linux',
       supportTier: 'business',
+      usagePattern: {
+        type: 'bursty',
+        averageUtilizationPercent: 25,
+      },
       dataResidency: {
         scope: 'eu',
         complianceLocked: true,
@@ -502,6 +507,7 @@ describe('report generators', () => {
         ['Workload name', 'Client portal'],
         ['Environment', 'production'],
         ['Data residency', 'eu (locked)'],
+        ['Usage pattern', 'bursty (25% average utilization)'],
         ['Cost allocation tags', 'team:platform, project:migration-q3'],
         ['Normalized service requirements', '1'],
       ]),
@@ -648,6 +654,12 @@ describe('report generators', () => {
           'aws Reserved 3-year lowers recurring run rate.',
           '29',
           '348',
+        ]),
+        expect.arrayContaining([
+          'Right-sizing',
+          'aws compute averages 25% utilization; evaluate smaller instance sizes, autoscaling bounds, or scheduled capacity before committing.',
+          '21.28',
+          '255.36',
         ]),
       ]),
     );

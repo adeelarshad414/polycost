@@ -2304,9 +2304,13 @@ export class ComparisonOrchestratorService {
         ? {
             workloadProfile: {
               ...(profile.environment ? { environment: profile.environment } : {}),
+              ...(profile.commitmentPreferencePercent !== undefined
+                ? { commitmentPreferencePercent: profile.commitmentPreferencePercent }
+                : {}),
               ...(profile.dataResidency ? { dataResidency: profile.dataResidency } : {}),
               ...(profile.operatingSystem ? { operatingSystem: profile.operatingSystem } : {}),
               ...(profile.supportTier ? { supportTier: profile.supportTier } : {}),
+              ...(profile.usagePattern ? { usagePattern: profile.usagePattern } : {}),
               ...(profile.tags && profile.tags.length > 0 ? { tags: profile.tags } : {}),
             },
           }

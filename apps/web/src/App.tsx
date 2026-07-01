@@ -6338,9 +6338,12 @@ function productionDepthInsights(
     : lowest.totals.monthly * 36;
   const egressGb = parseInputNumber(form.monthlyEgressGb) ?? 0;
   const utilization = parseInputNumber(form.averageUtilizationPercent);
+  const rightSizingRate = form.usagePattern === 'bursty' ? rightSizingSavingsRate(utilization) : 0;
+  const rightSizingMonthly =
+    rightSizingRate > 0 ? roundCurrency(computeMonthly * rightSizingRate) : undefined;
   const rightsizingSignal =
-    form.usagePattern === 'bursty' && utilization !== undefined && utilization < 55
-      ? 'Downsize or autoscale'
+    rightSizingMonthly !== undefined
+      ? `Save ${formatCurrency(rightSizingMonthly)}/mo`
       : form.scalingType === 'fixed'
         ? 'Load-test fixed nodes'
         : 'Autoscaling ready';
@@ -6397,8 +6400,20 @@ function productionDepthInsights(
     {
       label: 'Rightsizing',
       value: rightsizingSignal,
-      detail: `${capitalize(form.usagePattern.replace('_', ' '))} usage with ${form.scalingType} capacity. Validate CPU, memory, and peak concurrency before commitment.`,
-      tone: rightsizingSignal === 'Autoscaling ready' ? 'good' : 'review',
+      detail:
+        rightSizingMonthly !== undefined
+          ? `${formatDecimal(utilization ?? 0)}% average utilization implies a ${formatPercent(
+              rightSizingRate * 100,
+            )} compute-spend review before commitment.`
+          : `${capitalize(form.usagePattern.replace('_', ' '))} usage with ${form.scalingType} capacity. Validate CPU, memory, and peak concurrency before commitment.`,
+      tone:
+        rightSizingMonthly !== undefined
+          ? utilization !== undefined && utilization <= 25
+            ? 'risk'
+            : 'review'
+          : rightsizingSignal === 'Autoscaling ready'
+            ? 'good'
+            : 'review',
     },
     {
       label: 'Commitment coverage',
@@ -6596,6 +6611,26 @@ function componentMonthly(provider: ComparisonProviderResult, component: CostCom
   return provider.lineItems
     .filter((lineItem) => lineItemCostComponent(lineItem) === component)
     .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+}
+
+function rightSizingSavingsRate(averageUtilizationPercent?: number): number {
+  if (averageUtilizationPercent === undefined) {
+    return 0;
+  }
+
+  if (averageUtilizationPercent <= 25) {
+    return 0.35;
+  }
+
+  if (averageUtilizationPercent <= 40) {
+    return 0.25;
+  }
+
+  if (averageUtilizationPercent <= 55) {
+    return 0.15;
+  }
+
+  return 0;
 }
 
 function lineItemCostComponent(lineItem: ComparisonLineItem): CostComponent {

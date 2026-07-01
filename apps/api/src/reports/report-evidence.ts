@@ -77,6 +77,7 @@ export function workloadScopeRows(result: ComparisonResult): string[][] {
 
   const workloadProfile = requirements.workloadProfile;
   const dataResidency = workloadProfile?.dataResidency;
+  const usagePattern = workloadProfile?.usagePattern;
   const costAllocationTags =
     workloadProfile?.tags?.map((tag) => `${tag.key}:${tag.value}`).join(', ') ?? 'None supplied';
 
@@ -89,6 +90,22 @@ export function workloadScopeRows(result: ComparisonResult): string[][] {
     ['Environment', workloadProfile?.environment ?? 'Not specified'],
     ['Operating system / license', workloadProfile?.operatingSystem ?? 'Not specified'],
     ['Support tier', workloadProfile?.supportTier ?? 'Not specified'],
+    [
+      'Commitment preference',
+      workloadProfile?.commitmentPreferencePercent !== undefined
+        ? `${workloadProfile.commitmentPreferencePercent}%`
+        : 'Not specified',
+    ],
+    [
+      'Usage pattern',
+      usagePattern
+        ? usagePattern.type === 'bursty'
+          ? `bursty (${usagePattern.averageUtilizationPercent ?? 'unknown'}% average utilization)`
+          : usagePattern.type === 'scheduled'
+            ? `scheduled (${usagePattern.hoursPerDay ?? '?'} hrs/day, ${usagePattern.daysPerWeek ?? '?'} days/week)`
+            : 'always on'
+        : 'Not specified',
+    ],
     [
       'Data residency',
       dataResidency
@@ -484,6 +501,37 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
         `${provider.providerId} on-demand $${formatNumber(
           onDemand.monthlyCostUsd,
         )}/mo vs ${bestCommitment.model} $${formatNumber(bestCommitment.monthlyCostUsd)}/mo.`,
+      ]);
+    }
+  }
+
+  const usagePattern = result.requirements?.workloadProfile?.usagePattern;
+  const averageUtilization =
+    usagePattern?.type === 'bursty' ? usagePattern.averageUtilizationPercent : undefined;
+  const rightSizingRate = rightSizingSavingsRate(averageUtilization);
+
+  if (rightSizingRate > 0 && averageUtilization !== undefined) {
+    for (const provider of result.providers) {
+      const computeMonthly = componentMonthly(provider, 'compute');
+
+      if (computeMonthly <= 0) {
+        continue;
+      }
+
+      const monthlySavings = computeMonthly * rightSizingRate;
+
+      rows.push([
+        'Right-sizing',
+        `${provider.providerId} compute averages ${formatNumber(
+          averageUtilization,
+        )}% utilization; evaluate smaller instance sizes, autoscaling bounds, or scheduled capacity before committing.`,
+        formatNumber(monthlySavings),
+        formatNumber(monthlySavings * 12),
+        monthlySavings > 100 ? 'High' : 'Medium',
+        'Medium',
+        `Rule-based ${formatNumber(
+          rightSizingRate * 100,
+        )}% compute-spend opportunity from $${formatNumber(computeMonthly)}/mo compute baseline.`,
       ]);
     }
   }
@@ -1008,8 +1056,34 @@ function componentMonthly(
   component: NonNullable<ComparisonLineItem['costComponent']>,
 ): number {
   return provider.lineItems
-    .filter((lineItem) => lineItem.costComponent === component)
+    .filter((lineItem) => (lineItem.costComponent ?? costComponentForCategory(lineItem.category)) === component)
     .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+}
+
+function rightSizingSavingsRate(averageUtilizationPercent?: number): number {
+  if (averageUtilizationPercent === undefined) {
+    return 0;
+  }
+
+  if (averageUtilizationPercent <= 25) {
+    return 0.35;
+  }
+
+  if (averageUtilizationPercent <= 40) {
+    return 0.25;
+  }
+
+  if (averageUtilizationPercent <= 55) {
+    return 0.15;
+  }
+
+  return 0;
+}
+
+function costComponentForCategory(
+  category: ComparisonLineItem['category'],
+): NonNullable<ComparisonLineItem['costComponent']> {
+  return category === 'network' ? 'egress' : category;
 }
 
 function networkDescription(description: string): boolean {

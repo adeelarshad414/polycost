@@ -314,7 +314,13 @@ export interface ComparisonResult {
     regionPreference?: string;
     workloadProfile?: Pick<
       NonNullable<NormalizedWorkloadSpec['workloadProfile']>,
-      'environment' | 'dataResidency' | 'operatingSystem' | 'supportTier' | 'tags'
+      | 'environment'
+      | 'commitmentPreferencePercent'
+      | 'dataResidency'
+      | 'operatingSystem'
+      | 'supportTier'
+      | 'usagePattern'
+      | 'tags'
     >;
     serviceRequirements: ServiceRequirement[];
   };
