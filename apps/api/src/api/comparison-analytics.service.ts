@@ -114,10 +114,24 @@ export interface FinOpsFinding {
   providerId?: ProviderId;
 }
 
+export interface ExecutiveForecastProvider {
+  providerId: ProviderId;
+  monthlyRunRateUsd: number;
+  ninetyDayRunRateUsd: number;
+  annualizedRunRateUsd: number;
+}
+
+export interface ExecutiveForecast {
+  horizonDays: 90;
+  assumption: string;
+  providerForecasts: ExecutiveForecastProvider[];
+}
+
 export interface ComparisonAnalyticsResponse {
   comparisonId: string;
   generatedAt: string;
   pricingAsOf: string;
+  executiveForecast: ExecutiveForecast;
   costComposition: ProviderCostComposition[];
   providerDeltaAnalysis: ProviderDeltaAnalysis[];
   sensitivityScenarios: SensitivityScenarioRow[];
@@ -200,6 +214,7 @@ export class ComparisonAnalyticsService {
       comparisonId: result.comparisonId,
       generatedAt: generatedAt.toISOString(),
       pricingAsOf: result.pricingAsOf,
+      executiveForecast: executiveForecast(result.providers),
       costComposition: providerDimensionAmounts.map(({ provider, amounts }) =>
         costComposition(provider, amounts),
       ),
@@ -211,6 +226,20 @@ export class ComparisonAnalyticsService {
       finOpsFindings: finOpsFindings(result, providerDimensionAmounts),
     };
   }
+}
+
+function executiveForecast(providers: ComparisonProviderResult[]): ExecutiveForecast {
+  return {
+    horizonDays: 90,
+    assumption:
+      '90-day projection uses current monthly run rate x 3; no historical trend or seasonality is inferred.',
+    providerForecasts: providers.map((provider) => ({
+      providerId: provider.providerId,
+      monthlyRunRateUsd: roundCurrency(provider.totals.monthly),
+      ninetyDayRunRateUsd: roundCurrency(provider.totals.monthly * 3),
+      annualizedRunRateUsd: roundCurrency(provider.totals.monthly * 12),
+    })),
+  };
 }
 
 function costComposition(

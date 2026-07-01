@@ -75,6 +75,18 @@ describe('api client', () => {
       comparisonId: 'comparison-1',
       generatedAt: '2026-07-02T12:00:00.000Z',
       pricingAsOf: '2026-07-02T00:00:00.000Z',
+      executiveForecast: {
+        horizonDays: 90,
+        assumption: '90-day projection uses current monthly run rate x 3.',
+        providerForecasts: [
+          {
+            providerId: 'aws',
+            monthlyRunRateUsd: 100,
+            ninetyDayRunRateUsd: 300,
+            annualizedRunRateUsd: 1200,
+          },
+        ],
+      },
       costComposition: [
         {
           providerId: 'aws',

@@ -1964,6 +1964,7 @@ function ProgressiveComparisonPage({
                 comparison={comparison}
                 form={submittedForm}
                 pricingModel={pricingModel}
+                analytics={comparisonAnalytics}
               />
               <EngineeringAnalyticsPreview comparison={comparison} interval={interval} />
             </div>
@@ -1977,6 +1978,7 @@ function ProgressiveComparisonPage({
                   busyAction={busyAction}
                   client={client}
                   comparison={comparison}
+                  comparisonAnalytics={comparisonAnalytics}
                   error={error}
                   exportingFormat={exportingFormat}
                   form={submittedForm}
@@ -2189,6 +2191,7 @@ function StateDetailContent({
   busyAction,
   client,
   comparison,
+  comparisonAnalytics,
   error,
   exportingFormat,
   form,
@@ -2203,6 +2206,7 @@ function StateDetailContent({
   busyAction: BusyAction;
   client: PolyCostClient;
   comparison: ComparisonResult;
+  comparisonAnalytics: ComparisonAnalyticsResponse | null;
   error: string | null;
   exportingFormat: ReportFormat | null;
   form: WorkloadFormState;
@@ -2225,6 +2229,7 @@ function StateDetailContent({
         />
         <ExecutiveDecisionDashboard
           comparison={comparison}
+          analytics={comparisonAnalytics}
           form={form}
           regionCatalog={regionCatalog}
           exportingFormat={exportingFormat}
@@ -5383,6 +5388,7 @@ function ResultSectionHeader({
 }
 
 function ExecutiveOverview({
+  analytics,
   comparison,
   exportingFormat,
   form,
@@ -5390,6 +5396,7 @@ function ExecutiveOverview({
   pricingModel,
   onExport,
 }: {
+  analytics?: ComparisonAnalyticsResponse | null;
   comparison: ComparisonResult | null;
   exportingFormat?: ReportFormat | null;
   form: WorkloadFormState;
@@ -5399,8 +5406,14 @@ function ExecutiveOverview({
 }) {
   return (
     <section className="demo-overview" aria-label="Executive analytics overview">
-      <ExecutiveAnalyticsPreview comparison={comparison} form={form} pricingModel={pricingModel} />
+      <ExecutiveAnalyticsPreview
+        analytics={analytics}
+        comparison={comparison}
+        form={form}
+        pricingModel={pricingModel}
+      />
       <ExecutiveDecisionDashboard
+        analytics={analytics}
         comparison={comparison}
         form={form}
         regionCatalog={null}
@@ -5413,10 +5426,12 @@ function ExecutiveOverview({
 }
 
 function ExecutiveAnalyticsPreview({
+  analytics: serverAnalytics,
   comparison,
   form,
   pricingModel,
 }: {
+  analytics?: ComparisonAnalyticsResponse | null;
   comparison: ComparisonResult | null;
   form: WorkloadFormState;
   pricingModel: PricingModelKey;
@@ -5424,6 +5439,7 @@ function ExecutiveAnalyticsPreview({
   const analytics = executiveAnalyticsModel(comparison, form);
   const pricedCount = analytics.pricedMonthlySummaries.length;
   const totalMonthly = analytics.totalMonthlyAcrossProviders;
+  const forecast = executiveForecastForCheapest(serverAnalytics, comparison);
 
   return (
     <section className="executive-analytics-preview" aria-label="Executive analytics dashboard">
@@ -5442,9 +5458,16 @@ function ExecutiveAnalyticsPreview({
             ? `${pricedCount}/3 provider estimates priced for this workload.`
             : 'Run a comparison to calculate provider estimates.'}
         </p>
-        <div className="executive-trend-pending" role="status">
-          <span>Trend pending</span>
-          <strong>Historical spend data not yet available</strong>
+        <div
+          className={forecast ? 'executive-trend-ready' : 'executive-trend-pending'}
+          role="status"
+        >
+          <span>{forecast ? 'Server projection' : 'Trend pending'}</span>
+          <strong>
+            {forecast
+              ? `${formatCurrency(forecast.ninetyDayRunRateUsd)} over 90 days`
+              : 'Historical spend data not yet available'}
+          </strong>
           <div className="executive-pending-sparkline" aria-hidden="true">
             <i />
             <i />
@@ -5482,8 +5505,13 @@ function ExecutiveAnalyticsPreview({
         />
         <ExecutiveStatTile
           label="90-day forecast"
-          value="Pending"
-          detail="Backend trend series required"
+          value={forecast ? formatCurrency(forecast.ninetyDayRunRateUsd) : 'Pending'}
+          detail={
+            forecast
+              ? `${providerLabel(forecast.providerId)} run-rate projection`
+              : 'Backend projection pending'
+          }
+          providerId={forecast?.providerId}
         />
         <ExecutiveStatTile
           label="Potential savings"
@@ -5503,7 +5531,30 @@ function ExecutiveAnalyticsPreview({
   );
 }
 
+function executiveForecastForCheapest(
+  analytics: ComparisonAnalyticsResponse | null | undefined,
+  comparison: ComparisonResult | null,
+): ComparisonAnalyticsResponse['executiveForecast']['providerForecasts'][number] | undefined {
+  if (!analytics?.executiveForecast.providerForecasts.length) {
+    return undefined;
+  }
+
+  const preferredProviderId = comparison?.cheapestProviderId;
+  const preferredForecast = analytics.executiveForecast.providerForecasts.find(
+    (forecast) => forecast.providerId === preferredProviderId,
+  );
+
+  if (preferredForecast) {
+    return preferredForecast;
+  }
+
+  return [...analytics.executiveForecast.providerForecasts].sort(
+    (left, right) => left.ninetyDayRunRateUsd - right.ninetyDayRunRateUsd,
+  )[0];
+}
+
 function ExecutiveDecisionDashboard({
+  analytics: serverAnalytics,
   comparison,
   form,
   regionCatalog,
@@ -5511,6 +5562,7 @@ function ExecutiveDecisionDashboard({
   isLoading,
   onExport,
 }: {
+  analytics?: ComparisonAnalyticsResponse | null;
   comparison: ComparisonResult | null;
   form: WorkloadFormState;
   regionCatalog: RegionCatalogResponse | null;
@@ -5521,6 +5573,7 @@ function ExecutiveDecisionDashboard({
   const analytics = executiveAnalyticsModel(comparison, form);
   const decision = analytics.review.executiveDecision;
   const recommendation = executiveRecommendation(analytics, form, regionCatalog);
+  const forecast = executiveForecastForCheapest(serverAnalytics, comparison);
 
   return (
     <section className="executive-decision-dashboard" aria-label="Executive decision dashboard">
@@ -5555,14 +5608,21 @@ function ExecutiveDecisionDashboard({
         <article className="executive-data-gap-card">
           <div className="executive-card-heading">
             <span>Trend & forecast</span>
-            <strong>Pending backend series</strong>
+            <strong>{forecast ? 'Server projection ready' : 'Pending backend series'}</strong>
           </div>
-          <div className="executive-data-gap-chart" role="status">
-            <span>Trend data not yet available</span>
+          <div
+            className={forecast ? 'executive-data-gap-chart is-ready' : 'executive-data-gap-chart'}
+            role="status"
+          >
+            <span>{forecast ? '90-day run-rate projection' : 'Trend data not yet available'}</span>
             <p>
-              PolyCost has current comparison totals, but no exposed historical cost series or
-              forecast endpoint yet. Sparkline and 90-day forecast stay pending instead of showing
-              fabricated data.
+              {forecast
+                ? `${providerLabel(forecast.providerId)} projects to ${formatCurrency(
+                    forecast.ninetyDayRunRateUsd,
+                  )} over 90 days and ${formatCurrency(
+                    forecast.annualizedRunRateUsd,
+                  )} annualized. ${serverAnalytics?.executiveForecast.assumption ?? ''}`
+                : 'PolyCost has current comparison totals, but no exposed historical cost series yet. The projection stays pending instead of showing fabricated trend data.'}
             </p>
           </div>
         </article>

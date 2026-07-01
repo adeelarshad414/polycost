@@ -119,7 +119,8 @@ describe('App', () => {
     expect(container.querySelectorAll('.executive-provider-card')).toHaveLength(3);
     expect(container.querySelector('.executive-pricing-bars')).toBeInstanceOf(HTMLElement);
     expect(container.querySelector('.executive-break-even-card')).toBeInstanceOf(HTMLElement);
-    expect(text(container)).toContain('Trend pending');
+    expect(text(container)).toContain('Server projection');
+    expect(text(container)).toContain('$90.00 over 90 days');
     expect(container.querySelector('.recharts-wrapper')).toBeInstanceOf(HTMLElement);
     expect(text(container)).toContain('Show full breakdown, pricing models & export options');
     expect(text(container)).toContain('Engineering service spend');
@@ -2277,6 +2278,18 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       comparisonId: comparisonResult.comparisonId,
       generatedAt: '2026-07-02T12:00:00.000Z',
       pricingAsOf: comparisonResult.pricingAsOf,
+      executiveForecast: {
+        horizonDays: 90 as const,
+        assumption: '90-day projection uses current monthly run rate x 3.',
+        providerForecasts: [
+          {
+            providerId: 'gcp' as const,
+            monthlyRunRateUsd: 30,
+            ninetyDayRunRateUsd: 90,
+            annualizedRunRateUsd: 360,
+          },
+        ],
+      },
       costComposition: [],
       providerDeltaAnalysis: [],
       sensitivityScenarios: [],

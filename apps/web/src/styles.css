@@ -4461,6 +4461,7 @@ select:disabled {
 }
 
 .executive-trend-pending,
+.executive-trend-ready,
 .executive-data-gap-chart {
   display: grid;
   gap: var(--pc-space-1);
@@ -4471,6 +4472,7 @@ select:disabled {
 }
 
 .executive-trend-pending > span,
+.executive-trend-ready > span,
 .executive-data-gap-chart > span {
   color: var(--pc-warning);
   font-size: var(--pc-text-xs);
@@ -4479,7 +4481,23 @@ select:disabled {
   text-transform: uppercase;
 }
 
+.executive-trend-ready,
+.executive-data-gap-chart.is-ready {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--brand-green) 28%, var(--pc-border));
+}
+
+.executive-trend-ready > span,
+.executive-data-gap-chart.is-ready > span {
+  color: var(--brand-green);
+}
+
 .executive-trend-pending strong {
+  color: var(--pc-text-primary);
+  font-size: var(--pc-text-sm);
+}
+
+.executive-trend-ready strong {
   color: var(--pc-text-primary);
   font-size: var(--pc-text-sm);
 }

@@ -238,6 +238,19 @@ describe('ComparisonAnalyticsService', () => {
         }),
       ]),
     );
+    expect(analytics.executiveForecast).toEqual({
+      horizonDays: 90,
+      assumption:
+        '90-day projection uses current monthly run rate x 3; no historical trend or seasonality is inferred.',
+      providerForecasts: expect.arrayContaining([
+        {
+          providerId: 'azure',
+          monthlyRunRateUsd: 800,
+          ninetyDayRunRateUsd: 2400,
+          annualizedRunRateUsd: 9600,
+        },
+      ]),
+    });
     expect(analytics.providerDeltaAnalysis).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

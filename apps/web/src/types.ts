@@ -444,10 +444,22 @@ export interface FinOpsFinding {
   providerId?: ProviderId;
 }
 
+export interface ExecutiveForecast {
+  horizonDays: 90;
+  assumption: string;
+  providerForecasts: Array<{
+    providerId: ProviderId;
+    monthlyRunRateUsd: number;
+    ninetyDayRunRateUsd: number;
+    annualizedRunRateUsd: number;
+  }>;
+}
+
 export interface ComparisonAnalyticsResponse {
   comparisonId: string;
   generatedAt: string;
   pricingAsOf: string;
+  executiveForecast: ExecutiveForecast;
   costComposition: ProviderCostComposition[];
   providerDeltaAnalysis: ProviderDeltaAnalysis[];
   sensitivityScenarios: SensitivityScenarioRow[];
