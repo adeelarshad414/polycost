@@ -1179,6 +1179,9 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Provider delta analysis');
     expect(text(container)).toContain('Why each service is cheaper');
     expect(text(container)).toContain('Azure is 33% lower than GCP for compute.');
+    expect(text(container)).toContain('Region variance heat map');
+    expect(text(container)).toContain('Modeled monthly sensitivity by compliant region');
+    expect(text(container)).toContain('Europe West');
     expect(text(container)).toContain('Scenario sensitivity');
     expect(text(container)).toContain('Provider winner under operational shocks');
     expect(text(container)).toContain('Demand +25%');

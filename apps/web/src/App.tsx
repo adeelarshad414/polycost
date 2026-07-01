@@ -9,6 +9,7 @@ import { ThemeSwitcher } from './components/ThemeSwitcher';
 import { TopLoadingBar } from './components/TopLoadingBar';
 import { hourlyFromMonthly, intervalMultiplierFromMonthly } from './cost-time';
 import {
+  canonicalRegionForRegionPreference,
   canonicalRegionsForResidencyScope,
   COMPARISON_REGION_GROUPS,
   comparisonRegionLabel,
@@ -138,6 +139,34 @@ const PRICING_MODEL_OPTIONS: Array<{
     description: 'Interruptible compute shown as an estimate range.',
   },
 ];
+
+const REGION_VARIANCE_PROFILES = [
+  {
+    regionId: 'us-east',
+    multiplier: 1,
+    evidence: 'Baseline North America pricing sensitivity.',
+  },
+  {
+    regionId: 'us-west',
+    multiplier: 1.03,
+    evidence: 'Modeled 3% regional premium for west-coast capacity sensitivity.',
+  },
+  {
+    regionId: 'eu-west',
+    multiplier: 1.08,
+    evidence: 'Modeled 8% regional premium for EU residency/compliance sensitivity.',
+  },
+  {
+    regionId: 'ap-southeast',
+    multiplier: 1.12,
+    evidence: 'Modeled 12% regional premium for APAC latency/residency sensitivity.',
+  },
+  {
+    regionId: 'ap-south',
+    multiplier: 0.96,
+    evidence: 'Modeled 4% discount sensitivity for lower-cost APAC alternatives.',
+  },
+] as const;
 
 const INSTANCE_TIER_OPTIONS: Array<[WorkloadFormState['instanceTier'], string]> = [
   ['small', 'Small - dev/test or light production'],
@@ -5925,6 +5954,7 @@ function ProductionDepthAnalytics({
 }) {
   const insights = productionDepthInsights(comparison, form);
   const providerDeltas = providerDeltaRows(comparison);
+  const regionVariance = regionVarianceRows(comparison, form);
   const scenarios = sensitivityScenarioRows(comparison, form);
 
   return (
@@ -5952,6 +5982,7 @@ function ProductionDepthAnalytics({
         ))}
       </div>
       <ProviderDeltaAnalysisTable rows={providerDeltas} />
+      <RegionVariancePanel rows={regionVariance} />
       <ScenarioSensitivityTable rows={scenarios} />
     </section>
   );
@@ -6008,6 +6039,95 @@ function ProviderDeltaAnalysisTable({ rows }: { rows: ProviderDeltaRow[] }) {
         <div className="scenario-sensitivity-empty" role="status">
           Run a comparison with at least two priced providers per service to explain provider
           deltas.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RegionVariancePanel({ rows }: { rows: RegionVarianceRow[] }) {
+  return (
+    <div className="region-variance-panel" aria-label="Region variance heat map">
+      <div className="scenario-sensitivity-heading">
+        <div>
+          <span>Region variance heat map</span>
+          <h4>Modeled monthly sensitivity by compliant region</h4>
+        </div>
+      </div>
+
+      {rows.length > 0 ? (
+        <div className="table-wrap region-variance-wrap">
+          <table className="ranking-table region-variance-table">
+            <thead>
+              <tr>
+                <th scope="col">Region</th>
+                {PROVIDER_ORDER.map((providerId) => (
+                  <th scope="col" key={providerId}>
+                    {providerLabel(providerId)}
+                  </th>
+                ))}
+                <th scope="col">Low</th>
+                <th scope="col">Evidence</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.regionId}>
+                  <td>
+                    <strong>{row.label}</strong>
+                    <small>
+                      {row.isSelected ? 'Current comparison region' : row.regionSummary}
+                    </small>
+                  </td>
+                  {PROVIDER_ORDER.map((providerId) => {
+                    const provider = row.providers.find(
+                      (candidate) => candidate.providerId === providerId,
+                    );
+
+                    return (
+                      <td
+                        className={
+                          provider?.isLowest
+                            ? `scenario-low scenario-low-${provider.providerId}`
+                            : undefined
+                        }
+                        key={`${row.regionId}-${providerId}`}
+                      >
+                        {provider ? (
+                          <>
+                            <strong>{formatCurrency(provider.modeledMonthly)}</strong>
+                            <small>{formatSignedCurrency(provider.deltaVsSelected)}</small>
+                            <small>{provider.providerRegion}</small>
+                          </>
+                        ) : (
+                          'N/A'
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td>
+                    {row.lowestProviderId ? (
+                      <span className={`scenario-low-label scenario-low-${row.lowestProviderId}`}>
+                        {providerLabel(row.lowestProviderId)}
+                      </span>
+                    ) : (
+                      'Pending'
+                    )}
+                  </td>
+                  <td>
+                    <strong>{row.evidence}</strong>
+                    <small>
+                      {formatDecimal(row.multiplier)}x multiplier on current cached totals.
+                    </small>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="scenario-sensitivity-empty" role="status">
+          Region variance is unavailable until a comparison is run for at least one provider.
         </div>
       )}
     </div>
@@ -6586,6 +6706,25 @@ interface ProviderDeltaRow {
   evidence: string;
 }
 
+interface RegionVarianceProviderCost {
+  providerId: ProviderId;
+  providerRegion: string;
+  modeledMonthly: number;
+  deltaVsSelected: number;
+  isLowest: boolean;
+}
+
+interface RegionVarianceRow {
+  regionId: string;
+  label: string;
+  regionSummary: string;
+  multiplier: number;
+  evidence: string;
+  isSelected: boolean;
+  providers: RegionVarianceProviderCost[];
+  lowestProviderId?: ProviderId;
+}
+
 function providerDeltaRows(comparison: ComparisonResult | null): ProviderDeltaRow[] {
   if (!comparison) {
     return [];
@@ -6648,6 +6787,59 @@ function providerDeltaRows(comparison: ComparisonResult | null): ProviderDeltaRo
       },
     ];
   }).sort((left, right) => right.monthlyDelta - left.monthlyDelta);
+}
+
+function regionVarianceRows(
+  comparison: ComparisonResult | null,
+  form: WorkloadFormState,
+): RegionVarianceRow[] {
+  if (!comparison || comparison.providers.length === 0) {
+    return [];
+  }
+
+  const selectedRegion = canonicalRegionForRegionPreference(form.regionPreference);
+  const allowedRegions =
+    form.complianceLocked && form.dataResidency
+      ? canonicalRegionsForResidencyScope(form.dataResidency)
+      : undefined;
+  const visibleProfiles = REGION_VARIANCE_PROFILES.filter(
+    (profile) => !allowedRegions || allowedRegions.includes(profile.regionId),
+  );
+
+  return visibleProfiles.map((profile) => {
+    const group = COMPARISON_REGION_GROUPS.find((candidate) => candidate.id === profile.regionId);
+    const providerCosts = comparison.providers
+      .map((provider) => ({
+        providerId: provider.providerId,
+        providerRegion: group?.providerRegions[provider.providerId] ?? profile.regionId,
+        modeledMonthly: roundCurrency(provider.totals.monthly * profile.multiplier),
+        deltaVsSelected: roundCurrency(
+          provider.totals.monthly * profile.multiplier - provider.totals.monthly,
+        ),
+        isLowest: false,
+      }))
+      .sort((left, right) => left.modeledMonthly - right.modeledMonthly);
+    const lowest = providerCosts[0];
+
+    return {
+      regionId: profile.regionId,
+      label: group?.label ?? profile.regionId,
+      regionSummary: group ? providerRegionSummary(group) : profile.regionId,
+      multiplier: profile.multiplier,
+      evidence: profile.evidence,
+      isSelected: selectedRegion === profile.regionId,
+      providers: providerCosts
+        .map((provider) => ({
+          ...provider,
+          isLowest: provider.providerId === lowest?.providerId,
+        }))
+        .sort(
+          (left, right) =>
+            PROVIDER_ORDER.indexOf(left.providerId) - PROVIDER_ORDER.indexOf(right.providerId),
+        ),
+      lowestProviderId: lowest?.providerId,
+    };
+  });
 }
 
 function productionDepthInsights(
