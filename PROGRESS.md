@@ -34,6 +34,7 @@ say so explicitly rather than marking it done.
 | 8 - API layer                                          | Complete                             | 2026-06-29   |
 | 9 - Frontend                                           | Complete                             | 2026-06-29   |
 | 10 - E2E verification against MVP acceptance criteria  | Complete with known gaps (see notes) | 2026-06-29   |
+| Post-Phase 10 report export evidence polish            | Complete                             | 2026-07-01   |
 
 ## Phase 0 - Build plan & approval
 
@@ -813,6 +814,40 @@ remain carried-forward UI automation work.
   `curl -fsS http://localhost:3001/health`, `curl -fsSI http://localhost:3000`,
   and `npm run test:e2e` against the rebuilt stack.
 - `npm run ci:lint` still reports only the existing 15 API security warnings.
+
+## Post-Phase 10 report export evidence polish
+
+**Status:** Complete
+**Date:** 2026-07-01
+
+- Report evidence model: added shared row builders for decision summary, selected
+  pricing-scenario provider ranking, workload scope, pricing-model availability, and
+  report assumptions.
+- CSV/XLSX/PDF exports: all three formats now surface the new evidence sections,
+  label the cheapest provider as the on-demand baseline, and keep selected
+  commitment/spot scenarios separate from the baseline comparison.
+- PDF readability: unavailable pricing models now render as document-friendly
+  "not eligible" rows instead of empty currency placeholders. Long single-token
+  wrapping is guarded, and the no-requirements fallback is preserved in PDF output.
+- Verification: report generator unit coverage was expanded for the new sections,
+  pricing-model availability, assumptions, workload scope, and missing-requirements
+  PDF fallback.
+- Tests/checks passing locally:
+  `npm run test:unit --workspace @polycost/api -- --runTestsByPath src/reports/report-generators.spec.ts`,
+  `npm run lint --workspace @polycost/api`,
+  `npm run typecheck --workspace @polycost/api`,
+  `npm run test:unit --workspace @polycost/api`,
+  `npm run build --workspace @polycost/api`, `npm run format:check`, and
+  `git diff --check`.
+- PDF visual QA: generated a sample PDF, rendered it with `pdftoppm`, and inspected
+  all pages for clipping, overlap, and unreadable unavailable-scenario rows. Poppler
+  emitted only a local fontconfig cache warning; rendered pages were usable.
+- Remote verification: PR #5 (`Enhance report export evidence`) passed the GitHub
+  `quality` workflow, including format check, lint/typecheck, QA, graph validation,
+  unit coverage, integration tests, build, E2E tests, and dependency security scan,
+  then merged to `main`.
+- `npm run lint --workspace @polycost/api` still reports only the existing 15 API
+  security warnings already tracked in known issues.
 
 ## Known issues / carried-forward items
 
