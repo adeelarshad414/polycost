@@ -921,6 +921,11 @@ controls.
   on network line items when provider catalog data exposes them. The engineering
   dashboard, CSV, XLSX, and PDF reports now include commitment payment/TCO evidence
   and egress tier audit sections.
+- Inline scenario what-if: the engineering dashboard now has a region and scale
+  what-if panel that clones the reviewed guided-form model, adjusts region and
+  scale fields, calls the cached comparison endpoint directly, and displays the
+  before/after monthly and annualized delta without invoking natural-language
+  parsing again.
 - Verification passing locally:
   `npm run check`, `npm run build`, `npm run test:coverage`,
   `npm run test:e2e --workspace @polycost/web`,

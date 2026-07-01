@@ -782,9 +782,8 @@ describe('ComparisonView', () => {
         ]),
       ],
     };
-    const client = clientMock();
     const { container, unmount } = render(
-      <ComparisonView client={client} comparison={richResult} interval="monthly" />,
+      <ComparisonView comparison={richResult} interval="monthly" />,
     );
     await act(async () => undefined);
 
@@ -886,7 +885,19 @@ describe('ComparisonView', () => {
         ]),
       ],
     };
-    const client = clientMock();
+    const whatIfResult: ComparisonResult = {
+      ...richResult,
+      comparisonId: 'scenario-what-if-123',
+      cheapestProviderId: 'azure',
+      providers: [
+        providerWithItems('aws', [['compute', 'aws what-if compute', 120]]),
+        providerWithItems('azure', [['compute', 'azure what-if compute', 90]]),
+        providerWithItems('gcp', [['compute', 'gcp what-if compute', 105]]),
+      ],
+    };
+    const client = clientMock({
+      createComparison: jest.fn(async () => whatIfResult),
+    });
     const { container, unmount } = render(
       <ComparisonView client={client} comparison={richResult} interval="monthly" />,
     );
@@ -905,9 +916,29 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('$42.00');
     expect(text(container)).toContain('Payment and TCO detail');
     expect(text(container)).toContain('Commitment scenario monthly, hourly, and term view');
+    expect(text(container)).toContain('Region and scale what-if');
+    expect(text(container)).toContain('Cache-backed rerun without natural-language reparse');
     expect(text(container)).toContain('Egress tiered breakdown');
     expect(text(container)).toContain('0-300 GB');
     expect(text(container)).toContain('Best:');
+    await click(buttonByText(container, 'Run what-if'));
+    expect(client.parseWorkload).not.toHaveBeenCalled();
+    expect(client.createComparison).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workload: expect.objectContaining({
+          region: expect.objectContaining({
+            preference: 'us-east',
+          }),
+        }),
+        compute: [
+          expect.objectContaining({
+            instanceCount: 3,
+          }),
+        ],
+      }),
+    );
+    expect(text(container)).toContain('Scenario comparison scenario-what-if-123');
+    expect(text(container)).toContain('+$15.00');
     await click(buttonByText(container, 'Spot'));
     expect(text(container)).toContain('Est. $38.00-$57.00');
     expect(text(container)).toContain('estimated $38.00-$57.00/mo range');
