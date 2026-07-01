@@ -115,6 +115,11 @@ interface SupportingServicesRates {
 interface RuntimeServicesRates {
   functionRequestPerMillion: number;
   functionGbSecond: number;
+  appPlatformRequestPerMillion: number;
+  appPlatformVcpuHour: number;
+  appPlatformMemoryGbHour: number;
+  appPlatformAlwaysOnVcpuHour: number;
+  appPlatformAlwaysOnMemoryGbHour: number;
   kubernetesControlPlaneMonthly: number;
   kubernetesNodeOverheadMonthly: number;
   registryStoragePerGbMonth: number;
@@ -1684,6 +1689,47 @@ export class ComparisonOrchestratorService {
       );
     }
 
+    if (serviceTypes.has('app-platform') && values.appPlatformRequestsMillion > 0) {
+      const activeHours =
+        (values.appPlatformRequestsMillion *
+          1_000_000 *
+          (values.appPlatformRequestDurationMs / 1000)) /
+        3600;
+      const requestCost = values.appPlatformRequestsMillion * rates.appPlatformRequestPerMillion;
+      const computeCost = activeHours * values.appPlatformVcpu * rates.appPlatformVcpuHour;
+      const memoryCost = activeHours * values.appPlatformMemoryGb * rates.appPlatformMemoryGbHour;
+
+      lineItems.push(
+        this.computeModeledLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-app-platform-requests',
+          description: `${providerLabel(providerId)} managed app platform request estimate`,
+          monthlyCostUsd: this.roundCurrency(requestCost),
+          unit: '1M requests',
+          unitPriceUsd: rates.appPlatformRequestPerMillion,
+        }),
+        this.computeModeledLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-app-platform-request-compute',
+          description: `${providerLabel(providerId)} managed app platform active vCPU estimate`,
+          monthlyCostUsd: this.roundCurrency(computeCost),
+          unit: 'vCPU-hour',
+          unitPriceUsd: rates.appPlatformVcpuHour,
+        }),
+        this.computeModeledLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-app-platform-request-memory',
+          description: `${providerLabel(providerId)} managed app platform active memory estimate`,
+          monthlyCostUsd: this.roundCurrency(memoryCost),
+          unit: 'GB-hour',
+          unitPriceUsd: rates.appPlatformMemoryGbHour,
+        }),
+      );
+    }
+
     if (serviceTypes.has('container-orchestration') && values.kubernetesClusterCount > 0) {
       lineItems.push(
         this.computeModeledLineItem({
@@ -3031,6 +3077,11 @@ function runtimeServicesRates(providerId: ProviderId): RuntimeServicesRates {
       return {
         functionRequestPerMillion: 0.2,
         functionGbSecond: 0.0000166667,
+        appPlatformRequestPerMillion: 0,
+        appPlatformVcpuHour: 0.064,
+        appPlatformMemoryGbHour: 0.007,
+        appPlatformAlwaysOnVcpuHour: 0.064,
+        appPlatformAlwaysOnMemoryGbHour: 0.007,
         kubernetesControlPlaneMonthly: 73,
         kubernetesNodeOverheadMonthly: 8,
         registryStoragePerGbMonth: 0.1,
@@ -3040,6 +3091,11 @@ function runtimeServicesRates(providerId: ProviderId): RuntimeServicesRates {
       return {
         functionRequestPerMillion: 0.2,
         functionGbSecond: 0.000016,
+        appPlatformRequestPerMillion: 0.4,
+        appPlatformVcpuHour: 0.0864,
+        appPlatformMemoryGbHour: 0.009,
+        appPlatformAlwaysOnVcpuHour: 0.095,
+        appPlatformAlwaysOnMemoryGbHour: 0.012,
         kubernetesControlPlaneMonthly: 0,
         kubernetesNodeOverheadMonthly: 6,
         registryStoragePerGbMonth: 0.167,
@@ -3049,6 +3105,11 @@ function runtimeServicesRates(providerId: ProviderId): RuntimeServicesRates {
       return {
         functionRequestPerMillion: 0.4,
         functionGbSecond: 0.0000025,
+        appPlatformRequestPerMillion: 0.4,
+        appPlatformVcpuHour: 0.0864,
+        appPlatformMemoryGbHour: 0.009,
+        appPlatformAlwaysOnVcpuHour: 0.0648,
+        appPlatformAlwaysOnMemoryGbHour: 0.00675,
         kubernetesControlPlaneMonthly: 73,
         kubernetesNodeOverheadMonthly: 7,
         registryStoragePerGbMonth: 0.1,
@@ -3063,6 +3124,12 @@ function runtimeServicesAssumptions(
   | 'functionInvocationsMillion'
   | 'functionDurationMs'
   | 'functionMemoryMb'
+  | 'appPlatformRequestsMillion'
+  | 'appPlatformRequestDurationMs'
+  | 'appPlatformVcpu'
+  | 'appPlatformMemoryGb'
+  | 'appPlatformAlwaysOnHours'
+  | 'appPlatformMinInstances'
   | 'kubernetesClusterCount'
   | 'kubernetesWorkerNodeCount'
   | 'registryStorageGb'
@@ -3073,6 +3140,14 @@ function runtimeServicesAssumptions(
     functionInvocationsMillion: maxScaleParam(requirements, 'functionInvocationsMillion'),
     functionDurationMs: maxScaleParam(requirements, 'functionDurationMs') || 100,
     functionMemoryMb: maxScaleParam(requirements, 'functionMemoryMb') || 512,
+    appPlatformRequestsMillion: maxScaleParam(requirements, 'appPlatformRequestsMillion'),
+    appPlatformRequestDurationMs:
+      maxScaleParam(requirements, 'appPlatformRequestDurationMs') || 400,
+    appPlatformVcpu: maxScaleParam(requirements, 'appPlatformVcpu') || 1,
+    appPlatformMemoryGb: maxScaleParam(requirements, 'appPlatformMemoryGb') || 0.5,
+    appPlatformAlwaysOnHours:
+      maxScaleParam(requirements, 'appPlatformAlwaysOnHours') || HOURS_PER_MONTH,
+    appPlatformMinInstances: maxScaleParam(requirements, 'appPlatformMinInstances') || 1,
     kubernetesClusterCount: maxScaleParam(requirements, 'kubernetesClusterCount'),
     kubernetesWorkerNodeCount: maxScaleParam(requirements, 'kubernetesWorkerNodeCount'),
     registryStorageGb: maxScaleParam(requirements, 'registryStorageGb'),

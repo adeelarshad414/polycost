@@ -202,7 +202,7 @@ describe('report generators', () => {
     expect(csv).toContain('Egress & Networking Detail');
     expect(csv).toContain('aws,egress,internet egress,us-east-1,46.08');
     expect(csv).toContain('Optimization Opportunities');
-    expect(csv).toContain('Commitment coverage,aws Reserved 3-year lowers recurring run rate.');
+    expect(csv).toContain('Commitment coverage,aws Reserved 3-year lowers recurring run rate;');
     expect(csv).toContain('Region Comparison');
     expect(csv).toContain('aws,eu-west,eu-west-1,76.68,5.68,1.08');
     expect(csv).toContain('Break-Even Analysis');
@@ -908,6 +908,80 @@ describe('report generators', () => {
           'Medium',
           'Medium',
           'aws dominant runtime row is "AWS serverless function GB-second estimate" at $90/mo; function runtime tuning is modeled as a 25% reduction of that row.',
+        ]),
+      ]),
+    );
+
+    expect(
+      optimizationOpportunityRows({
+        ...comparison,
+        requirements: {
+          ...comparison.requirements!,
+          serviceRequirements: [
+            {
+              serviceCategory: 'application',
+              serviceType: 'app-platform',
+              quantity: 1,
+              scaleParams: {
+                appPlatformRequestsMillion: 10,
+                appPlatformRequestDurationMs: 400,
+                appPlatformVcpu: 1,
+                appPlatformMemoryGb: 0.5,
+                appPlatformAlwaysOnHours: 730,
+                appPlatformMinInstances: 1,
+              },
+            },
+          ],
+        },
+        providers: [
+          {
+            providerId: 'aws',
+            lineItems: [
+              {
+                category: 'compute',
+                costComponent: 'compute',
+                description: 'AWS managed app platform request estimate',
+                skuId: 'modeled-app-platform-requests',
+                isApproximate: true,
+                baseMonthlyCostUsd: 0,
+              },
+              {
+                category: 'compute',
+                costComponent: 'compute',
+                description: 'AWS managed app platform active vCPU estimate',
+                skuId: 'modeled-app-platform-request-compute',
+                isApproximate: true,
+                baseMonthlyCostUsd: 71.11,
+              },
+              {
+                category: 'compute',
+                costComponent: 'compute',
+                description: 'AWS managed app platform active memory estimate',
+                skuId: 'modeled-app-platform-request-memory',
+                isApproximate: true,
+                baseMonthlyCostUsd: 3.89,
+              },
+            ],
+            totals: {
+              daily: 3.29,
+              weekly: 23.08,
+              monthly: 100,
+              quarterly: 300,
+              yearly: 1200,
+            },
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'App platform model',
+          'aws always-on app-hosting posture is favored for the configured traffic; validate request-based only if idle windows or traffic spikes dominate.',
+          '25.72',
+          '308.64',
+          'Medium',
+          'Low',
+          'aws request-based model $75/mo vs always-on $49.28/mo for 10M requests, 400ms, 1 vCPU, 0.5GB, 1 minimum instance(s), 730 hrs/mo.',
         ]),
       ]),
     );

@@ -74,7 +74,7 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
   family('app-platform', 'application', 'App hosting', 'mapped', {
     aws: ['AWS Elastic Beanstalk', 'AWS App Runner'],
     azure: ['Azure App Service'],
-    gcp: ['App Engine'],
+    gcp: ['Cloud Run', 'App Engine'],
   }),
   family('static-web', 'application', 'Static web apps', 'mapped', {
     aws: ['AWS Amplify Hosting', 'Amazon S3 website hosting'],

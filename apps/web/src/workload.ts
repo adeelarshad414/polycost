@@ -125,6 +125,12 @@ export interface WorkloadFormState {
   functionInvocationsMillion: string;
   functionDurationMs: string;
   functionMemoryMb: string;
+  appPlatformRequestsMillion: string;
+  appPlatformRequestDurationMs: string;
+  appPlatformVcpu: string;
+  appPlatformMemoryGb: string;
+  appPlatformAlwaysOnHours: string;
+  appPlatformMinInstances: string;
   kubernetesClusterCount: string;
   kubernetesWorkerNodeCount: string;
   registryStorageGb: string;
@@ -232,6 +238,12 @@ type NumericWorkloadFormField =
   | 'functionInvocationsMillion'
   | 'functionDurationMs'
   | 'functionMemoryMb'
+  | 'appPlatformRequestsMillion'
+  | 'appPlatformRequestDurationMs'
+  | 'appPlatformVcpu'
+  | 'appPlatformMemoryGb'
+  | 'appPlatformAlwaysOnHours'
+  | 'appPlatformMinInstances'
   | 'kubernetesClusterCount'
   | 'kubernetesWorkerNodeCount'
   | 'registryStorageGb'
@@ -344,6 +356,12 @@ export const defaultWorkloadForm: WorkloadFormState = {
   functionInvocationsMillion: '0',
   functionDurationMs: '100',
   functionMemoryMb: '512',
+  appPlatformRequestsMillion: '0',
+  appPlatformRequestDurationMs: '400',
+  appPlatformVcpu: '1',
+  appPlatformMemoryGb: '0.5',
+  appPlatformAlwaysOnHours: '730',
+  appPlatformMinInstances: '1',
   kubernetesClusterCount: '0',
   kubernetesWorkerNodeCount: '0',
   registryStorageGb: '0',
@@ -1081,6 +1099,44 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
     'functionMemoryMb',
     'Function memory must be a whole number above 0 MB.',
   );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'appPlatformRequestsMillion',
+    'App platform requests must be 0 million or higher.',
+  );
+  requirePositiveNumber(
+    issues,
+    form,
+    'appPlatformRequestDurationMs',
+    'App platform request duration must be greater than 0 ms.',
+  );
+  requirePositiveNumber(
+    issues,
+    form,
+    'appPlatformVcpu',
+    'App platform vCPU must be greater than 0.',
+  );
+  requirePositiveNumber(
+    issues,
+    form,
+    'appPlatformMemoryGb',
+    'App platform memory must be greater than 0 GB.',
+  );
+  requireBoundedNumber(
+    issues,
+    form,
+    'appPlatformAlwaysOnHours',
+    0,
+    730,
+    'App platform always-on hours must be between 0 and 730.',
+  );
+  optionalNonNegativeIntegerField(
+    issues,
+    form,
+    'appPlatformMinInstances',
+    'App platform minimum instances must be a whole number 0 or higher.',
+  );
   optionalNonNegativeIntegerField(
     issues,
     form,
@@ -1558,6 +1614,28 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
     functionMemoryMb: numberToInput(
       runtimeServices.functionMemoryMb ?? Number(defaultWorkloadForm.functionMemoryMb),
     ),
+    appPlatformRequestsMillion: numberToInput(
+      runtimeServices.appPlatformRequestsMillion ??
+        Number(defaultWorkloadForm.appPlatformRequestsMillion),
+    ),
+    appPlatformRequestDurationMs: numberToInput(
+      runtimeServices.appPlatformRequestDurationMs ??
+        Number(defaultWorkloadForm.appPlatformRequestDurationMs),
+    ),
+    appPlatformVcpu: numberToInput(
+      runtimeServices.appPlatformVcpu ?? Number(defaultWorkloadForm.appPlatformVcpu),
+    ),
+    appPlatformMemoryGb: numberToInput(
+      runtimeServices.appPlatformMemoryGb ?? Number(defaultWorkloadForm.appPlatformMemoryGb),
+    ),
+    appPlatformAlwaysOnHours: numberToInput(
+      runtimeServices.appPlatformAlwaysOnHours ??
+        Number(defaultWorkloadForm.appPlatformAlwaysOnHours),
+    ),
+    appPlatformMinInstances: numberToInput(
+      runtimeServices.appPlatformMinInstances ??
+        Number(defaultWorkloadForm.appPlatformMinInstances),
+    ),
     kubernetesClusterCount: numberToInput(
       runtimeServices.kubernetesClusterCount ?? Number(defaultWorkloadForm.kubernetesClusterCount),
     ),
@@ -1672,6 +1750,7 @@ export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceReq
           ? supportingServicesScaleParamsFromForm(form)
           : {}),
         ...(serviceType === 'serverless-functions' ||
+        serviceType === 'app-platform' ||
         serviceType === 'container-orchestration' ||
         serviceType === 'container-registry'
           ? runtimeScaleParamsFromForm(form)
@@ -1793,6 +1872,10 @@ function runtimeServiceFamilyIds(form: WorkloadFormState): string[] {
 
   if (hasPositiveFormNumber(form.functionInvocationsMillion)) {
     ids.push('serverless-functions');
+  }
+
+  if (hasPositiveFormNumber(form.appPlatformRequestsMillion)) {
+    ids.push('app-platform');
   }
 
   if (
@@ -1943,14 +2026,23 @@ function supportingServiceScaleParamsFromNws(nws: NormalizedWorkloadSpec): Recor
 function runtimeScaleParamsFromNws(nws: NormalizedWorkloadSpec): Record<string, number> {
   const runtimeRequirements =
     nws.serviceRequirements?.filter((requirement) =>
-      ['serverless-functions', 'container-orchestration', 'container-registry'].includes(
-        requirement.serviceType,
-      ),
+      [
+        'serverless-functions',
+        'app-platform',
+        'container-orchestration',
+        'container-registry',
+      ].includes(requirement.serviceType),
     ) ?? [];
   const keys = [
     'functionInvocationsMillion',
     'functionDurationMs',
     'functionMemoryMb',
+    'appPlatformRequestsMillion',
+    'appPlatformRequestDurationMs',
+    'appPlatformVcpu',
+    'appPlatformMemoryGb',
+    'appPlatformAlwaysOnHours',
+    'appPlatformMinInstances',
     'kubernetesClusterCount',
     'kubernetesWorkerNodeCount',
     'registryStorageGb',
@@ -2242,6 +2334,12 @@ function runtimeScaleParamsFromForm(form: WorkloadFormState): ServiceRequirement
     functionInvocationsMillion: parseOptionalNumber(form.functionInvocationsMillion) ?? 0,
     functionDurationMs: parsePositiveNumber(form.functionDurationMs, 100),
     functionMemoryMb: parsePositiveInteger(form.functionMemoryMb, 512),
+    appPlatformRequestsMillion: parseOptionalNumber(form.appPlatformRequestsMillion) ?? 0,
+    appPlatformRequestDurationMs: parsePositiveNumber(form.appPlatformRequestDurationMs, 400),
+    appPlatformVcpu: parsePositiveNumber(form.appPlatformVcpu, 1),
+    appPlatformMemoryGb: parsePositiveNumber(form.appPlatformMemoryGb, 0.5),
+    appPlatformAlwaysOnHours: parseBoundedNumber(form.appPlatformAlwaysOnHours, 0, 730, 730),
+    appPlatformMinInstances: parseNonNegativeInteger(form.appPlatformMinInstances, 1),
     kubernetesClusterCount: parseNonNegativeInteger(form.kubernetesClusterCount, 0),
     kubernetesWorkerNodeCount: parseNonNegativeInteger(form.kubernetesWorkerNodeCount, 0),
     registryStorageGb: parseOptionalNumber(form.registryStorageGb) ?? 0,
@@ -2812,6 +2910,18 @@ function formNumericValue(form: WorkloadFormState, field: NumericWorkloadFormFie
       return form.functionDurationMs;
     case 'functionMemoryMb':
       return form.functionMemoryMb;
+    case 'appPlatformRequestsMillion':
+      return form.appPlatformRequestsMillion;
+    case 'appPlatformRequestDurationMs':
+      return form.appPlatformRequestDurationMs;
+    case 'appPlatformVcpu':
+      return form.appPlatformVcpu;
+    case 'appPlatformMemoryGb':
+      return form.appPlatformMemoryGb;
+    case 'appPlatformAlwaysOnHours':
+      return form.appPlatformAlwaysOnHours;
+    case 'appPlatformMinInstances':
+      return form.appPlatformMinInstances;
     case 'kubernetesClusterCount':
       return form.kubernetesClusterCount;
     case 'kubernetesWorkerNodeCount':

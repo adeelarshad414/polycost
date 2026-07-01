@@ -1687,6 +1687,30 @@ function InitialHomePage({
                   onChange={(value) => update('functionInvocationsMillion', value)}
                 />
                 <TextField
+                  label="App requests"
+                  value={form.appPlatformRequestsMillion}
+                  inputMode="decimal"
+                  suffix="M/mo"
+                  error={fieldErrors.appPlatformRequestsMillion}
+                  onChange={(value) => update('appPlatformRequestsMillion', value)}
+                />
+                <TextField
+                  label="App vCPU"
+                  value={form.appPlatformVcpu}
+                  inputMode="decimal"
+                  suffix="vCPU"
+                  error={fieldErrors.appPlatformVcpu}
+                  onChange={(value) => update('appPlatformVcpu', value)}
+                />
+                <TextField
+                  label="App memory"
+                  value={form.appPlatformMemoryGb}
+                  inputMode="decimal"
+                  suffix="GB"
+                  error={fieldErrors.appPlatformMemoryGb}
+                  onChange={(value) => update('appPlatformMemoryGb', value)}
+                />
+                <TextField
                   label="K8s clusters"
                   value={form.kubernetesClusterCount}
                   inputMode="numeric"
@@ -2960,7 +2984,7 @@ function WorkloadForm({
         <details className="advanced-service-fields">
           <summary>
             <span>Serverless & container cost drivers</span>
-            <small>Function usage, Kubernetes overhead, registry transfer</small>
+            <small>Functions, app hosting, Kubernetes overhead, registry transfer</small>
           </summary>
           <div className="form-grid secondary-grid">
             <TextField
@@ -2986,6 +3010,54 @@ function WorkloadForm({
               suffix="MB"
               error={fieldErrors.functionMemoryMb}
               onChange={(value) => update('functionMemoryMb', value)}
+            />
+            <TextField
+              label="App requests"
+              value={form.appPlatformRequestsMillion}
+              inputMode="decimal"
+              suffix="M/mo"
+              error={fieldErrors.appPlatformRequestsMillion}
+              onChange={(value) => update('appPlatformRequestsMillion', value)}
+            />
+            <TextField
+              label="App request duration"
+              value={form.appPlatformRequestDurationMs}
+              inputMode="decimal"
+              suffix="ms"
+              error={fieldErrors.appPlatformRequestDurationMs}
+              onChange={(value) => update('appPlatformRequestDurationMs', value)}
+            />
+            <TextField
+              label="App vCPU"
+              value={form.appPlatformVcpu}
+              inputMode="decimal"
+              suffix="vCPU"
+              error={fieldErrors.appPlatformVcpu}
+              onChange={(value) => update('appPlatformVcpu', value)}
+            />
+            <TextField
+              label="App memory"
+              value={form.appPlatformMemoryGb}
+              inputMode="decimal"
+              suffix="GB"
+              error={fieldErrors.appPlatformMemoryGb}
+              onChange={(value) => update('appPlatformMemoryGb', value)}
+            />
+            <TextField
+              label="Always-on hours"
+              value={form.appPlatformAlwaysOnHours}
+              inputMode="decimal"
+              suffix="hrs/mo"
+              error={fieldErrors.appPlatformAlwaysOnHours}
+              onChange={(value) => update('appPlatformAlwaysOnHours', value)}
+            />
+            <TextField
+              label="Minimum instances"
+              value={form.appPlatformMinInstances}
+              inputMode="numeric"
+              suffix="instances"
+              error={fieldErrors.appPlatformMinInstances}
+              onChange={(value) => update('appPlatformMinInstances', value)}
             />
             <TextField
               label="K8s clusters"
@@ -5960,6 +6032,7 @@ function ProductionDepthAnalytics({
   const storageOptimizations = storageOptimizationRows(comparison, form);
   const databaseOptimizations = databaseOptimizationRows(comparison, form);
   const runtimeOptimizations = runtimeOptimizationRows(comparison, form);
+  const appPlatformModels = appPlatformModelRows(comparison, form);
   const operationsOptimizations = operationsOptimizationRows(comparison, form);
   const egressOptimizations = egressOptimizationRows(comparison, form);
   const spotBlendRows = spotBlendOptimizerRows(comparison, form);
@@ -5998,6 +6071,7 @@ function ProductionDepthAnalytics({
       <StorageOptimizationPanel rows={storageOptimizations} />
       <DatabaseOptimizationPanel rows={databaseOptimizations} />
       <RuntimeOptimizationPanel rows={runtimeOptimizations} />
+      <AppPlatformModelPanel rows={appPlatformModels} />
       <OperationsOptimizationPanel rows={operationsOptimizations} />
       <EgressOptimizationPanel rows={egressOptimizations} />
       <SpotBlendOptimizerPanel rows={spotBlendRows} />
@@ -6455,6 +6529,71 @@ function RuntimeOptimizationPanel({ rows }: { rows: RuntimeOptimizationRow[] }) 
         <div className="scenario-sensitivity-empty" role="status">
           Runtime optimization appears when function duration, invocation volume, Kubernetes
           control-plane/node overhead, or container registry transfer becomes material.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AppPlatformModelPanel({ rows }: { rows: AppPlatformModelRow[] }) {
+  return (
+    <div className="app-platform-model-panel" aria-label="App platform model comparison">
+      <div className="scenario-sensitivity-heading">
+        <div>
+          <span>App platform model comparison</span>
+          <h4>App Runner, App Service, and Cloud Run request-based vs always-on posture</h4>
+        </div>
+      </div>
+
+      {rows.length > 0 ? (
+        <div className="table-wrap app-platform-model-wrap">
+          <table className="ranking-table app-platform-model-table">
+            <thead>
+              <tr>
+                <th scope="col">Provider</th>
+                <th scope="col">Request-based</th>
+                <th scope="col">Always-on</th>
+                <th scope="col">Better model</th>
+                <th scope="col">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.providerId}>
+                  <td>
+                    <span className={`scenario-low-label scenario-low-${row.providerId}`}>
+                      {providerLabel(row.providerId)}
+                    </span>
+                    <small>{row.usageSignal}</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.requestBasedMonthly)}/mo</strong>
+                    <small>{row.requestEvidence}</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.alwaysOnMonthly)}/mo</strong>
+                    <small>{row.alwaysOnEvidence}</small>
+                  </td>
+                  <td>
+                    <strong>{row.winningModel}</strong>
+                    <small>
+                      {formatCurrency(row.monthlyDelta)}/mo · {formatCurrency(row.annualDelta)}/yr
+                      spread
+                    </small>
+                  </td>
+                  <td>
+                    <strong>{row.recommendation}</strong>
+                    <small>{row.evidence}</small>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="scenario-sensitivity-empty" role="status">
+          App platform comparison appears when app-hosting requests are configured or App hosting is
+          selected in the service catalog.
         </div>
       )}
     </div>
@@ -7422,6 +7561,29 @@ interface RuntimeOptimizationRow {
   evidence: string;
 }
 
+interface AppPlatformModelRates {
+  requestPerMillion: number;
+  vcpuHour: number;
+  memoryGbHour: number;
+  alwaysOnVcpuHour: number;
+  alwaysOnMemoryGbHour: number;
+  evidence: string;
+}
+
+interface AppPlatformModelRow {
+  providerId: ProviderId;
+  requestBasedMonthly: number;
+  alwaysOnMonthly: number;
+  winningModel: 'Request-based' | 'Always-on';
+  monthlyDelta: number;
+  annualDelta: number;
+  usageSignal: string;
+  requestEvidence: string;
+  alwaysOnEvidence: string;
+  recommendation: string;
+  evidence: string;
+}
+
 interface OperationsOptimizationRow {
   providerId: ProviderId;
   operationsMonthly: number;
@@ -7471,6 +7633,34 @@ interface ArchitectureRiskFlag {
   signal: string;
   evidence: string;
 }
+
+const APP_PLATFORM_MODEL_RATES: Record<ProviderId, AppPlatformModelRates> = {
+  aws: {
+    requestPerMillion: 0,
+    vcpuHour: 0.064,
+    memoryGbHour: 0.007,
+    alwaysOnVcpuHour: 0.064,
+    alwaysOnMemoryGbHour: 0.007,
+    evidence: 'App Runner-style active vCPU plus provisioned/active memory model.',
+  },
+  azure: {
+    requestPerMillion: 0.4,
+    vcpuHour: 0.0864,
+    memoryGbHour: 0.009,
+    alwaysOnVcpuHour: 0.095,
+    alwaysOnMemoryGbHour: 0.012,
+    evidence:
+      'App Service always-on plan compared with a request-metered managed-app approximation.',
+  },
+  gcp: {
+    requestPerMillion: 0.4,
+    vcpuHour: 0.0864,
+    memoryGbHour: 0.009,
+    alwaysOnVcpuHour: 0.0648,
+    alwaysOnMemoryGbHour: 0.00675,
+    evidence: 'Cloud Run request-based model compared with always-allocated CPU worker posture.',
+  },
+};
 
 function providerDeltaRows(comparison: ComparisonResult | null): ProviderDeltaRow[] {
   if (!comparison) {
@@ -8120,6 +8310,10 @@ function runtimeOptimizationRows(
   const functionInvocationsMillion = parseInputNumber(form.functionInvocationsMillion) ?? 0;
   const functionDurationMs = parseInputNumber(form.functionDurationMs) ?? 0;
   const functionMemoryMb = parseInputNumber(form.functionMemoryMb) ?? 0;
+  const appPlatformRequestsMillion = parseInputNumber(form.appPlatformRequestsMillion) ?? 0;
+  const appPlatformRequestDurationMs = parseInputNumber(form.appPlatformRequestDurationMs) ?? 0;
+  const appPlatformVcpu = parseInputNumber(form.appPlatformVcpu) ?? 0;
+  const appPlatformMemoryGb = parseInputNumber(form.appPlatformMemoryGb) ?? 0;
   const kubernetesClusterCount = parseInputNumber(form.kubernetesClusterCount) ?? 0;
   const kubernetesWorkerNodeCount = parseInputNumber(form.kubernetesWorkerNodeCount) ?? 0;
   const registryStorageGb = parseInputNumber(form.registryStorageGb) ?? 0;
@@ -8130,6 +8324,14 @@ function runtimeOptimizationRows(
       : undefined,
     functionInvocationsMillion > 0 && functionDurationMs > 0 && functionMemoryMb > 0
       ? `${formatDecimal(functionDurationMs)}ms @ ${formatDecimal(functionMemoryMb)}MB`
+      : undefined,
+    appPlatformRequestsMillion > 0
+      ? `${formatDecimal(appPlatformRequestsMillion)}M app requests`
+      : undefined,
+    appPlatformRequestsMillion > 0 && appPlatformVcpu > 0 && appPlatformMemoryGb > 0
+      ? `${formatDecimal(appPlatformRequestDurationMs)}ms @ ${formatDecimal(
+          appPlatformVcpu,
+        )} vCPU / ${formatDecimal(appPlatformMemoryGb)}GB`
       : undefined,
     kubernetesClusterCount + kubernetesWorkerNodeCount > 0
       ? `${formatDecimal(kubernetesClusterCount)} clusters / ${formatDecimal(
@@ -8142,6 +8344,7 @@ function runtimeOptimizationRows(
   const usageSignal = usageSignalParts.join(' · ') || 'Runtime rows only';
   const hasAdvancedFormSignal =
     functionInvocationsMillion > 0 ||
+    appPlatformRequestsMillion > 0 ||
     kubernetesClusterCount > 0 ||
     kubernetesWorkerNodeCount > 0 ||
     registryStorageGb > 0 ||
@@ -8175,6 +8378,10 @@ function runtimeOptimizationRows(
         functionDurationMs,
         functionInvocationsMillion,
         functionMemoryMb,
+        appPlatformMemoryGb,
+        appPlatformRequestDurationMs,
+        appPlatformRequestsMillion,
+        appPlatformVcpu,
         kubernetesClusterCount,
         kubernetesWorkerNodeCount,
         registryEgressGb,
@@ -8208,6 +8415,10 @@ function runtimeOptimizationSignal(
     functionDurationMs: number;
     functionInvocationsMillion: number;
     functionMemoryMb: number;
+    appPlatformMemoryGb: number;
+    appPlatformRequestDurationMs: number;
+    appPlatformRequestsMillion: number;
+    appPlatformVcpu: number;
     kubernetesClusterCount: number;
     kubernetesWorkerNodeCount: number;
     registryEgressGb: number;
@@ -8223,6 +8434,29 @@ function runtimeOptimizationSignal(
   const baseEvidence = `${primary.description} is the largest runtime row at ${formatCurrency(
     primaryMonthly,
   )}/mo.`;
+
+  if (normalizedPrimary.includes('app platform')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      primaryDriver: 'Managed app platform shape',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation:
+        'Compare request-based scale-to-zero with always-on/provisioned app capacity before selecting the runtime posture.',
+      driverEvidence:
+        context.appPlatformRequestsMillion > 0
+          ? `${formatDecimal(context.appPlatformRequestsMillion)}M app requests · ${formatDecimal(
+              context.appPlatformRequestDurationMs,
+            )}ms @ ${formatDecimal(context.appPlatformVcpu)} vCPU / ${formatDecimal(
+              context.appPlatformMemoryGb,
+            )}GB`
+          : 'App platform line item surfaced by backend',
+      evidence: `${baseEvidence} App-platform posture review models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
 
   if (normalizedPrimary.includes('gb-second') || normalizedPrimary.includes('duration')) {
     const monthlySavings = roundCurrency(primaryMonthly * 0.25);
@@ -8356,6 +8590,132 @@ function runtimeOptimizationSignal(
       monthlySavings,
     )}/mo opportunity at 15% of the runtime baseline.`,
   };
+}
+
+function appPlatformModelRows(
+  comparison: ComparisonResult | null,
+  form: WorkloadFormState,
+): AppPlatformModelRow[] {
+  if (!comparison) {
+    return [];
+  }
+
+  const requestsMillion = parseInputNumber(form.appPlatformRequestsMillion) ?? 0;
+  const durationMs = parseInputNumber(form.appPlatformRequestDurationMs) ?? 400;
+  const vcpu = parseInputNumber(form.appPlatformVcpu) ?? 1;
+  const memoryGb = parseInputNumber(form.appPlatformMemoryGb) ?? 0.5;
+  const alwaysOnHours = parseInputNumber(form.appPlatformAlwaysOnHours) ?? 730;
+  const minInstances = parseInputNumber(form.appPlatformMinInstances) ?? 1;
+  const hasAppPlatformLineItems = comparison.providers.some((provider) =>
+    provider.lineItems.some((lineItem) =>
+      `${lineItem.skuId ?? ''} ${lineItem.description}`.toLowerCase().includes('app platform'),
+    ),
+  );
+  const appPlatformSelected = form.selectedServiceFamilyIds.includes('app-platform');
+
+  if (requestsMillion <= 0 && !hasAppPlatformLineItems && !appPlatformSelected) {
+    return [];
+  }
+
+  const usageSignal =
+    requestsMillion > 0
+      ? `${formatDecimal(requestsMillion)}M requests · ${formatDecimal(durationMs)}ms · ${formatDecimal(
+          vcpu,
+        )} vCPU / ${formatDecimal(memoryGb)}GB`
+      : 'App-hosting service catalog selection';
+
+  return comparison.providers
+    .map((provider) => {
+      const requestLineMonthly = roundCurrency(
+        provider.lineItems
+          .filter((lineItem) => lineItem.skuId?.startsWith('modeled-app-platform-request'))
+          .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0),
+      );
+      const requestBasedMonthly =
+        requestLineMonthly > 0
+          ? requestLineMonthly
+          : appPlatformRequestMonthly(provider.providerId, {
+              durationMs,
+              memoryGb,
+              requestsMillion,
+              vcpu,
+            });
+      const alwaysOnMonthly = appPlatformAlwaysOnMonthly(provider.providerId, {
+        alwaysOnHours,
+        memoryGb,
+        minInstances,
+        vcpu,
+      });
+      const winningModel: AppPlatformModelRow['winningModel'] =
+        requestBasedMonthly <= alwaysOnMonthly ? 'Request-based' : 'Always-on';
+      const monthlyDelta = roundCurrency(Math.abs(alwaysOnMonthly - requestBasedMonthly));
+      const annualDelta = roundCurrency(monthlyDelta * 12);
+      const rates = APP_PLATFORM_MODEL_RATES[provider.providerId];
+      const recommendation =
+        winningModel === 'Request-based'
+          ? `Keep scale-to-zero/request-based posture; always-on would add ${formatCurrency(
+              monthlyDelta,
+            )}/mo at this traffic level.`
+          : `Use always-on/provisioned app capacity for steady traffic; request-based metering is ${formatCurrency(
+              monthlyDelta,
+            )}/mo higher at this shape.`;
+
+      return {
+        providerId: provider.providerId,
+        requestBasedMonthly,
+        alwaysOnMonthly,
+        winningModel,
+        monthlyDelta,
+        annualDelta,
+        usageSignal,
+        requestEvidence: `${formatDecimal(requestsMillion)}M requests at ${formatDecimal(
+          durationMs,
+        )}ms, ${formatDecimal(vcpu)} vCPU, ${formatDecimal(memoryGb)}GB.`,
+        alwaysOnEvidence: `${formatDecimal(minInstances)} instance(s) for ${formatDecimal(
+          alwaysOnHours,
+        )} hrs/mo.`,
+        recommendation,
+        evidence: rates.evidence,
+      };
+    })
+    .filter((row) => row.requestBasedMonthly > 0 || row.alwaysOnMonthly > 0)
+    .sort((left, right) => right.monthlyDelta - left.monthlyDelta);
+}
+
+function appPlatformRequestMonthly(
+  providerId: ProviderId,
+  input: {
+    durationMs: number;
+    memoryGb: number;
+    requestsMillion: number;
+    vcpu: number;
+  },
+): number {
+  const rates = APP_PLATFORM_MODEL_RATES[providerId];
+  const activeHours = (input.requestsMillion * 1_000_000 * (input.durationMs / 1000)) / 3600;
+  const requestCost = input.requestsMillion * rates.requestPerMillion;
+  const computeCost = activeHours * input.vcpu * rates.vcpuHour;
+  const memoryCost = activeHours * input.memoryGb * rates.memoryGbHour;
+
+  return roundCurrency(requestCost + computeCost + memoryCost);
+}
+
+function appPlatformAlwaysOnMonthly(
+  providerId: ProviderId,
+  input: {
+    alwaysOnHours: number;
+    memoryGb: number;
+    minInstances: number;
+    vcpu: number;
+  },
+): number {
+  const rates = APP_PLATFORM_MODEL_RATES[providerId];
+  const instanceHours = Math.max(0, input.alwaysOnHours) * Math.max(0, input.minInstances);
+
+  return roundCurrency(
+    instanceHours *
+      (input.vcpu * rates.alwaysOnVcpuHour + input.memoryGb * rates.alwaysOnMemoryGbHour),
+  );
 }
 
 function operationsOptimizationRows(
@@ -9856,6 +10216,10 @@ function runtimeDescriptionMatches(description: string): boolean {
     'lambda',
     'cloud functions',
     'azure functions',
+    'app platform',
+    'app runner',
+    'app service',
+    'cloud run',
     'kubernetes',
     'container registry',
     'registry storage',
@@ -9872,6 +10236,10 @@ function runtimeAdvancedDescriptionMatches(description: string): boolean {
     'gb-second',
     'duration',
     'function request',
+    'app platform',
+    'app runner',
+    'app service',
+    'cloud run',
     'control plane',
     'node overhead',
     'registry storage',

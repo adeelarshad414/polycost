@@ -1284,6 +1284,70 @@ describe('ComparisonView', () => {
     unmount();
   });
 
+  it('surfaces app platform request-based versus always-on model comparison', async () => {
+    const awsProvider = providerWithItems('aws', [
+      ['compute', 'aws compute', 25],
+      ['compute', 'AWS managed app platform request estimate', 0],
+      ['compute', 'AWS managed app platform active vCPU estimate', 71.11],
+      ['compute', 'AWS managed app platform active memory estimate', 3.89],
+    ]);
+    awsProvider.lineItems[1] = {
+      ...awsProvider.lineItems[1],
+      costComponent: 'compute',
+      skuId: 'modeled-app-platform-requests',
+    };
+    awsProvider.lineItems[2] = {
+      ...awsProvider.lineItems[2],
+      costComponent: 'compute',
+      skuId: 'modeled-app-platform-request-compute',
+    };
+    awsProvider.lineItems[3] = {
+      ...awsProvider.lineItems[3],
+      costComponent: 'compute',
+      skuId: 'modeled-app-platform-request-memory',
+    };
+    const appPlatformResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'aws',
+      providers: [
+        awsProvider,
+        providerWithItems('azure', [['compute', 'azure compute', 210]]),
+        providerWithItems('gcp', [['compute', 'gcp compute', 190]]),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView
+        comparison={appPlatformResult}
+        form={{
+          ...defaultWorkloadForm,
+          appPlatformRequestsMillion: '10',
+          appPlatformRequestDurationMs: '400',
+          appPlatformVcpu: '1',
+          appPlatformMemoryGb: '0.5',
+          appPlatformAlwaysOnHours: '730',
+          appPlatformMinInstances: '1',
+        }}
+        interval="monthly"
+      />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain('App platform model comparison');
+    expect(text(container)).toContain(
+      'App Runner, App Service, and Cloud Run request-based vs always-on posture',
+    );
+    expect(text(container)).toContain('10M requests · 400ms · 1 vCPU / 0.5GB');
+    expect(text(container)).toContain('$75.00/mo');
+    expect(text(container)).toContain('$49.28/mo');
+    expect(text(container)).toContain('Always-on');
+    expect(text(container)).toContain('$25.72/mo · $308.64/yr spread');
+    expect(text(container)).toContain(
+      'Use always-on/provisioned app capacity for steady traffic; request-based metering is $25.72/mo higher at this shape.',
+    );
+
+    unmount();
+  });
+
   it('surfaces operations optimization detail from observability and secrets dimensions', async () => {
     const awsProvider = providerWithItems('aws', [
       ['compute', 'aws compute', 40],

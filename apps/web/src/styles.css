@@ -4832,6 +4832,15 @@ select:disabled {
   padding: var(--pc-space-1);
 }
 
+.app-platform-model-panel {
+  display: grid;
+  gap: var(--pc-space-1);
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface) 94%, var(--pc-bg-surface-2));
+  padding: var(--pc-space-1);
+}
+
 .operations-optimization-panel {
   display: grid;
   gap: var(--pc-space-1);
@@ -5099,6 +5108,10 @@ select:disabled {
   max-height: 340px;
 }
 
+.app-platform-model-wrap {
+  max-height: 340px;
+}
+
 .spot-blend-wrap {
   max-height: 340px;
 }
@@ -5125,6 +5138,10 @@ select:disabled {
 
 .egress-optimization-table {
   min-width: 1040px;
+}
+
+.app-platform-model-table {
+  min-width: 1060px;
 }
 
 .spot-blend-table {
@@ -5166,6 +5183,12 @@ select:disabled {
 }
 
 .runtime-optimization-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.app-platform-model-table th {
   position: sticky;
   top: 0;
   z-index: 1;
@@ -5213,6 +5236,10 @@ select:disabled {
   vertical-align: top;
 }
 
+.app-platform-model-table td {
+  vertical-align: top;
+}
+
 .operations-optimization-table td {
   vertical-align: top;
 }
@@ -5246,6 +5273,10 @@ select:disabled {
 }
 
 .runtime-optimization-table td:first-child {
+  min-width: 180px;
+}
+
+.app-platform-model-table td:first-child {
   min-width: 180px;
 }
 
@@ -5291,6 +5322,12 @@ select:disabled {
   white-space: normal;
 }
 
+.app-platform-model-table td:nth-child(5) {
+  min-width: 340px;
+  max-width: 480px;
+  white-space: normal;
+}
+
 .spot-blend-table td:nth-child(5) {
   min-width: 340px;
   max-width: 480px;
@@ -5313,6 +5350,12 @@ select:disabled {
 .commitment-coverage-table td small,
 .egress-optimization-table td strong,
 .egress-optimization-table td small,
+.runtime-optimization-table td strong,
+.runtime-optimization-table td small,
+.app-platform-model-table td strong,
+.app-platform-model-table td small,
+.operations-optimization-table td strong,
+.operations-optimization-table td small,
 .spot-blend-table td strong,
 .spot-blend-table td small,
 .license-optimization-table td strong,
@@ -5325,6 +5368,9 @@ select:disabled {
 .region-variance-table td small,
 .commitment-coverage-table td small,
 .egress-optimization-table td small,
+.runtime-optimization-table td small,
+.app-platform-model-table td small,
+.operations-optimization-table td small,
 .spot-blend-table td small,
 .license-optimization-table td small {
   margin-top: 3px;
