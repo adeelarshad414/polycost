@@ -3701,6 +3701,7 @@ select:disabled {
 }
 
 .service-cheapest-matrix,
+.full-cost-matrix,
 .cost-formula-evidence {
   display: grid;
   gap: var(--pc-space-2);
@@ -3708,6 +3709,79 @@ select:disabled {
   border-radius: 8px;
   background: color-mix(in srgb, var(--pc-bg-surface) 90%, var(--pc-bg-surface-2));
   padding: var(--pc-space-2);
+}
+
+.cost-matrix-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pc-space-1);
+}
+
+.cost-matrix-controls label {
+  display: grid;
+  min-width: min(220px, 100%);
+  gap: 6px;
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.cost-matrix-controls select {
+  min-height: 42px;
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: var(--pc-bg-surface);
+  color: var(--pc-text-primary);
+  font-size: var(--pc-text-sm);
+  font-weight: 750;
+  text-transform: none;
+}
+
+.cost-matrix-wrap {
+  max-height: 520px;
+}
+
+.cost-matrix-table {
+  min-width: 1680px;
+}
+
+.cost-matrix-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.cost-matrix-table td:first-child {
+  max-width: 280px;
+  white-space: normal;
+}
+
+.cost-matrix-table td:nth-child(3) {
+  color: var(--pc-text-secondary);
+  font-family: var(--pc-font-body);
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.matrix-service-label {
+  display: inline-block;
+  color: var(--pc-text-primary);
+  font-family: var(--pc-font-body);
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.matrix-unavailable {
+  color: var(--pc-text-tertiary);
+  font-family: var(--pc-font-body);
+  font-weight: 800;
+}
+
+.matrix-estimated {
+  color: var(--pc-warning);
 }
 
 .service-matrix-table td:last-child {

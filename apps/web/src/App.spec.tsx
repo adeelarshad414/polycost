@@ -810,17 +810,32 @@ describe('ComparisonView', () => {
   });
 
   it('renders FinOps feature additions without fabricating unsupported backend data', async () => {
+    const awsRichProvider = providerWithItems('aws', [
+      ['compute', 'aws compute', 50],
+      ['storage', 'aws storage', 10],
+      ['database', 'aws database', 10],
+      ['network', 'aws network egress', 30],
+    ]);
+    awsRichProvider.lineItems[0].pricingModels = [
+      {
+        model: 'spot',
+        available: true,
+        estimated: true,
+        monthlyCostUsd: 24,
+        caveat: 'Spot pricing is interruptible and volatile.',
+      },
+      {
+        model: 'reserved-1yr',
+        available: true,
+        monthlyCostUsd: 42,
+      },
+    ];
     const richResult: ComparisonResult = {
       ...comparisonResult,
       cheapestProviderId: 'azure',
       providers: [
         {
-          ...providerWithItems('aws', [
-            ['compute', 'aws compute', 50],
-            ['storage', 'aws storage', 10],
-            ['database', 'aws database', 10],
-            ['network', 'aws network egress', 30],
-          ]),
+          ...awsRichProvider,
           pricingModels: [
             {
               model: 'on-demand',
@@ -866,6 +881,11 @@ describe('ComparisonView', () => {
     expect(buttonByText(container, '3yr reserved').disabled).toBe(false);
     expect(buttonByText(container, 'Spot').disabled).toBe(false);
     expect(buttonByText(container, 'Savings plan').disabled).toBe(false);
+    expect(text(container)).toContain('Full cost matrix');
+    expect(text(container)).toContain('AWS On-demand');
+    expect(text(container)).toContain('Azure 1yr');
+    expect(text(container)).toContain('$24.00 est.');
+    expect(text(container)).toContain('$42.00');
     expect(text(container)).toContain('Best:');
     await click(buttonByText(container, 'Spot'));
     expect(text(container)).toContain('Est. $38.00-$57.00');

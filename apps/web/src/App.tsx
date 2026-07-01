@@ -49,8 +49,13 @@ import {
 type InputMode = 'describe' | 'form';
 type BusyAction = 'parse' | 'compare' | 'refresh' | 'export' | null;
 type ServiceCategory = ComparisonProviderResult['lineItems'][number]['category'];
+type ComparisonLineItem = ComparisonProviderResult['lineItems'][number];
 type FormSectionTone = 'profile' | 'compute' | 'services' | 'portfolio' | 'data' | 'network';
 type ToggleIconKind = 'storage' | 'database' | 'cdn' | 'loadBalancer' | 'multiAz' | 'multiRegion';
+type CostMatrixCategoryFilter = ServiceCategory | 'all';
+type CostMatrixProviderFilter = ProviderId | 'all';
+type CostMatrixPricingModelFilter = PricingModelKey | 'all';
+type CostMatrixSortKey = 'service' | `${ProviderId}:${PricingModelKey}`;
 
 const INPUT_MODE_OPTIONS: Array<{
   key: InputMode;
@@ -1501,6 +1506,7 @@ function StateDetailContent({
         />
         <EngineeringAnalyticsDashboard comparison={comparison} interval={interval} />
         <ServiceCheapestMatrix comparison={comparison} interval={interval} />
+        <FullCostMatrixTable comparison={comparison} />
         <CostFormulaEvidence comparison={comparison} />
         <ComparisonToolbar interval={interval} onIntervalChange={onIntervalChange} />
         <FinOpsFeatureLayer
@@ -3109,6 +3115,9 @@ export function ComparisonView({
           />
           <EngineeringAnalyticsDashboard comparison={comparison} interval={interval} />
           <ArchitectureWorkspace comparison={comparison} interval={interval} form={form} />
+          <ServiceCheapestMatrix comparison={comparison} interval={interval} />
+          <FullCostMatrixTable comparison={comparison} />
+          <CostFormulaEvidence comparison={comparison} />
           <FinOpsFeatureLayer
             client={client}
             comparison={comparison}
@@ -3548,6 +3557,375 @@ function ServiceCheapestMatrix({
       </div>
     </section>
   );
+}
+
+function FullCostMatrixTable({ comparison }: { comparison: ComparisonResult | null }) {
+  const [categoryFilter, setCategoryFilter] = useState<CostMatrixCategoryFilter>('all');
+  const [providerFilter, setProviderFilter] = useState<CostMatrixProviderFilter>('all');
+  const [pricingModelFilter, setPricingModelFilter] = useState<CostMatrixPricingModelFilter>('all');
+  const [sortBy, setSortBy] = useState<CostMatrixSortKey>('service');
+  const visibleProviders =
+    providerFilter === 'all'
+      ? PROVIDER_ORDER
+      : PROVIDER_ORDER.filter((providerId) => providerId === providerFilter);
+  const visiblePricingModels =
+    pricingModelFilter === 'all'
+      ? PRICING_MODEL_OPTIONS
+      : PRICING_MODEL_OPTIONS.filter((model) => model.key === pricingModelFilter);
+  const rows = fullCostMatrixRows(comparison);
+  const visibleRows = rows
+    .filter((row) => categoryFilter === 'all' || row.category === categoryFilter)
+    .sort((left, right) => compareCostMatrixRows(left, right, sortBy));
+
+  return (
+    <section className="full-cost-matrix" aria-label="Full cost matrix">
+      <div className="engineering-dashboard-heading">
+        <div>
+          <span>Full cost matrix</span>
+          <h3>Service x provider x pricing model</h3>
+        </div>
+        <p>
+          This is the engineering audit view for scenario tradeoffs. Empty cells mean the current
+          backend response did not publish that service-level pricing model.
+        </p>
+      </div>
+
+      <div className="cost-matrix-controls" aria-label="Cost matrix controls">
+        <label>
+          <span>Category</span>
+          <select
+            value={categoryFilter}
+            onChange={(event) => setCategoryFilter(event.target.value as CostMatrixCategoryFilter)}
+          >
+            <option value="all">All services</option>
+            {SERVICE_CATEGORIES.map((category) => (
+              <option value={category} key={category}>
+                {capitalize(category)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Provider</span>
+          <select
+            value={providerFilter}
+            onChange={(event) => setProviderFilter(event.target.value as CostMatrixProviderFilter)}
+          >
+            <option value="all">All providers</option>
+            {PROVIDER_ORDER.map((providerId) => (
+              <option value={providerId} key={providerId}>
+                {providerLabel(providerId)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Pricing model</span>
+          <select
+            value={pricingModelFilter}
+            onChange={(event) =>
+              setPricingModelFilter(event.target.value as CostMatrixPricingModelFilter)
+            }
+          >
+            <option value="all">All models</option>
+            {PRICING_MODEL_OPTIONS.map((model) => (
+              <option value={model.key} key={model.key}>
+                {model.shortLabel}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Sort</span>
+          <select
+            value={sortBy}
+            onChange={(event) => setSortBy(event.target.value as CostMatrixSortKey)}
+          >
+            <option value="service">Service order</option>
+            {PROVIDER_ORDER.flatMap((providerId) =>
+              PRICING_MODEL_OPTIONS.map((model) => (
+                <option
+                  value={costMatrixSortKey(providerId, model.key)}
+                  key={`${providerId}-${model.key}`}
+                >
+                  {providerLabel(providerId)} {costMatrixPricingModelLabel(model.key)}
+                </option>
+              )),
+            )}
+          </select>
+        </label>
+      </div>
+
+      <div className="table-wrap cost-matrix-wrap">
+        <table className="ranking-table cost-matrix-table">
+          <thead>
+            <tr>
+              <th scope="col">Service</th>
+              <th scope="col">Category</th>
+              <th scope="col">Confidence</th>
+              {visibleProviders.flatMap((providerId) =>
+                visiblePricingModels.map((model) => (
+                  <th scope="col" key={`${providerId}-${model.key}`}>
+                    {providerLabel(providerId)} {costMatrixPricingModelLabel(model.key)}
+                  </th>
+                )),
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {visibleRows.length > 0 ? (
+              visibleRows.map((row) => (
+                <tr key={row.key}>
+                  <td>
+                    <span className="matrix-service-label">{row.service}</span>
+                  </td>
+                  <td>{capitalize(row.category)}</td>
+                  <td>{row.approximate ? 'Approximate' : 'Mapped'}</td>
+                  {visibleProviders.flatMap((providerId) =>
+                    visiblePricingModels.map((model) => (
+                      <td key={`${row.key}-${providerId}-${model.key}`}>
+                        <CostMatrixValue cell={costMatrixCellFromRow(row, providerId, model.key)} />
+                      </td>
+                    )),
+                  )}
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={3 + visibleProviders.length * visiblePricingModels.length}>
+                  No services match this filter.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function CostMatrixValue({ cell }: { cell: CostMatrixCell }) {
+  if (!cell.available || cell.monthlyCostUsd === undefined) {
+    return (
+      <span className="matrix-unavailable" title={cell.caveat}>
+        N/A
+      </span>
+    );
+  }
+
+  return (
+    <span className={cell.estimated ? 'matrix-estimated' : undefined} title={cell.caveat}>
+      {formatCurrency(cell.monthlyCostUsd)}
+      {cell.estimated ? ' est.' : ''}
+    </span>
+  );
+}
+
+interface CostMatrixCell {
+  available: boolean;
+  monthlyCostUsd?: number;
+  estimated?: boolean;
+  caveat?: string;
+}
+
+interface FullCostMatrixRow {
+  key: string;
+  service: string;
+  category: ServiceCategory;
+  approximate: boolean;
+  sortCosts: Array<{
+    providerId: ProviderId;
+    monthlyCostUsd: number;
+  }>;
+  providerModelCosts: Array<{
+    providerId: ProviderId;
+    modelCosts: Array<{
+      pricingModel: PricingModelKey;
+      cell: CostMatrixCell;
+    }>;
+  }>;
+}
+
+function fullCostMatrixRows(comparison: ComparisonResult | null): FullCostMatrixRow[] {
+  if (!comparison) {
+    return [];
+  }
+
+  const providersById = new Map<ProviderId, ComparisonProviderResult>(
+    comparison.providers.map((provider) => [provider.providerId, provider]),
+  );
+  const rowCount = Math.max(
+    ...comparison.providers.map((provider) => provider.lineItems.length),
+    0,
+  );
+
+  return Array.from({ length: rowCount }, (_, index) => {
+    const firstLineItem = PROVIDER_ORDER.map((providerId) =>
+      providersById.get(providerId)?.lineItems.at(index),
+    ).find((lineItem): lineItem is ComparisonLineItem => Boolean(lineItem));
+    const category = firstLineItem?.category ?? 'compute';
+    const service = firstLineItem
+      ? `${capitalize(firstLineItem.category)} - ${firstLineItem.description}`
+      : `Service row ${index + 1}`;
+    const sortCosts: FullCostMatrixRow['sortCosts'] = [];
+    let approximate = firstLineItem?.isApproximate ?? false;
+    const providerModelCosts = PROVIDER_ORDER.map((providerId) => {
+      const lineItem = providersById.get(providerId)?.lineItems.at(index);
+
+      if (lineItem) {
+        approximate = approximate || lineItem.isApproximate;
+        sortCosts.push({ providerId, monthlyCostUsd: lineItem.baseMonthlyCostUsd });
+      }
+
+      return {
+        providerId,
+        modelCosts: PRICING_MODEL_OPTIONS.map((model) => ({
+          pricingModel: model.key,
+          cell: lineItem
+            ? costMatrixCellForLineItem(lineItem, model.key)
+            : missingCostMatrixCell('No matching service line item in this provider response.'),
+        })),
+      };
+    });
+
+    return {
+      key: `${index}-${category}-${service}`,
+      service,
+      category,
+      approximate,
+      sortCosts,
+      providerModelCosts,
+    };
+  });
+}
+
+function missingCostMatrixCell(caveat: string): CostMatrixCell {
+  return {
+    available: false,
+    caveat,
+  };
+}
+
+function costMatrixCellFromRow(
+  row: FullCostMatrixRow,
+  providerId: ProviderId,
+  pricingModel: PricingModelKey,
+): CostMatrixCell {
+  return (
+    row.providerModelCosts
+      .find((provider) => provider.providerId === providerId)
+      ?.modelCosts.find((model) => model.pricingModel === pricingModel)?.cell ??
+    missingCostMatrixCell('Pricing model unavailable for this row.')
+  );
+}
+
+function costMatrixCellForLineItem(
+  lineItem: ComparisonLineItem,
+  pricingModel: PricingModelKey,
+): CostMatrixCell {
+  if (pricingModel === 'on-demand') {
+    return {
+      available: true,
+      monthlyCostUsd: lineItem.baseMonthlyCostUsd,
+      caveat: 'Base monthly line item cost.',
+    };
+  }
+
+  const model = lineItem.pricingModels?.find((candidate) => candidate.model === pricingModel);
+
+  if (!model) {
+    return {
+      available: false,
+      caveat: 'Service-level pricing model not present in the backend response.',
+    };
+  }
+
+  if (!model.available || model.monthlyCostUsd === undefined) {
+    return {
+      available: false,
+      caveat: model.unavailableReason ?? model.caveat ?? 'Pricing model unavailable.',
+    };
+  }
+
+  return {
+    available: true,
+    monthlyCostUsd: model.monthlyCostUsd,
+    estimated: model.estimated,
+    caveat: model.caveat ?? model.providerTerm ?? model.displayName,
+  };
+}
+
+function compareCostMatrixRows(
+  left: FullCostMatrixRow,
+  right: FullCostMatrixRow,
+  sortBy: CostMatrixSortKey,
+): number {
+  if (sortBy === 'service') {
+    return left.service.localeCompare(right.service);
+  }
+
+  const parsed = parseCostMatrixSortKey(sortBy);
+
+  if (!parsed) {
+    return left.service.localeCompare(right.service);
+  }
+
+  return (
+    costMatrixSortCost(left, parsed.providerId, parsed.pricingModel) -
+    costMatrixSortCost(right, parsed.providerId, parsed.pricingModel)
+  );
+}
+
+function costMatrixSortKey(
+  providerId: ProviderId,
+  pricingModel: PricingModelKey,
+): CostMatrixSortKey {
+  return `${providerId}:${pricingModel}`;
+}
+
+function parseCostMatrixSortKey(
+  sortBy: CostMatrixSortKey,
+): { providerId: ProviderId; pricingModel: PricingModelKey } | null {
+  const [providerId, pricingModel] = sortBy.split(':');
+
+  if (!isProviderId(providerId) || !isPricingModelKey(pricingModel)) {
+    return null;
+  }
+
+  return { providerId, pricingModel };
+}
+
+function isProviderId(value: string): value is ProviderId {
+  return PROVIDER_ORDER.some((providerId) => providerId === value);
+}
+
+function isPricingModelKey(value: string): value is PricingModelKey {
+  return PRICING_MODEL_OPTIONS.some((model) => model.key === value);
+}
+
+function costMatrixSortCost(
+  row: FullCostMatrixRow,
+  providerId: ProviderId,
+  pricingModel: PricingModelKey,
+): number {
+  return (
+    costMatrixCellFromRow(row, providerId, pricingModel).monthlyCostUsd ?? Number.POSITIVE_INFINITY
+  );
+}
+
+function costMatrixPricingModelLabel(pricingModel: PricingModelKey): string {
+  switch (pricingModel) {
+    case 'on-demand':
+      return 'On-demand';
+    case 'reserved-1yr':
+      return '1yr';
+    case 'reserved-3yr':
+      return '3yr';
+    case 'savings-plan':
+      return 'Savings';
+    case 'spot':
+      return 'Spot';
+  }
 }
 
 function CostFormulaEvidence({ comparison }: { comparison: ComparisonResult | null }) {
