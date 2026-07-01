@@ -5960,6 +5960,7 @@ function ProductionDepthAnalytics({
   const storageOptimizations = storageOptimizationRows(comparison, form);
   const databaseOptimizations = databaseOptimizationRows(comparison, form);
   const runtimeOptimizations = runtimeOptimizationRows(comparison, form);
+  const operationsOptimizations = operationsOptimizationRows(comparison, form);
   const egressOptimizations = egressOptimizationRows(comparison, form);
   const spotBlendRows = spotBlendOptimizerRows(comparison, form);
   const licenseRows = licenseOptimizationRows(comparison, form);
@@ -5997,6 +5998,7 @@ function ProductionDepthAnalytics({
       <StorageOptimizationPanel rows={storageOptimizations} />
       <DatabaseOptimizationPanel rows={databaseOptimizations} />
       <RuntimeOptimizationPanel rows={runtimeOptimizations} />
+      <OperationsOptimizationPanel rows={operationsOptimizations} />
       <EgressOptimizationPanel rows={egressOptimizations} />
       <SpotBlendOptimizerPanel rows={spotBlendRows} />
       <LicenseOptimizationPanel rows={licenseRows} operatingSystem={form.operatingSystem} />
@@ -6453,6 +6455,70 @@ function RuntimeOptimizationPanel({ rows }: { rows: RuntimeOptimizationRow[] }) 
         <div className="scenario-sensitivity-empty" role="status">
           Runtime optimization appears when function duration, invocation volume, Kubernetes
           control-plane/node overhead, or container registry transfer becomes material.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OperationsOptimizationPanel({ rows }: { rows: OperationsOptimizationRow[] }) {
+  return (
+    <div className="operations-optimization-panel" aria-label="Operations optimization detail">
+      <div className="scenario-sensitivity-heading">
+        <div>
+          <span>Operations optimization detail</span>
+          <h4>Observability, logging, tracing, secrets, WAF, and security posture controls</h4>
+        </div>
+      </div>
+
+      {rows.length > 0 ? (
+        <div className="table-wrap operations-optimization-wrap">
+          <table className="ranking-table operations-optimization-table">
+            <thead>
+              <tr>
+                <th scope="col">Provider</th>
+                <th scope="col">Ops share</th>
+                <th scope="col">Dominant driver</th>
+                <th scope="col">Opportunity</th>
+                <th scope="col">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.providerId}>
+                  <td>
+                    <span className={`scenario-low-label scenario-low-${row.providerId}`}>
+                      {providerLabel(row.providerId)}
+                    </span>
+                    <small>{row.usageSignal}</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.operationsMonthly)}/mo</strong>
+                    <small>{formatPercent(row.operationsSharePercent)} of provider total</small>
+                  </td>
+                  <td>
+                    <strong>{row.primaryDriver}</strong>
+                    <small>{row.driverEvidence}</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.monthlySavings)}/mo</strong>
+                    <small>
+                      {formatCurrency(row.annualSavings)}/yr · {row.effort} effort
+                    </small>
+                  </td>
+                  <td>
+                    <strong>{row.recommendation}</strong>
+                    <small>{row.evidence}</small>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="scenario-sensitivity-empty" role="status">
+          Operations optimization appears when logs, metrics, traces, secrets, WAF, DDoS, or
+          security-posture line items become material.
         </div>
       )}
     </div>
@@ -7346,6 +7412,20 @@ interface RuntimeOptimizationRow {
   providerId: ProviderId;
   runtimeMonthly: number;
   runtimeSharePercent: number;
+  primaryDriver: string;
+  usageSignal: string;
+  monthlySavings: number;
+  annualSavings: number;
+  effort: 'Low' | 'Medium' | 'High';
+  recommendation: string;
+  driverEvidence: string;
+  evidence: string;
+}
+
+interface OperationsOptimizationRow {
+  providerId: ProviderId;
+  operationsMonthly: number;
+  operationsSharePercent: number;
   primaryDriver: string;
   usageSignal: string;
   monthlySavings: number;
@@ -8275,6 +8355,401 @@ function runtimeOptimizationSignal(
     evidence: `Runtime platform review models ${formatCurrency(
       monthlySavings,
     )}/mo opportunity at 15% of the runtime baseline.`,
+  };
+}
+
+function operationsOptimizationRows(
+  comparison: ComparisonResult | null,
+  form: WorkloadFormState,
+): OperationsOptimizationRow[] {
+  if (!comparison) {
+    return [];
+  }
+
+  const observabilityMetricsMillion = parseInputNumber(form.observabilityMetricsMillion) ?? 0;
+  const observabilityLogsIngestGb = parseInputNumber(form.observabilityLogsIngestGb) ?? 0;
+  const observabilityLogRetentionGb = parseInputNumber(form.observabilityLogRetentionGb) ?? 0;
+  const observabilityAlarms = parseInputNumber(form.observabilityAlarms) ?? 0;
+  const observabilityDashboards = parseInputNumber(form.observabilityDashboards) ?? 0;
+  const observabilityTracesMillion = parseInputNumber(form.observabilityTracesMillion) ?? 0;
+  const secretsCount = parseInputNumber(form.secretsCount) ?? 0;
+  const secretApiCallsTenThousand = parseInputNumber(form.secretApiCallsTenThousand) ?? 0;
+  const securityProtectedResources = parseInputNumber(form.securityProtectedResources) ?? 0;
+  const securityFindingsThousand = parseInputNumber(form.securityFindingsThousand) ?? 0;
+  const wafWebAclCount = parseInputNumber(form.wafWebAclCount) ?? 0;
+  const wafRuleCount = parseInputNumber(form.wafRuleCount) ?? 0;
+  const wafRequestsMillion = parseInputNumber(form.wafRequestsMillion) ?? 0;
+  const ddosProtectedResources = parseInputNumber(form.ddosProtectedResources) ?? 0;
+  const usageSignalParts = [
+    observabilityMetricsMillion > 0
+      ? `${formatDecimal(observabilityMetricsMillion)}M metrics`
+      : undefined,
+    observabilityLogsIngestGb > 0
+      ? `${formatDecimal(observabilityLogsIngestGb)}GB logs`
+      : undefined,
+    observabilityLogRetentionGb > 0
+      ? `${formatDecimal(observabilityLogRetentionGb)}GB-mo retention`
+      : undefined,
+    observabilityTracesMillion > 0
+      ? `${formatDecimal(observabilityTracesMillion)}M traces`
+      : undefined,
+    secretsCount > 0 ? `${formatDecimal(secretsCount)} secrets` : undefined,
+    wafRequestsMillion > 0 ? `${formatDecimal(wafRequestsMillion)}M WAF requests` : undefined,
+    ddosProtectedResources > 0
+      ? `${formatDecimal(ddosProtectedResources)} DDoS resources`
+      : undefined,
+  ].filter(Boolean);
+  const usageSignal = usageSignalParts.join(' · ') || 'Operations rows only';
+  const hasAdvancedFormSignal =
+    observabilityMetricsMillion > 0 ||
+    observabilityLogsIngestGb > 0 ||
+    observabilityLogRetentionGb > 0 ||
+    observabilityAlarms > 0 ||
+    observabilityDashboards > 0 ||
+    observabilityTracesMillion > 0 ||
+    secretsCount > 0 ||
+    secretApiCallsTenThousand > 0 ||
+    securityProtectedResources > 0 ||
+    securityFindingsThousand > 0 ||
+    wafWebAclCount > 0 ||
+    wafRuleCount > 0 ||
+    wafRequestsMillion > 0 ||
+    ddosProtectedResources > 0;
+
+  return comparison.providers
+    .flatMap((provider) => {
+      const operationsRows = operationsIntelligenceLineItems(provider).sort(
+        (left, right) => right.baseMonthlyCostUsd - left.baseMonthlyCostUsd,
+      );
+      const advancedRows = operationsRows.filter((lineItem) =>
+        operationsAdvancedDescriptionMatches(`${lineItem.skuId ?? ''} ${lineItem.description}`),
+      );
+      const primary = advancedRows[0] ?? operationsRows[0];
+      const operationsMonthly = roundCurrency(
+        operationsRows.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0),
+      );
+      const operationsSharePercent =
+        provider.totals.monthly > 0 ? (operationsMonthly / provider.totals.monthly) * 100 : 0;
+      const material =
+        operationsMonthly >= 10 ||
+        operationsSharePercent >= 10 ||
+        hasAdvancedFormSignal ||
+        advancedRows.length > 0;
+
+      if (!primary || operationsMonthly <= 0 || !material) {
+        return [];
+      }
+
+      const signal = operationsOptimizationSignal(primary, operationsMonthly, {
+        ddosProtectedResources,
+        observabilityAlarms,
+        observabilityDashboards,
+        observabilityLogRetentionGb,
+        observabilityLogsIngestGb,
+        observabilityMetricsMillion,
+        observabilityTracesMillion,
+        secretApiCallsTenThousand,
+        secretsCount,
+        securityFindingsThousand,
+        securityProtectedResources,
+        wafRequestsMillion,
+        wafRuleCount,
+        wafWebAclCount,
+      });
+
+      return [
+        {
+          providerId: provider.providerId,
+          operationsMonthly,
+          operationsSharePercent,
+          usageSignal,
+          annualSavings: roundCurrency(signal.monthlySavings * 12),
+          ...signal,
+        },
+      ];
+    })
+    .sort((left, right) => right.monthlySavings - left.monthlySavings);
+}
+
+function operationsIntelligenceLineItems(provider: ComparisonProviderResult): ComparisonLineItem[] {
+  return provider.lineItems.filter((lineItem) =>
+    operationsDescriptionMatches(`${lineItem.skuId ?? ''} ${lineItem.description}`),
+  );
+}
+
+function operationsOptimizationSignal(
+  primary: ComparisonLineItem,
+  operationsMonthly: number,
+  context: {
+    ddosProtectedResources: number;
+    observabilityAlarms: number;
+    observabilityDashboards: number;
+    observabilityLogRetentionGb: number;
+    observabilityLogsIngestGb: number;
+    observabilityMetricsMillion: number;
+    observabilityTracesMillion: number;
+    secretApiCallsTenThousand: number;
+    secretsCount: number;
+    securityFindingsThousand: number;
+    securityProtectedResources: number;
+    wafRequestsMillion: number;
+    wafRuleCount: number;
+    wafWebAclCount: number;
+  },
+): Omit<
+  OperationsOptimizationRow,
+  'providerId' | 'operationsMonthly' | 'operationsSharePercent' | 'usageSignal' | 'annualSavings'
+> {
+  const normalizedPrimary = `${primary.skuId ?? ''} ${primary.description}`.toLowerCase();
+  const primaryMonthly =
+    primary.baseMonthlyCostUsd > 0 ? primary.baseMonthlyCostUsd : operationsMonthly;
+  const baseEvidence = `${primary.description} is the largest operations row at ${formatCurrency(
+    primaryMonthly,
+  )}/mo.`;
+
+  if (normalizedPrimary.includes('log ingestion')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.3);
+
+    return {
+      primaryDriver: 'Log ingestion volume',
+      monthlySavings,
+      effort: 'Low',
+      recommendation:
+        'Filter debug noise at source, sample high-volume streams, and route low-value logs to cheaper retention.',
+      driverEvidence:
+        context.observabilityLogsIngestGb > 0
+          ? `${formatDecimal(context.observabilityLogsIngestGb)}GB logs ingested/month`
+          : 'Log ingestion line item surfaced by backend',
+      evidence: `${baseEvidence} Log filtering models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('log retention')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.35);
+
+    return {
+      primaryDriver: 'Log retention storage',
+      monthlySavings,
+      effort: 'Low',
+      recommendation:
+        'Shorten hot retention, export compliance logs to archive storage, and delete duplicate streams.',
+      driverEvidence:
+        context.observabilityLogRetentionGb > 0
+          ? `${formatDecimal(context.observabilityLogRetentionGb)}GB-month retained logs`
+          : 'Log retention line item surfaced by backend',
+      evidence: `${baseEvidence} Retention policy tuning models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('metric')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.25);
+
+    return {
+      primaryDriver: 'Custom metric cardinality',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation:
+        'Reduce high-cardinality labels and aggregate custom metrics before they multiply across services.',
+      driverEvidence:
+        context.observabilityMetricsMillion > 0
+          ? `${formatDecimal(context.observabilityMetricsMillion)}M metric samples/month`
+          : 'Metric line item surfaced by backend',
+      evidence: `${baseEvidence} Cardinality cleanup models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('trace')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.3);
+
+    return {
+      primaryDriver: 'Trace/APM sampling',
+      monthlySavings,
+      effort: 'Low',
+      recommendation:
+        'Sample traces by route and error rate instead of retaining every successful request path.',
+      driverEvidence:
+        context.observabilityTracesMillion > 0
+          ? `${formatDecimal(context.observabilityTracesMillion)}M traces/month`
+          : 'Trace line item surfaced by backend',
+      evidence: `${baseEvidence} Trace sampling models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('dashboard')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      primaryDriver: 'Dashboard footprint',
+      monthlySavings,
+      effort: 'Low',
+      recommendation: 'Consolidate duplicate dashboards and keep persona-specific views only.',
+      driverEvidence:
+        context.observabilityDashboards > 0
+          ? `${formatDecimal(context.observabilityDashboards)} dashboards`
+          : 'Dashboard line item surfaced by backend',
+      evidence: `${baseEvidence} Dashboard consolidation models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('alarm')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      primaryDriver: 'Alarm rule count',
+      monthlySavings,
+      effort: 'Low',
+      recommendation:
+        'Group low-value alarms into composite policies and reserve paging alerts for actionable symptoms.',
+      driverEvidence:
+        context.observabilityAlarms > 0
+          ? `${formatDecimal(context.observabilityAlarms)} alarm rules`
+          : 'Alarm line item surfaced by backend',
+      evidence: `${baseEvidence} Alarm policy cleanup models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('secret api')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      primaryDriver: 'Secret API calls',
+      monthlySavings,
+      effort: 'Low',
+      recommendation:
+        'Cache secrets safely inside runtime boundaries and remove polling loops that re-read unchanged values.',
+      driverEvidence:
+        context.secretApiCallsTenThousand > 0
+          ? `${formatDecimal(context.secretApiCallsTenThousand)} x 10k secret calls/month`
+          : 'Secret API line item surfaced by backend',
+      evidence: `${baseEvidence} Secret call reduction models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('secret')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.15);
+
+    return {
+      primaryDriver: 'Managed secret inventory',
+      monthlySavings,
+      effort: 'Low',
+      recommendation:
+        'Retire stale secrets, consolidate duplicate environment keys, and keep rotation policy tied to ownership tags.',
+      driverEvidence:
+        context.secretsCount > 0
+          ? `${formatDecimal(context.secretsCount)} managed secrets`
+          : 'Managed secrets line item surfaced by backend',
+      evidence: `${baseEvidence} Secret inventory cleanup models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('ddos')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.15);
+
+    return {
+      primaryDriver: 'DDoS protection baseline',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation:
+        'Validate which public endpoints truly need advanced DDoS protection versus baseline provider protection.',
+      driverEvidence:
+        context.ddosProtectedResources > 0
+          ? `${formatDecimal(context.ddosProtectedResources)} protected resources`
+          : 'DDoS protection line item surfaced by backend',
+      evidence: `${baseEvidence} Protection-scope review models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('waf request')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.25);
+
+    return {
+      primaryDriver: 'WAF request inspection',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation:
+        'Scope WAF inspection to exposed paths and tune managed rules before every request pays inspection cost.',
+      driverEvidence:
+        context.wafRequestsMillion > 0
+          ? `${formatDecimal(context.wafRequestsMillion)}M inspected requests/month`
+          : 'WAF request line item surfaced by backend',
+      evidence: `${baseEvidence} WAF request tuning models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('waf')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      primaryDriver: 'WAF rule footprint',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation:
+        'Remove duplicate WAF rules and consolidate web ACLs around shared managed rule groups.',
+      driverEvidence:
+        context.wafWebAclCount + context.wafRuleCount > 0
+          ? `${formatDecimal(context.wafWebAclCount)} ACLs · ${formatDecimal(
+              context.wafRuleCount,
+            )} rules`
+          : 'WAF line item surfaced by backend',
+      evidence: `${baseEvidence} WAF rule review models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('security posture') || normalizedPrimary.includes('finding')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      primaryDriver: 'Security posture scope',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation:
+        'Scope posture scanning to production assets first and suppress duplicate low-value findings.',
+      driverEvidence:
+        context.securityProtectedResources + context.securityFindingsThousand > 0
+          ? `${formatDecimal(context.securityProtectedResources)} resources · ${formatDecimal(
+              context.securityFindingsThousand,
+            )}k findings`
+          : 'Security posture line item surfaced by backend',
+      evidence: `${baseEvidence} Security scope review models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  const monthlySavings = roundCurrency(operationsMonthly * 0.15);
+
+  return {
+    primaryDriver: 'Operations service footprint',
+    monthlySavings,
+    effort: 'Medium',
+    recommendation:
+      'Review monitoring, logging, secrets, and security controls as explicit production cost centers.',
+    driverEvidence: `${formatCurrency(operationsMonthly)}/mo operations spend`,
+    evidence: `Operations service review models ${formatCurrency(
+      monthlySavings,
+    )}/mo opportunity at 15% of the operations baseline.`,
   };
 }
 
@@ -9401,6 +9876,41 @@ function runtimeAdvancedDescriptionMatches(description: string): boolean {
     'node overhead',
     'registry storage',
     'registry egress',
+  ].some((needle) => normalized.includes(needle));
+}
+
+function operationsDescriptionMatches(description: string): boolean {
+  const normalized = description.toLowerCase();
+
+  return [
+    'monitoring',
+    'metric',
+    'log ingestion',
+    'log retention',
+    'alarm',
+    'dashboard',
+    'trace',
+    'secret',
+    'security posture',
+    'security finding',
+    'waf',
+    'ddos',
+  ].some((needle) => normalized.includes(needle));
+}
+
+function operationsAdvancedDescriptionMatches(description: string): boolean {
+  const normalized = description.toLowerCase();
+
+  return [
+    'log ingestion',
+    'log retention',
+    'metric',
+    'trace',
+    'secret',
+    'waf',
+    'ddos',
+    'security posture',
+    'security finding',
   ].some((needle) => normalized.includes(needle));
 }
 

@@ -653,6 +653,31 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
     ]);
   }
 
+  for (const provider of result.providers) {
+    const operationsMonthly = operationsIntelligenceMonthly(provider);
+    const providerMonthly = provider.totals.monthly;
+    const operationsShare = providerMonthly > 0 ? operationsMonthly / providerMonthly : 0;
+    const insight = operationsOptimizationInsight(provider);
+    const isMaterial =
+      operationsMonthly >= 10 || operationsShare >= 0.1 || Boolean(insight?.hasAdvancedSignal);
+
+    if (!insight || !isMaterial) {
+      continue;
+    }
+
+    rows.push([
+      'Operations optimization',
+      `${provider.providerId} observability/security operations are ${formatNumber(
+        operationsShare * 100,
+      )}% of monthly spend; ${insight.recommendation}`,
+      formatNumber(insight.monthlySavings),
+      formatNumber(insight.monthlySavings * 12),
+      insight.monthlySavings > 100 ? 'High' : insight.monthlySavings > 20 ? 'Medium' : 'Low',
+      insight.effort,
+      insight.evidence,
+    ]);
+  }
+
   rows.push(...architectureRiskOpportunityRows(result));
 
   for (const provider of result.providers) {
@@ -730,7 +755,7 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
       : [
           [
             'No material optimization opportunity detected',
-            'Current comparison does not expose provider spread, commitment, storage, database, runtime, egress, licensing, or mapping signals above thresholds.',
+            'Current comparison does not expose provider spread, commitment, storage, database, runtime, operations, egress, licensing, or mapping signals above thresholds.',
             '',
             '',
             'Low',
@@ -1201,6 +1226,13 @@ function runtimeIntelligenceMonthly(provider: ComparisonProviderResult): number 
   );
 }
 
+function operationsIntelligenceMonthly(provider: ComparisonProviderResult): number {
+  return operationsIntelligenceLineItems(provider).reduce(
+    (sum, lineItem) => sum + lineItem.baseMonthlyCostUsd,
+    0,
+  );
+}
+
 function databaseIntelligenceLineItems(provider: ComparisonProviderResult): ComparisonLineItem[] {
   return provider.lineItems.filter(
     (lineItem) =>
@@ -1214,6 +1246,12 @@ function databaseIntelligenceLineItems(provider: ComparisonProviderResult): Comp
 function runtimeIntelligenceLineItems(provider: ComparisonProviderResult): ComparisonLineItem[] {
   return provider.lineItems.filter((lineItem) =>
     runtimeDescription(`${lineItem.skuId ?? ''} ${lineItem.description}`),
+  );
+}
+
+function operationsIntelligenceLineItems(provider: ComparisonProviderResult): ComparisonLineItem[] {
+  return provider.lineItems.filter((lineItem) =>
+    operationsDescription(`${lineItem.skuId ?? ''} ${lineItem.description}`),
   );
 }
 
@@ -1368,6 +1406,14 @@ interface DatabaseOptimizationInsight {
 }
 
 interface RuntimeOptimizationInsight {
+  recommendation: string;
+  monthlySavings: number;
+  effort: 'Low' | 'Medium' | 'High';
+  evidence: string;
+  hasAdvancedSignal: boolean;
+}
+
+interface OperationsOptimizationInsight {
   recommendation: string;
   monthlySavings: number;
   effort: 'Low' | 'Medium' | 'High';
@@ -1912,6 +1958,193 @@ function runtimeOptimizationInsight(
   };
 }
 
+function operationsOptimizationInsight(
+  provider: ComparisonProviderResult,
+): OperationsOptimizationInsight | undefined {
+  const operationsRows = operationsIntelligenceLineItems(provider).sort(
+    (left, right) => right.baseMonthlyCostUsd - left.baseMonthlyCostUsd,
+  );
+  const operationsMonthly = operationsRows.reduce(
+    (sum, lineItem) => sum + lineItem.baseMonthlyCostUsd,
+    0,
+  );
+
+  if (operationsMonthly <= 0 || operationsRows.length === 0) {
+    return undefined;
+  }
+
+  const advancedRows = operationsRows.filter((lineItem) =>
+    operationsAdvancedDescription(`${lineItem.skuId ?? ''} ${lineItem.description}`),
+  );
+  const primary = advancedRows[0] ?? operationsRows[0];
+  const primaryMonthly = primary.baseMonthlyCostUsd || operationsMonthly;
+  const primaryDescription = primary.description;
+  const normalizedPrimary = `${primary.skuId ?? ''} ${primaryDescription}`.toLowerCase();
+
+  if (normalizedPrimary.includes('log ingestion')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.3);
+
+    return {
+      recommendation:
+        'filter debug noise at source, sample high-volume streams, and route low-value logs to cheaper retention.',
+      monthlySavings,
+      effort: 'Low',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant operations row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; log filtering is modeled as a 30% reduction of that row.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('log retention')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.35);
+
+    return {
+      recommendation:
+        'shorten hot log retention, export compliance logs to archive storage, and delete duplicate streams.',
+      monthlySavings,
+      effort: 'Low',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant operations row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; retention policy tuning is modeled as a 35% reduction of that row.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('metric')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.25);
+
+    return {
+      recommendation:
+        'reduce high-cardinality metric labels and aggregate custom metrics before they multiply across services.',
+      monthlySavings,
+      effort: 'Medium',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant operations row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; metric cardinality cleanup is modeled as a 25% reduction of that row.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('trace')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.3);
+
+    return {
+      recommendation:
+        'sample traces by route and error rate instead of retaining every successful request path.',
+      monthlySavings,
+      effort: 'Low',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant operations row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; trace sampling is modeled as a 30% reduction of that row.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('secret api')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      recommendation:
+        'cache secrets safely inside runtime boundaries and remove polling loops that re-read unchanged values.',
+      monthlySavings,
+      effort: 'Low',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant operations row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; secret call reduction is modeled as a 20% reduction of that row.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('secret')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.15);
+
+    return {
+      recommendation:
+        'retire stale secrets, consolidate duplicate environment keys, and tie rotation policy to ownership tags.',
+      monthlySavings,
+      effort: 'Low',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant operations row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; secret inventory cleanup is modeled as a 15% reduction of that row.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('ddos')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.15);
+
+    return {
+      recommendation:
+        'validate which public endpoints truly need advanced DDoS protection versus baseline provider protection.',
+      monthlySavings,
+      effort: 'Medium',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant operations row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; protection-scope review is modeled as a 15% reduction of that row.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('waf request')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.25);
+
+    return {
+      recommendation:
+        'scope WAF inspection to exposed paths and tune managed rules before every request pays inspection cost.',
+      monthlySavings,
+      effort: 'Medium',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant operations row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; WAF request tuning is modeled as a 25% reduction of that row.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('waf')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      recommendation:
+        'remove duplicate WAF rules and consolidate web ACLs around shared managed rule groups.',
+      monthlySavings,
+      effort: 'Medium',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant operations row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; WAF rule review is modeled as a 20% reduction of that row.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('security posture') || normalizedPrimary.includes('finding')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      recommendation:
+        'scope posture scanning to production assets first and suppress duplicate low-value findings.',
+      monthlySavings,
+      effort: 'Medium',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant operations row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; security scope review is modeled as a 20% reduction of that row.`,
+    };
+  }
+
+  const monthlySavings = roundCurrency(operationsMonthly * 0.15);
+
+  return {
+    recommendation:
+      'review monitoring, logging, secrets, and security controls as explicit production cost centers.',
+    monthlySavings,
+    effort: 'Medium',
+    hasAdvancedSignal: false,
+    evidence: `${provider.providerId} operations baseline is $${formatNumber(
+      operationsMonthly,
+    )}/mo across ${operationsRows.length} observability/security row(s); service-footprint review is modeled at 15% of spend.`,
+  };
+}
+
 function egressOptimizationInsight(provider: ComparisonProviderResult): EgressOptimizationInsight {
   const egressMonthly = componentMonthly(provider, 'egress');
   const egressRows = provider.lineItems
@@ -2210,6 +2443,41 @@ function runtimeAdvancedDescription(description: string): boolean {
     'node overhead',
     'registry storage',
     'registry egress',
+  ].some((needle) => normalized.includes(needle));
+}
+
+function operationsDescription(description: string): boolean {
+  const normalized = description.toLowerCase();
+
+  return [
+    'monitoring',
+    'metric',
+    'log ingestion',
+    'log retention',
+    'alarm',
+    'dashboard',
+    'trace',
+    'secret',
+    'security posture',
+    'security finding',
+    'waf',
+    'ddos',
+  ].some((needle) => normalized.includes(needle));
+}
+
+function operationsAdvancedDescription(description: string): boolean {
+  const normalized = description.toLowerCase();
+
+  return [
+    'log ingestion',
+    'log retention',
+    'metric',
+    'trace',
+    'secret',
+    'waf',
+    'ddos',
+    'security posture',
+    'security finding',
   ].some((needle) => normalized.includes(needle));
 }
 

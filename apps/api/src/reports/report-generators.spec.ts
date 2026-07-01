@@ -911,6 +911,54 @@ describe('report generators', () => {
         ]),
       ]),
     );
+
+    expect(
+      optimizationOpportunityRows({
+        ...comparison,
+        providers: [
+          {
+            providerId: 'aws',
+            lineItems: [
+              {
+                category: 'operations',
+                costComponent: 'operations',
+                description: 'AWS log ingestion estimate',
+                skuId: 'modeled-operations-log-ingestion',
+                isApproximate: false,
+                baseMonthlyCostUsd: 120,
+              },
+              {
+                category: 'operations',
+                costComponent: 'operations',
+                description: 'AWS managed secrets estimate',
+                skuId: 'modeled-security-secrets',
+                isApproximate: false,
+                baseMonthlyCostUsd: 20,
+              },
+            ],
+            totals: {
+              daily: 6.58,
+              weekly: 46.15,
+              monthly: 200,
+              quarterly: 600,
+              yearly: 2400,
+            },
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'Operations optimization',
+          'aws observability/security operations are 70% of monthly spend; filter debug noise at source, sample high-volume streams, and route low-value logs to cheaper retention.',
+          '36',
+          '432',
+          'Medium',
+          'Low',
+          'aws dominant operations row is "AWS log ingestion estimate" at $120/mo; log filtering is modeled as a 30% reduction of that row.',
+        ]),
+      ]),
+    );
   });
 
   it('builds fallback service requirement rows when comparison requirements are absent', () => {

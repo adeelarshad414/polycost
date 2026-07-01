@@ -1284,6 +1284,72 @@ describe('ComparisonView', () => {
     unmount();
   });
 
+  it('surfaces operations optimization detail from observability and secrets dimensions', async () => {
+    const awsProvider = providerWithItems('aws', [
+      ['compute', 'aws compute', 40],
+      ['operations', 'AWS log ingestion estimate', 120],
+      ['operations', 'AWS log retention storage estimate', 15],
+      ['operations', 'AWS managed secrets estimate', 20],
+    ]);
+    awsProvider.lineItems[1] = {
+      ...awsProvider.lineItems[1],
+      costComponent: 'operations',
+      skuId: 'modeled-operations-log-ingestion',
+    };
+    awsProvider.lineItems[2] = {
+      ...awsProvider.lineItems[2],
+      costComponent: 'operations',
+      skuId: 'modeled-operations-log-retention',
+    };
+    awsProvider.lineItems[3] = {
+      ...awsProvider.lineItems[3],
+      costComponent: 'operations',
+      skuId: 'modeled-security-secrets',
+    };
+    const operationsResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'aws',
+      providers: [
+        awsProvider,
+        providerWithItems('azure', [['compute', 'azure compute', 230]]),
+        providerWithItems('gcp', [['compute', 'gcp compute', 240]]),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView
+        comparison={operationsResult}
+        form={{
+          ...defaultWorkloadForm,
+          observabilityLogsIngestGb: '240',
+          observabilityLogRetentionGb: '500',
+          observabilityMetricsMillion: '25',
+          observabilityTracesMillion: '8',
+          secretsCount: '50',
+          secretApiCallsTenThousand: '300',
+        }}
+        interval="monthly"
+      />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain('Operations optimization detail');
+    expect(text(container)).toContain(
+      'Observability, logging, tracing, secrets, WAF, and security posture controls',
+    );
+    expect(text(container)).toContain('Log ingestion volume');
+    expect(text(container)).toContain(
+      '25M metrics · 240GB logs · 500GB-mo retention · 8M traces · 50 secrets',
+    );
+    expect(text(container)).toContain('$36.00/mo');
+    expect(text(container)).toContain('$432.00/yr');
+    expect(text(container)).toContain(
+      'Filter debug noise at source, sample high-volume streams, and route low-value logs to cheaper retention.',
+    );
+    expect(text(container)).toContain('240GB logs ingested/month');
+
+    unmount();
+  });
+
   it('renders FinOps feature additions without fabricating unsupported backend data', async () => {
     const awsRichProvider = providerWithItems('aws', [
       ['compute', 'aws compute', 50],
