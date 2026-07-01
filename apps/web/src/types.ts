@@ -140,6 +140,10 @@ export interface NormalizedWorkloadSpec {
     queryDataTb?: number;
     cacheReplicaCount?: number;
     storageGrowthGbPerMonth?: number;
+    searchNodeCount?: number;
+    searchNodeHours?: number;
+    searchStorageGb?: number;
+    searchQueriesMillion?: number;
   }>;
   network: {
     estimatedMonthlyEgressGb?: number;

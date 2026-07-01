@@ -1197,7 +1197,7 @@ describe('ComparisonView', () => {
 
     expect(text(container)).toContain('Database optimization detail');
     expect(text(container)).toContain(
-      'NoSQL capacity, RU/s, replicas, backups, cache, and warehouse query tuning',
+      'NoSQL, RU/s, replicas, backups, cache, managed search, and query tuning',
     );
     expect(text(container)).toContain('RU/s provisioned capacity');
     expect(text(container)).toContain('generic nosql · 250GB data · 4,000 RU/s · 70M NoSQL units');
@@ -1207,6 +1207,52 @@ describe('ComparisonView', () => {
       'Validate RU/s utilization, autoscale limits, and serverless break-even.',
     );
     expect(text(container)).toContain('4,000 RU/s configured');
+
+    unmount();
+  });
+
+  it('surfaces managed-search optimization detail from search database dimensions', async () => {
+    const awsProvider = providerWithItems('aws', [
+      ['database', 'Amazon OpenSearch Service capacity estimate', 120],
+    ]);
+    awsProvider.lineItems[0] = {
+      ...awsProvider.lineItems[0],
+      costComponent: 'database',
+      skuId: 'modeled-database-search-capacity',
+    };
+    const searchResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'aws',
+      providers: [
+        awsProvider,
+        providerWithItems('azure', [['compute', 'azure compute', 70]]),
+        providerWithItems('gcp', [['compute', 'gcp compute', 75]]),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView
+        comparison={searchResult}
+        form={{
+          ...defaultWorkloadForm,
+          databaseEnabled: true,
+          databaseEngine: 'generic_nosql',
+          databaseSizeGb: '500',
+          databaseSearchNodeCount: '2',
+          databaseSearchStorageGb: '500',
+          databaseSearchQueriesMillion: '25',
+        }}
+        interval="monthly"
+      />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain('Managed search capacity');
+    expect(text(container)).toContain('2 search nodes · 500GB index');
+    expect(text(container)).toContain('$26.40/mo');
+    expect(text(container)).toContain('$316.80/yr');
+    expect(text(container)).toContain(
+      'Right-size search replicas, index lifecycle, and query capacity before scaling search clusters.',
+    );
 
     unmount();
   });

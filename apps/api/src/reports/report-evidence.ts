@@ -1385,6 +1385,9 @@ function architectureRiskOpportunityRows(result: ComparisonResult): string[][] {
       const storageGrowthGb = numericScaleParam(scaleParams, 'storageGrowthGbPerMonth');
       const sizeGb = numericScaleParam(scaleParams, 'sizeGb');
       const replicaTransferGb = numericScaleParam(scaleParams, 'crossRegionReplicaTransferGb');
+      const searchNodeCount = numericScaleParam(scaleParams, 'searchNodeCount');
+      const searchStorageGb = numericScaleParam(scaleParams, 'searchStorageGb');
+      const searchQueriesMillion = numericScaleParam(scaleParams, 'searchQueriesMillion');
       const isNoSql =
         engine.includes('nosql') ||
         engine.includes('mongo') ||
@@ -1420,6 +1423,27 @@ function architectureRiskOpportunityRows(result: ComparisonResult): string[][] {
           `Requirement evidence: ${formatNumber(sizeGb)}GB current size and ${formatNumber(
             storageGrowthGb,
           )}GB/month growth.`,
+        ]);
+      }
+
+      if (
+        requirement.serviceType.includes('search') ||
+        searchNodeCount > 0 ||
+        searchStorageGb > 0 ||
+        searchQueriesMillion > 0
+      ) {
+        rows.push([
+          'Architecture risk',
+          `${requirement.serviceType} has managed-search capacity assumptions; validate replicas, partitions, semantic/query add-ons, and index lifecycle before production indexing.`,
+          '',
+          '',
+          searchNodeCount >= 3 || searchStorageGb >= 500 || searchQueriesMillion >= 50
+            ? 'High'
+            : 'Medium',
+          'Medium',
+          `Requirement evidence: ${formatNumber(searchNodeCount)} search nodes, ${formatNumber(
+            searchStorageGb,
+          )}GB index storage, ${formatNumber(searchQueriesMillion)}M queries/month.`,
         ]);
       }
 
@@ -1801,6 +1825,28 @@ function databaseOptimizationInsight(
       evidence: `${provider.providerId} dominant database row is "${primaryDescription}" at $${formatNumber(
         primaryMonthly,
       )}/mo; NoSQL capacity-mode tuning is modeled as a 20% reduction of that row.`,
+    };
+  }
+
+  if (
+    normalizedPrimary.includes('search') ||
+    normalizedPrimary.includes('opensearch') ||
+    normalizedPrimary.includes('cognitive search') ||
+    normalizedPrimary.includes('azure ai search') ||
+    normalizedPrimary.includes('cloud search') ||
+    normalizedPrimary.includes('vertex ai search')
+  ) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.22);
+
+    return {
+      recommendation:
+        'right-size search replicas, partitions, index lifecycle, and query capacity before scaling managed-search clusters.',
+      monthlySavings,
+      effort: 'Medium',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant database row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; managed-search tuning is modeled as a 22% reduction of that row.`,
     };
   }
 
@@ -2572,6 +2618,12 @@ function databaseDescription(description: string): boolean {
     'cache',
     'redis',
     'growth',
+    'search',
+    'opensearch',
+    'cognitive search',
+    'azure ai search',
+    'cloud search',
+    'vertex ai search',
   ].some((needle) => normalized.includes(needle));
 }
 
@@ -2600,6 +2652,12 @@ function databaseAdvancedDescription(description: string): boolean {
     'cache',
     'redis',
     'growth',
+    'search',
+    'opensearch',
+    'cognitive search',
+    'azure ai search',
+    'cloud search',
+    'vertex ai search',
   ].some((needle) => normalized.includes(needle));
 }
 

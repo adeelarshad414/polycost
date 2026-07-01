@@ -97,6 +97,9 @@ interface DatabaseDimensionRates {
   queryPerTb: number;
   cacheReplicaMonthly: number;
   storageGrowthPerGbMonth: number;
+  searchNodeHour: number;
+  searchStoragePerGbMonth: number;
+  searchQueryPerMillion: number;
 }
 
 interface SupportingServicesRates {
@@ -1222,7 +1225,13 @@ export class ComparisonOrchestratorService {
   ): ComparisonLineItem[] {
     const rates = databaseDimensionRates(providerId);
     const regionLabel = nws.workload.region.preference ?? 'default region';
-    const databaseComponents = nws.database;
+    const requirementDatabaseComponents = databaseComponentsFromRequirements(nws);
+    const databaseComponents =
+      nws.database.length === 0
+        ? requirementDatabaseComponents
+        : nws.database.some(databaseHasManagedSearchAssumption)
+          ? nws.database
+          : [...nws.database, ...requirementDatabaseComponents];
 
     if (databaseComponents.length === 0) {
       return [];
@@ -1439,6 +1448,58 @@ export class ComparisonOrchestratorService {
             quantity: database.storageGrowthGbPerMonth,
             unit: 'GB-month',
             unitPriceUsd: rates.storageGrowthPerGbMonth,
+          }),
+        );
+      }
+
+      if (
+        database.searchNodeCount !== undefined &&
+        database.searchNodeCount > 0 &&
+        database.searchNodeHours !== undefined &&
+        database.searchNodeHours > 0 &&
+        rates.searchNodeHour > 0
+      ) {
+        modeledLineItems.push(
+          this.databaseLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-database-search-capacity',
+            description: `${providerManagedSearchLabel(providerId)} capacity estimate`,
+            quantity: database.searchNodeCount * database.searchNodeHours,
+            unit: 'node-hour',
+            unitPriceUsd: rates.searchNodeHour,
+          }),
+        );
+      }
+
+      if (
+        database.searchStorageGb !== undefined &&
+        database.searchStorageGb > 0 &&
+        rates.searchStoragePerGbMonth > 0
+      ) {
+        modeledLineItems.push(
+          this.databaseLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-database-search-storage',
+            description: `${providerManagedSearchLabel(providerId)} index storage estimate`,
+            quantity: database.searchStorageGb,
+            unit: 'GB-month',
+            unitPriceUsd: rates.searchStoragePerGbMonth,
+          }),
+        );
+      }
+
+      if (database.searchQueriesMillion !== undefined && database.searchQueriesMillion > 0) {
+        modeledLineItems.push(
+          this.databaseLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-database-search-queries',
+            description: `${providerManagedSearchLabel(providerId)} search query estimate`,
+            quantity: database.searchQueriesMillion,
+            unit: '1M queries',
+            unitPriceUsd: rates.searchQueryPerMillion,
           }),
         );
       }
@@ -2518,7 +2579,7 @@ export class ComparisonOrchestratorService {
     }));
     const databaseRequirements: ServiceRequirement[] = nws.database.map((database) => ({
       serviceCategory: 'database',
-      serviceType: databaseServiceType(database.engine),
+      serviceType: databaseServiceType(database),
       instanceType: `${database.engine} - ${database.sizeGb ?? 'provider default'}GB`,
       tier: database.highAvailability ? 'high-availability' : 'single-zone',
       region,
@@ -2556,6 +2617,18 @@ export class ComparisonOrchestratorService {
           : {}),
         ...(database.storageGrowthGbPerMonth !== undefined
           ? { storageGrowthGbPerMonth: database.storageGrowthGbPerMonth }
+          : {}),
+        ...(database.searchNodeCount !== undefined
+          ? { searchNodeCount: database.searchNodeCount }
+          : {}),
+        ...(database.searchNodeHours !== undefined
+          ? { searchNodeHours: database.searchNodeHours }
+          : {}),
+        ...(database.searchStorageGb !== undefined
+          ? { searchStorageGb: database.searchStorageGb }
+          : {}),
+        ...(database.searchQueriesMillion !== undefined
+          ? { searchQueriesMillion: database.searchQueriesMillion }
           : {}),
       },
     }));
@@ -2984,6 +3057,9 @@ function databaseDimensionRates(providerId: ProviderId): DatabaseDimensionRates 
         queryPerTb: 5,
         cacheReplicaMonthly: 45,
         storageGrowthPerGbMonth: 0.115,
+        searchNodeHour: 0.24,
+        searchStoragePerGbMonth: 0.135,
+        searchQueryPerMillion: 0,
       };
     case 'azure':
       return {
@@ -2998,6 +3074,9 @@ function databaseDimensionRates(providerId: ProviderId): DatabaseDimensionRates 
         queryPerTb: 5,
         cacheReplicaMonthly: 42,
         storageGrowthPerGbMonth: 0.12,
+        searchNodeHour: 0.336,
+        searchStoragePerGbMonth: 0.1,
+        searchQueryPerMillion: 0,
       };
     case 'gcp':
       return {
@@ -3012,22 +3091,114 @@ function databaseDimensionRates(providerId: ProviderId): DatabaseDimensionRates 
         queryPerTb: 5,
         cacheReplicaMonthly: 40,
         storageGrowthPerGbMonth: 0.17,
+        searchNodeHour: 0.008219,
+        searchStoragePerGbMonth: 5,
+        searchQueryPerMillion: 1500,
       };
   }
 }
 
 function databaseServiceType(
-  engine: NormalizedWorkloadSpec['database'][number]['engine'],
-): 'cache' | 'nosql-database' | 'relational-database' {
-  if (engine === 'redis') {
+  database: NormalizedWorkloadSpec['database'][number],
+): 'cache' | 'managed-search' | 'nosql-database' | 'relational-database' {
+  if (databaseHasManagedSearchAssumption(database)) {
+    return 'managed-search';
+  }
+
+  if (database.engine === 'redis') {
     return 'cache';
   }
 
-  if (engine === 'mongodb' || engine === 'generic_nosql') {
+  if (database.engine === 'mongodb' || database.engine === 'generic_nosql') {
     return 'nosql-database';
   }
 
   return 'relational-database';
+}
+
+function databaseComponentsFromRequirements(
+  nws: NormalizedWorkloadSpec,
+): NormalizedWorkloadSpec['database'] {
+  return (nws.serviceRequirements ?? [])
+    .filter(
+      (requirement) =>
+        requirement.serviceCategory === 'database' && requirement.serviceType.includes('search'),
+    )
+    .map((requirement) => {
+      const searchNodeCount = scaleParamNumber(requirement.scaleParams, 'searchNodeCount');
+      const searchNodeHours =
+        scaleParamNumber(requirement.scaleParams, 'searchNodeHours') ||
+        (searchNodeCount > 0 ? HOURS_PER_MONTH : 0);
+      const searchStorageGb = scaleParamNumber(requirement.scaleParams, 'searchStorageGb');
+      const searchQueriesMillion = scaleParamNumber(
+        requirement.scaleParams,
+        'searchQueriesMillion',
+      );
+      const sizeGb =
+        scaleParamNumber(requirement.scaleParams, 'databaseSizeGb') ||
+        scaleParamNumber(requirement.scaleParams, 'sizeGb') ||
+        searchStorageGb;
+
+      return {
+        role: String(requirement.scaleParams?.databaseRole ?? requirement.serviceType),
+        engine: 'generic_nosql' as const,
+        ...(sizeGb > 0 ? { sizeGb } : {}),
+        highAvailability: scaleParamBoolean(requirement.scaleParams, 'databaseHighAvailability'),
+        ...(searchNodeCount > 0 ? { searchNodeCount } : {}),
+        ...(searchNodeHours > 0 ? { searchNodeHours } : {}),
+        ...(searchStorageGb > 0 ? { searchStorageGb } : {}),
+        ...(searchQueriesMillion > 0 ? { searchQueriesMillion } : {}),
+      };
+    });
+}
+
+function scaleParamNumber(
+  scaleParams: ServiceRequirement['scaleParams'] | undefined,
+  key: string,
+): number {
+  const value = scaleParams?.[key];
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const numericValue = Number(value);
+
+    return Number.isFinite(numericValue) ? numericValue : 0;
+  }
+
+  return 0;
+}
+
+function scaleParamBoolean(
+  scaleParams: ServiceRequirement['scaleParams'] | undefined,
+  key: string,
+): boolean {
+  const value = scaleParams?.[key];
+
+  return value === true || value === 'true';
+}
+
+function databaseHasManagedSearchAssumption(
+  database: NormalizedWorkloadSpec['database'][number],
+): boolean {
+  return (
+    (database.searchNodeCount !== undefined && database.searchNodeCount > 0) ||
+    (database.searchStorageGb !== undefined && database.searchStorageGb > 0) ||
+    (database.searchQueriesMillion !== undefined && database.searchQueriesMillion > 0)
+  );
+}
+
+function providerManagedSearchLabel(providerId: ProviderId): string {
+  switch (providerId) {
+    case 'aws':
+      return 'Amazon OpenSearch Service';
+    case 'azure':
+      return 'Azure AI Search';
+    case 'gcp':
+      return 'Google Cloud Search / Vertex AI Search';
+  }
 }
 
 function supportingServicesRates(providerId: ProviderId): SupportingServicesRates {

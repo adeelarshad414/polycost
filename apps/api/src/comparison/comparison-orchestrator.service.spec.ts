@@ -1018,6 +1018,71 @@ describe('ComparisonOrchestratorService', () => {
     expect(result.providers[0].breakdown?.databaseMonthlyCostUsd).toBe(804.2);
   });
 
+  it('adds modeled managed-search database line items from service requirements', async () => {
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async (): Promise<ProviderPricingResult> => ({
+          providerId: 'aws',
+          baseMonthlyCostUsd: 20,
+          lineItems: [
+            {
+              category: 'compute',
+              costComponent: 'compute',
+              description: 'AWS compute',
+              isApproximate: false,
+              baseMonthlyCostUsd: 20,
+              skuId: 'aws-compute',
+              region: 'us-east-1',
+              unit: 'hour',
+              unitPriceUsd: 0.03,
+            },
+          ],
+        })),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      database: [],
+      serviceRequirements: [
+        {
+          serviceCategory: 'database',
+          serviceType: 'managed-search',
+          instanceType: '2 search nodes - 500GB index',
+          quantity: 1,
+          scaleParams: {
+            searchNodeCount: 2,
+            searchNodeHours: 730,
+            searchStorageGb: 500,
+            searchQueriesMillion: 25,
+          },
+        },
+      ],
+    });
+
+    expect(result.providers[0].lineItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          skuId: 'modeled-database-search-capacity',
+          description: 'Amazon OpenSearch Service capacity estimate',
+          baseMonthlyCostUsd: 350.4,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-database-search-storage',
+          description: 'Amazon OpenSearch Service index storage estimate',
+          baseMonthlyCostUsd: 67.5,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-database-search-queries',
+          description: 'Amazon OpenSearch Service search query estimate',
+          baseMonthlyCostUsd: 0,
+        }),
+      ]),
+    );
+    expect(result.providers[0].breakdown?.databaseMonthlyCostUsd).toBe(417.9);
+  });
+
   it('adds modeled operations line items for observability and secrets assumptions', async () => {
     const service = createService([
       adapter(

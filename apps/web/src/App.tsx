@@ -3316,7 +3316,7 @@ function WorkloadForm({
           <details className="advanced-service-fields">
             <summary>
               <span>Advanced database cost drivers</span>
-              <small>Backups, IOPS, replicas, NoSQL units, RU/s, query TB</small>
+              <small>Backups, IOPS, replicas, NoSQL units, RU/s, search, query TB</small>
             </summary>
             <div
               className={
@@ -3423,6 +3423,42 @@ function WorkloadForm({
                 disabled={!form.databaseEnabled}
                 error={fieldErrors.databaseStorageGrowthGbPerMonth}
                 onChange={(value) => update('databaseStorageGrowthGbPerMonth', value)}
+              />
+              <TextField
+                label="Search nodes"
+                value={form.databaseSearchNodeCount}
+                inputMode="numeric"
+                suffix="nodes"
+                disabled={!form.databaseEnabled}
+                error={fieldErrors.databaseSearchNodeCount}
+                onChange={(value) => update('databaseSearchNodeCount', value)}
+              />
+              <TextField
+                label="Search hours"
+                value={form.databaseSearchNodeHours}
+                inputMode="decimal"
+                suffix="hrs/mo"
+                disabled={!form.databaseEnabled}
+                error={fieldErrors.databaseSearchNodeHours}
+                onChange={(value) => update('databaseSearchNodeHours', value)}
+              />
+              <TextField
+                label="Search index"
+                value={form.databaseSearchStorageGb}
+                inputMode="decimal"
+                suffix="GB"
+                disabled={!form.databaseEnabled}
+                error={fieldErrors.databaseSearchStorageGb}
+                onChange={(value) => update('databaseSearchStorageGb', value)}
+              />
+              <TextField
+                label="Search queries"
+                value={form.databaseSearchQueriesMillion}
+                inputMode="decimal"
+                suffix="M/mo"
+                disabled={!form.databaseEnabled}
+                error={fieldErrors.databaseSearchQueriesMillion}
+                onChange={(value) => update('databaseSearchQueriesMillion', value)}
               />
             </div>
           </details>
@@ -6469,7 +6505,7 @@ function DatabaseOptimizationPanel({ rows }: { rows: DatabaseOptimizationRow[] }
       <div className="scenario-sensitivity-heading">
         <div>
           <span>Database optimization detail</span>
-          <h4>NoSQL capacity, RU/s, replicas, backups, cache, and warehouse query tuning</h4>
+          <h4>NoSQL, RU/s, replicas, backups, cache, managed search, and query tuning</h4>
         </div>
       </div>
 
@@ -8065,6 +8101,9 @@ function databaseOptimizationRows(
   const queryDataTb = parseInputNumber(form.databaseQueryDataTb) ?? 0;
   const cacheReplicas = parseInputNumber(form.databaseCacheReplicaCount) ?? 0;
   const storageGrowthGb = parseInputNumber(form.databaseStorageGrowthGbPerMonth) ?? 0;
+  const searchNodes = parseInputNumber(form.databaseSearchNodeCount) ?? 0;
+  const searchStorageGb = parseInputNumber(form.databaseSearchStorageGb) ?? 0;
+  const searchQueriesMillion = parseInputNumber(form.databaseSearchQueriesMillion) ?? 0;
   const warehouseStorageGb = parseInputNumber(form.analyticsWarehouseStorageGb) ?? 0;
   const warehouseQueryTb = parseInputNumber(form.analyticsWarehouseQueryTb) ?? 0;
   const databaseEngineLabel = form.databaseEngine.replace(/_/g, ' ');
@@ -8081,6 +8120,9 @@ function databaseOptimizationRows(
     readReplicas + cacheReplicas > 0
       ? `${formatDecimal(readReplicas + cacheReplicas)} replica nodes`
       : undefined,
+    searchNodes + searchStorageGb + searchQueriesMillion > 0
+      ? `${formatDecimal(searchNodes)} search nodes · ${formatDecimal(searchStorageGb)}GB index`
+      : undefined,
   ].filter(Boolean);
   const usageSignal = usageSignalParts.join(' · ') || 'Database rows only';
   const hasAdvancedFormSignal =
@@ -8093,6 +8135,7 @@ function databaseOptimizationRows(
     queryDataTb > 0 ||
     cacheReplicas > 0 ||
     storageGrowthGb > 0 ||
+    searchNodes + searchStorageGb + searchQueriesMillion > 0 ||
     warehouseStorageGb > 0 ||
     warehouseQueryTb > 0;
 
@@ -8132,6 +8175,9 @@ function databaseOptimizationRows(
         readReplicas,
         replicaTransferGb,
         ruPerSecond,
+        searchNodes,
+        searchQueriesMillion,
+        searchStorageGb,
         storageGrowthGb,
         warehouseStorageGb,
       });
@@ -8175,6 +8221,9 @@ function databaseOptimizationSignal(
     readReplicas: number;
     replicaTransferGb: number;
     ruPerSecond: number;
+    searchNodes: number;
+    searchQueriesMillion: number;
+    searchStorageGb: number;
     storageGrowthGb: number;
     warehouseStorageGb: number;
   },
@@ -8226,6 +8275,34 @@ function databaseOptimizationSignal(
             )}M writes`
           : `${context.databaseEngineLabel} capacity line item`,
       evidence: `${baseEvidence} Capacity-mode review models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (
+    normalizedPrimary.includes('search') ||
+    normalizedPrimary.includes('opensearch') ||
+    normalizedPrimary.includes('cognitive search') ||
+    normalizedPrimary.includes('azure ai search') ||
+    normalizedPrimary.includes('cloud search') ||
+    normalizedPrimary.includes('vertex ai search')
+  ) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.22);
+
+    return {
+      primaryDriver: 'Managed search capacity',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation:
+        'Right-size search replicas, index lifecycle, and query capacity before scaling search clusters.',
+      driverEvidence:
+        context.searchNodes + context.searchStorageGb + context.searchQueriesMillion > 0
+          ? `${formatDecimal(context.searchNodes)} nodes · ${formatDecimal(
+              context.searchStorageGb,
+            )}GB index · ${formatDecimal(context.searchQueriesMillion)}M queries`
+          : 'Search service line item surfaced by backend',
+      evidence: `${baseEvidence} Managed-search tuning models ${formatCurrency(
         monthlySavings,
       )}/mo opportunity.`,
     };
@@ -9617,6 +9694,9 @@ function architectureRiskFlags(
   const databaseGrowthGb = parseInputNumber(form.databaseStorageGrowthGbPerMonth) ?? 0;
   const databaseReplicaTransferGb =
     parseInputNumber(form.databaseCrossRegionReplicaTransferGb) ?? 0;
+  const searchNodes = parseInputNumber(form.databaseSearchNodeCount) ?? 0;
+  const searchStorageGb = parseInputNumber(form.databaseSearchStorageGb) ?? 0;
+  const searchQueriesMillion = parseInputNumber(form.databaseSearchQueriesMillion) ?? 0;
   const maxEgressShare = maxComponentShare(comparison, 'egress');
 
   if (egressGb >= 500 || maxEgressShare >= 20) {
@@ -9678,6 +9758,20 @@ function architectureRiskFlags(
           'Storage autoscaling, backup retention, replica transfer, and IOPS can grow faster than the base database instance cost.',
       });
     }
+  }
+
+  if (searchNodes > 0 || searchStorageGb > 0 || searchQueriesMillion > 0) {
+    flags.push({
+      id: 'managed-search-scaling-model',
+      title: 'Managed search scaling model',
+      severity:
+        searchNodes >= 3 || searchStorageGb >= 500 || searchQueriesMillion >= 50
+          ? 'high'
+          : 'medium',
+      signal: `${formatDecimal(searchNodes)} nodes · ${formatDecimal(searchStorageGb)}GB index`,
+      evidence:
+        'Search pricing can hinge on replicas, partitions, semantic ranking, index retention, and query volume; validate capacity mode before production indexing.',
+    });
   }
 
   if (
@@ -10267,6 +10361,12 @@ function databaseDescriptionMatches(description: string): boolean {
     'cache',
     'redis',
     'growth',
+    'search',
+    'opensearch',
+    'cognitive search',
+    'azure ai search',
+    'cloud search',
+    'vertex ai search',
   ].some((needle) => normalized.includes(needle));
 }
 
@@ -10295,6 +10395,12 @@ function databaseAdvancedDescriptionMatches(description: string): boolean {
     'cache',
     'redis',
     'growth',
+    'search',
+    'opensearch',
+    'cognitive search',
+    'azure ai search',
+    'cloud search',
+    'vertex ai search',
   ].some((needle) => normalized.includes(needle));
 }
 

@@ -131,6 +131,11 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Azure Managed Redis'],
     gcp: ['Memorystore'],
   }),
+  family('managed-search', 'database', 'Managed search', 'mapped', {
+    aws: ['Amazon OpenSearch Service'],
+    azure: ['Azure AI Search'],
+    gcp: ['Cloud Search', 'Vertex AI Search'],
+  }),
   family('graph-ledger', 'database', 'Graph + ledger data', 'roadmap', {
     aws: ['Amazon Neptune', 'Amazon QLDB'],
     azure: ['Azure Cosmos DB Gremlin API'],

@@ -922,6 +922,46 @@ describe('report generators', () => {
             providerId: 'aws',
             lineItems: [
               {
+                category: 'database',
+                costComponent: 'database',
+                description: 'Amazon OpenSearch Service capacity estimate',
+                skuId: 'modeled-database-search-capacity',
+                isApproximate: false,
+                baseMonthlyCostUsd: 120,
+              },
+            ],
+            totals: {
+              daily: 6.58,
+              weekly: 46.15,
+              monthly: 200,
+              quarterly: 600,
+              yearly: 2400,
+            },
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'Database optimization',
+          'aws database and analytics data services are 60% of monthly spend; right-size search replicas, partitions, index lifecycle, and query capacity before scaling managed-search clusters.',
+          '26.4',
+          '316.8',
+          'Medium',
+          'Medium',
+          'aws dominant database row is "Amazon OpenSearch Service capacity estimate" at $120/mo; managed-search tuning is modeled as a 22% reduction of that row.',
+        ]),
+      ]),
+    );
+
+    expect(
+      optimizationOpportunityRows({
+        ...comparison,
+        providers: [
+          {
+            providerId: 'aws',
+            lineItems: [
+              {
                 category: 'compute',
                 costComponent: 'compute',
                 description: 'AWS serverless function GB-second estimate',

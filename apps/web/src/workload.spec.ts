@@ -405,6 +405,48 @@ describe('workload helpers', () => {
     );
   });
 
+  it('serializes managed-search assumptions and restores them from NWS', () => {
+    const nws = buildNwsFromForm({
+      ...defaultWorkloadForm,
+      databaseEngine: 'generic_nosql',
+      databaseSizeGb: '500',
+      databaseSearchNodeCount: '2',
+      databaseSearchNodeHours: '730',
+      databaseSearchStorageGb: '500',
+      databaseSearchQueriesMillion: '25',
+    });
+
+    expect(nws.database[0]).toMatchObject({
+      engine: 'generic_nosql',
+      sizeGb: 500,
+      searchNodeCount: 2,
+      searchNodeHours: 730,
+      searchStorageGb: 500,
+      searchQueriesMillion: 25,
+    });
+    expect(nws.serviceRequirements).toContainEqual(
+      expect.objectContaining({
+        serviceCategory: 'database',
+        serviceType: 'managed-search',
+        instanceType: '2 search nodes - 500GB index',
+        scaleParams: expect.objectContaining({
+          searchNodeCount: 2,
+          searchNodeHours: 730,
+          searchStorageGb: 500,
+          searchQueriesMillion: 25,
+        }),
+      }),
+    );
+    expect(formFromNws(nws)).toEqual(
+      expect.objectContaining({
+        databaseSearchNodeCount: '2',
+        databaseSearchNodeHours: '730',
+        databaseSearchStorageGb: '500',
+        databaseSearchQueriesMillion: '25',
+      }),
+    );
+  });
+
   it('serializes observability and secrets assumptions into service requirements', () => {
     const nws = buildNwsFromForm({
       ...defaultWorkloadForm,

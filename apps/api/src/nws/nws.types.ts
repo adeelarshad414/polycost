@@ -117,6 +117,10 @@ export const databaseComponentSchema = z
     queryDataTb: z.number().nonnegative().optional(),
     cacheReplicaCount: z.number().int().nonnegative().optional(),
     storageGrowthGbPerMonth: z.number().nonnegative().optional(),
+    searchNodeCount: z.number().int().nonnegative().optional(),
+    searchNodeHours: z.number().min(0).max(730).optional(),
+    searchStorageGb: z.number().nonnegative().optional(),
+    searchQueriesMillion: z.number().nonnegative().optional(),
   })
   .strict();
 

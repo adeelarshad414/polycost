@@ -87,6 +87,10 @@ export interface WorkloadFormState {
   databaseQueryDataTb: string;
   databaseCacheReplicaCount: string;
   databaseStorageGrowthGbPerMonth: string;
+  databaseSearchNodeCount: string;
+  databaseSearchNodeHours: string;
+  databaseSearchStorageGb: string;
+  databaseSearchQueriesMillion: string;
   analyticsWarehouseStorageGb: string;
   analyticsWarehouseQueryTb: string;
   analyticsDataLakeStorageGb: string;
@@ -206,6 +210,10 @@ type NumericWorkloadFormField =
   | 'databaseQueryDataTb'
   | 'databaseCacheReplicaCount'
   | 'databaseStorageGrowthGbPerMonth'
+  | 'databaseSearchNodeCount'
+  | 'databaseSearchNodeHours'
+  | 'databaseSearchStorageGb'
+  | 'databaseSearchQueriesMillion'
   | 'analyticsWarehouseStorageGb'
   | 'analyticsWarehouseQueryTb'
   | 'analyticsDataLakeStorageGb'
@@ -330,6 +338,10 @@ export const defaultWorkloadForm: WorkloadFormState = {
   databaseQueryDataTb: '0',
   databaseCacheReplicaCount: '0',
   databaseStorageGrowthGbPerMonth: '0',
+  databaseSearchNodeCount: '0',
+  databaseSearchNodeHours: '730',
+  databaseSearchStorageGb: '0',
+  databaseSearchQueriesMillion: '0',
   analyticsWarehouseStorageGb: '0',
   analyticsWarehouseQueryTb: '0',
   analyticsDataLakeStorageGb: '0',
@@ -885,6 +897,32 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
       'databaseStorageGrowthGbPerMonth',
       'Database storage growth must be 0 GB/month or higher.',
     );
+    optionalNonNegativeIntegerField(
+      issues,
+      form,
+      'databaseSearchNodeCount',
+      'Search nodes must be a whole number 0 or higher.',
+    );
+    requireBoundedNumber(
+      issues,
+      form,
+      'databaseSearchNodeHours',
+      0,
+      730,
+      'Search node hours must be from 0 to 730 hours/month.',
+    );
+    optionalNonNegativeNumberField(
+      issues,
+      form,
+      'databaseSearchStorageGb',
+      'Search index storage must be 0 GB or higher.',
+    );
+    optionalNonNegativeNumberField(
+      issues,
+      form,
+      'databaseSearchQueriesMillion',
+      'Search queries must be 0 million/month or higher.',
+    );
   }
 
   optionalNonNegativeNumberField(
@@ -1413,6 +1451,7 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
   const compute = nws.compute[0];
   const storage = nws.storage[0];
   const database = nws.database[0];
+  const databaseServices = databaseScaleParamsFromNws(nws);
   const supportingServices = supportingServiceScaleParamsFromNws(nws);
   const runtimeServices = runtimeScaleParamsFromNws(nws);
   const analyticsServices = analyticsScaleParamsFromNws(nws);
@@ -1546,6 +1585,26 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
     databaseStorageGrowthGbPerMonth: numberToInput(
       database?.storageGrowthGbPerMonth ??
         Number(defaultWorkloadForm.databaseStorageGrowthGbPerMonth),
+    ),
+    databaseSearchNodeCount: numberToInput(
+      database?.searchNodeCount ??
+        databaseServices.searchNodeCount ??
+        Number(defaultWorkloadForm.databaseSearchNodeCount),
+    ),
+    databaseSearchNodeHours: numberToInput(
+      database?.searchNodeHours ??
+        databaseServices.searchNodeHours ??
+        Number(defaultWorkloadForm.databaseSearchNodeHours),
+    ),
+    databaseSearchStorageGb: numberToInput(
+      database?.searchStorageGb ??
+        databaseServices.searchStorageGb ??
+        Number(defaultWorkloadForm.databaseSearchStorageGb),
+    ),
+    databaseSearchQueriesMillion: numberToInput(
+      database?.searchQueriesMillion ??
+        databaseServices.searchQueriesMillion ??
+        Number(defaultWorkloadForm.databaseSearchQueriesMillion),
     ),
     analyticsWarehouseStorageGb: numberToInput(
       analyticsServices.analyticsWarehouseStorageGb ??
@@ -1841,7 +1900,9 @@ export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceReq
         ...(isAnalyticsServiceFamily(serviceType) ? analyticsScaleParamsFromForm(form) : {}),
         ...(isIntegrationServiceFamily(serviceType) ? integrationScaleParamsFromForm(form) : {}),
         ...(serviceType.includes('storage') ? storageScaleParamsFromForm(form) : {}),
-        ...(serviceType.includes('database') || serviceType === 'cache'
+        ...(serviceType.includes('database') ||
+        serviceType === 'cache' ||
+        serviceType === 'managed-search'
           ? databaseScaleParamsFromForm(form)
           : {}),
         ...(serviceType === 'vm-compute' || serviceType === 'autoscaling-compute'
@@ -2106,6 +2167,24 @@ function supportingServiceScaleParamsFromNws(nws: NormalizedWorkloadSpec): Recor
   ) as Record<string, number>;
 }
 
+function databaseScaleParamsFromNws(nws: NormalizedWorkloadSpec): Record<string, number> {
+  const databaseRequirements =
+    nws.serviceRequirements?.filter(
+      (requirement) =>
+        requirement.serviceCategory === 'database' && requirement.serviceType.includes('search'),
+    ) ?? [];
+  const keys = ['searchNodeCount', 'searchNodeHours', 'searchStorageGb', 'searchQueriesMillion'];
+
+  return Object.fromEntries(
+    keys.map((key) => [
+      key,
+      databaseRequirements
+        .map((requirement) => numericScaleParam(requirement.scaleParams, key))
+        .find((value) => value !== undefined),
+    ]),
+  ) as Record<string, number>;
+}
+
 function runtimeScaleParamsFromNws(nws: NormalizedWorkloadSpec): Record<string, number> {
   const runtimeRequirements =
     nws.serviceRequirements?.filter((requirement) =>
@@ -2194,7 +2273,17 @@ function numericScaleParam(
 ): number | undefined {
   const value = scaleParams?.[key];
 
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const numericValue = Number(value);
+
+    return Number.isFinite(numericValue) ? numericValue : undefined;
+  }
+
+  return undefined;
 }
 
 function serviceCategoryForFamily(serviceType: string): ServiceRequirement['serviceCategory'] {
@@ -2242,7 +2331,17 @@ function instanceTypeForServiceRequirement(
     }GB`;
   }
 
-  if (serviceType.includes('database') || serviceType === 'cache') {
+  if (
+    serviceType.includes('database') ||
+    serviceType === 'cache' ||
+    serviceType === 'managed-search'
+  ) {
+    if (serviceType === 'managed-search') {
+      return `${form.databaseSearchNodeCount || '0'} search nodes - ${
+        form.databaseSearchStorageGb || '0'
+      }GB index`;
+    }
+
     return `${form.databaseEngine} - ${form.databaseSizeGb || 'provider default'}GB`;
   }
 
@@ -2341,6 +2440,7 @@ function databaseAdvancedAssumptionsFromForm(
   form: WorkloadFormState,
 ): Partial<NormalizedWorkloadSpec['database'][number]> {
   const backupStorageGb = parseOptionalNumber(form.databaseBackupStorageGb);
+  const searchNodeCount = parseNonNegativeInteger(form.databaseSearchNodeCount, 0);
 
   return {
     ...optionalPositiveNumber('backupStorageGb', form.databaseBackupStorageGb),
@@ -2365,6 +2465,12 @@ function databaseAdvancedAssumptionsFromForm(
     ...optionalPositiveNumber('queryDataTb', form.databaseQueryDataTb),
     ...optionalPositiveInteger('cacheReplicaCount', form.databaseCacheReplicaCount),
     ...optionalPositiveNumber('storageGrowthGbPerMonth', form.databaseStorageGrowthGbPerMonth),
+    ...optionalPositiveInteger('searchNodeCount', form.databaseSearchNodeCount),
+    ...(searchNodeCount > 0
+      ? optionalPositiveNumber('searchNodeHours', form.databaseSearchNodeHours)
+      : {}),
+    ...optionalPositiveNumber('searchStorageGb', form.databaseSearchStorageGb),
+    ...optionalPositiveNumber('searchQueriesMillion', form.databaseSearchQueriesMillion),
   };
 }
 
@@ -2388,6 +2494,10 @@ function databaseScaleParamsFromForm(form: WorkloadFormState): ServiceRequiremen
     queryDataTb: parseOptionalNumber(form.databaseQueryDataTb) ?? 0,
     cacheReplicaCount: parseNonNegativeInteger(form.databaseCacheReplicaCount, 0),
     storageGrowthGbPerMonth: parseOptionalNumber(form.databaseStorageGrowthGbPerMonth) ?? 0,
+    searchNodeCount: parseNonNegativeInteger(form.databaseSearchNodeCount, 0),
+    searchNodeHours: parseBoundedNumber(form.databaseSearchNodeHours, 0, 730, 730),
+    searchStorageGb: parseOptionalNumber(form.databaseSearchStorageGb) ?? 0,
+    searchQueriesMillion: parseOptionalNumber(form.databaseSearchQueriesMillion) ?? 0,
   };
 }
 
@@ -2601,6 +2711,14 @@ function storageServiceFamilyId(form: WorkloadFormState): string {
 }
 
 function databaseServiceFamilyId(form: WorkloadFormState): string {
+  if (
+    hasPositiveFormNumber(form.databaseSearchNodeCount) ||
+    hasPositiveFormNumber(form.databaseSearchStorageGb) ||
+    hasPositiveFormNumber(form.databaseSearchQueriesMillion)
+  ) {
+    return 'managed-search';
+  }
+
   if (form.databaseEngine === 'redis') {
     return 'cache';
   }
@@ -2917,6 +3035,14 @@ function formNumericValue(form: WorkloadFormState, field: NumericWorkloadFormFie
       return form.databaseCacheReplicaCount;
     case 'databaseStorageGrowthGbPerMonth':
       return form.databaseStorageGrowthGbPerMonth;
+    case 'databaseSearchNodeCount':
+      return form.databaseSearchNodeCount;
+    case 'databaseSearchNodeHours':
+      return form.databaseSearchNodeHours;
+    case 'databaseSearchStorageGb':
+      return form.databaseSearchStorageGb;
+    case 'databaseSearchQueriesMillion':
+      return form.databaseSearchQueriesMillion;
     case 'analyticsWarehouseStorageGb':
       return form.analyticsWarehouseStorageGb;
     case 'analyticsWarehouseQueryTb':
