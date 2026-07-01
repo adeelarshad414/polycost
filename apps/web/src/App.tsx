@@ -6341,7 +6341,11 @@ function ProductionDepthAnalytics({
   const spotBlendRows = spotBlendOptimizerRows(comparison, form);
   const licenseRows = licenseOptimizationRows(comparison, form);
   const architectureRisks = architectureRiskFlags(comparison, form);
-  const scenarios = sensitivityScenarioRows(comparison, form);
+  const scenarios = sensitivityScenarioRows(
+    comparison,
+    form,
+    serverAnalytics?.sensitivityScenarios,
+  );
 
   return (
     <section className="production-depth-analytics" aria-label="Production-depth analytics">
@@ -12209,7 +12213,12 @@ function productionDepthInsights(
 function sensitivityScenarioRows(
   comparison: ComparisonResult | null,
   form: WorkloadFormState,
+  serverRows?: ComparisonAnalyticsResponse['sensitivityScenarios'],
 ): SensitivityScenarioRow[] {
+  if (serverRows && serverRows.length > 0) {
+    return backendSensitivityScenarioRows(serverRows);
+  }
+
   if (!comparison) {
     return [];
   }
@@ -12291,6 +12300,51 @@ function sensitivityScenarioRows(
           (peakBufferPercent / 100),
     ),
   ];
+}
+
+function backendSensitivityScenarioRows(
+  rows: ComparisonAnalyticsResponse['sensitivityScenarios'],
+): SensitivityScenarioRow[] {
+  const groupedRows = rows.reduce((groups, row) => {
+    const key = `${row.variable}:${row.changePercent}`;
+    const current = groups.get(key) ?? {
+      id: key,
+      label: `${row.label} ${row.changePercent > 0 ? '+' : ''}${formatPercent(row.changePercent)}`,
+      assumption: `Backend analytics varied ${row.label.toLowerCase()} by ${
+        row.changePercent > 0 ? '+' : ''
+      }${formatPercent(row.changePercent)} against cached dimension totals.`,
+      providers: [] as SensitivityScenarioProviderCost[],
+    };
+
+    current.providers.push({
+      providerId: row.providerId,
+      monthlyCostUsd: row.adjustedMonthlyUsd,
+      deltaVsBaselineUsd: row.deltaMonthlyUsd,
+      isLowest: false,
+    });
+    groups.set(key, current);
+
+    return groups;
+  }, new Map<string, Omit<SensitivityScenarioRow, 'lowestProviderId'> & { providers: SensitivityScenarioProviderCost[] }>());
+
+  return [...groupedRows.values()].map((row) => {
+    const providers = row.providers.sort(
+      (left, right) =>
+        PROVIDER_ORDER.indexOf(left.providerId) - PROVIDER_ORDER.indexOf(right.providerId),
+    );
+    const lowest = [...providers].sort(
+      (left, right) => left.monthlyCostUsd - right.monthlyCostUsd,
+    )[0];
+
+    return {
+      ...row,
+      providers: providers.map((provider) => ({
+        ...provider,
+        isLowest: provider.providerId === lowest?.providerId,
+      })),
+      lowestProviderId: lowest?.providerId,
+    };
+  });
 }
 
 function scenarioSensitivityRow(

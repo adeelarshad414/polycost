@@ -150,7 +150,17 @@ describe('api client', () => {
           evidence: 'Backend network tier evidence.',
         },
       ],
-      sensitivityScenarios: [],
+      sensitivityScenarios: [
+        {
+          variable: 'egress_traffic',
+          label: 'Egress traffic',
+          changePercent: 50,
+          providerId: 'aws',
+          baselineMonthlyUsd: 100,
+          adjustedMonthlyUsd: 106,
+          deltaMonthlyUsd: 6,
+        },
+      ],
       commitmentRoiTimelines: [],
       commitmentCoverage: [
         {

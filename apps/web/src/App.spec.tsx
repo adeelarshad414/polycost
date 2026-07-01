@@ -378,6 +378,9 @@ describe('App', () => {
       'Backend-ranked provider delta from current cached comparison.',
     );
     expect(text(container)).toContain('Backend AWS internet egress');
+    expect(text(container)).toContain(
+      'Backend analytics varied egress traffic by +50% against cached dimension totals.',
+    );
     expect(text(container)).toContain('Service driver split');
     expect(text(container)).toContain('EC2');
     expect(text(container)).toContain('VM');
@@ -2383,7 +2386,35 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
           evidence: 'Backend network tier evidence.',
         },
       ],
-      sensitivityScenarios: [],
+      sensitivityScenarios: [
+        {
+          variable: 'egress_traffic' as const,
+          label: 'Egress traffic',
+          changePercent: 50,
+          providerId: 'aws' as const,
+          baselineMonthlyUsd: 42,
+          adjustedMonthlyUsd: 48,
+          deltaMonthlyUsd: 6,
+        },
+        {
+          variable: 'egress_traffic' as const,
+          label: 'Egress traffic',
+          changePercent: 50,
+          providerId: 'azure' as const,
+          baselineMonthlyUsd: 38,
+          adjustedMonthlyUsd: 41,
+          deltaMonthlyUsd: 3,
+        },
+        {
+          variable: 'egress_traffic' as const,
+          label: 'Egress traffic',
+          changePercent: 50,
+          providerId: 'gcp' as const,
+          baselineMonthlyUsd: 30,
+          adjustedMonthlyUsd: 35,
+          deltaMonthlyUsd: 5,
+        },
+      ],
       commitmentRoiTimelines: [],
       commitmentCoverage: [
         {
