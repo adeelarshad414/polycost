@@ -5958,6 +5958,7 @@ function ProductionDepthAnalytics({
   const commitmentCoverage = commitmentCoverageGapRows(comparison, form);
   const tcoSignals = crossProviderTcoRows(comparison, form);
   const egressOptimizations = egressOptimizationRows(comparison, form);
+  const spotBlendRows = spotBlendOptimizerRows(comparison, form);
   const licenseRows = licenseOptimizationRows(comparison, form);
   const architectureRisks = architectureRiskFlags(comparison, form);
   const scenarios = sensitivityScenarioRows(comparison, form);
@@ -5991,6 +5992,7 @@ function ProductionDepthAnalytics({
       <CommitmentCoverageGapPanel rows={commitmentCoverage} />
       <CrossProviderTcoPanel rows={tcoSignals} />
       <EgressOptimizationPanel rows={egressOptimizations} />
+      <SpotBlendOptimizerPanel rows={spotBlendRows} />
       <LicenseOptimizationPanel rows={licenseRows} operatingSystem={form.operatingSystem} />
       <ArchitectureRiskFlagsPanel flags={architectureRisks} />
       <ScenarioSensitivityTable rows={scenarios} />
@@ -6317,6 +6319,74 @@ function EgressOptimizationPanel({ rows }: { rows: EgressOptimizationRow[] }) {
         <div className="scenario-sensitivity-empty" role="status">
           Egress optimization appears when network or data-transfer line items exceed materiality
           thresholds.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SpotBlendOptimizerPanel({ rows }: { rows: SpotBlendOptimizerRow[] }) {
+  return (
+    <div className="spot-blend-panel" aria-label="Spot blend optimizer">
+      <div className="scenario-sensitivity-heading">
+        <div>
+          <span>Spot blend optimizer</span>
+          <h4>Mixed on-demand and interruptible-capacity estimate</h4>
+        </div>
+      </div>
+
+      {rows.length > 0 ? (
+        <div className="table-wrap spot-blend-wrap">
+          <table className="ranking-table spot-blend-table">
+            <thead>
+              <tr>
+                <th scope="col">Provider</th>
+                <th scope="col">Blend</th>
+                <th scope="col">Estimated run-rate</th>
+                <th scope="col">Savings</th>
+                <th scope="col">Risk note</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.providerId}>
+                  <td>
+                    <span className={`scenario-low-label scenario-low-${row.providerId}`}>
+                      {providerLabel(row.providerId)}
+                    </span>
+                    <small>{row.providerTerm}</small>
+                  </td>
+                  <td>
+                    <strong>
+                      {formatPercent(row.onDemandPercent)} on-demand /{' '}
+                      {formatPercent(row.spotPercent)} spot
+                    </strong>
+                    <small>{row.workloadFit}</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.blendedMonthly)}/mo est.</strong>
+                    <small>
+                      Range {formatCurrency(row.estimatedLowMonthly)}-
+                      {formatCurrency(row.estimatedHighMonthly)}/mo
+                    </small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.monthlySavings)}/mo</strong>
+                    <small>{formatCurrency(row.annualSavings)}/yr vs on-demand</small>
+                  </td>
+                  <td>
+                    <strong>{row.risk} interruption risk</strong>
+                    <small>{row.evidence}</small>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="scenario-sensitivity-empty" role="status">
+          Spot blend optimizer appears when providers expose interruptible-capacity estimates below
+          on-demand.
         </div>
       )}
     </div>
@@ -7046,6 +7116,23 @@ interface EgressOptimizationRow {
   evidence: string;
 }
 
+interface SpotBlendOptimizerRow {
+  providerId: ProviderId;
+  onDemandMonthly: number;
+  spotMonthly: number;
+  blendedMonthly: number;
+  estimatedLowMonthly: number;
+  estimatedHighMonthly: number;
+  monthlySavings: number;
+  annualSavings: number;
+  spotPercent: number;
+  onDemandPercent: number;
+  risk: 'Low' | 'Medium' | 'High';
+  providerTerm: string;
+  workloadFit: string;
+  evidence: string;
+}
+
 interface LicenseOptimizationRow {
   providerId: ProviderId;
   windowsMonthly: number;
@@ -7364,6 +7451,124 @@ function egressOptimizationSignal(
       monthlySavings,
     )}/mo at 30% of current egress.`,
   };
+}
+
+function spotBlendOptimizerRows(
+  comparison: ComparisonResult | null,
+  form: WorkloadFormState,
+): SpotBlendOptimizerRow[] {
+  if (!comparison) {
+    return [];
+  }
+
+  const spotPercent = spotBlendPercent(form);
+  const spotRate = spotPercent / 100;
+  const onDemandPercent = 100 - spotPercent;
+
+  return comparison.providers
+    .flatMap((provider) => {
+      const onDemandMonthly =
+        provider.pricingModels?.find((model) => model.model === 'on-demand')?.monthlyCostUsd ??
+        provider.totals.monthly;
+      const spotModel = provider.pricingModels?.find(
+        (model) => model.model === 'spot' && model.available && model.monthlyCostUsd !== undefined,
+      );
+
+      if (!spotModel?.monthlyCostUsd || spotModel.monthlyCostUsd >= onDemandMonthly) {
+        return [];
+      }
+
+      const blendedMonthly = roundCurrency(
+        onDemandMonthly * (1 - spotRate) + spotModel.monthlyCostUsd * spotRate,
+      );
+      const monthlySavings = roundCurrency(onDemandMonthly - blendedMonthly);
+
+      if (monthlySavings <= 0) {
+        return [];
+      }
+
+      const risk = spotBlendRisk(form, spotPercent, spotModel.volatility);
+      const estimatedLowMonthly = roundCurrency(blendedMonthly * 0.94);
+      const estimatedHighMonthly = roundCurrency(blendedMonthly * 1.06);
+
+      return [
+        {
+          providerId: provider.providerId,
+          onDemandMonthly: roundCurrency(onDemandMonthly),
+          spotMonthly: roundCurrency(spotModel.monthlyCostUsd),
+          blendedMonthly,
+          estimatedLowMonthly,
+          estimatedHighMonthly,
+          monthlySavings,
+          annualSavings: roundCurrency(monthlySavings * 12),
+          spotPercent,
+          onDemandPercent,
+          risk,
+          providerTerm: spotModel.providerTerm ?? spotModel.displayName ?? 'Spot estimate',
+          workloadFit: spotBlendWorkloadFit(form, spotPercent),
+          evidence: `${providerLabel(provider.providerId)} spot estimate is ${formatCurrency(
+            spotModel.monthlyCostUsd,
+          )}/mo versus ${formatCurrency(onDemandMonthly)}/mo on-demand. ${
+            spotModel.caveat ??
+            'Validate interruption tolerance and current spot market behavior before committing.'
+          }`,
+        },
+      ];
+    })
+    .sort((left, right) => right.monthlySavings - left.monthlySavings);
+}
+
+function spotBlendPercent(form: WorkloadFormState): number {
+  if (form.environment === 'production' && form.usagePattern === 'always_on') {
+    return 20;
+  }
+
+  if (form.environment === 'production') {
+    return form.usagePattern === 'bursty' ? 40 : 30;
+  }
+
+  if (form.environment === 'development' || form.environment === 'test') {
+    return form.usagePattern === 'bursty' ? 60 : 50;
+  }
+
+  if (form.environment === 'staging') {
+    return form.usagePattern === 'bursty' ? 50 : 40;
+  }
+
+  return form.usagePattern === 'bursty' ? 40 : 30;
+}
+
+function spotBlendRisk(
+  form: WorkloadFormState,
+  spotPercent: number,
+  volatility?: NonNullable<ComparisonProviderResult['pricingModels']>[number]['volatility'],
+): 'Low' | 'Medium' | 'High' {
+  if (form.environment === 'production' && spotPercent >= 40) {
+    return 'High';
+  }
+
+  if (volatility === 'volatile' || spotPercent >= 50) {
+    return 'High';
+  }
+
+  if (spotPercent >= 30 || form.environment === 'production') {
+    return 'Medium';
+  }
+
+  return 'Low';
+}
+
+function spotBlendWorkloadFit(form: WorkloadFormState, spotPercent: number): string {
+  if (form.environment === 'production') {
+    return `${capitalize(form.usagePattern.replace('_', ' '))} production workload; keep ${formatPercent(
+      100 - spotPercent,
+    )} baseline on-demand capacity.`;
+  }
+
+  return `${capitalize(form.environment)} ${form.usagePattern.replace(
+    '_',
+    ' ',
+  )} profile can test a higher interruptible blend.`;
 }
 
 function licenseOptimizationRows(

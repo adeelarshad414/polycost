@@ -556,6 +556,28 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
     }
   }
 
+  for (const provider of result.providers) {
+    const spotInsight = spotBlendInsight(result, provider);
+
+    if (!spotInsight) {
+      continue;
+    }
+
+    rows.push([
+      'Spot blend',
+      `${provider.providerId} can model a ${formatNumber(
+        spotInsight.onDemandPercent,
+      )}% on-demand / ${formatNumber(
+        spotInsight.spotPercent,
+      )}% spot blend for interruptible capacity.`,
+      formatNumber(spotInsight.monthlySavings),
+      formatNumber(spotInsight.monthlySavings * 12),
+      spotInsight.risk === 'High' ? 'Medium' : 'High',
+      spotInsight.risk,
+      spotInsight.evidence,
+    ]);
+  }
+
   rows.push(...architectureRiskOpportunityRows(result));
 
   for (const provider of result.providers) {
@@ -1222,6 +1244,116 @@ interface EgressOptimizationInsight {
   monthlySavings: number;
   effort: 'Low' | 'Medium' | 'High';
   evidence: string;
+}
+
+interface SpotBlendInsight {
+  spotPercent: number;
+  onDemandPercent: number;
+  onDemandMonthly: number;
+  spotMonthly: number;
+  blendedMonthly: number;
+  monthlySavings: number;
+  risk: 'Low' | 'Medium' | 'High';
+  evidence: string;
+}
+
+function spotBlendInsight(
+  result: ComparisonResult,
+  provider: ComparisonProviderResult,
+): SpotBlendInsight | undefined {
+  const onDemand = modelCostForProvider(provider, 'on-demand');
+  const spot = modelCostForProvider(provider, 'spot');
+
+  if (
+    !onDemand.available ||
+    !spot.available ||
+    onDemand.monthlyCostUsd === undefined ||
+    spot.monthlyCostUsd === undefined ||
+    spot.monthlyCostUsd >= onDemand.monthlyCostUsd
+  ) {
+    return undefined;
+  }
+
+  const spotPercent = spotBlendPercent(result);
+  const spotRate = spotPercent / 100;
+  const blendedMonthly = roundCurrency(
+    onDemand.monthlyCostUsd * (1 - spotRate) + spot.monthlyCostUsd * spotRate,
+  );
+  const monthlySavings = roundCurrency(onDemand.monthlyCostUsd - blendedMonthly);
+
+  if (monthlySavings <= 0) {
+    return undefined;
+  }
+
+  const risk = spotBlendRisk(result, spotPercent, spot.volatility);
+  const lowEstimate = roundCurrency(blendedMonthly * 0.94);
+  const highEstimate = roundCurrency(blendedMonthly * 1.06);
+
+  return {
+    spotPercent,
+    onDemandPercent: 100 - spotPercent,
+    onDemandMonthly: onDemand.monthlyCostUsd,
+    spotMonthly: spot.monthlyCostUsd,
+    blendedMonthly,
+    monthlySavings,
+    risk,
+    evidence: `${provider.providerId} on-demand $${formatNumber(
+      onDemand.monthlyCostUsd,
+    )}/mo vs spot estimate $${formatNumber(
+      spot.monthlyCostUsd,
+    )}/mo; blended estimate is $${formatNumber(
+      blendedMonthly,
+    )}/mo (range $${formatNumber(lowEstimate)}-$${formatNumber(
+      highEstimate,
+    )}/mo) with ${risk.toLowerCase()} interruption risk. ${
+      spot.caveat ?? 'Spot is interruptible and must be validated against current market behavior.'
+    }`,
+  };
+}
+
+function spotBlendPercent(result: ComparisonResult): number {
+  const environment = result.requirements?.workloadProfile?.environment;
+  const usagePattern = result.requirements?.workloadProfile?.usagePattern?.type;
+
+  if (environment === 'production' && usagePattern === 'always_on') {
+    return 20;
+  }
+
+  if (environment === 'production') {
+    return usagePattern === 'bursty' ? 40 : 30;
+  }
+
+  if (environment === 'development' || environment === 'test') {
+    return usagePattern === 'bursty' ? 60 : 50;
+  }
+
+  if (environment === 'staging') {
+    return usagePattern === 'bursty' ? 50 : 40;
+  }
+
+  return usagePattern === 'bursty' ? 40 : 30;
+}
+
+function spotBlendRisk(
+  result: ComparisonResult,
+  spotPercent: number,
+  volatility?: PricingModelCost['volatility'],
+): 'Low' | 'Medium' | 'High' {
+  const environment = result.requirements?.workloadProfile?.environment;
+
+  if (environment === 'production' && spotPercent >= 40) {
+    return 'High';
+  }
+
+  if (volatility === 'volatile' || spotPercent >= 50) {
+    return 'High';
+  }
+
+  if (spotPercent >= 30 || environment === 'production') {
+    return 'Medium';
+  }
+
+  return 'Low';
 }
 
 function egressOptimizationInsight(provider: ComparisonProviderResult): EgressOptimizationInsight {

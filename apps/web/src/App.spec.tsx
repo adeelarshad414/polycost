@@ -1238,6 +1238,11 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain(
       'Evaluate CDN offload, cache-control, and same-region data access.',
     );
+    expect(text(container)).toContain('Spot blend optimizer');
+    expect(text(container)).toContain('Mixed on-demand and interruptible-capacity estimate');
+    expect(text(container)).toContain('80% on-demand / 20% spot');
+    expect(text(container)).toContain('$89.50/mo est.');
+    expect(text(container)).toContain('High interruption risk');
     expect(text(container)).toContain('Architecture risk flags');
     expect(text(container)).toContain('Cost behaviors to validate before commitment');
     expect(text(container)).toContain('Data-transfer concentration');

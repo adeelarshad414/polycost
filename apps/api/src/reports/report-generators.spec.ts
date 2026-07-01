@@ -732,6 +732,41 @@ describe('report generators', () => {
         ]),
       ]),
     );
+
+    expect(
+      optimizationOpportunityRows({
+        ...comparison,
+        providers: [
+          {
+            ...comparison.providers[0],
+            pricingModels: [
+              ...(comparison.providers[0].pricingModels ?? []),
+              {
+                model: 'spot',
+                available: true,
+                monthlyCostUsd: 35,
+                hourlyCostUsd: 0.05,
+                estimated: true,
+                volatility: 'volatile',
+                caveat: 'Interruptible capacity.',
+              },
+            ],
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'Spot blend',
+          'aws can model a 60% on-demand / 40% spot blend for interruptible capacity.',
+          '14.4',
+          '172.8',
+          'Medium',
+          'High',
+          expect.stringContaining('blended estimate is $56.6/mo'),
+        ]),
+      ]),
+    );
   });
 
   it('builds fallback service requirement rows when comparison requirements are absent', () => {
