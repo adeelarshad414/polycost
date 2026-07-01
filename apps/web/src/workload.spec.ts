@@ -447,6 +447,61 @@ describe('workload helpers', () => {
     );
   });
 
+  it('serializes serverless and container runtime assumptions into service requirements', () => {
+    const nws = buildNwsFromForm({
+      ...defaultWorkloadForm,
+      selectedServiceFamilyIds: [],
+      functionInvocationsMillion: '5',
+      functionDurationMs: '200',
+      functionMemoryMb: '512',
+      kubernetesClusterCount: '2',
+      kubernetesWorkerNodeCount: '6',
+      registryStorageGb: '40',
+      registryEgressGb: '100',
+    });
+
+    expect(nws.serviceRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceCategory: 'compute',
+          serviceType: 'serverless-functions',
+          scaleParams: expect.objectContaining({
+            functionInvocationsMillion: 5,
+            functionDurationMs: 200,
+            functionMemoryMb: 512,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'containers',
+          serviceType: 'container-orchestration',
+          scaleParams: expect.objectContaining({
+            kubernetesClusterCount: 2,
+            kubernetesWorkerNodeCount: 6,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'containers',
+          serviceType: 'container-registry',
+          scaleParams: expect.objectContaining({
+            registryStorageGb: 40,
+            registryEgressGb: 100,
+          }),
+        }),
+      ]),
+    );
+    expect(formFromNws(nws)).toEqual(
+      expect.objectContaining({
+        functionInvocationsMillion: '5',
+        functionDurationMs: '200',
+        functionMemoryMb: '512',
+        kubernetesClusterCount: '2',
+        kubernetesWorkerNodeCount: '6',
+        registryStorageGb: '40',
+        registryEgressGb: '100',
+      }),
+    );
+  });
+
   it('maps an NWS back into editable form values', () => {
     const nws = buildNwsFromForm(defaultWorkloadForm, 'natural_language', 'web app');
     const form = formFromNws(nws);
@@ -507,6 +562,13 @@ describe('workload helpers', () => {
         observabilityTracesMillion: '-1',
         secretsCount: '3.5',
         secretApiCallsTenThousand: '-1',
+        functionInvocationsMillion: '-1',
+        functionDurationMs: '0',
+        functionMemoryMb: '512.5',
+        kubernetesClusterCount: '1.5',
+        kubernetesWorkerNodeCount: '2.5',
+        registryStorageGb: '-1',
+        registryEgressGb: '-1',
         commitmentPreferencePercent: '101',
         usagePattern: 'scheduled',
         usageHoursPerDay: '0',
@@ -536,6 +598,13 @@ describe('workload helpers', () => {
       'observabilityTracesMillion',
       'secretsCount',
       'secretApiCallsTenThousand',
+      'functionInvocationsMillion',
+      'functionDurationMs',
+      'functionMemoryMb',
+      'kubernetesClusterCount',
+      'kubernetesWorkerNodeCount',
+      'registryStorageGb',
+      'registryEgressGb',
       'commitmentPreferencePercent',
       'usageHoursPerDay',
       'usageDaysPerWeek',

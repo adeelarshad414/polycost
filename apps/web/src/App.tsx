@@ -1559,6 +1559,30 @@ function InitialHomePage({
                   error={fieldErrors.secretsCount}
                   onChange={(value) => update('secretsCount', value)}
                 />
+                <TextField
+                  label="Function invokes"
+                  value={form.functionInvocationsMillion}
+                  inputMode="decimal"
+                  suffix="M/mo"
+                  error={fieldErrors.functionInvocationsMillion}
+                  onChange={(value) => update('functionInvocationsMillion', value)}
+                />
+                <TextField
+                  label="K8s clusters"
+                  value={form.kubernetesClusterCount}
+                  inputMode="numeric"
+                  suffix="clusters"
+                  error={fieldErrors.kubernetesClusterCount}
+                  onChange={(value) => update('kubernetesClusterCount', value)}
+                />
+                <TextField
+                  label="Registry storage"
+                  value={form.registryStorageGb}
+                  inputMode="decimal"
+                  suffix="GB"
+                  error={fieldErrors.registryStorageGb}
+                  onChange={(value) => update('registryStorageGb', value)}
+                />
               </div>
             </details>
           </form>
@@ -2788,6 +2812,70 @@ function WorkloadForm({
           error={fieldErrors.bulkServiceRows}
           onRowsChange={updateBulkServiceRows}
         />
+        <details className="advanced-service-fields">
+          <summary>
+            <span>Serverless & container cost drivers</span>
+            <small>Function usage, Kubernetes overhead, registry transfer</small>
+          </summary>
+          <div className="form-grid secondary-grid">
+            <TextField
+              label="Function invokes"
+              value={form.functionInvocationsMillion}
+              inputMode="decimal"
+              suffix="M/mo"
+              error={fieldErrors.functionInvocationsMillion}
+              onChange={(value) => update('functionInvocationsMillion', value)}
+            />
+            <TextField
+              label="Function duration"
+              value={form.functionDurationMs}
+              inputMode="decimal"
+              suffix="ms"
+              error={fieldErrors.functionDurationMs}
+              onChange={(value) => update('functionDurationMs', value)}
+            />
+            <TextField
+              label="Function memory"
+              value={form.functionMemoryMb}
+              inputMode="numeric"
+              suffix="MB"
+              error={fieldErrors.functionMemoryMb}
+              onChange={(value) => update('functionMemoryMb', value)}
+            />
+            <TextField
+              label="K8s clusters"
+              value={form.kubernetesClusterCount}
+              inputMode="numeric"
+              suffix="clusters"
+              error={fieldErrors.kubernetesClusterCount}
+              onChange={(value) => update('kubernetesClusterCount', value)}
+            />
+            <TextField
+              label="Worker nodes"
+              value={form.kubernetesWorkerNodeCount}
+              inputMode="numeric"
+              suffix="nodes"
+              error={fieldErrors.kubernetesWorkerNodeCount}
+              onChange={(value) => update('kubernetesWorkerNodeCount', value)}
+            />
+            <TextField
+              label="Registry storage"
+              value={form.registryStorageGb}
+              inputMode="decimal"
+              suffix="GB"
+              error={fieldErrors.registryStorageGb}
+              onChange={(value) => update('registryStorageGb', value)}
+            />
+            <TextField
+              label="Registry egress"
+              value={form.registryEgressGb}
+              inputMode="decimal"
+              suffix="GB/mo"
+              error={fieldErrors.registryEgressGb}
+              onChange={(value) => update('registryEgressGb', value)}
+            />
+          </div>
+        </details>
       </FormSection>
 
       <FormSection title="Data" tone="data">

@@ -105,6 +105,13 @@ export interface WorkloadFormState {
   observabilityTracesMillion: string;
   secretsCount: string;
   secretApiCallsTenThousand: string;
+  functionInvocationsMillion: string;
+  functionDurationMs: string;
+  functionMemoryMb: string;
+  kubernetesClusterCount: string;
+  kubernetesWorkerNodeCount: string;
+  registryStorageGb: string;
+  registryEgressGb: string;
   cdn: boolean;
   loadBalancer: boolean;
   selectedServiceCategory: string;
@@ -189,6 +196,13 @@ type NumericWorkloadFormField =
   | 'observabilityTracesMillion'
   | 'secretsCount'
   | 'secretApiCallsTenThousand'
+  | 'functionInvocationsMillion'
+  | 'functionDurationMs'
+  | 'functionMemoryMb'
+  | 'kubernetesClusterCount'
+  | 'kubernetesWorkerNodeCount'
+  | 'registryStorageGb'
+  | 'registryEgressGb'
   | 'commitmentPreferencePercent'
   | 'usageHoursPerDay'
   | 'usageDaysPerWeek'
@@ -278,6 +292,13 @@ export const defaultWorkloadForm: WorkloadFormState = {
   observabilityTracesMillion: '0',
   secretsCount: '0',
   secretApiCallsTenThousand: '0',
+  functionInvocationsMillion: '0',
+  functionDurationMs: '100',
+  functionMemoryMb: '512',
+  kubernetesClusterCount: '0',
+  kubernetesWorkerNodeCount: '0',
+  registryStorageGb: '0',
+  registryEgressGb: '0',
   cdn: true,
   loadBalancer: true,
   selectedServiceCategory: 'compute',
@@ -874,6 +895,48 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
     'secretApiCallsTenThousand',
     'Secret API calls must be 0 ten-thousand-call units or higher.',
   );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'functionInvocationsMillion',
+    'Function invocations must be 0 million or higher.',
+  );
+  requirePositiveNumber(
+    issues,
+    form,
+    'functionDurationMs',
+    'Function duration must be greater than 0 ms.',
+  );
+  requirePositiveInteger(
+    issues,
+    form,
+    'functionMemoryMb',
+    'Function memory must be a whole number above 0 MB.',
+  );
+  optionalNonNegativeIntegerField(
+    issues,
+    form,
+    'kubernetesClusterCount',
+    'Kubernetes clusters must be a whole number 0 or higher.',
+  );
+  optionalNonNegativeIntegerField(
+    issues,
+    form,
+    'kubernetesWorkerNodeCount',
+    'Kubernetes worker nodes must be a whole number 0 or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'registryStorageGb',
+    'Registry storage must be 0 GB or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'registryEgressGb',
+    'Registry egress must be 0 GB or higher.',
+  );
   requireBoundedNumber(
     issues,
     form,
@@ -1059,6 +1122,7 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
   const storage = nws.storage[0];
   const database = nws.database[0];
   const supportingServices = supportingServiceScaleParamsFromNws(nws);
+  const runtimeServices = runtimeScaleParamsFromNws(nws);
 
   return {
     ...defaultWorkloadForm,
@@ -1250,6 +1314,29 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
       supportingServices.secretApiCallsTenThousand ??
         Number(defaultWorkloadForm.secretApiCallsTenThousand),
     ),
+    functionInvocationsMillion: numberToInput(
+      runtimeServices.functionInvocationsMillion ??
+        Number(defaultWorkloadForm.functionInvocationsMillion),
+    ),
+    functionDurationMs: numberToInput(
+      runtimeServices.functionDurationMs ?? Number(defaultWorkloadForm.functionDurationMs),
+    ),
+    functionMemoryMb: numberToInput(
+      runtimeServices.functionMemoryMb ?? Number(defaultWorkloadForm.functionMemoryMb),
+    ),
+    kubernetesClusterCount: numberToInput(
+      runtimeServices.kubernetesClusterCount ?? Number(defaultWorkloadForm.kubernetesClusterCount),
+    ),
+    kubernetesWorkerNodeCount: numberToInput(
+      runtimeServices.kubernetesWorkerNodeCount ??
+        Number(defaultWorkloadForm.kubernetesWorkerNodeCount),
+    ),
+    registryStorageGb: numberToInput(
+      runtimeServices.registryStorageGb ?? Number(defaultWorkloadForm.registryStorageGb),
+    ),
+    registryEgressGb: numberToInput(
+      runtimeServices.registryEgressGb ?? Number(defaultWorkloadForm.registryEgressGb),
+    ),
     cdn: nws.network.cdn,
     loadBalancer: nws.network.loadBalancer,
     selectedServiceCategory: primaryServiceRequirement(nws)?.serviceCategory ?? 'compute',
@@ -1344,6 +1431,11 @@ export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceReq
         serviceType === 'keys-secrets'
           ? supportingServicesScaleParamsFromForm(form)
           : {}),
+        ...(serviceType === 'serverless-functions' ||
+        serviceType === 'container-orchestration' ||
+        serviceType === 'container-registry'
+          ? runtimeScaleParamsFromForm(form)
+          : {}),
         ...(serviceType.includes('storage') ? storageScaleParamsFromForm(form) : {}),
         ...(serviceType.includes('database') || serviceType === 'cache'
           ? databaseScaleParamsFromForm(form)
@@ -1383,6 +1475,7 @@ function orderedRequirementIds(form: WorkloadFormState): string[] {
     ...(form.storageEnabled ? [storageServiceFamilyId(form)] : []),
     ...(form.databaseEnabled ? [databaseServiceFamilyId(form)] : []),
     ...supportingServiceFamilyIds(form),
+    ...runtimeServiceFamilyIds(form),
     ...(form.cdn ? ['cdn-edge'] : []),
     ...(form.loadBalancer ? ['load-balancing'] : []),
   ]);
@@ -1435,6 +1528,30 @@ function supportingServiceFamilyIds(form: WorkloadFormState): string[] {
   return ids;
 }
 
+function runtimeServiceFamilyIds(form: WorkloadFormState): string[] {
+  const ids: string[] = [];
+
+  if (hasPositiveFormNumber(form.functionInvocationsMillion)) {
+    ids.push('serverless-functions');
+  }
+
+  if (
+    hasPositiveFormNumber(form.kubernetesClusterCount) ||
+    hasPositiveFormNumber(form.kubernetesWorkerNodeCount)
+  ) {
+    ids.push('container-orchestration');
+  }
+
+  if (
+    hasPositiveFormNumber(form.registryStorageGb) ||
+    hasPositiveFormNumber(form.registryEgressGb)
+  ) {
+    ids.push('container-registry');
+  }
+
+  return ids;
+}
+
 function hasPositiveFormNumber(value: string): boolean {
   const parsed = parseOptionalNumber(value);
 
@@ -1479,6 +1596,33 @@ function supportingServiceScaleParamsFromNws(nws: NormalizedWorkloadSpec): Recor
     keys.map((key) => [
       key,
       supportingRequirements
+        .map((requirement) => numericScaleParam(requirement.scaleParams, key))
+        .find((value) => value !== undefined),
+    ]),
+  ) as Record<string, number>;
+}
+
+function runtimeScaleParamsFromNws(nws: NormalizedWorkloadSpec): Record<string, number> {
+  const runtimeRequirements =
+    nws.serviceRequirements?.filter((requirement) =>
+      ['serverless-functions', 'container-orchestration', 'container-registry'].includes(
+        requirement.serviceType,
+      ),
+    ) ?? [];
+  const keys = [
+    'functionInvocationsMillion',
+    'functionDurationMs',
+    'functionMemoryMb',
+    'kubernetesClusterCount',
+    'kubernetesWorkerNodeCount',
+    'registryStorageGb',
+    'registryEgressGb',
+  ];
+
+  return Object.fromEntries(
+    keys.map((key) => [
+      key,
+      runtimeRequirements
         .map((requirement) => numericScaleParam(requirement.scaleParams, key))
         .find((value) => value !== undefined),
     ]),
@@ -1680,6 +1824,18 @@ function supportingServicesScaleParamsFromForm(
     observabilityTracesMillion: parseOptionalNumber(form.observabilityTracesMillion) ?? 0,
     secretsCount: parseNonNegativeInteger(form.secretsCount, 0),
     secretApiCallsTenThousand: parseOptionalNumber(form.secretApiCallsTenThousand) ?? 0,
+  };
+}
+
+function runtimeScaleParamsFromForm(form: WorkloadFormState): ServiceRequirement['scaleParams'] {
+  return {
+    functionInvocationsMillion: parseOptionalNumber(form.functionInvocationsMillion) ?? 0,
+    functionDurationMs: parsePositiveNumber(form.functionDurationMs, 100),
+    functionMemoryMb: parsePositiveInteger(form.functionMemoryMb, 512),
+    kubernetesClusterCount: parseNonNegativeInteger(form.kubernetesClusterCount, 0),
+    kubernetesWorkerNodeCount: parseNonNegativeInteger(form.kubernetesWorkerNodeCount, 0),
+    registryStorageGb: parseOptionalNumber(form.registryStorageGb) ?? 0,
+    registryEgressGb: parseOptionalNumber(form.registryEgressGb) ?? 0,
   };
 }
 
@@ -2177,6 +2333,20 @@ function formNumericValue(form: WorkloadFormState, field: NumericWorkloadFormFie
       return form.secretsCount;
     case 'secretApiCallsTenThousand':
       return form.secretApiCallsTenThousand;
+    case 'functionInvocationsMillion':
+      return form.functionInvocationsMillion;
+    case 'functionDurationMs':
+      return form.functionDurationMs;
+    case 'functionMemoryMb':
+      return form.functionMemoryMb;
+    case 'kubernetesClusterCount':
+      return form.kubernetesClusterCount;
+    case 'kubernetesWorkerNodeCount':
+      return form.kubernetesWorkerNodeCount;
+    case 'registryStorageGb':
+      return form.registryStorageGb;
+    case 'registryEgressGb':
+      return form.registryEgressGb;
     case 'commitmentPreferencePercent':
       return form.commitmentPreferencePercent;
     case 'usageHoursPerDay':

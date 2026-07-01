@@ -847,6 +847,105 @@ describe('ComparisonOrchestratorService', () => {
     expect(result.providers[0].breakdown?.operationsMonthlyCostUsd).toBe(63.8);
   });
 
+  it('adds modeled serverless and container runtime line items', async () => {
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async (): Promise<ProviderPricingResult> => ({
+          providerId: 'aws',
+          baseMonthlyCostUsd: 10,
+          lineItems: [
+            {
+              category: 'compute',
+              costComponent: 'compute',
+              description: 'aws compute',
+              isApproximate: false,
+              baseMonthlyCostUsd: 10,
+              skuId: 'aws-compute',
+              region: 'us-east-1',
+              unit: 'hour',
+              unitPriceUsd: 0.01,
+            },
+          ],
+        })),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      serviceRequirements: [
+        {
+          serviceCategory: 'compute',
+          serviceType: 'serverless-functions',
+          quantity: 1,
+          scaleParams: {
+            functionInvocationsMillion: 5,
+            functionDurationMs: 200,
+            functionMemoryMb: 512,
+          },
+        },
+        {
+          serviceCategory: 'containers',
+          serviceType: 'container-orchestration',
+          quantity: 1,
+          scaleParams: {
+            kubernetesClusterCount: 2,
+            kubernetesWorkerNodeCount: 6,
+          },
+        },
+        {
+          serviceCategory: 'containers',
+          serviceType: 'container-registry',
+          quantity: 1,
+          scaleParams: {
+            registryStorageGb: 40,
+            registryEgressGb: 100,
+          },
+        },
+      ],
+    });
+
+    expect(result.providers[0].lineItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'compute',
+          skuId: 'modeled-serverless-function-requests',
+          baseMonthlyCostUsd: 1,
+          isApproximate: true,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-serverless-function-duration',
+          baseMonthlyCostUsd: 8.33,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-kubernetes-control-plane',
+          baseMonthlyCostUsd: 146,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-kubernetes-node-overhead',
+          baseMonthlyCostUsd: 48,
+        }),
+        expect.objectContaining({
+          category: 'storage',
+          skuId: 'modeled-container-registry-storage',
+          baseMonthlyCostUsd: 4,
+        }),
+        expect.objectContaining({
+          category: 'network',
+          skuId: 'modeled-container-registry-egress',
+          baseMonthlyCostUsd: 9,
+        }),
+      ]),
+    );
+    expect(result.providers[0].breakdown).toEqual(
+      expect.objectContaining({
+        computeMonthlyCostUsd: 213.33,
+        storageMonthlyCostUsd: 4,
+        egressMonthlyCostUsd: 9,
+      }),
+    );
+  });
+
   it('uses a safe warning when a provider fails without an Error object', async () => {
     const service = createService([
       adapter(

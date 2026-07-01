@@ -95,6 +95,15 @@ interface SupportingServicesRates {
   secretApiPerTenThousand: number;
 }
 
+interface RuntimeServicesRates {
+  functionRequestPerMillion: number;
+  functionGbSecond: number;
+  kubernetesControlPlaneMonthly: number;
+  kubernetesNodeOverheadMonthly: number;
+  registryStoragePerGbMonth: number;
+  registryEgressPerGb: number;
+}
+
 type StorageClassKey = NonNullable<NormalizedWorkloadSpec['storage'][number]['storageClass']>;
 
 export class ComparisonUnavailableError extends Error {
@@ -432,6 +441,7 @@ export class ComparisonOrchestratorService {
     const storageLineItems = this.storageDimensionLineItems(nws, providerId);
     const databaseLineItems = this.databaseDimensionLineItems(nws, providerId, lineItems);
     const supportingServicesLineItems = this.supportingServicesLineItems(nws, providerId);
+    const runtimeServicesLineItems = this.runtimeServicesLineItems(nws, providerId);
     const networkLineItems = this.networkDimensionLineItems(nws, providerId);
 
     return [
@@ -441,6 +451,7 @@ export class ComparisonOrchestratorService {
       ...storageLineItems,
       ...databaseLineItems,
       ...supportingServicesLineItems,
+      ...runtimeServicesLineItems,
       ...networkLineItems,
     ].filter((lineItem): lineItem is ComparisonLineItem => lineItem !== undefined);
   }
@@ -1430,6 +1441,134 @@ export class ComparisonOrchestratorService {
     });
   }
 
+  private runtimeServicesLineItems(
+    nws: NormalizedWorkloadSpec,
+    providerId: ProviderId,
+  ): ComparisonLineItem[] {
+    const requirements = nws.serviceRequirements ?? [];
+    const serviceTypes = new Set(requirements.map((requirement) => requirement.serviceType));
+    const rates = runtimeServicesRates(providerId);
+    const regionLabel = nws.workload.region.preference ?? 'default region';
+    const values = runtimeServicesAssumptions(requirements);
+    const lineItems: ComparisonLineItem[] = [];
+
+    if (serviceTypes.has('serverless-functions') && values.functionInvocationsMillion > 0) {
+      const invocations = values.functionInvocationsMillion * 1_000_000;
+      const durationSeconds = values.functionDurationMs / 1000;
+      const memoryGb = values.functionMemoryMb / 1024;
+      const gbSeconds = invocations * durationSeconds * memoryGb;
+      const requestCost = values.functionInvocationsMillion * rates.functionRequestPerMillion;
+      const durationCost = gbSeconds * rates.functionGbSecond;
+
+      lineItems.push(
+        this.computeModeledLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-serverless-function-requests',
+          description: `${providerLabel(providerId)} serverless function request estimate`,
+          monthlyCostUsd: this.roundCurrency(requestCost),
+          unit: '1M requests',
+          unitPriceUsd: rates.functionRequestPerMillion,
+        }),
+        this.computeModeledLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-serverless-function-duration',
+          description: `${providerLabel(providerId)} serverless function GB-second estimate`,
+          monthlyCostUsd: this.roundCurrency(durationCost),
+          unit: 'GB-second',
+          unitPriceUsd: rates.functionGbSecond,
+        }),
+      );
+    }
+
+    if (serviceTypes.has('container-orchestration') && values.kubernetesClusterCount > 0) {
+      lineItems.push(
+        this.computeModeledLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-kubernetes-control-plane',
+          description: `${providerLabel(providerId)} managed Kubernetes control plane estimate`,
+          monthlyCostUsd: this.roundCurrency(
+            values.kubernetesClusterCount * rates.kubernetesControlPlaneMonthly,
+          ),
+          unit: 'cluster-month',
+          unitPriceUsd: rates.kubernetesControlPlaneMonthly,
+        }),
+      );
+    }
+
+    if (serviceTypes.has('container-orchestration') && values.kubernetesWorkerNodeCount > 0) {
+      lineItems.push(
+        this.computeModeledLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-kubernetes-node-overhead',
+          description: `${providerLabel(providerId)} Kubernetes node networking/operations overhead estimate`,
+          monthlyCostUsd: this.roundCurrency(
+            values.kubernetesWorkerNodeCount * rates.kubernetesNodeOverheadMonthly,
+          ),
+          unit: 'node-month',
+          unitPriceUsd: rates.kubernetesNodeOverheadMonthly,
+        }),
+      );
+    }
+
+    if (serviceTypes.has('container-registry') && values.registryStorageGb > 0) {
+      lineItems.push(
+        this.storageLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-container-registry-storage',
+          description: `${providerLabel(providerId)} container registry storage estimate`,
+          quantity: values.registryStorageGb,
+          unit: 'GB-month',
+          unitPriceUsd: rates.registryStoragePerGbMonth,
+        }),
+      );
+    }
+
+    if (serviceTypes.has('container-registry') && values.registryEgressGb > 0) {
+      lineItems.push(
+        this.networkLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-container-registry-egress',
+          description: `${providerLabel(providerId)} container registry egress estimate`,
+          quantity: values.registryEgressGb,
+          unit: 'GB',
+          unitPriceUsd: rates.registryEgressPerGb,
+        }),
+      );
+    }
+
+    return lineItems;
+  }
+
+  private computeModeledLineItem(input: {
+    providerId: ProviderId;
+    regionLabel: string;
+    skuId: string;
+    description: string;
+    monthlyCostUsd: number;
+    unit: string;
+    unitPriceUsd: number;
+  }): ComparisonLineItem {
+    return this.normalizeLineItem({
+      category: 'compute',
+      costComponent: 'compute',
+      description: input.description,
+      isApproximate: true,
+      baseMonthlyCostUsd: input.monthlyCostUsd,
+      baseHourlyCostUsd: input.monthlyCostUsd / HOURS_PER_MONTH,
+      skuId: input.skuId,
+      region: input.regionLabel,
+      unit: input.unit,
+      unitPriceUsd: input.unitPriceUsd,
+      pricingBasis: 'flat',
+    });
+  }
+
   private componentTotal(lineItems: ComparisonLineItem[], component: CostComponent): number {
     return this.roundCurrency(
       lineItems
@@ -1972,6 +2111,61 @@ function maxScaleParam(requirements: ServiceRequirement[], key: string): number 
       return typeof value === 'number' && Number.isFinite(value) ? value : 0;
     }),
   );
+}
+
+function runtimeServicesRates(providerId: ProviderId): RuntimeServicesRates {
+  switch (providerId) {
+    case 'aws':
+      return {
+        functionRequestPerMillion: 0.2,
+        functionGbSecond: 0.0000166667,
+        kubernetesControlPlaneMonthly: 73,
+        kubernetesNodeOverheadMonthly: 8,
+        registryStoragePerGbMonth: 0.1,
+        registryEgressPerGb: 0.09,
+      };
+    case 'azure':
+      return {
+        functionRequestPerMillion: 0.2,
+        functionGbSecond: 0.000016,
+        kubernetesControlPlaneMonthly: 0,
+        kubernetesNodeOverheadMonthly: 6,
+        registryStoragePerGbMonth: 0.167,
+        registryEgressPerGb: 0.087,
+      };
+    case 'gcp':
+      return {
+        functionRequestPerMillion: 0.4,
+        functionGbSecond: 0.0000025,
+        kubernetesControlPlaneMonthly: 73,
+        kubernetesNodeOverheadMonthly: 7,
+        registryStoragePerGbMonth: 0.1,
+        registryEgressPerGb: 0.12,
+      };
+  }
+}
+
+function runtimeServicesAssumptions(
+  requirements: ServiceRequirement[],
+): Record<
+  | 'functionInvocationsMillion'
+  | 'functionDurationMs'
+  | 'functionMemoryMb'
+  | 'kubernetesClusterCount'
+  | 'kubernetesWorkerNodeCount'
+  | 'registryStorageGb'
+  | 'registryEgressGb',
+  number
+> {
+  return {
+    functionInvocationsMillion: maxScaleParam(requirements, 'functionInvocationsMillion'),
+    functionDurationMs: maxScaleParam(requirements, 'functionDurationMs') || 100,
+    functionMemoryMb: maxScaleParam(requirements, 'functionMemoryMb') || 512,
+    kubernetesClusterCount: maxScaleParam(requirements, 'kubernetesClusterCount'),
+    kubernetesWorkerNodeCount: maxScaleParam(requirements, 'kubernetesWorkerNodeCount'),
+    registryStorageGb: maxScaleParam(requirements, 'registryStorageGb'),
+    registryEgressGb: maxScaleParam(requirements, 'registryEgressGb'),
+  };
 }
 
 function networkDimensionRates(providerId: ProviderId): NetworkDimensionRates {

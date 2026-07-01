@@ -66,7 +66,7 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Azure Container Apps', 'Azure Container Instances'],
     gcp: ['Cloud Run'],
   }),
-  family('container-registry', 'containers', 'Container registry', 'roadmap', {
+  family('container-registry', 'containers', 'Container registry', 'mapped', {
     aws: ['Amazon ECR'],
     azure: ['Azure Container Registry'],
     gcp: ['Artifact Registry'],
