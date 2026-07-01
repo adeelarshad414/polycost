@@ -77,9 +77,6 @@
   --pc-provider-aws-soft: #fff3df;
   --pc-provider-azure-soft: #e2f2ff;
   --pc-provider-gcp-soft: #e8f5ea;
-  --pc-provider-aws-panel: #fff8ed;
-  --pc-provider-azure-panel: #f1f8ff;
-  --pc-provider-gcp-panel: #f3fbf5;
   --pc-cloud-progress-gradient: linear-gradient(
     90deg,
     var(--brand-orange) 0%,
@@ -157,9 +154,6 @@
   --pc-provider-aws-soft: #332414;
   --pc-provider-azure-soft: #11283a;
   --pc-provider-gcp-soft: #132b1b;
-  --pc-provider-aws-panel: #211a12;
-  --pc-provider-azure-panel: #101d28;
-  --pc-provider-gcp-panel: #101f15;
   --pc-brand-accent-hover: #5b93e0;
   --pc-brand-accent-soft: #142544;
   --pc-shadow-soft: 0 1px 2px rgb(0 0 0 / 22%), 0 14px 38px rgb(0 0 0 / 25%);
@@ -406,14 +400,7 @@ textarea:focus-visible {
 .initial-home-actions-primary {
   border: 1px solid color-mix(in srgb, var(--pc-action-primary) 22%, var(--pc-border));
   border-radius: 8px;
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--brand-orange) 8%, transparent),
-      color-mix(in srgb, var(--brand-blue) 7%, transparent) 48%,
-      color-mix(in srgb, var(--brand-green) 8%, transparent)
-    ),
-    color-mix(in srgb, var(--pc-bg-surface-2) 62%, var(--pc-bg-surface));
+  background: color-mix(in srgb, var(--pc-bg-surface-2) 62%, var(--pc-bg-surface));
   padding: 10px;
 }
 
@@ -470,14 +457,7 @@ textarea:focus-visible {
   gap: var(--pc-space-2);
   animation: progressive-panel-enter 180ms ease-out both;
   border-color: color-mix(in srgb, var(--pc-action-primary) 26%, var(--pc-border));
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--brand-orange) 9%, transparent),
-      color-mix(in srgb, var(--brand-blue) 8%, transparent) 48%,
-      color-mix(in srgb, var(--brand-green) 9%, transparent)
-    ),
-    color-mix(in srgb, var(--pc-bg-surface) 94%, var(--pc-bg-surface-2));
+  background: color-mix(in srgb, var(--pc-bg-surface) 94%, var(--pc-bg-surface-2));
   padding: var(--pc-space-2);
 }
 
@@ -577,8 +557,8 @@ textarea:focus-visible {
 }
 
 .input-mode-badge-describe {
-  border-color: color-mix(in srgb, var(--pc-provider-azure) 30%, var(--pc-border));
-  background: color-mix(in srgb, var(--pc-provider-azure-soft) 64%, var(--pc-bg-surface));
+  border-color: color-mix(in srgb, var(--pc-info) 30%, var(--pc-border));
+  background: color-mix(in srgb, var(--pc-info-soft) 64%, var(--pc-bg-surface));
 }
 
 .pricing-model-badge {
@@ -586,9 +566,9 @@ textarea:focus-visible {
   min-height: 26px;
   align-items: center;
   gap: 6px;
-  border: 1px solid color-mix(in srgb, var(--brand-green) 28%, var(--pc-border));
+  border: 1px solid color-mix(in srgb, var(--pc-success) 28%, var(--pc-border));
   border-radius: 999px;
-  background: color-mix(in srgb, var(--brand-green) 10%, var(--pc-bg-surface));
+  background: color-mix(in srgb, var(--pc-success-soft) 52%, var(--pc-bg-surface));
   color: var(--pc-text-primary);
   padding: 0 9px;
   font-size: var(--pc-text-xs);
@@ -605,13 +585,13 @@ textarea:focus-visible {
 
 .pricing-model-badge-reserved-1yr,
 .pricing-model-badge-reserved-3yr {
-  border-color: color-mix(in srgb, var(--brand-orange) 30%, var(--pc-border));
-  background: color-mix(in srgb, var(--brand-orange) 10%, var(--pc-bg-surface));
+  border-color: color-mix(in srgb, var(--pc-warning) 30%, var(--pc-border));
+  background: color-mix(in srgb, var(--pc-warning-soft) 54%, var(--pc-bg-surface));
 }
 
 .pricing-model-badge-savings-plan {
-  border-color: color-mix(in srgb, var(--brand-blue) 30%, var(--pc-border));
-  background: color-mix(in srgb, var(--brand-blue) 10%, var(--pc-bg-surface));
+  border-color: color-mix(in srgb, var(--pc-info) 30%, var(--pc-border));
+  background: color-mix(in srgb, var(--pc-info-soft) 54%, var(--pc-bg-surface));
 }
 
 .pricing-model-badge-spot {
@@ -758,6 +738,7 @@ textarea:focus-visible {
   min-width: 0;
   gap: var(--pc-space-2);
   border: 1px solid color-mix(in srgb, var(--pc-border) 86%, transparent);
+  border-top-width: 4px;
   border-radius: 8px;
   background: var(--pc-bg-surface);
   box-shadow: var(--pc-shadow-soft);
@@ -766,15 +747,15 @@ textarea:focus-visible {
 }
 
 .provider-summary-card-aws {
-  background: color-mix(in srgb, var(--pc-provider-aws-panel) 60%, var(--pc-bg-surface));
+  border-top-color: var(--pc-provider-aws);
 }
 
 .provider-summary-card-azure {
-  background: color-mix(in srgb, var(--pc-provider-azure-panel) 64%, var(--pc-bg-surface));
+  border-top-color: var(--pc-provider-azure);
 }
 
 .provider-summary-card-gcp {
-  background: color-mix(in srgb, var(--pc-provider-gcp-panel) 62%, var(--pc-bg-surface));
+  border-top-color: var(--pc-provider-gcp);
 }
 
 .provider-summary-heading {
@@ -979,17 +960,11 @@ textarea:focus-visible {
   margin: calc(clamp(var(--pc-space-2), 2.2vw, var(--pc-space-3)) * -1)
     calc(clamp(var(--pc-space-2), 2.2vw, var(--pc-space-3)) * -1) var(--pc-space-3);
   border-bottom: 1px solid var(--pc-landing-border);
-  background:
-    radial-gradient(
-      circle at 24% 24%,
-      color-mix(in srgb, var(--brand-blue) 18%, transparent) 0,
-      transparent 32%
-    ),
-    linear-gradient(
-      180deg,
-      var(--pc-landing-bg) 0%,
-      color-mix(in srgb, var(--pc-landing-surface-1) 88%, var(--pc-landing-bg)) 100%
-    );
+  background: linear-gradient(
+    180deg,
+    var(--pc-landing-bg) 0%,
+    color-mix(in srgb, var(--pc-landing-surface-1) 88%, var(--pc-landing-bg)) 100%
+  );
   color: var(--pc-landing-text-primary);
 }
 
@@ -1591,7 +1566,7 @@ textarea:focus-visible {
   background: linear-gradient(
     90deg,
     color-mix(in srgb, var(--pc-bg-surface-2) 82%, var(--pc-bg-surface)) 0%,
-    color-mix(in srgb, var(--brand-blue-dark) 24%, var(--pc-bg-surface)) 100%
+    color-mix(in srgb, var(--pc-border-strong) 32%, var(--pc-bg-surface)) 100%
   );
 }
 
@@ -3083,7 +3058,7 @@ select:disabled {
 }
 
 .platform-readiness-checking {
-  border-color: color-mix(in srgb, var(--pc-provider-azure) 34%, var(--pc-border));
+  border-color: color-mix(in srgb, var(--pc-info) 34%, var(--pc-border));
 }
 
 .platform-readiness-attention {
@@ -3129,10 +3104,10 @@ select:disabled {
   height: 10px;
   flex: 0 0 auto;
   border-radius: 999px;
-  background: var(--pc-provider-azure);
+  background: var(--pc-info);
   box-shadow:
-    0 0 0 4px color-mix(in srgb, var(--pc-provider-azure) 16%, transparent),
-    0 0 18px color-mix(in srgb, var(--pc-provider-azure) 32%, transparent);
+    0 0 0 4px color-mix(in srgb, var(--pc-info) 16%, transparent),
+    0 0 18px color-mix(in srgb, var(--pc-info) 32%, transparent);
 }
 
 .platform-readiness-good .readiness-dot {
@@ -3188,13 +3163,13 @@ select:disabled {
 }
 
 .readiness-pill-checking {
-  border-color: color-mix(in srgb, var(--pc-provider-azure) 34%, var(--pc-border));
-  background: color-mix(in srgb, var(--pc-provider-azure-soft) 66%, var(--pc-bg-surface));
+  border-color: color-mix(in srgb, var(--pc-info) 34%, var(--pc-border));
+  background: color-mix(in srgb, var(--pc-info-soft) 58%, var(--pc-bg-surface));
 }
 
 .readiness-pill-review {
-  border-color: color-mix(in srgb, var(--pc-provider-aws) 34%, var(--pc-border));
-  background: color-mix(in srgb, var(--pc-provider-aws-soft) 64%, var(--pc-bg-surface));
+  border-color: color-mix(in srgb, var(--pc-warning) 34%, var(--pc-border));
+  background: color-mix(in srgb, var(--pc-warning-soft) 58%, var(--pc-bg-surface));
 }
 
 .readiness-pill-attention {
@@ -3306,19 +3281,19 @@ select:disabled {
 
 .calculator-link-aws {
   border-color: color-mix(in srgb, var(--pc-provider-aws) 54%, var(--pc-border));
-  background: color-mix(in srgb, var(--pc-provider-aws-soft) 74%, var(--pc-bg-surface));
+  background: var(--pc-bg-surface);
   color: var(--pc-provider-aws);
 }
 
 .calculator-link-azure {
   border-color: color-mix(in srgb, var(--pc-provider-azure) 54%, var(--pc-border));
-  background: color-mix(in srgb, var(--pc-provider-azure-soft) 74%, var(--pc-bg-surface));
+  background: var(--pc-bg-surface);
   color: var(--pc-provider-azure);
 }
 
 .calculator-link-gcp {
   border-color: color-mix(in srgb, var(--pc-provider-gcp) 54%, var(--pc-border));
-  background: color-mix(in srgb, var(--pc-provider-gcp-soft) 74%, var(--pc-bg-surface));
+  background: var(--pc-bg-surface);
   color: var(--pc-provider-gcp);
 }
 
@@ -3905,20 +3880,9 @@ select:disabled {
   display: grid;
   grid-template-columns: minmax(280px, 1fr) minmax(280px, 0.9fr);
   gap: var(--pc-space-2);
-  border-top: 4px solid var(--pc-action-primary);
+  border-top: 4px solid var(--pc-border-strong);
   padding: var(--pc-space-2);
-  background:
-    linear-gradient(
-      120deg,
-      color-mix(in srgb, var(--pc-provider-aws-soft) 48%, transparent),
-      transparent 36%
-    ),
-    linear-gradient(
-      240deg,
-      color-mix(in srgb, var(--pc-provider-azure-soft) 46%, transparent),
-      transparent 34%
-    ),
-    var(--pc-bg-surface);
+  background: var(--pc-bg-surface);
 }
 
 .executive-headline-card,
@@ -4367,20 +4331,9 @@ select:disabled {
 .engineering-analytics-dashboard {
   display: grid;
   gap: var(--pc-space-2);
-  border-top: 4px solid var(--pc-provider-azure);
+  border-top: 4px solid var(--pc-border-strong);
   padding: var(--pc-space-2);
-  background:
-    linear-gradient(
-      116deg,
-      color-mix(in srgb, var(--pc-provider-azure-soft) 48%, transparent),
-      transparent 36%
-    ),
-    linear-gradient(
-      244deg,
-      color-mix(in srgb, var(--pc-provider-gcp-soft) 38%, transparent),
-      transparent 34%
-    ),
-    var(--pc-bg-surface);
+  background: var(--pc-bg-surface);
 }
 
 .engineering-preview-header,
@@ -4806,25 +4759,9 @@ select:disabled {
   display: grid;
   gap: var(--pc-space-2);
   overflow: hidden;
-  border-top: 4px solid var(--pc-action-primary);
+  border-top: 4px solid var(--pc-border-strong);
   padding: var(--pc-space-2);
-  background:
-    linear-gradient(
-      125deg,
-      color-mix(in srgb, var(--pc-provider-aws-soft) 42%, transparent),
-      transparent 30%
-    ),
-    linear-gradient(
-      235deg,
-      color-mix(in srgb, var(--pc-provider-azure-soft) 38%, transparent),
-      transparent 34%
-    ),
-    linear-gradient(
-      0deg,
-      color-mix(in srgb, var(--pc-provider-gcp-soft) 30%, transparent),
-      transparent 42%
-    ),
-    var(--pc-bg-surface);
+  background: var(--pc-bg-surface);
 }
 
 .financial-analytics .panel-heading {
@@ -5672,9 +5609,9 @@ select:disabled {
 .provider-card::before {
   position: absolute;
   inset: 0 0 auto;
-  height: 88px;
+  display: none;
+  height: 0;
   content: '';
-  opacity: 0.72;
   pointer-events: none;
 }
 
@@ -5684,35 +5621,29 @@ select:disabled {
 
 .provider-aws {
   border-top-color: var(--pc-provider-aws);
-  background:
-    linear-gradient(180deg, var(--pc-provider-aws-panel) 0, var(--pc-bg-surface) 58%),
-    var(--pc-bg-surface);
+  background: var(--pc-bg-surface);
 }
 
 .provider-aws::before {
-  background: linear-gradient(90deg, var(--pc-provider-aws-soft), transparent 72%);
+  background: none;
 }
 
 .provider-azure {
   border-top-color: var(--pc-provider-azure);
-  background:
-    linear-gradient(180deg, var(--pc-provider-azure-panel) 0, var(--pc-bg-surface) 58%),
-    var(--pc-bg-surface);
+  background: var(--pc-bg-surface);
 }
 
 .provider-azure::before {
-  background: linear-gradient(90deg, var(--pc-provider-azure-soft), transparent 72%);
+  background: none;
 }
 
 .provider-gcp {
   border-top-color: var(--pc-provider-gcp);
-  background:
-    linear-gradient(180deg, var(--pc-provider-gcp-panel) 0, var(--pc-bg-surface) 58%),
-    var(--pc-bg-surface);
+  background: var(--pc-bg-surface);
 }
 
 .provider-gcp::before {
-  background: linear-gradient(90deg, var(--pc-provider-gcp-soft), transparent 72%);
+  background: none;
 }
 
 .provider-header {
