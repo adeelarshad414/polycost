@@ -92,6 +92,10 @@ export interface WorkloadFormState {
   analyticsIntegrationJobHours: string;
   analyticsStreamingIngestGb: string;
   analyticsBiUsers: string;
+  integrationQueueMessagesMillion: string;
+  integrationEventsMillion: string;
+  integrationWorkflowTransitionsThousand: string;
+  integrationApiGatewayRequestsMillion: string;
   monthlyEgressGb: string;
   crossAzTransferGb: string;
   interRegionTransferGb: string;
@@ -189,6 +193,10 @@ type NumericWorkloadFormField =
   | 'analyticsIntegrationJobHours'
   | 'analyticsStreamingIngestGb'
   | 'analyticsBiUsers'
+  | 'integrationQueueMessagesMillion'
+  | 'integrationEventsMillion'
+  | 'integrationWorkflowTransitionsThousand'
+  | 'integrationApiGatewayRequestsMillion'
   | 'monthlyEgressGb'
   | 'crossAzTransferGb'
   | 'interRegionTransferGb'
@@ -291,6 +299,10 @@ export const defaultWorkloadForm: WorkloadFormState = {
   analyticsIntegrationJobHours: '0',
   analyticsStreamingIngestGb: '0',
   analyticsBiUsers: '0',
+  integrationQueueMessagesMillion: '0',
+  integrationEventsMillion: '0',
+  integrationWorkflowTransitionsThousand: '0',
+  integrationApiGatewayRequestsMillion: '0',
   monthlyEgressGb: '750',
   crossAzTransferGb: '0',
   interRegionTransferGb: '0',
@@ -467,11 +479,12 @@ export const ARCHITECTURE_TEMPLATES: ArchitectureTemplate[] = [
       databaseHighAvailability: true,
       monthlyEgressGb: '5000',
       commitmentPreferencePercent: '75',
+      integrationApiGatewayRequestsMillion: '250',
       selectedServiceCategory: 'application',
-      selectedServiceFamilyId: 'api-management',
+      selectedServiceFamilyId: 'api-gateway',
       selectedServiceFamilyIds: [
         'autoscaling-compute',
-        'api-management',
+        'api-gateway',
         'relational-database',
         'cache',
         'load-balancing',
@@ -573,6 +586,9 @@ export const ARCHITECTURE_TEMPLATES: ArchitectureTemplate[] = [
       storageSizeGb: '750',
       databaseSizeGb: '250',
       monthlyEgressGb: '2000',
+      integrationQueueMessagesMillion: '75',
+      integrationEventsMillion: '40',
+      integrationWorkflowTransitionsThousand: '120',
       selectedServiceCategory: 'containers',
       selectedServiceFamilyId: 'container-orchestration',
       selectedServiceFamilyIds: [
@@ -839,6 +855,30 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
     form,
     'analyticsBiUsers',
     'BI users must be a whole number 0 or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'integrationQueueMessagesMillion',
+    'Queue messages must be 0 million or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'integrationEventsMillion',
+    'Event routing volume must be 0 million or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'integrationWorkflowTransitionsThousand',
+    'Workflow transitions must be 0 thousand or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'integrationApiGatewayRequestsMillion',
+    'API gateway requests must be 0 million or higher.',
   );
 
   optionalNonNegativeNumberField(issues, form, 'monthlyEgressGb', 'Egress must be 0 GB or higher.');
@@ -1185,6 +1225,7 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
   const supportingServices = supportingServiceScaleParamsFromNws(nws);
   const runtimeServices = runtimeScaleParamsFromNws(nws);
   const analyticsServices = analyticsScaleParamsFromNws(nws);
+  const integrationServices = integrationScaleParamsFromNws(nws);
 
   return {
     ...defaultWorkloadForm,
@@ -1337,6 +1378,22 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
     ),
     analyticsBiUsers: numberToInput(
       analyticsServices.analyticsBiUsers ?? Number(defaultWorkloadForm.analyticsBiUsers),
+    ),
+    integrationQueueMessagesMillion: numberToInput(
+      integrationServices.integrationQueueMessagesMillion ??
+        Number(defaultWorkloadForm.integrationQueueMessagesMillion),
+    ),
+    integrationEventsMillion: numberToInput(
+      integrationServices.integrationEventsMillion ??
+        Number(defaultWorkloadForm.integrationEventsMillion),
+    ),
+    integrationWorkflowTransitionsThousand: numberToInput(
+      integrationServices.integrationWorkflowTransitionsThousand ??
+        Number(defaultWorkloadForm.integrationWorkflowTransitionsThousand),
+    ),
+    integrationApiGatewayRequestsMillion: numberToInput(
+      integrationServices.integrationApiGatewayRequestsMillion ??
+        Number(defaultWorkloadForm.integrationApiGatewayRequestsMillion),
     ),
     monthlyEgressGb: numberToInput(nws.network.estimatedMonthlyEgressGb),
     crossAzTransferGb: numberToInput(
@@ -1522,6 +1579,7 @@ export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceReq
           ? runtimeScaleParamsFromForm(form)
           : {}),
         ...(isAnalyticsServiceFamily(serviceType) ? analyticsScaleParamsFromForm(form) : {}),
+        ...(isIntegrationServiceFamily(serviceType) ? integrationScaleParamsFromForm(form) : {}),
         ...(serviceType.includes('storage') ? storageScaleParamsFromForm(form) : {}),
         ...(serviceType.includes('database') || serviceType === 'cache'
           ? databaseScaleParamsFromForm(form)
@@ -1563,6 +1621,7 @@ function orderedRequirementIds(form: WorkloadFormState): string[] {
     ...supportingServiceFamilyIds(form),
     ...runtimeServiceFamilyIds(form),
     ...analyticsServiceFamilyIds(form),
+    ...integrationServiceFamilyIds(form),
     ...(form.cdn ? ['cdn-edge'] : []),
     ...(form.loadBalancer ? ['load-balancing'] : []),
   ]);
@@ -1668,6 +1727,28 @@ function analyticsServiceFamilyIds(form: WorkloadFormState): string[] {
   return ids;
 }
 
+function integrationServiceFamilyIds(form: WorkloadFormState): string[] {
+  const ids: string[] = [];
+
+  if (hasPositiveFormNumber(form.integrationQueueMessagesMillion)) {
+    ids.push('queues-messaging');
+  }
+
+  if (hasPositiveFormNumber(form.integrationEventsMillion)) {
+    ids.push('eventing');
+  }
+
+  if (hasPositiveFormNumber(form.integrationWorkflowTransitionsThousand)) {
+    ids.push('workflow-orchestration');
+  }
+
+  if (hasPositiveFormNumber(form.integrationApiGatewayRequestsMillion)) {
+    ids.push('api-gateway');
+  }
+
+  return ids;
+}
+
 function isAnalyticsServiceFamily(serviceType: string): boolean {
   return [
     'data-warehouse',
@@ -1676,6 +1757,12 @@ function isAnalyticsServiceFamily(serviceType: string): boolean {
     'streaming-analytics',
     'business-intelligence',
   ].includes(serviceType);
+}
+
+function isIntegrationServiceFamily(serviceType: string): boolean {
+  return ['queues-messaging', 'eventing', 'workflow-orchestration', 'api-gateway'].includes(
+    serviceType,
+  );
 }
 
 function hasPositiveFormNumber(value: string): boolean {
@@ -1773,6 +1860,28 @@ function analyticsScaleParamsFromNws(nws: NormalizedWorkloadSpec): Record<string
     keys.map((key) => [
       key,
       analyticsRequirements
+        .map((requirement) => numericScaleParam(requirement.scaleParams, key))
+        .find((value) => value !== undefined),
+    ]),
+  ) as Record<string, number>;
+}
+
+function integrationScaleParamsFromNws(nws: NormalizedWorkloadSpec): Record<string, number> {
+  const integrationRequirements =
+    nws.serviceRequirements?.filter((requirement) =>
+      isIntegrationServiceFamily(requirement.serviceType),
+    ) ?? [];
+  const keys = [
+    'integrationQueueMessagesMillion',
+    'integrationEventsMillion',
+    'integrationWorkflowTransitionsThousand',
+    'integrationApiGatewayRequestsMillion',
+  ];
+
+  return Object.fromEntries(
+    keys.map((key) => [
+      key,
+      integrationRequirements
         .map((requirement) => numericScaleParam(requirement.scaleParams, key))
         .find((value) => value !== undefined),
     ]),
@@ -1997,6 +2106,19 @@ function analyticsScaleParamsFromForm(form: WorkloadFormState): ServiceRequireme
     analyticsIntegrationJobHours: parseOptionalNumber(form.analyticsIntegrationJobHours) ?? 0,
     analyticsStreamingIngestGb: parseOptionalNumber(form.analyticsStreamingIngestGb) ?? 0,
     analyticsBiUsers: parseNonNegativeInteger(form.analyticsBiUsers, 0),
+  };
+}
+
+function integrationScaleParamsFromForm(
+  form: WorkloadFormState,
+): ServiceRequirement['scaleParams'] {
+  return {
+    integrationQueueMessagesMillion: parseOptionalNumber(form.integrationQueueMessagesMillion) ?? 0,
+    integrationEventsMillion: parseOptionalNumber(form.integrationEventsMillion) ?? 0,
+    integrationWorkflowTransitionsThousand:
+      parseOptionalNumber(form.integrationWorkflowTransitionsThousand) ?? 0,
+    integrationApiGatewayRequestsMillion:
+      parseOptionalNumber(form.integrationApiGatewayRequestsMillion) ?? 0,
   };
 }
 
@@ -2468,6 +2590,14 @@ function formNumericValue(form: WorkloadFormState, field: NumericWorkloadFormFie
       return form.analyticsStreamingIngestGb;
     case 'analyticsBiUsers':
       return form.analyticsBiUsers;
+    case 'integrationQueueMessagesMillion':
+      return form.integrationQueueMessagesMillion;
+    case 'integrationEventsMillion':
+      return form.integrationEventsMillion;
+    case 'integrationWorkflowTransitionsThousand':
+      return form.integrationWorkflowTransitionsThousand;
+    case 'integrationApiGatewayRequestsMillion':
+      return form.integrationApiGatewayRequestsMillion;
     case 'monthlyEgressGb':
       return form.monthlyEgressGb;
     case 'crossAzTransferGb':

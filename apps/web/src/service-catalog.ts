@@ -81,7 +81,7 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Azure Static Web Apps'],
     gcp: ['Firebase Hosting', 'Cloud Storage website hosting'],
   }),
-  family('api-management', 'application', 'API management', 'roadmap', {
+  family('api-gateway', 'application', 'API gateway', 'mapped', {
     aws: ['Amazon API Gateway'],
     azure: ['Azure API Management'],
     gcp: ['Apigee API Management'],
@@ -176,17 +176,17 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Azure AI Vision', 'Azure Speech', 'Azure Language'],
     gcp: ['Cloud Vision', 'Speech-to-Text', 'Natural Language AI'],
   }),
-  family('queues-messaging', 'integration', 'Queues + messaging', 'roadmap', {
+  family('queues-messaging', 'integration', 'Queues + messaging', 'mapped', {
     aws: ['Amazon SQS', 'Amazon SNS'],
     azure: ['Azure Service Bus'],
     gcp: ['Pub/Sub'],
   }),
-  family('eventing', 'integration', 'Event routing', 'roadmap', {
+  family('eventing', 'integration', 'Event routing', 'mapped', {
     aws: ['Amazon EventBridge'],
     azure: ['Azure Event Grid'],
     gcp: ['Eventarc'],
   }),
-  family('workflow-orchestration', 'integration', 'Workflow orchestration', 'roadmap', {
+  family('workflow-orchestration', 'integration', 'Workflow orchestration', 'mapped', {
     aws: ['AWS Step Functions'],
     azure: ['Azure Logic Apps'],
     gcp: ['Workflows'],

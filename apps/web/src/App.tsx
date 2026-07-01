@@ -3297,6 +3297,43 @@ function WorkloadForm({
         </div>
       </FormSection>
 
+      <FormSection title="Integration" tone="network">
+        <div className="form-grid secondary-grid">
+          <TextField
+            label="Queue messages"
+            value={form.integrationQueueMessagesMillion}
+            inputMode="decimal"
+            suffix="M/mo"
+            error={fieldErrors.integrationQueueMessagesMillion}
+            onChange={(value) => update('integrationQueueMessagesMillion', value)}
+          />
+          <TextField
+            label="Event routing"
+            value={form.integrationEventsMillion}
+            inputMode="decimal"
+            suffix="M/mo"
+            error={fieldErrors.integrationEventsMillion}
+            onChange={(value) => update('integrationEventsMillion', value)}
+          />
+          <TextField
+            label="Workflow transitions"
+            value={form.integrationWorkflowTransitionsThousand}
+            inputMode="decimal"
+            suffix="K/mo"
+            error={fieldErrors.integrationWorkflowTransitionsThousand}
+            onChange={(value) => update('integrationWorkflowTransitionsThousand', value)}
+          />
+          <TextField
+            label="API gateway requests"
+            value={form.integrationApiGatewayRequestsMillion}
+            inputMode="decimal"
+            suffix="M/mo"
+            error={fieldErrors.integrationApiGatewayRequestsMillion}
+            onChange={(value) => update('integrationApiGatewayRequestsMillion', value)}
+          />
+        </div>
+      </FormSection>
+
       <FormSection title="Network" tone="network">
         <div className="form-grid secondary-grid">
           <TextField

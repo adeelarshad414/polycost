@@ -566,6 +566,58 @@ describe('workload helpers', () => {
     );
   });
 
+  it('serializes integration and API gateway assumptions into service requirements', () => {
+    const nws = buildNwsFromForm({
+      ...defaultWorkloadForm,
+      selectedServiceFamilyIds: [],
+      integrationQueueMessagesMillion: '50',
+      integrationEventsMillion: '20',
+      integrationWorkflowTransitionsThousand: '100',
+      integrationApiGatewayRequestsMillion: '10',
+    });
+
+    expect(nws.serviceRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceCategory: 'integration',
+          serviceType: 'queues-messaging',
+          scaleParams: expect.objectContaining({
+            integrationQueueMessagesMillion: 50,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'integration',
+          serviceType: 'eventing',
+          scaleParams: expect.objectContaining({
+            integrationEventsMillion: 20,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'integration',
+          serviceType: 'workflow-orchestration',
+          scaleParams: expect.objectContaining({
+            integrationWorkflowTransitionsThousand: 100,
+          }),
+        }),
+        expect.objectContaining({
+          serviceCategory: 'application',
+          serviceType: 'api-gateway',
+          scaleParams: expect.objectContaining({
+            integrationApiGatewayRequestsMillion: 10,
+          }),
+        }),
+      ]),
+    );
+    expect(formFromNws(nws)).toEqual(
+      expect.objectContaining({
+        integrationQueueMessagesMillion: '50',
+        integrationEventsMillion: '20',
+        integrationWorkflowTransitionsThousand: '100',
+        integrationApiGatewayRequestsMillion: '10',
+      }),
+    );
+  });
+
   it('maps an NWS back into editable form values', () => {
     const nws = buildNwsFromForm(defaultWorkloadForm, 'natural_language', 'web app');
     const form = formFromNws(nws);
@@ -632,6 +684,10 @@ describe('workload helpers', () => {
         analyticsIntegrationJobHours: '-1',
         analyticsStreamingIngestGb: '-1',
         analyticsBiUsers: '1.5',
+        integrationQueueMessagesMillion: '-1',
+        integrationEventsMillion: '-1',
+        integrationWorkflowTransitionsThousand: '-1',
+        integrationApiGatewayRequestsMillion: '-1',
         functionInvocationsMillion: '-1',
         functionDurationMs: '0',
         functionMemoryMb: '512.5',
@@ -655,6 +711,10 @@ describe('workload helpers', () => {
       'analyticsIntegrationJobHours',
       'analyticsStreamingIngestGb',
       'analyticsBiUsers',
+      'integrationQueueMessagesMillion',
+      'integrationEventsMillion',
+      'integrationWorkflowTransitionsThousand',
+      'integrationApiGatewayRequestsMillion',
       'monthlyEgressGb',
       'crossAzTransferGb',
       'interRegionTransferGb',
