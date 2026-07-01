@@ -1604,6 +1604,58 @@ textarea:focus-visible {
   gap: var(--pc-space-3);
 }
 
+.requirements-file-loader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--pc-space-2);
+  align-items: center;
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface-2) 72%, transparent);
+  padding: var(--pc-space-2);
+}
+
+.requirements-file-trigger {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pc-space-1);
+  border: 1px solid color-mix(in srgb, var(--pc-action-primary) 36%, var(--pc-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-action-primary) 12%, var(--pc-bg-surface));
+  color: var(--pc-action-primary);
+  cursor: pointer;
+  font-size: var(--pc-text-sm);
+  font-weight: 800;
+  padding: 0 var(--pc-space-2);
+}
+
+.requirements-file-trigger:hover,
+.requirements-file-trigger:focus-within,
+.requirements-file-loader:focus-within .requirements-file-trigger {
+  border-color: var(--pc-action-primary);
+  box-shadow: 0 0 0 3px var(--pc-focus-ring);
+}
+
+.requirements-file-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.requirements-file-copy p {
+  margin: 0;
+  color: var(--pc-text-muted);
+  font-size: var(--pc-text-xs);
+  line-height: 1.45;
+}
+
+.requirements-file-copy .requirements-file-status {
+  color: var(--pc-success);
+  font-weight: 800;
+}
+
 .field-label,
 .field-caption,
 .summary-label,
@@ -5307,6 +5359,10 @@ select:disabled {
 
   .initial-home-fields,
   .initial-optional-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .requirements-file-loader {
     grid-template-columns: 1fr;
   }
 

@@ -621,6 +621,72 @@ describe('App', () => {
     unmount();
   });
 
+  it('loads a requirements file into the same parse and review flow', async () => {
+    const fileText =
+      'Client requirements: web app with 4 app servers, managed Postgres, 500GB object storage, and 1TB egress in US East.';
+    const parsedNws = buildNwsFromForm({
+      ...defaultWorkloadForm,
+      workloadName: 'Uploaded requirements portal',
+    });
+    const client = clientMock({
+      parseWorkload: jest.fn(async () => ({
+        draftNws: parsedNws,
+        parserConfidence: 'high' as const,
+        fieldsRequiringReview: [],
+      })),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Paste / parse'));
+    const file = new File([fileText], 'client-requirements.md', { type: 'text/markdown' });
+    Object.defineProperty(file, 'text', {
+      configurable: true,
+      value: jest.fn(async () => fileText),
+    });
+
+    await changeFileInput(inputById(container, 'requirements-file-input'), file);
+
+    expect(textareaById(container, 'natural-language-input').value).toContain('managed Postgres');
+    expect(text(container)).toContain('Loaded from client-requirements.md');
+    expect(text(container)).toContain(
+      'Loaded client-requirements.md. Review the text, then parse requirements.',
+    );
+
+    await click(buttonByText(container, 'Parse requirements'));
+
+    expect(client.parseWorkload).toHaveBeenCalledWith(expect.stringContaining('1TB egress'));
+    expect(text(container)).toContain('Review checkpoint');
+    expect((container.querySelector('#name') as HTMLInputElement).value).toBe(
+      'Uploaded requirements portal',
+    );
+
+    unmount();
+  });
+
+  it('keeps structured CSV and diagram imports behind the Phase 2 parser hook', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Paste / parse'));
+    const file = new File(['service,quantity\ncompute,4'], 'architecture.csv', {
+      type: 'text/csv',
+    });
+    Object.defineProperty(file, 'text', {
+      configurable: true,
+      value: jest.fn(async () => 'service,quantity\ncompute,4'),
+    });
+
+    await changeFileInput(inputById(container, 'requirements-file-input'), file);
+
+    expect(text(container)).toContain(
+      'Upload a plain text, Markdown, JSON, or YAML requirements file.',
+    );
+    expect(client.parseWorkload).not.toHaveBeenCalled();
+    expect(textareaById(container, 'natural-language-input').value).toContain('web app');
+
+    unmount();
+  });
+
   it('parses natural-language input into the editable form', async () => {
     const parsedNws = buildNwsFromForm({
       ...defaultWorkloadForm,
@@ -1029,6 +1095,18 @@ async function changeSelect(select: HTMLSelectElement, value: string): Promise<v
   await act(async () => {
     select.value = value;
     select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+
+async function changeFileInput(input: HTMLInputElement, file: File): Promise<void> {
+  await act(async () => {
+    Object.defineProperty(input, 'files', {
+      configurable: true,
+      value: [file],
+    });
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
   });
 }
 

@@ -2,7 +2,8 @@
 
 PolyCost's Phase 1 pipeline is intentionally cloud-neutral:
 
-1. Input arrives from natural language or the guided form.
+1. Input arrives from natural language, the guided form, or a plain requirements
+   file loaded into the natural-language parser.
 2. The input is parsed into normalized requirements and the existing Normalized
    Workload Specification.
 3. Service equivalence mapping resolves AWS, Azure, and GCP counterparts with
@@ -21,9 +22,10 @@ downstream comparison pipeline without redesigning the API.
   registry interface. CSV, Excel, and diagram parsers should implement the same
   `RequirementParserService` contract and return normalized requirements before
   converting to NWS.
-- `apps/web/src/App.tsx` keeps the file-upload surface out of Phase 1, but the
-  requirement review/edit panel is the UI destination for future imported
-  requirements.
+- `apps/web/src/App.tsx` includes a Phase 1 requirements-file bridge for TXT,
+  Markdown, JSON, and YAML files. It reads the file client-side into the existing
+  natural-language parser and review/edit checkpoint. CSV, Excel, and DrawIO
+  structured import remain Phase 2 parser implementations behind the same surface.
 
 ## Phase 3 Hooks
 

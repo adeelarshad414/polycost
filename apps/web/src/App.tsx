@@ -79,6 +79,18 @@ const INPUT_MODE_OPTIONS: Array<{
 
 const PRICING_MODEL_STORAGE_KEY = 'polycost-pricing-model';
 const REQUIREMENT_SESSION_STORAGE_KEY = 'polycost-current-requirements-v1';
+const REQUIREMENTS_FILE_MAX_BYTES = 128 * 1024;
+const REQUIREMENTS_FILE_ACCEPT =
+  '.txt,.md,.markdown,.json,.yaml,.yml,text/plain,text/markdown,application/json,application/yaml,application/x-yaml,text/yaml';
+const REQUIREMENTS_FILE_EXTENSIONS = ['.txt', '.md', '.markdown', '.json', '.yaml', '.yml'];
+const REQUIREMENTS_FILE_MIME_TYPES = new Set([
+  'text/plain',
+  'text/markdown',
+  'application/json',
+  'application/yaml',
+  'application/x-yaml',
+  'text/yaml',
+]);
 const PRICING_MODEL_OPTIONS: Array<{
   key: PricingModelKey;
   label: string;
@@ -438,6 +450,7 @@ export function App({ client = polyCostClient }: AppProps) {
   const [isEditingRequirements, setIsEditingRequirements] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [requirementsFileName, setRequirementsFileName] = useState<string | null>(null);
   const [regionCatalog, setRegionCatalog] = useState<RegionCatalogResponse | null>(null);
   const [regionCatalogError, setRegionCatalogError] = useState<string | null>(null);
   const [formValidationIssues, setFormValidationIssues] = useState<WorkloadFormIssue[]>([]);
@@ -690,9 +703,65 @@ export function App({ client = polyCostClient }: AppProps) {
 
   function handleClearRequirements() {
     setNaturalLanguageInput('');
+    setRequirementsFileName(null);
     setFormValidationIssues([]);
     setNotice(null);
     setError(null);
+  }
+
+  function handleNaturalLanguageChange(value: string) {
+    setNaturalLanguageInput(value);
+    setRequirementsFileName(null);
+  }
+
+  function handleUseSampleRequirements() {
+    setInputMode('describe');
+    setNaturalLanguageInput(sampleNaturalLanguageInput);
+    setRequirementsFileName(null);
+    setNotice(null);
+    setError(null);
+  }
+
+  async function handleRequirementsFileLoad(file: File | null) {
+    if (!file) {
+      return;
+    }
+
+    if (file.size > REQUIREMENTS_FILE_MAX_BYTES) {
+      setError('Upload a requirements file under 128KB.');
+      setNotice(null);
+      return;
+    }
+
+    if (!isSupportedRequirementsFile(file)) {
+      setError(
+        'Upload a plain text, Markdown, JSON, or YAML requirements file. CSV, Excel, and DrawIO imports are Phase 2 hook points.',
+      );
+      setNotice(null);
+      return;
+    }
+
+    try {
+      const fileText = await file.text();
+      if (!fileText.trim()) {
+        setError('The selected requirements file is empty.');
+        setNotice(null);
+        return;
+      }
+
+      setNaturalLanguageInput(fileText);
+      setRequirementsFileName(file.name || 'requirements file');
+      setInputMode('describe');
+      setRequirementsAwaitingReview(false);
+      setFormValidationIssues([]);
+      setError(null);
+      setNotice(
+        `Loaded ${file.name || 'requirements file'}. Review the text, then parse requirements.`,
+      );
+    } catch {
+      setError('Could not read the selected requirements file.');
+      setNotice(null);
+    }
   }
 
   function handleClearComparison() {
@@ -704,6 +773,7 @@ export function App({ client = polyCostClient }: AppProps) {
     setSubmittedInputMode('form');
     setInputMode('form');
     setNaturalLanguageInput(sampleNaturalLanguageInput);
+    setRequirementsFileName(null);
     setComparison(null);
     setIsEditingRequirements(false);
     setInterval('monthly');
@@ -792,12 +862,14 @@ export function App({ client = polyCostClient }: AppProps) {
           onEdit={handleEditComparison}
           onInputModeChange={setInputMode}
           onPricingModelChange={handlePricingModelChange}
-          onNaturalLanguageChange={setNaturalLanguageInput}
+          onNaturalLanguageChange={handleNaturalLanguageChange}
           onFormChange={handleFormChange}
           onSubmit={handleCompare}
           onParse={handleParse}
           onClearRequirements={handleClearRequirements}
-          onUseSample={() => setNaturalLanguageInput(sampleNaturalLanguageInput)}
+          onUseSample={handleUseSampleRequirements}
+          onRequirementsFileLoad={handleRequirementsFileLoad}
+          requirementsFileName={requirementsFileName}
           onIntervalChange={setInterval}
           onRefreshLive={handleRefreshLive}
           onExport={(format) => void handleExport(format)}
@@ -814,14 +886,16 @@ export function App({ client = polyCostClient }: AppProps) {
           notice={notice}
           error={error}
           validationIssues={formValidationIssues}
-          isComparing={busyAction === 'compare'}
+          isComparing={busyAction === 'compare' || busyAction === 'parse'}
           onInputModeChange={setInputMode}
           onPricingModelChange={handlePricingModelChange}
-          onNaturalLanguageChange={setNaturalLanguageInput}
+          onNaturalLanguageChange={handleNaturalLanguageChange}
           onChange={handleFormChange}
           onClearRequirements={handleClearRequirements}
           onSubmit={handleCompare}
-          onUseSample={() => setNaturalLanguageInput(sampleNaturalLanguageInput)}
+          onUseSample={handleUseSampleRequirements}
+          onRequirementsFileLoad={handleRequirementsFileLoad}
+          requirementsFileName={requirementsFileName}
         />
       )}
     </main>
@@ -987,6 +1061,8 @@ function InitialHomePage({
   onClearRequirements,
   onSubmit,
   onUseSample,
+  onRequirementsFileLoad,
+  requirementsFileName,
 }: {
   form: WorkloadFormState;
   inputMode: InputMode;
@@ -1006,6 +1082,8 @@ function InitialHomePage({
   onClearRequirements: () => void;
   onSubmit: (event: FormEvent) => void;
   onUseSample: () => void;
+  onRequirementsFileLoad: (file: File | null) => void | Promise<void>;
+  requirementsFileName: string | null;
 }) {
   function update<K extends keyof WorkloadFormState>(key: K, value: WorkloadFormState[K]) {
     onChange({
@@ -1175,6 +1253,8 @@ function InitialHomePage({
               onChange={onNaturalLanguageChange}
               onClear={onClearRequirements}
               onUseSample={onUseSample}
+              onFileLoad={onRequirementsFileLoad}
+              fileName={requirementsFileName}
             />
             <div className="initial-home-actions">
               <Button
@@ -1226,6 +1306,8 @@ function ProgressiveComparisonPage({
   onParse,
   onClearRequirements,
   onUseSample,
+  onRequirementsFileLoad,
+  requirementsFileName,
   onIntervalChange,
   onRefreshLive,
   onExport,
@@ -1258,6 +1340,8 @@ function ProgressiveComparisonPage({
   onParse: () => void;
   onClearRequirements: () => void;
   onUseSample: () => void;
+  onRequirementsFileLoad: (file: File | null) => void | Promise<void>;
+  requirementsFileName: string | null;
   onIntervalChange: (interval: IntervalKey) => void;
   onRefreshLive: () => void;
   onExport: (format: ReportFormat) => void;
@@ -1285,6 +1369,8 @@ function ProgressiveComparisonPage({
               onParse={onParse}
               onSubmit={onSubmit}
               onUseSample={onUseSample}
+              onRequirementsFileLoad={onRequirementsFileLoad}
+              requirementsFileName={requirementsFileName}
             />
             <StatusMessage notice={editStatusNotice(notice)} error={error} />
           </>
@@ -1677,6 +1763,8 @@ function RequirementsEditPanel({
   onParse,
   onSubmit,
   onUseSample,
+  onRequirementsFileLoad,
+  requirementsFileName,
 }: {
   form: WorkloadFormState;
   inputMode: InputMode;
@@ -1695,6 +1783,8 @@ function RequirementsEditPanel({
   onParse: () => void;
   onSubmit: (event?: FormEvent) => void;
   onUseSample: () => void;
+  onRequirementsFileLoad: (file: File | null) => void | Promise<void>;
+  requirementsFileName: string | null;
 }) {
   return (
     <section className="requirements-edit-panel" aria-label="Edit workload requirements">
@@ -1717,6 +1807,8 @@ function RequirementsEditPanel({
           onClear={onClearRequirements}
           onParse={onParse}
           onUseSample={onUseSample}
+          onFileLoad={onRequirementsFileLoad}
+          fileName={requirementsFileName}
         />
       ) : (
         <WorkloadForm
@@ -1872,6 +1964,8 @@ function DescribePanel({
   onClear,
   onParse,
   onUseSample,
+  onFileLoad,
+  fileName,
 }: {
   value: string;
   isParsing: boolean;
@@ -1879,6 +1973,8 @@ function DescribePanel({
   onClear: () => void;
   onParse?: () => void;
   onUseSample: () => void;
+  onFileLoad: (file: File | null) => void | Promise<void>;
+  fileName: string | null;
 }) {
   return (
     <div className="describe-panel">
@@ -1891,6 +1987,38 @@ function DescribePanel({
         onChange={(event) => onChange(event.currentTarget.value)}
         placeholder="Paste an architecture description, cloud bill excerpt, or CSV-like text. Example: A web app for 5,000 daily users with Postgres, 250GB object storage, CDN, and US East preference."
       />
+      <div className="requirements-file-loader">
+        <label className="requirements-file-trigger" htmlFor="requirements-file-input">
+          <UploadIcon />
+          Upload requirements file
+        </label>
+        <input
+          id="requirements-file-input"
+          className="sr-only"
+          type="file"
+          accept={REQUIREMENTS_FILE_ACCEPT}
+          aria-describedby="requirements-file-help"
+          disabled={isParsing}
+          onChange={(event) => {
+            const input = event.currentTarget;
+            const file = input.files?.[0] ?? null;
+
+            void Promise.resolve(onFileLoad(file)).finally(() => {
+              input.value = '';
+            });
+          }}
+        />
+        <div className="requirements-file-copy">
+          <p id="requirements-file-help">
+            TXT, Markdown, JSON, or YAML. CSV, Excel, and diagram parsers plug in at Phase 2.
+          </p>
+          {fileName ? (
+            <p className="requirements-file-status" role="status">
+              Loaded from {fileName}
+            </p>
+          ) : null}
+        </div>
+      </div>
       <div className="action-row">
         {onParse ? (
           <Button
@@ -4954,6 +5082,14 @@ function ParseIcon() {
   );
 }
 
+function UploadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon">
+      <path d="M12 17V5M8 9l4-4 4 4M5 19h14" />
+    </svg>
+  );
+}
+
 function ModeIcon({ mode }: { mode: InputMode }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="segment-icon">
@@ -6043,6 +6179,15 @@ function storeRequirementSession(session: StoredRequirementSession): void {
 
 function clearRequirementSession(): void {
   window.sessionStorage.removeItem(REQUIREMENT_SESSION_STORAGE_KEY);
+}
+
+function isSupportedRequirementsFile(file: File): boolean {
+  const lowerName = file.name.toLowerCase();
+  const hasSupportedExtension = REQUIREMENTS_FILE_EXTENSIONS.some((extension) =>
+    lowerName.endsWith(extension),
+  );
+
+  return hasSupportedExtension || REQUIREMENTS_FILE_MIME_TYPES.has(file.type);
 }
 
 function reportFormatLabel(format: ReportFormat): string {

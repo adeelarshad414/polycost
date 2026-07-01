@@ -938,6 +938,13 @@ controls.
   `upfrontCostUsd`; the comparison rollup preserves and sums it for provider-level
   Reserved/Savings scenarios, the engineering TCO table shows it separately from
   recurring monthly cost, and CSV/XLSX/PDF reports include it in term TCO.
+- Phase 1 requirements file bridge: the Paste / parse input now accepts TXT,
+  Markdown, JSON, and YAML requirement files client-side, loads the content into
+  the same natural-language parser/review/edit flow, and explicitly keeps CSV,
+  Excel, and DrawIO structured import behind the documented Phase 2 parser hook.
+- Focused verification passing locally:
+  `npm run typecheck --workspace @polycost/web` and
+  `npm run test:unit --workspace @polycost/web -- --runTestsByPath src/App.spec.tsx`.
 - Verification passing locally:
   `npm run check`, `npm run build`, `npm run test:coverage`,
   `npm run test:e2e --workspace @polycost/web`,
@@ -970,9 +977,10 @@ when it is actually resolved in a later phase, with a note on which phase resolv
   changes the refreshed result still needs either a test-only catalog fixture path or
   internal SKU traceability for safe mutation.
 - The AI-native reimagining prompt's most aggressive DoD is not fully product-complete
-  yet: file upload remains a documented Phase 2 hook, and account-level requirement
-  persistence is not implemented because auth/user accounts are not part of this
-  Phase 1 codebase. Session-level requirement persistence is implemented for
+  yet: Phase 1 plain requirements file loading is implemented, while rich CSV,
+  Excel, and DrawIO structured import remains a documented Phase 2 hook. Account-level
+  requirement persistence is not implemented because auth/user accounts are not part
+  of this Phase 1 codebase. Session-level requirement persistence is implemented for
   what-if reruns and pricing-model switches.
 - The engineering matrix now filters by category/provider/pricing model and sorts by
   every provider/model column, but the backend still needs richer service-level
