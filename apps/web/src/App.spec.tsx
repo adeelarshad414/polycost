@@ -1230,6 +1230,14 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Egress exit proxy');
     expect(text(container)).toContain('Free-tier signal');
     expect(text(container)).toContain('Data-out proxy');
+    expect(text(container)).toContain('Egress optimization detail');
+    expect(text(container)).toContain(
+      'Cache, NAT, private transfer, and high-volume data-out actions',
+    );
+    expect(text(container)).toContain('Internet egress');
+    expect(text(container)).toContain(
+      'Evaluate CDN offload, cache-control, and same-region data access.',
+    );
     expect(text(container)).toContain('Architecture risk flags');
     expect(text(container)).toContain('Cost behaviors to validate before commitment');
     expect(text(container)).toContain('Data-transfer concentration');

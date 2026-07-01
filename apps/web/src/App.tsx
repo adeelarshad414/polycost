@@ -5957,6 +5957,7 @@ function ProductionDepthAnalytics({
   const regionVariance = regionVarianceRows(comparison, form);
   const commitmentCoverage = commitmentCoverageGapRows(comparison, form);
   const tcoSignals = crossProviderTcoRows(comparison, form);
+  const egressOptimizations = egressOptimizationRows(comparison, form);
   const licenseRows = licenseOptimizationRows(comparison, form);
   const architectureRisks = architectureRiskFlags(comparison, form);
   const scenarios = sensitivityScenarioRows(comparison, form);
@@ -5989,6 +5990,7 @@ function ProductionDepthAnalytics({
       <RegionVariancePanel rows={regionVariance} />
       <CommitmentCoverageGapPanel rows={commitmentCoverage} />
       <CrossProviderTcoPanel rows={tcoSignals} />
+      <EgressOptimizationPanel rows={egressOptimizations} />
       <LicenseOptimizationPanel rows={licenseRows} operatingSystem={form.operatingSystem} />
       <ArchitectureRiskFlagsPanel flags={architectureRisks} />
       <ScenarioSensitivityTable rows={scenarios} />
@@ -6251,6 +6253,70 @@ function CrossProviderTcoPanel({ rows }: { rows: CrossProviderTcoRow[] }) {
       ) : (
         <div className="scenario-sensitivity-empty" role="status">
           Run a comparison to populate TCO signals beyond infrastructure run-rate.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EgressOptimizationPanel({ rows }: { rows: EgressOptimizationRow[] }) {
+  return (
+    <div className="egress-optimization-panel" aria-label="Egress optimization detail">
+      <div className="scenario-sensitivity-heading">
+        <div>
+          <span>Egress optimization detail</span>
+          <h4>Cache, NAT, private transfer, and high-volume data-out actions</h4>
+        </div>
+      </div>
+
+      {rows.length > 0 ? (
+        <div className="table-wrap egress-optimization-wrap">
+          <table className="ranking-table egress-optimization-table">
+            <thead>
+              <tr>
+                <th scope="col">Provider</th>
+                <th scope="col">Egress share</th>
+                <th scope="col">Dominant driver</th>
+                <th scope="col">Opportunity</th>
+                <th scope="col">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.providerId}>
+                  <td>
+                    <span className={`scenario-low-label scenario-low-${row.providerId}`}>
+                      {providerLabel(row.providerId)}
+                    </span>
+                    <small>{row.trafficSignal}</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.egressMonthly)}/mo</strong>
+                    <small>{formatPercent(row.egressSharePercent)} of provider total</small>
+                  </td>
+                  <td>
+                    <strong>{row.primaryDriver}</strong>
+                    <small>{row.driverEvidence}</small>
+                  </td>
+                  <td>
+                    <strong>{formatCurrency(row.monthlySavings)}/mo</strong>
+                    <small>
+                      {formatCurrency(row.monthlySavings * 12)}/yr · {row.effort} effort
+                    </small>
+                  </td>
+                  <td>
+                    <strong>{row.recommendation}</strong>
+                    <small>{row.evidence}</small>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="scenario-sensitivity-empty" role="status">
+          Egress optimization appears when network or data-transfer line items exceed materiality
+          thresholds.
         </div>
       )}
     </div>
@@ -6967,6 +7033,19 @@ interface CrossProviderTcoRow {
   evidence: string;
 }
 
+interface EgressOptimizationRow {
+  providerId: ProviderId;
+  egressMonthly: number;
+  egressSharePercent: number;
+  primaryDriver: string;
+  trafficSignal: string;
+  monthlySavings: number;
+  effort: 'Low' | 'Medium' | 'High';
+  recommendation: string;
+  driverEvidence: string;
+  evidence: string;
+}
+
 interface LicenseOptimizationRow {
   providerId: ProviderId;
   windowsMonthly: number;
@@ -7101,6 +7180,190 @@ function regionVarianceRows(
       lowestProviderId: lowest?.providerId,
     };
   });
+}
+
+function egressOptimizationRows(
+  comparison: ComparisonResult | null,
+  form: WorkloadFormState,
+): EgressOptimizationRow[] {
+  if (!comparison) {
+    return [];
+  }
+
+  const configuredEgressGb = parseInputNumber(form.monthlyEgressGb) ?? 0;
+  const cdnTrafficGb = parseInputNumber(form.cdnTrafficGb) ?? 0;
+  const crossAzGb = parseInputNumber(form.crossAzTransferGb) ?? 0;
+  const interRegionGb = parseInputNumber(form.interRegionTransferGb) ?? 0;
+  const natGb = parseInputNumber(form.natGatewayGb) ?? 0;
+  const cacheHit = clampNumber(parseInputNumber(form.cdnCacheHitRatioPercent) ?? 85, 0, 100);
+  const trafficSignalParts = [
+    configuredEgressGb > 0 ? `${formatDecimal(configuredEgressGb)}GB internet` : undefined,
+    cdnTrafficGb > 0 ? `${formatDecimal(cdnTrafficGb)}GB CDN` : undefined,
+    crossAzGb + interRegionGb + natGb > 0
+      ? `${formatDecimal(crossAzGb + interRegionGb + natGb)}GB private path`
+      : undefined,
+  ].filter(Boolean);
+  const trafficSignal = trafficSignalParts.join(' · ') || 'Network rows only';
+
+  return comparison.providers
+    .flatMap((provider) => {
+      const egressMonthly = roundCurrency(componentMonthly(provider, 'egress'));
+      const egressSharePercent =
+        provider.totals.monthly > 0 ? (egressMonthly / provider.totals.monthly) * 100 : 0;
+      const networkRows = networkLineItems(provider).sort(
+        (left, right) => right.baseMonthlyCostUsd - left.baseMonthlyCostUsd,
+      );
+      const primary = networkRows[0];
+      const material =
+        egressMonthly >= 25 ||
+        egressSharePercent >= 15 ||
+        configuredEgressGb >= 500 ||
+        cdnTrafficGb >= 500 ||
+        crossAzGb + interRegionGb + natGb >= 500;
+
+      if (!primary || !material) {
+        return [];
+      }
+
+      const signal = egressOptimizationSignal(primary, egressMonthly, {
+        cacheHit,
+        cdnTrafficGb,
+        configuredEgressGb,
+        privateTransferGb: crossAzGb + interRegionGb + natGb,
+        tieredGb: networkRows.reduce((sum, lineItem) => sum + lineItemTierBillableGb(lineItem), 0),
+      });
+
+      return [
+        {
+          providerId: provider.providerId,
+          egressMonthly,
+          egressSharePercent,
+          trafficSignal,
+          ...signal,
+        },
+      ];
+    })
+    .sort((left, right) => right.monthlySavings - left.monthlySavings);
+}
+
+function networkLineItems(provider: ComparisonProviderResult): ComparisonLineItem[] {
+  return provider.lineItems.filter(
+    (lineItem) =>
+      lineItem.category === 'network' ||
+      lineItemCostComponent(lineItem) === 'egress' ||
+      networkDescriptionMatches(lineItem.description),
+  );
+}
+
+function egressOptimizationSignal(
+  primary: ComparisonLineItem,
+  egressMonthly: number,
+  context: {
+    cacheHit: number;
+    cdnTrafficGb: number;
+    configuredEgressGb: number;
+    privateTransferGb: number;
+    tieredGb: number;
+  },
+): Omit<
+  EgressOptimizationRow,
+  'providerId' | 'egressMonthly' | 'egressSharePercent' | 'trafficSignal'
+> {
+  const normalizedPrimary = `${primary.skuId ?? ''} ${primary.description}`.toLowerCase();
+  const primaryMonthly = primary.baseMonthlyCostUsd;
+  const baseEvidence = `${primary.description} is the largest network row at ${formatCurrency(
+    primaryMonthly,
+  )}/mo.`;
+
+  if (normalizedPrimary.includes('cdn')) {
+    const targetCacheHit = 95;
+    const cacheGap = Math.max(0, targetCacheHit - context.cacheHit);
+    const monthlySavings = roundCurrency(primaryMonthly * clampNumber(cacheGap / 100, 0.05, 0.2));
+
+    return {
+      primaryDriver: 'CDN delivery',
+      monthlySavings,
+      effort: 'Low',
+      recommendation: `Raise CDN cache hit toward ${targetCacheHit}% before scaling origin capacity.`,
+      driverEvidence:
+        context.cdnTrafficGb > 0
+          ? `${formatDecimal(context.cdnTrafficGb)}GB CDN traffic · ${formatPercent(
+              context.cacheHit,
+            )} cache hit`
+          : `${formatPercent(context.cacheHit)} cache hit from workload profile`,
+      evidence: `${baseEvidence} Cache policy tuning models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity without changing provider selection.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('nat')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.4);
+
+    return {
+      primaryDriver: 'NAT gateway',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation: 'Move eligible traffic to private endpoints and remove NAT hairpin paths.',
+      driverEvidence:
+        context.privateTransferGb > 0
+          ? `${formatDecimal(context.privateTransferGb)}GB private-path traffic`
+          : 'NAT line item surfaced by backend',
+      evidence: `${baseEvidence} Route review models a 40% reduction of the NAT baseline.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('cross-az') || normalizedPrimary.includes('inter-region')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.5);
+
+    return {
+      primaryDriver: normalizedPrimary.includes('inter-region')
+        ? 'Inter-region transfer'
+        : 'Cross-AZ transfer',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation: 'Co-locate chatty services or redesign replication paths before HA sign-off.',
+      driverEvidence:
+        context.privateTransferGb > 0
+          ? `${formatDecimal(context.privateTransferGb)}GB private-path traffic`
+          : 'Private transfer line item surfaced by backend',
+      evidence: `${baseEvidence} Locality review models a 50% reduction of that transfer path.`,
+    };
+  }
+
+  if (context.tieredGb >= 10_240 || egressMonthly >= 1000) {
+    const monthlySavings = roundCurrency(egressMonthly * 0.25);
+
+    return {
+      primaryDriver: 'High-volume data out',
+      monthlySavings,
+      effort: 'High',
+      recommendation: 'Evaluate private connectivity, CDN commitments, and same-region access.',
+      driverEvidence:
+        context.tieredGb > 0
+          ? `${formatDecimal(context.tieredGb)}GB tier-traced egress`
+          : `${formatCurrency(egressMonthly)}/mo network exposure`,
+      evidence: `High-volume egress review models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity at 25% of the current egress baseline.`,
+    };
+  }
+
+  const monthlySavings = roundCurrency(egressMonthly * 0.3);
+
+  return {
+    primaryDriver: 'Internet egress',
+    monthlySavings,
+    effort: 'Medium',
+    recommendation: 'Evaluate CDN offload, cache-control, and same-region data access.',
+    driverEvidence:
+      context.configuredEgressGb > 0
+        ? `${formatDecimal(context.configuredEgressGb)}GB internet egress configured`
+        : 'Network egress line item surfaced by backend',
+    evidence: `${baseEvidence} Rule-based review models ${formatCurrency(
+      monthlySavings,
+    )}/mo at 30% of current egress.`,
+  };
 }
 
 function licenseOptimizationRows(
@@ -7721,6 +7984,27 @@ function componentMonthly(provider: ComparisonProviderResult, component: CostCom
   return provider.lineItems
     .filter((lineItem) => lineItemCostComponent(lineItem) === component)
     .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+}
+
+function lineItemTierBillableGb(lineItem: ComparisonLineItem): number {
+  return lineItem.egressTiers?.reduce((sum, tier) => sum + tier.billableGb, 0) ?? 0;
+}
+
+function networkDescriptionMatches(description: string): boolean {
+  const normalized = description.toLowerCase();
+
+  return [
+    'egress',
+    'load balancer',
+    'nat',
+    'cdn',
+    'vpn',
+    'direct connect',
+    'interconnect',
+    'dns',
+    'cross-az',
+    'inter-region',
+  ].some((needle) => normalized.includes(needle));
 }
 
 function maxComponentShare(comparison: ComparisonResult | null, component: CostComponent): number {

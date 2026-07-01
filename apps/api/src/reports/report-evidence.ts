@@ -563,17 +563,17 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
     const providerMonthly = provider.totals.monthly;
 
     if (providerMonthly > 0 && egressMonthly / providerMonthly >= 0.2) {
-      const estimatedSavings = egressMonthly * 0.3;
+      const insight = egressOptimizationInsight(provider);
       rows.push([
         'Egress optimization',
         `${provider.providerId} egress is ${formatNumber(
           (egressMonthly / providerMonthly) * 100,
-        )}% of monthly spend; evaluate CDN offload and same-region data access.`,
-        formatNumber(estimatedSavings),
-        formatNumber(estimatedSavings * 12),
+        )}% of monthly spend; ${insight.recommendation}`,
+        formatNumber(insight.monthlySavings),
+        formatNumber(insight.monthlySavings * 12),
         'High',
-        'Medium',
-        `Rule-based 30% egress-reduction opportunity from $${formatNumber(egressMonthly)}/mo egress baseline.`,
+        insight.effort,
+        insight.evidence,
       ]);
     }
   }
@@ -1215,6 +1215,135 @@ function architectureRiskOpportunityRows(result: ComparisonResult): string[][] {
   }
 
   return rows;
+}
+
+interface EgressOptimizationInsight {
+  recommendation: string;
+  monthlySavings: number;
+  effort: 'Low' | 'Medium' | 'High';
+  evidence: string;
+}
+
+function egressOptimizationInsight(provider: ComparisonProviderResult): EgressOptimizationInsight {
+  const egressMonthly = componentMonthly(provider, 'egress');
+  const egressRows = provider.lineItems
+    .filter(
+      (lineItem) =>
+        lineItem.category === 'network' ||
+        lineItem.costComponent === 'egress' ||
+        networkDescription(lineItem.description),
+    )
+    .sort((left, right) => right.baseMonthlyCostUsd - left.baseMonthlyCostUsd);
+  const primary = egressRows[0];
+  const primaryMonthly = primary?.baseMonthlyCostUsd ?? egressMonthly;
+  const primaryDescription = primary?.description ?? 'egress baseline';
+  const normalizedPrimary = `${primary?.skuId ?? ''} ${primaryDescription}`.toLowerCase();
+  const tieredGb = egressRows.reduce(
+    (sum, lineItem) =>
+      sum +
+      (lineItem.egressTiers?.reduce((tierSum, tier) => tierSum + tier.billableGb, 0) ?? 0),
+    0,
+  );
+  const cacheHit = parseCacheHitPercent(primaryDescription);
+  const originMissGb = parseOriginMissGb(primaryDescription);
+
+  if (normalizedPrimary.includes('cdn')) {
+    const targetCacheHit = 95;
+    const cacheGap = cacheHit !== undefined ? Math.max(0, targetCacheHit - cacheHit) : 10;
+    const savingsRate = clampRatio(cacheGap / 100, 0.05, 0.2);
+    const monthlySavings = roundCurrency(primaryMonthly * savingsRate);
+
+    return {
+      recommendation:
+        cacheHit !== undefined
+          ? `raise CDN cache hit from ${formatNumber(cacheHit)}% toward ${targetCacheHit}% before scaling origin capacity.`
+          : 'tune CDN cache policy and origin paths before scaling direct egress.',
+      monthlySavings,
+      effort: 'Low',
+      evidence: `${provider.providerId} largest network row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo${
+        originMissGb !== undefined ? ` with ${formatNumber(originMissGb)}GB origin miss` : ''
+      }; cache-hit tuning opportunity modeled at $${formatNumber(monthlySavings)}/mo.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('nat')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.4);
+
+    return {
+      recommendation:
+        'reduce NAT hairpin traffic with private endpoints, gateway endpoints, or route-table review.',
+      monthlySavings,
+      effort: 'Medium',
+      evidence: `${provider.providerId} largest network row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; private endpoint routing is modeled as a 40% reduction of that NAT baseline.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('cross-az') || normalizedPrimary.includes('inter-region')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.5);
+
+    return {
+      recommendation:
+        'keep chatty services in the same AZ/region or redesign replication paths before HA sign-off.',
+      monthlySavings,
+      effort: 'Medium',
+      evidence: `${provider.providerId} largest network row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; locality review models a 50% reduction of that transfer path.`,
+    };
+  }
+
+  if (tieredGb >= 10_240 || egressMonthly >= 1000) {
+    const monthlySavings = roundCurrency(egressMonthly * 0.25);
+
+    return {
+      recommendation:
+        'evaluate private connectivity, CDN commitments, and same-region data access for high-volume egress.',
+      monthlySavings,
+      effort: 'High',
+      evidence: `${provider.providerId} has $${formatNumber(
+        egressMonthly,
+      )}/mo egress exposure${
+        tieredGb > 0 ? ` across ${formatNumber(tieredGb)}GB of tier-traced data-out` : ''
+      }; high-volume optimization is modeled at 25% of the egress baseline.`,
+    };
+  }
+
+  const monthlySavings = roundCurrency(egressMonthly * 0.3);
+
+  return {
+    recommendation: 'evaluate CDN offload, cache-control, and same-region data access.',
+    monthlySavings,
+    effort: 'Medium',
+    evidence: `${provider.providerId} egress/network baseline is $${formatNumber(
+      egressMonthly,
+    )}/mo; rule-based reduction is 30% when no single network driver dominates.`,
+  };
+}
+
+function parseCacheHitPercent(description: string): number | undefined {
+  const match = description.match(/(\d+(?:\.\d+)?)%\s*cache hit/i);
+  const parsed = match ? Number(match[1]) : undefined;
+
+  return parsed !== undefined && Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseOriginMissGb(description: string): number | undefined {
+  const match = description.match(/([\d,.]+)\s*GB\s*origin miss/i);
+  const parsed = match ? Number(match[1].replace(/,/g, '')) : undefined;
+
+  return parsed !== undefined && Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function clampRatio(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+
+  return Math.min(max, Math.max(min, value));
 }
 
 function commitmentPreferencePercent(result: ComparisonResult): number {

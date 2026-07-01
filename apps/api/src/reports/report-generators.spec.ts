@@ -669,6 +669,15 @@ describe('report generators', () => {
           'High',
           'Medium',
         ]),
+        expect.arrayContaining([
+          'Egress optimization',
+          'aws egress is 64.9% of monthly spend; evaluate CDN offload, cache-control, and same-region data access.',
+          '13.82',
+          '165.84',
+          'High',
+          'Medium',
+          'aws egress/network baseline is $46.08/mo; rule-based reduction is 30% when no single network driver dominates.',
+        ]),
       ]),
     );
     expect(egressNetworkingDetailRows(comparison)).toEqual(
