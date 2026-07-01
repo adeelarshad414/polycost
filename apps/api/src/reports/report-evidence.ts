@@ -4,6 +4,7 @@ import {
   ComparisonProviderResult,
   ComparisonResult,
 } from '../comparison/comparison.types';
+import { ServiceRequirement } from '../nws/nws.types';
 import { ReportInterval, ReportOptions, ReportPricingModel } from './report.types';
 
 const REPORT_PRICING_MODELS: ReportPricingModel[] = [
@@ -700,6 +701,128 @@ export function lineItemEvidenceRows(result: ComparisonResult): string[][] {
   ];
 }
 
+export function methodologySourceRows(result: ComparisonResult): string[][] {
+  const warningCount = result.warnings?.length ?? 0;
+  const lineItems = result.providers.flatMap((provider) => provider.lineItems);
+  const approximateCount = lineItems.filter((lineItem) => lineItem.isApproximate).length;
+  const modeledSkuCount = lineItems.filter((lineItem) =>
+    lineItem.skuId?.startsWith('modeled-'),
+  ).length;
+  const tieredEgressRows = lineItems.reduce(
+    (count, lineItem) => count + (lineItem.egressTiers?.length ?? 0),
+    0,
+  );
+
+  return [
+    ['Area', 'Source / method', 'Reviewer action'],
+    [
+      'Pricing snapshot',
+      `Comparison pricingAsOf is ${result.pricingAsOf}; totals are generated from cached provider catalog rows and explicit modeled cost rows, not request-time calculator calls.`,
+      'Refresh cached pricing before final vendor commitment and confirm private discounts, credits, taxes, and negotiated enterprise terms separately.',
+    ],
+    [
+      'Provider catalog APIs',
+      'AWS catalog rows originate from AWS Price List bulk offer files; Azure rows originate from Azure Retail Prices API; GCP rows originate from Cloud Billing Catalog API when credentials are configured.',
+      'Use the SKU Mapping Appendix to trace each exported line item back to provider, SKU, region, unit, rate, and pricing-basis evidence.',
+    ],
+    [
+      'Modeled fallback rows',
+      `${modeledSkuCount} line item(s) use PolyCost modeled SKU IDs for cost dimensions that are not yet resolved to a provider catalog SKU.`,
+      'Treat modeled rows as decision-grade estimates and replace with provider calculator evidence before procurement.',
+    ],
+    [
+      'Time normalization',
+      'All monthly run-rate math uses the shared 730-hours/month constant; hourly, quarterly, and yearly values derive from that monthly baseline.',
+      'Do not mix calendar-month hour counts in external spreadsheets unless the whole model is recalculated consistently.',
+    ],
+    [
+      'Egress tiering',
+      tieredEgressRows > 0
+        ? `${tieredEgressRows} explicit egress tier row(s) are attached to line items and exported in the egress breakdown.`
+        : 'No explicit egress tier rows were attached; flat or blended network line items are labeled as such.',
+      'For high-volume traffic, validate source/destination region pair, CDN hit ratio, NAT path, and inter-AZ/inter-region transfer separately.',
+    ],
+    [
+      'Commitment and spot evidence',
+      'Reserved, Savings Plan/CUD, and Spot rows are included only when provider evidence is available; unavailable models stay blank instead of being inferred.',
+      'Confirm term, upfront option, commitment coverage, and interruptibility tolerance with workload owners before relying on savings projections.',
+    ],
+    [
+      'Equivalence confidence',
+      approximateCount > 0
+        ? `${approximateCount} approximate mapping(s) require solution-architect review.`
+        : 'No approximate line items are flagged in this comparison.',
+      'Review workload requirement, resolved SKU, region, service family, and confidence columns in the SKU Mapping Appendix.',
+    ],
+    [
+      'Cost allocation and governance',
+      result.requirements?.workloadProfile?.tags?.length
+        ? `Report includes ${result.requirements.workloadProfile.tags.length} cost-allocation tag(s) from the workload profile.`
+        : 'No cost-allocation tags were supplied in the workload profile.',
+      'Carry tags into IaC/provider billing labels so the estimate can be reconciled with future actuals.',
+    ],
+    [
+      'Warnings',
+      warningCount > 0
+        ? `${warningCount} warning(s) were captured with this comparison.`
+        : 'No provider or live-refresh warnings were captured with this comparison.',
+      'Resolve warning rows before using the report as a final proposal artifact.',
+    ],
+  ];
+}
+
+export function skuMappingAppendixRows(result: ComparisonResult): string[][] {
+  const requirements = result.requirements?.serviceRequirements ?? [];
+  const rows = result.providers.flatMap((provider) =>
+    provider.lineItems.map((lineItem) => {
+      const requirement = requirements.find(
+        (candidate) => candidate.serviceCategory === lineItem.category,
+      );
+
+      return [
+        provider.providerId,
+        lineItem.category,
+        lineItem.costComponent ?? lineItem.category,
+        serviceRequirementLabel(requirement, lineItem.category),
+        lineItem.skuId ?? 'No SKU supplied',
+        lineItem.description,
+        lineItem.region ?? result.requirements?.regionPreference ?? '',
+        lineItem.unit ?? '',
+        lineItem.unitPriceUsd !== undefined ? formatNumber(lineItem.unitPriceUsd) : '',
+        lineItem.baseHourlyCostUsd !== undefined ? formatNumber(lineItem.baseHourlyCostUsd) : '',
+        formatNumber(lineItem.baseMonthlyCostUsd),
+        lineItem.isApproximate ? 'Approximate' : 'Mapped',
+        lineItem.pricingBasis ?? 'flat',
+        calculationText(lineItem),
+        pricingModelEvidence(lineItem),
+      ];
+    }),
+  );
+
+  return [
+    [
+      'Provider',
+      'Category',
+      'Cost component',
+      'User service',
+      'Resolved SKU',
+      'Description',
+      'Region',
+      'Unit',
+      'Unit price USD',
+      'Hourly USD',
+      'Monthly USD',
+      'Confidence',
+      'Pricing basis',
+      'Calculation',
+      'Pricing model evidence',
+    ],
+    ...(rows.length > 0
+      ? rows
+      : [['No SKU mapping rows were attached to this comparison.', '', '', '', '', '', '', '', '', '', '', '', '', '', '']]),
+  ];
+}
+
 export function optimizationOpportunityRows(result: ComparisonResult): string[][] {
   const rows: string[][] = [];
   const rankedOnDemand = rankedProviderScenarios(result, {
@@ -1267,6 +1390,24 @@ export function labelForPricingModel(pricingModel: ReportPricingModel): string {
     case 'spot':
       return 'Spot estimate range';
   }
+}
+
+function serviceRequirementLabel(
+  requirement: ServiceRequirement | undefined,
+  fallbackCategory: ComparisonLineItem['category'],
+): string {
+  if (!requirement) {
+    return `${fallbackCategory} (no normalized requirement row)`;
+  }
+
+  return [
+    `${requirement.serviceCategory}/${requirement.serviceType}`,
+    requirement.instanceType,
+    requirement.tier,
+    requirement.region,
+  ]
+    .filter(Boolean)
+    .join(' / ');
 }
 
 function selectedMonthlyCost(model: PricingModelCost | undefined, fallbackMonthly: number): number {

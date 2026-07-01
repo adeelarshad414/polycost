@@ -7,6 +7,7 @@ import {
   egressNetworkingDetailRows,
   egressTierBreakdownRows,
   lineItemEvidenceRows,
+  methodologySourceRows,
   optimizationOpportunityRows,
   pricingModelAvailabilityRows,
   providerRankingRows,
@@ -15,6 +16,7 @@ import {
   reportContextRows,
   selectedScenarioRows,
   serviceRequirementRows,
+  skuMappingAppendixRows,
   workloadScopeRows,
 } from './report-evidence';
 import { buildReportInsights } from './report-insights';
@@ -99,6 +101,12 @@ export class CsvReportGenerator {
       [],
       ['Rate Math Evidence'],
       ...lineItemEvidenceRows(result).map((row) => row.map(sanitizeSpreadsheetText)),
+      [],
+      ['Methodology & Data Sources'],
+      ...methodologySourceRows(result).map((row) => row.map(sanitizeSpreadsheetText)),
+      [],
+      ['SKU Mapping Appendix'],
+      ...skuMappingAppendixRows(result).map((row) => row.map(sanitizeSpreadsheetText)),
       [],
       ['Report Assumptions'],
       ...reportAssumptionRows(result).map((row) => row.map(sanitizeSpreadsheetText)),

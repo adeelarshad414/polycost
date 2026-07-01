@@ -11,6 +11,7 @@ import {
   labelForInterval,
   labelForPricingModel,
   lineItemEvidenceRows,
+  methodologySourceRows,
   optimizationOpportunityRows,
   pricingModelAvailabilityRows,
   providerRankingRows,
@@ -18,6 +19,7 @@ import {
   reportAssumptionRows,
   selectedScenarioRows,
   serviceRequirementRows,
+  skuMappingAppendixRows,
   workloadScopeRows,
 } from './report-evidence';
 import { sanitizeSpreadsheetText } from './report-security';
@@ -212,6 +214,11 @@ describe('report generators', () => {
       'compute,vm-compute,balanced general-purpose tier / x86 / shared tenancy - 2 vCPU - 4GB / balanced',
     );
     expect(csv).toContain('Rate Math Evidence');
+    expect(csv).toContain('Methodology & Data Sources');
+    expect(csv).toContain('Provider catalog APIs');
+    expect(csv).toContain('AWS Price List bulk offer files');
+    expect(csv).toContain('SKU Mapping Appendix');
+    expect(csv).toContain('Resolved SKU');
     expect(csv).toContain('Report Assumptions');
     expect(csv).toContain(
       'Pricing source,Cached provider catalog rates with 1 warning(s) captured in this export.',
@@ -272,6 +279,8 @@ describe('report generators', () => {
     expect(xlsxText).toContain('<sheet name="Region Comparison" sheetId="5"');
     expect(xlsxText).toContain('<sheet name="Break-Even Analysis" sheetId="6"');
     expect(xlsxText).toContain('<sheet name="Break-Even Summary" sheetId="7"');
+    expect(xlsxText).toContain('<sheet name="Methodology &amp; Sources" sheetId="8"');
+    expect(xlsxText).toContain('<sheet name="SKU Mapping Appendix" sheetId="9"');
     expect(xlsxText).toContain('<calcPr calcMode="auto" fullCalcOnLoad="1"/>');
     expect(xlsxText).toContain(
       '<definedName name="WhatIfScaleFactor">&apos;What If&apos;!$B$5</definedName>',
@@ -318,6 +327,10 @@ describe('report generators', () => {
     expect(xlsxText).toContain('<f>IF(H9&lt;=G9,1,0)</f><v>0</v>');
     expect(xlsxText).toContain('Normalized Service Requirements');
     expect(xlsxText).toContain('Rate Math Evidence');
+    expect(xlsxText).toContain('Methodology &amp; Data Sources');
+    expect(xlsxText).toContain('Provider catalog APIs');
+    expect(xlsxText).toContain('SKU Mapping Appendix');
+    expect(xlsxText).toContain('Resolved SKU');
     expect(xlsxText).toContain('Report Assumptions');
     expect(xlsxText).toContain('<v>71</v>');
     expect(xlsxText).toContain('PolyCost What-If Model');
@@ -421,6 +434,9 @@ describe('report generators', () => {
     expect(pdfText).toContain('aws | Reserved 3-year | on-demand $71/mo | committed $42/mo');
     expect(pdfText).toContain('Normalized service requirements');
     expect(pdfText).toContain('Rate math evidence');
+    expect(pdfText).toContain('Methodology and data sources');
+    expect(pdfText).toContain('Provider catalog APIs');
+    expect(pdfText).toContain('SKU mapping appendix');
     expect(pdfText).toContain('Report assumptions');
     expect(pdfText).toContain('=cmd\\(1\\)\\\\risky compute');
     expect(pdfText).toContain('general | provider_pricing_failed | general warning');
@@ -499,6 +515,42 @@ describe('report generators', () => {
           'Approximate mappings',
           '1 line item(s) are approximate and should be reviewed by a solution architect before commitment.',
         ],
+      ]),
+    );
+
+    expect(methodologySourceRows(comparison)).toEqual(
+      expect.arrayContaining([
+        [
+          'Provider catalog APIs',
+          expect.stringContaining('AWS Price List bulk offer files'),
+          expect.stringContaining('SKU Mapping Appendix'),
+        ],
+        [
+          'Modeled fallback rows',
+          expect.stringContaining('0 line item(s) use PolyCost modeled SKU IDs'),
+          expect.stringContaining('provider calculator evidence'),
+        ],
+      ]),
+    );
+
+    expect(skuMappingAppendixRows(comparison)).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'aws',
+          'compute',
+          'compute',
+          expect.stringContaining('compute/vm-compute'),
+          'No SKU supplied',
+          '=cmd(1)\\risky compute',
+          'us-east',
+          '',
+          '',
+          '',
+          '60.8',
+          'Mapped',
+          'flat',
+          expect.stringContaining('Provider adapter monthly subtotal'),
+        ]),
       ]),
     );
 

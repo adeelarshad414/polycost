@@ -7,6 +7,7 @@ import {
   egressNetworkingDetailRows,
   egressTierBreakdownRows,
   lineItemEvidenceRows,
+  methodologySourceRows,
   optimizationOpportunityRows,
   pricingModelAvailabilityRows,
   providerRankingRows,
@@ -15,6 +16,7 @@ import {
   reportContextRows,
   selectedScenarioRows,
   serviceRequirementRows,
+  skuMappingAppendixRows,
   workloadScopeRows,
 } from './report-evidence';
 import { buildReportInsights } from './report-insights';
@@ -239,6 +241,25 @@ export class PdfReportGenerator {
     for (const row of lineItemEvidenceRows(result).slice(1)) {
       lines.push({
         text: `${row[0]} | ${row[1]} | ${row[2]} | ${row[8]}`,
+        fontSize: 10,
+      });
+    }
+
+    lines.push(
+      { text: '', fontSize: 10 },
+      { text: 'Methodology and data sources', fontSize: 14 },
+    );
+    for (const row of methodologySourceRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]}: ${row[1]} Reviewer action: ${row[2]}`,
+        fontSize: 10,
+      });
+    }
+
+    lines.push({ text: '', fontSize: 10 }, { text: 'SKU mapping appendix', fontSize: 14 });
+    for (const row of skuMappingAppendixRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]} | ${row[1]} | ${row[4]} | ${row[5]} | confidence ${row[11]} | ${row[13]}`,
         fontSize: 10,
       });
     }

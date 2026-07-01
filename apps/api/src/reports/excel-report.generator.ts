@@ -8,6 +8,7 @@ import {
   egressTierBreakdownRows,
   labelForPricingModel,
   lineItemEvidenceRows,
+  methodologySourceRows,
   optimizationOpportunityRows,
   pricingModelAvailabilityRows,
   providerRankingRows,
@@ -16,6 +17,7 @@ import {
   reportContextRows,
   selectedScenarioRows,
   serviceRequirementRows,
+  skuMappingAppendixRows,
   workloadScopeRows,
 } from './report-evidence';
 import { PricingModelCost } from '../adapters/common/cloud-provider-adapter';
@@ -138,6 +140,8 @@ export class ExcelReportGenerator {
           rows: breakEvenSheet.rows,
         },
         evidenceSheet('Break-Even Summary', breakEvenSummaryRows(result)),
+        evidenceSheet('Methodology & Sources', methodologySourceRows(result)),
+        evidenceSheet('SKU Mapping Appendix', skuMappingAppendixRows(result)),
       ],
       namedRanges,
     };
@@ -314,6 +318,28 @@ export class ExcelReportGenerator {
         style: 2,
       },
       ...lineItemEvidenceRows(result).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
+      {
+        cells: [],
+      },
+      {
+        cells: ['Methodology & Data Sources'],
+        style: 2,
+      },
+      ...methodologySourceRows(result).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
+      {
+        cells: [],
+      },
+      {
+        cells: ['SKU Mapping Appendix'],
+        style: 2,
+      },
+      ...skuMappingAppendixRows(result).map((row, index) => ({
         cells: row.map(sanitizeSpreadsheetText),
         ...(index === 0 ? { style: 2 } : {}),
       })),
