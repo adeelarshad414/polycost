@@ -58,6 +58,7 @@ export class ComparisonOrchestratorService {
 
   async compare(input: unknown): Promise<ComparisonResult> {
     const nws = NWSValidator.validate(input);
+    // PHASE_3_HOOK: validated NWS/serviceRequirements can feed Terraform generation before pricing.
     const providerOutcomes = await Promise.all(
       this.adapters.map((adapter) => this.priceProvider(adapter, nws)),
     );

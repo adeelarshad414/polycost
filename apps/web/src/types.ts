@@ -1,3 +1,13 @@
+import type {
+  AiCostNarrative as SharedAiCostNarrative,
+  NormalizedRequirement as SharedNormalizedRequirement,
+  ProviderCostResult as SharedProviderCostResult,
+} from '@polycost/types';
+
+export type NormalizedRequirement = SharedNormalizedRequirement;
+export type ProviderCostResult = SharedProviderCostResult;
+export type AiCostNarrative = SharedAiCostNarrative;
+
 export const PROVIDER_ORDER = ['aws', 'azure', 'gcp'] as const;
 export type ProviderId = (typeof PROVIDER_ORDER)[number];
 export type ServiceCategory = 'compute' | 'storage' | 'database' | 'network';
