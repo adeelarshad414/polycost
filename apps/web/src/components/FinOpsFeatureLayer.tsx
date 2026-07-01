@@ -54,7 +54,7 @@ interface CurrencyOption {
 }
 
 interface BreakdownPart {
-  key: 'compute' | 'storage' | 'egress' | 'support' | 'licensing' | 'operations';
+  key: 'compute' | 'storage' | 'egress' | 'networking' | 'support' | 'licensing' | 'operations';
   label: string;
   total: number;
   percent: number;
@@ -2112,6 +2112,8 @@ function breakdownParts(
     provider.breakdown?.storageMonthlyCostUsd ?? componentTotal(provider, 'storage');
   const egressMonthly =
     provider.breakdown?.egressMonthlyCostUsd ?? componentTotal(provider, 'egress');
+  const networkingMonthly =
+    provider.breakdown?.networkingMonthlyCostUsd ?? componentTotal(provider, 'networking');
   const databaseMonthly = databaseMonthlyCost(provider);
   const supportMonthly =
     provider.breakdown?.supportMonthlyCostUsd ?? componentTotal(provider, 'support');
@@ -2127,6 +2129,7 @@ function breakdownParts(
           selectedModelCost.monthlyCostUsd -
             storageMonthly -
             egressMonthly -
+            networkingMonthly -
             databaseMonthly -
             supportMonthly -
             licensingMonthly -
@@ -2136,6 +2139,7 @@ function breakdownParts(
   const compute = selectedComputeMonthly * multiplier;
   const storage = storageMonthly * multiplier;
   const egress = egressMonthly * multiplier;
+  const networking = networkingMonthly * multiplier;
   const support = supportMonthly * multiplier;
   const licensing = licensingMonthly * multiplier;
   const operations = operationsMonthly * multiplier;
@@ -2157,6 +2161,12 @@ function breakdownParts(
       label: 'Egress/data transfer',
       total: roundCurrency(egress),
       className: 'bg-brand-green',
+    },
+    {
+      key: 'networking',
+      label: 'Networking',
+      total: roundCurrency(networking),
+      className: 'bg-cyan-500',
     },
     {
       key: 'support',

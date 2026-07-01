@@ -6237,6 +6237,10 @@ function costWaterfallSteps(
     ['Storage', breakdown?.storageMonthlyCostUsd ?? componentMonthlyTotal(provider, 'storage')],
     ['Database', breakdown?.databaseMonthlyCostUsd ?? componentMonthlyTotal(provider, 'database')],
     ['Egress', breakdown?.egressMonthlyCostUsd ?? componentMonthlyTotal(provider, 'egress')],
+    [
+      'Networking',
+      breakdown?.networkingMonthlyCostUsd ?? componentMonthlyTotal(provider, 'networking'),
+    ],
     ['Support', breakdown?.supportMonthlyCostUsd ?? componentMonthlyTotal(provider, 'support')],
     [
       'Licensing',

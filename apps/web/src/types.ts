@@ -13,7 +13,14 @@ export type ProviderId = (typeof PROVIDER_ORDER)[number];
 export type ServiceCategory =
   'compute' | 'storage' | 'database' | 'network' | 'support' | 'licensing' | 'operations';
 export type CostComponent =
-  'compute' | 'storage' | 'database' | 'egress' | 'support' | 'licensing' | 'operations';
+  | 'compute'
+  | 'storage'
+  | 'database'
+  | 'egress'
+  | 'networking'
+  | 'support'
+  | 'licensing'
+  | 'operations';
 export type PricingModelKey =
   'on-demand' | 'reserved-1yr' | 'reserved-3yr' | 'spot' | 'savings-plan';
 export type PricingBasis = 'flat' | 'tiered';
@@ -288,6 +295,7 @@ export interface ComparisonCostBreakdown {
   computeMonthlyCostUsd: number;
   storageMonthlyCostUsd: number;
   egressMonthlyCostUsd: number;
+  networkingMonthlyCostUsd: number;
   databaseMonthlyCostUsd: number;
   supportMonthlyCostUsd: number;
   licensingMonthlyCostUsd: number;

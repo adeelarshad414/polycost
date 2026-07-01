@@ -43,6 +43,7 @@ export interface ComparisonCostBreakdown {
   computeMonthlyCostUsd: number;
   storageMonthlyCostUsd: number;
   egressMonthlyCostUsd: number;
+  networkingMonthlyCostUsd: number;
   databaseMonthlyCostUsd: number;
   supportMonthlyCostUsd: number;
   licensingMonthlyCostUsd: number;

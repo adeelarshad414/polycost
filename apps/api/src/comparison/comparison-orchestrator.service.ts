@@ -397,6 +397,7 @@ export class ComparisonOrchestratorService {
     const computeMonthlyCostUsd = this.componentTotal(lineItems, 'compute');
     const storageMonthlyCostUsd = this.componentTotal(lineItems, 'storage');
     const egressMonthlyCostUsd = this.componentTotal(lineItems, 'egress');
+    const networkingMonthlyCostUsd = this.componentTotal(lineItems, 'networking');
     const databaseMonthlyCostUsd = this.componentTotal(lineItems, 'database');
     const supportMonthlyCostUsd = this.componentTotal(lineItems, 'support');
     const licensingMonthlyCostUsd = this.componentTotal(lineItems, 'licensing');
@@ -406,6 +407,7 @@ export class ComparisonOrchestratorService {
       computeMonthlyCostUsd,
       storageMonthlyCostUsd,
       egressMonthlyCostUsd,
+      networkingMonthlyCostUsd,
       databaseMonthlyCostUsd,
       supportMonthlyCostUsd,
       licensingMonthlyCostUsd,
@@ -414,6 +416,7 @@ export class ComparisonOrchestratorService {
         computeMonthlyCostUsd +
           storageMonthlyCostUsd +
           egressMonthlyCostUsd +
+          networkingMonthlyCostUsd +
           databaseMonthlyCostUsd +
           supportMonthlyCostUsd +
           licensingMonthlyCostUsd +
@@ -717,6 +720,7 @@ export class ComparisonOrchestratorService {
           quantity: network.crossAzTransferGb,
           unit: 'GB',
           unitPriceUsd: rates.crossAzPerGb,
+          costComponent: 'networking',
         }),
       );
     }
@@ -731,6 +735,7 @@ export class ComparisonOrchestratorService {
           quantity: network.interRegionTransferGb,
           unit: 'GB',
           unitPriceUsd: rates.interRegionPerGb,
+          costComponent: 'networking',
         }),
       );
     }
@@ -778,6 +783,7 @@ export class ComparisonOrchestratorService {
             monthlyCostUsd,
             unit: 'month',
             unitPriceUsd: monthlyCostUsd,
+            costComponent: 'networking',
           }),
         );
       }
@@ -802,6 +808,7 @@ export class ComparisonOrchestratorService {
             monthlyCostUsd,
             unit: 'month',
             unitPriceUsd: monthlyCostUsd,
+            costComponent: 'networking',
           }),
         );
       }
@@ -830,6 +837,7 @@ export class ComparisonOrchestratorService {
             monthlyCostUsd,
             unit: 'month',
             unitPriceUsd: monthlyCostUsd,
+            costComponent: 'networking',
           }),
         );
       }
@@ -859,6 +867,7 @@ export class ComparisonOrchestratorService {
             monthlyCostUsd,
             unit: 'month',
             unitPriceUsd: monthlyCostUsd,
+            costComponent: 'networking',
           }),
         );
       }
@@ -889,6 +898,7 @@ export class ComparisonOrchestratorService {
             monthlyCostUsd,
             unit: 'month',
             unitPriceUsd: monthlyCostUsd,
+            costComponent: 'networking',
           }),
         );
       }
@@ -906,13 +916,14 @@ export class ComparisonOrchestratorService {
     monthlyCostUsd?: number;
     unit: string;
     unitPriceUsd: number;
+    costComponent?: Extract<CostComponent, 'egress' | 'networking'>;
   }): ComparisonLineItem {
     const monthlyCostUsd =
       input.monthlyCostUsd ?? this.roundCurrency((input.quantity ?? 0) * input.unitPriceUsd);
 
     return this.normalizeLineItem({
       category: 'network',
-      costComponent: 'egress',
+      costComponent: input.costComponent ?? 'egress',
       description: input.description,
       isApproximate: true,
       baseMonthlyCostUsd: monthlyCostUsd,
@@ -1994,6 +2005,7 @@ export class ComparisonOrchestratorService {
           quantity: values.analyticsStreamingIngestGb,
           unit: 'GB ingested',
           unitPriceUsd: rates.streamingIngestPerGb,
+          costComponent: 'networking',
         }),
       );
     }

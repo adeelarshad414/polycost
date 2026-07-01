@@ -981,7 +981,7 @@ describe('report generators', () => {
         ]),
         expect.arrayContaining([
           'Egress optimization',
-          'aws egress is 64.9% of monthly spend; evaluate CDN offload, cache-control, and same-region data access.',
+          'aws egress and networking are 64.9% of monthly spend; evaluate CDN offload, cache-control, and same-region data access.',
           '13.82',
           '165.84',
           'High',
@@ -1106,7 +1106,7 @@ describe('report generators', () => {
       expect.arrayContaining([
         expect.arrayContaining([
           'Egress optimization',
-          'aws egress is 91.34% of monthly spend; validate port speed, redundancy, metered-vs-unlimited transfer, and VPN-to-private-circuit break-even before final network design.',
+          'aws egress and networking are 91.34% of monthly spend; validate port speed, redundancy, metered-vs-unlimited transfer, and VPN-to-private-circuit break-even before final network design.',
           '64.75',
           '777',
           'High',

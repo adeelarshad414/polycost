@@ -391,6 +391,7 @@ describe('ComparisonOrchestratorService', () => {
       computeMonthlyCostUsd: 100,
       storageMonthlyCostUsd: 10,
       egressMonthlyCostUsd: 15,
+      networkingMonthlyCostUsd: 0,
       databaseMonthlyCostUsd: 20,
       supportMonthlyCostUsd: 0,
       licensingMonthlyCostUsd: 0,
@@ -774,45 +775,53 @@ describe('ComparisonOrchestratorService', () => {
       expect.arrayContaining([
         expect.objectContaining({
           category: 'network',
-          costComponent: 'egress',
+          costComponent: 'networking',
           skuId: 'modeled-cross-az-transfer',
           baseMonthlyCostUsd: 1,
           isApproximate: true,
         }),
         expect.objectContaining({
+          costComponent: 'networking',
           skuId: 'modeled-inter-region-transfer',
           baseMonthlyCostUsd: 4,
         }),
         expect.objectContaining({
+          costComponent: 'egress',
           skuId: 'modeled-cdn-delivery',
           description: expect.stringContaining('80% cache hit'),
           baseMonthlyCostUsd: 87,
         }),
         expect.objectContaining({
+          costComponent: 'networking',
           skuId: 'modeled-nat-gateway',
           baseMonthlyCostUsd: 55.35,
         }),
         expect.objectContaining({
+          costComponent: 'networking',
           skuId: 'modeled-dns',
           baseMonthlyCostUsd: 2.2,
         }),
         expect.objectContaining({
+          costComponent: 'networking',
           skuId: 'modeled-load-balancer-capacity',
           baseMonthlyCostUsd: 18.43,
         }),
         expect.objectContaining({
+          costComponent: 'networking',
           skuId: 'modeled-vpn-connectivity',
           description: expect.stringContaining('2 connection(s), 730 hrs, 1000 GB transfer'),
           baseMonthlyCostUsd: 163,
         }),
         expect.objectContaining({
+          costComponent: 'networking',
           skuId: 'modeled-private-circuit',
           description: expect.stringContaining('1 circuit(s), 730 port hrs, 2000 GB transfer'),
           baseMonthlyCostUsd: 259,
         }),
       ]),
     );
-    expect(result.providers[0].breakdown?.egressMonthlyCostUsd).toBe(589.98);
+    expect(result.providers[0].breakdown?.egressMonthlyCostUsd).toBe(87);
+    expect(result.providers[0].breakdown?.networkingMonthlyCostUsd).toBe(502.98);
   });
 
   it('adds explicit modeled storage dimension line items when advanced storage assumptions exist', async () => {
@@ -1545,6 +1554,7 @@ describe('ComparisonOrchestratorService', () => {
         expect.objectContaining({
           category: 'network',
           skuId: 'modeled-analytics-streaming-ingest',
+          costComponent: 'networking',
           baseMonthlyCostUsd: 14,
         }),
         expect.objectContaining({
@@ -1558,7 +1568,8 @@ describe('ComparisonOrchestratorService', () => {
       expect.objectContaining({
         computeMonthlyCostUsd: 10,
         storageMonthlyCostUsd: 127,
-        egressMonthlyCostUsd: 14,
+        egressMonthlyCostUsd: 0,
+        networkingMonthlyCostUsd: 14,
         operationsMonthlyCostUsd: 752.8,
       }),
     );

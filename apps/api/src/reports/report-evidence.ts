@@ -1467,15 +1467,16 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
   rows.push(...architectureRiskOpportunityRows(result));
 
   for (const provider of result.providers) {
-    const egressMonthly = componentMonthly(provider, 'egress');
+    const dataPathMonthly =
+      componentMonthly(provider, 'egress') + componentMonthly(provider, 'networking');
     const providerMonthly = provider.totals.monthly;
 
-    if (providerMonthly > 0 && egressMonthly / providerMonthly >= 0.2) {
+    if (providerMonthly > 0 && dataPathMonthly / providerMonthly >= 0.2) {
       const insight = egressOptimizationInsight(provider);
       rows.push([
         'Egress optimization',
-        `${provider.providerId} egress is ${formatNumber(
-          (egressMonthly / providerMonthly) * 100,
+        `${provider.providerId} egress and networking are ${formatNumber(
+          (dataPathMonthly / providerMonthly) * 100,
         )}% of monthly spend; ${insight.recommendation}`,
         formatNumber(insight.monthlySavings),
         formatNumber(insight.monthlySavings * 12),
@@ -2559,21 +2560,22 @@ function architectureRiskOpportunityRows(result: ComparisonResult): string[][] {
   const rows: string[][] = [];
 
   for (const provider of result.providers) {
-    const egressMonthly = componentMonthly(provider, 'egress');
+    const dataPathMonthly =
+      componentMonthly(provider, 'egress') + componentMonthly(provider, 'networking');
     const providerMonthly = provider.totals.monthly;
 
-    if (providerMonthly > 0 && egressMonthly / providerMonthly >= 0.35) {
+    if (providerMonthly > 0 && dataPathMonthly / providerMonthly >= 0.35) {
       rows.push([
         'Architecture risk',
         `${provider.providerId} data-transfer line items are ${formatNumber(
-          (egressMonthly / providerMonthly) * 100,
+          (dataPathMonthly / providerMonthly) * 100,
         )}% of monthly spend; validate CDN, NAT, cross-AZ, and inter-region paths before sign-off.`,
         '',
         '',
         'High',
         'Medium',
         `Egress/networking risk from cached line items: $${formatNumber(
-          egressMonthly,
+          dataPathMonthly,
         )}/mo of $${formatNumber(providerMonthly)}/mo.`,
       ]);
     }
@@ -4054,6 +4056,8 @@ function operationsOptimizationInsight(
 
 function egressOptimizationInsight(provider: ComparisonProviderResult): EgressOptimizationInsight {
   const egressMonthly = componentMonthly(provider, 'egress');
+  const networkingMonthly = componentMonthly(provider, 'networking');
+  const dataPathMonthly = egressMonthly + networkingMonthly;
   const egressRows = provider.lineItems
     .filter(
       (lineItem) =>
@@ -4144,8 +4148,8 @@ function egressOptimizationInsight(provider: ComparisonProviderResult): EgressOp
     };
   }
 
-  if (tieredGb >= 10_240 || egressMonthly >= 1000) {
-    const monthlySavings = roundCurrency(egressMonthly * 0.25);
+  if (tieredGb >= 10_240 || dataPathMonthly >= 1000) {
+    const monthlySavings = roundCurrency(dataPathMonthly * 0.25);
 
     return {
       recommendation:
@@ -4153,21 +4157,21 @@ function egressOptimizationInsight(provider: ComparisonProviderResult): EgressOp
       monthlySavings,
       effort: 'High',
       evidence: `${provider.providerId} has $${formatNumber(
-        egressMonthly,
-      )}/mo egress exposure${
+        dataPathMonthly,
+      )}/mo egress/network exposure${
         tieredGb > 0 ? ` across ${formatNumber(tieredGb)}GB of tier-traced data-out` : ''
-      }; high-volume optimization is modeled at 25% of the egress baseline.`,
+      }; high-volume optimization is modeled at 25% of the data-path baseline.`,
     };
   }
 
-  const monthlySavings = roundCurrency(egressMonthly * 0.3);
+  const monthlySavings = roundCurrency(dataPathMonthly * 0.3);
 
   return {
     recommendation: 'evaluate CDN offload, cache-control, and same-region data access.',
     monthlySavings,
     effort: 'Medium',
     evidence: `${provider.providerId} egress/network baseline is $${formatNumber(
-      egressMonthly,
+      dataPathMonthly,
     )}/mo; rule-based reduction is 30% when no single network driver dominates.`,
   };
 }
