@@ -279,7 +279,10 @@ button,
 a,
 input,
 select,
-textarea {
+textarea,
+summary,
+[role='button'],
+[tabindex]:not([tabindex='-1']) {
   outline-color: var(--pc-action-primary);
   outline-offset: 2px;
 }
@@ -288,7 +291,10 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+summary:focus-visible,
+[role='button']:focus-visible,
+[tabindex]:not([tabindex='-1']):focus-visible {
   outline: 2px solid var(--pc-action-primary);
 }
 
