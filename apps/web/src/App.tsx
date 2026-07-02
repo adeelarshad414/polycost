@@ -281,6 +281,72 @@ const COMPUTE_SIZE_PRESETS: ComputeSizePreset[] = [
   },
 ];
 
+interface ComputeStorageDefault {
+  sizeGb: string;
+  storageRole: string;
+  storageType: WorkloadFormState['storageType'];
+  storageAccessPattern: WorkloadFormState['storageAccessPattern'];
+  storageClass: WorkloadFormState['storageClass'];
+  provisionedIops?: string;
+  provisionedThroughputMbps?: string;
+}
+
+const COMPUTE_STORAGE_DEFAULTS: Record<WorkloadFormState['instanceTier'], ComputeStorageDefault> = {
+  small: {
+    sizeGb: '50',
+    storageRole: 'starter disk',
+    storageType: 'block',
+    storageAccessPattern: 'frequent',
+    storageClass: 'standard',
+  },
+  balanced: {
+    sizeGb: '100',
+    storageRole: 'app data disk',
+    storageType: 'block',
+    storageAccessPattern: 'frequent',
+    storageClass: 'standard',
+  },
+  compute: {
+    sizeGb: '100',
+    storageRole: 'compute scratch disk',
+    storageType: 'block',
+    storageAccessPattern: 'frequent',
+    storageClass: 'standard',
+  },
+  memory: {
+    sizeGb: '250',
+    storageRole: 'data working set',
+    storageType: 'block',
+    storageAccessPattern: 'frequent',
+    storageClass: 'standard',
+  },
+  storage: {
+    sizeGb: '1000',
+    storageRole: 'high I/O data tier',
+    storageType: 'block',
+    storageAccessPattern: 'frequent',
+    storageClass: 'premium',
+    provisionedIops: '16000',
+    provisionedThroughputMbps: '500',
+  },
+  accelerated: {
+    sizeGb: '500',
+    storageRole: 'accelerator scratch disk',
+    storageType: 'block',
+    storageAccessPattern: 'frequent',
+    storageClass: 'premium',
+    provisionedIops: '8000',
+    provisionedThroughputMbps: '250',
+  },
+  custom: {
+    sizeGb: '100',
+    storageRole: 'custom compute disk',
+    storageType: 'block',
+    storageAccessPattern: 'frequent',
+    storageClass: 'standard',
+  },
+};
+
 const PROCESSOR_ARCHITECTURE_OPTIONS: Array<[WorkloadFormState['processorArchitecture'], string]> =
   [
     ['x86_64', 'x86 - Intel / AMD'],
@@ -1421,6 +1487,10 @@ function InitialHomePage({
     });
   }
 
+  function updateInstanceTier(value: WorkloadFormState['instanceTier']) {
+    onChange(applyComputeStorageDefault({ ...form, instanceTier: value }));
+  }
+
   function applyComputeSizing(suggestion: ComputeSizePreset) {
     onChange(applyComputeSizingSuggestion(form, suggestion));
   }
@@ -1511,7 +1581,7 @@ function InitialHomePage({
                 label="Instance tier"
                 value={form.instanceTier}
                 options={INSTANCE_TIER_OPTIONS}
-                onChange={(value) => update('instanceTier', value)}
+                onChange={updateInstanceTier}
               />
               <SelectField
                 label="Architecture"
@@ -2885,6 +2955,10 @@ function WorkloadForm({
     onChange(formWithBulkServiceRows(form, rows));
   }
 
+  function updateInstanceTier(value: WorkloadFormState['instanceTier']) {
+    onChange(applyComputeStorageDefault({ ...form, instanceTier: value }));
+  }
+
   function applyComputeSizing(suggestion: ComputeSizePreset) {
     onChange(applyComputeSizingSuggestion(form, suggestion));
   }
@@ -3155,7 +3229,7 @@ function WorkloadForm({
             label="Instance tier"
             value={form.instanceTier}
             options={INSTANCE_TIER_OPTIONS}
-            onChange={(value) => update('instanceTier', value)}
+            onChange={updateInstanceTier}
           />
           <SelectField
             label="Architecture"
@@ -5065,7 +5139,7 @@ function applyComputeSizingSuggestion(
 ): WorkloadFormState {
   const serviceFamilyId = suggestion.tier === 'small' ? 'burstable-compute' : 'vm-compute';
 
-  return {
+  return applyComputeStorageDefault({
     ...form,
     selectedServiceCategory: 'compute',
     selectedServiceFamilyId: serviceFamilyId,
@@ -5077,7 +5151,60 @@ function applyComputeSizingSuggestion(
     processorArchitecture: suggestion.tier === 'accelerated' ? 'gpu' : form.processorArchitecture,
     vcpu: String(suggestion.vcpu),
     memoryGb: String(suggestion.memoryGb),
+  });
+}
+
+function applyComputeStorageDefault(form: WorkloadFormState): WorkloadFormState {
+  if (!shouldApplyComputeStorageDefault(form)) {
+    return form;
+  }
+
+  const storageDefault = computeStorageDefaultForTier(form.instanceTier);
+
+  return {
+    ...form,
+    storageEnabled: true,
+    storageRole: storageDefault.storageRole,
+    storageType: storageDefault.storageType,
+    storageSizeGb: storageDefault.sizeGb,
+    storageAccessPattern: storageDefault.storageAccessPattern,
+    storageClass: storageDefault.storageClass,
+    provisionedIops: storageDefault.provisionedIops ?? '0',
+    provisionedThroughputMbps: storageDefault.provisionedThroughputMbps ?? '0',
   };
+}
+
+function shouldApplyComputeStorageDefault(form: WorkloadFormState): boolean {
+  const currentStorageSize = form.storageSizeGb.trim();
+
+  return (
+    !form.storageEnabled ||
+    currentStorageSize.length === 0 ||
+    Object.values(COMPUTE_STORAGE_DEFAULTS).some(
+      (storageDefault) => storageDefault.sizeGb === currentStorageSize,
+    )
+  );
+}
+
+function computeStorageDefaultForTier(
+  tier: WorkloadFormState['instanceTier'],
+): ComputeStorageDefault {
+  switch (tier) {
+    case 'small':
+      return COMPUTE_STORAGE_DEFAULTS.small;
+    case 'balanced':
+      return COMPUTE_STORAGE_DEFAULTS.balanced;
+    case 'compute':
+      return COMPUTE_STORAGE_DEFAULTS.compute;
+    case 'memory':
+      return COMPUTE_STORAGE_DEFAULTS.memory;
+    case 'storage':
+      return COMPUTE_STORAGE_DEFAULTS.storage;
+    case 'accelerated':
+      return COMPUTE_STORAGE_DEFAULTS.accelerated;
+    case 'custom':
+      return COMPUTE_STORAGE_DEFAULTS.custom;
+  }
 }
 
 interface ComputeSizingIntent {

@@ -201,6 +201,29 @@ describe('App', () => {
     unmount();
   });
 
+  it('seeds editable storage defaults from compute tier changes without overwriting custom storage', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await changeSelect(selectById(container, 'instance-tier'), 'memory');
+    expect(inputById(container, 'storage-gb').value).toBe('250');
+
+    await changeInput(inputById(container, 'storage-gb'), '777');
+    await changeSelect(selectById(container, 'instance-tier'), 'accelerated');
+    expect(inputById(container, 'storage-gb').value).toBe('777');
+
+    await click(buttonByText(container, 'Compare costs'));
+    await settleAsyncEffects();
+
+    expect(client.validateWorkload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        storage: [expect.objectContaining({ sizeGb: 777 })],
+      }),
+    );
+
+    unmount();
+  });
+
   it('shows the expanded provider region fallback while the live catalog loads', () => {
     const { container, unmount } = render(<App client={clientMock()} />);
     const regionSelect = selectById(container, 'region');
