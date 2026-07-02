@@ -98,4 +98,36 @@ describe('calculateEgressCost', () => {
   ])('covers %s boundary math', (_label, tiers, gbPerMonth, expected) => {
     expect(calculateEgressCost(tiers, gbPerMonth)).toBeCloseTo(expected, 2);
   });
+
+  it('matches the manual AWS-style tier calculation for 80TB of internet egress', () => {
+    const tiers: EgressTierRate[] = [
+      { tierFromGb: 0, tierToGb: 10_240, pricePerGb: 0.09 },
+      { tierFromGb: 10_240, tierToGb: 51_200, pricePerGb: 0.085 },
+      { tierFromGb: 51_200, tierToGb: null, pricePerGb: 0.07 },
+    ];
+
+    expect(calculateEgressTierBreakdown(tiers, 81_920)).toEqual([
+      {
+        tierFromGb: 0,
+        tierToGb: 10_240,
+        pricePerGb: 0.09,
+        billableGb: 10_240,
+        monthlyCostUsd: 921.6,
+      },
+      {
+        tierFromGb: 10_240,
+        tierToGb: 51_200,
+        pricePerGb: 0.085,
+        billableGb: 40_960,
+        monthlyCostUsd: 3481.6,
+      },
+      {
+        tierFromGb: 51_200,
+        pricePerGb: 0.07,
+        billableGb: 30_720,
+        monthlyCostUsd: 2150.4,
+      },
+    ]);
+    expect(calculateEgressCost(tiers, 81_920)).toBe(6553.6);
+  });
 });
