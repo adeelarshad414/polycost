@@ -105,6 +105,12 @@ const REQUIREMENT_SESSION_STORAGE_KEY = 'polycost-current-requirements-v1';
 const COMPARISON_HISTORY_STORAGE_KEY = 'polycost-comparison-history-v1';
 const MAX_COMPARISON_HISTORY_ENTRIES = 8;
 const REQUIREMENTS_FILE_MAX_BYTES = 128 * 1024;
+const CONFIDENCE_TOOLTIP =
+  'Confidence reflects how closely the equivalent service matches on specs, not just name.';
+const HOURS_PER_MONTH_TOOLTIP =
+  'AWS/Azure billing standard: 365 days divided by 12 months times 24 hours. Used consistently for all monthly calculations.';
+const SPOT_ESTIMATE_TOOLTIP =
+  'Spot prices are estimate ranges, not guaranteed rates. They can change materially by provider, region, instance family, and interruption tolerance; do not treat them as fixed commitments.';
 const REQUIREMENTS_FILE_ACCEPT =
   '.txt,.md,.markdown,.json,.yaml,.yml,text/plain,text/markdown,application/json,application/yaml,application/x-yaml,text/yaml';
 const REQUIREMENTS_FILE_EXTENSIONS = ['.txt', '.md', '.markdown', '.json', '.yaml', '.yml'];
@@ -8708,12 +8714,21 @@ function FullCostMatrixTable({ comparison }: { comparison: ComparisonResult | nu
               {showTechnicalColumns ? (
                 <>
                   <th scope="col">Category</th>
-                  <th scope="col">Confidence</th>
+                  <th scope="col" title={CONFIDENCE_TOOLTIP} aria-label={CONFIDENCE_TOOLTIP}>
+                    Confidence
+                  </th>
                 </>
               ) : null}
               {visibleProviders.flatMap((providerId) =>
                 visiblePricingModels.map((model) => (
-                  <th scope="col" key={`${providerId}-${model.key}`}>
+                  <th
+                    scope="col"
+                    key={`${providerId}-${model.key}`}
+                    title={pricingModelTooltip(model.key)}
+                    aria-label={`${providerLabel(providerId)} ${costMatrixPricingModelLabel(
+                      model.key,
+                    )}. ${pricingModelTooltip(model.key)}`}
+                  >
                     {providerLabel(providerId)} {costMatrixPricingModelLabel(model.key)}
                   </th>
                 )),
@@ -8730,7 +8745,11 @@ function FullCostMatrixTable({ comparison }: { comparison: ComparisonResult | nu
                   {showTechnicalColumns ? (
                     <>
                       <td>{capitalize(row.category)}</td>
-                      <td className="cost-matrix-confidence">
+                      <td
+                        className="cost-matrix-confidence"
+                        title={CONFIDENCE_TOOLTIP}
+                        aria-label={`${row.approximate ? 'Approximate' : 'Mapped'} service confidence. ${CONFIDENCE_TOOLTIP}`}
+                      >
                         {row.approximate ? 'Approximate' : 'Mapped'}
                       </td>
                     </>
@@ -8987,6 +9006,21 @@ function costMatrixPricingModelLabel(pricingModel: PricingModelKey): string {
   }
 }
 
+function pricingModelTooltip(pricingModel: PricingModelKey): string {
+  switch (pricingModel) {
+    case 'on-demand':
+      return 'On-demand pricing keeps the workload fully flexible with no usage commitment.';
+    case 'reserved-1yr':
+      return 'Reserved 1yr pricing models a one-year commitment; lower recurring cost with less flexibility than on-demand.';
+    case 'reserved-3yr':
+      return 'Reserved 3yr pricing models a three-year commitment; usually lower recurring cost with the least flexibility.';
+    case 'savings-plan':
+      return 'Savings or committed-use pricing models provider commitment programs; verify eligible services, term, and payment option before procurement.';
+    case 'spot':
+      return `Spot pricing models interruptible capacity. ${SPOT_ESTIMATE_TOOLTIP}`;
+  }
+}
+
 function CostFormulaEvidence({ comparison }: { comparison: ComparisonResult | null }) {
   const rows = costFormulaRows(comparison);
 
@@ -8997,7 +9031,7 @@ function CostFormulaEvidence({ comparison }: { comparison: ComparisonResult | nu
           <span>Calculation evidence</span>
           <h3>Rate x quantity x time</h3>
         </div>
-        <p>
+        <p title={HOURS_PER_MONTH_TOOLTIP}>
           Monthly totals are derived from cached rates and the shared 730-hours/month constant; no
           request-time cloud calculator calls are made.
         </p>
@@ -9009,7 +9043,13 @@ function CostFormulaEvidence({ comparison }: { comparison: ComparisonResult | nu
               {providerLabel(row.providerId)} · {capitalize(row.category)}
             </span>
             <strong>{row.description}</strong>
-            <p>{row.formula}</p>
+            <p
+              title={
+                row.formula.includes(`${HOURS_PER_MONTH}`) ? HOURS_PER_MONTH_TOOLTIP : undefined
+              }
+            >
+              {row.formula}
+            </p>
           </article>
         ))}
       </div>
@@ -13760,7 +13800,7 @@ function costFormulaRows(comparison: ComparisonResult | null): Array<{
           lineItem.baseHourlyCostUsd !== undefined
             ? `${formatCurrency(
                 lineItem.baseHourlyCostUsd,
-              )} hourly x ${HOURS_PER_MONTH} hours = ${formatCurrency(
+              )}/hr x ${HOURS_PER_MONTH} hrs/month = ${formatCurrency(
                 lineItem.baseMonthlyCostUsd,
               )} monthly`
             : lineItem.unitPriceUsd !== undefined
@@ -14197,7 +14237,11 @@ function ExecutiveDecisionPanel({ decision }: { decision: ExecutiveDecision }) {
       </div>
 
       <div className="executive-scoreboard">
-        <div className={`confidence-pill confidence-${decision.confidence.toLowerCase()}`}>
+        <div
+          className={`confidence-pill confidence-${decision.confidence.toLowerCase()}`}
+          title={CONFIDENCE_TOOLTIP}
+          aria-label={`Confidence ${decision.confidence}. ${decision.confidenceDetail}. ${CONFIDENCE_TOOLTIP}`}
+        >
           <span>Confidence</span>
           <strong>{decision.confidence}</strong>
           <small>{decision.confidenceDetail}</small>

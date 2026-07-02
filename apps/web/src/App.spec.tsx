@@ -1101,9 +1101,7 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Describe infrastructure');
     expect(text(container)).toContain('Add services to see your comparison');
     expect(text(container)).toContain('Add services');
-    expect(
-      container.querySelector('.comparison-empty-illustration'),
-    ).toBeInstanceOf(SVGSVGElement);
+    expect(container.querySelector('.comparison-empty-illustration')).toBeInstanceOf(SVGSVGElement);
     expect(container.querySelector('.engineering-empty-illustration')).toBeInstanceOf(
       SVGSVGElement,
     );
@@ -1166,12 +1164,21 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Backend contract note');
     expect(text(container)).toContain('Resource name');
     expect(text(container)).toContain('Spec / SKU');
+    expect(container.querySelector('.confidence-pill')?.getAttribute('title')).toContain(
+      'Confidence reflects how closely the equivalent service matches on specs',
+    );
     const headerButtons = Array.from(container.querySelectorAll('button'));
     expect(
       headerButtons
         .find((button) => button.getAttribute('aria-label')?.startsWith('Spec / SKU:'))
         ?.getAttribute('title'),
     ).toContain('Resolved SKU, unit, rate, and pricing basis');
+    expect(
+      headerButtons
+        .find((button) => button.getAttribute('aria-label')?.startsWith('Spec / SKU:'))
+        ?.closest('th')
+        ?.getAttribute('aria-sort'),
+    ).toBe('none');
     expect(
       headerButtons
         .find((button) => button.getAttribute('aria-label')?.startsWith('$/mo:'))
@@ -2055,10 +2062,18 @@ describe('ComparisonView', () => {
     expect(buttonByText(container, '1yr reserved').disabled).toBe(false);
     expect(buttonByText(container, '3yr reserved').disabled).toBe(false);
     expect(buttonByText(container, 'Spot').disabled).toBe(false);
+    expect(buttonByText(container, 'Spot').getAttribute('title')).toContain(
+      'Spot pricing models interruptible capacity',
+    );
     expect(buttonByText(container, 'Savings plan').disabled).toBe(false);
     expect(text(container)).toContain('Full cost matrix');
     expect(text(container)).toContain('AWS On-demand');
     expect(text(container)).toContain('Azure 1yr');
+    expect(
+      Array.from(container.querySelectorAll('th'))
+        .find((header) => header.textContent?.includes('AWS Spot'))
+        ?.getAttribute('title'),
+    ).toContain('estimate ranges');
     expect(text(container)).toContain('Columns');
     expect(text(container)).toContain('Compact cost view');
     const columnModeSelect = selectByOptionValue(container, 'summary');
@@ -2114,6 +2129,11 @@ describe('ComparisonView', () => {
     );
     expect(text(container)).toContain('Payment and TCO detail');
     expect(text(container)).toContain('Commitment scenario monthly, hourly, and term view');
+    expect(
+      Array.from(container.querySelectorAll('th'))
+        .find((header) => header.textContent?.includes('Effective hourly'))
+        ?.getAttribute('title'),
+    ).toContain('blended hourly cost');
     expect(text(container)).toContain('Upfront cash');
     expect(text(container)).toContain('$120.00');
     expect(text(container)).toContain('$624.00');

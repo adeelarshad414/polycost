@@ -142,6 +142,11 @@ const USD_CURRENCY: CurrencyOption = {
   rate: 1,
 };
 
+const EFFECTIVE_HOURLY_TOOLTIP =
+  'The blended hourly cost accounting for upfront payments amortized over the commitment term.';
+const SPOT_ESTIMATE_TOOLTIP =
+  'Spot prices are estimate ranges, not guaranteed rates. They can change materially by provider, region, instance family, and interruption tolerance; do not treat them as fixed commitments.';
+
 const CURRENCY_OPTIONS: Array<Pick<CurrencyOption, 'code' | 'label' | 'locale'>> = [
   { code: 'USD', label: 'USD', locale: 'en-US' },
   { code: 'PKR', label: 'PKR', locale: 'en-PK' },
@@ -514,7 +519,8 @@ export function FinOpsFeatureLayer({
                 key={model.key}
                 type="button"
                 aria-pressed={pricingModel === model.key}
-                title={model.detail}
+                title={pricingModelTooltip(model.key)}
+                aria-label={`${model.label}. ${pricingModelTooltip(model.key)}`}
                 onClick={() => updatePricingModel(model.key)}
                 className={[
                   'inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary',
@@ -568,7 +574,8 @@ export function FinOpsFeatureLayer({
                   key={option.key}
                   type="button"
                   aria-pressed={paymentOption === option.key}
-                  title={option.detail}
+                  title={`${option.detail} ${EFFECTIVE_HOURLY_TOOLTIP}`}
+                  aria-label={`${option.label}. ${option.detail} ${EFFECTIVE_HOURLY_TOOLTIP}`}
                   onClick={() => setPaymentOption(option.key)}
                   className={[
                     'inline-flex min-h-10 items-center justify-center rounded-md px-3 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary',
@@ -597,6 +604,12 @@ export function FinOpsFeatureLayer({
             const selectedModelCost = provider
               ? providerModelCost(provider, pricingModel)
               : undefined;
+            const selectedModelDisplay = selectedModelCost
+              ? formatModelCost(selectedModelCost, interval, currency)
+              : 'Pending';
+            const selectedModelHint = selectedModelCost
+              ? pricingModelTooltip(selectedModelCost.model, selectedModelCost.estimated)
+              : pricingModelTooltip(pricingModel);
 
             return (
               <article
@@ -605,10 +618,14 @@ export function FinOpsFeatureLayer({
               >
                 <div className="flex min-w-0 items-center justify-between gap-3">
                   <ProviderTextHeading providerId={providerId} />
-                  <strong className="font-mono text-base text-text-primary">
-                    {selectedModelCost
-                      ? formatModelCost(selectedModelCost, interval, currency)
-                      : 'Pending'}
+                  <strong
+                    className="font-mono text-base text-text-primary"
+                    title={selectedModelHint}
+                    aria-label={`${providerLabel(providerId)} ${pricingModelLabel(
+                      pricingModel,
+                    )} cost ${selectedModelDisplay}. ${selectedModelHint}`}
+                  >
+                    {selectedModelDisplay}
                   </strong>
                 </div>
                 {provider ? (
@@ -1081,7 +1098,14 @@ function CommitmentTcoPanel({
             <tr className="bg-surface-1 text-left text-xs font-bold uppercase tracking-wide text-text-muted">
               <th className="border-b border-border px-3 py-2">Provider</th>
               <th className="border-b border-border px-3 py-2">Model</th>
-              <th className="border-b border-border px-3 py-2 text-right">Effective hourly</th>
+              <th
+                className="border-b border-border px-3 py-2 text-right"
+                scope="col"
+                title={EFFECTIVE_HOURLY_TOOLTIP}
+                aria-label={`Effective hourly. ${EFFECTIVE_HOURLY_TOOLTIP}`}
+              >
+                Effective hourly
+              </th>
               <th className="border-b border-border px-3 py-2 text-right">Monthly recurring</th>
               <th className="border-b border-border px-3 py-2 text-right">Upfront cash</th>
               <th className="border-b border-border px-3 py-2">Payment option</th>
@@ -1098,7 +1122,10 @@ function CommitmentTcoPanel({
                   <td className="border-b border-border px-3 py-2 font-semibold text-text-primary">
                     {providerLabel(row.providerId)}
                   </td>
-                  <td className="border-b border-border px-3 py-2 text-text-secondary">
+                  <td
+                    className="border-b border-border px-3 py-2 text-text-secondary"
+                    title={pricingModelTooltip(row.model)}
+                  >
                     {pricingModelLabel(row.model)}
                   </td>
                   <td className="border-b border-border px-3 py-2 text-right font-mono text-text-primary">
@@ -2413,6 +2440,23 @@ function PricingModelIcon({ model }: { model: PricingModelKey }) {
 
 function pricingModelLabel(model: PricingModelKey): string {
   return PRICING_MODELS.find((option) => option.key === model)?.label ?? model;
+}
+
+function pricingModelTooltip(model: PricingModelKey, estimated = false): string {
+  switch (model) {
+    case 'on-demand':
+      return 'On-demand pricing keeps the workload fully flexible with no usage commitment.';
+    case 'reserved-1yr':
+      return 'Reserved 1yr pricing models a one-year commitment; lower recurring cost with less flexibility than on-demand.';
+    case 'reserved-3yr':
+      return 'Reserved 3yr pricing models a three-year commitment; usually lower recurring cost with the least flexibility.';
+    case 'savings-plan':
+      return 'Savings or committed-use pricing models provider commitment programs; verify eligible services, term, and payment option before procurement.';
+    case 'spot':
+      return estimated
+        ? `Spot pricing models interruptible capacity. ${SPOT_ESTIMATE_TOOLTIP}`
+        : 'Spot pricing models interruptible capacity; validate interruption tolerance and regional availability before using it as the operating scenario.';
+  }
 }
 
 function requiresPaymentOption(model: PricingModelKey): boolean {

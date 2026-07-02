@@ -17,6 +17,9 @@ type PersonaViewMode = 'executive' | 'engineering';
 type SortKey = 'resourceName' | 'provider' | 'region' | 'spec' | 'monthlyCost';
 type SortDirection = 'asc' | 'desc';
 
+const CONFIDENCE_TOOLTIP =
+  'Confidence reflects how closely the equivalent service matches on specs, not just name.';
+
 interface PersonaComparisonWorkspaceProps {
   comparison: ComparisonResult | null;
   interval: IntervalKey;
@@ -673,15 +676,7 @@ function EmptyServicesIllustration() {
       className="engineering-empty-illustration h-20 w-20 text-text-muted"
       fill="none"
     >
-      <rect
-        x="17"
-        y="18"
-        width="46"
-        height="42"
-        rx="8"
-        stroke="currentColor"
-        strokeWidth="3"
-      />
+      <rect x="17" y="18" width="46" height="42" rx="8" stroke="currentColor" strokeWidth="3" />
       <path
         d="M28 30h24M28 40h24M28 50h12"
         stroke="currentColor"
@@ -807,7 +802,11 @@ function SharedComparisonState({
           <strong className="text-text-primary">Comparison evidence:</strong>{' '}
           {comparisonEvidenceSummary(data)}
         </div>
-        <span className={`confidence-pill confidence-${data.confidence.toLowerCase()}`}>
+        <span
+          className={`confidence-pill confidence-${data.confidence.toLowerCase()}`}
+          title={CONFIDENCE_TOOLTIP}
+          aria-label={`${data.confidence} confidence. ${data.confidenceDetail}. ${CONFIDENCE_TOOLTIP}`}
+        >
           <strong>{data.confidence}</strong>
           <small>{data.confidenceDetail}</small>
         </span>
@@ -839,12 +838,7 @@ function EmptyComparisonIllustration() {
         strokeLinejoin="round"
         strokeWidth="3"
       />
-      <path
-        d="M27 61h26M32 68h16"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="3"
-      />
+      <path d="M27 61h26M32 68h16" stroke="currentColor" strokeLinecap="round" strokeWidth="3" />
       <circle cx="32" cy="42" r="2.5" fill="currentColor" />
       <circle cx="40" cy="42" r="2.5" fill="currentColor" />
       <circle cx="48" cy="42" r="2.5" fill="currentColor" />
@@ -894,6 +888,7 @@ function SortableHeader({
   return (
     <th
       scope="col"
+      aria-sort={isActive ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
       className={[
         'px-3 py-2',
         alignRight ? 'text-right' : 'text-left',
