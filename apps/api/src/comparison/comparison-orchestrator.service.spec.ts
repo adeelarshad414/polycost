@@ -566,7 +566,7 @@ describe('ComparisonOrchestratorService', () => {
         expect.objectContaining({
           category: 'support',
           costComponent: 'support',
-          description: 'AWS Business Support+ support estimate',
+          description: 'AWS Business Support support estimate',
           baseMonthlyCostUsd: 29,
           isApproximate: true,
         }),
@@ -778,7 +778,7 @@ describe('ComparisonOrchestratorService', () => {
           }),
           lineItems: expect.arrayContaining([
             expect.objectContaining({
-              description: 'AWS Business Support+ support estimate',
+              description: 'AWS Business Support support estimate',
               skuId: 'modeled-support-business',
               baseMonthlyCostUsd: 15_800,
             }),
@@ -807,6 +807,32 @@ describe('ComparisonOrchestratorService', () => {
               baseMonthlyCostUsd: 15_900,
             }),
           ]),
+        }),
+      ]),
+    );
+  });
+
+  it('labels AWS developer support separately from business support', async () => {
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async () => providerResult('aws', [100])),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      workloadProfile: {
+        supportTier: 'developer',
+      },
+    });
+
+    expect(result.providers[0].lineItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          description: 'AWS Developer Support support estimate',
+          skuId: 'modeled-support-developer',
+          baseMonthlyCostUsd: 29,
         }),
       ]),
     );

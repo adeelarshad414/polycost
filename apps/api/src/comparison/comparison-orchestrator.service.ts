@@ -3274,9 +3274,9 @@ function providerSupportPlanLabel(providerId: ProviderId, supportTier: SupportTi
 function awsSupportPlanLabel(supportTier: SupportTier): string {
   switch (supportTier) {
     case 'developer':
-      return 'Business Support+ minimum';
+      return 'Developer Support';
     case 'business':
-      return 'Business Support+';
+      return 'Business Support';
     case 'enterprise':
       return 'Enterprise Support';
     case 'none':
