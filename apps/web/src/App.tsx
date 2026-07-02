@@ -200,6 +200,82 @@ const INSTANCE_TIER_OPTIONS: Array<[WorkloadFormState['instanceTier'], string]> 
   ['custom', 'Custom - use vCPU and memory fields'],
 ];
 
+interface ComputeSizePreset {
+  id: string;
+  label: string;
+  tier: WorkloadFormState['instanceTier'];
+  vcpu: number;
+  memoryGb: number;
+  fit: string;
+  families: string;
+}
+
+const COMPUTE_SIZE_PRESETS: ComputeSizePreset[] = [
+  {
+    id: 'burstable-2-4',
+    label: 'Burstable 2x4',
+    tier: 'small',
+    vcpu: 2,
+    memoryGb: 4,
+    fit: 'Low average CPU',
+    families: 'AWS T4g/T3 · Azure Bsv2 · GCP E2 shared',
+  },
+  {
+    id: 'balanced-4-16',
+    label: 'Balanced 4x16',
+    tier: 'balanced',
+    vcpu: 4,
+    memoryGb: 16,
+    fit: 'General app tier',
+    families: 'AWS M7i/M7g · Azure Dv5/Dpsv5 · GCP N2/T2A',
+  },
+  {
+    id: 'balanced-8-32',
+    label: 'Balanced 8x32',
+    tier: 'balanced',
+    vcpu: 8,
+    memoryGb: 32,
+    fit: 'API or worker tier',
+    families: 'AWS M7i/M7g · Azure Dv5/Dpsv5 · GCP N2/T2A',
+  },
+  {
+    id: 'compute-8-16',
+    label: 'Compute optimized 8x16',
+    tier: 'compute',
+    vcpu: 8,
+    memoryGb: 16,
+    fit: 'CPU-bound service',
+    families: 'AWS C7i/C7g · Azure Fsv2 · GCP C3/C2',
+  },
+  {
+    id: 'memory-8-64',
+    label: 'Memory optimized 8x64',
+    tier: 'memory',
+    vcpu: 8,
+    memoryGb: 64,
+    fit: 'Cache or database',
+    families: 'AWS R7i/R7g · Azure Esv5/Epsv5 · GCP M3/M2',
+  },
+  {
+    id: 'storage-16-64',
+    label: 'Storage optimized 16x64',
+    tier: 'storage',
+    vcpu: 16,
+    memoryGb: 64,
+    fit: 'High I/O data tier',
+    families: 'AWS I4i/I4g · Azure Lsv3 · GCP Z3',
+  },
+  {
+    id: 'accelerated-16-64',
+    label: 'GPU accelerated 16x64',
+    tier: 'accelerated',
+    vcpu: 16,
+    memoryGb: 64,
+    fit: 'CUDA or ML',
+    families: 'AWS G5/P4d · Azure NC · GCP A2/G2',
+  },
+];
+
 const PROCESSOR_ARCHITECTURE_OPTIONS: Array<[WorkloadFormState['processorArchitecture'], string]> =
   [
     ['x86_64', 'x86 - Intel / AMD'],
@@ -1459,6 +1535,10 @@ function InitialHomePage({
     });
   }
 
+  function applyComputeSizing(suggestion: ComputeSizePreset) {
+    onChange(applyComputeSizingSuggestion(form, suggestion));
+  }
+
   function applyTemplate(template: ArchitectureTemplate) {
     onChange(template.form);
   }
@@ -1575,6 +1655,7 @@ function InitialHomePage({
                 error={fieldErrors.memoryGb}
                 onChange={(value) => update('memoryGb', value)}
               />
+              <ComputeSizingAssistant form={form} compact onApply={applyComputeSizing} />
               <RegionSelectField
                 value={form.regionPreference}
                 dataResidency={form.dataResidency}
@@ -2918,6 +2999,10 @@ function WorkloadForm({
     onChange(formWithBulkServiceRows(form, rows));
   }
 
+  function applyComputeSizing(suggestion: ComputeSizePreset) {
+    onChange(applyComputeSizingSuggestion(form, suggestion));
+  }
+
   function applyTemplate(template: ArchitectureTemplate) {
     onChange(template.form);
   }
@@ -3038,6 +3123,7 @@ function WorkloadForm({
             error={fieldErrors.memoryGb}
             onChange={(value) => update('memoryGb', value)}
           />
+          <ComputeSizingAssistant form={form} onApply={applyComputeSizing} />
           <TextField
             label="Instances"
             value={form.instanceCount}
@@ -4405,6 +4491,52 @@ function validationIssueMap(
   }, {});
 }
 
+function ComputeSizingAssistant({
+  form,
+  compact = false,
+  onApply,
+}: {
+  form: WorkloadFormState;
+  compact?: boolean;
+  onApply: (suggestion: ComputeSizePreset) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const suggestions = computeSizingSuggestions(query, form).slice(0, compact ? 2 : 3);
+  const inputId = compact ? 'initial-compute-sizing-search' : 'compute-sizing-search';
+
+  return (
+    <div className={compact ? 'compute-sizing-assistant is-compact' : 'compute-sizing-assistant'}>
+      <label className="compute-sizing-search" htmlFor={inputId}>
+        <span>Sizing search</span>
+        <input
+          id={inputId}
+          className="compute-sizing-input"
+          value={query}
+          placeholder="8 vCPU 32GB memory optimized"
+          onChange={(event) => setQuery(event.currentTarget.value)}
+        />
+      </label>
+      <div className="compute-sizing-options" aria-label="Compute sizing suggestions">
+        {suggestions.map((suggestion) => (
+          <button
+            key={suggestion.id}
+            type="button"
+            className="compute-sizing-option"
+            onClick={() => onApply(suggestion)}
+          >
+            <strong>{suggestion.label}</strong>
+            <small>
+              {suggestion.vcpu} vCPU / {suggestion.memoryGb}GB · {suggestion.fit}
+            </small>
+            <small>{suggestion.families}</small>
+            <span>{computeSizingSignal(suggestion)}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TextField({
   label,
   value,
@@ -5039,6 +5171,231 @@ function formWithBulkServiceRows(
     selectedServiceFamilyId: primaryServiceFamilyId,
     selectedServiceCategory: primaryFamily?.categoryId ?? form.selectedServiceCategory,
   };
+}
+
+function applyComputeSizingSuggestion(
+  form: WorkloadFormState,
+  suggestion: ComputeSizePreset,
+): WorkloadFormState {
+  const serviceFamilyId = suggestion.tier === 'small' ? 'burstable-compute' : 'vm-compute';
+
+  return {
+    ...form,
+    selectedServiceCategory: 'compute',
+    selectedServiceFamilyId: serviceFamilyId,
+    selectedServiceFamilyIds: orderedServiceFamilyIds([
+      ...form.selectedServiceFamilyIds,
+      serviceFamilyId,
+    ]),
+    instanceTier: suggestion.tier,
+    processorArchitecture: suggestion.tier === 'accelerated' ? 'gpu' : form.processorArchitecture,
+    vcpu: String(suggestion.vcpu),
+    memoryGb: String(suggestion.memoryGb),
+  };
+}
+
+interface ComputeSizingIntent {
+  vcpu: number;
+  memoryGb: number;
+  tier?: WorkloadFormState['instanceTier'];
+}
+
+function computeSizingSuggestions(query: string, form: WorkloadFormState): ComputeSizePreset[] {
+  const intent = computeSizingIntent(query, form);
+
+  return [...COMPUTE_SIZE_PRESETS].sort(
+    (left, right) =>
+      computePresetScore(left, intent) - computePresetScore(right, intent) ||
+      left.vcpu - right.vcpu ||
+      left.memoryGb - right.memoryGb,
+  );
+}
+
+function computeSizingIntent(query: string, form: WorkloadFormState): ComputeSizingIntent {
+  const lower = query.toLowerCase();
+  const tokens = tokenizeSizingQuery(lower);
+  const fallbackVcpu = positiveFormNumber(form.vcpu) ?? 2;
+  const fallbackMemoryGb = positiveFormNumber(form.memoryGb) ?? 4;
+  const vcpu =
+    numberNearToken(tokens, ['vcpu', 'vcpus', 'core', 'cores', 'cpu', 'cpus']) ?? fallbackVcpu;
+  const memoryGb = memoryGbFromTokens(tokens) ?? fallbackMemoryGb;
+
+  return {
+    vcpu,
+    memoryGb,
+    tier: tierFromSizingQuery(lower),
+  };
+}
+
+function computePresetScore(preset: ComputeSizePreset, intent: ComputeSizingIntent): number {
+  const vcpuDelta = Math.abs(Math.log2(preset.vcpu / Math.max(intent.vcpu, 1)));
+  const memoryDelta = Math.abs(Math.log2(preset.memoryGb / Math.max(intent.memoryGb, 1)));
+  const tierPenalty = intent.tier && intent.tier !== preset.tier ? 0.8 : 0;
+  const underProvisionPenalty =
+    preset.vcpu < intent.vcpu || preset.memoryGb < intent.memoryGb ? 1.2 : 0;
+
+  return vcpuDelta * 2 + memoryDelta * 1.5 + tierPenalty + underProvisionPenalty;
+}
+
+function tokenizeSizingQuery(value: string): string[] {
+  const tokens: string[] = [];
+  let current = '';
+  let currentKind: 'number' | 'word' | null = null;
+
+  for (const char of value) {
+    const kind = sizingTokenKind(char, currentKind);
+
+    if (!kind) {
+      if (current) {
+        tokens.push(current);
+      }
+
+      current = '';
+      currentKind = null;
+      continue;
+    }
+
+    if (currentKind && kind !== currentKind) {
+      tokens.push(current);
+      current = char;
+      currentKind = kind;
+      continue;
+    }
+
+    current += char;
+    currentKind = kind;
+  }
+
+  if (current) {
+    tokens.push(current);
+  }
+
+  return tokens;
+}
+
+function sizingTokenKind(
+  char: string,
+  currentKind: 'number' | 'word' | null,
+): 'number' | 'word' | null {
+  const code = char.charCodeAt(0);
+
+  if ((code >= 48 && code <= 57) || (char === '.' && currentKind === 'number')) {
+    return 'number';
+  }
+
+  if (code >= 97 && code <= 122) {
+    return 'word';
+  }
+
+  return null;
+}
+
+function numberNearToken(tokens: string[], targetTokens: string[]): number | undefined {
+  const targetSet = new Set(targetTokens);
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    const parsed = positiveFormNumber(sizingTokenAt(tokens, index));
+
+    if (
+      parsed &&
+      (targetSet.has(sizingTokenAt(tokens, index - 1)) ||
+        targetSet.has(sizingTokenAt(tokens, index + 1)))
+    ) {
+      return parsed;
+    }
+  }
+
+  return undefined;
+}
+
+function memoryGbFromTokens(tokens: string[]): number | undefined {
+  const memoryUnits = new Set(['gb', 'gib']);
+  const memoryWords = new Set(['ram', 'memory']);
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    const parsed = positiveFormNumber(sizingTokenAt(tokens, index));
+
+    if (!parsed) {
+      continue;
+    }
+
+    const previous = sizingTokenAt(tokens, index - 1);
+    const next = sizingTokenAt(tokens, index + 1);
+    const secondNext = sizingTokenAt(tokens, index + 2);
+
+    if (
+      memoryUnits.has(previous) ||
+      memoryUnits.has(next) ||
+      memoryWords.has(previous) ||
+      memoryWords.has(next) ||
+      (memoryWords.has(previous) && memoryUnits.has(next)) ||
+      (memoryUnits.has(next) && memoryWords.has(secondNext))
+    ) {
+      return parsed;
+    }
+  }
+
+  return undefined;
+}
+
+function sizingTokenAt(tokens: string[], index: number): string {
+  if (index < 0) {
+    return '';
+  }
+
+  return tokens.slice(index, index + 1).join('');
+}
+
+function positiveFormNumber(value: string): number | undefined {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function tierFromSizingQuery(lower: string): WorkloadFormState['instanceTier'] | undefined {
+  if (/\b(gpu|cuda|ml|machine learning|accelerat)/.test(lower)) {
+    return 'accelerated';
+  }
+
+  if (/\b(memory|ram|cache|database|db)\b/.test(lower)) {
+    return 'memory';
+  }
+
+  if (/\b(storage|io|iops|throughput|nvme)\b/.test(lower)) {
+    return 'storage';
+  }
+
+  if (/\b(compute|cpu|batch)\b/.test(lower)) {
+    return 'compute';
+  }
+
+  if (/\b(burst|small|dev|test)\b/.test(lower)) {
+    return 'small';
+  }
+
+  if (/\b(balanced|general|web|api)\b/.test(lower)) {
+    return 'balanced';
+  }
+
+  return undefined;
+}
+
+function computeSizingSignal(suggestion: ComputeSizePreset): string {
+  const density = suggestion.memoryGb / Math.max(suggestion.vcpu, 1);
+  const densityLabel = `${formatDecimal(density)}GB/vCPU`;
+
+  if (suggestion.tier === 'compute') {
+    return `${densityLabel} · CPU value`;
+  }
+
+  if (suggestion.tier === 'memory') {
+    return `${densityLabel} · memory value`;
+  }
+
+  if (suggestion.tier === 'accelerated') {
+    return `${densityLabel} · accelerator class`;
+  }
+
+  return `${densityLabel} · cost/spec signal`;
 }
 
 function parseBulkServiceRows(input: string): BulkServiceDraftRow[] {

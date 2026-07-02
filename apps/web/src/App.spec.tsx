@@ -176,6 +176,31 @@ describe('App', () => {
     unmount();
   });
 
+  it('applies compute sizing suggestions from natural-language sizing search', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await changeInput(
+      inputById(container, 'initial-compute-sizing-search'),
+      '8 vCPU 64GB memory optimized',
+    );
+    const memorySuggestion = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('.compute-sizing-option'),
+    ).find((button) => button.textContent?.includes('Memory optimized 8x64'));
+
+    if (!(memorySuggestion instanceof HTMLButtonElement)) {
+      throw new Error('Expected memory optimized sizing suggestion');
+    }
+
+    await click(memorySuggestion);
+
+    expect(inputById(container, 'vcpu').value).toBe('8');
+    expect(inputById(container, 'memory-gb').value).toBe('64');
+    expect(selectById(container, 'instance-tier').value).toBe('memory');
+
+    unmount();
+  });
+
   it('adopts the backend pricing model recommendation after comparison', async () => {
     const recommendedResult: ComparisonResult = {
       ...comparisonResult,
