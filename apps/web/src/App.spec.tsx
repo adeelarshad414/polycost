@@ -1940,6 +1940,8 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('80% on-demand / 20% spot');
     expect(text(container)).toContain('$89.50/mo est.');
     expect(text(container)).toContain('High interruption risk');
+    expect(text(container)).toContain('daily-to-weekly planning band');
+    expect(text(container)).toContain('20% interruptible share');
     expect(text(container)).toContain('Architecture risk flags');
     expect(text(container)).toContain('Cost behaviors to validate before commitment');
     expect(text(container)).toContain('Backend egress driver');

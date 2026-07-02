@@ -8333,6 +8333,7 @@ function SpotBlendOptimizerPanel({ rows }: { rows: SpotBlendOptimizerRow[] }) {
                   </td>
                   <td>
                     <strong>{row.risk} interruption risk</strong>
+                    <small>{row.interruptionFrequency}</small>
                     <small>{row.evidence}</small>
                   </td>
                 </tr>
@@ -9274,6 +9275,7 @@ interface SpotBlendOptimizerRow {
   spotPercent: number;
   onDemandPercent: number;
   risk: 'Low' | 'Medium' | 'High';
+  interruptionFrequency: string;
   providerTerm: string;
   workloadFit: string;
   evidence: string;
@@ -12501,6 +12503,12 @@ function spotBlendOptimizerRows(
       }
 
       const risk = spotBlendRisk(form, spotPercent, spotModel.volatility);
+      const interruptionFrequency = spotInterruptionFrequency(
+        provider.providerId,
+        risk,
+        spotPercent,
+        spotModel.volatility,
+      );
       const estimatedLowMonthly = roundCurrency(blendedMonthly * 0.94);
       const estimatedHighMonthly = roundCurrency(blendedMonthly * 1.06);
 
@@ -12517,6 +12525,7 @@ function spotBlendOptimizerRows(
           spotPercent,
           onDemandPercent,
           risk,
+          interruptionFrequency,
           providerTerm: spotModel.providerTerm ?? spotModel.displayName ?? 'Spot estimate',
           workloadFit: spotBlendWorkloadFit(form, spotPercent),
           evidence: `${providerLabel(provider.providerId)} spot estimate is ${formatCurrency(
@@ -12569,6 +12578,31 @@ function spotBlendRisk(
   }
 
   return 'Low';
+}
+
+function spotInterruptionFrequency(
+  providerId: ProviderId,
+  risk: SpotBlendOptimizerRow['risk'],
+  spotPercent: number,
+  volatility?: NonNullable<ComparisonProviderResult['pricingModels']>[number]['volatility'],
+): string {
+  const band =
+    risk === 'High'
+      ? 'daily-to-weekly planning band'
+      : risk === 'Medium'
+        ? 'weekly-to-monthly planning band'
+        : 'monthly-or-lower planning band';
+  const providerSignal =
+    providerId === 'aws'
+      ? 'capacity-pool dependent'
+      : providerId === 'azure'
+        ? 'eviction-policy dependent'
+        : 'preemption-policy dependent';
+  const volatilitySignal = volatility === 'volatile' ? 'volatile estimate' : 'modeled estimate';
+
+  return `${band} · ${formatPercent(
+    spotPercent,
+  )} interruptible share · ${providerLabel(providerId)} ${providerSignal} ${volatilitySignal}.`;
 }
 
 function spotBlendWorkloadFit(form: WorkloadFormState, spotPercent: number): string {
