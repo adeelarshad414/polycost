@@ -238,6 +238,11 @@ const configService = {
     switch (key) {
       case 'RATE_LIMIT_NL_PARSE_PER_MINUTE':
       case 'RATE_LIMIT_LIVE_REFRESH_PER_MINUTE':
+      case 'RATE_LIMIT_COMPARISON_PER_MINUTE':
+      case 'RATE_LIMIT_EXPORT_PER_MINUTE':
+      case 'RATE_LIMIT_SHARE_LINK_PER_MINUTE':
+      case 'RATE_LIMIT_PUBLIC_READ_PER_MINUTE':
+      case 'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE':
         return 2;
       case 'FEATURE_LIVE_PRICING_REFRESH_ENABLED':
         return true;
@@ -301,18 +306,29 @@ describe('API contracts', () => {
   it('POST /comparisons persists and returns the comparison result', async () => {
     const service = comparisonApplicationService();
     const controller = comparisonsController(service);
+    const response = {
+      header: jest.fn(),
+    };
 
     await expect(
-      controller.create({
-        nws: validNws,
-        options: {
-          useLivePricing: false,
+      controller.create(
+        {
+          nws: validNws,
+          options: {
+            useLivePricing: false,
+          },
         },
-      }),
+        {
+          ip: '127.0.0.1',
+          headers: {},
+        },
+        response,
+      ),
     ).resolves.toEqual(comparisonResult);
     expect(service.createComparison).toHaveBeenCalledWith(validNws, {
       useLivePricing: false,
     });
+    expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
   });
 
   it('GET /comparisons/:id returns a previous snapshot', async () => {
@@ -404,6 +420,10 @@ describe('API contracts', () => {
       'quarterly',
       'reserved-3yr',
       response,
+      {
+        ip: '127.0.0.1',
+        headers: {},
+      },
     );
 
     expect(file.getHeaders()).toEqual({
@@ -413,6 +433,7 @@ describe('API contracts', () => {
       length: expect.any(Number),
     });
     expect(response.header).toHaveBeenCalledWith('Content-Type', 'text/csv');
+    expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
     expect(response.header).toHaveBeenCalledWith(
       'Content-Disposition',
       'attachment; filename="polycost-comparison-11111111-1111-4111-8111-111111111111.csv"',
@@ -428,11 +449,19 @@ describe('API contracts', () => {
     };
 
     await expect(
-      controller.createExportJob(comparisonResult.comparisonId, {
-        format: 'pdf',
-        interval: 'monthly',
-        pricingModel: 'on-demand',
-      }),
+      controller.createExportJob(
+        comparisonResult.comparisonId,
+        {
+          format: 'pdf',
+          interval: 'monthly',
+          pricingModel: 'on-demand',
+        },
+        {
+          ip: '127.0.0.1',
+          headers: {},
+        },
+        response,
+      ),
     ).resolves.toEqual(exportJobResponse);
     expect(exportJobs.createExportJob).toHaveBeenCalledWith(comparisonResult.comparisonId, 'pdf', {
       interval: 'monthly',
@@ -446,6 +475,10 @@ describe('API contracts', () => {
       comparisonResult.comparisonId,
       exportJobResponse.jobId,
       response,
+      {
+        ip: '127.0.0.2',
+        headers: {},
+      },
     );
 
     expect(file.getHeaders()).toEqual({
@@ -776,6 +809,63 @@ describe('API contracts', () => {
     await controller.parse({ naturalLanguageInput: 'web app' }, request);
     await controller.parse({ naturalLanguageInput: 'web app' }, request);
     await expect(controller.parse({ naturalLanguageInput: 'web app' }, request)).rejects.toThrow(
+      RateLimitExceededError,
+    );
+  });
+
+  it('rate limits comparison, export, and share-link generation by identity', async () => {
+    const identity = {
+      ip: '203.0.113.42',
+      headers: {},
+    };
+    const response = {
+      header: jest.fn(),
+    };
+    const comparisonController = comparisonsController(comparisonApplicationService());
+    const shareLinksController = new ShareLinksController(
+      costManagementService(),
+      new ApiRateLimitService(() => 0),
+      configService,
+    );
+
+    await comparisonController.create({ nws: validNws }, identity, response);
+    await comparisonController.create({ nws: validNws }, identity, response);
+    await expect(
+      comparisonController.create({ nws: validNws }, identity, response),
+    ).rejects.toThrow(RateLimitExceededError);
+
+    await comparisonController.createExportJob(
+      comparisonResult.comparisonId,
+      {
+        format: 'pdf',
+      },
+      identity,
+      response,
+    );
+    await comparisonController.createExportJob(
+      comparisonResult.comparisonId,
+      {
+        format: 'pdf',
+      },
+      identity,
+      response,
+    );
+    await expect(
+      comparisonController.createExportJob(
+        comparisonResult.comparisonId,
+        {
+          format: 'pdf',
+        },
+        identity,
+        response,
+      ),
+    ).rejects.toThrow(RateLimitExceededError);
+
+    const shareLinkBody = { workloadId: workloadRecord.id, expiresInDays: 30 };
+
+    await shareLinksController.create(shareLinkBody, identity, response);
+    await shareLinksController.create(shareLinkBody, identity, response);
+    expect(() => shareLinksController.create(shareLinkBody, identity, response)).toThrow(
       RateLimitExceededError,
     );
   });

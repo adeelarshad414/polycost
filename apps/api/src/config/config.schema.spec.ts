@@ -24,6 +24,11 @@ describe('config schema', () => {
     expect(config.PRICING_ETL_DEFAULT_REGION_AWS).toBe('us-east-1');
     expect(config.PRICING_ETL_DEFAULT_REGION_AZURE).toBe('eastus');
     expect(config.PRICING_ETL_DEFAULT_REGION_GCP).toBe('us-central1');
+    expect(config.RATE_LIMIT_COMPARISON_PER_MINUTE).toBe(30);
+    expect(config.RATE_LIMIT_EXPORT_PER_MINUTE).toBe(10);
+    expect(config.RATE_LIMIT_SHARE_LINK_PER_MINUTE).toBe(20);
+    expect(config.RATE_LIMIT_PUBLIC_READ_PER_MINUTE).toBe(60);
+    expect(config.RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE).toBe(30);
     expect(config.NL_PARSE_MAX_INPUT_CHARS).toBe(4000);
     expect(config.FEATURE_RESERVED_PRICING).toBe(true);
   });

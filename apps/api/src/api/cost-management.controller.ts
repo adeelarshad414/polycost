@@ -1,5 +1,7 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { HOURS_PER_MONTH } from '../cost-time';
+import { AppConfig } from '../config/config.schema';
 import {
   providerRegionsForCanonicalRegion,
   supportedCanonicalRegions,
@@ -15,11 +17,24 @@ import {
   StoragePricingTier,
   WorkloadInput,
 } from './cost-management.types';
+import {
+  ApiRateLimitService,
+  RateLimitHeaderResponse,
+  requestIdentity,
+  writeRateLimitHeaders,
+} from './rate-limit.service';
 
 type QueryValue = string | string[] | undefined;
 interface RequestLike {
+  ip?: string;
   headers?: Record<string, unknown>;
 }
+
+type PublicRateLimitConfigKey =
+  | 'RATE_LIMIT_COMPARISON_PER_MINUTE'
+  | 'RATE_LIMIT_SHARE_LINK_PER_MINUTE'
+  | 'RATE_LIMIT_PUBLIC_READ_PER_MINUTE'
+  | 'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE';
 
 const INSTANCE_FAMILIES = [
   'general-purpose',
@@ -40,15 +55,45 @@ const PRICING_TERMS: CachedPricingTerm[] = [
 
 @Controller('api/v1/pricing')
 export class CachedPricingController {
-  constructor(private readonly costManagementService: CostManagementService) {}
+  constructor(
+    private readonly costManagementService: CostManagementService,
+    private readonly apiRateLimitService: ApiRateLimitService = new ApiRateLimitService(),
+    private readonly configService?: ConfigService<AppConfig, true>,
+  ) {}
 
   @Get('compare')
-  compare(@Query() query: Record<string, QueryValue>) {
+  compare(
+    @Query() query: Record<string, QueryValue>,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'pricing_compare',
+      request,
+      response,
+      'RATE_LIMIT_COMPARISON_PER_MINUTE',
+    );
+
     return this.costManagementService.compareCachedPricing(parseCompareQuery(query));
   }
 
   @Get('breakdown')
-  breakdown(@Query() query: Record<string, QueryValue>) {
+  breakdown(
+    @Query() query: Record<string, QueryValue>,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'pricing_breakdown',
+      request,
+      response,
+      'RATE_LIMIT_COMPARISON_PER_MINUTE',
+    );
+
     const workloadId = parseRequiredString(query.workloadId, 'workloadId');
     const term = parsePricingTerm(query.term);
 
@@ -63,62 +108,174 @@ export class CachedPricingController {
 
 @Controller('api/v1/workloads')
 export class WorkloadsController {
-  constructor(private readonly costManagementService: CostManagementService) {}
+  constructor(
+    private readonly costManagementService: CostManagementService,
+    private readonly apiRateLimitService: ApiRateLimitService = new ApiRateLimitService(),
+    private readonly configService?: ConfigService<AppConfig, true>,
+  ) {}
 
   @Post()
-  create(@Body() body: unknown) {
+  create(
+    @Body() body: unknown,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'workload_create',
+      request,
+      response,
+      'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE',
+    );
+
     return this.costManagementService.createWorkload(parseWorkloadInput(body));
   }
 }
 
 @Controller('api/v1/budgets')
 export class BudgetsController {
-  constructor(private readonly costManagementService: CostManagementService) {}
+  constructor(
+    private readonly costManagementService: CostManagementService,
+    private readonly apiRateLimitService: ApiRateLimitService = new ApiRateLimitService(),
+    private readonly configService?: ConfigService<AppConfig, true>,
+  ) {}
 
   @Post()
-  create(@Body() body: unknown) {
+  create(
+    @Body() body: unknown,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'budget_create',
+      request,
+      response,
+      'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE',
+    );
+
     return this.costManagementService.createBudget(parseBudgetInput(body));
   }
 }
 
 @Controller('api/v1/alerts')
 export class AlertsController {
-  constructor(private readonly costManagementService: CostManagementService) {}
+  constructor(
+    private readonly costManagementService: CostManagementService,
+    private readonly apiRateLimitService: ApiRateLimitService = new ApiRateLimitService(),
+    private readonly configService?: ConfigService<AppConfig, true>,
+  ) {}
 
   @Get()
-  list(@Query('workloadId') workloadId?: QueryValue) {
+  list(
+    @Query('workloadId') workloadId?: QueryValue,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'alerts_list',
+      request,
+      response,
+      'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
+    );
+
     return this.costManagementService.listAlerts(optionalSingleString(workloadId));
   }
 
   @Patch(':id')
-  update(@Param('id') alertId: string, @Body() body: unknown) {
+  update(
+    @Param('id') alertId: string,
+    @Body() body: unknown,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'alert_update',
+      request,
+      response,
+      'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE',
+    );
+
     return this.costManagementService.updateAlertDismissed(alertId, parseDismissedUpdate(body));
   }
 }
 
 @Controller('api/v1/share-links')
 export class ShareLinksController {
-  constructor(private readonly costManagementService: CostManagementService) {}
+  constructor(
+    private readonly costManagementService: CostManagementService,
+    private readonly apiRateLimitService: ApiRateLimitService = new ApiRateLimitService(),
+    private readonly configService?: ConfigService<AppConfig, true>,
+  ) {}
 
   @Post()
-  create(@Body() body: unknown) {
+  create(
+    @Body() body: unknown,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'share_link_create',
+      request,
+      response,
+      'RATE_LIMIT_SHARE_LINK_PER_MINUTE',
+    );
+
     return this.costManagementService.createShareLink(parseShareLinkInput(body));
   }
 
   @Post(':token/revoke')
-  revoke(@Param('token') token: string) {
+  revoke(
+    @Param('token') token: string,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'share_link_revoke',
+      request,
+      response,
+      'RATE_LIMIT_SHARE_LINK_PER_MINUTE',
+    );
+
     return this.costManagementService.revokeShareLink(token);
   }
 
   @Get(':token/analytics')
-  analytics(@Param('token') token: string) {
+  analytics(
+    @Param('token') token: string,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'share_link_analytics',
+      request,
+      response,
+      'RATE_LIMIT_SHARE_LINK_PER_MINUTE',
+    );
+
     return this.costManagementService.getShareLinkAnalytics(token);
   }
 }
 
 @Controller('api/v1/share')
 export class SharedReportsController {
-  constructor(private readonly costManagementService: CostManagementService) {}
+  constructor(
+    private readonly costManagementService: CostManagementService,
+    private readonly apiRateLimitService: ApiRateLimitService = new ApiRateLimitService(),
+    private readonly configService?: ConfigService<AppConfig, true>,
+  ) {}
 
   @Get(':token')
   get(
@@ -126,7 +283,17 @@ export class SharedReportsController {
     @Query('password') password: QueryValue,
     @Query('section') section: QueryValue,
     @Req() request: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'shared_report_get',
+      request,
+      response,
+      'RATE_LIMIT_SHARE_LINK_PER_MINUTE',
+    );
+
     return this.costManagementService.getSharedReport(token, optionalSingleString(password), {
       countryCode: countryCodeFromHeaders(request.headers ?? {}),
       section: optionalSingleString(section) ?? 'summary',
@@ -137,11 +304,54 @@ export class SharedReportsController {
 
 @Controller('api/v1/exchange-rates')
 export class ExchangeRatesController {
-  constructor(private readonly costManagementService: CostManagementService) {}
+  constructor(
+    private readonly costManagementService: CostManagementService,
+    private readonly apiRateLimitService: ApiRateLimitService = new ApiRateLimitService(),
+    private readonly configService?: ConfigService<AppConfig, true>,
+  ) {}
 
   @Get()
-  get(@Query('base') base?: QueryValue) {
+  get(
+    @Query('base') base?: QueryValue,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'exchange_rates_get',
+      request,
+      response,
+      'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
+    );
+
     return this.costManagementService.getExchangeRates(parseCurrency(base ?? 'USD', 'base'));
+  }
+}
+
+function consumePublicRateLimit(
+  apiRateLimitService: ApiRateLimitService,
+  configService: ConfigService<AppConfig, true> | undefined,
+  scope: string,
+  request: RequestLike | undefined,
+  response: RateLimitHeaderResponse | undefined,
+  configKey: PublicRateLimitConfigKey,
+): void {
+  const limit = configService?.get(configKey, { infer: true }) ?? defaultRateLimitFor(configKey);
+  const state = apiRateLimitService.consume(scope, requestIdentity(request ?? {}), limit);
+  writeRateLimitHeaders(response, state);
+}
+
+function defaultRateLimitFor(configKey: PublicRateLimitConfigKey): number {
+  switch (configKey) {
+    case 'RATE_LIMIT_COMPARISON_PER_MINUTE':
+      return 30;
+    case 'RATE_LIMIT_SHARE_LINK_PER_MINUTE':
+      return 20;
+    case 'RATE_LIMIT_PUBLIC_READ_PER_MINUTE':
+      return 60;
+    case 'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE':
+      return 30;
   }
 }
 

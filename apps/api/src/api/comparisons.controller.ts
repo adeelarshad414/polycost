@@ -43,10 +43,20 @@ export class ComparisonsController {
   ) {}
 
   @Post()
-  async create(@Body() body: unknown) {
-    const request = parseCreateComparisonRequest(body);
+  async create(
+    @Body() body: unknown,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: HeaderResponse,
+  ) {
+    this.consumeRateLimit(
+      'comparison_create',
+      request,
+      response,
+      'RATE_LIMIT_COMPARISON_PER_MINUTE',
+    );
+    const parsed = parseCreateComparisonRequest(body);
 
-    return this.comparisonApplicationService.createComparison(request.nws, request.options);
+    return this.comparisonApplicationService.createComparison(parsed.nws, parsed.options);
   }
 
   @Get(':id')
@@ -70,7 +80,9 @@ export class ComparisonsController {
     @Query('interval') intervalQuery: unknown,
     @Query('pricingModel') pricingModelQuery: unknown,
     @Res({ passthrough: true }) response: HeaderResponse,
+    @Req() request?: RequestLike,
   ): Promise<StreamableFile> {
+    this.consumeRateLimit('comparison_export', request, response, 'RATE_LIMIT_EXPORT_PER_MINUTE');
     const format = parseReportFormat(formatQuery);
     const options = {
       interval: parseReportInterval(intervalQuery),
@@ -98,13 +110,24 @@ export class ComparisonsController {
   }
 
   @Post(':id/export-jobs')
-  async createExportJob(@Param('id') comparisonId: string, @Body() body: unknown) {
-    const request = parseCreateExportJobRequest(body);
+  async createExportJob(
+    @Param('id') comparisonId: string,
+    @Body() body: unknown,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: HeaderResponse,
+  ) {
+    this.consumeRateLimit(
+      'comparison_export_job_create',
+      request,
+      response,
+      'RATE_LIMIT_EXPORT_PER_MINUTE',
+    );
+    const parsed = parseCreateExportJobRequest(body);
 
     return this.reportExportJobsService.createExportJob(
       comparisonId,
-      request.format,
-      request.options,
+      parsed.format,
+      parsed.options,
     );
   }
 
@@ -118,7 +141,14 @@ export class ComparisonsController {
     @Param('id') comparisonId: string,
     @Param('jobId') jobId: string,
     @Res({ passthrough: true }) response: HeaderResponse,
+    @Req() request?: RequestLike,
   ): Promise<StreamableFile> {
+    this.consumeRateLimit(
+      'comparison_export_job_download',
+      request,
+      response,
+      'RATE_LIMIT_EXPORT_PER_MINUTE',
+    );
     const report = await this.reportExportJobsService.downloadExportJob(comparisonId, jobId);
     const fileName = report.fileName.replace(/"/g, '');
     const disposition = `attachment; filename="${fileName}"`;
@@ -150,6 +180,20 @@ export class ComparisonsController {
       comparisonId,
       this.configService.get('FEATURE_LIVE_PRICING_REFRESH_ENABLED', { infer: true }),
     );
+  }
+
+  private consumeRateLimit(
+    scope: string,
+    request: RequestLike | undefined,
+    response: HeaderResponse | undefined,
+    configKey: 'RATE_LIMIT_COMPARISON_PER_MINUTE' | 'RATE_LIMIT_EXPORT_PER_MINUTE',
+  ): void {
+    const rateLimit = this.apiRateLimitService.consume(
+      scope,
+      requestIdentity(request ?? {}),
+      this.configService.get(configKey, { infer: true }),
+    );
+    writeRateLimitHeaders(response, rateLimit);
   }
 }
 

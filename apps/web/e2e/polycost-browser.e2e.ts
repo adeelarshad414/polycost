@@ -6,6 +6,7 @@ import type {
   ReportExportJobResponse,
   ReportFormat,
 } from '../src/types';
+import { HOURS_PER_MONTH } from '../src/cost-time';
 
 test('persists light and dark theme choices across reloads', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
@@ -305,7 +306,7 @@ function provider(
   monthly: number,
   lineItems: ComparisonResult['providers'][number]['lineItems'],
 ): ComparisonResult['providers'][number] {
-  const hourly = round(monthly / 730);
+  const hourly = round(monthly / HOURS_PER_MONTH);
 
   return {
     providerId,
@@ -329,7 +330,7 @@ function provider(
         model: 'reserved-3yr',
         available: true,
         monthlyCostUsd: round(monthly * 0.68),
-        hourlyCostUsd: round((monthly * 0.68) / 730),
+        hourlyCostUsd: round((monthly * 0.68) / HOURS_PER_MONTH),
         caveat: 'Modeled three-year commitment.',
       },
     ],
@@ -370,11 +371,11 @@ function lineItem(
     category,
     description,
     isApproximate,
-    baseHourlyCostUsd: round(monthly / 730),
+    baseHourlyCostUsd: round(monthly / HOURS_PER_MONTH),
     baseMonthlyCostUsd: monthly,
     region,
     unit: 'hour',
-    unitPriceUsd: round(monthly / 730),
+    unitPriceUsd: round(monthly / HOURS_PER_MONTH),
   };
 }
 
