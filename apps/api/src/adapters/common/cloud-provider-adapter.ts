@@ -17,6 +17,7 @@ export type PricingModelKey =
 export type PricingBasis = 'flat' | 'tiered';
 export type PricingVolatility = 'stable' | 'variable' | 'volatile';
 export type PricingSource = 'catalog' | 'modeled-estimate';
+export type RateSource = 'pricing_catalog' | 'pricing_rates' | 'modeled_estimate' | 'manual_model';
 
 export interface EgressTierBreakdown {
   tierFromGb: number;
@@ -71,6 +72,13 @@ export interface ProviderPricingLineItem {
   unit: string;
   unitPriceUsd: number;
   pricingBasis?: PricingBasis;
+  rateSource?: RateSource;
+  rateSourceSkuId?: string;
+  pricingTermCode?: string;
+  paymentOptionCode?: string;
+  rateCurrency?: string;
+  rateValidFrom?: string;
+  rateSourceFetchedAt?: string;
   egressTiers?: EgressTierBreakdown[];
   pricingModels?: PricingModelCost[];
 }

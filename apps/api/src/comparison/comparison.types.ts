@@ -5,6 +5,7 @@ import {
   PricingModelKey,
   PricingModelCost,
   ProviderId,
+  RateSource,
   ServiceCategory,
 } from '../adapters/common/cloud-provider-adapter';
 import {
@@ -35,6 +36,13 @@ export interface ComparisonLineItem {
   unit?: string;
   unitPriceUsd?: number;
   pricingBasis?: PricingBasis;
+  rateSource?: RateSource;
+  rateSourceSkuId?: string;
+  pricingTermCode?: string;
+  paymentOptionCode?: string;
+  rateCurrency?: string;
+  rateValidFrom?: string;
+  rateSourceFetchedAt?: string;
   egressTiers?: EgressTierBreakdown[];
   pricingModels?: PricingModelCost[];
 }

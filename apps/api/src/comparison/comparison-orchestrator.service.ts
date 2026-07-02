@@ -266,6 +266,13 @@ export class ComparisonOrchestratorService {
         unit: annotatedLineItem.unit,
         unitPriceUsd: annotatedLineItem.unitPriceUsd,
         pricingBasis: annotatedLineItem.pricingBasis ?? 'flat',
+        rateSource: annotatedLineItem.rateSource,
+        rateSourceSkuId: annotatedLineItem.rateSourceSkuId,
+        pricingTermCode: annotatedLineItem.pricingTermCode,
+        paymentOptionCode: annotatedLineItem.paymentOptionCode,
+        rateCurrency: annotatedLineItem.rateCurrency,
+        rateValidFrom: annotatedLineItem.rateValidFrom,
+        rateSourceFetchedAt: annotatedLineItem.rateSourceFetchedAt,
         ...(annotatedLineItem.egressTiers ? { egressTiers: annotatedLineItem.egressTiers } : {}),
         ...(annotatedLineItem.pricingModels
           ? { pricingModels: this.normalizePricingModels(annotatedLineItem.pricingModels) }

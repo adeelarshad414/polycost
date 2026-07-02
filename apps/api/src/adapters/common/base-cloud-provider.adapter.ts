@@ -528,6 +528,16 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       typeof record.attributes?.regionFallbackFrom === 'string'
         ? record.attributes.regionFallbackFrom
         : record.region;
+    const pricingTermCode =
+      typeof record.attributes?.pricingModel === 'string'
+        ? record.attributes.pricingModel
+        : undefined;
+    const paymentOptionCode =
+      typeof record.attributes?.upfrontOption === 'string'
+        ? record.attributes.upfrontOption
+        : undefined;
+    const rateCurrency =
+      typeof record.attributes?.currencyCode === 'string' ? record.attributes.currencyCode : 'USD';
 
     return {
       category,
@@ -541,6 +551,13 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       unit: record.unit,
       unitPriceUsd: record.unitPriceUsd,
       pricingBasis: cost.pricingBasis,
+      rateSource: 'pricing_catalog',
+      rateSourceSkuId: record.skuId,
+      ...(pricingTermCode ? { pricingTermCode } : {}),
+      ...(paymentOptionCode ? { paymentOptionCode } : {}),
+      rateCurrency,
+      rateValidFrom: record.effectiveDate,
+      rateSourceFetchedAt: record.fetchedAt,
       ...(cost.egressTiers && cost.egressTiers.length > 0 ? { egressTiers: cost.egressTiers } : {}),
       ...(options.pricingModels ? { pricingModels: options.pricingModels } : {}),
     };
