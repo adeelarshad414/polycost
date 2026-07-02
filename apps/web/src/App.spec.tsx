@@ -564,6 +564,8 @@ describe('App', () => {
       interval: 'hourly',
       pricingModel: 'reserved-1yr',
     });
+    expect(text(container)).toContain('PDF report generated and downloaded.');
+    expect(buttonByText(container, 'PDF downloaded')).toBeInstanceOf(HTMLButtonElement);
 
     expect(detailGate.dataset.open).toBe('true');
     expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);

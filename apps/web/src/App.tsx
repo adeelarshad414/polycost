@@ -688,6 +688,7 @@ export function App({ client = polyCostClient }: AppProps) {
   );
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [exportingFormat, setExportingFormat] = useState<ReportFormat | null>(null);
+  const [completedExportFormat, setCompletedExportFormat] = useState<ReportFormat | null>(null);
   const [isEditingRequirements, setIsEditingRequirements] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1010,6 +1011,7 @@ export function App({ client = polyCostClient }: AppProps) {
     setNotice(null);
     setBusyAction('export');
     setExportingFormat(format);
+    setCompletedExportFormat(null);
 
     try {
       const blob = await client.exportComparison(comparison.comparisonId, format, {
@@ -1021,6 +1023,7 @@ export function App({ client = polyCostClient }: AppProps) {
       }
 
       downloadBlob(blob, `polycost-comparison-${comparison.comparisonId}.${format}`);
+      setCompletedExportFormat(format);
       setNotice(`${format.toUpperCase()} report generated and downloaded.`);
     } catch (exportError) {
       if (isCurrentAsyncAction(actionId)) {
@@ -1215,6 +1218,7 @@ export function App({ client = polyCostClient }: AppProps) {
           requirementsAwaitingReview={requirementsAwaitingReview}
           busyAction={busyAction}
           exportingFormat={exportingFormat}
+          completedExportFormat={completedExportFormat}
           notice={notice}
           error={error}
           naturalLanguageInput={naturalLanguageInput}
@@ -1955,6 +1959,7 @@ function ProgressiveComparisonPage({
   requirementsAwaitingReview,
   busyAction,
   exportingFormat,
+  completedExportFormat,
   notice,
   error,
   naturalLanguageInput,
@@ -1994,6 +1999,7 @@ function ProgressiveComparisonPage({
   requirementsAwaitingReview: boolean;
   busyAction: BusyAction;
   exportingFormat: ReportFormat | null;
+  completedExportFormat: ReportFormat | null;
   notice: string | null;
   error: string | null;
   naturalLanguageInput: string;
@@ -2066,6 +2072,7 @@ function ProgressiveComparisonPage({
               pricingModel={pricingModel}
               busyAction={busyAction}
               exportingFormat={exportingFormat}
+              completedExportFormat={completedExportFormat}
               onExport={onExport}
               onRefreshLive={onRefreshLive}
             />
@@ -2107,6 +2114,7 @@ function ProgressiveComparisonPage({
                   comparisonAnalytics={comparisonAnalytics}
                   error={error}
                   exportingFormat={exportingFormat}
+                  completedExportFormat={completedExportFormat}
                   form={submittedForm}
                   interval={interval}
                   pricingModel={pricingModel}
@@ -2260,6 +2268,7 @@ function ResultQuickActions({
   interval,
   pricingModel,
   busyAction,
+  completedExportFormat,
   exportingFormat,
   onExport,
   onRefreshLive,
@@ -2268,6 +2277,7 @@ function ResultQuickActions({
   interval: IntervalKey;
   pricingModel: PricingModelKey;
   busyAction: BusyAction;
+  completedExportFormat: ReportFormat | null;
   exportingFormat: ReportFormat | null;
   onExport: (format: ReportFormat) => void;
   onRefreshLive: () => void;
@@ -2300,6 +2310,7 @@ function ResultQuickActions({
       <div className="result-quick-actions-controls">
         <ExportBar
           disabled={busyAction !== null && busyAction !== 'export'}
+          completedExportFormat={completedExportFormat}
           exportingFormat={exportingFormat}
           onExport={onExport}
         />
@@ -2326,6 +2337,7 @@ function StateDetailContent({
   comparisonAnalytics,
   error,
   exportingFormat,
+  completedExportFormat,
   form,
   interval,
   pricingModel,
@@ -2341,6 +2353,7 @@ function StateDetailContent({
   comparisonAnalytics: ComparisonAnalyticsResponse | null;
   error: string | null;
   exportingFormat: ReportFormat | null;
+  completedExportFormat: ReportFormat | null;
   form: WorkloadFormState;
   interval: IntervalKey;
   pricingModel: PricingModelKey;
@@ -2428,6 +2441,7 @@ function StateDetailContent({
         <div className="progressive-export-panel">
           <ExportBar
             disabled={busyAction !== null && busyAction !== 'export'}
+            completedExportFormat={completedExportFormat}
             exportingFormat={exportingFormat}
             onExport={onExport}
           />
@@ -5813,10 +5827,12 @@ function CloudCalculatorLinks({ regionCatalog }: { regionCatalog: RegionCatalogR
 }
 
 function ExportBar({
+  completedExportFormat,
   disabled,
   exportingFormat,
   onExport,
 }: {
+  completedExportFormat?: ReportFormat | null;
   disabled: boolean;
   exportingFormat: ReportFormat | null;
   onExport: (format: ReportFormat) => void;
@@ -5826,6 +5842,7 @@ function ExportBar({
       {(['pdf', 'csv', 'xlsx'] as ReportFormat[]).map((format) => {
         const label = reportFormatLabel(format);
         const isExporting = exportingFormat === format;
+        const isCompleted = !exportingFormat && completedExportFormat === format;
 
         return (
           <Button
@@ -5838,7 +5855,7 @@ function ExportBar({
             onClick={() => onExport(format)}
           >
             <DownloadIcon />
-            {label}
+            {isCompleted ? `${label} downloaded` : label}
           </Button>
         );
       })}
