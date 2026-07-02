@@ -161,6 +161,8 @@ interface IntegrationServicesRates {
 
 type StorageClassKey = NonNullable<NormalizedWorkloadSpec['storage'][number]['storageClass']>;
 type WorkloadEnvironment = NonNullable<NormalizedWorkloadSpec['workloadProfile']>['environment'];
+type ComputeTenancy = NonNullable<NormalizedWorkloadSpec['compute'][number]['tenancy']>;
+type DedicatedComputeTenancy = Extract<ComputeTenancy, 'dedicated-host' | 'sole-tenant'>;
 
 export class ComparisonUnavailableError extends Error {
   constructor(readonly failures: ComparisonWarning[]) {
@@ -551,6 +553,7 @@ export class ComparisonOrchestratorService {
   ): ComparisonLineItem[] {
     const supportLineItem = this.supportLineItem(nws, providerId, lineItems);
     const licensingLineItem = this.licensingLineItem(nws, providerId);
+    const tenancyLineItem = this.tenancyLineItem(nws, providerId, lineItems);
     const resilienceLineItem = this.resilienceLineItem(nws, providerId, lineItems);
     const storageLineItems = this.storageDimensionLineItems(nws, providerId);
     const databaseLineItems = this.databaseDimensionLineItems(nws, providerId, lineItems);
@@ -564,6 +567,7 @@ export class ComparisonOrchestratorService {
     return [
       supportLineItem,
       licensingLineItem,
+      tenancyLineItem,
       resilienceLineItem,
       ...storageLineItems,
       ...databaseLineItems,
@@ -659,6 +663,165 @@ export class ComparisonOrchestratorService {
       unit: 'vCPU-hour',
       unitPriceUsd,
       pricingBasis: 'flat',
+    });
+  }
+
+  private tenancyLineItem(
+    nws: NormalizedWorkloadSpec,
+    providerId: ProviderId,
+    lineItems: ComparisonLineItem[],
+  ): ComparisonLineItem | undefined {
+    const dedicatedComponents = nws.compute.filter(
+      (component) => component.tenancy === 'dedicated-host' || component.tenancy === 'sole-tenant',
+    );
+
+    if (dedicatedComponents.length === 0) {
+      return undefined;
+    }
+
+    const componentsNeedingPremium = dedicatedComponents.filter(
+      (component) =>
+        !this.hasNativeTenancyCatalogCoverage(component.role, component.tenancy, lineItems),
+    );
+
+    if (componentsNeedingPremium.length === 0) {
+      return undefined;
+    }
+
+    const usageAdjustment = this.usageAdjustment(nws);
+    const monthlyHours = usageAdjustment?.monthlyHours ?? HOURS_PER_MONTH;
+    const resilienceMultiplier = this.resilienceCapacityProfile(nws).factor;
+    const sharedVcpuHourlyRate = tenancySharedVcpuHourlyRate(providerId);
+    let premiumMonthlyCostUsd = 0;
+    const densityNotes: string[] = [];
+
+    for (const component of componentsNeedingPremium) {
+      const tenancy = component.tenancy as DedicatedComputeTenancy;
+      const vcpu = component.vcpu ?? 2;
+      const quantity =
+        component.scalingType === 'autoscaling' && component.autoscalingRange
+          ? (component.autoscalingRange.min + component.autoscalingRange.max) / 2
+          : (component.instanceCount ?? 1);
+      const adjustedQuantity = quantity * resilienceMultiplier;
+      const instancesPerHost = Math.max(1, Math.floor(TENANCY_REFERENCE_HOST_VCPU / vcpu));
+      const hosts = Math.max(1, Math.ceil(adjustedQuantity / instancesPerHost));
+      const hostMonthlyCostUsd = hosts * tenancyHostMonthlyRate(providerId, tenancy);
+      const sharedBaselineMonthlyCostUsd =
+        vcpu * adjustedQuantity * monthlyHours * sharedVcpuHourlyRate;
+      const componentPremiumMonthlyCostUsd = Math.max(
+        0,
+        hostMonthlyCostUsd - sharedBaselineMonthlyCostUsd,
+      );
+
+      premiumMonthlyCostUsd += componentPremiumMonthlyCostUsd;
+      densityNotes.push(
+        `${component.role}: ${hosts} ${TENANCY_REFERENCE_HOST_VCPU}-vCPU host(s), ${instancesPerHost} instance(s)/host density`,
+      );
+    }
+
+    const monthlyCostUsd = this.roundCurrency(premiumMonthlyCostUsd);
+
+    if (monthlyCostUsd <= 0) {
+      return undefined;
+    }
+
+    const dominantTenancy = componentsNeedingPremium[0].tenancy as DedicatedComputeTenancy;
+
+    return this.normalizeLineItem({
+      category: 'compute',
+      costComponent: 'compute',
+      description: `${providerLabel(providerId)} ${computeTenancyLabel(
+        dominantTenancy,
+      )} tenancy premium estimate (${densityNotes.join('; ')})`,
+      isApproximate: true,
+      baseMonthlyCostUsd: monthlyCostUsd,
+      baseHourlyCostUsd: monthlyCostUsd / HOURS_PER_MONTH,
+      skuId: `modeled-compute-${dominantTenancy}-premium`,
+      unit: 'host-month premium',
+      unitPriceUsd: tenancyHostMonthlyRate(providerId, dominantTenancy),
+      pricingBasis: 'flat',
+      pricingModels: this.tenancyPricingModels(providerId, monthlyCostUsd),
+    });
+  }
+
+  private hasNativeTenancyCatalogCoverage(
+    role: string,
+    tenancy: ComputeTenancy | undefined,
+    lineItems: ComparisonLineItem[],
+  ): boolean {
+    if (tenancy !== 'dedicated-host' && tenancy !== 'sole-tenant') {
+      return false;
+    }
+
+    const rolePrefix = role.toLowerCase();
+
+    return lineItems.some((lineItem) => {
+      if (lineItem.costComponent !== 'compute' || lineItem.isApproximate) {
+        return false;
+      }
+
+      const descriptor = `${lineItem.description} ${lineItem.skuId ?? ''}`.toLowerCase();
+
+      return descriptor.includes(rolePrefix) && tenancyDescriptorMatches(descriptor, tenancy);
+    });
+  }
+
+  private tenancyPricingModels(providerId: ProviderId, monthlyCostUsd: number): PricingModelCost[] {
+    const models: Array<{
+      model: PricingModelKey;
+      factor: number;
+      caveat: string;
+    }> = [
+      {
+        model: 'on-demand',
+        factor: 1,
+        caveat: 'Modeled as incremental dedicated host / sole-tenant premium above shared compute.',
+      },
+      {
+        model: 'reserved-1yr',
+        factor: 0.82,
+        caveat:
+          'Planning estimate for one-year host reservation or committed-use discount coverage.',
+      },
+      {
+        model: 'reserved-3yr',
+        factor: 0.64,
+        caveat:
+          'Planning estimate for three-year host reservation or committed-use discount coverage.',
+      },
+      {
+        model: 'spot',
+        factor: 1,
+        caveat:
+          'Dedicated host and sole-tenant capacity is modeled without spot discount until provider-specific placement is validated.',
+      },
+      {
+        model: 'savings-plan',
+        factor: 0.86,
+        caveat:
+          'Planning estimate for eligible savings-plan or committed-use coverage; validate tenancy eligibility before purchase.',
+      },
+    ];
+
+    return models.map(({ model, factor, caveat }) => {
+      const modelMonthlyCostUsd = this.roundCurrency(monthlyCostUsd * factor);
+
+      return {
+        model,
+        available: true,
+        displayName: pricingModelDisplayName(model),
+        providerTerm: tenancyPricingProviderTerm(providerId, model),
+        source: 'modeled-estimate',
+        estimated: true,
+        volatility:
+          model === 'spot' ? 'volatile' : model === 'savings-plan' ? 'variable' : 'stable',
+        monthlyCostUsd: modelMonthlyCostUsd,
+        hourlyCostUsd: this.roundCurrency(modelMonthlyCostUsd / HOURS_PER_MONTH),
+        savingsPercentVsOnDemand: this.savingsPercent(modelMonthlyCostUsd, monthlyCostUsd),
+        ...(model === 'reserved-1yr' ? { commitmentTermMonths: 12 } : {}),
+        ...(model === 'reserved-3yr' ? { commitmentTermMonths: 36 } : {}),
+        caveat,
+      };
     });
   }
 
@@ -2737,6 +2900,99 @@ function providerLabel(providerId: ProviderId): string {
       return 'Azure';
     case 'gcp':
       return 'GCP';
+  }
+}
+
+const TENANCY_REFERENCE_HOST_VCPU = 64;
+
+function tenancyHostMonthlyRate(providerId: ProviderId, tenancy: DedicatedComputeTenancy): number {
+  switch (providerId) {
+    case 'aws':
+      return tenancy === 'sole-tenant' ? 2950 : 2950;
+    case 'azure':
+      return tenancy === 'sole-tenant' ? 3100 : 3100;
+    case 'gcp':
+      return tenancy === 'sole-tenant' ? 2850 : 2850;
+  }
+}
+
+function tenancySharedVcpuHourlyRate(providerId: ProviderId): number {
+  switch (providerId) {
+    case 'aws':
+      return 0.0208;
+    case 'azure':
+      return 0.0226;
+    case 'gcp':
+      return 0.02;
+  }
+}
+
+function computeTenancyLabel(tenancy: DedicatedComputeTenancy): string {
+  switch (tenancy) {
+    case 'dedicated-host':
+      return 'Dedicated host';
+    case 'sole-tenant':
+      return 'Sole-tenant';
+  }
+}
+
+function tenancyDescriptorMatches(descriptor: string, tenancy: DedicatedComputeTenancy): boolean {
+  if (tenancy === 'dedicated-host') {
+    return /dedicated[- ]?(host|instance|tenancy)/i.test(descriptor);
+  }
+
+  return /sole[- ]?tenant|single[- ]tenant/i.test(descriptor);
+}
+
+function pricingModelDisplayName(model: PricingModelKey): string {
+  switch (model) {
+    case 'on-demand':
+      return 'On-demand';
+    case 'reserved-1yr':
+      return 'Reserved 1 year';
+    case 'reserved-3yr':
+      return 'Reserved 3 year';
+    case 'spot':
+      return 'Spot';
+    case 'savings-plan':
+      return 'Savings / committed use';
+  }
+}
+
+function tenancyPricingProviderTerm(providerId: ProviderId, model: PricingModelKey): string {
+  switch (model) {
+    case 'on-demand':
+      return 'Dedicated capacity on-demand';
+    case 'reserved-1yr':
+      return tenancyCommitmentProviderTerm(providerId, 12);
+    case 'reserved-3yr':
+      return tenancyCommitmentProviderTerm(providerId, 36);
+    case 'spot':
+      return 'No spot discount modeled';
+    case 'savings-plan':
+      return tenancySavingsProviderTerm(providerId);
+  }
+}
+
+function tenancyCommitmentProviderTerm(providerId: ProviderId, months: 12 | 36): string {
+  switch (providerId) {
+    case 'aws':
+      return `Dedicated Host Reservation ${months / 12}yr`;
+    case 'azure':
+      return `Azure Dedicated Host reservation ${months / 12}yr`;
+    case 'gcp':
+      return `Sole-tenant committed use ${months / 12}yr`;
+  }
+}
+
+function tenancySavingsProviderTerm(providerId: ProviderId): string {
+  switch (providerId) {
+    case 'aws':
+      return 'Savings Plan eligibility estimate';
+    case 'azure':
+      return 'Azure savings plan eligibility estimate';
+    case 'gcp':
+      return 'Committed-use eligibility estimate';
   }
 }
 

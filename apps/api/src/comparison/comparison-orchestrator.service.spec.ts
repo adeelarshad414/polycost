@@ -656,6 +656,96 @@ describe('ComparisonOrchestratorService', () => {
     );
   });
 
+  it('adds modeled dedicated tenancy premiums when catalog compute falls back to shared capacity', async () => {
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async (): Promise<ProviderPricingResult> => ({
+          providerId: 'aws',
+          baseMonthlyCostUsd: 100,
+          lineItems: [
+            {
+              category: 'compute',
+              costComponent: 'compute',
+              description: 'web compute: AWS shared compute fallback',
+              isApproximate: true,
+              baseMonthlyCostUsd: 100,
+              skuId: 'aws-shared-compute',
+              region: 'us-east-1',
+              unit: 'hour',
+              unitPriceUsd: 0.137,
+              pricingBasis: 'flat',
+              pricingModels: [
+                { model: 'on-demand', available: true, monthlyCostUsd: 100 },
+                { model: 'reserved-1yr', available: true, monthlyCostUsd: 60 },
+                { model: 'reserved-3yr', available: true, monthlyCostUsd: 45 },
+                { model: 'spot', available: true, monthlyCostUsd: 35 },
+                { model: 'savings-plan', available: true, monthlyCostUsd: 58 },
+              ],
+            },
+          ],
+        })),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      compute: [
+        {
+          role: 'web',
+          vcpu: 4,
+          scalingType: 'fixed',
+          instanceCount: 3,
+          tenancy: 'dedicated-host',
+        },
+      ],
+    });
+
+    expect(result.providers[0].lineItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'compute',
+          costComponent: 'compute',
+          description: expect.stringContaining(
+            'AWS Dedicated host tenancy premium estimate (web: 1 64-vCPU host(s), 16 instance(s)/host density)',
+          ),
+          skuId: 'modeled-compute-dedicated-host-premium',
+          isApproximate: true,
+          baseMonthlyCostUsd: 2767.79,
+          pricingModels: expect.arrayContaining([
+            expect.objectContaining({
+              model: 'reserved-1yr',
+              available: true,
+              monthlyCostUsd: 2269.59,
+            }),
+            expect.objectContaining({
+              model: 'spot',
+              available: true,
+              monthlyCostUsd: 2767.79,
+            }),
+          ]),
+        }),
+      ]),
+    );
+    expect(result.providers[0].breakdown).toEqual(
+      expect.objectContaining({
+        computeMonthlyCostUsd: 2867.79,
+      }),
+    );
+    expect(result.providers[0].pricingModels).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          model: 'reserved-1yr',
+          available: true,
+        }),
+        expect.objectContaining({
+          model: 'savings-plan',
+          available: true,
+        }),
+      ]),
+    );
+  });
+
   it('uses provider-specific public support rate cards', async () => {
     const service = createService([
       adapter(
