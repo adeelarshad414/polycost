@@ -237,6 +237,70 @@ describe('App', () => {
     unmount();
   });
 
+  it('shows provider-specific stale pricing data health warnings', async () => {
+    const staleHealth: DataHealthResponse = {
+      generatedAt: '2026-07-02T00:00:00.000Z',
+      freshnessPolicyHours: 48,
+      overallStatus: 'stale',
+      alertCount: 1,
+      alerts: [
+        {
+          providerId: 'azure',
+          severity: 'warning',
+          message: 'Azure pricing data is 72 hours old; refresh before proposal use.',
+        },
+      ],
+      providers: [
+        {
+          providerId: 'aws',
+          status: 'success',
+          freshness: 'fresh',
+          ageHours: 1,
+          recordsUpdated: 12,
+          recordsRejected: 0,
+          recordsSkipped: 3,
+          cache: freshCacheSummary(30, 18),
+          message: 'AWS pricing cache is fresh.',
+        },
+        {
+          providerId: 'azure',
+          status: 'partial',
+          freshness: 'stale',
+          ageHours: 72,
+          recordsUpdated: 10,
+          recordsRejected: 0,
+          recordsSkipped: 2,
+          cache: { ...freshCacheSummary(24, 12), ageHours: 72, freshness: 'stale' },
+          message: 'Azure pricing cache is stale.',
+        },
+        {
+          providerId: 'gcp',
+          status: 'success',
+          freshness: 'fresh',
+          ageHours: 1,
+          recordsUpdated: 8,
+          recordsRejected: 0,
+          recordsSkipped: 1,
+          cache: freshCacheSummary(20, 12),
+          message: 'GCP pricing cache is fresh.',
+        },
+      ],
+    };
+    const client = clientMock({
+      getDataHealth: jest.fn(async () => staleHealth),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await settleAsyncEffects();
+
+    expect(text(container)).toContain('Azure stale (72h old) · refresh before final commitment');
+    expect(text(container)).toContain(
+      'Azure pricing data is 72 hours old; refresh before proposal use.',
+    );
+
+    unmount();
+  });
+
   it('adopts the backend pricing model recommendation after comparison', async () => {
     const recommendedResult: ComparisonResult = {
       ...comparisonResult,

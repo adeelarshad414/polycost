@@ -2551,11 +2551,8 @@ function DataHealthBanner({
   const tone = error ? 'degraded' : (health?.overallStatus ?? 'degraded');
   const currentRateRows =
     health?.providers.reduce((total, provider) => total + provider.cache.currentRateRows, 0) ?? 0;
-  const summary = error
-    ? 'Pricing data health unavailable'
-    : health?.overallStatus === 'fresh'
-      ? `Pricing cache fresh across ${health.providers.length} providers · ${currentRateRows} current rates`
-      : `${health?.alertCount ?? 0} pricing data alert${health?.alertCount === 1 ? '' : 's'}`;
+  const summary = dataHealthBannerSummary(health, error, currentRateRows);
+  const detail = dataHealthBannerDetail(health, error);
 
   return (
     <section
@@ -2569,12 +2566,7 @@ function DataHealthBanner({
       <div className="data-health-main">
         <span>Data health</span>
         <strong>{summary}</strong>
-        <small>
-          {error ??
-            `Freshness policy ${health?.freshnessPolicyHours ?? 48}h · generated ${formatDateTime(
-              health?.generatedAt,
-            )}`}
-        </small>
+        <small>{detail}</small>
       </div>
       {health ? (
         <div className="data-health-providers" aria-label="Provider data freshness">
@@ -2595,6 +2587,61 @@ function DataHealthBanner({
       ) : null}
     </section>
   );
+}
+
+function dataHealthBannerSummary(
+  health: DataHealthResponse | null,
+  error: string | null,
+  currentRateRows: number,
+): string {
+  if (error) {
+    return 'Pricing data health unavailable';
+  }
+
+  if (!health) {
+    return 'Pricing data health pending';
+  }
+
+  if (health.overallStatus === 'fresh') {
+    return `Pricing cache fresh across ${health.providers.length} providers · ${currentRateRows} current rates`;
+  }
+
+  const affectedProviders = health.providers.filter(
+    (provider) => provider.freshness !== 'fresh' || provider.status !== 'success',
+  );
+  const affectedSummary =
+    affectedProviders.length > 0
+      ? affectedProviders.map(dataHealthProviderIssueLabel).join(', ')
+      : `${health.alertCount} pricing data alert${health.alertCount === 1 ? '' : 's'}`;
+
+  return `${affectedSummary} · refresh before final commitment`;
+}
+
+function dataHealthBannerDetail(health: DataHealthResponse | null, error: string | null): string {
+  if (error) {
+    return error;
+  }
+
+  if (!health) {
+    return 'Waiting for pricing cache health.';
+  }
+
+  const firstAlert = health.alerts[0]?.message;
+
+  if (health.overallStatus !== 'fresh' && firstAlert) {
+    return firstAlert;
+  }
+
+  return `Freshness policy ${health.freshnessPolicyHours}h · generated ${formatDateTime(
+    health.generatedAt,
+  )}`;
+}
+
+function dataHealthProviderIssueLabel(provider: DataHealthResponse['providers'][number]): string {
+  const ageLabel =
+    provider.ageHours !== undefined ? `${provider.ageHours}h old` : provider.freshness;
+
+  return `${providerLabel(provider.providerId)} ${provider.freshness} (${ageLabel})`;
 }
 
 function RequirementsEditPanel({
