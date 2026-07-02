@@ -346,6 +346,30 @@ textarea:focus-visible {
   line-height: 1.55;
 }
 
+.initial-provider-badges {
+  display: flex;
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pc-space-1);
+  flex-wrap: wrap;
+}
+
+.initial-provider-badge {
+  min-height: 30px;
+  gap: 7px;
+  background: color-mix(in srgb, var(--color-bg-elevated) 88%, transparent);
+  padding-inline: 11px;
+}
+
+.provider-badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 12%, transparent);
+}
+
 .initial-home-form {
   display: grid;
   gap: var(--pc-space-2);

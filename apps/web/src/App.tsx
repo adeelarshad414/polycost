@@ -2,7 +2,7 @@ import { FormEvent, ReactNode, useEffect, useRef, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatApiError, PolyCostClient, PolyCostApiError, polyCostClient } from './api-client';
 import { POLYCOST_TAGLINE } from './brand';
-import { Button } from './components/Button';
+import { Button, ProviderBadge } from './components/Button';
 import { FinOpsFeatureLayer, SharedReportPlaceholder } from './components/FinOpsFeatureLayer';
 import { PersonaComparisonWorkspace } from './components/PersonaComparisonWorkspace';
 import { ThemeSwitcher } from './components/ThemeSwitcher';
@@ -1509,7 +1509,21 @@ function InitialHomePage({
     <section className="initial-home" id="requirements" aria-labelledby="page-title">
       <div className="initial-home-brand">
         <h1 id="page-title">{POLYCOST_TAGLINE}</h1>
-        <p>Enter the core workload shape, then compare AWS, Azure, and GCP side by side.</p>
+        <p>Compare AWS, Azure, and GCP costs — instantly.</p>
+        <div className="initial-provider-badges" aria-label="Supported cloud providers">
+          <ProviderBadge provider="aws" className="initial-provider-badge">
+            <span className="provider-badge-dot" aria-hidden="true" />
+            AWS
+          </ProviderBadge>
+          <ProviderBadge provider="azure" className="initial-provider-badge">
+            <span className="provider-badge-dot" aria-hidden="true" />
+            Azure
+          </ProviderBadge>
+          <ProviderBadge provider="gcp" className="initial-provider-badge">
+            <span className="provider-badge-dot" aria-hidden="true" />
+            GCP
+          </ProviderBadge>
+        </div>
       </div>
 
       <div className="initial-home-form" aria-label="Compare cloud costs">
