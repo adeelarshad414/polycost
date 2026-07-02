@@ -59,6 +59,7 @@ interface NetworkDimensionRates {
   interRegionPerGb: number;
   cdnViewerPerGb: number;
   cdnOriginPerGb: number;
+  cdnRequestPerMillion: number;
   natHourly: number;
   natPerGb: number;
   dnsZoneMonthly: number;
@@ -908,28 +909,66 @@ export class ComparisonOrchestratorService {
       );
     }
 
-    if (network.cdn && network.cdnTrafficGb && network.cdnTrafficGb > 0) {
+    if (
+      network.cdn &&
+      ((network.cdnTrafficGb && network.cdnTrafficGb > 0) ||
+        (network.cdnRequestsMillion && network.cdnRequestsMillion > 0))
+    ) {
       const cacheHitRatio = network.cdnCacheHitRatioPercent ?? 85;
-      const originMissGb = network.cdnTrafficGb * ((100 - cacheHitRatio) / 100);
-      const monthlyCostUsd = this.roundCurrency(
-        network.cdnTrafficGb * rates.cdnViewerPerGb + originMissGb * rates.cdnOriginPerGb,
-      );
+      const viewerTrafficGb = network.cdnTrafficGb ?? 0;
+      const originMissGb = viewerTrafficGb * ((100 - cacheHitRatio) / 100);
+      const edgeRequestsMillion = network.cdnRequestsMillion ?? 0;
 
-      lineItems.push(
-        this.networkLineItem({
-          providerId,
-          regionLabel,
-          skuId: 'modeled-cdn-delivery',
-          description: `${providerLabel(
+      if (viewerTrafficGb > 0) {
+        lineItems.push(
+          this.networkLineItem({
             providerId,
-          )} CDN delivery estimate (${Math.round(cacheHitRatio)}% cache hit, ${this.roundCurrency(
-            originMissGb,
-          )} GB origin miss)`,
-          monthlyCostUsd,
-          unit: 'month',
-          unitPriceUsd: monthlyCostUsd,
-        }),
-      );
+            regionLabel,
+            skuId: 'modeled-cdn-viewer-transfer',
+            description: `${providerLabel(
+              providerId,
+            )} CDN viewer data transfer estimate (${Math.round(cacheHitRatio)}% cache hit)`,
+            quantity: viewerTrafficGb,
+            unit: 'GB to viewers',
+            unitPriceUsd: rates.cdnViewerPerGb,
+          }),
+        );
+      }
+
+      if (originMissGb > 0) {
+        lineItems.push(
+          this.networkLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-cdn-origin-transfer',
+            description: `${providerLabel(
+              providerId,
+            )} CDN origin miss transfer estimate (${Math.round(
+              cacheHitRatio,
+            )}% cache hit, ${this.roundCurrency(originMissGb)} GB origin miss)`,
+            quantity: originMissGb,
+            unit: 'GB from origin',
+            unitPriceUsd: rates.cdnOriginPerGb,
+          }),
+        );
+      }
+
+      if (edgeRequestsMillion > 0) {
+        lineItems.push(
+          this.networkLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-cdn-edge-requests',
+            description: `${providerLabel(
+              providerId,
+            )} CDN edge request estimate (${this.roundCurrency(edgeRequestsMillion)}M requests)`,
+            quantity: edgeRequestsMillion,
+            unit: '1M requests',
+            unitPriceUsd: rates.cdnRequestPerMillion,
+            costComponent: 'networking',
+          }),
+        );
+      }
     }
 
     if ((network.natGatewayGb && network.natGatewayGb > 0) || network.natGatewayHours) {
@@ -2937,6 +2976,7 @@ export class ComparisonOrchestratorService {
                 estimatedMonthlyEgressGb: nws.network.estimatedMonthlyEgressGb ?? 0,
                 cdnTrafficGb: nws.network.cdnTrafficGb ?? 0,
                 cdnCacheHitRatioPercent: nws.network.cdnCacheHitRatioPercent ?? 85,
+                cdnRequestsMillion: nws.network.cdnRequestsMillion ?? 0,
               },
             },
           ]
@@ -4027,6 +4067,7 @@ function networkDimensionRates(providerId: ProviderId): NetworkDimensionRates {
         interRegionPerGb: 0.02,
         cdnViewerPerGb: 0.085,
         cdnOriginPerGb: 0.01,
+        cdnRequestPerMillion: 0.75,
         natHourly: 0.045,
         natPerGb: 0.045,
         dnsZoneMonthly: 0.5,
@@ -4045,6 +4086,7 @@ function networkDimensionRates(providerId: ProviderId): NetworkDimensionRates {
         interRegionPerGb: 0.02,
         cdnViewerPerGb: 0.081,
         cdnOriginPerGb: 0.01,
+        cdnRequestPerMillion: 0.75,
         natHourly: 0.045,
         natPerGb: 0.045,
         dnsZoneMonthly: 0.5,
@@ -4063,6 +4105,7 @@ function networkDimensionRates(providerId: ProviderId): NetworkDimensionRates {
         interRegionPerGb: 0.02,
         cdnViewerPerGb: 0.08,
         cdnOriginPerGb: 0.01,
+        cdnRequestPerMillion: 0.75,
         natHourly: 0.0014,
         natPerGb: 0.045,
         dnsZoneMonthly: 0.2,

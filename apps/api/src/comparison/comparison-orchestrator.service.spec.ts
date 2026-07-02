@@ -845,6 +845,7 @@ describe('ComparisonOrchestratorService', () => {
         cdn: true,
         cdnTrafficGb: 1000,
         cdnCacheHitRatioPercent: 80,
+        cdnRequestsMillion: 20,
         natGatewayGb: 500,
         natGatewayHours: 730,
         dnsHostedZones: 2,
@@ -880,9 +881,21 @@ describe('ComparisonOrchestratorService', () => {
         }),
         expect.objectContaining({
           costComponent: 'egress',
-          skuId: 'modeled-cdn-delivery',
+          skuId: 'modeled-cdn-viewer-transfer',
           description: expect.stringContaining('80% cache hit'),
-          baseMonthlyCostUsd: 87,
+          baseMonthlyCostUsd: 85,
+        }),
+        expect.objectContaining({
+          costComponent: 'egress',
+          skuId: 'modeled-cdn-origin-transfer',
+          description: expect.stringContaining('80% cache hit'),
+          baseMonthlyCostUsd: 2,
+        }),
+        expect.objectContaining({
+          costComponent: 'networking',
+          skuId: 'modeled-cdn-edge-requests',
+          description: expect.stringContaining('20M requests'),
+          baseMonthlyCostUsd: 15,
         }),
         expect.objectContaining({
           costComponent: 'networking',
@@ -920,7 +933,7 @@ describe('ComparisonOrchestratorService', () => {
       ]),
     );
     expect(result.providers[0].breakdown?.egressMonthlyCostUsd).toBe(87);
-    expect(result.providers[0].breakdown?.networkingMonthlyCostUsd).toBe(520.5);
+    expect(result.providers[0].breakdown?.networkingMonthlyCostUsd).toBe(535.5);
   });
 
   it('adds explicit modeled storage dimension line items when advanced storage assumptions exist', async () => {

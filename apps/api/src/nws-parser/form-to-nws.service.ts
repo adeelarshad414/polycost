@@ -47,6 +47,9 @@ export class FormToNWSService {
         ...(isNumber(formInput.network?.cdnCacheHitRatioPercent)
           ? { cdnCacheHitRatioPercent: formInput.network.cdnCacheHitRatioPercent }
           : {}),
+        ...(isNumber(formInput.network?.cdnRequestsMillion)
+          ? { cdnRequestsMillion: formInput.network.cdnRequestsMillion }
+          : {}),
         ...(isNumber(formInput.network?.natGatewayGb)
           ? { natGatewayGb: formInput.network.natGatewayGb }
           : {}),

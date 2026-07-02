@@ -3919,6 +3919,14 @@ function WorkloadForm({
             onChange={(value) => update('cdnCacheHitRatioPercent', value)}
           />
           <TextField
+            label="CDN requests"
+            value={form.cdnRequestsMillion}
+            inputMode="decimal"
+            suffix="M/mo"
+            error={fieldErrors.cdnRequestsMillion}
+            onChange={(value) => update('cdnRequestsMillion', value)}
+          />
+          <TextField
             label="NAT GB/mo"
             value={form.natGatewayGb}
             inputMode="decimal"
@@ -11843,6 +11851,18 @@ function networkingComponentLabel(lineItem: ComparisonLineItem): string {
     return 'NAT gateway processing';
   }
 
+  if (normalized.includes('cdn-viewer') || normalized.includes('viewer data transfer')) {
+    return 'CDN viewer transfer';
+  }
+
+  if (normalized.includes('cdn-origin') || normalized.includes('origin miss')) {
+    return 'CDN origin transfer';
+  }
+
+  if (normalized.includes('cdn-edge') || normalized.includes('edge request')) {
+    return 'CDN edge requests';
+  }
+
   if (normalized.includes('cdn')) {
     return 'CDN delivery';
   }
@@ -11913,6 +11933,12 @@ function networkingValidationAction(component: string): string {
       return 'Validate LCU/capacity-unit drivers: rules, connections, bandwidth, and hours.';
     case 'NAT gateway processing':
       return 'Confirm private endpoints or route changes can remove NAT hairpin traffic.';
+    case 'CDN viewer transfer':
+      return 'Validate viewer geography, compression, cache-control, and direct-egress alternative.';
+    case 'CDN origin transfer':
+      return 'Raise cache hit and keep origins regional to reduce miss traffic.';
+    case 'CDN edge requests':
+      return 'Validate request volume, HTTP method mix, and cache-key policy.';
     case 'CDN delivery':
       return 'Tune cache hit, origin path, edge requests, and direct-egress alternative.';
     case 'DNS zones and queries':

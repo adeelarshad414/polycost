@@ -250,6 +250,7 @@ export const normalizedWorkloadSpecSchema = z
         interRegionTransferGb: z.number().nonnegative().optional(),
         cdnTrafficGb: z.number().nonnegative().optional(),
         cdnCacheHitRatioPercent: z.number().min(0).max(100).optional(),
+        cdnRequestsMillion: z.number().nonnegative().optional(),
         natGatewayGb: z.number().nonnegative().optional(),
         natGatewayHours: z.number().min(0).max(730).optional(),
         dnsHostedZones: z.number().int().nonnegative().optional(),

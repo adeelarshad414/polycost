@@ -116,6 +116,7 @@ export interface WorkloadFormState {
   interRegionTransferGb: string;
   cdnTrafficGb: string;
   cdnCacheHitRatioPercent: string;
+  cdnRequestsMillion: string;
   natGatewayGb: string;
   natGatewayHours: string;
   dnsHostedZones: string;
@@ -251,6 +252,7 @@ type NumericWorkloadFormField =
   | 'interRegionTransferGb'
   | 'cdnTrafficGb'
   | 'cdnCacheHitRatioPercent'
+  | 'cdnRequestsMillion'
   | 'natGatewayGb'
   | 'natGatewayHours'
   | 'dnsHostedZones'
@@ -392,6 +394,7 @@ export const defaultWorkloadForm: WorkloadFormState = {
   interRegionTransferGb: '0',
   cdnTrafficGb: '0',
   cdnCacheHitRatioPercent: '85',
+  cdnRequestsMillion: '0',
   natGatewayGb: '0',
   natGatewayHours: '0',
   dnsHostedZones: '0',
@@ -1133,6 +1136,12 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
   optionalNonNegativeNumberField(
     issues,
     form,
+    'cdnRequestsMillion',
+    'CDN edge requests must be 0 million or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
     'natGatewayGb',
     'NAT processed data must be 0 GB or higher.',
   );
@@ -1525,6 +1534,7 @@ export function buildNwsFromForm(
             cdnCacheHitRatioPercent: parseBoundedNumber(form.cdnCacheHitRatioPercent, 0, 100, 85),
           }
         : {}),
+      ...optionalPositiveNumber('cdnRequestsMillion', form.cdnRequestsMillion),
       ...optionalPositiveNumber('natGatewayGb', form.natGatewayGb),
       ...optionalPositiveNumber('natGatewayHours', form.natGatewayHours),
       ...optionalPositiveInteger('dnsHostedZones', form.dnsHostedZones),
@@ -1835,6 +1845,9 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
     cdnCacheHitRatioPercent: numberToInput(
       nws.network.cdnCacheHitRatioPercent ?? Number(defaultWorkloadForm.cdnCacheHitRatioPercent),
     ),
+    cdnRequestsMillion: numberToInput(
+      nws.network.cdnRequestsMillion ?? Number(defaultWorkloadForm.cdnRequestsMillion),
+    ),
     natGatewayGb: numberToInput(
       nws.network.natGatewayGb ?? Number(defaultWorkloadForm.natGatewayGb),
     ),
@@ -2066,6 +2079,7 @@ export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceReq
         interRegionTransferGb: parseOptionalNumber(form.interRegionTransferGb) ?? 0,
         cdnTrafficGb: parseOptionalNumber(form.cdnTrafficGb) ?? 0,
         cdnCacheHitRatioPercent: parseBoundedNumber(form.cdnCacheHitRatioPercent, 0, 100, 85),
+        cdnRequestsMillion: parseOptionalNumber(form.cdnRequestsMillion) ?? 0,
         natGatewayGb: parseOptionalNumber(form.natGatewayGb) ?? 0,
         natGatewayHours: parseBoundedNumber(form.natGatewayHours, 0, 730, 0),
         dnsHostedZones: parseNonNegativeInteger(form.dnsHostedZones, 0),
@@ -3402,6 +3416,8 @@ function formNumericValue(form: WorkloadFormState, field: NumericWorkloadFormFie
       return form.cdnTrafficGb;
     case 'cdnCacheHitRatioPercent':
       return form.cdnCacheHitRatioPercent;
+    case 'cdnRequestsMillion':
+      return form.cdnRequestsMillion;
     case 'natGatewayGb':
       return form.natGatewayGb;
     case 'natGatewayHours':

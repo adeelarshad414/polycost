@@ -364,6 +364,10 @@ export const NWS_PARSE_RESULT_JSON_SCHEMA = {
               minimum: 0,
               maximum: 100,
             },
+            cdnRequestsMillion: {
+              type: 'number',
+              minimum: 0,
+            },
             natGatewayGb: {
               type: 'number',
               minimum: 0,

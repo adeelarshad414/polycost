@@ -162,6 +162,7 @@ export interface NormalizedWorkloadSpec {
     interRegionTransferGb?: number;
     cdnTrafficGb?: number;
     cdnCacheHitRatioPercent?: number;
+    cdnRequestsMillion?: number;
     natGatewayGb?: number;
     natGatewayHours?: number;
     dnsHostedZones?: number;
