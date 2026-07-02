@@ -2282,10 +2282,23 @@ function scenarioCaveat(
   }
 
   if (pricingModel === 'spot') {
-    return model.caveat ?? 'Spot is interruptible and shown as an estimate, not a guarantee.';
+    return spotEstimateCaveat(model.caveat);
   }
 
   return model.caveat ?? 'Commitment scenario based on cached provider pricing terms.';
+}
+
+function spotEstimateCaveat(caveat: string | undefined): string {
+  const estimateNotice =
+    'Spot/preemptible pricing is interruptible and modeled as an estimate, not a guarantee.';
+
+  if (!caveat) {
+    return estimateNotice;
+  }
+
+  return /estimate|estimated|not a guarantee/i.test(caveat)
+    ? caveat
+    : `${caveat} ${estimateNotice}`;
 }
 
 function calculationText(lineItem: ComparisonLineItem): string {

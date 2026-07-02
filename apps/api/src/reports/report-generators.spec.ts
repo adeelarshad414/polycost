@@ -819,27 +819,27 @@ describe('report generators', () => {
   });
 
   it('builds selected scenario rows for unavailable commitments and spot estimates', () => {
-    const rows = selectedScenarioRows(
-      {
-        ...comparison,
-        providers: [
-          {
-            ...comparison.providers[0],
-            pricingModels: [
-              {
-                model: 'spot',
-                available: true,
-                monthlyCostUsd: 35,
-                hourlyCostUsd: 0.05,
-                caveat: 'Interruptible capacity.',
-              },
-            ],
-          },
-          comparison.providers[1],
-        ],
-      },
-      { interval: 'yearly', pricingModel: 'spot' },
-    );
+    const spotComparison = {
+      ...comparison,
+      providers: [
+        {
+          ...comparison.providers[0],
+          pricingModels: [
+            {
+              model: 'spot' as const,
+              available: true,
+              monthlyCostUsd: 35,
+              hourlyCostUsd: 0.05,
+              caveat: 'Interruptible capacity.',
+            },
+          ],
+        },
+        comparison.providers[1],
+      ],
+    };
+    const spotEstimateCaveat =
+      'Interruptible capacity. Spot/preemptible pricing is interruptible and modeled as an estimate, not a guarantee.';
+    const rows = selectedScenarioRows(spotComparison, { interval: 'yearly', pricingModel: 'spot' });
 
     expect(rows[0]).toEqual([
       'Provider',
@@ -849,7 +849,7 @@ describe('report generators', () => {
       'Hourly USD',
       'Caveat',
     ]);
-    expect(rows[1]).toEqual(['aws', 'yes', '420', '35', '0.05', 'Interruptible capacity.']);
+    expect(rows[1]).toEqual(['aws', 'yes', '420', '35', '0.05', spotEstimateCaveat]);
     expect(rows[2]).toEqual([
       'gcp',
       'no',
@@ -858,6 +858,33 @@ describe('report generators', () => {
       '',
       'Not available for this SKU/region.',
     ]);
+    expect(providerRankingRows(spotComparison, { interval: 'yearly', pricingModel: 'spot' })).toEqual(
+      expect.arrayContaining([
+        ['aws', '#1', 'yes', '420', '35', '420', '0', '0', '1', spotEstimateCaveat],
+      ]),
+    );
+    expect(
+      selectedScenarioRows(
+        {
+          ...spotComparison,
+          providers: [
+            {
+              ...spotComparison.providers[0],
+              pricingModels: [
+                {
+                  model: 'spot',
+                  available: true,
+                  monthlyCostUsd: 35,
+                  caveat: 'Spot estimate range from cached provider data.',
+                },
+              ],
+            },
+            spotComparison.providers[1],
+          ],
+        },
+        { pricingModel: 'spot' },
+      )[1][5],
+    ).toBe('Spot estimate range from cached provider data.');
   });
 
   it('labels every report interval and pricing model', () => {
