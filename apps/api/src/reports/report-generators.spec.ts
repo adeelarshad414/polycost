@@ -240,8 +240,8 @@ describe('report generators', () => {
       'Evidence confidence,"Review required - 2/3 providers priced, 1 approximate mapping(s), 1 warning(s)."',
     );
     expect(csv).toContain('Provider Ranking');
-    expect(csv).toContain('aws,#1,yes,126,42,504,0,0,1,Three-year commitment.');
-    expect(csv).toContain('gcp,Not eligible,no,,,,,,0,Not available for this SKU/region.');
+    expect(csv).toContain('aws,#1,yes,no,126,42,504,0,0,1,Three-year commitment.');
+    expect(csv).toContain('gcp,Not eligible,no,,,,,,,0,Not available for this SKU/region.');
     expect(csv).toContain('Workload Scope');
     expect(csv).toContain('Workload name,Client portal');
     expect(csv).toContain('Architecture Overview');
@@ -262,13 +262,13 @@ describe('report generators', () => {
     expect(csv).toContain('Cost Coverage Map');
     expect(csv).toContain('aws,Compute families and sizing,Covered,1,0,60.8');
     expect(csv).toContain('Selected Pricing Scenario');
-    expect(csv).toContain('aws,yes,126,42,0.06,Three-year commitment.');
+    expect(csv).toContain('aws,yes,126,42,0.06,no,not supplied,Three-year commitment.');
     expect(csv).toContain('Pricing Model Availability');
     expect(csv).toContain(
       'gcp,available,not modeled,not modeled,not modeled,not modeled,Only on-demand totals are modeled for this provider.',
     );
     expect(csv).toContain('Commitment Payment and TCO');
-    expect(csv).toContain('aws,Reserved 3-year,yes,0.06,42,360,All upfront,36 months,1872');
+    expect(csv).toContain('aws,Reserved 3-year,yes,no,0.06,42,360,All upfront,36 months,1872');
     expect(csv).toContain('Egress Tiered Breakdown');
     expect(csv).toContain('aws,us-east-1,0-512 GB,512,0.09,46.08,0.09');
     expect(csv).toContain('Egress & Networking Detail');
@@ -543,7 +543,7 @@ describe('report generators', () => {
     expect(pdfText).toContain('Decision summary');
     expect(pdfText).toContain('Cost baseline: aws ranks #1 for Reserved 3-year');
     expect(pdfText).toContain('Provider ranking');
-    expect(pdfText).toContain('aws | #1 | eligible yes | selected $126');
+    expect(pdfText).toContain('aws | #1 | eligible yes | estimate no | selected $126');
     expect(pdfText).toContain('Workload scope');
     expect(pdfText).toContain('Architecture overview');
     expect(pdfText).toContain('compute | compute/vm-compute');
@@ -632,8 +632,20 @@ describe('report generators', () => {
 
     expect(providerRankingRows(comparison, { interval: 'quarterly', pricingModel: 'reserved-3yr' })).toEqual(
       expect.arrayContaining([
-        ['aws', '#1', 'yes', '126', '42', '504', '0', '0', '1', 'Three-year commitment.'],
-        ['gcp', 'Not eligible', 'no', '', '', '', '', '', '0', 'Not available for this SKU/region.'],
+        ['aws', '#1', 'yes', 'no', '126', '42', '504', '0', '0', '1', 'Three-year commitment.'],
+        [
+          'gcp',
+          'Not eligible',
+          'no',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '0',
+          'Not available for this SKU/region.',
+        ],
       ]),
     );
 
@@ -912,12 +924,25 @@ describe('report generators', () => {
       'Yearly USD',
       'Monthly USD',
       'Hourly USD',
+      'Estimate flag',
+      'Source',
       'Caveat',
     ]);
-    expect(rows[1]).toEqual(['aws', 'yes', '420', '35', '0.05', spotEstimateCaveat]);
+    expect(rows[1]).toEqual([
+      'aws',
+      'yes',
+      '420',
+      '35',
+      '0.05',
+      'yes',
+      'not supplied',
+      spotEstimateCaveat,
+    ]);
     expect(rows[2]).toEqual([
       'gcp',
       'no',
+      '',
+      '',
       '',
       '',
       '',
@@ -925,7 +950,7 @@ describe('report generators', () => {
     ]);
     expect(providerRankingRows(spotComparison, { interval: 'yearly', pricingModel: 'spot' })).toEqual(
       expect.arrayContaining([
-        ['aws', '#1', 'yes', '420', '35', '420', '0', '0', '1', spotEstimateCaveat],
+        ['aws', '#1', 'yes', 'yes', '420', '35', '420', '0', '0', '1', spotEstimateCaveat],
       ]),
     );
     expect(
@@ -948,7 +973,7 @@ describe('report generators', () => {
           ],
         },
         { pricingModel: 'spot' },
-      )[1][5],
+      )[1][7],
     ).toBe('Spot estimate range from cached provider data.');
   });
 
@@ -1028,6 +1053,7 @@ describe('report generators', () => {
         'aws',
         'Reserved 3-year',
         'yes',
+        'no',
         '0.06',
         '42',
         '360',

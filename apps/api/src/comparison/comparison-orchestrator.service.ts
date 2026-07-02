@@ -383,8 +383,9 @@ export class ComparisonOrchestratorService {
       source: commitmentCosts.some((model) => model?.source === 'modeled-estimate')
         ? 'modeled-estimate'
         : representativeModel?.source,
-      estimated: commitmentCosts.some((model) => model?.estimated === true),
-      volatility: representativeModel?.volatility,
+      estimated:
+        pricingModel === 'spot' || commitmentCosts.some((model) => model?.estimated === true),
+      volatility: pricingModel === 'spot' ? 'volatile' : representativeModel?.volatility,
       ...(representativeModel?.upfrontOption
         ? { upfrontOption: representativeModel.upfrontOption }
         : {}),
@@ -451,6 +452,9 @@ export class ComparisonOrchestratorService {
   private normalizePricingModels(pricingModels: PricingModelCost[]): PricingModelCost[] {
     return pricingModels.map((model) => ({
       ...model,
+      ...(model.model === 'spot'
+        ? { estimated: true as const, volatility: 'volatile' as const }
+        : {}),
       ...(model.monthlyCostUsd !== undefined && model.hourlyCostUsd === undefined
         ? { hourlyCostUsd: this.roundCurrency(model.monthlyCostUsd / HOURS_PER_MONTH) }
         : {}),

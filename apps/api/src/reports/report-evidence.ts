@@ -40,6 +40,7 @@ export interface RegionComparisonEvidenceRow {
 interface ProviderScenario {
   providerId: string;
   available: boolean;
+  estimateFlag: string;
   intervalCostUsd?: number;
   monthlyCostUsd?: number;
   yearlyCostUsd?: number;
@@ -738,6 +739,7 @@ export function providerRankingRows(
       'Provider',
       'Rank',
       'Selected model eligible',
+      'Estimate flag',
       `${labelForInterval(interval)} USD`,
       'Monthly USD',
       'Yearly USD',
@@ -750,6 +752,7 @@ export function providerRankingRows(
       scenario.providerId,
       scenario.rank !== undefined ? `#${scenario.rank}` : 'Not eligible',
       scenario.available ? 'yes' : 'no',
+      scenario.estimateFlag,
       scenario.intervalCostUsd !== undefined ? formatNumber(scenario.intervalCostUsd) : '',
       scenario.monthlyCostUsd !== undefined ? formatNumber(scenario.monthlyCostUsd) : '',
       scenario.yearlyCostUsd !== undefined ? formatNumber(scenario.yearlyCostUsd) : '',
@@ -786,6 +789,7 @@ export function commitmentTcoRows(result: ComparisonResult): string[][] {
       'Provider',
       'Pricing model',
       'Available',
+      'Estimate flag',
       'Effective hourly USD',
       'Monthly recurring USD',
       'Upfront cash USD',
@@ -814,6 +818,7 @@ export function commitmentTcoRows(result: ComparisonResult): string[][] {
           provider.providerId,
           labelForPricingModel(pricingModel),
           model.available ? 'yes' : 'no',
+          model.available ? modelEstimateFlag(pricingModel, model) : '',
           hourly !== undefined ? formatNumber(hourly) : '',
           monthly !== undefined ? formatNumber(monthly) : '',
           upfront !== undefined ? formatNumber(upfront) : '',
@@ -961,7 +966,16 @@ export function selectedScenarioRows(result: ComparisonResult, options: ReportOp
   const interval = options.interval ?? 'monthly';
 
   return [
-    ['Provider', 'Available', `${labelForInterval(interval)} USD`, 'Monthly USD', 'Hourly USD', 'Caveat'],
+    [
+      'Provider',
+      'Available',
+      `${labelForInterval(interval)} USD`,
+      'Monthly USD',
+      'Hourly USD',
+      'Estimate flag',
+      'Source',
+      'Caveat',
+    ],
     ...result.providers.map((provider) => {
       const model = provider.pricingModels?.find((candidate) => candidate.model === pricingModel);
       const monthly = selectedMonthlyCost(model, provider.totals.monthly);
@@ -973,6 +987,8 @@ export function selectedScenarioRows(result: ComparisonResult, options: ReportOp
         available ? formatNumber(costForInterval(monthly, interval)) : '',
         available ? formatNumber(monthly) : '',
         available ? formatNumber(model?.hourlyCostUsd ?? monthly / HOURS_PER_MONTH) : '',
+        available ? modelEstimateFlag(pricingModel, model) : '',
+        available ? pricingModelSource(model, pricingModel) : '',
         scenarioCaveat(pricingModel, model),
       ];
     }),
@@ -2200,6 +2216,7 @@ function providerScenario(
   return {
     providerId: provider.providerId,
     available,
+    estimateFlag: available ? modelEstimateFlag(pricingModel, model) : '',
     ...(monthlyCostUsd !== undefined
       ? {
           intervalCostUsd: costForInterval(monthlyCostUsd, interval),
@@ -2243,12 +2260,14 @@ function pricingModelStatus(
     return `unavailable: ${model.unavailableReason ?? 'not offered for this configuration'}`;
   }
 
+  const estimate = modelEstimateFlag(pricingModel, model) === 'yes' ? '; estimate flag yes' : '';
+  const source = model.source ? `; source ${model.source}` : '';
   const savings =
     model.savingsPercentVsOnDemand !== undefined
       ? `; ${formatNumber(model.savingsPercentVsOnDemand)}% vs on-demand`
       : '';
 
-  return `available${savings}`;
+  return `available${estimate}${source}${savings}`;
 }
 
 function providerAvailabilityNote(provider: ComparisonProviderResult): string {
@@ -2325,10 +2344,30 @@ function pricingModelEvidence(lineItem: ComparisonLineItem): string {
   return lineItem.pricingModels
     .map((model) =>
       model.available
-        ? `${model.model}: $${formatNumber(model.monthlyCostUsd ?? 0)} monthly`
+        ? `${model.model}: $${formatNumber(model.monthlyCostUsd ?? 0)} monthly (estimate ${
+            modelEstimateFlag(model.model, model)
+          }; source ${pricingModelSource(model, model.model)})`
         : `${model.model}: unavailable (${model.unavailableReason ?? 'not offered'})`,
     )
     .join('; ');
+}
+
+function modelEstimateFlag(
+  pricingModel: ReportPricingModel,
+  model: PricingModelCost | undefined,
+): 'yes' | 'no' {
+  return pricingModel === 'spot' || model?.estimated === true ? 'yes' : 'no';
+}
+
+function pricingModelSource(
+  model: PricingModelCost | undefined,
+  pricingModel: ReportPricingModel,
+): string {
+  if (model?.source) {
+    return model.source;
+  }
+
+  return pricingModel === 'on-demand' ? 'catalog' : 'not supplied';
 }
 
 function componentMonthly(

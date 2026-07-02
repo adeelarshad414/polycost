@@ -722,6 +722,8 @@ describe('ComparisonOrchestratorService', () => {
               model: 'spot',
               available: true,
               monthlyCostUsd: 2767.79,
+              estimated: true,
+              volatility: 'volatile',
             }),
           ]),
         }),
@@ -741,6 +743,12 @@ describe('ComparisonOrchestratorService', () => {
         expect.objectContaining({
           model: 'savings-plan',
           available: true,
+        }),
+        expect.objectContaining({
+          model: 'spot',
+          available: true,
+          estimated: true,
+          volatility: 'volatile',
         }),
       ]),
     );

@@ -207,7 +207,7 @@ export class PdfReportGenerator {
     );
     for (const row of commitmentTcoRows(result).slice(1)) {
       lines.push({
-        text: `${row[0]} | ${row[1]} | available ${row[2]} | monthly $${row[4]} | upfront $${row[5] || 'n/a'} | payment ${row[6]} | term ${row[7]} | TCO $${row[8] || 'n/a'} | savings ${row[9] || 'n/a'}`,
+        text: `${row[0]} | ${row[1]} | available ${row[2]} | estimate ${row[3]} | monthly $${row[5]} | upfront $${row[6] || 'n/a'} | payment ${row[7]} | term ${row[8]} | TCO $${row[9] || 'n/a'} | savings ${row[10] || 'n/a'}`,
         fontSize: 10,
       });
     }
@@ -623,18 +623,18 @@ function serviceRequirementPdfText(row: string[]): string {
 
 function providerRankingPdfText(row: string[]): string {
   if (row[2] === 'no') {
-    return `${row[0]} | ${row[1]} | not eligible for selected model | ${row[9]}`;
+    return `${row[0]} | ${row[1]} | not eligible for selected model | ${row[10]}`;
   }
 
-  return `${row[0]} | ${row[1]} | eligible yes | selected $${row[3]} | monthly $${row[4]} | delta $${row[6]} | ${row[9]}`;
+  return `${row[0]} | ${row[1]} | eligible yes | estimate ${row[3]} | selected $${row[4]} | monthly $${row[5]} | delta $${row[7]} | ${row[10]}`;
 }
 
 function selectedScenarioPdfText(row: string[]): string {
   if (row[1] === 'no') {
-    return `${row[0]}: not eligible for selected model | ${row[5]}`;
+    return `${row[0]}: not eligible for selected model | ${row[7]}`;
   }
 
-  return `${row[0]}: eligible yes | selected $${row[2]} | monthly $${row[3]} | ${row[5]}`;
+  return `${row[0]}: eligible yes | estimate ${row[5]} | source ${row[6]} | selected $${row[2]} | monthly $${row[3]} | ${row[7]}`;
 }
 
 function pageContent(lines: PdfLine[]): string {
