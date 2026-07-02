@@ -4,6 +4,7 @@ import {
   ComparisonProviderResult,
   ComparisonResult,
 } from '../comparison/comparison.types';
+import { commitmentPricingModelCandidates } from '../comparison/commitment-policy';
 import { HOURS_PER_DAY, HOURS_PER_MONTH, HOURS_PER_WEEK } from '../cost-time';
 import { ServiceRequirement } from '../nws/nws.types';
 import {
@@ -1172,6 +1173,7 @@ export function skuMappingAppendixRows(result: ComparisonResult): string[][] {
 
 export function optimizationOpportunityRows(result: ComparisonResult): string[][] {
   const rows: string[][] = [];
+  const commitmentCandidates = commitmentPricingModelCandidates(result.requirements?.workloadProfile);
   const rankedOnDemand = rankedProviderScenarios(result, {
     interval: 'monthly',
     pricingModel: 'on-demand',
@@ -1202,7 +1204,7 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
     const onDemand = modelCostForProvider(provider, 'on-demand');
     const targetCoveragePercent = commitmentPreferencePercent(result);
     const targetCoverageRate = targetCoveragePercent / 100;
-    const bestCommitment = ['reserved-3yr', 'reserved-1yr', 'savings-plan']
+    const bestCommitment = commitmentCandidates
       .map((pricingModel) => modelCostForProvider(provider, pricingModel as ReportPricingModel))
       .filter(
         (model) =>

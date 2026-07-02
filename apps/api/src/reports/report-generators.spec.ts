@@ -47,7 +47,7 @@ const comparison: ComparisonResult = {
     },
     workloadProfile: {
       environment: 'production',
-      commitmentPreferencePercent: 65,
+      commitmentPreferencePercent: 90,
       operatingSystem: 'linux',
       supportTier: 'business',
       usagePattern: {
@@ -955,9 +955,9 @@ describe('report generators', () => {
       expect.arrayContaining([
         expect.arrayContaining([
           'Commitment coverage',
-          'aws Reserved 3-year lowers recurring run rate; 35% remains exposed at the target coverage setting.',
-          '10.15',
-          '121.8',
+          'aws Reserved 3-year lowers recurring run rate; 10% remains exposed at the target coverage setting.',
+          '2.9',
+          '34.8',
         ]),
         expect.arrayContaining([
           'Right-sizing',
@@ -1537,6 +1537,39 @@ describe('report generators', () => {
         ]),
       ]),
     );
+  });
+
+  it('keeps non-production optimization advice off 3-year commitments', () => {
+    const rows = optimizationOpportunityRows({
+      ...comparison,
+      requirements: {
+        ...comparison.requirements!,
+        workloadProfile: {
+          ...comparison.requirements!.workloadProfile!,
+          environment: 'development',
+          commitmentPreferencePercent: 90,
+        },
+      },
+      providers: [
+        {
+          ...comparison.providers[0],
+          pricingModels: [
+            ...(comparison.providers[0].pricingModels ?? []),
+            {
+              model: 'reserved-1yr',
+              available: true,
+              monthlyCostUsd: 50,
+              hourlyCostUsd: 0.07,
+              caveat: 'One-year commitment.',
+            },
+          ],
+        },
+      ],
+    });
+    const rowText = rows.map((row) => row.join(' | ')).join('\n');
+
+    expect(rowText).toContain('Commitment coverage | aws Reserved 1-year lowers recurring run rate');
+    expect(rowText).not.toContain('Reserved 3-year lowers recurring run rate');
   });
 
   it('builds fallback service requirement rows when comparison requirements are absent', () => {

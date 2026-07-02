@@ -452,4 +452,53 @@ describe('ComparisonAnalyticsService', () => {
       ]),
     );
   });
+
+  it('excludes 3-year commitment savings from non-production coverage analytics', () => {
+    const service = new ComparisonAnalyticsService();
+    const developmentComparison: ComparisonResult = {
+      ...comparison,
+      requirements: {
+        ...comparison.requirements!,
+        workloadProfile: {
+          ...(comparison.requirements?.workloadProfile ?? {}),
+          environment: 'development',
+          commitmentPreferencePercent: 90,
+        },
+      },
+      providers: comparison.providers.map((provider) =>
+        provider.providerId === 'aws'
+          ? {
+              ...provider,
+              lineItems: provider.lineItems.map((lineItem) =>
+                lineItem.category === 'compute'
+                  ? {
+                      ...lineItem,
+                      pricingModels: [
+                        { model: 'on-demand', available: true, monthlyCostUsd: 400 },
+                        { model: 'reserved-3yr', available: true, monthlyCostUsd: 250 },
+                      ],
+                    }
+                  : lineItem,
+              ),
+            }
+          : provider,
+      ),
+    };
+
+    const analytics = service.build(developmentComparison, new Date('2026-07-02T12:00:00.000Z'));
+    const awsCoverage = analytics.commitmentCoverage.find((row) => row.providerId === 'aws');
+
+    expect(awsCoverage).toMatchObject({
+      eligibleMonthlyUsd: 0,
+      maxMonthlySavingsUsd: 0,
+      recommendation: 'aws has no modeled commitment discount for the current service mix.',
+    });
+    expect(analytics.finOpsFindings).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'aws-commitment-gap',
+        }),
+      ]),
+    );
+  });
 });

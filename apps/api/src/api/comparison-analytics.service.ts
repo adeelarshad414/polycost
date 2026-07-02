@@ -6,6 +6,10 @@ import {
   ComparisonResult,
 } from '../comparison/comparison.types';
 import {
+  CommitmentPricingModel,
+  commitmentPricingModelCandidates,
+} from '../comparison/commitment-policy';
+import {
   costCoverageMapRows,
   egressNetworkingDetailRows,
   optimizationOpportunityRows,
@@ -587,6 +591,10 @@ function commitmentRoiTimelines(providers: ComparisonProviderResult[]): Commitme
 }
 
 function commitmentCoverage(result: ComparisonResult): CommitmentCoverageRow[] {
+  const commitmentCandidates = commitmentPricingModelCandidates(
+    result.requirements?.workloadProfile,
+  );
+  const commitmentCandidateSet = new Set<string>(commitmentCandidates);
   const targetCoveragePercent = clampPercent(
     result.requirements?.workloadProfile?.commitmentPreferencePercent ?? 0,
   );
@@ -602,8 +610,7 @@ function commitmentCoverage(result: ComparisonResult): CommitmentCoverageRow[] {
         .filter((lineItem) =>
           lineItem.pricingModels?.some(
             (model) =>
-              model.model !== 'on-demand' &&
-              model.model !== 'spot' &&
+              commitmentCandidateSet.has(model.model) &&
               model.available &&
               model.monthlyCostUsd !== undefined,
           ),
@@ -611,7 +618,10 @@ function commitmentCoverage(result: ComparisonResult): CommitmentCoverageRow[] {
         .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0),
     );
     const maxMonthlySavingsUsd = roundCurrency(
-      provider.lineItems.reduce((sum, lineItem) => sum + lineItemCommitmentSavings(lineItem), 0),
+      provider.lineItems.reduce(
+        (sum, lineItem) => sum + lineItemCommitmentSavings(lineItem, commitmentCandidates),
+        0,
+      ),
     );
     const ineligibleMonthlyUsd = roundCurrency(
       Math.max(0, zeroCommitmentMonthlyUsd - eligibleMonthlyUsd),
@@ -908,15 +918,22 @@ function dimensionForLineItem(lineItem: ComparisonLineItem): AnalyticsDimension 
   return 'other';
 }
 
-function lineItemCommitmentSavings(lineItem: ComparisonLineItem): number {
+function lineItemCommitmentSavings(
+  lineItem: ComparisonLineItem,
+  commitmentCandidates: CommitmentPricingModel[],
+): number {
+  if (commitmentCandidates.length === 0) {
+    return 0;
+  }
+
+  const commitmentCandidateSet = new Set<string>(commitmentCandidates);
   const onDemand =
     lineItem.pricingModels?.find((model) => model.model === 'on-demand' && model.available)
       ?.monthlyCostUsd ?? lineItem.baseMonthlyCostUsd;
   const bestCommitted = lineItem.pricingModels
     ?.filter(
       (model) =>
-        model.model !== 'on-demand' &&
-        model.model !== 'spot' &&
+        commitmentCandidateSet.has(model.model) &&
         model.available &&
         model.monthlyCostUsd !== undefined,
     )

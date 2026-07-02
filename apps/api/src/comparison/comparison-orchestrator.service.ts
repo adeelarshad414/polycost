@@ -30,6 +30,7 @@ import {
   ComparisonWarning,
   PricingModelRecommendation,
 } from './comparison.types';
+import { commitmentPricingModelCandidates } from './commitment-policy';
 import { EquivalentServiceMapper } from './equivalent-service-mapper';
 import { IntervalCostCalculator } from './interval-cost-calculator';
 
@@ -2640,31 +2641,13 @@ export class ComparisonOrchestratorService {
     environment: WorkloadEnvironment | undefined,
     commitmentPreferencePercent?: number,
   ): PricingModelKey[] {
-    if (commitmentPreferencePercent === undefined || commitmentPreferencePercent < 35) {
-      return ['on-demand'];
-    }
-
-    const isProduction = environment === 'production';
-    const isNonProduction =
-      environment === 'development' || environment === 'test' || environment === 'staging';
-
-    if (isNonProduction) {
-      if (commitmentPreferencePercent >= 85) {
-        return ['savings-plan', 'reserved-1yr', 'on-demand'];
-      }
-
-      return ['on-demand'];
-    }
-
-    if (isProduction && commitmentPreferencePercent >= 85) {
-      return ['reserved-3yr', 'savings-plan', 'reserved-1yr', 'on-demand'];
-    }
-
-    if (commitmentPreferencePercent >= 65) {
-      return ['reserved-1yr', 'savings-plan', 'on-demand'];
-    }
-
-    return ['savings-plan', 'reserved-1yr', 'on-demand'];
+    return [
+      ...commitmentPricingModelCandidates({
+        ...(environment ? { environment } : {}),
+        ...(commitmentPreferencePercent !== undefined ? { commitmentPreferencePercent } : {}),
+      }),
+      'on-demand',
+    ];
   }
 
   private pricingModelAvailableAcrossProviders(
