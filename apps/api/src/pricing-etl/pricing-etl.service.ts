@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { CloudProviderAdapter } from '../adapters/common/cloud-provider-adapter';
 import {
   NormalizedPricingWriter,
@@ -12,6 +12,8 @@ const MAX_ERROR_DETAIL_LENGTH = 2000;
 
 @Injectable()
 export class PricingEtlService {
+  private readonly logger = new Logger(PricingEtlService.name);
+
   constructor(
     private readonly adapters: CloudProviderAdapter[],
     private readonly catalogWriter: PricingCatalogWriter,
@@ -98,7 +100,16 @@ export class PricingEtlService {
       return;
     }
 
-    await this.failureNotifier.notifyProviderResult(result);
+    try {
+      await this.failureNotifier.notifyProviderResult(result);
+    } catch (error) {
+      this.logger.error({
+        event: 'pricing_sync_alert_notification_failed',
+        provider: result.provider,
+        status: result.status,
+        error: error instanceof Error ? error.message : 'Unknown notifier failure',
+      });
+    }
   }
 }
 

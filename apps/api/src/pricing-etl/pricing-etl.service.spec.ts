@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import {
   CloudProviderAdapter,
   PricingCatalogRecord,
@@ -247,6 +248,71 @@ describe('PricingEtlService', () => {
         errorDetail: 'GCP catalog unavailable',
       }),
     );
+  });
+
+  it('keeps ETL summaries intact when alert notification delivery fails', async () => {
+    const loggerSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    const writer: PricingCatalogWriter = {
+      upsertPricingRecords: jest.fn(async (records) => ({
+        recordsUpdated: records.length,
+        recordsRejected: 0,
+      })),
+    };
+    const runRepository: PricingEtlRunRepository = {
+      recordProviderRun: jest.fn(async () => undefined),
+    };
+    const notifier = {
+      notifyProviderResult: jest.fn(async () => {
+        throw new Error('webhook unavailable');
+      }),
+    };
+    const service = new PricingEtlService(
+      [
+        adapter(
+          'aws',
+          jest.fn(async () => [createCatalogRecord('aws', 'AWS-1')]),
+        ),
+        adapter(
+          'gcp',
+          jest.fn(async () => {
+            throw new Error('GCP catalog unavailable');
+          }),
+        ),
+      ],
+      writer,
+      runRepository,
+      fixedClock(),
+      undefined,
+      notifier,
+    );
+
+    await expect(service.refreshAllProviders()).resolves.toEqual(
+      expect.objectContaining({
+        status: 'partial',
+        providerResults: expect.arrayContaining([
+          expect.objectContaining({
+            provider: 'aws',
+            status: 'success',
+          }),
+          expect.objectContaining({
+            provider: 'gcp',
+            status: 'failed',
+            errorDetail: 'GCP catalog unavailable',
+          }),
+        ]),
+      }),
+    );
+    expect(runRepository.recordProviderRun).toHaveBeenCalledTimes(2);
+    expect(notifier.notifyProviderResult).toHaveBeenCalledTimes(1);
+    expect(loggerSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'pricing_sync_alert_notification_failed',
+        provider: 'gcp',
+        status: 'failed',
+        error: 'webhook unavailable',
+      }),
+    );
+    loggerSpy.mockRestore();
   });
 
   it('marks a provider run partial when some catalog rows are rejected', async () => {

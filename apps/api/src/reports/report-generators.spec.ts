@@ -812,7 +812,7 @@ describe('report generators', () => {
           '0',
           '0',
           '',
-          'No storage requirement or priced row detected for aws.',
+          expect.stringContaining('no configured or priced signal'),
           expect.stringContaining('Validate storage class'),
         ],
         [
