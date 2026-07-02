@@ -652,12 +652,24 @@ function SharedComparisonState({
 
   if (!data.comparisonId) {
     return (
-      <div className="rounded-lg border border-border bg-surface-1 p-3 text-sm text-text-secondary">
-        <strong className="text-text-primary">
-          Evidence workspace is waiting for a comparison.
-        </strong>{' '}
-        {emptyStateMessage ??
-          'Run a comparison to populate both Executive and Engineering views from the same result.'}
+      <div className="grid gap-4 rounded-lg border border-dashed border-border bg-surface-1 p-5 text-sm text-text-secondary sm:grid-cols-[auto_1fr_auto] sm:items-center">
+        <EmptyComparisonIllustration />
+        <div className="min-w-0">
+          <strong className="block text-base font-semibold text-text-primary">
+            Ready to compare
+          </strong>
+          <span className="mt-1 block leading-6">
+            {emptyStateMessage ??
+              'Describe your infrastructure to populate Executive and Engineering evidence from the same comparison result.'}
+          </span>
+        </div>
+        <a
+          href="#requirements"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-action-primary bg-action-primary px-4 py-2 text-sm font-semibold text-[color:var(--on-primary-action)] shadow-sm transition hover:bg-action-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
+          aria-label="Describe your infrastructure above"
+        >
+          Describe infrastructure
+        </a>
       </div>
     );
   }
@@ -683,6 +695,34 @@ function SharedComparisonState({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function EmptyComparisonIllustration() {
+  return (
+    <svg
+      viewBox="0 0 80 80"
+      aria-hidden="true"
+      className="comparison-empty-illustration h-20 w-20 text-text-muted"
+      fill="none"
+    >
+      <path
+        d="M25.5 51.5H55a12.5 12.5 0 0 0 1.6-24.9A17 17 0 0 0 23.4 31 10.6 10.6 0 0 0 25.5 51.5Z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="3"
+      />
+      <path
+        d="M27 61h26M32 68h16"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="3"
+      />
+      <circle cx="32" cy="42" r="2.5" fill="currentColor" />
+      <circle cx="40" cy="42" r="2.5" fill="currentColor" />
+      <circle cx="48" cy="42" r="2.5" fill="currentColor" />
+    </svg>
   );
 }
 

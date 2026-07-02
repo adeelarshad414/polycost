@@ -1097,6 +1097,16 @@ describe('ComparisonView', () => {
     expect(mobileProviderLabels(container)).toEqual(['AWS', 'Azure', 'GCP']);
     expect(text(container)).toContain('Pending');
     expect(text(container)).toContain('Run a comparison to populate AWS service bars.');
+    expect(text(container)).toContain('Ready to compare');
+    expect(text(container)).toContain('Describe infrastructure');
+    expect(
+      container.querySelector('.comparison-empty-illustration'),
+    ).toBeInstanceOf(SVGSVGElement);
+    expect(
+      container
+        .querySelector<HTMLAnchorElement>('a[aria-label="Describe your infrastructure above"]')
+        ?.getAttribute('href'),
+    ).toBe('#requirements');
     expect(text(container)).not.toContain('Pricing unavailable');
 
     unmount();
