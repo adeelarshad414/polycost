@@ -3946,6 +3946,30 @@ function WorkloadForm({
             error={fieldErrors.loadBalancerHours}
             onChange={(value) => update('loadBalancerHours', value)}
           />
+          <TextField
+            label="LB new conn"
+            value={form.loadBalancerNewConnectionsPerSecond}
+            inputMode="decimal"
+            suffix="/sec"
+            error={fieldErrors.loadBalancerNewConnectionsPerSecond}
+            onChange={(value) => update('loadBalancerNewConnectionsPerSecond', value)}
+          />
+          <TextField
+            label="LB active conn"
+            value={form.loadBalancerActiveConnections}
+            inputMode="numeric"
+            suffix="conn"
+            error={fieldErrors.loadBalancerActiveConnections}
+            onChange={(value) => update('loadBalancerActiveConnections', value)}
+          />
+          <TextField
+            label="LB rule eval"
+            value={form.loadBalancerRuleEvaluationsPerSecond}
+            inputMode="decimal"
+            suffix="/sec"
+            error={fieldErrors.loadBalancerRuleEvaluationsPerSecond}
+            onChange={(value) => update('loadBalancerRuleEvaluationsPerSecond', value)}
+          />
           <details className="advanced-service-fields form-grid-span">
             <summary>
               <span>Private connectivity</span>

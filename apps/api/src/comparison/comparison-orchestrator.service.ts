@@ -65,6 +65,7 @@ interface NetworkDimensionRates {
   dnsPerMillionQueries: number;
   loadBalancerHourly: number;
   loadBalancerPerGb: number;
+  loadBalancerLcuHour: number;
   vpnConnectionHourly: number;
   vpnDataTransferPerGb: number;
   privateCircuitPortHourly: number;
@@ -984,9 +985,17 @@ export class ComparisonOrchestratorService {
     if (
       network.loadBalancer &&
       ((network.loadBalancerProcessedGb && network.loadBalancerProcessedGb > 0) ||
-        network.loadBalancerHours)
+        network.loadBalancerHours ||
+        network.loadBalancerNewConnectionsPerSecond ||
+        network.loadBalancerActiveConnections ||
+        network.loadBalancerRuleEvaluationsPerSecond)
     ) {
-      const hours = network.loadBalancerHours ?? 0;
+      const hasLcuDriver = Boolean(
+        network.loadBalancerNewConnectionsPerSecond ||
+        network.loadBalancerActiveConnections ||
+        network.loadBalancerRuleEvaluationsPerSecond,
+      );
+      const hours = network.loadBalancerHours ?? (hasLcuDriver ? HOURS_PER_MONTH : 0);
       const processedGb = network.loadBalancerProcessedGb ?? 0;
       const monthlyCostUsd = this.roundCurrency(
         hours * rates.loadBalancerHourly + processedGb * rates.loadBalancerPerGb,
@@ -1004,6 +1013,30 @@ export class ComparisonOrchestratorService {
             monthlyCostUsd,
             unit: 'month',
             unitPriceUsd: monthlyCostUsd,
+            costComponent: 'networking',
+          }),
+        );
+      }
+
+      const lcuProfile = loadBalancerLcuProfile(network, hours, processedGb);
+      const lcuMonthlyCostUsd = this.roundCurrency(lcuProfile.lcuHours * rates.loadBalancerLcuHour);
+
+      if (lcuMonthlyCostUsd > 0) {
+        lineItems.push(
+          this.networkLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-load-balancer-lcu',
+            description: `${providerLabel(
+              providerId,
+            )} load balancer LCU/capacity-unit estimate (${lcuProfile.peakLcu.toFixed(
+              2,
+            )} LCU peak from ${lcuProfile.dominantDriver}, ${this.roundCurrency(
+              lcuProfile.lcuHours,
+            )} LCU-hrs)`,
+            monthlyCostUsd: lcuMonthlyCostUsd,
+            unit: 'LCU-hour',
+            unitPriceUsd: rates.loadBalancerLcuHour,
             costComponent: 'networking',
           }),
         );
@@ -2902,6 +2935,8 @@ export class ComparisonOrchestratorService {
               quantity: 1,
               scaleParams: {
                 estimatedMonthlyEgressGb: nws.network.estimatedMonthlyEgressGb ?? 0,
+                cdnTrafficGb: nws.network.cdnTrafficGb ?? 0,
+                cdnCacheHitRatioPercent: nws.network.cdnCacheHitRatioPercent ?? 85,
               },
             },
           ]
@@ -2914,6 +2949,15 @@ export class ComparisonOrchestratorService {
               region,
               az: nws.availability.multiAz ? 'multi-az' : 'single-az',
               quantity: 1,
+              scaleParams: {
+                loadBalancerProcessedGb: nws.network.loadBalancerProcessedGb ?? 0,
+                loadBalancerHours: nws.network.loadBalancerHours ?? 0,
+                loadBalancerNewConnectionsPerSecond:
+                  nws.network.loadBalancerNewConnectionsPerSecond ?? 0,
+                loadBalancerActiveConnections: nws.network.loadBalancerActiveConnections ?? 0,
+                loadBalancerRuleEvaluationsPerSecond:
+                  nws.network.loadBalancerRuleEvaluationsPerSecond ?? 0,
+              },
             },
           ]
         : []),
@@ -3989,6 +4033,7 @@ function networkDimensionRates(providerId: ProviderId): NetworkDimensionRates {
         dnsPerMillionQueries: 0.4,
         loadBalancerHourly: 0.0225,
         loadBalancerPerGb: 0.008,
+        loadBalancerLcuHour: 0.008,
         vpnConnectionHourly: 0.05,
         vpnDataTransferPerGb: 0.09,
         privateCircuitPortHourly: 0.3,
@@ -4006,6 +4051,7 @@ function networkDimensionRates(providerId: ProviderId): NetworkDimensionRates {
         dnsPerMillionQueries: 0.4,
         loadBalancerHourly: 0.025,
         loadBalancerPerGb: 0.005,
+        loadBalancerLcuHour: 0.008,
         vpnConnectionHourly: 0.05,
         vpnDataTransferPerGb: 0.087,
         privateCircuitPortHourly: 0.42,
@@ -4023,10 +4069,46 @@ function networkDimensionRates(providerId: ProviderId): NetworkDimensionRates {
         dnsPerMillionQueries: 0.4,
         loadBalancerHourly: 0.025,
         loadBalancerPerGb: 0.008,
+        loadBalancerLcuHour: 0.008,
         vpnConnectionHourly: 0.05,
         vpnDataTransferPerGb: 0.12,
         privateCircuitPortHourly: 2.428,
         privateCircuitDataTransferPerGb: 0.02,
       };
   }
+}
+
+function loadBalancerLcuProfile(
+  network: NormalizedWorkloadSpec['network'],
+  hours: number,
+  processedGb: number,
+): { dominantDriver: string; lcuHours: number; peakLcu: number } {
+  const effectiveHours = Math.max(1, hours);
+  const processedGbPerHour = processedGb / effectiveHours;
+  const dimensions = [
+    {
+      driver: 'new connections',
+      lcu: (network.loadBalancerNewConnectionsPerSecond ?? 0) / 25,
+    },
+    {
+      driver: 'active connections',
+      lcu: (network.loadBalancerActiveConnections ?? 0) / 3000,
+    },
+    {
+      driver: 'processed bandwidth',
+      lcu: processedGbPerHour,
+    },
+    {
+      driver: 'rule evaluations',
+      lcu: (network.loadBalancerRuleEvaluationsPerSecond ?? 0) / 1000,
+    },
+  ].sort((left, right) => right.lcu - left.lcu);
+  const dominant = dimensions[0];
+  const peakLcu = Math.max(0, dominant?.lcu ?? 0);
+
+  return {
+    dominantDriver: dominant?.driver ?? 'capacity dimensions',
+    lcuHours: peakLcu * hours,
+    peakLcu,
+  };
 }

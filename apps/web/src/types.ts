@@ -168,6 +168,9 @@ export interface NormalizedWorkloadSpec {
     dnsQueriesMillion?: number;
     loadBalancerProcessedGb?: number;
     loadBalancerHours?: number;
+    loadBalancerNewConnectionsPerSecond?: number;
+    loadBalancerActiveConnections?: number;
+    loadBalancerRuleEvaluationsPerSecond?: number;
     vpnConnectionCount?: number;
     vpnConnectionHours?: number;
     vpnDataTransferGb?: number;

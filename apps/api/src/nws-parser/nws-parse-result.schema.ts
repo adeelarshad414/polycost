@@ -347,6 +347,87 @@ export const NWS_PARSE_RESULT_JSON_SCHEMA = {
               type: 'number',
               minimum: 0,
             },
+            crossAzTransferGb: {
+              type: 'number',
+              minimum: 0,
+            },
+            interRegionTransferGb: {
+              type: 'number',
+              minimum: 0,
+            },
+            cdnTrafficGb: {
+              type: 'number',
+              minimum: 0,
+            },
+            cdnCacheHitRatioPercent: {
+              type: 'number',
+              minimum: 0,
+              maximum: 100,
+            },
+            natGatewayGb: {
+              type: 'number',
+              minimum: 0,
+            },
+            natGatewayHours: {
+              type: 'number',
+              minimum: 0,
+              maximum: 730,
+            },
+            dnsHostedZones: {
+              type: 'integer',
+              minimum: 0,
+            },
+            dnsQueriesMillion: {
+              type: 'number',
+              minimum: 0,
+            },
+            loadBalancerProcessedGb: {
+              type: 'number',
+              minimum: 0,
+            },
+            loadBalancerHours: {
+              type: 'number',
+              minimum: 0,
+              maximum: 730,
+            },
+            loadBalancerNewConnectionsPerSecond: {
+              type: 'number',
+              minimum: 0,
+            },
+            loadBalancerActiveConnections: {
+              type: 'integer',
+              minimum: 0,
+            },
+            loadBalancerRuleEvaluationsPerSecond: {
+              type: 'number',
+              minimum: 0,
+            },
+            vpnConnectionCount: {
+              type: 'integer',
+              minimum: 0,
+            },
+            vpnConnectionHours: {
+              type: 'number',
+              minimum: 0,
+              maximum: 730,
+            },
+            vpnDataTransferGb: {
+              type: 'number',
+              minimum: 0,
+            },
+            privateCircuitCount: {
+              type: 'integer',
+              minimum: 0,
+            },
+            privateCircuitPortHours: {
+              type: 'number',
+              minimum: 0,
+              maximum: 730,
+            },
+            privateCircuitDataTransferGb: {
+              type: 'number',
+              minimum: 0,
+            },
             cdn: {
               type: 'boolean',
             },

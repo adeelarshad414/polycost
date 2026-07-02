@@ -852,6 +852,9 @@ describe('ComparisonOrchestratorService', () => {
         loadBalancer: true,
         loadBalancerProcessedGb: 250,
         loadBalancerHours: 730,
+        loadBalancerNewConnectionsPerSecond: 75,
+        loadBalancerActiveConnections: 9000,
+        loadBalancerRuleEvaluationsPerSecond: 1500,
         vpnConnectionCount: 2,
         vpnConnectionHours: 730,
         vpnDataTransferGb: 1000,
@@ -898,6 +901,12 @@ describe('ComparisonOrchestratorService', () => {
         }),
         expect.objectContaining({
           costComponent: 'networking',
+          skuId: 'modeled-load-balancer-lcu',
+          description: expect.stringContaining('3.00 LCU peak'),
+          baseMonthlyCostUsd: 17.52,
+        }),
+        expect.objectContaining({
+          costComponent: 'networking',
           skuId: 'modeled-vpn-connectivity',
           description: expect.stringContaining('2 connection(s), 730 hrs, 1000 GB transfer'),
           baseMonthlyCostUsd: 163,
@@ -911,7 +920,7 @@ describe('ComparisonOrchestratorService', () => {
       ]),
     );
     expect(result.providers[0].breakdown?.egressMonthlyCostUsd).toBe(87);
-    expect(result.providers[0].breakdown?.networkingMonthlyCostUsd).toBe(502.98);
+    expect(result.providers[0].breakdown?.networkingMonthlyCostUsd).toBe(520.5);
   });
 
   it('adds explicit modeled storage dimension line items when advanced storage assumptions exist', async () => {

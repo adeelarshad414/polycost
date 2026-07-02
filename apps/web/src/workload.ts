@@ -122,6 +122,9 @@ export interface WorkloadFormState {
   dnsQueriesMillion: string;
   loadBalancerProcessedGb: string;
   loadBalancerHours: string;
+  loadBalancerNewConnectionsPerSecond: string;
+  loadBalancerActiveConnections: string;
+  loadBalancerRuleEvaluationsPerSecond: string;
   vpnConnectionCount: string;
   vpnConnectionHours: string;
   vpnDataTransferGb: string;
@@ -254,6 +257,9 @@ type NumericWorkloadFormField =
   | 'dnsQueriesMillion'
   | 'loadBalancerProcessedGb'
   | 'loadBalancerHours'
+  | 'loadBalancerNewConnectionsPerSecond'
+  | 'loadBalancerActiveConnections'
+  | 'loadBalancerRuleEvaluationsPerSecond'
   | 'vpnConnectionCount'
   | 'vpnConnectionHours'
   | 'vpnDataTransferGb'
@@ -392,6 +398,9 @@ export const defaultWorkloadForm: WorkloadFormState = {
   dnsQueriesMillion: '0',
   loadBalancerProcessedGb: '0',
   loadBalancerHours: '0',
+  loadBalancerNewConnectionsPerSecond: '0',
+  loadBalancerActiveConnections: '0',
+  loadBalancerRuleEvaluationsPerSecond: '0',
   vpnConnectionCount: '0',
   vpnConnectionHours: '0',
   vpnDataTransferGb: '0',
@@ -1161,6 +1170,24 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
     730,
     'Load balancer hours must be between 0 and 730.',
   );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'loadBalancerNewConnectionsPerSecond',
+    'Load balancer new connections must be 0 per second or higher.',
+  );
+  optionalNonNegativeIntegerField(
+    issues,
+    form,
+    'loadBalancerActiveConnections',
+    'Load balancer active connections must be a whole number 0 or higher.',
+  );
+  optionalNonNegativeNumberField(
+    issues,
+    form,
+    'loadBalancerRuleEvaluationsPerSecond',
+    'Load balancer rule evaluations must be 0 per second or higher.',
+  );
   optionalNonNegativeIntegerField(
     issues,
     form,
@@ -1504,6 +1531,18 @@ export function buildNwsFromForm(
       ...optionalPositiveNumber('dnsQueriesMillion', form.dnsQueriesMillion),
       ...optionalPositiveNumber('loadBalancerProcessedGb', form.loadBalancerProcessedGb),
       ...optionalPositiveNumber('loadBalancerHours', form.loadBalancerHours),
+      ...optionalPositiveNumber(
+        'loadBalancerNewConnectionsPerSecond',
+        form.loadBalancerNewConnectionsPerSecond,
+      ),
+      ...optionalPositiveInteger(
+        'loadBalancerActiveConnections',
+        form.loadBalancerActiveConnections,
+      ),
+      ...optionalPositiveNumber(
+        'loadBalancerRuleEvaluationsPerSecond',
+        form.loadBalancerRuleEvaluationsPerSecond,
+      ),
       ...optionalPositiveInteger('vpnConnectionCount', form.vpnConnectionCount),
       ...optionalPositiveNumber('vpnConnectionHours', form.vpnConnectionHours),
       ...optionalPositiveNumber('vpnDataTransferGb', form.vpnDataTransferGb),
@@ -1814,6 +1853,18 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
     loadBalancerHours: numberToInput(
       nws.network.loadBalancerHours ?? Number(defaultWorkloadForm.loadBalancerHours),
     ),
+    loadBalancerNewConnectionsPerSecond: numberToInput(
+      nws.network.loadBalancerNewConnectionsPerSecond ??
+        Number(defaultWorkloadForm.loadBalancerNewConnectionsPerSecond),
+    ),
+    loadBalancerActiveConnections: numberToInput(
+      nws.network.loadBalancerActiveConnections ??
+        Number(defaultWorkloadForm.loadBalancerActiveConnections),
+    ),
+    loadBalancerRuleEvaluationsPerSecond: numberToInput(
+      nws.network.loadBalancerRuleEvaluationsPerSecond ??
+        Number(defaultWorkloadForm.loadBalancerRuleEvaluationsPerSecond),
+    ),
     vpnConnectionCount: numberToInput(
       nws.network.vpnConnectionCount ?? Number(defaultWorkloadForm.vpnConnectionCount),
     ),
@@ -2021,6 +2072,14 @@ export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceReq
         dnsQueriesMillion: parseOptionalNumber(form.dnsQueriesMillion) ?? 0,
         loadBalancerProcessedGb: parseOptionalNumber(form.loadBalancerProcessedGb) ?? 0,
         loadBalancerHours: parseBoundedNumber(form.loadBalancerHours, 0, 730, 0),
+        loadBalancerNewConnectionsPerSecond:
+          parseOptionalNumber(form.loadBalancerNewConnectionsPerSecond) ?? 0,
+        loadBalancerActiveConnections: parseNonNegativeInteger(
+          form.loadBalancerActiveConnections,
+          0,
+        ),
+        loadBalancerRuleEvaluationsPerSecond:
+          parseOptionalNumber(form.loadBalancerRuleEvaluationsPerSecond) ?? 0,
         ...(serviceType === 'monitoring' ||
         serviceType === 'logging-audit' ||
         serviceType === 'tracing-apm' ||
@@ -3355,6 +3414,12 @@ function formNumericValue(form: WorkloadFormState, field: NumericWorkloadFormFie
       return form.loadBalancerProcessedGb;
     case 'loadBalancerHours':
       return form.loadBalancerHours;
+    case 'loadBalancerNewConnectionsPerSecond':
+      return form.loadBalancerNewConnectionsPerSecond;
+    case 'loadBalancerActiveConnections':
+      return form.loadBalancerActiveConnections;
+    case 'loadBalancerRuleEvaluationsPerSecond':
+      return form.loadBalancerRuleEvaluationsPerSecond;
     case 'vpnConnectionCount':
       return form.vpnConnectionCount;
     case 'vpnConnectionHours':

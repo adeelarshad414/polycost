@@ -35,6 +35,69 @@ export class FormToNWSService {
         ...(isNumber(formInput.network?.estimatedMonthlyEgressGb)
           ? { estimatedMonthlyEgressGb: formInput.network.estimatedMonthlyEgressGb }
           : {}),
+        ...(isNumber(formInput.network?.crossAzTransferGb)
+          ? { crossAzTransferGb: formInput.network.crossAzTransferGb }
+          : {}),
+        ...(isNumber(formInput.network?.interRegionTransferGb)
+          ? { interRegionTransferGb: formInput.network.interRegionTransferGb }
+          : {}),
+        ...(isNumber(formInput.network?.cdnTrafficGb)
+          ? { cdnTrafficGb: formInput.network.cdnTrafficGb }
+          : {}),
+        ...(isNumber(formInput.network?.cdnCacheHitRatioPercent)
+          ? { cdnCacheHitRatioPercent: formInput.network.cdnCacheHitRatioPercent }
+          : {}),
+        ...(isNumber(formInput.network?.natGatewayGb)
+          ? { natGatewayGb: formInput.network.natGatewayGb }
+          : {}),
+        ...(isNumber(formInput.network?.natGatewayHours)
+          ? { natGatewayHours: formInput.network.natGatewayHours }
+          : {}),
+        ...(isNumber(formInput.network?.dnsHostedZones)
+          ? { dnsHostedZones: formInput.network.dnsHostedZones }
+          : {}),
+        ...(isNumber(formInput.network?.dnsQueriesMillion)
+          ? { dnsQueriesMillion: formInput.network.dnsQueriesMillion }
+          : {}),
+        ...(isNumber(formInput.network?.loadBalancerProcessedGb)
+          ? { loadBalancerProcessedGb: formInput.network.loadBalancerProcessedGb }
+          : {}),
+        ...(isNumber(formInput.network?.loadBalancerHours)
+          ? { loadBalancerHours: formInput.network.loadBalancerHours }
+          : {}),
+        ...(isNumber(formInput.network?.loadBalancerNewConnectionsPerSecond)
+          ? {
+              loadBalancerNewConnectionsPerSecond:
+                formInput.network.loadBalancerNewConnectionsPerSecond,
+            }
+          : {}),
+        ...(isNumber(formInput.network?.loadBalancerActiveConnections)
+          ? { loadBalancerActiveConnections: formInput.network.loadBalancerActiveConnections }
+          : {}),
+        ...(isNumber(formInput.network?.loadBalancerRuleEvaluationsPerSecond)
+          ? {
+              loadBalancerRuleEvaluationsPerSecond:
+                formInput.network.loadBalancerRuleEvaluationsPerSecond,
+            }
+          : {}),
+        ...(isNumber(formInput.network?.vpnConnectionCount)
+          ? { vpnConnectionCount: formInput.network.vpnConnectionCount }
+          : {}),
+        ...(isNumber(formInput.network?.vpnConnectionHours)
+          ? { vpnConnectionHours: formInput.network.vpnConnectionHours }
+          : {}),
+        ...(isNumber(formInput.network?.vpnDataTransferGb)
+          ? { vpnDataTransferGb: formInput.network.vpnDataTransferGb }
+          : {}),
+        ...(isNumber(formInput.network?.privateCircuitCount)
+          ? { privateCircuitCount: formInput.network.privateCircuitCount }
+          : {}),
+        ...(isNumber(formInput.network?.privateCircuitPortHours)
+          ? { privateCircuitPortHours: formInput.network.privateCircuitPortHours }
+          : {}),
+        ...(isNumber(formInput.network?.privateCircuitDataTransferGb)
+          ? { privateCircuitDataTransferGb: formInput.network.privateCircuitDataTransferGb }
+          : {}),
         cdn: formInput.network?.cdn ?? false,
         loadBalancer: formInput.network?.loadBalancer ?? false,
       },
