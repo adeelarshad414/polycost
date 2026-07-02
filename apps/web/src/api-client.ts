@@ -28,6 +28,8 @@ import {
 const DEFAULT_API_BASE_URL = '/api/v1';
 const EXPORT_JOB_POLL_INTERVAL_MS = 500;
 const EXPORT_JOB_MAX_ATTEMPTS = 120;
+const GENERIC_BROWSER_ERROR_MESSAGE =
+  'PolyCost hit an unexpected browser-side issue while preparing the request. Refresh the page and try again.';
 
 interface ExportComparisonOptions {
   interval?: IntervalKey;
@@ -411,8 +413,13 @@ async function toApiError(response: Response): Promise<PolyCostApiError> {
 
 export function formatApiError(error: unknown): string {
   if (error instanceof PolyCostApiError) {
-    const details = error.details.map((detail) => detail.issue).join(' ');
-    return details ? `${error.message} ${details}` : error.message;
+    const message = safeUserFacingErrorMessage(error.message, fallbackHttpErrorMessage(error.status));
+    const details = error.details
+      .map((detail) => safeUserFacingErrorMessage(detail.issue, ''))
+      .filter(Boolean)
+      .join(' ');
+
+    return details ? `${message} ${details}` : message;
   }
 
   if (error instanceof Error) {
@@ -420,10 +427,37 @@ export function formatApiError(error: unknown): string {
       return 'PolyCost could not reach the API service. Start the backend or check the API base URL, then try again.';
     }
 
-    return error.message;
+    return safeUserFacingErrorMessage(error.message, GENERIC_BROWSER_ERROR_MESSAGE);
   }
 
-  return 'PolyCost hit an unexpected browser-side issue while preparing the request. Refresh the page and try again.';
+  return GENERIC_BROWSER_ERROR_MESSAGE;
+}
+
+function safeUserFacingErrorMessage(message: string, fallback: string): string {
+  const trimmed = message.trim();
+
+  if (!trimmed || looksLikeRawTechnicalError(trimmed)) {
+    return fallback;
+  }
+
+  const firstLine = trimmed.split(/\r?\n/)[0]?.trim() ?? '';
+
+  if (!firstLine || looksLikeRawTechnicalError(firstLine)) {
+    return fallback;
+  }
+
+  return firstLine.replace(/^(Error|TypeError|SyntaxError|ReferenceError):\s+/u, '').slice(0, 280);
+}
+
+function looksLikeRawTechnicalError(message: string): boolean {
+  const compact = message.trim();
+
+  return (
+    compact.includes('[object Object]') ||
+    /\bat\s+\S+\s+\([^)]*:\d+:\d+\)/u.test(message) ||
+    /\bat\s+[^(\n]+:\d+:\d+/u.test(message) ||
+    (compact.startsWith('{') && compact.endsWith('}'))
+  );
 }
 
 function fallbackHttpErrorMessage(status: number): string {

@@ -810,6 +810,21 @@ describe('api client', () => {
       ),
     ).toBe('Invalid NWS compute is required');
     expect(formatApiError(new Error('Broken'))).toBe('Broken');
+    expect(formatApiError(new Error('[object Object]'))).toBe(
+      'PolyCost hit an unexpected browser-side issue while preparing the request. Refresh the page and try again.',
+    );
+    expect(formatApiError(new Error('Error: hidden stack\n    at run (/tmp/app.js:1:2)'))).toBe(
+      'PolyCost hit an unexpected browser-side issue while preparing the request. Refresh the page and try again.',
+    );
+    expect(formatApiError(new Error('TypeError: Region picker failed'))).toBe(
+      'Region picker failed',
+    );
+    expect(formatApiError(new PolyCostApiError(400, 'BAD_BODY', '[object Object]'))).toBe(
+      'PolyCost could not use that request. Review the workload inputs and try again.',
+    );
+    expect(formatApiError(new PolyCostApiError(422, 'BAD_BODY', '{"message":"bad"}'))).toBe(
+      'PolyCost could not validate that workload. Review the highlighted fields and try again.',
+    );
     expect(formatApiError(new TypeError('Failed to fetch'))).toBe(
       'PolyCost could not reach the API service. Start the backend or check the API base URL, then try again.',
     );

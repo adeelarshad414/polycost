@@ -3990,6 +3990,54 @@ select:disabled {
   stroke-linejoin: round;
 }
 
+.app-fatal-state {
+  display: grid;
+  width: min(100% - 32px, 680px);
+  margin: min(18vh, 160px) auto;
+  gap: var(--pc-space-2);
+  border: 1px solid color-mix(in srgb, var(--pc-error) 40%, var(--pc-border));
+  border-radius: var(--pc-radius-card);
+  background: color-mix(in srgb, var(--pc-error-soft) 55%, var(--pc-bg-surface));
+  box-shadow: var(--pc-shadow-soft);
+  padding: clamp(24px, 5vw, 42px);
+}
+
+.app-fatal-state-kicker {
+  color: var(--pc-error);
+  font-size: var(--pc-text-xs);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app-fatal-state h1 {
+  margin: 0;
+  color: var(--pc-text-primary);
+  font-size: var(--pc-text-2xl);
+  line-height: 1.1;
+}
+
+.app-fatal-state p {
+  max-width: 58ch;
+  margin: 0;
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-md);
+  line-height: 1.7;
+}
+
+.app-fatal-state button {
+  justify-self: start;
+  min-height: 44px;
+  border: 1px solid var(--pc-landing-primary-action);
+  border-radius: 8px;
+  background: var(--pc-landing-primary-action);
+  color: var(--on-primary-action);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  padding: 0 var(--pc-space-2);
+}
+
 .status-message {
   color: var(--pc-success);
   background: var(--pc-success-soft);
