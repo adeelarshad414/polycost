@@ -768,6 +768,66 @@ describe('report generators', () => {
       ]),
     );
 
+    const baseRequirements = comparison.requirements as NonNullable<ComparisonResult['requirements']>;
+    const monitoringOnlyComparison: ComparisonResult = {
+      ...comparison,
+      requirements: {
+        ...baseRequirements,
+        serviceRequirements: [
+          {
+            serviceCategory: 'operations',
+            serviceType: 'monitoring-observability',
+            quantity: 1,
+          },
+        ],
+      },
+      providers: [
+        {
+          providerId: 'aws',
+          lineItems: [
+            {
+              category: 'operations',
+              costComponent: 'operations',
+              description: 'monitoring metrics and log retention',
+              isApproximate: true,
+              baseMonthlyCostUsd: 12,
+            },
+          ],
+          totals: {
+            daily: 0.4,
+            weekly: 2.8,
+            monthly: 12,
+            quarterly: 36,
+            yearly: 144,
+          },
+        },
+      ],
+    };
+    expect(costCoverageMapRows(monitoringOnlyComparison)).toEqual(
+      expect.arrayContaining([
+        [
+          'aws',
+          'Storage classes, snapshots, and retrieval',
+          'Not configured',
+          '0',
+          '0',
+          '',
+          'No storage requirement or priced row detected for aws.',
+          expect.stringContaining('Validate storage class'),
+        ],
+        [
+          'aws',
+          'Monitoring, observability, secrets, WAF, and security operations',
+          'Partial',
+          '1',
+          '1',
+          '12',
+          expect.stringContaining('monitoring metrics and log retention'),
+          expect.stringContaining('Validate logs'),
+        ],
+      ]),
+    );
+
     expect(methodologySourceRows(comparison)).toEqual(
       expect.arrayContaining([
         [
@@ -802,6 +862,11 @@ describe('report generators', () => {
           expect.stringContaining('Provider adapter monthly subtotal'),
         ]),
       ]),
+    );
+    const skuMappingRows = skuMappingAppendixRows(comparison);
+    const skuMappingColumnCount = skuMappingRows[0].length;
+    expect(skuMappingRows.slice(1).every((row) => row.length === skuMappingColumnCount)).toBe(
+      true,
     );
 
     expect(workloadScopeRows(comparison)).toEqual(

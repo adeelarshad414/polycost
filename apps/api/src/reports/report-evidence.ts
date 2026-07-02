@@ -354,7 +354,7 @@ const COST_COVERAGE_DIMENSIONS: CostCoverageDimension[] = [
       'Validate storage class, operations, retrieval, replication, minimum-duration exposure, snapshot retention, IOPS, multi-attach, and lifecycle policies.',
     matches: (lineItem) =>
       lineItem.category === 'storage' ||
-      /storage|snapshot|retrieval|replication|lifecycle|archive|backup|minimum-duration|monitoring|multi-attach/i.test(
+      /storage|snapshot|retrieval|replication|lifecycle|archive|backup|minimum-duration|multi-attach/i.test(
         lineItem.description,
       ),
   },
