@@ -1099,12 +1099,22 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Run a comparison to populate AWS service bars.');
     expect(text(container)).toContain('Ready to compare');
     expect(text(container)).toContain('Describe infrastructure');
+    expect(text(container)).toContain('Add services to see your comparison');
+    expect(text(container)).toContain('Add services');
     expect(
       container.querySelector('.comparison-empty-illustration'),
     ).toBeInstanceOf(SVGSVGElement);
+    expect(container.querySelector('.engineering-empty-illustration')).toBeInstanceOf(
+      SVGSVGElement,
+    );
     expect(
       container
         .querySelector<HTMLAnchorElement>('a[aria-label="Describe your infrastructure above"]')
+        ?.getAttribute('href'),
+    ).toBe('#requirements');
+    expect(
+      container
+        .querySelector<HTMLAnchorElement>('a[aria-label="Add services to see your comparison"]')
         ?.getAttribute('href'),
     ).toBe('#requirements');
     expect(text(container)).not.toContain('Pricing unavailable');
@@ -1189,9 +1199,8 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain(
       'Mapping provider SKUs, totals, export links, and engineering rows from the backend response.',
     );
-    expect(text(container)).toContain(
-      'Building engineering rows from mapped AWS, Azure, and GCP line items.',
-    );
+    expect(text(container)).toContain('Building engineering rows');
+    expect(text(container)).toContain('Mapping AWS, Azure, and GCP line items');
     expect(text(container)).toContain('API JSON will activate when this comparison finishes');
 
     unmount();

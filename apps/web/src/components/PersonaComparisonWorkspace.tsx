@@ -401,9 +401,6 @@ function EngineeringPersonaView({
   onTagFilterChange: (tag: string) => void;
 }) {
   const [showAllRows, setShowAllRows] = useState(false);
-  const emptyRowsMessage = isLoading
-    ? 'Building engineering rows from mapped AWS, Azure, and GCP line items.'
-    : 'Run a comparison to populate engineering rows with provider, region, SKU, and monthly cost evidence.';
   const apiJsonPendingMessage = isLoading
     ? 'API JSON will activate when this comparison finishes'
     : 'Run a comparison to open API JSON';
@@ -499,8 +496,13 @@ function EngineeringPersonaView({
                 ))
               ) : (
                 <tr>
-                  <td className="px-3 py-8 text-center text-text-secondary" colSpan={5}>
-                    {emptyRowsMessage}
+                  <td className="px-3 py-8" colSpan={5}>
+                    <EngineeringRowsEmptyState
+                      hasComparison={Boolean(data.comparisonId)}
+                      isFiltered={tagFilter !== 'all'}
+                      isLoading={isLoading}
+                      onClearFilters={() => onTagFilterChange('all')}
+                    />
                   </td>
                 </tr>
               )}
@@ -588,6 +590,130 @@ function EngineeringPersonaView({
         </div>
       </div>
     </div>
+  );
+}
+
+function EngineeringRowsEmptyState({
+  hasComparison,
+  isFiltered,
+  isLoading,
+  onClearFilters,
+}: {
+  hasComparison: boolean;
+  isFiltered: boolean;
+  isLoading: boolean;
+  onClearFilters: () => void;
+}) {
+  if (isLoading) {
+    return (
+      <div
+        className="mx-auto grid max-w-2xl place-items-center gap-3 rounded-lg border border-dashed border-border bg-surface-0 p-5 text-center text-sm text-text-secondary"
+        aria-busy="true"
+        role="status"
+      >
+        <span
+          className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-action-primary motion-reduce:animate-none"
+          aria-hidden="true"
+        />
+        <strong className="text-text-primary">Building engineering rows</strong>
+        <span>
+          Mapping AWS, Azure, and GCP line items into provider, region, SKU, and monthly cost
+          evidence.
+        </span>
+      </div>
+    );
+  }
+
+  if (isFiltered) {
+    return (
+      <div className="mx-auto grid max-w-2xl place-items-center gap-3 rounded-lg border border-dashed border-border bg-surface-0 p-5 text-center text-sm text-text-secondary">
+        <NoResultsIllustration />
+        <strong className="text-base font-semibold text-text-primary">
+          No services match your filters
+        </strong>
+        <span>Clear the tag filter to restore every mapped service row in this comparison.</span>
+        <button
+          type="button"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border-strong bg-surface-1 px-4 py-2 text-sm font-semibold text-text-primary transition hover:bg-surface-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
+          onClick={onClearFilters}
+        >
+          Clear filters
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto grid max-w-2xl place-items-center gap-3 rounded-lg border border-dashed border-border bg-surface-0 p-5 text-center text-sm text-text-secondary">
+      <EmptyServicesIllustration />
+      <strong className="text-base font-semibold text-text-primary">
+        {hasComparison ? 'No services added yet' : 'Add services to see your comparison'}
+      </strong>
+      <span>
+        {hasComparison
+          ? 'This comparison returned no priced service rows. Add compute, storage, database, or networking services and compare again.'
+          : 'Describe your infrastructure above to populate provider, region, SKU, and monthly cost rows.'}
+      </span>
+      <a
+        href="#requirements"
+        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-action-primary bg-action-primary px-4 py-2 text-sm font-semibold text-[color:var(--on-primary-action)] shadow-sm transition hover:bg-action-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
+        aria-label="Add services to see your comparison"
+      >
+        Add services
+      </a>
+    </div>
+  );
+}
+
+function EmptyServicesIllustration() {
+  return (
+    <svg
+      viewBox="0 0 80 80"
+      aria-hidden="true"
+      className="engineering-empty-illustration h-20 w-20 text-text-muted"
+      fill="none"
+    >
+      <rect
+        x="17"
+        y="18"
+        width="46"
+        height="42"
+        rx="8"
+        stroke="currentColor"
+        strokeWidth="3"
+      />
+      <path
+        d="M28 30h24M28 40h24M28 50h12"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="3"
+      />
+      <path d="M22 66h36" stroke="currentColor" strokeLinecap="round" strokeWidth="3" />
+    </svg>
+  );
+}
+
+function NoResultsIllustration() {
+  return (
+    <svg
+      viewBox="0 0 80 80"
+      aria-hidden="true"
+      className="engineering-filter-empty-illustration h-20 w-20 text-text-muted"
+      fill="none"
+    >
+      <path
+        d="M18 20h44L47 38v15l-14 7V38L18 20Z"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="3"
+      />
+      <path
+        d="M55 55l10 10M65 55 55 65"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="3"
+      />
+    </svg>
   );
 }
 
