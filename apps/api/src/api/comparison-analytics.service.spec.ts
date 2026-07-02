@@ -291,39 +291,50 @@ describe('ComparisonAnalyticsService', () => {
         }),
       ]),
     );
-    expect(analytics.regionVarianceHeatMap).toEqual([
-      expect.objectContaining({
-        comparisonRegion: 'eu-west',
-        label: 'Europe West',
-        multiplier: 1.08,
-        isSelected: true,
-        complianceEligible: true,
-        lowestProviderId: 'azure',
-        providers: [
-          {
-            providerId: 'aws',
-            providerRegion: 'eu-west-1',
-            modeledMonthlyUsd: 1080,
-            deltaVsSelectedMonthlyUsd: 80,
-            isLowest: false,
-          },
-          {
-            providerId: 'azure',
-            providerRegion: 'westeurope',
-            modeledMonthlyUsd: 864,
-            deltaVsSelectedMonthlyUsd: 64,
-            isLowest: true,
-          },
-          {
-            providerId: 'gcp',
-            providerRegion: 'europe-west1',
-            modeledMonthlyUsd: 972,
-            deltaVsSelectedMonthlyUsd: 72,
-            isLowest: false,
-          },
-        ],
-      }),
-    ]);
+    expect(analytics.regionVarianceHeatMap).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          comparisonRegion: 'eu-west',
+          label: 'Europe West',
+          multiplier: 1.08,
+          isSelected: true,
+          complianceEligible: true,
+          lowestProviderId: 'azure',
+          providers: [
+            {
+              providerId: 'aws',
+              providerRegion: 'eu-west-1',
+              modeledMonthlyUsd: 1080,
+              deltaVsSelectedMonthlyUsd: 80,
+              isLowest: false,
+            },
+            {
+              providerId: 'azure',
+              providerRegion: 'westeurope',
+              modeledMonthlyUsd: 864,
+              deltaVsSelectedMonthlyUsd: 64,
+              isLowest: true,
+            },
+            {
+              providerId: 'gcp',
+              providerRegion: 'europe-west1',
+              modeledMonthlyUsd: 972,
+              deltaVsSelectedMonthlyUsd: 72,
+              isLowest: false,
+            },
+          ],
+        }),
+      ]),
+    );
+    expect(analytics.regionVarianceHeatMap).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          comparisonRegion: 'eu-central',
+          label: 'Europe Central',
+          complianceEligible: true,
+        }),
+      ]),
+    );
     expect(analytics.egressNetworkingDetails).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

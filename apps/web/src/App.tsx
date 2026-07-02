@@ -149,6 +149,11 @@ const REGION_VARIANCE_PROFILES = [
     evidence: 'Baseline North America pricing sensitivity.',
   },
   {
+    regionId: 'us-central',
+    multiplier: 0.99,
+    evidence: 'Modeled 1% regional discount for central US capacity sensitivity.',
+  },
+  {
     regionId: 'us-west',
     multiplier: 1.03,
     evidence: 'Modeled 3% regional premium for west-coast capacity sensitivity.',
@@ -157,6 +162,21 @@ const REGION_VARIANCE_PROFILES = [
     regionId: 'eu-west',
     multiplier: 1.08,
     evidence: 'Modeled 8% regional premium for EU residency/compliance sensitivity.',
+  },
+  {
+    regionId: 'eu-central',
+    multiplier: 1.09,
+    evidence: 'Modeled 9% regional premium for EU central capacity sensitivity.',
+  },
+  {
+    regionId: 'uk',
+    multiplier: 1.1,
+    evidence: 'Modeled 10% regional premium for UK residency sensitivity.',
+  },
+  {
+    regionId: 'canada',
+    multiplier: 1.04,
+    evidence: 'Modeled 4% regional premium for Canada residency sensitivity.',
   },
   {
     regionId: 'ap-southeast',

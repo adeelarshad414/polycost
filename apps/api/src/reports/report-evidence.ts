@@ -5,6 +5,10 @@ import {
   ComparisonResult,
 } from '../comparison/comparison.types';
 import { ServiceRequirement } from '../nws/nws.types';
+import {
+  providerRegionForCanonicalRegion,
+  supportedCanonicalRegions,
+} from '../pricing-normalization/region-map';
 import { ReportInterval, ReportOptions, ReportPricingModel } from './report.types';
 
 const REPORT_PRICING_MODELS: ReportPricingModel[] = [
@@ -15,33 +19,11 @@ const REPORT_PRICING_MODELS: ReportPricingModel[] = [
   'spot',
 ];
 
-const REGION_VARIANCE_PROFILES = [
-  {
-    region: 'us-east',
-    multiplier: 1,
-    evidence: 'Baseline North America pricing sensitivity.',
-  },
-  {
-    region: 'us-west',
-    multiplier: 1.03,
-    evidence: 'Modeled 3% regional premium for west-coast capacity sensitivity.',
-  },
-  {
-    region: 'eu-west',
-    multiplier: 1.08,
-    evidence: 'Modeled 8% regional premium for EU residency/compliance sensitivity.',
-  },
-  {
-    region: 'ap-southeast',
-    multiplier: 1.12,
-    evidence: 'Modeled 12% regional premium for APAC latency/residency sensitivity.',
-  },
-  {
-    region: 'ap-south',
-    multiplier: 0.96,
-    evidence: 'Modeled 4% discount sensitivity for lower-cost APAC alternatives.',
-  },
-] as const;
+const REGION_VARIANCE_PROFILES = supportedCanonicalRegions().map((region) => ({
+  region,
+  multiplier: regionVarianceMultiplier(region),
+  evidence: regionVarianceEvidence(region),
+}));
 
 export interface RegionComparisonEvidenceRow {
   providerId: string;
@@ -4504,31 +4486,53 @@ function operationsAdvancedDescription(description: string): boolean {
 }
 
 function providerRegionLabel(providerId: string, comparisonRegion: string): string {
-  const regionMap: Record<string, Record<string, string>> = {
-    aws: {
-      'us-east': 'us-east-1',
-      'us-west': 'us-west-2',
-      'eu-west': 'eu-west-1',
-      'ap-southeast': 'ap-southeast-1',
-      'ap-south': 'ap-south-1',
-    },
-    azure: {
-      'us-east': 'eastus',
-      'us-west': 'westus2',
-      'eu-west': 'westeurope',
-      'ap-southeast': 'southeastasia',
-      'ap-south': 'centralindia',
-    },
-    gcp: {
-      'us-east': 'us-east1',
-      'us-west': 'us-west1',
-      'eu-west': 'europe-west1',
-      'ap-southeast': 'asia-southeast1',
-      'ap-south': 'asia-south1',
-    },
-  };
+  if (providerId === 'aws' || providerId === 'azure' || providerId === 'gcp') {
+    return providerRegionForCanonicalRegion(comparisonRegion, providerId) ?? comparisonRegion;
+  }
 
-  return regionMap[providerId]?.[comparisonRegion] ?? comparisonRegion;
+  return comparisonRegion;
+}
+
+function regionVarianceMultiplier(region: string): number {
+  switch (region) {
+    case 'us-east':
+      return 1;
+    case 'us-central':
+      return 0.99;
+    case 'us-west':
+      return 1.03;
+    case 'canada':
+      return 1.04;
+    case 'eu-west':
+      return 1.08;
+    case 'eu-central':
+      return 1.09;
+    case 'uk':
+      return 1.1;
+    case 'ap-south':
+      return 0.96;
+    case 'ap-southeast':
+      return 1.12;
+    default:
+      return 1;
+  }
+}
+
+function regionVarianceEvidence(region: string): string {
+  const multiplier = regionVarianceMultiplier(region);
+  const deltaPercent = Math.round((multiplier - 1) * 100);
+
+  if (region === 'us-east') {
+    return 'Baseline North America pricing sensitivity.';
+  }
+
+  if (deltaPercent === 0) {
+    return 'Modeled neutral regional sensitivity for comparable capacity planning.';
+  }
+
+  const direction = deltaPercent > 0 ? 'premium' : 'discount';
+
+  return `Modeled ${Math.abs(deltaPercent)}% regional ${direction} for ${region} capacity sensitivity.`;
 }
 
 function costForInterval(monthly: number, interval: ReportInterval): number {
