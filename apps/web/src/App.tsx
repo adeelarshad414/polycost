@@ -2089,17 +2089,13 @@ function ProgressiveComparisonPage({
 
             <ProviderSummaryCards comparison={comparison} interval={interval} />
 
-            <div
-              className="progressive-analytics-stack"
-              aria-label="Executive and engineering analytics"
-            >
+            <div className="progressive-analytics-stack" aria-label="Executive analytics">
               <ExecutiveAnalyticsPreview
                 comparison={comparison}
                 form={submittedForm}
                 pricingModel={pricingModel}
                 analytics={comparisonAnalytics}
               />
-              <EngineeringAnalyticsPreview comparison={comparison} interval={interval} />
             </div>
 
             <div className="result-disclosure-stack" aria-label="Additional comparison details">
@@ -6944,63 +6940,6 @@ function ExecutiveStatTile({
       <strong>{value}</strong>
       <small>{detail}</small>
     </article>
-  );
-}
-
-function EngineeringAnalyticsPreview({
-  comparison,
-  interval,
-}: {
-  comparison: ComparisonResult | null;
-  interval: IntervalKey;
-}) {
-  const analytics = engineeringAnalyticsModel(comparison, interval);
-
-  return (
-    <section className="engineering-analytics-preview" aria-label="Engineering analytics dashboard">
-      <div className="engineering-preview-header">
-        <div>
-          <span>Engineering service spend</span>
-          <h3>Cost-by-service concentration</h3>
-        </div>
-        <strong>{capitalize(interval)} view</strong>
-      </div>
-
-      <EngineeringServiceChartGrid analytics={analytics} compact />
-
-      <div className="engineering-signal-strip" aria-label="Engineering data signals">
-        <EngineeringSignal
-          label="Line items"
-          value={analytics.totalLineItems > 0 ? String(analytics.totalLineItems) : 'Pending'}
-          detail="Provider-returned cost drivers"
-        />
-        <EngineeringSignal
-          label="Approximate mappings"
-          value={String(analytics.approximateCount)}
-          detail="Require architecture review"
-          tone={analytics.approximateCount > 0 ? 'review' : 'ready'}
-        />
-        <EngineeringSignal
-          label="Top driver"
-          value={
-            analytics.topDriver
-              ? `${providerServiceLabel(
-                  analytics.topDriver.providerId,
-                  analytics.topDriver.service.category,
-                )}`
-              : 'Pending'
-          }
-          detail={
-            analytics.topDriver
-              ? `${providerLabel(analytics.topDriver.providerId)} · ${formatCurrency(
-                  analytics.topDriver.service.value,
-                )}`
-              : 'Awaiting provider costs'
-          }
-          providerId={analytics.topDriver?.providerId}
-        />
-      </div>
-    </section>
   );
 }
 
@@ -13927,36 +13866,6 @@ function engineeringChartDimensions(
   }
 
   return { width: compact ? 238 : 276, height: compact ? 138 : 164 };
-}
-
-function EngineeringSignal({
-  detail,
-  label,
-  providerId,
-  tone,
-  value,
-}: {
-  detail: string;
-  label: string;
-  providerId?: ProviderId;
-  tone?: 'ready' | 'review';
-  value: string;
-}) {
-  const className = [
-    'engineering-signal',
-    providerId ? `engineering-signal-${providerId}` : undefined,
-    tone ? `engineering-signal-${tone}` : undefined,
-  ]
-    .filter(Boolean)
-    .join(' ');
-
-  return (
-    <article className={className}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <small>{detail}</small>
-    </article>
-  );
 }
 
 function ProviderCostWorkspace({

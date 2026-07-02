@@ -124,8 +124,9 @@ describe('App', () => {
     expect(text(container)).toContain('$90.00 over 90 days');
     expect(container.querySelector('.recharts-wrapper')).toBeInstanceOf(HTMLElement);
     expect(text(container)).toContain('Show full breakdown, pricing models & export options');
-    expect(text(container)).toContain('Engineering service spend');
-    expect(text(container)).toContain('Cost-by-service concentration');
+    expect(text(container)).not.toContain('Engineering cost controls');
+    expect(text(container)).not.toContain('Service driver split');
+    expect(text(container)).not.toContain('Provider cost by mapped service family');
     expect(text(container)).not.toContain('Cost periods & executive analytics');
     expect(text(container)).not.toContain('Pricing models, breakdown, budget & share');
     expect(text(container)).not.toContain('Architecture & engineering evidence');
@@ -495,7 +496,8 @@ describe('App', () => {
     expect(text(container)).toContain('Export summary');
     expect(detailGate.dataset.open).toBe('true');
     expect(text(container)).toContain('Engineering cost controls');
-    expect(text(container)).toContain('Engineering service spend');
+    expect(text(container)).toContain('Service driver split');
+    expect(text(container)).toContain('Provider cost by mapped service family');
     expect(text(container)).toContain('Backend cost coverage map');
     expect(text(container)).toContain('Backend-modeled baseline region sensitivity.');
     expect(text(container)).toContain('Backend commitment exposure');
