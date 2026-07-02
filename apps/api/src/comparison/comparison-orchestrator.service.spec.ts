@@ -1561,75 +1561,78 @@ describe('ComparisonOrchestratorService', () => {
     );
   });
 
-  it('adds modeled app platform request-based line items', async () => {
-    const service = createService([
-      adapter(
-        'aws',
-        jest.fn(async (): Promise<ProviderPricingResult> => ({
-          providerId: 'aws',
-          baseMonthlyCostUsd: 10,
-          lineItems: [
-            {
-              category: 'compute',
-              costComponent: 'compute',
-              description: 'aws compute',
-              isApproximate: false,
-              baseMonthlyCostUsd: 10,
-              skuId: 'aws-compute',
-              region: 'us-east-1',
-              unit: 'hour',
-              unitPriceUsd: 0.01,
+  it.each(['app-platform', 'serverless-containers'])(
+    'adds modeled %s request-based line items',
+    async (serviceType) => {
+      const service = createService([
+        adapter(
+          'aws',
+          jest.fn(async (): Promise<ProviderPricingResult> => ({
+            providerId: 'aws',
+            baseMonthlyCostUsd: 10,
+            lineItems: [
+              {
+                category: 'compute',
+                costComponent: 'compute',
+                description: 'aws compute',
+                isApproximate: false,
+                baseMonthlyCostUsd: 10,
+                skuId: 'aws-compute',
+                region: 'us-east-1',
+                unit: 'hour',
+                unitPriceUsd: 0.01,
+              },
+            ],
+          })),
+        ),
+      ]);
+
+      const result = await service.compare({
+        ...validWorkload,
+        serviceRequirements: [
+          {
+            serviceCategory: serviceType === 'app-platform' ? 'application' : 'containers',
+            serviceType,
+            quantity: 1,
+            scaleParams: {
+              appPlatformRequestsMillion: 10,
+              appPlatformRequestDurationMs: 400,
+              appPlatformVcpu: 1,
+              appPlatformMemoryGb: 0.5,
+              appPlatformAlwaysOnHours: 730,
+              appPlatformMinInstances: 1,
             },
-          ],
-        })),
-      ),
-    ]);
-
-    const result = await service.compare({
-      ...validWorkload,
-      serviceRequirements: [
-        {
-          serviceCategory: 'application',
-          serviceType: 'app-platform',
-          quantity: 1,
-          scaleParams: {
-            appPlatformRequestsMillion: 10,
-            appPlatformRequestDurationMs: 400,
-            appPlatformVcpu: 1,
-            appPlatformMemoryGb: 0.5,
-            appPlatformAlwaysOnHours: 730,
-            appPlatformMinInstances: 1,
           },
-        },
-      ],
-    });
+        ],
+      });
 
-    expect(result.providers[0].lineItems).toEqual(
-      expect.arrayContaining([
+      expect(result.providers[0].lineItems).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            category: 'compute',
+            skuId: 'modeled-app-platform-requests',
+            baseMonthlyCostUsd: 0,
+            unit: '1M requests',
+          }),
+          expect.objectContaining({
+            skuId: 'modeled-app-platform-request-compute',
+            baseMonthlyCostUsd: 71.11,
+            unit: 'vCPU-hour',
+          }),
+          expect.objectContaining({
+            skuId: 'modeled-app-platform-request-memory',
+            baseMonthlyCostUsd: 3.89,
+            unit: 'GB-hour',
+          }),
+        ]),
+      );
+      expect(result.providers[0].breakdown).toEqual(
         expect.objectContaining({
-          category: 'compute',
-          skuId: 'modeled-app-platform-requests',
-          baseMonthlyCostUsd: 0,
-          unit: '1M requests',
+          computeMonthlyCostUsd: 85,
         }),
-        expect.objectContaining({
-          skuId: 'modeled-app-platform-request-compute',
-          baseMonthlyCostUsd: 71.11,
-          unit: 'vCPU-hour',
-        }),
-        expect.objectContaining({
-          skuId: 'modeled-app-platform-request-memory',
-          baseMonthlyCostUsd: 3.89,
-          unit: 'GB-hour',
-        }),
-      ]),
-    );
-    expect(result.providers[0].breakdown).toEqual(
-      expect.objectContaining({
-        computeMonthlyCostUsd: 85,
-      }),
-    );
-  });
+      );
+    },
+  );
 
   it('adds modeled analytics platform line items', async () => {
     const service = createService([

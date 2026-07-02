@@ -11591,7 +11591,9 @@ function appPlatformModelRows(
       `${lineItem.skuId ?? ''} ${lineItem.description}`.toLowerCase().includes('app platform'),
     ),
   );
-  const appPlatformSelected = form.selectedServiceFamilyIds.includes('app-platform');
+  const appPlatformSelected =
+    form.selectedServiceFamilyIds.includes('app-platform') ||
+    form.selectedServiceFamilyIds.includes('serverless-containers');
 
   if (requestsMillion <= 0 && !hasAppPlatformLineItems && !appPlatformSelected) {
     return [];

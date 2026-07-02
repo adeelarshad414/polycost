@@ -35,6 +35,31 @@ describe('workload helpers', () => {
     );
   });
 
+  it('serializes serverless container runtime drivers into the NWS', () => {
+    const nws = buildNwsFromForm({
+      ...defaultWorkloadForm,
+      selectedServiceFamilyId: 'serverless-containers',
+      selectedServiceFamilyIds: ['serverless-containers'],
+      appPlatformRequestsMillion: '12',
+      appPlatformRequestDurationMs: '350',
+      appPlatformVcpu: '2',
+      appPlatformMemoryGb: '1',
+    });
+
+    expect(nws.serviceRequirements).toContainEqual(
+      expect.objectContaining({
+        serviceCategory: 'containers',
+        serviceType: 'serverless-containers',
+        scaleParams: expect.objectContaining({
+          appPlatformRequestsMillion: 12,
+          appPlatformRequestDurationMs: 350,
+          appPlatformVcpu: 2,
+          appPlatformMemoryGb: 1,
+        }),
+      }),
+    );
+  });
+
   it('builds a valid NWS from the structured form', () => {
     const nws = buildNwsFromForm({
       ...defaultWorkloadForm,

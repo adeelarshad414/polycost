@@ -2108,6 +2108,8 @@ export class ComparisonOrchestratorService {
     const regionLabel = nws.workload.region.preference ?? 'default region';
     const values = runtimeServicesAssumptions(requirements);
     const lineItems: ComparisonLineItem[] = [];
+    const hasAppPlatformRuntime =
+      serviceTypes.has('app-platform') || serviceTypes.has('serverless-containers');
 
     if (serviceTypes.has('serverless-functions') && values.functionInvocationsMillion > 0) {
       const invocations = values.functionInvocationsMillion * 1_000_000;
@@ -2139,7 +2141,7 @@ export class ComparisonOrchestratorService {
       );
     }
 
-    if (serviceTypes.has('app-platform') && values.appPlatformRequestsMillion > 0) {
+    if (hasAppPlatformRuntime && values.appPlatformRequestsMillion > 0) {
       const activeHours =
         (values.appPlatformRequestsMillion *
           1_000_000 *

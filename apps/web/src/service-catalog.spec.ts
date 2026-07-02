@@ -5,6 +5,7 @@ describe('service catalog coverage labels', () => {
     const pricedFamilyIds = [
       'serverless-functions',
       'container-orchestration',
+      'serverless-containers',
       'container-registry',
       'app-platform',
       'api-gateway',

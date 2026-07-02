@@ -2105,6 +2105,7 @@ export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceReq
           : {}),
         ...(serviceType === 'serverless-functions' ||
         serviceType === 'app-platform' ||
+        serviceType === 'serverless-containers' ||
         serviceType === 'container-orchestration' ||
         serviceType === 'container-registry'
           ? runtimeScaleParamsFromForm(form)

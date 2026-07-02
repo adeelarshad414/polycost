@@ -66,8 +66,8 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Azure Kubernetes Service'],
     gcp: ['Google Kubernetes Engine'],
   }),
-  family('serverless-containers', 'containers', 'Serverless containers', 'mapped', {
-    aws: ['AWS Fargate', 'Amazon ECS'],
+  family('serverless-containers', 'containers', 'Serverless containers', 'priced', {
+    aws: ['AWS App Runner', 'AWS Fargate'],
     azure: ['Azure Container Apps', 'Azure Container Instances'],
     gcp: ['Cloud Run'],
   }),
