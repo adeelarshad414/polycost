@@ -7,6 +7,7 @@ import {
   THEME_STORAGE_KEY,
 } from './theme';
 import { CLOUD_SERVICE_CATALOG, DEFAULT_SELECTED_SERVICE_FAMILY_IDS } from './service-catalog';
+import { HOURS_PER_MONTH } from './cost-time';
 import { NormalizedWorkloadSpec } from './types';
 import {
   ARCHITECTURE_TEMPLATES,
@@ -17,6 +18,15 @@ import {
 } from './workload';
 
 describe('workload helpers', () => {
+  it('derives always-on workload defaults from the shared monthly-hours constant', () => {
+    expect(defaultWorkloadForm.databaseSearchNodeHours).toBe(String(HOURS_PER_MONTH));
+    expect(defaultWorkloadForm.appPlatformAlwaysOnHours).toBe(String(HOURS_PER_MONTH));
+    expect(
+      ARCHITECTURE_TEMPLATES.find((template) => template.id === 'machine-learning-training')?.form
+        .aiModelHostingHours,
+    ).toBe(String(HOURS_PER_MONTH));
+  });
+
   it('marks archive storage as priced because class, retrieval, lifecycle, and snapshot dimensions are modeled', () => {
     expect(CLOUD_SERVICE_CATALOG.find((family) => family.id === 'archive-storage')).toEqual(
       expect.objectContaining({
