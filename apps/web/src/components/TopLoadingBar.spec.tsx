@@ -18,13 +18,18 @@ describe('TopLoadingBar', () => {
 
     expect(progress(container)?.getAttribute('aria-label')).toBe('Refreshing');
     expect(progress(container)?.getAttribute('aria-valuenow')).toBe('80');
-    expect(container.querySelector('.animate-top-loading-grow')).toBeInstanceOf(HTMLElement);
+    expect(container.querySelector('.top-loading-bar-fill.is-sweeping')).toBeInstanceOf(
+      HTMLElement,
+    );
 
     act(() => {
       rerender(<TopLoadingBar isLoading={false} label="Refreshing" />);
     });
 
     expect(progress(container)?.getAttribute('aria-valuenow')).toBe('100');
+    expect(container.querySelector('.top-loading-bar-fill.is-complete')).toBeInstanceOf(
+      HTMLElement,
+    );
 
     act(() => {
       jest.advanceTimersByTime(220);

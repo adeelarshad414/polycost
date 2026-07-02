@@ -51,10 +51,10 @@ export function TopLoadingBar({ isLoading, label = 'Page loading' }: TopLoadingB
     >
       <span
         className={[
-          'top-loading-bar-fill block h-full w-full origin-left',
+          'top-loading-bar-fill origin-left',
           isComplete
-            ? 'scale-x-100 opacity-0 transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none'
-            : 'scale-x-[0.8] animate-top-loading-grow motion-reduce:scale-x-100 motion-reduce:animate-none',
+            ? 'is-complete scale-x-100 motion-reduce:transition-none'
+            : 'is-sweeping scale-x-100',
         ].join(' ')}
       />
     </div>

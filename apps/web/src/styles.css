@@ -121,6 +121,67 @@
   --pc-focus-ring: color-mix(in srgb, var(--pc-action-primary) 22%, transparent);
   --pc-chart-grid: color-mix(in srgb, var(--pc-border-strong) 58%, transparent);
   --pc-chart-hover: color-mix(in srgb, var(--pc-border) 48%, transparent);
+  --pc-bg: var(--pc-bg-canvas);
+  --pc-danger: var(--pc-error);
+  --color-bg-base: var(--pc-bg-canvas);
+  --color-bg-surface: var(--pc-bg-surface);
+  --color-bg-elevated: color-mix(in srgb, var(--pc-bg-surface) 86%, var(--pc-bg-surface-2));
+  --color-bg-overlay: color-mix(in srgb, var(--pc-bg-surface-2) 72%, var(--pc-bg-surface));
+  --color-bg-subtle: color-mix(in srgb, var(--pc-bg-surface-2) 58%, var(--pc-bg-surface));
+  --color-text-primary: var(--pc-text-primary);
+  --color-text-secondary: var(--pc-text-secondary);
+  --color-text-tertiary: var(--pc-text-tertiary);
+  --color-text-inverse: var(--on-primary-action);
+  --color-border-default: var(--pc-border);
+  --color-border-subtle: color-mix(in srgb, var(--pc-border) 66%, transparent);
+  --color-border-strong: var(--pc-border-strong);
+  --color-border-focus: var(--pc-action-primary);
+  --color-action-primary: var(--pc-action-primary);
+  --color-action-primary-hover: var(--primary-action-hover);
+  --color-action-primary-active: var(--primary-action-active);
+  --color-action-primary-muted: var(--pc-action-primary-soft);
+  --color-aws: var(--brand-orange);
+  --color-aws-bright: var(--brand-orange-dark);
+  --color-aws-muted: color-mix(in srgb, var(--brand-orange) 12%, transparent);
+  --color-azure: var(--brand-blue);
+  --color-azure-bright: var(--brand-blue-dark);
+  --color-azure-muted: color-mix(in srgb, var(--brand-blue) 12%, transparent);
+  --color-gcp: var(--brand-green);
+  --color-gcp-bright: var(--brand-green-dark);
+  --color-gcp-muted: color-mix(in srgb, var(--brand-green) 12%, transparent);
+  --color-success: var(--pc-success);
+  --color-success-muted: var(--pc-success-soft);
+  --color-warning: var(--pc-warning);
+  --color-warning-muted: var(--pc-warning-soft);
+  --color-error: var(--pc-error);
+  --color-error-muted: var(--pc-error-soft);
+  --color-info: var(--pc-info);
+  --color-info-muted: var(--pc-info-soft);
+  --color-estimate: #7c3aed;
+  --color-estimate-muted: color-mix(in srgb, var(--color-estimate) 12%, transparent);
+  --space-0-25: 2px;
+  --space-0-5: 4px;
+  --space-1: 8px;
+  --space-1-5: 12px;
+  --space-2: 16px;
+  --space-2-5: 20px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-5: 40px;
+  --space-6: 48px;
+  --space-8: 64px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+  --shadow-sm: var(--pc-shadow-soft);
+  --shadow-md: var(--pc-shadow-card);
+  --shadow-lg: var(--pc-shadow-strong);
+  --shadow-glow-aws: 0 0 20px color-mix(in srgb, var(--brand-orange) 16%, transparent);
+  --shadow-glow-azure: 0 0 20px color-mix(in srgb, var(--brand-blue) 16%, transparent);
+  --shadow-glow-gcp: 0 0 20px color-mix(in srgb, var(--brand-green) 16%, transparent);
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 }
 
 :root[data-theme='dark'] {
@@ -156,6 +217,10 @@
   --pc-provider-gcp-soft: #132b1b;
   --pc-brand-accent-hover: #5b93e0;
   --pc-brand-accent-soft: #142544;
+  --pc-success-soft: #173322;
+  --pc-warning-soft: #3b2915;
+  --pc-error-soft: #3a191a;
+  --pc-info-soft: #142544;
   --pc-shadow-soft: 0 1px 2px rgb(0 0 0 / 22%), 0 14px 38px rgb(0 0 0 / 25%);
   --pc-shadow-card: 0 1px 2px rgb(0 0 0 / 26%), 0 22px 50px rgb(0 0 0 / 28%);
   --pc-shadow-strong: 0 24px 68px rgb(0 0 0 / 34%);
@@ -1103,8 +1168,53 @@ textarea:focus-visible {
 }
 
 .top-loading-bar-fill {
+  position: relative;
+  display: block;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--pc-border) 34%, transparent);
+}
+
+.top-loading-bar-fill::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: clamp(160px, 34vw, 440px);
   background: var(--pc-cloud-progress-gradient);
   box-shadow: var(--pc-cloud-progress-shadow);
+  content: '';
+  transform: translateX(-115%);
+}
+
+.top-loading-bar-fill.is-sweeping::before {
+  animation: top-loading-sweep 1.16s var(--ease-standard) infinite;
+}
+
+.top-loading-bar-fill.is-complete {
+  background: var(--pc-cloud-progress-gradient);
+  box-shadow: var(--pc-cloud-progress-shadow);
+  opacity: 0;
+  transition:
+    opacity 200ms ease-out,
+    transform 200ms ease-out;
+}
+
+.top-loading-bar-fill.is-complete::before {
+  display: none;
+}
+
+@keyframes top-loading-sweep {
+  0% {
+    transform: translateX(-115%);
+  }
+
+  58% {
+    transform: translateX(140%);
+  }
+
+  100% {
+    transform: translateX(315%);
+  }
 }
 
 .landing-page {
@@ -1137,14 +1247,14 @@ textarea:focus-visible {
   display: inline-flex;
   width: 168px;
   max-width: 44vw;
-  height: 28px;
+  min-height: 44px;
   align-items: center;
 }
 
 .landing-logo-link img {
   display: block;
   width: 100%;
-  height: 100%;
+  height: 28px;
   object-fit: contain;
   object-position: left center;
 }
@@ -1156,6 +1266,9 @@ textarea:focus-visible {
 }
 
 .landing-links a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
   color: var(--pc-landing-text-secondary);
   font-size: var(--pc-text-sm);
   font-weight: 700;
@@ -1176,7 +1289,7 @@ textarea:focus-visible {
 }
 
 .landing-actions .pc-button {
-  min-height: 38px;
+  min-height: 44px;
   padding: 0 14px;
 }
 
@@ -1208,8 +1321,8 @@ textarea:focus-visible {
 
 .landing-menu-button {
   display: none;
-  width: 38px;
-  min-height: 38px;
+  width: 44px;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--pc-landing-border-strong);
@@ -1440,6 +1553,7 @@ textarea:focus-visible {
 }
 
 .app-brand-link {
+  min-height: 44px;
   color: inherit;
   text-decoration: none;
 }
@@ -1539,7 +1653,7 @@ textarea:focus-visible {
 
 .top-nav a {
   display: inline-flex;
-  min-height: 36px;
+  min-height: 44px;
   align-items: center;
   border: 1px solid transparent;
   border-radius: 8px;
@@ -1598,7 +1712,7 @@ textarea:focus-visible {
 .pricing-model-preference-options button {
   display: inline-flex;
   min-width: 72px;
-  min-height: 34px;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
   gap: 6px;
@@ -1626,7 +1740,7 @@ textarea:focus-visible {
   position: relative;
   display: inline-flex;
   min-width: 76px;
-  min-height: 40px;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--pc-border);
@@ -1764,12 +1878,12 @@ textarea:focus-visible {
 }
 
 .landing-theme-switcher {
-  min-height: 38px;
+  min-height: 44px;
 }
 
 .landing-theme-switcher .theme-switch-button {
   min-width: 72px;
-  min-height: 38px;
+  min-height: 44px;
   border-color: var(--pc-landing-border);
   background: color-mix(in srgb, var(--pc-landing-surface-1) 86%, transparent);
   box-shadow: none;
@@ -1841,7 +1955,7 @@ textarea:focus-visible {
 
 .requirements-file-trigger {
   display: inline-flex;
-  min-height: 40px;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
   gap: var(--pc-space-1);
@@ -2597,7 +2711,7 @@ select:hover {
 }
 
 .range-field-control input {
-  min-height: auto;
+  min-height: 44px;
   border: 0;
   background: linear-gradient(90deg, var(--brand-orange), var(--brand-blue), var(--brand-green));
   accent-color: var(--brand-blue);
@@ -3676,20 +3790,23 @@ select:disabled {
 }
 
 .pc-button-destructive {
-  border-color: var(--pc-landing-destructive);
-  background: var(--pc-landing-destructive);
-  box-shadow: 0 10px 22px color-mix(in srgb, var(--pc-landing-destructive) 24%, transparent);
-  color: var(--on-primary-action);
+  border-color: color-mix(in srgb, var(--pc-landing-destructive) 34%, var(--pc-border));
+  background: color-mix(in srgb, var(--pc-error-soft) 72%, transparent);
+  box-shadow: none;
+  color: var(--pc-landing-destructive);
 }
 
 .pc-button-destructive:hover:not(:disabled) {
-  border-color: var(--destructive-hover);
-  background: var(--destructive-hover);
-  box-shadow: 0 12px 28px color-mix(in srgb, var(--pc-landing-destructive) 30%, transparent);
+  border-color: color-mix(in srgb, var(--destructive-hover) 56%, var(--pc-border));
+  background: color-mix(in srgb, var(--pc-error-soft) 92%, var(--pc-bg-surface));
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--pc-landing-destructive) 10%, transparent);
+  color: var(--destructive-hover);
 }
 
 .pc-button-destructive:active:not(:disabled) {
-  background: var(--destructive-active);
+  border-color: var(--destructive-active);
+  background: color-mix(in srgb, var(--pc-error-soft) 86%, var(--pc-bg-surface-2));
+  color: var(--destructive-active);
 }
 
 .button-system-preview {
@@ -5606,7 +5723,7 @@ select:disabled {
 }
 
 .cost-matrix-controls select {
-  min-height: 42px;
+  min-height: 44px;
   border: 1px solid var(--pc-border);
   border-radius: 8px;
   background: var(--pc-bg-surface);
@@ -7285,9 +7402,7 @@ select:disabled {
 
   .landing-links a {
     min-width: 0;
-    display: inline-flex;
-    min-height: 38px;
-    align-items: center;
+    min-height: 44px;
     border-radius: 6px;
     padding: 0 10px;
   }
@@ -7317,23 +7432,26 @@ select:disabled {
   }
 
   .landing-actions .pc-button {
-    min-width: 42px;
+    min-width: 44px;
     padding: 0 10px;
   }
 
   .app-header {
     position: static;
-    padding: var(--pc-space-2);
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--pc-space-1);
+    padding: var(--pc-space-1) var(--pc-space-2);
   }
 
   .brand-lockup {
-    flex-direction: column;
-    justify-content: center;
-    text-align: center;
+    flex-direction: row;
+    justify-content: flex-start;
+    text-align: left;
   }
 
   .brand-logo-shell {
-    width: min(220px, 74vw);
+    width: min(148px, 42vw);
   }
 
   .brand-logo-image {
@@ -7344,15 +7462,20 @@ select:disabled {
     max-width: 32ch;
   }
 
+  .brand-copy {
+    display: none;
+  }
+
   .app-header-actions {
-    display: grid;
-    width: 100%;
-    grid-template-columns: 1fr;
+    display: inline-flex;
+    width: auto;
+    grid-template-columns: none;
+    justify-content: flex-end;
   }
 
   .app-signin-button {
     justify-content: center;
-    width: 100%;
+    width: auto;
   }
 
   .input-zone,
@@ -7672,7 +7795,7 @@ select:disabled {
 
   .landing-actions .pc-button,
   .landing-menu-button {
-    width: 38px;
+    width: 44px;
     padding: 0;
   }
 }
@@ -7690,8 +7813,26 @@ select:disabled {
     transition: none;
   }
 
+  .top-loading-bar-fill.is-sweeping::before {
+    width: 100%;
+    animation: top-loading-reduced-pulse 1.4s ease-in-out infinite !important;
+    animation-duration: 1.4s !important;
+    transform: none;
+  }
+
   .provider-pending-bars i {
     animation: none;
+  }
+}
+
+@keyframes top-loading-reduced-pulse {
+  0%,
+  100% {
+    opacity: 0.34;
+  }
+
+  50% {
+    opacity: 0.86;
   }
 }
 
