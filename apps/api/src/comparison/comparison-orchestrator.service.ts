@@ -77,12 +77,16 @@ interface StorageDimensionRates {
   deletePerThousand: number;
   listPerThousand: number;
   retrievalPerGb: Partial<Record<StorageClassKey, number>>;
+  storagePerGbMonth: Partial<Record<StorageClassKey, number>>;
+  minimumDurationDays: Partial<Record<StorageClassKey, number>>;
+  intelligentTieringMonitoringPerThousandObjects: number;
   replicationSameRegionPerGb: number;
   replicationCrossRegionPerGb: number;
   lifecyclePerThousand: number;
   snapshotPerGbMonth: number;
   iopsMonth: number;
   throughputMbpsMonth: number;
+  multiAttachPerGbMonth: number;
 }
 
 interface DatabaseDimensionRates {
@@ -1265,6 +1269,52 @@ export class ComparisonOrchestratorService {
         );
       }
 
+      if (
+        storageClass === 'intelligent-tiering' &&
+        storage.objectCountThousand !== undefined &&
+        storage.objectCountThousand > 0 &&
+        rates.intelligentTieringMonitoringPerThousandObjects > 0
+      ) {
+        lineItems.push(
+          this.storageLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-storage-intelligent-tiering-monitoring',
+            description: `${providerLabel(providerId)} ${role} intelligent-tiering monitoring estimate`,
+            quantity: storage.objectCountThousand,
+            unit: '1K objects',
+            unitPriceUsd: rates.intelligentTieringMonitoringPerThousandObjects,
+          }),
+        );
+      }
+
+      const minimumDurationDays = rates.minimumDurationDays[storageClass] ?? 0;
+      const plannedRetentionDays = storage.objectRetentionDays;
+      const storageRate = rates.storagePerGbMonth[storageClass] ?? 0;
+      if (
+        plannedRetentionDays !== undefined &&
+        plannedRetentionDays < minimumDurationDays &&
+        minimumDurationDays > 0 &&
+        storageRate > 0
+      ) {
+        const extraBillableGbMonth =
+          storage.sizeGb * ((minimumDurationDays - plannedRetentionDays) / 30);
+
+        lineItems.push(
+          this.storageLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-storage-minimum-duration',
+            description: `${providerLabel(providerId)} ${role} ${storageClassLabel(
+              storageClass,
+            )} minimum-duration exposure estimate (${plannedRetentionDays}d planned, ${minimumDurationDays}d billable minimum)`,
+            quantity: extraBillableGbMonth,
+            unit: 'GB-month exposure',
+            unitPriceUsd: storageRate,
+          }),
+        );
+      }
+
       if (storage.replication && storage.replication !== 'none') {
         const unitPriceUsd =
           storage.replication === 'cross-region'
@@ -1324,6 +1374,24 @@ export class ComparisonOrchestratorService {
             }),
           );
         }
+      }
+
+      if (
+        storage.type === 'block' &&
+        storage.multiAttachEnabled === true &&
+        rates.multiAttachPerGbMonth > 0
+      ) {
+        lineItems.push(
+          this.storageLineItem({
+            providerId,
+            regionLabel,
+            skuId: 'modeled-storage-multi-attach',
+            description: `${providerLabel(providerId)} ${role} multi-attach block storage capability estimate`,
+            quantity: storage.sizeGb,
+            unit: 'GB-month',
+            unitPriceUsd: rates.multiAttachPerGbMonth,
+          }),
+        );
       }
 
       if (
@@ -2744,6 +2812,12 @@ export class ComparisonOrchestratorService {
         ...(storage.monthlyRetrievalGb !== undefined
           ? { monthlyRetrievalGb: storage.monthlyRetrievalGb }
           : {}),
+        ...(storage.objectCountThousand !== undefined
+          ? { objectCountThousand: storage.objectCountThousand }
+          : {}),
+        ...(storage.objectRetentionDays !== undefined
+          ? { objectRetentionDays: storage.objectRetentionDays }
+          : {}),
         ...(storage.replication ? { replication: storage.replication } : {}),
         ...(storage.lifecycleTransitionsThousand !== undefined
           ? { lifecycleTransitionsThousand: storage.lifecycleTransitionsThousand }
@@ -2757,6 +2831,9 @@ export class ComparisonOrchestratorService {
           : {}),
         ...(storage.provisionedThroughputMbps !== undefined
           ? { provisionedThroughputMbps: storage.provisionedThroughputMbps }
+          : {}),
+        ...(storage.multiAttachEnabled !== undefined
+          ? { multiAttachEnabled: storage.multiAttachEnabled }
           : {}),
       },
     }));
@@ -3264,12 +3341,39 @@ function storageDimensionRates(providerId: ProviderId): StorageDimensionRates {
           nearline: 0.01,
           coldline: 0.02,
         },
+        storagePerGbMonth: {
+          standard: 0.023,
+          hot: 0.023,
+          'intelligent-tiering': 0.023,
+          'infrequent-access': 0.0125,
+          'one-zone-infrequent-access': 0.01,
+          'archive-instant': 0.004,
+          archive: 0.0036,
+          'deep-archive': 0.00099,
+          cool: 0.0125,
+          cold: 0.004,
+          nearline: 0.0125,
+          coldline: 0.004,
+        },
+        minimumDurationDays: {
+          'infrequent-access': 30,
+          'one-zone-infrequent-access': 30,
+          'archive-instant': 90,
+          archive: 90,
+          'deep-archive': 180,
+          cool: 30,
+          cold: 90,
+          nearline: 30,
+          coldline: 90,
+        },
+        intelligentTieringMonitoringPerThousandObjects: 0.0025,
         replicationSameRegionPerGb: 0.01,
         replicationCrossRegionPerGb: 0.02,
         lifecyclePerThousand: 0.01,
         snapshotPerGbMonth: 0.05,
         iopsMonth: 0.005,
         throughputMbpsMonth: 0.04,
+        multiAttachPerGbMonth: 0.02,
       };
     case 'azure':
       return {
@@ -3286,12 +3390,36 @@ function storageDimensionRates(providerId: ProviderId): StorageDimensionRates {
           nearline: 0.01,
           coldline: 0.02,
         },
+        storagePerGbMonth: {
+          standard: 0.0184,
+          hot: 0.0184,
+          cool: 0.01,
+          cold: 0.0036,
+          archive: 0.00099,
+          'deep-archive': 0.00099,
+          'infrequent-access': 0.01,
+          nearline: 0.01,
+          coldline: 0.0036,
+          premium: 0.15,
+          ultra: 0.18,
+        },
+        minimumDurationDays: {
+          cool: 30,
+          cold: 90,
+          archive: 180,
+          'deep-archive': 180,
+          'infrequent-access': 30,
+          nearline: 30,
+          coldline: 90,
+        },
+        intelligentTieringMonitoringPerThousandObjects: 0.0025,
         replicationSameRegionPerGb: 0.008,
         replicationCrossRegionPerGb: 0.018,
         lifecyclePerThousand: 0.01,
         snapshotPerGbMonth: 0.045,
         iopsMonth: 0.004,
         throughputMbpsMonth: 0.035,
+        multiAttachPerGbMonth: 0.015,
       };
     case 'gcp':
       return {
@@ -3308,12 +3436,34 @@ function storageDimensionRates(providerId: ProviderId): StorageDimensionRates {
           cold: 0.02,
           'infrequent-access': 0.01,
         },
+        storagePerGbMonth: {
+          standard: 0.02,
+          hot: 0.02,
+          nearline: 0.01,
+          coldline: 0.004,
+          archive: 0.0012,
+          'deep-archive': 0.0012,
+          cool: 0.01,
+          cold: 0.004,
+          'infrequent-access': 0.01,
+        },
+        minimumDurationDays: {
+          nearline: 30,
+          coldline: 90,
+          archive: 365,
+          'deep-archive': 365,
+          cool: 30,
+          cold: 90,
+          'infrequent-access': 30,
+        },
+        intelligentTieringMonitoringPerThousandObjects: 0.0025,
         replicationSameRegionPerGb: 0.01,
         replicationCrossRegionPerGb: 0.02,
         lifecyclePerThousand: 0.01,
         snapshotPerGbMonth: 0.026,
         iopsMonth: 0.0045,
         throughputMbpsMonth: 0.032,
+        multiAttachPerGbMonth: 0.012,
       };
   }
 }

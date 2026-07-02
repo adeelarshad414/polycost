@@ -222,6 +222,14 @@ export const NWS_PARSE_RESULT_JSON_SCHEMA = {
                 type: 'number',
                 minimum: 0,
               },
+              objectCountThousand: {
+                type: 'number',
+                minimum: 0,
+              },
+              objectRetentionDays: {
+                type: 'integer',
+                minimum: 0,
+              },
               replication: {
                 type: 'string',
                 enum: ['none', 'same-region', 'cross-region'],
@@ -245,6 +253,9 @@ export const NWS_PARSE_RESULT_JSON_SCHEMA = {
               provisionedThroughputMbps: {
                 type: 'number',
                 minimum: 0,
+              },
+              multiAttachEnabled: {
+                type: 'boolean',
               },
             },
           },

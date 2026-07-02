@@ -3430,6 +3430,24 @@ function WorkloadForm({
                 onChange={(value) => update('monthlyRetrievalGb', value)}
               />
               <TextField
+                label="Object count"
+                value={form.objectCountThousand}
+                inputMode="decimal"
+                suffix="k objects"
+                disabled={!form.storageEnabled}
+                error={fieldErrors.objectCountThousand}
+                onChange={(value) => update('objectCountThousand', value)}
+              />
+              <TextField
+                label="Object retention"
+                value={form.objectRetentionDays}
+                inputMode="numeric"
+                suffix="days"
+                disabled={!form.storageEnabled}
+                error={fieldErrors.objectRetentionDays}
+                onChange={(value) => update('objectRetentionDays', value)}
+              />
+              <TextField
                 label="Lifecycle ops"
                 value={form.lifecycleTransitionsThousand}
                 inputMode="decimal"
@@ -3473,6 +3491,13 @@ function WorkloadForm({
                 disabled={!form.storageEnabled}
                 error={fieldErrors.provisionedThroughputMbps}
                 onChange={(value) => update('provisionedThroughputMbps', value)}
+              />
+              <CheckboxField
+                label="Block multi-attach"
+                icon="storage"
+                checked={form.multiAttachEnabled}
+                disabled={!form.storageEnabled || form.storageType !== 'block'}
+                onChange={(checked) => update('multiAttachEnabled', checked)}
               />
             </div>
           </details>
@@ -9332,6 +9357,8 @@ function storageOptimizationRows(
     (parseInputNumber(form.monthlyDeleteRequestsThousand) ?? 0) +
     (parseInputNumber(form.monthlyListRequestsThousand) ?? 0);
   const lifecycleTransitions = parseInputNumber(form.lifecycleTransitionsThousand) ?? 0;
+  const objectCountThousand = parseInputNumber(form.objectCountThousand) ?? 0;
+  const objectRetentionDays = parseInputNumber(form.objectRetentionDays) ?? 0;
   const snapshotSizeGb = parseInputNumber(form.snapshotSizeGb) ?? 0;
   const snapshotRetentionDays = parseInputNumber(form.snapshotRetentionDays) ?? 0;
   const provisionedIops = parseInputNumber(form.provisionedIops) ?? 0;
@@ -9340,14 +9367,22 @@ function storageOptimizationRows(
   const usageSignalParts = [
     storageGb > 0 ? `${formatDecimal(storageGb)}GB ${storageClassLabel}` : undefined,
     retrievalGb > 0 ? `${formatDecimal(retrievalGb)}GB retrieval` : undefined,
+    objectCountThousand > 0
+      ? `${formatDecimal(objectCountThousand)}K objects / ${formatDecimal(
+          objectRetentionDays,
+        )}d retention`
+      : undefined,
     requestThousands > 0 ? `${formatDecimal(requestThousands)}K operations` : undefined,
     form.storageReplication !== 'none' ? form.storageReplication.replace('-', ' ') : undefined,
+    form.multiAttachEnabled ? 'multi-attach' : undefined,
   ].filter(Boolean);
   const usageSignal = usageSignalParts.join(' · ') || 'Storage rows only';
   const hasAdvancedFormSignal =
     form.storageClass !== 'standard' ||
     retrievalGb > 0 ||
     requestThousands > 0 ||
+    objectCountThousand > 0 ||
+    form.multiAttachEnabled ||
     lifecycleTransitions > 0 ||
     snapshotSizeGb > 0 ||
     form.storageReplication !== 'none' ||
@@ -9378,6 +9413,9 @@ function storageOptimizationRows(
 
       const signal = storageOptimizationSignal(primary, storageMonthly, {
         lifecycleTransitions,
+        multiAttachEnabled: form.multiAttachEnabled,
+        objectCountThousand,
+        objectRetentionDays,
         provisionedIops,
         provisionedThroughputMbps,
         requestThousands,
@@ -9426,6 +9464,8 @@ function storageAnatomyRows(
     (parseInputNumber(form.monthlyDeleteRequestsThousand) ?? 0) +
     (parseInputNumber(form.monthlyListRequestsThousand) ?? 0);
   const retrievalGb = parseInputNumber(form.monthlyRetrievalGb) ?? 0;
+  const objectCountThousand = parseInputNumber(form.objectCountThousand) ?? 0;
+  const objectRetentionDays = parseInputNumber(form.objectRetentionDays) ?? 0;
   const snapshotSizeGb = parseInputNumber(form.snapshotSizeGb) ?? 0;
   const snapshotRetentionDays = parseInputNumber(form.snapshotRetentionDays) ?? 0;
   const lifecycleTransitions = parseInputNumber(form.lifecycleTransitionsThousand) ?? 0;
@@ -9461,6 +9501,7 @@ function storageAnatomyRows(
           monthly: storageMonthly,
           sharePercent,
           operationsSignal: storageOperationsSignal({
+            objectCountThousand,
             operationMonthly: dimensionTotals.operations,
             requestThousands,
             retrievalGb,
@@ -9469,6 +9510,7 @@ function storageAnatomyRows(
           resilienceSignal: storageResilienceSignal({
             lifecycleMonthly: dimensionTotals.lifecycle,
             lifecycleTransitions,
+            objectRetentionDays,
             replicationMonthly: dimensionTotals.replication,
             snapshotMonthly: dimensionTotals.snapshot,
             snapshotRetentionDays,
@@ -9478,6 +9520,7 @@ function storageAnatomyRows(
           performanceSignal: storagePerformanceSignal({
             databaseGrowthGb,
             databaseSizeGb,
+            multiAttachEnabled: form.multiAttachEnabled,
             performanceMonthly: dimensionTotals.performance,
             provisionedIops,
             provisionedThroughputMbps,
@@ -9531,17 +9574,23 @@ function storageDimensionTotals(
         totals.retrieval += amount;
       } else if (normalized.includes('replication') || normalized.includes('replica transfer')) {
         totals.replication += amount;
-      } else if (normalized.includes('lifecycle') || normalized.includes('transition')) {
+      } else if (
+        normalized.includes('lifecycle') ||
+        normalized.includes('transition') ||
+        normalized.includes('minimum-duration')
+      ) {
         totals.lifecycle += amount;
       } else if (
         normalized.includes('iops') ||
         normalized.includes('throughput') ||
-        normalized.includes('performance')
+        normalized.includes('performance') ||
+        normalized.includes('multi-attach')
       ) {
         totals.performance += amount;
       } else if (
         normalized.includes('operation') ||
         normalized.includes('request') ||
+        normalized.includes('monitoring') ||
         normalized.includes('put') ||
         normalized.includes('get') ||
         normalized.includes('list') ||
@@ -9579,6 +9628,7 @@ function storageClassDisplayName(storageClass: WorkloadFormState['storageClass']
 }
 
 function storageOperationsSignal(input: {
+  objectCountThousand: number;
   operationMonthly: number;
   requestThousands: number;
   retrievalGb: number;
@@ -9591,6 +9641,9 @@ function storageOperationsSignal(input: {
     input.retrievalGb > 0
       ? `${formatDecimal(input.retrievalGb)}GB retrieval (${formatCurrency(input.retrievalMonthly)}/mo)`
       : undefined,
+    input.objectCountThousand > 0
+      ? `${formatDecimal(input.objectCountThousand)}K monitored objects`
+      : undefined,
   ].filter(Boolean);
 
   return parts.join(' · ') || 'No request/retrieval surcharge surfaced';
@@ -9599,6 +9652,7 @@ function storageOperationsSignal(input: {
 function storageResilienceSignal(input: {
   lifecycleMonthly: number;
   lifecycleTransitions: number;
+  objectRetentionDays: number;
   replicationMonthly: number;
   snapshotMonthly: number;
   snapshotRetentionDays: number;
@@ -9621,6 +9675,9 @@ function storageResilienceSignal(input: {
           input.lifecycleMonthly,
         )}/mo)`
       : undefined,
+    input.objectRetentionDays > 0
+      ? `${formatDecimal(input.objectRetentionDays)}d object retention`
+      : undefined,
   ].filter(Boolean);
 
   return parts.join(' · ') || 'No replication/snapshot/lifecycle rows';
@@ -9629,6 +9686,7 @@ function storageResilienceSignal(input: {
 function storagePerformanceSignal(input: {
   databaseGrowthGb: number;
   databaseSizeGb: number;
+  multiAttachEnabled: boolean;
   performanceMonthly: number;
   provisionedIops: number;
   provisionedThroughputMbps: number;
@@ -9640,6 +9698,9 @@ function storagePerformanceSignal(input: {
       ? `${formatDecimal(input.provisionedIops)} IOPS / ${formatDecimal(
           input.provisionedThroughputMbps,
         )} MB/s (${formatCurrency(input.performanceMonthly)}/mo)`
+      : undefined,
+    input.multiAttachEnabled
+      ? `multi-attach enabled (${formatCurrency(input.performanceMonthly)}/mo)`
       : undefined,
     input.databaseGrowthGb > 0
       ? `${formatDecimal(input.databaseGrowthGb)}GB/mo DB growth (${formatPercent(
@@ -9733,6 +9794,9 @@ function storageOptimizationSignal(
   storageMonthly: number,
   context: {
     lifecycleTransitions: number;
+    multiAttachEnabled: boolean;
+    objectCountThousand: number;
+    objectRetentionDays: number;
     provisionedIops: number;
     provisionedThroughputMbps: number;
     requestThousands: number;
@@ -9769,6 +9833,27 @@ function storageOptimizationSignal(
             )} days`
           : 'Snapshot line item surfaced by backend',
       evidence: `${baseEvidence} Retention pruning models ${formatCurrency(
+        monthlySavings,
+      )}/mo opportunity.`,
+    };
+  }
+
+  if (normalizedPrimary.includes('minimum-duration')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      primaryDriver: 'Minimum-duration exposure',
+      monthlySavings,
+      effort: 'Medium',
+      recommendation:
+        'Keep objects in the cold/archive class for the billable minimum or adjust lifecycle timing.',
+      driverEvidence:
+        context.objectRetentionDays > 0
+          ? `${formatDecimal(context.objectRetentionDays)}d planned retention · ${
+              context.storageClassLabel
+            }`
+          : 'Minimum-duration line item surfaced by backend',
+      evidence: `${baseEvidence} Lifecycle timing review models ${formatCurrency(
         monthlySavings,
       )}/mo opportunity.`,
     };
@@ -9815,7 +9900,8 @@ function storageOptimizationSignal(
   if (
     normalizedPrimary.includes('iops') ||
     normalizedPrimary.includes('throughput') ||
-    normalizedPrimary.includes('performance')
+    normalizedPrimary.includes('performance') ||
+    normalizedPrimary.includes('multi-attach')
   ) {
     const monthlySavings = roundCurrency(primaryMonthly * 0.25);
 
@@ -9824,9 +9910,10 @@ function storageOptimizationSignal(
       monthlySavings,
       effort: 'Medium',
       recommendation:
-        'Right-size provisioned IOPS and throughput after observing baseline latency.',
-      driverEvidence:
-        context.provisionedIops > 0 || context.provisionedThroughputMbps > 0
+        'Right-size provisioned IOPS, throughput, and multi-attach placement after observing latency and failover needs.',
+      driverEvidence: context.multiAttachEnabled
+        ? 'Block multi-attach enabled'
+        : context.provisionedIops > 0 || context.provisionedThroughputMbps > 0
           ? `${formatDecimal(context.provisionedIops)} IOPS · ${formatDecimal(
               context.provisionedThroughputMbps,
             )} MB/s`
@@ -9839,6 +9926,7 @@ function storageOptimizationSignal(
 
   if (
     normalizedPrimary.includes('request') ||
+    normalizedPrimary.includes('monitoring') ||
     normalizedPrimary.includes('put') ||
     normalizedPrimary.includes('get') ||
     normalizedPrimary.includes('list') ||
@@ -9852,9 +9940,11 @@ function storageOptimizationSignal(
       effort: 'Medium',
       recommendation: 'Batch object operations and reduce LIST-heavy access paths before scaling.',
       driverEvidence:
-        context.requestThousands > 0
-          ? `${formatDecimal(context.requestThousands)}K monthly operations`
-          : 'Request operation line item surfaced by backend',
+        context.objectCountThousand > 0 && normalizedPrimary.includes('monitoring')
+          ? `${formatDecimal(context.objectCountThousand)}K monitored objects`
+          : context.requestThousands > 0
+            ? `${formatDecimal(context.requestThousands)}K monthly operations`
+            : 'Request operation line item surfaced by backend',
       evidence: `${baseEvidence} Request-shape tuning models ${formatCurrency(
         monthlySavings,
       )}/mo opportunity.`,
@@ -12861,6 +12951,9 @@ function storageDescriptionMatches(description: string): boolean {
     'retrieval',
     'replication',
     'lifecycle',
+    'minimum-duration',
+    'monitoring',
+    'multi-attach',
     'iops',
     'throughput',
     'object request',
@@ -12880,6 +12973,9 @@ function storageAdvancedDescriptionMatches(description: string): boolean {
     'retrieval',
     'replication',
     'lifecycle',
+    'minimum-duration',
+    'monitoring',
+    'multi-attach',
     'iops',
     'throughput',
     'object request',

@@ -366,10 +366,13 @@ const COST_COVERAGE_DIMENSIONS: CostCoverageDimension[] = [
     key: 'storage',
     label: 'Storage classes, snapshots, and retrieval',
     requirementCategories: ['storage'],
-    reviewCue: 'Validate storage class, operations, retrieval, replication, snapshot retention, IOPS, and lifecycle policies.',
+    reviewCue:
+      'Validate storage class, operations, retrieval, replication, minimum-duration exposure, snapshot retention, IOPS, multi-attach, and lifecycle policies.',
     matches: (lineItem) =>
       lineItem.category === 'storage' ||
-      /storage|snapshot|retrieval|replication|lifecycle|archive|backup/i.test(lineItem.description),
+      /storage|snapshot|retrieval|replication|lifecycle|archive|backup|minimum-duration|monitoring|multi-attach/i.test(
+        lineItem.description,
+      ),
   },
   {
     key: 'networking',
@@ -2920,6 +2923,21 @@ function storageOptimizationInsight(
     };
   }
 
+  if (normalizedPrimary.includes('minimum-duration')) {
+    const monthlySavings = roundCurrency(primaryMonthly * 0.2);
+
+    return {
+      recommendation:
+        'align lifecycle timing with cold/archive billable minimums before approving the storage run-rate.',
+      monthlySavings,
+      effort: 'Medium',
+      hasAdvancedSignal: true,
+      evidence: `${provider.providerId} dominant storage row is "${primaryDescription}" at $${formatNumber(
+        primaryMonthly,
+      )}/mo; minimum-duration timing cleanup is modeled at 20% of that row.`,
+    };
+  }
+
   if (normalizedPrimary.includes('retrieval') || normalizedPrimary.includes('archive')) {
     const monthlySavings = roundCurrency(primaryMonthly * 0.25);
 
@@ -2953,13 +2971,14 @@ function storageOptimizationInsight(
   if (
     normalizedPrimary.includes('iops') ||
     normalizedPrimary.includes('throughput') ||
-    normalizedPrimary.includes('performance')
+    normalizedPrimary.includes('performance') ||
+    normalizedPrimary.includes('multi-attach')
   ) {
     const monthlySavings = roundCurrency(primaryMonthly * 0.25);
 
     return {
       recommendation:
-        'right-size provisioned IOPS and throughput after measuring baseline storage latency.',
+        'right-size provisioned IOPS, throughput, and multi-attach placement after measuring baseline latency and failover needs.',
       monthlySavings,
       effort: 'Medium',
       hasAdvancedSignal: true,
@@ -2971,6 +2990,7 @@ function storageOptimizationInsight(
 
   if (
     normalizedPrimary.includes('request') ||
+    normalizedPrimary.includes('monitoring') ||
     normalizedPrimary.includes('put') ||
     normalizedPrimary.includes('get') ||
     normalizedPrimary.includes('list') ||
@@ -2980,7 +3000,7 @@ function storageOptimizationInsight(
 
     return {
       recommendation:
-        'batch object operations and reduce LIST-heavy access patterns before scaling request volume.',
+        'batch object operations, reduce LIST-heavy access patterns, and validate monitored object count before scaling request volume.',
       monthlySavings,
       effort: 'Medium',
       hasAdvancedSignal: true,
@@ -3148,17 +3168,23 @@ function storageAnatomyDimensions(
         totals.retrieval += monthly;
       } else if (normalized.includes('replication') || normalized.includes('replica transfer')) {
         totals.replication += monthly;
-      } else if (normalized.includes('lifecycle') || normalized.includes('transition')) {
+      } else if (
+        normalized.includes('lifecycle') ||
+        normalized.includes('transition') ||
+        normalized.includes('minimum-duration')
+      ) {
         totals.lifecycle += monthly;
       } else if (
         normalized.includes('iops') ||
         normalized.includes('throughput') ||
-        normalized.includes('performance')
+        normalized.includes('performance') ||
+        normalized.includes('multi-attach')
       ) {
         totals.performance += monthly;
       } else if (
         normalized.includes('operation') ||
         normalized.includes('request') ||
+        normalized.includes('monitoring') ||
         normalized.includes('put') ||
         normalized.includes('get') ||
         normalized.includes('list') ||
@@ -4296,6 +4322,9 @@ function storageDescription(description: string): boolean {
     'retrieval',
     'replication',
     'lifecycle',
+    'minimum-duration',
+    'monitoring',
+    'multi-attach',
     'iops',
     'throughput',
     'object request',
@@ -4315,6 +4344,9 @@ function storageAdvancedDescription(description: string): boolean {
     'retrieval',
     'replication',
     'lifecycle',
+    'minimum-duration',
+    'monitoring',
+    'multi-attach',
     'iops',
     'throughput',
     'object request',

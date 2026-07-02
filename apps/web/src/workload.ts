@@ -65,12 +65,15 @@ export interface WorkloadFormState {
   monthlyDeleteRequestsThousand: string;
   monthlyListRequestsThousand: string;
   monthlyRetrievalGb: string;
+  objectCountThousand: string;
+  objectRetentionDays: string;
   storageReplication: StorageReplication;
   lifecycleTransitionsThousand: string;
   snapshotSizeGb: string;
   snapshotRetentionDays: string;
   provisionedIops: string;
   provisionedThroughputMbps: string;
+  multiAttachEnabled: boolean;
   databaseEnabled: boolean;
   databaseRole: string;
   databaseEngine: DatabaseEngine;
@@ -200,6 +203,8 @@ type NumericWorkloadFormField =
   | 'monthlyDeleteRequestsThousand'
   | 'monthlyListRequestsThousand'
   | 'monthlyRetrievalGb'
+  | 'objectCountThousand'
+  | 'objectRetentionDays'
   | 'lifecycleTransitionsThousand'
   | 'snapshotSizeGb'
   | 'snapshotRetentionDays'
@@ -330,12 +335,15 @@ export const defaultWorkloadForm: WorkloadFormState = {
   monthlyDeleteRequestsThousand: '0',
   monthlyListRequestsThousand: '0',
   monthlyRetrievalGb: '0',
+  objectCountThousand: '0',
+  objectRetentionDays: '30',
   storageReplication: 'none',
   lifecycleTransitionsThousand: '0',
   snapshotSizeGb: '0',
   snapshotRetentionDays: '30',
   provisionedIops: '0',
   provisionedThroughputMbps: '0',
+  multiAttachEnabled: false,
   databaseEnabled: true,
   databaseRole: 'primary',
   databaseEngine: 'postgres',
@@ -831,6 +839,20 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
       form,
       'monthlyRetrievalGb',
       'Retrieval volume must be 0 GB or higher.',
+    );
+    optionalNonNegativeNumberField(
+      issues,
+      form,
+      'objectCountThousand',
+      'Object count must be 0 thousand or higher.',
+    );
+    requireBoundedInteger(
+      issues,
+      form,
+      'objectRetentionDays',
+      0,
+      3650,
+      'Object retention must be a whole number from 0 to 3650 days.',
     );
     optionalNonNegativeNumberField(
       issues,
@@ -1613,6 +1635,12 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
     monthlyRetrievalGb: numberToInput(
       storage?.monthlyRetrievalGb ?? Number(defaultWorkloadForm.monthlyRetrievalGb),
     ),
+    objectCountThousand: numberToInput(
+      storage?.objectCountThousand ?? Number(defaultWorkloadForm.objectCountThousand),
+    ),
+    objectRetentionDays: numberToInput(
+      storage?.objectRetentionDays ?? Number(defaultWorkloadForm.objectRetentionDays),
+    ),
     storageReplication: storage?.replication ?? defaultWorkloadForm.storageReplication,
     lifecycleTransitionsThousand: numberToInput(
       storage?.lifecycleTransitionsThousand ??
@@ -1630,6 +1658,7 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
     provisionedThroughputMbps: numberToInput(
       storage?.provisionedThroughputMbps ?? Number(defaultWorkloadForm.provisionedThroughputMbps),
     ),
+    multiAttachEnabled: storage?.multiAttachEnabled ?? defaultWorkloadForm.multiAttachEnabled,
     databaseEnabled: Boolean(database),
     databaseRole: database?.role ?? defaultWorkloadForm.databaseRole,
     databaseEngine: database?.engine ?? defaultWorkloadForm.databaseEngine,
@@ -2571,6 +2600,8 @@ function storageAdvancedAssumptionsFromForm(
     ...optionalPositiveNumber('monthlyDeleteRequestsThousand', form.monthlyDeleteRequestsThousand),
     ...optionalPositiveNumber('monthlyListRequestsThousand', form.monthlyListRequestsThousand),
     ...optionalPositiveNumber('monthlyRetrievalGb', form.monthlyRetrievalGb),
+    ...optionalPositiveNumber('objectCountThousand', form.objectCountThousand),
+    ...optionalNonNegativeInteger('objectRetentionDays', form.objectRetentionDays),
     ...(form.storageReplication !== 'none' ? { replication: form.storageReplication } : {}),
     ...optionalPositiveNumber('lifecycleTransitionsThousand', form.lifecycleTransitionsThousand),
     ...optionalPositiveNumber('snapshotSizeGb', form.snapshotSizeGb),
@@ -2579,6 +2610,7 @@ function storageAdvancedAssumptionsFromForm(
       : {}),
     ...optionalPositiveInteger('provisionedIops', form.provisionedIops),
     ...optionalPositiveNumber('provisionedThroughputMbps', form.provisionedThroughputMbps),
+    ...(form.multiAttachEnabled ? { multiAttachEnabled: true } : {}),
   };
 }
 
@@ -2594,12 +2626,15 @@ function storageScaleParamsFromForm(form: WorkloadFormState): ServiceRequirement
     monthlyDeleteRequestsThousand: parseOptionalNumber(form.monthlyDeleteRequestsThousand) ?? 0,
     monthlyListRequestsThousand: parseOptionalNumber(form.monthlyListRequestsThousand) ?? 0,
     monthlyRetrievalGb: parseOptionalNumber(form.monthlyRetrievalGb) ?? 0,
+    objectCountThousand: parseOptionalNumber(form.objectCountThousand) ?? 0,
+    objectRetentionDays: parseNonNegativeInteger(form.objectRetentionDays, 0),
     storageReplication: form.storageReplication,
     lifecycleTransitionsThousand: parseOptionalNumber(form.lifecycleTransitionsThousand) ?? 0,
     snapshotSizeGb: parseOptionalNumber(form.snapshotSizeGb) ?? 0,
     snapshotRetentionDays: parseNonNegativeInteger(form.snapshotRetentionDays, 0),
     provisionedIops: parseNonNegativeInteger(form.provisionedIops, 0),
     provisionedThroughputMbps: parseOptionalNumber(form.provisionedThroughputMbps) ?? 0,
+    multiAttachEnabled: form.multiAttachEnabled,
   };
 }
 
@@ -3218,6 +3253,10 @@ function formNumericValue(form: WorkloadFormState, field: NumericWorkloadFormFie
       return form.monthlyListRequestsThousand;
     case 'monthlyRetrievalGb':
       return form.monthlyRetrievalGb;
+    case 'objectCountThousand':
+      return form.objectCountThousand;
+    case 'objectRetentionDays':
+      return form.objectRetentionDays;
     case 'lifecycleTransitionsThousand':
       return form.lifecycleTransitionsThousand;
     case 'snapshotSizeGb':

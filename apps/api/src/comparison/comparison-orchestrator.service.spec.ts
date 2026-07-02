@@ -952,12 +952,27 @@ describe('ComparisonOrchestratorService', () => {
           monthlyDeleteRequestsThousand: 10,
           monthlyListRequestsThousand: 25,
           monthlyRetrievalGb: 40,
+          objectRetentionDays: 30,
           replication: 'cross-region',
           lifecycleTransitionsThousand: 20,
           snapshotSizeGb: 200,
           snapshotRetentionDays: 45,
           provisionedIops: 3000,
           provisionedThroughputMbps: 125,
+        },
+        {
+          role: 'media-index',
+          type: 'object',
+          sizeGb: 100,
+          accessPattern: 'frequent',
+          storageClass: 'intelligent-tiering',
+          objectCountThousand: 4000,
+        },
+        {
+          role: 'cluster-disk',
+          type: 'block',
+          sizeGb: 100,
+          multiAttachEnabled: true,
         },
       ],
     });
@@ -984,6 +999,15 @@ describe('ComparisonOrchestratorService', () => {
           baseMonthlyCostUsd: 1.2,
         }),
         expect.objectContaining({
+          skuId: 'modeled-storage-intelligent-tiering-monitoring',
+          baseMonthlyCostUsd: 10,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-storage-minimum-duration',
+          description: expect.stringContaining('30d planned, 90d billable minimum'),
+          baseMonthlyCostUsd: 3.6,
+        }),
+        expect.objectContaining({
           skuId: 'modeled-storage-cross-region-replication',
           baseMonthlyCostUsd: 10,
         }),
@@ -996,6 +1020,10 @@ describe('ComparisonOrchestratorService', () => {
           baseMonthlyCostUsd: 15,
         }),
         expect.objectContaining({
+          skuId: 'modeled-storage-multi-attach',
+          baseMonthlyCostUsd: 2,
+        }),
+        expect.objectContaining({
           skuId: 'modeled-storage-provisioned-iops',
           baseMonthlyCostUsd: 15,
         }),
@@ -1005,7 +1033,7 @@ describe('ComparisonOrchestratorService', () => {
         }),
       ]),
     );
-    expect(result.providers[0].breakdown?.storageMonthlyCostUsd).toBe(47.13);
+    expect(result.providers[0].breakdown?.storageMonthlyCostUsd).toBe(62.73);
   });
 
   it('adds explicit modeled database dimension line items when advanced database assumptions exist', async () => {

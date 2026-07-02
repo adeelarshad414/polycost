@@ -372,12 +372,15 @@ describe('workload helpers', () => {
       monthlyDeleteRequestsThousand: '10',
       monthlyListRequestsThousand: '25',
       monthlyRetrievalGb: '40',
+      objectCountThousand: '5000',
+      objectRetentionDays: '30',
       storageReplication: 'cross-region',
       lifecycleTransitionsThousand: '20',
       snapshotSizeGb: '200',
       snapshotRetentionDays: '45',
       provisionedIops: '3000',
       provisionedThroughputMbps: '125',
+      multiAttachEnabled: true,
     });
 
     expect(nws.storage[0]).toMatchObject({
@@ -387,12 +390,15 @@ describe('workload helpers', () => {
       monthlyDeleteRequestsThousand: 10,
       monthlyListRequestsThousand: 25,
       monthlyRetrievalGb: 40,
+      objectCountThousand: 5000,
+      objectRetentionDays: 30,
       replication: 'cross-region',
       lifecycleTransitionsThousand: 20,
       snapshotSizeGb: 200,
       snapshotRetentionDays: 45,
       provisionedIops: 3000,
       provisionedThroughputMbps: 125,
+      multiAttachEnabled: true,
     });
     expect(nws.serviceRequirements).toContainEqual(
       expect.objectContaining({
@@ -403,10 +409,13 @@ describe('workload helpers', () => {
           monthlyPutRequestsThousand: 100,
           monthlyGetRequestsThousand: 250,
           monthlyRetrievalGb: 40,
+          objectCountThousand: 5000,
+          objectRetentionDays: 30,
           storageReplication: 'cross-region',
           snapshotSizeGb: 200,
           provisionedIops: 3000,
           provisionedThroughputMbps: 125,
+          multiAttachEnabled: true,
         }),
       }),
     );
@@ -416,11 +425,14 @@ describe('workload helpers', () => {
         monthlyPutRequestsThousand: '100',
         monthlyGetRequestsThousand: '250',
         monthlyRetrievalGb: '40',
+        objectCountThousand: '5000',
+        objectRetentionDays: '30',
         storageReplication: 'cross-region',
         snapshotSizeGb: '200',
         snapshotRetentionDays: '45',
         provisionedIops: '3000',
         provisionedThroughputMbps: '125',
+        multiAttachEnabled: true,
       }),
     );
   });

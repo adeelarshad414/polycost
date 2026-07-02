@@ -124,12 +124,15 @@ export interface NormalizedWorkloadSpec {
     monthlyDeleteRequestsThousand?: number;
     monthlyListRequestsThousand?: number;
     monthlyRetrievalGb?: number;
+    objectCountThousand?: number;
+    objectRetentionDays?: number;
     replication?: StorageReplication;
     lifecycleTransitionsThousand?: number;
     snapshotSizeGb?: number;
     snapshotRetentionDays?: number;
     provisionedIops?: number;
     provisionedThroughputMbps?: number;
+    multiAttachEnabled?: boolean;
   }>;
   database: Array<{
     role: string;

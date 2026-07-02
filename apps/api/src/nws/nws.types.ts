@@ -84,12 +84,15 @@ export const storageComponentSchema = z
     monthlyDeleteRequestsThousand: z.number().nonnegative().optional(),
     monthlyListRequestsThousand: z.number().nonnegative().optional(),
     monthlyRetrievalGb: z.number().nonnegative().optional(),
+    objectCountThousand: z.number().nonnegative().optional(),
+    objectRetentionDays: z.number().int().nonnegative().optional(),
     replication: storageReplicationSchema.optional(),
     lifecycleTransitionsThousand: z.number().nonnegative().optional(),
     snapshotSizeGb: z.number().nonnegative().optional(),
     snapshotRetentionDays: z.number().int().nonnegative().optional(),
     provisionedIops: z.number().int().nonnegative().optional(),
     provisionedThroughputMbps: z.number().nonnegative().optional(),
+    multiAttachEnabled: z.boolean().optional(),
   })
   .strict();
 
