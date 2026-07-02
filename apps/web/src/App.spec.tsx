@@ -201,6 +201,19 @@ describe('App', () => {
     unmount();
   });
 
+  it('shows the expanded provider region fallback while the live catalog loads', () => {
+    const { container, unmount } = render(<App client={clientMock()} />);
+    const regionSelect = selectById(container, 'region');
+    const regionOptions = regionSelect.textContent ?? '';
+
+    expect(regionSelect.querySelectorAll('option').length).toBeGreaterThan(120);
+    expect(regionOptions).toContain('ap-southeast-7 - Asia Pacific (Thailand)');
+    expect(regionOptions).toContain('newzealandnorth - New Zealand North');
+    expect(regionOptions).toContain('us-west8 - US West (Phoenix)');
+
+    unmount();
+  });
+
   it('adopts the backend pricing model recommendation after comparison', async () => {
     const recommendedResult: ComparisonResult = {
       ...comparisonResult,

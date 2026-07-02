@@ -1,0 +1,255 @@
+import {
+  CloudRegion,
+  CloudRegionProviderCatalog,
+  ProviderId,
+  RegionCatalogResponse,
+} from './types';
+
+type RegionSeed = [id: string, label: string];
+
+export const DEFAULT_CALCULATOR_URLS: Record<ProviderId, string> = {
+  aws: 'https://calculator.aws/#/',
+  azure: 'https://azure.microsoft.com/en-us/pricing/calculator/',
+  gcp: 'https://cloud.google.com/products/calculator',
+};
+
+export const DEFAULT_REGION_REFERENCE_URLS: Record<ProviderId, string> = {
+  aws: 'https://aws.amazon.com/about-aws/global-infrastructure/regions_az/',
+  azure: 'https://learn.microsoft.com/en-us/azure/reliability/availability-zones-region-support',
+  gcp: 'https://cloud.google.com/compute/docs/regions-zones',
+};
+
+const AWS_FALLBACK_REGION_SEEDS: RegionSeed[] = [
+  ['af-south-1', 'Africa (Cape Town)'],
+  ['ap-east-1', 'Asia Pacific (Hong Kong)'],
+  ['ap-east-2', 'Asia Pacific (Taipei)'],
+  ['ap-northeast-1', 'Asia Pacific (Tokyo)'],
+  ['ap-northeast-2', 'Asia Pacific (Seoul)'],
+  ['ap-northeast-3', 'Asia Pacific (Osaka)'],
+  ['ap-south-1', 'Asia Pacific (Mumbai)'],
+  ['ap-south-2', 'Asia Pacific (Hyderabad)'],
+  ['ap-southeast-1', 'Asia Pacific (Singapore)'],
+  ['ap-southeast-2', 'Asia Pacific (Sydney)'],
+  ['ap-southeast-3', 'Asia Pacific (Jakarta)'],
+  ['ap-southeast-4', 'Asia Pacific (Melbourne)'],
+  ['ap-southeast-5', 'Asia Pacific (Malaysia)'],
+  ['ap-southeast-6', 'Asia Pacific (New Zealand)'],
+  ['ap-southeast-7', 'Asia Pacific (Thailand)'],
+  ['ca-central-1', 'Canada (Central)'],
+  ['ca-west-1', 'Canada West (Calgary)'],
+  ['eu-central-1', 'Europe (Frankfurt)'],
+  ['eu-central-2', 'Europe (Zurich)'],
+  ['eu-north-1', 'Europe (Stockholm)'],
+  ['eu-south-1', 'Europe (Milan)'],
+  ['eu-south-2', 'Europe (Spain)'],
+  ['eu-west-1', 'Europe (Ireland)'],
+  ['eu-west-2', 'Europe (London)'],
+  ['eu-west-3', 'Europe (Paris)'],
+  ['il-central-1', 'Israel (Tel Aviv)'],
+  ['me-central-1', 'Middle East (UAE)'],
+  ['me-south-1', 'Middle East (Bahrain)'],
+  ['mx-central-1', 'Mexico (Central)'],
+  ['sa-east-1', 'South America (Sao Paulo)'],
+  ['us-east-1', 'US East (N. Virginia)'],
+  ['us-east-2', 'US East (Ohio)'],
+  ['us-west-1', 'US West (N. California)'],
+  ['us-west-2', 'US West (Oregon)'],
+];
+
+const AZURE_FALLBACK_REGION_SEEDS: RegionSeed[] = [
+  ['attatlanta1', 'ATT Atlanta 1'],
+  ['attdallas1', 'ATT Dallas 1'],
+  ['attdetroit1', 'ATT Detroit 1'],
+  ['attnewyork1', 'ATT New York 1'],
+  ['australiacentral', 'Australia Central'],
+  ['australiacentral2', 'Australia Central 2'],
+  ['australiaeast', 'Australia East'],
+  ['australiasoutheast', 'Australia Southeast'],
+  ['austriaeast', 'Austria East'],
+  ['belgiumcentral', 'Belgium Central'],
+  ['brazilsouth', 'Brazil South'],
+  ['brazilsoutheast', 'Brazil Southeast'],
+  ['canadacentral', 'Canada Central'],
+  ['canadaeast', 'Canada East'],
+  ['centralindia', 'Central India'],
+  ['centralus', 'Central US'],
+  ['chilecentral', 'Chile Central'],
+  ['chinaeast', 'China East'],
+  ['chinaeast2', 'China East 2'],
+  ['chinaeast3', 'China East 3'],
+  ['chinanorth', 'China North'],
+  ['chinanorth2', 'China North 2'],
+  ['chinanorth3', 'China North 3'],
+  ['deloscloudgermanycentral', 'Delos Cloud Germany Central'],
+  ['deloscloudgermanynorth', 'Delos Cloud Germany North'],
+  ['denmarkeast', 'Denmark East'],
+  ['eastasia', 'East Asia'],
+  ['eastus', 'East US'],
+  ['eastus2', 'East US 2'],
+  ['francecentral', 'France Central'],
+  ['francesouth', 'France South'],
+  ['germanynorth', 'Germany North'],
+  ['germanywestcentral', 'Germany West Central'],
+  ['indiasouthcentral', 'India South Central'],
+  ['indonesiacentral', 'Indonesia Central'],
+  ['israelcentral', 'Israel Central'],
+  ['israelnorthwest', 'Israel Northwest'],
+  ['italynorth', 'Italy North'],
+  ['japaneast', 'Japan East'],
+  ['japanwest', 'Japan West'],
+  ['jioindiacentral', 'Jio India Central'],
+  ['jioindiawest', 'Jio India West'],
+  ['koreacentral', 'Korea Central'],
+  ['koreasouth', 'Korea South'],
+  ['malaysiawest', 'Malaysia West'],
+  ['mexicocentral', 'Mexico Central'],
+  ['newzealandnorth', 'New Zealand North'],
+  ['northcentralus', 'North Central US'],
+  ['northeurope', 'North Europe'],
+  ['norwayeast', 'Norway East'],
+  ['norwaywest', 'Norway West'],
+  ['polandcentral', 'Poland Central'],
+  ['portland', 'Portland'],
+  ['qatarcentral', 'Qatar Central'],
+  ['sgxsingapore1', 'SGX Singapore 1'],
+  ['southafricanorth', 'South Africa North'],
+  ['southafricawest', 'South Africa West'],
+  ['southcentralus', 'South Central US'],
+  ['southcentralus2', 'South Central US 2'],
+  ['southeastasia', 'Southeast Asia'],
+  ['southeastus', 'Southeast US'],
+  ['southindia', 'South India'],
+  ['southwestus', 'Southwest US'],
+  ['spaincentral', 'Spain Central'],
+  ['swedencentral', 'Sweden Central'],
+  ['swedensouth', 'Sweden South'],
+  ['switzerlandnorth', 'Switzerland North'],
+  ['switzerlandwest', 'Switzerland West'],
+  ['uaecentral', 'UAE Central'],
+  ['uaenorth', 'UAE North'],
+  ['uksouth', 'UK South'],
+  ['ukwest', 'UK West'],
+  ['usgovarizona', 'US Gov Arizona'],
+  ['usgoviowa', 'US Gov Iowa'],
+  ['usgovtexas', 'US Gov Texas'],
+  ['usgovvirginia', 'US Gov Virginia'],
+  ['westcentralus', 'West Central US'],
+  ['westeurope', 'West Europe'],
+  ['westindia', 'West India'],
+  ['westus', 'West US'],
+  ['westus2', 'West US 2'],
+  ['westus3', 'West US 3'],
+];
+
+const GCP_FALLBACK_REGION_SEEDS: RegionSeed[] = [
+  ['africa-south1', 'Africa South (Johannesburg)'],
+  ['asia-east1', 'Asia East (Taiwan)'],
+  ['asia-east2', 'Asia East (Hong Kong)'],
+  ['asia-northeast1', 'Asia Northeast (Tokyo)'],
+  ['asia-northeast2', 'Asia Northeast (Osaka)'],
+  ['asia-northeast3', 'Asia Northeast (Seoul)'],
+  ['asia-south1', 'Asia South (Mumbai)'],
+  ['asia-south2', 'Asia South (Delhi)'],
+  ['asia-southeast1', 'Asia Southeast (Singapore)'],
+  ['asia-southeast2', 'Asia Southeast (Jakarta)'],
+  ['asia-southeast3', 'Asia Southeast (Malaysia)'],
+  ['australia-southeast1', 'Australia Southeast (Sydney)'],
+  ['australia-southeast2', 'Australia Southeast (Melbourne)'],
+  ['europe-central2', 'Europe Central (Warsaw)'],
+  ['europe-north1', 'Europe North (Finland)'],
+  ['europe-north2', 'Europe North (Stockholm)'],
+  ['europe-southwest1', 'Europe Southwest (Madrid)'],
+  ['europe-west1', 'Europe West (Belgium)'],
+  ['europe-west2', 'Europe West (London)'],
+  ['europe-west3', 'Europe West (Frankfurt)'],
+  ['europe-west4', 'Europe West (Netherlands)'],
+  ['europe-west6', 'Europe West (Zurich)'],
+  ['europe-west8', 'Europe West (Milan)'],
+  ['europe-west9', 'Europe West (Paris)'],
+  ['europe-west10', 'Europe West (Berlin)'],
+  ['europe-west12', 'Europe West (Turin)'],
+  ['europe-west15', 'Europe West (Madrid low CO2)'],
+  ['me-central1', 'Middle East Central (Doha)'],
+  ['me-central2', 'Middle East Central (Dammam)'],
+  ['me-west1', 'Middle East West (Tel Aviv)'],
+  ['northamerica-northeast1', 'North America Northeast (Montreal)'],
+  ['northamerica-northeast2', 'North America Northeast (Toronto)'],
+  ['northamerica-south1', 'North America South (Mexico)'],
+  ['southamerica-east1', 'South America East (Sao Paulo)'],
+  ['southamerica-west1', 'South America West (Santiago)'],
+  ['us-central1', 'US Central (Iowa)'],
+  ['us-central2', 'US Central (Oklahoma)'],
+  ['us-east1', 'US East (South Carolina)'],
+  ['us-east4', 'US East (Northern Virginia)'],
+  ['us-east5', 'US East (Columbus)'],
+  ['us-east7', 'US East (Virginia)'],
+  ['us-south1', 'US South (Dallas)'],
+  ['us-west1', 'US West (Oregon)'],
+  ['us-west2', 'US West (Los Angeles)'],
+  ['us-west3', 'US West (Salt Lake City)'],
+  ['us-west4', 'US West (Las Vegas)'],
+  ['us-west8', 'US West (Phoenix)'],
+];
+
+export const FALLBACK_REGION_CATALOG: RegionCatalogResponse = {
+  generatedAt: 'fallback',
+  cacheTtlSeconds: 0,
+  providers: [
+    fallbackProviderCatalog(
+      'aws',
+      'AWS',
+      'https://b0.p.awsstatic.com/locations/1.0/aws/current/locations.json',
+      AWS_FALLBACK_REGION_SEEDS,
+    ),
+    fallbackProviderCatalog(
+      'azure',
+      'Azure',
+      'https://azure.microsoft.com/en-us/explore/global-infrastructure/products-by-region/table',
+      AZURE_FALLBACK_REGION_SEEDS,
+    ),
+    fallbackProviderCatalog(
+      'gcp',
+      'Google Cloud',
+      'https://www.gstatic.com/ipranges/cloud.json',
+      GCP_FALLBACK_REGION_SEEDS,
+    ),
+  ],
+};
+
+function fallbackProviderCatalog(
+  providerId: ProviderId,
+  label: string,
+  sourceUrl: string,
+  regions: RegionSeed[],
+): CloudRegionProviderCatalog {
+  return {
+    providerId,
+    label,
+    source: 'fallback',
+    sourceUrl,
+    calculatorUrl: defaultCalculatorUrl(providerId),
+    regions: fallbackRegions(providerId, regions),
+  };
+}
+
+function fallbackRegions(providerId: ProviderId, regions: RegionSeed[]): CloudRegion[] {
+  return regions
+    .map(([id, label]) => ({
+      providerId,
+      id,
+      label,
+      source: 'fallback' as const,
+    }))
+    .sort((left, right) => left.label.localeCompare(right.label, 'en-US', { numeric: true }));
+}
+
+function defaultCalculatorUrl(providerId: ProviderId): string {
+  switch (providerId) {
+    case 'aws':
+      return DEFAULT_CALCULATOR_URLS.aws;
+    case 'azure':
+      return DEFAULT_CALCULATOR_URLS.azure;
+    case 'gcp':
+      return DEFAULT_CALCULATOR_URLS.gcp;
+  }
+}

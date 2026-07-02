@@ -18,6 +18,11 @@ import {
   regionPreferenceForResidencyLock,
 } from './region-normalization';
 import {
+  DEFAULT_CALCULATOR_URLS,
+  DEFAULT_REGION_REFERENCE_URLS,
+  FALLBACK_REGION_CATALOG,
+} from './region-catalog';
+import {
   CLOUD_SERVICE_CATALOG,
   SERVICE_CATALOG_CATEGORIES,
   type CloudServiceFamily,
@@ -407,125 +412,6 @@ const FAULT_TOLERANCE_OPTIONS: Array<[WorkloadFormState['faultTolerance'], strin
   ['multi-region', 'Multi-region'],
   ['active-active', 'Active-active'],
 ];
-
-const DEFAULT_CALCULATOR_URLS: Record<ProviderId, string> = {
-  aws: 'https://calculator.aws/#/',
-  azure: 'https://azure.microsoft.com/en-us/pricing/calculator/',
-  gcp: 'https://cloud.google.com/products/calculator',
-};
-
-const DEFAULT_REGION_REFERENCE_URLS: Record<ProviderId, string> = {
-  aws: 'https://aws.amazon.com/about-aws/global-infrastructure/regions_az/',
-  azure: 'https://learn.microsoft.com/en-us/azure/reliability/availability-zones-region-support',
-  gcp: 'https://cloud.google.com/compute/docs/regions-zones',
-};
-
-const FALLBACK_REGION_CATALOG: RegionCatalogResponse = {
-  generatedAt: 'fallback',
-  cacheTtlSeconds: 0,
-  providers: [
-    {
-      providerId: 'aws',
-      label: 'AWS',
-      source: 'fallback',
-      sourceUrl: 'https://b0.p.awsstatic.com/locations/1.0/aws/current/locations.json',
-      calculatorUrl: DEFAULT_CALCULATOR_URLS.aws,
-      regions: [
-        { providerId: 'aws', id: 'us-east-1', label: 'US East (N. Virginia)', source: 'fallback' },
-        { providerId: 'aws', id: 'us-east-2', label: 'US East (Ohio)', source: 'fallback' },
-        {
-          providerId: 'aws',
-          id: 'us-west-1',
-          label: 'US West (N. California)',
-          source: 'fallback',
-        },
-        { providerId: 'aws', id: 'us-west-2', label: 'US West (Oregon)', source: 'fallback' },
-        { providerId: 'aws', id: 'eu-west-1', label: 'Europe (Ireland)', source: 'fallback' },
-        { providerId: 'aws', id: 'eu-central-1', label: 'Europe (Frankfurt)', source: 'fallback' },
-        { providerId: 'aws', id: 'ap-south-1', label: 'Asia Pacific (Mumbai)', source: 'fallback' },
-        {
-          providerId: 'aws',
-          id: 'ap-southeast-1',
-          label: 'Asia Pacific (Singapore)',
-          source: 'fallback',
-        },
-        {
-          providerId: 'aws',
-          id: 'ap-northeast-1',
-          label: 'Asia Pacific (Tokyo)',
-          source: 'fallback',
-        },
-      ],
-    },
-    {
-      providerId: 'azure',
-      label: 'Azure',
-      source: 'fallback',
-      sourceUrl:
-        'https://azure.microsoft.com/en-us/explore/global-infrastructure/products-by-region/table',
-      calculatorUrl: DEFAULT_CALCULATOR_URLS.azure,
-      regions: [
-        { providerId: 'azure', id: 'eastus', label: 'East US', source: 'fallback' },
-        { providerId: 'azure', id: 'eastus2', label: 'East US 2', source: 'fallback' },
-        { providerId: 'azure', id: 'centralus', label: 'Central US', source: 'fallback' },
-        { providerId: 'azure', id: 'westus', label: 'West US', source: 'fallback' },
-        { providerId: 'azure', id: 'westus2', label: 'West US 2', source: 'fallback' },
-        { providerId: 'azure', id: 'westus3', label: 'West US 3', source: 'fallback' },
-        { providerId: 'azure', id: 'uksouth', label: 'UK South', source: 'fallback' },
-        { providerId: 'azure', id: 'westeurope', label: 'West Europe', source: 'fallback' },
-        { providerId: 'azure', id: 'southeastasia', label: 'Southeast Asia', source: 'fallback' },
-      ],
-    },
-    {
-      providerId: 'gcp',
-      label: 'Google Cloud',
-      source: 'fallback',
-      sourceUrl: 'https://www.gstatic.com/ipranges/cloud.json',
-      calculatorUrl: DEFAULT_CALCULATOR_URLS.gcp,
-      regions: [
-        { providerId: 'gcp', id: 'us-central1', label: 'US Central (Iowa)', source: 'fallback' },
-        {
-          providerId: 'gcp',
-          id: 'us-east1',
-          label: 'US East (South Carolina)',
-          source: 'fallback',
-        },
-        {
-          providerId: 'gcp',
-          id: 'us-east4',
-          label: 'US East (Northern Virginia)',
-          source: 'fallback',
-        },
-        { providerId: 'gcp', id: 'us-west1', label: 'US West (Oregon)', source: 'fallback' },
-        {
-          providerId: 'gcp',
-          id: 'europe-west1',
-          label: 'Europe West (Belgium)',
-          source: 'fallback',
-        },
-        {
-          providerId: 'gcp',
-          id: 'europe-west2',
-          label: 'Europe West (London)',
-          source: 'fallback',
-        },
-        { providerId: 'gcp', id: 'asia-south1', label: 'Asia South (Mumbai)', source: 'fallback' },
-        {
-          providerId: 'gcp',
-          id: 'asia-southeast1',
-          label: 'Asia Southeast (Singapore)',
-          source: 'fallback',
-        },
-        {
-          providerId: 'gcp',
-          id: 'asia-northeast1',
-          label: 'Asia Northeast (Tokyo)',
-          source: 'fallback',
-        },
-      ],
-    },
-  ],
-};
 
 const INITIAL_HOME_FORM: WorkloadFormState = {
   ...defaultWorkloadForm,
