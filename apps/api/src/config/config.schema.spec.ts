@@ -42,6 +42,34 @@ describe('config schema', () => {
     ).toThrow();
   });
 
+  it('rejects wildcard CORS origins for production-bound environments', () => {
+    expect(() =>
+      validateConfig({
+        ...baseConfig,
+        NODE_ENV: 'production',
+        CORS_ALLOWED_ORIGINS: '*',
+      }),
+    ).toThrow('Wildcard CORS origins are not allowed in staging or production.');
+
+    expect(() =>
+      validateConfig({
+        ...baseConfig,
+        NODE_ENV: 'staging',
+        CORS_ALLOWED_ORIGINS: 'https://app.example.com,*',
+      }),
+    ).toThrow('Wildcard CORS origins are not allowed in staging or production.');
+  });
+
+  it('keeps wildcard CORS available only for local test harnesses', () => {
+    expect(
+      validateConfig({
+        ...baseConfig,
+        NODE_ENV: 'test',
+        CORS_ALLOWED_ORIGINS: '*',
+      }).CORS_ALLOWED_ORIGINS,
+    ).toBe('*');
+  });
+
   it('accepts optional pricing sync alert webhooks', () => {
     const config = validateConfig({
       ...baseConfig,
