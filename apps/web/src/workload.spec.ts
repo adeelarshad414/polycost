@@ -1200,6 +1200,8 @@ describe('theme helpers', () => {
     expect(systemTheme(() => ({ matches: true }))).toBe('dark');
     expect(systemTheme(() => ({ matches: false }))).toBe('light');
     expect(resolveTheme('light')).toBe('light');
+    expect(resolveTheme('system', () => ({ matches: true }))).toBe('dark');
+    expect(resolveTheme('system', () => ({ matches: false }))).toBe('light');
   });
 
   it('reads, writes, and applies theme choices', () => {
@@ -1210,17 +1212,19 @@ describe('theme helpers', () => {
     };
     const root = document.createElement('html');
 
-    expect(storedTheme(storageLike, () => ({ matches: true }))).toBe('dark');
+    expect(storedTheme(storageLike)).toBe('system');
     storage.set(THEME_STORAGE_KEY, 'dark');
     expect(storedTheme(storageLike)).toBe('dark');
+    storage.set(THEME_STORAGE_KEY, 'system');
+    expect(storedTheme(storageLike)).toBe('system');
 
-    const resolved = applyTheme('light', root, storageLike);
+    const resolved = applyTheme('system', root, storageLike, () => ({ matches: true }));
 
-    expect(resolved).toBe('light');
-    expect(root.dataset.theme).toBe('light');
-    expect(root.dataset.themeChoice).toBe('light');
-    expect(root.style.colorScheme).toBe('light');
-    expect(storageLike.setItem).toHaveBeenCalledWith(THEME_STORAGE_KEY, 'light');
+    expect(resolved).toBe('dark');
+    expect(root.dataset.theme).toBe('dark');
+    expect(root.dataset.themeChoice).toBe('system');
+    expect(root.style.colorScheme).toBe('dark');
+    expect(storageLike.setItem).toHaveBeenCalledWith(THEME_STORAGE_KEY, 'system');
   });
 
   it('subscribes to live system theme changes', () => {

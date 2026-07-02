@@ -1760,6 +1760,57 @@ textarea:focus-visible {
   align-items: center;
 }
 
+.theme-mode-control {
+  display: grid;
+  min-height: 44px;
+  grid-template-columns: repeat(3, 44px);
+  align-items: center;
+  border: 1px solid var(--pc-border);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--pc-bg-surface-2) 70%, var(--pc-bg-surface));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 48%),
+    0 8px 22px rgb(18 21 28 / 8%);
+  gap: 2px;
+  padding: 3px;
+}
+
+.theme-mode-button {
+  display: inline-grid;
+  width: 44px;
+  min-height: 44px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--pc-text-secondary);
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease,
+    color 150ms ease,
+    transform 100ms ease;
+}
+
+.theme-mode-button:hover {
+  background: color-mix(in srgb, var(--pc-action-primary-soft) 42%, transparent);
+  color: var(--pc-text-primary);
+}
+
+.theme-mode-button[aria-checked='true'] {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--pc-bg-surface) 94%, transparent), transparent),
+    color-mix(in srgb, var(--pc-action-primary-soft) 72%, var(--pc-bg-surface));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--pc-action-primary) 28%, transparent),
+    0 6px 14px rgb(18 21 28 / 14%);
+  color: var(--pc-text-primary);
+}
+
+.theme-mode-button:active {
+  transform: translateY(1px);
+}
+
 .theme-switch-button {
   position: relative;
   display: inline-flex;
@@ -1958,6 +2009,10 @@ textarea:focus-visible {
   min-height: 44px;
   border-color: var(--pc-landing-border);
   background: color-mix(in srgb, var(--pc-landing-surface-1) 86%, transparent);
+  box-shadow: none;
+}
+
+.landing-theme-switcher .theme-mode-control {
   box-shadow: none;
 }
 
@@ -7523,7 +7578,7 @@ select:disabled {
   }
 
   .brand-logo-shell {
-    width: min(148px, 42vw);
+    width: min(128px, 34vw);
   }
 
   .brand-logo-image {
@@ -7811,6 +7866,18 @@ select:disabled {
 }
 
 @media (max-width: 480px) {
+  .app-signin-button {
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+    max-width: 44px;
+    padding: 0;
+  }
+
+  .app-signin-text {
+    display: none;
+  }
+
   .landing-logo-link {
     width: 118px;
   }

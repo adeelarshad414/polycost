@@ -31,7 +31,14 @@ import {
   serviceCatalogTraceability,
   supportLabel,
 } from './service-catalog';
-import { applyTheme, ResolvedTheme, resolveTheme, storedTheme, ThemeChoice } from './theme';
+import {
+  applyTheme,
+  ResolvedTheme,
+  resolveTheme,
+  storedTheme,
+  subscribeToSystemTheme,
+  ThemeChoice,
+} from './theme';
 import {
   ComparisonProviderResult,
   ComparisonAnalyticsResponse,
@@ -701,6 +708,16 @@ export function App({ client = polyCostClient }: AppProps) {
 
   useEffect(() => {
     setResolvedTheme(applyTheme(themeChoice));
+
+    if (themeChoice !== 'system') {
+      return undefined;
+    }
+
+    return subscribeToSystemTheme((nextTheme) => {
+      document.documentElement.dataset.theme = nextTheme;
+      document.documentElement.style.colorScheme = nextTheme;
+      setResolvedTheme(nextTheme);
+    });
   }, [themeChoice]);
 
   useEffect(() => {
@@ -1408,9 +1425,15 @@ function AppHeader({
 
       <div className="app-header-actions">
         <ThemeSwitcher themeChoice={themeChoice} onThemeChange={onThemeChange} />
-        <Button type="button" variant="secondary" className="app-signin-button" onClick={onSignIn}>
+        <Button
+          type="button"
+          variant="secondary"
+          className="app-signin-button"
+          aria-label="Sign in"
+          onClick={onSignIn}
+        >
           <SignInIcon />
-          Sign in
+          <span className="app-signin-text">Sign in</span>
         </Button>
       </div>
     </header>
