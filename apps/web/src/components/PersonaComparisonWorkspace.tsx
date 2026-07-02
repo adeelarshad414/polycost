@@ -399,6 +399,13 @@ function EngineeringPersonaView({
   tagOptions: string[];
   onTagFilterChange: (tag: string) => void;
 }) {
+  const emptyRowsMessage = isLoading
+    ? 'Building engineering rows from mapped AWS, Azure, and GCP line items.'
+    : 'Run a comparison to populate engineering rows with provider, region, SKU, and monthly cost evidence.';
+  const apiJsonPendingMessage = isLoading
+    ? 'API JSON will activate when this comparison finishes'
+    : 'Run a comparison to open API JSON';
+
   return (
     <div className="min-w-0 space-y-4" aria-label="Engineering comparison view">
       {data.missingEngineeringFields.length > 0 ? (
@@ -485,7 +492,7 @@ function EngineeringPersonaView({
               ) : (
                 <tr>
                   <td className="px-3 py-8 text-center text-text-secondary" colSpan={5}>
-                    Run a comparison to populate engineering rows.
+                    {emptyRowsMessage}
                   </td>
                 </tr>
               )}
@@ -545,7 +552,7 @@ function EngineeringPersonaView({
             </a>
           ) : (
             <span className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-muted">
-              API JSON pending comparison
+              {apiJsonPendingMessage}
             </span>
           )}
         </div>
@@ -567,19 +574,46 @@ function SharedComparisonState({
 }) {
   if (error) {
     return (
-      <div className="rounded-lg border border-action-destructive bg-surface-1 p-3 text-sm text-text-primary">
-        <strong>Comparison needs attention.</strong> {error}
+      <div
+        className="rounded-lg border border-action-destructive bg-surface-1 p-3 text-sm text-text-primary"
+        role="alert"
+      >
+        <strong>Comparison needs attention.</strong> {error}{' '}
+        <span className="text-text-secondary">
+          Check the requirement inputs, then refresh live pricing or run the comparison again.
+        </span>
       </div>
     );
   }
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Comparison loading">
+      <div
+        className="grid grid-cols-1 gap-3 sm:grid-cols-3"
+        aria-busy="true"
+        aria-label="Comparison loading"
+        role="status"
+      >
+        <div className="flex items-start gap-3 rounded-lg border border-border bg-surface-1 p-4 sm:col-span-3">
+          <span
+            className="mt-0.5 h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-border border-t-action-primary motion-reduce:animate-none"
+            aria-hidden="true"
+          />
+          <div>
+            <strong className="block text-sm text-text-primary">
+              Pricing evidence is being refreshed.
+            </strong>
+            <span className="mt-1 block text-sm text-text-secondary">
+              Mapping provider SKUs, totals, export links, and engineering rows from the backend
+              response.
+            </span>
+          </div>
+        </div>
         {[0, 1, 2].map((item) => (
           <div
             key={item}
             className="h-24 animate-pulse rounded-lg border border-border bg-surface-1 motion-reduce:animate-none"
+            aria-hidden="true"
           />
         ))}
       </div>
@@ -589,6 +623,9 @@ function SharedComparisonState({
   if (!data.comparisonId) {
     return (
       <div className="rounded-lg border border-border bg-surface-1 p-3 text-sm text-text-secondary">
+        <strong className="text-text-primary">
+          Evidence workspace is waiting for a comparison.
+        </strong>{' '}
         {emptyStateMessage ??
           'Run a comparison to populate both Executive and Engineering views from the same result.'}
       </div>
@@ -717,11 +754,15 @@ function lineItemSpec(lineItem: ComparisonLineItem): string {
     lineItem.pricingBasis ? `${capitalize(lineItem.pricingBasis)} pricing` : undefined,
   ].filter((part): part is string => Boolean(part));
 
-  return parts.length > 0 ? parts.join(' · ') : 'Provider SKU detail unavailable';
+  return parts.length > 0
+    ? parts.join(' · ')
+    : 'Modeled cost driver - provider SKU/rate metadata not returned by API';
 }
 
 function comparisonEvidenceSummary(data: PersonaComparisonData): string {
-  const pricingDate = data.pricingAsOf ? formatDateTime(data.pricingAsOf) : 'pricing date pending';
+  const pricingDate = data.pricingAsOf
+    ? formatDateTime(data.pricingAsOf)
+    : 'pricing sync date not returned';
   const approximateText =
     data.totalApproximateCount === 1
       ? '1 approximate mapping'
@@ -755,7 +796,7 @@ function confidenceDetail(
   approximateCount: number,
 ): string {
   if (confidence === 'Pending') {
-    return 'No provider estimates yet';
+    return 'Run comparison to collect provider estimates';
   }
 
   if (confidence === 'High') {

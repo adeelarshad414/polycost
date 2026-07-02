@@ -1142,10 +1142,32 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Backend contract note');
     expect(text(container)).toContain('Resource name');
     expect(text(container)).toContain('Spec / SKU');
+    expect(text(container)).toContain(
+      'Modeled cost driver - provider SKU/rate metadata not returned by API',
+    );
+    expect(text(container)).not.toContain('Provider SKU detail unavailable');
     expect(text(container)).toContain('aws-compute-01');
     expect(text(container)).toContain('azure-compute-01');
     expect(text(container)).toContain('gcp-compute-01');
     expect(text(container)).toContain('Tag filtering is ready in the UI');
+
+    unmount();
+  });
+
+  it('explains comparison workspace loading states with actionable context', async () => {
+    const { container, unmount } = render(
+      <ComparisonView client={clientMock()} comparison={null} interval="monthly" isLoading />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain('Pricing evidence is being refreshed.');
+    expect(text(container)).toContain(
+      'Mapping provider SKUs, totals, export links, and engineering rows from the backend response.',
+    );
+    expect(text(container)).toContain(
+      'Building engineering rows from mapped AWS, Azure, and GCP line items.',
+    );
+    expect(text(container)).toContain('API JSON will activate when this comparison finishes');
 
     unmount();
   });
