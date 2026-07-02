@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { HOURS_PER_MONTH } from '../cost-time';
 import {
   providerRegionsForCanonicalRegion,
   supportedCanonicalRegions,
@@ -163,7 +164,7 @@ function parseWorkloadInput(body: unknown): WorkloadInput {
     memoryGb: parsePositiveNumber(record.memoryGb, 'memoryGb'),
     region: parseCanonicalRegion(record.region),
     instanceCount: parsePositiveNumber(record.instanceCount ?? 1, 'instanceCount', true),
-    hoursPerMonth: parsePositiveNumber(record.hoursPerMonth ?? 730, 'hoursPerMonth'),
+    hoursPerMonth: parsePositiveNumber(record.hoursPerMonth ?? HOURS_PER_MONTH, 'hoursPerMonth'),
     storageGb: parseNonNegativeNumber(record.storageGb ?? 0, 'storageGb'),
     storageTier: parseStorageTier(record.storageTier ?? 'standard'),
     egressGbPerMonth: parseNonNegativeNumber(record.egressGbPerMonth ?? 0, 'egressGbPerMonth'),

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { HOURS_PER_MONTH } from '../cost-time';
 
 export const SUPPORTED_NWS_SCHEMA_VERSIONS = ['1.0'] as const;
 
@@ -122,7 +123,7 @@ export const databaseComponentSchema = z
     cacheReplicaCount: z.number().int().nonnegative().optional(),
     storageGrowthGbPerMonth: z.number().nonnegative().optional(),
     searchNodeCount: z.number().int().nonnegative().optional(),
-    searchNodeHours: z.number().min(0).max(730).optional(),
+    searchNodeHours: z.number().min(0).max(HOURS_PER_MONTH).optional(),
     searchStorageGb: z.number().nonnegative().optional(),
     searchQueriesMillion: z.number().nonnegative().optional(),
   })
@@ -252,19 +253,19 @@ export const normalizedWorkloadSpecSchema = z
         cdnCacheHitRatioPercent: z.number().min(0).max(100).optional(),
         cdnRequestsMillion: z.number().nonnegative().optional(),
         natGatewayGb: z.number().nonnegative().optional(),
-        natGatewayHours: z.number().min(0).max(730).optional(),
+        natGatewayHours: z.number().min(0).max(HOURS_PER_MONTH).optional(),
         dnsHostedZones: z.number().int().nonnegative().optional(),
         dnsQueriesMillion: z.number().nonnegative().optional(),
         loadBalancerProcessedGb: z.number().nonnegative().optional(),
-        loadBalancerHours: z.number().min(0).max(730).optional(),
+        loadBalancerHours: z.number().min(0).max(HOURS_PER_MONTH).optional(),
         loadBalancerNewConnectionsPerSecond: z.number().nonnegative().optional(),
         loadBalancerActiveConnections: z.number().int().nonnegative().optional(),
         loadBalancerRuleEvaluationsPerSecond: z.number().nonnegative().optional(),
         vpnConnectionCount: z.number().int().nonnegative().optional(),
-        vpnConnectionHours: z.number().min(0).max(730).optional(),
+        vpnConnectionHours: z.number().min(0).max(HOURS_PER_MONTH).optional(),
         vpnDataTransferGb: z.number().nonnegative().optional(),
         privateCircuitCount: z.number().int().nonnegative().optional(),
-        privateCircuitPortHours: z.number().min(0).max(730).optional(),
+        privateCircuitPortHours: z.number().min(0).max(HOURS_PER_MONTH).optional(),
         privateCircuitDataTransferGb: z.number().nonnegative().optional(),
         cdn: z.boolean(),
         loadBalancer: z.boolean(),

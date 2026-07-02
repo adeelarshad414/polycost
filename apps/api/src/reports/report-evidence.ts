@@ -4,6 +4,7 @@ import {
   ComparisonProviderResult,
   ComparisonResult,
 } from '../comparison/comparison.types';
+import { HOURS_PER_DAY, HOURS_PER_MONTH, HOURS_PER_WEEK } from '../cost-time';
 import { ServiceRequirement } from '../nws/nws.types';
 import {
   providerRegionForCanonicalRegion,
@@ -799,7 +800,9 @@ export function commitmentTcoRows(result: ComparisonResult): string[][] {
         const termMonths = termMonthsForModel(model, pricingModel);
         const monthly = model.available ? model.monthlyCostUsd : undefined;
         const hourly =
-          model.available && monthly !== undefined ? (model.hourlyCostUsd ?? monthly / 730) : undefined;
+          model.available && monthly !== undefined
+            ? (model.hourlyCostUsd ?? monthly / HOURS_PER_MONTH)
+            : undefined;
         const upfront = model.available ? model.upfrontCostUsd : undefined;
         const termTco =
           monthly !== undefined && termMonths !== undefined
@@ -968,7 +971,7 @@ export function selectedScenarioRows(result: ComparisonResult, options: ReportOp
         available ? 'yes' : 'no',
         available ? formatNumber(costForInterval(monthly, interval)) : '',
         available ? formatNumber(monthly) : '',
-        available ? formatNumber(model?.hourlyCostUsd ?? monthly / 730) : '',
+        available ? formatNumber(model?.hourlyCostUsd ?? monthly / HOURS_PER_MONTH) : '',
         scenarioCaveat(pricingModel, model),
       ];
     }),
@@ -2061,7 +2064,7 @@ function modelCostForProvider(
       model: 'on-demand',
       available: true,
       monthlyCostUsd: provider.totals.monthly,
-      hourlyCostUsd: provider.totals.hourly ?? provider.totals.monthly / 730,
+      hourlyCostUsd: provider.totals.hourly ?? provider.totals.monthly / HOURS_PER_MONTH,
       savingsPercentVsOnDemand: 0,
     };
   }
@@ -2285,9 +2288,9 @@ function scenarioCaveat(
 
 function calculationText(lineItem: ComparisonLineItem): string {
   if (lineItem.baseHourlyCostUsd !== undefined) {
-    return `$${formatNumber(lineItem.baseHourlyCostUsd)} hourly x 730 hours = $${formatNumber(
-      lineItem.baseMonthlyCostUsd,
-    )} monthly`;
+    return `$${formatNumber(
+      lineItem.baseHourlyCostUsd,
+    )} hourly x ${HOURS_PER_MONTH} hours = $${formatNumber(lineItem.baseMonthlyCostUsd)} monthly`;
   }
 
   if (lineItem.unitPriceUsd !== undefined) {
@@ -3813,7 +3816,8 @@ function appPlatformModelAssumptions(result: ComparisonResult): {
   );
 
   return {
-    alwaysOnHours: maxRequirementScaleParam(appRequirements, 'appPlatformAlwaysOnHours') || 730,
+    alwaysOnHours:
+      maxRequirementScaleParam(appRequirements, 'appPlatformAlwaysOnHours') || HOURS_PER_MONTH,
     durationMs: maxRequirementScaleParam(appRequirements, 'appPlatformRequestDurationMs') || 400,
     hasRequirement: appRequirements.length > 0,
     memoryGb: maxRequirementScaleParam(appRequirements, 'appPlatformMemoryGb') || 0.5,
@@ -4538,11 +4542,11 @@ function regionVarianceEvidence(region: string): string {
 function costForInterval(monthly: number, interval: ReportInterval): number {
   switch (interval) {
     case 'hourly':
-      return monthly / 730;
+      return monthly / HOURS_PER_MONTH;
     case 'daily':
-      return (monthly / 730) * 24;
+      return (monthly / HOURS_PER_MONTH) * HOURS_PER_DAY;
     case 'weekly':
-      return (monthly / 730) * 168;
+      return (monthly / HOURS_PER_MONTH) * HOURS_PER_WEEK;
     case 'monthly':
       return monthly;
     case 'quarterly':

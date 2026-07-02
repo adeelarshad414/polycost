@@ -12,6 +12,7 @@ import {
   DEFAULT_COMPARISON_REGION,
   regionPreferenceForResidencyLock,
 } from './region-normalization';
+import { HOURS_PER_MONTH } from './cost-time';
 
 export type WorkloadType = NormalizedWorkloadSpec['workload']['type'];
 export type StorageType = NormalizedWorkloadSpec['storage'][number]['type'];
@@ -677,12 +678,12 @@ export const ARCHITECTURE_TEMPLATES: ArchitectureTemplate[] = [
       crossAzTransferGb: '750',
       interRegionTransferGb: '300',
       natGatewayGb: '1200',
-      natGatewayHours: '730',
+      natGatewayHours: String(HOURS_PER_MONTH),
       vpnConnectionCount: '2',
-      vpnConnectionHours: '730',
+      vpnConnectionHours: String(HOURS_PER_MONTH),
       vpnDataTransferGb: '500',
       privateCircuitCount: '1',
-      privateCircuitPortHours: '730',
+      privateCircuitPortHours: String(HOURS_PER_MONTH),
       privateCircuitDataTransferGb: '1000',
       securityProtectedResources: '180',
       securityFindingsThousand: '45',
@@ -986,7 +987,7 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
       form,
       'databaseSearchNodeHours',
       0,
-      730,
+      HOURS_PER_MONTH,
       'Search node hours must be from 0 to 730 hours/month.',
     );
     optionalNonNegativeNumberField(
@@ -1150,7 +1151,7 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
     form,
     'natGatewayHours',
     0,
-    730,
+    HOURS_PER_MONTH,
     'NAT hours must be between 0 and 730.',
   );
   optionalNonNegativeIntegerField(
@@ -1176,7 +1177,7 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
     form,
     'loadBalancerHours',
     0,
-    730,
+    HOURS_PER_MONTH,
     'Load balancer hours must be between 0 and 730.',
   );
   optionalNonNegativeNumberField(
@@ -1208,7 +1209,7 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
     form,
     'vpnConnectionHours',
     0,
-    730,
+    HOURS_PER_MONTH,
     'VPN hours must be between 0 and 730.',
   );
   optionalNonNegativeNumberField(
@@ -1228,7 +1229,7 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
     form,
     'privateCircuitPortHours',
     0,
-    730,
+    HOURS_PER_MONTH,
     'Private circuit port hours must be between 0 and 730.',
   );
   optionalNonNegativeNumberField(
@@ -1368,7 +1369,7 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
     form,
     'appPlatformAlwaysOnHours',
     0,
-    730,
+    HOURS_PER_MONTH,
     'App platform always-on hours must be between 0 and 730.',
   );
   optionalNonNegativeIntegerField(
@@ -2081,11 +2082,11 @@ export function serviceRequirementsFromForm(form: WorkloadFormState): ServiceReq
         cdnCacheHitRatioPercent: parseBoundedNumber(form.cdnCacheHitRatioPercent, 0, 100, 85),
         cdnRequestsMillion: parseOptionalNumber(form.cdnRequestsMillion) ?? 0,
         natGatewayGb: parseOptionalNumber(form.natGatewayGb) ?? 0,
-        natGatewayHours: parseBoundedNumber(form.natGatewayHours, 0, 730, 0),
+        natGatewayHours: parseBoundedNumber(form.natGatewayHours, 0, HOURS_PER_MONTH, 0),
         dnsHostedZones: parseNonNegativeInteger(form.dnsHostedZones, 0),
         dnsQueriesMillion: parseOptionalNumber(form.dnsQueriesMillion) ?? 0,
         loadBalancerProcessedGb: parseOptionalNumber(form.loadBalancerProcessedGb) ?? 0,
-        loadBalancerHours: parseBoundedNumber(form.loadBalancerHours, 0, 730, 0),
+        loadBalancerHours: parseBoundedNumber(form.loadBalancerHours, 0, HOURS_PER_MONTH, 0),
         loadBalancerNewConnectionsPerSecond:
           parseOptionalNumber(form.loadBalancerNewConnectionsPerSecond) ?? 0,
         loadBalancerActiveConnections: parseNonNegativeInteger(
@@ -2770,7 +2771,12 @@ function databaseScaleParamsFromForm(form: WorkloadFormState): ServiceRequiremen
     cacheReplicaCount: parseNonNegativeInteger(form.databaseCacheReplicaCount, 0),
     storageGrowthGbPerMonth: parseOptionalNumber(form.databaseStorageGrowthGbPerMonth) ?? 0,
     searchNodeCount: parseNonNegativeInteger(form.databaseSearchNodeCount, 0),
-    searchNodeHours: parseBoundedNumber(form.databaseSearchNodeHours, 0, 730, 730),
+    searchNodeHours: parseBoundedNumber(
+      form.databaseSearchNodeHours,
+      0,
+      HOURS_PER_MONTH,
+      HOURS_PER_MONTH,
+    ),
     searchStorageGb: parseOptionalNumber(form.databaseSearchStorageGb) ?? 0,
     searchQueriesMillion: parseOptionalNumber(form.databaseSearchQueriesMillion) ?? 0,
   };
@@ -2806,7 +2812,12 @@ function runtimeScaleParamsFromForm(form: WorkloadFormState): ServiceRequirement
     appPlatformRequestDurationMs: parsePositiveNumber(form.appPlatformRequestDurationMs, 400),
     appPlatformVcpu: parsePositiveNumber(form.appPlatformVcpu, 1),
     appPlatformMemoryGb: parsePositiveNumber(form.appPlatformMemoryGb, 0.5),
-    appPlatformAlwaysOnHours: parseBoundedNumber(form.appPlatformAlwaysOnHours, 0, 730, 730),
+    appPlatformAlwaysOnHours: parseBoundedNumber(
+      form.appPlatformAlwaysOnHours,
+      0,
+      HOURS_PER_MONTH,
+      HOURS_PER_MONTH,
+    ),
     appPlatformMinInstances: parseNonNegativeInteger(form.appPlatformMinInstances, 1),
     kubernetesClusterCount: parseNonNegativeInteger(form.kubernetesClusterCount, 0),
     kubernetesWorkerNodeCount: parseNonNegativeInteger(form.kubernetesWorkerNodeCount, 0),

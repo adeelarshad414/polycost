@@ -1,3 +1,5 @@
+import { HOURS_PER_MONTH } from '../cost-time';
+
 export const NWS_PARSE_RESULT_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -375,7 +377,7 @@ export const NWS_PARSE_RESULT_JSON_SCHEMA = {
             natGatewayHours: {
               type: 'number',
               minimum: 0,
-              maximum: 730,
+              maximum: HOURS_PER_MONTH,
             },
             dnsHostedZones: {
               type: 'integer',
@@ -392,7 +394,7 @@ export const NWS_PARSE_RESULT_JSON_SCHEMA = {
             loadBalancerHours: {
               type: 'number',
               minimum: 0,
-              maximum: 730,
+              maximum: HOURS_PER_MONTH,
             },
             loadBalancerNewConnectionsPerSecond: {
               type: 'number',
@@ -413,7 +415,7 @@ export const NWS_PARSE_RESULT_JSON_SCHEMA = {
             vpnConnectionHours: {
               type: 'number',
               minimum: 0,
-              maximum: 730,
+              maximum: HOURS_PER_MONTH,
             },
             vpnDataTransferGb: {
               type: 'number',
@@ -426,7 +428,7 @@ export const NWS_PARSE_RESULT_JSON_SCHEMA = {
             privateCircuitPortHours: {
               type: 'number',
               minimum: 0,
-              maximum: 730,
+              maximum: HOURS_PER_MONTH,
             },
             privateCircuitDataTransferGb: {
               type: 'number',

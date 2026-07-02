@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { formatApiError, polyCostClient, PolyCostClient } from '../api-client';
 import { Button } from './Button';
-import { hourlyFromMonthly, intervalMultiplierFromMonthly } from '../cost-time';
+import { HOURS_PER_MONTH, hourlyFromMonthly, intervalMultiplierFromMonthly } from '../cost-time';
 import {
   AlertRecord,
   BudgetRecord,
@@ -1811,7 +1811,7 @@ function workloadInputFromForm(form: WorkloadFormState): WorkloadInput {
     memoryGb,
     region: canonicalRegionForRegionPreference(form.regionPreference) ?? DEFAULT_COMPARISON_REGION,
     instanceCount: Math.round(positiveNumberOrDefault(form.instanceCount, 1)),
-    hoursPerMonth: 730,
+    hoursPerMonth: HOURS_PER_MONTH,
     storageGb: form.storageEnabled ? nonNegativeNumberOrDefault(form.storageSizeGb, 0) : 0,
     storageTier: storageTierForAccessPattern(form.storageAccessPattern),
     egressGbPerMonth: nonNegativeNumberOrDefault(form.monthlyEgressGb, 0),

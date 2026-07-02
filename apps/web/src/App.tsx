@@ -7,7 +7,7 @@ import { FinOpsFeatureLayer, SharedReportPlaceholder } from './components/FinOps
 import { PersonaComparisonWorkspace } from './components/PersonaComparisonWorkspace';
 import { ThemeSwitcher } from './components/ThemeSwitcher';
 import { TopLoadingBar } from './components/TopLoadingBar';
-import { hourlyFromMonthly, intervalMultiplierFromMonthly } from './cost-time';
+import { HOURS_PER_MONTH, hourlyFromMonthly, intervalMultiplierFromMonthly } from './cost-time';
 import {
   canonicalRegionForRegionPreference,
   canonicalRegionsForResidencyScope,
@@ -9647,7 +9647,7 @@ function computeSpecificationRows(
       const profile = COMPUTE_SPEC_PROFILES[form.instanceTier][provider.providerId];
       const familyLabel = computeFamilyLabel(profile, architecture);
       const memoryPerDollar = totalMemoryGb / computeMonthly;
-      const hourlyEffective = computeMonthly / 730;
+      const hourlyEffective = computeMonthly / HOURS_PER_MONTH;
       const armDelta = computeArchitectureDelta(provider.providerId, computeMonthly, architecture);
       const tenancySignal = computeTenancySignal(form, vcpu, activeInstances);
       const architectureFit =
@@ -10210,7 +10210,7 @@ function storageRateEvidence(lineItem: ComparisonLineItem | undefined): string {
   }
 
   if (lineItem.baseHourlyCostUsd !== undefined) {
-    return `${formatCurrency(lineItem.baseHourlyCostUsd)}/hr x 730 hrs`;
+    return `${formatCurrency(lineItem.baseHourlyCostUsd)}/hr x ${HOURS_PER_MONTH} hrs`;
   }
 
   return `${lineItem.description} is the largest storage-related row`;
@@ -10871,7 +10871,7 @@ function databaseRateEvidence(lineItem: ComparisonLineItem | undefined): string 
   }
 
   if (lineItem.baseHourlyCostUsd !== undefined) {
-    return `${formatCurrency(lineItem.baseHourlyCostUsd)}/hr x 730 hrs`;
+    return `${formatCurrency(lineItem.baseHourlyCostUsd)}/hr x ${HOURS_PER_MONTH} hrs`;
   }
 
   return `${lineItem.description} is the largest database-related row`;
@@ -11554,7 +11554,7 @@ function appPlatformModelRows(
   const durationMs = parseInputNumber(form.appPlatformRequestDurationMs) ?? 400;
   const vcpu = parseInputNumber(form.appPlatformVcpu) ?? 1;
   const memoryGb = parseInputNumber(form.appPlatformMemoryGb) ?? 0.5;
-  const alwaysOnHours = parseInputNumber(form.appPlatformAlwaysOnHours) ?? 730;
+  const alwaysOnHours = parseInputNumber(form.appPlatformAlwaysOnHours) ?? HOURS_PER_MONTH;
   const minInstances = parseInputNumber(form.appPlatformMinInstances) ?? 1;
   const hasAppPlatformLineItems = comparison.providers.some((provider) =>
     provider.lineItems.some((lineItem) =>
@@ -12345,7 +12345,7 @@ function networkingRateEvidence(lineItem: ComparisonLineItem): string {
   }
 
   if (lineItem.baseHourlyCostUsd !== undefined) {
-    return `${formatCurrency(lineItem.baseHourlyCostUsd)}/hr x 730 hrs`;
+    return `${formatCurrency(lineItem.baseHourlyCostUsd)}/hr x ${HOURS_PER_MONTH} hrs`;
   }
 
   return 'Monthly modeled subtotal';
@@ -13768,7 +13768,9 @@ function costFormulaRows(comparison: ComparisonResult | null): Array<{
         description: lineItem.description,
         formula:
           lineItem.baseHourlyCostUsd !== undefined
-            ? `${formatCurrency(lineItem.baseHourlyCostUsd)} hourly x 730 hours = ${formatCurrency(
+            ? `${formatCurrency(
+                lineItem.baseHourlyCostUsd,
+              )} hourly x ${HOURS_PER_MONTH} hours = ${formatCurrency(
                 lineItem.baseMonthlyCostUsd,
               )} monthly`
             : lineItem.unitPriceUsd !== undefined
