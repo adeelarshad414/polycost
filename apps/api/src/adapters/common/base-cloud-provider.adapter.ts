@@ -2,6 +2,7 @@ import { NWSValidator } from '../../nws/nws-validator';
 import { NormalizedWorkloadSpec } from '../../nws/nws.types';
 import {
   calculateEgressCost,
+  calculateEgressTierBreakdown,
   EgressTierRate,
 } from '../../pricing-normalization/egress-tier-calculator';
 import {
@@ -690,23 +691,11 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     tiers: EgressTierRate[],
     gbPerMonth: number,
   ): NonNullable<CostCalculation['egressTiers']> {
-    const sortedTiers = [...tiers].sort((left, right) => left.tierFromGb - right.tierFromGb);
-
-    return sortedTiers
-      .map((tier, index) => {
-        const nextTier = sortedTiers[index + 1];
-        const tierCeiling = tier.tierToGb ?? nextTier?.tierFromGb ?? Number.POSITIVE_INFINITY;
-        const billableGb = Math.max(0, Math.min(gbPerMonth, tierCeiling) - tier.tierFromGb);
-
-        return {
-          tierFromGb: tier.tierFromGb,
-          ...(Number.isFinite(tierCeiling) ? { tierToGb: tierCeiling } : {}),
-          pricePerGb: tier.pricePerGb,
-          billableGb: this.roundCurrency(billableGb),
-          monthlyCostUsd: this.roundCurrency(billableGb * tier.pricePerGb),
-        };
-      })
-      .filter((tier) => tier.billableGb > 0);
+    return calculateEgressTierBreakdown(tiers, gbPerMonth).map((tier) => ({
+      ...tier,
+      billableGb: this.roundCurrency(tier.billableGb),
+      monthlyCostUsd: this.roundCurrency(tier.monthlyCostUsd),
+    }));
   }
 
   private toEgressTier(value: unknown): EgressTierRate | undefined {
