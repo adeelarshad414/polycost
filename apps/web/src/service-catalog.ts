@@ -51,7 +51,7 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Virtual Machine Scale Sets'],
     gcp: ['Managed Instance Groups'],
   }),
-  family('serverless-functions', 'compute', 'Serverless functions', 'mapped', {
+  family('serverless-functions', 'compute', 'Serverless functions', 'priced', {
     aws: ['AWS Lambda'],
     azure: ['Azure Functions'],
     gcp: ['Cloud Run functions'],
@@ -61,7 +61,7 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Azure Batch', 'Azure CycleCloud'],
     gcp: ['Batch', 'Cloud HPC Toolkit'],
   }),
-  family('container-orchestration', 'containers', 'Managed Kubernetes', 'mapped', {
+  family('container-orchestration', 'containers', 'Managed Kubernetes', 'priced', {
     aws: ['Amazon EKS'],
     azure: ['Azure Kubernetes Service'],
     gcp: ['Google Kubernetes Engine'],
@@ -71,12 +71,12 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Azure Container Apps', 'Azure Container Instances'],
     gcp: ['Cloud Run'],
   }),
-  family('container-registry', 'containers', 'Container registry', 'mapped', {
+  family('container-registry', 'containers', 'Container registry', 'priced', {
     aws: ['Amazon ECR'],
     azure: ['Azure Container Registry'],
     gcp: ['Artifact Registry'],
   }),
-  family('app-platform', 'application', 'App hosting', 'mapped', {
+  family('app-platform', 'application', 'App hosting', 'priced', {
     aws: ['AWS Elastic Beanstalk', 'AWS App Runner'],
     azure: ['Azure App Service'],
     gcp: ['Cloud Run', 'App Engine'],
@@ -86,7 +86,7 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Azure Static Web Apps'],
     gcp: ['Firebase Hosting', 'Cloud Storage website hosting'],
   }),
-  family('api-gateway', 'application', 'API gateway', 'mapped', {
+  family('api-gateway', 'application', 'API gateway', 'priced', {
     aws: ['Amazon API Gateway'],
     azure: ['Azure API Management'],
     gcp: ['Apigee API Management'],
@@ -126,7 +126,7 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Azure SQL', 'Azure Database for PostgreSQL', 'Azure Database for MySQL'],
     gcp: ['Cloud SQL', 'AlloyDB'],
   }),
-  family('nosql-database', 'database', 'NoSQL database', 'mapped', {
+  family('nosql-database', 'database', 'NoSQL database', 'priced', {
     aws: ['Amazon DynamoDB', 'Amazon DocumentDB'],
     azure: ['Azure Cosmos DB', 'Azure DocumentDB'],
     gcp: ['Firestore', 'Bigtable'],
@@ -136,7 +136,7 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Azure Managed Redis'],
     gcp: ['Memorystore'],
   }),
-  family('managed-search', 'database', 'Managed search', 'mapped', {
+  family('managed-search', 'database', 'Managed search', 'priced', {
     aws: ['Amazon OpenSearch Service'],
     azure: ['Azure AI Search'],
     gcp: ['Cloud Search', 'Vertex AI Search'],
@@ -146,27 +146,27 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Azure Cosmos DB Gremlin API'],
     gcp: ['Spanner Graph', 'Dataplex metadata'],
   }),
-  family('data-warehouse', 'analytics', 'Data warehouse', 'mapped', {
+  family('data-warehouse', 'analytics', 'Data warehouse', 'priced', {
     aws: ['Amazon Redshift'],
     azure: ['Azure Synapse Analytics', 'Microsoft Fabric'],
     gcp: ['BigQuery'],
   }),
-  family('data-lake', 'analytics', 'Data lake', 'mapped', {
+  family('data-lake', 'analytics', 'Data lake', 'priced', {
     aws: ['AWS Lake Formation', 'AWS Glue Data Catalog'],
     azure: ['Azure Data Lake Storage', 'Microsoft Purview'],
     gcp: ['Dataplex', 'Cloud Storage'],
   }),
-  family('data-integration', 'analytics', 'Data integration', 'mapped', {
+  family('data-integration', 'analytics', 'Data integration', 'priced', {
     aws: ['AWS Glue'],
     azure: ['Azure Data Factory'],
     gcp: ['Dataflow', 'Cloud Data Fusion'],
   }),
-  family('streaming-analytics', 'analytics', 'Streaming analytics', 'mapped', {
+  family('streaming-analytics', 'analytics', 'Streaming analytics', 'priced', {
     aws: ['Amazon Kinesis', 'Amazon Managed Service for Apache Flink'],
     azure: ['Event Hubs', 'Azure Stream Analytics'],
     gcp: ['Pub/Sub', 'Dataflow'],
   }),
-  family('business-intelligence', 'analytics', 'Business intelligence', 'mapped', {
+  family('business-intelligence', 'analytics', 'Business intelligence', 'priced', {
     aws: ['Amazon QuickSight'],
     azure: ['Power BI', 'Microsoft Fabric'],
     gcp: ['Looker'],
@@ -186,17 +186,17 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Azure AI Vision', 'Azure Speech', 'Azure Language'],
     gcp: ['Cloud Vision', 'Speech-to-Text', 'Natural Language AI'],
   }),
-  family('queues-messaging', 'integration', 'Queues + messaging', 'mapped', {
+  family('queues-messaging', 'integration', 'Queues + messaging', 'priced', {
     aws: ['Amazon SQS', 'Amazon SNS'],
     azure: ['Azure Service Bus'],
     gcp: ['Pub/Sub'],
   }),
-  family('eventing', 'integration', 'Event routing', 'mapped', {
+  family('eventing', 'integration', 'Event routing', 'priced', {
     aws: ['Amazon EventBridge'],
     azure: ['Azure Event Grid'],
     gcp: ['Eventarc'],
   }),
-  family('workflow-orchestration', 'integration', 'Workflow orchestration', 'mapped', {
+  family('workflow-orchestration', 'integration', 'Workflow orchestration', 'priced', {
     aws: ['AWS Step Functions'],
     azure: ['Azure Logic Apps'],
     gcp: ['Workflows'],
@@ -231,32 +231,32 @@ export const CLOUD_SERVICE_CATALOG: CloudServiceFamily[] = [
     azure: ['Microsoft Entra ID', 'Managed identities'],
     gcp: ['Cloud IAM', 'Identity Platform'],
   }),
-  family('keys-secrets', 'security', 'Keys + secrets', 'mapped', {
+  family('keys-secrets', 'security', 'Keys + secrets', 'priced', {
     aws: ['AWS KMS', 'AWS Secrets Manager'],
     azure: ['Azure Key Vault'],
     gcp: ['Cloud KMS', 'Secret Manager'],
   }),
-  family('security-posture', 'security', 'Security posture', 'mapped', {
+  family('security-posture', 'security', 'Security posture', 'priced', {
     aws: ['AWS Security Hub', 'Amazon GuardDuty'],
     azure: ['Microsoft Defender for Cloud', 'Microsoft Sentinel'],
     gcp: ['Security Command Center'],
   }),
-  family('waf-ddos', 'security', 'WAF + DDoS protection', 'mapped', {
+  family('waf-ddos', 'security', 'WAF + DDoS protection', 'priced', {
     aws: ['AWS WAF', 'AWS Shield'],
     azure: ['Azure Web Application Firewall', 'Azure DDoS Protection'],
     gcp: ['Cloud Armor'],
   }),
-  family('monitoring', 'operations', 'Monitoring', 'mapped', {
+  family('monitoring', 'operations', 'Monitoring', 'priced', {
     aws: ['Amazon CloudWatch'],
     azure: ['Azure Monitor'],
     gcp: ['Cloud Monitoring'],
   }),
-  family('logging-audit', 'operations', 'Logging + audit', 'mapped', {
+  family('logging-audit', 'operations', 'Logging + audit', 'priced', {
     aws: ['AWS CloudTrail', 'CloudWatch Logs'],
     azure: ['Azure Activity Log', 'Log Analytics'],
     gcp: ['Cloud Audit Logs', 'Cloud Logging'],
   }),
-  family('tracing-apm', 'operations', 'Tracing + APM', 'mapped', {
+  family('tracing-apm', 'operations', 'Tracing + APM', 'priced', {
     aws: ['AWS X-Ray'],
     azure: ['Application Insights'],
     gcp: ['Cloud Trace', 'Cloud Profiler'],
