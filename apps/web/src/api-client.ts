@@ -404,7 +404,7 @@ async function toApiError(response: Response): Promise<PolyCostApiError> {
   return new PolyCostApiError(
     response.status,
     body.error?.code ?? 'HTTP_ERROR',
-    body.error?.message ?? `Request failed with status ${response.status}`,
+    body.error?.message ?? fallbackHttpErrorMessage(response.status),
     body.error?.details ?? [],
   );
 }
@@ -416,10 +416,52 @@ export function formatApiError(error: unknown): string {
   }
 
   if (error instanceof Error) {
+    if (isNetworkFetchError(error)) {
+      return 'PolyCost could not reach the API service. Start the backend or check the API base URL, then try again.';
+    }
+
     return error.message;
   }
 
-  return 'Unexpected application error';
+  return 'PolyCost hit an unexpected browser-side issue while preparing the request. Refresh the page and try again.';
+}
+
+function fallbackHttpErrorMessage(status: number): string {
+  switch (status) {
+    case 400:
+      return 'PolyCost could not use that request. Review the workload inputs and try again.';
+    case 401:
+      return 'PolyCost needs a signed-in session for this request. Sign in again, then retry.';
+    case 403:
+      return 'PolyCost reached the API, but this account does not have access to that action.';
+    case 404:
+      return 'PolyCost could not find the requested API resource. Refresh the page and try again.';
+    case 405:
+      return 'PolyCost reached a server that does not accept this API action. Check that the web app is pointed at the PolyCost API service, then try again.';
+    case 408:
+      return 'The PolyCost API took too long to respond. Retry once the pricing service catches up.';
+    case 409:
+      return 'PolyCost could not complete the request because the saved comparison changed. Refresh the comparison and try again.';
+    case 422:
+      return 'PolyCost could not validate that workload. Review the highlighted fields and try again.';
+    case 429:
+      return 'The PolyCost API is receiving too many requests right now. Wait a moment, then retry.';
+    case 500:
+      return 'The PolyCost API hit a server-side problem while processing this request. Try again after refreshing pricing data.';
+    case 502:
+    case 503:
+    case 504:
+      return 'The PolyCost API is temporarily unavailable. Confirm the backend service is running, then try again.';
+    default:
+      return `PolyCost could not complete the API request (HTTP ${status}). Refresh the page and try again.`;
+  }
+}
+
+function isNetworkFetchError(error: Error): boolean {
+  return (
+    error instanceof TypeError &&
+    /failed to fetch|networkerror|load failed|fetch failed/i.test(error.message)
+  );
 }
 
 export const polyCostClient = createPolyCostClient();

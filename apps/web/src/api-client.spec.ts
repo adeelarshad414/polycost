@@ -237,6 +237,20 @@ describe('api client', () => {
     );
   });
 
+  it('explains plain HTTP failures without exposing raw status copy', async () => {
+    global.fetch = jest.fn(async () => jsonResponse({}, 405)) as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(client.createComparison(buildNwsFromForm(defaultWorkloadForm))).rejects.toEqual(
+      expect.objectContaining({
+        status: 405,
+        code: 'HTTP_ERROR',
+        message:
+          'PolyCost reached a server that does not accept this API action. Check that the web app is pointed at the PolyCost API service, then try again.',
+      }) as PolyCostApiError,
+    );
+  });
+
   it('downloads binary exports through the async export-job flow', async () => {
     const blob = new Blob(['csv']);
     const fetchMock = jest
@@ -796,7 +810,12 @@ describe('api client', () => {
       ),
     ).toBe('Invalid NWS compute is required');
     expect(formatApiError(new Error('Broken'))).toBe('Broken');
-    expect(formatApiError('bad')).toBe('Unexpected application error');
+    expect(formatApiError(new TypeError('Failed to fetch'))).toBe(
+      'PolyCost could not reach the API service. Start the backend or check the API base URL, then try again.',
+    );
+    expect(formatApiError('bad')).toBe(
+      'PolyCost hit an unexpected browser-side issue while preparing the request. Refresh the page and try again.',
+    );
   });
 
   it('parses workload and refreshes live comparisons', async () => {
