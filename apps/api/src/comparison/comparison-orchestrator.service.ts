@@ -135,6 +135,8 @@ interface RuntimeServicesRates {
   appPlatformAlwaysOnVcpuHour: number;
   appPlatformAlwaysOnMemoryGbHour: number;
   kubernetesControlPlaneMonthly: number;
+  kubernetesWorkerVcpuHour: number;
+  kubernetesWorkerMemoryGbHour: number;
   kubernetesNodeOverheadMonthly: number;
   registryStoragePerGbMonth: number;
   registryEgressPerGb: number;
@@ -2199,7 +2201,24 @@ export class ComparisonOrchestratorService {
     }
 
     if (serviceTypes.has('container-orchestration') && values.kubernetesWorkerNodeCount > 0) {
+      const workerNodeMonthlyCost = this.roundCurrency(
+        HOURS_PER_MONTH *
+          (values.kubernetesWorkerVcpu * rates.kubernetesWorkerVcpuHour +
+            values.kubernetesWorkerMemoryGb * rates.kubernetesWorkerMemoryGbHour),
+      );
+
       lineItems.push(
+        this.computeModeledLineItem({
+          providerId,
+          regionLabel,
+          skuId: 'modeled-kubernetes-worker-node-compute',
+          description: `${providerLabel(providerId)} Kubernetes worker node compute estimate (${values.kubernetesWorkerNodeCount} node(s), ${values.kubernetesWorkerVcpu} vCPU, ${values.kubernetesWorkerMemoryGb} GB RAM each)`,
+          monthlyCostUsd: this.roundCurrency(
+            values.kubernetesWorkerNodeCount * workerNodeMonthlyCost,
+          ),
+          unit: 'node-month',
+          unitPriceUsd: workerNodeMonthlyCost,
+        }),
         this.computeModeledLineItem({
           providerId,
           regionLabel,
@@ -3823,6 +3842,8 @@ function runtimeServicesRates(providerId: ProviderId): RuntimeServicesRates {
         appPlatformAlwaysOnVcpuHour: 0.064,
         appPlatformAlwaysOnMemoryGbHour: 0.007,
         kubernetesControlPlaneMonthly: 73,
+        kubernetesWorkerVcpuHour: 0.0416,
+        kubernetesWorkerMemoryGbHour: 0.0046,
         kubernetesNodeOverheadMonthly: 8,
         registryStoragePerGbMonth: 0.1,
         registryEgressPerGb: 0.09,
@@ -3837,6 +3858,8 @@ function runtimeServicesRates(providerId: ProviderId): RuntimeServicesRates {
         appPlatformAlwaysOnVcpuHour: 0.095,
         appPlatformAlwaysOnMemoryGbHour: 0.012,
         kubernetesControlPlaneMonthly: 0,
+        kubernetesWorkerVcpuHour: 0.0464,
+        kubernetesWorkerMemoryGbHour: 0.0052,
         kubernetesNodeOverheadMonthly: 6,
         registryStoragePerGbMonth: 0.167,
         registryEgressPerGb: 0.087,
@@ -3851,6 +3874,8 @@ function runtimeServicesRates(providerId: ProviderId): RuntimeServicesRates {
         appPlatformAlwaysOnVcpuHour: 0.0648,
         appPlatformAlwaysOnMemoryGbHour: 0.00675,
         kubernetesControlPlaneMonthly: 73,
+        kubernetesWorkerVcpuHour: 0.0332,
+        kubernetesWorkerMemoryGbHour: 0.0045,
         kubernetesNodeOverheadMonthly: 7,
         registryStoragePerGbMonth: 0.1,
         registryEgressPerGb: 0.12,
@@ -3871,6 +3896,8 @@ function runtimeServicesAssumptions(
   | 'appPlatformAlwaysOnHours'
   | 'appPlatformMinInstances'
   | 'kubernetesClusterCount'
+  | 'kubernetesWorkerVcpu'
+  | 'kubernetesWorkerMemoryGb'
   | 'kubernetesWorkerNodeCount'
   | 'registryStorageGb'
   | 'registryEgressGb',
@@ -3889,6 +3916,8 @@ function runtimeServicesAssumptions(
       maxScaleParam(requirements, 'appPlatformAlwaysOnHours') || HOURS_PER_MONTH,
     appPlatformMinInstances: maxScaleParam(requirements, 'appPlatformMinInstances') || 1,
     kubernetesClusterCount: maxScaleParam(requirements, 'kubernetesClusterCount'),
+    kubernetesWorkerVcpu: maxScaleParam(requirements, 'kubernetesWorkerVcpu') || 2,
+    kubernetesWorkerMemoryGb: maxScaleParam(requirements, 'kubernetesWorkerMemoryGb') || 4,
     kubernetesWorkerNodeCount: maxScaleParam(requirements, 'kubernetesWorkerNodeCount'),
     registryStorageGb: maxScaleParam(requirements, 'registryStorageGb'),
     registryEgressGb: maxScaleParam(requirements, 'registryEgressGb'),

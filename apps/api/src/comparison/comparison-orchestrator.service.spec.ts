@@ -1505,6 +1505,8 @@ describe('ComparisonOrchestratorService', () => {
           quantity: 1,
           scaleParams: {
             kubernetesClusterCount: 2,
+            kubernetesWorkerVcpu: 2,
+            kubernetesWorkerMemoryGb: 4,
             kubernetesWorkerNodeCount: 6,
           },
         },
@@ -1537,6 +1539,10 @@ describe('ComparisonOrchestratorService', () => {
           baseMonthlyCostUsd: 146,
         }),
         expect.objectContaining({
+          skuId: 'modeled-kubernetes-worker-node-compute',
+          baseMonthlyCostUsd: 445.01,
+        }),
+        expect.objectContaining({
           skuId: 'modeled-kubernetes-node-overhead',
           baseMonthlyCostUsd: 48,
         }),
@@ -1554,7 +1560,7 @@ describe('ComparisonOrchestratorService', () => {
     );
     expect(result.providers[0].breakdown).toEqual(
       expect.objectContaining({
-        computeMonthlyCostUsd: 213.33,
+        computeMonthlyCostUsd: 658.34,
         storageMonthlyCostUsd: 4,
         egressMonthlyCostUsd: 9,
       }),

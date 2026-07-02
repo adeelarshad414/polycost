@@ -757,6 +757,8 @@ describe('workload helpers', () => {
           serviceType: 'container-orchestration',
           scaleParams: expect.objectContaining({
             kubernetesClusterCount: 2,
+            kubernetesWorkerVcpu: 2,
+            kubernetesWorkerMemoryGb: 4,
             kubernetesWorkerNodeCount: 6,
           }),
         }),
