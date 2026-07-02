@@ -2546,6 +2546,20 @@ function PricingModelPreferenceControl({
           </button>
         ))}
       </div>
+      <div className="pricing-model-preference-select-wrap">
+        <select
+          className="pricing-model-preference-select"
+          aria-label="Pricing model"
+          value={pricingModel}
+          onChange={(event) => onPricingModelChange(event.currentTarget.value as PricingModelKey)}
+        >
+          {PRICING_MODEL_OPTIONS.map((option) => (
+            <option key={option.key} value={option.key}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }
