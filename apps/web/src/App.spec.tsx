@@ -1172,6 +1172,43 @@ describe('ComparisonView', () => {
     unmount();
   });
 
+  it('keeps long engineering row sets compact until the user expands them', async () => {
+    const categories: Array<
+      ComparisonResult['providers'][number]['lineItems'][number]['category']
+    > = ['compute', 'storage', 'database', 'network', 'support', 'operations'];
+    const providerRows = (label: string): Parameters<typeof providerWithItems>[1] =>
+      categories.map((category, index) => [
+        category,
+        `${label} line item ${index + 1}`,
+        25 + index,
+      ]);
+    const longResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'aws',
+      providers: [
+        providerWithItems('aws', providerRows('aws')),
+        providerWithItems('azure', providerRows('azure')),
+        providerWithItems('gcp', providerRows('gcp')),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView comparison={longResult} interval="monthly" />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain(
+      'Showing 12 of 18 resource rows sorted by $/mo (descending).',
+    );
+    await click(buttonByText(container, 'Show all rows (6 more)'));
+
+    expect(text(container)).toContain(
+      'Showing 18 of 18 resource rows sorted by $/mo (descending).',
+    );
+    expect(text(container)).toContain('Collapse to top 12');
+
+    unmount();
+  });
+
   it('renders multi-category comparison rows in engineering mode', async () => {
     const richResult: ComparisonResult = {
       ...comparisonResult,

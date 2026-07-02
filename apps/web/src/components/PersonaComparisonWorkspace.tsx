@@ -74,6 +74,7 @@ interface EngineeringCostRow {
 }
 
 const PERSONA_VIEW_STORAGE_KEY = 'polycost-persona-view';
+const ENGINEERING_TABLE_PAGE_SIZE = 12;
 
 export function PersonaComparisonWorkspace({
   comparison,
@@ -399,12 +400,16 @@ function EngineeringPersonaView({
   tagOptions: string[];
   onTagFilterChange: (tag: string) => void;
 }) {
+  const [showAllRows, setShowAllRows] = useState(false);
   const emptyRowsMessage = isLoading
     ? 'Building engineering rows from mapped AWS, Azure, and GCP line items.'
     : 'Run a comparison to populate engineering rows with provider, region, SKU, and monthly cost evidence.';
   const apiJsonPendingMessage = isLoading
     ? 'API JSON will activate when this comparison finishes'
     : 'Run a comparison to open API JSON';
+  const isRowLimitActive = rows.length > ENGINEERING_TABLE_PAGE_SIZE && !showAllRows;
+  const visibleRows = isRowLimitActive ? rows.slice(0, ENGINEERING_TABLE_PAGE_SIZE) : rows;
+  const hiddenRowCount = rows.length - visibleRows.length;
 
   return (
     <div className="min-w-0 space-y-4" aria-label="Engineering comparison view">
@@ -460,8 +465,8 @@ function EngineeringPersonaView({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {rows.length > 0 ? (
-                rows.map((row) => (
+              {visibleRows.length > 0 ? (
+                visibleRows.map((row) => (
                   <tr key={row.id} className="hover:bg-surface-0">
                     <th
                       scope="row"
@@ -499,6 +504,28 @@ function EngineeringPersonaView({
             </tbody>
           </table>
         </div>
+        {rows.length > 0 ? (
+          <div
+            className="flex flex-col gap-2 border-t border-border bg-surface-0 px-3 py-3 text-xs text-text-secondary sm:flex-row sm:items-center sm:justify-between"
+            aria-live="polite"
+          >
+            <span>
+              Showing {visibleRows.length} of {rows.length} resource rows sorted by{' '}
+              {sortKeyLabel(sortKey)} ({sortDirection === 'asc' ? 'ascending' : 'descending'}).
+            </span>
+            {rows.length > ENGINEERING_TABLE_PAGE_SIZE ? (
+              <button
+                type="button"
+                className="inline-flex min-h-9 items-center justify-center rounded-md border border-border-strong bg-surface-1 px-3 text-xs font-semibold text-text-primary transition hover:bg-surface-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
+                onClick={() => setShowAllRows((current) => !current)}
+              >
+                {showAllRows
+                  ? `Collapse to top ${ENGINEERING_TABLE_PAGE_SIZE}`
+                  : `Show all rows${hiddenRowCount > 0 ? ` (${hiddenRowCount} more)` : ''}`}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="grid min-w-0 gap-3 rounded-lg border border-border bg-surface-1 p-3 shadow-sm lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
@@ -870,6 +897,21 @@ function compareRows(
       return left.resourceName.localeCompare(right.resourceName);
     case 'spec':
       return left.spec.localeCompare(right.spec);
+  }
+}
+
+function sortKeyLabel(sortKey: SortKey): string {
+  switch (sortKey) {
+    case 'resourceName':
+      return 'resource name';
+    case 'provider':
+      return 'provider';
+    case 'region':
+      return 'region';
+    case 'spec':
+      return 'spec / SKU';
+    case 'monthlyCost':
+      return '$/mo';
   }
 }
 
