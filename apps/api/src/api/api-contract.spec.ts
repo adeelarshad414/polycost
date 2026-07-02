@@ -299,8 +299,21 @@ describe('API contracts', () => {
       new ApiRateLimitService(() => 0),
       configService,
     );
+    const response = {
+      header: jest.fn(),
+    };
 
-    await expect(controller.validate(validNws)).resolves.toEqual({ valid: true });
+    await expect(
+      controller.validate(
+        validNws,
+        {
+          ip: '127.0.0.1',
+          headers: {},
+        },
+        response,
+      ),
+    ).resolves.toEqual({ valid: true });
+    expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
   });
 
   it('POST /comparisons persists and returns the comparison result', async () => {
@@ -334,8 +347,21 @@ describe('API contracts', () => {
   it('GET /comparisons/:id returns a previous snapshot', async () => {
     const service = comparisonApplicationService();
     const controller = comparisonsController(service);
+    const response = {
+      header: jest.fn(),
+    };
 
-    await expect(controller.get(comparisonResult.comparisonId)).resolves.toEqual(comparisonResult);
+    await expect(
+      controller.get(
+        comparisonResult.comparisonId,
+        {
+          ip: '127.0.0.1',
+          headers: {},
+        },
+        response,
+      ),
+    ).resolves.toEqual(comparisonResult);
+    expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
   });
 
   it('GET /comparisons/:id/analytics returns deterministic comparison intelligence', async () => {
@@ -523,9 +549,24 @@ describe('API contracts', () => {
 
   it('GET /data-health returns public pricing freshness through the controller', async () => {
     const service = comparisonApplicationService();
-    const controller = new DataHealthController(service as never);
+    const controller = new DataHealthController(
+      service as never,
+      new ApiRateLimitService(() => 0),
+      configService,
+    );
+    const response = {
+      header: jest.fn(),
+    };
 
-    await expect(controller.getDataHealth()).resolves.toEqual({
+    await expect(
+      controller.getDataHealth(
+        {
+          ip: '127.0.0.1',
+          headers: {},
+        },
+        response,
+      ),
+    ).resolves.toEqual({
       generatedAt: '2026-07-01T00:00:00.000Z',
       freshnessPolicyHours: 48,
       overallStatus: 'fresh',
@@ -559,6 +600,7 @@ describe('API contracts', () => {
         },
       ],
     });
+    expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
   });
 
   it('GET /pricing/compare reads normalized cached pricing only', async () => {
@@ -585,9 +627,24 @@ describe('API contracts', () => {
 
   it('GET /pricing/models returns provider-specific model terminology', () => {
     const service = costManagementService();
-    const controller = new CachedPricingController(service);
+    const controller = new CachedPricingController(
+      service,
+      new ApiRateLimitService(() => 0),
+      configService,
+    );
+    const response = {
+      header: jest.fn(),
+    };
 
-    expect(controller.models()).toEqual({
+    expect(
+      controller.models(
+        {
+          ip: '127.0.0.1',
+          headers: {},
+        },
+        response,
+      ),
+    ).toEqual({
       defaultModel: 'on-demand',
       generatedAt: expect.any(String),
       models: expect.arrayContaining([
@@ -611,6 +668,7 @@ describe('API contracts', () => {
         }),
       ]),
     });
+    expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
   });
 
   it('GET /pricing/breakdown reads workload breakdown from cached tables', async () => {
@@ -769,10 +827,26 @@ describe('API contracts', () => {
     const service = {
       getRegionCatalog: jest.fn(async () => catalog),
     };
-    const controller = new RegionsController(service as never);
+    const controller = new RegionsController(
+      service as never,
+      new ApiRateLimitService(() => 0),
+      configService,
+    );
+    const response = {
+      header: jest.fn(),
+    };
 
-    await expect(controller.getRegions()).resolves.toEqual(catalog);
+    await expect(
+      controller.getRegions(
+        {
+          ip: '127.0.0.1',
+          headers: {},
+        },
+        response,
+      ),
+    ).resolves.toEqual(catalog);
     expect(service.getRegionCatalog).toHaveBeenCalledTimes(1);
+    expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
   });
 
   it('rejects invalid comparison and export request shapes', async () => {

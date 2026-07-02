@@ -60,14 +60,29 @@ export class ComparisonsController {
   }
 
   @Get(':id')
-  async get(@Param('id') comparisonId: string) {
+  async get(
+    @Param('id') comparisonId: string,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: HeaderResponse,
+  ) {
+    this.consumeRateLimit('comparison_get', request, response, 'RATE_LIMIT_PUBLIC_READ_PER_MINUTE');
     const snapshot = await this.comparisonApplicationService.getComparison(comparisonId);
 
     return snapshot.resultSnapshot;
   }
 
   @Get(':id/analytics')
-  async analytics(@Param('id') comparisonId: string) {
+  async analytics(
+    @Param('id') comparisonId: string,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: HeaderResponse,
+  ) {
+    this.consumeRateLimit(
+      'comparison_analytics',
+      request,
+      response,
+      'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
+    );
     const snapshot = await this.comparisonApplicationService.getComparison(comparisonId);
 
     return this.comparisonAnalyticsService.build(snapshot.resultSnapshot);
@@ -132,7 +147,19 @@ export class ComparisonsController {
   }
 
   @Get(':id/export-jobs/:jobId')
-  async getExportJob(@Param('id') comparisonId: string, @Param('jobId') jobId: string) {
+  async getExportJob(
+    @Param('id') comparisonId: string,
+    @Param('jobId') jobId: string,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: HeaderResponse,
+  ) {
+    this.consumeRateLimit(
+      'comparison_export_job_status',
+      request,
+      response,
+      'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
+    );
+
     return this.reportExportJobsService.getExportJob(comparisonId, jobId);
   }
 
@@ -186,7 +213,10 @@ export class ComparisonsController {
     scope: string,
     request: RequestLike | undefined,
     response: HeaderResponse | undefined,
-    configKey: 'RATE_LIMIT_COMPARISON_PER_MINUTE' | 'RATE_LIMIT_EXPORT_PER_MINUTE',
+    configKey:
+      | 'RATE_LIMIT_COMPARISON_PER_MINUTE'
+      | 'RATE_LIMIT_EXPORT_PER_MINUTE'
+      | 'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
   ): void {
     const rateLimit = this.apiRateLimitService.consume(
       scope,

@@ -101,7 +101,19 @@ export class CachedPricingController {
   }
 
   @Get('models')
-  models(): PricingModelCatalogResponse {
+  models(
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ): PricingModelCatalogResponse {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'pricing_models_catalog',
+      request,
+      response,
+      'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
+    );
+
     return pricingModelCatalog();
   }
 }
