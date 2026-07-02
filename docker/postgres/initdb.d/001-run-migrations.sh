@@ -45,7 +45,9 @@ for migration in \
   013_report_export_jobs.sql \
   014_comparison_prewarm_jobs.sql \
   015_seed_accelerated_compute_pricing_catalog.sql \
-  016_pricing_cache_sync_status.sql
+  016_pricing_cache_sync_status.sql \
+  017_seed_burstable_compute_catalog.sql \
+  018_pricing_rates_active_uniqueness.sql
 do
   psql \
     --username "$POSTGRES_USER" \
