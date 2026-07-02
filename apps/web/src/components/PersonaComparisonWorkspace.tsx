@@ -443,6 +443,7 @@ function EngineeringPersonaView({
                 <SortableHeader
                   label="Region"
                   sortKey="region"
+                  description="Provider region used for this line item after residency and preference rules."
                   activeSortKey={sortKey}
                   sortDirection={sortDirection}
                   onSort={onSort}
@@ -450,6 +451,7 @@ function EngineeringPersonaView({
                 <SortableHeader
                   label="Spec / SKU"
                   sortKey="spec"
+                  description="Resolved SKU, unit, rate, and pricing basis returned by the comparison API."
                   activeSortKey={sortKey}
                   sortDirection={sortDirection}
                   onSort={onSort}
@@ -457,6 +459,7 @@ function EngineeringPersonaView({
                 <SortableHeader
                   label="$/mo"
                   sortKey="monthlyCost"
+                  description="Monthly line-item cost before changing the global time-period view."
                   activeSortKey={sortKey}
                   sortDirection={sortDirection}
                   onSort={onSort}
@@ -704,6 +707,7 @@ function ExecutiveMetricCard({
 function SortableHeader({
   activeSortKey,
   alignRight = false,
+  description,
   label,
   onSort,
   sortDirection,
@@ -712,6 +716,7 @@ function SortableHeader({
 }: {
   activeSortKey: SortKey;
   alignRight?: boolean;
+  description?: string;
   label: string;
   onSort: (sortKey: SortKey) => void;
   sortDirection: SortDirection;
@@ -734,6 +739,8 @@ function SortableHeader({
       <button
         type="button"
         onClick={() => onSort(sortKey)}
+        aria-label={description ? `${label}: ${description}` : label}
+        title={description}
         className={[
           'inline-flex min-h-11 items-center gap-1 rounded-md px-2 text-xs font-semibold uppercase tracking-wide text-text-muted transition hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary',
           alignRight ? 'ml-auto justify-end' : undefined,

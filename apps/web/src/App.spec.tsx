@@ -1142,6 +1142,17 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Backend contract note');
     expect(text(container)).toContain('Resource name');
     expect(text(container)).toContain('Spec / SKU');
+    const headerButtons = Array.from(container.querySelectorAll('button'));
+    expect(
+      headerButtons
+        .find((button) => button.getAttribute('aria-label')?.startsWith('Spec / SKU:'))
+        ?.getAttribute('title'),
+    ).toContain('Resolved SKU, unit, rate, and pricing basis');
+    expect(
+      headerButtons
+        .find((button) => button.getAttribute('aria-label')?.startsWith('$/mo:'))
+        ?.getAttribute('title'),
+    ).toContain('Monthly line-item cost');
     expect(text(container)).toContain(
       'Modeled cost driver - provider SKU/rate metadata not returned by API',
     );
