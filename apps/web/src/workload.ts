@@ -115,6 +115,7 @@ export interface WorkloadFormState {
   monthlyEgressGb: string;
   crossAzTransferGb: string;
   interRegionTransferGb: string;
+  interRegionDestination: string;
   cdnTrafficGb: string;
   cdnCacheHitRatioPercent: string;
   cdnRequestsMillion: string;
@@ -393,6 +394,7 @@ export const defaultWorkloadForm: WorkloadFormState = {
   monthlyEgressGb: '750',
   crossAzTransferGb: '0',
   interRegionTransferGb: '0',
+  interRegionDestination: '',
   cdnTrafficGb: '0',
   cdnCacheHitRatioPercent: '85',
   cdnRequestsMillion: '0',
@@ -1529,6 +1531,9 @@ export function buildNwsFromForm(
       ...optionalNonNegativeNumber('estimatedMonthlyEgressGb', form.monthlyEgressGb),
       ...optionalPositiveNumber('crossAzTransferGb', form.crossAzTransferGb),
       ...optionalPositiveNumber('interRegionTransferGb', form.interRegionTransferGb),
+      ...(form.interRegionDestination.trim()
+        ? { interRegionDestination: form.interRegionDestination.trim() }
+        : {}),
       ...optionalPositiveNumber('cdnTrafficGb', form.cdnTrafficGb),
       ...(parsePositiveNumber(form.cdnTrafficGb, 0) > 0
         ? {
@@ -1840,6 +1845,8 @@ export function formFromNws(nws: NormalizedWorkloadSpec): WorkloadFormState {
     interRegionTransferGb: numberToInput(
       nws.network.interRegionTransferGb ?? Number(defaultWorkloadForm.interRegionTransferGb),
     ),
+    interRegionDestination:
+      nws.network.interRegionDestination ?? defaultWorkloadForm.interRegionDestination,
     cdnTrafficGb: numberToInput(
       nws.network.cdnTrafficGb ?? Number(defaultWorkloadForm.cdnTrafficGb),
     ),

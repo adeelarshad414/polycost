@@ -909,15 +909,22 @@ export class ComparisonOrchestratorService {
     }
 
     if (network.interRegionTransferGb && network.interRegionTransferGb > 0) {
+      const route = interRegionRouteRate(
+        providerId,
+        regionLabel,
+        network.interRegionDestination,
+        rates.interRegionPerGb,
+      );
+
       lineItems.push(
         this.networkLineItem({
           providerId,
           regionLabel,
           skuId: 'modeled-inter-region-transfer',
-          description: `${providerLabel(providerId)} inter-region data transfer estimate`,
+          description: `${providerLabel(providerId)} inter-region data transfer estimate (${route.label})`,
           quantity: network.interRegionTransferGb,
           unit: 'GB',
-          unitPriceUsd: rates.interRegionPerGb,
+          unitPriceUsd: route.rate,
           costComponent: 'networking',
         }),
       );
@@ -4144,6 +4151,148 @@ function networkDimensionRates(providerId: ProviderId): NetworkDimensionRates {
         privateCircuitDataTransferPerGb: 0.02,
       };
   }
+}
+
+function interRegionRouteRate(
+  providerId: ProviderId,
+  sourceRegion: string,
+  destinationRegion: string | undefined,
+  fallbackRate: number,
+): { rate: number; label: string } {
+  const source = normalizedRegionRouteKey(sourceRegion);
+  const destination = normalizedRegionRouteKey(destinationRegion);
+
+  if (!destination || destination === 'default') {
+    return {
+      rate: fallbackRate,
+      label: 'provider default route',
+    };
+  }
+
+  const routeRates = interRegionRouteRates(providerId);
+  const exactRate = routeRates.get(`${source}->${destination}`);
+  const reverseRate = routeRates.get(`${destination}->${source}`);
+  const routeLabel = `${source} to ${destination}`;
+
+  if (exactRate !== undefined || reverseRate !== undefined) {
+    return {
+      rate: exactRate ?? reverseRate ?? fallbackRate,
+      label: routeLabel,
+    };
+  }
+
+  const fallbackRates = interRegionContinentFallbackRates(providerId);
+  const fallback =
+    regionContinent(source) === regionContinent(destination)
+      ? fallbackRates.sameContinent
+      : fallbackRates.crossContinent;
+
+  return {
+    rate: fallback,
+    label: `${routeLabel} estimated by regional distance`,
+  };
+}
+
+const AWS_INTER_REGION_ROUTE_RATES = new Map<string, number>([
+  ['us-east->us-west', 0.02],
+  ['us-east->eu-west', 0.05],
+  ['us-east->ap-south', 0.09],
+  ['us-west->ap-south', 0.09],
+  ['eu-west->ap-south', 0.09],
+]);
+
+const AZURE_INTER_REGION_ROUTE_RATES = new Map<string, number>([
+  ['us-east->us-west', 0.02],
+  ['us-east->eu-west', 0.05],
+  ['us-east->ap-south', 0.087],
+  ['eu-west->ap-south', 0.087],
+]);
+
+const GCP_INTER_REGION_ROUTE_RATES = new Map<string, number>([
+  ['us-central->us-east', 0.01],
+  ['us-central->europe-west', 0.08],
+  ['us-east->europe-west', 0.08],
+  ['us-central->asia-south', 0.12],
+  ['europe-west->asia-south', 0.12],
+]);
+
+function interRegionRouteRates(providerId: ProviderId): ReadonlyMap<string, number> {
+  switch (providerId) {
+    case 'aws':
+      return AWS_INTER_REGION_ROUTE_RATES;
+    case 'azure':
+      return AZURE_INTER_REGION_ROUTE_RATES;
+    case 'gcp':
+      return GCP_INTER_REGION_ROUTE_RATES;
+  }
+}
+
+function interRegionContinentFallbackRates(providerId: ProviderId): {
+  sameContinent: number;
+  crossContinent: number;
+} {
+  switch (providerId) {
+    case 'aws':
+    case 'azure':
+      return { sameContinent: 0.02, crossContinent: 0.05 };
+    case 'gcp':
+      return { sameContinent: 0.01, crossContinent: 0.08 };
+  }
+}
+
+function normalizedRegionRouteKey(region: string | undefined): string {
+  if (!region) {
+    return 'default';
+  }
+
+  const normalized = region
+    .toLowerCase()
+    .trim()
+    .replace(/[_\s]+/g, '-');
+
+  if (/^(us|na)-east/.test(normalized) || normalized === 'eastus') {
+    return 'us-east';
+  }
+
+  if (/^(us|na)-west/.test(normalized) || normalized === 'westus') {
+    return 'us-west';
+  }
+
+  if (/^(us|northamerica)-central/.test(normalized) || normalized === 'us-central1') {
+    return 'us-central';
+  }
+
+  if (/^(eu|europe|westeurope|northeurope)/.test(normalized) || normalized === 'eu-west') {
+    return normalized.includes('europe') ? 'europe-west' : 'eu-west';
+  }
+
+  if (/^(ap|asia)-(south|southeast|east)/.test(normalized) || normalized === 'centralindia') {
+    return normalized.includes('south') || normalized === 'centralindia'
+      ? 'ap-south'
+      : 'asia-south';
+  }
+
+  return normalized.replace(/\d+$/, '');
+}
+
+function regionContinent(region: string): 'americas' | 'europe' | 'asia' | 'other' {
+  if (
+    region.startsWith('us-') ||
+    region.startsWith('northamerica') ||
+    region.startsWith('southamerica')
+  ) {
+    return 'americas';
+  }
+
+  if (region.startsWith('eu-') || region.startsWith('europe')) {
+    return 'europe';
+  }
+
+  if (region.startsWith('ap-') || region.startsWith('asia')) {
+    return 'asia';
+  }
+
+  return 'other';
 }
 
 function loadBalancerLcuProfile(

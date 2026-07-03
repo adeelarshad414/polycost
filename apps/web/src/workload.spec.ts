@@ -298,6 +298,7 @@ describe('workload helpers', () => {
       ...defaultWorkloadForm,
       crossAzTransferGb: '100',
       interRegionTransferGb: '200',
+      interRegionDestination: 'eu-west-1',
       cdnTrafficGb: '1000',
       cdnCacheHitRatioPercent: '80',
       cdnRequestsMillion: '20',
@@ -321,6 +322,7 @@ describe('workload helpers', () => {
     expect(nws.network).toMatchObject({
       crossAzTransferGb: 100,
       interRegionTransferGb: 200,
+      interRegionDestination: 'eu-west-1',
       cdnTrafficGb: 1000,
       cdnCacheHitRatioPercent: 80,
       cdnRequestsMillion: 20,
@@ -343,6 +345,7 @@ describe('workload helpers', () => {
     expect(formFromNws(nws)).toEqual(
       expect.objectContaining({
         vpnConnectionCount: '2',
+        interRegionDestination: 'eu-west-1',
         loadBalancerNewConnectionsPerSecond: '75',
         loadBalancerActiveConnections: '9000',
         loadBalancerRuleEvaluationsPerSecond: '1500',

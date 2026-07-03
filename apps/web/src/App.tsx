@@ -4062,6 +4062,13 @@ function WorkloadForm({
             onChange={(value) => update('interRegionTransferGb', value)}
           />
           <TextField
+            label="Destination region"
+            value={form.interRegionDestination}
+            inputMode="text"
+            error={fieldErrors.interRegionDestination}
+            onChange={(value) => update('interRegionDestination', value)}
+          />
+          <TextField
             label="CDN traffic GB/mo"
             value={form.cdnTrafficGb}
             inputMode="decimal"

@@ -160,6 +160,7 @@ export interface NormalizedWorkloadSpec {
     estimatedMonthlyEgressGb?: number;
     crossAzTransferGb?: number;
     interRegionTransferGb?: number;
+    interRegionDestination?: string;
     cdnTrafficGb?: number;
     cdnCacheHitRatioPercent?: number;
     cdnRequestsMillion?: number;

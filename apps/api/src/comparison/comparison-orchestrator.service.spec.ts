@@ -872,10 +872,18 @@ describe('ComparisonOrchestratorService', () => {
 
     const result = await service.compare({
       ...validWorkload,
+      workload: {
+        ...validWorkload.workload,
+        region: {
+          preference: 'us-east-1',
+          isDefault: false,
+        },
+      },
       network: {
         estimatedMonthlyEgressGb: 0,
         crossAzTransferGb: 100,
         interRegionTransferGb: 200,
+        interRegionDestination: 'eu-west-1',
         cdn: true,
         cdnTrafficGb: 1000,
         cdnCacheHitRatioPercent: 80,
@@ -911,7 +919,8 @@ describe('ComparisonOrchestratorService', () => {
         expect.objectContaining({
           costComponent: 'networking',
           skuId: 'modeled-inter-region-transfer',
-          baseMonthlyCostUsd: 4,
+          description: expect.stringContaining('us-east to eu-west'),
+          baseMonthlyCostUsd: 10,
         }),
         expect.objectContaining({
           costComponent: 'egress',
@@ -967,7 +976,7 @@ describe('ComparisonOrchestratorService', () => {
       ]),
     );
     expect(result.providers[0].breakdown?.egressMonthlyCostUsd).toBe(87);
-    expect(result.providers[0].breakdown?.networkingMonthlyCostUsd).toBe(535.5);
+    expect(result.providers[0].breakdown?.networkingMonthlyCostUsd).toBe(541.5);
   });
 
   it('adds explicit modeled storage dimension line items when advanced storage assumptions exist', async () => {

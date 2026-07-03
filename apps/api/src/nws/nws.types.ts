@@ -249,6 +249,7 @@ export const normalizedWorkloadSpecSchema = z
         estimatedMonthlyEgressGb: z.number().nonnegative().optional(),
         crossAzTransferGb: z.number().nonnegative().optional(),
         interRegionTransferGb: z.number().nonnegative().optional(),
+        interRegionDestination: z.string().min(1).optional(),
         cdnTrafficGb: z.number().nonnegative().optional(),
         cdnCacheHitRatioPercent: z.number().min(0).max(100).optional(),
         cdnRequestsMillion: z.number().nonnegative().optional(),
