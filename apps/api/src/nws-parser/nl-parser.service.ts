@@ -549,7 +549,13 @@ function inferSupportTier(input: string): WorkloadProfile['supportTier'] {
     return 'none';
   }
 
-  if (/\b(?:enterprise support|premium support|professional direct)\b/i.test(input)) {
+  if (/\b(?:enterprise[-\s]?on[-\s]?ramp|professional direct|pro direct)\b/i.test(input)) {
+    return 'enterprise_onramp';
+  }
+
+  if (
+    /\b(?:enterprise support|premium support|premier support|unified enterprise)\b/i.test(input)
+  ) {
     return 'enterprise';
   }
 

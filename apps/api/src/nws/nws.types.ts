@@ -142,7 +142,9 @@ export const workloadProfileSchema = z
       .strict()
       .optional(),
     operatingSystem: z.enum(['linux', 'windows', 'byol']).optional(),
-    supportTier: z.enum(['none', 'developer', 'business', 'enterprise']).optional(),
+    supportTier: z
+      .enum(['none', 'developer', 'business', 'enterprise_onramp', 'enterprise'])
+      .optional(),
     usagePattern: z
       .object({
         type: z.enum(['always_on', 'scheduled', 'bursty']),

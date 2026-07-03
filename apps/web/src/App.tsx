@@ -474,9 +474,10 @@ const OPERATING_SYSTEM_OPTIONS: Array<[WorkloadFormState['operatingSystem'], str
 
 const SUPPORT_TIER_OPTIONS: Array<[WorkloadFormState['supportTier'], string]> = [
   ['none', 'No support'],
-  ['developer', 'Developer'],
-  ['business', 'Business'],
-  ['enterprise', 'Enterprise'],
+  ['developer', 'Developer / Standard'],
+  ['business', 'Business / Enhanced'],
+  ['enterprise_onramp', 'Enterprise On-Ramp / Pro Direct'],
+  ['enterprise', 'Enterprise / Premier'],
 ];
 
 const USAGE_PATTERN_OPTIONS: Array<[WorkloadFormState['usagePattern'], string]> = [
@@ -5781,6 +5782,8 @@ function supportTierLabel(supportTier: WorkloadFormState['supportTier']): string
       return 'Developer support';
     case 'business':
       return 'Business support';
+    case 'enterprise_onramp':
+      return 'Enterprise on-ramp support';
     case 'enterprise':
       return 'Enterprise support';
   }

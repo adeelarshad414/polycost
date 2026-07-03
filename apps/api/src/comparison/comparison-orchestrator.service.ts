@@ -628,7 +628,7 @@ export class ComparisonOrchestratorService {
       isApproximate: true,
       baseMonthlyCostUsd: supportCost,
       baseHourlyCostUsd: supportCost / HOURS_PER_MONTH,
-      skuId: `modeled-support-${supportTier}`,
+      skuId: `modeled-support-${supportTier.replace(/_/g, '-')}`,
       unit: 'month',
       unitPriceUsd: supportCost,
       pricingBasis: 'flat',
@@ -3193,6 +3193,14 @@ const AWS_BUSINESS_SUPPORT_BRACKETS: TieredSupportBracket[] = [
   { rate: 0.03 },
 ];
 
+const AWS_ENTERPRISE_ONRAMP_PERCENT = 0.1;
+const AWS_ENTERPRISE_ONRAMP_MINIMUM = 5_500;
+const AWS_BUSINESS_SUPPORT_MINIMUM = 100;
+const AWS_ENTERPRISE_SUPPORT_MINIMUM = 15_000;
+const AZURE_UNIFIED_ENTERPRISE_ESTIMATE = 15_000;
+const GCP_ENHANCED_SUPPORT_MINIMUM = 500;
+const GCP_PREMIUM_SUPPORT_MINIMUM = 12_500;
+
 const AWS_ENTERPRISE_SUPPORT_BRACKETS: TieredSupportBracket[] = [
   { upTo: 150_000, rate: 0.1 },
   { upTo: 500_000, rate: 0.07 },
@@ -3217,11 +3225,19 @@ const GCP_PREMIUM_SUPPORT_BRACKETS: TieredSupportBracket[] = [
 function awsSupportCost(supportTier: SupportTier, subtotal: number): number {
   switch (supportTier) {
     case 'developer':
-      return 29;
+      return Math.max(29, subtotal * 0.03);
     case 'business':
-      return Math.max(29, tieredSupportCharge(subtotal, AWS_BUSINESS_SUPPORT_BRACKETS));
+      return Math.max(
+        AWS_BUSINESS_SUPPORT_MINIMUM,
+        tieredSupportCharge(subtotal, AWS_BUSINESS_SUPPORT_BRACKETS),
+      );
+    case 'enterprise_onramp':
+      return Math.max(AWS_ENTERPRISE_ONRAMP_MINIMUM, subtotal * AWS_ENTERPRISE_ONRAMP_PERCENT);
     case 'enterprise':
-      return Math.max(5_000, tieredSupportCharge(subtotal, AWS_ENTERPRISE_SUPPORT_BRACKETS));
+      return Math.max(
+        AWS_ENTERPRISE_SUPPORT_MINIMUM,
+        tieredSupportCharge(subtotal, AWS_ENTERPRISE_SUPPORT_BRACKETS),
+      );
     case 'none':
     case undefined:
       return 0;
@@ -3234,8 +3250,10 @@ function azureSupportCost(supportTier: SupportTier): number {
       return 29;
     case 'business':
       return 100;
-    case 'enterprise':
+    case 'enterprise_onramp':
       return 1_000;
+    case 'enterprise':
+      return AZURE_UNIFIED_ENTERPRISE_ESTIMATE;
     case 'none':
     case undefined:
       return 0;
@@ -3247,9 +3265,16 @@ function gcpSupportCost(supportTier: SupportTier, subtotal: number): number {
     case 'developer':
       return Math.max(29, subtotal * 0.03);
     case 'business':
-      return Math.max(100, tieredSupportCharge(subtotal, GCP_ENHANCED_SUPPORT_BRACKETS));
+    case 'enterprise_onramp':
+      return Math.max(
+        GCP_ENHANCED_SUPPORT_MINIMUM,
+        tieredSupportCharge(subtotal, GCP_ENHANCED_SUPPORT_BRACKETS),
+      );
     case 'enterprise':
-      return Math.max(15_000, tieredSupportCharge(subtotal, GCP_PREMIUM_SUPPORT_BRACKETS));
+      return Math.max(
+        GCP_PREMIUM_SUPPORT_MINIMUM,
+        tieredSupportCharge(subtotal, GCP_PREMIUM_SUPPORT_BRACKETS),
+      );
     case 'none':
     case undefined:
       return 0;
@@ -3299,6 +3324,8 @@ function awsSupportPlanLabel(supportTier: SupportTier): string {
       return 'Developer Support';
     case 'business':
       return 'Business Support';
+    case 'enterprise_onramp':
+      return 'Enterprise On-Ramp';
     case 'enterprise':
       return 'Enterprise Support';
     case 'none':
@@ -3313,8 +3340,10 @@ function azureSupportPlanLabel(supportTier: SupportTier): string {
       return 'Developer';
     case 'business':
       return 'Standard';
-    case 'enterprise':
+    case 'enterprise_onramp':
       return 'Professional Direct';
+    case 'enterprise':
+      return 'Unified Enterprise';
     case 'none':
     case undefined:
       return 'No';
@@ -3326,6 +3355,8 @@ function gcpSupportPlanLabel(supportTier: SupportTier): string {
     case 'developer':
       return 'Standard';
     case 'business':
+      return 'Enhanced';
+    case 'enterprise_onramp':
       return 'Enhanced';
     case 'enterprise':
       return 'Premium';

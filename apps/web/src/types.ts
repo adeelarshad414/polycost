@@ -197,7 +197,7 @@ export interface NormalizedWorkloadSpec {
       frameworks?: string[];
     };
     operatingSystem?: 'linux' | 'windows' | 'byol';
-    supportTier?: 'none' | 'developer' | 'business' | 'enterprise';
+    supportTier?: 'none' | 'developer' | 'business' | 'enterprise_onramp' | 'enterprise';
     usagePattern?: {
       type: 'always_on' | 'scheduled' | 'bursty';
       hoursPerDay?: number;

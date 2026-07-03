@@ -38,7 +38,7 @@ export interface WorkloadFormState {
   complianceLocked: boolean;
   complianceFrameworks: string;
   operatingSystem: 'linux' | 'windows' | 'byol';
-  supportTier: 'none' | 'developer' | 'business' | 'enterprise';
+  supportTier: 'none' | 'developer' | 'business' | 'enterprise_onramp' | 'enterprise';
   usagePattern: 'always_on' | 'scheduled' | 'bursty';
   usageHoursPerDay: string;
   usageDaysPerWeek: string;
@@ -584,7 +584,7 @@ export const ARCHITECTURE_TEMPLATES: ArchitectureTemplate[] = [
     form: templateForm({
       workloadName: 'High-traffic API',
       workloadType: 'api_backend',
-      supportTier: 'enterprise',
+      supportTier: 'enterprise_onramp',
       dailyActiveUsers: '100000',
       peakConcurrentUsers: '15000',
       computeRole: 'api nodes',
