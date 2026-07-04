@@ -234,6 +234,11 @@ describe('EquivalentServiceMapper', () => {
           highAvailability: false,
         },
         {
+          role: 'sql',
+          engine: 'sql_server',
+          highAvailability: false,
+        },
+        {
           role: 'relational',
           engine: 'generic_relational',
           highAvailability: false,
@@ -253,6 +258,7 @@ describe('EquivalentServiceMapper', () => {
     expect(mappings.map((mapping) => mapping.tierLabel)).toEqual([
       'database-mysql-managed',
       'database-mongodb-managed',
+      'database-sql-server-managed',
       'database-generic-relational-managed',
       'database-generic-nosql-managed',
     ]);

@@ -572,7 +572,7 @@ export class ComparisonOrchestratorService {
     lineItems: ComparisonLineItem[],
   ): ComparisonLineItem[] {
     const supportLineItem = this.supportLineItem(nws, providerId, lineItems);
-    const licensingLineItem = this.licensingLineItem(nws, providerId);
+    const licensingLineItems = this.licensingLineItems(nws, providerId);
     const tenancyLineItem = this.tenancyLineItem(nws, providerId, lineItems);
     const resilienceLineItem = this.resilienceLineItem(nws, providerId, lineItems);
     const storageLineItems = this.storageDimensionLineItems(nws, providerId);
@@ -586,7 +586,7 @@ export class ComparisonOrchestratorService {
 
     return [
       supportLineItem,
-      licensingLineItem,
+      ...licensingLineItems,
       tenancyLineItem,
       resilienceLineItem,
       ...storageLineItems,
@@ -655,7 +655,17 @@ export class ComparisonOrchestratorService {
     return this.roundCurrency(awsSupportCost(supportTier, subtotal));
   }
 
-  private licensingLineItem(
+  private licensingLineItems(
+    nws: NormalizedWorkloadSpec,
+    providerId: ProviderId,
+  ): ComparisonLineItem[] {
+    return [
+      this.windowsOsLicensingLineItem(nws, providerId),
+      ...this.sqlServerLicensingLineItems(nws, providerId),
+    ].filter((lineItem): lineItem is ComparisonLineItem => lineItem !== undefined);
+  }
+
+  private windowsOsLicensingLineItem(
     nws: NormalizedWorkloadSpec,
     providerId: ProviderId,
   ): ComparisonLineItem | undefined {
@@ -673,15 +683,80 @@ export class ComparisonOrchestratorService {
       return undefined;
     }
 
+    return this.licenseLineItem({
+      providerId,
+      description: `${providerLabel(providerId)} Windows OS licensing estimate`,
+      monthlyCostUsd,
+      skuId: 'modeled-windows-os-license',
+      unit: 'vCPU-hour',
+      unitPriceUsd,
+    });
+  }
+
+  private sqlServerLicensingLineItems(
+    nws: NormalizedWorkloadSpec,
+    providerId: ProviderId,
+  ): ComparisonLineItem[] {
+    const operatingSystem = nws.workloadProfile?.operatingSystem ?? 'linux';
+    const monthlyHours = this.usageAdjustment(nws)?.monthlyHours ?? HOURS_PER_MONTH;
+    const sqlServerDatabases = nws.database.filter((database) => database.engine === 'sql_server');
+
+    return sqlServerDatabases.map((database, index) => {
+      const vcpu = sqlServerLicenseVcpu(database);
+      const availabilityMultiplier = database.highAvailability ? 2 : 1;
+      const vcpuHours = vcpu * monthlyHours * availabilityMultiplier;
+      const availabilityLabel = database.highAvailability ? 'HA pair' : 'single instance';
+
+      if (operatingSystem === 'byol') {
+        return this.licenseLineItem({
+          providerId,
+          description: `${providerLabel(providerId)} SQL Server ${sqlServerByolLabel(
+            providerId,
+          )} applied (${vcpu} vCPU ${availabilityLabel}, modeled license-included delta avoided)`,
+          monthlyCostUsd: 0,
+          skuId: `modeled-sql-server-license-byol-${index + 1}`,
+          unit: 'vCPU-hour avoided',
+          unitPriceUsd: 0,
+        });
+      }
+
+      const unitPriceUsd = sqlServerLicenseRate(providerId);
+      const monthlyCostUsd = this.roundCurrency(vcpuHours * unitPriceUsd);
+
+      return this.licenseLineItem({
+        providerId,
+        description: `${providerLabel(
+          providerId,
+        )} SQL Server license-included surcharge estimate (${vcpu} vCPU ${availabilityLabel}, ${Math.round(
+          vcpuHours,
+        )} vCPU-hrs)`,
+        monthlyCostUsd,
+        skuId: `modeled-sql-server-license-${index + 1}`,
+        unit: 'vCPU-hour',
+        unitPriceUsd,
+      });
+    });
+  }
+
+  private licenseLineItem(input: {
+    providerId: ProviderId;
+    description: string;
+    monthlyCostUsd: number;
+    skuId: string;
+    unit: string;
+    unitPriceUsd: number;
+  }): ComparisonLineItem {
     return this.normalizeLineItem({
       category: 'licensing',
       costComponent: 'licensing',
-      description: `${providerLabel(providerId)} Windows OS licensing estimate`,
+      description: input.description,
       isApproximate: true,
-      baseMonthlyCostUsd: monthlyCostUsd,
-      baseHourlyCostUsd: monthlyCostUsd / HOURS_PER_MONTH,
-      unit: 'vCPU-hour',
-      unitPriceUsd,
+      baseMonthlyCostUsd: input.monthlyCostUsd,
+      baseHourlyCostUsd: input.monthlyCostUsd / HOURS_PER_MONTH,
+      skuId: input.skuId,
+      region: providerLabel(input.providerId),
+      unit: input.unit,
+      unitPriceUsd: input.unitPriceUsd,
       pricingBasis: 'flat',
     });
   }
@@ -3658,6 +3733,42 @@ function databaseDimensionRates(providerId: ProviderId): DatabaseDimensionRates 
         searchStoragePerGbMonth: 5,
         searchQueryPerMillion: 1500,
       };
+  }
+}
+
+function sqlServerLicenseRate(providerId: ProviderId): number {
+  switch (providerId) {
+    case 'aws':
+      return 0.12;
+    case 'azure':
+      return 0.11;
+    case 'gcp':
+      return 0.13;
+  }
+}
+
+function sqlServerLicenseVcpu(database: NormalizedWorkloadSpec['database'][number]): number {
+  const sizeGb = database.sizeGb ?? 100;
+
+  if (sizeGb >= 1024) {
+    return 8;
+  }
+
+  if (sizeGb >= 512) {
+    return 4;
+  }
+
+  return 2;
+}
+
+function sqlServerByolLabel(providerId: ProviderId): string {
+  switch (providerId) {
+    case 'azure':
+      return 'Azure Hybrid Benefit/BYOL';
+    case 'aws':
+      return 'BYOL license mobility';
+    case 'gcp':
+      return 'BYOL license mobility';
   }
 }
 

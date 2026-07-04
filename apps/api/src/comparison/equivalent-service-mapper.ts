@@ -163,6 +163,10 @@ export class EquivalentServiceMapper {
       return 'database-mysql-managed';
     }
 
+    if (component.engine === 'sql_server') {
+      return 'database-sql-server-managed';
+    }
+
     if (component.engine === 'mongodb') {
       return 'database-mongodb-managed';
     }

@@ -277,6 +277,7 @@ export const NWS_PARSE_RESULT_JSON_SCHEMA = {
                 enum: [
                   'postgres',
                   'mysql',
+                  'sql_server',
                   'mongodb',
                   'redis',
                   'generic_relational',

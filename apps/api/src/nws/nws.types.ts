@@ -103,6 +103,7 @@ export const databaseComponentSchema = z
     engine: z.enum([
       'postgres',
       'mysql',
+      'sql_server',
       'mongodb',
       'redis',
       'generic_relational',

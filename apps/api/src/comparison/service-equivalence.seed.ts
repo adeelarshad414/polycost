@@ -188,6 +188,16 @@ export const SERVICE_EQUIVALENCE_SEED: ServiceEquivalenceRule[] = [
   },
   {
     category: 'database',
+    tierLabel: 'database-sql-server-managed',
+    awsSkuPattern: 'Amazon RDS for SQL Server',
+    azureSkuPattern: 'Azure SQL Managed Instance or Azure SQL Database',
+    gcpSkuPattern: 'Cloud SQL for SQL Server',
+    notes:
+      'Managed SQL Server-compatible database. License-included vs BYOL/Hybrid Benefit can materially change cost.',
+    isApproximate: false,
+  },
+  {
+    category: 'database',
     tierLabel: 'database-mongodb-managed',
     awsSkuPattern: 'Amazon DocumentDB or MongoDB Atlas on AWS',
     azureSkuPattern: 'Azure Cosmos DB for MongoDB or MongoDB Atlas on Azure',

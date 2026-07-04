@@ -1347,6 +1347,94 @@ describe('ComparisonOrchestratorService', () => {
     expect(result.providers[0].breakdown?.databaseMonthlyCostUsd).toBe(804.2);
   });
 
+  it('adds SQL Server license-included surcharge as a separate licensing line item', async () => {
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async () => providerResult('aws', [100])),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      workloadProfile: {
+        operatingSystem: 'linux',
+      },
+      database: [
+        {
+          role: 'primary',
+          engine: 'sql_server',
+          sizeGb: 600,
+          highAvailability: true,
+        },
+      ],
+    });
+
+    const provider = result.providers[0];
+
+    expect(provider).toBeDefined();
+    expect(provider?.lineItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'licensing',
+          costComponent: 'licensing',
+          description:
+            'AWS SQL Server license-included surcharge estimate (4 vCPU HA pair, 5840 vCPU-hrs)',
+          skuId: 'modeled-sql-server-license-1',
+          baseMonthlyCostUsd: 700.8,
+          unit: 'vCPU-hour',
+          unitPriceUsd: 0.12,
+          isApproximate: true,
+        }),
+      ]),
+    );
+    expect(provider?.breakdown?.licensingMonthlyCostUsd).toBe(700.8);
+  });
+
+  it('keeps SQL Server BYOL and Azure Hybrid Benefit visible as an audited zero-cost license path', async () => {
+    const service = createService([
+      adapter(
+        'azure',
+        jest.fn(async () => providerResult('azure', [100])),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      workloadProfile: {
+        operatingSystem: 'byol',
+      },
+      database: [
+        {
+          role: 'primary',
+          engine: 'sql_server',
+          sizeGb: 600,
+          highAvailability: false,
+        },
+      ],
+    });
+
+    const provider = result.providers[0];
+
+    expect(provider).toBeDefined();
+    expect(provider?.lineItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'licensing',
+          costComponent: 'licensing',
+          description:
+            'Azure SQL Server Azure Hybrid Benefit/BYOL applied (4 vCPU single instance, modeled license-included delta avoided)',
+          skuId: 'modeled-sql-server-license-byol-1',
+          baseMonthlyCostUsd: 0,
+          unit: 'vCPU-hour avoided',
+          unitPriceUsd: 0,
+          isApproximate: true,
+        }),
+      ]),
+    );
+    expect(provider?.breakdown?.licensingMonthlyCostUsd).toBe(0);
+  });
+
   it('adds modeled managed-search database line items from service requirements', async () => {
     const service = createService([
       adapter(

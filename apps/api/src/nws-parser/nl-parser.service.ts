@@ -12,7 +12,7 @@ import {
 } from './nws-parser.types';
 
 const WORKLOAD_SIGNAL_PATTERN =
-  /\b(ai|analytics|api|api gateway|app|aurora|azure ml|batch|bedrock|bigquery|bi|cdn|cloud armor|container|cosmos|data lake|data warehouse|database|db|ddos|defender|dynamodb|ec2|egress|embedding|embeddings|etl|event bus|event grid|eventbridge|file|firestore|generative ai|gpu|guardduty|inference|kubernetes|llm|load balancer|looker|machine learning|message queue|ml|model|mongo|mysql|nosql|openai|postgres|power bi|pub\/sub|pubsub|queue|redis|redshift|sagemaker|security command center|security hub|server|service|service bus|shield|spanner|step functions|storage|streaming|synapse|tokens|traffic|upload|users|vector|vertex ai|vm|waf|warehouse|web|website|workflow|workload)\b/i;
+  /\b(ai|analytics|api|api gateway|app|aurora|azure ml|batch|bedrock|bigquery|bi|cdn|cloud armor|container|cosmos|data lake|data warehouse|database|db|ddos|defender|dynamodb|ec2|egress|embedding|embeddings|etl|event bus|event grid|eventbridge|file|firestore|generative ai|gpu|guardduty|inference|kubernetes|llm|load balancer|looker|machine learning|message queue|ml|model|mongo|mssql|mysql|nosql|openai|postgres|power bi|pub\/sub|pubsub|queue|redis|redshift|sagemaker|security command center|security hub|server|service|service bus|shield|spanner|sql server|sqlserver|step functions|storage|streaming|synapse|tokens|traffic|upload|users|vector|vertex ai|vm|waf|warehouse|web|website|workflow|workload)\b/i;
 
 export class NWSParseInputError extends Error {
   constructor(message: string) {
@@ -894,6 +894,10 @@ function inferDatabaseEngine(input: string): NormalizedWorkloadSpec['database'][
 
   if (input.includes('mysql')) {
     return 'mysql';
+  }
+
+  if (/\b(sql server|sqlserver|mssql|ms sql)\b/i.test(input)) {
+    return 'sql_server';
   }
 
   if (input.includes('mongo')) {

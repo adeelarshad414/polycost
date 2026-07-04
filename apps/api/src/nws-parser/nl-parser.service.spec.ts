@@ -285,6 +285,30 @@ describe('NLParserService', () => {
     });
   });
 
+  it('infers SQL Server, BYOL, and enterprise-on-ramp support intent', async () => {
+    const client: StructuredLlmClient = {
+      createStructuredOutput: jest.fn(),
+    };
+    const service = new NLParserService(configService(4000, false), client, fixedNow);
+
+    const result = await service.parse(
+      'Production API with two 4 vCPU 16GB servers, SQL Server database size 600GB, Azure Hybrid Benefit, and Professional Direct support.',
+    );
+
+    expect(result.draftNws.database[0]).toEqual(
+      expect.objectContaining({
+        engine: 'sql_server',
+        sizeGb: 600,
+      }),
+    );
+    expect(result.draftNws.workloadProfile).toEqual(
+      expect.objectContaining({
+        operatingSystem: 'byol',
+        supportTier: 'enterprise_onramp',
+      }),
+    );
+  });
+
   it('parses common vCPU and GB server shorthand without confusing storage size', async () => {
     const client: StructuredLlmClient = {
       createStructuredOutput: jest.fn(),

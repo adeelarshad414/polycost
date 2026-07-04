@@ -3709,6 +3709,7 @@ function WorkloadForm({
               options={[
                 ['postgres', 'Postgres'],
                 ['mysql', 'MySQL'],
+                ['sql_server', 'SQL Server'],
                 ['mongodb', 'MongoDB'],
                 ['redis', 'Redis'],
                 ['generic_relational', 'Relational'],

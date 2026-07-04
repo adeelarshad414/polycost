@@ -136,7 +136,14 @@ export interface NormalizedWorkloadSpec {
   }>;
   database: Array<{
     role: string;
-    engine: 'postgres' | 'mysql' | 'mongodb' | 'redis' | 'generic_relational' | 'generic_nosql';
+    engine:
+      | 'postgres'
+      | 'mysql'
+      | 'sql_server'
+      | 'mongodb'
+      | 'redis'
+      | 'generic_relational'
+      | 'generic_nosql';
     sizeGb?: number;
     highAvailability: boolean;
     managedServicePreference?: string;
