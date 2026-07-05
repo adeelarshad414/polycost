@@ -44,6 +44,7 @@ import {
   ApiNotFoundError,
   ApiUnauthorizedError,
   ApiValidationError,
+  DataHealthResponse,
   LiveRefreshUnavailableError,
   RateLimitExceededError,
 } from './api-errors';
@@ -106,6 +107,15 @@ const comparisonResult: ComparisonResult = {
       },
     },
   ],
+};
+
+const freshDataHealth: DataHealthResponse = {
+  generatedAt: '2026-07-01T00:00:00.000Z',
+  freshnessPolicyHours: 48,
+  overallStatus: 'fresh',
+  alertCount: 0,
+  alerts: [],
+  providers: [],
 };
 
 const workloadRecord: WorkloadRecord = {
@@ -1084,6 +1094,7 @@ describe('API contracts', () => {
       getPricingStatus: jest.fn(async () => ({
         providers: [],
       })),
+      getDataHealth: jest.fn(async () => freshDataHealth),
     };
     const liveRefresh = {
       refreshSnapshot: jest.fn(async () => []),
@@ -1132,6 +1143,7 @@ describe('API contracts', () => {
         resultSnapshot: comparisonResult,
       })),
       getPricingStatus: jest.fn(),
+      getDataHealth: jest.fn(async () => freshDataHealth),
     };
     const service = new ComparisonApplicationService(
       {
@@ -1181,6 +1193,48 @@ describe('API contracts', () => {
         },
       ],
     });
+  });
+
+  it('adds pricing data-health warnings to created comparison snapshots', async () => {
+    const staleDataHealth: DataHealthResponse = {
+      ...freshDataHealth,
+      overallStatus: 'stale',
+      alertCount: 1,
+      alerts: [
+        {
+          providerId: 'azure',
+          severity: 'warning',
+          message:
+            'Pricing data is 72h old against the 48h policy; refresh before production decisions.',
+        },
+      ],
+    };
+    const repository = {
+      saveComparison: jest.fn(async () => undefined),
+      recordComparisonAuditLog: jest.fn(async () => undefined),
+      getDataHealth: jest.fn(async () => staleDataHealth),
+    };
+    const service = new ComparisonApplicationService(
+      {
+        compare: jest.fn(async () => comparisonResult),
+      } as never,
+      repository as never,
+    );
+    const expected = {
+      ...comparisonResult,
+      warnings: [
+        {
+          providerId: 'azure',
+          code: 'pricing_data_health',
+          message:
+            'Pricing data is 72h old against the 48h policy; refresh before production decisions.',
+        },
+      ],
+    };
+
+    await expect(service.createComparison(validNws)).resolves.toEqual(expected);
+    expect(repository.saveComparison).toHaveBeenCalledWith(validNws, expected);
+    expect(repository.recordComparisonAuditLog).toHaveBeenCalledWith(expected);
   });
 
   it('reports comparison application not-found and disabled live-refresh failures', async () => {
