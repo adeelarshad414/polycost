@@ -55,6 +55,14 @@ interface ResilienceCapacityProfile {
   label: string;
 }
 
+interface BurstableCpuCreditPolicy {
+  familyLabel: string;
+  baselineUtilizationPercent: number;
+  unitPriceUsd: number;
+  unit: string;
+  zeroCostLabel: string;
+}
+
 interface NetworkDimensionRates {
   crossAzPerGb: number;
   interRegionPerGb: number;
@@ -575,6 +583,7 @@ export class ComparisonOrchestratorService {
     const licensingLineItems = this.licensingLineItems(nws, providerId);
     const tenancyLineItem = this.tenancyLineItem(nws, providerId, lineItems);
     const resilienceLineItem = this.resilienceLineItem(nws, providerId, lineItems);
+    const burstableCpuCreditLineItems = this.burstableCpuCreditLineItems(nws, providerId);
     const storageLineItems = this.storageDimensionLineItems(nws, providerId);
     const databaseLineItems = this.databaseDimensionLineItems(nws, providerId, lineItems);
     const supportingServicesLineItems = this.supportingServicesLineItems(nws, providerId);
@@ -589,6 +598,7 @@ export class ComparisonOrchestratorService {
       ...licensingLineItems,
       tenancyLineItem,
       resilienceLineItem,
+      ...burstableCpuCreditLineItems,
       ...storageLineItems,
       ...databaseLineItems,
       ...supportingServicesLineItems,
@@ -759,6 +769,92 @@ export class ComparisonOrchestratorService {
       unitPriceUsd: input.unitPriceUsd,
       pricingBasis: 'flat',
     });
+  }
+
+  private burstableCpuCreditLineItems(
+    nws: NormalizedWorkloadSpec,
+    providerId: ProviderId,
+  ): ComparisonLineItem[] {
+    const burstableComponents = nws.compute.filter(
+      (component) => component.instanceFamily === 'burstable',
+    );
+
+    if (burstableComponents.length === 0) {
+      return [];
+    }
+
+    const policy = burstableCpuCreditPolicy(providerId);
+    const monthlyHours = this.burstableCpuCreditOperatingHours(nws);
+    const averageUtilizationPercent = this.burstableAverageUtilizationPercent(nws, policy);
+    const utilizationAboveBaseline = Math.max(
+      0,
+      (averageUtilizationPercent - policy.baselineUtilizationPercent) / 100,
+    );
+    const resilienceMultiplier = this.resilienceCapacityProfile(nws).factor;
+    const regionLabel = nws.workload.region.preference ?? 'default region';
+
+    return burstableComponents.map((component, index) => {
+      const vcpu = component.vcpu ?? 2;
+      const quantity = this.averageComputeQuantity(component) * resilienceMultiplier;
+      const creditHours = vcpu * quantity * monthlyHours * utilizationAboveBaseline;
+      const monthlyCostUsd = this.roundCurrency(creditHours * policy.unitPriceUsd);
+      const utilizationLabel = `${Math.round(
+        averageUtilizationPercent,
+      )}% avg vs ${policy.baselineUtilizationPercent}% baseline`;
+      const description =
+        monthlyCostUsd > 0
+          ? `${providerLabel(providerId)} ${policy.familyLabel} CPU credit overage estimate for ${
+              component.role
+            } (${utilizationLabel}, ${Math.round(creditHours)} ${policy.unit})`
+          : `${providerLabel(providerId)} ${
+              policy.familyLabel
+            } ${policy.zeroCostLabel} for ${component.role} (${utilizationLabel}; no paid overage modeled)`;
+
+      return this.computeModeledLineItem({
+        providerId,
+        regionLabel,
+        skuId: `modeled-compute-burstable-cpu-credits-${index + 1}`,
+        description,
+        monthlyCostUsd,
+        unit: policy.unit,
+        unitPriceUsd: policy.unitPriceUsd,
+      });
+    });
+  }
+
+  private burstableCpuCreditOperatingHours(nws: NormalizedWorkloadSpec): number {
+    const usagePattern = nws.workloadProfile?.usagePattern;
+
+    if (usagePattern?.type !== 'scheduled') {
+      return HOURS_PER_MONTH;
+    }
+
+    return this.usageAdjustment(nws)?.monthlyHours ?? HOURS_PER_MONTH;
+  }
+
+  private burstableAverageUtilizationPercent(
+    nws: NormalizedWorkloadSpec,
+    policy: BurstableCpuCreditPolicy,
+  ): number {
+    const usagePattern = nws.workloadProfile?.usagePattern;
+
+    if (usagePattern?.averageUtilizationPercent !== undefined) {
+      return usagePattern.averageUtilizationPercent;
+    }
+
+    if (usagePattern?.type === 'bursty') {
+      return 55;
+    }
+
+    return policy.baselineUtilizationPercent;
+  }
+
+  private averageComputeQuantity(component: NormalizedWorkloadSpec['compute'][number]): number {
+    if (component.scalingType === 'autoscaling' && component.autoscalingRange) {
+      return (component.autoscalingRange.min + component.autoscalingRange.max) / 2;
+    }
+
+    return component.instanceCount ?? 1;
   }
 
   private tenancyLineItem(
@@ -4366,6 +4462,35 @@ function interRegionRouteRates(providerId: ProviderId): ReadonlyMap<string, numb
       return AZURE_INTER_REGION_ROUTE_RATES;
     case 'gcp':
       return GCP_INTER_REGION_ROUTE_RATES;
+  }
+}
+
+function burstableCpuCreditPolicy(providerId: ProviderId): BurstableCpuCreditPolicy {
+  switch (providerId) {
+    case 'aws':
+      return {
+        familyLabel: 'T-series',
+        baselineUtilizationPercent: 20,
+        unitPriceUsd: 0.05,
+        unit: 'vCPU-credit-hour',
+        zeroCostLabel: 'CPU credit baseline signal',
+      };
+    case 'azure':
+      return {
+        familyLabel: 'B-series',
+        baselineUtilizationPercent: 20,
+        unitPriceUsd: 0,
+        unit: 'vCPU-credit-hour',
+        zeroCostLabel: 'CPU credit depletion risk signal',
+      };
+    case 'gcp':
+      return {
+        familyLabel: 'E2 shared-core',
+        baselineUtilizationPercent: 20,
+        unitPriceUsd: 0,
+        unit: 'vCPU-credit-hour',
+        zeroCostLabel: 'scheduling risk signal',
+      };
   }
 }
 

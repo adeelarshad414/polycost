@@ -754,6 +754,123 @@ describe('ComparisonOrchestratorService', () => {
     );
   });
 
+  it('models AWS T-series CPU credit overage when burstable utilization exceeds baseline', async () => {
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async () => providerResult('aws', [100])),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      compute: [
+        {
+          role: 'web',
+          instanceFamily: 'burstable',
+          vcpu: 2,
+          scalingType: 'fixed',
+          instanceCount: 2,
+        },
+      ],
+      workloadProfile: {
+        usagePattern: {
+          type: 'always_on',
+          averageUtilizationPercent: 70,
+        },
+      },
+    });
+
+    expect(result.providers[0].lineItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'compute',
+          costComponent: 'compute',
+          description: expect.stringContaining(
+            'AWS T-series CPU credit overage estimate for web (70% avg vs 20% baseline, 1460 vCPU-credit-hour)',
+          ),
+          skuId: 'modeled-compute-burstable-cpu-credits-1',
+          isApproximate: true,
+          baseMonthlyCostUsd: 73,
+          unit: 'vCPU-credit-hour',
+          unitPriceUsd: 0.05,
+        }),
+      ]),
+    );
+    expect(result.providers[0].breakdown).toEqual(
+      expect.objectContaining({
+        computeMonthlyCostUsd: 173,
+      }),
+    );
+  });
+
+  it('surfaces zero-cost burstable CPU risk for Azure and GCP without changing totals', async () => {
+    const service = createService([
+      adapter(
+        'azure',
+        jest.fn(async () => providerResult('azure', [100])),
+      ),
+      adapter(
+        'gcp',
+        jest.fn(async () => providerResult('gcp', [100])),
+      ),
+    ]);
+
+    const result = await service.compare({
+      ...validWorkload,
+      compute: [
+        {
+          role: 'worker',
+          instanceFamily: 'burstable',
+          vcpu: 2,
+          scalingType: 'fixed',
+          instanceCount: 2,
+        },
+      ],
+      workloadProfile: {
+        usagePattern: {
+          type: 'always_on',
+          averageUtilizationPercent: 70,
+        },
+      },
+    });
+
+    expect(result.providers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          providerId: 'azure',
+          breakdown: expect.objectContaining({
+            computeMonthlyCostUsd: 100,
+          }),
+          lineItems: expect.arrayContaining([
+            expect.objectContaining({
+              description: expect.stringContaining(
+                'Azure B-series CPU credit depletion risk signal for worker (70% avg vs 20% baseline; no paid overage modeled)',
+              ),
+              skuId: 'modeled-compute-burstable-cpu-credits-1',
+              baseMonthlyCostUsd: 0,
+            }),
+          ]),
+        }),
+        expect.objectContaining({
+          providerId: 'gcp',
+          breakdown: expect.objectContaining({
+            computeMonthlyCostUsd: 100,
+          }),
+          lineItems: expect.arrayContaining([
+            expect.objectContaining({
+              description: expect.stringContaining(
+                'GCP E2 shared-core scheduling risk signal for worker (70% avg vs 20% baseline; no paid overage modeled)',
+              ),
+              skuId: 'modeled-compute-burstable-cpu-credits-1',
+              baseMonthlyCostUsd: 0,
+            }),
+          ]),
+        }),
+      ]),
+    );
+  });
+
   it('uses provider-specific public support rate cards', async () => {
     const service = createService([
       adapter(
