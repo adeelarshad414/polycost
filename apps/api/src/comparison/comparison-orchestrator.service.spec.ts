@@ -1904,6 +1904,13 @@ describe('ComparisonOrchestratorService', () => {
           baseMonthlyCostUsd: 8.33,
         }),
         expect.objectContaining({
+          skuId: 'modeled-serverless-function-memory-tradeoff',
+          description: expect.stringContaining(
+            'AWS serverless function memory tradeoff evidence (512MB at 200ms costs $8.33/mo; 1024MB must run at <=100ms to keep GB-second spend flat)',
+          ),
+          baseMonthlyCostUsd: 0,
+        }),
+        expect.objectContaining({
           skuId: 'modeled-kubernetes-control-plane',
           baseMonthlyCostUsd: 146,
         }),

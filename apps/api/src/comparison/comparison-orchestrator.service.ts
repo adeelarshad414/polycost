@@ -2535,6 +2535,7 @@ export class ComparisonOrchestratorService {
       const gbSeconds = invocations * durationSeconds * memoryGb;
       const requestCost = values.functionInvocationsMillion * rates.functionRequestPerMillion;
       const durationCost = gbSeconds * rates.functionGbSecond;
+      const durationMonthlyCostUsd = this.roundCurrency(durationCost);
 
       lineItems.push(
         this.computeModeledLineItem({
@@ -2551,9 +2552,19 @@ export class ComparisonOrchestratorService {
           regionLabel,
           skuId: 'modeled-serverless-function-duration',
           description: `${providerLabel(providerId)} serverless function GB-second estimate`,
-          monthlyCostUsd: this.roundCurrency(durationCost),
+          monthlyCostUsd: durationMonthlyCostUsd,
           unit: 'GB-second',
           unitPriceUsd: rates.functionGbSecond,
+        }),
+      );
+
+      lineItems.push(
+        this.serverlessFunctionMemoryTradeoffLineItem({
+          providerId,
+          regionLabel,
+          functionMemoryMb: values.functionMemoryMb,
+          functionDurationMs: values.functionDurationMs,
+          durationMonthlyCostUsd,
         }),
       );
     }
@@ -2677,6 +2688,31 @@ export class ComparisonOrchestratorService {
     }
 
     return lineItems;
+  }
+
+  private serverlessFunctionMemoryTradeoffLineItem(input: {
+    providerId: ProviderId;
+    regionLabel: string;
+    functionMemoryMb: number;
+    functionDurationMs: number;
+    durationMonthlyCostUsd: number;
+  }): ComparisonLineItem {
+    const doubledMemoryMb = input.functionMemoryMb * 2;
+    const breakEvenDurationMs = Math.max(1, Math.round(input.functionDurationMs / 2));
+
+    return this.computeModeledLineItem({
+      providerId: input.providerId,
+      regionLabel: input.regionLabel,
+      skuId: 'modeled-serverless-function-memory-tradeoff',
+      description: `${providerLabel(input.providerId)} serverless function memory tradeoff evidence (${
+        input.functionMemoryMb
+      }MB at ${input.functionDurationMs}ms costs $${input.durationMonthlyCostUsd.toFixed(
+        2,
+      )}/mo; ${doubledMemoryMb}MB must run at <=${breakEvenDurationMs}ms to keep GB-second spend flat)`,
+      monthlyCostUsd: 0,
+      unit: 'analysis',
+      unitPriceUsd: 0,
+    });
   }
 
   private analyticsServicesLineItems(
