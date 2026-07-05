@@ -1,6 +1,8 @@
 import net from 'node:net';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { DataHealthResponse } from '../api/api-errors';
+import { ApiDatabaseRepository } from '../api/api-database.repository';
 import { AppConfig } from '../config/config.schema';
 
 export type DependencyStatus = 'ok' | 'degraded';
@@ -22,6 +24,15 @@ export interface HealthResponse {
   };
 }
 
+export interface DeepHealthResponse {
+  status: 'healthy' | 'degraded' | 'critical';
+  service: 'polycost-api';
+  generatedAt: string;
+  dependencies: HealthResponse['dependencies'];
+  pricingData?: DataHealthResponse;
+  pricingDataError?: string;
+}
+
 export type TcpProbe = (host: string, port: number, timeoutMs: number) => Promise<HealthDependency>;
 
 export const HEALTH_TCP_PROBE = Symbol('HEALTH_TCP_PROBE');
@@ -33,6 +44,8 @@ export class HealthService {
     @Optional()
     @Inject(HEALTH_TCP_PROBE)
     private readonly tcpProbe: TcpProbe = probeTcp,
+    @Optional()
+    private readonly apiDatabaseRepository?: ApiDatabaseRepository,
   ) {}
 
   async getHealth(): Promise<HealthResponse> {
@@ -58,6 +71,61 @@ export class HealthService {
       },
     };
   }
+
+  async getDeepHealth(): Promise<DeepHealthResponse> {
+    const health = await this.getHealth();
+    let pricingData: DataHealthResponse | undefined;
+    let pricingDataError: string | undefined;
+
+    if (this.apiDatabaseRepository) {
+      try {
+        pricingData = await this.apiDatabaseRepository.getDataHealth();
+      } catch (error) {
+        pricingDataError = error instanceof Error ? error.message : 'Unknown data-health failure';
+      }
+    } else {
+      pricingDataError = 'Data-health repository is not registered in this runtime';
+    }
+
+    return {
+      status: deepHealthStatus(health, pricingData, pricingDataError),
+      service: 'polycost-api',
+      generatedAt: new Date().toISOString(),
+      dependencies: health.dependencies,
+      ...(pricingData ? { pricingData } : {}),
+      ...(pricingDataError ? { pricingDataError } : {}),
+    };
+  }
+}
+
+function deepHealthStatus(
+  health: HealthResponse,
+  pricingData: DataHealthResponse | undefined,
+  pricingDataError: string | undefined,
+): DeepHealthResponse['status'] {
+  if (health.dependencies.db.status !== 'ok' || pricingDataError) {
+    return 'critical';
+  }
+
+  if (
+    pricingData?.overallStatus === 'degraded' ||
+    pricingData?.alerts.some((alert) => alert.severity === 'critical') ||
+    pricingData?.providers.some(
+      (provider) => provider.freshness === 'failed' || provider.freshness === 'missing',
+    )
+  ) {
+    return 'critical';
+  }
+
+  if (
+    health.dependencies.cache.status !== 'ok' ||
+    pricingData?.overallStatus === 'stale' ||
+    pricingData?.alerts.some((alert) => alert.severity === 'warning')
+  ) {
+    return 'degraded';
+  }
+
+  return 'healthy';
 }
 
 export function probeTcp(host: string, port: number, timeoutMs: number): Promise<HealthDependency> {

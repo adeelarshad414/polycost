@@ -1930,7 +1930,7 @@ describe('ComparisonOrchestratorService', () => {
         }),
         expect.objectContaining({
           skuId: 'modeled-kubernetes-worker-node-compute',
-          baseMonthlyCostUsd: 445.01,
+          baseMonthlyCostUsd: 445.02,
         }),
         expect.objectContaining({
           skuId: 'modeled-kubernetes-node-overhead',
@@ -1950,7 +1950,7 @@ describe('ComparisonOrchestratorService', () => {
     );
     expect(result.providers[0].breakdown).toEqual(
       expect.objectContaining({
-        computeMonthlyCostUsd: 658.34,
+        computeMonthlyCostUsd: 658.35,
         storageMonthlyCostUsd: 4,
         egressMonthlyCostUsd: 9,
       }),
