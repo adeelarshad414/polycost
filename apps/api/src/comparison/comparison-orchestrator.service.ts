@@ -1605,6 +1605,10 @@ export class ComparisonOrchestratorService {
         storage.lifecycleTransitionsThousand > 0 &&
         rates.lifecyclePerThousand > 0
       ) {
+        const lifecycleTransitionMonthlyCostUsd = this.roundCurrency(
+          storage.lifecycleTransitionsThousand * rates.lifecyclePerThousand,
+        );
+
         lineItems.push(
           this.storageLineItem({
             providerId,
@@ -1616,6 +1620,20 @@ export class ComparisonOrchestratorService {
             unitPriceUsd: rates.lifecyclePerThousand,
           }),
         );
+
+        const lifecycleSavingsLineItem = this.storageLifecycleSavingsLineItem({
+          providerId,
+          regionLabel,
+          role,
+          storage,
+          storageClass,
+          rates,
+          lifecycleTransitionMonthlyCostUsd,
+        });
+
+        if (lifecycleSavingsLineItem) {
+          lineItems.push(lifecycleSavingsLineItem);
+        }
       }
 
       if (storage.snapshotSizeGb !== undefined && storage.snapshotSizeGb > 0) {
@@ -1696,6 +1714,65 @@ export class ComparisonOrchestratorService {
     }
 
     return lineItems;
+  }
+
+  private storageLifecycleSavingsLineItem(input: {
+    providerId: ProviderId;
+    regionLabel: string;
+    role: string;
+    storage: NormalizedWorkloadSpec['storage'][number];
+    storageClass: StorageClassKey;
+    rates: StorageDimensionRates;
+    lifecycleTransitionMonthlyCostUsd: number;
+  }): ComparisonLineItem | undefined {
+    const standardStorageRate =
+      input.rates.storagePerGbMonth.standard ?? input.rates.storagePerGbMonth.hot ?? 0;
+    const targetStorageRate = input.rates.storagePerGbMonth[input.storageClass] ?? 0;
+
+    if (
+      input.storageClass === 'standard' ||
+      standardStorageRate <= 0 ||
+      targetStorageRate <= 0 ||
+      input.storage.sizeGb <= 0
+    ) {
+      return undefined;
+    }
+
+    const grossSavingsUsd = this.roundCurrency(
+      Math.max(0, standardStorageRate - targetStorageRate) * input.storage.sizeGb,
+    );
+
+    if (grossSavingsUsd <= 0) {
+      return undefined;
+    }
+
+    const netSavingsUsd = this.roundCurrency(
+      grossSavingsUsd - input.lifecycleTransitionMonthlyCostUsd,
+    );
+    const retrievalNote =
+      input.storage.monthlyRetrievalGb !== undefined && input.storage.monthlyRetrievalGb > 0
+        ? ', before retrieval charges'
+        : '';
+    const netLabel =
+      netSavingsUsd >= 0
+        ? `$${netSavingsUsd.toFixed(2)}/mo net savings`
+        : `$${Math.abs(netSavingsUsd).toFixed(2)}/mo net added cost`;
+
+    return this.storageLineItem({
+      providerId: input.providerId,
+      regionLabel: input.regionLabel,
+      skuId: 'modeled-storage-lifecycle-net-savings',
+      description: `${providerLabel(input.providerId)} ${
+        input.role
+      } lifecycle savings evidence vs all-standard storage (${storageClassLabel(
+        input.storageClass,
+      )}: $${grossSavingsUsd.toFixed(2)}/mo gross savings - $${input.lifecycleTransitionMonthlyCostUsd.toFixed(
+        2,
+      )}/mo transition cost = ${netLabel}${retrievalNote})`,
+      quantity: 0,
+      unit: 'analysis',
+      unitPriceUsd: 0,
+    });
   }
 
   private storageLineItem(input: {

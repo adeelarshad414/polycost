@@ -1331,6 +1331,13 @@ describe('ComparisonOrchestratorService', () => {
           baseMonthlyCostUsd: 0.2,
         }),
         expect.objectContaining({
+          skuId: 'modeled-storage-lifecycle-net-savings',
+          description: expect.stringContaining(
+            'AWS assets lifecycle savings evidence vs all-standard storage (archive: $9.70/mo gross savings - $0.20/mo transition cost = $9.50/mo net savings, before retrieval charges)',
+          ),
+          baseMonthlyCostUsd: 0,
+        }),
+        expect.objectContaining({
           skuId: 'modeled-storage-snapshots',
           baseMonthlyCostUsd: 15,
         }),
