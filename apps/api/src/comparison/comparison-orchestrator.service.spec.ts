@@ -2094,6 +2094,14 @@ describe('ComparisonOrchestratorService', () => {
           baseMonthlyCostUsd: 100,
         }),
         expect.objectContaining({
+          category: 'operations',
+          skuId: 'modeled-analytics-warehouse-capacity-evidence',
+          description: expect.stringContaining(
+            'AWS data warehouse capacity evidence (20 TB queried = $100.00/mo on-demand vs Redshift reserved RA3 floor $1080.00/mo; on-demand saves $980.00/mo; break-even 216 TB/mo)',
+          ),
+          baseMonthlyCostUsd: 0,
+        }),
+        expect.objectContaining({
           category: 'storage',
           skuId: 'modeled-analytics-data-lake-storage',
           baseMonthlyCostUsd: 115,

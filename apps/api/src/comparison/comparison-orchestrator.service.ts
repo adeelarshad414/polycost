@@ -122,6 +122,12 @@ interface NoSqlProvisionedCapacityScenario {
   monthlyCostUsd: number;
 }
 
+interface WarehouseCapacityScenario {
+  label: string;
+  monthlyCostUsd: number;
+  breakEvenTb: number;
+}
+
 interface SupportingServicesRates {
   metricPerMillion: number;
   logIngestPerGb: number;
@@ -2699,6 +2705,10 @@ export class ComparisonOrchestratorService {
     }
 
     if (serviceTypes.has('data-warehouse') && values.analyticsWarehouseQueryTb > 0) {
+      const queryMonthlyCostUsd = this.roundCurrency(
+        values.analyticsWarehouseQueryTb * rates.warehouseQueryPerTb,
+      );
+
       lineItems.push(
         this.operationsLineItem({
           providerId,
@@ -2710,6 +2720,18 @@ export class ComparisonOrchestratorService {
           unitPriceUsd: rates.warehouseQueryPerTb,
         }),
       );
+
+      const capacityEvidenceLineItem = this.analyticsWarehouseCapacityEvidenceLineItem({
+        providerId,
+        regionLabel,
+        queryTb: values.analyticsWarehouseQueryTb,
+        queryMonthlyCostUsd,
+        queryUnitPriceUsd: rates.warehouseQueryPerTb,
+      });
+
+      if (capacityEvidenceLineItem) {
+        lineItems.push(capacityEvidenceLineItem);
+      }
     }
 
     if (serviceTypes.has('data-lake') && values.analyticsDataLakeStorageGb > 0) {
@@ -2770,6 +2792,44 @@ export class ComparisonOrchestratorService {
     }
 
     return lineItems;
+  }
+
+  private analyticsWarehouseCapacityEvidenceLineItem(input: {
+    providerId: ProviderId;
+    regionLabel: string;
+    queryTb: number;
+    queryMonthlyCostUsd: number;
+    queryUnitPriceUsd: number;
+  }): ComparisonLineItem | undefined {
+    const capacityScenario = warehouseCapacityScenario(input.providerId, input.queryUnitPriceUsd);
+
+    if (!capacityScenario || input.queryTb <= 0 || input.queryMonthlyCostUsd <= 0) {
+      return undefined;
+    }
+
+    const deltaUsd = this.roundCurrency(
+      input.queryMonthlyCostUsd - capacityScenario.monthlyCostUsd,
+    );
+    const outcome =
+      deltaUsd >= 0
+        ? `committed capacity saves $${deltaUsd.toFixed(2)}/mo`
+        : `on-demand saves $${Math.abs(deltaUsd).toFixed(2)}/mo`;
+
+    return this.operationsLineItem({
+      providerId: input.providerId,
+      regionLabel: input.regionLabel,
+      skuId: 'modeled-analytics-warehouse-capacity-evidence',
+      description: `${providerLabel(input.providerId)} data warehouse capacity evidence (${
+        input.queryTb
+      } TB queried = $${input.queryMonthlyCostUsd.toFixed(2)}/mo on-demand vs ${
+        capacityScenario.label
+      } $${capacityScenario.monthlyCostUsd.toFixed(2)}/mo; ${outcome}; break-even ${Math.ceil(
+        this.roundCurrency(capacityScenario.breakEvenTb),
+      )} TB/mo)`,
+      quantity: 0,
+      unit: 'analysis',
+      unitPriceUsd: 0,
+    });
   }
 
   private aiServicesLineItems(
@@ -4478,6 +4538,36 @@ function analyticsServicesRates(providerId: ProviderId): AnalyticsServicesRates 
         biUserMonthly: 30,
       };
   }
+}
+
+function warehouseCapacityScenario(
+  providerId: ProviderId,
+  queryUnitPriceUsd: number,
+): WarehouseCapacityScenario | undefined {
+  if (queryUnitPriceUsd <= 0) {
+    return undefined;
+  }
+
+  const scenario =
+    providerId === 'aws'
+      ? {
+          label: 'Redshift reserved RA3 floor',
+          monthlyCostUsd: 1080,
+        }
+      : providerId === 'azure'
+        ? {
+            label: 'Synapse committed SQL pool floor',
+            monthlyCostUsd: 1051.2,
+          }
+        : {
+            label: 'BigQuery 100-slot commitment floor',
+            monthlyCostUsd: 2920,
+          };
+
+  return {
+    ...scenario,
+    breakEvenTb: scenario.monthlyCostUsd / queryUnitPriceUsd,
+  };
 }
 
 function analyticsServicesAssumptions(
