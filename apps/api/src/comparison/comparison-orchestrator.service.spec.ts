@@ -1191,6 +1191,14 @@ describe('ComparisonOrchestratorService', () => {
           baseMonthlyCostUsd: 15,
         }),
         expect.objectContaining({
+          costComponent: 'egress',
+          skuId: 'modeled-cdn-break-even-evidence',
+          description: expect.stringContaining(
+            'AWS CDN break-even evidence (CDN adds $12.00/mo: direct egress $90.00/mo vs CDN $102.00/mo; break-even 5000 GB at 80% cache hit and 20M requests)',
+          ),
+          baseMonthlyCostUsd: 0,
+        }),
+        expect.objectContaining({
           costComponent: 'networking',
           skuId: 'modeled-nat-gateway',
           baseMonthlyCostUsd: 55.35,

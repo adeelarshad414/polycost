@@ -1110,6 +1110,11 @@ export class ComparisonOrchestratorService {
       const viewerTrafficGb = network.cdnTrafficGb ?? 0;
       const originMissGb = viewerTrafficGb * ((100 - cacheHitRatio) / 100);
       const edgeRequestsMillion = network.cdnRequestsMillion ?? 0;
+      const cdnDeliveryMonthlyCostUsd = this.roundCurrency(
+        viewerTrafficGb * rates.cdnViewerPerGb +
+          originMissGb * rates.cdnOriginPerGb +
+          edgeRequestsMillion * rates.cdnRequestPerMillion,
+      );
 
       if (viewerTrafficGb > 0) {
         lineItems.push(
@@ -1160,6 +1165,20 @@ export class ComparisonOrchestratorService {
             costComponent: 'networking',
           }),
         );
+      }
+
+      const breakEvenLineItem = this.cdnBreakEvenLineItem({
+        providerId,
+        regionLabel,
+        viewerTrafficGb,
+        edgeRequestsMillion,
+        cacheHitRatio,
+        rates,
+        cdnDeliveryMonthlyCostUsd,
+      });
+
+      if (breakEvenLineItem) {
+        lineItems.push(breakEvenLineItem);
       }
     }
 
@@ -1336,6 +1355,63 @@ export class ComparisonOrchestratorService {
     }
 
     return lineItems;
+  }
+
+  private cdnBreakEvenLineItem(input: {
+    providerId: ProviderId;
+    regionLabel: string;
+    viewerTrafficGb: number;
+    edgeRequestsMillion: number;
+    cacheHitRatio: number;
+    rates: NetworkDimensionRates;
+    cdnDeliveryMonthlyCostUsd: number;
+  }): ComparisonLineItem | undefined {
+    if (input.viewerTrafficGb <= 0) {
+      return undefined;
+    }
+
+    const directRate = directInternetEgressPlanningRate(input.providerId);
+    const originMissRatio = (100 - input.cacheHitRatio) / 100;
+    const cdnVariableRate =
+      input.rates.cdnViewerPerGb + originMissRatio * input.rates.cdnOriginPerGb;
+    const requestMonthlyCostUsd = this.roundCurrency(
+      input.edgeRequestsMillion * input.rates.cdnRequestPerMillion,
+    );
+    const directMonthlyCostUsd = this.roundCurrency(input.viewerTrafficGb * directRate);
+    const deltaUsd = this.roundCurrency(directMonthlyCostUsd - input.cdnDeliveryMonthlyCostUsd);
+    const variableRateAdvantage = directRate - cdnVariableRate;
+    const breakEvenGb =
+      variableRateAdvantage > 0
+        ? requestMonthlyCostUsd > 0
+          ? requestMonthlyCostUsd / variableRateAdvantage
+          : 0
+        : undefined;
+    const breakEvenLabel =
+      breakEvenGb === undefined
+        ? 'no GB break-even at current CDN variable rate'
+        : breakEvenGb === 0
+          ? 'break-even is immediate without request cost'
+          : `break-even ${Math.ceil(this.roundCurrency(breakEvenGb))} GB`;
+    const outcome =
+      deltaUsd >= 0
+        ? `CDN saves $${deltaUsd.toFixed(2)}/mo`
+        : `CDN adds $${Math.abs(deltaUsd).toFixed(2)}/mo`;
+
+    return this.networkLineItem({
+      providerId: input.providerId,
+      regionLabel: input.regionLabel,
+      skuId: 'modeled-cdn-break-even-evidence',
+      description: `${providerLabel(
+        input.providerId,
+      )} CDN break-even evidence (${outcome}: direct egress $${directMonthlyCostUsd.toFixed(
+        2,
+      )}/mo vs CDN $${input.cdnDeliveryMonthlyCostUsd.toFixed(2)}/mo; ${breakEvenLabel} at ${Math.round(
+        input.cacheHitRatio,
+      )}% cache hit and ${this.roundCurrency(input.edgeRequestsMillion)}M requests)`,
+      quantity: 0,
+      unit: 'analysis',
+      unitPriceUsd: 0,
+    });
   }
 
   private networkLineItem(input: {
@@ -4465,6 +4541,17 @@ function networkDimensionRates(providerId: ProviderId): NetworkDimensionRates {
         privateCircuitPortHourly: 2.428,
         privateCircuitDataTransferPerGb: 0.02,
       };
+  }
+}
+
+function directInternetEgressPlanningRate(providerId: ProviderId): number {
+  switch (providerId) {
+    case 'aws':
+      return 0.09;
+    case 'azure':
+      return 0.087;
+    case 'gcp':
+      return 0.12;
   }
 }
 
