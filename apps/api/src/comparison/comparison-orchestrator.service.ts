@@ -117,6 +117,11 @@ interface DatabaseDimensionRates {
   searchQueryPerMillion: number;
 }
 
+interface NoSqlProvisionedCapacityScenario {
+  label: string;
+  monthlyCostUsd: number;
+}
+
 interface SupportingServicesRates {
   metricPerMillion: number;
   logIngestPerGb: number;
@@ -2043,6 +2048,18 @@ export class ComparisonOrchestratorService {
         );
       }
 
+      const noSqlProvisionedEvidenceLineItem = this.noSqlProvisionedCapacityEvidenceLineItem({
+        providerId,
+        regionLabel,
+        role,
+        database,
+        rates,
+      });
+
+      if (noSqlProvisionedEvidenceLineItem) {
+        modeledLineItems.push(noSqlProvisionedEvidenceLineItem);
+      }
+
       if (
         database.ruPerSecond !== undefined &&
         database.ruPerSecond > 0 &&
@@ -2165,6 +2182,67 @@ export class ComparisonOrchestratorService {
     }
 
     return modeledLineItems;
+  }
+
+  private noSqlProvisionedCapacityEvidenceLineItem(input: {
+    providerId: ProviderId;
+    regionLabel: string;
+    role: string;
+    database: NormalizedWorkloadSpec['database'][number];
+    rates: DatabaseDimensionRates;
+  }): ComparisonLineItem | undefined {
+    const readsMillion = input.database.nosqlReadRequestUnitsMillion ?? 0;
+    const writesMillion = input.database.nosqlWriteRequestUnitsMillion ?? 0;
+
+    if (readsMillion <= 0 && writesMillion <= 0) {
+      return undefined;
+    }
+
+    const onDemandMonthlyCostUsd = this.roundCurrency(
+      readsMillion * input.rates.nosqlReadPerMillion +
+        writesMillion * input.rates.nosqlWritePerMillion,
+    );
+
+    if (onDemandMonthlyCostUsd <= 0) {
+      return undefined;
+    }
+
+    const secondsPerMonth = HOURS_PER_MONTH * 3600;
+    const readUnitsPerSecond = (readsMillion * 1_000_000) / secondsPerMonth;
+    const writeUnitsPerSecond = (writesMillion * 1_000_000) / secondsPerMonth;
+    const provisionedScenario = noSqlProvisionedCapacityScenario({
+      providerId: input.providerId,
+      rates: input.rates,
+      readUnitsPerSecond,
+      writeUnitsPerSecond,
+      configuredRuPerSecond: input.database.ruPerSecond,
+    });
+
+    if (!provisionedScenario) {
+      return undefined;
+    }
+
+    const deltaUsd = this.roundCurrency(
+      onDemandMonthlyCostUsd - provisionedScenario.monthlyCostUsd,
+    );
+    const outcome =
+      deltaUsd >= 0
+        ? `provisioned saves $${deltaUsd.toFixed(2)}/mo`
+        : `on-demand saves $${Math.abs(deltaUsd).toFixed(2)}/mo`;
+
+    return this.databaseLineItem({
+      providerId: input.providerId,
+      regionLabel: input.regionLabel,
+      skuId: 'modeled-database-nosql-provisioned-evidence',
+      description: `${providerLabel(input.providerId)} ${
+        input.role
+      } NoSQL provisioned-capacity evidence (${provisionedScenario.label} = $${provisionedScenario.monthlyCostUsd.toFixed(
+        2,
+      )}/mo vs on-demand $${onDemandMonthlyCostUsd.toFixed(2)}/mo; ${outcome} at steady traffic)`,
+      monthlyCostUsd: 0,
+      unit: 'analysis',
+      unitPriceUsd: 0,
+    });
   }
 
   private databaseLineItem(input: {
@@ -3983,6 +4061,54 @@ function databaseDimensionRates(providerId: ProviderId): DatabaseDimensionRates 
         searchQueryPerMillion: 1500,
       };
   }
+}
+
+function noSqlProvisionedCapacityScenario(input: {
+  providerId: ProviderId;
+  rates: DatabaseDimensionRates;
+  readUnitsPerSecond: number;
+  writeUnitsPerSecond: number;
+  configuredRuPerSecond?: number;
+}): NoSqlProvisionedCapacityScenario | undefined {
+  switch (input.providerId) {
+    case 'aws': {
+      const monthlyCostUsd = roundModeledCurrency(
+        (input.readUnitsPerSecond * 0.00013 + input.writeUnitsPerSecond * 0.00065) *
+          HOURS_PER_MONTH,
+      );
+
+      return {
+        label: `DynamoDB provisioned capacity (${roundModeledCurrency(
+          input.readUnitsPerSecond,
+        )} RCU / ${roundModeledCurrency(input.writeUnitsPerSecond)} WCU average)`,
+        monthlyCostUsd,
+      };
+    }
+    case 'azure':
+    case 'gcp': {
+      const ruPerSecond =
+        input.configuredRuPerSecond ??
+        Math.ceil(input.readUnitsPerSecond + input.writeUnitsPerSecond * 5);
+
+      if (ruPerSecond <= 0 || input.rates.ruPerSecondMonth <= 0) {
+        return undefined;
+      }
+
+      const providerTerm =
+        input.providerId === 'azure'
+          ? 'Cosmos DB provisioned RU/s'
+          : 'GCP provisioned-throughput proxy';
+
+      return {
+        label: `${providerTerm} (${ruPerSecond} RU/s equivalent)`,
+        monthlyCostUsd: roundModeledCurrency(ruPerSecond * input.rates.ruPerSecondMonth),
+      };
+    }
+  }
+}
+
+function roundModeledCurrency(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 function sqlServerLicenseRate(providerId: ProviderId): number {

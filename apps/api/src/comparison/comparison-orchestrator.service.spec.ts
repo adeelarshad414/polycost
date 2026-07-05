@@ -1447,6 +1447,13 @@ describe('ComparisonOrchestratorService', () => {
           baseMonthlyCostUsd: 25,
         }),
         expect.objectContaining({
+          skuId: 'modeled-database-nosql-provisioned-evidence',
+          description: expect.stringContaining(
+            'AWS primary NoSQL provisioned-capacity evidence (DynamoDB provisioned capacity (19.03 RCU / 7.61 WCU average) = $5.42/mo vs on-demand $37.50/mo; provisioned saves $32.08/mo at steady traffic)',
+          ),
+          baseMonthlyCostUsd: 0,
+        }),
+        expect.objectContaining({
           skuId: 'modeled-database-ru-capacity',
           baseMonthlyCostUsd: 32,
         }),
