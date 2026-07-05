@@ -1292,6 +1292,13 @@ describe('ComparisonOrchestratorService', () => {
           objectCountThousand: 4000,
         },
         {
+          role: 'shared-files',
+          type: 'file',
+          sizeGb: 300,
+          accessPattern: 'infrequent',
+          storageClass: 'infrequent-access',
+        },
+        {
           role: 'cluster-disk',
           type: 'block',
           sizeGb: 100,
@@ -1324,6 +1331,13 @@ describe('ComparisonOrchestratorService', () => {
         expect.objectContaining({
           skuId: 'modeled-storage-intelligent-tiering-monitoring',
           baseMonthlyCostUsd: 10,
+        }),
+        expect.objectContaining({
+          skuId: 'modeled-storage-file-service-evidence',
+          description: expect.stringContaining(
+            'AWS shared-files file storage evidence (Amazon EFS Standard/IA with bursting, elastic, or provisioned throughput; 300 GB infrequent access, throughput and replication mode must be validated for the final SKU)',
+          ),
+          baseMonthlyCostUsd: 0,
         }),
         expect.objectContaining({
           skuId: 'modeled-storage-minimum-duration',

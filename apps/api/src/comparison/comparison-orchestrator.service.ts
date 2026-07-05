@@ -1554,6 +1554,18 @@ export class ComparisonOrchestratorService {
         storage.storageClass ?? storageClassFromAccessPattern(storage.accessPattern);
       const role = storage.role;
 
+      if (storage.type === 'file') {
+        lineItems.push(
+          this.storageFileServiceEvidenceLineItem({
+            providerId,
+            regionLabel,
+            role,
+            storage,
+            storageClass,
+          }),
+        );
+      }
+
       const requestDimensions: Array<{
         quantity: number | undefined;
         rate: number;
@@ -1801,6 +1813,26 @@ export class ComparisonOrchestratorService {
     }
 
     return lineItems;
+  }
+
+  private storageFileServiceEvidenceLineItem(input: {
+    providerId: ProviderId;
+    regionLabel: string;
+    role: string;
+    storage: NormalizedWorkloadSpec['storage'][number];
+    storageClass: StorageClassKey;
+  }): ComparisonLineItem {
+    return this.storageLineItem({
+      providerId: input.providerId,
+      regionLabel: input.regionLabel,
+      skuId: 'modeled-storage-file-service-evidence',
+      description: `${providerLabel(input.providerId)} ${input.role} file storage evidence (${providerFileStorageLabel(
+        input.providerId,
+      )}; ${input.storage.sizeGb} GB ${storageClassLabel(input.storageClass)}, throughput and replication mode must be validated for the final SKU)`,
+      quantity: 0,
+      unit: 'analysis',
+      unitPriceUsd: 0,
+    });
   }
 
   private storageLifecycleSavingsLineItem(input: {
@@ -3953,6 +3985,17 @@ function storageClassLabel(storageClass: StorageClassKey): string {
       return 'premium';
     case 'ultra':
       return 'ultra';
+  }
+}
+
+function providerFileStorageLabel(providerId: ProviderId): string {
+  switch (providerId) {
+    case 'aws':
+      return 'Amazon EFS Standard/IA with bursting, elastic, or provisioned throughput';
+    case 'azure':
+      return 'Azure Files Standard/Premium with LRS/ZRS/GRS redundancy choices';
+    case 'gcp':
+      return 'Cloud Filestore Basic/Enterprise with tier-specific throughput';
   }
 }
 
