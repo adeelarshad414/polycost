@@ -159,6 +159,7 @@ export interface LlmClassifierClient {
     diagramNodeId?: string;
     stencilId?: string;
   }): Promise<DiagramNodeClassification | undefined> | DiagramNodeClassification | undefined;
+  lastFailureReason?(): string | undefined;
 }
 
 export interface DiagramImportRecordInput {

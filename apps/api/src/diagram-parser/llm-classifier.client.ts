@@ -108,10 +108,16 @@ export class StubLlmClassifierClient implements LlmClassifierClient {
   classify(): DiagramNodeClassification | undefined {
     return undefined;
   }
+
+  lastFailureReason(): string {
+    return 'Tier 3 LLM classifier not configured';
+  }
 }
 
 @Injectable()
 export class OpenAiCompatibleDiagramLlmClassifierClient implements LlmClassifierClient {
+  private lastFailureReasonValue: string | undefined;
+
   constructor(
     private readonly configService: ConfigService<AppConfig, true>,
     private readonly secretsReader: SecretsReader,
@@ -123,10 +129,12 @@ export class OpenAiCompatibleDiagramLlmClassifierClient implements LlmClassifier
     diagramNodeId?: string;
     stencilId?: string;
   }): Promise<DiagramNodeClassification | undefined> {
+    this.lastFailureReasonValue = undefined;
     const endpoint = this.configService.get('DIAGRAM_LLM_CLASSIFIER_ENDPOINT', { infer: true });
     const model = this.configService.get('DIAGRAM_LLM_CLASSIFIER_MODEL', { infer: true });
 
     if (!endpoint || !model) {
+      this.lastFailureReasonValue = 'Tier 3 LLM classifier not configured';
       return undefined;
     }
 
@@ -149,6 +157,7 @@ export class OpenAiCompatibleDiagramLlmClassifierClient implements LlmClassifier
         }
 
         if (!response.ok) {
+          this.lastFailureReasonValue = `Tier 3 LLM classifier returned HTTP ${response.status}`;
           return undefined;
         }
 
@@ -156,16 +165,27 @@ export class OpenAiCompatibleDiagramLlmClassifierClient implements LlmClassifier
         const content = body.choices?.[0]?.message?.content;
 
         if (!content) {
+          this.lastFailureReasonValue = 'Tier 3 LLM classifier returned no content';
           return undefined;
         }
 
-        return classificationFromOutput(content, input.diagramNodeId);
+        const classification = classificationFromOutput(content, input.diagramNodeId);
+        if (!classification) {
+          this.lastFailureReasonValue = 'Tier 3 LLM classifier returned no usable classification';
+        }
+
+        return classification;
       }
     } catch {
+      this.lastFailureReasonValue = 'Tier 3 LLM classifier request failed or timed out';
       return undefined;
     }
 
     return undefined;
+  }
+
+  lastFailureReason(): string | undefined {
+    return this.lastFailureReasonValue;
   }
 }
 

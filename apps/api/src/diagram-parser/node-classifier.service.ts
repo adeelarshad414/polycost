@@ -67,10 +67,14 @@ export class NodeClassifierService {
       return llmMatch;
     }
 
+    const llmFailureReason = this.llmClassifierClient.lastFailureReason?.();
+
     return {
       id: node.id,
       displayLabel,
-      reason: 'no service alias matched; classify before pricing',
+      reason: llmFailureReason
+        ? `no service alias matched; ${llmFailureReason}`
+        : 'no service alias matched; classify before pricing',
       sourceRef: node.sourceRef,
     };
   }

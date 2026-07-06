@@ -113,6 +113,7 @@ describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
         }),
       ]),
     });
+    expect(client.lastFailureReason()).toBeUndefined();
   });
 
   it('does not fetch secrets when classifier endpoint or model config is missing', async () => {
@@ -125,6 +126,7 @@ describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
     );
 
     await expect(client.classify({ displayLabel: 'Unknown service' })).resolves.toBeUndefined();
+    expect(client.lastFailureReason()).toBe('Tier 3 LLM classifier not configured');
     expect(secrets.getSecret).not.toHaveBeenCalled();
     expect(fetchClient).not.toHaveBeenCalled();
   });
@@ -146,6 +148,9 @@ describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
     );
 
     await expect(client.classify({ displayLabel: 'Mystery tier' })).resolves.toBeUndefined();
+    expect(client.lastFailureReason()).toBe(
+      'Tier 3 LLM classifier returned no usable classification',
+    );
   });
 
   it('retries transient provider failures and keeps graceful fallback semantics', async () => {
@@ -210,5 +215,6 @@ describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
     );
 
     await expect(client.classify({ displayLabel: 'Mystery service' })).resolves.toBeUndefined();
+    expect(client.lastFailureReason()).toBe('Tier 3 LLM classifier request failed or timed out');
   });
 });

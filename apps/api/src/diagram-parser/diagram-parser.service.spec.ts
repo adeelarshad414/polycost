@@ -296,6 +296,29 @@ describe('DiagramParserService', () => {
     });
   });
 
+  it('surfaces Tier 3 LLM fallback diagnostics on unresolved review rows', async () => {
+    const llmClient: LlmClassifierClient = {
+      classify: jest.fn(async () => undefined),
+      lastFailureReason: jest.fn(() => 'Tier 3 LLM classifier request failed or timed out'),
+    };
+
+    const parsed = await service(llmClient).parse({
+      content: 'graph TD\n  A[Mystery foobar node]',
+      fileName: 'custom.mmd',
+      inputFormat: 'mermaid',
+    });
+
+    expect(parsed.review.unresolvedClassifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          displayLabel: 'Mystery foobar node',
+          reason: 'no service alias matched; Tier 3 LLM classifier request failed or timed out',
+        }),
+      ]),
+    );
+    expect(parsed.fieldsRequiringReview).toContain('diagram.nodes.A.classification');
+  });
+
   it('caps oversized diagrams at 200 parsed nodes with a review warning', async () => {
     const content = [
       'graph TD',

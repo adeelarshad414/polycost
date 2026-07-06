@@ -49,6 +49,26 @@ say so explicitly rather than marking it done.
 | Phase 2.8G - Catalog lineage readback hardening        | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8H - Pricing honesty UI labeling               | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8I - AWS ETL network SKU hardening             | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8J - Diagram LLM fallback diagnostics          | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8J - Diagram LLM fallback diagnostics
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Added optional Tier 3 LLM classifier diagnostics so unresolved review rows can
+  explain whether the classifier was unconfigured, returned malformed/no content, or
+  failed/timed out.
+- The default stub classifier now reports `Tier 3 LLM classifier not configured`,
+  preserving credential-free local behavior while making the fallback explicit.
+- Added parser-level coverage proving unresolved diagram nodes carry the LLM fallback
+  reason into `review.unresolvedClassifications`.
+- Verification evidence in this continuation:
+  - Focused diagram parser and LLM classifier specs passed: 2 suites / 25 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this hardens fallback transparency, but full visual VSDX
+  rendering and a production prompt/classifier evaluation corpus remain future work.
 
 ## Phase 2.8I - AWS ETL network SKU hardening
 
