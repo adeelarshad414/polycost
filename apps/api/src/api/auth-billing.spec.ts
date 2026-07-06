@@ -4,7 +4,7 @@ import { AppConfig } from '../config/config.schema';
 import { ApiForbiddenError, ApiUnauthorizedError } from './api-errors';
 import { ApiDatabaseRepository, LocalAccountWithPassword } from './api-database.repository';
 import { AuthService } from './auth.service';
-import { AuthIdentity } from './auth.types';
+import { AuthIdentity, TeamRole } from './auth.types';
 import { BillingService } from './billing.service';
 import { hashPassword } from './password-hash';
 
@@ -596,49 +596,177 @@ describe('AuthService', () => {
     );
   });
 
-  it.each(['member'] as const)(
-    'returns structured forbidden errors when %s tries team-admin actions',
-    async (role) => {
-      const repository = repositoryMock();
-      repository.getTeamMembership.mockResolvedValue({
-        teamId: account.defaultTeam!.teamId,
-        teamName: account.defaultTeam!.teamName,
-        role,
-      });
-      const service = new AuthService(repository as never, configService());
-      const limitedIdentity: AuthIdentity = {
-        ...identity,
-        role,
-      };
+  it('enforces the team RBAC matrix for member, admin, and owner actions', async () => {
+    const repository = repositoryMock();
+    repository.listTeamMembers.mockResolvedValue([
+      {
+        accountId: account.accountId,
+        email: account.email,
+        displayName: account.displayName,
+        role: 'owner',
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+      {
+        accountId: '99999999-9999-4999-8999-999999999999',
+        email: 'member@example.com',
+        role: 'member',
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+    ]);
+    repository.updateTeamSettings.mockImplementation(async (input) => ({
+      teamId: input.teamId,
+      teamName: input.teamName,
+      plan: 'oss',
+      role: 'admin',
+      updatedAt: '2026-07-06T00:00:00.000Z',
+    }));
+    repository.createTeamInvitation.mockImplementation(async (input) => ({
+      id: '88888888-8888-4888-8888-888888888888',
+      teamId: input.teamId,
+      email: input.email,
+      role: input.role,
+      status: 'pending',
+      invitedByAccountId: input.invitedByAccountId,
+      expiresAt: input.expiresAt,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    }));
+    repository.revokeTeamInvitation.mockResolvedValue({
+      id: '88888888-8888-4888-8888-888888888888',
+      teamId: account.defaultTeam!.teamId,
+      email: 'finops@example.com',
+      role: 'member',
+      status: 'revoked',
+      invitedByAccountId: account.accountId,
+      expiresAt: '2026-07-13T00:00:00.000Z',
+      createdAt: '2026-07-06T00:00:00.000Z',
+      revokedAt: '2026-07-06T00:05:00.000Z',
+    });
+    repository.upsertSsoProviderConfig.mockResolvedValue({
+      providerType: 'oidc',
+      displayName: 'Corporate OIDC',
+      issuerUrl: 'https://idp.example.com',
+      status: 'configured',
+    });
+    repository.getTeamMembership.mockImplementation(async ({ accountId }) => ({
+      teamId: account.defaultTeam!.teamId,
+      teamName: account.defaultTeam!.teamName,
+      role: accountId === account.accountId ? 'owner' : 'member',
+    }));
+    repository.updateTeamMemberRole.mockImplementation(async (input) => ({
+      accountId: input.accountId,
+      email: 'member@example.com',
+      role: input.role,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    }));
+    repository.removeTeamMember.mockResolvedValue(true);
+    repository.countTeamOwners.mockResolvedValue(2);
+    const service = new AuthService(repository as never, configService());
+    const memberIdentity = identityWithRole('member');
+    const adminIdentity = identityWithRole('admin');
+    const ownerIdentity = identityWithRole('owner');
 
-      await expect(
-        service.listTeamMembers(account.defaultTeam!.teamId, limitedIdentity),
-      ).rejects.toThrow(ApiForbiddenError);
-      await expect(
-        service.inviteTeamMember(
-          account.defaultTeam!.teamId,
-          {
-            email: 'new@example.com',
-            role: 'member',
-          },
-          limitedIdentity,
-        ),
-      ).rejects.toThrow(ApiForbiddenError);
-      await expect(
-        service.updateTeamMemberRole(
-          account.defaultTeam!.teamId,
-          account.accountId,
-          {
-            role: 'admin',
-          },
-          limitedIdentity,
-        ),
-      ).rejects.toThrow(ApiForbiddenError);
-      await expect(
-        service.removeTeamMember(account.defaultTeam!.teamId, account.accountId, limitedIdentity),
-      ).rejects.toThrow(ApiForbiddenError);
-    },
-  );
+    await expectForbidden(
+      service.updateTeamSettings(
+        account.defaultTeam!.teamId,
+        { teamName: 'Member edit' },
+        memberIdentity,
+      ),
+      'Team admin access is required',
+    );
+    await expectForbidden(
+      service.listTeamMembers(account.defaultTeam!.teamId, memberIdentity),
+      'Team admin access is required',
+    );
+    await expectForbidden(
+      service.inviteTeamMember(
+        account.defaultTeam!.teamId,
+        { email: 'new@example.com', role: 'member' },
+        memberIdentity,
+      ),
+      'Team admin access is required',
+    );
+    await expectForbidden(
+      service.configureSsoProvider(
+        account.defaultTeam!.teamId,
+        {
+          providerType: 'oidc',
+          displayName: 'Corporate OIDC',
+          issuerUrl: 'https://idp.example.com',
+        },
+        memberIdentity,
+      ),
+      'Team admin access is required',
+    );
+
+    await expect(
+      service.updateTeamSettings(
+        account.defaultTeam!.teamId,
+        { teamName: 'Admin edit' },
+        adminIdentity,
+      ),
+    ).resolves.toMatchObject({ teamName: 'Admin edit' });
+    await expect(
+      service.listTeamMembers(account.defaultTeam!.teamId, adminIdentity),
+    ).resolves.toHaveLength(2);
+    await expect(
+      service.inviteTeamMember(
+        account.defaultTeam!.teamId,
+        { email: 'new@example.com', role: 'member' },
+        adminIdentity,
+      ),
+    ).resolves.toMatchObject({ email: 'new@example.com', role: 'member' });
+    await expect(
+      service.revokeTeamInvitation(
+        account.defaultTeam!.teamId,
+        '88888888-8888-4888-8888-888888888888',
+        adminIdentity,
+      ),
+    ).resolves.toMatchObject({ status: 'revoked' });
+    await expect(
+      service.testSsoConnection(
+        account.defaultTeam!.teamId,
+        {
+          providerType: 'oidc',
+          displayName: 'Corporate OIDC',
+          issuerUrl: 'https://idp.example.com',
+        },
+        adminIdentity,
+      ),
+    ).resolves.toMatchObject({ ok: true });
+    await expect(
+      service.removeTeamMember(
+        account.defaultTeam!.teamId,
+        '99999999-9999-4999-8999-999999999999',
+        adminIdentity,
+      ),
+    ).resolves.toEqual({ removed: true });
+
+    await expectForbidden(
+      service.updateTeamMemberRole(
+        account.defaultTeam!.teamId,
+        '99999999-9999-4999-8999-999999999999',
+        { role: 'admin' },
+        adminIdentity,
+      ),
+      'Team owner access is required',
+    );
+    await expectForbidden(
+      service.removeTeamMember(account.defaultTeam!.teamId, account.accountId, adminIdentity),
+      'Only team owners can remove owners',
+    );
+
+    await expect(
+      service.updateTeamMemberRole(
+        account.defaultTeam!.teamId,
+        '99999999-9999-4999-8999-999999999999',
+        { role: 'admin' },
+        ownerIdentity,
+      ),
+    ).resolves.toMatchObject({ role: 'admin' });
+    await expect(
+      service.removeTeamMember(account.defaultTeam!.teamId, account.accountId, ownerIdentity),
+    ).resolves.toEqual({ removed: true });
+  });
 });
 
 describe('BillingService', () => {
@@ -909,6 +1037,18 @@ function repositoryMock() {
     saveInvoiceReconciliation: jest.fn(),
     listInvoiceReconciliations: jest.fn(),
   } as unknown as jest.Mocked<ApiDatabaseRepository>;
+}
+
+function identityWithRole(role: TeamRole): AuthIdentity {
+  return {
+    ...identity,
+    role,
+  };
+}
+
+async function expectForbidden(promise: Promise<unknown>, message: string): Promise<void> {
+  await expect(promise).rejects.toThrow(ApiForbiddenError);
+  await expect(promise).rejects.toThrow(message);
 }
 
 function configService(): ConfigService<AppConfig, true> {

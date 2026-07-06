@@ -53,6 +53,26 @@ say so explicitly rather than marking it done.
 | Phase 2.8K - Auth RBAC UI enforcement polish           | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8L - Release hygiene evidence polish           | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8M - Session policy documentation              | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8N - API RBAC matrix hardening                 | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8N - API RBAC matrix hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Replaced the narrow member-only authorization check with an explicit
+  Owner/Admin/Member RBAC matrix in `auth-billing.spec.ts`.
+- The matrix now proves members are blocked from team-admin actions, admins can
+  update settings/list members/invite/revoke invites/test SSO/remove non-owner
+  members, admins cannot change roles or remove owners, and owners can perform
+  owner-only role changes/removals while the final-owner guard remains covered by
+  the existing dedicated test.
+- Verification evidence in this continuation:
+  - Focused auth/billing spec passed: 17 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this strengthens API-layer RBAC proof, but the broader
+  hosted enterprise auth product surface remains future work.
 
 ## Phase 2.8M - Session policy documentation
 
