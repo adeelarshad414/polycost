@@ -8,10 +8,7 @@ interface AppErrorBoundaryState {
   hasError: boolean;
 }
 
-export class AppErrorBoundary extends Component<
-  AppErrorBoundaryProps,
-  AppErrorBoundaryState
-> {
+export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorBoundaryState> {
   state: AppErrorBoundaryState = {
     hasError: false,
   };
@@ -33,11 +30,7 @@ export class AppErrorBoundary extends Component<
 
     return (
       <main className="app-shell">
-        <section
-          className="app-fatal-state"
-          role="alert"
-          aria-labelledby="app-fatal-state-title"
-        >
+        <section className="app-fatal-state" role="alert" aria-labelledby="app-fatal-state-title">
           <span className="app-fatal-state-kicker">Workspace recovery</span>
           <h1 id="app-fatal-state-title">PolyCost could not render this workspace.</h1>
           <p>

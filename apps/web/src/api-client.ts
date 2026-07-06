@@ -413,7 +413,10 @@ async function toApiError(response: Response): Promise<PolyCostApiError> {
 
 export function formatApiError(error: unknown): string {
   if (error instanceof PolyCostApiError) {
-    const message = safeUserFacingErrorMessage(error.message, fallbackHttpErrorMessage(error.status));
+    const message = safeUserFacingErrorMessage(
+      error.message,
+      fallbackHttpErrorMessage(error.status),
+    );
     const details = error.details
       .map((detail) => safeUserFacingErrorMessage(detail.issue, ''))
       .filter(Boolean)

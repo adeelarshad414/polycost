@@ -47,7 +47,10 @@ for migration in \
   015_seed_accelerated_compute_pricing_catalog.sql \
   016_pricing_cache_sync_status.sql \
   017_seed_burstable_compute_catalog.sql \
-  018_pricing_rates_active_uniqueness.sql
+  018_pricing_rates_active_uniqueness.sql \
+  019_comparison_audit_rate_evidence.sql \
+  020_pricing_rates_estimate_only_guard.sql \
+  021_seed_distinct_payment_option_rates.sql
 do
   psql \
     --username "$POSTGRES_USER" \

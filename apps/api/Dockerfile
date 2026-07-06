@@ -21,6 +21,7 @@ COPY package.json package-lock.json* ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/types/package.json packages/types/package.json
+COPY packages/types packages/types
 RUN npm ci --omit=dev --workspace @polycost/api --include-workspace-root=false
 
 COPY --from=build /app/apps/api/dist apps/api/dist

@@ -804,6 +804,56 @@ describe('BaseCloudProviderAdapter', () => {
     );
   });
 
+  it('falls back to default-region compute when requested-region rows do not fit', async () => {
+    const adapter = new TestProviderAdapter(
+      new InMemoryPricingCatalogReader([
+        {
+          ...catalog[0],
+          region: 'partial-region',
+        },
+        {
+          ...catalog[1],
+          region: 'fallback-region',
+        },
+      ]),
+      'fallback-region',
+    );
+
+    const result = await adapter.priceWorkload({
+      ...fullWorkload,
+      workload: {
+        type: 'web_app',
+        region: {
+          preference: 'partial-region',
+          isDefault: false,
+        },
+      },
+      storage: [],
+      database: [],
+      network: {
+        cdn: false,
+        loadBalancer: false,
+      },
+      compute: [
+        {
+          role: 'web',
+          scalingType: 'fixed',
+          instanceCount: 1,
+          vcpu: 2,
+          memoryGb: 4,
+        },
+      ],
+    });
+
+    expect(result.lineItems[0]).toEqual(
+      expect.objectContaining({
+        skuId: 'COMPUTE-RIGHT',
+        region: 'partial-region',
+        isApproximate: true,
+      }),
+    );
+  });
+
   it('fails clearly when no matching catalog record exists', async () => {
     const adapter = new TestProviderAdapter(new InMemoryPricingCatalogReader([]), 'test-region');
 

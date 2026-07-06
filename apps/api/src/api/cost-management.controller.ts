@@ -52,6 +52,7 @@ const PRICING_TERMS: CachedPricingTerm[] = [
   'spot',
   'savings_plan',
 ];
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 @Controller('api/v1/pricing')
 export class CachedPricingController {
@@ -94,7 +95,7 @@ export class CachedPricingController {
       'RATE_LIMIT_COMPARISON_PER_MINUTE',
     );
 
-    const workloadId = parseRequiredString(query.workloadId, 'workloadId');
+    const workloadId = parseUuid(query.workloadId, 'workloadId');
     const term = parsePricingTerm(query.term);
 
     return this.costManagementService.getWorkloadCostBreakdown(workloadId, term);
@@ -195,7 +196,7 @@ export class AlertsController {
       'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
     );
 
-    return this.costManagementService.listAlerts(optionalSingleString(workloadId));
+    return this.costManagementService.listAlerts(parseOptionalUuid(workloadId, 'workloadId'));
   }
 
   @Patch(':id')
@@ -214,7 +215,10 @@ export class AlertsController {
       'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE',
     );
 
-    return this.costManagementService.updateAlertDismissed(alertId, parseDismissedUpdate(body));
+    return this.costManagementService.updateAlertDismissed(
+      parseUuid(alertId, 'id'),
+      parseDismissedUpdate(body),
+    );
   }
 }
 
@@ -397,7 +401,7 @@ function parseBudgetInput(body: unknown): BudgetInput {
   const record = requireRecord(body, 'Budget request body must be an object');
 
   return {
-    workloadId: parseRequiredString(record.workloadId, 'workloadId'),
+    workloadId: parseUuid(record.workloadId, 'workloadId'),
     thresholdUsd: parsePositiveNumber(record.thresholdUsd, 'thresholdUsd'),
     ...(record.alertOnAnomalyPercent !== undefined
       ? {
@@ -414,7 +418,7 @@ function parseShareLinkInput(body: unknown): ShareLinkInput {
   const record = requireRecord(body, 'Share-link request body must be an object');
 
   return {
-    workloadId: parseRequiredString(record.workloadId, 'workloadId'),
+    workloadId: parseUuid(record.workloadId, 'workloadId'),
     watermark: typeof record.watermark === 'boolean' ? record.watermark : true,
     expiresInDays: parsePositiveNumber(record.expiresInDays, 'expiresInDays', true),
     pricingModel: parseSharePricingModel(record.pricingModel ?? 'on-demand'),
@@ -699,6 +703,31 @@ function parseRequiredString(value: unknown, field: string): string {
   }
 
   return parsed;
+}
+
+function parseUuid(value: unknown, field: string): string {
+  const parsed = parseRequiredString(value, field);
+
+  if (!UUID_PATTERN.test(parsed)) {
+    throw new ApiValidationError(`${field} must be a UUID`, [
+      {
+        field,
+        issue: 'must be a valid UUID',
+      },
+    ]);
+  }
+
+  return parsed;
+}
+
+function parseOptionalUuid(value: unknown, field: string): string | undefined {
+  const parsed = optionalSingleString(value);
+
+  if (!parsed) {
+    return undefined;
+  }
+
+  return parseUuid(parsed, field);
 }
 
 function optionalSingleString(value: unknown): string | undefined {

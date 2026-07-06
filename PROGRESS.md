@@ -959,6 +959,50 @@ controls.
   `index.html`; `npm run security:audit -- --audit-level=high` exits successfully
   while listing low/moderate tooling advisories already tracked below.
 
+## 2026-07-06 Production-readiness pass
+
+- Added `USE_MOCK_PROVIDERS=true` and `PRICING_ETL_RUN_ON_BOOT=true` as local-demo
+  defaults, with deterministic mock AWS/Azure/GCP provider adapters that seed broad
+  compute, storage, database, and tiered network pricing on API startup.
+- Fixed first-run/self-hosted backend boot gaps: API Docker runtime now includes the
+  shared `@polycost/types` package, pricing ETL startup jobs use a BullMQ-safe job ID,
+  `PricingModelsModule` no longer asks Nest to inject a raw function, and both
+  `/health/deep` and `/api/v1/health/deep` are mapped explicitly.
+- Hardened catalog persistence so normalized provider refreshes populate both
+  `pricing_catalog` and current `pricing_rates`, including reserved, savings-plan,
+  and spot-estimate rows with payment-option variants.
+- Fixed the live `/api/v1/comparisons` 500 caused by stale local DB volumes missing
+  migration `019`; applied migrations `019`-`021` to the running stack and upgraded
+  `npm run db:migrate` so it now applies pending migrations to existing volumes before
+  validating.
+- Improved provider equivalence fallback: if a cloud-specific region has partial rows
+  but no shape-compatible compute SKU, the adapter falls back to that provider's
+  default region and labels the result approximate. This restored three-way AWS,
+  Azure, and GCP comparison output for AWS-shaped region inputs.
+- Added structured server-side logging for unexpected internal API errors without
+  leaking stack traces to clients; handled validation and expected 503s remain clean
+  client responses.
+- Hardened cached-management endpoints with UUID validation for workload and alert
+  IDs, converting invalid IDs into structured `VALIDATION_ERROR` 400 responses instead
+  of Postgres 500s.
+- Updated web Playwright E2E coverage to match the current theme contract: system
+  preference is the default choice while the resolved theme follows OS media, and
+  light/dark choices persist when selected.
+- Live smoke verification on the Compose stack passed for deep health, three-provider
+  comparison, comparison retrieval, analytics, PDF/CSV/XLSX exports, pricing models,
+  workload breakdown, workloads, budgets, alerts, share links, shared reports, and
+  exchange rates.
+- Verification passing locally:
+  `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm run build`,
+  `npm run test:unit --workspace @polycost/api`, `npm run test:unit --workspace @polycost/web`,
+  `npm run test:integration`, `npm run test:e2e --workspace @polycost/api`,
+  `npm run test:e2e --workspace @polycost/web`, `npm run graphify:validate`,
+  `npm run qa`, `npm run devops:check`, `npm run cloud:check`, `npm run db:validate`,
+  `npm run security:audit`, and `npm audit --omit=dev --audit-level=moderate`.
+- Notes: `npm run build` still warns that `%VITE_API_BASE_URL%` is not defined in
+  `index.html`; lint passes with existing security-plugin warnings only; full audit
+  high/critical gate passes while production-only audit reports 0 vulnerabilities.
+
 ## Known issues / carried-forward items
 
 Running list. Add here whenever a phase completes with known gaps. Remove an item only

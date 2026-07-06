@@ -14,7 +14,10 @@ import { SpotEstimateService } from './spot-estimate.service';
   providers: [
     SecretsService,
     PricingCacheService,
-    ApiRateLimitService,
+    {
+      provide: ApiRateLimitService,
+      useFactory: () => new ApiRateLimitService(),
+    },
     PricingTermsService,
     PostgresPricingRatesRepository,
     {

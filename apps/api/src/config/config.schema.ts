@@ -1,5 +1,24 @@
 import { z } from 'zod';
 
+const envBoolean = (defaultValue: boolean) =>
+  z
+    .preprocess((value) => {
+      if (typeof value !== 'string') {
+        return value;
+      }
+
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'true') {
+        return true;
+      }
+      if (normalized === 'false') {
+        return false;
+      }
+
+      return value;
+    }, z.boolean())
+    .default(defaultValue);
+
 export const configSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'staging', 'production']),
@@ -23,6 +42,8 @@ export const configSchema = z
     PRICING_ETL_DEFAULT_REGION_AWS: z.string().default('us-east-1'),
     PRICING_ETL_DEFAULT_REGION_AZURE: z.string().default('eastus'),
     PRICING_ETL_DEFAULT_REGION_GCP: z.string().default('us-central1'),
+    USE_MOCK_PROVIDERS: envBoolean(true),
+    PRICING_ETL_RUN_ON_BOOT: envBoolean(true),
     RATE_LIMIT_COMPARISON_PER_MINUTE: z.coerce.number().int().positive().default(30),
     RATE_LIMIT_EXPORT_PER_MINUTE: z.coerce.number().int().positive().default(10),
     RATE_LIMIT_SHARE_LINK_PER_MINUTE: z.coerce.number().int().positive().default(20),
@@ -41,8 +62,8 @@ export const configSchema = z
       .default(
         'http://localhost:3000,http://localhost:3002,http://127.0.0.1:3000,http://127.0.0.1:3002',
       ),
-    FEATURE_LIVE_PRICING_REFRESH_ENABLED: z.coerce.boolean().default(true),
-    FEATURE_RESERVED_PRICING: z.coerce.boolean().default(true),
+    FEATURE_LIVE_PRICING_REFRESH_ENABLED: envBoolean(true),
+    FEATURE_RESERVED_PRICING: envBoolean(true),
   })
   .superRefine((config, context) => {
     const origins = config.CORS_ALLOWED_ORIGINS.split(',').map((origin) => origin.trim());

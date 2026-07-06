@@ -21,6 +21,7 @@ describe('normalizeInstanceFamily', () => {
     expect(normalizeInstanceFamily('gcp', 'n2-standard-4')).toBe('general-purpose');
     expect(normalizeInstanceFamily('gcp', 'c3-highcpu-8')).toBe('compute-optimized');
     expect(normalizeInstanceFamily('gcp', 'm3-megamem-64')).toBe('memory-optimized');
+    expect(normalizeInstanceFamily('gcp', 'z3-highmem-8')).toBe('storage-optimized');
   });
 
   it('returns undefined instead of guessing unknown families', () => {

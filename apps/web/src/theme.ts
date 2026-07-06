@@ -12,9 +12,7 @@ export function isThemeChoice(value: string | null): value is ThemeChoice {
   return value === 'system' || value === 'light' || value === 'dark';
 }
 
-export function storedTheme(
-  storage: Pick<Storage, 'getItem'> = localStorage,
-): ThemeChoice {
+export function storedTheme(storage: Pick<Storage, 'getItem'> = localStorage): ThemeChoice {
   const value = storage.getItem(THEME_STORAGE_KEY);
 
   if (isThemeChoice(value)) {

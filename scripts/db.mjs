@@ -24,6 +24,9 @@ const expectedMigrations = [
   '016_pricing_cache_sync_status.sql',
   '017_seed_burstable_compute_catalog.sql',
   '018_pricing_rates_active_uniqueness.sql',
+  '019_comparison_audit_rate_evidence.sql',
+  '020_pricing_rates_estimate_only_guard.sql',
+  '021_seed_distinct_payment_option_rates.sql',
 ];
 
 if (!['migrate', 'seed', 'reset', 'validate'].includes(command)) {
@@ -35,8 +38,7 @@ if (command === 'validate') {
   await validateMigrations();
   console.log('Database validation passed.');
 } else if (command === 'migrate') {
-  runDocker(['compose', 'up', '-d', 'postgres']);
-  console.log('Database service is up. Bootstrap migrations run on fresh Postgres volumes.');
+  await migrateDatabase();
 } else if (command === 'seed') {
   runDocker(['compose', 'up', '-d', 'vault', 'vault-seed']);
   console.log('Vault seed service requested. Local DB secrets are generated into Docker volumes.');
@@ -44,6 +46,29 @@ if (command === 'validate') {
   runDocker(['compose', 'down', '-v']);
   runDocker(['compose', 'up', '-d', 'postgres']);
   console.log('Database reset complete. Project Docker volumes were recreated.');
+}
+
+async function migrateDatabase() {
+  runDocker(['compose', 'up', '-d', 'postgres']);
+
+  const appliedVersions = liveMigrationVersions(await readLiveSchemaMigrations());
+  const missingMigrations = expectedMigrations.filter(
+    (migration) => !appliedVersions.has(migration.slice(0, 3)),
+  );
+
+  if (missingMigrations.length === 0) {
+    console.log('Database service is up. No pending migrations found.');
+    await validateMigrations();
+    return;
+  }
+
+  for (const migration of missingMigrations) {
+    console.log(`Applying migration ${migration}...`);
+    applyMigration(migration);
+  }
+
+  await validateMigrations();
+  console.log(`Database migrated successfully: ${missingMigrations.join(', ')}`);
 }
 
 async function validateMigrations() {
@@ -78,6 +103,19 @@ async function validateMigrations() {
     return;
   }
 
+  const schemaMigrationsOutput = await readLiveSchemaMigrations();
+  const appliedVersions = liveMigrationVersions(schemaMigrationsOutput);
+
+  const missingVersions = expectedMigrations
+    .map((migration) => migration.slice(0, 3))
+    .filter((version) => !appliedVersions.has(version));
+
+  if (missingVersions.length > 0) {
+    fail(`Live schema_migrations output is missing expected versions:\n${schemaMigrationsOutput}`);
+  }
+}
+
+async function readLiveSchemaMigrations() {
   const result = spawnSync(
     'docker',
     [
@@ -100,13 +138,50 @@ async function validateMigrations() {
     fail(`Live schema_migrations check failed:\n${result.stderr || result.stdout}`);
   }
 
-  const missingVersions = expectedMigrations
-    .map((migration) => migration.slice(0, 3))
-    .filter((version) => !result.stdout.includes(version));
+  return result.stdout;
+}
 
-  if (missingVersions.length > 0) {
-    fail(`Live schema_migrations output is missing expected versions:\n${result.stdout}`);
+function liveMigrationVersions(schemaMigrationsOutput) {
+  const versions = new Set();
+
+  for (const line of schemaMigrationsOutput.split('\n')) {
+    const match = line.match(/^\s*(\d{3})\s*\|/);
+
+    if (match) {
+      versions.add(match[1]);
+    }
   }
+
+  return versions;
+}
+
+function applyMigration(migration) {
+  if (migration === '002_least_privilege_roles.sql') {
+    runDocker([
+      'compose',
+      'exec',
+      '-T',
+      'postgres',
+      'sh',
+      '-lc',
+      'APP_DB_PASSWORD="$(cat /run/polycost-secrets/app_db_password)"; ETL_DB_PASSWORD="$(cat /run/polycost-secrets/etl_db_password)"; psql --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --set app_password="$APP_DB_PASSWORD" --set etl_password="$ETL_DB_PASSWORD" --file /polycost-migrations/002_least_privilege_roles.sql',
+    ]);
+    return;
+  }
+
+  runDocker([
+    'compose',
+    'exec',
+    '-T',
+    'postgres',
+    'psql',
+    '-U',
+    'polycost_owner',
+    '-d',
+    'polycost_dev',
+    '-f',
+    `/polycost-migrations/${migration}`,
+  ]);
 }
 
 function runDocker(args) {

@@ -14,4 +14,9 @@ export class HealthController {
   getDeepHealth() {
     return this.healthService.getDeepHealth();
   }
+
+  @Get('api/v1/health/deep')
+  getApiDeepHealth() {
+    return this.healthService.getDeepHealth();
+  }
 }

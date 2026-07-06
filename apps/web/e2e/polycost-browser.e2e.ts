@@ -6,20 +6,21 @@ import type {
   ReportExportJobResponse,
   ReportFormat,
 } from '../src/types';
-import { HOURS_PER_MONTH } from '../src/cost-time';
+
+const HOURS_PER_MONTH = 730;
 
 test('persists light and dark theme choices across reloads', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/');
 
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await expect(page.locator('html')).toHaveAttribute('data-theme-choice', 'dark');
+  await expect(page.locator('html')).toHaveAttribute('data-theme-choice', 'system');
 
-  await page.getByRole('button', { name: /switch to light mode/i }).click();
+  await page.getByRole('radio', { name: /use light theme/i }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   await expect(page.locator('html')).toHaveAttribute('data-theme-choice', 'light');
-  await expect(page.getByRole('button', { name: /switch to dark mode/i })).toHaveAttribute(
-    'aria-pressed',
+  await expect(page.getByRole('radio', { name: /use dark theme/i })).toHaveAttribute(
+    'aria-checked',
     'false',
   );
 
@@ -27,10 +28,10 @@ test('persists light and dark theme choices across reloads', async ({ page }) =>
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   await expect(page.locator('html')).toHaveAttribute('data-theme-choice', 'light');
 
-  await page.getByRole('button', { name: /switch to dark mode/i }).click();
+  await page.getByRole('radio', { name: /use dark theme/i }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await expect(page.getByRole('button', { name: /switch to light mode/i })).toHaveAttribute(
-    'aria-pressed',
+  await expect(page.getByRole('radio', { name: /use dark theme/i })).toHaveAttribute(
+    'aria-checked',
     'true',
   );
 });

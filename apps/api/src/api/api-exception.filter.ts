@@ -1,4 +1,11 @@
-import { ArgumentsHost, Catch, ExceptionFilter, HttpException, Injectable } from '@nestjs/common';
+import {
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpException,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { ComparisonUnavailableError } from '../comparison/comparison-orchestrator.service';
 import { NWSMigrationError, NWSValidationError } from '../nws/nws-validator';
 import { NWSParseInputError } from '../nws-parser/nl-parser.service';
@@ -20,12 +27,23 @@ interface ErrorResponse {
 @Catch()
 @Injectable()
 export class ApiExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(ApiExceptionFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<ErrorResponse>();
     const mapped = mapException(exception);
 
     if (mapped.retryAfterSeconds !== undefined && response.header) {
       response.header('Retry-After', mapped.retryAfterSeconds.toString());
+    }
+
+    if (mapped.code === 'INTERNAL_ERROR') {
+      this.logger.error({
+        event: 'api_unhandled_exception',
+        code: mapped.code,
+        message: mapped.message,
+        exception: serializeExceptionForLog(exception),
+      });
     }
 
     response.status(mapped.statusCode).send({
@@ -154,5 +172,24 @@ function mapException(exception: unknown): {
     code: 'INTERNAL_ERROR',
     message: 'Unexpected server error',
     details: [],
+  };
+}
+
+function serializeExceptionForLog(exception: unknown): {
+  name: string;
+  message: string;
+  stack?: string;
+} {
+  if (exception instanceof Error) {
+    return {
+      name: exception.name,
+      message: exception.message,
+      ...(exception.stack ? { stack: exception.stack } : {}),
+    };
+  }
+
+  return {
+    name: typeof exception,
+    message: String(exception),
   };
 }

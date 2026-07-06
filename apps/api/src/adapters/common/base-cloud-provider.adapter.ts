@@ -255,6 +255,17 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       return exactMatches;
     }
 
+    return this.findDefaultRegionFallbackRecords(category, region);
+  }
+
+  private async findDefaultRegionFallbackRecords(
+    category: ServiceCategory,
+    region: string,
+  ): Promise<PricingCatalogRecord[]> {
+    if (region === this.defaultRegion) {
+      return [];
+    }
+
     const fallbackMatches = await this.catalogReader.find({
       provider: this.providerId,
       category,
@@ -321,9 +332,28 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
         tenancy,
       ),
     );
+    let fallbackRecords = records;
+
+    if (candidates.length === 0 && region !== this.defaultRegion) {
+      fallbackRecords = await this.findDefaultRegionFallbackRecords('compute', region);
+      candidates = fallbackRecords.filter(
+        this.computeRecordPredicate(
+          vcpu,
+          memoryGb,
+          pricingModel,
+          instanceFamily,
+          processorArchitecture,
+          tenancy,
+        ),
+      );
+    }
+
+    if (fallbackRecords.length === 0) {
+      fallbackRecords = records;
+    }
 
     if (candidates.length === 0 && (instanceFamily || processorArchitecture || tenancy)) {
-      candidates = records
+      candidates = fallbackRecords
         .filter(this.computeRecordPredicate(vcpu, memoryGb, pricingModel))
         .map((record) => ({
           ...record,

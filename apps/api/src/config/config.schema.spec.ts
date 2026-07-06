@@ -24,6 +24,8 @@ describe('config schema', () => {
     expect(config.PRICING_ETL_DEFAULT_REGION_AWS).toBe('us-east-1');
     expect(config.PRICING_ETL_DEFAULT_REGION_AZURE).toBe('eastus');
     expect(config.PRICING_ETL_DEFAULT_REGION_GCP).toBe('us-central1');
+    expect(config.USE_MOCK_PROVIDERS).toBe(true);
+    expect(config.PRICING_ETL_RUN_ON_BOOT).toBe(true);
     expect(config.RATE_LIMIT_COMPARISON_PER_MINUTE).toBe(30);
     expect(config.RATE_LIMIT_EXPORT_PER_MINUTE).toBe(10);
     expect(config.RATE_LIMIT_SHARE_LINK_PER_MINUTE).toBe(20);
@@ -88,6 +90,19 @@ describe('config schema', () => {
     });
 
     expect(config.PRICING_SYNC_ALERT_WEBHOOK_URL).toBeUndefined();
+  });
+
+  it('allows production deployments to opt into live provider adapters and scheduled-only sync', () => {
+    const config = validateConfig({
+      ...baseConfig,
+      NODE_ENV: 'production',
+      USE_MOCK_PROVIDERS: 'false',
+      PRICING_ETL_RUN_ON_BOOT: 'false',
+      CORS_ALLOWED_ORIGINS: 'https://polycost.example.com',
+    });
+
+    expect(config.USE_MOCK_PROVIDERS).toBe(false);
+    expect(config.PRICING_ETL_RUN_ON_BOOT).toBe(false);
   });
 
   it('keeps secret-shaped values out of the schema', () => {

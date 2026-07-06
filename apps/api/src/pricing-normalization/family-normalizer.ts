@@ -50,6 +50,7 @@ const GCP_FAMILY_RULES: FamilyRule[] = [
   { prefix: 'n1', family: 'general-purpose' },
   { prefix: 'n2', family: 'general-purpose' },
   { prefix: 't2d', family: 'general-purpose' },
+  { prefix: 'z3', family: 'storage-optimized' },
 ];
 
 export function normalizeInstanceFamily(

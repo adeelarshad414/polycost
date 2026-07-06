@@ -697,6 +697,37 @@ describe('API contracts', () => {
     );
   });
 
+  it('rejects invalid cached-management UUIDs before they reach persistence', () => {
+    const service = costManagementService();
+    const pricingController = new CachedPricingController(service);
+    const budgetsController = new BudgetsController(service);
+    const alertsController = new AlertsController(service);
+    const shareLinksController = new ShareLinksController(service);
+
+    expect(() =>
+      pricingController.breakdown({
+        workloadId: 'undefined',
+        term: 'on_demand',
+      }),
+    ).toThrow(ApiValidationError);
+    expect(() =>
+      budgetsController.create({
+        workloadId: 'not-a-uuid',
+        thresholdUsd: 500,
+      }),
+    ).toThrow(ApiValidationError);
+    expect(() => alertsController.list('not-a-uuid')).toThrow(ApiValidationError);
+    expect(() => alertsController.update('not-a-uuid', { dismissed: true })).toThrow(
+      ApiValidationError,
+    );
+    expect(() =>
+      shareLinksController.create({
+        workloadId: 'not-a-uuid',
+        expiresInDays: 30,
+      }),
+    ).toThrow(ApiValidationError);
+  });
+
   it('POST /workloads persists a normalized workload config', async () => {
     const service = costManagementService();
     const controller = new WorkloadsController(service);

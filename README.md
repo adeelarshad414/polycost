@@ -143,6 +143,10 @@ npm run db:reset
 npm run db:validate
 ```
 
+`db:migrate` starts the local Postgres service, checks the live `schema_migrations`
+table, and applies any pending migration files in order. `db:validate` verifies that
+all expected migration files exist and that the running database has recorded them.
+
 Security and quality checks:
 
 ```bash
@@ -162,12 +166,19 @@ Start from `.env.example`. Important local settings include:
 - `PRICING_SYNC_ALERT_WEBHOOK_URL`
 - `EXCHANGE_RATE_API_URL`
 - `EXCHANGE_RATE_TARGET_CURRENCIES`
+- `USE_MOCK_PROVIDERS`
+- `PRICING_ETL_RUN_ON_BOOT`
 - `FEATURE_LIVE_PRICING_REFRESH_ENABLED`
 - `FEATURE_RESERVED_PRICING`
 - `RATE_LIMIT_NL_PARSE_PER_MINUTE`
 - `RATE_LIMIT_LIVE_REFRESH_PER_MINUTE`
 
 Local Docker Compose runs Vault, Postgres, Redis, the API, and the web app. The development Vault token and seeded secrets are for local use only.
+
+For self-hosted demos without cloud pricing credentials, keep `USE_MOCK_PROVIDERS=true`
+and `PRICING_ETL_RUN_ON_BOOT=true`. The API will seed a deterministic AWS/Azure/GCP
+pricing catalog on startup, while real provider adapters remain available when mock
+providers are disabled.
 
 ## Documentation
 

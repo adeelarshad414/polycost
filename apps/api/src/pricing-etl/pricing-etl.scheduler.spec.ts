@@ -1,14 +1,21 @@
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema';
 import { PricingEtlService } from './pricing-etl.service';
-import { PRICING_ETL_REFRESH_JOB_NAME, PricingEtlSummary } from './pricing-etl.types';
+import {
+  PRICING_ETL_REFRESH_JOB_NAME,
+  PRICING_ETL_STARTUP_REFRESH_JOB_ID,
+  PricingEtlSummary,
+} from './pricing-etl.types';
 import { PricingEtlQueue, PricingEtlScheduler, PricingEtlWorker } from './pricing-etl.scheduler';
 
-const configService = (cron: string) =>
+const configService = (cron: string, runOnBoot = true) =>
   ({
     get: jest.fn((key: keyof AppConfig) => {
       if (key === 'PRICING_ETL_SCHEDULE_CRON') {
         return cron;
+      }
+      if (key === 'PRICING_ETL_RUN_ON_BOOT') {
+        return runOnBoot;
       }
 
       throw new Error(`Unexpected config key ${String(key)}`);
@@ -21,7 +28,7 @@ const summary: PricingEtlSummary = {
 };
 
 describe('PricingEtlScheduler', () => {
-  it('schedules the recurring BullMQ job from config and starts a worker', async () => {
+  it('schedules recurring and startup BullMQ jobs from config and starts a worker', async () => {
     const queue: PricingEtlQueue = {
       add: jest.fn(async () => undefined),
       close: jest.fn(async () => undefined),
@@ -56,11 +63,46 @@ describe('PricingEtlScheduler', () => {
         },
       }),
     );
+    expect(queue.add).toHaveBeenCalledWith(
+      PRICING_ETL_REFRESH_JOB_NAME,
+      {},
+      expect.objectContaining({
+        jobId: PRICING_ETL_STARTUP_REFRESH_JOB_ID,
+      }),
+    );
     expect(workerFactory).toHaveBeenCalledTimes(1);
     if (!capturedProcessor) {
       throw new Error('Expected the scheduler to register a worker processor');
     }
     await expect(capturedProcessor()).resolves.toBe(summary);
+  });
+
+  it('can disable startup refresh for scheduled-only deployments', async () => {
+    const queue: PricingEtlQueue = {
+      add: jest.fn(async () => undefined),
+      close: jest.fn(async () => undefined),
+    };
+    const scheduler = new PricingEtlScheduler(
+      configService('0 2 * * *', false),
+      {
+        refreshAllProviders: jest.fn(async () => summary),
+      } as unknown as PricingEtlService,
+      queue,
+      () => ({
+        close: jest.fn(async () => undefined),
+      }),
+    );
+
+    await scheduler.onModuleInit();
+
+    expect(queue.add).toHaveBeenCalledTimes(1);
+    expect(queue.add).toHaveBeenCalledWith(
+      PRICING_ETL_REFRESH_JOB_NAME,
+      {},
+      expect.objectContaining({
+        jobId: PRICING_ETL_REFRESH_JOB_NAME,
+      }),
+    );
   });
 
   it('closes worker and queue on module destroy', async () => {
