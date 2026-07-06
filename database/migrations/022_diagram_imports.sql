@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS diagram_imports (
     mime_type           TEXT,
     size_bytes          INTEGER NOT NULL,
     sha256              TEXT NOT NULL,
+    temp_file_ref       TEXT,
     parser_confidence   TEXT NOT NULL,
     unresolved_count    INTEGER NOT NULL DEFAULT 0,
     ignored_count       INTEGER NOT NULL DEFAULT 0,
@@ -23,6 +24,8 @@ CREATE TABLE IF NOT EXISTS diagram_imports (
         CHECK (size_bytes > 0 AND size_bytes <= 5242880),
     CONSTRAINT diagram_imports_sha256_check
         CHECK (sha256 ~ '^[a-f0-9]{64}$'),
+    CONSTRAINT diagram_imports_temp_file_ref_check
+        CHECK (temp_file_ref IS NULL OR temp_file_ref !~ '[\\/]'),
     CONSTRAINT diagram_imports_counts_check
         CHECK (unresolved_count >= 0 AND ignored_count >= 0)
 );

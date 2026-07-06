@@ -193,6 +193,7 @@ function buildDraftNws({
     .filter((node) => node.classification?.serviceCategory === 'networking')
     .map((node) => `${node.displayLabel} ${node.classification?.serviceType ?? ''}`)
     .join(' ');
+  const regionPreference = regionPreferenceFromNodes(classifiedNodes);
 
   const candidate: NormalizedWorkloadSpec = {
     schemaVersion: '1.0',
@@ -205,7 +206,8 @@ function buildDraftNws({
       name: diagramWorkloadName(decoded.fileName),
       type: workloadTypeFromNodes(classifiedNodes),
       region: {
-        isDefault: true,
+        ...(regionPreference ? { preference: regionPreference } : {}),
+        isDefault: !regionPreference,
       },
     },
     compute:
@@ -371,6 +373,25 @@ function storageSizeGbFromLabel(label: string): number | undefined {
   }
 
   return matchedSize.unit === 'tb' ? matchedSize.value * 1024 : matchedSize.value;
+}
+
+function regionPreferenceFromNodes(nodes: ClassifiedDiagramNode[]): string | undefined {
+  const regionPatterns = [
+    /\b(us|eu|ap|sa|ca|me|af)-(?:north|south|east|west|central|northeast|southeast|southwest|northwest)-\d\b/i,
+    /\b[a-z]+(?:us|eu|asia|india|japan|korea|australia|brazil|canada|uk|france|germany|switzerland|norway|sweden|poland|spain|italy|uae|israel|qatar|southafrica)\d?\b/i,
+    /\b(?:eastus|westus|centralus|westeurope|northeurope|uksouth|ukwest|japaneast|japanwest)\b/i,
+  ];
+
+  for (const node of nodes) {
+    for (const pattern of regionPatterns) {
+      const match = node.displayLabel.match(pattern);
+      if (match?.[0]) {
+        return match[0].toLowerCase();
+      }
+    }
+  }
+
+  return undefined;
 }
 
 function firstNumberForUnits(label: string, units: string[]): number | undefined {

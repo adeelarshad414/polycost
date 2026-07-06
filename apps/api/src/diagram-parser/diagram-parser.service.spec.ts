@@ -8,6 +8,7 @@ import { AliasDictionary } from './alias-dictionary';
 import { DiagramImportRepository } from './diagram-import.repository';
 import { DiagramParserController } from './diagram-parser.controller';
 import { DiagramParserService } from './diagram-parser.service';
+import { DiagramTempFileStore } from './diagram-temp-file.store';
 import { DrawioExtractor } from './drawio.extractor';
 import { FormatDetectorService } from './format-detector.service';
 import { LucidCsvExtractor } from './lucid-csv.extractor';
@@ -71,6 +72,23 @@ describe('DiagramParserService', () => {
     ).rejects.toThrow(ApiValidationError);
   });
 
+  it.each([
+    ['JPEG image', Buffer.from([0xff, 0xd8, 0xff, 0x00]), 'image.drawio'],
+    ['GIF image', Buffer.from('GIF89a'), 'image.drawio'],
+    ['PDF document', Buffer.from('%PDF-1.7'), 'diagram.drawio'],
+  ])(
+    'rejects unsupported binary %s uploads before extraction',
+    async (_label, payload, fileName) => {
+      await expect(
+        service().parse({
+          content: payload.toString('base64'),
+          encoding: 'base64',
+          fileName,
+        }),
+      ).rejects.toThrow(ApiValidationError);
+    },
+  );
+
   it('rejects compressed VSDX expansion bombs below the upload-size limit', async () => {
     await expect(
       service().parse({
@@ -89,9 +107,16 @@ describe('DiagramParserController', () => {
         throw new Error('db unavailable');
       }),
     } as unknown as DiagramImportRepository;
+    const tempFileStore = {
+      store: jest.fn(async () => ({
+        fileRef: '77777777-7777-4777-8777-777777777777-random.mmd',
+        expiresAt: '2026-07-07T00:00:00.000Z',
+      })),
+    } as unknown as DiagramTempFileStore;
     const controller = new DiagramParserController(
       service(),
       repository,
+      tempFileStore,
       new ApiRateLimitService(() => 0),
       configService(),
     );
@@ -110,7 +135,21 @@ describe('DiagramParserController', () => {
 
     expect(result.source.format).toBe('mermaid');
     expect(result.source.persisted).toBe(false);
+    expect(result.source.tempFileStored).toBe(true);
+    expect(result.source.expiresAt).toBe('2026-07-07T00:00:00.000Z');
     expect(result.review.components.length).toBeGreaterThan(0);
+    expect(tempFileStore.store).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detectedFormat: 'mermaid',
+      }),
+      result.importId,
+    );
+    expect(repository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tempFileRef: '77777777-7777-4777-8777-777777777777-random.mmd',
+        expiresAt: '2026-07-07T00:00:00.000Z',
+      }),
+    );
     expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
   });
 });

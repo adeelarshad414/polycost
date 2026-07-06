@@ -119,6 +119,23 @@ The main API is versioned under `/api/v1`.
 - `GET /exchange-rates` returns cached exchange-rate data.
 - `GET /regions` returns the cloud region catalog used by the UI.
 
+## Diagram Imports
+
+Supported Phase 2 inputs:
+
+- Mermaid: paste `.mmd` or Mermaid flowchart text.
+- draw.io / diagrams.net: export with `File > Save as` or `File > Export as > XML`, then upload the `.drawio` or `.xml` source file.
+- Lucidchart CSV: use `File > Export > CSV of Shape Data`, then upload the CSV export.
+- Lucidchart VSDX: use `File > Export > Visio (VSDX)`, then upload the `.vsdx` file.
+
+Limits and safety behavior:
+
+- Max decoded diagram source size is 5MB.
+- Images, screenshots, and PDFs are not parsed in Phase 2; export the editable source format instead.
+- XML entities/DTDs, compressed draw.io bombs, VSDX ZIP bombs, spoofed image extensions, and oversized uploads are rejected.
+- Successful imports are copied to a randomized non-webroot temp path for the review step and expire after 24 hours.
+- If `DIAGRAM_LLM_CLASSIFIER_ENDPOINT` is unset, unresolved nodes stay in the review screen for manual classification. This is the default OSS path.
+
 ## Common Commands
 
 ```bash

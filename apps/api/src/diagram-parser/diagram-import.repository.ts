@@ -50,13 +50,29 @@ export class DiagramImportRepository implements OnModuleDestroy {
           mime_type,
           size_bytes,
           sha256,
+          temp_file_ref,
           parser_confidence,
           unresolved_count,
           ignored_count,
           graph_snapshot,
-          nws_snapshot
+          nws_snapshot,
+          expires_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb)
+        VALUES (
+          $1,
+          $2,
+          $3,
+          $4,
+          $5,
+          $6,
+          $7,
+          $8,
+          $9,
+          $10,
+          $11::jsonb,
+          $12::jsonb,
+          COALESCE($13::timestamptz, now() + interval '24 hours')
+        )
       `,
       [
         input.importId,
@@ -65,11 +81,13 @@ export class DiagramImportRepository implements OnModuleDestroy {
         input.mimeType ?? null,
         input.sizeBytes,
         input.sha256,
+        input.tempFileRef ?? null,
         input.parserConfidence,
         input.unresolvedCount,
         input.ignoredCount,
         JSON.stringify(input.graph),
         JSON.stringify(input.draftNws),
+        input.expiresAt ?? null,
       ],
     );
 

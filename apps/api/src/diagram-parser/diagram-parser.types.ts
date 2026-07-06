@@ -3,7 +3,9 @@ import { NormalizedWorkloadSpec, ServiceRequirement } from '../nws/nws.types';
 import { ParserConfidence } from '../nws-parser/nws-parser.types';
 
 export const DIAGRAM_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
-export const DIAGRAM_INFLATED_MAX_BYTES = 5 * 1024 * 1024;
+export const DIAGRAM_INFLATED_MAX_BYTES = 20 * 1024 * 1024;
+export const DIAGRAM_JSON_BODY_MAX_BYTES = 8 * 1024 * 1024;
+export const DIAGRAM_TEMP_RETENTION_HOURS = 24;
 export const DIAGRAM_MAX_NODES = 250;
 export const DIAGRAM_MAX_EDGES = 500;
 
@@ -115,6 +117,8 @@ export interface DiagramParseResult {
     sha256: string;
     parsedAt: string;
     persisted: boolean;
+    tempFileStored: boolean;
+    expiresAt?: string;
   };
   graph: DiagramGraph;
   review: {
@@ -140,6 +144,8 @@ export interface DiagramImportRecordInput {
   mimeType?: string;
   sizeBytes: number;
   sha256: string;
+  tempFileRef?: string;
+  expiresAt?: string;
   parserConfidence: ParserConfidence;
   unresolvedCount: number;
   ignoredCount: number;

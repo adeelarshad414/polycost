@@ -6,7 +6,7 @@ import {
   formatApiError,
   PolyCostApiError,
 } from './api-client';
-import { DiagramParseRequest } from './types';
+import { DiagramParseRequest, DiagramParseResult } from './types';
 import { buildNwsFromForm, defaultWorkloadForm } from './workload';
 
 const originalFetch = global.fetch;
@@ -731,61 +731,59 @@ describe('api client', () => {
   });
 
   it('parses diagram uploads through the diagram ingestion endpoint', async () => {
-    const diagramParseResult = {
+    const diagramParseResult: DiagramParseResult = {
       importId: 'diagram-1',
-      detectedFormat: 'drawio',
       parserConfidence: 'medium',
-      overallConfidenceScore: 0.74,
-      summary: {
-        nodeCount: 3,
-        edgeCount: 2,
-        classifiedNodeCount: 2,
-        unresolvedNodeCount: 1,
-        decorativeNodeCount: 0,
-        assumptionCount: 1,
+      fieldsRequiringReview: ['diagram.nodes.web'],
+      source: {
+        format: 'drawio',
+        fileName: 'web-app.drawio',
+        mimeType: 'application/xml',
+        sizeBytes: 128,
+        sha256: 'a'.repeat(64),
+        parsedAt: '2026-07-06T00:00:00.000Z',
+        persisted: true,
+        tempFileStored: true,
+        expiresAt: '2026-07-07T00:00:00.000Z',
       },
-      nodes: [
-        {
-          id: 'web',
-          label: 'Web tier',
-          normalizedLabel: 'web tier',
-          providerHints: ['aws'],
-          classification: {
+      graph: {
+        format: 'drawio',
+        nodes: [
+          {
+            id: 'web',
+            displayLabel: 'Web tier',
+            kind: 'resource',
+            sourceRef: 'drawio:web',
+          },
+        ],
+        edges: [
+          {
+            id: 'edge-1',
+            sourceId: 'web',
+            targetId: 'db',
+            displayLabel: 'traffic',
+          },
+        ],
+        ignoredNodes: [],
+      },
+      review: {
+        components: [
+          {
+            nodeId: 'web',
+            displayLabel: 'Web tier',
+            serviceCategory: 'compute',
+            serviceType: 'vm-compute',
             confidence: 'high',
-            score: 0.92,
-            category: 'compute',
-            canonicalService: 'compute',
-            matchedBy: 'stencil',
+            sourceRef: 'drawio:web',
+            assumedDefaults: ['2 vCPU'],
+            editable: true,
           },
-          source: {
-            page: 'Page-1',
-            shapeId: 'web',
-          },
-        },
-      ],
-      edges: [
-        {
-          id: 'edge-1',
-          sourceId: 'web',
-          targetId: 'db',
-          label: 'traffic',
-        },
-      ],
-      assumptions: ['Database engine was inferred from diagram label.'],
-      warnings: ['Review unresolved queue label.'],
-      unresolvedNodes: [],
-      decorativeNodes: [],
-      sourceTraceability: [
-        {
-          sourceId: 'web',
-          sourceLabel: 'Web tier',
-          providerHints: ['aws'],
-          normalizedRequirementId: 'compute-general',
-          confidence: 'high',
-          reasoning: 'Stencil matched compute.',
-        },
-      ],
-      nws: buildNwsFromForm(defaultWorkloadForm, 'drawio_diagram'),
+        ],
+        unresolvedClassifications: [],
+        ignoredNodes: [],
+        assumedDefaults: ['2 vCPU'],
+      },
+      draftNws: buildNwsFromForm(defaultWorkloadForm, 'drawio_diagram'),
     };
     const payload: DiagramParseRequest = {
       content: '<mxfile><diagram><mxGraphModel /></diagram></mxfile>',

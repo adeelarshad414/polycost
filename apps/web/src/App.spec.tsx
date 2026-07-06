@@ -7,6 +7,7 @@ import {
   ComparisonResult,
   DataHealthResponse,
   DiagramParseResult,
+  NormalizedWorkloadSpec,
   ParsedNwsDraft,
   PricingStatusResponse,
   RegionCatalogResponse,
@@ -1078,16 +1079,102 @@ describe('App', () => {
     expect(text(container)).toContain('Ignored decorative nodes');
     expect((container.querySelector('#name') as HTMLInputElement).value).toBe('Diagram portal');
 
+    await click(buttonByText(container, 'Remove'));
+    await changeSelect(selectByAriaLabel(container, 'Classify Legacy appliance'), 'queue');
+    await changeSelect(selectByAriaLabel(container, 'Add missing diagram service'), 'cdn');
     await click(buttonByText(container, 'Compare costs'));
 
-    expect(client.validateWorkload).toHaveBeenCalledWith(
+    const submittedNws = (client.validateWorkload as jest.Mock).mock
+      .calls[0][0] as NormalizedWorkloadSpec;
+    expect(submittedNws).toEqual(
       expect.objectContaining({
         metadata: expect.objectContaining({ sourceType: 'drawio_diagram' }),
-        serviceRequirements: parsedNws.serviceRequirements,
       }),
     );
+    expect(submittedNws.serviceRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceType: 'queue',
+          scaleParams: expect.objectContaining({ diagramNodeId: 'unknown' }),
+        }),
+        expect.objectContaining({
+          serviceType: 'cdn',
+          scaleParams: expect.objectContaining({ reason: 'manual diagram review classification' }),
+        }),
+      ]),
+    );
+    expect(submittedNws.serviceRequirements).not.toEqual(parsedNws.serviceRequirements);
     expect(client.createComparison).toHaveBeenCalled();
     expect(text(container)).toContain('Parsed from diagram');
+
+    unmount();
+  });
+
+  it('supports manual diagram review defaults for storage, database, and network services', async () => {
+    const parsedNws = buildNwsFromForm(
+      {
+        ...defaultWorkloadForm,
+        workloadName: 'Diagram review lab',
+      },
+      'drawio_diagram',
+    );
+    const parsedDiagram = diagramParseResult(parsedNws);
+    parsedDiagram.review.unresolvedClassifications = [
+      {
+        id: 'bucket',
+        displayLabel: 'Object bucket',
+        reason: 'no stencil metadata',
+        sourceRef: 'drawio:node-bucket',
+      },
+    ];
+    parsedDiagram.graph.nodes.push({
+      id: 'bucket',
+      displayLabel: 'Object bucket',
+      kind: 'unknown',
+      sourceRef: 'drawio:node-bucket',
+    });
+    const client = clientMock({
+      parseDiagram: jest.fn(async () => parsedDiagram),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Upload diagram'));
+    await changeTextarea(textareaById(container, 'diagram-source'), '<mxfile>diagram</mxfile>');
+    await click(buttonByText(container, 'Parse diagram'));
+    await changeSelect(selectByAriaLabel(container, 'Classify Object bucket'), 'object-storage');
+    await changeSelect(
+      selectByAriaLabel(container, 'Add missing diagram service'),
+      'relational-database',
+    );
+    await changeSelect(
+      selectByAriaLabel(container, 'Add missing diagram service'),
+      'load-balancer',
+    );
+
+    expect(text(container)).toContain('100 GB storage');
+    expect(text(container)).toContain('100 GB database storage');
+    expect(text(container)).toContain('730 load-balancer hours per month');
+
+    await click(buttonByText(container, 'Clear'));
+
+    expect(textareaById(container, 'diagram-source').value).toBe('');
+    expect(text(container)).not.toContain('100 GB database storage');
+    expect(client.createComparison).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('shows a validation message before parsing an empty diagram', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Upload diagram'));
+    await click(lastButtonByText(container, 'Parse diagram'));
+
+    expect(text(container)).toContain(
+      'Upload a diagram or paste Mermaid, draw.io XML, or Lucid CSV content first.',
+    );
+    expect(client.parseDiagram).not.toHaveBeenCalled();
 
     unmount();
   });
@@ -1117,6 +1204,37 @@ describe('App', () => {
         inputFormat: 'drawio',
         fileName: 'architecture.drawio',
         mimeType: 'application/xml',
+      }),
+    );
+
+    unmount();
+  });
+
+  it('loads Mermaid diagram files as text parser input', async () => {
+    const fileText = 'flowchart LR\n  api[API] --> db[(Postgres)]';
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Upload diagram'));
+    const file = new File([fileText], 'architecture.mmd', { type: 'text/plain' });
+    Object.defineProperty(file, 'text', {
+      configurable: true,
+      value: jest.fn(async () => fileText),
+    });
+
+    await changeFileInput(inputById(container, 'diagram-file'), file);
+    expect(text(container)).toContain('Loaded from architecture.mmd');
+    expect(text(container)).toContain('Mermaid');
+
+    await click(buttonByText(container, 'Parse diagram'));
+
+    expect(client.parseDiagram).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: fileText,
+        encoding: 'text',
+        inputFormat: 'mermaid',
+        fileName: 'architecture.mmd',
+        mimeType: 'text/plain',
       }),
     );
 
@@ -2465,6 +2583,19 @@ function selectByOptionValue(container: HTMLElement, value: string): HTMLSelectE
   return select;
 }
 
+function selectByAriaLabel(container: HTMLElement, label: string): HTMLSelectElement {
+  const select = Array.from(container.querySelectorAll('select')).find(
+    (candidate): candidate is HTMLSelectElement =>
+      candidate instanceof HTMLSelectElement && candidate.getAttribute('aria-label') === label,
+  );
+
+  if (!select) {
+    throw new Error(`Select not found for aria-label: ${label}`);
+  }
+
+  return select;
+}
+
 function checkboxByLabel(container: HTMLElement, label: string): HTMLInputElement {
   const field = Array.from(container.querySelectorAll('.checkbox-field')).find((candidate) =>
     candidate.textContent?.includes(label),
@@ -2495,6 +2626,20 @@ function buttonByText(container: HTMLElement, label: string): HTMLButtonElement 
   const button = Array.from(container.querySelectorAll('button')).find(
     (candidate) => candidate.textContent?.trim() === label,
   );
+
+  if (!(button instanceof HTMLButtonElement)) {
+    throw new Error(`Button not found: ${label}`);
+  }
+
+  return button;
+}
+
+function lastButtonByText(container: HTMLElement, label: string): HTMLButtonElement {
+  const buttons = Array.from(container.querySelectorAll('button')).filter(
+    (candidate): candidate is HTMLButtonElement =>
+      candidate instanceof HTMLButtonElement && candidate.textContent?.trim() === label,
+  );
+  const button = buttons.at(-1);
 
   if (!(button instanceof HTMLButtonElement)) {
     throw new Error(`Button not found: ${label}`);
@@ -2636,6 +2781,8 @@ function diagramParseResult(
       sha256: 'a'.repeat(64),
       parsedAt: '2026-07-02T00:00:00.000Z',
       persisted: false,
+      tempFileStored: true,
+      expiresAt: '2026-07-03T00:00:00.000Z',
     },
     graph: {
       format: 'mermaid',
@@ -2667,7 +2814,16 @@ function diagramParseResult(
       ignoredNodes: [],
       assumedDefaults: component.assumedDefaults,
     },
-    draftNws,
+    draftNws: {
+      ...draftNws,
+      serviceRequirements: draftNws.serviceRequirements?.map((requirement) => ({
+        ...requirement,
+        scaleParams: {
+          ...requirement.scaleParams,
+          diagramNodeId: 'app',
+        },
+      })),
+    },
   };
 }
 
@@ -2783,6 +2939,8 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
         sha256: 'a'.repeat(64),
         parsedAt: '2026-07-02T00:00:00.000Z',
         persisted: false,
+        tempFileStored: true,
+        expiresAt: '2026-07-03T00:00:00.000Z',
       },
       graph: {
         format: 'mermaid' as const,

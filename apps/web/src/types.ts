@@ -278,6 +278,8 @@ export interface DiagramParseResult {
     sha256: string;
     parsedAt: string;
     persisted: boolean;
+    tempFileStored: boolean;
+    expiresAt?: string;
   };
   graph: {
     format: DiagramInputFormat;

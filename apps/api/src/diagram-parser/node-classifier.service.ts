@@ -37,12 +37,12 @@ export class NodeClassifierService {
 
     const stencilMatch = this.stencilMapRegistry.match(node.stencilId ?? node.style);
     if (stencilMatch) {
-      return classificationFromMatch(stencilMatch, displayLabel, 'high', 'stencil match');
+      return classificationFromMatch(stencilMatch, displayLabel, 'high', 'stencil match', node.id);
     }
 
     const labelMatch = this.aliasDictionary.match(displayLabel);
     if (labelMatch) {
-      return classificationFromMatch(labelMatch, displayLabel, 'moderate', 'label alias');
+      return classificationFromMatch(labelMatch, displayLabel, 'moderate', 'label alias', node.id);
     }
 
     const llmMatch = await this.llmClassifierClient.classify({
@@ -68,6 +68,7 @@ function classificationFromMatch(
   label: string,
   confidence: DiagramNodeClassification['confidence'],
   reason: string,
+  diagramNodeId: string,
 ): DiagramNodeClassification {
   const assumedDefaults = assumptionsFor(match.serviceCategory, match.serviceType, label);
 
@@ -77,11 +78,17 @@ function classificationFromMatch(
     confidence,
     reason,
     assumedDefaults,
-    serviceRequirement: serviceRequirementFor(match.serviceCategory, match.serviceType, label, {
-      confidence,
-      reason,
-      assumedDefaultCount: assumedDefaults.length,
-    }),
+    serviceRequirement: serviceRequirementFor(
+      match.serviceCategory,
+      match.serviceType,
+      label,
+      {
+        confidence,
+        reason,
+        assumedDefaultCount: assumedDefaults.length,
+      },
+      diagramNodeId,
+    ),
   };
 }
 
@@ -90,12 +97,16 @@ function serviceRequirementFor(
   serviceType: string,
   label: string,
   scaleParams: Record<string, string | number | boolean>,
+  diagramNodeId: string,
 ): ServiceRequirement {
   return {
     serviceCategory,
     serviceType,
     quantity: quantityFromLabel(label),
-    scaleParams,
+    scaleParams: {
+      ...scaleParams,
+      diagramNodeId,
+    },
   };
 }
 
@@ -136,7 +147,9 @@ function assumptionsFor(
 }
 
 function quantityFromLabel(label: string): number {
-  const countMatch = label.match(/\b([2-9]|[1-9]\d+)\s*(?:x|instances?|nodes?|servers?)\b/i);
+  const countMatch =
+    label.match(/\b(?:x|×)\s*([2-9]|[1-9]\d+)\b/i) ??
+    label.match(/\b([2-9]|[1-9]\d+)\s*(?:x|×|instances?|nodes?|servers?)\b/i);
 
   return countMatch ? Number.parseInt(countMatch[1], 10) : 1;
 }

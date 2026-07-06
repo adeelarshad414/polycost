@@ -54,6 +54,7 @@ import {
   ProviderId,
   RegionCatalogResponse,
   ReportFormat,
+  ServiceRequirement,
 } from './types';
 import {
   ARCHITECTURE_TEMPLATES,
@@ -81,6 +82,7 @@ type CostMatrixProviderFilter = ProviderId | 'all';
 type CostMatrixPricingModelFilter = PricingModelKey | 'all';
 type CostMatrixSortKey = 'service' | `${ProviderId}:${PricingModelKey}`;
 type CostMatrixColumnMode = 'summary' | 'technical';
+type ServiceRequirementCategory = ServiceRequirement['serviceCategory'];
 
 const INPUT_MODE_OPTIONS: Array<{
   key: InputMode;
@@ -133,6 +135,20 @@ const REQUIREMENTS_FILE_MIME_TYPES = new Set([
 ]);
 const DIAGRAM_FILE_ACCEPT =
   '.mmd,.mermaid,.drawio,.xml,.csv,.vsdx,text/plain,text/csv,application/xml,application/vnd.visio,application/vnd.ms-visio.drawing.main+xml,application/octet-stream';
+const DIAGRAM_REVIEW_SERVICE_OPTIONS: Array<{
+  label: string;
+  serviceCategory: ServiceRequirementCategory;
+  serviceType: string;
+}> = [
+  { label: 'Compute / VM', serviceCategory: 'compute', serviceType: 'vm-compute' },
+  { label: 'Container app', serviceCategory: 'containers', serviceType: 'container-app' },
+  { label: 'Object storage', serviceCategory: 'storage', serviceType: 'object-storage' },
+  { label: 'Relational database', serviceCategory: 'database', serviceType: 'relational-database' },
+  { label: 'Load balancer', serviceCategory: 'networking', serviceType: 'load-balancer' },
+  { label: 'CDN', serviceCategory: 'networking', serviceType: 'cdn' },
+  { label: 'Message queue', serviceCategory: 'integration', serviceType: 'queue' },
+  { label: 'Analytics warehouse', serviceCategory: 'analytics', serviceType: 'warehouse' },
+];
 const PRICING_MODEL_OPTIONS: Array<{
   key: PricingModelKey;
   label: string;
@@ -1185,6 +1201,187 @@ export function App({ client = polyCostClient }: AppProps) {
     setError(null);
   }
 
+  function handleRemoveDiagramComponent(nodeId: string) {
+    setDiagramParseResult((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const removedComponent = current.review.components.find(
+        (component) => component.nodeId === nodeId,
+      );
+
+      return {
+        ...current,
+        fieldsRequiringReview: [
+          ...new Set([...current.fieldsRequiringReview, `diagram.nodes.${nodeId}.removed`]),
+        ],
+        draftNws: {
+          ...current.draftNws,
+          serviceRequirements: (current.draftNws.serviceRequirements ?? []).filter(
+            (requirement) => diagramNodeIdForRequirement(requirement) !== nodeId,
+          ),
+          sourceTraceability: current.draftNws.sourceTraceability?.filter(
+            (trace) => trace.sourceRef !== removedComponent?.sourceRef,
+          ),
+        },
+        review: {
+          ...current.review,
+          components: current.review.components.filter((component) => component.nodeId !== nodeId),
+          ignoredNodes: removedComponent
+            ? [
+                ...current.review.ignoredNodes,
+                {
+                  id: nodeId,
+                  displayLabel: removedComponent.displayLabel,
+                  reason: 'removed during review',
+                  sourceRef: removedComponent.sourceRef,
+                },
+              ]
+            : current.review.ignoredNodes,
+        },
+        graph: {
+          ...current.graph,
+          nodes: current.graph.nodes.filter((node) => node.id !== nodeId),
+          ignoredNodes: removedComponent
+            ? [
+                ...current.graph.ignoredNodes,
+                {
+                  id: nodeId,
+                  displayLabel: removedComponent.displayLabel,
+                  reason: 'removed during review',
+                  sourceRef: removedComponent.sourceRef,
+                },
+              ]
+            : current.graph.ignoredNodes,
+        },
+      };
+    });
+    setNotice('Removed the diagram service from the comparison review.');
+  }
+
+  function handleClassifyDiagramNode(nodeId: string, serviceType: string) {
+    if (!serviceType) {
+      return;
+    }
+
+    setDiagramParseResult((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const node = current.review.unresolvedClassifications.find((item) => item.id === nodeId);
+      if (!node) {
+        return current;
+      }
+
+      const requirement = serviceRequirementForManualClassification(nodeId, serviceType);
+      const component = diagramReviewComponentFromRequirement(node, requirement);
+
+      return {
+        ...current,
+        parserConfidence: 'low',
+        fieldsRequiringReview: [
+          ...new Set([...current.fieldsRequiringReview, `diagram.nodes.${nodeId}.classification`]),
+        ],
+        draftNws: {
+          ...current.draftNws,
+          serviceRequirements: [...(current.draftNws.serviceRequirements ?? []), requirement],
+          sourceTraceability: [
+            ...(current.draftNws.sourceTraceability ?? []),
+            {
+              nwsPath: `serviceRequirements.${nodeId}`,
+              sourceRef: node.sourceRef,
+            },
+          ],
+        },
+        review: {
+          ...current.review,
+          components: [...current.review.components, component],
+          unresolvedClassifications: current.review.unresolvedClassifications.filter(
+            (item) => item.id !== nodeId,
+          ),
+          assumedDefaults: [
+            ...new Set([...current.review.assumedDefaults, ...component.assumedDefaults]),
+          ],
+        },
+        graph: {
+          ...current.graph,
+          nodes: current.graph.nodes.map((graphNode) =>
+            graphNode.id === nodeId ? { ...graphNode, kind: 'resource' } : graphNode,
+          ),
+        },
+      };
+    });
+    setNotice(
+      'Classified the unresolved diagram node. Review the sizing assumptions before comparing.',
+    );
+  }
+
+  function handleAddDiagramRequirement(serviceType: string) {
+    if (!serviceType) {
+      return;
+    }
+
+    const nodeId = `manual-${Date.now()}`;
+    const sourceRef = `diagram:manual:${nodeId}`;
+    const requirement = serviceRequirementForManualClassification(nodeId, serviceType);
+
+    setDiagramParseResult((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const component = diagramReviewComponentFromRequirement(
+        {
+          id: nodeId,
+          displayLabel: serviceLabelForType(serviceType),
+          sourceRef,
+        },
+        requirement,
+      );
+
+      return {
+        ...current,
+        parserConfidence: 'low',
+        fieldsRequiringReview: [
+          ...new Set([...current.fieldsRequiringReview, `diagram.nodes.${nodeId}.manual`]),
+        ],
+        draftNws: {
+          ...current.draftNws,
+          serviceRequirements: [...(current.draftNws.serviceRequirements ?? []), requirement],
+          sourceTraceability: [
+            ...(current.draftNws.sourceTraceability ?? []),
+            {
+              nwsPath: `serviceRequirements.${nodeId}`,
+              sourceRef,
+            },
+          ],
+        },
+        review: {
+          ...current.review,
+          components: [...current.review.components, component],
+          assumedDefaults: [
+            ...new Set([...current.review.assumedDefaults, ...component.assumedDefaults]),
+          ],
+        },
+        graph: {
+          ...current.graph,
+          nodes: [
+            ...current.graph.nodes,
+            {
+              id: nodeId,
+              displayLabel: component.displayLabel,
+              kind: 'resource',
+              sourceRef,
+            },
+          ],
+        },
+      };
+    });
+    setNotice('Added a manual diagram service. Review the workload form before comparing.');
+  }
+
   function handleUseSampleRequirements() {
     setInputMode('describe');
     setNaturalLanguageInput(sampleNaturalLanguageInput);
@@ -1423,6 +1620,9 @@ export function App({ client = polyCostClient }: AppProps) {
           onPricingModelChange={handlePricingModelChange}
           onNaturalLanguageChange={handleNaturalLanguageChange}
           onDiagramInputChange={handleDiagramInputChange}
+          onRemoveDiagramComponent={handleRemoveDiagramComponent}
+          onClassifyDiagramNode={handleClassifyDiagramNode}
+          onAddDiagramRequirement={handleAddDiagramRequirement}
           onFormChange={handleFormChange}
           onSubmit={handleCompare}
           onParse={handleParse}
@@ -1461,6 +1661,9 @@ export function App({ client = polyCostClient }: AppProps) {
           onPricingModelChange={handlePricingModelChange}
           onNaturalLanguageChange={handleNaturalLanguageChange}
           onDiagramInputChange={handleDiagramInputChange}
+          onRemoveDiagramComponent={handleRemoveDiagramComponent}
+          onClassifyDiagramNode={handleClassifyDiagramNode}
+          onAddDiagramRequirement={handleAddDiagramRequirement}
           onChange={handleFormChange}
           onClearRequirements={handleClearRequirements}
           onClearDiagramInput={handleClearDiagramInput}
@@ -1647,6 +1850,9 @@ function InitialHomePage({
   onPricingModelChange,
   onNaturalLanguageChange,
   onDiagramInputChange,
+  onRemoveDiagramComponent,
+  onClassifyDiagramNode,
+  onAddDiagramRequirement,
   onChange,
   onClearRequirements,
   onClearDiagramInput,
@@ -1681,6 +1887,9 @@ function InitialHomePage({
   onPricingModelChange: (model: PricingModelKey) => void;
   onNaturalLanguageChange: (value: string) => void;
   onDiagramInputChange: (value: string) => void;
+  onRemoveDiagramComponent: (nodeId: string) => void;
+  onClassifyDiagramNode: (nodeId: string, serviceType: string) => void;
+  onAddDiagramRequirement: (serviceType: string) => void;
   onChange: (form: WorkloadFormState) => void;
   onClearRequirements: () => void;
   onClearDiagramInput: () => void;
@@ -2162,6 +2371,9 @@ function InitialHomePage({
               onParse={onParseDiagram}
               onFileLoad={onDiagramFileLoad}
               fileName={diagramFileName}
+              onRemoveComponent={onRemoveDiagramComponent}
+              onClassifyNode={onClassifyDiagramNode}
+              onAddRequirement={onAddDiagramRequirement}
             />
             {diagramParseResult ? (
               <div className="diagram-review-workspace">
@@ -2273,6 +2485,9 @@ function ProgressiveComparisonPage({
   onPricingModelChange,
   onNaturalLanguageChange,
   onDiagramInputChange,
+  onRemoveDiagramComponent,
+  onClassifyDiagramNode,
+  onAddDiagramRequirement,
   onFormChange,
   onSubmit,
   onParse,
@@ -2321,6 +2536,9 @@ function ProgressiveComparisonPage({
   onPricingModelChange: (model: PricingModelKey) => void;
   onNaturalLanguageChange: (value: string) => void;
   onDiagramInputChange: (value: string) => void;
+  onRemoveDiagramComponent: (nodeId: string) => void;
+  onClassifyDiagramNode: (nodeId: string, serviceType: string) => void;
+  onAddDiagramRequirement: (serviceType: string) => void;
   onFormChange: (form: WorkloadFormState) => void;
   onSubmit: (event?: FormEvent) => void;
   onParse: () => void;
@@ -2361,6 +2579,9 @@ function ProgressiveComparisonPage({
               onPricingModelChange={onPricingModelChange}
               onNaturalLanguageChange={onNaturalLanguageChange}
               onDiagramInputChange={onDiagramInputChange}
+              onRemoveDiagramComponent={onRemoveDiagramComponent}
+              onClassifyDiagramNode={onClassifyDiagramNode}
+              onAddDiagramRequirement={onAddDiagramRequirement}
               onParse={onParse}
               onParseDiagram={onParseDiagram}
               onSubmit={onSubmit}
@@ -3007,6 +3228,9 @@ function RequirementsEditPanel({
   onPricingModelChange,
   onNaturalLanguageChange,
   onDiagramInputChange,
+  onRemoveDiagramComponent,
+  onClassifyDiagramNode,
+  onAddDiagramRequirement,
   onParse,
   onParseDiagram,
   onSubmit,
@@ -3035,6 +3259,9 @@ function RequirementsEditPanel({
   onPricingModelChange: (model: PricingModelKey) => void;
   onNaturalLanguageChange: (value: string) => void;
   onDiagramInputChange: (value: string) => void;
+  onRemoveDiagramComponent: (nodeId: string) => void;
+  onClassifyDiagramNode: (nodeId: string, serviceType: string) => void;
+  onAddDiagramRequirement: (serviceType: string) => void;
   onParse: () => void;
   onParseDiagram: () => void;
   onSubmit: (event?: FormEvent) => void;
@@ -3079,6 +3306,9 @@ function RequirementsEditPanel({
           onParse={onParseDiagram}
           onFileLoad={onDiagramFileLoad}
           fileName={diagramFileName}
+          onRemoveComponent={onRemoveDiagramComponent}
+          onClassifyNode={onClassifyDiagramNode}
+          onAddRequirement={onAddDiagramRequirement}
           compact
         />
       ) : (
@@ -3244,6 +3474,9 @@ function DiagramImportPanel({
   onParse,
   onFileLoad,
   fileName,
+  onRemoveComponent,
+  onClassifyNode,
+  onAddRequirement,
   compact = false,
 }: {
   value: string;
@@ -3255,6 +3488,9 @@ function DiagramImportPanel({
   onParse: () => void;
   onFileLoad: (file: File | null) => void | Promise<void>;
   fileName: string | null;
+  onRemoveComponent: (nodeId: string) => void;
+  onClassifyNode: (nodeId: string, serviceType: string) => void;
+  onAddRequirement: (serviceType: string) => void;
   compact?: boolean;
 }) {
   const supportedLabel = 'Mermaid, draw.io XML, Lucid CSV, or VSDX';
@@ -3305,7 +3541,14 @@ function DiagramImportPanel({
           Loaded from {fileName}
         </p>
       ) : null}
-      {parseResult ? <DiagramReviewPanel result={parseResult} /> : null}
+      {parseResult ? (
+        <DiagramReviewPanel
+          result={parseResult}
+          onRemoveComponent={onRemoveComponent}
+          onClassifyNode={onClassifyNode}
+          onAddRequirement={onAddRequirement}
+        />
+      ) : null}
       <div className="action-row">
         <Button
           type="button"
@@ -3332,7 +3575,17 @@ function DiagramImportPanel({
   );
 }
 
-function DiagramReviewPanel({ result }: { result: DiagramParseResult }) {
+function DiagramReviewPanel({
+  result,
+  onRemoveComponent,
+  onClassifyNode,
+  onAddRequirement,
+}: {
+  result: DiagramParseResult;
+  onRemoveComponent: (nodeId: string) => void;
+  onClassifyNode: (nodeId: string, serviceType: string) => void;
+  onAddRequirement: (serviceType: string) => void;
+}) {
   return (
     <section className="diagram-review-panel" aria-label="Diagram parse review">
       <div className="diagram-review-summary">
@@ -3342,6 +3595,18 @@ function DiagramReviewPanel({ result }: { result: DiagramParseResult }) {
           {result.review.components.length} services · {result.graph.edges.length} links ·{' '}
           {result.review.unresolvedClassifications.length} unresolved
         </small>
+      </div>
+      <div className="diagram-preview-pane" aria-label="Diagram structure preview">
+        {result.graph.nodes.slice(0, 12).map((node) => (
+          <span className={`diagram-preview-node diagram-preview-node-${node.kind}`} key={node.id}>
+            {node.displayLabel}
+          </span>
+        ))}
+        {result.graph.nodes.length > 12 ? (
+          <span className="diagram-preview-node diagram-preview-node-more">
+            +{result.graph.nodes.length - 12} more
+          </span>
+        ) : null}
       </div>
       <div className="diagram-review-grid">
         {result.review.components.slice(0, 8).map((component) => (
@@ -3356,26 +3621,77 @@ function DiagramReviewPanel({ result }: { result: DiagramParseResult }) {
             {component.assumedDefaults.length > 0 ? (
               <em>{component.assumedDefaults.slice(0, 2).join(', ')}</em>
             ) : null}
+            <button
+              type="button"
+              className="diagram-review-link-button"
+              onClick={() => onRemoveComponent(component.nodeId)}
+            >
+              Remove
+            </button>
           </article>
         ))}
       </div>
       {result.review.unresolvedClassifications.length > 0 ? (
         <div className="diagram-review-callout diagram-review-callout-risk">
           <span>Needs classification</span>
-          <strong>
-            {result.review.unresolvedClassifications
-              .slice(0, 3)
-              .map((node) => node.displayLabel)
-              .join(', ')}
-          </strong>
+          <div className="diagram-review-unresolved-list">
+            {result.review.unresolvedClassifications.slice(0, 4).map((node) => (
+              <label className="diagram-review-select-row" key={node.id}>
+                <span>{node.displayLabel}</span>
+                <select
+                  aria-label={`Classify ${node.displayLabel}`}
+                  defaultValue=""
+                  onChange={(event) => onClassifyNode(node.id, event.currentTarget.value)}
+                >
+                  <option value="" disabled>
+                    Classify as
+                  </option>
+                  {DIAGRAM_REVIEW_SERVICE_OPTIONS.map((option) => (
+                    <option key={option.serviceType} value={option.serviceType}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
         </div>
       ) : null}
       {result.review.ignoredNodes.length > 0 ? (
-        <div className="diagram-review-callout">
-          <span>Ignored decorative nodes</span>
-          <strong>{result.review.ignoredNodes.length}</strong>
-        </div>
+        <details className="diagram-review-callout">
+          <summary>
+            <span>Ignored decorative nodes</span>
+            <strong>{result.review.ignoredNodes.length}</strong>
+          </summary>
+          <ul className="diagram-review-ignored-list">
+            {result.review.ignoredNodes.slice(0, 8).map((node) => (
+              <li key={`${node.sourceRef}-${node.id}`}>
+                {node.displayLabel} · {node.reason}
+              </li>
+            ))}
+          </ul>
+        </details>
       ) : null}
+      <label className="diagram-review-select-row diagram-review-add-row">
+        <span>Add missing service</span>
+        <select
+          aria-label="Add missing diagram service"
+          defaultValue=""
+          onChange={(event) => {
+            onAddRequirement(event.currentTarget.value);
+            event.currentTarget.value = '';
+          }}
+        >
+          <option value="" disabled>
+            Add service
+          </option>
+          {DIAGRAM_REVIEW_SERVICE_OPTIONS.map((option) => (
+            <option key={option.serviceType} value={option.serviceType}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
     </section>
   );
 }
@@ -16464,6 +16780,93 @@ function isSupportedRequirementsFile(file: File): boolean {
   );
 
   return hasSupportedExtension || REQUIREMENTS_FILE_MIME_TYPES.has(file.type);
+}
+
+function diagramNodeIdForRequirement(requirement: ServiceRequirement): string | undefined {
+  const value = requirement.scaleParams?.diagramNodeId;
+
+  return typeof value === 'string' ? value : undefined;
+}
+
+function serviceRequirementForManualClassification(
+  nodeId: string,
+  serviceType: string,
+): ServiceRequirement {
+  const option = diagramServiceOptionForType(serviceType);
+  const assumedDefaults = manualAssumptionsForService(option.serviceCategory, option.serviceType);
+
+  return {
+    serviceCategory: option.serviceCategory,
+    serviceType: option.serviceType,
+    quantity: 1,
+    scaleParams: {
+      confidence: 'low',
+      reason: 'manual diagram review classification',
+      diagramNodeId: nodeId,
+      assumedDefaultCount: assumedDefaults.length,
+    },
+  };
+}
+
+function diagramReviewComponentFromRequirement(
+  node: {
+    id: string;
+    displayLabel: string;
+    sourceRef: string;
+  },
+  requirement: ServiceRequirement,
+): DiagramParseResult['review']['components'][number] {
+  return {
+    nodeId: node.id,
+    displayLabel: node.displayLabel,
+    serviceCategory: requirement.serviceCategory,
+    serviceType: requirement.serviceType,
+    confidence: 'low',
+    sourceRef: node.sourceRef,
+    assumedDefaults: manualAssumptionsForService(
+      requirement.serviceCategory,
+      requirement.serviceType,
+    ),
+    editable: true,
+  };
+}
+
+function diagramServiceOptionForType(serviceType: string) {
+  return (
+    DIAGRAM_REVIEW_SERVICE_OPTIONS.find((option) => option.serviceType === serviceType) ??
+    DIAGRAM_REVIEW_SERVICE_OPTIONS[0]
+  );
+}
+
+function serviceLabelForType(serviceType: string): string {
+  return diagramServiceOptionForType(serviceType).label;
+}
+
+function manualAssumptionsForService(
+  serviceCategory: ServiceRequirementCategory,
+  serviceType: string,
+): string[] {
+  if (serviceCategory === 'compute' || serviceCategory === 'containers') {
+    return ['manual classification', '2 vCPU', '8 GB memory'];
+  }
+
+  if (serviceCategory === 'storage') {
+    return ['manual classification', '100 GB storage'];
+  }
+
+  if (serviceCategory === 'database') {
+    return ['manual classification', '100 GB database storage'];
+  }
+
+  if (serviceType === 'load-balancer') {
+    return ['manual classification', `${HOURS_PER_MONTH} load-balancer hours per month`];
+  }
+
+  if (serviceType === 'cdn') {
+    return ['manual classification', 'CDN enabled with 85% cache hit ratio'];
+  }
+
+  return ['manual classification'];
 }
 
 function diagramFormatFromFile(file: File): DiagramInputFormat | 'auto' {

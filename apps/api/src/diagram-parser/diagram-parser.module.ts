@@ -7,6 +7,7 @@ import { AliasDictionary } from './alias-dictionary';
 import { DiagramImportRepository } from './diagram-import.repository';
 import { DiagramParserController } from './diagram-parser.controller';
 import { DiagramParserService } from './diagram-parser.service';
+import { DiagramTempFileStore } from './diagram-temp-file.store';
 import { DrawioExtractor } from './drawio.extractor';
 import { FormatDetectorService } from './format-detector.service';
 import { StubLlmClassifierClient } from './llm-classifier.client';
@@ -38,6 +39,7 @@ import { VsdxExtractor } from './vsdx.extractor';
       ) => new NodeClassifierService(stencilMapRegistry, aliasDictionary, llmClassifierClient),
     },
     DiagramParserService,
+    DiagramTempFileStore,
     {
       provide: DiagramImportRepository,
       inject: [ConfigService, SecretsService],

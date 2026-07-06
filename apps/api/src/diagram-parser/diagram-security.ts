@@ -7,7 +7,12 @@ import {
   DiagramInputFormat,
 } from './diagram-parser.types';
 
-const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+const UNSUPPORTED_BINARY_SIGNATURES = [
+  { label: 'PNG image', magic: Buffer.from([0x89, 0x50, 0x4e, 0x47]) },
+  { label: 'JPEG image', magic: Buffer.from([0xff, 0xd8, 0xff]) },
+  { label: 'GIF image', magic: Buffer.from('GIF8', 'ascii') },
+  { label: 'PDF document', magic: Buffer.from('%PDF', 'ascii') },
+] as const;
 const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 const XML_ENTITY_PATTERN = /<!DOCTYPE|<!ENTITY|\bSYSTEM\b|\bPUBLIC\b/i;
 
@@ -30,13 +35,19 @@ export function assertUploadSize(buffer: Buffer): void {
 }
 
 export function assertNoBinaryImageSpoof(buffer: Buffer, fileName?: string): void {
-  if (buffer.subarray(0, PNG_MAGIC.length).equals(PNG_MAGIC)) {
-    throw new ApiValidationError('Diagram file content does not match a supported diagram format', [
-      {
-        field: 'content',
-        issue: `${fileName ?? 'upload'} looks like a PNG image, not a diagram source`,
-      },
-    ]);
+  for (const signature of UNSUPPORTED_BINARY_SIGNATURES) {
+    if (buffer.subarray(0, signature.magic.length).equals(signature.magic)) {
+      // PHASE_2_5_HOOK: route image/PDF diagram uploads to an optional vision/OCR parser here.
+      throw new ApiValidationError(
+        'Diagram file content does not match a supported diagram format',
+        [
+          {
+            field: 'content',
+            issue: `${fileName ?? 'upload'} looks like a ${signature.label}, not a diagram source. Export as draw.io XML, Mermaid, Lucid CSV, or VSDX.`,
+          },
+        ],
+      );
+    }
   }
 }
 

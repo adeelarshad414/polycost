@@ -1043,6 +1043,35 @@ controls.
   `index.html`; lint passes with existing security-plugin warnings only; full audit
   high/critical gate passes while production-only audit reports 0 vulnerabilities.
 
+## 2026-07-06 Phase 2 diagram-to-cost hardening pass
+
+- Hardened diagram ingestion beyond the initial Phase 2 scaffold: decoded uploads keep
+  the 5MB safety cap, JSON request envelopes now allow base64 VSDX payloads safely,
+  binary sniffing rejects PNG/JPEG/GIF/PDF content, and inflated draw.io/VSDX content
+  is bounded by size and compression-ratio guards.
+- Added randomized 24-hour temp-file storage outside the webroot via
+  `DIAGRAM_TEMP_DIR`, including DB metadata for `temp_file_ref` and `expires_at`.
+  Only the random file reference is persisted, not a filesystem path.
+- Expanded review UX so diagram components are not silently trusted: users can remove
+  detected services, classify unresolved nodes, add missing services, inspect ignored
+  decorative nodes, and submit the edited NWS into the normal comparison pipeline.
+- Added API/browser fixture coverage for Mermaid, draw.io, Lucid CSV, and VSDX; added
+  malicious fixture coverage for XXE, deflate bomb, ZIP bomb, and renamed binary
+  image uploads.
+- Fixed Compose migration drift for existing local volumes by running
+  `npm run db:migrate` inside `npm run ci:e2e`, and updated the fresh Postgres init
+  migration list through `023`.
+- Added SQL Server local seed pricing rows so VSDX diagrams containing SQL Server
+  databases can still produce three-cloud comparison output in clean/local stacks.
+- Verification passing locally:
+  `npm run format:check`, `npm run ci:lint`, `npm run ci:unit`,
+  `npm run ci:integration`, `npm run ci:build`, `npm run ci:e2e`,
+  `npm run ci:security`, `npm run db:validate`, `npm run graphify:validate`,
+  `npm run qa`, `npm run devops:check`, and `npm run cloud:check`.
+- Notes: `npm run ci:security` exits 0 at the high threshold while reporting
+  low/moderate transitive advisories in tooling paths; `npm run qa` still skips the
+  optional Node 24-only impeccable check because the repo targets Node 20.
+
 ## Known issues / carried-forward items
 
 Running list. Add here whenever a phase completes with known gaps. Remove an item only

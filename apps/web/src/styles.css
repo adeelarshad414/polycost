@@ -2182,6 +2182,44 @@ summary:focus-visible,
   gap: var(--pc-space-1);
 }
 
+.diagram-preview-pane {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border: 1px dashed color-mix(in srgb, var(--pc-border) 82%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface) 78%, transparent);
+  padding: var(--pc-space-1);
+}
+
+.diagram-preview-node {
+  max-width: 180px;
+  overflow: hidden;
+  border: 1px solid var(--pc-border);
+  border-radius: 999px;
+  background: var(--pc-bg-surface);
+  color: var(--pc-text-primary);
+  font-size: var(--pc-text-xs);
+  font-weight: 800;
+  padding: 5px 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagram-preview-node-resource {
+  border-color: color-mix(in srgb, var(--brand-green) 34%, var(--pc-border));
+}
+
+.diagram-preview-node-unknown {
+  border-color: color-mix(in srgb, var(--pc-warning) 42%, var(--pc-border));
+}
+
+.diagram-preview-node-decorative,
+.diagram-preview-node-more {
+  color: var(--pc-text-secondary);
+}
+
 .diagram-review-card {
   display: grid;
   min-width: 0;
@@ -2210,6 +2248,24 @@ summary:focus-visible,
   color: var(--pc-warning);
   font-style: normal;
   font-weight: 800;
+}
+
+.diagram-review-link-button {
+  width: fit-content;
+  border: 0;
+  background: transparent;
+  color: var(--pc-danger);
+  cursor: pointer;
+  font-size: var(--pc-text-xs);
+  font-weight: 900;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.diagram-review-link-button:hover,
+.diagram-review-link-button:focus-visible {
+  color: color-mix(in srgb, var(--pc-danger) 82%, var(--pc-text-primary));
 }
 
 .confidence-badge {
@@ -2242,8 +2298,60 @@ summary:focus-visible,
   padding: var(--pc-space-1);
 }
 
+.diagram-review-callout summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--pc-space-1);
+}
+
 .diagram-review-callout-risk {
   background: color-mix(in srgb, var(--pc-warning-soft) 74%, var(--pc-bg-surface));
+}
+
+.diagram-review-unresolved-list,
+.diagram-review-ignored-list {
+  display: grid;
+  gap: 8px;
+  margin: var(--pc-space-1) 0 0;
+  padding: 0;
+}
+
+.diagram-review-ignored-list {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  list-style: none;
+}
+
+.diagram-review-select-row {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 220px);
+}
+
+.diagram-review-select-row span {
+  color: var(--pc-text-primary);
+  font-size: var(--pc-text-xs);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.diagram-review-select-row select {
+  min-width: 0;
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: var(--pc-bg-surface);
+  color: var(--pc-text-primary);
+  font: inherit;
+  font-size: var(--pc-text-xs);
+  padding: 7px 9px;
+}
+
+.diagram-review-add-row {
+  border-top: 1px solid var(--pc-border);
+  padding-top: var(--pc-space-1);
 }
 
 .diagram-review-workspace {

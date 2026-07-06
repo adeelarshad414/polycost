@@ -45,6 +45,13 @@ same form. You can always switch to editing it directly.
 Use **Upload diagram** when you already have an architecture sketch. PolyCost accepts
 Mermaid text, draw.io XML, Lucid-style CSV exports, and VSDX files up to 5MB.
 
+Export paths:
+
+- draw.io / diagrams.net: `File > Save as` for `.drawio`, or `File > Export as > XML`.
+- Lucidchart shape data: `File > Export > CSV of Shape Data`.
+- Lucidchart Visio export: `File > Export > Visio (VSDX)`.
+- Mermaid: paste the `.mmd` source or flowchart text directly.
+
 After parsing, PolyCost shows a review panel with:
 
 - Classified services and confidence levels.
