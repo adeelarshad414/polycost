@@ -1,11 +1,23 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, Req, Res } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ProviderId } from '../adapters/common/cloud-provider-adapter';
 import { ApiValidationError } from '../api/api-errors';
+import {
+  ApiRateLimitService,
+  RateLimitHeaderResponse,
+  requestIdentity,
+  writeRateLimitHeaders,
+} from '../api/rate-limit.service';
+import { AppConfig } from '../config/config.schema';
 import { providerRegionForCanonicalRegion } from '../pricing-normalization/region-map';
 import { PaymentOptionCode, PricingGranularity, PricingTermCode } from './pricing-models.types';
 import { PricingMatrixService } from './pricing-matrix.service';
 
 type QueryValue = string | string[] | undefined;
+interface RequestLike {
+  ip?: string;
+  headers?: Record<string, unknown>;
+}
 
 const PROVIDERS: ProviderId[] = ['aws', 'azure', 'gcp'];
 const GRANULARITIES: PricingGranularity[] = ['hourly', 'daily', 'weekly', 'monthly', 'yearly'];
@@ -18,14 +30,21 @@ const PAYMENT_OPTIONS: PaymentOptionCode[] = [
 
 @Controller('api/v1/pricing')
 export class PricingModelsController {
-  constructor(private readonly pricingMatrixService: PricingMatrixService) {}
+  constructor(
+    private readonly pricingMatrixService: PricingMatrixService,
+    private readonly apiRateLimitService: ApiRateLimitService,
+    private readonly configService: ConfigService<AppConfig, true>,
+  ) {}
 
   @Get(':provider/:service')
   rate(
     @Param('provider') providerParam: string,
     @Param('service') service: string,
     @Query() query: Record<string, QueryValue>,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
+    this.consumeRateLimit('pricing_model_rate', request, response);
     const provider = parseProvider(providerParam);
 
     return this.pricingMatrixService.resolveRate({
@@ -43,7 +62,10 @@ export class PricingModelsController {
     @Param('provider') providerParam: string,
     @Param('service') service: string,
     @Query('region') region: QueryValue,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
+    this.consumeRateLimit('pricing_model_options', request, response);
     const provider = parseProvider(providerParam);
 
     return this.pricingMatrixService.listModels(
@@ -58,7 +80,10 @@ export class PricingModelsController {
     @Param('provider') providerParam: string,
     @Param('service') service: string,
     @Query('region') region: QueryValue,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
+    this.consumeRateLimit('pricing_model_matrix', request, response);
     const provider = parseProvider(providerParam);
 
     return this.pricingMatrixService.matrix({
@@ -67,14 +92,42 @@ export class PricingModelsController {
       region: parseRegion(region, provider),
     });
   }
+
+  private consumeRateLimit(
+    scope: string,
+    request: RequestLike | undefined,
+    response: RateLimitHeaderResponse | undefined,
+  ): void {
+    const state = this.apiRateLimitService.consume(
+      scope,
+      requestIdentity(request ?? {}),
+      this.configService.get('RATE_LIMIT_PUBLIC_READ_PER_MINUTE', { infer: true }),
+    );
+    writeRateLimitHeaders(response, state);
+  }
 }
 
 @Controller('api/v1/compare')
 export class PricingCompareV2Controller {
-  constructor(private readonly pricingMatrixService: PricingMatrixService) {}
+  constructor(
+    private readonly pricingMatrixService: PricingMatrixService,
+    private readonly apiRateLimitService: ApiRateLimitService,
+    private readonly configService: ConfigService<AppConfig, true>,
+  ) {}
 
   @Get()
-  compare(@Query() query: Record<string, QueryValue>) {
+  compare(
+    @Query() query: Record<string, QueryValue>,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    const state = this.apiRateLimitService.consume(
+      'pricing_compare_v2',
+      requestIdentity(request ?? {}),
+      this.configService.get('RATE_LIMIT_COMPARISON_PER_MINUTE', { infer: true }),
+    );
+    writeRateLimitHeaders(response, state);
+
     const canonicalRegion = optionalSingleString(query.region) ?? 'us-east';
 
     return this.pricingMatrixService.compare({

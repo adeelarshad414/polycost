@@ -3,17 +3,28 @@ import { CsvReportGenerator } from './csv-report.generator';
 import { ExcelReportGenerator } from './excel-report.generator';
 import { PdfReportGenerator } from './pdf-report.generator';
 import {
+  architectureOverviewRows,
+  breakEvenSummaryRows,
   commitmentTcoRows,
+  costCoverageMapRows,
+  dataFreshnessRows,
   decisionSummaryRows,
+  egressNetworkingDetailRows,
   egressTierBreakdownRows,
   labelForInterval,
   labelForPricingModel,
   lineItemEvidenceRows,
+  methodologySourceRows,
+  optimizationOpportunityRows,
   pricingModelAvailabilityRows,
+  providerCostDetailRows,
   providerRankingRows,
+  regionComparisonRows,
   reportAssumptionRows,
+  reportCoverRows,
   selectedScenarioRows,
   serviceRequirementRows,
+  skuMappingAppendixRows,
   workloadScopeRows,
 } from './report-evidence';
 import { sanitizeSpreadsheetText } from './report-security';
@@ -28,17 +39,44 @@ const comparison: ComparisonResult = {
     workloadName: 'Client portal',
     workloadType: 'web_app',
     regionPreference: 'us-east',
+    availability: {
+      multiAz: true,
+      multiRegion: false,
+      slaTarget: '99.9%',
+      faultTolerance: 'multi-az',
+    },
+    workloadProfile: {
+      environment: 'production',
+      commitmentPreferencePercent: 90,
+      operatingSystem: 'linux',
+      supportTier: 'business',
+      usagePattern: {
+        type: 'bursty',
+        averageUtilizationPercent: 25,
+      },
+      dataResidency: {
+        scope: 'eu',
+        complianceLocked: true,
+      },
+      tags: [
+        { key: 'team', value: 'platform' },
+        { key: 'project', value: 'migration-q3' },
+      ],
+    },
     serviceRequirements: [
       {
         serviceCategory: 'compute',
         serviceType: 'vm-compute',
-        instanceType: 'balanced tier - 2 vCPU - 4GB',
+        instanceType: 'balanced general-purpose tier / x86 / shared tenancy - 2 vCPU - 4GB',
         tier: 'balanced',
         region: 'us-east',
         az: '2 zones',
         quantity: 2,
         scaleParams: {
           scalingType: 'fixed',
+          instanceFamily: 'general-purpose',
+          processorArchitecture: 'x86_64',
+          tenancy: 'shared',
         },
       },
     ],
@@ -133,13 +171,64 @@ const comparison: ComparisonResult = {
   ],
 };
 
+const reportDataHealth = {
+  generatedAt: '2026-07-02T00:00:00.000Z',
+  freshnessPolicyHours: 48,
+  overallStatus: 'stale' as const,
+  alertCount: 1,
+  providers: [
+    {
+      providerId: 'aws' as const,
+      freshness: 'fresh' as const,
+      ageHours: 4,
+      message: 'Pricing cache refreshed 4h ago across 30 catalog rows and 18 current rate rows.',
+      cache: {
+        catalogRows: 30,
+        currentRateRows: 18,
+        ageHours: 4,
+        freshness: 'fresh' as const,
+        syncStatusCounts: {
+          success: 48,
+          partial: 0,
+          failed: 0,
+        },
+      },
+    },
+    {
+      providerId: 'azure' as const,
+      freshness: 'stale' as const,
+      ageHours: 72,
+      message: 'Pricing data is 72h old against the 48h policy.',
+      cache: {
+        catalogRows: 22,
+        currentRateRows: 12,
+        ageHours: 72,
+        freshness: 'stale' as const,
+        syncStatusCounts: {
+          success: 32,
+          partial: 2,
+          failed: 0,
+        },
+      },
+    },
+  ],
+};
+
 describe('report generators', () => {
   it('creates a CSV report with matching totals and spreadsheet injection mitigation', () => {
     const csv = new CsvReportGenerator()
-      .generate(comparison, { interval: 'quarterly', pricingModel: 'reserved-3yr' })
+      .generate(comparison, {
+        interval: 'quarterly',
+        pricingModel: 'reserved-3yr',
+        generatedAt: '2026-07-02T00:00:00.000Z',
+      })
       .toString('utf8');
 
     expect(csv).toContain('Comparison ID,comparison-123');
+    expect(csv).toContain('Generated at,2026-07-02T00:00:00.000Z');
+    expect(csv).toContain(
+      'Data freshness notice,Pricing data as of 2026-06-29T00:00:00.000Z; refresh cached pricing before final commitment.',
+    );
     expect(csv).toContain('Cheapest provider (on-demand baseline),gcp');
     expect(csv).toContain('Selected interval,Quarterly');
     expect(csv).toContain('Selected pricing model,Reserved 3-year');
@@ -151,10 +240,13 @@ describe('report generators', () => {
       'Evidence confidence,"Review required - 2/3 providers priced, 1 approximate mapping(s), 1 warning(s)."',
     );
     expect(csv).toContain('Provider Ranking');
-    expect(csv).toContain('aws,#1,yes,126,42,504,0,0,1,Three-year commitment.');
-    expect(csv).toContain('gcp,Not eligible,no,,,,,,0,Not available for this SKU/region.');
+    expect(csv).toContain('aws,#1,yes,no,126,42,504,0,0,1,Three-year commitment.');
+    expect(csv).toContain('gcp,Not eligible,no,,,,,,,0,Not available for this SKU/region.');
     expect(csv).toContain('Workload Scope');
     expect(csv).toContain('Workload name,Client portal');
+    expect(csv).toContain('Architecture Overview');
+    expect(csv).toContain('AWS mapping,Azure mapping,GCP mapping');
+    expect(csv).toContain('compute/vm-compute');
     expect(csv).toContain('FinOps Summary');
     expect(csv).toContain('Executive recommendation,gcp is the current cost baseline');
     expect(csv).toContain('Decision confidence,Medium - 2/3 providers priced; 1 approximate mappings');
@@ -164,19 +256,39 @@ describe('report generators', () => {
     expect(csv).toContain('Lowest monthly run rate,gcp $20');
     expect(csv).toContain('Annual avoidable spread,$612');
     expect(csv).toContain('Dominant cost driver,storage $20');
+    expect(csv).toContain('Provider Cost Detail');
+    expect(csv).toContain('Provider total,aws,all,all,aws monthly total');
+    expect(csv).toContain('Category subtotal,aws,network,egress,network / egress subtotal');
+    expect(csv).toContain('Cost Coverage Map');
+    expect(csv).toContain('aws,Compute families and sizing,Covered,1,0,60.8');
     expect(csv).toContain('Selected Pricing Scenario');
-    expect(csv).toContain('aws,yes,126,42,0.06,Three-year commitment.');
+    expect(csv).toContain('aws,yes,126,42,0.06,no,not supplied,Three-year commitment.');
     expect(csv).toContain('Pricing Model Availability');
     expect(csv).toContain(
       'gcp,available,not modeled,not modeled,not modeled,not modeled,Only on-demand totals are modeled for this provider.',
     );
     expect(csv).toContain('Commitment Payment and TCO');
-    expect(csv).toContain('aws,Reserved 3-year,yes,0.06,42,360,All upfront,36 months,1872');
+    expect(csv).toContain('aws,Reserved 3-year,yes,no,0.06,42,360,All upfront,36 months,1872');
     expect(csv).toContain('Egress Tiered Breakdown');
     expect(csv).toContain('aws,us-east-1,0-512 GB,512,0.09,46.08,0.09');
+    expect(csv).toContain('Egress & Networking Detail');
+    expect(csv).toContain('aws,egress,internet egress,us-east-1,46.08');
+    expect(csv).toContain('Optimization Opportunities');
+    expect(csv).toContain('Commitment coverage,aws Reserved 3-year lowers recurring run rate;');
+    expect(csv).toContain('Region Comparison');
+    expect(csv).toContain('aws,eu-west,eu-west-1,76.68,5.68,1.08');
+    expect(csv).toContain('Break-Even Analysis');
+    expect(csv).toContain('aws,Reserved 3-year,71,42,360,29,13,Three-year commitment.');
     expect(csv).toContain('Normalized Service Requirements');
-    expect(csv).toContain('compute,vm-compute,balanced tier - 2 vCPU - 4GB / balanced');
+    expect(csv).toContain(
+      'compute,vm-compute,balanced general-purpose tier / x86 / shared tenancy - 2 vCPU - 4GB / balanced',
+    );
     expect(csv).toContain('Rate Math Evidence');
+    expect(csv).toContain('Methodology & Data Sources');
+    expect(csv).toContain('Provider catalog APIs');
+    expect(csv).toContain('AWS Price List bulk offer files');
+    expect(csv).toContain('SKU Mapping Appendix');
+    expect(csv).toContain('Resolved SKU');
     expect(csv).toContain('Report Assumptions');
     expect(csv).toContain(
       'Pricing source,Cached provider catalog rates with 1 warning(s) captured in this export.',
@@ -199,7 +311,8 @@ describe('report generators', () => {
     expect(csv).toContain('Selected interval,Monthly');
     expect(csv).toContain('Selected pricing model,On-demand');
     expect(csv).toContain('No normalized service requirements were attached to this comparison.');
-    expect(csv).not.toContain('Warnings');
+    expect(csv).toContain('Warnings,No provider or live-refresh warnings were captured');
+    expect(csv).not.toContain('Warnings\nProvider,Code,Message');
   });
 
   it('creates CSV warning rows for general warnings without provider IDs', () => {
@@ -218,10 +331,53 @@ describe('report generators', () => {
     expect(csv).toContain("Warnings\nProvider,Code,Message\n,live_refresh_failed,'@refresh unavailable");
   });
 
+  it('embeds data-health evidence across report formats when supplied', () => {
+    const options = {
+      generatedAt: '2026-07-02T00:00:00.000Z',
+      dataHealth: reportDataHealth,
+    };
+    const csv = new CsvReportGenerator().generate(comparison, options).toString('utf8');
+    const pdf = new PdfReportGenerator().generate(comparison, options).toString('utf8');
+    const xlsx = new ExcelReportGenerator().generate(comparison, options).toString('utf8');
+
+    expect(csv).toContain(
+      'Data freshness notice,1 data-health alert(s) at 2026-07-02T00:00:00.000Z; refresh cached pricing before final commitment.',
+    );
+    expect(csv).toContain(
+      'Data health status,"stale; policy 48h; aws fresh (4h, 18 current rates); azure stale (72h, 12 current rates)"',
+    );
+    expect(csv).toContain('Current rate rows,30');
+    expect(pdf).toContain('Data health status: stale; policy 48h; aws fresh');
+    expect(pdf).toContain('Current rate rows: 30');
+    expect(xlsx).toContain('<sheet name="Data Freshness" sheetId="13"');
+    expect(xlsx).toContain('Provider freshness');
+    expect(xlsx).toContain('success 80; partial 2; failed 0');
+    expect(dataFreshnessRows(options)).toEqual(
+      expect.arrayContaining([
+        ['Overall status', 'stale'],
+        ['Catalog rows', '52'],
+        ['Current rate rows', '30'],
+      ]),
+    );
+    expect(reportCoverRows(comparison, options)).toEqual(
+      expect.arrayContaining([
+        [
+          'Data freshness notice',
+          '1 data-health alert(s) at 2026-07-02T00:00:00.000Z; refresh cached pricing before final commitment.',
+        ],
+        [
+          'Data health status',
+          expect.stringContaining('stale; policy 48h; aws fresh'),
+        ],
+      ]),
+    );
+  });
+
   it('creates a real XLSX package with matching totals and spreadsheet injection mitigation', () => {
     const xlsx = new ExcelReportGenerator().generate(comparison, {
       interval: 'quarterly',
       pricingModel: 'reserved-3yr',
+      generatedAt: '2026-07-02T00:00:00.000Z',
     });
     const xlsxText = xlsx.toString('utf8');
 
@@ -232,12 +388,25 @@ describe('report generators', () => {
     expect(xlsxText).toContain('xl/worksheets/sheet2.xml');
     expect(xlsxText).toContain('<sheet name="Comparison"');
     expect(xlsxText).toContain('<sheet name="What If" sheetId="2"');
+    expect(xlsxText).toContain('<sheet name="Architecture Overview" sheetId="3"');
+    expect(xlsxText).toContain('<sheet name="Provider Cost Detail" sheetId="4"');
+    expect(xlsxText).toContain('<sheet name="Cost Coverage Map" sheetId="5"');
+    expect(xlsxText).toContain('<sheet name="Optimization Opportunities" sheetId="6"');
+    expect(xlsxText).toContain('<sheet name="Egress &amp; Networking Detail" sheetId="7"');
+    expect(xlsxText).toContain('<sheet name="Region Comparison" sheetId="8"');
+    expect(xlsxText).toContain('<sheet name="Break-Even Analysis" sheetId="9"');
+    expect(xlsxText).toContain('<sheet name="Break-Even Summary" sheetId="10"');
+    expect(xlsxText).toContain('<sheet name="Methodology &amp; Sources" sheetId="11"');
+    expect(xlsxText).toContain('<sheet name="SKU Mapping Appendix" sheetId="12"');
     expect(xlsxText).toContain('<calcPr calcMode="auto" fullCalcOnLoad="1"/>');
     expect(xlsxText).toContain(
       '<definedName name="WhatIfScaleFactor">&apos;What If&apos;!$B$5</definedName>',
     );
     expect(xlsxText).toContain(
       '<definedName name="WhatIfRegionMultiplier">&apos;What If&apos;!$B$6</definedName>',
+    );
+    expect(xlsxText).toContain(
+      '<definedName name="BreakEvenOnDemandMultiplier">&apos;Break-Even Analysis&apos;!$B$5</definedName>',
     );
     expect(xlsxText).toMatch(
       /<definedName name="ComparisonMonthlyTotals">&apos;Comparison&apos;!\$D\$\d+:\$D\$\d+<\/definedName>/,
@@ -253,6 +422,17 @@ describe('report generators', () => {
     expect(xlsxText).toContain('Provider Ranking');
     expect(xlsxText).toContain('Selected model eligible');
     expect(xlsxText).toContain('Workload Scope');
+    expect(xlsxText).toContain('Generated at');
+    expect(xlsxText).toContain('2026-07-02T00:00:00.000Z');
+    expect(xlsxText).toContain('Data freshness notice');
+    expect(xlsxText).toContain('Architecture Overview');
+    expect(xlsxText).toContain('AWS mapping');
+    expect(xlsxText).toContain('compute/vm-compute');
+    expect(xlsxText).toContain('Provider Cost Detail');
+    expect(xlsxText).toContain('Provider total');
+    expect(xlsxText).toContain('Category subtotal');
+    expect(xlsxText).toContain('Cost Coverage Map');
+    expect(xlsxText).toContain('Compute families and sizing');
     expect(xlsxText).toContain('FinOps Summary');
     expect(xlsxText).toContain('Executive recommendation');
     expect(xlsxText).toContain('Decision confidence');
@@ -266,8 +446,19 @@ describe('report generators', () => {
     expect(xlsxText).toContain('<t>360</t>');
     expect(xlsxText).toContain('<t>1872</t>');
     expect(xlsxText).toContain('Egress Tiered Breakdown');
+    expect(xlsxText).toContain('Optimization Opportunities');
+    expect(xlsxText).toContain('Egress &amp; Networking Detail');
+    expect(xlsxText).toContain('Region Comparison');
+    expect(xlsxText).toContain('PolyCost Break-Even Analysis');
+    expect(xlsxText).toContain('<f>D9*C9*BreakEvenOnDemandMultiplier</f><v>0</v>');
+    expect(xlsxText).toContain('<f>F9+E9*C9</f><v>360</v>');
+    expect(xlsxText).toContain('<f>IF(H9&lt;=G9,1,0)</f><v>0</v>');
     expect(xlsxText).toContain('Normalized Service Requirements');
     expect(xlsxText).toContain('Rate Math Evidence');
+    expect(xlsxText).toContain('Methodology &amp; Data Sources');
+    expect(xlsxText).toContain('Provider catalog APIs');
+    expect(xlsxText).toContain('SKU Mapping Appendix');
+    expect(xlsxText).toContain('Resolved SKU');
     expect(xlsxText).toContain('Report Assumptions');
     expect(xlsxText).toContain('<v>71</v>');
     expect(xlsxText).toContain('PolyCost What-If Model');
@@ -334,20 +525,28 @@ describe('report generators', () => {
           comparison.providers[1],
         ],
       },
-      { interval: 'quarterly', pricingModel: 'reserved-3yr' },
+      {
+        interval: 'quarterly',
+        pricingModel: 'reserved-3yr',
+        generatedAt: '2026-07-02T00:00:00.000Z',
+      },
     );
     const pdfText = pdf.toString('utf8');
 
     expect(pdf.subarray(0, 8).toString('utf8')).toBe('%PDF-1.4');
     expect(pdfText).toContain('Comparison ID: comparison-123');
+    expect(pdfText).toContain('Generated at: 2026-07-02T00:00:00.000Z');
+    expect(pdfText).toContain('Data freshness notice: Pricing data as of');
     expect(pdfText).toContain('Cheapest provider \\(on-demand baseline\\): gcp');
     expect(pdfText).toContain('Selected interval: Quarterly');
     expect(pdfText).toContain('Selected pricing model: Reserved 3-year');
     expect(pdfText).toContain('Decision summary');
     expect(pdfText).toContain('Cost baseline: aws ranks #1 for Reserved 3-year');
     expect(pdfText).toContain('Provider ranking');
-    expect(pdfText).toContain('aws | #1 | eligible yes | selected $126');
+    expect(pdfText).toContain('aws | #1 | eligible yes | estimate no | selected $126');
     expect(pdfText).toContain('Workload scope');
+    expect(pdfText).toContain('Architecture overview');
+    expect(pdfText).toContain('compute | compute/vm-compute');
     expect(pdfText).toContain('FinOps summary');
     expect(pdfText).toContain('Executive recommendation: gcp is the current cost baseline');
     expect(pdfText).toContain('Decision confidence: Medium');
@@ -355,14 +554,29 @@ describe('report generators', () => {
     expect(pdfText).toContain('Architecture risk: Medium');
     expect(pdfText).toContain('Lowest monthly run rate: gcp $20');
     expect(pdfText).toContain('aws: daily $2.33, weekly $16.34, monthly $71');
+    expect(pdfText).toContain('Provider cost detail');
+    expect(pdfText).toContain('Provider total | aws | all / all | monthly $71');
+    expect(pdfText).toContain('Cost coverage map');
+    expect(pdfText).toContain('aws | Compute families and sizing | Covered');
     expect(pdfText).toContain('Selected pricing scenario');
     expect(pdfText).toContain('Pricing model availability');
     expect(pdfText).toContain('Commitment payment and TCO');
     expect(pdfText).toContain('upfront $360');
     expect(pdfText).toContain('Egress tiered breakdown');
     expect(pdfText).toContain('aws | us-east-1 | 0-512 GB | billable 512 GB');
+    expect(pdfText).toContain('Egress and networking detail');
+    expect(pdfText).toContain('aws | egress | internet egress | monthly $46.08');
+    expect(pdfText).toContain('Optimization opportunities');
+    expect(pdfText).toContain('Commitment coverage | aws Reserved 3-year lowers recurring run rate');
+    expect(pdfText).toContain('Region comparison');
+    expect(pdfText).toContain('aws | eu-west \\(eu-west-1\\) | modeled monthly $76.68');
+    expect(pdfText).toContain('Break-even analysis');
+    expect(pdfText).toContain('aws | Reserved 3-year | on-demand $71/mo | committed $42/mo');
     expect(pdfText).toContain('Normalized service requirements');
     expect(pdfText).toContain('Rate math evidence');
+    expect(pdfText).toContain('Methodology and data sources');
+    expect(pdfText).toContain('Provider catalog APIs');
+    expect(pdfText).toContain('SKU mapping appendix');
     expect(pdfText).toContain('Report assumptions');
     expect(pdfText).toContain('=cmd\\(1\\)\\\\risky compute');
     expect(pdfText).toContain('general | provider_pricing_failed | general warning');
@@ -384,7 +598,10 @@ describe('report generators', () => {
       warnings: undefined,
     });
 
-    expect(pdf.toString('utf8')).not.toContain('Warnings');
+    const pdfText = pdf.toString('utf8');
+
+    expect(pdfText).toContain('Warnings: No provider or live-refresh warnings were captured');
+    expect(pdfText).not.toContain('provider_pricing_failed');
   });
 
   it('keeps the PDF requirement fallback when workload requirements are absent', () => {
@@ -415,8 +632,20 @@ describe('report generators', () => {
 
     expect(providerRankingRows(comparison, { interval: 'quarterly', pricingModel: 'reserved-3yr' })).toEqual(
       expect.arrayContaining([
-        ['aws', '#1', 'yes', '126', '42', '504', '0', '0', '1', 'Three-year commitment.'],
-        ['gcp', 'Not eligible', 'no', '', '', '', '', '', '0', 'Not available for this SKU/region.'],
+        ['aws', '#1', 'yes', 'no', '126', '42', '504', '0', '0', '1', 'Three-year commitment.'],
+        [
+          'gcp',
+          'Not eligible',
+          'no',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '0',
+          'Not available for this SKU/region.',
+        ],
       ]),
     );
 
@@ -444,36 +673,250 @@ describe('report generators', () => {
       ]),
     );
 
+    expect(
+      reportCoverRows(comparison, {
+        interval: 'quarterly',
+        pricingModel: 'reserved-3yr',
+        generatedAt: '2026-07-02T00:00:00.000Z',
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        ['Generated at', '2026-07-02T00:00:00.000Z'],
+        ['Provider coverage', '2/2 providers priced'],
+        ['Line-item evidence', '4 line item(s), 1 approximate'],
+      ]),
+    );
+
+    expect(architectureOverviewRows(comparison)).toEqual(
+      expect.arrayContaining([
+        [
+          'compute',
+          expect.stringContaining('compute/vm-compute'),
+          expect.stringContaining('risky compute'),
+          'Not mapped',
+          'Not mapped',
+          'Partial',
+          expect.stringContaining('Complete missing provider mappings'),
+        ],
+      ]),
+    );
+
+    expect(providerCostDetailRows(comparison)).toEqual(
+      expect.arrayContaining([
+        [
+          'Provider total',
+          'aws',
+          'all',
+          'all',
+          'aws monthly total',
+          '',
+          '',
+          '71',
+          '100%',
+          'Review required',
+          '3 line item(s) roll up to $71/mo.',
+        ],
+        [
+          'Category subtotal',
+          'aws',
+          'network',
+          'egress',
+          'network / egress subtotal',
+          '',
+          '',
+          '46.08',
+          '64.9%',
+          'Mapped',
+          'aws subtotal across 1 row(s).',
+        ],
+        expect.arrayContaining([
+          'Line item',
+          'aws',
+          'network',
+          'egress',
+          'internet egress',
+          '',
+          'us-east-1',
+          '46.08',
+          '64.9%',
+          'Mapped',
+          expect.stringContaining('$0.09 per GB rolled into $46.08 monthly'),
+        ]),
+      ]),
+    );
+
+    expect(costCoverageMapRows(comparison)).toEqual(
+      expect.arrayContaining([
+        [
+          'aws',
+          'Compute families and sizing',
+          'Covered',
+          '1',
+          '0',
+          '60.8',
+          expect.stringContaining('risky compute'),
+          expect.stringContaining('Validate family'),
+        ],
+        [
+          'aws',
+          'Database, NoSQL, cache, warehouse, and search',
+          'Partial',
+          '1',
+          '1',
+          '10.2',
+          expect.stringContaining('primary "postgres"'),
+          expect.stringContaining('Validate engine tier'),
+        ],
+        [
+          'gcp',
+          'Compute families and sizing',
+          'Missing priced row',
+          '0',
+          '0',
+          '',
+          expect.stringContaining('configured requirement but no priced row'),
+          expect.stringContaining('Validate family'),
+        ],
+      ]),
+    );
+
+    const baseRequirements = comparison.requirements as NonNullable<ComparisonResult['requirements']>;
+    const monitoringOnlyComparison: ComparisonResult = {
+      ...comparison,
+      requirements: {
+        ...baseRequirements,
+        serviceRequirements: [
+          {
+            serviceCategory: 'operations',
+            serviceType: 'monitoring-observability',
+            quantity: 1,
+          },
+        ],
+      },
+      providers: [
+        {
+          providerId: 'aws',
+          lineItems: [
+            {
+              category: 'operations',
+              costComponent: 'operations',
+              description: 'monitoring metrics and log retention',
+              isApproximate: true,
+              baseMonthlyCostUsd: 12,
+            },
+          ],
+          totals: {
+            daily: 0.4,
+            weekly: 2.8,
+            monthly: 12,
+            quarterly: 36,
+            yearly: 144,
+          },
+        },
+      ],
+    };
+    expect(costCoverageMapRows(monitoringOnlyComparison)).toEqual(
+      expect.arrayContaining([
+        [
+          'aws',
+          'Storage classes, snapshots, and retrieval',
+          'Not configured',
+          '0',
+          '0',
+          '',
+          expect.stringContaining('no configured or priced signal'),
+          expect.stringContaining('Validate storage class'),
+        ],
+        [
+          'aws',
+          'Monitoring, observability, secrets, WAF, and security operations',
+          'Partial',
+          '1',
+          '1',
+          '12',
+          expect.stringContaining('monitoring metrics and log retention'),
+          expect.stringContaining('Validate logs'),
+        ],
+      ]),
+    );
+
+    expect(methodologySourceRows(comparison)).toEqual(
+      expect.arrayContaining([
+        [
+          'Provider catalog APIs',
+          expect.stringContaining('AWS Price List bulk offer files'),
+          expect.stringContaining('SKU Mapping Appendix'),
+        ],
+        [
+          'Modeled fallback rows',
+          expect.stringContaining('0 line item(s) use PolyCost modeled SKU IDs'),
+          expect.stringContaining('provider calculator evidence'),
+        ],
+      ]),
+    );
+
+    expect(skuMappingAppendixRows(comparison)).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'aws',
+          'compute',
+          'compute',
+          expect.stringContaining('compute/vm-compute'),
+          'No SKU supplied',
+          '=cmd(1)\\risky compute',
+          'us-east',
+          '',
+          '',
+          '',
+          '60.8',
+          'Mapped',
+          'flat',
+          expect.stringContaining('Provider adapter monthly subtotal'),
+        ]),
+      ]),
+    );
+    const skuMappingRows = skuMappingAppendixRows(comparison);
+    const skuMappingColumnCount = skuMappingRows[0].length;
+    expect(skuMappingRows.slice(1).every((row) => row.length === skuMappingColumnCount)).toBe(
+      true,
+    );
+
     expect(workloadScopeRows(comparison)).toEqual(
       expect.arrayContaining([
         ['Workload name', 'Client portal'],
+        ['Availability posture', 'multi-AZ (99.9% SLA target)'],
+        ['Fault tolerance', 'multi-az'],
+        ['Environment', 'production'],
+        ['Data residency', 'eu (locked)'],
+        ['Usage pattern', 'bursty (25% average utilization)'],
+        ['Cost allocation tags', 'team:platform, project:migration-q3'],
         ['Normalized service requirements', '1'],
       ]),
     );
   });
 
   it('builds selected scenario rows for unavailable commitments and spot estimates', () => {
-    const rows = selectedScenarioRows(
-      {
-        ...comparison,
-        providers: [
-          {
-            ...comparison.providers[0],
-            pricingModels: [
-              {
-                model: 'spot',
-                available: true,
-                monthlyCostUsd: 35,
-                hourlyCostUsd: 0.05,
-                caveat: 'Interruptible capacity.',
-              },
-            ],
-          },
-          comparison.providers[1],
-        ],
-      },
-      { interval: 'yearly', pricingModel: 'spot' },
-    );
+    const spotComparison = {
+      ...comparison,
+      providers: [
+        {
+          ...comparison.providers[0],
+          pricingModels: [
+            {
+              model: 'spot' as const,
+              available: true,
+              monthlyCostUsd: 35,
+              hourlyCostUsd: 0.05,
+              caveat: 'Interruptible capacity.',
+            },
+          ],
+        },
+        comparison.providers[1],
+      ],
+    };
+    const spotEstimateCaveat =
+      'Interruptible capacity. Spot/preemptible pricing is interruptible and modeled as an estimate, not a guarantee.';
+    const rows = selectedScenarioRows(spotComparison, { interval: 'yearly', pricingModel: 'spot' });
 
     expect(rows[0]).toEqual([
       'Provider',
@@ -481,17 +924,57 @@ describe('report generators', () => {
       'Yearly USD',
       'Monthly USD',
       'Hourly USD',
+      'Estimate flag',
+      'Source',
       'Caveat',
     ]);
-    expect(rows[1]).toEqual(['aws', 'yes', '420', '35', '0.05', 'Interruptible capacity.']);
+    expect(rows[1]).toEqual([
+      'aws',
+      'yes',
+      '420',
+      '35',
+      '0.05',
+      'yes',
+      'not supplied',
+      spotEstimateCaveat,
+    ]);
     expect(rows[2]).toEqual([
       'gcp',
       'no',
       '',
       '',
       '',
+      '',
+      '',
       'Not available for this SKU/region.',
     ]);
+    expect(providerRankingRows(spotComparison, { interval: 'yearly', pricingModel: 'spot' })).toEqual(
+      expect.arrayContaining([
+        ['aws', '#1', 'yes', 'yes', '420', '35', '420', '0', '0', '1', spotEstimateCaveat],
+      ]),
+    );
+    expect(
+      selectedScenarioRows(
+        {
+          ...spotComparison,
+          providers: [
+            {
+              ...spotComparison.providers[0],
+              pricingModels: [
+                {
+                  model: 'spot',
+                  available: true,
+                  monthlyCostUsd: 35,
+                  caveat: 'Spot estimate range from cached provider data.',
+                },
+              ],
+            },
+            spotComparison.providers[1],
+          ],
+        },
+        { pricingModel: 'spot' },
+      )[1][7],
+    ).toBe('Spot estimate range from cached provider data.');
   });
 
   it('labels every report interval and pricing model', () => {
@@ -570,6 +1053,7 @@ describe('report generators', () => {
         'aws',
         'Reserved 3-year',
         'yes',
+        'no',
         '0.06',
         '42',
         '360',
@@ -582,6 +1066,628 @@ describe('report generators', () => {
     expect(egressRows).toContainEqual(
       expect.arrayContaining(['aws', 'us-east-1', '0-512 GB', '512', '0.09', '46.08']),
     );
+  });
+
+  it('builds production-grade optimization, network, region, and break-even rows', () => {
+    expect(optimizationOpportunityRows(comparison)).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'Commitment coverage',
+          'aws Reserved 3-year lowers recurring run rate; 10% remains exposed at the target coverage setting.',
+          '2.9',
+          '34.8',
+        ]),
+        expect.arrayContaining([
+          'Right-sizing',
+          'aws compute averages 25% utilization; evaluate smaller instance sizes, autoscaling bounds, or scheduled capacity before committing.',
+          '21.28',
+          '255.36',
+        ]),
+        expect.arrayContaining([
+          'Compute specification',
+          'aws M7i/M6i mapping should be validated for vCPU/RAM, network bandwidth, and disk baseline; evaluate M7g Graviton3 as an ARM target before locking M7i/M6i.',
+          '12.16',
+          '145.92',
+        ]),
+        expect.arrayContaining([
+          'Architecture risk',
+          'aws data-transfer line items are 64.9% of monthly spend; validate CDN, NAT, cross-AZ, and inter-region paths before sign-off.',
+          '',
+          '',
+          'High',
+          'Medium',
+        ]),
+        expect.arrayContaining([
+          'Egress optimization',
+          'aws egress and networking are 64.9% of monthly spend; evaluate CDN offload, cache-control, and same-region data access.',
+          '13.82',
+          '165.84',
+          'High',
+          'Medium',
+          'aws egress/network baseline is $46.08/mo; rule-based reduction is 30% when no single network driver dominates.',
+        ]),
+      ]),
+    );
+    expect(egressNetworkingDetailRows(comparison)).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining(['aws', 'egress', 'internet egress', 'us-east-1', '46.08']),
+      ]),
+    );
+    expect(regionComparisonRows(comparison)).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining(['aws', 'eu-west', 'eu-west-1', '76.68', '5.68', '1.08']),
+      ]),
+    );
+    expect(breakEvenSummaryRows(comparison)).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining(['aws', 'Reserved 3-year', '71', '42', '360', '29', '13']),
+      ]),
+    );
+
+    expect(
+      optimizationOpportunityRows({
+        ...comparison,
+        providers: [
+          {
+            ...comparison.providers[0],
+            lineItems: [
+              ...comparison.providers[0].lineItems,
+              {
+                category: 'licensing',
+                costComponent: 'licensing',
+                description: 'AWS Windows OS licensing estimate',
+                isApproximate: true,
+                baseMonthlyCostUsd: 24,
+              },
+            ],
+            totals: {
+              ...comparison.providers[0].totals,
+              monthly: 95,
+            },
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'License optimization',
+          'aws includes Windows/licensing cost; validate Linux equivalent or BYOL eligibility before committing.',
+          '24',
+          '288',
+          'Medium',
+          'Medium',
+          'Windows run-rate $95/mo vs Linux/BYOL-equivalent $71/mo; explicit licensing uplift is $24/mo.',
+        ]),
+      ]),
+    );
+
+    expect(
+      optimizationOpportunityRows({
+        ...comparison,
+        requirements: {
+          ...comparison.requirements!,
+          serviceRequirements: [
+            ...comparison.requirements!.serviceRequirements,
+            {
+              serviceCategory: 'storage',
+              serviceType: 'object-storage',
+              instanceType: 'object / archive - 1000 GB',
+              tier: 'archive',
+              region: 'us-east',
+              quantity: 1,
+              scaleParams: {
+                role: 'uploads',
+                sizeGb: 1000,
+                storageClass: 'archive',
+                monthlyRetrievalGb: 250,
+                snapshotSizeGb: 500,
+                snapshotRetentionDays: 60,
+                replication: 'none',
+              },
+            },
+          ],
+        },
+        providers: [
+          {
+            providerId: 'aws',
+            lineItems: [
+              {
+                category: 'network',
+                costComponent: 'egress',
+                description:
+                  'AWS VPN connectivity estimate (2 connection(s), 730 hrs, 1000 GB transfer)',
+                skuId: 'modeled-vpn-connectivity',
+                isApproximate: true,
+                baseMonthlyCostUsd: 163,
+              },
+              {
+                category: 'network',
+                costComponent: 'egress',
+                description:
+                  'AWS private circuit estimate (1 circuit(s), 730 port hrs, 2000 GB transfer)',
+                skuId: 'modeled-private-circuit',
+                isApproximate: true,
+                baseMonthlyCostUsd: 259,
+              },
+            ],
+            totals: {
+              daily: 15.4,
+              weekly: 107.8,
+              monthly: 462,
+              quarterly: 1386,
+              yearly: 5544,
+            },
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'Egress optimization',
+          'aws egress and networking are 91.34% of monthly spend; validate port speed, redundancy, metered-vs-unlimited transfer, and VPN-to-private-circuit break-even before final network design.',
+          '64.75',
+          '777',
+          'High',
+          'High',
+          'aws largest network row is "AWS private circuit estimate (1 circuit(s), 730 port hrs, 2000 GB transfer)" at $259/mo; private-connectivity architecture review is modeled as a 25% reduction of that baseline.',
+        ]),
+      ]),
+    );
+
+    expect(
+      optimizationOpportunityRows({
+        ...comparison,
+        providers: [
+          {
+            ...comparison.providers[0],
+            pricingModels: [
+              ...(comparison.providers[0].pricingModels ?? []),
+              {
+                model: 'spot',
+                available: true,
+                monthlyCostUsd: 35,
+                hourlyCostUsd: 0.05,
+                estimated: true,
+                volatility: 'volatile',
+                caveat: 'Interruptible capacity.',
+              },
+            ],
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'Spot blend',
+          'aws can model a 60% on-demand / 40% spot blend for interruptible capacity.',
+          '14.4',
+          '172.8',
+          'Medium',
+          'High',
+          expect.stringContaining('blended estimate is $56.6/mo'),
+        ]),
+      ]),
+    );
+
+    expect(
+      optimizationOpportunityRows({
+        ...comparison,
+        requirements: {
+          ...comparison.requirements!,
+          serviceRequirements: [
+            ...comparison.requirements!.serviceRequirements,
+            {
+              serviceCategory: 'database',
+              serviceType: 'nosql-database',
+              instanceType: 'generic_nosql / 250GB',
+              tier: 'managed',
+              region: 'us-east',
+              quantity: 1,
+              scaleParams: {
+                databaseEngine: 'generic_nosql',
+                databaseSizeGb: 250,
+                ruPerSecond: 4000,
+                nosqlReadRequestUnitsMillion: 50,
+                nosqlWriteRequestUnitsMillion: 20,
+                backupStorageGb: 100,
+                backupRetentionDays: 30,
+                provisionedIops: 8000,
+                readReplicaCount: 1,
+                crossRegionReplicaTransferGb: 100,
+              },
+            },
+          ],
+        },
+        providers: [
+          {
+            providerId: 'aws',
+            lineItems: [
+              {
+                category: 'storage',
+                costComponent: 'storage',
+                description: 'AWS snapshot retention estimate',
+                skuId: 'modeled-storage-snapshots',
+                isApproximate: false,
+                baseMonthlyCostUsd: 40,
+              },
+              {
+                category: 'storage',
+                costComponent: 'storage',
+                description: 'AWS archive retrieval estimate',
+                skuId: 'modeled-storage-retrieval',
+                isApproximate: false,
+                baseMonthlyCostUsd: 15,
+              },
+            ],
+            totals: {
+              daily: 3.95,
+              weekly: 27.69,
+              monthly: 120,
+              quarterly: 360,
+              yearly: 1440,
+            },
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'Storage optimization',
+          'aws storage is 45.83% of monthly spend; tune snapshot retention and deduplicate backup copies before approving the storage run-rate.',
+          '12',
+          '144',
+          'Low',
+          'Low',
+          'aws dominant storage row is "AWS snapshot retention estimate" at $40/mo; retention pruning is modeled as a 30% reduction of that row.',
+        ]),
+        expect.arrayContaining([
+          'Storage anatomy',
+          'aws storage class/type review: standard; validate snapshot retention and older-copy tiering before final quote.',
+          '',
+          '',
+          'Medium',
+          'Low',
+          expect.stringContaining('retrieval $15/mo, snapshot $40/mo'),
+        ]),
+      ]),
+    );
+
+    expect(
+      optimizationOpportunityRows({
+        ...comparison,
+        providers: [
+          {
+            providerId: 'aws',
+            lineItems: [
+              {
+                category: 'database',
+                costComponent: 'database',
+                description: 'AWS primary RU/s provisioned capacity estimate',
+                skuId: 'modeled-database-ru-capacity',
+                isApproximate: false,
+                baseMonthlyCostUsd: 80,
+              },
+              {
+                category: 'database',
+                costComponent: 'database',
+                description: 'AWS primary NoSQL write unit estimate',
+                skuId: 'modeled-database-nosql-write-units',
+                isApproximate: false,
+                baseMonthlyCostUsd: 40,
+              },
+            ],
+            totals: {
+              daily: 6.58,
+              weekly: 46.15,
+              monthly: 200,
+              quarterly: 600,
+              yearly: 2400,
+            },
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'Database optimization',
+          'aws database and analytics data services are 60% of monthly spend; validate RU/s utilization, autoscale limits, and serverless/provisioned break-even before production traffic.',
+          '20',
+          '240',
+          'Low',
+          'Medium',
+          'aws dominant database row is "AWS primary RU/s provisioned capacity estimate" at $80/mo; RU/s right-sizing is modeled as a 25% reduction of that row.',
+        ]),
+      ]),
+    );
+
+    expect(
+      optimizationOpportunityRows({
+        ...comparison,
+        providers: [
+          {
+            providerId: 'aws',
+            lineItems: [
+              {
+                category: 'database',
+                costComponent: 'database',
+                description: 'Amazon OpenSearch Service capacity estimate',
+                skuId: 'modeled-database-search-capacity',
+                isApproximate: false,
+                baseMonthlyCostUsd: 120,
+              },
+            ],
+            totals: {
+              daily: 6.58,
+              weekly: 46.15,
+              monthly: 200,
+              quarterly: 600,
+              yearly: 2400,
+            },
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'Database optimization',
+          'aws database and analytics data services are 60% of monthly spend; right-size search replicas, partitions, index lifecycle, and query capacity before scaling managed-search clusters.',
+          '26.4',
+          '316.8',
+          'Medium',
+          'Medium',
+          'aws dominant database row is "Amazon OpenSearch Service capacity estimate" at $120/mo; managed-search tuning is modeled as a 22% reduction of that row.',
+        ]),
+      ]),
+    );
+
+    expect(
+      optimizationOpportunityRows({
+        ...comparison,
+        providers: [
+          {
+            providerId: 'aws',
+            lineItems: [
+              {
+                category: 'compute',
+                costComponent: 'compute',
+                description: 'AWS serverless function GB-second estimate',
+                skuId: 'modeled-serverless-function-duration',
+                isApproximate: false,
+                baseMonthlyCostUsd: 90,
+              },
+              {
+                category: 'operations',
+                costComponent: 'operations',
+                description: 'AWS managed Kubernetes control plane estimate',
+                skuId: 'modeled-kubernetes-control-plane',
+                isApproximate: false,
+                baseMonthlyCostUsd: 72,
+              },
+            ],
+            totals: {
+              daily: 7.89,
+              weekly: 55.38,
+              monthly: 240,
+              quarterly: 720,
+              yearly: 2880,
+            },
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'Runtime optimization',
+          'aws serverless/container runtime is 67.5% of monthly spend; tune function memory-duration settings and compare functions with always-on containers for steady traffic.',
+          '22.5',
+          '270',
+          'Medium',
+          'Medium',
+          'aws dominant runtime row is "AWS serverless function GB-second estimate" at $90/mo; function runtime tuning is modeled as a 25% reduction of that row.',
+        ]),
+      ]),
+    );
+
+    expect(
+      optimizationOpportunityRows({
+        ...comparison,
+        requirements: {
+          ...comparison.requirements!,
+          serviceRequirements: [
+            {
+              serviceCategory: 'compute',
+              serviceType: 'serverless-functions',
+              quantity: 1,
+              scaleParams: {
+                functionInvocationsMillion: 5,
+                functionDurationMs: 200,
+                functionMemoryMb: 512,
+              },
+            },
+          ],
+        },
+        providers: [
+          {
+            providerId: 'aws',
+            lineItems: [],
+            totals: {
+              daily: 0.31,
+              weekly: 2.15,
+              monthly: 9.33,
+              quarterly: 27.99,
+              yearly: 111.96,
+            },
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'Serverless memory curve',
+          'aws function memory break-even: 1024MB must run at or below 100ms to keep GB-second cost flat while improving latency.',
+          '0',
+          '0',
+          'Low',
+          'Low',
+          'aws current function shape is 5M invocations/month at 200ms and 512MB: $9.33/mo current vs $9.33/mo at the linear memory-duration knee.',
+        ]),
+      ]),
+    );
+
+    expect(
+      optimizationOpportunityRows({
+        ...comparison,
+        requirements: {
+          ...comparison.requirements!,
+          serviceRequirements: [
+            {
+              serviceCategory: 'application',
+              serviceType: 'app-platform',
+              quantity: 1,
+              scaleParams: {
+                appPlatformRequestsMillion: 10,
+                appPlatformRequestDurationMs: 400,
+                appPlatformVcpu: 1,
+                appPlatformMemoryGb: 0.5,
+                appPlatformAlwaysOnHours: 730,
+                appPlatformMinInstances: 1,
+              },
+            },
+          ],
+        },
+        providers: [
+          {
+            providerId: 'aws',
+            lineItems: [
+              {
+                category: 'compute',
+                costComponent: 'compute',
+                description: 'AWS managed app platform request estimate',
+                skuId: 'modeled-app-platform-requests',
+                isApproximate: true,
+                baseMonthlyCostUsd: 0,
+              },
+              {
+                category: 'compute',
+                costComponent: 'compute',
+                description: 'AWS managed app platform active vCPU estimate',
+                skuId: 'modeled-app-platform-request-compute',
+                isApproximate: true,
+                baseMonthlyCostUsd: 71.11,
+              },
+              {
+                category: 'compute',
+                costComponent: 'compute',
+                description: 'AWS managed app platform active memory estimate',
+                skuId: 'modeled-app-platform-request-memory',
+                isApproximate: true,
+                baseMonthlyCostUsd: 3.89,
+              },
+            ],
+            totals: {
+              daily: 3.29,
+              weekly: 23.08,
+              monthly: 100,
+              quarterly: 300,
+              yearly: 1200,
+            },
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'App platform model',
+          'aws always-on app-hosting posture is favored for the configured traffic; validate request-based only if idle windows or traffic spikes dominate.',
+          '25.72',
+          '308.64',
+          'Medium',
+          'Low',
+          'aws request-based model $75/mo vs always-on $49.28/mo for 10M requests, 400ms, 1 vCPU, 0.5GB, 1 minimum instance(s), 730 hrs/mo.',
+        ]),
+      ]),
+    );
+
+    expect(
+      optimizationOpportunityRows({
+        ...comparison,
+        providers: [
+          {
+            providerId: 'aws',
+            lineItems: [
+              {
+                category: 'operations',
+                costComponent: 'operations',
+                description: 'AWS log ingestion estimate',
+                skuId: 'modeled-operations-log-ingestion',
+                isApproximate: false,
+                baseMonthlyCostUsd: 120,
+              },
+              {
+                category: 'operations',
+                costComponent: 'operations',
+                description: 'AWS managed secrets estimate',
+                skuId: 'modeled-security-secrets',
+                isApproximate: false,
+                baseMonthlyCostUsd: 20,
+              },
+            ],
+            totals: {
+              daily: 6.58,
+              weekly: 46.15,
+              monthly: 200,
+              quarterly: 600,
+              yearly: 2400,
+            },
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          'Operations optimization',
+          'aws observability/security operations are 70% of monthly spend; filter debug noise at source, sample high-volume streams, and route low-value logs to cheaper retention.',
+          '36',
+          '432',
+          'Medium',
+          'Low',
+          'aws dominant operations row is "AWS log ingestion estimate" at $120/mo; log filtering is modeled as a 30% reduction of that row.',
+        ]),
+      ]),
+    );
+  });
+
+  it('keeps non-production optimization advice off 3-year commitments', () => {
+    const rows = optimizationOpportunityRows({
+      ...comparison,
+      requirements: {
+        ...comparison.requirements!,
+        workloadProfile: {
+          ...comparison.requirements!.workloadProfile!,
+          environment: 'development',
+          commitmentPreferencePercent: 90,
+        },
+      },
+      providers: [
+        {
+          ...comparison.providers[0],
+          pricingModels: [
+            ...(comparison.providers[0].pricingModels ?? []),
+            {
+              model: 'reserved-1yr',
+              available: true,
+              monthlyCostUsd: 50,
+              hourlyCostUsd: 0.07,
+              caveat: 'One-year commitment.',
+            },
+          ],
+        },
+      ],
+    });
+    const rowText = rows.map((row) => row.join(' | ')).join('\n');
+
+    expect(rowText).toContain('Commitment coverage | aws Reserved 1-year lowers recurring run rate');
+    expect(rowText).not.toContain('Reserved 3-year lowers recurring run rate');
   });
 
   it('builds fallback service requirement rows when comparison requirements are absent', () => {

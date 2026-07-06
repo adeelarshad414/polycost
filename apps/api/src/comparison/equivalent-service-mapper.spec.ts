@@ -155,6 +155,68 @@ describe('EquivalentServiceMapper', () => {
     ]);
   });
 
+  it('maps compute family intent to family-specific provider patterns', () => {
+    const mappings = mapper.mapWorkload({
+      ...workload,
+      compute: [
+        {
+          role: 'ml-worker',
+          scalingType: 'fixed',
+          instanceCount: 2,
+          instanceFamily: 'accelerated-computing',
+        },
+      ],
+      storage: [],
+      database: [],
+      network: {
+        cdn: false,
+        loadBalancer: false,
+      },
+    });
+
+    expect(mappings).toEqual([
+      expect.objectContaining({
+        tierLabel: 'compute-fixed-accelerated-computing',
+        providerSkuPatterns: expect.objectContaining({
+          aws: 'EC2 G/P-family GPU and accelerated instances',
+          azure: 'Virtual Machines NC/ND GPU instances',
+          gcp: 'Compute Engine A2/G2 accelerator machine types',
+        }),
+      }),
+    ]);
+  });
+
+  it('maps burstable compute to reviewed shared-core provider patterns', () => {
+    const mappings = mapper.mapWorkload({
+      ...workload,
+      compute: [
+        {
+          role: 'lamp-web',
+          scalingType: 'fixed',
+          instanceCount: 2,
+          instanceFamily: 'burstable',
+        },
+      ],
+      storage: [],
+      database: [],
+      network: {
+        cdn: false,
+        loadBalancer: false,
+      },
+    });
+
+    expect(mappings).toEqual([
+      expect.objectContaining({
+        tierLabel: 'compute-fixed-burstable',
+        providerSkuPatterns: expect.objectContaining({
+          aws: 'EC2 T3/T4g burstable instances',
+          azure: 'Virtual Machines B-series burstable instances',
+          gcp: 'Compute Engine E2 shared-core machine types',
+        }),
+      }),
+    ]);
+  });
+
   it('maps all database engine tiers that V1 accepts', () => {
     const mappings = mapper.mapWorkload({
       ...workload,
@@ -169,6 +231,11 @@ describe('EquivalentServiceMapper', () => {
         {
           role: 'mongo',
           engine: 'mongodb',
+          highAvailability: false,
+        },
+        {
+          role: 'sql',
+          engine: 'sql_server',
           highAvailability: false,
         },
         {
@@ -191,6 +258,7 @@ describe('EquivalentServiceMapper', () => {
     expect(mappings.map((mapping) => mapping.tierLabel)).toEqual([
       'database-mysql-managed',
       'database-mongodb-managed',
+      'database-sql-server-managed',
       'database-generic-relational-managed',
       'database-generic-nosql-managed',
     ]);

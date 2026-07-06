@@ -43,7 +43,10 @@ interface AwsReservedTerm extends AwsOnDemandTerm {
 
 const AWS_BULK_PRICING_ENDPOINT = 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws';
 
-const CATEGORY_SERVICE_CODES: Record<ServiceCategory, string[]> = {
+const CATALOG_REFRESH_CATEGORIES = ['compute', 'storage', 'database', 'network'] as const;
+type CatalogRefreshCategory = (typeof CATALOG_REFRESH_CATEGORIES)[number];
+
+const CATEGORY_SERVICE_CODES: Record<CatalogRefreshCategory, string[]> = {
   compute: ['AmazonEC2'],
   storage: ['AmazonS3'],
   database: ['AmazonRDS', 'AmazonElastiCache'],
@@ -95,7 +98,7 @@ export class AwsProviderAdapter extends BaseCloudProviderAdapter {
   async refreshPricingCatalog(
     options: RefreshPricingCatalogOptions = {},
   ): Promise<PricingCatalogRecord[]> {
-    const categories = options.categories ?? ['compute', 'storage', 'database', 'network'];
+    const categories = catalogRefreshCategories(options.categories);
     const fetchedAt = options.fetchedAt ?? this.now().toISOString();
     const records: PricingCatalogRecord[] = [];
 
@@ -253,6 +256,18 @@ export class AwsProviderAdapter extends BaseCloudProviderAdapter {
       })
       .slice(0, 1);
   }
+}
+
+function catalogRefreshCategories(
+  categories: ServiceCategory[] | undefined,
+): CatalogRefreshCategory[] {
+  if (!categories) {
+    return [...CATALOG_REFRESH_CATEGORIES];
+  }
+
+  return categories.filter((category): category is CatalogRefreshCategory =>
+    CATALOG_REFRESH_CATEGORIES.includes(category as CatalogRefreshCategory),
+  );
 }
 
 function uniqueSkuRecords(records: PricingCatalogRecord[]): PricingCatalogRecord[] {

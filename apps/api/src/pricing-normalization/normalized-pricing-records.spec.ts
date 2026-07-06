@@ -49,7 +49,7 @@ describe('normalizePricingCatalogRecords', () => {
       expect.objectContaining({
         provider: 'aws',
         providerSkuId: 't3.small',
-        family: 'general-purpose',
+        family: 'burstable',
         vcpu: 2,
         memoryGb: 2,
         term: 'on_demand',

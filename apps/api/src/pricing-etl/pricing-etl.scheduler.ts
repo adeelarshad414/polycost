@@ -6,6 +6,7 @@ import { PricingEtlService } from './pricing-etl.service';
 import {
   PRICING_ETL_QUEUE_NAME,
   PRICING_ETL_REFRESH_JOB_NAME,
+  PRICING_ETL_STARTUP_REFRESH_JOB_ID,
   PricingEtlSummary,
 } from './pricing-etl.types';
 
@@ -43,6 +44,7 @@ export class PricingEtlScheduler implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit(): Promise<void> {
     await this.scheduleRecurringRefresh();
+    await this.scheduleStartupRefresh();
     this.worker = this.workerFactory(() => this.etlService.refreshAllProviders());
   }
 
@@ -67,6 +69,26 @@ export class PricingEtlScheduler implements OnModuleInit, OnModuleDestroy {
         repeat: {
           pattern: cronPattern,
         },
+        removeOnComplete: true,
+        removeOnFail: 100,
+      },
+    );
+  }
+
+  async scheduleStartupRefresh(): Promise<void> {
+    const runOnBoot = this.configService.get('PRICING_ETL_RUN_ON_BOOT', {
+      infer: true,
+    });
+
+    if (!runOnBoot) {
+      return;
+    }
+
+    await this.queue.add(
+      PRICING_ETL_REFRESH_JOB_NAME,
+      {},
+      {
+        jobId: PRICING_ETL_STARTUP_REFRESH_JOB_ID,
         removeOnComplete: true,
         removeOnFail: 100,
       },

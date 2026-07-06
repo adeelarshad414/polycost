@@ -100,9 +100,17 @@ function serviceRequirementsFromNws(nws: NormalizedWorkloadSpec): ServiceRequire
     ...nws.compute.map((compute): ServiceRequirement => ({
       serviceCategory: 'compute',
       serviceType: compute.scalingType === 'autoscaling' ? 'autoscaling-compute' : 'vm-compute',
-      ...(compute.vcpu !== undefined || compute.memoryGb !== undefined
+      ...(compute.vcpu !== undefined ||
+      compute.memoryGb !== undefined ||
+      compute.instanceFamily ||
+      compute.processorArchitecture ||
+      compute.tenancy
         ? {
-            instanceType: `${compute.vcpu ?? '?'} vCPU / ${compute.memoryGb ?? '?'} GB`,
+            instanceType: `${compute.instanceFamily ?? 'general-purpose'} / ${
+              compute.processorArchitecture ?? 'x86_64'
+            } / ${compute.tenancy ?? 'shared'} / ${
+              compute.vcpu ?? '?'
+            } vCPU / ${compute.memoryGb ?? '?'} GB`,
           }
         : {}),
       ...(region ? { region } : {}),
@@ -110,6 +118,11 @@ function serviceRequirementsFromNws(nws: NormalizedWorkloadSpec): ServiceRequire
       quantity: compute.instanceCount ?? compute.autoscalingRange?.min ?? 1,
       scaleParams: {
         role: compute.role,
+        ...(compute.instanceFamily ? { instanceFamily: compute.instanceFamily } : {}),
+        ...(compute.processorArchitecture
+          ? { processorArchitecture: compute.processorArchitecture }
+          : {}),
+        ...(compute.tenancy ? { tenancy: compute.tenancy } : {}),
         scalingType: compute.scalingType,
         ...(compute.autoscalingRange
           ? {
@@ -129,17 +142,53 @@ function serviceRequirementsFromNws(nws: NormalizedWorkloadSpec): ServiceRequire
             : storage.accessPattern === 'archive'
               ? 'archive-storage'
               : 'object-storage',
+      instanceType: `${storage.type} / ${
+        storage.storageClass ?? storage.accessPattern ?? 'standard'
+      } - ${storage.sizeGb} GB`,
       ...(storage.accessPattern ? { tier: storage.accessPattern } : {}),
+      ...(storage.storageClass ? { tier: storage.storageClass } : {}),
       ...(region ? { region } : {}),
       quantity: 1,
       scaleParams: {
         role: storage.role,
         sizeGb: storage.sizeGb,
+        ...(storage.accessPattern ? { storageAccessPattern: storage.accessPattern } : {}),
+        ...(storage.storageClass ? { storageClass: storage.storageClass } : {}),
+        ...(storage.monthlyPutRequestsThousand !== undefined
+          ? { monthlyPutRequestsThousand: storage.monthlyPutRequestsThousand }
+          : {}),
+        ...(storage.monthlyGetRequestsThousand !== undefined
+          ? { monthlyGetRequestsThousand: storage.monthlyGetRequestsThousand }
+          : {}),
+        ...(storage.monthlyDeleteRequestsThousand !== undefined
+          ? { monthlyDeleteRequestsThousand: storage.monthlyDeleteRequestsThousand }
+          : {}),
+        ...(storage.monthlyListRequestsThousand !== undefined
+          ? { monthlyListRequestsThousand: storage.monthlyListRequestsThousand }
+          : {}),
+        ...(storage.monthlyRetrievalGb !== undefined
+          ? { monthlyRetrievalGb: storage.monthlyRetrievalGb }
+          : {}),
+        ...(storage.replication ? { replication: storage.replication } : {}),
+        ...(storage.lifecycleTransitionsThousand !== undefined
+          ? { lifecycleTransitionsThousand: storage.lifecycleTransitionsThousand }
+          : {}),
+        ...(storage.snapshotSizeGb !== undefined ? { snapshotSizeGb: storage.snapshotSizeGb } : {}),
+        ...(storage.snapshotRetentionDays !== undefined
+          ? { snapshotRetentionDays: storage.snapshotRetentionDays }
+          : {}),
+        ...(storage.provisionedIops !== undefined
+          ? { provisionedIops: storage.provisionedIops }
+          : {}),
+        ...(storage.provisionedThroughputMbps !== undefined
+          ? { provisionedThroughputMbps: storage.provisionedThroughputMbps }
+          : {}),
       },
     })),
     ...nws.database.map((database): ServiceRequirement => ({
       serviceCategory: 'database',
-      serviceType: database.engine === 'redis' ? 'cache' : 'relational-database',
+      serviceType: databaseServiceType(database.engine),
+      instanceType: `${database.engine} - ${database.sizeGb ?? 'provider default'}GB`,
       tier: database.highAvailability ? 'high-availability' : 'single-zone',
       ...(region ? { region } : {}),
       az: database.highAvailability ? 'multi-az' : 'single-az',
@@ -148,7 +197,50 @@ function serviceRequirementsFromNws(nws: NormalizedWorkloadSpec): ServiceRequire
         role: database.role,
         engine: database.engine,
         ...(database.sizeGb !== undefined ? { sizeGb: database.sizeGb } : {}),
+        ...(database.backupStorageGb !== undefined
+          ? { backupStorageGb: database.backupStorageGb }
+          : {}),
+        ...(database.backupRetentionDays !== undefined
+          ? { backupRetentionDays: database.backupRetentionDays }
+          : {}),
+        ...(database.provisionedIops !== undefined
+          ? { provisionedIops: database.provisionedIops }
+          : {}),
+        ...(database.readReplicaCount !== undefined
+          ? { readReplicaCount: database.readReplicaCount }
+          : {}),
+        ...(database.crossRegionReplicaTransferGb !== undefined
+          ? { crossRegionReplicaTransferGb: database.crossRegionReplicaTransferGb }
+          : {}),
+        ...(database.nosqlReadRequestUnitsMillion !== undefined
+          ? { nosqlReadRequestUnitsMillion: database.nosqlReadRequestUnitsMillion }
+          : {}),
+        ...(database.nosqlWriteRequestUnitsMillion !== undefined
+          ? { nosqlWriteRequestUnitsMillion: database.nosqlWriteRequestUnitsMillion }
+          : {}),
+        ...(database.ruPerSecond !== undefined ? { ruPerSecond: database.ruPerSecond } : {}),
+        ...(database.queryDataTb !== undefined ? { queryDataTb: database.queryDataTb } : {}),
+        ...(database.cacheReplicaCount !== undefined
+          ? { cacheReplicaCount: database.cacheReplicaCount }
+          : {}),
+        ...(database.storageGrowthGbPerMonth !== undefined
+          ? { storageGrowthGbPerMonth: database.storageGrowthGbPerMonth }
+          : {}),
       },
     })),
   ];
+}
+
+function databaseServiceType(
+  engine: NormalizedWorkloadSpec['database'][number]['engine'],
+): 'cache' | 'nosql-database' | 'relational-database' {
+  if (engine === 'redis') {
+    return 'cache';
+  }
+
+  if (engine === 'mongodb' || engine === 'generic_nosql') {
+    return 'nosql-database';
+  }
+
+  return 'relational-database';
 }

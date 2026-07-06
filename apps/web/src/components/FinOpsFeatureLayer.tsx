@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { formatApiError, polyCostClient, PolyCostClient } from '../api-client';
 import { Button } from './Button';
-import { hourlyFromMonthly, intervalMultiplierFromMonthly } from '../cost-time';
+import { HOURS_PER_MONTH, hourlyFromMonthly, intervalMultiplierFromMonthly } from '../cost-time';
 import {
   AlertRecord,
   BudgetRecord,
@@ -16,6 +16,7 @@ import {
   PricingModelKey,
   PricingModelsForServiceResponse,
   ProviderId,
+  ShareLinkAnalyticsResponse,
   SharedReportResponse,
   StoragePricingTier,
   WorkloadInput,
@@ -53,7 +54,7 @@ interface CurrencyOption {
 }
 
 interface BreakdownPart {
-  key: 'compute' | 'storage' | 'egress';
+  key: 'compute' | 'storage' | 'egress' | 'networking' | 'support' | 'licensing' | 'operations';
   label: string;
   total: number;
   percent: number;
@@ -141,6 +142,11 @@ const USD_CURRENCY: CurrencyOption = {
   rate: 1,
 };
 
+const EFFECTIVE_HOURLY_TOOLTIP =
+  'The blended hourly cost accounting for upfront payments amortized over the commitment term.';
+const SPOT_ESTIMATE_TOOLTIP =
+  'Spot prices are estimate ranges, not guaranteed rates. They can change materially by provider, region, instance family, and interruption tolerance; do not treat them as fixed commitments.';
+
 const CURRENCY_OPTIONS: Array<Pick<CurrencyOption, 'code' | 'label' | 'locale'>> = [
   { code: 'USD', label: 'USD', locale: 'en-US' },
   { code: 'PKR', label: 'PKR', locale: 'en-PK' },
@@ -177,6 +183,10 @@ export function FinOpsFeatureLayer({
   const [shareLink, setShareLink] = useState<GeneratedShareLink | null>(null);
   const [shareStatus, setShareStatus] = useState<'idle' | 'creating' | 'ready' | 'copied'>('idle');
   const [shareError, setShareError] = useState<string | null>(null);
+  const [shareCopyWarning, setShareCopyWarning] = useState<string | null>(null);
+  const [shareAnalytics, setShareAnalytics] = useState<ShareLinkAnalyticsResponse | null>(null);
+  const [shareAnalyticsError, setShareAnalyticsError] = useState<string | null>(null);
+  const [isLoadingShareAnalytics, setIsLoadingShareAnalytics] = useState(false);
   const [exchangeRates, setExchangeRates] = useState<ExchangeRatesResponse | null>(null);
   const [exchangeRateError, setExchangeRateError] = useState<string | null>(null);
   const [isLoadingExchangeRates, setIsLoadingExchangeRates] = useState(true);
@@ -396,6 +406,7 @@ export function FinOpsFeatureLayer({
 
     setShareStatus('creating');
     setShareError(null);
+    setShareCopyWarning(null);
 
     try {
       const workload = await client.createWorkload(workloadInputFromForm(form));
@@ -409,12 +420,33 @@ export function FinOpsFeatureLayer({
       });
       const publicUrl = publicShareUrl(share.url, share.token, interval, pricingModel);
 
-      await copyToClipboard(publicUrl);
       setShareLink({ token: share.token, publicUrl });
-      setShareStatus('copied');
+      void refreshShareAnalytics(share.token);
+      try {
+        await copyToClipboard(publicUrl);
+        setShareStatus('copied');
+      } catch {
+        setShareStatus('ready');
+        setShareCopyWarning(
+          'Link created, but the browser blocked clipboard copy. Use the report link above.',
+        );
+      }
     } catch (error) {
       setShareStatus('idle');
       setShareError(formatApiError(error));
+    }
+  }
+
+  async function refreshShareAnalytics(token: string) {
+    setIsLoadingShareAnalytics(true);
+    setShareAnalyticsError(null);
+
+    try {
+      setShareAnalytics(await client.getShareLinkAnalytics(token));
+    } catch (error) {
+      setShareAnalyticsError(formatApiError(error));
+    } finally {
+      setIsLoadingShareAnalytics(false);
     }
   }
 
@@ -425,10 +457,13 @@ export function FinOpsFeatureLayer({
 
     setShareStatus('creating');
     setShareError(null);
+    setShareCopyWarning(null);
 
     try {
       await client.revokeShareLink(shareLink.token);
       setShareLink(null);
+      setShareAnalytics(null);
+      setShareAnalyticsError(null);
       setShareStatus('idle');
     } catch (error) {
       setShareStatus('ready');
@@ -484,7 +519,8 @@ export function FinOpsFeatureLayer({
                 key={model.key}
                 type="button"
                 aria-pressed={pricingModel === model.key}
-                title={model.detail}
+                title={pricingModelTooltip(model.key)}
+                aria-label={`${model.label}. ${pricingModelTooltip(model.key)}`}
                 onClick={() => updatePricingModel(model.key)}
                 className={[
                   'inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary',
@@ -538,7 +574,8 @@ export function FinOpsFeatureLayer({
                   key={option.key}
                   type="button"
                   aria-pressed={paymentOption === option.key}
-                  title={option.detail}
+                  title={`${option.detail} ${EFFECTIVE_HOURLY_TOOLTIP}`}
+                  aria-label={`${option.label}. ${option.detail} ${EFFECTIVE_HOURLY_TOOLTIP}`}
                   onClick={() => setPaymentOption(option.key)}
                   className={[
                     'inline-flex min-h-10 items-center justify-center rounded-md px-3 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary',
@@ -567,6 +604,12 @@ export function FinOpsFeatureLayer({
             const selectedModelCost = provider
               ? providerModelCost(provider, pricingModel)
               : undefined;
+            const selectedModelDisplay = selectedModelCost
+              ? formatModelCost(selectedModelCost, interval, currency)
+              : 'Pending';
+            const selectedModelHint = selectedModelCost
+              ? pricingModelTooltip(selectedModelCost.model, selectedModelCost.estimated)
+              : pricingModelTooltip(pricingModel);
 
             return (
               <article
@@ -575,10 +618,14 @@ export function FinOpsFeatureLayer({
               >
                 <div className="flex min-w-0 items-center justify-between gap-3">
                   <ProviderTextHeading providerId={providerId} />
-                  <strong className="font-mono text-base text-text-primary">
-                    {selectedModelCost
-                      ? formatModelCost(selectedModelCost, interval, currency)
-                      : 'Pending'}
+                  <strong
+                    className="font-mono text-base text-text-primary"
+                    title={selectedModelHint}
+                    aria-label={`${providerLabel(providerId)} ${pricingModelLabel(
+                      pricingModel,
+                    )} cost ${selectedModelDisplay}. ${selectedModelHint}`}
+                  >
+                    {selectedModelDisplay}
                   </strong>
                 </div>
                 {provider ? (
@@ -810,12 +857,40 @@ export function FinOpsFeatureLayer({
               </>
             )}
           </div>
+          {shareLink ? (
+            <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface-0 p-3 text-xs font-semibold text-text-muted sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                Recipient activity:{' '}
+                <strong className="text-text-primary">
+                  {isLoadingShareAnalytics
+                    ? 'refreshing...'
+                    : shareAnalytics
+                      ? shareAnalyticsSummary(shareAnalytics)
+                      : 'no views recorded yet'}
+                </strong>
+                {shareAnalyticsError ? ` · analytics unavailable: ${shareAnalyticsError}` : ''}
+              </span>
+              <button
+                type="button"
+                className="self-start text-action-primary underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:text-text-muted sm:self-auto"
+                disabled={isLoadingShareAnalytics}
+                onClick={() => void refreshShareAnalytics(shareLink.token)}
+              >
+                Refresh views
+              </button>
+            </div>
+          ) : null}
           {shareError ? (
             <div
               className="rounded-lg border border-action-destructive bg-surface-0 p-3 text-sm text-text-primary"
               role="alert"
             >
               <strong>Share link failed.</strong> {shareError}
+            </div>
+          ) : null}
+          {shareCopyWarning ? (
+            <div className="rounded-lg border border-border bg-surface-0 p-3 text-sm text-text-secondary">
+              <strong className="text-text-primary">Link ready.</strong> {shareCopyWarning}
             </div>
           ) : null}
           <div className="flex flex-wrap gap-2">
@@ -1023,7 +1098,14 @@ function CommitmentTcoPanel({
             <tr className="bg-surface-1 text-left text-xs font-bold uppercase tracking-wide text-text-muted">
               <th className="border-b border-border px-3 py-2">Provider</th>
               <th className="border-b border-border px-3 py-2">Model</th>
-              <th className="border-b border-border px-3 py-2 text-right">Effective hourly</th>
+              <th
+                className="border-b border-border px-3 py-2 text-right"
+                scope="col"
+                title={EFFECTIVE_HOURLY_TOOLTIP}
+                aria-label={`Effective hourly. ${EFFECTIVE_HOURLY_TOOLTIP}`}
+              >
+                Effective hourly
+              </th>
               <th className="border-b border-border px-3 py-2 text-right">Monthly recurring</th>
               <th className="border-b border-border px-3 py-2 text-right">Upfront cash</th>
               <th className="border-b border-border px-3 py-2">Payment option</th>
@@ -1040,7 +1122,10 @@ function CommitmentTcoPanel({
                   <td className="border-b border-border px-3 py-2 font-semibold text-text-primary">
                     {providerLabel(row.providerId)}
                   </td>
-                  <td className="border-b border-border px-3 py-2 text-text-secondary">
+                  <td
+                    className="border-b border-border px-3 py-2 text-text-secondary"
+                    title={pricingModelTooltip(row.model)}
+                  >
                     {pricingModelLabel(row.model)}
                   </td>
                   <td className="border-b border-border px-3 py-2 text-right font-mono text-text-primary">
@@ -1748,19 +1833,40 @@ function workloadInputFromForm(form: WorkloadFormState): WorkloadInput {
   const memoryGb = positiveNumberOrDefault(form.memoryGb, 4);
 
   return {
-    instanceFamily: instanceFamilyForWorkload(vcpu, memoryGb),
+    instanceFamily: instanceFamilyForWorkload(form.instanceTier, vcpu, memoryGb),
     vcpu,
     memoryGb,
     region: canonicalRegionForRegionPreference(form.regionPreference) ?? DEFAULT_COMPARISON_REGION,
     instanceCount: Math.round(positiveNumberOrDefault(form.instanceCount, 1)),
-    hoursPerMonth: 730,
+    hoursPerMonth: HOURS_PER_MONTH,
     storageGb: form.storageEnabled ? nonNegativeNumberOrDefault(form.storageSizeGb, 0) : 0,
     storageTier: storageTierForAccessPattern(form.storageAccessPattern),
     egressGbPerMonth: nonNegativeNumberOrDefault(form.monthlyEgressGb, 0),
   };
 }
 
-function instanceFamilyForWorkload(vcpu: number, memoryGb: number): NormalizedInstanceFamily {
+function instanceFamilyForWorkload(
+  instanceTier: WorkloadFormState['instanceTier'],
+  vcpu: number,
+  memoryGb: number,
+): NormalizedInstanceFamily {
+  switch (instanceTier) {
+    case 'compute':
+      return 'compute-optimized';
+    case 'memory':
+      return 'memory-optimized';
+    case 'storage':
+      return 'storage-optimized';
+    case 'accelerated':
+      return 'accelerated-computing';
+    case 'small':
+      return 'burstable';
+    case 'balanced':
+      return 'general-purpose';
+    case 'custom':
+      break;
+  }
+
   if (memoryGb / Math.max(vcpu, 1) >= 6) {
     return 'memory-optimized';
   }
@@ -1812,6 +1918,15 @@ function publicShareUrl(
   url.searchParams.set('pricingModel', pricingModel);
 
   return url.toString();
+}
+
+function shareAnalyticsSummary(analytics: ShareLinkAnalyticsResponse): string {
+  const viewLabel = analytics.totalViews === 1 ? 'view' : 'views';
+  const lastViewed = analytics.lastViewedAt
+    ? `, last viewed ${formatReportDate(analytics.lastViewedAt)}`
+    : '';
+
+  return `${analytics.totalViews} ${viewLabel}${lastViewed}`;
 }
 
 function capitalize(value: string): string {
@@ -2025,18 +2140,37 @@ function breakdownParts(
     provider.breakdown?.storageMonthlyCostUsd ?? componentTotal(provider, 'storage');
   const egressMonthly =
     provider.breakdown?.egressMonthlyCostUsd ?? componentTotal(provider, 'egress');
+  const networkingMonthly =
+    provider.breakdown?.networkingMonthlyCostUsd ?? componentTotal(provider, 'networking');
   const databaseMonthly = databaseMonthlyCost(provider);
+  const supportMonthly =
+    provider.breakdown?.supportMonthlyCostUsd ?? componentTotal(provider, 'support');
+  const licensingMonthly =
+    provider.breakdown?.licensingMonthlyCostUsd ?? componentTotal(provider, 'licensing');
+  const operationsMonthly =
+    provider.breakdown?.operationsMonthlyCostUsd ?? componentTotal(provider, 'operations');
   const selectedModelCost = providerModelCost(provider, pricingModel);
   const selectedComputeMonthly =
     selectedModelCost.available && selectedModelCost.monthlyCostUsd !== undefined
       ? Math.max(
           0,
-          selectedModelCost.monthlyCostUsd - storageMonthly - egressMonthly - databaseMonthly,
+          selectedModelCost.monthlyCostUsd -
+            storageMonthly -
+            egressMonthly -
+            networkingMonthly -
+            databaseMonthly -
+            supportMonthly -
+            licensingMonthly -
+            operationsMonthly,
         )
       : (provider.breakdown?.computeMonthlyCostUsd ?? componentTotal(provider, 'compute'));
   const compute = selectedComputeMonthly * multiplier;
   const storage = storageMonthly * multiplier;
   const egress = egressMonthly * multiplier;
+  const networking = networkingMonthly * multiplier;
+  const support = supportMonthly * multiplier;
+  const licensing = licensingMonthly * multiplier;
+  const operations = operationsMonthly * multiplier;
   const parts = [
     {
       key: 'compute',
@@ -2055,6 +2189,30 @@ function breakdownParts(
       label: 'Egress/data transfer',
       total: roundCurrency(egress),
       className: 'bg-brand-green',
+    },
+    {
+      key: 'networking',
+      label: 'Networking',
+      total: roundCurrency(networking),
+      className: 'bg-cyan-500',
+    },
+    {
+      key: 'support',
+      label: 'Support plan',
+      total: roundCurrency(support),
+      className: 'bg-amber-500',
+    },
+    {
+      key: 'licensing',
+      label: 'OS licensing',
+      total: roundCurrency(licensing),
+      className: 'bg-sky-500',
+    },
+    {
+      key: 'operations',
+      label: 'Resilience ops',
+      total: roundCurrency(operations),
+      className: 'bg-emerald-500',
     },
   ] satisfies Array<Omit<BreakdownPart, 'percent'>>;
   const total = parts.reduce((sum, part) => sum + part.total, 0);
@@ -2282,6 +2440,23 @@ function PricingModelIcon({ model }: { model: PricingModelKey }) {
 
 function pricingModelLabel(model: PricingModelKey): string {
   return PRICING_MODELS.find((option) => option.key === model)?.label ?? model;
+}
+
+function pricingModelTooltip(model: PricingModelKey, estimated = false): string {
+  switch (model) {
+    case 'on-demand':
+      return 'On-demand pricing keeps the workload fully flexible with no usage commitment.';
+    case 'reserved-1yr':
+      return 'Reserved 1yr pricing models a one-year commitment; lower recurring cost with less flexibility than on-demand.';
+    case 'reserved-3yr':
+      return 'Reserved 3yr pricing models a three-year commitment; usually lower recurring cost with the least flexibility.';
+    case 'savings-plan':
+      return 'Savings or committed-use pricing models provider commitment programs; verify eligible services, term, and payment option before procurement.';
+    case 'spot':
+      return estimated
+        ? `Spot pricing models interruptible capacity. ${SPOT_ESTIMATE_TOOLTIP}`
+        : 'Spot pricing models interruptible capacity; validate interruption tolerance and regional availability before using it as the operating scenario.';
+  }
 }
 
 function requiresPaymentOption(model: PricingModelKey): boolean {

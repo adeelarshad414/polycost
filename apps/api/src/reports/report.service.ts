@@ -15,11 +15,15 @@ export class ReportService {
 
   generate(result: ComparisonResult, format: ReportFormat, options: ReportOptions = {}): GeneratedReport {
     const metadata = reportMetadata(format);
+    const enrichedOptions: ReportOptions = {
+      ...options,
+      generatedAt: options.generatedAt ?? new Date().toISOString(),
+    };
 
     return {
       fileName: `polycost-comparison-${result.comparisonId}.${metadata.extension}`,
       contentType: metadata.contentType,
-      content: this.generateContent(result, format, options),
+      content: this.generateContent(result, format, enrichedOptions),
     };
   }
 

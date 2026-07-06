@@ -11,10 +11,12 @@ import { CsvReportGenerator } from '../reports/csv-report.generator';
 import { ExcelReportGenerator } from '../reports/excel-report.generator';
 import { PdfReportGenerator } from '../reports/pdf-report.generator';
 import { ReportService } from '../reports/report.service';
+import { ReportExportJobResponse } from '../reports/report.types';
 import { AdminApiKeyGuard } from './admin-api-key.guard';
 import { ApiExceptionFilter } from './api-exception.filter';
 import { ApiRateLimitService } from './rate-limit.service';
 import { ComparisonApplicationService } from './comparison-application.service';
+import { ComparisonPrewarmService } from './comparison-prewarm.service';
 import { ComparisonsController } from './comparisons.controller';
 import {
   AlertsController,
@@ -26,6 +28,8 @@ import {
   WorkloadsController,
 } from './cost-management.controller';
 import { CostManagementService } from './cost-management.service';
+import { DataHealthController } from './data-health.controller';
+import { ReportExportJobsService } from './report-export-jobs.service';
 import {
   AlertRecord,
   BudgetRecord,
@@ -40,9 +44,11 @@ import {
   ApiNotFoundError,
   ApiUnauthorizedError,
   ApiValidationError,
+  DataHealthResponse,
   LiveRefreshUnavailableError,
   RateLimitExceededError,
 } from './api-errors';
+import { ComparisonAnalyticsService } from './comparison-analytics.service';
 import { PricingStatusController } from './pricing-status.controller';
 import { RegionsController } from './regions.controller';
 import { WorkloadController } from './workload.controller';
@@ -101,6 +107,15 @@ const comparisonResult: ComparisonResult = {
       },
     },
   ],
+};
+
+const freshDataHealth: DataHealthResponse = {
+  generatedAt: '2026-07-01T00:00:00.000Z',
+  freshnessPolicyHours: 48,
+  overallStatus: 'fresh',
+  alertCount: 0,
+  alerts: [],
+  providers: [],
 };
 
 const workloadRecord: WorkloadRecord = {
@@ -184,6 +199,25 @@ const sharedReportResponse: SharedReportResponse = {
   breakdown: workloadBreakdown,
 };
 
+const shareLinkAnalyticsResponse = {
+  token: shareLinkResponse.token,
+  totalViews: 3,
+  lastViewedAt: '2026-07-01T00:00:00.000Z',
+  countryViews: [
+    {
+      countryCode: 'US',
+      views: 2,
+    },
+  ],
+  sectionViews: [
+    {
+      section: 'summary',
+      views: 3,
+      lastViewedAt: '2026-07-01T00:00:00.000Z',
+    },
+  ],
+};
+
 const exchangeRatesResponse: ExchangeRatesResponse = {
   base: 'USD',
   lastUpdated: '2026-06-29T00:00:00.000Z',
@@ -193,11 +227,32 @@ const exchangeRatesResponse: ExchangeRatesResponse = {
   },
 };
 
+const exportJobResponse: ReportExportJobResponse = {
+  jobId: '66666666-6666-4666-8666-666666666666',
+  comparisonId: comparisonResult.comparisonId,
+  format: 'pdf',
+  interval: 'monthly',
+  pricingModel: 'on-demand',
+  status: 'completed',
+  fileName: `polycost-comparison-${comparisonResult.comparisonId}.pdf`,
+  contentType: 'application/pdf',
+  createdAt: '2026-07-01T00:00:00.000Z',
+  startedAt: '2026-07-01T00:00:01.000Z',
+  completedAt: '2026-07-01T00:00:02.000Z',
+  statusUrl: `/api/v1/comparisons/${comparisonResult.comparisonId}/export-jobs/66666666-6666-4666-8666-666666666666`,
+  downloadUrl: `/api/v1/comparisons/${comparisonResult.comparisonId}/export-jobs/66666666-6666-4666-8666-666666666666/download`,
+};
+
 const configService = {
   get: jest.fn((key: keyof AppConfig) => {
     switch (key) {
       case 'RATE_LIMIT_NL_PARSE_PER_MINUTE':
       case 'RATE_LIMIT_LIVE_REFRESH_PER_MINUTE':
+      case 'RATE_LIMIT_COMPARISON_PER_MINUTE':
+      case 'RATE_LIMIT_EXPORT_PER_MINUTE':
+      case 'RATE_LIMIT_SHARE_LINK_PER_MINUTE':
+      case 'RATE_LIMIT_PUBLIC_READ_PER_MINUTE':
+      case 'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE':
         return 2;
       case 'FEATURE_LIVE_PRICING_REFRESH_ENABLED':
         return true;
@@ -254,32 +309,138 @@ describe('API contracts', () => {
       new ApiRateLimitService(() => 0),
       configService,
     );
+    const response = {
+      header: jest.fn(),
+    };
 
-    await expect(controller.validate(validNws)).resolves.toEqual({ valid: true });
+    await expect(
+      controller.validate(
+        validNws,
+        {
+          ip: '127.0.0.1',
+          headers: {},
+        },
+        response,
+      ),
+    ).resolves.toEqual({ valid: true });
+    expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
   });
 
   it('POST /comparisons persists and returns the comparison result', async () => {
     const service = comparisonApplicationService();
     const controller = comparisonsController(service);
+    const response = {
+      header: jest.fn(),
+    };
 
     await expect(
-      controller.create({
-        nws: validNws,
-        options: {
-          useLivePricing: false,
+      controller.create(
+        {
+          nws: validNws,
+          options: {
+            useLivePricing: false,
+          },
         },
-      }),
+        {
+          ip: '127.0.0.1',
+          headers: {},
+        },
+        response,
+      ),
     ).resolves.toEqual(comparisonResult);
     expect(service.createComparison).toHaveBeenCalledWith(validNws, {
       useLivePricing: false,
     });
+    expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
   });
 
   it('GET /comparisons/:id returns a previous snapshot', async () => {
     const service = comparisonApplicationService();
     const controller = comparisonsController(service);
+    const response = {
+      header: jest.fn(),
+    };
 
-    await expect(controller.get(comparisonResult.comparisonId)).resolves.toEqual(comparisonResult);
+    await expect(
+      controller.get(
+        comparisonResult.comparisonId,
+        {
+          ip: '127.0.0.1',
+          headers: {},
+        },
+        response,
+      ),
+    ).resolves.toEqual(comparisonResult);
+    expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
+  });
+
+  it('GET /comparisons/:id/analytics returns deterministic comparison intelligence', async () => {
+    const service = comparisonApplicationService();
+    const controller = comparisonsController(service);
+
+    await expect(controller.analytics(comparisonResult.comparisonId)).resolves.toMatchObject(
+      expect.objectContaining({
+        comparisonId: comparisonResult.comparisonId,
+        pricingAsOf: comparisonResult.pricingAsOf,
+        costComposition: expect.arrayContaining([
+          expect.objectContaining({
+            providerId: 'aws',
+            totalMonthlyUsd: 30,
+            items: expect.arrayContaining([
+              expect.objectContaining({
+                dimension: 'compute',
+                monthlyCostUsd: 30,
+                percentOfProviderTotal: 100,
+              }),
+            ]),
+          }),
+        ]),
+        commitmentCoverage: expect.arrayContaining([
+          expect.objectContaining({
+            providerId: 'aws',
+            eligibleMonthlyUsd: 0,
+            coveredPercentOfSpend: 0,
+            onDemandExposureMonthlyUsd: 30,
+            zeroCommitmentMonthlyUsd: 30,
+            targetBlendMonthlyUsd: 30,
+            fullyCommittedMonthlyUsd: 30,
+            targetOnDemandExposureMonthlyUsd: 30,
+            exposedPercentOfSpend: 100,
+            maxMonthlySavingsUsd: 0,
+          }),
+        ]),
+        regionVarianceHeatMap: expect.arrayContaining([
+          expect.objectContaining({
+            comparisonRegion: 'us-east',
+            label: 'US East',
+            multiplier: 1,
+            isSelected: true,
+            complianceEligible: true,
+            lowestProviderId: 'aws',
+            providers: [
+              {
+                providerId: 'aws',
+                providerRegion: 'us-east-1',
+                modeledMonthlyUsd: 30,
+                deltaVsSelectedMonthlyUsd: 0,
+                isLowest: true,
+              },
+            ],
+          }),
+        ]),
+        egressNetworkingDetails: expect.any(Array),
+        optimizationOpportunities: expect.arrayContaining([
+          expect.objectContaining({
+            id: expect.any(String),
+            category: expect.any(String),
+            recommendation: expect.any(String),
+            priority: expect.stringMatching(/High|Medium|Low/),
+            effort: expect.stringMatching(/High|Medium|Low/),
+            evidence: expect.any(String),
+          }),
+        ]),
+      }),
+    );
   });
 
   it('GET /comparisons/:id/export returns a binary download with content headers', async () => {
@@ -295,6 +456,10 @@ describe('API contracts', () => {
       'quarterly',
       'reserved-3yr',
       response,
+      {
+        ip: '127.0.0.1',
+        headers: {},
+      },
     );
 
     expect(file.getHeaders()).toEqual({
@@ -304,10 +469,61 @@ describe('API contracts', () => {
       length: expect.any(Number),
     });
     expect(response.header).toHaveBeenCalledWith('Content-Type', 'text/csv');
+    expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
     expect(response.header).toHaveBeenCalledWith(
       'Content-Disposition',
       'attachment; filename="polycost-comparison-11111111-1111-4111-8111-111111111111.csv"',
     );
+  });
+
+  it('POST /comparisons/:id/export-jobs returns async export job status and download', async () => {
+    const service = comparisonApplicationService();
+    const exportJobs = reportExportJobsService();
+    const controller = comparisonsController(service, exportJobs);
+    const response = {
+      header: jest.fn(),
+    };
+
+    await expect(
+      controller.createExportJob(
+        comparisonResult.comparisonId,
+        {
+          format: 'pdf',
+          interval: 'monthly',
+          pricingModel: 'on-demand',
+        },
+        {
+          ip: '127.0.0.1',
+          headers: {},
+        },
+        response,
+      ),
+    ).resolves.toEqual(exportJobResponse);
+    expect(exportJobs.createExportJob).toHaveBeenCalledWith(comparisonResult.comparisonId, 'pdf', {
+      interval: 'monthly',
+      pricingModel: 'on-demand',
+    });
+    await expect(
+      controller.getExportJob(comparisonResult.comparisonId, exportJobResponse.jobId),
+    ).resolves.toEqual(exportJobResponse);
+
+    const file = await controller.downloadExportJob(
+      comparisonResult.comparisonId,
+      exportJobResponse.jobId,
+      response,
+      {
+        ip: '127.0.0.2',
+        headers: {},
+      },
+    );
+
+    expect(file.getHeaders()).toEqual({
+      type: 'application/pdf',
+      disposition:
+        'attachment; filename="polycost-comparison-11111111-1111-4111-8111-111111111111.pdf"',
+      length: expect.any(Number),
+    });
+    expect(response.header).toHaveBeenCalledWith('Content-Type', 'application/pdf');
   });
 
   it('POST /comparisons/:id/refresh-live creates a new comparison snapshot', async () => {
@@ -341,6 +557,62 @@ describe('API contracts', () => {
     });
   });
 
+  it('GET /data-health returns public pricing freshness through the controller', async () => {
+    const service = comparisonApplicationService();
+    const controller = new DataHealthController(
+      service as never,
+      new ApiRateLimitService(() => 0),
+      configService,
+    );
+    const response = {
+      header: jest.fn(),
+    };
+
+    await expect(
+      controller.getDataHealth(
+        {
+          ip: '127.0.0.1',
+          headers: {},
+        },
+        response,
+      ),
+    ).resolves.toEqual({
+      generatedAt: '2026-07-01T00:00:00.000Z',
+      freshnessPolicyHours: 48,
+      overallStatus: 'fresh',
+      alertCount: 0,
+      alerts: [],
+      providers: [
+        {
+          providerId: 'aws',
+          status: 'success',
+          freshness: 'fresh',
+          ageHours: 1,
+          recordsUpdated: 12,
+          recordsRejected: 0,
+          recordsSkipped: 3,
+          lastSuccessfulRun: '2026-06-30T23:00:00.000Z',
+          cache: {
+            catalogRows: 30,
+            currentRateRows: 18,
+            latestCatalogSyncAt: '2026-06-30T23:00:00.000Z',
+            latestRateSyncAt: '2026-06-30T23:00:00.000Z',
+            ageHours: 1,
+            freshness: 'fresh',
+            syncStatusCounts: {
+              success: 48,
+              partial: 0,
+              failed: 0,
+            },
+          },
+          message:
+            'Pricing cache refreshed 1h ago across 30 catalog rows and 18 current rate rows.',
+        },
+      ],
+    });
+    expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
+  });
+
   it('GET /pricing/compare reads normalized cached pricing only', async () => {
     const service = costManagementService();
     const controller = new CachedPricingController(service);
@@ -365,9 +637,24 @@ describe('API contracts', () => {
 
   it('GET /pricing/models returns provider-specific model terminology', () => {
     const service = costManagementService();
-    const controller = new CachedPricingController(service);
+    const controller = new CachedPricingController(
+      service,
+      new ApiRateLimitService(() => 0),
+      configService,
+    );
+    const response = {
+      header: jest.fn(),
+    };
 
-    expect(controller.models()).toEqual({
+    expect(
+      controller.models(
+        {
+          ip: '127.0.0.1',
+          headers: {},
+        },
+        response,
+      ),
+    ).toEqual({
       defaultModel: 'on-demand',
       generatedAt: expect.any(String),
       models: expect.arrayContaining([
@@ -391,6 +678,7 @@ describe('API contracts', () => {
         }),
       ]),
     });
+    expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
   });
 
   it('GET /pricing/breakdown reads workload breakdown from cached tables', async () => {
@@ -407,6 +695,37 @@ describe('API contracts', () => {
       workloadRecord.id,
       'reserved_1yr',
     );
+  });
+
+  it('rejects invalid cached-management UUIDs before they reach persistence', () => {
+    const service = costManagementService();
+    const pricingController = new CachedPricingController(service);
+    const budgetsController = new BudgetsController(service);
+    const alertsController = new AlertsController(service);
+    const shareLinksController = new ShareLinksController(service);
+
+    expect(() =>
+      pricingController.breakdown({
+        workloadId: 'undefined',
+        term: 'on_demand',
+      }),
+    ).toThrow(ApiValidationError);
+    expect(() =>
+      budgetsController.create({
+        workloadId: 'not-a-uuid',
+        thresholdUsd: 500,
+      }),
+    ).toThrow(ApiValidationError);
+    expect(() => alertsController.list('not-a-uuid')).toThrow(ApiValidationError);
+    expect(() => alertsController.update('not-a-uuid', { dismissed: true })).toThrow(
+      ApiValidationError,
+    );
+    expect(() =>
+      shareLinksController.create({
+        workloadId: 'not-a-uuid',
+        expiresInDays: 30,
+      }),
+    ).toThrow(ApiValidationError);
   });
 
   it('POST /workloads persists a normalized workload config', async () => {
@@ -496,9 +815,21 @@ describe('API contracts', () => {
       password: 'client-demo',
     });
     await expect(
-      sharedReportsController.get(shareLinkResponse.token, 'client-demo'),
+      sharedReportsController.get(shareLinkResponse.token, 'client-demo', 'summary', {
+        headers: {
+          'cf-ipcountry': 'US',
+          'user-agent': 'jest',
+        },
+      }),
     ).resolves.toEqual(sharedReportResponse);
-    expect(service.getSharedReport).toHaveBeenCalledWith(shareLinkResponse.token, 'client-demo');
+    expect(service.getSharedReport).toHaveBeenCalledWith(shareLinkResponse.token, 'client-demo', {
+      countryCode: 'US',
+      section: 'summary',
+      userAgent: 'jest',
+    });
+    await expect(shareLinksController.analytics(shareLinkResponse.token)).resolves.toEqual(
+      shareLinkAnalyticsResponse,
+    );
     await expect(shareLinksController.revoke(shareLinkResponse.token)).resolves.toEqual(
       shareLinkResponse,
     );
@@ -537,10 +868,26 @@ describe('API contracts', () => {
     const service = {
       getRegionCatalog: jest.fn(async () => catalog),
     };
-    const controller = new RegionsController(service as never);
+    const controller = new RegionsController(
+      service as never,
+      new ApiRateLimitService(() => 0),
+      configService,
+    );
+    const response = {
+      header: jest.fn(),
+    };
 
-    await expect(controller.getRegions()).resolves.toEqual(catalog);
+    await expect(
+      controller.getRegions(
+        {
+          ip: '127.0.0.1',
+          headers: {},
+        },
+        response,
+      ),
+    ).resolves.toEqual(catalog);
     expect(service.getRegionCatalog).toHaveBeenCalledTimes(1);
+    expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
   });
 
   it('rejects invalid comparison and export request shapes', async () => {
@@ -577,6 +924,63 @@ describe('API contracts', () => {
     await controller.parse({ naturalLanguageInput: 'web app' }, request);
     await controller.parse({ naturalLanguageInput: 'web app' }, request);
     await expect(controller.parse({ naturalLanguageInput: 'web app' }, request)).rejects.toThrow(
+      RateLimitExceededError,
+    );
+  });
+
+  it('rate limits comparison, export, and share-link generation by identity', async () => {
+    const identity = {
+      ip: '203.0.113.42',
+      headers: {},
+    };
+    const response = {
+      header: jest.fn(),
+    };
+    const comparisonController = comparisonsController(comparisonApplicationService());
+    const shareLinksController = new ShareLinksController(
+      costManagementService(),
+      new ApiRateLimitService(() => 0),
+      configService,
+    );
+
+    await comparisonController.create({ nws: validNws }, identity, response);
+    await comparisonController.create({ nws: validNws }, identity, response);
+    await expect(
+      comparisonController.create({ nws: validNws }, identity, response),
+    ).rejects.toThrow(RateLimitExceededError);
+
+    await comparisonController.createExportJob(
+      comparisonResult.comparisonId,
+      {
+        format: 'pdf',
+      },
+      identity,
+      response,
+    );
+    await comparisonController.createExportJob(
+      comparisonResult.comparisonId,
+      {
+        format: 'pdf',
+      },
+      identity,
+      response,
+    );
+    await expect(
+      comparisonController.createExportJob(
+        comparisonResult.comparisonId,
+        {
+          format: 'pdf',
+        },
+        identity,
+        response,
+      ),
+    ).rejects.toThrow(RateLimitExceededError);
+
+    const shareLinkBody = { workloadId: workloadRecord.id, expiresInDays: 30 };
+
+    await shareLinksController.create(shareLinkBody, identity, response);
+    await shareLinksController.create(shareLinkBody, identity, response);
+    expect(() => shareLinksController.create(shareLinkBody, identity, response)).toThrow(
       RateLimitExceededError,
     );
   });
@@ -713,6 +1117,7 @@ describe('API contracts', () => {
     };
     const repository = {
       saveComparison: jest.fn(async () => undefined),
+      recordComparisonAuditLog: jest.fn(async () => undefined),
       getComparison: jest.fn(async () => ({
         nwsSnapshot: validNws,
         resultSnapshot: comparisonResult,
@@ -720,20 +1125,27 @@ describe('API contracts', () => {
       getPricingStatus: jest.fn(async () => ({
         providers: [],
       })),
+      getDataHealth: jest.fn(async () => freshDataHealth),
     };
     const liveRefresh = {
       refreshSnapshot: jest.fn(async () => []),
+    };
+    const prewarm = {
+      enqueue: jest.fn(),
     };
     const service = new ComparisonApplicationService(
       orchestrator as never,
       repository as never,
       liveRefresh as never,
+      prewarm as unknown as ComparisonPrewarmService,
     );
 
     await expect(service.createComparison(validNws, { useLivePricing: false })).resolves.toEqual(
       comparisonResult,
     );
     expect(repository.saveComparison).toHaveBeenCalledWith(validNws, comparisonResult);
+    expect(repository.recordComparisonAuditLog).toHaveBeenCalledWith(comparisonResult);
+    expect(prewarm.enqueue).toHaveBeenCalledWith(comparisonResult);
     await expect(service.getComparison(comparisonResult.comparisonId)).resolves.toEqual({
       nwsSnapshot: validNws,
       resultSnapshot: comparisonResult,
@@ -756,11 +1168,13 @@ describe('API contracts', () => {
     };
     const repository = {
       saveComparison: jest.fn(async () => undefined),
+      recordComparisonAuditLog: jest.fn(async () => undefined),
       getComparison: jest.fn(async () => ({
         nwsSnapshot: validNws,
         resultSnapshot: comparisonResult,
       })),
       getPricingStatus: jest.fn(),
+      getDataHealth: jest.fn(async () => freshDataHealth),
     };
     const service = new ComparisonApplicationService(
       {
@@ -800,6 +1214,58 @@ describe('API contracts', () => {
         },
       ],
     });
+    expect(repository.recordComparisonAuditLog).toHaveBeenCalledWith({
+      ...refreshedResult,
+      warnings: [
+        {
+          providerId: 'azure',
+          code: 'live_refresh_failed',
+          message: 'azure live refresh failed: provider throttled',
+        },
+      ],
+    });
+  });
+
+  it('adds pricing data-health warnings to created comparison snapshots', async () => {
+    const staleDataHealth: DataHealthResponse = {
+      ...freshDataHealth,
+      overallStatus: 'stale',
+      alertCount: 1,
+      alerts: [
+        {
+          providerId: 'azure',
+          severity: 'warning',
+          message:
+            'Pricing data is 72h old against the 48h policy; refresh before production decisions.',
+        },
+      ],
+    };
+    const repository = {
+      saveComparison: jest.fn(async () => undefined),
+      recordComparisonAuditLog: jest.fn(async () => undefined),
+      getDataHealth: jest.fn(async () => staleDataHealth),
+    };
+    const service = new ComparisonApplicationService(
+      {
+        compare: jest.fn(async () => comparisonResult),
+      } as never,
+      repository as never,
+    );
+    const expected = {
+      ...comparisonResult,
+      warnings: [
+        {
+          providerId: 'azure',
+          code: 'pricing_data_health',
+          message:
+            'Pricing data is 72h old against the 48h policy; refresh before production decisions.',
+        },
+      ],
+    };
+
+    await expect(service.createComparison(validNws)).resolves.toEqual(expected);
+    expect(repository.saveComparison).toHaveBeenCalledWith(validNws, expected);
+    expect(repository.recordComparisonAuditLog).toHaveBeenCalledWith(expected);
   });
 
   it('reports comparison application not-found and disabled live-refresh failures', async () => {
@@ -809,6 +1275,7 @@ describe('API contracts', () => {
       } as never,
       {
         saveComparison: jest.fn(),
+        recordComparisonAuditLog: jest.fn(),
         getComparison: jest.fn(async () => undefined),
         getPricingStatus: jest.fn(),
       } as never,
@@ -846,6 +1313,40 @@ function comparisonApplicationService() {
         },
       ],
     })),
+    getDataHealth: jest.fn(async () => ({
+      generatedAt: '2026-07-01T00:00:00.000Z',
+      freshnessPolicyHours: 48,
+      overallStatus: 'fresh' as const,
+      alertCount: 0,
+      alerts: [],
+      providers: [
+        {
+          providerId: 'aws' as const,
+          status: 'success' as const,
+          freshness: 'fresh' as const,
+          ageHours: 1,
+          recordsUpdated: 12,
+          recordsRejected: 0,
+          recordsSkipped: 3,
+          lastSuccessfulRun: '2026-06-30T23:00:00.000Z',
+          cache: {
+            catalogRows: 30,
+            currentRateRows: 18,
+            latestCatalogSyncAt: '2026-06-30T23:00:00.000Z',
+            latestRateSyncAt: '2026-06-30T23:00:00.000Z',
+            ageHours: 1,
+            freshness: 'fresh' as const,
+            syncStatusCounts: {
+              success: 48,
+              partial: 0,
+              failed: 0,
+            },
+          },
+          message:
+            'Pricing cache refreshed 1h ago across 30 catalog rows and 18 current rate rows.',
+        },
+      ],
+    })),
   } as unknown as jest.Mocked<ComparisonApplicationService>;
 }
 
@@ -859,12 +1360,29 @@ function costManagementService() {
     updateAlertDismissed: jest.fn(async () => alertRecord),
     createShareLink: jest.fn(async () => shareLinkResponse),
     getSharedReport: jest.fn(async () => sharedReportResponse),
+    getShareLinkAnalytics: jest.fn(async () => shareLinkAnalyticsResponse),
     revokeShareLink: jest.fn(async () => shareLinkResponse),
     getExchangeRates: jest.fn(async () => exchangeRatesResponse),
   } as unknown as jest.Mocked<CostManagementService>;
 }
 
-function comparisonsController(service: jest.Mocked<ComparisonApplicationService>) {
+function reportExportJobsService() {
+  return {
+    createExportJob: jest.fn(async () => exportJobResponse),
+    getExportJob: jest.fn(async () => exportJobResponse),
+    downloadExportJob: jest.fn(async () => ({
+      fileName:
+        exportJobResponse.fileName ?? `polycost-comparison-${comparisonResult.comparisonId}.pdf`,
+      contentType: exportJobResponse.contentType ?? 'application/pdf',
+      content: Buffer.from('report'),
+    })),
+  } as unknown as jest.Mocked<ReportExportJobsService>;
+}
+
+function comparisonsController(
+  service: jest.Mocked<ComparisonApplicationService>,
+  exportJobs: jest.Mocked<ReportExportJobsService> = reportExportJobsService(),
+) {
   return new ComparisonsController(
     service,
     new ReportService(
@@ -874,6 +1392,8 @@ function comparisonsController(service: jest.Mocked<ComparisonApplicationService
     ),
     new ApiRateLimitService(() => 0),
     configService,
+    exportJobs,
+    new ComparisonAnalyticsService(),
   );
 }
 

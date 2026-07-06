@@ -1,4 +1,7 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { HOURS_PER_MONTH } from '../cost-time';
+import { AppConfig } from '../config/config.schema';
 import {
   providerRegionsForCanonicalRegion,
   supportedCanonicalRegions,
@@ -14,11 +17,28 @@ import {
   StoragePricingTier,
   WorkloadInput,
 } from './cost-management.types';
+import {
+  ApiRateLimitService,
+  RateLimitHeaderResponse,
+  requestIdentity,
+  writeRateLimitHeaders,
+} from './rate-limit.service';
 
 type QueryValue = string | string[] | undefined;
+interface RequestLike {
+  ip?: string;
+  headers?: Record<string, unknown>;
+}
+
+type PublicRateLimitConfigKey =
+  | 'RATE_LIMIT_COMPARISON_PER_MINUTE'
+  | 'RATE_LIMIT_SHARE_LINK_PER_MINUTE'
+  | 'RATE_LIMIT_PUBLIC_READ_PER_MINUTE'
+  | 'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE';
 
 const INSTANCE_FAMILIES = [
   'general-purpose',
+  'burstable',
   'compute-optimized',
   'memory-optimized',
   'storage-optimized',
@@ -32,97 +52,322 @@ const PRICING_TERMS: CachedPricingTerm[] = [
   'spot',
   'savings_plan',
 ];
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 @Controller('api/v1/pricing')
 export class CachedPricingController {
-  constructor(private readonly costManagementService: CostManagementService) {}
+  constructor(
+    private readonly costManagementService: CostManagementService,
+    private readonly apiRateLimitService: ApiRateLimitService = new ApiRateLimitService(),
+    private readonly configService?: ConfigService<AppConfig, true>,
+  ) {}
 
   @Get('compare')
-  compare(@Query() query: Record<string, QueryValue>) {
+  compare(
+    @Query() query: Record<string, QueryValue>,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'pricing_compare',
+      request,
+      response,
+      'RATE_LIMIT_COMPARISON_PER_MINUTE',
+    );
+
     return this.costManagementService.compareCachedPricing(parseCompareQuery(query));
   }
 
   @Get('breakdown')
-  breakdown(@Query() query: Record<string, QueryValue>) {
-    const workloadId = parseRequiredString(query.workloadId, 'workloadId');
+  breakdown(
+    @Query() query: Record<string, QueryValue>,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'pricing_breakdown',
+      request,
+      response,
+      'RATE_LIMIT_COMPARISON_PER_MINUTE',
+    );
+
+    const workloadId = parseUuid(query.workloadId, 'workloadId');
     const term = parsePricingTerm(query.term);
 
     return this.costManagementService.getWorkloadCostBreakdown(workloadId, term);
   }
 
   @Get('models')
-  models(): PricingModelCatalogResponse {
+  models(
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ): PricingModelCatalogResponse {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'pricing_models_catalog',
+      request,
+      response,
+      'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
+    );
+
     return pricingModelCatalog();
   }
 }
 
 @Controller('api/v1/workloads')
 export class WorkloadsController {
-  constructor(private readonly costManagementService: CostManagementService) {}
+  constructor(
+    private readonly costManagementService: CostManagementService,
+    private readonly apiRateLimitService: ApiRateLimitService = new ApiRateLimitService(),
+    private readonly configService?: ConfigService<AppConfig, true>,
+  ) {}
 
   @Post()
-  create(@Body() body: unknown) {
+  create(
+    @Body() body: unknown,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'workload_create',
+      request,
+      response,
+      'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE',
+    );
+
     return this.costManagementService.createWorkload(parseWorkloadInput(body));
   }
 }
 
 @Controller('api/v1/budgets')
 export class BudgetsController {
-  constructor(private readonly costManagementService: CostManagementService) {}
+  constructor(
+    private readonly costManagementService: CostManagementService,
+    private readonly apiRateLimitService: ApiRateLimitService = new ApiRateLimitService(),
+    private readonly configService?: ConfigService<AppConfig, true>,
+  ) {}
 
   @Post()
-  create(@Body() body: unknown) {
+  create(
+    @Body() body: unknown,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'budget_create',
+      request,
+      response,
+      'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE',
+    );
+
     return this.costManagementService.createBudget(parseBudgetInput(body));
   }
 }
 
 @Controller('api/v1/alerts')
 export class AlertsController {
-  constructor(private readonly costManagementService: CostManagementService) {}
+  constructor(
+    private readonly costManagementService: CostManagementService,
+    private readonly apiRateLimitService: ApiRateLimitService = new ApiRateLimitService(),
+    private readonly configService?: ConfigService<AppConfig, true>,
+  ) {}
 
   @Get()
-  list(@Query('workloadId') workloadId?: QueryValue) {
-    return this.costManagementService.listAlerts(optionalSingleString(workloadId));
+  list(
+    @Query('workloadId') workloadId?: QueryValue,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'alerts_list',
+      request,
+      response,
+      'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
+    );
+
+    return this.costManagementService.listAlerts(parseOptionalUuid(workloadId, 'workloadId'));
   }
 
   @Patch(':id')
-  update(@Param('id') alertId: string, @Body() body: unknown) {
-    return this.costManagementService.updateAlertDismissed(alertId, parseDismissedUpdate(body));
+  update(
+    @Param('id') alertId: string,
+    @Body() body: unknown,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'alert_update',
+      request,
+      response,
+      'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE',
+    );
+
+    return this.costManagementService.updateAlertDismissed(
+      parseUuid(alertId, 'id'),
+      parseDismissedUpdate(body),
+    );
   }
 }
 
 @Controller('api/v1/share-links')
 export class ShareLinksController {
-  constructor(private readonly costManagementService: CostManagementService) {}
+  constructor(
+    private readonly costManagementService: CostManagementService,
+    private readonly apiRateLimitService: ApiRateLimitService = new ApiRateLimitService(),
+    private readonly configService?: ConfigService<AppConfig, true>,
+  ) {}
 
   @Post()
-  create(@Body() body: unknown) {
+  create(
+    @Body() body: unknown,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'share_link_create',
+      request,
+      response,
+      'RATE_LIMIT_SHARE_LINK_PER_MINUTE',
+    );
+
     return this.costManagementService.createShareLink(parseShareLinkInput(body));
   }
 
   @Post(':token/revoke')
-  revoke(@Param('token') token: string) {
+  revoke(
+    @Param('token') token: string,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'share_link_revoke',
+      request,
+      response,
+      'RATE_LIMIT_SHARE_LINK_PER_MINUTE',
+    );
+
     return this.costManagementService.revokeShareLink(token);
+  }
+
+  @Get(':token/analytics')
+  analytics(
+    @Param('token') token: string,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'share_link_analytics',
+      request,
+      response,
+      'RATE_LIMIT_SHARE_LINK_PER_MINUTE',
+    );
+
+    return this.costManagementService.getShareLinkAnalytics(token);
   }
 }
 
 @Controller('api/v1/share')
 export class SharedReportsController {
-  constructor(private readonly costManagementService: CostManagementService) {}
+  constructor(
+    private readonly costManagementService: CostManagementService,
+    private readonly apiRateLimitService: ApiRateLimitService = new ApiRateLimitService(),
+    private readonly configService?: ConfigService<AppConfig, true>,
+  ) {}
 
   @Get(':token')
-  get(@Param('token') token: string, @Query('password') password?: QueryValue) {
-    return this.costManagementService.getSharedReport(token, optionalSingleString(password));
+  get(
+    @Param('token') token: string,
+    @Query('password') password: QueryValue,
+    @Query('section') section: QueryValue,
+    @Req() request: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'shared_report_get',
+      request,
+      response,
+      'RATE_LIMIT_SHARE_LINK_PER_MINUTE',
+    );
+
+    return this.costManagementService.getSharedReport(token, optionalSingleString(password), {
+      countryCode: countryCodeFromHeaders(request.headers ?? {}),
+      section: optionalSingleString(section) ?? 'summary',
+      userAgent: optionalSingleString(request.headers?.['user-agent']),
+    });
   }
 }
 
 @Controller('api/v1/exchange-rates')
 export class ExchangeRatesController {
-  constructor(private readonly costManagementService: CostManagementService) {}
+  constructor(
+    private readonly costManagementService: CostManagementService,
+    private readonly apiRateLimitService: ApiRateLimitService = new ApiRateLimitService(),
+    private readonly configService?: ConfigService<AppConfig, true>,
+  ) {}
 
   @Get()
-  get(@Query('base') base?: QueryValue) {
+  get(
+    @Query('base') base?: QueryValue,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'exchange_rates_get',
+      request,
+      response,
+      'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
+    );
+
     return this.costManagementService.getExchangeRates(parseCurrency(base ?? 'USD', 'base'));
+  }
+}
+
+function consumePublicRateLimit(
+  apiRateLimitService: ApiRateLimitService,
+  configService: ConfigService<AppConfig, true> | undefined,
+  scope: string,
+  request: RequestLike | undefined,
+  response: RateLimitHeaderResponse | undefined,
+  configKey: PublicRateLimitConfigKey,
+): void {
+  const limit = configService?.get(configKey, { infer: true }) ?? defaultRateLimitFor(configKey);
+  const state = apiRateLimitService.consume(scope, requestIdentity(request ?? {}), limit);
+  writeRateLimitHeaders(response, state);
+}
+
+function defaultRateLimitFor(configKey: PublicRateLimitConfigKey): number {
+  switch (configKey) {
+    case 'RATE_LIMIT_COMPARISON_PER_MINUTE':
+      return 30;
+    case 'RATE_LIMIT_SHARE_LINK_PER_MINUTE':
+      return 20;
+    case 'RATE_LIMIT_PUBLIC_READ_PER_MINUTE':
+      return 60;
+    case 'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE':
+      return 30;
   }
 }
 
@@ -145,7 +390,7 @@ function parseWorkloadInput(body: unknown): WorkloadInput {
     memoryGb: parsePositiveNumber(record.memoryGb, 'memoryGb'),
     region: parseCanonicalRegion(record.region),
     instanceCount: parsePositiveNumber(record.instanceCount ?? 1, 'instanceCount', true),
-    hoursPerMonth: parsePositiveNumber(record.hoursPerMonth ?? 730, 'hoursPerMonth'),
+    hoursPerMonth: parsePositiveNumber(record.hoursPerMonth ?? HOURS_PER_MONTH, 'hoursPerMonth'),
     storageGb: parseNonNegativeNumber(record.storageGb ?? 0, 'storageGb'),
     storageTier: parseStorageTier(record.storageTier ?? 'standard'),
     egressGbPerMonth: parseNonNegativeNumber(record.egressGbPerMonth ?? 0, 'egressGbPerMonth'),
@@ -156,7 +401,7 @@ function parseBudgetInput(body: unknown): BudgetInput {
   const record = requireRecord(body, 'Budget request body must be an object');
 
   return {
-    workloadId: parseRequiredString(record.workloadId, 'workloadId'),
+    workloadId: parseUuid(record.workloadId, 'workloadId'),
     thresholdUsd: parsePositiveNumber(record.thresholdUsd, 'thresholdUsd'),
     ...(record.alertOnAnomalyPercent !== undefined
       ? {
@@ -173,7 +418,7 @@ function parseShareLinkInput(body: unknown): ShareLinkInput {
   const record = requireRecord(body, 'Share-link request body must be an object');
 
   return {
-    workloadId: parseRequiredString(record.workloadId, 'workloadId'),
+    workloadId: parseUuid(record.workloadId, 'workloadId'),
     watermark: typeof record.watermark === 'boolean' ? record.watermark : true,
     expiresInDays: parsePositiveNumber(record.expiresInDays, 'expiresInDays', true),
     pricingModel: parseSharePricingModel(record.pricingModel ?? 'on-demand'),
@@ -182,6 +427,14 @@ function parseShareLinkInput(body: unknown): ShareLinkInput {
       ? { password: record.password.trim() }
       : {}),
   };
+}
+
+function countryCodeFromHeaders(headers: Record<string, unknown>): string | undefined {
+  return (
+    optionalSingleString(headers['cloudfront-viewer-country']) ??
+    optionalSingleString(headers['cf-ipcountry']) ??
+    optionalSingleString(headers['x-vercel-ip-country'])
+  );
 }
 
 function parseSharePricingModel(value: unknown): ShareLinkInput['pricingModel'] {
@@ -450,6 +703,31 @@ function parseRequiredString(value: unknown, field: string): string {
   }
 
   return parsed;
+}
+
+function parseUuid(value: unknown, field: string): string {
+  const parsed = parseRequiredString(value, field);
+
+  if (!UUID_PATTERN.test(parsed)) {
+    throw new ApiValidationError(`${field} must be a UUID`, [
+      {
+        field,
+        issue: 'must be a valid UUID',
+      },
+    ]);
+  }
+
+  return parsed;
+}
+
+function parseOptionalUuid(value: unknown, field: string): string | undefined {
+  const parsed = optionalSingleString(value);
+
+  if (!parsed) {
+    return undefined;
+  }
+
+  return parseUuid(parsed, field);
 }
 
 function optionalSingleString(value: unknown): string | undefined {

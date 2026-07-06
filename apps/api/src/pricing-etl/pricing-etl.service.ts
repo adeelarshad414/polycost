@@ -1,22 +1,38 @@
-import { Injectable } from '@nestjs/common';
-import { CloudProviderAdapter } from '../adapters/common/cloud-provider-adapter';
+import { Injectable, Logger } from '@nestjs/common';
+import {
+  CloudProviderAdapter,
+  PricingCatalogRecord,
+} from '../adapters/common/cloud-provider-adapter';
 import {
   NormalizedPricingWriter,
   PricingCatalogWriter,
   PricingEtlRunRepository,
 } from '../database/pricing-repository.types';
+import { PricingSyncFailureNotifier } from './pricing-sync-alert.service';
 import { PricingEtlProviderResult, PricingEtlSummary } from './pricing-etl.types';
 
 const MAX_ERROR_DETAIL_LENGTH = 2000;
+const PRICING_ETL_MAX_ATTEMPTS = 3;
+const PRICING_ETL_BACKOFF_MS = 500;
+
+export interface PricingEtlRetryOptions {
+  maxAttempts?: number;
+  baseDelayMs?: number;
+  delay?: (durationMs: number) => Promise<void>;
+}
 
 @Injectable()
 export class PricingEtlService {
+  private readonly logger = new Logger(PricingEtlService.name);
+
   constructor(
     private readonly adapters: CloudProviderAdapter[],
     private readonly catalogWriter: PricingCatalogWriter,
     private readonly runRepository: PricingEtlRunRepository,
     private readonly now: () => Date = () => new Date(),
     private readonly normalizedPricingWriter?: NormalizedPricingWriter,
+    private readonly failureNotifier?: PricingSyncFailureNotifier,
+    private readonly retryOptions: PricingEtlRetryOptions = {},
   ) {}
 
   async refreshAllProviders(): Promise<PricingEtlSummary> {
@@ -35,7 +51,7 @@ export class PricingEtlService {
     let result: PricingEtlProviderResult;
 
     try {
-      const records = await adapter.refreshPricingCatalog();
+      const records = await this.refreshCatalogWithRetry(adapter);
       const catalogWriteResult = await this.catalogWriter.upsertPricingRecords(records);
       const normalizedWriteResult = this.normalizedPricingWriter
         ? await this.normalizedPricingWriter.upsertNormalizedPricingRecords(records)
@@ -82,12 +98,69 @@ export class PricingEtlService {
       recordsSkipped: result.recordsSkipped,
       errorDetail: result.errorDetail,
     });
+    await this.notifyPricingSyncIssue(result);
 
     return result;
   }
 
+  private async refreshCatalogWithRetry(
+    adapter: CloudProviderAdapter,
+  ): Promise<PricingCatalogRecord[]> {
+    const maxAttempts = Math.max(
+      1,
+      Math.trunc(this.retryOptions.maxAttempts ?? PRICING_ETL_MAX_ATTEMPTS),
+    );
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        return await adapter.refreshPricingCatalog();
+      } catch (error) {
+        lastError = error;
+
+        if (attempt < maxAttempts) {
+          this.logger.warn({
+            event: 'pricing_etl_provider_refresh_retry',
+            provider: adapter.providerId,
+            attempt,
+            maxAttempts,
+            error: safeErrorMessage(error),
+          });
+          await this.retryDelay(this.retryBackoffMs(attempt));
+        }
+      }
+    }
+
+    throw lastError;
+  }
+
+  private async retryDelay(durationMs: number): Promise<void> {
+    await (this.retryOptions.delay ?? delay)(durationMs);
+  }
+
+  private retryBackoffMs(attempt: number): number {
+    return Math.max(0, this.retryOptions.baseDelayMs ?? PRICING_ETL_BACKOFF_MS) * attempt;
+  }
+
   private timestamp(): string {
     return this.now().toISOString();
+  }
+
+  private async notifyPricingSyncIssue(result: PricingEtlProviderResult): Promise<void> {
+    if (!this.failureNotifier || result.status === 'success') {
+      return;
+    }
+
+    try {
+      await this.failureNotifier.notifyProviderResult(result);
+    } catch (error) {
+      this.logger.error({
+        event: 'pricing_sync_alert_notification_failed',
+        provider: result.provider,
+        status: result.status,
+        error: error instanceof Error ? error.message : 'Unknown notifier failure',
+      });
+    }
   }
 }
 
@@ -109,4 +182,10 @@ function summarize(results: PricingEtlProviderResult[]): PricingEtlSummary['stat
 function safeErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : 'Unknown provider refresh error';
   return message.slice(0, MAX_ERROR_DETAIL_LENGTH);
+}
+
+function delay(durationMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, durationMs);
+  });
 }

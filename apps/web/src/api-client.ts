@@ -4,22 +4,37 @@ import {
   BackendHealthResponse,
   BudgetInput,
   BudgetRecord,
+  ComparisonAnalyticsResponse,
   ComparisonResult,
+  DataHealthResponse,
   ExchangeRatesResponse,
+  IntervalKey,
   NormalizedWorkloadSpec,
   ParsedNwsDraft,
   PricingModelCatalogResponse,
   PricingModelsForServiceResponse,
+  PricingModelKey,
   PricingStatusResponse,
   RegionCatalogResponse,
+  ReportExportJobResponse,
   ReportFormat,
   SharedReportResponse,
+  ShareLinkAnalyticsResponse,
   ShareLinkResponse,
   WorkloadInput,
   WorkloadRecord,
 } from './types';
 
 const DEFAULT_API_BASE_URL = '/api/v1';
+const EXPORT_JOB_POLL_INTERVAL_MS = 500;
+const EXPORT_JOB_MAX_ATTEMPTS = 120;
+const GENERIC_BROWSER_ERROR_MESSAGE =
+  'PolyCost hit an unexpected browser-side issue while preparing the request. Refresh the page and try again.';
+
+interface ExportComparisonOptions {
+  interval?: IntervalKey;
+  pricingModel?: PricingModelKey;
+}
 
 interface ApiErrorEnvelope {
   error?: {
@@ -44,14 +59,23 @@ export class PolyCostApiError extends Error {
 
 export interface PolyCostClient {
   getHealth(): Promise<BackendHealthResponse>;
+  getDataHealth(): Promise<DataHealthResponse>;
   parseWorkload(input: string): Promise<ParsedNwsDraft>;
   validateWorkload(nws: NormalizedWorkloadSpec): Promise<{ valid: true }>;
   createComparison(nws: NormalizedWorkloadSpec): Promise<ComparisonResult>;
+  getComparisonAnalytics(comparisonId: string): Promise<ComparisonAnalyticsResponse>;
   refreshLiveComparison(comparisonId: string): Promise<ComparisonResult>;
+  createExportJob(
+    comparisonId: string,
+    format: ReportFormat,
+    options?: ExportComparisonOptions,
+  ): Promise<ReportExportJobResponse>;
+  getExportJob(comparisonId: string, jobId: string): Promise<ReportExportJobResponse>;
+  downloadExportJob(comparisonId: string, jobId: string): Promise<Blob>;
   exportComparison(
     comparisonId: string,
     format: ReportFormat,
-    options?: { interval?: string; pricingModel?: string },
+    options?: ExportComparisonOptions,
   ): Promise<Blob>;
   getPricingStatus(): Promise<PricingStatusResponse>;
   getPricingModels(): Promise<PricingModelCatalogResponse>;
@@ -71,6 +95,7 @@ export interface PolyCostClient {
     password?: string;
   }): Promise<ShareLinkResponse>;
   revokeShareLink(token: string): Promise<ShareLinkResponse>;
+  getShareLinkAnalytics(token: string): Promise<ShareLinkAnalyticsResponse>;
   getSharedReport(token: string, password?: string): Promise<SharedReportResponse>;
   createBudget(input: BudgetInput): Promise<BudgetRecord>;
   listAlerts(workloadId?: string): Promise<AlertRecord[]>;
@@ -95,6 +120,9 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
     getHealth() {
       return requestJson<BackendHealthResponse>(apiRootHealthUrl(baseUrl));
     },
+    getDataHealth() {
+      return requestJson<DataHealthResponse>(baseUrl, '/data-health');
+    },
     parseWorkload(input) {
       return requestJson<ParsedNwsDraft>(baseUrl, '/workload/parse', {
         method: 'POST',
@@ -118,29 +146,31 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         }),
       });
     },
+    getComparisonAnalytics(comparisonId) {
+      return requestJson<ComparisonAnalyticsResponse>(
+        baseUrl,
+        `/comparisons/${encodeURIComponent(comparisonId)}/analytics`,
+      );
+    },
     refreshLiveComparison(comparisonId) {
       return requestJson<ComparisonResult>(baseUrl, `/comparisons/${comparisonId}/refresh-live`, {
         method: 'POST',
       });
     },
+    createExportJob(comparisonId, format, options = {}) {
+      return createExportJobRequest(baseUrl, comparisonId, format, options);
+    },
+    getExportJob(comparisonId, jobId) {
+      return getExportJobRequest(baseUrl, comparisonId, jobId);
+    },
+    downloadExportJob(comparisonId, jobId) {
+      return downloadExportJobRequest(baseUrl, comparisonId, jobId);
+    },
     async exportComparison(comparisonId, format, options = {}) {
-      const query = new URLSearchParams({ format });
+      const job = await createExportJobRequest(baseUrl, comparisonId, format, options);
+      const completedJob = await pollExportJob(baseUrl, comparisonId, job);
 
-      if (options.interval) {
-        query.set('interval', options.interval);
-      }
-
-      if (options.pricingModel) {
-        query.set('pricingModel', options.pricingModel);
-      }
-
-      const response = await fetch(`${baseUrl}/comparisons/${comparisonId}/export?${query}`);
-
-      if (!response.ok) {
-        throw await toApiError(response);
-      }
-
-      return response.blob();
+      return downloadExportJobRequest(baseUrl, comparisonId, completedJob.jobId);
     },
     getPricingStatus() {
       return requestJson<PricingStatusResponse>(baseUrl, '/pricing/status');
@@ -180,6 +210,12 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         },
       );
     },
+    getShareLinkAnalytics(token) {
+      return requestJson<ShareLinkAnalyticsResponse>(
+        baseUrl,
+        `/share-links/${encodeURIComponent(token)}/analytics`,
+      );
+    },
     getSharedReport(token, password) {
       const query = password ? `?password=${encodeURIComponent(password)}` : '';
       return requestJson<SharedReportResponse>(
@@ -210,6 +246,92 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
       );
     },
   };
+}
+
+function createExportJobRequest(
+  baseUrl: string,
+  comparisonId: string,
+  format: ReportFormat,
+  options: ExportComparisonOptions,
+): Promise<ReportExportJobResponse> {
+  return requestJson<ReportExportJobResponse>(
+    baseUrl,
+    `/comparisons/${encodeURIComponent(comparisonId)}/export-jobs`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        format,
+        interval: options.interval,
+        pricingModel: options.pricingModel,
+      }),
+    },
+  );
+}
+
+function getExportJobRequest(
+  baseUrl: string,
+  comparisonId: string,
+  jobId: string,
+): Promise<ReportExportJobResponse> {
+  return requestJson<ReportExportJobResponse>(
+    baseUrl,
+    `/comparisons/${encodeURIComponent(comparisonId)}/export-jobs/${encodeURIComponent(jobId)}`,
+  );
+}
+
+async function downloadExportJobRequest(
+  baseUrl: string,
+  comparisonId: string,
+  jobId: string,
+): Promise<Blob> {
+  const response = await fetch(
+    `${baseUrl}/comparisons/${encodeURIComponent(comparisonId)}/export-jobs/${encodeURIComponent(
+      jobId,
+    )}/download`,
+  );
+
+  if (!response.ok) {
+    throw await toApiError(response);
+  }
+
+  return response.blob();
+}
+
+async function pollExportJob(
+  baseUrl: string,
+  comparisonId: string,
+  initialJob: ReportExportJobResponse,
+): Promise<ReportExportJobResponse> {
+  let job = initialJob;
+
+  for (let attempt = 0; attempt < EXPORT_JOB_MAX_ATTEMPTS; attempt += 1) {
+    if (job.status === 'completed') {
+      return job;
+    }
+
+    if (job.status === 'failed') {
+      throw new PolyCostApiError(
+        422,
+        'EXPORT_JOB_FAILED',
+        job.errorMessage ?? 'Report generation failed. Try again after refreshing the comparison.',
+      );
+    }
+
+    await delay(EXPORT_JOB_POLL_INTERVAL_MS);
+    job = await getExportJobRequest(baseUrl, comparisonId, job.jobId);
+  }
+
+  throw new PolyCostApiError(
+    408,
+    'EXPORT_JOB_TIMEOUT',
+    'Report generation is still running. Try the download again in a moment.',
+  );
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 function apiRootHealthUrl(baseUrl: string): string {
@@ -284,22 +406,99 @@ async function toApiError(response: Response): Promise<PolyCostApiError> {
   return new PolyCostApiError(
     response.status,
     body.error?.code ?? 'HTTP_ERROR',
-    body.error?.message ?? `Request failed with status ${response.status}`,
+    body.error?.message ?? fallbackHttpErrorMessage(response.status),
     body.error?.details ?? [],
   );
 }
 
 export function formatApiError(error: unknown): string {
   if (error instanceof PolyCostApiError) {
-    const details = error.details.map((detail) => detail.issue).join(' ');
-    return details ? `${error.message} ${details}` : error.message;
+    const message = safeUserFacingErrorMessage(
+      error.message,
+      fallbackHttpErrorMessage(error.status),
+    );
+    const details = error.details
+      .map((detail) => safeUserFacingErrorMessage(detail.issue, ''))
+      .filter(Boolean)
+      .join(' ');
+
+    return details ? `${message} ${details}` : message;
   }
 
   if (error instanceof Error) {
-    return error.message;
+    if (isNetworkFetchError(error)) {
+      return 'PolyCost could not reach the API service. Start the backend or check the API base URL, then try again.';
+    }
+
+    return safeUserFacingErrorMessage(error.message, GENERIC_BROWSER_ERROR_MESSAGE);
   }
 
-  return 'Unexpected application error';
+  return GENERIC_BROWSER_ERROR_MESSAGE;
+}
+
+function safeUserFacingErrorMessage(message: string, fallback: string): string {
+  const trimmed = message.trim();
+
+  if (!trimmed || looksLikeRawTechnicalError(trimmed)) {
+    return fallback;
+  }
+
+  const firstLine = trimmed.split(/\r?\n/)[0]?.trim() ?? '';
+
+  if (!firstLine || looksLikeRawTechnicalError(firstLine)) {
+    return fallback;
+  }
+
+  return firstLine.replace(/^(Error|TypeError|SyntaxError|ReferenceError):\s+/u, '').slice(0, 280);
+}
+
+function looksLikeRawTechnicalError(message: string): boolean {
+  const compact = message.trim();
+
+  return (
+    compact.includes('[object Object]') ||
+    /\bat\s+\S+\s+\([^)]*:\d+:\d+\)/u.test(message) ||
+    /\bat\s+[^(\n]+:\d+:\d+/u.test(message) ||
+    (compact.startsWith('{') && compact.endsWith('}'))
+  );
+}
+
+function fallbackHttpErrorMessage(status: number): string {
+  switch (status) {
+    case 400:
+      return 'PolyCost could not use that request. Review the workload inputs and try again.';
+    case 401:
+      return 'PolyCost needs a signed-in session for this request. Sign in again, then retry.';
+    case 403:
+      return 'PolyCost reached the API, but this account does not have access to that action.';
+    case 404:
+      return 'PolyCost could not find the requested API resource. Refresh the page and try again.';
+    case 405:
+      return 'PolyCost reached a server that does not accept this API action. Check that the web app is pointed at the PolyCost API service, then try again.';
+    case 408:
+      return 'The PolyCost API took too long to respond. Retry once the pricing service catches up.';
+    case 409:
+      return 'PolyCost could not complete the request because the saved comparison changed. Refresh the comparison and try again.';
+    case 422:
+      return 'PolyCost could not validate that workload. Review the highlighted fields and try again.';
+    case 429:
+      return 'The PolyCost API is receiving too many requests right now. Wait a moment, then retry.';
+    case 500:
+      return 'The PolyCost API hit a server-side problem while processing this request. Try again after refreshing pricing data.';
+    case 502:
+    case 503:
+    case 504:
+      return 'The PolyCost API is temporarily unavailable. Confirm the backend service is running, then try again.';
+    default:
+      return `PolyCost could not complete the API request (HTTP ${status}). Refresh the page and try again.`;
+  }
+}
+
+function isNetworkFetchError(error: Error): boolean {
+  return (
+    error instanceof TypeError &&
+    /failed to fetch|networkerror|load failed|fetch failed/i.test(error.message)
+  );
 }
 
 export const polyCostClient = createPolyCostClient();

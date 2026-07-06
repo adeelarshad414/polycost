@@ -107,6 +107,82 @@ describe('ApiDatabaseRepository', () => {
     await expect(repository.getComparison(comparisonResult.comparisonId)).resolves.toBeUndefined();
   });
 
+  it('records comparison audit rows from provider line items', async () => {
+    const query = jest.fn(async () => ({
+      rows: [],
+      rowCount: 1,
+    }));
+    const repository = createRepository(query);
+
+    await repository.recordComparisonAuditLog({
+      ...comparisonResult,
+      providers: [
+        {
+          providerId: 'aws',
+          totals: {
+            daily: 1,
+            weekly: 7,
+            monthly: 30,
+            quarterly: 90,
+            yearly: 360,
+          },
+          lineItems: [
+            {
+              category: 'compute',
+              costComponent: 'compute',
+              description: 'web compute',
+              isApproximate: false,
+              baseMonthlyCostUsd: 30,
+              baseHourlyCostUsd: 0.0411,
+              skuId: 'm7i.large',
+              region: 'us-east-1',
+              unitPriceUsd: 0.0411,
+              unit: 'Hrs',
+              pricingBasis: 'flat',
+              rateSource: 'pricing_catalog',
+              rateSourceSkuId: 'm7i.large',
+              pricingTermCode: 'on-demand',
+              rateCurrency: 'USD',
+              rateValidFrom: '2026-07-01T00:00:00.000Z',
+              rateSourceFetchedAt: '2026-07-01T02:00:00.000Z',
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('comparison_audit_logs'), [
+      expect.any(String),
+    ]);
+    const firstCall = query.mock.calls[0] as unknown as [string, unknown[]];
+    const auditRows = JSON.parse(String(firstCall[1][0]));
+
+    expect(auditRows).toEqual([
+      expect.objectContaining({
+        comparison_id: comparisonResult.comparisonId,
+        provider: 'aws',
+        service_category: 'compute',
+        cost_component: 'compute',
+        service_label: 'web compute',
+        resolved_sku_id: 'm7i.large',
+        provider_region: 'us-east-1',
+        confidence: 'direct',
+        rate_used_usd: 0.0411,
+        rate_source: 'pricing_catalog',
+        rate_source_sku_id: 'm7i.large',
+        pricing_term_code: 'on-demand',
+        payment_option_code: null,
+        rate_currency: 'USD',
+        rate_unit: 'Hrs',
+        rate_valid_from: '2026-07-01T00:00:00.000Z',
+        rate_source_fetched_at: '2026-07-01T02:00:00.000Z',
+        monthly_cost_usd: 30,
+        pricing_basis: 'flat',
+        is_approximate: false,
+      }),
+    ]);
+  });
+
   it('returns latest pricing status for every provider', async () => {
     const repository = createRepository(
       jest.fn(async () => ({
@@ -158,6 +234,377 @@ describe('ApiDatabaseRepository', () => {
         },
       ],
     });
+  });
+
+  it('summarizes provider freshness through the data-health response', async () => {
+    const repository = createRepository(
+      jest
+        .fn()
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              provider: 'aws',
+              status: 'success',
+              records_updated: 12,
+              records_rejected: 0,
+              records_skipped: 7,
+              last_successful_run: new Date('2026-06-30T12:00:00.000Z'),
+            },
+            {
+              provider: 'azure',
+              status: 'success',
+              records_updated: 9,
+              records_rejected: 1,
+              records_skipped: 0,
+              last_successful_run: new Date('2026-06-28T00:00:00.000Z'),
+            },
+            {
+              provider: 'gcp',
+              status: 'failed',
+              records_updated: 0,
+              records_rejected: 3,
+              records_skipped: 0,
+              last_successful_run: null,
+            },
+          ],
+          rowCount: 3,
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              provider: 'aws',
+              catalog_rows: '30',
+              current_rate_rows: '18',
+              latest_catalog_sync_at: new Date('2026-06-30T11:00:00.000Z'),
+              latest_rate_sync_at: new Date('2026-06-30T12:00:00.000Z'),
+              catalog_success_rows: '30',
+              catalog_partial_rows: '0',
+              catalog_failed_rows: '0',
+              rate_success_rows: '18',
+              rate_partial_rows: '0',
+              rate_failed_rows: '0',
+            },
+            {
+              provider: 'azure',
+              catalog_rows: '20',
+              current_rate_rows: '9',
+              latest_catalog_sync_at: new Date('2026-06-28T00:00:00.000Z'),
+              latest_rate_sync_at: new Date('2026-06-28T00:00:00.000Z'),
+              catalog_success_rows: '18',
+              catalog_partial_rows: '2',
+              catalog_failed_rows: '0',
+              rate_success_rows: '9',
+              rate_partial_rows: '0',
+              rate_failed_rows: '0',
+            },
+          ],
+          rowCount: 2,
+        }),
+    );
+
+    await expect(repository.getDataHealth(new Date('2026-07-01T00:00:00.000Z'))).resolves.toEqual({
+      generatedAt: '2026-07-01T00:00:00.000Z',
+      freshnessPolicyHours: 48,
+      overallStatus: 'degraded',
+      alertCount: 2,
+      alerts: [
+        {
+          providerId: 'azure',
+          severity: 'warning',
+          message:
+            'Pricing data is 72h old against the 48h policy; refresh before production decisions.',
+        },
+        {
+          providerId: 'gcp',
+          severity: 'critical',
+          message: 'Latest provider sync failed; use cached data with caution.',
+        },
+      ],
+      providers: [
+        expect.objectContaining({
+          providerId: 'aws',
+          freshness: 'fresh',
+          ageHours: 12,
+          cache: expect.objectContaining({
+            catalogRows: 30,
+            currentRateRows: 18,
+            ageHours: 12,
+            freshness: 'fresh',
+            syncStatusCounts: {
+              success: 48,
+              partial: 0,
+              failed: 0,
+            },
+          }),
+        }),
+        expect.objectContaining({
+          providerId: 'azure',
+          freshness: 'stale',
+          ageHours: 72,
+          cache: expect.objectContaining({
+            catalogRows: 20,
+            currentRateRows: 9,
+            ageHours: 72,
+            freshness: 'stale',
+            syncStatusCounts: {
+              success: 27,
+              partial: 2,
+              failed: 0,
+            },
+          }),
+        }),
+        expect.objectContaining({
+          providerId: 'gcp',
+          freshness: 'failed',
+          cache: expect.objectContaining({
+            catalogRows: 0,
+            currentRateRows: 0,
+            freshness: 'missing',
+          }),
+        }),
+      ],
+    });
+  });
+
+  it('creates, transitions, and reads report export jobs', async () => {
+    const createdAt = new Date('2026-07-01T00:00:00.000Z');
+    const startedAt = new Date('2026-07-01T00:00:05.000Z');
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: '66666666-6666-4666-8666-666666666666',
+            comparison_id: comparisonResult.comparisonId,
+            format: 'pdf',
+            interval: 'monthly',
+            pricing_model: 'reserved-1yr',
+            status: 'pending',
+            file_name: null,
+            content_type: null,
+            error_message: null,
+            created_at: createdAt,
+            started_at: null,
+            completed_at: null,
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: '66666666-6666-4666-8666-666666666666',
+            comparison_id: comparisonResult.comparisonId,
+            format: 'pdf',
+            interval: 'monthly',
+            pricing_model: 'reserved-1yr',
+            status: 'running',
+            file_name: null,
+            content_type: null,
+            error_message: null,
+            created_at: createdAt,
+            started_at: startedAt,
+            completed_at: null,
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [],
+        rowCount: 1,
+      });
+    const repository = createRepository(query);
+
+    await expect(
+      repository.createReportExportJob({
+        comparisonId: comparisonResult.comparisonId,
+        format: 'pdf',
+        interval: 'monthly',
+        pricingModel: 'reserved-1yr',
+      }),
+    ).resolves.toEqual({
+      jobId: '66666666-6666-4666-8666-666666666666',
+      comparisonId: comparisonResult.comparisonId,
+      format: 'pdf',
+      interval: 'monthly',
+      pricingModel: 'reserved-1yr',
+      status: 'pending',
+      createdAt: '2026-07-01T00:00:00.000Z',
+    });
+    await expect(
+      repository.getReportExportJob(
+        comparisonResult.comparisonId,
+        '66666666-6666-4666-8666-666666666666',
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        status: 'running',
+        startedAt: '2026-07-01T00:00:05.000Z',
+      }),
+    );
+    await repository.markReportExportJobRunning(
+      '66666666-6666-4666-8666-666666666666',
+      '2026-07-01T00:00:05.000Z',
+    );
+    await repository.completeReportExportJob(
+      '66666666-6666-4666-8666-666666666666',
+      {
+        fileName: 'polycost-comparison.pdf',
+        contentType: 'application/pdf',
+        content: Buffer.from('pdf'),
+      },
+      '2026-07-01T00:00:10.000Z',
+    );
+
+    expect(query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('INSERT INTO report_export_jobs'),
+      [comparisonResult.comparisonId, 'pdf', 'monthly', 'reserved-1yr'],
+    );
+    expect(query).toHaveBeenNthCalledWith(3, expect.stringContaining("SET status = 'running'"), [
+      '66666666-6666-4666-8666-666666666666',
+      '2026-07-01T00:00:05.000Z',
+    ]);
+    expect(query).toHaveBeenNthCalledWith(4, expect.stringContaining("SET status = 'completed'"), [
+      '66666666-6666-4666-8666-666666666666',
+      'polycost-comparison.pdf',
+      'application/pdf',
+      Buffer.from('pdf'),
+      '2026-07-01T00:00:10.000Z',
+    ]);
+  });
+
+  it('reads completed report export artifacts and records export failures', async () => {
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: '66666666-6666-4666-8666-666666666666',
+            comparison_id: comparisonResult.comparisonId,
+            format: 'xlsx',
+            interval: 'yearly',
+            pricing_model: 'on-demand',
+            status: 'completed',
+            file_name: 'polycost-comparison.xlsx',
+            content_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            artifact: Buffer.from('xlsx'),
+            error_message: null,
+            created_at: new Date('2026-07-01T00:00:00.000Z'),
+            started_at: new Date('2026-07-01T00:00:05.000Z'),
+            completed_at: new Date('2026-07-01T00:00:10.000Z'),
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [],
+        rowCount: 1,
+      });
+    const repository = createRepository(query);
+
+    await expect(
+      repository.getReportExportJobArtifact(
+        comparisonResult.comparisonId,
+        '66666666-6666-4666-8666-666666666666',
+      ),
+    ).resolves.toEqual({
+      job: expect.objectContaining({
+        fileName: 'polycost-comparison.xlsx',
+        status: 'completed',
+      }),
+      content: Buffer.from('xlsx'),
+    });
+    await repository.failReportExportJob(
+      '66666666-6666-4666-8666-666666666666',
+      'Generation failed',
+      '2026-07-01T00:00:12.000Z',
+    );
+
+    expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining("SET status = 'failed'"), [
+      '66666666-6666-4666-8666-666666666666',
+      'Generation failed',
+      '2026-07-01T00:00:12.000Z',
+    ]);
+  });
+
+  it('creates, starts, and finishes comparison prewarm jobs', async () => {
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: '77777777-7777-4777-8777-777777777777',
+            comparison_id: comparisonResult.comparisonId,
+            status: 'pending',
+            requested_combinations: 8,
+            warmed_combinations: 0,
+            failed_combinations: 0,
+            error_message: null,
+            created_at: new Date('2026-07-01T00:00:00.000Z'),
+            started_at: null,
+            completed_at: null,
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [],
+        rowCount: 1,
+      });
+    const repository = createRepository(query);
+
+    await expect(
+      repository.createComparisonPrewarmJob({
+        comparisonId: comparisonResult.comparisonId,
+        requestedCombinations: 8,
+      }),
+    ).resolves.toEqual({
+      jobId: '77777777-7777-4777-8777-777777777777',
+      comparisonId: comparisonResult.comparisonId,
+      status: 'pending',
+      requestedCombinations: 8,
+      warmedCombinations: 0,
+      failedCombinations: 0,
+      createdAt: '2026-07-01T00:00:00.000Z',
+    });
+    await repository.markComparisonPrewarmJobRunning(
+      '77777777-7777-4777-8777-777777777777',
+      '2026-07-01T00:00:01.000Z',
+    );
+    await repository.finishComparisonPrewarmJob('77777777-7777-4777-8777-777777777777', {
+      status: 'completed',
+      warmedCombinations: 7,
+      failedCombinations: 1,
+      completedAt: '2026-07-01T00:00:02.000Z',
+      errorMessage: 'reserved rate missing',
+    });
+
+    expect(query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('INSERT INTO comparison_prewarm_jobs'),
+      [comparisonResult.comparisonId, 8],
+    );
+    expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining("SET status = 'running'"), [
+      '77777777-7777-4777-8777-777777777777',
+      '2026-07-01T00:00:01.000Z',
+    ]);
+    expect(query).toHaveBeenNthCalledWith(3, expect.stringContaining('warmed_combinations = $3'), [
+      '77777777-7777-4777-8777-777777777777',
+      'completed',
+      7,
+      1,
+      'reserved rate missing',
+      '2026-07-01T00:00:02.000Z',
+    ]);
   });
 
   it('creates normalized workload records through the app DB role', async () => {
@@ -356,6 +803,67 @@ describe('ApiDatabaseRepository', () => {
     );
     expect(query).toHaveBeenNthCalledWith(3, expect.stringContaining('UPDATE share_links'), [
       '2026-06-30T00:00:00.000Z',
+    ]);
+  });
+
+  it('records and summarizes non-PII share-link analytics', async () => {
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [{ token: 'share-token-12345678901234567890' }],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            country_code: 'US',
+            section: 'summary',
+            views: '2',
+            last_viewed_at: new Date('2026-07-01T00:00:00.000Z'),
+          },
+          {
+            country_code: 'CA',
+            section: 'engineering',
+            views: '1',
+            last_viewed_at: new Date('2026-06-30T00:00:00.000Z'),
+          },
+        ],
+        rowCount: 2,
+      });
+    const repository = createRepository(query);
+
+    await repository.recordShareLinkEvent({
+      token: 'share-token-12345678901234567890',
+      countryCode: 'US',
+      section: 'summary',
+      userAgentHash: 'hash',
+      viewedAt: '2026-07-01T00:00:00.000Z',
+    });
+    await expect(
+      repository.getShareLinkAnalytics('share-token-12345678901234567890'),
+    ).resolves.toEqual({
+      token: 'share-token-12345678901234567890',
+      totalViews: 3,
+      lastViewedAt: '2026-07-01T00:00:00.000Z',
+      countryViews: [
+        { countryCode: 'US', views: 2 },
+        { countryCode: 'CA', views: 1 },
+      ],
+      sectionViews: [
+        { section: 'summary', views: 2, lastViewedAt: '2026-07-01T00:00:00.000Z' },
+        { section: 'engineering', views: 1, lastViewedAt: '2026-06-30T00:00:00.000Z' },
+      ],
+    });
+    expect(query).toHaveBeenNthCalledWith(1, expect.stringContaining('share_link_events'), [
+      'share-token-12345678901234567890',
+      'US',
+      'summary',
+      'hash',
+      '2026-07-01T00:00:00.000Z',
     ]);
   });
 });

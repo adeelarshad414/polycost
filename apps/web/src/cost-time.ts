@@ -1,10 +1,11 @@
 import { IntervalKey } from './types';
+import monthlyHourStandard from '@polycost/types/monthly-hour-standard.json';
 
-export const HOURS_PER_DAY = 24;
-export const DAYS_PER_WEEK = 7;
+export const HOURS_PER_DAY = monthlyHourStandard.hoursPerDay;
+export const DAYS_PER_WEEK = monthlyHourStandard.daysPerWeek;
 export const HOURS_PER_WEEK = HOURS_PER_DAY * DAYS_PER_WEEK;
-export const HOURS_PER_MONTH = 730;
-export const MONTHS_PER_QUARTER = 3;
+export const HOURS_PER_MONTH = monthlyHourStandard.hoursPerMonth;
+export const MONTHS_PER_QUARTER = monthlyHourStandard.monthsPerQuarter;
 export const HOURS_PER_YEAR = HOURS_PER_MONTH * 12;
 
 export function hourlyFromMonthly(monthlyCostUsd: number): number {

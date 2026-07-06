@@ -10,8 +10,17 @@ export type AiCostNarrative = SharedAiCostNarrative;
 
 export const PROVIDER_ORDER = ['aws', 'azure', 'gcp'] as const;
 export type ProviderId = (typeof PROVIDER_ORDER)[number];
-export type ServiceCategory = 'compute' | 'storage' | 'database' | 'network';
-export type CostComponent = 'compute' | 'storage' | 'database' | 'egress';
+export type ServiceCategory =
+  'compute' | 'storage' | 'database' | 'network' | 'support' | 'licensing' | 'operations';
+export type CostComponent =
+  | 'compute'
+  | 'storage'
+  | 'database'
+  | 'egress'
+  | 'networking'
+  | 'support'
+  | 'licensing'
+  | 'operations';
 export type PricingModelKey =
   'on-demand' | 'reserved-1yr' | 'reserved-3yr' | 'spot' | 'savings-plan';
 export type PricingBasis = 'flat' | 'tiered';
@@ -20,10 +29,13 @@ export type PricingSource = 'catalog' | 'modeled-estimate';
 export type IntervalKey = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 export type NormalizedInstanceFamily =
   | 'general-purpose'
+  | 'burstable'
   | 'compute-optimized'
   | 'memory-optimized'
   | 'storage-optimized'
   | 'accelerated-computing';
+export type ProcessorArchitecture = 'x86_64' | 'arm64' | 'gpu';
+export type ComputeTenancy = 'shared' | 'dedicated-host' | 'sole-tenant';
 export type CachedPricingTerm =
   'on_demand' | 'reserved_1yr' | 'reserved_3yr' | 'spot' | 'savings_plan';
 export type PricingTermCode =
@@ -35,6 +47,22 @@ export type PricingTermCode =
   | 'spot_estimate';
 export type PaymentOptionCode = 'no_upfront' | 'partial_upfront' | 'all_upfront' | 'n_a';
 export type StoragePricingTier = 'standard' | 'infrequent_access' | 'archive';
+export type StorageClass =
+  | 'standard'
+  | 'hot'
+  | 'cool'
+  | 'cold'
+  | 'nearline'
+  | 'coldline'
+  | 'intelligent-tiering'
+  | 'infrequent-access'
+  | 'one-zone-infrequent-access'
+  | 'archive-instant'
+  | 'archive'
+  | 'deep-archive'
+  | 'premium'
+  | 'ultra';
+export type StorageReplication = 'none' | 'same-region' | 'cross-region';
 
 export const INTERVALS: Array<{ key: IntervalKey; label: string }> = [
   { key: 'hourly', label: 'Hourly' },
@@ -73,6 +101,9 @@ export interface NormalizedWorkloadSpec {
   };
   compute: Array<{
     role: string;
+    instanceFamily?: NormalizedInstanceFamily;
+    processorArchitecture?: ProcessorArchitecture;
+    tenancy?: ComputeTenancy;
     vcpu?: number;
     memoryGb?: number;
     instanceCount?: number;
@@ -87,16 +118,74 @@ export interface NormalizedWorkloadSpec {
     type: 'object' | 'block' | 'file';
     sizeGb: number;
     accessPattern?: 'frequent' | 'infrequent' | 'archive';
+    storageClass?: StorageClass;
+    monthlyPutRequestsThousand?: number;
+    monthlyGetRequestsThousand?: number;
+    monthlyDeleteRequestsThousand?: number;
+    monthlyListRequestsThousand?: number;
+    monthlyRetrievalGb?: number;
+    objectCountThousand?: number;
+    objectRetentionDays?: number;
+    replication?: StorageReplication;
+    lifecycleTransitionsThousand?: number;
+    snapshotSizeGb?: number;
+    snapshotRetentionDays?: number;
+    provisionedIops?: number;
+    provisionedThroughputMbps?: number;
+    multiAttachEnabled?: boolean;
   }>;
   database: Array<{
     role: string;
-    engine: 'postgres' | 'mysql' | 'mongodb' | 'redis' | 'generic_relational' | 'generic_nosql';
+    engine:
+      | 'postgres'
+      | 'mysql'
+      | 'sql_server'
+      | 'mongodb'
+      | 'redis'
+      | 'generic_relational'
+      | 'generic_nosql';
     sizeGb?: number;
     highAvailability: boolean;
     managedServicePreference?: string;
+    backupStorageGb?: number;
+    backupRetentionDays?: number;
+    provisionedIops?: number;
+    readReplicaCount?: number;
+    crossRegionReplicaTransferGb?: number;
+    nosqlReadRequestUnitsMillion?: number;
+    nosqlWriteRequestUnitsMillion?: number;
+    ruPerSecond?: number;
+    queryDataTb?: number;
+    cacheReplicaCount?: number;
+    storageGrowthGbPerMonth?: number;
+    searchNodeCount?: number;
+    searchNodeHours?: number;
+    searchStorageGb?: number;
+    searchQueriesMillion?: number;
   }>;
   network: {
     estimatedMonthlyEgressGb?: number;
+    crossAzTransferGb?: number;
+    interRegionTransferGb?: number;
+    interRegionDestination?: string;
+    cdnTrafficGb?: number;
+    cdnCacheHitRatioPercent?: number;
+    cdnRequestsMillion?: number;
+    natGatewayGb?: number;
+    natGatewayHours?: number;
+    dnsHostedZones?: number;
+    dnsQueriesMillion?: number;
+    loadBalancerProcessedGb?: number;
+    loadBalancerHours?: number;
+    loadBalancerNewConnectionsPerSecond?: number;
+    loadBalancerActiveConnections?: number;
+    loadBalancerRuleEvaluationsPerSecond?: number;
+    vpnConnectionCount?: number;
+    vpnConnectionHours?: number;
+    vpnDataTransferGb?: number;
+    privateCircuitCount?: number;
+    privateCircuitPortHours?: number;
+    privateCircuitDataTransferGb?: number;
     cdn: boolean;
     loadBalancer: boolean;
   };
@@ -104,6 +193,28 @@ export interface NormalizedWorkloadSpec {
     multiAz: boolean;
     multiRegion: boolean;
     slaTarget?: string;
+    faultTolerance?: 'single-zone' | 'multi-az' | 'multi-region' | 'active-active';
+  };
+  workloadProfile?: {
+    environment?: 'production' | 'staging' | 'development' | 'test';
+    commitmentPreferencePercent?: number;
+    dataResidency?: {
+      scope: string;
+      complianceLocked: boolean;
+      frameworks?: string[];
+    };
+    operatingSystem?: 'linux' | 'windows' | 'byol';
+    supportTier?: 'none' | 'developer' | 'business' | 'enterprise_onramp' | 'enterprise';
+    usagePattern?: {
+      type: 'always_on' | 'scheduled' | 'bursty';
+      hoursPerDay?: number;
+      daysPerWeek?: number;
+      averageUtilizationPercent?: number;
+    };
+    tags?: Array<{
+      key: string;
+      value: string;
+    }>;
   };
   serviceRequirements?: ServiceRequirement[];
   sourceTraceability?: Array<{
@@ -200,7 +311,11 @@ export interface ComparisonCostBreakdown {
   computeMonthlyCostUsd: number;
   storageMonthlyCostUsd: number;
   egressMonthlyCostUsd: number;
+  networkingMonthlyCostUsd: number;
   databaseMonthlyCostUsd: number;
+  supportMonthlyCostUsd: number;
+  licensingMonthlyCostUsd: number;
+  operationsMonthlyCostUsd: number;
   scopedMonthlyCostUsd: number;
 }
 
@@ -212,6 +327,17 @@ export interface ComparisonProviderResult {
   breakdown?: ComparisonCostBreakdown;
 }
 
+export interface PricingModelRecommendation {
+  preferredModel: PricingModelKey;
+  confidence: 'high' | 'medium' | 'low';
+  rationale: string;
+  sourceSignals: {
+    environment?: NonNullable<NormalizedWorkloadSpec['workloadProfile']>['environment'];
+    commitmentPreferencePercent?: number;
+    flexibilityBias: 'flexibility' | 'balanced' | 'cost-optimized';
+  };
+}
+
 export interface ComparisonResult {
   comparisonId: string;
   pricingAsOf: string;
@@ -220,15 +346,224 @@ export interface ComparisonResult {
     workloadName?: string;
     workloadType: NormalizedWorkloadSpec['workload']['type'];
     regionPreference?: string;
+    availability?: Pick<
+      NormalizedWorkloadSpec['availability'],
+      'multiAz' | 'multiRegion' | 'slaTarget' | 'faultTolerance'
+    >;
+    workloadProfile?: Pick<
+      NonNullable<NormalizedWorkloadSpec['workloadProfile']>,
+      | 'environment'
+      | 'commitmentPreferencePercent'
+      | 'dataResidency'
+      | 'operatingSystem'
+      | 'supportTier'
+      | 'usagePattern'
+      | 'tags'
+    >;
     serviceRequirements: ServiceRequirement[];
   };
   providers: ComparisonProviderResult[];
   cheapestProviderId: ProviderId;
+  pricingModelRecommendation?: PricingModelRecommendation;
   warnings?: Array<{
     providerId?: ProviderId;
     code?: string;
     message: string;
   }>;
+}
+
+export type AnalyticsDimension =
+  | 'compute'
+  | 'storage'
+  | 'egress'
+  | 'networking'
+  | 'database'
+  | 'support'
+  | 'licensing'
+  | 'operations'
+  | 'other';
+
+export interface CostCompositionItem {
+  dimension: AnalyticsDimension;
+  label: string;
+  monthlyCostUsd: number;
+  percentOfProviderTotal: number;
+  runningMonthlyUsd: number;
+  topDriver?: string;
+}
+
+export interface ProviderCostComposition {
+  providerId: ProviderId;
+  totalMonthlyUsd: number;
+  items: CostCompositionItem[];
+}
+
+export interface ProviderDeltaAnalysis {
+  dimension: AnalyticsDimension;
+  label: string;
+  cheapestProviderId: ProviderId;
+  mostExpensiveProviderId: ProviderId;
+  cheapestMonthlyUsd: number;
+  mostExpensiveMonthlyUsd: number;
+  deltaMonthlyUsd: number;
+  deltaPercentVsMostExpensive: number;
+  explanation: string;
+}
+
+export interface RegionVarianceProviderCost {
+  providerId: ProviderId;
+  providerRegion: string;
+  modeledMonthlyUsd: number;
+  deltaVsSelectedMonthlyUsd: number;
+  isLowest: boolean;
+}
+
+export interface RegionVarianceHeatMapRow {
+  comparisonRegion: string;
+  label: string;
+  regionSummary: string;
+  multiplier: number;
+  evidence: string;
+  isSelected: boolean;
+  complianceEligible: boolean;
+  lowestProviderId?: ProviderId;
+  providers: RegionVarianceProviderCost[];
+}
+
+export interface EgressNetworkingDetailRow {
+  id: string;
+  providerId: ProviderId;
+  networkComponent: string;
+  description: string;
+  region?: string;
+  monthlyCostUsd: number;
+  shareOfProviderTotalPercent: number;
+  unit?: string;
+  rateUsd?: number;
+  evidence: string;
+}
+
+export interface SensitivityScenarioRow {
+  variable: 'compute_capacity' | 'storage_volume' | 'egress_traffic' | 'database_capacity';
+  label: string;
+  changePercent: number;
+  providerId: ProviderId;
+  baselineMonthlyUsd: number;
+  adjustedMonthlyUsd: number;
+  deltaMonthlyUsd: number;
+}
+
+export interface CommitmentRoiTimeline {
+  providerId: ProviderId;
+  pricingModel: Exclude<PricingModelKey, 'on-demand' | 'spot'>;
+  label: string;
+  baselineMonthlyUsd: number;
+  committedMonthlyUsd: number;
+  upfrontCostUsd: number;
+  monthlySavingsUsd: number;
+  breakEvenMonth?: number;
+  points: Array<{
+    month: number;
+    onDemandCumulativeUsd: number;
+    committedCumulativeUsd: number;
+    savingsUsd: number;
+  }>;
+}
+
+export interface CommitmentCoverageRow {
+  providerId: ProviderId;
+  eligibleMonthlyUsd: number;
+  coveredPercentOfSpend: number;
+  onDemandExposureMonthlyUsd: number;
+  zeroCommitmentMonthlyUsd: number;
+  targetCoveragePercent: number;
+  targetBlendMonthlyUsd: number;
+  fullyCommittedMonthlyUsd: number;
+  ineligibleMonthlyUsd: number;
+  targetOnDemandExposureMonthlyUsd: number;
+  exposedPercentOfSpend: number;
+  targetSavingsMonthlyUsd: number;
+  remainingOpportunityMonthlyUsd: number;
+  maxMonthlySavingsUsd: number;
+  recommendation: string;
+}
+
+export interface TcoSignal {
+  providerId: ProviderId;
+  egressLockInMonthlyUsd: number;
+  supportMonthlyUsd: number;
+  licensingMonthlyUsd: number;
+  freeTierApplicability: 'possible' | 'unlikely';
+  note: string;
+}
+
+export interface OptimizationOpportunity {
+  id: string;
+  category: string;
+  recommendation: string;
+  estimatedMonthlySavingsUsd?: number;
+  estimatedAnnualSavingsUsd?: number;
+  priority: 'High' | 'Medium' | 'Low';
+  effort: 'High' | 'Medium' | 'Low';
+  evidence: string;
+}
+
+export interface FinOpsFinding {
+  id: string;
+  severity: 'info' | 'review' | 'warning' | 'critical';
+  category:
+    | 'cost-driver'
+    | 'right-sizing'
+    | 'commitment'
+    | 'egress'
+    | 'licensing'
+    | 'support'
+    | 'mapping'
+    | 'risk';
+  title: string;
+  recommendation: string;
+  estimatedMonthlyImpactUsd?: number;
+  providerId?: ProviderId;
+}
+
+export interface ExecutiveForecast {
+  horizonDays: 90;
+  assumption: string;
+  providerForecasts: Array<{
+    providerId: ProviderId;
+    monthlyRunRateUsd: number;
+    ninetyDayRunRateUsd: number;
+    annualizedRunRateUsd: number;
+  }>;
+}
+
+export interface CostCoverageMapEntry {
+  providerId: ProviderId;
+  dimension: string;
+  status: string;
+  pricedRows: number;
+  approximateRows: number;
+  monthlyUsd?: number;
+  evidence: string;
+  reviewCue: string;
+}
+
+export interface ComparisonAnalyticsResponse {
+  comparisonId: string;
+  generatedAt: string;
+  pricingAsOf: string;
+  executiveForecast: ExecutiveForecast;
+  costCoverageMap: CostCoverageMapEntry[];
+  costComposition: ProviderCostComposition[];
+  providerDeltaAnalysis: ProviderDeltaAnalysis[];
+  regionVarianceHeatMap: RegionVarianceHeatMapRow[];
+  egressNetworkingDetails: EgressNetworkingDetailRow[];
+  sensitivityScenarios: SensitivityScenarioRow[];
+  commitmentRoiTimelines: CommitmentRoiTimeline[];
+  commitmentCoverage: CommitmentCoverageRow[];
+  tcoSignals: TcoSignal[];
+  optimizationOpportunities: OptimizationOpportunity[];
+  finOpsFindings: FinOpsFinding[];
 }
 
 export interface PricingStatusResponse {
@@ -239,6 +574,42 @@ export interface PricingStatusResponse {
     recordsUpdated: number;
     recordsRejected: number;
     recordsSkipped: number;
+  }>;
+}
+
+export interface DataHealthResponse {
+  generatedAt: string;
+  freshnessPolicyHours: number;
+  overallStatus: 'fresh' | 'stale' | 'degraded';
+  alertCount: number;
+  alerts: Array<{
+    providerId?: ProviderId;
+    severity: 'warning' | 'critical';
+    message: string;
+  }>;
+  providers: Array<{
+    providerId: ProviderId;
+    status: 'success' | 'partial' | 'failed';
+    freshness: 'fresh' | 'stale' | 'missing' | 'failed';
+    lastSuccessfulRun?: string;
+    ageHours?: number;
+    recordsUpdated: number;
+    recordsRejected: number;
+    recordsSkipped: number;
+    cache: {
+      catalogRows: number;
+      currentRateRows: number;
+      latestCatalogSyncAt?: string;
+      latestRateSyncAt?: string;
+      ageHours?: number;
+      freshness: 'fresh' | 'stale' | 'missing';
+      syncStatusCounts: {
+        success: number;
+        partial: number;
+        failed: number;
+      };
+    };
+    message: string;
   }>;
 }
 
@@ -384,6 +755,21 @@ export interface SharedReportResponse {
   breakdown: WorkloadCostBreakdown;
 }
 
+export interface ShareLinkAnalyticsResponse {
+  token: string;
+  totalViews: number;
+  lastViewedAt?: string;
+  countryViews: Array<{
+    countryCode: string;
+    views: number;
+  }>;
+  sectionViews: Array<{
+    section: string;
+    views: number;
+    lastViewedAt?: string;
+  }>;
+}
+
 export interface ExchangeRatesResponse {
   base: string;
   lastUpdated?: string;
@@ -391,6 +777,24 @@ export interface ExchangeRatesResponse {
 }
 
 export type ReportFormat = 'pdf' | 'csv' | 'xlsx';
+export type ReportExportJobStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+export interface ReportExportJobResponse {
+  jobId: string;
+  comparisonId: string;
+  format: ReportFormat;
+  interval?: IntervalKey;
+  pricingModel?: PricingModelKey;
+  status: ReportExportJobStatus;
+  fileName?: string;
+  contentType?: string;
+  errorMessage?: string;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  statusUrl: string;
+  downloadUrl?: string;
+}
 
 export interface ApiErrorDetail {
   field?: string;

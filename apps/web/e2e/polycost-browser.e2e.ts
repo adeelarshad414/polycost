@@ -3,21 +3,24 @@ import type {
   ComparisonResult,
   ProviderId,
   RegionCatalogResponse,
+  ReportExportJobResponse,
   ReportFormat,
 } from '../src/types';
+
+const HOURS_PER_MONTH = 730;
 
 test('persists light and dark theme choices across reloads', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/');
 
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await expect(page.locator('html')).toHaveAttribute('data-theme-choice', 'dark');
+  await expect(page.locator('html')).toHaveAttribute('data-theme-choice', 'system');
 
-  await page.getByRole('button', { name: /switch to light mode/i }).click();
+  await page.getByRole('radio', { name: /use light theme/i }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   await expect(page.locator('html')).toHaveAttribute('data-theme-choice', 'light');
-  await expect(page.getByRole('button', { name: /switch to dark mode/i })).toHaveAttribute(
-    'aria-pressed',
+  await expect(page.getByRole('radio', { name: /use dark theme/i })).toHaveAttribute(
+    'aria-checked',
     'false',
   );
 
@@ -25,10 +28,10 @@ test('persists light and dark theme choices across reloads', async ({ page }) =>
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   await expect(page.locator('html')).toHaveAttribute('data-theme-choice', 'light');
 
-  await page.getByRole('button', { name: /switch to dark mode/i }).click();
+  await page.getByRole('radio', { name: /use dark theme/i }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await expect(page.getByRole('button', { name: /switch to light mode/i })).toHaveAttribute(
-    'aria-pressed',
+  await expect(page.getByRole('radio', { name: /use dark theme/i })).toHaveAttribute(
+    'aria-checked',
     'true',
   );
 });
@@ -48,7 +51,7 @@ test('compares the default workload on mobile without page-level horizontal over
   await page.getByRole('button', { name: /compare costs/i }).click();
   await expect(page.getByLabel('Provider cost summary')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText('Executive monthly baseline')).toBeVisible();
-  await expect(page.getByText('Engineering service spend')).toBeVisible();
+  await expect(page.getByText('Service driver split')).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 
   const disclosure = page.getByRole('button', { name: /show full breakdown/i });
@@ -59,6 +62,7 @@ test('compares the default workload on mobile without page-level horizontal over
     'true',
   );
   await expect(page.getByLabel('Engineering cost controls')).toBeVisible();
+  await expect(page.getByText('Service driver split')).toBeVisible();
   await expect(page.getByLabel('Architecture and engineering evidence')).toBeVisible();
   await expect(page.getByLabel('Official cloud pricing and region references')).toBeVisible();
   await expectNoHorizontalOverflow(page);
@@ -95,24 +99,71 @@ test('surfaces provider pricing warnings in the engineering evidence view', asyn
 test('requests PDF, CSV, and Excel exports with the selected scenario context', async ({
   page,
 }) => {
-  const exportRequests: URL[] = [];
+  const exportRequests: Array<{
+    format: ReportFormat;
+    interval: string | null;
+    pricingModel: string | null;
+  }> = [];
 
   await mockRegionCatalog(page);
   await mockComparisonCreation(page, browserComparison());
-  await page.route('**/api/v1/comparisons/e2e-browser/export?**', async (route) => {
-    const url = new URL(route.request().url());
-    const format = url.searchParams.get('format') as ReportFormat | null;
+  await page.route('**/api/v1/comparisons/e2e-browser/export-jobs', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+
+    const payload = JSON.parse(route.request().postData() ?? '{}') as {
+      format?: ReportFormat;
+      interval?: string;
+      pricingModel?: string;
+    };
+    const format = payload.format;
 
     if (!format) {
       await route.fulfill({ status: 400, body: 'missing format' });
       return;
     }
 
-    exportRequests.push(url);
+    exportRequests.push({
+      format,
+      interval: payload.interval ?? null,
+      pricingModel: payload.pricingModel ?? null,
+    });
     await route.fulfill({
       status: 200,
-      contentType: exportContentType(format),
-      body: exportBody(format),
+      contentType: 'application/json',
+      body: JSON.stringify(exportJob(format, 'completed')),
+    });
+  });
+  await page.route(
+    '**/api/v1/comparisons/e2e-browser/export-jobs/job-*/download',
+    async (route) => {
+      const url = new URL(route.request().url());
+      const jobId = url.pathname.split('/').at(-2) ?? '';
+      const format = jobId.replace(/^job-/, '') as ReportFormat;
+
+      await route.fulfill({
+        status: 200,
+        contentType: exportContentType(format),
+        body: exportBody(format),
+      });
+    },
+  );
+  await page.route('**/api/v1/comparisons/e2e-browser/export-jobs/job-*', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith('/download')) {
+      await route.fallback();
+      return;
+    }
+
+    const jobId = url.pathname.split('/').at(-1) ?? '';
+    const format = jobId.replace(/^job-/, '') as ReportFormat;
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(exportJob(format, 'completed')),
     });
   });
 
@@ -123,22 +174,18 @@ test('requests PDF, CSV, and Excel exports with the selected scenario context', 
 
   const quickActions = page.getByLabel('Comparison quick actions');
   for (const [buttonName, notice] of [
-    [/^PDF$/, 'PDF export downloaded.'],
-    [/^CSV$/, 'CSV export downloaded.'],
-    [/^Excel$/, 'XLSX export downloaded.'],
+    [/^PDF$/, 'PDF report generated and downloaded.'],
+    [/^CSV$/, 'CSV report generated and downloaded.'],
+    [/^Excel$/, 'XLSX report generated and downloaded.'],
   ] as const) {
     await quickActions.getByRole('button', { name: buttonName }).click();
     await expect(page.locator('.status-message').filter({ hasText: notice })).toBeVisible();
   }
 
-  expect(exportRequests.map((url) => url.searchParams.get('format'))).toEqual([
-    'pdf',
-    'csv',
-    'xlsx',
-  ]);
-  for (const url of exportRequests) {
-    expect(url.searchParams.get('interval')).toBe('monthly');
-    expect(url.searchParams.get('pricingModel')).toBe('reserved-3yr');
+  expect(exportRequests.map((request) => request.format)).toEqual(['pdf', 'csv', 'xlsx']);
+  for (const request of exportRequests) {
+    expect(request.interval).toBe('monthly');
+    expect(request.pricingModel).toBe('reserved-3yr');
   }
 });
 
@@ -260,7 +307,7 @@ function provider(
   monthly: number,
   lineItems: ComparisonResult['providers'][number]['lineItems'],
 ): ComparisonResult['providers'][number] {
-  const hourly = round(monthly / 730);
+  const hourly = round(monthly / HOURS_PER_MONTH);
 
   return {
     providerId,
@@ -284,7 +331,7 @@ function provider(
         model: 'reserved-3yr',
         available: true,
         monthlyCostUsd: round(monthly * 0.68),
-        hourlyCostUsd: round((monthly * 0.68) / 730),
+        hourlyCostUsd: round((monthly * 0.68) / HOURS_PER_MONTH),
         caveat: 'Modeled three-year commitment.',
       },
     ],
@@ -325,11 +372,11 @@ function lineItem(
     category,
     description,
     isApproximate,
-    baseHourlyCostUsd: round(monthly / 730),
+    baseHourlyCostUsd: round(monthly / HOURS_PER_MONTH),
     baseMonthlyCostUsd: monthly,
     region,
     unit: 'hour',
-    unitPriceUsd: round(monthly / 730),
+    unitPriceUsd: round(monthly / HOURS_PER_MONTH),
   };
 }
 
@@ -356,6 +403,29 @@ function regionCatalog(): RegionCatalogResponse {
         regions: [{ id: 'us-east1', label: 'South Carolina', geography: 'North America' }],
       },
     ],
+  };
+}
+
+function exportJob(
+  format: ReportFormat,
+  status: ReportExportJobResponse['status'],
+): ReportExportJobResponse {
+  const jobId = `job-${format}`;
+  const statusUrl = `/api/v1/comparisons/e2e-browser/export-jobs/${jobId}`;
+
+  return {
+    jobId,
+    comparisonId: 'e2e-browser',
+    format,
+    interval: 'monthly',
+    pricingModel: 'reserved-3yr',
+    status,
+    fileName: `polycost-e2e-browser.${format}`,
+    contentType: exportContentType(format),
+    createdAt: '2026-07-01T00:00:00.000Z',
+    ...(status === 'completed' ? { completedAt: '2026-07-01T00:00:01.000Z' } : {}),
+    statusUrl,
+    ...(status === 'completed' ? { downloadUrl: `${statusUrl}/download` } : {}),
   };
 }
 

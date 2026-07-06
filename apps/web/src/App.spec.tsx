@@ -5,9 +5,11 @@ import { PolyCostClient, PolyCostApiError } from './api-client';
 import {
   BackendHealthResponse,
   ComparisonResult,
+  DataHealthResponse,
   ParsedNwsDraft,
   PricingStatusResponse,
   RegionCatalogResponse,
+  ReportExportJobResponse,
 } from './types';
 import { intervalMultiplierFromMonthly } from './cost-time';
 import { buildNwsFromForm, defaultWorkloadForm } from './workload';
@@ -29,6 +31,7 @@ describe('App', () => {
   beforeEach(() => {
     window.localStorage.removeItem('polycost-persona-view');
     window.localStorage.removeItem('polycost-dismissed-budget-alerts');
+    window.localStorage.removeItem('polycost-comparison-history-v1');
     window.sessionStorage.removeItem('polycost-current-requirements-v1');
     window.URL.createObjectURL = jest.fn(() => 'blob:polycost-report');
     window.URL.revokeObjectURL = jest.fn();
@@ -43,6 +46,7 @@ describe('App', () => {
     document.documentElement.dataset.themeChoice = 'light';
     window.localStorage.removeItem('polycost-persona-view');
     window.localStorage.removeItem('polycost-dismissed-budget-alerts');
+    window.localStorage.removeItem('polycost-comparison-history-v1');
     window.sessionStorage.removeItem('polycost-current-requirements-v1');
   });
 
@@ -62,6 +66,7 @@ describe('App', () => {
     );
 
     await click(buttonByText(container, 'Compare costs'));
+    await settleAsyncEffects();
 
     expect(text(container)).toContain('Requirements');
     expect(text(container)).toContain('Manual entry');
@@ -88,17 +93,40 @@ describe('App', () => {
       }),
     );
     expect(client.createComparison).toHaveBeenCalled();
+    expect(client.getComparisonAnalytics).toHaveBeenCalledWith(comparisonResult.comparisonId);
     expect(text(container)).not.toContain('Comparison ready.');
+    expect(text(container)).toContain('Server analytics');
+    expect(text(container)).toContain('Coverage');
+    expect(text(container)).toContain('Deltas');
+    expect(text(container)).toContain('Findings');
     expect(text(container)).toContain('AWS');
     expect(text(container)).toContain('Azure');
     expect(text(container)).toContain('GCP');
+    expect(
+      JSON.parse(window.localStorage.getItem('polycost-comparison-history-v1') ?? '[]')[0],
+    ).toMatchObject({
+      comparisonId: comparisonResult.comparisonId,
+      cheapestProviderId: 'gcp',
+      providerCount: 3,
+    });
     expect(text(container)).toContain('Executive monthly baseline');
     expect(text(container)).toContain('Provider mix');
-    expect(text(container)).toContain('Trend pending');
+    expect(text(container)).toContain('Cost composition waterfall');
+    expect(text(container)).toContain('Backend compute base');
+    expect(text(container)).toContain('Pricing model comparison');
+    expect(text(container)).toContain('On-demand vs commitments');
+    expect(text(container)).toContain('Break-even timeline');
+    expect(text(container)).toContain('Backend committed use');
+    expect(container.querySelectorAll('.executive-provider-card')).toHaveLength(3);
+    expect(container.querySelector('.executive-pricing-bars')).toBeInstanceOf(HTMLElement);
+    expect(container.querySelector('.executive-break-even-card')).toBeInstanceOf(HTMLElement);
+    expect(text(container)).toContain('Server projection');
+    expect(text(container)).toContain('$90.00 over 90 days');
     expect(container.querySelector('.recharts-wrapper')).toBeInstanceOf(HTMLElement);
     expect(text(container)).toContain('Show full breakdown, pricing models & export options');
-    expect(text(container)).toContain('Engineering service spend');
-    expect(text(container)).toContain('Cost-by-service concentration');
+    expect(text(container)).not.toContain('Engineering cost controls');
+    expect(text(container)).not.toContain('Service driver split');
+    expect(text(container)).not.toContain('Provider cost by mapped service family');
     expect(text(container)).not.toContain('Cost periods & executive analytics');
     expect(text(container)).not.toContain('Pricing models, breakdown, budget & share');
     expect(text(container)).not.toContain('Architecture & engineering evidence');
@@ -113,6 +141,242 @@ describe('App', () => {
     expect(text(container)).not.toContain('Export CSV');
     expect(text(container)).not.toContain('API JSON');
     expect(text(container)).not.toContain('SKU/spec pending API field');
+
+    unmount();
+  });
+
+  it('applies quick-start architecture templates to the structured form', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    expect(text(container)).toContain('Quick starts');
+    await click(templateButtonByText(container, 'Microservices'));
+
+    expect(inputById(container, 'vcpu').value).toBe('4');
+    expect(inputById(container, 'memory-gb').value).toBe('16');
+
+    await click(buttonByText(container, 'Compare costs'));
+
+    expect(client.validateWorkload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workload: expect.objectContaining({
+          name: 'Microservices platform',
+          type: 'api_backend',
+        }),
+        serviceRequirements: expect.arrayContaining([
+          expect.objectContaining({
+            serviceType: 'container-orchestration',
+          }),
+          expect.objectContaining({
+            serviceType: 'cicd',
+          }),
+        ]),
+      }),
+    );
+
+    unmount();
+  });
+
+  it('applies compute sizing suggestions from natural-language sizing search', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await changeInput(
+      inputById(container, 'initial-compute-sizing-search'),
+      '8 vCPU 64GB memory optimized',
+    );
+    const memorySuggestion = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('.compute-sizing-option'),
+    ).find((button) => button.textContent?.includes('Memory optimized 8x64'));
+
+    if (!(memorySuggestion instanceof HTMLButtonElement)) {
+      throw new Error('Expected memory optimized sizing suggestion');
+    }
+
+    await click(memorySuggestion);
+
+    expect(inputById(container, 'vcpu').value).toBe('8');
+    expect(inputById(container, 'memory-gb').value).toBe('64');
+    expect(selectById(container, 'instance-tier').value).toBe('memory');
+
+    unmount();
+  });
+
+  it('seeds editable storage defaults from compute tier changes without overwriting custom storage', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await changeSelect(selectById(container, 'instance-tier'), 'memory');
+    expect(inputById(container, 'storage-gb').value).toBe('250');
+
+    await changeInput(inputById(container, 'storage-gb'), '777');
+    await changeSelect(selectById(container, 'instance-tier'), 'accelerated');
+    expect(inputById(container, 'storage-gb').value).toBe('777');
+
+    await click(buttonByText(container, 'Compare costs'));
+    await settleAsyncEffects();
+
+    expect(client.validateWorkload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        storage: [expect.objectContaining({ sizeGb: 777 })],
+      }),
+    );
+
+    unmount();
+  });
+
+  it('shows the expanded provider region fallback while the live catalog loads', () => {
+    const { container, unmount } = render(<App client={clientMock()} />);
+    const regionSelect = selectById(container, 'region');
+    const regionOptions = regionSelect.textContent ?? '';
+
+    expect(regionSelect.querySelectorAll('option').length).toBeGreaterThan(120);
+    expect(regionOptions).toContain('ap-southeast-7 - Asia Pacific (Thailand)');
+    expect(regionOptions).toContain('newzealandnorth - New Zealand North');
+    expect(regionOptions).toContain('us-west8 - US West (Phoenix)');
+
+    unmount();
+  });
+
+  it('shows provider-specific stale pricing data health warnings', async () => {
+    const staleHealth: DataHealthResponse = {
+      generatedAt: '2026-07-02T00:00:00.000Z',
+      freshnessPolicyHours: 48,
+      overallStatus: 'stale',
+      alertCount: 1,
+      alerts: [
+        {
+          providerId: 'azure',
+          severity: 'warning',
+          message: 'Azure pricing data is 72 hours old; refresh before proposal use.',
+        },
+      ],
+      providers: [
+        {
+          providerId: 'aws',
+          status: 'success',
+          freshness: 'fresh',
+          ageHours: 1,
+          recordsUpdated: 12,
+          recordsRejected: 0,
+          recordsSkipped: 3,
+          cache: freshCacheSummary(30, 18),
+          message: 'AWS pricing cache is fresh.',
+        },
+        {
+          providerId: 'azure',
+          status: 'partial',
+          freshness: 'stale',
+          ageHours: 72,
+          recordsUpdated: 10,
+          recordsRejected: 0,
+          recordsSkipped: 2,
+          cache: { ...freshCacheSummary(24, 12), ageHours: 72, freshness: 'stale' },
+          message: 'Azure pricing cache is stale.',
+        },
+        {
+          providerId: 'gcp',
+          status: 'success',
+          freshness: 'fresh',
+          ageHours: 1,
+          recordsUpdated: 8,
+          recordsRejected: 0,
+          recordsSkipped: 1,
+          cache: freshCacheSummary(20, 12),
+          message: 'GCP pricing cache is fresh.',
+        },
+      ],
+    };
+    const client = clientMock({
+      getDataHealth: jest.fn(async () => staleHealth),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await settleAsyncEffects();
+
+    expect(text(container)).toContain('Azure stale (72h old) · refresh before final commitment');
+    expect(text(container)).toContain(
+      'Azure pricing data is 72 hours old; refresh before proposal use.',
+    );
+
+    unmount();
+  });
+
+  it('adopts the backend pricing model recommendation after comparison', async () => {
+    const recommendedResult: ComparisonResult = {
+      ...comparisonResult,
+      pricingModelRecommendation: {
+        preferredModel: 'reserved-3yr',
+        confidence: 'high',
+        rationale:
+          'Defaulting to 3-year reserved pricing because this is a production workload with 90% commitment preference and all priced providers expose comparable long-term commitment data.',
+        sourceSignals: {
+          environment: 'production',
+          commitmentPreferencePercent: 90,
+          flexibilityBias: 'cost-optimized',
+        },
+      },
+    };
+    const client = clientMock({
+      createComparison: jest.fn(async () => recommendedResult),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Compare costs'));
+
+    expect(window.localStorage.getItem('polycost-pricing-model')).toBe('reserved-3yr');
+    expect(text(container)).toContain('Recommended scenario');
+    expect(text(container)).toContain('Reserved 3yr');
+    expect(text(container)).toContain('Production');
+    expect(text(container)).toContain('90% commitment');
+    expect(
+      JSON.parse(window.localStorage.getItem('polycost-comparison-history-v1') ?? '[]')[0],
+    ).toMatchObject({
+      pricingModel: 'reserved-3yr',
+    });
+
+    unmount();
+  });
+
+  it('restores recent comparison history into the guided form', async () => {
+    window.localStorage.setItem(
+      'polycost-comparison-history-v1',
+      JSON.stringify([
+        {
+          id: 'history-1',
+          comparisonId: 'history-1',
+          createdAt: '2026-07-01T08:30:00.000Z',
+          form: {
+            ...defaultWorkloadForm,
+            workloadName: 'Restored API',
+            workloadType: 'api_backend',
+            vcpu: '8',
+            memoryGb: '32',
+            selectedServiceCategory: 'compute',
+            selectedServiceFamilyId: 'vm-compute',
+          },
+          inputMode: 'describe',
+          pricingModel: 'reserved-1yr',
+          cheapestProviderId: 'azure',
+          serviceCount: 2,
+          providerCount: 3,
+          monthlyLowestUsd: 123.45,
+          summary: 'Restored API · API backend',
+        },
+      ]),
+    );
+    const { container, unmount } = render(<App client={clientMock()} />);
+
+    expect(text(container)).toContain('Recent comparisons');
+    await click(comparisonHistoryButtonByText(container, 'Restored API'));
+
+    expect(buttonByText(container, 'Guided form').getAttribute('aria-selected')).toBe('true');
+    expect(inputById(container, 'vcpu').value).toBe('8');
+    expect(inputById(container, 'memory-gb').value).toBe('32');
+    expect(window.localStorage.getItem('polycost-pricing-model')).toBe('reserved-1yr');
+    expect(text(container)).toContain(
+      'Loaded Restored API · API backend. Compare again to refresh pricing.',
+    );
 
     unmount();
   });
@@ -232,7 +496,23 @@ describe('App', () => {
     expect(text(container)).toContain('Export summary');
     expect(detailGate.dataset.open).toBe('true');
     expect(text(container)).toContain('Engineering cost controls');
-    expect(text(container)).toContain('Engineering service spend');
+    expect(text(container)).toContain('Service driver split');
+    expect(text(container)).toContain('Provider cost by mapped service family');
+    expect(text(container)).toContain('Backend cost coverage map');
+    expect(text(container)).toContain('Backend-modeled baseline region sensitivity.');
+    expect(text(container)).toContain('Backend commitment exposure');
+    expect(text(container)).toContain('Backend optimization opportunities');
+    expect(text(container)).toContain(
+      'Backend-ranked provider delta from current cached comparison.',
+    );
+    expect(text(container)).toContain(
+      'Backend-modeled exit exposure starts with GCP egress transfer.',
+    );
+    expect(text(container)).toContain('Licensing');
+    expect(text(container)).toContain('Backend AWS internet egress');
+    expect(text(container)).toContain(
+      'Backend analytics varied egress traffic by +50% against cached dimension totals.',
+    );
     expect(text(container)).toContain('Service driver split');
     expect(text(container)).toContain('EC2');
     expect(text(container)).toContain('VM');
@@ -286,6 +566,8 @@ describe('App', () => {
       interval: 'hourly',
       pricingModel: 'reserved-1yr',
     });
+    expect(text(container)).toContain('PDF report generated and downloaded.');
+    expect(buttonByText(container, 'PDF downloaded')).toBeInstanceOf(HTMLButtonElement);
 
     expect(detailGate.dataset.open).toBe('true');
     expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);
@@ -348,7 +630,7 @@ describe('App', () => {
       await click(buttonByText(container, 'PDF'));
 
       expect(
-        buttonByText(container, 'Exporting PDF...').querySelector('.animate-spin'),
+        buttonByText(container, 'Generating PDF...').querySelector('.animate-spin'),
       ).toBeInstanceOf(SVGElement);
 
       exportDeferred.resolve(new Blob(['report']));
@@ -528,6 +810,55 @@ describe('App', () => {
       interval: 'yearly',
       pricingModel: 'on-demand',
     });
+
+    unmount();
+  });
+
+  it('imports bulk service rows into the editable guided form', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Compare costs'));
+    await click(buttonByText(container, 'Edit'));
+
+    await changeTextarea(
+      textareaById(container, 'bulk-service-input'),
+      'Managed Kubernetes, 3, production, shared platform cluster\nS3, 2, standard',
+    );
+
+    expect(text(container)).toContain('Bulk service import');
+    expect(text(container)).toContain('Managed Kubernetes');
+    expect(text(container)).toContain('Object storage');
+
+    await click(buttonByText(container, 'Add matched services'));
+
+    expect(text(container)).toContain('Imported rows');
+    expect(text(container)).toContain('Managed Kubernetes');
+
+    await click(buttonByText(container, 'Compare'));
+
+    expect(client.validateWorkload).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        serviceRequirements: expect.arrayContaining([
+          expect.objectContaining({
+            serviceCategory: 'containers',
+            serviceType: 'container-orchestration',
+            quantity: 3,
+            tier: 'production',
+            scaleParams: expect.objectContaining({
+              bulkImport: true,
+              bulkNote: 'shared platform cluster',
+            }),
+          }),
+          expect.objectContaining({
+            serviceCategory: 'storage',
+            serviceType: 'object-storage',
+            quantity: 2,
+            tier: 'standard',
+          }),
+        ]),
+      }),
+    );
 
     unmount();
   });
@@ -766,6 +1097,24 @@ describe('ComparisonView', () => {
     expect(mobileProviderLabels(container)).toEqual(['AWS', 'Azure', 'GCP']);
     expect(text(container)).toContain('Pending');
     expect(text(container)).toContain('Run a comparison to populate AWS service bars.');
+    expect(text(container)).toContain('Ready to compare');
+    expect(text(container)).toContain('Describe infrastructure');
+    expect(text(container)).toContain('Add services to see your comparison');
+    expect(text(container)).toContain('Add services');
+    expect(container.querySelector('.comparison-empty-illustration')).toBeInstanceOf(SVGSVGElement);
+    expect(container.querySelector('.engineering-empty-illustration')).toBeInstanceOf(
+      SVGSVGElement,
+    );
+    expect(
+      container
+        .querySelector<HTMLAnchorElement>('a[aria-label="Describe your infrastructure above"]')
+        ?.getAttribute('href'),
+    ).toBe('#requirements');
+    expect(
+      container
+        .querySelector<HTMLAnchorElement>('a[aria-label="Add services to see your comparison"]')
+        ?.getAttribute('href'),
+    ).toBe('#requirements');
     expect(text(container)).not.toContain('Pricing unavailable');
 
     unmount();
@@ -815,10 +1164,88 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Backend contract note');
     expect(text(container)).toContain('Resource name');
     expect(text(container)).toContain('Spec / SKU');
+    expect(container.querySelector('.confidence-pill')?.getAttribute('title')).toContain(
+      'Confidence reflects how closely the equivalent service matches on specs',
+    );
+    const headerButtons = Array.from(container.querySelectorAll('button'));
+    expect(
+      headerButtons
+        .find((button) => button.getAttribute('aria-label')?.startsWith('Spec / SKU:'))
+        ?.getAttribute('title'),
+    ).toContain('Resolved SKU, unit, rate, and pricing basis');
+    expect(
+      headerButtons
+        .find((button) => button.getAttribute('aria-label')?.startsWith('Spec / SKU:'))
+        ?.closest('th')
+        ?.getAttribute('aria-sort'),
+    ).toBe('none');
+    expect(
+      headerButtons
+        .find((button) => button.getAttribute('aria-label')?.startsWith('$/mo:'))
+        ?.getAttribute('title'),
+    ).toContain('Monthly line-item cost');
+    expect(text(container)).toContain(
+      'Modeled cost driver - provider SKU/rate metadata not returned by API',
+    );
+    expect(text(container)).not.toContain('Provider SKU detail unavailable');
     expect(text(container)).toContain('aws-compute-01');
     expect(text(container)).toContain('azure-compute-01');
     expect(text(container)).toContain('gcp-compute-01');
     expect(text(container)).toContain('Tag filtering is ready in the UI');
+
+    unmount();
+  });
+
+  it('explains comparison workspace loading states with actionable context', async () => {
+    const { container, unmount } = render(
+      <ComparisonView client={clientMock()} comparison={null} interval="monthly" isLoading />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain('Pricing evidence is being refreshed.');
+    expect(text(container)).toContain(
+      'Mapping provider SKUs, totals, export links, and engineering rows from the backend response.',
+    );
+    expect(text(container)).toContain('Building engineering rows');
+    expect(text(container)).toContain('Mapping AWS, Azure, and GCP line items');
+    expect(text(container)).toContain('API JSON will activate when this comparison finishes');
+
+    unmount();
+  });
+
+  it('keeps long engineering row sets compact until the user expands them', async () => {
+    const categories: Array<
+      ComparisonResult['providers'][number]['lineItems'][number]['category']
+    > = ['compute', 'storage', 'database', 'network', 'support', 'operations'];
+    const providerRows = (label: string): Parameters<typeof providerWithItems>[1] =>
+      categories.map((category, index) => [
+        category,
+        `${label} line item ${index + 1}`,
+        25 + index,
+      ]);
+    const longResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'aws',
+      providers: [
+        providerWithItems('aws', providerRows('aws')),
+        providerWithItems('azure', providerRows('azure')),
+        providerWithItems('gcp', providerRows('gcp')),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView comparison={longResult} interval="monthly" />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain(
+      'Showing 12 of 18 resource rows sorted by $/mo (descending).',
+    );
+    await click(buttonByText(container, 'Show all rows (6 more)'));
+
+    expect(text(container)).toContain(
+      'Showing 18 of 18 resource rows sorted by $/mo (descending).',
+    );
+    expect(text(container)).toContain('Collapse to top 12');
 
     unmount();
   });
@@ -870,6 +1297,649 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('gcp compute');
     expect(text(container)).toContain('$60.00');
     expect(text(container)).toContain('$4.00');
+
+    unmount();
+  });
+
+  it('surfaces compute specification matrix with architecture and tenancy economics', async () => {
+    const computeResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'gcp',
+      providers: [
+        providerWithItems('aws', [['compute', 'aws memory compute', 200]]),
+        providerWithItems('azure', [['compute', 'azure memory compute', 180]]),
+        providerWithItems('gcp', [['compute', 'gcp memory compute', 160]]),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView
+        comparison={computeResult}
+        form={{
+          ...defaultWorkloadForm,
+          instanceTier: 'memory',
+          processorArchitecture: 'arm64',
+          computeTenancy: 'dedicated-host',
+          vcpu: '4',
+          memoryGb: '16',
+          instanceCount: '3',
+        }}
+        interval="monthly"
+      />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain('Compute specification matrix');
+    expect(text(container)).toContain(
+      'Family, capacity, network/disk baseline, and architecture economics',
+    );
+    expect(text(container)).toContain('R7g Graviton3');
+    expect(text(container)).toContain('Epsv5 Ampere Altra');
+    expect(text(container)).toContain('Tau T2A');
+    expect(text(container)).toContain('3 nodes · 12 vCPU / 48GB');
+    expect(text(container)).toContain('GB per $');
+    expect(text(container)).toContain('Selected ARM vs x86');
+    expect(text(container)).toContain('Dedicated host · 16 instance(s) per 64-vCPU reference host');
+    expect(text(container)).toContain(
+      'Validate host density and license/compliance placement before accepting the per-instance comparison.',
+    );
+
+    unmount();
+  });
+
+  it('surfaces Windows license optimization detail from licensing line items', async () => {
+    const windowsResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'azure',
+      providers: [
+        providerWithItems('aws', [
+          ['compute', 'aws compute', 80],
+          ['licensing', 'aws Windows license', 24],
+        ]),
+        providerWithItems('azure', [
+          ['compute', 'azure compute', 70],
+          ['licensing', 'azure Windows license', 20],
+        ]),
+        providerWithItems('gcp', [
+          ['compute', 'gcp compute', 85],
+          ['licensing', 'gcp Windows license', 22],
+        ]),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView
+        comparison={windowsResult}
+        form={{ ...defaultWorkloadForm, operatingSystem: 'windows' }}
+        interval="monthly"
+      />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain('License optimization detail');
+    expect(text(container)).toContain(
+      'Windows uplift, Linux-equivalent run-rate, and BYOL savings',
+    );
+    expect(text(container)).toContain('Hybrid Benefit / BYOL');
+    expect(text(container)).toContain('$24.00/mo');
+    expect(text(container)).toContain('$288.00/yr');
+    expect(text(container)).toContain('Linux/BYOL equivalent');
+
+    unmount();
+  });
+
+  it('surfaces storage optimization detail from modeled storage dimensions', async () => {
+    const awsProvider = providerWithItems('aws', [
+      ['compute', 'aws compute', 40],
+      ['storage', 'AWS snapshot retention estimate', 24],
+      ['storage', 'AWS archive retrieval estimate', 12],
+      ['storage', 'AWS storage operation estimate', 2],
+      ['storage', 'AWS cross-region replication estimate', 20],
+      ['storage', 'AWS lifecycle transition estimate', 1],
+      ['storage', 'AWS provisioned IOPS performance estimate', 15],
+    ]);
+    awsProvider.lineItems[1] = {
+      ...awsProvider.lineItems[1],
+      costComponent: 'storage',
+      skuId: 'modeled-storage-snapshots',
+    };
+    awsProvider.lineItems[2] = {
+      ...awsProvider.lineItems[2],
+      costComponent: 'storage',
+      skuId: 'modeled-storage-retrieval',
+    };
+    awsProvider.lineItems[3] = {
+      ...awsProvider.lineItems[3],
+      costComponent: 'storage',
+      skuId: 'modeled-storage-put-operations',
+    };
+    awsProvider.lineItems[4] = {
+      ...awsProvider.lineItems[4],
+      costComponent: 'storage',
+      skuId: 'modeled-storage-cross-region-replication',
+    };
+    awsProvider.lineItems[5] = {
+      ...awsProvider.lineItems[5],
+      costComponent: 'storage',
+      skuId: 'modeled-storage-lifecycle-transitions',
+    };
+    awsProvider.lineItems[6] = {
+      ...awsProvider.lineItems[6],
+      costComponent: 'storage',
+      skuId: 'modeled-storage-provisioned-iops',
+    };
+    const storageResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'aws',
+      providers: [
+        awsProvider,
+        providerWithItems('azure', [['compute', 'azure compute', 70]]),
+        providerWithItems('gcp', [['compute', 'gcp compute', 75]]),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView
+        comparison={storageResult}
+        form={{
+          ...defaultWorkloadForm,
+          storageEnabled: true,
+          storageSizeGb: '1000',
+          storageClass: 'archive',
+          monthlyPutRequestsThousand: '1',
+          monthlyGetRequestsThousand: '1',
+          monthlyRetrievalGb: '250',
+          lifecycleTransitionsThousand: '20',
+          snapshotSizeGb: '500',
+          snapshotRetentionDays: '60',
+          storageReplication: 'cross-region',
+          provisionedIops: '3000',
+          provisionedThroughputMbps: '125',
+        }}
+        interval="monthly"
+      />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain('Storage optimization detail');
+    expect(text(container)).toContain(
+      'Storage class, retrieval, snapshots, replication, and performance tuning',
+    );
+    expect(text(container)).toContain('Snapshot retention');
+    expect(text(container)).toContain(
+      '1,000GB archive · 250GB retrieval · 2K operations · cross region',
+    );
+    expect(text(container)).toContain('$7.20/mo');
+    expect(text(container)).toContain('$86.40/yr');
+    expect(text(container)).toContain(
+      'Reduce retention, deduplicate snapshots, or move older copies to colder tiers.',
+    );
+    expect(text(container)).toContain('500GB snapshots · 60 days');
+    expect(text(container)).toContain('Storage cost anatomy');
+    expect(text(container)).toContain(
+      'Classes, operations, retrieval, replication, snapshots, and IOPS',
+    );
+    expect(text(container)).toContain('Object · Archive');
+    expect(text(container)).toContain('2K ops ($2.00/mo)');
+    expect(text(container)).toContain('250GB retrieval ($12.00/mo)');
+    expect(text(container)).toContain('cross region ($20.00/mo)');
+    expect(text(container)).toContain('500GB snapshots / 60d ($24.00/mo)');
+    expect(text(container)).toContain('20K lifecycle transitions ($1.00/mo)');
+    expect(text(container)).toContain('3,000 IOPS / 125 MB/s ($15.00/mo)');
+    expect(text(container)).toContain(
+      'Review snapshot retention and older-copy tiering before finalizing storage run-rate.',
+    );
+
+    unmount();
+  });
+
+  it('surfaces database optimization detail from modeled database dimensions', async () => {
+    const awsProvider = providerWithItems('aws', [
+      ['compute', 'aws compute', 40],
+      ['database', 'AWS primary RU/s provisioned capacity estimate', 32],
+      ['database', 'AWS primary NoSQL write unit estimate', 20],
+      ['database', 'AWS primary backup retention estimate', 10],
+      ['database', 'AWS primary read replica estimate', 18],
+      ['database', 'AWS primary provisioned IOPS estimate', 8],
+      ['database', 'AWS cache replica estimate', 12],
+      ['database', 'AWS data warehouse query processing estimate', 25],
+      ['database', 'Amazon OpenSearch Service capacity estimate', 16],
+    ]);
+    awsProvider.lineItems[1] = {
+      ...awsProvider.lineItems[1],
+      costComponent: 'database',
+      skuId: 'modeled-database-ru-capacity',
+    };
+    awsProvider.lineItems[2] = {
+      ...awsProvider.lineItems[2],
+      costComponent: 'database',
+      skuId: 'modeled-database-nosql-write-units',
+    };
+    awsProvider.lineItems[3] = {
+      ...awsProvider.lineItems[3],
+      costComponent: 'database',
+      skuId: 'modeled-database-backup-storage',
+    };
+    awsProvider.lineItems[4] = {
+      ...awsProvider.lineItems[4],
+      costComponent: 'database',
+      skuId: 'modeled-database-read-replica',
+    };
+    awsProvider.lineItems[5] = {
+      ...awsProvider.lineItems[5],
+      costComponent: 'database',
+      skuId: 'modeled-database-iops',
+    };
+    awsProvider.lineItems[6] = {
+      ...awsProvider.lineItems[6],
+      costComponent: 'database',
+      skuId: 'modeled-database-cache-replica',
+    };
+    awsProvider.lineItems[7] = {
+      ...awsProvider.lineItems[7],
+      costComponent: 'database',
+      skuId: 'modeled-analytics-warehouse-query',
+    };
+    awsProvider.lineItems[8] = {
+      ...awsProvider.lineItems[8],
+      costComponent: 'database',
+      skuId: 'modeled-database-search-capacity',
+    };
+    const databaseResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'aws',
+      providers: [
+        awsProvider,
+        providerWithItems('azure', [['compute', 'azure compute', 70]]),
+        providerWithItems('gcp', [['compute', 'gcp compute', 75]]),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView
+        comparison={databaseResult}
+        form={{
+          ...defaultWorkloadForm,
+          databaseEnabled: true,
+          databaseEngine: 'generic_nosql',
+          databaseSizeGb: '250',
+          databaseBackupStorageGb: '100',
+          databaseBackupRetentionDays: '30',
+          databaseProvisionedIops: '8000',
+          databaseReadReplicaCount: '1',
+          databaseCrossRegionReplicaTransferGb: '100',
+          databaseNosqlReadRequestUnitsMillion: '50',
+          databaseNosqlWriteRequestUnitsMillion: '20',
+          databaseRuPerSecond: '4000',
+          databaseQueryDataTb: '3',
+          databaseCacheReplicaCount: '2',
+          databaseStorageGrowthGbPerMonth: '30',
+          databaseSearchNodeCount: '2',
+          databaseSearchStorageGb: '500',
+          databaseSearchQueriesMillion: '25',
+          analyticsWarehouseStorageGb: '500',
+          analyticsWarehouseQueryTb: '4',
+        }}
+        interval="monthly"
+      />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain('Database optimization detail');
+    expect(text(container)).toContain(
+      'NoSQL, RU/s, replicas, backups, cache, managed search, and query tuning',
+    );
+    expect(text(container)).toContain('RU/s provisioned capacity');
+    expect(text(container)).toContain('generic nosql · 250GB data · 4,000 RU/s · 70M NoSQL units');
+    expect(text(container)).toContain('$8.00/mo');
+    expect(text(container)).toContain('$96.00/yr');
+    expect(text(container)).toContain(
+      'Validate RU/s utilization, autoscale limits, and serverless break-even.',
+    );
+    expect(text(container)).toContain('4,000 RU/s configured');
+    expect(text(container)).toContain('Database cost anatomy');
+    expect(text(container)).toContain(
+      'Relational, NoSQL, cache, warehouse, search, backup, and IOPS',
+    );
+    expect(text(container)).toContain('generic nosql · HA / multi-zone');
+    expect(text(container)).toContain('4,000 RU/s ($32.00/mo)');
+    expect(text(container)).toContain('50M reads / 20M writes ($20.00/mo)');
+    expect(text(container)).toContain('1 replicas / 100GB transfer ($18.00/mo)');
+    expect(text(container)).toContain('100GB backup / 30GB growth ($10.00/mo)');
+    expect(text(container)).toContain('8,000 IOPS ($8.00/mo)');
+    expect(text(container)).toContain('7TB query / 500GB warehouse ($25.00/mo)');
+    expect(text(container)).toContain('2 cache replicas ($12.00/mo)');
+    expect(text(container)).toContain('2 search nodes / 500GB index ($16.00/mo)');
+
+    unmount();
+  });
+
+  it('surfaces managed-search optimization detail from search database dimensions', async () => {
+    const awsProvider = providerWithItems('aws', [
+      ['database', 'Amazon OpenSearch Service capacity estimate', 120],
+    ]);
+    awsProvider.lineItems[0] = {
+      ...awsProvider.lineItems[0],
+      costComponent: 'database',
+      skuId: 'modeled-database-search-capacity',
+    };
+    const searchResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'aws',
+      providers: [
+        awsProvider,
+        providerWithItems('azure', [['compute', 'azure compute', 70]]),
+        providerWithItems('gcp', [['compute', 'gcp compute', 75]]),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView
+        comparison={searchResult}
+        form={{
+          ...defaultWorkloadForm,
+          databaseEnabled: true,
+          databaseEngine: 'generic_nosql',
+          databaseSizeGb: '500',
+          databaseSearchNodeCount: '2',
+          databaseSearchStorageGb: '500',
+          databaseSearchQueriesMillion: '25',
+        }}
+        interval="monthly"
+      />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain('Managed search capacity');
+    expect(text(container)).toContain('2 search nodes · 500GB index');
+    expect(text(container)).toContain('$26.40/mo');
+    expect(text(container)).toContain('$316.80/yr');
+    expect(text(container)).toContain(
+      'Right-size search replicas, index lifecycle, and query capacity before scaling search clusters.',
+    );
+
+    unmount();
+  });
+
+  it('surfaces runtime optimization detail from serverless and container dimensions', async () => {
+    const awsProvider = providerWithItems('aws', [
+      ['compute', 'aws compute', 40],
+      ['compute', 'AWS serverless function GB-second estimate', 90],
+      ['operations', 'AWS managed Kubernetes control plane estimate', 72],
+      ['storage', 'AWS container registry storage estimate', 4],
+      ['network', 'AWS container registry egress estimate', 9],
+    ]);
+    awsProvider.lineItems[1] = {
+      ...awsProvider.lineItems[1],
+      costComponent: 'compute',
+      skuId: 'modeled-serverless-function-duration',
+    };
+    awsProvider.lineItems[2] = {
+      ...awsProvider.lineItems[2],
+      costComponent: 'operations',
+      skuId: 'modeled-kubernetes-control-plane',
+    };
+    awsProvider.lineItems[3] = {
+      ...awsProvider.lineItems[3],
+      costComponent: 'storage',
+      skuId: 'modeled-container-registry-storage',
+    };
+    awsProvider.lineItems[4] = {
+      ...awsProvider.lineItems[4],
+      costComponent: 'egress',
+      skuId: 'modeled-container-registry-egress',
+    };
+    const runtimeResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'aws',
+      providers: [
+        awsProvider,
+        providerWithItems('azure', [['compute', 'azure compute', 220]]),
+        providerWithItems('gcp', [['compute', 'gcp compute', 230]]),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView
+        comparison={runtimeResult}
+        form={{
+          ...defaultWorkloadForm,
+          functionInvocationsMillion: '5',
+          functionDurationMs: '200',
+          functionMemoryMb: '512',
+          kubernetesClusterCount: '2',
+          kubernetesWorkerNodeCount: '6',
+          registryStorageGb: '40',
+          registryEgressGb: '100',
+        }}
+        interval="monthly"
+      />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain('Runtime optimization detail');
+    expect(text(container)).toContain(
+      'Functions, memory curve, Kubernetes overhead, registry, and platform fit',
+    );
+    expect(text(container)).toContain('Function duration / memory');
+    expect(text(container)).toContain(
+      '5M invocations · 200ms @ 512MB · 2 clusters / 6 nodes · 40GB registry · 100GB image egress',
+    );
+    expect(text(container)).toContain('$22.50/mo');
+    expect(text(container)).toContain('$270.00/yr');
+    expect(text(container)).toContain(
+      'Tune the memory-duration knee and compare functions with always-on containers for steady traffic.',
+    );
+    expect(text(container)).toContain('5M invocations · 200ms @ 512MB');
+    expect(text(container)).toContain('Serverless memory-duration curve');
+    expect(text(container)).toContain('1,024MB @ 100ms');
+    expect(text(container)).toContain('$9.33/mo');
+    expect(text(container)).toContain(
+      'Benchmark 1,024MB; keep duration at or below 100ms to improve latency without raising compute cost.',
+    );
+
+    unmount();
+  });
+
+  it('surfaces app platform request-based versus always-on model comparison', async () => {
+    const awsProvider = providerWithItems('aws', [
+      ['compute', 'aws compute', 25],
+      ['compute', 'AWS managed app platform request estimate', 0],
+      ['compute', 'AWS managed app platform active vCPU estimate', 71.11],
+      ['compute', 'AWS managed app platform active memory estimate', 3.89],
+    ]);
+    awsProvider.lineItems[1] = {
+      ...awsProvider.lineItems[1],
+      costComponent: 'compute',
+      skuId: 'modeled-app-platform-requests',
+    };
+    awsProvider.lineItems[2] = {
+      ...awsProvider.lineItems[2],
+      costComponent: 'compute',
+      skuId: 'modeled-app-platform-request-compute',
+    };
+    awsProvider.lineItems[3] = {
+      ...awsProvider.lineItems[3],
+      costComponent: 'compute',
+      skuId: 'modeled-app-platform-request-memory',
+    };
+    const appPlatformResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'aws',
+      providers: [
+        awsProvider,
+        providerWithItems('azure', [['compute', 'azure compute', 210]]),
+        providerWithItems('gcp', [['compute', 'gcp compute', 190]]),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView
+        comparison={appPlatformResult}
+        form={{
+          ...defaultWorkloadForm,
+          appPlatformRequestsMillion: '10',
+          appPlatformRequestDurationMs: '400',
+          appPlatformVcpu: '1',
+          appPlatformMemoryGb: '0.5',
+          appPlatformAlwaysOnHours: '730',
+          appPlatformMinInstances: '1',
+        }}
+        interval="monthly"
+      />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain('App platform model comparison');
+    expect(text(container)).toContain(
+      'App Runner, App Service, and Cloud Run request-based vs always-on posture',
+    );
+    expect(text(container)).toContain('10M requests · 400ms · 1 vCPU / 0.5GB');
+    expect(text(container)).toContain('$75.00/mo');
+    expect(text(container)).toContain('$49.28/mo');
+    expect(text(container)).toContain('Always-on');
+    expect(text(container)).toContain('$25.72/mo · $308.64/yr spread');
+    expect(text(container)).toContain(
+      'Use always-on/provisioned app capacity for steady traffic; request-based metering is $25.72/mo higher at this shape.',
+    );
+
+    unmount();
+  });
+
+  it('surfaces operations optimization detail from observability and secrets dimensions', async () => {
+    const awsProvider = providerWithItems('aws', [
+      ['compute', 'aws compute', 40],
+      ['operations', 'AWS log ingestion estimate', 120],
+      ['operations', 'AWS log retention storage estimate', 15],
+      ['operations', 'AWS managed secrets estimate', 20],
+    ]);
+    awsProvider.lineItems[1] = {
+      ...awsProvider.lineItems[1],
+      costComponent: 'operations',
+      skuId: 'modeled-operations-log-ingestion',
+    };
+    awsProvider.lineItems[2] = {
+      ...awsProvider.lineItems[2],
+      costComponent: 'operations',
+      skuId: 'modeled-operations-log-retention',
+    };
+    awsProvider.lineItems[3] = {
+      ...awsProvider.lineItems[3],
+      costComponent: 'operations',
+      skuId: 'modeled-security-secrets',
+    };
+    const operationsResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'aws',
+      providers: [
+        awsProvider,
+        providerWithItems('azure', [['compute', 'azure compute', 230]]),
+        providerWithItems('gcp', [['compute', 'gcp compute', 240]]),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView
+        comparison={operationsResult}
+        form={{
+          ...defaultWorkloadForm,
+          observabilityLogsIngestGb: '240',
+          observabilityLogRetentionGb: '500',
+          observabilityMetricsMillion: '25',
+          observabilityTracesMillion: '8',
+          secretsCount: '50',
+          secretApiCallsTenThousand: '300',
+        }}
+        interval="monthly"
+      />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain('Operations optimization detail');
+    expect(text(container)).toContain(
+      'Observability, logging, tracing, secrets, WAF, and security posture controls',
+    );
+    expect(text(container)).toContain('Log ingestion volume');
+    expect(text(container)).toContain(
+      '25M metrics · 240GB logs · 500GB-mo retention · 8M traces · 50 secrets',
+    );
+    expect(text(container)).toContain('$36.00/mo');
+    expect(text(container)).toContain('$432.00/yr');
+    expect(text(container)).toContain(
+      'Filter debug noise at source, sample high-volume streams, and route low-value logs to cheaper retention.',
+    );
+    expect(text(container)).toContain('240GB logs ingested/month');
+
+    unmount();
+  });
+
+  it('surfaces private connectivity optimization from VPN and circuit network rows', async () => {
+    const awsProvider = providerWithItems('aws', [
+      ['compute', 'aws compute', 40],
+      [
+        'network',
+        'AWS VPN connectivity estimate (2 connection(s), 730 hrs, 1000 GB transfer)',
+        163,
+      ],
+      [
+        'network',
+        'AWS private circuit estimate (1 circuit(s), 730 port hrs, 2000 GB transfer)',
+        259,
+      ],
+    ]);
+    awsProvider.lineItems[1] = {
+      ...awsProvider.lineItems[1],
+      costComponent: 'egress',
+      skuId: 'modeled-vpn-connectivity',
+    };
+    awsProvider.lineItems[2] = {
+      ...awsProvider.lineItems[2],
+      costComponent: 'networking',
+      skuId: 'modeled-private-circuit',
+    };
+    const networkResult: ComparisonResult = {
+      ...comparisonResult,
+      cheapestProviderId: 'aws',
+      providers: [
+        awsProvider,
+        providerWithItems('azure', [['compute', 'azure compute', 500]]),
+        providerWithItems('gcp', [['compute', 'gcp compute', 520]]),
+      ],
+    };
+    const { container, unmount } = render(
+      <ComparisonView
+        comparison={networkResult}
+        form={{
+          ...defaultWorkloadForm,
+          vpnConnectionCount: '2',
+          vpnConnectionHours: '730',
+          vpnDataTransferGb: '1000',
+          privateCircuitCount: '1',
+          privateCircuitPortHours: '730',
+          privateCircuitDataTransferGb: '2000',
+        }}
+        interval="monthly"
+      />,
+    );
+    await act(async () => undefined);
+
+    expect(text(container)).toContain('Egress optimization detail');
+    expect(text(container)).toContain('Private circuit');
+    expect(text(container)).toContain('3,000GB private path');
+    expect(text(container)).toContain('$64.75/mo');
+    expect(text(container)).toContain(
+      'Validate port speed, redundancy, metered-vs-unlimited transfer, and VPN-to-private-circuit break-even before final network design.',
+    );
+    expect(text(container)).toContain(
+      'Connectivity architecture review models $64.75/mo opportunity at 25% of that private-connectivity baseline.',
+    );
+    expect(text(container)).toContain('Networking cost itemization');
+    expect(text(container)).toContain(
+      'Load balancing, CDN, NAT, DNS, VPN, and private-path charges',
+    );
+    expect(text(container)).toContain('VPN connectivity');
+    expect(text(container)).toContain('Private connectivity');
+    expect(text(container)).toContain('2 connection(s), 730 hrs, 1000 GB transfer');
+    expect(text(container)).toContain('1 circuit(s), 730 port hrs, 2000 GB transfer');
+    expect(text(container)).toContain('Monthly modeled subtotal');
+    expect(text(container)).toContain(
+      'Validate tunnel count, redundancy, transfer volume, and private-circuit break-even.',
+    );
+    expect(text(container)).toContain(
+      'Validate port speed, redundancy, metered transfer, and commitment terms.',
+    );
 
     unmount();
   });
@@ -976,8 +2046,14 @@ describe('ComparisonView', () => {
     const client = clientMock({
       createComparison: jest.fn(async () => whatIfResult),
     });
+    const analytics = await client.getComparisonAnalytics(richResult.comparisonId);
     const { container, unmount } = render(
-      <ComparisonView client={client} comparison={richResult} interval="monthly" />,
+      <ComparisonView
+        analytics={analytics}
+        client={client}
+        comparison={richResult}
+        interval="monthly"
+      />,
     );
     await act(async () => undefined);
 
@@ -986,14 +2062,78 @@ describe('ComparisonView', () => {
     expect(buttonByText(container, '1yr reserved').disabled).toBe(false);
     expect(buttonByText(container, '3yr reserved').disabled).toBe(false);
     expect(buttonByText(container, 'Spot').disabled).toBe(false);
+    expect(buttonByText(container, 'Spot').getAttribute('title')).toContain(
+      'Spot pricing models interruptible capacity',
+    );
     expect(buttonByText(container, 'Savings plan').disabled).toBe(false);
     expect(text(container)).toContain('Full cost matrix');
     expect(text(container)).toContain('AWS On-demand');
     expect(text(container)).toContain('Azure 1yr');
+    expect(
+      Array.from(container.querySelectorAll('th'))
+        .find((header) => header.textContent?.includes('AWS Spot'))
+        ?.getAttribute('title'),
+    ).toContain('estimate ranges');
+    expect(text(container)).toContain('Columns');
+    expect(text(container)).toContain('Compact cost view');
+    const columnModeSelect = selectByOptionValue(container, 'summary');
+    await changeSelect(columnModeSelect, 'summary');
+    expect(columnModeSelect.value).toBe('summary');
     expect(text(container)).toContain('$24.00 est.');
     expect(text(container)).toContain('$42.00');
+    expect(text(container)).toContain('Production-depth analytics');
+    expect(text(container)).toContain('AWS commitment ROI');
+    expect(text(container)).toContain('Month 3');
+    expect(text(container)).toContain('Break-even');
+    expect(text(container)).toContain('Provider delta analysis');
+    expect(text(container)).toContain('Why each service is cheaper');
+    expect(text(container)).toContain('Azure is 33% lower than GCP for compute.');
+    expect(text(container)).toContain('Region variance heat map');
+    expect(text(container)).toContain('Modeled monthly sensitivity by compliant region');
+    expect(text(container)).toContain('Backend-modeled baseline region sensitivity.');
+    expect(text(container)).toContain('Commitment coverage gap');
+    expect(text(container)).toContain('0% on-demand vs target blend vs 100% committed');
+    expect(text(container)).toContain('$20.30/mo');
+    expect(text(container)).toContain('35% exposed');
+    expect(text(container)).toContain('Cross-provider TCO signals');
+    expect(text(container)).toContain('Egress exit proxy');
+    expect(text(container)).toContain('Free-tier signal');
+    expect(text(container)).toContain('Data-out proxy');
+    expect(text(container)).toContain('Egress optimization detail');
+    expect(text(container)).toContain(
+      'Cache, NAT, private transfer, and high-volume data-out actions',
+    );
+    expect(text(container)).toContain('Internet egress');
+    expect(text(container)).toContain(
+      'Evaluate CDN offload, cache-control, and same-region data access.',
+    );
+    expect(text(container)).toContain('Spot blend optimizer');
+    expect(text(container)).toContain('Mixed on-demand and interruptible-capacity estimate');
+    expect(text(container)).toContain('80% on-demand / 20% spot');
+    expect(text(container)).toContain('$89.50/mo est.');
+    expect(text(container)).toContain('High interruption risk');
+    expect(text(container)).toContain('daily-to-weekly planning band');
+    expect(text(container)).toContain('20% interruptible share');
+    expect(text(container)).toContain('Architecture risk flags');
+    expect(text(container)).toContain('Cost behaviors to validate before commitment');
+    expect(text(container)).toContain('Backend egress driver');
+    expect(text(container)).toContain(
+      'Backend FinOps finding: Backend identified egress driver from cached totals.',
+    );
+    expect(text(container)).toContain('Data-transfer concentration');
+    expect(text(container)).toContain('Scenario sensitivity');
+    expect(text(container)).toContain('Provider winner under operational shocks');
+    expect(text(container)).toContain('Egress traffic +50%');
+    expect(text(container)).toContain(
+      'Backend analytics varied egress traffic by +50% against cached dimension totals.',
+    );
     expect(text(container)).toContain('Payment and TCO detail');
     expect(text(container)).toContain('Commitment scenario monthly, hourly, and term view');
+    expect(
+      Array.from(container.querySelectorAll('th'))
+        .find((header) => header.textContent?.includes('Effective hourly'))
+        ?.getAttribute('title'),
+    ).toContain('blended hourly cost');
     expect(text(container)).toContain('Upfront cash');
     expect(text(container)).toContain('$120.00');
     expect(text(container)).toContain('$624.00');
@@ -1083,11 +2223,29 @@ async function click(element: HTMLElement): Promise<void> {
   });
 }
 
+async function settleAsyncEffects(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
 async function changeInput(input: HTMLInputElement, value: string): Promise<void> {
   await act(async () => {
     const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
     valueSetter?.call(input, value);
     input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+async function changeTextarea(textarea: HTMLTextAreaElement, value: string): Promise<void> {
+  await act(async () => {
+    const valueSetter = Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      'value',
+    )?.set;
+    valueSetter?.call(textarea, value);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
 
@@ -1140,6 +2298,20 @@ function selectById(container: HTMLElement, id: string): HTMLSelectElement {
   return select;
 }
 
+function selectByOptionValue(container: HTMLElement, value: string): HTMLSelectElement {
+  const select = Array.from(container.querySelectorAll('select')).find(
+    (candidate): candidate is HTMLSelectElement =>
+      candidate instanceof HTMLSelectElement &&
+      Array.from(candidate.options).some((option) => option.value === value),
+  );
+
+  if (!select) {
+    throw new Error(`Select not found for option value: ${value}`);
+  }
+
+  return select;
+}
+
 function checkboxByLabel(container: HTMLElement, label: string): HTMLInputElement {
   const field = Array.from(container.querySelectorAll('.checkbox-field')).find((candidate) =>
     candidate.textContent?.includes(label),
@@ -1173,6 +2345,30 @@ function buttonByText(container: HTMLElement, label: string): HTMLButtonElement 
 
   if (!(button instanceof HTMLButtonElement)) {
     throw new Error(`Button not found: ${label}`);
+  }
+
+  return button;
+}
+
+function templateButtonByText(container: HTMLElement, label: string): HTMLButtonElement {
+  const button = Array.from(
+    container.querySelectorAll<HTMLButtonElement>('.architecture-template-button'),
+  ).find((candidate) => candidate.textContent?.includes(label));
+
+  if (!(button instanceof HTMLButtonElement)) {
+    throw new Error(`Template button not found: ${label}`);
+  }
+
+  return button;
+}
+
+function comparisonHistoryButtonByText(container: HTMLElement, label: string): HTMLButtonElement {
+  const button = Array.from(
+    container.querySelectorAll<HTMLButtonElement>('.comparison-history-row'),
+  ).find((candidate) => candidate.textContent?.includes(label));
+
+  if (!(button instanceof HTMLButtonElement)) {
+    throw new Error(`Comparison history button not found: ${label}`);
   }
 
   return button;
@@ -1214,7 +2410,11 @@ function clearClientCalls(client: PolyCostClient): void {
     client.parseWorkload,
     client.validateWorkload,
     client.createComparison,
+    client.getComparisonAnalytics,
     client.refreshLiveComparison,
+    client.createExportJob,
+    client.getExportJob,
+    client.downloadExportJob,
     client.exportComparison,
   ].forEach((method) => {
     if (jest.isMockFunction(method)) {
@@ -1240,6 +2440,25 @@ function deferred<T>(): {
   });
 
   return { promise, resolve, reject };
+}
+
+function freshCacheSummary(
+  catalogRows: number,
+  currentRateRows: number,
+): DataHealthResponse['providers'][number]['cache'] {
+  return {
+    catalogRows,
+    currentRateRows,
+    latestCatalogSyncAt: '2026-06-30T23:00:00.000Z',
+    latestRateSyncAt: '2026-06-30T23:00:00.000Z',
+    ageHours: 1,
+    freshness: 'fresh',
+    syncStatusCounts: {
+      success: catalogRows + currentRateRows,
+      partial: 0,
+      failed: 0,
+    },
+  };
 }
 
 function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
@@ -1277,14 +2496,287 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     status: 'ok',
     service: 'polycost-api',
   };
+  const dataHealth: DataHealthResponse = {
+    generatedAt: '2026-07-01T00:00:00.000Z',
+    freshnessPolicyHours: 48,
+    overallStatus: 'fresh',
+    alertCount: 0,
+    alerts: [],
+    providers: [
+      {
+        providerId: 'aws',
+        status: 'success',
+        freshness: 'fresh',
+        ageHours: 1,
+        recordsUpdated: 12,
+        recordsRejected: 0,
+        recordsSkipped: 3,
+        lastSuccessfulRun: '2026-06-30T23:00:00.000Z',
+        cache: freshCacheSummary(30, 18),
+        message: 'Pricing cache refreshed 1h ago across 30 catalog rows and 18 current rate rows.',
+      },
+      {
+        providerId: 'azure',
+        status: 'success',
+        freshness: 'fresh',
+        ageHours: 1,
+        recordsUpdated: 10,
+        recordsRejected: 0,
+        recordsSkipped: 2,
+        lastSuccessfulRun: '2026-06-30T23:00:00.000Z',
+        cache: freshCacheSummary(24, 15),
+        message: 'Pricing cache refreshed 1h ago across 24 catalog rows and 15 current rate rows.',
+      },
+      {
+        providerId: 'gcp',
+        status: 'success',
+        freshness: 'fresh',
+        ageHours: 1,
+        recordsUpdated: 8,
+        recordsRejected: 0,
+        recordsSkipped: 1,
+        lastSuccessfulRun: '2026-06-30T23:00:00.000Z',
+        cache: freshCacheSummary(20, 12),
+        message: 'Pricing cache refreshed 1h ago across 20 catalog rows and 12 current rate rows.',
+      },
+    ],
+  };
   const pendingRegionCatalog = new Promise<RegionCatalogResponse>(() => undefined);
+  const reportExportJob: ReportExportJobResponse = {
+    jobId: '66666666-6666-4666-8666-666666666666',
+    comparisonId: comparisonResult.comparisonId,
+    format: 'pdf',
+    interval: 'monthly',
+    pricingModel: 'on-demand',
+    status: 'completed',
+    fileName: 'polycost-comparison.pdf',
+    contentType: 'application/pdf',
+    createdAt: '2026-07-01T00:00:00.000Z',
+    startedAt: '2026-07-01T00:00:01.000Z',
+    completedAt: '2026-07-01T00:00:02.000Z',
+    statusUrl: `/api/v1/comparisons/${comparisonResult.comparisonId}/export-jobs/66666666-6666-4666-8666-666666666666`,
+    downloadUrl: `/api/v1/comparisons/${comparisonResult.comparisonId}/export-jobs/66666666-6666-4666-8666-666666666666/download`,
+  };
 
   return {
     getHealth: jest.fn(async () => backendHealth),
+    getDataHealth: jest.fn(async () => dataHealth),
     parseWorkload: jest.fn(async () => parsed),
     validateWorkload: jest.fn(async () => ({ valid: true as const })),
     createComparison: jest.fn(async () => comparisonResult),
+    getComparisonAnalytics: jest.fn(async () => ({
+      comparisonId: comparisonResult.comparisonId,
+      generatedAt: '2026-07-02T12:00:00.000Z',
+      pricingAsOf: comparisonResult.pricingAsOf,
+      executiveForecast: {
+        horizonDays: 90 as const,
+        assumption: '90-day projection uses current monthly run rate x 3.',
+        providerForecasts: [
+          {
+            providerId: 'gcp' as const,
+            monthlyRunRateUsd: 30,
+            ninetyDayRunRateUsd: 90,
+            annualizedRunRateUsd: 360,
+          },
+        ],
+      },
+      costCoverageMap: [
+        {
+          providerId: 'gcp' as const,
+          dimension: 'Compute families and sizing',
+          status: 'Covered',
+          pricedRows: 1,
+          approximateRows: 0,
+          monthlyUsd: 30,
+          evidence: 'gcp compute row is priced.',
+          reviewCue: 'Validate family.',
+        },
+      ],
+      costComposition: [
+        {
+          providerId: 'gcp' as const,
+          totalMonthlyUsd: 30,
+          items: [
+            {
+              dimension: 'compute' as const,
+              label: 'Backend compute base',
+              monthlyCostUsd: 30,
+              percentOfProviderTotal: 100,
+              runningMonthlyUsd: 30,
+              topDriver: 'gcp compute',
+            },
+          ],
+        },
+      ],
+      providerDeltaAnalysis: [],
+      regionVarianceHeatMap: [
+        {
+          comparisonRegion: 'us-east',
+          label: 'US East',
+          regionSummary: 'AWS us-east-1 · Azure eastus · GCP us-east1',
+          multiplier: 1,
+          evidence: 'Backend-modeled baseline region sensitivity.',
+          isSelected: true,
+          complianceEligible: true,
+          lowestProviderId: 'gcp' as const,
+          providers: [
+            {
+              providerId: 'aws' as const,
+              providerRegion: 'us-east-1',
+              modeledMonthlyUsd: 42,
+              deltaVsSelectedMonthlyUsd: 0,
+              isLowest: false,
+            },
+            {
+              providerId: 'azure' as const,
+              providerRegion: 'eastus',
+              modeledMonthlyUsd: 38,
+              deltaVsSelectedMonthlyUsd: 0,
+              isLowest: false,
+            },
+            {
+              providerId: 'gcp' as const,
+              providerRegion: 'us-east1',
+              modeledMonthlyUsd: 30,
+              deltaVsSelectedMonthlyUsd: 0,
+              isLowest: true,
+            },
+          ],
+        },
+      ],
+      egressNetworkingDetails: [
+        {
+          id: 'aws-egress-1',
+          providerId: 'aws' as const,
+          networkComponent: 'egress',
+          description: 'Backend AWS internet egress',
+          region: 'us-east-1',
+          monthlyCostUsd: 12,
+          shareOfProviderTotalPercent: 12,
+          unit: 'GB',
+          rateUsd: 0.09,
+          evidence: 'Backend network tier evidence.',
+        },
+      ],
+      sensitivityScenarios: [
+        {
+          variable: 'egress_traffic' as const,
+          label: 'Egress traffic',
+          changePercent: 50,
+          providerId: 'aws' as const,
+          baselineMonthlyUsd: 42,
+          adjustedMonthlyUsd: 48,
+          deltaMonthlyUsd: 6,
+        },
+        {
+          variable: 'egress_traffic' as const,
+          label: 'Egress traffic',
+          changePercent: 50,
+          providerId: 'azure' as const,
+          baselineMonthlyUsd: 38,
+          adjustedMonthlyUsd: 41,
+          deltaMonthlyUsd: 3,
+        },
+        {
+          variable: 'egress_traffic' as const,
+          label: 'Egress traffic',
+          changePercent: 50,
+          providerId: 'gcp' as const,
+          baselineMonthlyUsd: 30,
+          adjustedMonthlyUsd: 35,
+          deltaMonthlyUsd: 5,
+        },
+      ],
+      commitmentRoiTimelines: [
+        {
+          providerId: 'gcp' as const,
+          pricingModel: 'savings-plan' as const,
+          label: 'Backend committed use',
+          baselineMonthlyUsd: 30,
+          committedMonthlyUsd: 24,
+          upfrontCostUsd: 12,
+          monthlySavingsUsd: 6,
+          breakEvenMonth: 2,
+          points: [
+            {
+              month: 1,
+              onDemandCumulativeUsd: 30,
+              committedCumulativeUsd: 36,
+              savingsUsd: -6,
+            },
+            {
+              month: 6,
+              onDemandCumulativeUsd: 180,
+              committedCumulativeUsd: 156,
+              savingsUsd: 24,
+            },
+            {
+              month: 12,
+              onDemandCumulativeUsd: 360,
+              committedCumulativeUsd: 300,
+              savingsUsd: 60,
+            },
+          ],
+        },
+      ],
+      commitmentCoverage: [
+        {
+          providerId: 'gcp' as const,
+          eligibleMonthlyUsd: 30,
+          coveredPercentOfSpend: 100,
+          onDemandExposureMonthlyUsd: 0,
+          zeroCommitmentMonthlyUsd: 30,
+          targetCoveragePercent: 70,
+          targetBlendMonthlyUsd: 24,
+          fullyCommittedMonthlyUsd: 21,
+          ineligibleMonthlyUsd: 0,
+          targetOnDemandExposureMonthlyUsd: 9,
+          exposedPercentOfSpend: 30,
+          targetSavingsMonthlyUsd: 6,
+          remainingOpportunityMonthlyUsd: 3,
+          maxMonthlySavingsUsd: 9,
+          recommendation:
+            'gcp can move from $30/mo at 0% commitment coverage to $21/mo at 100%; target blend is $24/mo.',
+        },
+      ],
+      tcoSignals: [
+        {
+          providerId: 'gcp' as const,
+          egressLockInMonthlyUsd: 8,
+          supportMonthlyUsd: 3,
+          licensingMonthlyUsd: 2,
+          freeTierApplicability: 'possible' as const,
+          note: 'Backend-modeled exit exposure starts with GCP egress transfer.',
+        },
+      ],
+      optimizationOpportunities: [
+        {
+          id: 'provider-selection-1',
+          category: 'Provider selection',
+          recommendation: 'Shortlist GCP before committing to AWS.',
+          estimatedMonthlySavingsUsd: 12,
+          estimatedAnnualSavingsUsd: 144,
+          priority: 'High' as const,
+          effort: 'Medium' as const,
+          evidence: 'Backend-ranked provider delta from current cached comparison.',
+        },
+      ],
+      finOpsFindings: [
+        {
+          id: 'gcp-egress-driver',
+          severity: 'warning' as const,
+          category: 'egress' as const,
+          title: 'Backend egress driver',
+          recommendation: 'Backend identified egress driver from cached totals.',
+          estimatedMonthlyImpactUsd: 8,
+          providerId: 'gcp' as const,
+        },
+      ],
+    })),
     refreshLiveComparison: jest.fn(async () => comparisonResult),
+    createExportJob: jest.fn(async () => reportExportJob),
+    getExportJob: jest.fn(async () => reportExportJob),
+    downloadExportJob: jest.fn(async () => new Blob(['report'])),
     exportComparison: jest.fn(async () => new Blob(['report'])),
     getPricingStatus: jest.fn(async () => pricingStatus),
     getPricingModels: jest.fn(async () => ({
@@ -1354,6 +2846,12 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     revokeShareLink: jest.fn(async () => ({
       token: 'public-token-123',
       url: '/api/v1/share/public-token-123',
+    })),
+    getShareLinkAnalytics: jest.fn(async () => ({
+      token: 'public-token-123',
+      totalViews: 0,
+      countryViews: [],
+      sectionViews: [],
     })),
     getSharedReport: jest.fn(async () => ({
       token: 'public-token-123',

@@ -17,6 +17,9 @@ type PersonaViewMode = 'executive' | 'engineering';
 type SortKey = 'resourceName' | 'provider' | 'region' | 'spec' | 'monthlyCost';
 type SortDirection = 'asc' | 'desc';
 
+const CONFIDENCE_TOOLTIP =
+  'Confidence reflects how closely the equivalent service matches on specs, not just name.';
+
 interface PersonaComparisonWorkspaceProps {
   comparison: ComparisonResult | null;
   interval: IntervalKey;
@@ -74,6 +77,7 @@ interface EngineeringCostRow {
 }
 
 const PERSONA_VIEW_STORAGE_KEY = 'polycost-persona-view';
+const ENGINEERING_TABLE_PAGE_SIZE = 12;
 
 export function PersonaComparisonWorkspace({
   comparison,
@@ -205,10 +209,13 @@ export function usePersonaComparisonData(
       })
       .sort((left, right) => left.monthlyTotal - right.monthlyTotal);
     const activeRegion = form.regionPreference.trim() || 'Provider default region';
+    const workloadTags =
+      comparison?.requirements?.workloadProfile?.tags?.map((tag) => `${tag.key}:${tag.value}`) ??
+      [];
     const rows =
       comparison?.providers.flatMap((provider) =>
         provider.lineItems.map((lineItem, index) =>
-          engineeringRowFromLineItem(provider.providerId, lineItem, index),
+          engineeringRowFromLineItem(provider.providerId, lineItem, index, workloadTags),
         ),
       ) ?? [];
     const cheapest = pricedSummaries[0];
@@ -243,7 +250,8 @@ export function usePersonaComparisonData(
       annualForecast: cheapest ? roundCurrency(cheapest.monthlyTotal * 12) : undefined,
       activeRegion,
       warningMessages: comparison?.warnings?.map((warning) => warning.message) ?? [],
-      missingEngineeringFields: ['Tags are not present in the comparison response yet.'],
+      missingEngineeringFields:
+        workloadTags.length > 0 ? [] : ['Tags are not present in the comparison response yet.'],
       confidence,
       confidenceDetail: confidenceDetail(confidence, pricedProviderCount, totalApproximateCount),
       pricedProviderCount,
@@ -395,6 +403,14 @@ function EngineeringPersonaView({
   tagOptions: string[];
   onTagFilterChange: (tag: string) => void;
 }) {
+  const [showAllRows, setShowAllRows] = useState(false);
+  const apiJsonPendingMessage = isLoading
+    ? 'API JSON will activate when this comparison finishes'
+    : 'Run a comparison to open API JSON';
+  const isRowLimitActive = rows.length > ENGINEERING_TABLE_PAGE_SIZE && !showAllRows;
+  const visibleRows = isRowLimitActive ? rows.slice(0, ENGINEERING_TABLE_PAGE_SIZE) : rows;
+  const hiddenRowCount = rows.length - visibleRows.length;
+
   return (
     <div className="min-w-0 space-y-4" aria-label="Engineering comparison view">
       {data.missingEngineeringFields.length > 0 ? (
@@ -427,6 +443,7 @@ function EngineeringPersonaView({
                 <SortableHeader
                   label="Region"
                   sortKey="region"
+                  description="Provider region used for this line item after residency and preference rules."
                   activeSortKey={sortKey}
                   sortDirection={sortDirection}
                   onSort={onSort}
@@ -434,6 +451,7 @@ function EngineeringPersonaView({
                 <SortableHeader
                   label="Spec / SKU"
                   sortKey="spec"
+                  description="Resolved SKU, unit, rate, and pricing basis returned by the comparison API."
                   activeSortKey={sortKey}
                   sortDirection={sortDirection}
                   onSort={onSort}
@@ -441,6 +459,7 @@ function EngineeringPersonaView({
                 <SortableHeader
                   label="$/mo"
                   sortKey="monthlyCost"
+                  description="Monthly line-item cost before changing the global time-period view."
                   activeSortKey={sortKey}
                   sortDirection={sortDirection}
                   onSort={onSort}
@@ -449,8 +468,8 @@ function EngineeringPersonaView({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {rows.length > 0 ? (
-                rows.map((row) => (
+              {visibleRows.length > 0 ? (
+                visibleRows.map((row) => (
                   <tr key={row.id} className="hover:bg-surface-0">
                     <th
                       scope="row"
@@ -480,14 +499,41 @@ function EngineeringPersonaView({
                 ))
               ) : (
                 <tr>
-                  <td className="px-3 py-8 text-center text-text-secondary" colSpan={5}>
-                    Run a comparison to populate engineering rows.
+                  <td className="px-3 py-8" colSpan={5}>
+                    <EngineeringRowsEmptyState
+                      hasComparison={Boolean(data.comparisonId)}
+                      isFiltered={tagFilter !== 'all'}
+                      isLoading={isLoading}
+                      onClearFilters={() => onTagFilterChange('all')}
+                    />
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+        {rows.length > 0 ? (
+          <div
+            className="flex flex-col gap-2 border-t border-border bg-surface-0 px-3 py-3 text-xs text-text-secondary sm:flex-row sm:items-center sm:justify-between"
+            aria-live="polite"
+          >
+            <span>
+              Showing {visibleRows.length} of {rows.length} resource rows sorted by{' '}
+              {sortKeyLabel(sortKey)} ({sortDirection === 'asc' ? 'ascending' : 'descending'}).
+            </span>
+            {rows.length > ENGINEERING_TABLE_PAGE_SIZE ? (
+              <button
+                type="button"
+                className="inline-flex min-h-9 items-center justify-center rounded-md border border-border-strong bg-surface-1 px-3 text-xs font-semibold text-text-primary transition hover:bg-surface-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
+                onClick={() => setShowAllRows((current) => !current)}
+              >
+                {showAllRows
+                  ? `Collapse to top ${ENGINEERING_TABLE_PAGE_SIZE}`
+                  : `Show all rows${hiddenRowCount > 0 ? ` (${hiddenRowCount} more)` : ''}`}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="grid min-w-0 gap-3 rounded-lg border border-border bg-surface-1 p-3 shadow-sm lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
@@ -541,12 +587,128 @@ function EngineeringPersonaView({
             </a>
           ) : (
             <span className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-muted">
-              API JSON pending comparison
+              {apiJsonPendingMessage}
             </span>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+function EngineeringRowsEmptyState({
+  hasComparison,
+  isFiltered,
+  isLoading,
+  onClearFilters,
+}: {
+  hasComparison: boolean;
+  isFiltered: boolean;
+  isLoading: boolean;
+  onClearFilters: () => void;
+}) {
+  if (isLoading) {
+    return (
+      <div
+        className="mx-auto grid max-w-2xl place-items-center gap-3 rounded-lg border border-dashed border-border bg-surface-0 p-5 text-center text-sm text-text-secondary"
+        aria-busy="true"
+        role="status"
+      >
+        <span
+          className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-action-primary motion-reduce:animate-none"
+          aria-hidden="true"
+        />
+        <strong className="text-text-primary">Building engineering rows</strong>
+        <span>
+          Mapping AWS, Azure, and GCP line items into provider, region, SKU, and monthly cost
+          evidence.
+        </span>
+      </div>
+    );
+  }
+
+  if (isFiltered) {
+    return (
+      <div className="mx-auto grid max-w-2xl place-items-center gap-3 rounded-lg border border-dashed border-border bg-surface-0 p-5 text-center text-sm text-text-secondary">
+        <NoResultsIllustration />
+        <strong className="text-base font-semibold text-text-primary">
+          No services match your filters
+        </strong>
+        <span>Clear the tag filter to restore every mapped service row in this comparison.</span>
+        <button
+          type="button"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border-strong bg-surface-1 px-4 py-2 text-sm font-semibold text-text-primary transition hover:bg-surface-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
+          onClick={onClearFilters}
+        >
+          Clear filters
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto grid max-w-2xl place-items-center gap-3 rounded-lg border border-dashed border-border bg-surface-0 p-5 text-center text-sm text-text-secondary">
+      <EmptyServicesIllustration />
+      <strong className="text-base font-semibold text-text-primary">
+        {hasComparison ? 'No services added yet' : 'Add services to see your comparison'}
+      </strong>
+      <span>
+        {hasComparison
+          ? 'This comparison returned no priced service rows. Add compute, storage, database, or networking services and compare again.'
+          : 'Describe your infrastructure above to populate provider, region, SKU, and monthly cost rows.'}
+      </span>
+      <a
+        href="#requirements"
+        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-action-primary bg-action-primary px-4 py-2 text-sm font-semibold text-[color:var(--on-primary-action)] shadow-sm transition hover:bg-action-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
+        aria-label="Add services to see your comparison"
+      >
+        Add services
+      </a>
+    </div>
+  );
+}
+
+function EmptyServicesIllustration() {
+  return (
+    <svg
+      viewBox="0 0 80 80"
+      aria-hidden="true"
+      className="engineering-empty-illustration h-20 w-20 text-text-muted"
+      fill="none"
+    >
+      <rect x="17" y="18" width="46" height="42" rx="8" stroke="currentColor" strokeWidth="3" />
+      <path
+        d="M28 30h24M28 40h24M28 50h12"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="3"
+      />
+      <path d="M22 66h36" stroke="currentColor" strokeLinecap="round" strokeWidth="3" />
+    </svg>
+  );
+}
+
+function NoResultsIllustration() {
+  return (
+    <svg
+      viewBox="0 0 80 80"
+      aria-hidden="true"
+      className="engineering-filter-empty-illustration h-20 w-20 text-text-muted"
+      fill="none"
+    >
+      <path
+        d="M18 20h44L47 38v15l-14 7V38L18 20Z"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="3"
+      />
+      <path
+        d="M55 55l10 10M65 55 55 65"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="3"
+      />
+    </svg>
   );
 }
 
@@ -563,19 +725,46 @@ function SharedComparisonState({
 }) {
   if (error) {
     return (
-      <div className="rounded-lg border border-action-destructive bg-surface-1 p-3 text-sm text-text-primary">
-        <strong>Comparison needs attention.</strong> {error}
+      <div
+        className="rounded-lg border border-action-destructive bg-surface-1 p-3 text-sm text-text-primary"
+        role="alert"
+      >
+        <strong>Comparison needs attention.</strong> {error}{' '}
+        <span className="text-text-secondary">
+          Check the requirement inputs, then refresh live pricing or run the comparison again.
+        </span>
       </div>
     );
   }
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Comparison loading">
+      <div
+        className="grid grid-cols-1 gap-3 sm:grid-cols-3"
+        aria-busy="true"
+        aria-label="Comparison loading"
+        role="status"
+      >
+        <div className="flex items-start gap-3 rounded-lg border border-border bg-surface-1 p-4 sm:col-span-3">
+          <span
+            className="mt-0.5 h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-border border-t-action-primary motion-reduce:animate-none"
+            aria-hidden="true"
+          />
+          <div>
+            <strong className="block text-sm text-text-primary">
+              Pricing evidence is being refreshed.
+            </strong>
+            <span className="mt-1 block text-sm text-text-secondary">
+              Mapping provider SKUs, totals, export links, and engineering rows from the backend
+              response.
+            </span>
+          </div>
+        </div>
         {[0, 1, 2].map((item) => (
           <div
             key={item}
             className="h-24 animate-pulse rounded-lg border border-border bg-surface-1 motion-reduce:animate-none"
+            aria-hidden="true"
           />
         ))}
       </div>
@@ -584,9 +773,24 @@ function SharedComparisonState({
 
   if (!data.comparisonId) {
     return (
-      <div className="rounded-lg border border-border bg-surface-1 p-3 text-sm text-text-secondary">
-        {emptyStateMessage ??
-          'Run a comparison to populate both Executive and Engineering views from the same result.'}
+      <div className="grid gap-4 rounded-lg border border-dashed border-border bg-surface-1 p-5 text-sm text-text-secondary sm:grid-cols-[auto_1fr_auto] sm:items-center">
+        <EmptyComparisonIllustration />
+        <div className="min-w-0">
+          <strong className="block text-base font-semibold text-text-primary">
+            Ready to compare
+          </strong>
+          <span className="mt-1 block leading-6">
+            {emptyStateMessage ??
+              'Describe your infrastructure to populate Executive and Engineering evidence from the same comparison result.'}
+          </span>
+        </div>
+        <a
+          href="#requirements"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-action-primary bg-action-primary px-4 py-2 text-sm font-semibold text-[color:var(--on-primary-action)] shadow-sm transition hover:bg-action-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
+          aria-label="Describe your infrastructure above"
+        >
+          Describe infrastructure
+        </a>
       </div>
     );
   }
@@ -598,7 +802,11 @@ function SharedComparisonState({
           <strong className="text-text-primary">Comparison evidence:</strong>{' '}
           {comparisonEvidenceSummary(data)}
         </div>
-        <span className={`confidence-pill confidence-${data.confidence.toLowerCase()}`}>
+        <span
+          className={`confidence-pill confidence-${data.confidence.toLowerCase()}`}
+          title={CONFIDENCE_TOOLTIP}
+          aria-label={`${data.confidence} confidence. ${data.confidenceDetail}. ${CONFIDENCE_TOOLTIP}`}
+        >
           <strong>{data.confidence}</strong>
           <small>{data.confidenceDetail}</small>
         </span>
@@ -612,6 +820,29 @@ function SharedComparisonState({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function EmptyComparisonIllustration() {
+  return (
+    <svg
+      viewBox="0 0 80 80"
+      aria-hidden="true"
+      className="comparison-empty-illustration h-20 w-20 text-text-muted"
+      fill="none"
+    >
+      <path
+        d="M25.5 51.5H55a12.5 12.5 0 0 0 1.6-24.9A17 17 0 0 0 23.4 31 10.6 10.6 0 0 0 25.5 51.5Z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="3"
+      />
+      <path d="M27 61h26M32 68h16" stroke="currentColor" strokeLinecap="round" strokeWidth="3" />
+      <circle cx="32" cy="42" r="2.5" fill="currentColor" />
+      <circle cx="40" cy="42" r="2.5" fill="currentColor" />
+      <circle cx="48" cy="42" r="2.5" fill="currentColor" />
+    </svg>
   );
 }
 
@@ -636,6 +867,7 @@ function ExecutiveMetricCard({
 function SortableHeader({
   activeSortKey,
   alignRight = false,
+  description,
   label,
   onSort,
   sortDirection,
@@ -644,6 +876,7 @@ function SortableHeader({
 }: {
   activeSortKey: SortKey;
   alignRight?: boolean;
+  description?: string;
   label: string;
   onSort: (sortKey: SortKey) => void;
   sortDirection: SortDirection;
@@ -655,6 +888,7 @@ function SortableHeader({
   return (
     <th
       scope="col"
+      aria-sort={isActive ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
       className={[
         'px-3 py-2',
         alignRight ? 'text-right' : 'text-left',
@@ -666,6 +900,8 @@ function SortableHeader({
       <button
         type="button"
         onClick={() => onSort(sortKey)}
+        aria-label={description ? `${label}: ${description}` : label}
+        title={description}
         className={[
           'inline-flex min-h-11 items-center gap-1 rounded-md px-2 text-xs font-semibold uppercase tracking-wide text-text-muted transition hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary',
           alignRight ? 'ml-auto justify-end' : undefined,
@@ -684,6 +920,7 @@ function engineeringRowFromLineItem(
   providerId: ProviderId,
   lineItem: ComparisonLineItem,
   index: number,
+  tags: string[],
 ): EngineeringCostRow {
   const resourceName = `${providerId}-${lineItem.category}-${String(index + 1).padStart(2, '0')}`;
 
@@ -698,7 +935,7 @@ function engineeringRowFromLineItem(
     monthlyCost: lineItem.baseMonthlyCostUsd,
     description: lineItem.description,
     isApproximate: lineItem.isApproximate,
-    tags: [],
+    tags,
   };
 }
 
@@ -712,11 +949,15 @@ function lineItemSpec(lineItem: ComparisonLineItem): string {
     lineItem.pricingBasis ? `${capitalize(lineItem.pricingBasis)} pricing` : undefined,
   ].filter((part): part is string => Boolean(part));
 
-  return parts.length > 0 ? parts.join(' · ') : 'Provider SKU detail unavailable';
+  return parts.length > 0
+    ? parts.join(' · ')
+    : 'Modeled cost driver - provider SKU/rate metadata not returned by API';
 }
 
 function comparisonEvidenceSummary(data: PersonaComparisonData): string {
-  const pricingDate = data.pricingAsOf ? formatDateTime(data.pricingAsOf) : 'pricing date pending';
+  const pricingDate = data.pricingAsOf
+    ? formatDateTime(data.pricingAsOf)
+    : 'pricing sync date not returned';
   const approximateText =
     data.totalApproximateCount === 1
       ? '1 approximate mapping'
@@ -750,7 +991,7 @@ function confidenceDetail(
   approximateCount: number,
 ): string {
   if (confidence === 'Pending') {
-    return 'No provider estimates yet';
+    return 'Run comparison to collect provider estimates';
   }
 
   if (confidence === 'High') {
@@ -824,6 +1065,21 @@ function compareRows(
       return left.resourceName.localeCompare(right.resourceName);
     case 'spec':
       return left.spec.localeCompare(right.spec);
+  }
+}
+
+function sortKeyLabel(sortKey: SortKey): string {
+  switch (sortKey) {
+    case 'resourceName':
+      return 'resource name';
+    case 'provider':
+      return 'provider';
+    case 'region':
+      return 'region';
+    case 'spec':
+      return 'spec / SKU';
+    case 'monthlyCost':
+      return '$/mo';
   }
 }
 

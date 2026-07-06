@@ -60,7 +60,10 @@ interface GcpSku {
 const GCP_CATALOG_ENDPOINT = 'https://cloudbilling.googleapis.com/v1/services';
 const GCP_SECRET_PATH = 'polycost/providers/gcp';
 
-const CATEGORY_MATCHERS: Record<ServiceCategory, RegExp[]> = {
+const CATALOG_REFRESH_CATEGORIES = ['compute', 'storage', 'database', 'network'] as const;
+type CatalogRefreshCategory = (typeof CATALOG_REFRESH_CATEGORIES)[number];
+
+const CATEGORY_MATCHERS: Record<CatalogRefreshCategory, RegExp[]> = {
   compute: [/compute/i],
   storage: [/storage/i],
   database: [/sql/i, /database/i, /memorystore/i],
@@ -83,7 +86,7 @@ export class GcpProviderAdapter extends BaseCloudProviderAdapter {
   async refreshPricingCatalog(
     options: RefreshPricingCatalogOptions = {},
   ): Promise<PricingCatalogRecord[]> {
-    const categories = options.categories ?? ['compute', 'storage', 'database', 'network'];
+    const categories = catalogRefreshCategories(options.categories);
     const fetchedAt = options.fetchedAt ?? this.now().toISOString();
     const token = await this.getAccessToken();
     const services = await this.fetchServices(token);
@@ -236,6 +239,18 @@ export class GcpProviderAdapter extends BaseCloudProviderAdapter {
       );
     }
   }
+}
+
+function catalogRefreshCategories(
+  categories: ServiceCategory[] | undefined,
+): CatalogRefreshCategory[] {
+  if (!categories) {
+    return [...CATALOG_REFRESH_CATEGORIES];
+  }
+
+  return categories.filter((category): category is CatalogRefreshCategory =>
+    CATALOG_REFRESH_CATEGORIES.includes(category as CatalogRefreshCategory),
+  );
 }
 
 function uniqueSkuRecords(records: PricingCatalogRecord[]): PricingCatalogRecord[] {

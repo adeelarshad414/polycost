@@ -1,6 +1,11 @@
 import { ApiNotFoundError, ApiUnauthorizedError } from './api-errors';
 import { CostManagementService } from './cost-management.service';
-import { ShareLinkRecord, WorkloadCostBreakdown, WorkloadRecord } from './cost-management.types';
+import {
+  ShareLinkAnalyticsResponse,
+  ShareLinkRecord,
+  WorkloadCostBreakdown,
+  WorkloadRecord,
+} from './cost-management.types';
 
 const workload: WorkloadRecord = {
   id: '22222222-2222-4222-8222-222222222222',
@@ -31,6 +36,25 @@ const shareLink: ShareLinkRecord = {
   granularity: 'yearly',
   expiresAt: '2026-07-30T00:00:00.000Z',
   createdAt: '2026-06-30T00:00:00.000Z',
+};
+
+const analytics: ShareLinkAnalyticsResponse = {
+  token: shareLink.token,
+  totalViews: 2,
+  lastViewedAt: '2026-07-01T00:00:00.000Z',
+  countryViews: [
+    {
+      countryCode: 'US',
+      views: 2,
+    },
+  ],
+  sectionViews: [
+    {
+      section: 'summary',
+      views: 2,
+      lastViewedAt: '2026-07-01T00:00:00.000Z',
+    },
+  ],
 };
 
 describe('CostManagementService', () => {
@@ -68,9 +92,19 @@ describe('CostManagementService', () => {
   });
 
   it('returns read-only shared reports scoped to an active token', async () => {
-    const service = new CostManagementService(repositoryMock() as never);
+    const repository = repositoryMock();
+    const service = new CostManagementService(
+      repository as never,
+      () => new Date('2026-07-01T00:00:00.000Z'),
+    );
 
-    await expect(service.getSharedReport(shareLink.token)).resolves.toEqual({
+    await expect(
+      service.getSharedReport(shareLink.token, undefined, {
+        countryCode: 'us',
+        section: 'Executive Summary',
+        userAgent: 'jest',
+      }),
+    ).resolves.toEqual({
       token: shareLink.token,
       watermark: true,
       expiresAt: shareLink.expiresAt,
@@ -79,6 +113,13 @@ describe('CostManagementService', () => {
       passwordProtected: false,
       workload,
       breakdown,
+    });
+    expect(repository.recordShareLinkEvent).toHaveBeenCalledWith({
+      token: shareLink.token,
+      countryCode: 'US',
+      section: 'executive-summary',
+      userAgentHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      viewedAt: '2026-07-01T00:00:00.000Z',
     });
   });
 
@@ -108,10 +149,17 @@ describe('CostManagementService', () => {
     expect(repository.revokeShareLink).toHaveBeenCalledWith(shareLink.token, expect.any(String));
   });
 
+  it('returns aggregate share-link analytics by token', async () => {
+    const service = new CostManagementService(repositoryMock() as never);
+
+    await expect(service.getShareLinkAnalytics(shareLink.token)).resolves.toEqual(analytics);
+  });
+
   it('fails clearly for missing workloads and expired share links', async () => {
     const repository = repositoryMock({
       getWorkload: jest.fn(async () => undefined),
       getActiveShareLink: jest.fn(async () => undefined),
+      getShareLinkAnalytics: jest.fn(async () => undefined),
     });
     const service = new CostManagementService(repository as never);
 
@@ -122,6 +170,7 @@ describe('CostManagementService', () => {
       }),
     ).rejects.toThrow(ApiNotFoundError);
     await expect(service.getSharedReport(shareLink.token)).rejects.toThrow(ApiNotFoundError);
+    await expect(service.getShareLinkAnalytics(shareLink.token)).rejects.toThrow(ApiNotFoundError);
   });
 });
 
@@ -136,6 +185,8 @@ function repositoryMock(overrides: Record<string, unknown> = {}) {
     updateAlertDismissed: jest.fn(),
     createShareLink: jest.fn(async () => shareLink),
     getActiveShareLink: jest.fn(async () => shareLink),
+    recordShareLinkEvent: jest.fn(async () => undefined),
+    getShareLinkAnalytics: jest.fn(async () => analytics),
     revokeShareLink: jest.fn(async () => shareLink),
     getExchangeRates: jest.fn(),
     ...overrides,

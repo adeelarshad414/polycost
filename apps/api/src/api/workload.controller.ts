@@ -52,7 +52,18 @@ export class WorkloadController {
   }
 
   @Post('validate')
-  async validate(@Body() body: unknown): Promise<{ valid: true }> {
+  async validate(
+    @Body() body: unknown,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ): Promise<{ valid: true }> {
+    const rateLimit = this.apiRateLimitService.consume(
+      'workload_validate',
+      requestIdentity(request ?? {}),
+      this.configService.get('RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE', { infer: true }),
+    );
+    writeRateLimitHeaders(response, rateLimit);
+
     return this.comparisonApplicationService.validateNws(body);
   }
 }

@@ -70,6 +70,148 @@ describe('api client', () => {
     );
   });
 
+  it('fetches backend comparison analytics for saved results', async () => {
+    const analytics = {
+      comparisonId: 'comparison-1',
+      generatedAt: '2026-07-02T12:00:00.000Z',
+      pricingAsOf: '2026-07-02T00:00:00.000Z',
+      executiveForecast: {
+        horizonDays: 90,
+        assumption: '90-day projection uses current monthly run rate x 3.',
+        providerForecasts: [
+          {
+            providerId: 'aws',
+            monthlyRunRateUsd: 100,
+            ninetyDayRunRateUsd: 300,
+            annualizedRunRateUsd: 1200,
+          },
+        ],
+      },
+      costCoverageMap: [
+        {
+          providerId: 'aws',
+          dimension: 'Compute families and sizing',
+          status: 'Covered',
+          pricedRows: 1,
+          approximateRows: 0,
+          monthlyUsd: 80,
+          evidence: 'aws compute row is priced.',
+          reviewCue: 'Validate family.',
+        },
+      ],
+      costComposition: [
+        {
+          providerId: 'aws',
+          totalMonthlyUsd: 100,
+          items: [
+            {
+              dimension: 'compute',
+              label: 'Compute',
+              monthlyCostUsd: 80,
+              percentOfProviderTotal: 80,
+              runningMonthlyUsd: 80,
+            },
+          ],
+        },
+      ],
+      providerDeltaAnalysis: [],
+      regionVarianceHeatMap: [
+        {
+          comparisonRegion: 'us-east',
+          label: 'US East',
+          regionSummary: 'AWS us-east-1 · Azure eastus · GCP us-east1',
+          multiplier: 1,
+          evidence: 'Baseline North America pricing sensitivity.',
+          isSelected: true,
+          complianceEligible: true,
+          lowestProviderId: 'aws',
+          providers: [
+            {
+              providerId: 'aws',
+              providerRegion: 'us-east-1',
+              modeledMonthlyUsd: 100,
+              deltaVsSelectedMonthlyUsd: 0,
+              isLowest: true,
+            },
+          ],
+        },
+      ],
+      egressNetworkingDetails: [
+        {
+          id: 'aws-egress-1',
+          providerId: 'aws',
+          networkComponent: 'egress',
+          description: 'Backend AWS internet egress',
+          region: 'us-east-1',
+          monthlyCostUsd: 12,
+          shareOfProviderTotalPercent: 12,
+          unit: 'GB',
+          rateUsd: 0.09,
+          evidence: 'Backend network tier evidence.',
+        },
+      ],
+      sensitivityScenarios: [
+        {
+          variable: 'egress_traffic',
+          label: 'Egress traffic',
+          changePercent: 50,
+          providerId: 'aws',
+          baselineMonthlyUsd: 100,
+          adjustedMonthlyUsd: 106,
+          deltaMonthlyUsd: 6,
+        },
+      ],
+      commitmentRoiTimelines: [],
+      commitmentCoverage: [
+        {
+          providerId: 'aws',
+          eligibleMonthlyUsd: 80,
+          coveredPercentOfSpend: 80,
+          onDemandExposureMonthlyUsd: 20,
+          zeroCommitmentMonthlyUsd: 100,
+          targetCoveragePercent: 70,
+          targetBlendMonthlyUsd: 86,
+          fullyCommittedMonthlyUsd: 80,
+          ineligibleMonthlyUsd: 20,
+          targetOnDemandExposureMonthlyUsd: 44,
+          exposedPercentOfSpend: 44,
+          targetSavingsMonthlyUsd: 14,
+          remainingOpportunityMonthlyUsd: 6,
+          maxMonthlySavingsUsd: 20,
+          recommendation:
+            'aws can move from $100/mo at 0% commitment coverage to $80/mo at 100%; target blend is $86/mo.',
+        },
+      ],
+      tcoSignals: [],
+      optimizationOpportunities: [
+        {
+          id: 'provider-selection-1',
+          category: 'Provider selection',
+          recommendation: 'Shortlist aws before committing to gcp.',
+          estimatedMonthlySavingsUsd: 20,
+          estimatedAnnualSavingsUsd: 240,
+          priority: 'High',
+          effort: 'Medium',
+          evidence: 'Provider delta from current cached comparison.',
+        },
+      ],
+      finOpsFindings: [],
+    };
+    const fetchMock = jest.fn(async () => jsonResponse(analytics));
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(client.getComparisonAnalytics('comparison-1')).resolves.toEqual(analytics);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/comparisons/comparison-1/analytics',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+  });
+
   it('maps API error envelopes', async () => {
     global.fetch = jest.fn(async () =>
       jsonResponse(
@@ -95,16 +237,45 @@ describe('api client', () => {
     );
   });
 
-  it('downloads binary exports', async () => {
-    const blob = new Blob(['csv']);
-    const fetchMock = jest.fn(
-      async () =>
-        ({
-          ok: true,
-          status: 200,
-          blob: jest.fn(async () => blob),
-        }) as unknown as Response,
+  it('explains plain HTTP failures without exposing raw status copy', async () => {
+    global.fetch = jest.fn(async () => jsonResponse({}, 405)) as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(client.createComparison(buildNwsFromForm(defaultWorkloadForm))).rejects.toEqual(
+      expect.objectContaining({
+        status: 405,
+        code: 'HTTP_ERROR',
+        message:
+          'PolyCost reached a server that does not accept this API action. Check that the web app is pointed at the PolyCost API service, then try again.',
+      }) as PolyCostApiError,
     );
+  });
+
+  it('downloads binary exports through the async export-job flow', async () => {
+    const blob = new Blob(['csv']);
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          jobId: 'job-1',
+          comparisonId: 'comparison-1',
+          format: 'csv',
+          interval: 'quarterly',
+          pricingModel: 'reserved-3yr',
+          status: 'completed',
+          fileName: 'polycost-comparison.csv',
+          contentType: 'text/csv',
+          createdAt: '2026-07-01T00:00:00.000Z',
+          completedAt: '2026-07-01T00:00:01.000Z',
+          statusUrl: '/api/v1/comparisons/comparison-1/export-jobs/job-1',
+          downloadUrl: '/api/v1/comparisons/comparison-1/export-jobs/job-1/download',
+        }),
+      )
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        blob: jest.fn(async () => blob),
+      } as unknown as Response);
     global.fetch = fetchMock as typeof fetch;
     const client = createPolyCostClient('http://api.test/api/v1');
 
@@ -114,8 +285,83 @@ describe('api client', () => {
         pricingModel: 'reserved-3yr',
       }),
     ).resolves.toBe(blob);
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://api.test/api/v1/comparisons/comparison-1/export?format=csv&interval=quarterly&pricingModel=reserved-3yr',
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'http://api.test/api/v1/comparisons/comparison-1/export-jobs',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          format: 'csv',
+          interval: 'quarterly',
+          pricingModel: 'reserved-3yr',
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://api.test/api/v1/comparisons/comparison-1/export-jobs/job-1/download',
+    );
+  });
+
+  it('creates, reads, and downloads report export jobs', async () => {
+    const blob = new Blob(['xlsx']);
+    const pendingJob = {
+      jobId: 'job-1',
+      comparisonId: 'comparison-1',
+      format: 'xlsx',
+      interval: 'monthly',
+      pricingModel: 'on-demand',
+      status: 'pending',
+      createdAt: '2026-07-01T00:00:00.000Z',
+      statusUrl: '/api/v1/comparisons/comparison-1/export-jobs/job-1',
+    };
+    const completedJob = {
+      ...pendingJob,
+      status: 'completed',
+      fileName: 'polycost-comparison.xlsx',
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      completedAt: '2026-07-01T00:00:01.000Z',
+      downloadUrl: '/api/v1/comparisons/comparison-1/export-jobs/job-1/download',
+    };
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(pendingJob))
+      .mockResolvedValueOnce(jsonResponse(completedJob))
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        blob: jest.fn(async () => blob),
+      } as unknown as Response);
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(
+      client.createExportJob('comparison-1', 'xlsx', {
+        interval: 'monthly',
+        pricingModel: 'on-demand',
+      }),
+    ).resolves.toEqual(pendingJob);
+    await expect(client.getExportJob('comparison-1', 'job-1')).resolves.toEqual(completedJob);
+    await expect(client.downloadExportJob('comparison-1', 'job-1')).resolves.toBe(blob);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'http://api.test/api/v1/comparisons/comparison-1/export-jobs',
+      expect.objectContaining({
+        method: 'POST',
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://api.test/api/v1/comparisons/comparison-1/export-jobs/job-1',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      'http://api.test/api/v1/comparisons/comparison-1/export-jobs/job-1/download',
     );
   });
 
@@ -182,6 +428,66 @@ describe('api client', () => {
     );
     expect(fetchMock).toHaveBeenCalledWith(
       'http://api.test/api/v1/regions',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+  });
+
+  it('fetches public pricing data health', async () => {
+    const fetchMock = jest.fn(async () =>
+      jsonResponse({
+        generatedAt: '2026-07-01T00:00:00.000Z',
+        freshnessPolicyHours: 48,
+        overallStatus: 'fresh',
+        alertCount: 0,
+        alerts: [],
+        providers: [
+          {
+            providerId: 'aws',
+            status: 'success',
+            freshness: 'fresh',
+            ageHours: 1,
+            recordsUpdated: 12,
+            recordsRejected: 0,
+            recordsSkipped: 3,
+            cache: {
+              catalogRows: 30,
+              currentRateRows: 18,
+              latestCatalogSyncAt: '2026-06-30T23:00:00.000Z',
+              latestRateSyncAt: '2026-06-30T23:00:00.000Z',
+              ageHours: 1,
+              freshness: 'fresh',
+              syncStatusCounts: {
+                success: 48,
+                partial: 0,
+                failed: 0,
+              },
+            },
+            message:
+              'Pricing cache refreshed 1h ago across 30 catalog rows and 18 current rate rows.',
+          },
+        ],
+      }),
+    );
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(client.getDataHealth()).resolves.toEqual(
+      expect.objectContaining({
+        overallStatus: 'fresh',
+        providers: expect.arrayContaining([
+          expect.objectContaining({
+            providerId: 'aws',
+            freshness: 'fresh',
+          }),
+        ]),
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/data-health',
       expect.objectContaining({
         headers: expect.objectContaining({
           'Content-Type': 'application/json',
@@ -316,6 +622,21 @@ describe('api client', () => {
           workload: {},
           breakdown: {},
         }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          token: 'public-token',
+          totalViews: 2,
+          lastViewedAt: '2026-07-01T00:00:00.000Z',
+          countryViews: [{ countryCode: 'US', views: 2 }],
+          sectionViews: [
+            {
+              section: 'summary',
+              views: 2,
+              lastViewedAt: '2026-07-01T00:00:00.000Z',
+            },
+          ],
+        }),
       );
     global.fetch = fetchMock as typeof fetch;
     const client = createPolyCostClient('http://api.test/api/v1');
@@ -340,6 +661,7 @@ describe('api client', () => {
       password: 'client-demo',
     });
     await client.getSharedReport('public-token', 'client-demo');
+    await client.getShareLinkAnalytics('public-token');
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -366,6 +688,15 @@ describe('api client', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
       'http://api.test/api/v1/share/public-token?password=client-demo',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      'http://api.test/api/v1/share-links/public-token/analytics',
       expect.objectContaining({
         headers: expect.objectContaining({
           'Content-Type': 'application/json',
@@ -479,7 +810,27 @@ describe('api client', () => {
       ),
     ).toBe('Invalid NWS compute is required');
     expect(formatApiError(new Error('Broken'))).toBe('Broken');
-    expect(formatApiError('bad')).toBe('Unexpected application error');
+    expect(formatApiError(new Error('[object Object]'))).toBe(
+      'PolyCost hit an unexpected browser-side issue while preparing the request. Refresh the page and try again.',
+    );
+    expect(formatApiError(new Error('Error: hidden stack\n    at run (/tmp/app.js:1:2)'))).toBe(
+      'PolyCost hit an unexpected browser-side issue while preparing the request. Refresh the page and try again.',
+    );
+    expect(formatApiError(new Error('TypeError: Region picker failed'))).toBe(
+      'Region picker failed',
+    );
+    expect(formatApiError(new PolyCostApiError(400, 'BAD_BODY', '[object Object]'))).toBe(
+      'PolyCost could not use that request. Review the workload inputs and try again.',
+    );
+    expect(formatApiError(new PolyCostApiError(422, 'BAD_BODY', '{"message":"bad"}'))).toBe(
+      'PolyCost could not validate that workload. Review the highlighted fields and try again.',
+    );
+    expect(formatApiError(new TypeError('Failed to fetch'))).toBe(
+      'PolyCost could not reach the API service. Start the backend or check the API base URL, then try again.',
+    );
+    expect(formatApiError('bad')).toBe(
+      'PolyCost hit an unexpected browser-side issue while preparing the request. Refresh the page and try again.',
+    );
   });
 
   it('parses workload and refreshes live comparisons', async () => {

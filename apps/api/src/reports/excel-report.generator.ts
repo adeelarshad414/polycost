@@ -1,17 +1,28 @@
 import { Injectable } from '@nestjs/common';
 import { ComparisonResult } from '../comparison/comparison.types';
 import {
+  architectureOverviewRows,
+  breakEvenSummaryRows,
   commitmentTcoRows,
+  costCoverageMapRows,
+  dataFreshnessRows,
   decisionSummaryRows,
+  egressNetworkingDetailRows,
   egressTierBreakdownRows,
   labelForPricingModel,
   lineItemEvidenceRows,
+  methodologySourceRows,
+  optimizationOpportunityRows,
   pricingModelAvailabilityRows,
+  providerCostDetailRows,
   providerRankingRows,
+  regionComparisonRows,
   reportAssumptionRows,
   reportContextRows,
+  reportCoverRows,
   selectedScenarioRows,
   serviceRequirementRows,
+  skuMappingAppendixRows,
   workloadScopeRows,
 } from './report-evidence';
 import { PricingModelCost } from '../adapters/common/cloud-provider-adapter';
@@ -33,9 +44,13 @@ interface WorksheetRow {
 }
 
 interface WorkbookDefinition {
-  comparisonRows: WorksheetRow[];
-  whatIfRows: WorksheetRow[];
+  sheets: SheetDefinition[];
   namedRanges: NamedRange[];
+}
+
+interface SheetDefinition {
+  name: string;
+  rows: WorksheetRow[];
 }
 
 interface NamedRange {
@@ -58,18 +73,28 @@ interface WhatIfProviderScenario {
   baselineMonthlyUsd: number;
 }
 
+interface BreakEvenSheet {
+  rows: WorksheetRow[];
+  onDemandMultiplierRow: number;
+}
+
 const DEFAULT_WHAT_IF_SCALE_FACTOR = 1.25;
 const DEFAULT_WHAT_IF_REGION_MULTIPLIER = 1;
+const DEFAULT_BREAK_EVEN_ON_DEMAND_MULTIPLIER = 1;
 
 @Injectable()
 export class ExcelReportGenerator {
   generate(result: ComparisonResult, options: ReportOptions = {}): Buffer {
     const workbook = this.workbook(result, options);
+    const worksheetEntries = workbook.sheets.map((sheet, index) => ({
+      path: `xl/worksheets/sheet${index + 1}.xml`,
+      content: xmlBuffer(worksheetXml(sheet.rows)),
+    }));
 
     return createZip([
       {
         path: '[Content_Types].xml',
-        content: xmlBuffer(contentTypesXml()),
+        content: xmlBuffer(contentTypesXml(workbook.sheets.length)),
       },
       {
         path: '_rels/.rels',
@@ -77,35 +102,56 @@ export class ExcelReportGenerator {
       },
       {
         path: 'xl/workbook.xml',
-        content: xmlBuffer(workbookXml(workbook.namedRanges)),
+        content: xmlBuffer(workbookXml(workbook.sheets, workbook.namedRanges)),
       },
       {
         path: 'xl/_rels/workbook.xml.rels',
-        content: xmlBuffer(workbookRelationshipsXml()),
+        content: xmlBuffer(workbookRelationshipsXml(workbook.sheets.length)),
       },
       {
         path: 'xl/styles.xml',
         content: xmlBuffer(stylesXml()),
       },
-      {
-        path: 'xl/worksheets/sheet1.xml',
-        content: xmlBuffer(worksheetXml(workbook.comparisonRows)),
-      },
-      {
-        path: 'xl/worksheets/sheet2.xml',
-        content: xmlBuffer(worksheetXml(workbook.whatIfRows)),
-      },
+      ...worksheetEntries,
     ]);
   }
 
   private workbook(result: ComparisonResult, options: ReportOptions): WorkbookDefinition {
     const comparisonRows = this.rows(result, options);
     const whatIfSheet = whatIfRows(result, options);
-    const namedRanges = namedRangesForWorkbook(comparisonRows, whatIfSheet, result.providers.length);
+    const breakEvenSheet = breakEvenRows(result);
+    const namedRanges = namedRangesForWorkbook(
+      comparisonRows,
+      whatIfSheet,
+      breakEvenSheet,
+      result.providers.length,
+    );
 
     return {
-      comparisonRows,
-      whatIfRows: whatIfSheet.rows,
+      sheets: [
+        {
+          name: 'Comparison',
+          rows: comparisonRows,
+        },
+        {
+          name: 'What If',
+          rows: whatIfSheet.rows,
+        },
+        evidenceSheet('Architecture Overview', architectureOverviewRows(result)),
+        evidenceSheet('Provider Cost Detail', providerCostDetailRows(result)),
+        evidenceSheet('Cost Coverage Map', costCoverageMapRows(result)),
+        evidenceSheet('Optimization Opportunities', optimizationOpportunityRows(result)),
+        evidenceSheet('Egress & Networking Detail', egressNetworkingDetailRows(result)),
+        evidenceSheet('Region Comparison', regionComparisonRows(result)),
+        {
+          name: 'Break-Even Analysis',
+          rows: breakEvenSheet.rows,
+        },
+        evidenceSheet('Break-Even Summary', breakEvenSummaryRows(result)),
+        evidenceSheet('Methodology & Sources', methodologySourceRows(result)),
+        evidenceSheet('SKU Mapping Appendix', skuMappingAppendixRows(result)),
+        evidenceSheet('Data Freshness', dataFreshnessRows(options)),
+      ],
       namedRanges,
     };
   }
@@ -116,12 +162,10 @@ export class ExcelReportGenerator {
         cells: ['PolyCost Comparison Report'],
         style: 1,
       },
-      {
-        cells: ['Comparison ID', sanitizeSpreadsheetText(result.comparisonId)],
-      },
-      {
-        cells: ['Pricing As Of', sanitizeSpreadsheetText(result.pricingAsOf)],
-      },
+      ...reportCoverRows(result, options).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
       {
         cells: ['Cheapest provider (on-demand baseline)', result.cheapestProviderId],
       },
@@ -165,6 +209,17 @@ export class ExcelReportGenerator {
         cells: [],
       },
       {
+        cells: ['Architecture Overview'],
+        style: 2,
+      },
+      ...architectureOverviewRows(result).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
+      {
+        cells: [],
+      },
+      {
         cells: ['FinOps Summary'],
         style: 2,
       },
@@ -195,6 +250,28 @@ export class ExcelReportGenerator {
           provider.totals.quarterly,
           provider.totals.yearly,
         ],
+      })),
+      {
+        cells: [],
+      },
+      {
+        cells: ['Provider Cost Detail'],
+        style: 2,
+      },
+      ...providerCostDetailRows(result).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
+      {
+        cells: [],
+      },
+      {
+        cells: ['Cost Coverage Map'],
+        style: 2,
+      },
+      ...costCoverageMapRows(result).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
       })),
       {
         cells: [],
@@ -281,6 +358,28 @@ export class ExcelReportGenerator {
         style: 2,
       },
       ...lineItemEvidenceRows(result).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
+      {
+        cells: [],
+      },
+      {
+        cells: ['Methodology & Data Sources'],
+        style: 2,
+      },
+      ...methodologySourceRows(result).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
+      {
+        cells: [],
+      },
+      {
+        cells: ['SKU Mapping Appendix'],
+        style: 2,
+      },
+      ...skuMappingAppendixRows(result).map((row, index) => ({
         cells: row.map(sanitizeSpreadsheetText),
         ...(index === 0 ? { style: 2 } : {}),
       })),
@@ -504,6 +603,159 @@ function whatIfRows(result: ComparisonResult, options: ReportOptions): WhatIfShe
   };
 }
 
+function evidenceSheet(name: string, sourceRows: string[][]): SheetDefinition {
+  return {
+    name,
+    rows: [
+      {
+        cells: [name],
+        style: 1,
+      },
+      {
+        cells: [],
+      },
+      ...sourceRows.map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
+    ],
+  };
+}
+
+function breakEvenRows(result: ComparisonResult): BreakEvenSheet {
+  const rows: WorksheetRow[] = [
+    {
+      cells: ['PolyCost Break-Even Analysis'],
+      style: 1,
+    },
+    {
+      cells: [
+        'Scenario context',
+        'Edit the on-demand multiplier, then recalculate the workbook to test negotiated-rate sensitivity.',
+      ],
+    },
+    {
+      cells: [],
+    },
+    {
+      cells: ['Editable assumption', 'Value', 'How to use'],
+      style: 2,
+    },
+    {
+      cells: [
+        'On-demand monthly multiplier',
+        DEFAULT_BREAK_EVEN_ON_DEMAND_MULTIPLIER,
+        'Use 0.9 to model a 10% negotiated on-demand discount, or 1.1 to model a 10% premium.',
+      ],
+    },
+    {
+      cells: [],
+    },
+    {
+      cells: ['Provider commitment timeline'],
+      style: 2,
+    },
+    {
+      cells: [
+        'Provider',
+        'Pricing model',
+        'Month',
+        'On-demand monthly USD',
+        'Committed monthly USD',
+        'Upfront USD',
+        'On-demand cumulative USD',
+        'Committed cumulative USD',
+        'Break-even reached (1=yes)',
+        'Evidence',
+      ],
+      style: 2,
+    },
+  ];
+  const timelineRows = commitmentTimelineRows(result);
+
+  if (timelineRows.length === 0) {
+    rows.push({
+      cells: ['No commitment model has enough pricing evidence for break-even analysis.'],
+    });
+  } else {
+    rows.push(
+      ...timelineRows.map((timeline, index) => {
+        const rowNumber = rows.length + index + 1;
+        const onDemandCumulative = roundCurrency(
+          timeline.onDemandMonthlyUsd *
+            timeline.month *
+            DEFAULT_BREAK_EVEN_ON_DEMAND_MULTIPLIER,
+        );
+        const committedCumulative = roundCurrency(
+          timeline.upfrontUsd + timeline.committedMonthlyUsd * timeline.month,
+        );
+
+        return {
+          cells: [
+            timeline.providerId,
+            labelForPricingModel(timeline.pricingModel),
+            timeline.month,
+            timeline.onDemandMonthlyUsd,
+            timeline.committedMonthlyUsd,
+            timeline.upfrontUsd,
+            formulaCell(
+              `D${rowNumber}*C${rowNumber}*BreakEvenOnDemandMultiplier`,
+              onDemandCumulative,
+            ),
+            formulaCell(`F${rowNumber}+E${rowNumber}*C${rowNumber}`, committedCumulative),
+            formulaCell(
+              `IF(H${rowNumber}<=G${rowNumber},1,0)`,
+              committedCumulative <= onDemandCumulative ? 1 : 0,
+            ),
+            sanitizeSpreadsheetText(timeline.evidence),
+          ],
+        };
+      }),
+    );
+  }
+
+  return {
+    rows,
+    onDemandMultiplierRow: 5,
+  };
+}
+
+function commitmentTimelineRows(result: ComparisonResult): Array<{
+  providerId: ComparisonResult['providers'][number]['providerId'];
+  pricingModel: NonNullable<ReportOptions['pricingModel']>;
+  month: number;
+  onDemandMonthlyUsd: number;
+  committedMonthlyUsd: number;
+  upfrontUsd: number;
+  evidence: string;
+}> {
+  const months = [0, 1, 3, 6, 12, 24, 36];
+
+  return result.providers.flatMap((provider) => {
+    const onDemandMonthlyUsd =
+      provider.pricingModels?.find((model) => model.model === 'on-demand')?.monthlyCostUsd ??
+      provider.totals.monthly;
+
+    return ['reserved-1yr', 'reserved-3yr', 'savings-plan'].flatMap((pricingModel) => {
+      const model = provider.pricingModels?.find((candidate) => candidate.model === pricingModel);
+
+      if (!model?.available || model.monthlyCostUsd === undefined) {
+        return [];
+      }
+
+      return months.map((month) => ({
+        providerId: provider.providerId,
+        pricingModel: pricingModel as NonNullable<ReportOptions['pricingModel']>,
+        month,
+        onDemandMonthlyUsd,
+        committedMonthlyUsd: model.monthlyCostUsd ?? 0,
+        upfrontUsd: model.upfrontCostUsd ?? 0,
+        evidence: model.caveat ?? model.providerTerm ?? 'Cached provider commitment pricing.',
+      }));
+    });
+  });
+}
+
 function whatIfBaselineMonthlyCost(
   provider: ComparisonResult['providers'][number],
   pricingModel: ReportOptions['pricingModel'],
@@ -522,6 +774,7 @@ function whatIfBaselineMonthlyCost(
 function namedRangesForWorkbook(
   comparisonRows: WorksheetRow[],
   whatIfSheet: WhatIfSheet,
+  breakEvenSheet: BreakEvenSheet,
   providerCount: number,
 ): NamedRange[] {
   const providerTotalsHeaderRow = sectionHeaderRow(comparisonRows, 'Provider Totals');
@@ -537,6 +790,10 @@ function namedRangesForWorkbook(
     {
       name: 'WhatIfRegionMultiplier',
       reference: `'What If'!$B$${whatIfSheet.regionMultiplierRow}`,
+    },
+    {
+      name: 'BreakEvenOnDemandMultiplier',
+      reference: `'Break-Even Analysis'!$B$${breakEvenSheet.onDemandMultiplierRow}`,
     },
   ];
 
@@ -645,14 +902,17 @@ function isFormulaCell(value: CellValue): value is FormulaCell {
   return typeof value === 'object';
 }
 
-function contentTypesXml(): string {
+function contentTypesXml(sheetCount: number): string {
   return xmlDocument(`
     <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
       <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
       <Default Extension="xml" ContentType="application/xml"/>
       <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
-      <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
-      <Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+      ${Array.from(
+        { length: sheetCount },
+        (_, index) =>
+          `<Override PartName="/xl/worksheets/sheet${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`,
+      ).join('')}
       <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
     </Types>
   `);
@@ -666,13 +926,17 @@ function rootRelationshipsXml(): string {
   `);
 }
 
-function workbookXml(namedRanges: NamedRange[]): string {
+function workbookXml(sheets: SheetDefinition[], namedRanges: NamedRange[]): string {
   return xmlDocument(`
     <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
       <sheets>
-        <sheet name="Comparison" sheetId="1" r:id="rId1"/>
-        <sheet name="What If" sheetId="2" r:id="rId2"/>
+        ${sheets
+          .map(
+            (sheet, index) =>
+              `<sheet name="${escapeXml(sheet.name)}" sheetId="${index + 1}" r:id="rId${index + 1}"/>`,
+          )
+          .join('')}
       </sheets>
       <definedNames>
         ${namedRanges
@@ -687,12 +951,15 @@ function workbookXml(namedRanges: NamedRange[]): string {
   `);
 }
 
-function workbookRelationshipsXml(): string {
+function workbookRelationshipsXml(sheetCount: number): string {
   return xmlDocument(`
     <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-      <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
-      <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
-      <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+      ${Array.from(
+        { length: sheetCount },
+        (_, index) =>
+          `<Relationship Id="rId${index + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${index + 1}.xml"/>`,
+      ).join('')}
+      <Relationship Id="rId${sheetCount + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
     </Relationships>
   `);
 }

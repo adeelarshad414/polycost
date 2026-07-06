@@ -1,4 +1,4 @@
-export type ThemeChoice = 'light' | 'dark';
+export type ThemeChoice = 'system' | 'light' | 'dark';
 export type ResolvedTheme = 'light' | 'dark';
 type ThemeMediaQueryList = Pick<MediaQueryList, 'matches'> &
   Partial<Pick<MediaQueryList, 'addEventListener' | 'removeEventListener'>> & {
@@ -9,23 +9,27 @@ type ThemeMediaQueryList = Pick<MediaQueryList, 'matches'> &
 export const THEME_STORAGE_KEY = 'polycost-theme';
 
 export function isThemeChoice(value: string | null): value is ThemeChoice {
-  return value === 'light' || value === 'dark';
+  return value === 'system' || value === 'light' || value === 'dark';
 }
 
-export function storedTheme(
-  storage: Pick<Storage, 'getItem'> = localStorage,
-  matchMedia: (query: string) => Pick<MediaQueryList, 'matches'> = defaultMatchMedia,
-): ThemeChoice {
+export function storedTheme(storage: Pick<Storage, 'getItem'> = localStorage): ThemeChoice {
   const value = storage.getItem(THEME_STORAGE_KEY);
 
   if (isThemeChoice(value)) {
     return value;
   }
 
-  return systemTheme(matchMedia);
+  return 'system';
 }
 
-export function resolveTheme(choice: ThemeChoice): ResolvedTheme {
+export function resolveTheme(
+  choice: ThemeChoice,
+  matchMedia: (query: string) => Pick<MediaQueryList, 'matches'> = defaultMatchMedia,
+): ResolvedTheme {
+  if (choice === 'system') {
+    return systemTheme(matchMedia);
+  }
+
   return choice;
 }
 
@@ -49,8 +53,9 @@ export function applyTheme(
   choice: ThemeChoice,
   root: HTMLElement = document.documentElement,
   storage: Pick<Storage, 'setItem'> = localStorage,
+  matchMedia: (query: string) => Pick<MediaQueryList, 'matches'> = defaultMatchMedia,
 ): ResolvedTheme {
-  const resolved = resolveTheme(choice);
+  const resolved = resolveTheme(choice, matchMedia);
   root.dataset.theme = resolved;
   root.dataset.themeChoice = choice;
   root.style.colorScheme = resolved;

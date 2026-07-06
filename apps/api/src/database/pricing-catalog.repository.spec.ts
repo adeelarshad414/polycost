@@ -270,22 +270,27 @@ describe('PostgresPricingCatalogRepository', () => {
         },
       ]),
     ).resolves.toEqual({
-      recordsUpdated: 3,
+      recordsUpdated: 4,
       recordsRejected: 0,
       recordsSkipped: 0,
     });
     expect(query).toHaveBeenNthCalledWith(
       1,
       expect.stringContaining('INSERT INTO provider_skus'),
-      expect.arrayContaining(['aws', 't3.small', 'general-purpose', 2, 2, 'us-east-1']),
+      expect.arrayContaining(['aws', 't3.small', 'burstable', 2, 2, 'us-east-1']),
     );
     expect(query).toHaveBeenNthCalledWith(
       2,
+      expect.stringContaining('INSERT INTO pricing_rates'),
+      expect.arrayContaining(['aws', 't3.small', 'us-east-1', 'on_demand']),
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      3,
       expect.stringContaining('INSERT INTO storage_pricing'),
       ['aws', 'us-east-1', 'standard', 0.023, 'USD', '2026-01-01T00:00:00.000Z'],
     );
     expect(query).toHaveBeenNthCalledWith(
-      3,
+      4,
       expect.stringContaining('INSERT INTO egress_tier_rates'),
       ['aws', 'us-east-1', 0, null, 0.09, '2026-01-01T00:00:00.000Z'],
     );

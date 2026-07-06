@@ -1,13 +1,23 @@
 import { NormalizedWorkloadSpec } from '../../nws/nws.types';
 
 export type ProviderId = 'aws' | 'azure' | 'gcp';
-export type ServiceCategory = 'compute' | 'storage' | 'database' | 'network';
-export type CostComponent = 'compute' | 'storage' | 'database' | 'egress';
+export type ServiceCategory =
+  'compute' | 'storage' | 'database' | 'network' | 'support' | 'licensing' | 'operations';
+export type CostComponent =
+  | 'compute'
+  | 'storage'
+  | 'database'
+  | 'egress'
+  | 'networking'
+  | 'support'
+  | 'licensing'
+  | 'operations';
 export type PricingModelKey =
   'on-demand' | 'reserved-1yr' | 'reserved-3yr' | 'spot' | 'savings-plan';
 export type PricingBasis = 'flat' | 'tiered';
 export type PricingVolatility = 'stable' | 'variable' | 'volatile';
 export type PricingSource = 'catalog' | 'modeled-estimate';
+export type RateSource = 'pricing_catalog' | 'pricing_rates' | 'modeled_estimate' | 'manual_model';
 
 export interface EgressTierBreakdown {
   tierFromGb: number;
@@ -62,6 +72,13 @@ export interface ProviderPricingLineItem {
   unit: string;
   unitPriceUsd: number;
   pricingBasis?: PricingBasis;
+  rateSource?: RateSource;
+  rateSourceSkuId?: string;
+  pricingTermCode?: string;
+  paymentOptionCode?: string;
+  rateCurrency?: string;
+  rateValidFrom?: string;
+  rateSourceFetchedAt?: string;
   egressTiers?: EgressTierBreakdown[];
   pricingModels?: PricingModelCost[];
 }

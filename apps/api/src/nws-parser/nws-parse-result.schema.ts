@@ -1,3 +1,5 @@
+import { HOURS_PER_MONTH } from '../cost-time';
+
 export const NWS_PARSE_RESULT_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -108,6 +110,25 @@ export const NWS_PARSE_RESULT_JSON_SCHEMA = {
               role: {
                 type: 'string',
               },
+              instanceFamily: {
+                type: 'string',
+                enum: [
+                  'general-purpose',
+                  'burstable',
+                  'compute-optimized',
+                  'memory-optimized',
+                  'storage-optimized',
+                  'accelerated-computing',
+                ],
+              },
+              processorArchitecture: {
+                type: 'string',
+                enum: ['x86_64', 'arm64', 'gpu'],
+              },
+              tenancy: {
+                type: 'string',
+                enum: ['shared', 'dedicated-host', 'sole-tenant'],
+              },
               vcpu: {
                 type: 'number',
                 exclusiveMinimum: 0,
@@ -164,6 +185,80 @@ export const NWS_PARSE_RESULT_JSON_SCHEMA = {
                 type: 'string',
                 enum: ['frequent', 'infrequent', 'archive'],
               },
+              storageClass: {
+                type: 'string',
+                enum: [
+                  'standard',
+                  'hot',
+                  'cool',
+                  'cold',
+                  'nearline',
+                  'coldline',
+                  'intelligent-tiering',
+                  'infrequent-access',
+                  'one-zone-infrequent-access',
+                  'archive-instant',
+                  'archive',
+                  'deep-archive',
+                  'premium',
+                  'ultra',
+                ],
+              },
+              monthlyPutRequestsThousand: {
+                type: 'number',
+                minimum: 0,
+              },
+              monthlyGetRequestsThousand: {
+                type: 'number',
+                minimum: 0,
+              },
+              monthlyDeleteRequestsThousand: {
+                type: 'number',
+                minimum: 0,
+              },
+              monthlyListRequestsThousand: {
+                type: 'number',
+                minimum: 0,
+              },
+              monthlyRetrievalGb: {
+                type: 'number',
+                minimum: 0,
+              },
+              objectCountThousand: {
+                type: 'number',
+                minimum: 0,
+              },
+              objectRetentionDays: {
+                type: 'integer',
+                minimum: 0,
+              },
+              replication: {
+                type: 'string',
+                enum: ['none', 'same-region', 'cross-region'],
+              },
+              lifecycleTransitionsThousand: {
+                type: 'number',
+                minimum: 0,
+              },
+              snapshotSizeGb: {
+                type: 'number',
+                minimum: 0,
+              },
+              snapshotRetentionDays: {
+                type: 'integer',
+                minimum: 0,
+              },
+              provisionedIops: {
+                type: 'integer',
+                minimum: 0,
+              },
+              provisionedThroughputMbps: {
+                type: 'number',
+                minimum: 0,
+              },
+              multiAttachEnabled: {
+                type: 'boolean',
+              },
             },
           },
         },
@@ -182,6 +277,7 @@ export const NWS_PARSE_RESULT_JSON_SCHEMA = {
                 enum: [
                   'postgres',
                   'mysql',
+                  'sql_server',
                   'mongodb',
                   'redis',
                   'generic_relational',
@@ -198,6 +294,50 @@ export const NWS_PARSE_RESULT_JSON_SCHEMA = {
               managedServicePreference: {
                 type: 'string',
               },
+              backupStorageGb: {
+                type: 'number',
+                minimum: 0,
+              },
+              backupRetentionDays: {
+                type: 'integer',
+                minimum: 0,
+              },
+              provisionedIops: {
+                type: 'integer',
+                minimum: 0,
+              },
+              readReplicaCount: {
+                type: 'integer',
+                minimum: 0,
+              },
+              crossRegionReplicaTransferGb: {
+                type: 'number',
+                minimum: 0,
+              },
+              nosqlReadRequestUnitsMillion: {
+                type: 'number',
+                minimum: 0,
+              },
+              nosqlWriteRequestUnitsMillion: {
+                type: 'number',
+                minimum: 0,
+              },
+              ruPerSecond: {
+                type: 'integer',
+                minimum: 0,
+              },
+              queryDataTb: {
+                type: 'number',
+                minimum: 0,
+              },
+              cacheReplicaCount: {
+                type: 'integer',
+                minimum: 0,
+              },
+              storageGrowthGbPerMonth: {
+                type: 'number',
+                minimum: 0,
+              },
             },
           },
         },
@@ -207,6 +347,91 @@ export const NWS_PARSE_RESULT_JSON_SCHEMA = {
           required: ['cdn', 'loadBalancer'],
           properties: {
             estimatedMonthlyEgressGb: {
+              type: 'number',
+              minimum: 0,
+            },
+            crossAzTransferGb: {
+              type: 'number',
+              minimum: 0,
+            },
+            interRegionTransferGb: {
+              type: 'number',
+              minimum: 0,
+            },
+            cdnTrafficGb: {
+              type: 'number',
+              minimum: 0,
+            },
+            cdnCacheHitRatioPercent: {
+              type: 'number',
+              minimum: 0,
+              maximum: 100,
+            },
+            cdnRequestsMillion: {
+              type: 'number',
+              minimum: 0,
+            },
+            natGatewayGb: {
+              type: 'number',
+              minimum: 0,
+            },
+            natGatewayHours: {
+              type: 'number',
+              minimum: 0,
+              maximum: HOURS_PER_MONTH,
+            },
+            dnsHostedZones: {
+              type: 'integer',
+              minimum: 0,
+            },
+            dnsQueriesMillion: {
+              type: 'number',
+              minimum: 0,
+            },
+            loadBalancerProcessedGb: {
+              type: 'number',
+              minimum: 0,
+            },
+            loadBalancerHours: {
+              type: 'number',
+              minimum: 0,
+              maximum: HOURS_PER_MONTH,
+            },
+            loadBalancerNewConnectionsPerSecond: {
+              type: 'number',
+              minimum: 0,
+            },
+            loadBalancerActiveConnections: {
+              type: 'integer',
+              minimum: 0,
+            },
+            loadBalancerRuleEvaluationsPerSecond: {
+              type: 'number',
+              minimum: 0,
+            },
+            vpnConnectionCount: {
+              type: 'integer',
+              minimum: 0,
+            },
+            vpnConnectionHours: {
+              type: 'number',
+              minimum: 0,
+              maximum: HOURS_PER_MONTH,
+            },
+            vpnDataTransferGb: {
+              type: 'number',
+              minimum: 0,
+            },
+            privateCircuitCount: {
+              type: 'integer',
+              minimum: 0,
+            },
+            privateCircuitPortHours: {
+              type: 'number',
+              minimum: 0,
+              maximum: HOURS_PER_MONTH,
+            },
+            privateCircuitDataTransferGb: {
               type: 'number',
               minimum: 0,
             },

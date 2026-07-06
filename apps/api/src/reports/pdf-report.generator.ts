@@ -1,16 +1,27 @@
 import { Injectable } from '@nestjs/common';
 import { ComparisonLineItem, ComparisonResult } from '../comparison/comparison.types';
 import {
+  architectureOverviewRows,
+  breakEvenSummaryRows,
   commitmentTcoRows,
+  costCoverageMapRows,
+  dataFreshnessRows,
   decisionSummaryRows,
+  egressNetworkingDetailRows,
   egressTierBreakdownRows,
   lineItemEvidenceRows,
+  methodologySourceRows,
+  optimizationOpportunityRows,
   pricingModelAvailabilityRows,
+  providerCostDetailRows,
   providerRankingRows,
+  regionComparisonRows,
   reportAssumptionRows,
   reportContextRows,
+  reportCoverRows,
   selectedScenarioRows,
   serviceRequirementRows,
+  skuMappingAppendixRows,
   workloadScopeRows,
 } from './report-evidence';
 import { buildReportInsights } from './report-insights';
@@ -76,8 +87,12 @@ export class PdfReportGenerator {
   private lines(result: ComparisonResult, options: ReportOptions): PdfLine[] {
     const lines: PdfLine[] = [
       { text: 'PolyCost Comparison Report', fontSize: 18 },
-      { text: `Comparison ID: ${result.comparisonId}`, fontSize: 10 },
-      { text: `Pricing as of: ${result.pricingAsOf}`, fontSize: 10 },
+      ...reportCoverRows(result, options)
+        .slice(1)
+        .map((row) => ({
+          text: `${row[0]}: ${row[1]}`,
+          fontSize: 10,
+        })),
       {
         text: `Cheapest provider (on-demand baseline): ${result.cheapestProviderId}`,
         fontSize: 10,
@@ -86,6 +101,14 @@ export class PdfReportGenerator {
         text: `${row[0]}: ${row[1]}`,
         fontSize: 10,
       })),
+      { text: '', fontSize: 10 },
+      { text: 'Data freshness', fontSize: 14 },
+      ...dataFreshnessRows(options)
+        .slice(1)
+        .map((row) => ({
+          text: `${row[0]}: ${row[1]}`,
+          fontSize: 10,
+        })),
       { text: '', fontSize: 10 },
       { text: 'Decision summary', fontSize: 14 },
       ...decisionSummaryRows(result, options)
@@ -111,6 +134,18 @@ export class PdfReportGenerator {
           fontSize: 10,
         })),
       { text: '', fontSize: 10 },
+      { text: 'Architecture overview', fontSize: 14 },
+      {
+        text: 'Category | Requirement | AWS mapping | Azure mapping | GCP mapping | Confidence',
+        fontSize: 10,
+      },
+      ...architectureOverviewRows(result)
+        .slice(1)
+        .map((row) => ({
+          text: `${row[0]} | ${row[1]} | AWS ${row[2]} | Azure ${row[3]} | GCP ${row[4]} | confidence ${row[5]}`,
+          fontSize: 10,
+        })),
+      { text: '', fontSize: 10 },
       { text: 'FinOps summary', fontSize: 14 },
       ...buildReportInsights(result).map((insight) => ({
         text: `${insight.label}: ${insight.value}`,
@@ -123,6 +158,22 @@ export class PdfReportGenerator {
     for (const provider of result.providers) {
       lines.push({
         text: `${provider.providerId}: daily $${provider.totals.daily}, weekly $${provider.totals.weekly}, monthly $${provider.totals.monthly}, quarterly $${provider.totals.quarterly}, yearly $${provider.totals.yearly}`,
+        fontSize: 10,
+      });
+    }
+
+    lines.push({ text: '', fontSize: 10 }, { text: 'Provider cost detail', fontSize: 14 });
+    for (const row of providerCostDetailRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]} | ${row[1]} | ${row[2]} / ${row[3]} | monthly $${row[7]} | share ${row[8]} | ${row[10]}`,
+        fontSize: 10,
+      });
+    }
+
+    lines.push({ text: '', fontSize: 10 }, { text: 'Cost coverage map', fontSize: 14 });
+    for (const row of costCoverageMapRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]} | ${row[1]} | ${row[2]} | rows ${row[3]} | monthly $${row[5] || 'n/a'} | ${row[6]}`,
         fontSize: 10,
       });
     }
@@ -156,7 +207,7 @@ export class PdfReportGenerator {
     );
     for (const row of commitmentTcoRows(result).slice(1)) {
       lines.push({
-        text: `${row[0]} | ${row[1]} | available ${row[2]} | monthly $${row[4]} | upfront $${row[5] || 'n/a'} | payment ${row[6]} | term ${row[7]} | TCO $${row[8] || 'n/a'} | savings ${row[9] || 'n/a'}`,
+        text: `${row[0]} | ${row[1]} | available ${row[2]} | estimate ${row[3]} | monthly $${row[5]} | upfront $${row[6] || 'n/a'} | payment ${row[7]} | term ${row[8]} | TCO $${row[9] || 'n/a'} | savings ${row[10] || 'n/a'}`,
         fontSize: 10,
       });
     }
@@ -165,6 +216,44 @@ export class PdfReportGenerator {
     for (const row of egressTierBreakdownRows(result).slice(1)) {
       lines.push({
         text: `${row[0]} | ${row[1]} | ${row[2]} | billable ${row[3]} GB | rate $${row[4]}/GB | subtotal $${row[5]} | blended $${row[6] || 'n/a'}/GB`,
+        fontSize: 10,
+      });
+    }
+
+    lines.push(
+      { text: '', fontSize: 10 },
+      { text: 'Egress and networking detail', fontSize: 14 },
+    );
+    for (const row of egressNetworkingDetailRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]} | ${row[1]} | ${row[2]} | monthly $${row[4]} | share ${row[5]} | ${row[8]}`,
+        fontSize: 10,
+      });
+    }
+
+    lines.push(
+      { text: '', fontSize: 10 },
+      { text: 'Optimization opportunities', fontSize: 14 },
+    );
+    for (const row of optimizationOpportunityRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]} | ${row[1]} | monthly savings $${row[2] || 'n/a'} | priority ${row[4]} | effort ${row[5]}`,
+        fontSize: 10,
+      });
+    }
+
+    lines.push({ text: '', fontSize: 10 }, { text: 'Region comparison', fontSize: 14 });
+    for (const row of regionComparisonRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]} | ${row[1]} (${row[2]}) | modeled monthly $${row[3]} | delta $${row[4]} | ${row[6]}`,
+        fontSize: 10,
+      });
+    }
+
+    lines.push({ text: '', fontSize: 10 }, { text: 'Break-even analysis', fontSize: 14 });
+    for (const row of breakEvenSummaryRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]} | ${row[1]} | on-demand $${row[2]}/mo | committed $${row[3]}/mo | upfront $${row[4]} | break-even ${row[6]}`,
         fontSize: 10,
       });
     }
@@ -197,6 +286,25 @@ export class PdfReportGenerator {
     for (const row of lineItemEvidenceRows(result).slice(1)) {
       lines.push({
         text: `${row[0]} | ${row[1]} | ${row[2]} | ${row[8]}`,
+        fontSize: 10,
+      });
+    }
+
+    lines.push(
+      { text: '', fontSize: 10 },
+      { text: 'Methodology and data sources', fontSize: 14 },
+    );
+    for (const row of methodologySourceRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]}: ${row[1]} Reviewer action: ${row[2]}`,
+        fontSize: 10,
+      });
+    }
+
+    lines.push({ text: '', fontSize: 10 }, { text: 'SKU mapping appendix', fontSize: 14 });
+    for (const row of skuMappingAppendixRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]} | ${row[1]} | ${row[4]} | ${row[5]} | confidence ${row[11]} | ${row[13]}`,
         fontSize: 10,
       });
     }
@@ -515,18 +623,18 @@ function serviceRequirementPdfText(row: string[]): string {
 
 function providerRankingPdfText(row: string[]): string {
   if (row[2] === 'no') {
-    return `${row[0]} | ${row[1]} | not eligible for selected model | ${row[9]}`;
+    return `${row[0]} | ${row[1]} | not eligible for selected model | ${row[10]}`;
   }
 
-  return `${row[0]} | ${row[1]} | eligible yes | selected $${row[3]} | monthly $${row[4]} | delta $${row[6]} | ${row[9]}`;
+  return `${row[0]} | ${row[1]} | eligible yes | estimate ${row[3]} | selected $${row[4]} | monthly $${row[5]} | delta $${row[7]} | ${row[10]}`;
 }
 
 function selectedScenarioPdfText(row: string[]): string {
   if (row[1] === 'no') {
-    return `${row[0]}: not eligible for selected model | ${row[5]}`;
+    return `${row[0]}: not eligible for selected model | ${row[7]}`;
   }
 
-  return `${row[0]}: eligible yes | selected $${row[2]} | monthly $${row[3]} | ${row[5]}`;
+  return `${row[0]}: eligible yes | estimate ${row[5]} | source ${row[6]} | selected $${row[2]} | monthly $${row[3]} | ${row[7]}`;
 }
 
 function pageContent(lines: PdfLine[]): string {

@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import {
   CloudProviderAdapter,
   PricingCatalogRecord,
@@ -34,6 +35,8 @@ const fixedClock = () => {
   ];
   return jest.fn(() => dates.shift() ?? new Date('2026-06-28T00:00:09.000Z'));
 };
+
+const singleAttemptRetry = { maxAttempts: 1 };
 
 const createCatalogRecord = (
   provider: PricingCatalogRecord['provider'],
@@ -86,6 +89,51 @@ describe('PricingEtlService', () => {
     expect(summary.status).toBe('success');
     expect(writer.upsertPricingRecords).toHaveBeenCalledTimes(3);
     expect(runRepository.recordProviderRun).toHaveBeenCalledTimes(3);
+    expect(runRepository.recordProviderRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'aws',
+        status: 'success',
+        recordsUpdated: 1,
+      }),
+    );
+  });
+
+  it('retries transient provider refresh failures before recording success', async () => {
+    const writer: PricingCatalogWriter = {
+      upsertPricingRecords: jest.fn(async (records) => ({
+        recordsUpdated: records.length,
+        recordsRejected: 0,
+      })),
+    };
+    const runRepository: PricingEtlRunRepository = {
+      recordProviderRun: jest.fn(async () => undefined),
+    };
+    const refreshPricingCatalog = jest.fn() as jest.MockedFunction<
+      CloudProviderAdapter['refreshPricingCatalog']
+    >;
+    refreshPricingCatalog
+      .mockRejectedValueOnce(new Error('provider throttled'))
+      .mockResolvedValueOnce([createCatalogRecord('aws', 'AWS-1')]);
+    const retryDelay = jest.fn(async () => undefined);
+    const service = new PricingEtlService(
+      [adapter('aws', refreshPricingCatalog)],
+      writer,
+      runRepository,
+      fixedClock(),
+      undefined,
+      undefined,
+      {
+        maxAttempts: 2,
+        baseDelayMs: 25,
+        delay: retryDelay,
+      },
+    );
+
+    const summary = await service.refreshAllProviders();
+
+    expect(summary.status).toBe('success');
+    expect(refreshPricingCatalog).toHaveBeenCalledTimes(2);
+    expect(retryDelay).toHaveBeenCalledWith(25);
     expect(runRepository.recordProviderRun).toHaveBeenCalledWith(
       expect.objectContaining({
         provider: 'aws',
@@ -179,6 +227,9 @@ describe('PricingEtlService', () => {
       writer,
       runRepository,
       fixedClock(),
+      undefined,
+      undefined,
+      singleAttemptRetry,
     );
 
     const summary = await service.refreshAllProviders();
@@ -199,6 +250,121 @@ describe('PricingEtlService', () => {
       ]),
     );
     expect(runRepository.recordProviderRun).toHaveBeenCalledTimes(3);
+  });
+
+  it('notifies configured alerting when a provider sync fails', async () => {
+    const writer: PricingCatalogWriter = {
+      upsertPricingRecords: jest.fn(async (records) => ({
+        recordsUpdated: records.length,
+        recordsRejected: 0,
+      })),
+    };
+    const runRepository: PricingEtlRunRepository = {
+      recordProviderRun: jest.fn(async () => undefined),
+    };
+    const notifier = {
+      notifyProviderResult: jest.fn(async () => undefined),
+    };
+    const service = new PricingEtlService(
+      [
+        adapter(
+          'aws',
+          jest.fn(async () => [createCatalogRecord('aws', 'AWS-1')]),
+        ),
+        adapter(
+          'gcp',
+          jest.fn(async () => {
+            throw new Error('GCP catalog unavailable');
+          }),
+        ),
+      ],
+      writer,
+      runRepository,
+      fixedClock(),
+      undefined,
+      notifier,
+      singleAttemptRetry,
+    );
+
+    await expect(service.refreshAllProviders()).resolves.toEqual(
+      expect.objectContaining({
+        status: 'partial',
+      }),
+    );
+    expect(notifier.notifyProviderResult).toHaveBeenCalledTimes(1);
+    expect(notifier.notifyProviderResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'gcp',
+        status: 'failed',
+        errorDetail: 'GCP catalog unavailable',
+      }),
+    );
+  });
+
+  it('keeps ETL summaries intact when alert notification delivery fails', async () => {
+    const loggerSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    const writer: PricingCatalogWriter = {
+      upsertPricingRecords: jest.fn(async (records) => ({
+        recordsUpdated: records.length,
+        recordsRejected: 0,
+      })),
+    };
+    const runRepository: PricingEtlRunRepository = {
+      recordProviderRun: jest.fn(async () => undefined),
+    };
+    const notifier = {
+      notifyProviderResult: jest.fn(async () => {
+        throw new Error('webhook unavailable');
+      }),
+    };
+    const service = new PricingEtlService(
+      [
+        adapter(
+          'aws',
+          jest.fn(async () => [createCatalogRecord('aws', 'AWS-1')]),
+        ),
+        adapter(
+          'gcp',
+          jest.fn(async () => {
+            throw new Error('GCP catalog unavailable');
+          }),
+        ),
+      ],
+      writer,
+      runRepository,
+      fixedClock(),
+      undefined,
+      notifier,
+      singleAttemptRetry,
+    );
+
+    await expect(service.refreshAllProviders()).resolves.toEqual(
+      expect.objectContaining({
+        status: 'partial',
+        providerResults: expect.arrayContaining([
+          expect.objectContaining({
+            provider: 'aws',
+            status: 'success',
+          }),
+          expect.objectContaining({
+            provider: 'gcp',
+            status: 'failed',
+            errorDetail: 'GCP catalog unavailable',
+          }),
+        ]),
+      }),
+    );
+    expect(runRepository.recordProviderRun).toHaveBeenCalledTimes(2);
+    expect(notifier.notifyProviderResult).toHaveBeenCalledTimes(1);
+    expect(loggerSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'pricing_sync_alert_notification_failed',
+        provider: 'gcp',
+        status: 'failed',
+        error: 'webhook unavailable',
+      }),
+    );
+    loggerSpy.mockRestore();
   });
 
   it('marks a provider run partial when some catalog rows are rejected', async () => {
@@ -259,6 +425,9 @@ describe('PricingEtlService', () => {
       writer,
       runRepository,
       fixedClock(),
+      undefined,
+      undefined,
+      singleAttemptRetry,
     );
 
     const summary = await service.refreshAllProviders();
@@ -287,6 +456,9 @@ describe('PricingEtlService', () => {
       writer,
       runRepository,
       fixedClock(),
+      undefined,
+      undefined,
+      singleAttemptRetry,
     );
 
     const summary = await service.refreshAllProviders();

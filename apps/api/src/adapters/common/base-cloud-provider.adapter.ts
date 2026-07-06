@@ -1,9 +1,12 @@
 import { NWSValidator } from '../../nws/nws-validator';
+import { NormalizedWorkloadSpec } from '../../nws/nws.types';
 import {
   calculateEgressCost,
+  calculateEgressTierBreakdown,
   EgressTierRate,
 } from '../../pricing-normalization/egress-tier-calculator';
 import {
+  canonicalRegionForResidencyLock,
   canonicalRegionForProviderRegion,
   providerRegionForCanonicalRegion,
 } from '../../pricing-normalization/region-map';
@@ -22,10 +25,23 @@ import {
 } from './cloud-provider-adapter';
 import { AdapterPricingError } from './adapter-errors';
 import { HOURS_PER_MONTH } from '../../cost-time';
+import {
+  normalizeInstanceFamily,
+  NormalizedInstanceFamily,
+} from '../../pricing-normalization/family-normalizer';
 
 const CATALOG_COMMITMENT_PRICING_MODELS: PricingModelKey[] = ['reserved-1yr', 'reserved-3yr'];
 const ESTIMATED_COMPUTE_PRICING_MODELS: PricingModelKey[] = ['spot', 'savings-plan'];
 const PRICING_MODEL_UNAVAILABLE = 'Not available for this configuration.';
+
+type ComputeProcessorArchitecture = NonNullable<
+  NormalizedWorkloadSpec['compute'][number]['processorArchitecture']
+>;
+type ComputeTenancy = NonNullable<NormalizedWorkloadSpec['compute'][number]['tenancy']>;
+type StorageClass = NonNullable<NormalizedWorkloadSpec['storage'][number]['storageClass']>;
+type WorkloadDataResidency = NonNullable<
+  NormalizedWorkloadSpec['workloadProfile']
+>['dataResidency'];
 
 interface CostCalculation {
   hourlyCostUsd: number;
@@ -50,7 +66,10 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
 
   async priceWorkload(input: unknown): Promise<ProviderPricingResult> {
     const nws = NWSValidator.validate(input);
-    const region = this.providerRegionForPreference(nws.workload.region.preference);
+    const region = this.providerRegionForPreference(
+      nws.workload.region.preference,
+      nws.workloadProfile?.dataResidency,
+    );
     const lineItems: ProviderPricingLineItem[] = [];
 
     for (const component of nws.compute) {
@@ -59,6 +78,9 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
         component.vcpu,
         component.memoryGb,
         'on-demand',
+        component.instanceFamily,
+        component.processorArchitecture,
+        component.tenancy,
       );
       const quantity =
         component.scalingType === 'autoscaling' && component.autoscalingRange
@@ -73,25 +95,56 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
             component.memoryGb,
             quantity,
             record,
+            component.instanceFamily,
+            component.processorArchitecture,
+            component.tenancy,
           ),
         }),
       );
     }
 
     for (const component of nws.storage) {
-      const record = await this.selectRecord('storage', region, (candidate) => {
+      const storageRecordPredicate = (candidate: PricingCatalogRecord): boolean => {
         const type = candidate.attributes?.type;
         const accessPattern = candidate.attributes?.accessPattern;
+        const storageClass = candidate.attributes?.storageClass;
+        const normalizedStorageClass =
+          typeof storageClass === 'string' ? normalizeStorageClass(storageClass) : undefined;
+
         return (
           (type === undefined || type === component.type) &&
           (accessPattern === undefined ||
             component.accessPattern === undefined ||
-            accessPattern === component.accessPattern)
+            accessPattern === component.accessPattern) &&
+          (storageClass === undefined ||
+            component.storageClass === undefined ||
+            normalizedStorageClass === undefined ||
+            normalizedStorageClass === component.storageClass)
         );
-      });
+      };
+      const typeCompatibleStoragePredicate = (candidate: PricingCatalogRecord): boolean => {
+        const type = candidate.attributes?.type;
+        return type === undefined || type === component.type;
+      };
+      const preciseRecord = await this.selectOptionalRecord(
+        'storage',
+        region,
+        storageRecordPredicate,
+      );
+      const record =
+        preciseRecord ??
+        (await this.selectRecord('storage', region, typeCompatibleStoragePredicate));
 
       lineItems.push(
-        this.toLineItem('storage', record, component.sizeGb, `${component.role} storage`),
+        this.toLineItem(
+          'storage',
+          record,
+          component.sizeGb,
+          `${component.role} ${component.storageClass ?? component.accessPattern ?? component.type} storage`,
+          {
+            ...(preciseRecord === undefined ? { isApproximate: true } : {}),
+          },
+        ),
       );
     }
 
@@ -160,7 +213,23 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     options?: RefreshPricingCatalogOptions,
   ): Promise<PricingCatalogRecord[]>;
 
-  private providerRegionForPreference(regionPreference: string | undefined): string {
+  private providerRegionForPreference(
+    regionPreference: string | undefined,
+    dataResidency: WorkloadDataResidency | undefined,
+  ): string {
+    if (dataResidency?.complianceLocked) {
+      const residencyRegion = canonicalRegionForResidencyLock(
+        regionPreference,
+        dataResidency.scope,
+      );
+
+      if (residencyRegion) {
+        return (
+          providerRegionForCanonicalRegion(residencyRegion, this.providerId) ?? this.defaultRegion
+        );
+      }
+    }
+
     const preference = regionPreference?.trim();
 
     if (!preference) {
@@ -186,6 +255,17 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       return exactMatches;
     }
 
+    return this.findDefaultRegionFallbackRecords(category, region);
+  }
+
+  private async findDefaultRegionFallbackRecords(
+    category: ServiceCategory,
+    region: string,
+  ): Promise<PricingCatalogRecord[]> {
+    if (region === this.defaultRegion) {
+      return [];
+    }
+
     const fallbackMatches = await this.catalogReader.find({
       provider: this.providerId,
       category,
@@ -208,12 +288,28 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     vcpu?: number,
     memoryGb?: number,
     pricingModel: PricingModelKey = 'on-demand',
+    instanceFamily?: NormalizedInstanceFamily,
+    processorArchitecture?: ComputeProcessorArchitecture,
+    tenancy?: ComputeTenancy,
   ): Promise<PricingCatalogRecord> {
-    return this.selectRecord(
-      'compute',
+    const record = await this.selectOptionalComputeRecord(
       region,
-      this.computeRecordPredicate(vcpu, memoryGb, pricingModel),
+      vcpu,
+      memoryGb,
+      pricingModel,
+      instanceFamily,
+      processorArchitecture,
+      tenancy,
     );
+
+    if (!record) {
+      throw new AdapterPricingError(
+        this.providerId,
+        `no compute pricing catalog record found for region ${region}`,
+      );
+    }
+
+    return record;
   }
 
   private async selectOptionalComputeRecord(
@@ -221,11 +317,94 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     vcpu: number | undefined,
     memoryGb: number | undefined,
     pricingModel: PricingModelKey,
+    instanceFamily?: NormalizedInstanceFamily,
+    processorArchitecture?: ComputeProcessorArchitecture,
+    tenancy?: ComputeTenancy,
   ): Promise<PricingCatalogRecord | undefined> {
-    return this.selectOptionalRecord(
-      'compute',
-      region,
-      this.computeRecordPredicate(vcpu, memoryGb, pricingModel),
+    const records = await this.findCatalogRecords('compute', region);
+    let candidates = records.filter(
+      this.computeRecordPredicate(
+        vcpu,
+        memoryGb,
+        pricingModel,
+        instanceFamily,
+        processorArchitecture,
+        tenancy,
+      ),
+    );
+    let fallbackRecords = records;
+
+    if (candidates.length === 0 && region !== this.defaultRegion) {
+      fallbackRecords = await this.findDefaultRegionFallbackRecords('compute', region);
+      candidates = fallbackRecords.filter(
+        this.computeRecordPredicate(
+          vcpu,
+          memoryGb,
+          pricingModel,
+          instanceFamily,
+          processorArchitecture,
+          tenancy,
+        ),
+      );
+    }
+
+    if (fallbackRecords.length === 0) {
+      fallbackRecords = records;
+    }
+
+    if (candidates.length === 0 && (instanceFamily || processorArchitecture || tenancy)) {
+      candidates = fallbackRecords
+        .filter(this.computeRecordPredicate(vcpu, memoryGb, pricingModel))
+        .map((record) => ({
+          ...record,
+          attributes: {
+            ...(record.attributes ?? {}),
+            isApproximate: true,
+            familyFallbackFrom: instanceFamily,
+            familyFallbackTo: this.recordInstanceFamily(record) ?? 'unspecified',
+            architectureFallbackFrom: processorArchitecture,
+            architectureFallbackTo: this.recordProcessorArchitecture(record) ?? 'unspecified',
+            tenancyFallbackFrom: tenancy,
+            tenancyFallbackTo: this.recordComputeTenancy(record) ?? 'unspecified',
+          },
+        }));
+    }
+
+    const selected = candidates.sort((left, right) => {
+      const leftFamilyRank = this.instanceFamilyFitRank(left, instanceFamily);
+      const rightFamilyRank = this.instanceFamilyFitRank(right, instanceFamily);
+      const leftArchitectureRank = this.processorArchitectureFitRank(left, processorArchitecture);
+      const rightArchitectureRank = this.processorArchitectureFitRank(right, processorArchitecture);
+      const leftTenancyRank = this.computeTenancyFitRank(left, tenancy);
+      const rightTenancyRank = this.computeTenancyFitRank(right, tenancy);
+
+      if (leftFamilyRank !== rightFamilyRank) {
+        return leftFamilyRank - rightFamilyRank;
+      }
+
+      if (leftArchitectureRank !== rightArchitectureRank) {
+        return leftArchitectureRank - rightArchitectureRank;
+      }
+
+      if (leftTenancyRank !== rightTenancyRank) {
+        return leftTenancyRank - rightTenancyRank;
+      }
+
+      const leftRank = this.resourceFitRank(left);
+      const rightRank = this.resourceFitRank(right);
+
+      if (leftRank !== rightRank) {
+        return leftRank - rightRank;
+      }
+
+      return left.unitPriceUsd - right.unitPriceUsd;
+    })[0];
+
+    return this.annotateComputeIntentApproximation(
+      selected,
+      instanceFamily,
+      processorArchitecture,
+      tenancy,
     );
   }
 
@@ -233,13 +412,26 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     vcpu: number | undefined,
     memoryGb: number | undefined,
     pricingModel: PricingModelKey,
+    instanceFamily?: NormalizedInstanceFamily,
+    processorArchitecture?: ComputeProcessorArchitecture,
+    tenancy?: ComputeTenancy,
   ): (record: PricingCatalogRecord) => boolean {
     return (candidate) => {
       const candidateVcpu = this.numberAttribute(candidate, 'vcpu');
       const candidateMemoryGb = this.numberAttribute(candidate, 'memoryGb');
+      const candidateFamily = this.recordInstanceFamily(candidate);
+      const candidateArchitecture = this.recordProcessorArchitecture(candidate);
+      const candidateTenancy = this.recordComputeTenancy(candidate);
 
       return (
         this.matchesPricingModel(candidate, pricingModel) &&
+        (instanceFamily === undefined ||
+          candidateFamily === undefined ||
+          candidateFamily === instanceFamily) &&
+        (processorArchitecture === undefined ||
+          candidateArchitecture === undefined ||
+          candidateArchitecture === processorArchitecture) &&
+        (tenancy === undefined || candidateTenancy === undefined || candidateTenancy === tenancy) &&
         (vcpu === undefined || candidateVcpu === undefined || candidateVcpu >= vcpu) &&
         (memoryGb === undefined || candidateMemoryGb === undefined || candidateMemoryGb >= memoryGb)
       );
@@ -252,6 +444,9 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     memoryGb: number | undefined,
     quantity: number,
     onDemandRecord: PricingCatalogRecord,
+    instanceFamily?: NormalizedInstanceFamily,
+    processorArchitecture?: ComputeProcessorArchitecture,
+    tenancy?: ComputeTenancy,
   ): Promise<PricingModelCost[]> {
     const models: PricingModelCost[] = [
       {
@@ -263,7 +458,15 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     ];
 
     for (const pricingModel of CATALOG_COMMITMENT_PRICING_MODELS) {
-      const record = await this.selectOptionalComputeRecord(region, vcpu, memoryGb, pricingModel);
+      const record = await this.selectOptionalComputeRecord(
+        region,
+        vcpu,
+        memoryGb,
+        pricingModel,
+        instanceFamily,
+        processorArchitecture,
+        tenancy,
+      );
 
       if (!record) {
         models.push({
@@ -346,23 +549,45 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     descriptionPrefix: string,
     options: {
       costComponent?: CostComponent;
+      isApproximate?: boolean;
       pricingModels?: PricingModelCost[];
     } = {},
   ): ProviderPricingLineItem {
     const cost = this.monthlyCost(record, quantity);
+    const displayRegion =
+      typeof record.attributes?.regionFallbackFrom === 'string'
+        ? record.attributes.regionFallbackFrom
+        : record.region;
+    const pricingTermCode =
+      typeof record.attributes?.pricingModel === 'string'
+        ? record.attributes.pricingModel
+        : undefined;
+    const paymentOptionCode =
+      typeof record.attributes?.upfrontOption === 'string'
+        ? record.attributes.upfrontOption
+        : undefined;
+    const rateCurrency =
+      typeof record.attributes?.currencyCode === 'string' ? record.attributes.currencyCode : 'USD';
 
     return {
       category,
       costComponent: options.costComponent ?? this.costComponentForCategory(category),
       description: `${descriptionPrefix}: ${record.serviceName}`,
-      isApproximate: record.attributes?.isApproximate === true,
+      isApproximate: options.isApproximate ?? record.attributes?.isApproximate === true,
       baseHourlyCostUsd: cost.hourlyCostUsd,
       baseMonthlyCostUsd: cost.monthlyCostUsd,
       skuId: record.skuId,
-      region: record.region,
+      region: displayRegion,
       unit: record.unit,
       unitPriceUsd: record.unitPriceUsd,
       pricingBasis: cost.pricingBasis,
+      rateSource: 'pricing_catalog',
+      rateSourceSkuId: record.skuId,
+      ...(pricingTermCode ? { pricingTermCode } : {}),
+      ...(paymentOptionCode ? { paymentOptionCode } : {}),
+      rateCurrency,
+      rateValidFrom: record.effectiveDate,
+      rateSourceFetchedAt: record.fetchedAt,
       ...(cost.egressTiers && cost.egressTiers.length > 0 ? { egressTiers: cost.egressTiers } : {}),
       ...(options.pricingModels ? { pricingModels: options.pricingModels } : {}),
     };
@@ -513,23 +738,11 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     tiers: EgressTierRate[],
     gbPerMonth: number,
   ): NonNullable<CostCalculation['egressTiers']> {
-    const sortedTiers = [...tiers].sort((left, right) => left.tierFromGb - right.tierFromGb);
-
-    return sortedTiers
-      .map((tier, index) => {
-        const nextTier = sortedTiers[index + 1];
-        const tierCeiling = tier.tierToGb ?? nextTier?.tierFromGb ?? Number.POSITIVE_INFINITY;
-        const billableGb = Math.max(0, Math.min(gbPerMonth, tierCeiling) - tier.tierFromGb);
-
-        return {
-          tierFromGb: tier.tierFromGb,
-          ...(Number.isFinite(tierCeiling) ? { tierToGb: tierCeiling } : {}),
-          pricePerGb: tier.pricePerGb,
-          billableGb: this.roundCurrency(billableGb),
-          monthlyCostUsd: this.roundCurrency(billableGb * tier.pricePerGb),
-        };
-      })
-      .filter((tier) => tier.billableGb > 0);
+    return calculateEgressTierBreakdown(tiers, gbPerMonth).map((tier) => ({
+      ...tier,
+      billableGb: this.roundCurrency(tier.billableGb),
+      monthlyCostUsd: this.roundCurrency(tier.monthlyCostUsd),
+    }));
   }
 
   private toEgressTier(value: unknown): EgressTierRate | undefined {
@@ -608,8 +821,226 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     );
   }
 
+  private recordInstanceFamily(record: PricingCatalogRecord): NormalizedInstanceFamily | undefined {
+    const explicitFamily =
+      this.stringAttribute(record, 'family') ??
+      this.stringAttribute(record, 'instanceFamily') ??
+      this.stringAttribute(record, 'normalizedFamily');
+
+    if (isNormalizedInstanceFamily(explicitFamily)) {
+      return explicitFamily;
+    }
+
+    const descriptors = [
+      record.skuId,
+      record.serviceName,
+      record.skuDescription,
+      this.stringAttribute(record, 'instanceType'),
+      this.stringAttribute(record, 'skuName'),
+      this.stringAttribute(record, 'armSkuName'),
+      this.stringAttribute(record, 'machineType'),
+    ].filter((value): value is string => typeof value === 'string' && value.length > 0);
+
+    for (const descriptor of descriptors) {
+      const family = normalizeInstanceFamily(this.providerId, descriptor);
+
+      if (family) {
+        return family;
+      }
+    }
+
+    return undefined;
+  }
+
+  private recordProcessorArchitecture(
+    record: PricingCatalogRecord,
+  ): ComputeProcessorArchitecture | undefined {
+    const explicitArchitecture =
+      this.stringAttribute(record, 'processorArchitecture') ??
+      this.stringAttribute(record, 'architecture') ??
+      this.stringAttribute(record, 'cpuArchitecture');
+
+    if (isComputeProcessorArchitecture(explicitArchitecture)) {
+      return explicitArchitecture;
+    }
+
+    const descriptors = this.recordDescriptors(record);
+
+    if (
+      descriptors.some((descriptor) =>
+        /\b(gpu|nvidia|a100|h100|v100|p4d|g5|nc|nd|a2|g2)\b/i.test(descriptor),
+      )
+    ) {
+      return 'gpu';
+    }
+
+    if (
+      descriptors.some((descriptor) =>
+        /\b(arm|arm64|aarch64|graviton|ampere|t2a)\b/i.test(descriptor),
+      )
+    ) {
+      return 'arm64';
+    }
+
+    if (
+      descriptors.some((descriptor) =>
+        /\b(x86|x64|intel|amd|xeon|epyc|m\d|c\d|r\d|d\d|fsv2)\b/i.test(descriptor),
+      )
+    ) {
+      return 'x86_64';
+    }
+
+    return undefined;
+  }
+
+  private recordComputeTenancy(record: PricingCatalogRecord): ComputeTenancy | undefined {
+    const explicitTenancy =
+      this.stringAttribute(record, 'tenancy') ??
+      this.stringAttribute(record, 'hostTenancy') ??
+      this.stringAttribute(record, 'computeTenancy');
+
+    if (isComputeTenancy(explicitTenancy)) {
+      return explicitTenancy;
+    }
+
+    const descriptors = this.recordDescriptors(record);
+
+    if (
+      descriptors.some((descriptor) =>
+        /\b(sole[- ]tenant|sole tenant|single tenant)\b/i.test(descriptor),
+      )
+    ) {
+      return 'sole-tenant';
+    }
+
+    if (
+      descriptors.some((descriptor) =>
+        /\b(dedicated host|dedicated instance|dedicated tenancy)\b/i.test(descriptor),
+      )
+    ) {
+      return 'dedicated-host';
+    }
+
+    return undefined;
+  }
+
+  private instanceFamilyFitRank(
+    record: PricingCatalogRecord,
+    requestedFamily: NormalizedInstanceFamily | undefined,
+  ): number {
+    if (!requestedFamily) {
+      return 0;
+    }
+
+    const candidateFamily = this.recordInstanceFamily(record);
+
+    if (candidateFamily === requestedFamily) {
+      return 0;
+    }
+
+    return candidateFamily === undefined ? 1 : 2;
+  }
+
+  private processorArchitectureFitRank(
+    record: PricingCatalogRecord,
+    requestedArchitecture: ComputeProcessorArchitecture | undefined,
+  ): number {
+    if (!requestedArchitecture) {
+      return 0;
+    }
+
+    const candidateArchitecture = this.recordProcessorArchitecture(record);
+
+    if (candidateArchitecture === requestedArchitecture) {
+      return 0;
+    }
+
+    return candidateArchitecture === undefined ? 1 : 2;
+  }
+
+  private computeTenancyFitRank(
+    record: PricingCatalogRecord,
+    requestedTenancy: ComputeTenancy | undefined,
+  ): number {
+    if (!requestedTenancy) {
+      return 0;
+    }
+
+    const candidateTenancy = this.recordComputeTenancy(record);
+
+    if (candidateTenancy === requestedTenancy) {
+      return 0;
+    }
+
+    return candidateTenancy === undefined ? 1 : 2;
+  }
+
+  private annotateComputeIntentApproximation(
+    record: PricingCatalogRecord | undefined,
+    requestedFamily: NormalizedInstanceFamily | undefined,
+    requestedArchitecture: ComputeProcessorArchitecture | undefined,
+    requestedTenancy: ComputeTenancy | undefined,
+  ): PricingCatalogRecord | undefined {
+    if (!record) {
+      return undefined;
+    }
+
+    const candidateFamily = this.recordInstanceFamily(record);
+    const candidateArchitecture = this.recordProcessorArchitecture(record);
+    const candidateTenancy = this.recordComputeTenancy(record);
+    const familyApproximate =
+      requestedFamily !== undefined &&
+      requestedFamily !== 'general-purpose' &&
+      candidateFamily !== requestedFamily;
+    const architectureApproximate =
+      requestedArchitecture !== undefined &&
+      requestedArchitecture !== 'x86_64' &&
+      candidateArchitecture !== requestedArchitecture;
+    const tenancyApproximate =
+      requestedTenancy !== undefined &&
+      requestedTenancy !== 'shared' &&
+      candidateTenancy !== requestedTenancy;
+
+    if (!familyApproximate && !architectureApproximate && !tenancyApproximate) {
+      return record;
+    }
+
+    return {
+      ...record,
+      attributes: {
+        ...(record.attributes ?? {}),
+        isApproximate: true,
+        familyFallbackFrom: requestedFamily,
+        familyFallbackTo: candidateFamily ?? 'unspecified',
+        architectureFallbackFrom: requestedArchitecture,
+        architectureFallbackTo: candidateArchitecture ?? 'unspecified',
+        tenancyFallbackFrom: requestedTenancy,
+        tenancyFallbackTo: candidateTenancy ?? 'unspecified',
+      },
+    };
+  }
+
   private numberAttribute(record: PricingCatalogRecord, key: string): number | undefined {
     return this.numberValue(record.attributes?.[key]);
+  }
+
+  private recordDescriptors(record: PricingCatalogRecord): string[] {
+    return [
+      record.skuId,
+      record.serviceName,
+      record.skuDescription,
+      this.stringAttribute(record, 'instanceType'),
+      this.stringAttribute(record, 'skuName'),
+      this.stringAttribute(record, 'armSkuName'),
+      this.stringAttribute(record, 'machineType'),
+      this.stringAttribute(record, 'processor'),
+    ].filter((value): value is string => typeof value === 'string' && value.length > 0);
+  }
+
+  private stringAttribute(record: PricingCatalogRecord, key: string): string | undefined {
+    const value = record.attributes?.[key];
+
+    return typeof value === 'string' && value.trim() ? value.trim() : undefined;
   }
 
   private numberValue(value: unknown): number | undefined {
@@ -628,6 +1059,96 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
   protected roundCurrency(value: number): number {
     return Math.round((value + Number.EPSILON) * 100) / 100;
   }
+}
+
+function isNormalizedInstanceFamily(value: string | undefined): value is NormalizedInstanceFamily {
+  return (
+    value === 'general-purpose' ||
+    value === 'burstable' ||
+    value === 'compute-optimized' ||
+    value === 'memory-optimized' ||
+    value === 'storage-optimized' ||
+    value === 'accelerated-computing'
+  );
+}
+
+function isComputeProcessorArchitecture(
+  value: string | undefined,
+): value is ComputeProcessorArchitecture {
+  return value === 'x86_64' || value === 'arm64' || value === 'gpu';
+}
+
+function isComputeTenancy(value: string | undefined): value is ComputeTenancy {
+  return value === 'shared' || value === 'dedicated-host' || value === 'sole-tenant';
+}
+
+function normalizeStorageClass(value: string): StorageClass | undefined {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, '-');
+
+  if (!normalized) {
+    return undefined;
+  }
+
+  if (normalized.includes('deep') && normalized.includes('archive')) {
+    return 'deep-archive';
+  }
+
+  if (normalized.includes('instant') && normalized.includes('archive')) {
+    return 'archive-instant';
+  }
+
+  if (normalized.includes('archive') || normalized.includes('glacier')) {
+    return 'archive';
+  }
+
+  if (normalized.includes('one-zone')) {
+    return 'one-zone-infrequent-access';
+  }
+
+  if (normalized.includes('intelligent')) {
+    return 'intelligent-tiering';
+  }
+
+  if (normalized.includes('nearline')) {
+    return 'nearline';
+  }
+
+  if (normalized.includes('coldline')) {
+    return 'coldline';
+  }
+
+  if (normalized.includes('cold')) {
+    return 'cold';
+  }
+
+  if (normalized.includes('cool')) {
+    return 'cool';
+  }
+
+  if (normalized.includes('infrequent') || normalized.includes('standard-ia')) {
+    return 'infrequent-access';
+  }
+
+  if (normalized.includes('ultra')) {
+    return 'ultra';
+  }
+
+  if (normalized.includes('premium')) {
+    return 'premium';
+  }
+
+  if (normalized.includes('hot')) {
+    return 'hot';
+  }
+
+  if (normalized.includes('standard')) {
+    return 'standard';
+  }
+
+  return undefined;
 }
 
 function providerPricingModelMetadata(

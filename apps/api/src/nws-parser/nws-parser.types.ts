@@ -25,11 +25,7 @@ export interface StructuredWorkloadFormInput {
   compute?: ComputeComponent[];
   storage?: StorageComponent[];
   database?: DatabaseComponent[];
-  network?: {
-    estimatedMonthlyEgressGb?: number;
-    cdn?: boolean;
-    loadBalancer?: boolean;
-  };
+  network?: Partial<NormalizedWorkloadSpec['network']>;
   availability?: {
     multiAz?: boolean;
     multiRegion?: boolean;

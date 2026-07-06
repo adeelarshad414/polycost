@@ -2,11 +2,18 @@ import {
   CostComponent,
   EgressTierBreakdown,
   PricingBasis,
+  PricingModelKey,
   PricingModelCost,
   ProviderId,
+  RateSource,
   ServiceCategory,
 } from '../adapters/common/cloud-provider-adapter';
-import { ServiceRequirement, WorkloadSourceType, WorkloadType } from '../nws/nws.types';
+import {
+  NormalizedWorkloadSpec,
+  ServiceRequirement,
+  WorkloadSourceType,
+  WorkloadType,
+} from '../nws/nws.types';
 
 export interface CostIntervals {
   hourly?: number;
@@ -29,6 +36,13 @@ export interface ComparisonLineItem {
   unit?: string;
   unitPriceUsd?: number;
   pricingBasis?: PricingBasis;
+  rateSource?: RateSource;
+  rateSourceSkuId?: string;
+  pricingTermCode?: string;
+  paymentOptionCode?: string;
+  rateCurrency?: string;
+  rateValidFrom?: string;
+  rateSourceFetchedAt?: string;
   egressTiers?: EgressTierBreakdown[];
   pricingModels?: PricingModelCost[];
 }
@@ -37,7 +51,11 @@ export interface ComparisonCostBreakdown {
   computeMonthlyCostUsd: number;
   storageMonthlyCostUsd: number;
   egressMonthlyCostUsd: number;
+  networkingMonthlyCostUsd: number;
   databaseMonthlyCostUsd: number;
+  supportMonthlyCostUsd: number;
+  licensingMonthlyCostUsd: number;
+  operationsMonthlyCostUsd: number;
   scopedMonthlyCostUsd: number;
 }
 
@@ -51,7 +69,11 @@ export interface ComparisonProviderResult {
 
 export interface ComparisonWarning {
   providerId?: ProviderId;
-  code: 'provider_pricing_failed' | 'live_refresh_failed';
+  code:
+    | 'provider_pricing_failed'
+    | 'live_refresh_failed'
+    | 'data_residency_region_adjusted'
+    | 'pricing_data_health';
   message: string;
 }
 
@@ -60,7 +82,34 @@ export interface ComparisonRequirementSummary {
   workloadName?: string;
   workloadType: WorkloadType;
   regionPreference?: string;
+  availability?: Pick<
+    NormalizedWorkloadSpec['availability'],
+    'multiAz' | 'multiRegion' | 'slaTarget' | 'faultTolerance'
+  >;
+  workloadProfile?: Pick<
+    NonNullable<NormalizedWorkloadSpec['workloadProfile']>,
+    | 'environment'
+    | 'commitmentPreferencePercent'
+    | 'dataResidency'
+    | 'operatingSystem'
+    | 'supportTier'
+    | 'usagePattern'
+    | 'tags'
+  >;
   serviceRequirements: ServiceRequirement[];
+}
+
+type ComparisonWorkloadProfile = NormalizedWorkloadSpec['workloadProfile'];
+
+export interface PricingModelRecommendation {
+  preferredModel: PricingModelKey;
+  confidence: 'high' | 'medium' | 'low';
+  rationale: string;
+  sourceSignals: {
+    environment?: NonNullable<ComparisonWorkloadProfile>['environment'];
+    commitmentPreferencePercent?: number;
+    flexibilityBias: 'flexibility' | 'balanced' | 'cost-optimized';
+  };
 }
 
 export interface ComparisonResult {
@@ -69,5 +118,6 @@ export interface ComparisonResult {
   requirements?: ComparisonRequirementSummary;
   providers: ComparisonProviderResult[];
   cheapestProviderId: ProviderId;
+  pricingModelRecommendation?: PricingModelRecommendation;
   warnings?: ComparisonWarning[];
 }

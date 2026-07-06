@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { SecretsService } from '../secrets/secrets.service';
+import { ApiRateLimitService } from '../api/rate-limit.service';
 import { PricingCompareV2Controller, PricingModelsController } from './pricing-models.controller';
 import { PricingCacheService } from './pricing-cache.service';
 import { PricingMatrixService } from './pricing-matrix.service';
@@ -13,6 +14,10 @@ import { SpotEstimateService } from './spot-estimate.service';
   providers: [
     SecretsService,
     PricingCacheService,
+    {
+      provide: ApiRateLimitService,
+      useFactory: () => new ApiRateLimitService(),
+    },
     PricingTermsService,
     PostgresPricingRatesRepository,
     {

@@ -20,6 +20,12 @@ import {
   PricingEtlWorkerFactory,
 } from './pricing-etl.scheduler';
 import { PricingEtlService } from './pricing-etl.service';
+import {
+  PricingSyncFailureNotifier,
+  WebhookPricingSyncFailureNotifier,
+} from './pricing-sync-alert.service';
+
+const PRICING_SYNC_FAILURE_NOTIFIER = Symbol('PRICING_SYNC_FAILURE_NOTIFIER');
 
 @Module({
   imports: [ProviderAdaptersModule],
@@ -41,6 +47,11 @@ import { PricingEtlService } from './pricing-etl.service';
       provide: PRICING_ETL_RUN_REPOSITORY,
       useExisting: PostgresPricingCatalogRepository,
     },
+    WebhookPricingSyncFailureNotifier,
+    {
+      provide: PRICING_SYNC_FAILURE_NOTIFIER,
+      useExisting: WebhookPricingSyncFailureNotifier,
+    },
     {
       provide: PricingEtlService,
       inject: [
@@ -48,12 +59,14 @@ import { PricingEtlService } from './pricing-etl.service';
         PRICING_CATALOG_WRITER,
         PRICING_ETL_RUN_REPOSITORY,
         NORMALIZED_PRICING_WRITER,
+        PRICING_SYNC_FAILURE_NOTIFIER,
       ],
       useFactory: (
         adapters: CloudProviderAdapter[],
         catalogRepository: PostgresPricingCatalogRepository,
         runRepository: PostgresPricingCatalogRepository,
         normalizedPricingWriter: PostgresPricingCatalogRepository,
+        failureNotifier: PricingSyncFailureNotifier,
       ) =>
         new PricingEtlService(
           adapters,
@@ -61,6 +74,7 @@ import { PricingEtlService } from './pricing-etl.service';
           runRepository,
           undefined,
           normalizedPricingWriter,
+          failureNotifier,
         ),
     },
     {
