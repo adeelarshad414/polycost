@@ -58,6 +58,7 @@ export class ComparisonOrchestratorService {
 
   async compare(input: unknown): Promise<ComparisonResult> {
     const nws = NWSValidator.validate(input);
+    // PHASE_3_HOOK: validated NWS/serviceRequirements can feed Terraform generation before pricing.
     const providerOutcomes = await Promise.all(
       this.adapters.map((adapter) => this.priceProvider(adapter, nws)),
     );
@@ -128,6 +129,7 @@ export class ComparisonOrchestratorService {
         unit: annotatedLineItem.unit,
         unitPriceUsd: annotatedLineItem.unitPriceUsd,
         pricingBasis: annotatedLineItem.pricingBasis ?? 'flat',
+        ...(annotatedLineItem.egressTiers ? { egressTiers: annotatedLineItem.egressTiers } : {}),
         ...(annotatedLineItem.pricingModels
           ? {
               pricingModels: annotatedLineItem.pricingModels.map((model) => ({
@@ -140,6 +142,9 @@ export class ComparisonOrchestratorService {
                   : {}),
                 ...(model.monthlyCostUsd !== undefined
                   ? { monthlyCostUsd: this.roundCurrency(model.monthlyCostUsd) }
+                  : {}),
+                ...(model.upfrontCostUsd !== undefined
+                  ? { upfrontCostUsd: this.roundCurrency(model.upfrontCostUsd) }
                   : {}),
               })),
             }
@@ -233,6 +238,11 @@ export class ComparisonOrchestratorService {
       (sum, model) => sum + (model?.monthlyCostUsd ?? 0),
       0,
     );
+    const upfrontCostUsd = commitmentCosts.some((model) => model?.upfrontCostUsd !== undefined)
+      ? this.roundCurrency(
+          commitmentCosts.reduce((sum, model) => sum + (model?.upfrontCostUsd ?? 0), 0),
+        )
+      : undefined;
     const monthlyCostUsd = this.roundCurrency(nonComputeMonthlyCostUsd + computeMonthlyCostUsd);
 
     return {
@@ -248,6 +258,7 @@ export class ComparisonOrchestratorService {
       ...(representativeModel?.upfrontOption
         ? { upfrontOption: representativeModel.upfrontOption }
         : {}),
+      ...(upfrontCostUsd !== undefined ? { upfrontCostUsd } : {}),
       ...(representativeModel?.commitmentTermMonths
         ? { commitmentTermMonths: representativeModel.commitmentTermMonths }
         : {}),

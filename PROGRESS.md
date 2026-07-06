@@ -21,21 +21,22 @@ say so explicitly rather than marking it done.
 
 ## Phase status overview
 
-| Phase                                                  | Status   | Last updated |
-| ------------------------------------------------------ | -------- | ------------ |
-| 0 - Build plan & approval                              | Complete | 2026-06-28   |
-| 1 - Repo scaffold                                      | Complete | 2026-06-28   |
-| 2 - Data layer (Postgres schema, NWS types, validator) | Complete | 2026-06-28   |
-| 3 - Cloud provider adapters                            | Complete | 2026-06-28   |
-| 4 - Pricing ETL job                                    | Complete | 2026-06-28   |
-| 5 - NWS Parser Module                                  | Complete | 2026-06-28   |
-| 6 - Comparison Engine                                  | Complete | 2026-06-29   |
-| 7 - Report Module                                      | Complete | 2026-06-29   |
-| 8 - API layer                                          | Complete | 2026-06-29   |
-| 9 - Frontend                                           | Complete | 2026-06-29   |
-| 10 - E2E verification against MVP acceptance criteria  | Complete | 2026-07-01   |
-| Post-Phase 10 report export evidence polish            | Complete | 2026-07-01   |
-| Post-Phase 10 Playwright browser journey coverage      | Complete | 2026-07-01   |
+| Phase                                                  | Status                               | Last updated |
+| ------------------------------------------------------ | ------------------------------------ | ------------ |
+| 0 - Build plan & approval                              | Complete                             | 2026-06-28   |
+| 1 - Repo scaffold                                      | Complete                             | 2026-06-28   |
+| 2 - Data layer (Postgres schema, NWS types, validator) | Complete                             | 2026-06-28   |
+| 3 - Cloud provider adapters                            | Complete                             | 2026-06-28   |
+| 4 - Pricing ETL job                                    | Complete                             | 2026-06-28   |
+| 5 - NWS Parser Module                                  | Complete                             | 2026-06-28   |
+| 6 - Comparison Engine                                  | Complete                             | 2026-06-29   |
+| 7 - Report Module                                      | Complete                             | 2026-06-29   |
+| 8 - API layer                                          | Complete                             | 2026-06-29   |
+| 9 - Frontend                                           | Complete                             | 2026-06-29   |
+| 10 - E2E verification against MVP acceptance criteria  | Complete                             | 2026-07-01   |
+| Post-Phase 10 report export evidence polish            | Complete                             | 2026-07-01   |
+| Post-Phase 10 Playwright browser journey coverage      | Complete                             | 2026-07-01   |
+| AI-native Phase 1 reimagining pass                     | Complete with known gaps (see notes) | 2026-07-01   |
 
 ## Phase 0 - Build plan & approval
 
@@ -888,6 +889,76 @@ controls.
   the current progressive-disclosure mobile layout and no-horizontal-overflow
   requirement instead.
 
+## AI-native Phase 1 reimagining pass
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-01
+
+- Shared AI-native contracts: added the `@polycost/types` workspace package with
+  stable, versioned `NormalizedRequirement`, `ProviderCostResult`,
+  `AiCostNarrative`, and `RequirementParserService` contracts.
+- Phase 2/Phase 3 readiness: added `ARCHITECTURE_NOTES.md` and explicit
+  `PHASE_2_HOOK` / `PHASE_3_HOOK` comments at the parser and pricing pipeline
+  integration points so CSV/Excel/diagram parsing and Terraform import/generation
+  can plug into the same NWS path later.
+- Parser adapters: wrapped natural-language and guided-form parsing behind
+  injectable NWS-backed parser adapters. Natural language continues to use the
+  configured structured LLM path when available and the existing local heuristic
+  parser fallback when LLM config is absent.
+- Requirement trust checkpoint: natural-language input now parses into an editable
+  guided-form review state before comparison. The active requirements, input mode,
+  pricing scenario, and review flag persist in session storage for what-if re-runs
+  without re-parsing.
+- Share links: read-only share links now capture pricing model and granularity,
+  support optional password protection, and can be revoked.
+- What-if evidence: pricing-model deltas are visible in provider cards, and shared
+  reports preserve the selected scenario context.
+- Engineering dashboard: added a full service x provider x pricing-model matrix with
+  sticky headers, category/provider/pricing-model filters, and sort options for
+  every provider/model column. Missing service-level pricing-model data is shown as
+  `N/A` instead of `$0`.
+- Follow-up hardening: comparison results now preserve exact cached egress tier rows
+  on network line items when provider catalog data exposes them. The engineering
+  dashboard, CSV, XLSX, and PDF reports now include commitment payment/TCO evidence
+  and egress tier audit sections.
+- Inline scenario what-if: the engineering dashboard now has a region and scale
+  what-if panel that clones the reviewed guided-form model, adjusts region and
+  scale fields, calls the cached comparison endpoint directly, and displays the
+  before/after monthly and annualized delta without invoking natural-language
+  parsing again.
+- Excel what-if workbook: XLSX exports now include a second `What If` worksheet
+  with editable scale and region-multiplier assumptions, workbook-level named
+  ranges, auto-recalculation metadata, and formula-driven scenario monthly/yearly
+  and delta totals.
+- PDF visual deck: PDF exports now append server-rendered vector chart pages for
+  executive provider monthly run-rate comparison and engineering service-mix
+  evidence, using the same comparison totals and line-item data as the CSV/XLSX
+  exports.
+- Upfront cash evidence: cached pricing records can now publish optional
+  `upfrontCostUsd`; the comparison rollup preserves and sums it for provider-level
+  Reserved/Savings scenarios, the engineering TCO table shows it separately from
+  recurring monthly cost, and CSV/XLSX/PDF reports include it in term TCO.
+- Phase 1 requirements file bridge: the Paste / parse input now accepts TXT,
+  Markdown, JSON, and YAML requirement files client-side, loads the content into
+  the same natural-language parser/review/edit flow, and explicitly keeps CSV,
+  Excel, and DrawIO structured import behind the documented Phase 2 parser hook.
+- Fresh-stack pricing-model seed hardening: Postgres bootstrap now runs migrations
+  008-011, `db:validate` enforces them, and migration 011 adds local seed reserved
+  1-year / 3-year compute rows for all three providers and seeded compute sizes so
+  clean self-hosted demos show commitment scenario cells without live provider calls.
+- Focused verification passing locally:
+  `npm run typecheck --workspace @polycost/web` and
+  `npm run test:unit --workspace @polycost/web -- --runTestsByPath src/App.spec.tsx`.
+- Verification passing locally:
+  `npm run check`, `npm run build`, `npm run test:coverage`,
+  `npm run test:e2e --workspace @polycost/web`,
+  `POLYCOST_E2E_SKIP_COMPOSE=1 npm run ci:e2e`, `npm run security:audit`, and
+  `npm run db:validate` against the running Compose stack.
+- Notes: `npm run check` still reports the existing 15 API ESLint security warnings;
+  `npm run build` still warns that `%VITE_API_BASE_URL%` is not defined in
+  `index.html`; `npm run security:audit -- --audit-level=high` exits successfully
+  while listing low/moderate tooling advisories already tracked below.
+
 ## Known issues / carried-forward items
 
 Running list. Add here whenever a phase completes with known gaps. Remove an item only
@@ -902,14 +973,23 @@ when it is actually resolved in a later phase, with a note on which phase resolv
 - `eslint-plugin-security` reports warnings for controlled fixture reads,
   provider-response dictionary access, and the local Vault token-file read. These are
   non-blocking under the current lint config and were reviewed during Phase 3.
-- Full all-workspace `npm run test:coverage` currently fails the API global branch
-  threshold: all API tests pass, but aggregate API branch coverage reports 81.56%
-  against the configured 85% target. The focused web coverage gate for the frontend
-  polish passes.
+- Resolved on 2026-07-01: full all-workspace `npm run test:coverage` passes after
+  the later API/web coverage additions. Keep watching branch coverage as new shared
+  pricing and report paths are added.
 - Phase 10 refresh-live acceptance verifies that a comparison is re-run into a fresh
   snapshot from current catalog data. Deterministic proof that a changed catalog row
   changes the refreshed result still needs either a test-only catalog fixture path or
   internal SKU traceability for safe mutation.
+- The AI-native reimagining prompt's most aggressive DoD is not fully product-complete
+  yet: Phase 1 plain requirements file loading is implemented, while rich CSV,
+  Excel, and DrawIO structured import remains a documented Phase 2 hook. Account-level
+  requirement persistence is not implemented because auth/user accounts are not part
+  of this Phase 1 codebase. Session-level requirement persistence is implemented for
+  what-if reruns and pricing-model switches.
+- The engineering matrix now filters by category/provider/pricing model and sorts by
+  every provider/model column. Fresh local seed data now includes reserved compute
+  scenarios; non-compute commitment cells still render `N/A` where that pricing model
+  is not applicable or not available from provider/catalog data.
 
 ## Deviations from spec log
 

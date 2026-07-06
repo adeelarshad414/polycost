@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { ComparisonResult } from '../comparison/comparison.types';
+import { ComparisonLineItem, ComparisonResult } from '../comparison/comparison.types';
 import {
+  commitmentTcoRows,
   decisionSummaryRows,
+  egressTierBreakdownRows,
   lineItemEvidenceRows,
   pricingModelAvailabilityRows,
   providerRankingRows,
@@ -20,13 +22,33 @@ interface PdfLine {
   fontSize: number;
 }
 
+interface RgbColor {
+  red: number;
+  green: number;
+  blue: number;
+}
+
+interface ServiceMixSlice {
+  label: string;
+  value: number;
+  color: RgbColor;
+}
+
 const LINES_PER_PAGE = 42;
+const CHART_ORIGIN_X = 58;
+const PROVIDER_BAR_MAX_WIDTH = 330;
+const STACKED_BAR_WIDTH = 360;
+const TEXT_COLOR: RgbColor = { red: 0.07, green: 0.08, blue: 0.12 };
+const MUTED_TEXT_COLOR: RgbColor = { red: 0.36, green: 0.39, blue: 0.45 };
 
 @Injectable()
 export class PdfReportGenerator {
   generate(result: ComparisonResult, options: ReportOptions = {}): Buffer {
     const lines = this.lines(result, options);
-    const pages = chunk(lines, LINES_PER_PAGE);
+    const pageContents = [
+      ...chunk(lines, LINES_PER_PAGE).map((page) => pageContent(page)),
+      ...visualDeckPageContents(result, options),
+    ];
     const objects: string[] = [];
     const pageObjectNumbers: number[] = [];
 
@@ -34,14 +56,13 @@ export class PdfReportGenerator {
     objects.push('');
     objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
 
-    for (const page of pages) {
+    for (const content of pageContents) {
       const pageObjectNumber = objects.length + 1;
       const contentObjectNumber = objects.length + 2;
       pageObjectNumbers.push(pageObjectNumber);
       objects.push(
         `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentObjectNumber} 0 R >>`,
       );
-      const content = pageContent(page);
       objects.push(`<< /Length ${Buffer.byteLength(content, 'utf8')} >>\nstream\n${content}\nendstream`);
     }
 
@@ -131,6 +152,25 @@ export class PdfReportGenerator {
 
     lines.push(
       { text: '', fontSize: 10 },
+      { text: 'Commitment payment and TCO', fontSize: 14 },
+    );
+    for (const row of commitmentTcoRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]} | ${row[1]} | available ${row[2]} | monthly $${row[4]} | upfront $${row[5] || 'n/a'} | payment ${row[6]} | term ${row[7]} | TCO $${row[8] || 'n/a'} | savings ${row[9] || 'n/a'}`,
+        fontSize: 10,
+      });
+    }
+
+    lines.push({ text: '', fontSize: 10 }, { text: 'Egress tiered breakdown', fontSize: 14 });
+    for (const row of egressTierBreakdownRows(result).slice(1)) {
+      lines.push({
+        text: `${row[0]} | ${row[1]} | ${row[2]} | billable ${row[3]} GB | rate $${row[4]}/GB | subtotal $${row[5]} | blended $${row[6] || 'n/a'}/GB`,
+        fontSize: 10,
+      });
+    }
+
+    lines.push(
+      { text: '', fontSize: 10 },
       { text: 'Normalized service requirements', fontSize: 14 },
     );
     for (const row of serviceRequirementPdfRows(result)) {
@@ -182,6 +222,229 @@ export class PdfReportGenerator {
 
     return lines.flatMap((line) => wrapLine(line));
   }
+}
+
+function visualDeckPageContents(result: ComparisonResult, options: ReportOptions): string[] {
+  return [providerRunRateChartPage(result, options), serviceMixChartPage(result)];
+}
+
+function providerRunRateChartPage(result: ComparisonResult, options: ReportOptions): string {
+  const commands = chartPageBase('PolyCost Visual Decision Deck', [
+    'Provider monthly run-rate chart',
+    `Scenario: ${options.pricingModel ?? 'on-demand'} at ${options.interval ?? 'monthly'} cadence`,
+  ]);
+  const maxMonthly = Math.max(...result.providers.map((provider) => provider.totals.monthly), 1);
+  const cheapestMonthly = Math.min(...result.providers.map((provider) => provider.totals.monthly));
+
+  commands.push(
+    pdfText(
+      CHART_ORIGIN_X,
+      658,
+      10,
+      'Bars use cached comparison totals; this page is rendered server-side by the PDF exporter.',
+      MUTED_TEXT_COLOR,
+    ),
+  );
+
+  result.providers.forEach((provider, index) => {
+    const y = 600 - index * 74;
+    const width = Math.max(8, (provider.totals.monthly / maxMonthly) * PROVIDER_BAR_MAX_WIDTH);
+    const color = providerColor(provider.providerId);
+    const isLowest = provider.totals.monthly === cheapestMonthly;
+
+    commands.push(
+      pdfText(CHART_ORIGIN_X, y + 30, 12, provider.providerId.toUpperCase(), TEXT_COLOR),
+      filledRect(CHART_ORIGIN_X + 92, y + 22, width, 22, color),
+      pdfText(
+        CHART_ORIGIN_X + 92 + width + 12,
+        y + 27,
+        10,
+        `$${formatCurrency(provider.totals.monthly)} monthly`,
+        TEXT_COLOR,
+      ),
+      pdfText(
+        CHART_ORIGIN_X + 92,
+        y + 4,
+        9,
+        `$${formatCurrency(provider.totals.yearly)} yearly${isLowest ? ' · lowest baseline' : ''}`,
+        MUTED_TEXT_COLOR,
+      ),
+    );
+  });
+
+  commands.push(
+    pdfText(
+      CHART_ORIGIN_X,
+      220,
+      11,
+      'Executive readout: validate regional SKU availability, resilience, and transfer paths before vendor commitment.',
+      TEXT_COLOR,
+    ),
+  );
+
+  return commands.join('\n');
+}
+
+function serviceMixChartPage(result: ComparisonResult): string {
+  const commands = chartPageBase('Engineering Cost Evidence Deck', [
+    'Service mix stacked chart',
+    'Compute, storage, database, network, and other line-item totals by provider',
+  ]);
+
+  drawLegend(commands, [
+    { label: 'Compute', color: categoryColor('compute') },
+    { label: 'Storage', color: categoryColor('storage') },
+    { label: 'Database', color: categoryColor('database') },
+    { label: 'Network', color: categoryColor('network') },
+    { label: 'Other', color: categoryColor('other') },
+  ]);
+
+  result.providers.forEach((provider, index) => {
+    const y = 590 - index * 92;
+    const slices = serviceMixSlices(provider.lineItems);
+    const total = Math.max(
+      slices.reduce((sum, slice) => sum + slice.value, 0),
+      provider.totals.monthly,
+      1,
+    );
+    let x = CHART_ORIGIN_X + 96;
+
+    commands.push(
+      pdfText(CHART_ORIGIN_X, y + 28, 12, provider.providerId.toUpperCase(), TEXT_COLOR),
+      pdfText(
+        CHART_ORIGIN_X + 96,
+        y + 2,
+        9,
+        `Total monthly line items: $${formatCurrency(
+          slices.reduce((sum, slice) => sum + slice.value, 0),
+        )}`,
+        MUTED_TEXT_COLOR,
+      ),
+    );
+
+    for (const slice of slices) {
+      const width = Math.max(4, (slice.value / total) * STACKED_BAR_WIDTH);
+      commands.push(filledRect(x, y + 20, width, 24, slice.color));
+      x += width;
+    }
+  });
+
+  commands.push(
+    pdfText(
+      CHART_ORIGIN_X,
+      210,
+      10,
+      'Line-item source: same evidence rows used by CSV and XLSX exports; approximate mappings remain labeled in the text section.',
+      TEXT_COLOR,
+    ),
+  );
+
+  return commands.join('\n');
+}
+
+function chartPageBase(title: string, subtitles: string[]): string[] {
+  return [
+    filledRect(0, 0, 612, 792, { red: 0.98, green: 0.98, blue: 0.97 }),
+    filledRect(0, 734, 612, 58, { red: 0.95, green: 0.96, blue: 0.97 }),
+    pdfText(CHART_ORIGIN_X, 754, 18, title, TEXT_COLOR),
+    ...subtitles.map((subtitle, index) =>
+      pdfText(CHART_ORIGIN_X, 716 - index * 18, 11, subtitle, MUTED_TEXT_COLOR),
+    ),
+  ];
+}
+
+function drawLegend(
+  commands: string[],
+  entries: Array<{ label: string; color: RgbColor }>,
+): void {
+  entries.forEach((entry, index) => {
+    const x = CHART_ORIGIN_X + index * 94;
+
+    commands.push(
+      filledRect(x, 664, 12, 12, entry.color),
+      pdfText(x + 18, 666, 9, entry.label, MUTED_TEXT_COLOR),
+    );
+  });
+}
+
+function serviceMixSlices(lineItems: ComparisonLineItem[]): ServiceMixSlice[] {
+  const compute = totalForCategory(lineItems, 'compute');
+  const storage = totalForCategory(lineItems, 'storage');
+  const database = totalForCategory(lineItems, 'database');
+  const network = totalForCategory(lineItems, 'network');
+  const known = compute + storage + database + network;
+  const all = lineItems.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+  const other = Math.max(0, all - known);
+
+  return [
+    { label: 'Compute', value: compute, color: categoryColor('compute') },
+    { label: 'Storage', value: storage, color: categoryColor('storage') },
+    { label: 'Database', value: database, color: categoryColor('database') },
+    { label: 'Network', value: network, color: categoryColor('network') },
+    { label: 'Other', value: other, color: categoryColor('other') },
+  ].filter((slice) => slice.value > 0);
+}
+
+function totalForCategory(lineItems: ComparisonLineItem[], category: string): number {
+  return lineItems
+    .filter((lineItem) => lineItem.category === category)
+    .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+}
+
+function providerColor(providerId: ComparisonResult['providers'][number]['providerId']): RgbColor {
+  switch (providerId) {
+    case 'aws':
+      return { red: 0.85, green: 0.35, blue: 0.19 };
+    case 'azure':
+      return { red: 0.22, green: 0.54, blue: 0.87 };
+    case 'gcp':
+      return { red: 0.11, green: 0.62, blue: 0.46 };
+  }
+}
+
+function categoryColor(category: string): RgbColor {
+  switch (category) {
+    case 'compute':
+      return { red: 0.85, green: 0.35, blue: 0.19 };
+    case 'storage':
+      return { red: 0.22, green: 0.54, blue: 0.87 };
+    case 'database':
+      return { red: 0.11, green: 0.62, blue: 0.46 };
+    case 'network':
+      return { red: 0.56, green: 0.39, blue: 0.86 };
+    default:
+      return { red: 0.5, green: 0.54, blue: 0.6 };
+  }
+}
+
+function filledRect(x: number, y: number, width: number, height: number, color: RgbColor): string {
+  return `${rgb(color)} rg\n${formatPdfNumber(x)} ${formatPdfNumber(y)} ${formatPdfNumber(
+    width,
+  )} ${formatPdfNumber(height)} re f`;
+}
+
+function pdfText(
+  x: number,
+  y: number,
+  fontSize: number,
+  text: string,
+  color: RgbColor = TEXT_COLOR,
+): string {
+  return `${rgb(color)} rg\nBT\n/F1 ${fontSize} Tf\n1 0 0 1 ${formatPdfNumber(x)} ${formatPdfNumber(
+    y,
+  )} Tm\n(${escapePdfText(text)}) Tj\nET`;
+}
+
+function rgb(color: RgbColor): string {
+  return `${formatPdfNumber(color.red)} ${formatPdfNumber(color.green)} ${formatPdfNumber(color.blue)}`;
+}
+
+function formatPdfNumber(value: number): string {
+  return (Math.round((value + Number.EPSILON) * 1000) / 1000).toString();
+}
+
+function formatCurrency(value: number): string {
+  return (Math.round((value + Number.EPSILON) * 100) / 100).toString();
 }
 
 function wrapLine(line: PdfLine): PdfLine[] {

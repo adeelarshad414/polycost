@@ -104,12 +104,18 @@ export interface ShareLinkInput {
   workloadId: string;
   watermark: boolean;
   expiresInDays: number;
+  pricingModel: 'on-demand' | 'reserved-1yr' | 'reserved-3yr' | 'savings-plan' | 'spot';
+  granularity: 'hourly' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  password?: string;
 }
 
 export interface ShareLinkRecord {
   token: string;
   workloadId: string;
   watermark: boolean;
+  pricingModel: ShareLinkInput['pricingModel'];
+  granularity: ShareLinkInput['granularity'];
+  passwordHash?: string;
   expiresAt: string;
   revokedAt?: string;
   createdAt: string;
@@ -124,6 +130,9 @@ export interface SharedReportResponse {
   token: string;
   watermark: boolean;
   expiresAt: string;
+  pricingModel: ShareLinkInput['pricingModel'];
+  granularity: ShareLinkInput['granularity'];
+  passwordProtected: boolean;
   workload: WorkloadRecord;
   breakdown: WorkloadCostBreakdown;
 }

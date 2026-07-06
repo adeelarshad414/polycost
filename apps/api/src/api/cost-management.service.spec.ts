@@ -1,4 +1,4 @@
-import { ApiNotFoundError } from './api-errors';
+import { ApiNotFoundError, ApiUnauthorizedError } from './api-errors';
 import { CostManagementService } from './cost-management.service';
 import { ShareLinkRecord, WorkloadCostBreakdown, WorkloadRecord } from './cost-management.types';
 
@@ -27,6 +27,8 @@ const shareLink: ShareLinkRecord = {
   token: 'test-share-token-123456789012',
   workloadId: workload.id,
   watermark: true,
+  pricingModel: 'reserved-3yr',
+  granularity: 'yearly',
   expiresAt: '2026-07-30T00:00:00.000Z',
   createdAt: '2026-06-30T00:00:00.000Z',
 };
@@ -45,6 +47,9 @@ describe('CostManagementService', () => {
         workloadId: workload.id,
         watermark: true,
         expiresInDays: 30,
+        pricingModel: 'reserved-3yr',
+        granularity: 'yearly',
+        password: 'client-demo',
       }),
     ).resolves.toEqual({
       token: shareLink.token,
@@ -55,6 +60,9 @@ describe('CostManagementService', () => {
       token: shareLink.token,
       workloadId: workload.id,
       watermark: true,
+      pricingModel: 'reserved-3yr',
+      granularity: 'yearly',
+      passwordHash: expect.stringMatching(/^[a-f0-9]{64}$/),
       expiresAt: '2026-07-30T00:00:00.000Z',
     });
   });
@@ -66,9 +74,38 @@ describe('CostManagementService', () => {
       token: shareLink.token,
       watermark: true,
       expiresAt: shareLink.expiresAt,
+      pricingModel: 'reserved-3yr',
+      granularity: 'yearly',
+      passwordProtected: false,
       workload,
       breakdown,
     });
+  });
+
+  it('enforces password-protected shared reports and revokes active tokens', async () => {
+    const protectedShareLink: ShareLinkRecord = {
+      ...shareLink,
+      passwordHash: 'b7a8c8e152719b77eae7427ed619b63293589940c877c3a2122e4b642307cc29',
+    };
+    const repository = repositoryMock({
+      getActiveShareLink: jest.fn(async () => protectedShareLink),
+      revokeShareLink: jest.fn(async () => protectedShareLink),
+    });
+    const service = new CostManagementService(repository as never);
+
+    await expect(service.getSharedReport(shareLink.token)).rejects.toThrow(ApiUnauthorizedError);
+    await expect(service.getSharedReport(shareLink.token, 'client-demo')).resolves.toEqual(
+      expect.objectContaining({
+        passwordProtected: true,
+        pricingModel: 'reserved-3yr',
+        granularity: 'yearly',
+      }),
+    );
+    await expect(service.revokeShareLink(shareLink.token)).resolves.toEqual({
+      token: shareLink.token,
+      url: `/api/v1/share/${shareLink.token}`,
+    });
+    expect(repository.revokeShareLink).toHaveBeenCalledWith(shareLink.token, expect.any(String));
   });
 
   it('fails clearly for missing workloads and expired share links', async () => {
@@ -99,6 +136,7 @@ function repositoryMock(overrides: Record<string, unknown> = {}) {
     updateAlertDismissed: jest.fn(),
     createShareLink: jest.fn(async () => shareLink),
     getActiveShareLink: jest.fn(async () => shareLink),
+    revokeShareLink: jest.fn(async () => shareLink),
     getExchangeRates: jest.fn(),
     ...overrides,
   };

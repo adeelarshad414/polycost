@@ -40,6 +40,7 @@ import {
   defaultWorkloadForm,
   formFromNws,
   sampleNaturalLanguageInput,
+  serviceRequirementsFromForm,
   validateWorkloadForm,
   WorkloadFormIssue,
   WorkloadFormState,
@@ -48,8 +49,13 @@ import {
 type InputMode = 'describe' | 'form';
 type BusyAction = 'parse' | 'compare' | 'refresh' | 'export' | null;
 type ServiceCategory = ComparisonProviderResult['lineItems'][number]['category'];
+type ComparisonLineItem = ComparisonProviderResult['lineItems'][number];
 type FormSectionTone = 'profile' | 'compute' | 'services' | 'portfolio' | 'data' | 'network';
 type ToggleIconKind = 'storage' | 'database' | 'cdn' | 'loadBalancer' | 'multiAz' | 'multiRegion';
+type CostMatrixCategoryFilter = ServiceCategory | 'all';
+type CostMatrixProviderFilter = ProviderId | 'all';
+type CostMatrixPricingModelFilter = PricingModelKey | 'all';
+type CostMatrixSortKey = 'service' | `${ProviderId}:${PricingModelKey}`;
 
 const INPUT_MODE_OPTIONS: Array<{
   key: InputMode;
@@ -72,6 +78,19 @@ const INPUT_MODE_OPTIONS: Array<{
 ];
 
 const PRICING_MODEL_STORAGE_KEY = 'polycost-pricing-model';
+const REQUIREMENT_SESSION_STORAGE_KEY = 'polycost-current-requirements-v1';
+const REQUIREMENTS_FILE_MAX_BYTES = 128 * 1024;
+const REQUIREMENTS_FILE_ACCEPT =
+  '.txt,.md,.markdown,.json,.yaml,.yml,text/plain,text/markdown,application/json,application/yaml,application/x-yaml,text/yaml';
+const REQUIREMENTS_FILE_EXTENSIONS = ['.txt', '.md', '.markdown', '.json', '.yaml', '.yml'];
+const REQUIREMENTS_FILE_MIME_TYPES = new Set([
+  'text/plain',
+  'text/markdown',
+  'application/json',
+  'application/yaml',
+  'application/x-yaml',
+  'text/yaml',
+]);
 const PRICING_MODEL_OPTIONS: Array<{
   key: PricingModelKey;
   label: string;
@@ -265,6 +284,14 @@ const INITIAL_HOME_FORM: WorkloadFormState = {
   slaTarget: '',
 };
 
+interface StoredRequirementSession {
+  inputMode: InputMode;
+  naturalLanguageInput: string;
+  form: WorkloadFormState;
+  pricingModel: PricingModelKey;
+  requirementsAwaitingReview: boolean;
+}
+
 interface CategoryCostSummary {
   category: ServiceCategory;
   total: number;
@@ -394,23 +421,36 @@ export function App({ client = polyCostClient }: AppProps) {
   const shareToken = shareTokenFromLocation();
   const isPageLoading = usePageLoadingState();
   const activeAsyncActionId = useRef(0);
+  const initialRequirementSession = useRef(readStoredRequirementSession()).current;
   const [themeChoice, setThemeChoice] = useState<ThemeChoice>(() => storedTheme());
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
     resolveTheme(storedTheme()),
   );
-  const [inputMode, setInputMode] = useState<InputMode>('form');
-  const [naturalLanguageInput, setNaturalLanguageInput] = useState(sampleNaturalLanguageInput);
-  const [form, setForm] = useState<WorkloadFormState>(INITIAL_HOME_FORM);
+  const [inputMode, setInputMode] = useState<InputMode>(
+    () => initialRequirementSession?.inputMode ?? 'form',
+  );
+  const [naturalLanguageInput, setNaturalLanguageInput] = useState(
+    () => initialRequirementSession?.naturalLanguageInput ?? sampleNaturalLanguageInput,
+  );
+  const [form, setForm] = useState<WorkloadFormState>(
+    () => initialRequirementSession?.form ?? INITIAL_HOME_FORM,
+  );
   const [submittedForm, setSubmittedForm] = useState<WorkloadFormState>(INITIAL_HOME_FORM);
   const [submittedInputMode, setSubmittedInputMode] = useState<InputMode>('form');
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
   const [interval, setInterval] = useState<IntervalKey>('monthly');
-  const [pricingModel, setPricingModel] = useState<PricingModelKey>(() => readStoredPricingModel());
+  const [pricingModel, setPricingModel] = useState<PricingModelKey>(
+    () => initialRequirementSession?.pricingModel ?? readStoredPricingModel(),
+  );
+  const [requirementsAwaitingReview, setRequirementsAwaitingReview] = useState(
+    () => initialRequirementSession?.requirementsAwaitingReview ?? false,
+  );
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [exportingFormat, setExportingFormat] = useState<ReportFormat | null>(null);
   const [isEditingRequirements, setIsEditingRequirements] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [requirementsFileName, setRequirementsFileName] = useState<string | null>(null);
   const [regionCatalog, setRegionCatalog] = useState<RegionCatalogResponse | null>(null);
   const [regionCatalogError, setRegionCatalogError] = useState<string | null>(null);
   const [formValidationIssues, setFormValidationIssues] = useState<WorkloadFormIssue[]>([]);
@@ -418,6 +458,16 @@ export function App({ client = polyCostClient }: AppProps) {
   useEffect(() => {
     setResolvedTheme(applyTheme(themeChoice));
   }, [themeChoice]);
+
+  useEffect(() => {
+    storeRequirementSession({
+      inputMode,
+      naturalLanguageInput,
+      form,
+      pricingModel,
+      requirementsAwaitingReview,
+    });
+  }, [form, inputMode, naturalLanguageInput, pricingModel, requirementsAwaitingReview]);
 
   useEffect(() => {
     let isMounted = true;
@@ -471,7 +521,13 @@ export function App({ client = polyCostClient }: AppProps) {
       setForm(formFromNws(parsed.draftNws));
       setFormValidationIssues([]);
       setInputMode('form');
-      setNotice(reviewMessage(parsed.parserConfidence, parsed.fieldsRequiringReview));
+      setRequirementsAwaitingReview(true);
+      setNotice(
+        `${reviewMessage(
+          parsed.parserConfidence,
+          parsed.fieldsRequiringReview,
+        )} Review the interpreted services, edit anything, then compare.`,
+      );
     } catch (parseError) {
       if (isCurrentAsyncAction(actionId)) {
         setError(formatApiError(parseError));
@@ -485,13 +541,13 @@ export function App({ client = polyCostClient }: AppProps) {
 
   async function handleCompare(event?: FormEvent) {
     event?.preventDefault();
-    const validationIssues = inputMode === 'form' ? validateWorkloadForm(form) : [];
 
-    if (inputMode === 'describe' && !naturalLanguageInput.trim()) {
-      setError('Enter workload requirements before comparing.');
-      setNotice(null);
+    if (inputMode === 'describe') {
+      await handleParse();
       return;
     }
+
+    const validationIssues = inputMode === 'form' ? validateWorkloadForm(form) : [];
 
     if (validationIssues.length > 0) {
       setFormValidationIssues(validationIssues);
@@ -537,6 +593,7 @@ export function App({ client = polyCostClient }: AppProps) {
       setSubmittedForm(submittedComparisonForm);
       setSubmittedInputMode(submittedComparisonInputMode);
       setIsEditingRequirements(false);
+      setRequirementsAwaitingReview(false);
       setNotice(parserNotice ? `${parserNotice} Comparison ready.` : 'Comparison ready.');
     } catch (comparisonError) {
       if (isCurrentAsyncAction(actionId)) {
@@ -560,7 +617,7 @@ export function App({ client = polyCostClient }: AppProps) {
       return {
         nws: buildNwsFromForm(form, 'structured_form'),
         submittedComparisonForm: form,
-        submittedComparisonInputMode: 'form',
+        submittedComparisonInputMode: requirementsAwaitingReview ? 'describe' : 'form',
       };
     }
 
@@ -646,18 +703,77 @@ export function App({ client = polyCostClient }: AppProps) {
 
   function handleClearRequirements() {
     setNaturalLanguageInput('');
+    setRequirementsFileName(null);
     setFormValidationIssues([]);
     setNotice(null);
     setError(null);
   }
 
+  function handleNaturalLanguageChange(value: string) {
+    setNaturalLanguageInput(value);
+    setRequirementsFileName(null);
+  }
+
+  function handleUseSampleRequirements() {
+    setInputMode('describe');
+    setNaturalLanguageInput(sampleNaturalLanguageInput);
+    setRequirementsFileName(null);
+    setNotice(null);
+    setError(null);
+  }
+
+  async function handleRequirementsFileLoad(file: File | null) {
+    if (!file) {
+      return;
+    }
+
+    if (file.size > REQUIREMENTS_FILE_MAX_BYTES) {
+      setError('Upload a requirements file under 128KB.');
+      setNotice(null);
+      return;
+    }
+
+    if (!isSupportedRequirementsFile(file)) {
+      setError(
+        'Upload a plain text, Markdown, JSON, or YAML requirements file. CSV, Excel, and DrawIO imports are Phase 2 hook points.',
+      );
+      setNotice(null);
+      return;
+    }
+
+    try {
+      const fileText = await file.text();
+      if (!fileText.trim()) {
+        setError('The selected requirements file is empty.');
+        setNotice(null);
+        return;
+      }
+
+      setNaturalLanguageInput(fileText);
+      setRequirementsFileName(file.name || 'requirements file');
+      setInputMode('describe');
+      setRequirementsAwaitingReview(false);
+      setFormValidationIssues([]);
+      setError(null);
+      setNotice(
+        `Loaded ${file.name || 'requirements file'}. Review the text, then parse requirements.`,
+      );
+    } catch {
+      setError('Could not read the selected requirements file.');
+      setNotice(null);
+    }
+  }
+
   function handleClearComparison() {
     cancelAsyncActions();
     setForm(INITIAL_HOME_FORM);
+    setRequirementsAwaitingReview(false);
+    clearRequirementSession();
     setSubmittedForm(INITIAL_HOME_FORM);
     setSubmittedInputMode('form');
     setInputMode('form');
     setNaturalLanguageInput(sampleNaturalLanguageInput);
+    setRequirementsFileName(null);
     setComparison(null);
     setIsEditingRequirements(false);
     setInterval('monthly');
@@ -680,6 +796,7 @@ export function App({ client = polyCostClient }: AppProps) {
     setForm(submittedForm);
     setFormValidationIssues([]);
     setInputMode(submittedInputMode);
+    setRequirementsAwaitingReview(false);
     setIsEditingRequirements(true);
   }
 
@@ -732,6 +849,7 @@ export function App({ client = polyCostClient }: AppProps) {
           pricingModel={pricingModel}
           interval={interval}
           isEditingRequirements={isEditingRequirements}
+          requirementsAwaitingReview={requirementsAwaitingReview}
           busyAction={busyAction}
           exportingFormat={exportingFormat}
           notice={notice}
@@ -744,12 +862,14 @@ export function App({ client = polyCostClient }: AppProps) {
           onEdit={handleEditComparison}
           onInputModeChange={setInputMode}
           onPricingModelChange={handlePricingModelChange}
-          onNaturalLanguageChange={setNaturalLanguageInput}
+          onNaturalLanguageChange={handleNaturalLanguageChange}
           onFormChange={handleFormChange}
           onSubmit={handleCompare}
           onParse={handleParse}
           onClearRequirements={handleClearRequirements}
-          onUseSample={() => setNaturalLanguageInput(sampleNaturalLanguageInput)}
+          onUseSample={handleUseSampleRequirements}
+          onRequirementsFileLoad={handleRequirementsFileLoad}
+          requirementsFileName={requirementsFileName}
           onIntervalChange={setInterval}
           onRefreshLive={handleRefreshLive}
           onExport={(format) => void handleExport(format)}
@@ -759,20 +879,23 @@ export function App({ client = polyCostClient }: AppProps) {
           form={form}
           inputMode={inputMode}
           pricingModel={pricingModel}
+          requirementsAwaitingReview={requirementsAwaitingReview}
           naturalLanguageInput={naturalLanguageInput}
           regionCatalog={regionCatalog}
           regionCatalogError={regionCatalogError}
           notice={notice}
           error={error}
           validationIssues={formValidationIssues}
-          isComparing={busyAction === 'compare'}
+          isComparing={busyAction === 'compare' || busyAction === 'parse'}
           onInputModeChange={setInputMode}
           onPricingModelChange={handlePricingModelChange}
-          onNaturalLanguageChange={setNaturalLanguageInput}
+          onNaturalLanguageChange={handleNaturalLanguageChange}
           onChange={handleFormChange}
           onClearRequirements={handleClearRequirements}
           onSubmit={handleCompare}
-          onUseSample={() => setNaturalLanguageInput(sampleNaturalLanguageInput)}
+          onUseSample={handleUseSampleRequirements}
+          onRequirementsFileLoad={handleRequirementsFileLoad}
+          requirementsFileName={requirementsFileName}
         />
       )}
     </main>
@@ -930,6 +1053,7 @@ function InitialHomePage({
   error,
   validationIssues,
   isComparing,
+  requirementsAwaitingReview,
   onInputModeChange,
   onPricingModelChange,
   onNaturalLanguageChange,
@@ -937,6 +1061,8 @@ function InitialHomePage({
   onClearRequirements,
   onSubmit,
   onUseSample,
+  onRequirementsFileLoad,
+  requirementsFileName,
 }: {
   form: WorkloadFormState;
   inputMode: InputMode;
@@ -948,6 +1074,7 @@ function InitialHomePage({
   error: string | null;
   validationIssues: WorkloadFormIssue[];
   isComparing: boolean;
+  requirementsAwaitingReview: boolean;
   onInputModeChange: (mode: InputMode) => void;
   onPricingModelChange: (model: PricingModelKey) => void;
   onNaturalLanguageChange: (value: string) => void;
@@ -955,6 +1082,8 @@ function InitialHomePage({
   onClearRequirements: () => void;
   onSubmit: (event: FormEvent) => void;
   onUseSample: () => void;
+  onRequirementsFileLoad: (file: File | null) => void | Promise<void>;
+  requirementsFileName: string | null;
 }) {
   function update<K extends keyof WorkloadFormState>(key: K, value: WorkloadFormState[K]) {
     onChange({
@@ -999,9 +1128,12 @@ function InitialHomePage({
         {inputMode === 'form' ? (
           <form className="initial-guided-form" onSubmit={onSubmit}>
             <FormValidationSummary issues={validationIssues} />
+            {requirementsAwaitingReview ? <RequirementReviewCards form={form} /> : null}
             <div className="initial-home-actions initial-home-actions-primary">
               <span className="initial-home-action-hint">
-                Adjust the workload below, or run the default estimate now.
+                {requirementsAwaitingReview
+                  ? 'Review the interpreted workload below, edit anything, then confirm.'
+                  : 'Adjust the workload below, or run the default estimate now.'}
               </span>
               <Button
                 type="submit"
@@ -1011,10 +1143,17 @@ function InitialHomePage({
                 disabled={isComparing}
               >
                 <CompareIcon />
-                Compare costs
+                {requirementsAwaitingReview ? 'Confirm & compare' : 'Compare costs'}
               </Button>
             </div>
             <div className="initial-home-fields">
+              {requirementsAwaitingReview ? (
+                <TextField
+                  label="Name"
+                  value={form.workloadName}
+                  onChange={(value) => update('workloadName', value)}
+                />
+              ) : null}
               <SelectField
                 label="Service category"
                 value={form.selectedServiceCategory}
@@ -1114,6 +1253,8 @@ function InitialHomePage({
               onChange={onNaturalLanguageChange}
               onClear={onClearRequirements}
               onUseSample={onUseSample}
+              onFileLoad={onRequirementsFileLoad}
+              fileName={requirementsFileName}
             />
             <div className="initial-home-actions">
               <Button
@@ -1146,6 +1287,7 @@ function ProgressiveComparisonPage({
   pricingModel,
   interval,
   isEditingRequirements,
+  requirementsAwaitingReview,
   busyAction,
   exportingFormat,
   notice,
@@ -1164,6 +1306,8 @@ function ProgressiveComparisonPage({
   onParse,
   onClearRequirements,
   onUseSample,
+  onRequirementsFileLoad,
+  requirementsFileName,
   onIntervalChange,
   onRefreshLive,
   onExport,
@@ -1177,6 +1321,7 @@ function ProgressiveComparisonPage({
   pricingModel: PricingModelKey;
   interval: IntervalKey;
   isEditingRequirements: boolean;
+  requirementsAwaitingReview: boolean;
   busyAction: BusyAction;
   exportingFormat: ReportFormat | null;
   notice: string | null;
@@ -1195,6 +1340,8 @@ function ProgressiveComparisonPage({
   onParse: () => void;
   onClearRequirements: () => void;
   onUseSample: () => void;
+  onRequirementsFileLoad: (file: File | null) => void | Promise<void>;
+  requirementsFileName: string | null;
   onIntervalChange: (interval: IntervalKey) => void;
   onRefreshLive: () => void;
   onExport: (format: ReportFormat) => void;
@@ -1212,6 +1359,7 @@ function ProgressiveComparisonPage({
               regionCatalog={regionCatalog}
               regionCatalogError={regionCatalogError}
               validationIssues={validationIssues}
+              requirementsAwaitingReview={requirementsAwaitingReview}
               busyAction={busyAction}
               onClearRequirements={onClearRequirements}
               onFormChange={onFormChange}
@@ -1221,6 +1369,8 @@ function ProgressiveComparisonPage({
               onParse={onParse}
               onSubmit={onSubmit}
               onUseSample={onUseSample}
+              onRequirementsFileLoad={onRequirementsFileLoad}
+              requirementsFileName={requirementsFileName}
             />
             <StatusMessage notice={editStatusNotice(notice)} error={error} />
           </>
@@ -1442,6 +1592,7 @@ function StateDetailContent({
         />
         <EngineeringAnalyticsDashboard comparison={comparison} interval={interval} />
         <ServiceCheapestMatrix comparison={comparison} interval={interval} />
+        <FullCostMatrixTable comparison={comparison} />
         <CostFormulaEvidence comparison={comparison} />
         <ComparisonToolbar interval={interval} onIntervalChange={onIntervalChange} />
         <FinOpsFeatureLayer
@@ -1602,6 +1753,7 @@ function RequirementsEditPanel({
   regionCatalog,
   regionCatalogError,
   validationIssues,
+  requirementsAwaitingReview,
   busyAction,
   onClearRequirements,
   onFormChange,
@@ -1611,6 +1763,8 @@ function RequirementsEditPanel({
   onParse,
   onSubmit,
   onUseSample,
+  onRequirementsFileLoad,
+  requirementsFileName,
 }: {
   form: WorkloadFormState;
   inputMode: InputMode;
@@ -1619,6 +1773,7 @@ function RequirementsEditPanel({
   regionCatalog: RegionCatalogResponse | null;
   regionCatalogError: string | null;
   validationIssues: WorkloadFormIssue[];
+  requirementsAwaitingReview: boolean;
   busyAction: BusyAction;
   onClearRequirements: () => void;
   onFormChange: (form: WorkloadFormState) => void;
@@ -1628,6 +1783,8 @@ function RequirementsEditPanel({
   onParse: () => void;
   onSubmit: (event?: FormEvent) => void;
   onUseSample: () => void;
+  onRequirementsFileLoad: (file: File | null) => void | Promise<void>;
+  requirementsFileName: string | null;
 }) {
   return (
     <section className="requirements-edit-panel" aria-label="Edit workload requirements">
@@ -1650,6 +1807,8 @@ function RequirementsEditPanel({
           onClear={onClearRequirements}
           onParse={onParse}
           onUseSample={onUseSample}
+          onFileLoad={onRequirementsFileLoad}
+          fileName={requirementsFileName}
         />
       ) : (
         <WorkloadForm
@@ -1661,6 +1820,9 @@ function RequirementsEditPanel({
           onSubmit={onSubmit}
         />
       )}
+      {inputMode === 'form' && requirementsAwaitingReview ? (
+        <RequirementReviewCards form={form} compact />
+      ) : null}
       <div className="requirements-edit-actions">
         <Button
           type="button"
@@ -1671,7 +1833,9 @@ function RequirementsEditPanel({
           disabled={busyAction !== null && busyAction !== 'compare'}
         >
           <CompareIcon />
-          {compareButtonLabel(inputMode)}
+          {inputMode === 'form' && requirementsAwaitingReview
+            ? 'Confirm & compare'
+            : compareButtonLabel(inputMode)}
         </Button>
       </div>
     </section>
@@ -1800,6 +1964,8 @@ function DescribePanel({
   onClear,
   onParse,
   onUseSample,
+  onFileLoad,
+  fileName,
 }: {
   value: string;
   isParsing: boolean;
@@ -1807,6 +1973,8 @@ function DescribePanel({
   onClear: () => void;
   onParse?: () => void;
   onUseSample: () => void;
+  onFileLoad: (file: File | null) => void | Promise<void>;
+  fileName: string | null;
 }) {
   return (
     <div className="describe-panel">
@@ -1819,6 +1987,38 @@ function DescribePanel({
         onChange={(event) => onChange(event.currentTarget.value)}
         placeholder="Paste an architecture description, cloud bill excerpt, or CSV-like text. Example: A web app for 5,000 daily users with Postgres, 250GB object storage, CDN, and US East preference."
       />
+      <div className="requirements-file-loader">
+        <label className="requirements-file-trigger" htmlFor="requirements-file-input">
+          <UploadIcon />
+          Upload requirements file
+        </label>
+        <input
+          id="requirements-file-input"
+          className="sr-only"
+          type="file"
+          accept={REQUIREMENTS_FILE_ACCEPT}
+          aria-describedby="requirements-file-help"
+          disabled={isParsing}
+          onChange={(event) => {
+            const input = event.currentTarget;
+            const file = input.files?.[0] ?? null;
+
+            void Promise.resolve(onFileLoad(file)).finally(() => {
+              input.value = '';
+            });
+          }}
+        />
+        <div className="requirements-file-copy">
+          <p id="requirements-file-help">
+            TXT, Markdown, JSON, or YAML. CSV, Excel, and diagram parsers plug in at Phase 2.
+          </p>
+          {fileName ? (
+            <p className="requirements-file-status" role="status">
+              Loaded from {fileName}
+            </p>
+          ) : null}
+        </div>
+      </div>
       <div className="action-row">
         {onParse ? (
           <Button
@@ -2277,6 +2477,44 @@ function FormValidationSummary({ issues }: { issues: WorkloadFormIssue[] }) {
       </strong>{' '}
       <span>{issues.map((issue) => issue.message).join(' ')}</span>
     </div>
+  );
+}
+
+function RequirementReviewCards({
+  form,
+  compact = false,
+}: {
+  form: WorkloadFormState;
+  compact?: boolean;
+}) {
+  const requirements = serviceRequirementsFromForm(form);
+
+  return (
+    <section
+      className={compact ? 'requirement-review-cards is-compact' : 'requirement-review-cards'}
+      aria-label="Interpreted requirement review"
+    >
+      <div className="requirement-review-heading">
+        <span>Review checkpoint</span>
+        <strong>Interpreted services ready to price</strong>
+      </div>
+      <div className="requirement-review-grid">
+        {requirements.map((requirement, index) => (
+          <article
+            key={`${requirement.serviceCategory}-${requirement.serviceType}-${index}`}
+            className={`requirement-review-card requirement-review-card-${requirement.serviceCategory}`}
+          >
+            <span>{requirement.serviceCategory}</span>
+            <strong>{requirement.serviceType}</strong>
+            <small>
+              Qty {requirement.quantity}
+              {requirement.region ? ` · ${requirement.region}` : ''}
+              {requirement.az ? ` · ${requirement.az}` : ''}
+            </small>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -3005,6 +3243,9 @@ export function ComparisonView({
           />
           <EngineeringAnalyticsDashboard comparison={comparison} interval={interval} />
           <ArchitectureWorkspace comparison={comparison} interval={interval} form={form} />
+          <ServiceCheapestMatrix comparison={comparison} interval={interval} />
+          <FullCostMatrixTable comparison={comparison} />
+          <CostFormulaEvidence comparison={comparison} />
           <FinOpsFeatureLayer
             client={client}
             comparison={comparison}
@@ -3444,6 +3685,375 @@ function ServiceCheapestMatrix({
       </div>
     </section>
   );
+}
+
+function FullCostMatrixTable({ comparison }: { comparison: ComparisonResult | null }) {
+  const [categoryFilter, setCategoryFilter] = useState<CostMatrixCategoryFilter>('all');
+  const [providerFilter, setProviderFilter] = useState<CostMatrixProviderFilter>('all');
+  const [pricingModelFilter, setPricingModelFilter] = useState<CostMatrixPricingModelFilter>('all');
+  const [sortBy, setSortBy] = useState<CostMatrixSortKey>('service');
+  const visibleProviders =
+    providerFilter === 'all'
+      ? PROVIDER_ORDER
+      : PROVIDER_ORDER.filter((providerId) => providerId === providerFilter);
+  const visiblePricingModels =
+    pricingModelFilter === 'all'
+      ? PRICING_MODEL_OPTIONS
+      : PRICING_MODEL_OPTIONS.filter((model) => model.key === pricingModelFilter);
+  const rows = fullCostMatrixRows(comparison);
+  const visibleRows = rows
+    .filter((row) => categoryFilter === 'all' || row.category === categoryFilter)
+    .sort((left, right) => compareCostMatrixRows(left, right, sortBy));
+
+  return (
+    <section className="full-cost-matrix" aria-label="Full cost matrix">
+      <div className="engineering-dashboard-heading">
+        <div>
+          <span>Full cost matrix</span>
+          <h3>Service x provider x pricing model</h3>
+        </div>
+        <p>
+          This is the engineering audit view for scenario tradeoffs. Empty cells mean the current
+          backend response did not publish that service-level pricing model.
+        </p>
+      </div>
+
+      <div className="cost-matrix-controls" aria-label="Cost matrix controls">
+        <label>
+          <span>Category</span>
+          <select
+            value={categoryFilter}
+            onChange={(event) => setCategoryFilter(event.target.value as CostMatrixCategoryFilter)}
+          >
+            <option value="all">All services</option>
+            {SERVICE_CATEGORIES.map((category) => (
+              <option value={category} key={category}>
+                {capitalize(category)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Provider</span>
+          <select
+            value={providerFilter}
+            onChange={(event) => setProviderFilter(event.target.value as CostMatrixProviderFilter)}
+          >
+            <option value="all">All providers</option>
+            {PROVIDER_ORDER.map((providerId) => (
+              <option value={providerId} key={providerId}>
+                {providerLabel(providerId)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Pricing model</span>
+          <select
+            value={pricingModelFilter}
+            onChange={(event) =>
+              setPricingModelFilter(event.target.value as CostMatrixPricingModelFilter)
+            }
+          >
+            <option value="all">All models</option>
+            {PRICING_MODEL_OPTIONS.map((model) => (
+              <option value={model.key} key={model.key}>
+                {model.shortLabel}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Sort</span>
+          <select
+            value={sortBy}
+            onChange={(event) => setSortBy(event.target.value as CostMatrixSortKey)}
+          >
+            <option value="service">Service order</option>
+            {PROVIDER_ORDER.flatMap((providerId) =>
+              PRICING_MODEL_OPTIONS.map((model) => (
+                <option
+                  value={costMatrixSortKey(providerId, model.key)}
+                  key={`${providerId}-${model.key}`}
+                >
+                  {providerLabel(providerId)} {costMatrixPricingModelLabel(model.key)}
+                </option>
+              )),
+            )}
+          </select>
+        </label>
+      </div>
+
+      <div className="table-wrap cost-matrix-wrap">
+        <table className="ranking-table cost-matrix-table">
+          <thead>
+            <tr>
+              <th scope="col">Service</th>
+              <th scope="col">Category</th>
+              <th scope="col">Confidence</th>
+              {visibleProviders.flatMap((providerId) =>
+                visiblePricingModels.map((model) => (
+                  <th scope="col" key={`${providerId}-${model.key}`}>
+                    {providerLabel(providerId)} {costMatrixPricingModelLabel(model.key)}
+                  </th>
+                )),
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {visibleRows.length > 0 ? (
+              visibleRows.map((row) => (
+                <tr key={row.key}>
+                  <td>
+                    <span className="matrix-service-label">{row.service}</span>
+                  </td>
+                  <td>{capitalize(row.category)}</td>
+                  <td>{row.approximate ? 'Approximate' : 'Mapped'}</td>
+                  {visibleProviders.flatMap((providerId) =>
+                    visiblePricingModels.map((model) => (
+                      <td key={`${row.key}-${providerId}-${model.key}`}>
+                        <CostMatrixValue cell={costMatrixCellFromRow(row, providerId, model.key)} />
+                      </td>
+                    )),
+                  )}
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={3 + visibleProviders.length * visiblePricingModels.length}>
+                  No services match this filter.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function CostMatrixValue({ cell }: { cell: CostMatrixCell }) {
+  if (!cell.available || cell.monthlyCostUsd === undefined) {
+    return (
+      <span className="matrix-unavailable" title={cell.caveat}>
+        N/A
+      </span>
+    );
+  }
+
+  return (
+    <span className={cell.estimated ? 'matrix-estimated' : undefined} title={cell.caveat}>
+      {formatCurrency(cell.monthlyCostUsd)}
+      {cell.estimated ? ' est.' : ''}
+    </span>
+  );
+}
+
+interface CostMatrixCell {
+  available: boolean;
+  monthlyCostUsd?: number;
+  estimated?: boolean;
+  caveat?: string;
+}
+
+interface FullCostMatrixRow {
+  key: string;
+  service: string;
+  category: ServiceCategory;
+  approximate: boolean;
+  sortCosts: Array<{
+    providerId: ProviderId;
+    monthlyCostUsd: number;
+  }>;
+  providerModelCosts: Array<{
+    providerId: ProviderId;
+    modelCosts: Array<{
+      pricingModel: PricingModelKey;
+      cell: CostMatrixCell;
+    }>;
+  }>;
+}
+
+function fullCostMatrixRows(comparison: ComparisonResult | null): FullCostMatrixRow[] {
+  if (!comparison) {
+    return [];
+  }
+
+  const providersById = new Map<ProviderId, ComparisonProviderResult>(
+    comparison.providers.map((provider) => [provider.providerId, provider]),
+  );
+  const rowCount = Math.max(
+    ...comparison.providers.map((provider) => provider.lineItems.length),
+    0,
+  );
+
+  return Array.from({ length: rowCount }, (_, index) => {
+    const firstLineItem = PROVIDER_ORDER.map((providerId) =>
+      providersById.get(providerId)?.lineItems.at(index),
+    ).find((lineItem): lineItem is ComparisonLineItem => Boolean(lineItem));
+    const category = firstLineItem?.category ?? 'compute';
+    const service = firstLineItem
+      ? `${capitalize(firstLineItem.category)} - ${firstLineItem.description}`
+      : `Service row ${index + 1}`;
+    const sortCosts: FullCostMatrixRow['sortCosts'] = [];
+    let approximate = firstLineItem?.isApproximate ?? false;
+    const providerModelCosts = PROVIDER_ORDER.map((providerId) => {
+      const lineItem = providersById.get(providerId)?.lineItems.at(index);
+
+      if (lineItem) {
+        approximate = approximate || lineItem.isApproximate;
+        sortCosts.push({ providerId, monthlyCostUsd: lineItem.baseMonthlyCostUsd });
+      }
+
+      return {
+        providerId,
+        modelCosts: PRICING_MODEL_OPTIONS.map((model) => ({
+          pricingModel: model.key,
+          cell: lineItem
+            ? costMatrixCellForLineItem(lineItem, model.key)
+            : missingCostMatrixCell('No matching service line item in this provider response.'),
+        })),
+      };
+    });
+
+    return {
+      key: `${index}-${category}-${service}`,
+      service,
+      category,
+      approximate,
+      sortCosts,
+      providerModelCosts,
+    };
+  });
+}
+
+function missingCostMatrixCell(caveat: string): CostMatrixCell {
+  return {
+    available: false,
+    caveat,
+  };
+}
+
+function costMatrixCellFromRow(
+  row: FullCostMatrixRow,
+  providerId: ProviderId,
+  pricingModel: PricingModelKey,
+): CostMatrixCell {
+  return (
+    row.providerModelCosts
+      .find((provider) => provider.providerId === providerId)
+      ?.modelCosts.find((model) => model.pricingModel === pricingModel)?.cell ??
+    missingCostMatrixCell('Pricing model unavailable for this row.')
+  );
+}
+
+function costMatrixCellForLineItem(
+  lineItem: ComparisonLineItem,
+  pricingModel: PricingModelKey,
+): CostMatrixCell {
+  if (pricingModel === 'on-demand') {
+    return {
+      available: true,
+      monthlyCostUsd: lineItem.baseMonthlyCostUsd,
+      caveat: 'Base monthly line item cost.',
+    };
+  }
+
+  const model = lineItem.pricingModels?.find((candidate) => candidate.model === pricingModel);
+
+  if (!model) {
+    return {
+      available: false,
+      caveat: 'Service-level pricing model not present in the backend response.',
+    };
+  }
+
+  if (!model.available || model.monthlyCostUsd === undefined) {
+    return {
+      available: false,
+      caveat: model.unavailableReason ?? model.caveat ?? 'Pricing model unavailable.',
+    };
+  }
+
+  return {
+    available: true,
+    monthlyCostUsd: model.monthlyCostUsd,
+    estimated: model.estimated,
+    caveat: model.caveat ?? model.providerTerm ?? model.displayName,
+  };
+}
+
+function compareCostMatrixRows(
+  left: FullCostMatrixRow,
+  right: FullCostMatrixRow,
+  sortBy: CostMatrixSortKey,
+): number {
+  if (sortBy === 'service') {
+    return left.service.localeCompare(right.service);
+  }
+
+  const parsed = parseCostMatrixSortKey(sortBy);
+
+  if (!parsed) {
+    return left.service.localeCompare(right.service);
+  }
+
+  return (
+    costMatrixSortCost(left, parsed.providerId, parsed.pricingModel) -
+    costMatrixSortCost(right, parsed.providerId, parsed.pricingModel)
+  );
+}
+
+function costMatrixSortKey(
+  providerId: ProviderId,
+  pricingModel: PricingModelKey,
+): CostMatrixSortKey {
+  return `${providerId}:${pricingModel}`;
+}
+
+function parseCostMatrixSortKey(
+  sortBy: CostMatrixSortKey,
+): { providerId: ProviderId; pricingModel: PricingModelKey } | null {
+  const [providerId, pricingModel] = sortBy.split(':');
+
+  if (!isProviderId(providerId) || !isPricingModelKey(pricingModel)) {
+    return null;
+  }
+
+  return { providerId, pricingModel };
+}
+
+function isProviderId(value: string): value is ProviderId {
+  return PROVIDER_ORDER.some((providerId) => providerId === value);
+}
+
+function isPricingModelKey(value: string): value is PricingModelKey {
+  return PRICING_MODEL_OPTIONS.some((model) => model.key === value);
+}
+
+function costMatrixSortCost(
+  row: FullCostMatrixRow,
+  providerId: ProviderId,
+  pricingModel: PricingModelKey,
+): number {
+  return (
+    costMatrixCellFromRow(row, providerId, pricingModel).monthlyCostUsd ?? Number.POSITIVE_INFINITY
+  );
+}
+
+function costMatrixPricingModelLabel(pricingModel: PricingModelKey): string {
+  switch (pricingModel) {
+    case 'on-demand':
+      return 'On-demand';
+    case 'reserved-1yr':
+      return '1yr';
+    case 'reserved-3yr':
+      return '3yr';
+    case 'savings-plan':
+      return 'Savings';
+    case 'spot':
+      return 'Spot';
+  }
 }
 
 function CostFormulaEvidence({ comparison }: { comparison: ComparisonResult | null }) {
@@ -4472,6 +5082,14 @@ function ParseIcon() {
   );
 }
 
+function UploadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon">
+      <path d="M12 17V5M8 9l4-4 4 4M5 19h14" />
+    </svg>
+  );
+}
+
 function ModeIcon({ mode }: { mode: InputMode }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="segment-icon">
@@ -5489,11 +6107,11 @@ function intervalCostMultiplier(interval: IntervalKey): number {
 }
 
 function compareButtonLabel(inputMode: InputMode): string {
-  return inputMode === 'describe' ? 'Parse & compare' : 'Compare';
+  return inputMode === 'describe' ? 'Parse requirements' : 'Compare';
 }
 
 function compareLoadingLabel(inputMode: InputMode): string {
-  return inputMode === 'describe' ? 'Parsing...' : 'Comparing...';
+  return inputMode === 'describe' ? 'Parsing requirements...' : 'Comparing...';
 }
 
 function inputModeSummaryLabel(inputMode: InputMode): string {
@@ -5518,6 +6136,58 @@ function readStoredPricingModel(): PricingModelKey {
 
 function storePricingModel(pricingModel: PricingModelKey): void {
   window.localStorage.setItem(PRICING_MODEL_STORAGE_KEY, pricingModel);
+}
+
+function readStoredRequirementSession(): StoredRequirementSession | undefined {
+  try {
+    const stored = window.sessionStorage.getItem(REQUIREMENT_SESSION_STORAGE_KEY);
+    if (!stored) {
+      return undefined;
+    }
+
+    const parsed = JSON.parse(stored) as Partial<StoredRequirementSession>;
+    const inputMode: InputMode = parsed.inputMode === 'describe' ? 'describe' : 'form';
+    const pricingModel = PRICING_MODEL_OPTIONS.some((option) => option.key === parsed.pricingModel)
+      ? (parsed.pricingModel as PricingModelKey)
+      : 'on-demand';
+
+    if (!parsed.form || typeof parsed.form !== 'object') {
+      return undefined;
+    }
+
+    return {
+      inputMode,
+      pricingModel,
+      form: {
+        ...INITIAL_HOME_FORM,
+        ...parsed.form,
+      },
+      naturalLanguageInput:
+        typeof parsed.naturalLanguageInput === 'string'
+          ? parsed.naturalLanguageInput
+          : sampleNaturalLanguageInput,
+      requirementsAwaitingReview: Boolean(parsed.requirementsAwaitingReview),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function storeRequirementSession(session: StoredRequirementSession): void {
+  window.sessionStorage.setItem(REQUIREMENT_SESSION_STORAGE_KEY, JSON.stringify(session));
+}
+
+function clearRequirementSession(): void {
+  window.sessionStorage.removeItem(REQUIREMENT_SESSION_STORAGE_KEY);
+}
+
+function isSupportedRequirementsFile(file: File): boolean {
+  const lowerName = file.name.toLowerCase();
+  const hasSupportedExtension = REQUIREMENTS_FILE_EXTENSIONS.some((extension) =>
+    lowerName.endsWith(extension),
+  );
+
+  return hasSupportedExtension || REQUIREMENTS_FILE_MIME_TYPES.has(file.type);
 }
 
 function reportFormatLabel(format: ReportFormat): string {

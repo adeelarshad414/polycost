@@ -9,6 +9,14 @@ export type PricingBasis = 'flat' | 'tiered';
 export type PricingVolatility = 'stable' | 'variable' | 'volatile';
 export type PricingSource = 'catalog' | 'modeled-estimate';
 
+export interface EgressTierBreakdown {
+  tierFromGb: number;
+  tierToGb?: number;
+  pricePerGb: number;
+  billableGb: number;
+  monthlyCostUsd: number;
+}
+
 export interface PricingModelCost {
   model: PricingModelKey;
   available: boolean;
@@ -21,6 +29,7 @@ export interface PricingModelCost {
   hourlyCostUsd?: number;
   savingsPercentVsOnDemand?: number;
   upfrontOption?: 'none' | 'partial' | 'all';
+  upfrontCostUsd?: number;
   commitmentTermMonths?: number;
   lastFetchedAt?: string;
   caveat?: string;
@@ -53,6 +62,7 @@ export interface ProviderPricingLineItem {
   unit: string;
   unitPriceUsd: number;
   pricingBasis?: PricingBasis;
+  egressTiers?: EgressTierBreakdown[];
   pricingModels?: PricingModelCost[];
 }
 

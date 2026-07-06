@@ -3,7 +3,9 @@ import { CsvReportGenerator } from './csv-report.generator';
 import { ExcelReportGenerator } from './excel-report.generator';
 import { PdfReportGenerator } from './pdf-report.generator';
 import {
+  commitmentTcoRows,
   decisionSummaryRows,
+  egressTierBreakdownRows,
   labelForInterval,
   labelForPricingModel,
   lineItemEvidenceRows,
@@ -57,6 +59,26 @@ const comparison: ComparisonResult = {
           isApproximate: true,
           baseMonthlyCostUsd: 10.2,
         },
+        {
+          category: 'network',
+          costComponent: 'egress',
+          description: 'internet egress',
+          isApproximate: false,
+          baseMonthlyCostUsd: 46.08,
+          region: 'us-east-1',
+          unit: 'GB',
+          unitPriceUsd: 0.09,
+          pricingBasis: 'tiered',
+          egressTiers: [
+            {
+              tierFromGb: 0,
+              tierToGb: 512,
+              pricePerGb: 0.09,
+              billableGb: 512,
+              monthlyCostUsd: 46.08,
+            },
+          ],
+        },
       ],
       totals: {
         daily: 2.33,
@@ -77,6 +99,8 @@ const comparison: ComparisonResult = {
           available: true,
           monthlyCostUsd: 42,
           hourlyCostUsd: 0.06,
+          upfrontOption: 'all',
+          upfrontCostUsd: 360,
           caveat: 'Three-year commitment.',
         },
       ],
@@ -146,6 +170,10 @@ describe('report generators', () => {
     expect(csv).toContain(
       'gcp,available,not modeled,not modeled,not modeled,not modeled,Only on-demand totals are modeled for this provider.',
     );
+    expect(csv).toContain('Commitment Payment and TCO');
+    expect(csv).toContain('aws,Reserved 3-year,yes,0.06,42,360,All upfront,36 months,1872');
+    expect(csv).toContain('Egress Tiered Breakdown');
+    expect(csv).toContain('aws,us-east-1,0-512 GB,512,0.09,46.08,0.09');
     expect(csv).toContain('Normalized Service Requirements');
     expect(csv).toContain('compute,vm-compute,balanced tier - 2 vCPU - 4GB / balanced');
     expect(csv).toContain('Rate Math Evidence');
@@ -201,7 +229,25 @@ describe('report generators', () => {
     expect(xlsxText).toContain('[Content_Types].xml');
     expect(xlsxText).toContain('xl/workbook.xml');
     expect(xlsxText).toContain('xl/worksheets/sheet1.xml');
+    expect(xlsxText).toContain('xl/worksheets/sheet2.xml');
     expect(xlsxText).toContain('<sheet name="Comparison"');
+    expect(xlsxText).toContain('<sheet name="What If" sheetId="2"');
+    expect(xlsxText).toContain('<calcPr calcMode="auto" fullCalcOnLoad="1"/>');
+    expect(xlsxText).toContain(
+      '<definedName name="WhatIfScaleFactor">&apos;What If&apos;!$B$5</definedName>',
+    );
+    expect(xlsxText).toContain(
+      '<definedName name="WhatIfRegionMultiplier">&apos;What If&apos;!$B$6</definedName>',
+    );
+    expect(xlsxText).toMatch(
+      /<definedName name="ComparisonMonthlyTotals">&apos;Comparison&apos;!\$D\$\d+:\$D\$\d+<\/definedName>/,
+    );
+    expect(xlsxText).toContain(
+      '<definedName name="WhatIfScenarioMonthlyTotals">&apos;What If&apos;!$E$11:$E$11</definedName>',
+    );
+    expect(xlsxText).toContain(
+      '<definedName name="WhatIfMonthlyDeltas">&apos;What If&apos;!$G$11:$G$11</definedName>',
+    );
     expect(xlsxText).toContain('Decision Summary');
     expect(xlsxText).toContain('Cost baseline');
     expect(xlsxText).toContain('Provider Ranking');
@@ -215,12 +261,49 @@ describe('report generators', () => {
     expect(xlsxText).toContain('Lowest monthly run rate');
     expect(xlsxText).toContain('Selected Pricing Scenario');
     expect(xlsxText).toContain('Pricing Model Availability');
+    expect(xlsxText).toContain('Commitment Payment and TCO');
+    expect(xlsxText).toContain('Upfront cash USD');
+    expect(xlsxText).toContain('<t>360</t>');
+    expect(xlsxText).toContain('<t>1872</t>');
+    expect(xlsxText).toContain('Egress Tiered Breakdown');
     expect(xlsxText).toContain('Normalized Service Requirements');
     expect(xlsxText).toContain('Rate Math Evidence');
     expect(xlsxText).toContain('Report Assumptions');
     expect(xlsxText).toContain('<v>71</v>');
+    expect(xlsxText).toContain('PolyCost What-If Model');
+    expect(xlsxText).toContain('Editable assumption');
+    expect(xlsxText).toContain('<f>WhatIfScaleFactor</f><v>1.25</v>');
+    expect(xlsxText).toContain('<f>WhatIfRegionMultiplier</f><v>1</v>');
+    expect(xlsxText).toContain('<f>B11*C11*D11</f><v>52.5</v>');
+    expect(xlsxText).toContain('<f>SUM(WhatIfScenarioMonthlyTotals)</f><v>52.5</v>');
+    expect(xlsxText).toContain('<f>SUM(WhatIfMonthlyDeltas)</f><v>10.5</v>');
     expect(xlsxText).toContain('&apos;=cmd(1)\\risky compute');
     expect(xlsxText).toContain('&apos;+pricing temporarily unavailable');
+  });
+
+  it('keeps the XLSX what-if sheet valid when no provider supports the selected scenario', () => {
+    const xlsx = new ExcelReportGenerator().generate(
+      {
+        ...comparison,
+        providers: comparison.providers.map((provider) => ({
+          ...provider,
+          pricingModels: undefined,
+        })),
+      },
+      {
+        pricingModel: 'savings-plan',
+      },
+    );
+    const xlsxText = xlsx.toString('utf8');
+
+    expect(xlsxText).toContain('PolyCost What-If Model');
+    expect(xlsxText).toContain('No provider has an eligible selected pricing model');
+    expect(xlsxText).toContain('<f>0</f><v>0</v>');
+    expect(xlsxText).not.toContain('WhatIfScenarioMonthlyTotals');
+    expect(xlsxText).not.toContain('WhatIfMonthlyDeltas');
+    expect(xlsxText).toContain(
+      '<definedName name="WhatIfScaleFactor">&apos;What If&apos;!$B$5</definedName>',
+    );
   });
 
   it('creates a PDF report with matching totals and escaped interpolated text', () => {
@@ -274,12 +357,23 @@ describe('report generators', () => {
     expect(pdfText).toContain('aws: daily $2.33, weekly $16.34, monthly $71');
     expect(pdfText).toContain('Selected pricing scenario');
     expect(pdfText).toContain('Pricing model availability');
+    expect(pdfText).toContain('Commitment payment and TCO');
+    expect(pdfText).toContain('upfront $360');
+    expect(pdfText).toContain('Egress tiered breakdown');
+    expect(pdfText).toContain('aws | us-east-1 | 0-512 GB | billable 512 GB');
     expect(pdfText).toContain('Normalized service requirements');
     expect(pdfText).toContain('Rate math evidence');
     expect(pdfText).toContain('Report assumptions');
     expect(pdfText).toContain('=cmd\\(1\\)\\\\risky compute');
     expect(pdfText).toContain('general | provider_pricing_failed | general warning');
     expect(pdfText).toContain('this is a deliberately long line item description');
+    expect(pdfText).toContain('PolyCost Visual Decision Deck');
+    expect(pdfText).toContain('Provider monthly run-rate chart');
+    expect(pdfText).toContain('Engineering Cost Evidence Deck');
+    expect(pdfText).toContain('Service mix stacked chart');
+    expect(pdfText).toContain('$71 monthly');
+    expect(pdfText).toContain('Line-item source: same evidence rows used by CSV and XLSX exports');
+    expect(pdfText).toContain(' re f');
     expect(pdfText).toContain('xref');
     expect(pdfText).toContain('%%EOF');
   });
@@ -464,6 +558,30 @@ describe('report generators', () => {
     expect(rows[1][8]).toBe('$0.1 hourly x 730 hours = $73 monthly');
     expect(rows[1][9]).toContain('reserved-1yr: $50 monthly');
     expect(rows[1][9]).toContain('reserved-3yr: unavailable (No term for SKU.)');
+  });
+
+  it('builds payment TCO and egress tier audit rows', () => {
+    const tcoRows = commitmentTcoRows(comparison);
+    const egressRows = egressTierBreakdownRows(comparison);
+
+    expect(tcoRows[0]).toContain('Term TCO USD');
+    expect(tcoRows).toContainEqual(
+      expect.arrayContaining([
+        'aws',
+        'Reserved 3-year',
+        'yes',
+        '0.06',
+        '42',
+        '360',
+        'All upfront',
+        '36 months',
+        '1872',
+      ]),
+    );
+    expect(egressRows[0]).toContain('Effective blended USD/GB');
+    expect(egressRows).toContainEqual(
+      expect.arrayContaining(['aws', 'us-east-1', '0-512 GB', '512', '0.09', '46.08']),
+    );
   });
 
   it('builds fallback service requirement rows when comparison requirements are absent', () => {

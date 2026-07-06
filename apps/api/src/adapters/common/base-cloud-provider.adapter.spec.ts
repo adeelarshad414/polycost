@@ -208,6 +208,8 @@ describe('BaseCloudProviderAdapter', () => {
         attributes: {
           ...catalog[1].attributes,
           pricingModel: 'reserved-1yr',
+          upfrontOption: 'partial',
+          upfrontCostUsd: 240,
         },
       },
       {
@@ -242,6 +244,8 @@ describe('BaseCloudProviderAdapter', () => {
           available: true,
           hourlyCostUsd: 0.09,
           monthlyCostUsd: 65.7,
+          upfrontOption: 'partial',
+          upfrontCostUsd: 240,
         }),
         expect.objectContaining({
           model: 'reserved-3yr',
@@ -269,6 +273,15 @@ describe('BaseCloudProviderAdapter', () => {
         baseMonthlyCostUsd: 0.5,
         costComponent: 'egress',
         pricingBasis: 'tiered',
+        egressTiers: expect.arrayContaining([
+          expect.objectContaining({
+            tierFromGb: 5,
+            tierToGb: 10,
+            pricePerGb: 0.1,
+            billableGb: 5,
+            monthlyCostUsd: 0.5,
+          }),
+        ]),
       }),
     );
   });

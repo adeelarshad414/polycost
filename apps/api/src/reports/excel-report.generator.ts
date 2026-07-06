@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ComparisonResult } from '../comparison/comparison.types';
 import {
+  commitmentTcoRows,
   decisionSummaryRows,
+  egressTierBreakdownRows,
+  labelForPricingModel,
   lineItemEvidenceRows,
   pricingModelAvailabilityRows,
   providerRankingRows,
@@ -11,22 +14,57 @@ import {
   serviceRequirementRows,
   workloadScopeRows,
 } from './report-evidence';
-import { buildReportInsights } from './report-insights';
+import { PricingModelCost } from '../adapters/common/cloud-provider-adapter';
 import { escapeXml, sanitizeSpreadsheetText } from './report-security';
+import { buildReportInsights } from './report-insights';
 import { ReportOptions } from './report.types';
 import { createZip } from './zip-writer';
 
-type CellValue = string | number;
+type CellValue = string | number | FormulaCell;
+
+interface FormulaCell {
+  formula: string;
+  value: number;
+}
 
 interface WorksheetRow {
   cells: CellValue[];
   style?: number;
 }
 
+interface WorkbookDefinition {
+  comparisonRows: WorksheetRow[];
+  whatIfRows: WorksheetRow[];
+  namedRanges: NamedRange[];
+}
+
+interface NamedRange {
+  name: string;
+  reference: string;
+}
+
+interface WhatIfSheet {
+  rows: WorksheetRow[];
+  providerStartRow?: number;
+  providerEndRow?: number;
+  scaleFactorRow: number;
+  regionMultiplierRow: number;
+  monthlyDeltaStartRow?: number;
+  monthlyDeltaEndRow?: number;
+}
+
+interface WhatIfProviderScenario {
+  providerId: ComparisonResult['providers'][number]['providerId'];
+  baselineMonthlyUsd: number;
+}
+
+const DEFAULT_WHAT_IF_SCALE_FACTOR = 1.25;
+const DEFAULT_WHAT_IF_REGION_MULTIPLIER = 1;
+
 @Injectable()
 export class ExcelReportGenerator {
   generate(result: ComparisonResult, options: ReportOptions = {}): Buffer {
-    const rows = this.rows(result, options);
+    const workbook = this.workbook(result, options);
 
     return createZip([
       {
@@ -39,7 +77,7 @@ export class ExcelReportGenerator {
       },
       {
         path: 'xl/workbook.xml',
-        content: xmlBuffer(workbookXml()),
+        content: xmlBuffer(workbookXml(workbook.namedRanges)),
       },
       {
         path: 'xl/_rels/workbook.xml.rels',
@@ -51,9 +89,25 @@ export class ExcelReportGenerator {
       },
       {
         path: 'xl/worksheets/sheet1.xml',
-        content: xmlBuffer(worksheetXml(rows)),
+        content: xmlBuffer(worksheetXml(workbook.comparisonRows)),
+      },
+      {
+        path: 'xl/worksheets/sheet2.xml',
+        content: xmlBuffer(worksheetXml(workbook.whatIfRows)),
       },
     ]);
+  }
+
+  private workbook(result: ComparisonResult, options: ReportOptions): WorkbookDefinition {
+    const comparisonRows = this.rows(result, options);
+    const whatIfSheet = whatIfRows(result, options);
+    const namedRanges = namedRangesForWorkbook(comparisonRows, whatIfSheet, result.providers.length);
+
+    return {
+      comparisonRows,
+      whatIfRows: whatIfSheet.rows,
+      namedRanges,
+    };
   }
 
   private rows(result: ComparisonResult, options: ReportOptions): WorksheetRow[] {
@@ -168,6 +222,28 @@ export class ExcelReportGenerator {
         cells: [],
       },
       {
+        cells: ['Commitment Payment and TCO'],
+        style: 2,
+      },
+      ...commitmentTcoRows(result).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
+      {
+        cells: [],
+      },
+      {
+        cells: ['Egress Tiered Breakdown'],
+        style: 2,
+      },
+      ...egressTierBreakdownRows(result).map((row, index) => ({
+        cells: row.map(sanitizeSpreadsheetText),
+        ...(index === 0 ? { style: 2 } : {}),
+      })),
+      {
+        cells: [],
+      },
+      {
         cells: ['Normalized Service Requirements'],
         style: 2,
       },
@@ -248,6 +324,273 @@ export class ExcelReportGenerator {
   }
 }
 
+function whatIfRows(result: ComparisonResult, options: ReportOptions): WhatIfSheet {
+  const pricingModel = options.pricingModel ?? 'on-demand';
+  const scenarios = result.providers
+    .map((provider) => {
+      const baselineMonthlyUsd = whatIfBaselineMonthlyCost(provider, pricingModel);
+
+      return baselineMonthlyUsd !== undefined
+        ? {
+            providerId: provider.providerId,
+            baselineMonthlyUsd,
+          }
+        : undefined;
+    })
+    .filter((scenario): scenario is WhatIfProviderScenario => scenario !== undefined);
+  const rows: WorksheetRow[] = [
+    {
+      cells: ['PolyCost What-If Model'],
+      style: 1,
+    },
+    {
+      cells: [
+        'Scenario context',
+        'Edit the assumption cells, then recalculate the workbook to model scale and regional sensitivity.',
+      ],
+    },
+    {
+      cells: [],
+    },
+    {
+      cells: ['Editable assumption', 'Value', 'How to use'],
+      style: 2,
+    },
+    {
+      cells: [
+        'Scale factor',
+        DEFAULT_WHAT_IF_SCALE_FACTOR,
+        '1.25 models a 25% workload increase; change this cell for demand sensitivity.',
+      ],
+    },
+    {
+      cells: [
+        'Region multiplier',
+        DEFAULT_WHAT_IF_REGION_MULTIPLIER,
+        'Use 1 unless applying a manual regional price sensitivity adjustment.',
+      ],
+    },
+    {
+      cells: [
+        'Selected pricing model',
+        labelForPricingModel(pricingModel),
+        'The baseline uses the pricing model selected when the export was requested.',
+      ],
+    },
+    {
+      cells: [],
+    },
+    {
+      cells: ['Provider Scenario Model'],
+      style: 2,
+    },
+    {
+      cells: [
+        'Provider',
+        'Baseline monthly USD',
+        'Scale factor',
+        'Region multiplier',
+        'Scenario monthly USD',
+        'Scenario yearly USD',
+        'Delta monthly USD',
+        'Delta yearly USD',
+      ],
+      style: 2,
+    },
+  ];
+  const providerStartRow = rows.length + 1;
+
+  rows.push(
+    ...scenarios.map((scenario, index) => {
+      const rowNumber = providerStartRow + index;
+      const scenarioMonthly = roundCurrency(
+        scenario.baselineMonthlyUsd * DEFAULT_WHAT_IF_SCALE_FACTOR * DEFAULT_WHAT_IF_REGION_MULTIPLIER,
+      );
+      const scenarioYearly = roundCurrency(scenarioMonthly * 12);
+      const deltaMonthly = roundCurrency(scenarioMonthly - scenario.baselineMonthlyUsd);
+      const deltaYearly = roundCurrency(deltaMonthly * 12);
+
+      return {
+        cells: [
+          sanitizeSpreadsheetText(scenario.providerId),
+          scenario.baselineMonthlyUsd,
+          formulaCell('WhatIfScaleFactor', DEFAULT_WHAT_IF_SCALE_FACTOR),
+          formulaCell('WhatIfRegionMultiplier', DEFAULT_WHAT_IF_REGION_MULTIPLIER),
+          formulaCell(`B${rowNumber}*C${rowNumber}*D${rowNumber}`, scenarioMonthly),
+          formulaCell(`E${rowNumber}*12`, scenarioYearly),
+          formulaCell(`E${rowNumber}-B${rowNumber}`, deltaMonthly),
+          formulaCell(`G${rowNumber}*12`, deltaYearly),
+        ],
+      };
+    }),
+  );
+
+  if (scenarios.length === 0) {
+    rows.push({
+      cells: [
+        'No provider has an eligible selected pricing model for this what-if sheet.',
+        '',
+        '',
+      ],
+    });
+  }
+
+  const providerEndRow = scenarios.length > 0 ? providerStartRow + scenarios.length - 1 : undefined;
+  rows.push(
+    {
+      cells: [],
+    },
+    {
+      cells: ['Workbook Summary'],
+      style: 2,
+    },
+  );
+  const scenarioSummaries = scenarios.map((scenario) => {
+    const scenarioMonthly = roundCurrency(
+      scenario.baselineMonthlyUsd * DEFAULT_WHAT_IF_SCALE_FACTOR * DEFAULT_WHAT_IF_REGION_MULTIPLIER,
+    );
+
+    return {
+      scenarioMonthly,
+      deltaMonthly: roundCurrency(scenarioMonthly - scenario.baselineMonthlyUsd),
+    };
+  });
+  const totalScenarioMonthly = roundCurrency(
+    scenarioSummaries.reduce((sum, value) => sum + value.scenarioMonthly, 0),
+  );
+  const totalDeltaMonthly = roundCurrency(
+    scenarioSummaries.reduce((sum, value) => sum + value.deltaMonthly, 0),
+  );
+  const cheapestScenarioMonthly =
+    scenarioSummaries.length > 0
+      ? Math.min(...scenarioSummaries.map((scenario) => scenario.scenarioMonthly))
+      : 0;
+
+  rows.push(
+    {
+      cells: [
+        'Cheapest scenario monthly USD',
+        formulaCell(
+          scenarios.length > 0 ? 'MIN(WhatIfScenarioMonthlyTotals)' : '0',
+          cheapestScenarioMonthly,
+        ),
+      ],
+    },
+    {
+      cells: [
+        'Total scenario monthly USD',
+        formulaCell(
+          scenarios.length > 0 ? 'SUM(WhatIfScenarioMonthlyTotals)' : '0',
+          totalScenarioMonthly,
+        ),
+      ],
+    },
+    {
+      cells: [
+        'Total delta monthly USD',
+        formulaCell(scenarios.length > 0 ? 'SUM(WhatIfMonthlyDeltas)' : '0', totalDeltaMonthly),
+      ],
+    },
+  );
+
+  return {
+    rows,
+    providerStartRow: scenarios.length > 0 ? providerStartRow : undefined,
+    providerEndRow,
+    scaleFactorRow: 5,
+    regionMultiplierRow: 6,
+    monthlyDeltaStartRow: scenarios.length > 0 ? providerStartRow : undefined,
+    monthlyDeltaEndRow: providerEndRow,
+  };
+}
+
+function whatIfBaselineMonthlyCost(
+  provider: ComparisonResult['providers'][number],
+  pricingModel: ReportOptions['pricingModel'],
+): number | undefined {
+  if (!pricingModel || pricingModel === 'on-demand') {
+    return provider.totals.monthly;
+  }
+
+  const model: PricingModelCost | undefined = provider.pricingModels?.find(
+    (candidate) => candidate.model === pricingModel,
+  );
+
+  return model?.available === true ? model.monthlyCostUsd : undefined;
+}
+
+function namedRangesForWorkbook(
+  comparisonRows: WorksheetRow[],
+  whatIfSheet: WhatIfSheet,
+  providerCount: number,
+): NamedRange[] {
+  const providerTotalsHeaderRow = sectionHeaderRow(comparisonRows, 'Provider Totals');
+  const providerTotalsStartRow =
+    providerTotalsHeaderRow !== undefined ? providerTotalsHeaderRow + 2 : undefined;
+  const providerTotalsEndRow =
+    providerTotalsStartRow !== undefined ? providerTotalsStartRow + providerCount - 1 : undefined;
+  const namedRanges: NamedRange[] = [
+    {
+      name: 'WhatIfScaleFactor',
+      reference: `'What If'!$B$${whatIfSheet.scaleFactorRow}`,
+    },
+    {
+      name: 'WhatIfRegionMultiplier',
+      reference: `'What If'!$B$${whatIfSheet.regionMultiplierRow}`,
+    },
+  ];
+
+  if (
+    providerTotalsStartRow !== undefined &&
+    providerTotalsEndRow !== undefined &&
+    providerTotalsStartRow <= providerTotalsEndRow
+  ) {
+    namedRanges.push(
+      {
+        name: 'ComparisonProviderNames',
+        reference: `'Comparison'!$A$${providerTotalsStartRow}:$A$${providerTotalsEndRow}`,
+      },
+      {
+        name: 'ComparisonMonthlyTotals',
+        reference: `'Comparison'!$D$${providerTotalsStartRow}:$D$${providerTotalsEndRow}`,
+      },
+    );
+  }
+
+  if (
+    whatIfSheet.providerStartRow !== undefined &&
+    whatIfSheet.providerEndRow !== undefined &&
+    whatIfSheet.monthlyDeltaStartRow !== undefined &&
+    whatIfSheet.monthlyDeltaEndRow !== undefined
+  ) {
+    namedRanges.push(
+      {
+        name: 'WhatIfScenarioMonthlyTotals',
+        reference: `'What If'!$E$${whatIfSheet.providerStartRow}:$E$${whatIfSheet.providerEndRow}`,
+      },
+      {
+        name: 'WhatIfMonthlyDeltas',
+        reference: `'What If'!$G$${whatIfSheet.monthlyDeltaStartRow}:$G$${whatIfSheet.monthlyDeltaEndRow}`,
+      },
+    );
+  }
+
+  return namedRanges;
+}
+
+function sectionHeaderRow(rows: WorksheetRow[], sectionName: string): number | undefined {
+  const index = rows.findIndex((row) => row.cells[0] === sectionName);
+
+  return index === -1 ? undefined : index + 1;
+}
+
+function formulaCell(formula: string, value: number): FormulaCell {
+  return {
+    formula,
+    value: roundCurrency(value),
+  };
+}
+
 function worksheetXml(rows: WorksheetRow[]): string {
   return xmlDocument(`
     <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
@@ -274,6 +617,10 @@ function cellXml(value: CellValue, rowIndex: number, columnIndex: number, style?
   const ref = `${columnName(columnIndex)}${rowIndex}`;
   const styleAttribute = style !== undefined ? ` s="${style}"` : '';
 
+  if (isFormulaCell(value)) {
+    return `<c r="${ref}"${styleAttribute}><f>${escapeXml(value.formula)}</f><v>${value.value}</v></c>`;
+  }
+
   if (typeof value === 'number') {
     return `<c r="${ref}"${styleAttribute}><v>${value}</v></c>`;
   }
@@ -294,6 +641,10 @@ function columnName(columnIndex: number): string {
   return name;
 }
 
+function isFormulaCell(value: CellValue): value is FormulaCell {
+  return typeof value === 'object';
+}
+
 function contentTypesXml(): string {
   return xmlDocument(`
     <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -301,6 +652,7 @@ function contentTypesXml(): string {
       <Default Extension="xml" ContentType="application/xml"/>
       <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
       <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+      <Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
       <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
     </Types>
   `);
@@ -314,13 +666,23 @@ function rootRelationshipsXml(): string {
   `);
 }
 
-function workbookXml(): string {
+function workbookXml(namedRanges: NamedRange[]): string {
   return xmlDocument(`
     <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
       <sheets>
         <sheet name="Comparison" sheetId="1" r:id="rId1"/>
+        <sheet name="What If" sheetId="2" r:id="rId2"/>
       </sheets>
+      <definedNames>
+        ${namedRanges
+          .map(
+            (namedRange) =>
+              `<definedName name="${namedRange.name}">${escapeXml(namedRange.reference)}</definedName>`,
+          )
+          .join('')}
+      </definedNames>
+      <calcPr calcMode="auto" fullCalcOnLoad="1"/>
     </workbook>
   `);
 }
@@ -329,7 +691,8 @@ function workbookRelationshipsXml(): string {
   return xmlDocument(`
     <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
       <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
-      <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+      <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
+      <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
     </Relationships>
   `);
 }
@@ -365,4 +728,8 @@ function xmlDocument(body: string): string {
 
 function xmlBuffer(value: string): Buffer {
   return Buffer.from(value, 'utf8');
+}
+
+function roundCurrency(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }

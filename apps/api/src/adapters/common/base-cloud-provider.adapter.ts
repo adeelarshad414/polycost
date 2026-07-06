@@ -31,6 +31,13 @@ interface CostCalculation {
   hourlyCostUsd: number;
   monthlyCostUsd: number;
   pricingBasis: 'flat' | 'tiered';
+  egressTiers?: Array<{
+    tierFromGb: number;
+    tierToGb?: number;
+    pricePerGb: number;
+    billableGb: number;
+    monthlyCostUsd: number;
+  }>;
 }
 
 export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
@@ -356,6 +363,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       unit: record.unit,
       unitPriceUsd: record.unitPriceUsd,
       pricingBasis: cost.pricingBasis,
+      ...(cost.egressTiers && cost.egressTiers.length > 0 ? { egressTiers: cost.egressTiers } : {}),
       ...(options.pricingModels ? { pricingModels: options.pricingModels } : {}),
     };
   }
@@ -364,12 +372,14 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     const tiers = record.serviceCategory === 'network' ? this.egressTiers(record) : [];
 
     if (tiers.length > 0) {
+      const egressTiers = this.egressTierBreakdown(tiers, quantity);
       const monthlyCostUsd = this.roundCurrency(calculateEgressCost(tiers, quantity));
 
       return {
         hourlyCostUsd: this.roundCurrency(monthlyCostUsd / HOURS_PER_MONTH),
         monthlyCostUsd,
         pricingBasis: 'tiered',
+        egressTiers,
       };
     }
 
@@ -425,6 +435,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     record: PricingCatalogRecord,
   ): Omit<PricingModelCost, 'model' | 'available' | 'monthlyCostUsd' | 'hourlyCostUsd'> {
     const metadata = providerPricingModelMetadata(this.providerId, pricingModel);
+    const upfrontCostUsd = this.numberAttribute(record, 'upfrontCostUsd');
 
     return {
       displayName: metadata.displayName,
@@ -437,6 +448,9 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
         : {}),
       ...(typeof record.attributes?.upfrontOption === 'string'
         ? { upfrontOption: normalizeUpfrontOption(record.attributes.upfrontOption) }
+        : {}),
+      ...(upfrontCostUsd !== undefined && upfrontCostUsd >= 0
+        ? { upfrontCostUsd: this.roundCurrency(upfrontCostUsd) }
         : {}),
       lastFetchedAt: record.fetchedAt,
       caveat: metadata.caveat,
@@ -493,6 +507,29 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       .map((item) => this.toEgressTier(item))
       .filter((item): item is EgressTierRate => item !== undefined)
       .sort((left, right) => left.tierFromGb - right.tierFromGb);
+  }
+
+  private egressTierBreakdown(
+    tiers: EgressTierRate[],
+    gbPerMonth: number,
+  ): NonNullable<CostCalculation['egressTiers']> {
+    const sortedTiers = [...tiers].sort((left, right) => left.tierFromGb - right.tierFromGb);
+
+    return sortedTiers
+      .map((tier, index) => {
+        const nextTier = sortedTiers[index + 1];
+        const tierCeiling = tier.tierToGb ?? nextTier?.tierFromGb ?? Number.POSITIVE_INFINITY;
+        const billableGb = Math.max(0, Math.min(gbPerMonth, tierCeiling) - tier.tierFromGb);
+
+        return {
+          tierFromGb: tier.tierFromGb,
+          ...(Number.isFinite(tierCeiling) ? { tierToGb: tierCeiling } : {}),
+          pricePerGb: tier.pricePerGb,
+          billableGb: this.roundCurrency(billableGb),
+          monthlyCostUsd: this.roundCurrency(billableGb * tier.pricePerGb),
+        };
+      })
+      .filter((tier) => tier.billableGb > 0);
   }
 
   private toEgressTier(value: unknown): EgressTierRate | undefined {

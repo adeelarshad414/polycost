@@ -1,3 +1,13 @@
+import type {
+  AiCostNarrative as SharedAiCostNarrative,
+  NormalizedRequirement as SharedNormalizedRequirement,
+  ProviderCostResult as SharedProviderCostResult,
+} from '@polycost/types';
+
+export type NormalizedRequirement = SharedNormalizedRequirement;
+export type ProviderCostResult = SharedProviderCostResult;
+export type AiCostNarrative = SharedAiCostNarrative;
+
 export const PROVIDER_ORDER = ['aws', 'azure', 'gcp'] as const;
 export type ProviderId = (typeof PROVIDER_ORDER)[number];
 export type ServiceCategory = 'compute' | 'storage' | 'database' | 'network';
@@ -143,6 +153,14 @@ export interface CostIntervals {
   yearly: number;
 }
 
+export interface EgressTierBreakdown {
+  tierFromGb: number;
+  tierToGb?: number;
+  pricePerGb: number;
+  billableGb: number;
+  monthlyCostUsd: number;
+}
+
 export interface ComparisonLineItem {
   category: ServiceCategory;
   costComponent?: CostComponent;
@@ -155,6 +173,7 @@ export interface ComparisonLineItem {
   unit?: string;
   unitPriceUsd?: number;
   pricingBasis?: PricingBasis;
+  egressTiers?: EgressTierBreakdown[];
   pricingModels?: PricingModelCost[];
 }
 
@@ -170,6 +189,7 @@ export interface PricingModelCost {
   hourlyCostUsd?: number;
   savingsPercentVsOnDemand?: number;
   upfrontOption?: 'none' | 'partial' | 'all';
+  upfrontCostUsd?: number;
   commitmentTermMonths?: number;
   lastFetchedAt?: string;
   caveat?: string;
@@ -357,6 +377,9 @@ export interface SharedReportResponse {
   token: string;
   watermark: boolean;
   expiresAt: string;
+  pricingModel: PricingModelKey;
+  granularity: IntervalKey;
+  passwordProtected: boolean;
   workload: WorkloadRecord;
   breakdown: WorkloadCostBreakdown;
 }

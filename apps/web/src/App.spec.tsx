@@ -29,6 +29,7 @@ describe('App', () => {
   beforeEach(() => {
     window.localStorage.removeItem('polycost-persona-view');
     window.localStorage.removeItem('polycost-dismissed-budget-alerts');
+    window.sessionStorage.removeItem('polycost-current-requirements-v1');
     window.URL.createObjectURL = jest.fn(() => 'blob:polycost-report');
     window.URL.revokeObjectURL = jest.fn();
     HTMLAnchorElement.prototype.click = jest.fn();
@@ -42,6 +43,7 @@ describe('App', () => {
     document.documentElement.dataset.themeChoice = 'light';
     window.localStorage.removeItem('polycost-persona-view');
     window.localStorage.removeItem('polycost-dismissed-budget-alerts');
+    window.sessionStorage.removeItem('polycost-current-requirements-v1');
   });
 
   it('runs the structured-form comparison flow', async () => {
@@ -247,7 +249,7 @@ describe('App', () => {
     expect(buttonByText(container, '1yr reserved').getAttribute('aria-pressed')).toBe('true');
     expect(text(container)).toContain('Compute, storage, and data-transfer mix');
     expect(text(container)).toContain(
-      'Create a real read-only report link scoped to this workload.',
+      'Create a real read-only report link scoped to this workload, pricing model, and time granularity.',
     );
     await click(buttonByText(detailGate, 'Create & copy link'));
     expect(client.createWorkload).toHaveBeenCalledWith(
@@ -257,6 +259,8 @@ describe('App', () => {
       workloadId: '22222222-2222-4222-8222-222222222222',
       watermark: true,
       expiresInDays: 30,
+      pricingModel: 'reserved-1yr',
+      granularity: 'hourly',
     });
     expect(text(container)).toContain('Public report ready.');
 
@@ -573,13 +577,36 @@ describe('App', () => {
     const { container, unmount } = render(<App client={client} />);
 
     await click(buttonByText(container, 'Paste / parse'));
-    await click(buttonByText(container, 'Parse & compare'));
+    await click(buttonByText(container, 'Parse requirements'));
 
     expect(client.parseWorkload).toHaveBeenCalledWith(expect.stringContaining('web app'));
-    expect(client.validateWorkload).toHaveBeenCalledWith(parsedNws);
-    expect(client.createComparison).toHaveBeenCalledWith(parsedNws);
-    expect(text(container)).toContain('Parsed from text');
+    expect(client.validateWorkload).not.toHaveBeenCalled();
+    expect(client.createComparison).not.toHaveBeenCalled();
+    expect(text(container)).toContain('Review checkpoint');
+    expect(text(container)).toContain('Interpreted services ready to price');
+    expect((container.querySelector('#name') as HTMLInputElement).value).toBe(
+      'Parsed and compared portal',
+    );
     expect(text(container)).toContain('Parsed with medium confidence. Review 1 field.');
+
+    await click(buttonByText(container, 'Confirm & compare'));
+
+    expect(client.validateWorkload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ sourceType: 'structured_form' }),
+        workload: expect.objectContaining({
+          name: 'Parsed and compared portal',
+        }),
+      }),
+    );
+    expect(client.createComparison).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workload: expect.objectContaining({
+          name: 'Parsed and compared portal',
+        }),
+      }),
+    );
+    expect(text(container)).toContain('Parsed from text');
 
     await click(buttonByText(container, 'Edit'));
     expect(buttonByText(container, 'Paste / parse').getAttribute('aria-selected')).toBe('true');
@@ -589,8 +616,73 @@ describe('App', () => {
     expect((container.querySelector('#name') as HTMLInputElement).value).toBe(
       'Parsed and compared portal',
     );
-    expect(text(container)).toContain('Parsed with medium confidence. Review 1 field.');
     expect(text(container)).not.toContain('Comparison ready.');
+
+    unmount();
+  });
+
+  it('loads a requirements file into the same parse and review flow', async () => {
+    const fileText =
+      'Client requirements: web app with 4 app servers, managed Postgres, 500GB object storage, and 1TB egress in US East.';
+    const parsedNws = buildNwsFromForm({
+      ...defaultWorkloadForm,
+      workloadName: 'Uploaded requirements portal',
+    });
+    const client = clientMock({
+      parseWorkload: jest.fn(async () => ({
+        draftNws: parsedNws,
+        parserConfidence: 'high' as const,
+        fieldsRequiringReview: [],
+      })),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Paste / parse'));
+    const file = new File([fileText], 'client-requirements.md', { type: 'text/markdown' });
+    Object.defineProperty(file, 'text', {
+      configurable: true,
+      value: jest.fn(async () => fileText),
+    });
+
+    await changeFileInput(inputById(container, 'requirements-file-input'), file);
+
+    expect(textareaById(container, 'natural-language-input').value).toContain('managed Postgres');
+    expect(text(container)).toContain('Loaded from client-requirements.md');
+    expect(text(container)).toContain(
+      'Loaded client-requirements.md. Review the text, then parse requirements.',
+    );
+
+    await click(buttonByText(container, 'Parse requirements'));
+
+    expect(client.parseWorkload).toHaveBeenCalledWith(expect.stringContaining('1TB egress'));
+    expect(text(container)).toContain('Review checkpoint');
+    expect((container.querySelector('#name') as HTMLInputElement).value).toBe(
+      'Uploaded requirements portal',
+    );
+
+    unmount();
+  });
+
+  it('keeps structured CSV and diagram imports behind the Phase 2 parser hook', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Paste / parse'));
+    const file = new File(['service,quantity\ncompute,4'], 'architecture.csv', {
+      type: 'text/csv',
+    });
+    Object.defineProperty(file, 'text', {
+      configurable: true,
+      value: jest.fn(async () => 'service,quantity\ncompute,4'),
+    });
+
+    await changeFileInput(inputById(container, 'requirements-file-input'), file);
+
+    expect(text(container)).toContain(
+      'Upload a plain text, Markdown, JSON, or YAML requirements file.',
+    );
+    expect(client.parseWorkload).not.toHaveBeenCalled();
+    expect(textareaById(container, 'natural-language-input').value).toContain('web app');
 
     unmount();
   });
@@ -645,7 +737,7 @@ describe('App', () => {
     const { container, unmount } = render(<App client={client} />);
 
     await click(buttonByText(container, 'Paste / parse'));
-    await click(buttonByText(container, 'Parse & compare'));
+    await click(buttonByText(container, 'Parse requirements'));
 
     expect(text(container)).toContain('Input was not understood');
     expect(container.querySelector('.initial-home-form')).toBeInstanceOf(HTMLElement);
@@ -756,9 +848,8 @@ describe('ComparisonView', () => {
         ]),
       ],
     };
-    const client = clientMock();
     const { container, unmount } = render(
-      <ComparisonView client={client} comparison={richResult} interval="monthly" />,
+      <ComparisonView comparison={richResult} interval="monthly" />,
     );
     await act(async () => undefined);
 
@@ -784,17 +875,51 @@ describe('ComparisonView', () => {
   });
 
   it('renders FinOps feature additions without fabricating unsupported backend data', async () => {
+    const awsRichProvider = providerWithItems('aws', [
+      ['compute', 'aws compute', 50],
+      ['storage', 'aws storage', 10],
+      ['database', 'aws database', 10],
+      ['network', 'aws network egress', 30],
+    ]);
+    awsRichProvider.lineItems[0].pricingModels = [
+      {
+        model: 'spot',
+        available: true,
+        estimated: true,
+        monthlyCostUsd: 24,
+        caveat: 'Spot pricing is interruptible and volatile.',
+      },
+      {
+        model: 'reserved-1yr',
+        available: true,
+        monthlyCostUsd: 42,
+        upfrontOption: 'partial',
+        upfrontCostUsd: 120,
+      },
+    ];
+    awsRichProvider.lineItems[3] = {
+      ...awsRichProvider.lineItems[3],
+      costComponent: 'egress',
+      region: 'us-east-1',
+      unit: 'GB',
+      unitPriceUsd: 0.1,
+      pricingBasis: 'tiered',
+      egressTiers: [
+        {
+          tierFromGb: 0,
+          tierToGb: 300,
+          pricePerGb: 0.1,
+          billableGb: 300,
+          monthlyCostUsd: 30,
+        },
+      ],
+    };
     const richResult: ComparisonResult = {
       ...comparisonResult,
       cheapestProviderId: 'azure',
       providers: [
         {
-          ...providerWithItems('aws', [
-            ['compute', 'aws compute', 50],
-            ['storage', 'aws storage', 10],
-            ['database', 'aws database', 10],
-            ['network', 'aws network egress', 30],
-          ]),
+          ...awsRichProvider,
           pricingModels: [
             {
               model: 'on-demand',
@@ -812,6 +937,16 @@ describe('ComparisonView', () => {
               savingsPercentVsOnDemand: 52.5,
               caveat: 'Spot pricing is interruptible and volatile.',
             },
+            {
+              model: 'reserved-1yr',
+              available: true,
+              monthlyCostUsd: 42,
+              hourlyCostUsd: 0.06,
+              upfrontOption: 'partial',
+              upfrontCostUsd: 120,
+              commitmentTermMonths: 12,
+              savingsPercentVsOnDemand: 58,
+            },
           ],
         },
         providerWithItems('azure', [
@@ -828,7 +963,19 @@ describe('ComparisonView', () => {
         ]),
       ],
     };
-    const client = clientMock();
+    const whatIfResult: ComparisonResult = {
+      ...richResult,
+      comparisonId: 'scenario-what-if-123',
+      cheapestProviderId: 'azure',
+      providers: [
+        providerWithItems('aws', [['compute', 'aws what-if compute', 120]]),
+        providerWithItems('azure', [['compute', 'azure what-if compute', 90]]),
+        providerWithItems('gcp', [['compute', 'gcp what-if compute', 105]]),
+      ],
+    };
+    const client = clientMock({
+      createComparison: jest.fn(async () => whatIfResult),
+    });
     const { container, unmount } = render(
       <ComparisonView client={client} comparison={richResult} interval="monthly" />,
     );
@@ -840,7 +987,40 @@ describe('ComparisonView', () => {
     expect(buttonByText(container, '3yr reserved').disabled).toBe(false);
     expect(buttonByText(container, 'Spot').disabled).toBe(false);
     expect(buttonByText(container, 'Savings plan').disabled).toBe(false);
+    expect(text(container)).toContain('Full cost matrix');
+    expect(text(container)).toContain('AWS On-demand');
+    expect(text(container)).toContain('Azure 1yr');
+    expect(text(container)).toContain('$24.00 est.');
+    expect(text(container)).toContain('$42.00');
+    expect(text(container)).toContain('Payment and TCO detail');
+    expect(text(container)).toContain('Commitment scenario monthly, hourly, and term view');
+    expect(text(container)).toContain('Upfront cash');
+    expect(text(container)).toContain('$120.00');
+    expect(text(container)).toContain('$624.00');
+    expect(text(container)).toContain('upfront $120.00');
+    expect(text(container)).toContain('Region and scale what-if');
+    expect(text(container)).toContain('Cache-backed rerun without natural-language reparse');
+    expect(text(container)).toContain('Egress tiered breakdown');
+    expect(text(container)).toContain('0-300 GB');
     expect(text(container)).toContain('Best:');
+    await click(buttonByText(container, 'Run what-if'));
+    expect(client.parseWorkload).not.toHaveBeenCalled();
+    expect(client.createComparison).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workload: expect.objectContaining({
+          region: expect.objectContaining({
+            preference: 'us-east',
+          }),
+        }),
+        compute: [
+          expect.objectContaining({
+            instanceCount: 3,
+          }),
+        ],
+      }),
+    );
+    expect(text(container)).toContain('Scenario comparison scenario-what-if-123');
+    expect(text(container)).toContain('+$15.00');
     await click(buttonByText(container, 'Spot'));
     expect(text(container)).toContain('Est. $38.00-$57.00');
     expect(text(container)).toContain('estimated $38.00-$57.00/mo range');
@@ -850,7 +1030,7 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Egress/data transfer');
     expect(text(container)).toContain('Egress risk: $30.00 is 200% above the lowest provider.');
     expect(text(container)).toContain(
-      'Create a real read-only report link scoped to this workload.',
+      'Create a real read-only report link scoped to this workload, pricing model, and time granularity.',
     );
     expect(client.getExchangeRates).toHaveBeenCalledWith('USD');
     expect(text(container)).toContain('Exchange rates');
@@ -915,6 +1095,18 @@ async function changeSelect(select: HTMLSelectElement, value: string): Promise<v
   await act(async () => {
     select.value = value;
     select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+
+async function changeFileInput(input: HTMLInputElement, file: File): Promise<void> {
+  await act(async () => {
+    Object.defineProperty(input, 'files', {
+      configurable: true,
+      value: [file],
+    });
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
   });
 }
 
@@ -1159,10 +1351,17 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       token: 'public-token-123',
       url: '/api/v1/share/public-token-123',
     })),
+    revokeShareLink: jest.fn(async () => ({
+      token: 'public-token-123',
+      url: '/api/v1/share/public-token-123',
+    })),
     getSharedReport: jest.fn(async () => ({
       token: 'public-token-123',
       watermark: true,
       expiresAt: '2026-07-29T00:00:00.000Z',
+      pricingModel: 'on-demand' as const,
+      granularity: 'monthly' as const,
+      passwordProtected: false,
       workload: {
         id: '22222222-2222-4222-8222-222222222222',
         instanceFamily: 'general-purpose' as const,

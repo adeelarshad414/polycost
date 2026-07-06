@@ -99,6 +99,11 @@ export class ShareLinksController {
   create(@Body() body: unknown) {
     return this.costManagementService.createShareLink(parseShareLinkInput(body));
   }
+
+  @Post(':token/revoke')
+  revoke(@Param('token') token: string) {
+    return this.costManagementService.revokeShareLink(token);
+  }
 }
 
 @Controller('api/v1/share')
@@ -106,8 +111,8 @@ export class SharedReportsController {
   constructor(private readonly costManagementService: CostManagementService) {}
 
   @Get(':token')
-  get(@Param('token') token: string) {
-    return this.costManagementService.getSharedReport(token);
+  get(@Param('token') token: string, @Query('password') password?: QueryValue) {
+    return this.costManagementService.getSharedReport(token, optionalSingleString(password));
   }
 }
 
@@ -171,7 +176,55 @@ function parseShareLinkInput(body: unknown): ShareLinkInput {
     workloadId: parseRequiredString(record.workloadId, 'workloadId'),
     watermark: typeof record.watermark === 'boolean' ? record.watermark : true,
     expiresInDays: parsePositiveNumber(record.expiresInDays, 'expiresInDays', true),
+    pricingModel: parseSharePricingModel(record.pricingModel ?? 'on-demand'),
+    granularity: parseShareGranularity(record.granularity ?? 'monthly'),
+    ...(typeof record.password === 'string' && record.password.trim()
+      ? { password: record.password.trim() }
+      : {}),
   };
+}
+
+function parseSharePricingModel(value: unknown): ShareLinkInput['pricingModel'] {
+  const pricingModel = parseRequiredString(value, 'pricingModel');
+
+  if (
+    pricingModel === 'on-demand' ||
+    pricingModel === 'reserved-1yr' ||
+    pricingModel === 'reserved-3yr' ||
+    pricingModel === 'savings-plan' ||
+    pricingModel === 'spot'
+  ) {
+    return pricingModel;
+  }
+
+  throw new ApiValidationError('Unsupported share-link pricing model', [
+    {
+      field: 'pricingModel',
+      issue: 'must be on-demand, reserved-1yr, reserved-3yr, savings-plan, or spot',
+    },
+  ]);
+}
+
+function parseShareGranularity(value: unknown): ShareLinkInput['granularity'] {
+  const granularity = parseRequiredString(value, 'granularity');
+
+  if (
+    granularity === 'hourly' ||
+    granularity === 'daily' ||
+    granularity === 'weekly' ||
+    granularity === 'monthly' ||
+    granularity === 'quarterly' ||
+    granularity === 'yearly'
+  ) {
+    return granularity;
+  }
+
+  throw new ApiValidationError('Unsupported share-link granularity', [
+    {
+      field: 'granularity',
+      issue: 'must be hourly, daily, weekly, monthly, quarterly, or yearly',
+    },
+  ]);
 }
 
 function parseDismissedUpdate(body: unknown): boolean {

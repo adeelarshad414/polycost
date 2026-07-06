@@ -1,6 +1,6 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import { ApiNotFoundError } from './api-errors';
+import { ApiNotFoundError, ApiUnauthorizedError } from './api-errors';
 import { ApiDatabaseRepository } from './api-database.repository';
 import {
   AlertRecord,
@@ -78,6 +78,9 @@ export class CostManagementService {
       token,
       workloadId: input.workloadId,
       watermark: input.watermark,
+      pricingModel: input.pricingModel,
+      granularity: input.granularity,
+      ...(input.password ? { passwordHash: hashSharePassword(input.password) } : {}),
       expiresAt,
     });
 
@@ -87,22 +90,45 @@ export class CostManagementService {
     };
   }
 
-  async getSharedReport(token: string): Promise<SharedReportResponse> {
+  async getSharedReport(token: string, password?: string): Promise<SharedReportResponse> {
     const shareLink = await this.repository.getActiveShareLink(token);
 
     if (!shareLink) {
       throw new ApiNotFoundError('Share link was not found or has expired');
     }
 
+    if (shareLink.passwordHash && !passwordMatches(password, shareLink.passwordHash)) {
+      throw new ApiUnauthorizedError('Share link password is required or invalid');
+    }
+
     const workload = await this.ensureWorkload(shareLink.workloadId);
-    const breakdown = await this.getWorkloadCostBreakdown(workload.id, 'on_demand');
+    const breakdown = await this.getWorkloadCostBreakdown(
+      workload.id,
+      cachedPricingTermForShareModel(shareLink.pricingModel),
+    );
 
     return {
       token: shareLink.token,
       watermark: shareLink.watermark,
       expiresAt: shareLink.expiresAt,
+      pricingModel: shareLink.pricingModel,
+      granularity: shareLink.granularity,
+      passwordProtected: Boolean(shareLink.passwordHash),
       workload,
       breakdown,
+    };
+  }
+
+  async revokeShareLink(token: string): Promise<ShareLinkResponse> {
+    const revoked = await this.repository.revokeShareLink(token, this.now().toISOString());
+
+    if (!revoked) {
+      throw new ApiNotFoundError('Share link was not found');
+    }
+
+    return {
+      token: revoked.token,
+      url: `/api/v1/share/${revoked.token}`,
     };
   }
 
@@ -119,4 +145,41 @@ export class CostManagementService {
 
     return workload;
   }
+}
+
+function hashSharePassword(password: string): string {
+  return createHash('sha256').update(password, 'utf8').digest('hex');
+}
+
+function passwordMatches(password: string | undefined, expectedHash: string): boolean {
+  if (!password) {
+    return false;
+  }
+
+  const candidate = Buffer.from(hashSharePassword(password), 'hex');
+  const expected = Buffer.from(expectedHash, 'hex');
+
+  return candidate.length === expected.length && timingSafeEqual(candidate, expected);
+}
+
+function cachedPricingTermForShareModel(
+  pricingModel: ShareLinkInput['pricingModel'],
+): CachedPricingTerm {
+  if (pricingModel === 'reserved-1yr') {
+    return 'reserved_1yr';
+  }
+
+  if (pricingModel === 'reserved-3yr') {
+    return 'reserved_3yr';
+  }
+
+  if (pricingModel === 'savings-plan') {
+    return 'savings_plan';
+  }
+
+  if (pricingModel === 'spot') {
+    return 'spot';
+  }
+
+  return 'on_demand';
 }

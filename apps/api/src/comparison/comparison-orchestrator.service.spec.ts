@@ -216,7 +216,13 @@ describe('ComparisonOrchestratorService', () => {
           pricingBasis: 'flat',
           pricingModels: [
             { model: 'on-demand', available: true, monthlyCostUsd: 100, hourlyCostUsd: 0.14 },
-            { model: 'reserved-1yr', available: true, monthlyCostUsd: 80 },
+            {
+              model: 'reserved-1yr',
+              available: true,
+              monthlyCostUsd: 80,
+              upfrontOption: 'partial',
+              upfrontCostUsd: 240,
+            },
             { model: 'reserved-3yr', available: true, monthlyCostUsd: 50 },
           ],
         },
@@ -243,6 +249,15 @@ describe('ComparisonOrchestratorService', () => {
           unit: 'GB',
           unitPriceUsd: 0.09,
           pricingBasis: 'tiered',
+          egressTiers: [
+            {
+              tierFromGb: 0,
+              tierToGb: 200,
+              pricePerGb: 0.075,
+              billableGb: 200,
+              monthlyCostUsd: 15,
+            },
+          ],
         },
         {
           category: 'database',
@@ -280,6 +295,8 @@ describe('ComparisonOrchestratorService', () => {
           model: 'reserved-1yr',
           available: true,
           monthlyCostUsd: 125,
+          upfrontOption: 'partial',
+          upfrontCostUsd: 240,
           savingsPercentVsOnDemand: 13.79,
         }),
         expect.objectContaining({
@@ -305,6 +322,15 @@ describe('ComparisonOrchestratorService', () => {
       databaseMonthlyCostUsd: 20,
       scopedMonthlyCostUsd: 125,
     });
+    expect(result.providers[0].lineItems[2].egressTiers).toEqual([
+      {
+        tierFromGb: 0,
+        tierToGb: 200,
+        pricePerGb: 0.075,
+        billableGb: 200,
+        monthlyCostUsd: 15,
+      },
+    ]);
   });
 
   it('uses a safe warning when a provider fails without an Error object', async () => {
