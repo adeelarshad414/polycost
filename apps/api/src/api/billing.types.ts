@@ -30,6 +30,17 @@ export interface BillingImportInput {
   rows: BillingImportRowInput[];
 }
 
+export interface BillingProviderExportInput {
+  provider: ProviderId;
+  sourceType: BillingSourceType;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  content: string;
+  encoding?: 'text' | 'base64';
+  fileName?: string;
+  originalFileSha256?: string;
+}
+
 export interface BillingImportRecord {
   id: string;
   teamId?: string;

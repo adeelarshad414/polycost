@@ -4,7 +4,16 @@ import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema';
 import { ApiForbiddenError, ApiUnauthorizedError, ApiValidationError } from './api-errors';
 import { ApiDatabaseRepository, LocalAccountWithPassword } from './api-database.repository';
-import { AuthIdentity, AuthMeResponse, AuthSessionResponse, RequestWithAuth } from './auth.types';
+import {
+  AuthIdentity,
+  AuthMeResponse,
+  AuthSessionResponse,
+  RequestWithAuth,
+  SsoConfigurationStatus,
+  TeamInvitationRecord,
+  TeamMemberRecord,
+  TeamRole,
+} from './auth.types';
 import { hashPassword, verifyPassword } from './password-hash';
 
 interface AuthRequestMetadata {
@@ -13,6 +22,11 @@ interface AuthRequestMetadata {
 }
 
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const TEAM_ADMIN_ROLES = new Set<TeamRole>(['owner', 'admin']);
+const TEAM_OWNER_ROLE: TeamRole = 'owner';
+const INVITABLE_ROLES: Array<Exclude<TeamRole, 'owner'>> = ['admin', 'member', 'viewer'];
+const TEAM_ROLES: TeamRole[] = ['owner', 'admin', 'member', 'viewer'];
+const INVITATION_TTL_DAYS = 7;
 
 @Injectable()
 export class AuthService {
@@ -143,6 +157,170 @@ export class AuthService {
     };
   }
 
+  async listTeamMembers(teamId: string, identity: AuthIdentity): Promise<TeamMemberRecord[]> {
+    await this.requireTeamAdmin(identity, teamId);
+
+    return this.repository.listTeamMembers(teamId);
+  }
+
+  async inviteTeamMember(
+    teamId: string,
+    body: unknown,
+    identity: AuthIdentity,
+  ): Promise<TeamInvitationRecord> {
+    await this.requireTeamAdmin(identity, teamId);
+    const input = parseInviteBody(body);
+    const inviteToken = randomBytes(32).toString('base64url');
+    const invitation = await this.repository.createTeamInvitation({
+      teamId,
+      email: input.email,
+      role: input.role,
+      tokenHash: sha256(inviteToken),
+      invitedByAccountId: identity.accountId,
+      expiresAt: new Date(Date.now() + INVITATION_TTL_DAYS * 86_400_000).toISOString(),
+    });
+
+    return {
+      ...invitation,
+      inviteToken,
+    };
+  }
+
+  async listTeamInvitations(
+    teamId: string,
+    identity: AuthIdentity,
+  ): Promise<TeamInvitationRecord[]> {
+    await this.requireTeamAdmin(identity, teamId);
+
+    return this.repository.listTeamInvitations(teamId);
+  }
+
+  async acceptInvitation(body: unknown, identity: AuthIdentity): Promise<TeamInvitationRecord> {
+    const token = parseInvitationToken(body);
+    const invitation = await this.repository.findPendingInvitationByTokenHash(
+      sha256(token),
+      new Date().toISOString(),
+    );
+
+    if (!invitation) {
+      throw new ApiValidationError('Invitation is invalid or expired', [
+        {
+          field: 'token',
+          issue: 'must reference a pending invitation',
+        },
+      ]);
+    }
+
+    if (invitation.email !== identity.email) {
+      throw new ApiForbiddenError('Invitation belongs to a different account email');
+    }
+
+    return this.repository.acceptTeamInvitation({
+      invitationId: invitation.id,
+      accountId: identity.accountId,
+      acceptedAt: new Date().toISOString(),
+    });
+  }
+
+  async updateTeamMemberRole(
+    teamId: string,
+    accountId: string,
+    body: unknown,
+    identity: AuthIdentity,
+  ): Promise<TeamMemberRecord> {
+    const actor = await this.requireTeamAdmin(identity, teamId);
+    const role = parseTeamRoleBody(body);
+    const target = await this.repository.getTeamMembership({ accountId, teamId });
+
+    if (!target) {
+      throw new ApiValidationError('Team member was not found', [
+        {
+          field: 'accountId',
+          issue: 'must belong to the selected team',
+        },
+      ]);
+    }
+
+    if (
+      (target.role === TEAM_OWNER_ROLE || role === TEAM_OWNER_ROLE) &&
+      actor.role !== TEAM_OWNER_ROLE
+    ) {
+      throw new ApiForbiddenError('Only team owners can manage owner roles');
+    }
+
+    if (target.role === TEAM_OWNER_ROLE && role !== TEAM_OWNER_ROLE) {
+      await this.assertOwnerWillRemain(teamId);
+    }
+
+    const updated = await this.repository.updateTeamMemberRole({
+      teamId,
+      accountId,
+      role,
+    });
+
+    if (!updated) {
+      throw new ApiValidationError('Team member was not found', [
+        {
+          field: 'accountId',
+          issue: 'must belong to the selected team',
+        },
+      ]);
+    }
+
+    return updated;
+  }
+
+  async removeTeamMember(
+    teamId: string,
+    accountId: string,
+    identity: AuthIdentity,
+  ): Promise<{ removed: true }> {
+    const actor = await this.requireTeamAdmin(identity, teamId);
+    const target = await this.repository.getTeamMembership({ accountId, teamId });
+
+    if (!target) {
+      throw new ApiValidationError('Team member was not found', [
+        {
+          field: 'accountId',
+          issue: 'must belong to the selected team',
+        },
+      ]);
+    }
+
+    if (target.role === TEAM_OWNER_ROLE) {
+      if (actor.role !== TEAM_OWNER_ROLE) {
+        throw new ApiForbiddenError('Only team owners can remove owners');
+      }
+
+      await this.assertOwnerWillRemain(teamId);
+    }
+
+    await this.repository.removeTeamMember({ teamId, accountId });
+
+    return { removed: true };
+  }
+
+  async ssoStatus(identity: AuthIdentity): Promise<SsoConfigurationStatus> {
+    if (!identity.teamId) {
+      throw new ApiForbiddenError('An active team is required to view SSO configuration');
+    }
+
+    const publicBaseUrl = this.configService.get('AUTH_PUBLIC_BASE_URL', { infer: true });
+    const baseUrl = publicBaseUrl.replace(/\/$/, '');
+    const configuredProviders = await this.repository.listSsoProviderConfigs(identity.teamId);
+
+    return {
+      localLoginEnabled: this.configService.get('AUTH_LOCAL_REGISTRATION_ENABLED', { infer: true }),
+      oidcConfigured: Boolean(this.configService.get('AUTH_OIDC_ISSUER_URL', { infer: true })),
+      samlConfigured: Boolean(this.configService.get('AUTH_SAML_ENTITY_ID', { infer: true })),
+      configuredProviders,
+      callbackUrls: {
+        oidc: `${baseUrl}/api/v1/auth/sso/oidc/callback`,
+        saml: `${baseUrl}/api/v1/auth/sso/saml/acs`,
+      },
+    };
+  }
+
   private async issueSession(
     account: LocalAccountWithPassword,
     metadata: AuthRequestMetadata,
@@ -178,6 +356,33 @@ export class AuthService {
           }
         : {}),
     };
+  }
+
+  private async requireTeamAdmin(
+    identity: AuthIdentity,
+    teamId: string,
+  ): Promise<{ role: TeamRole }> {
+    const membership =
+      identity.teamId === teamId && identity.role
+        ? { role: identity.role }
+        : await this.repository.getTeamMembership({
+            accountId: identity.accountId,
+            teamId,
+          });
+
+    if (!membership || !TEAM_ADMIN_ROLES.has(membership.role)) {
+      throw new ApiForbiddenError('Team admin access is required');
+    }
+
+    return membership;
+  }
+
+  private async assertOwnerWillRemain(teamId: string): Promise<void> {
+    const ownerCount = await this.repository.countTeamOwners(teamId);
+
+    if (ownerCount <= 1) {
+      throw new ApiForbiddenError('At least one team owner must remain');
+    }
   }
 }
 
@@ -217,6 +422,46 @@ function parseLoginBody(body: unknown): { email: string; password: string } {
     email: normalizeEmail(record.email),
     password: requiredString(record.password, 'password'),
   };
+}
+
+function parseInviteBody(body: unknown): { email: string; role: Exclude<TeamRole, 'owner'> } {
+  const record = requireRecord(body, 'Team invitation request body must be an object');
+  const role = record.role;
+
+  if (!INVITABLE_ROLES.includes(role as Exclude<TeamRole, 'owner'>)) {
+    throw new ApiValidationError('role is invalid for invitations', [
+      {
+        field: 'role',
+        issue: 'must be admin, member, or viewer',
+      },
+    ]);
+  }
+
+  return {
+    email: normalizeEmail(record.email),
+    role: role as Exclude<TeamRole, 'owner'>,
+  };
+}
+
+function parseTeamRoleBody(body: unknown): TeamRole {
+  const record = requireRecord(body, 'Team role request body must be an object');
+
+  if (!TEAM_ROLES.includes(record.role as TeamRole)) {
+    throw new ApiValidationError('role is invalid', [
+      {
+        field: 'role',
+        issue: 'must be owner, admin, member, or viewer',
+      },
+    ]);
+  }
+
+  return record.role as TeamRole;
+}
+
+function parseInvitationToken(body: unknown): string {
+  const record = requireRecord(body, 'Invitation acceptance request body must be an object');
+
+  return requiredString(record.token, 'token');
 }
 
 function parsePassword(value: unknown, minimumLength: number): string {

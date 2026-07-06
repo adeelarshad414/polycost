@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RequestWithAuth } from './auth.types';
 import { SessionAuthGuard } from './session-auth.guard';
@@ -27,6 +27,61 @@ export class AuthController {
   @UseGuards(SessionAuthGuard)
   logout(@Req() request: RequestWithAuth) {
     return this.authService.logout(request.auth!);
+  }
+
+  @Get('teams/:teamId/members')
+  @UseGuards(SessionAuthGuard)
+  listTeamMembers(@Param('teamId') teamId: string, @Req() request: RequestWithAuth) {
+    return this.authService.listTeamMembers(teamId, request.auth!);
+  }
+
+  @Patch('teams/:teamId/members/:accountId')
+  @UseGuards(SessionAuthGuard)
+  updateTeamMemberRole(
+    @Param('teamId') teamId: string,
+    @Param('accountId') accountId: string,
+    @Body() body: unknown,
+    @Req() request: RequestWithAuth,
+  ) {
+    return this.authService.updateTeamMemberRole(teamId, accountId, body, request.auth!);
+  }
+
+  @Delete('teams/:teamId/members/:accountId')
+  @UseGuards(SessionAuthGuard)
+  removeTeamMember(
+    @Param('teamId') teamId: string,
+    @Param('accountId') accountId: string,
+    @Req() request: RequestWithAuth,
+  ) {
+    return this.authService.removeTeamMember(teamId, accountId, request.auth!);
+  }
+
+  @Post('teams/:teamId/invitations')
+  @UseGuards(SessionAuthGuard)
+  inviteTeamMember(
+    @Param('teamId') teamId: string,
+    @Body() body: unknown,
+    @Req() request: RequestWithAuth,
+  ) {
+    return this.authService.inviteTeamMember(teamId, body, request.auth!);
+  }
+
+  @Get('teams/:teamId/invitations')
+  @UseGuards(SessionAuthGuard)
+  listTeamInvitations(@Param('teamId') teamId: string, @Req() request: RequestWithAuth) {
+    return this.authService.listTeamInvitations(teamId, request.auth!);
+  }
+
+  @Post('invitations/accept')
+  @UseGuards(SessionAuthGuard)
+  acceptInvitation(@Body() body: unknown, @Req() request: RequestWithAuth) {
+    return this.authService.acceptInvitation(body, request.auth!);
+  }
+
+  @Get('sso/status')
+  @UseGuards(SessionAuthGuard)
+  ssoStatus(@Req() request: RequestWithAuth) {
+    return this.authService.ssoStatus(request.auth!);
   }
 }
 

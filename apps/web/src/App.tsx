@@ -44,10 +44,14 @@ import {
   ComparisonAnalyticsResponse,
   ComparisonResult,
   DataHealthResponse,
+  BillingImportResponse,
+  BillingProviderExportInput,
+  BillingSourceType,
   DiagramInputFormat,
   DiagramParseResult,
   INTERVALS,
   IntervalKey,
+  InvoiceReconciliationRecord,
   NormalizedWorkloadSpec,
   PROVIDER_ORDER,
   PricingModelKey,
@@ -55,6 +59,11 @@ import {
   RegionCatalogResponse,
   ReportFormat,
   ServiceRequirement,
+  AuthMeResponse,
+  SsoConfigurationStatus,
+  TeamInvitationRecord,
+  TeamMemberRecord,
+  TeamRole,
 } from './types';
 import {
   ARCHITECTURE_TEMPLATES,
@@ -113,6 +122,7 @@ const INPUT_MODE_OPTIONS: Array<{
 const PRICING_MODEL_STORAGE_KEY = 'polycost-pricing-model';
 const REQUIREMENT_SESSION_STORAGE_KEY = 'polycost-current-requirements-v1';
 const COMPARISON_HISTORY_STORAGE_KEY = 'polycost-comparison-history-v1';
+const AUTH_SESSION_STORAGE_KEY = 'polycost-auth-session-v1';
 const MAX_COMPARISON_HISTORY_ENTRIES = 8;
 const REQUIREMENTS_FILE_MAX_BYTES = 128 * 1024;
 const DIAGRAM_FILE_MAX_BYTES = 5 * 1024 * 1024;
@@ -1554,7 +1564,9 @@ export function App({ client = polyCostClient }: AppProps) {
 
   function handleSignIn() {
     setError(null);
-    setNotice('Sign in is not required for the local open-source demo.');
+    setNotice(
+      'Use the workspace control center below the header to sign in, invite teammates, and import billing exports.',
+    );
   }
 
   function startAsyncAction(): number {
@@ -1584,6 +1596,12 @@ export function App({ client = polyCostClient }: AppProps) {
         themeChoice={themeChoice}
         onSignIn={handleSignIn}
         onThemeChange={setThemeChoice}
+      />
+      <WorkspaceControlCenter
+        client={client}
+        comparisonId={comparison?.comparisonId}
+        onNotice={setNotice}
+        onError={setError}
       />
       {comparison ? (
         <ProgressiveComparisonPage
@@ -1785,6 +1803,576 @@ function ScrollProgressBar() {
     >
       <span className="scroll-progress-bar" style={{ transform: `scaleX(${progress})` }} />
     </div>
+  );
+}
+
+function WorkspaceControlCenter({
+  client,
+  comparisonId,
+  onNotice,
+  onError,
+}: {
+  client: PolyCostClient;
+  comparisonId?: string;
+  onNotice: (message: string | null) => void;
+  onError: (message: string | null) => void;
+}) {
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [token, setToken] = useState(() => readStoredAuthToken());
+  const [session, setSession] = useState<AuthMeResponse | null>(null);
+  const [email, setEmail] = useState('architect@example.com');
+  const [password, setPassword] = useState('correct horse battery staple');
+  const [displayName, setDisplayName] = useState('Architecture Lead');
+  const [teamName, setTeamName] = useState('PolyCost demo team');
+  const [authBusy, setAuthBusy] = useState(false);
+  const [workspaceBusy, setWorkspaceBusy] = useState<string | null>(null);
+  const [members, setMembers] = useState<TeamMemberRecord[]>([]);
+  const [invitations, setInvitations] = useState<TeamInvitationRecord[]>([]);
+  const [ssoStatus, setSsoStatus] = useState<SsoConfigurationStatus | null>(null);
+  const [inviteEmail, setInviteEmail] = useState('finops@example.com');
+  const [inviteRole, setInviteRole] = useState<Exclude<TeamRole, 'owner'>>('viewer');
+  const [lastInviteToken, setLastInviteToken] = useState<string | null>(null);
+  const [acceptToken, setAcceptToken] = useState('');
+  const [provider, setProvider] = useState<ProviderId>('aws');
+  const [billingPeriodStart, setBillingPeriodStart] = useState('2026-06-01');
+  const [billingPeriodEnd, setBillingPeriodEnd] = useState('2026-06-30');
+  const [exportContent, setExportContent] = useState(() => providerExportSample('aws'));
+  const [billingImport, setBillingImport] = useState<BillingImportResponse | null>(null);
+  const [reconciliation, setReconciliation] = useState<InvoiceReconciliationRecord | null>(null);
+  const activeTeam = session?.activeTeam;
+  const canManageTeam = activeTeam?.role === 'owner' || activeTeam?.role === 'admin';
+  const sourceType = sourceTypeForProvider(provider);
+
+  useEffect(() => {
+    if (!token) {
+      setSession(null);
+      setMembers([]);
+      setInvitations([]);
+      setSsoStatus(null);
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    void client
+      .getCurrentSession(token)
+      .then((currentSession) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setSession(currentSession);
+        onError(null);
+      })
+      .catch((sessionError) => {
+        if (!isMounted) {
+          return;
+        }
+
+        clearStoredAuthToken();
+        setToken('');
+        setSession(null);
+        onError(formatApiError(sessionError));
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [client, onError, token]);
+
+  useEffect(() => {
+    if (!token || !activeTeam || !canManageTeam) {
+      setMembers([]);
+      setInvitations([]);
+      setSsoStatus(null);
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    void Promise.all([
+      client.listTeamMembers(activeTeam.id, token),
+      client.listTeamInvitations(activeTeam.id, token),
+      client.getSsoStatus(token),
+    ])
+      .then(([nextMembers, nextInvitations, nextSsoStatus]) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setMembers(nextMembers);
+        setInvitations(nextInvitations);
+        setSsoStatus(nextSsoStatus);
+      })
+      .catch((workspaceError) => {
+        if (isMounted) {
+          onError(formatApiError(workspaceError));
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTeam, canManageTeam, client, onError, token, workspaceBusy]);
+
+  async function handleAuthSubmit(event: FormEvent) {
+    event.preventDefault();
+    setAuthBusy(true);
+    onError(null);
+    onNotice(null);
+
+    try {
+      const response =
+        authMode === 'register'
+          ? await client.register({
+              email,
+              password,
+              displayName,
+              teamName,
+            })
+          : await client.login({ email, password });
+
+      storeAuthToken(response.token);
+      setToken(response.token);
+      onNotice(
+        authMode === 'register'
+          ? 'Workspace registered. Team controls and billing import are now available.'
+          : 'Signed in. Team controls and billing import are now available.',
+      );
+    } catch (authError) {
+      onError(formatApiError(authError));
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function handleLogout() {
+    setAuthBusy(true);
+    try {
+      if (token) {
+        await client.logout(token);
+      }
+    } catch {
+      // Local token cleanup is still correct if the server session has already expired.
+    } finally {
+      clearStoredAuthToken();
+      setToken('');
+      setSession(null);
+      setAuthBusy(false);
+      onNotice('Signed out of the workspace.');
+    }
+  }
+
+  async function handleInvite(event: FormEvent) {
+    event.preventDefault();
+    if (!token || !activeTeam) {
+      return;
+    }
+
+    setWorkspaceBusy('invite');
+    onError(null);
+
+    try {
+      const invitation = await client.inviteTeamMember(
+        activeTeam.id,
+        {
+          email: inviteEmail,
+          role: inviteRole,
+        },
+        token,
+      );
+      setLastInviteToken(invitation.inviteToken ?? null);
+      onNotice(
+        'Invitation created. The one-time token is shown in the workspace panel for this demo.',
+      );
+    } catch (inviteError) {
+      onError(formatApiError(inviteError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handleAcceptInvitation(event: FormEvent) {
+    event.preventDefault();
+    if (!token || !acceptToken.trim()) {
+      return;
+    }
+
+    setWorkspaceBusy('accept-invite');
+    onError(null);
+
+    try {
+      await client.acceptTeamInvitation(acceptToken, token);
+      setAcceptToken('');
+      onNotice('Invitation accepted. Sign in again if you want to switch the active team session.');
+    } catch (acceptError) {
+      onError(formatApiError(acceptError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handleRoleChange(accountId: string, role: TeamRole) {
+    if (!token || !activeTeam) {
+      return;
+    }
+
+    setWorkspaceBusy(`role-${accountId}`);
+    onError(null);
+
+    try {
+      await client.updateTeamMemberRole(activeTeam.id, accountId, role, token);
+      onNotice('Team role updated.');
+    } catch (roleError) {
+      onError(formatApiError(roleError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handleRemoveMember(accountId: string) {
+    if (!token || !activeTeam) {
+      return;
+    }
+
+    setWorkspaceBusy(`remove-${accountId}`);
+    onError(null);
+
+    try {
+      await client.removeTeamMember(activeTeam.id, accountId, token);
+      onNotice('Team member removed.');
+    } catch (removeError) {
+      onError(formatApiError(removeError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handleImportProviderExport(event: FormEvent) {
+    event.preventDefault();
+    if (!token) {
+      onError('Sign in before importing provider billing exports.');
+      return;
+    }
+
+    setWorkspaceBusy('billing-import');
+    setBillingImport(null);
+    setReconciliation(null);
+    onError(null);
+
+    try {
+      const input: BillingProviderExportInput = {
+        provider,
+        sourceType,
+        billingPeriodStart,
+        billingPeriodEnd,
+        content: exportContent,
+        encoding: 'text',
+        fileName: `${provider}-billing-export.csv`,
+      };
+      const imported = await client.importProviderBillingExport(input, token);
+      setBillingImport(imported);
+
+      if (comparisonId) {
+        const reconciled = await client.reconcileBillingImport(
+          imported.importRun.id,
+          comparisonId,
+          token,
+        );
+        setReconciliation(reconciled);
+      }
+
+      onNotice(
+        comparisonId
+          ? 'Provider export imported and reconciled against the active comparison.'
+          : 'Provider export imported. Run a comparison to reconcile estimate versus actuals.',
+      );
+    } catch (billingError) {
+      onError(formatApiError(billingError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  return (
+    <section className="workspace-control-center" id="workspace" aria-label="Workspace controls">
+      <div className="workspace-control-heading">
+        <div>
+          <span>Production hardening layer</span>
+          <h2>Account, team, SSO readiness, and invoice reconciliation foundation</h2>
+        </div>
+        <strong>{session ? session.account.email : 'Local session required'}</strong>
+      </div>
+
+      <div className="workspace-control-grid">
+        <form className="workspace-panel" onSubmit={handleAuthSubmit}>
+          <div className="workspace-panel-heading">
+            <span>Workspace session</span>
+            <strong>
+              {session ? 'Connected' : authMode === 'register' ? 'Register' : 'Sign in'}
+            </strong>
+          </div>
+          {session ? (
+            <div className="workspace-session-summary">
+              <span>{session.account.displayName ?? session.account.email}</span>
+              <strong>
+                {activeTeam ? `${activeTeam.name} · ${activeTeam.role}` : 'No active team'}
+              </strong>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => void handleLogout()}
+                loading={authBusy}
+              >
+                <SignInIcon />
+                Sign out
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div
+                className="workspace-auth-toggle"
+                role="tablist"
+                aria-label="Authentication mode"
+              >
+                <button
+                  type="button"
+                  className={authMode === 'login' ? 'is-active' : ''}
+                  onClick={() => setAuthMode('login')}
+                >
+                  Sign in
+                </button>
+                <button
+                  type="button"
+                  className={authMode === 'register' ? 'is-active' : ''}
+                  onClick={() => setAuthMode('register')}
+                >
+                  Register
+                </button>
+              </div>
+              <label className="workspace-field">
+                <span>Email</span>
+                <input value={email} onChange={(event) => setEmail(event.currentTarget.value)} />
+              </label>
+              <label className="workspace-field">
+                <span>Password</span>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.currentTarget.value)}
+                />
+              </label>
+              {authMode === 'register' ? (
+                <>
+                  <label className="workspace-field">
+                    <span>Display name</span>
+                    <input
+                      value={displayName}
+                      onChange={(event) => setDisplayName(event.currentTarget.value)}
+                    />
+                  </label>
+                  <label className="workspace-field">
+                    <span>Team name</span>
+                    <input
+                      value={teamName}
+                      onChange={(event) => setTeamName(event.currentTarget.value)}
+                    />
+                  </label>
+                </>
+              ) : null}
+              <Button
+                type="submit"
+                variant="primary"
+                loading={authBusy}
+                loadingLabel="Connecting..."
+              >
+                <SignInIcon />
+                {authMode === 'register' ? 'Create workspace' : 'Sign in'}
+              </Button>
+            </>
+          )}
+        </form>
+
+        <section className="workspace-panel">
+          <div className="workspace-panel-heading">
+            <span>Team access</span>
+            <strong>{canManageTeam ? `${members.length} members` : 'Admin required'}</strong>
+          </div>
+          {canManageTeam && activeTeam && token ? (
+            <>
+              <form className="workspace-inline-form" onSubmit={handleInvite}>
+                <label className="workspace-field">
+                  <span>Invite email</span>
+                  <input
+                    value={inviteEmail}
+                    onChange={(event) => setInviteEmail(event.currentTarget.value)}
+                  />
+                </label>
+                <label className="workspace-field">
+                  <span>Role</span>
+                  <select
+                    value={inviteRole}
+                    onChange={(event) =>
+                      setInviteRole(event.currentTarget.value as Exclude<TeamRole, 'owner'>)
+                    }
+                  >
+                    <option value="viewer">Viewer</option>
+                    <option value="member">Member</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </label>
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  loading={workspaceBusy === 'invite'}
+                  loadingLabel="Inviting..."
+                >
+                  <ParseIcon />
+                  Invite
+                </Button>
+              </form>
+              {lastInviteToken ? (
+                <p className="workspace-token-output">Invite token: {lastInviteToken}</p>
+              ) : null}
+              <div className="workspace-member-list">
+                {members.map((member) => (
+                  <div className="workspace-member-row" key={member.accountId}>
+                    <span>
+                      <strong>{member.displayName ?? member.email}</strong>
+                      <small>{member.email}</small>
+                    </span>
+                    <select
+                      value={member.role}
+                      disabled={workspaceBusy === `role-${member.accountId}`}
+                      onChange={(event) =>
+                        void handleRoleChange(
+                          member.accountId,
+                          event.currentTarget.value as TeamRole,
+                        )
+                      }
+                    >
+                      <option value="owner">Owner</option>
+                      <option value="admin">Admin</option>
+                      <option value="member">Member</option>
+                      <option value="viewer">Viewer</option>
+                    </select>
+                    <button
+                      type="button"
+                      className="workspace-link-button"
+                      disabled={workspaceBusy === `remove-${member.accountId}`}
+                      onClick={() => void handleRemoveMember(member.accountId)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <form className="workspace-inline-form" onSubmit={handleAcceptInvitation}>
+                <label className="workspace-field workspace-field-wide">
+                  <span>Accept invite token</span>
+                  <input
+                    value={acceptToken}
+                    onChange={(event) => setAcceptToken(event.currentTarget.value)}
+                  />
+                </label>
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  loading={workspaceBusy === 'accept-invite'}
+                  loadingLabel="Accepting..."
+                >
+                  Accept
+                </Button>
+              </form>
+              <div className="workspace-sso-status">
+                <span>SSO readiness</span>
+                <strong>
+                  OIDC {ssoStatus?.oidcConfigured ? 'configured' : 'ready'} · SAML{' '}
+                  {ssoStatus?.samlConfigured ? 'configured' : 'ready'}
+                </strong>
+                <small>
+                  {invitations.filter((item) => item.status === 'pending').length} pending
+                  invitations
+                </small>
+              </div>
+            </>
+          ) : (
+            <p className="workspace-empty-state">
+              Sign in as a team owner or admin to manage members, issue invite tokens, and review
+              SSO status.
+            </p>
+          )}
+        </section>
+
+        <form
+          className="workspace-panel workspace-billing-panel"
+          onSubmit={handleImportProviderExport}
+        >
+          <div className="workspace-panel-heading">
+            <span>Actuals reconciliation</span>
+            <strong>
+              {billingImport ? `${billingImport.acceptedRows} rows imported` : 'Provider export'}
+            </strong>
+          </div>
+          <div className="workspace-billing-controls">
+            <label className="workspace-field">
+              <span>Provider</span>
+              <select
+                value={provider}
+                onChange={(event) => {
+                  const nextProvider = event.currentTarget.value as ProviderId;
+                  setProvider(nextProvider);
+                  setExportContent(providerExportSample(nextProvider));
+                }}
+              >
+                <option value="aws">AWS CUR</option>
+                <option value="azure">Azure Cost Management</option>
+                <option value="gcp">GCP Billing Export</option>
+              </select>
+            </label>
+            <TextField
+              label="Billing period start"
+              value={billingPeriodStart}
+              onChange={setBillingPeriodStart}
+            />
+            <TextField
+              label="Billing period end"
+              value={billingPeriodEnd}
+              onChange={setBillingPeriodEnd}
+            />
+          </div>
+          <label className="workspace-field workspace-export-field">
+            <span>{sourceType} CSV or JSON content</span>
+            <textarea
+              value={exportContent}
+              onChange={(event) => setExportContent(event.currentTarget.value)}
+            />
+          </label>
+          <Button
+            type="submit"
+            variant="primary"
+            loading={workspaceBusy === 'billing-import'}
+            loadingLabel="Importing actuals..."
+          >
+            <CompareIcon />
+            Import & reconcile
+          </Button>
+          {billingImport ? (
+            <div className="workspace-reconciliation-result">
+              <span>Import {billingImport.importRun.id.slice(0, 8)}</span>
+              <strong>{formatCurrency(billingImport.importRun.totalCostUsd)}</strong>
+              <small>
+                {reconciliation
+                  ? `${reconciliation.status} · ${formatCurrency(
+                      reconciliation.varianceUsd,
+                    )} variance`
+                  : 'Run a comparison to attach estimate-vs-actual evidence'}
+              </small>
+            </div>
+          ) : null}
+        </form>
+      </div>
+    </section>
   );
 }
 
@@ -3586,7 +4174,7 @@ function DiagramReviewPanel({
   onClassifyNode: (nodeId: string, serviceType: string) => void;
   onAddRequirement: (serviceType: string) => void;
 }) {
-  const layoutPreview = diagramLayoutPreview(result.graph.nodes);
+  const layoutPreview = diagramLayoutPreview(result.graph.nodes, result.graph.edges);
 
   return (
     <section className="diagram-review-panel" aria-label="Diagram parse review">
@@ -3603,16 +4191,29 @@ function DiagramReviewPanel({
         aria-label="Diagram structure preview"
       >
         {layoutPreview
-          ? layoutPreview.nodes.map((node) => (
-              <span
-                className={`diagram-preview-node diagram-preview-node-${node.kind}`}
-                key={node.id}
-                style={node.style}
-                title={node.visual?.pageName ?? node.sourceRef}
+          ? [
+              <svg
+                className="diagram-preview-edges"
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+                key="edges"
+                aria-hidden="true"
               >
-                {node.displayLabel}
-              </span>
-            ))
+                {layoutPreview.edges.map((edge) => (
+                  <line key={edge.id} x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} />
+                ))}
+              </svg>,
+              ...layoutPreview.nodes.map((node) => (
+                <span
+                  className={`diagram-preview-node diagram-preview-node-${node.kind}`}
+                  key={node.id}
+                  style={node.style}
+                  title={node.visual?.pageName ?? node.sourceRef}
+                >
+                  {node.displayLabel}
+                </span>
+              )),
+            ]
           : result.graph.nodes.slice(0, 12).map((node) => (
               <span
                 className={`diagram-preview-node diagram-preview-node-${node.kind}`}
@@ -3715,7 +4316,10 @@ function DiagramReviewPanel({
   );
 }
 
-function diagramLayoutPreview(nodes: DiagramParseResult['graph']['nodes']):
+function diagramLayoutPreview(
+  nodes: DiagramParseResult['graph']['nodes'],
+  edges: DiagramParseResult['graph']['edges'],
+):
   | {
       nodes: Array<
         DiagramParseResult['graph']['nodes'][number] & {
@@ -3725,9 +4329,22 @@ function diagramLayoutPreview(nodes: DiagramParseResult['graph']['nodes']):
             width: string;
             minHeight: string;
             borderColor?: string;
+            backgroundColor?: string;
+            zIndex: number;
+          };
+          center: {
+            x: number;
+            y: number;
           };
         }
       >;
+      edges: Array<{
+        id: string;
+        x1: number;
+        y1: number;
+        x2: number;
+        y2: number;
+      }>;
     }
   | undefined {
   const layoutNodes = nodes.filter((node) => node.bounds).slice(0, 18);
@@ -3742,19 +4359,62 @@ function diagramLayoutPreview(nodes: DiagramParseResult['graph']['nodes']):
   const maxY = Math.max(...layoutNodes.map((node) => node.bounds!.y + node.bounds!.height));
   const spanX = Math.max(maxX - minX, 1);
   const spanY = Math.max(maxY - minY, 1);
+  const positionedNodes = layoutNodes.map((node) => {
+    const left = ((node.bounds!.x - minX) / spanX) * 82 + 4;
+    const top = ((maxY - node.bounds!.y - node.bounds!.height) / spanY) * 68 + 10;
+    const width = Math.max((node.bounds!.width / spanX) * 72, 16);
+    const minHeight = Math.max((node.bounds!.height / spanY) * 88, 30);
+    const fillColor = safePreviewColor(node.visual?.fillColor);
+    const lineColor = safePreviewColor(node.visual?.lineColor);
+
+    return {
+      ...node,
+      center: {
+        x: left + width / 2,
+        y: top + minHeight / 2,
+      },
+      style: {
+        left: `${left}%`,
+        top: `${top}%`,
+        width: `${width}%`,
+        minHeight: `${minHeight}px`,
+        zIndex: 1,
+        ...(lineColor ? { borderColor: lineColor } : {}),
+        ...(fillColor
+          ? {
+              backgroundColor: `color-mix(in srgb, ${fillColor} 13%, var(--pc-bg-surface))`,
+            }
+          : {}),
+      },
+    };
+  });
+  const nodeCenters = new Map(positionedNodes.map((node) => [node.id, node.center]));
 
   return {
-    nodes: layoutNodes.map((node) => ({
-      ...node,
-      style: {
-        left: `${((node.bounds!.x - minX) / spanX) * 82 + 4}%`,
-        top: `${((maxY - node.bounds!.y - node.bounds!.height) / spanY) * 68 + 10}%`,
-        width: `${Math.max((node.bounds!.width / spanX) * 72, 16)}%`,
-        minHeight: `${Math.max((node.bounds!.height / spanY) * 88, 30)}px`,
-        ...(node.visual?.lineColor ? { borderColor: node.visual.lineColor } : {}),
-      },
-    })),
+    nodes: positionedNodes,
+    edges: edges
+      .map((edge) => {
+        const source = nodeCenters.get(edge.sourceId);
+        const target = nodeCenters.get(edge.targetId);
+
+        return source && target
+          ? {
+              id: edge.id,
+              x1: source.x,
+              y1: source.y,
+              x2: target.x,
+              y2: target.y,
+            }
+          : undefined;
+      })
+      .filter((edge): edge is { id: string; x1: number; y1: number; x2: number; y2: number } =>
+        Boolean(edge),
+      ),
   };
+}
+
+function safePreviewColor(value: string | undefined): string | undefined {
+  return value && /^#[0-9A-F]{6}$/i.test(value) ? value : undefined;
 }
 
 function DescribePanel({
@@ -16636,6 +17296,49 @@ function readStoredPricingModel(): PricingModelKey {
 
 function storePricingModel(pricingModel: PricingModelKey): void {
   window.localStorage.setItem(PRICING_MODEL_STORAGE_KEY, pricingModel);
+}
+
+function readStoredAuthToken(): string {
+  return window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY) ?? '';
+}
+
+function storeAuthToken(token: string): void {
+  window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, token);
+}
+
+function clearStoredAuthToken(): void {
+  window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
+}
+
+function sourceTypeForProvider(provider: ProviderId): BillingSourceType {
+  switch (provider) {
+    case 'aws':
+      return 'aws-cur';
+    case 'azure':
+      return 'azure-cost-management';
+    case 'gcp':
+      return 'gcp-billing-export';
+  }
+}
+
+function providerExportSample(provider: ProviderId): string {
+  switch (provider) {
+    case 'aws':
+      return [
+        'lineItem/ProductCode,product/sku,lineItem/UsageStartDate,lineItem/UsageEndDate,lineItem/UsageAmount,pricing/unit,lineItem/NetUnblendedCost,lineItem/CurrencyCode,product/region,lineItem/ResourceId,resourceTags/user:cost_center',
+        'AmazonEC2,sku-compute,2026-06-01T00:00:00Z,2026-06-30T23:59:59Z,730,Hrs,107.00,USD,us-east-1,i-1234567890abcdef0,engineering',
+      ].join('\n');
+    case 'azure':
+      return [
+        'ServiceName,MeterId,UsageDateTime,Quantity,UnitOfMeasure,CostInUSD,BillingCurrencyCode,ResourceLocation,ResourceId,Tags',
+        'Virtual Machines,meter-compute,2026-06-15T00:00:00Z,730,Hours,118.50,USD,eastus,/subscriptions/demo/resourceGroups/app/providers/Microsoft.Compute/virtualMachines/web,"{""cost_center"":""engineering""}"',
+      ].join('\n');
+    case 'gcp':
+      return [
+        'service.description,sku.id,usage_start_time,usage_end_time,usage.amount,usage.unit,cost,currency,location.region,resource.name,labels',
+        'Compute Engine,sku-compute,2026-06-01T00:00:00Z,2026-06-30T23:59:59Z,730,h,99.90,USD,us-central1,projects/demo/zones/us-central1-a/instances/web,"{""cost_center"":""engineering""}"',
+      ].join('\n');
+  }
 }
 
 function createComparisonHistoryEntry({

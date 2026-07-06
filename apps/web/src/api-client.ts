@@ -8,6 +8,7 @@ import {
   BudgetRecord,
   BillingImportInput,
   BillingImportResponse,
+  BillingProviderExportInput,
   ComparisonAnalyticsResponse,
   ComparisonResult,
   DataHealthResponse,
@@ -28,6 +29,10 @@ import {
   SharedReportResponse,
   ShareLinkAnalyticsResponse,
   ShareLinkResponse,
+  SsoConfigurationStatus,
+  TeamInvitationRecord,
+  TeamMemberRecord,
+  TeamRole,
   WorkloadInput,
   WorkloadRecord,
 } from './types';
@@ -76,6 +81,22 @@ export interface PolyCostClient {
   login(input: { email: string; password: string }): Promise<AuthSessionResponse>;
   getCurrentSession(token: string): Promise<AuthMeResponse>;
   logout(token: string): Promise<{ revoked: true }>;
+  listTeamMembers(teamId: string, token: string): Promise<TeamMemberRecord[]>;
+  inviteTeamMember(
+    teamId: string,
+    input: { email: string; role: Exclude<TeamRole, 'owner'> },
+    token: string,
+  ): Promise<TeamInvitationRecord>;
+  listTeamInvitations(teamId: string, token: string): Promise<TeamInvitationRecord[]>;
+  acceptTeamInvitation(tokenValue: string, token: string): Promise<TeamInvitationRecord>;
+  updateTeamMemberRole(
+    teamId: string,
+    accountId: string,
+    role: TeamRole,
+    token: string,
+  ): Promise<TeamMemberRecord>;
+  removeTeamMember(teamId: string, accountId: string, token: string): Promise<{ removed: true }>;
+  getSsoStatus(token: string): Promise<SsoConfigurationStatus>;
   parseWorkload(input: string): Promise<ParsedNwsDraft>;
   parseDiagram(input: DiagramParseRequest): Promise<DiagramParseResult>;
   validateWorkload(nws: NormalizedWorkloadSpec): Promise<{ valid: true }>;
@@ -119,6 +140,10 @@ export interface PolyCostClient {
   updateAlertDismissed(alertId: string, dismissed: boolean): Promise<AlertRecord>;
   getExchangeRates(base?: string): Promise<ExchangeRatesResponse>;
   importBillingActuals(input: BillingImportInput, token: string): Promise<BillingImportResponse>;
+  importProviderBillingExport(
+    input: BillingProviderExportInput,
+    token: string,
+  ): Promise<BillingImportResponse>;
   reconcileBillingImport(
     importRunId: string,
     comparisonId: string,
@@ -170,6 +195,68 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
     logout(token) {
       return requestJson<{ revoked: true }>(baseUrl, '/auth/logout', {
         method: 'POST',
+        headers: authorizationHeaders(token),
+      });
+    },
+    listTeamMembers(teamId, token) {
+      return requestJson<TeamMemberRecord[]>(
+        baseUrl,
+        `/auth/teams/${encodeURIComponent(teamId)}/members`,
+        {
+          headers: authorizationHeaders(token),
+        },
+      );
+    },
+    inviteTeamMember(teamId, input, token) {
+      return requestJson<TeamInvitationRecord>(
+        baseUrl,
+        `/auth/teams/${encodeURIComponent(teamId)}/invitations`,
+        {
+          method: 'POST',
+          headers: authorizationHeaders(token),
+          body: JSON.stringify(input),
+        },
+      );
+    },
+    listTeamInvitations(teamId, token) {
+      return requestJson<TeamInvitationRecord[]>(
+        baseUrl,
+        `/auth/teams/${encodeURIComponent(teamId)}/invitations`,
+        {
+          headers: authorizationHeaders(token),
+        },
+      );
+    },
+    acceptTeamInvitation(tokenValue, token) {
+      return requestJson<TeamInvitationRecord>(baseUrl, '/auth/invitations/accept', {
+        method: 'POST',
+        headers: authorizationHeaders(token),
+        body: JSON.stringify({ token: tokenValue }),
+      });
+    },
+    updateTeamMemberRole(teamId, accountId, role, token) {
+      return requestJson<TeamMemberRecord>(
+        baseUrl,
+        `/auth/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(accountId)}`,
+        {
+          method: 'PATCH',
+          headers: authorizationHeaders(token),
+          body: JSON.stringify({ role }),
+        },
+      );
+    },
+    removeTeamMember(teamId, accountId, token) {
+      return requestJson<{ removed: true }>(
+        baseUrl,
+        `/auth/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(accountId)}`,
+        {
+          method: 'DELETE',
+          headers: authorizationHeaders(token),
+        },
+      );
+    },
+    getSsoStatus(token) {
+      return requestJson<SsoConfigurationStatus>(baseUrl, '/auth/sso/status', {
         headers: authorizationHeaders(token),
       });
     },
@@ -303,6 +390,13 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
     },
     importBillingActuals(input, token) {
       return requestJson<BillingImportResponse>(baseUrl, '/billing/imports', {
+        method: 'POST',
+        headers: authorizationHeaders(token),
+        body: JSON.stringify(input),
+      });
+    },
+    importProviderBillingExport(input, token) {
+      return requestJson<BillingImportResponse>(baseUrl, '/billing/imports/provider-export', {
         method: 'POST',
         headers: authorizationHeaders(token),
         body: JSON.stringify(input),

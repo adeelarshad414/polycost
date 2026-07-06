@@ -43,6 +43,26 @@ login endpoint, password storage, session issuance, or authorization middleware.
 must be implemented as a dedicated auth phase with rate limits, secure sessions, and
 horizontal access-control tests.
 
+## Phase 2.7 Hardening Addendum
+
+The follow-up hardening pass added practical product surfaces on top of the
+foundations above:
+
+- `POST /api/v1/billing/imports/provider-export` maps bounded AWS CUR, Azure Cost
+  Management, and GCP Billing Export CSV/JSON content into normalized invoice line
+  items before reconciliation. This is a traceable actuals bridge, not full
+  invoice-grade billing parity.
+- Team administration routes now support member listing, role updates, protected
+  owner demotion/removal, invite creation/acceptance, and SSO readiness status.
+- The frontend now includes a workspace control center wired to the auth/team,
+  provider-export import, and reconciliation APIs.
+- VSDX connector records are aggregated into direct topology edges where possible,
+  and the browser preview renders layout-aware nodes plus connector lines.
+
+Remaining future scope is explicit: full provider billing/export coverage across all
+invoice edge cases, full Visio visual rendering, SSO handshakes, email invite
+delivery, and complete enterprise account/RBAC product UX.
+
 ## Security Advisory State
 
 Targeted npm overrides remove the fixable low/moderate transitive advisories from

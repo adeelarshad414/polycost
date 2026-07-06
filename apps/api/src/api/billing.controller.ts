@@ -13,6 +13,11 @@ export class BillingController {
     return this.billingService.importActuals(body, request.auth!);
   }
 
+  @Post('imports/provider-export')
+  importProviderExport(@Body() body: unknown, @Req() request: RequestWithAuth) {
+    return this.billingService.importProviderExport(body, request.auth!);
+  }
+
   @Post('imports/:id/reconcile')
   reconcile(
     @Param('id') importRunId: string,

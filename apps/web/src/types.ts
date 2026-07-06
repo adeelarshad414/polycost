@@ -297,6 +297,46 @@ export interface AuthMeResponse {
   };
 }
 
+export interface TeamMemberRecord {
+  accountId: string;
+  email: string;
+  displayName?: string;
+  role: TeamRole;
+  createdAt: string;
+  lastActiveAt?: string;
+}
+
+export interface TeamInvitationRecord {
+  id: string;
+  teamId: string;
+  email: string;
+  role: Exclude<TeamRole, 'owner'>;
+  status: 'pending' | 'accepted' | 'revoked' | 'expired';
+  invitedByAccountId: string;
+  acceptedByAccountId?: string;
+  expiresAt: string;
+  createdAt: string;
+  acceptedAt?: string;
+  revokedAt?: string;
+  inviteToken?: string;
+}
+
+export interface SsoConfigurationStatus {
+  localLoginEnabled: boolean;
+  oidcConfigured: boolean;
+  samlConfigured: boolean;
+  configuredProviders: Array<{
+    providerType: 'oidc' | 'saml';
+    displayName: string;
+    issuerUrl: string;
+    status: 'configured' | 'disabled';
+  }>;
+  callbackUrls: {
+    oidc: string;
+    saml: string;
+  };
+}
+
 export type BillingSourceType =
   'aws-cur' | 'azure-cost-management' | 'gcp-billing-export' | 'normalized-csv';
 
@@ -322,6 +362,17 @@ export interface BillingImportInput {
   billingPeriodEnd: string;
   originalFileSha256?: string;
   rows: BillingImportRowInput[];
+}
+
+export interface BillingProviderExportInput {
+  provider: ProviderId;
+  sourceType: BillingSourceType;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  content: string;
+  encoding?: 'text' | 'base64';
+  fileName?: string;
+  originalFileSha256?: string;
 }
 
 export interface BillingImportResponse {

@@ -175,7 +175,8 @@ function roundLayout(value: number): number {
 }
 
 function extractConnections(xml: string, path: string): DiagramGraphEdge[] {
-  const edges: DiagramGraphEdge[] = [];
+  const fallbackEdges: DiagramGraphEdge[] = [];
+  const connectorTargets = new Map<string, string[]>();
   const connectPattern = /<Connect\b([^>]*)\/?>/gi;
   let match: RegExpExecArray | null;
 
@@ -188,14 +189,42 @@ function extractConnections(xml: string, path: string): DiagramGraphEdge[] {
       continue;
     }
 
-    edges.push({
-      id: sanitizeSourceRef('vsdx', `${path}:${sourceId}-${targetId}-${edges.length + 1}`),
+    const targets = connectorTargets.get(sourceId) ?? [];
+    if (!targets.includes(targetId)) {
+      targets.push(targetId);
+      connectorTargets.set(sourceId, targets);
+    }
+
+    fallbackEdges.push({
+      id: sanitizeSourceRef('vsdx', `${path}:${sourceId}-${targetId}-${fallbackEdges.length + 1}`),
       sourceId,
       targetId,
     });
   }
 
-  return edges;
+  const aggregatedEdges: DiagramGraphEdge[] = [];
+
+  for (const [connectorId, targets] of connectorTargets.entries()) {
+    if (targets.length < 2) {
+      continue;
+    }
+
+    const [firstTarget, ...otherTargets] = targets;
+
+    for (const targetId of otherTargets) {
+      aggregatedEdges.push({
+        id: sanitizeSourceRef(
+          'vsdx',
+          `${path}:${connectorId}-${firstTarget}-${targetId}-${aggregatedEdges.length + 1}`,
+        ),
+        sourceId: firstTarget,
+        targetId,
+        displayLabel: 'Connector',
+      });
+    }
+  }
+
+  return aggregatedEdges.length > 0 ? aggregatedEdges : fallbackEdges;
 }
 
 function parseXmlAttributes(source: string): Record<string, string> {

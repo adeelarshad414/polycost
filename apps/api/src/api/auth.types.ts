@@ -6,6 +6,46 @@ export interface AccountTeamMembership {
   role: TeamRole;
 }
 
+export interface TeamMemberRecord {
+  accountId: string;
+  email: string;
+  displayName?: string;
+  role: TeamRole;
+  createdAt: string;
+  lastActiveAt?: string;
+}
+
+export interface TeamInvitationRecord {
+  id: string;
+  teamId: string;
+  email: string;
+  role: Exclude<TeamRole, 'owner'>;
+  status: 'pending' | 'accepted' | 'revoked' | 'expired';
+  invitedByAccountId: string;
+  acceptedByAccountId?: string;
+  expiresAt: string;
+  createdAt: string;
+  acceptedAt?: string;
+  revokedAt?: string;
+  inviteToken?: string;
+}
+
+export interface SsoConfigurationStatus {
+  localLoginEnabled: boolean;
+  oidcConfigured: boolean;
+  samlConfigured: boolean;
+  configuredProviders: Array<{
+    providerType: 'oidc' | 'saml';
+    displayName: string;
+    issuerUrl: string;
+    status: 'configured' | 'disabled';
+  }>;
+  callbackUrls: {
+    oidc: string;
+    saml: string;
+  };
+}
+
 export interface AuthIdentity {
   accountId: string;
   email: string;
