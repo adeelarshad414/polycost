@@ -57,6 +57,35 @@ say so explicitly rather than marking it done.
 | Phase 2.8O - Production-readiness CI gate              | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8P - Queryable comparison pricing evidence     | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8Q - Visible pricing evidence UI wiring        | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8R - Refresh-live evidence regression          | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8R - Refresh-live evidence regression
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Strengthened the live-pricing traceability regression so it now proves a refreshed
+  provider catalog row changes the comparison total and is visible through
+  `getComparisonPricingEvidence()` with the refreshed unit rate, fetched timestamp,
+  source endpoint, raw source record ID, derivation math, and changed payload hash.
+- Added explicit fixture source metadata (`fixture://aws/traceability/compute` and
+  `aws-price-row-ec2-trace`) to the traceability row so the test verifies source-row
+  identity remains stable while the payload hash changes when the refreshed catalog
+  price changes.
+- Added `src/api/live-pricing-traceability.spec.ts` to `npm run
+test:production-readiness`, making refresh-live SKU lineage part of the named
+  production hardening gate rather than an isolated focused test.
+- Verification evidence in this continuation:
+  - Focused live-pricing traceability spec passed: 1 suite / 1 test.
+  - `npm run test:production-readiness` passed: API 6 suites / 80 tests and web 2
+    suites / 80 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this proves exact refreshed catalog-row changes flow
+  into saved comparison evidence for the current refresh path, but it does not turn
+  PolyCost into full invoice-grade live cloud billing. Private pricing, billing
+  account discounts, and provider-invoice reconciliation remain separate future
+  hardening work.
 
 ## Phase 2.8Q - Visible pricing evidence UI wiring
 

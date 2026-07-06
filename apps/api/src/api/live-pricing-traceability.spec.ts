@@ -84,6 +84,8 @@ const initialRecord: PricingCatalogRecord = {
     pricingModel: 'on-demand',
     vcpu: 2,
     memoryGb: 4,
+    sourceEndpoint: 'fixture://aws/traceability/compute',
+    rawSourceRecordId: 'aws-price-row-ec2-trace',
   },
   effectiveDate: '2026-07-01T00:00:00.000Z',
   fetchedAt: '2026-07-01T01:00:00.000Z',
@@ -142,7 +144,11 @@ describe('live pricing traceability', () => {
     );
 
     const initial = await service.createComparison(workload);
+    const initialEvidence = await service.getComparisonPricingEvidence(initial.comparisonId);
     const refreshed = await service.refreshLiveComparison(initial.comparisonId, true);
+    const refreshedEvidence = await service.getComparisonPricingEvidence(refreshed.comparisonId);
+    const initialEvidenceRow = initialEvidence.evidence[0]!;
+    const refreshedEvidenceRow = refreshedEvidence.evidence[0]!;
 
     expect(initial.providers[0].totals.monthly).toBe(36.5);
     expect(refreshed.providers[0].totals.monthly).toBe(58.4);
@@ -160,6 +166,50 @@ describe('live pricing traceability', () => {
           isEstimate: false,
         }),
       }),
+    );
+    expect(initialEvidenceRow.displayedAmounts.monthlyCostUsd).toBe(36.5);
+    expect(initialEvidenceRow.rate).toEqual(
+      expect.objectContaining({
+        sourceEndpoint: 'fixture://aws/traceability/compute',
+        sourceRecordId: 'aws-price-row-ec2-trace',
+        unitPriceUsd: 0.05,
+        fetchedAt: '2026-07-01T01:00:00.000Z',
+      }),
+    );
+    expect(initialEvidenceRow.rate.sourcePayloadHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(refreshedEvidenceRow).toEqual(
+      expect.objectContaining({
+        displayedAmounts: expect.objectContaining({
+          monthlyCostUsd: 58.4,
+          hourlyCostUsd: 0.08,
+        }),
+        sku: expect.objectContaining({
+          resolvedSkuId: 'AWS-COMPUTE-TRACE',
+          sourceSkuId: 'AWS-COMPUTE-TRACE',
+          providerServiceName: 'Traceable EC2 shape',
+        }),
+        rate: expect.objectContaining({
+          source: 'pricing_catalog',
+          sourceEndpoint: 'fixture://aws/traceability/compute',
+          sourceRecordId: 'aws-price-row-ec2-trace',
+          unitPriceUsd: 0.08,
+          fetchedAt: '2026-07-06T01:00:00.000Z',
+        }),
+        derivation: expect.objectContaining({
+          monthlyCostUsd: 58.4,
+          hourlyCostUsd: 0.08,
+          monthlyHours: 730,
+        }),
+        equivalence: {
+          confidence: 'direct',
+          isApproximate: false,
+          isEstimate: false,
+        },
+      }),
+    );
+    expect(refreshedEvidenceRow.rate.sourcePayloadHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(refreshedEvidenceRow.rate.sourcePayloadHash).not.toBe(
+      initialEvidenceRow.rate.sourcePayloadHash,
     );
   });
 });
