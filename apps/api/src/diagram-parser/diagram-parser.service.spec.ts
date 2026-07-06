@@ -175,6 +175,89 @@ describe('DiagramParserService', () => {
     ]);
   });
 
+  it('keeps valid VSDX pages and reports page-level warnings for corrupt pages', async () => {
+    const parsed = await service().parse({
+      content: zipWithStoredEntries([
+        {
+          path: 'visio/pages/page1.xml',
+          content: `
+            <PageContents>
+              <Shapes>
+                <Shape ID="10" NameU="AWS19.EC2"><Text>EC2 web</Text></Shape>
+              </Shapes>
+            </PageContents>
+          `,
+        },
+        {
+          path: 'visio/pages/page2.xml',
+          content: `
+            <PageContents>
+              <Shapes>
+                <Shape ID="20" NameU="AWS19.RDS"><Text>broken database</Text></Shape>
+              </Shapes>
+          `,
+        },
+      ]).toString('base64'),
+      encoding: 'base64',
+      fileName: 'partial.vsdx',
+    });
+
+    expect(parsed.graph.format).toBe('vsdx');
+    expect(parsed.review.components).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          displayLabel: 'EC2 web',
+          serviceCategory: 'compute',
+        }),
+      ]),
+    );
+    expect(parsed.review.unresolvedClassifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'vsdx-page-parse-error-page2',
+          displayLabel: 'Page 2',
+          reason: expect.stringContaining('Unable to parse Page 2'),
+          sourceRef: 'vsdx:visio_pages_page2.xml:parse-error',
+        }),
+      ]),
+    );
+    expect(parsed.fieldsRequiringReview).toContain(
+      'diagram.extraction.vsdx-page-parse-error-page2',
+    );
+  });
+
+  it('still rejects unsafe VSDX XML instead of downgrading it to a parse warning', async () => {
+    await expect(
+      service().parse({
+        content: zipWithStoredEntries([
+          {
+            path: 'visio/pages/page1.xml',
+            content: `
+              <PageContents>
+                <Shapes>
+                  <Shape ID="10" NameU="AWS19.EC2"><Text>EC2 web</Text></Shape>
+                </Shapes>
+              </PageContents>
+            `,
+          },
+          {
+            path: 'visio/pages/page2.xml',
+            content: `
+              <!DOCTYPE foo [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]>
+              <PageContents>
+                <Shapes>
+                  <Shape ID="20" NameU="AWS19.RDS"><Text>&xxe;</Text></Shape>
+                </Shapes>
+              </PageContents>
+            `,
+          },
+        ]).toString('base64'),
+        encoding: 'base64',
+        fileName: 'unsafe.vsdx',
+      }),
+    ).rejects.toThrow(ApiValidationError);
+  });
+
   it('classifies unresolved nodes through the mocked Tier 3 LLM path', async () => {
     const llmClient: LlmClassifierClient = {
       classify: jest.fn(async (input) => ({

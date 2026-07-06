@@ -85,13 +85,16 @@ export class DiagramParserService {
     review: DiagramParseResult['review'];
     fieldsRequiringReview: string[];
   }> {
+    const extractionWarnings = extracted.extractionWarnings ?? [];
     const graphNodes: DiagramGraphNode[] = [];
     const classifiedNodes: ClassifiedDiagramNode[] = [];
-    const unresolvedClassifications: DiagramIgnoredNode[] = [];
+    const unresolvedClassifications: DiagramIgnoredNode[] = [...extractionWarnings];
     const ignoredNodes: DiagramIgnoredNode[] = [];
     const reviewComponents: DiagramReviewComponent[] = [];
     const assumedDefaults: string[] = [];
-    const fieldsRequiringReview: string[] = [];
+    const fieldsRequiringReview: string[] = extractionWarnings.map(
+      (warning) => `diagram.extraction.${warning.id}`,
+    );
 
     for (const node of extracted.nodes.slice(0, DIAGRAM_MAX_NODES)) {
       const displayLabel = sanitizeDisplayText(node.rawLabel, node.id);

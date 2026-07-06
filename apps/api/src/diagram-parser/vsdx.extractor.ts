@@ -3,6 +3,7 @@ import {
   DecodedDiagramInput,
   DiagramExtractor,
   DiagramGraphEdge,
+  DiagramIgnoredNode,
   ExtractedDiagram,
   ExtractedDiagramNode,
 } from './diagram-parser.types';
@@ -20,22 +21,30 @@ export class VsdxExtractor implements DiagramExtractor {
     );
     const nodes = new Map<string, ExtractedDiagramNode>();
     const edges: DiagramGraphEdge[] = [];
+    const extractionWarnings: DiagramIgnoredNode[] = [];
 
     for (const entry of entries) {
       const xml = entry.content.toString('utf8');
       assertXmlSafe(xml);
 
-      for (const node of extractShapes(xml, entry.path, masters)) {
-        nodes.set(node.id, node);
-      }
+      try {
+        assertPageXmlParseable(xml, entry.path);
 
-      edges.push(...extractConnections(xml, entry.path));
+        for (const node of extractShapes(xml, entry.path, masters)) {
+          nodes.set(node.id, node);
+        }
+
+        edges.push(...extractConnections(xml, entry.path));
+      } catch (error) {
+        extractionWarnings.push(pageParseWarning(entry.path, error));
+      }
     }
 
     return {
       format: this.format,
       nodes: [...nodes.values()],
       edges,
+      ...(extractionWarnings.length > 0 ? { extractionWarnings } : {}),
     };
   }
 }
@@ -218,6 +227,33 @@ function colorFromCell(value: string | undefined): string | undefined {
 
 function pageNameFromPath(path: string): string {
   return path.match(/page(\d+)\.xml$/i)?.[1] ? `Page ${path.match(/page(\d+)\.xml$/i)?.[1]}` : path;
+}
+
+function pageIdFromPath(path: string): string {
+  return `page${path.match(/page(\d+)\.xml$/i)?.[1] ?? 'unknown'}`;
+}
+
+function assertPageXmlParseable(xml: string, path: string): void {
+  if (!/<PageContents\b/i.test(xml)) {
+    throw new Error(`${pageNameFromPath(path)} is missing PageContents`);
+  }
+
+  if (!/<\/PageContents>/i.test(xml)) {
+    throw new Error(`${pageNameFromPath(path)} ended before PageContents closed`);
+  }
+}
+
+function pageParseWarning(path: string, error: unknown): DiagramIgnoredNode {
+  const pageId = pageIdFromPath(path);
+  const pageName = pageNameFromPath(path);
+  const message = error instanceof Error ? error.message : 'unknown parser error';
+
+  return {
+    id: `vsdx-page-parse-error-${pageId}`,
+    displayLabel: pageName,
+    reason: `Unable to parse ${pageName}: ${sanitizeDisplayText(message, 'page parser error')}`,
+    sourceRef: sanitizeSourceRef('vsdx', `${path}:parse-error`),
+  };
 }
 
 function roundLayout(value: number): number {

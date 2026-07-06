@@ -42,6 +42,47 @@ say so explicitly rather than marking it done.
 | Phase 2.8 - Gap-closure production readiness           | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8A - Auth product UX continuation              | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8B - Invite/SSO auth hardening                 | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8C - Diagram partial-parse hardening           | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8C - Diagram partial-parse hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- VSDX extraction now preserves valid pages when a later page has non-security XML
+  structure corruption. The API returns a review warning with page ID, page label,
+  source reference, and a `diagram.extraction.*` review field instead of silently
+  dropping the failure or discarding all valid pages.
+- Security boundary preserved: VSDX pages containing blocked XML entity declarations
+  still fail hard with `ApiValidationError` before partial-parse recovery is allowed.
+- Parser review model extended with extractor-level warnings so future diagram
+  extractors can report per-page/per-node recovery evidence without changing the
+  public comparison contract.
+- Verification evidence in this continuation:
+  - Focused API diagram parser test passed: 1 suite / 19 tests, including partial
+    VSDX recovery, unsafe VSDX rejection, VSDX masters/containers/connectors,
+    Tier-3 mocked LLM classification, oversized-node cap, and malicious fixture
+    rejection.
+  - `npm run format:check` passed.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run ci:unit` passed across API and web coverage suites.
+  - `npm run ci:build` passed for API and web production builds; the existing
+    `%VITE_API_BASE_URL%` build warning remains unchanged.
+  - `npm run ci:integration` passed with no integration tests found in current
+    workspaces.
+  - `npm run db:validate` passed; live `schema_migrations` check skipped because
+    Postgres was not running in that standalone command.
+  - `npm run provider:credentials:check` passed in mock-provider mode.
+  - `npm run security:audit` passed the high/critical gate while reporting the
+    already documented low Graphify/Ollama transitive advisory.
+  - `npm run graphify:validate`, `npm run qa`, `npm run devops:check`, and
+    `npm run cloud:check` passed. `qa` continues to document the Node 24-only
+    impeccable skip while the repo target remains Node 20.
+- Known gaps carried forward: this is extraction/review hardening, not full Visio
+  visual rendering. `npm run ci:e2e` was attempted with Docker access, but the local
+  Docker/Colima layer stopped returning `docker compose ps`/log diagnostics after API
+  startup failed; do not treat this as green evidence. PR `quality` CI is still
+  pending on GitHub as of this checkpoint.
 
 ## Phase 2.8B - Invite/SSO auth hardening
 

@@ -68,6 +68,7 @@ export interface ExtractedDiagram {
   format: DiagramInputFormat;
   nodes: ExtractedDiagramNode[];
   edges: DiagramGraphEdge[];
+  extractionWarnings?: DiagramIgnoredNode[];
 }
 
 export interface ExtractedDiagramNode {
