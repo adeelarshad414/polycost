@@ -58,6 +58,31 @@ say so explicitly rather than marking it done.
 | Phase 2.8P - Queryable comparison pricing evidence     | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8Q - Visible pricing evidence UI wiring        | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8R - Refresh-live evidence regression          | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8S - Reconciliation coverage hardening         | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8S - Reconciliation coverage hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Tightened the provider pricing reconciliation test so AWS, Azure, and GCP each
+  prove compute, storage, and egress reconciliation independently instead of only
+  satisfying a single aggregate assertion counter.
+- Strengthened raw-record checks for storage and egress to compare full source
+  lineage against `pricingLineageForCatalogRecord()`, including provider fixture
+  endpoint and SHA-256 payload hash, matching the existing compute trace rigor.
+- Kept the explicit `>= 20` reconciliation assertion floor per provider while making
+  zero coverage in any required category fail fast.
+- Verification evidence in this continuation:
+  - Focused pricing reconciliation spec passed: 1 suite / 3 tests.
+  - `npm run test:production-readiness` passed: API 6 suites / 80 tests and web 2
+    suites / 80 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this strengthens transform-drift detection for the
+  current mock/provider-normalization path, but full invoice-grade coverage of every
+  provider SKU, private pricing agreement, and live account billing export remains a
+  future hardening phase.
 
 ## Phase 2.8R - Refresh-live evidence regression
 
