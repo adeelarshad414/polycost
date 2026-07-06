@@ -1,4 +1,5 @@
 import React, { act } from 'react';
+import { flushSync } from 'react-dom';
 import { createRoot, Root } from 'react-dom/client';
 import { App, ComparisonView } from './App';
 import { PolyCostClient, PolyCostApiError } from './api-client';
@@ -2736,14 +2737,14 @@ function render(ui: React.ReactElement): { container: HTMLElement; unmount: () =
 
   act(() => {
     root = createRoot(container);
-    root.render(ui);
+    flushSync(() => root?.render(ui));
   });
 
   return {
     container,
     unmount: () => {
       act(() => {
-        root?.unmount();
+        flushSync(() => root?.unmount());
       });
       container.remove();
     },
