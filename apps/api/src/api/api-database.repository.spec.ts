@@ -891,6 +891,694 @@ describe('ApiDatabaseRepository', () => {
       '2026-07-01T00:00:00.000Z',
     ]);
   });
+
+  it('persists local auth accounts and resolves session/team context', async () => {
+    const createdAt = new Date('2026-07-06T00:00:00.000Z');
+    const expiresAt = new Date('2026-07-07T00:00:00.000Z');
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: '11111111-1111-4111-8111-111111111111',
+            email: 'architect@example.com',
+            display_name: 'Architect',
+            status: 'active',
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: '22222222-2222-4222-8222-222222222222',
+            name: 'Architecture team',
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            account_id: '11111111-1111-4111-8111-111111111111',
+            email: 'architect@example.com',
+            display_name: 'Architect',
+            status: 'active',
+            password_hash: 'scrypt:v1:hash',
+            failed_attempts: 2,
+            locked_until: null,
+            team_id: '22222222-2222-4222-8222-222222222222',
+            team_name: 'Architecture team',
+            role: 'owner',
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: '33333333-3333-4333-8333-333333333333',
+            expires_at: expiresAt,
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            session_id: '33333333-3333-4333-8333-333333333333',
+            account_id: '11111111-1111-4111-8111-111111111111',
+            email: 'architect@example.com',
+            display_name: 'Architect',
+            team_id: '22222222-2222-4222-8222-222222222222',
+            team_name: 'Architecture team',
+            role: 'owner',
+            expires_at: expiresAt,
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            team_id: '22222222-2222-4222-8222-222222222222',
+            team_name: 'Architecture team',
+            role: 'owner',
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            team_id: '22222222-2222-4222-8222-222222222222',
+            team_name: 'Architecture team',
+            role: 'admin',
+          },
+        ],
+        rowCount: 1,
+      });
+    const repository = createRepository(query);
+
+    await expect(
+      repository.createLocalAccountWithTeam({
+        email: 'architect@example.com',
+        displayName: 'Architect',
+        externalSubjectHash: 'a'.repeat(64),
+        passwordHash: 'scrypt:v1:hash',
+        teamName: 'Architecture team',
+        teamSlug: 'architecture-team',
+      }),
+    ).resolves.toEqual({
+      accountId: '11111111-1111-4111-8111-111111111111',
+      email: 'architect@example.com',
+      displayName: 'Architect',
+      status: 'active',
+      passwordHash: 'scrypt:v1:hash',
+      failedAttempts: 0,
+      defaultTeam: {
+        teamId: '22222222-2222-4222-8222-222222222222',
+        teamName: 'Architecture team',
+        role: 'owner',
+      },
+    });
+    await expect(repository.findLocalAccountByEmail('architect@example.com')).resolves.toEqual(
+      expect.objectContaining({
+        accountId: '11111111-1111-4111-8111-111111111111',
+        failedAttempts: 2,
+        defaultTeam: expect.objectContaining({
+          role: 'owner',
+        }),
+      }),
+    );
+
+    await repository.recordFailedLogin({
+      accountId: '11111111-1111-4111-8111-111111111111',
+      failedAttempts: 3,
+      lockedUntil: '2026-07-06T00:15:00.000Z',
+    });
+    await repository.resetFailedLogin('11111111-1111-4111-8111-111111111111');
+    await expect(
+      repository.createSession({
+        accountId: '11111111-1111-4111-8111-111111111111',
+        teamId: '22222222-2222-4222-8222-222222222222',
+        tokenHash: 'b'.repeat(64),
+        expiresAt: expiresAt.toISOString(),
+        userAgentHash: 'c'.repeat(64),
+        ipHash: 'd'.repeat(64),
+      }),
+    ).resolves.toEqual({
+      sessionId: '33333333-3333-4333-8333-333333333333',
+      expiresAt: expiresAt.toISOString(),
+    });
+    await expect(
+      repository.resolveSession('b'.repeat(64), createdAt.toISOString()),
+    ).resolves.toEqual({
+      accountId: '11111111-1111-4111-8111-111111111111',
+      email: 'architect@example.com',
+      displayName: 'Architect',
+      teamId: '22222222-2222-4222-8222-222222222222',
+      role: 'owner',
+      sessionId: '33333333-3333-4333-8333-333333333333',
+      expiresAt: expiresAt.toISOString(),
+    });
+    await repository.revokeSession('33333333-3333-4333-8333-333333333333', createdAt.toISOString());
+    await expect(
+      repository.listAccountTeams('11111111-1111-4111-8111-111111111111'),
+    ).resolves.toEqual([
+      {
+        teamId: '22222222-2222-4222-8222-222222222222',
+        teamName: 'Architecture team',
+        role: 'owner',
+      },
+    ]);
+    await expect(
+      repository.getTeamMembership({
+        accountId: '11111111-1111-4111-8111-111111111111',
+        teamId: '22222222-2222-4222-8222-222222222222',
+      }),
+    ).resolves.toEqual({
+      teamId: '22222222-2222-4222-8222-222222222222',
+      teamName: 'Architecture team',
+      role: 'admin',
+    });
+
+    expect(query).toHaveBeenNthCalledWith(1, 'BEGIN');
+    expect(query).toHaveBeenNthCalledWith(6, 'COMMIT');
+    expect(query).toHaveBeenNthCalledWith(8, expect.stringContaining('failed_attempts = $2'), [
+      '11111111-1111-4111-8111-111111111111',
+      3,
+      '2026-07-06T00:15:00.000Z',
+    ]);
+  });
+
+  it('manages team invitations, members, and SSO provider config rows', async () => {
+    const createdAt = new Date('2026-07-06T00:00:00.000Z');
+    const lastActiveAt = new Date('2026-07-06T00:05:00.000Z');
+    const expiresAt = new Date('2026-07-13T00:00:00.000Z');
+    const acceptedAt = new Date('2026-07-06T00:10:00.000Z');
+    const pendingInvitation = {
+      id: '88888888-8888-4888-8888-888888888888',
+      team_id: '22222222-2222-4222-8222-222222222222',
+      email: 'finops@example.com',
+      role: 'admin',
+      status: 'pending',
+      invited_by_account_id: '11111111-1111-4111-8111-111111111111',
+      accepted_by_account_id: null,
+      expires_at: expiresAt,
+      created_at: createdAt,
+      accepted_at: null,
+      revoked_at: null,
+    };
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            account_id: '11111111-1111-4111-8111-111111111111',
+            email: 'architect@example.com',
+            display_name: 'Architect',
+            role: 'owner',
+            created_at: createdAt,
+            last_active_at: lastActiveAt,
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [pendingInvitation],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            ...pendingInvitation,
+            status: 'expired',
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [pendingInvitation],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            ...pendingInvitation,
+            token_hash: 'e'.repeat(64),
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            ...pendingInvitation,
+            status: 'accepted',
+            accepted_by_account_id: '11111111-1111-4111-8111-111111111111',
+            accepted_at: acceptedAt,
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({
+        rows: [{ owners: '2' }],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            account_id: '11111111-1111-4111-8111-111111111111',
+            email: 'architect@example.com',
+            display_name: 'Architect',
+            role: 'admin',
+            created_at: createdAt,
+            last_active_at: null,
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            provider_type: 'oidc',
+            display_name: 'Corporate OIDC',
+            issuer_url: 'https://idp.example.com',
+            status: 'configured',
+          },
+          {
+            provider_type: 'saml',
+            display_name: 'Corporate SAML',
+            issuer_url: 'https://sso.example.com/saml',
+            status: 'draft',
+          },
+        ],
+        rowCount: 2,
+      });
+    const repository = createRepository(query);
+
+    await expect(
+      repository.listTeamMembers('22222222-2222-4222-8222-222222222222'),
+    ).resolves.toEqual([
+      {
+        accountId: '11111111-1111-4111-8111-111111111111',
+        email: 'architect@example.com',
+        displayName: 'Architect',
+        role: 'owner',
+        createdAt: createdAt.toISOString(),
+        lastActiveAt: lastActiveAt.toISOString(),
+      },
+    ]);
+    await expect(
+      repository.createTeamInvitation({
+        teamId: '22222222-2222-4222-8222-222222222222',
+        email: 'finops@example.com',
+        role: 'admin',
+        tokenHash: 'e'.repeat(64),
+        invitedByAccountId: '11111111-1111-4111-8111-111111111111',
+        expiresAt: expiresAt.toISOString(),
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        email: 'finops@example.com',
+        role: 'admin',
+        status: 'pending',
+      }),
+    );
+    await expect(
+      repository.listTeamInvitations('22222222-2222-4222-8222-222222222222'),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        status: 'expired',
+      }),
+    ]);
+    await expect(
+      repository.findPendingInvitationByTokenHash('e'.repeat(64), createdAt.toISOString()),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: '88888888-8888-4888-8888-888888888888',
+      }),
+    );
+    await expect(
+      repository.acceptTeamInvitation({
+        invitationId: '88888888-8888-4888-8888-888888888888',
+        accountId: '11111111-1111-4111-8111-111111111111',
+        acceptedAt: acceptedAt.toISOString(),
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        status: 'accepted',
+        acceptedByAccountId: '11111111-1111-4111-8111-111111111111',
+      }),
+    );
+    await expect(repository.countTeamOwners('22222222-2222-4222-8222-222222222222')).resolves.toBe(
+      2,
+    );
+    await expect(
+      repository.updateTeamMemberRole({
+        teamId: '22222222-2222-4222-8222-222222222222',
+        accountId: '11111111-1111-4111-8111-111111111111',
+        role: 'admin',
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        role: 'admin',
+      }),
+    );
+    await expect(
+      repository.removeTeamMember({
+        teamId: '22222222-2222-4222-8222-222222222222',
+        accountId: '11111111-1111-4111-8111-111111111111',
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      repository.listSsoProviderConfigs('22222222-2222-4222-8222-222222222222'),
+    ).resolves.toEqual([
+      {
+        providerType: 'oidc',
+        displayName: 'Corporate OIDC',
+        issuerUrl: 'https://idp.example.com',
+        status: 'configured',
+      },
+      {
+        providerType: 'saml',
+        displayName: 'Corporate SAML',
+        issuerUrl: 'https://sso.example.com/saml',
+        status: 'draft',
+      },
+    ]);
+
+    expect(query).toHaveBeenNthCalledWith(5, 'BEGIN');
+    expect(query).toHaveBeenNthCalledWith(9, 'COMMIT');
+  });
+
+  it('persists provider invoice imports and reconciliation evidence rows', async () => {
+    const createdAt = new Date('2026-07-06T00:00:00.000Z');
+    const completedAt = new Date('2026-07-06T00:00:02.000Z');
+    const usageStart = new Date('2026-06-01T00:00:00.000Z');
+    const usageEnd = new Date('2026-06-30T23:59:59.000Z');
+    const importRow = {
+      id: '55555555-5555-4555-8555-555555555555',
+      team_id: '22222222-2222-4222-8222-222222222222',
+      provider: 'aws',
+      source_type: 'aws-cur',
+      status: 'completed',
+      billing_period_start: new Date('2026-06-01T00:00:00.000Z'),
+      billing_period_end: new Date('2026-06-30T00:00:00.000Z'),
+      original_file_sha256: 'a'.repeat(64),
+      rows_received: 1,
+      rows_accepted: 1,
+      rows_rejected: 0,
+      total_cost_usd: '107.00',
+      created_by_account_id: '11111111-1111-4111-8111-111111111111',
+      created_at: createdAt,
+      completed_at: completedAt,
+      error_detail: null,
+    };
+    const lineItemRow = {
+      id: 'line-1',
+      import_run_id: '55555555-5555-4555-8555-555555555555',
+      team_id: '22222222-2222-4222-8222-222222222222',
+      provider: 'aws',
+      billing_period_start: new Date('2026-06-01T00:00:00.000Z'),
+      billing_period_end: new Date('2026-06-30T00:00:00.000Z'),
+      usage_start: usageStart,
+      usage_end: usageEnd,
+      service_name: 'AmazonEC2',
+      sku_id: 'sku-compute',
+      region: 'us-east-1',
+      resource_id: 'i-demo',
+      usage_quantity: '730.00',
+      usage_unit: 'Hrs',
+      cost_usd: '107.00',
+      currency: 'USD',
+      tags: { cost_center: 'engineering' },
+      raw_payload: { lineItemId: 'cur-1' },
+      line_item_hash: 'b'.repeat(64),
+      matched_comparison_id: comparisonResult.comparisonId,
+      matched_trace_key: 'aws:sku-compute:us-east-1:on-demand',
+      created_at: createdAt,
+    };
+    const reconciliationRow = {
+      id: '66666666-6666-4666-8666-666666666666',
+      import_run_id: '55555555-5555-4555-8555-555555555555',
+      comparison_id: comparisonResult.comparisonId,
+      provider: 'aws',
+      estimated_total_usd: '100.00',
+      invoiced_total_usd: '107.00',
+      variance_usd: '7.00',
+      variance_percent: '7.00',
+      status: 'variance-warning',
+      evidence: {
+        invoiceLineItemHashes: ['b'.repeat(64)],
+      },
+      created_at: completedAt,
+    };
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            ...importRow,
+            status: 'processing',
+            rows_accepted: 0,
+            rows_rejected: 0,
+            total_cost_usd: '0.00',
+            completed_at: null,
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [lineItemRow],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [importRow],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({
+        rows: [importRow],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [lineItemRow],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [reconciliationRow],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [reconciliationRow],
+        rowCount: 1,
+      });
+    const repository = createRepository(query);
+
+    await expect(
+      repository.createBillingImport({
+        importInput: {
+          provider: 'aws',
+          sourceType: 'aws-cur',
+          billingPeriodStart: '2026-06-01',
+          billingPeriodEnd: '2026-06-30',
+          rows: [],
+        },
+        originalFileSha256: 'a'.repeat(64),
+        teamId: '22222222-2222-4222-8222-222222222222',
+        createdByAccountId: '11111111-1111-4111-8111-111111111111',
+        rows: [
+          {
+            serviceName: 'AmazonEC2',
+            skuId: 'sku-compute',
+            region: 'us-east-1',
+            resourceId: 'i-demo',
+            usageStart: usageStart.toISOString(),
+            usageEnd: usageEnd.toISOString(),
+            usageQuantity: 730,
+            usageUnit: 'Hrs',
+            costUsd: 107,
+            currency: 'USD',
+            tags: { cost_center: 'engineering' },
+            rawPayload: { lineItemId: 'cur-1' },
+            lineItemHash: 'b'.repeat(64),
+          },
+        ],
+      }),
+    ).resolves.toEqual({
+      importRun: expect.objectContaining({
+        id: '55555555-5555-4555-8555-555555555555',
+        rowsAccepted: 1,
+        totalCostUsd: 107,
+      }),
+      lineItems: [
+        expect.objectContaining({
+          serviceName: 'AmazonEC2',
+          usageQuantity: 730,
+          matchedTraceKey: 'aws:sku-compute:us-east-1:on-demand',
+        }),
+      ],
+    });
+    await expect(
+      repository.getBillingImport('55555555-5555-4555-8555-555555555555'),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        provider: 'aws',
+        billingPeriodStart: '2026-06-01',
+      }),
+    );
+    await expect(
+      repository.listInvoiceLineItems('55555555-5555-4555-8555-555555555555'),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        lineItemHash: 'b'.repeat(64),
+        tags: { cost_center: 'engineering' },
+      }),
+    ]);
+    await expect(
+      repository.saveInvoiceReconciliation({
+        importRunId: '55555555-5555-4555-8555-555555555555',
+        comparisonId: comparisonResult.comparisonId,
+        provider: 'aws',
+        estimatedTotalUsd: 100,
+        invoicedTotalUsd: 107,
+        varianceUsd: 7,
+        variancePercent: 7,
+        status: 'variance-warning',
+        evidence: { invoiceLineItemHashes: ['b'.repeat(64)] },
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        status: 'variance-warning',
+        evidence: { invoiceLineItemHashes: ['b'.repeat(64)] },
+      }),
+    );
+    await expect(
+      repository.listInvoiceReconciliations('55555555-5555-4555-8555-555555555555'),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        varianceUsd: 7,
+      }),
+    ]);
+
+    expect(query).toHaveBeenNthCalledWith(1, 'BEGIN');
+    expect(query).toHaveBeenNthCalledWith(5, 'COMMIT');
+    expect(query).toHaveBeenNthCalledWith(
+      8,
+      expect.stringContaining('INSERT INTO invoice_reconciliation_results'),
+      [
+        '55555555-5555-4555-8555-555555555555',
+        comparisonResult.comparisonId,
+        'aws',
+        100,
+        107,
+        7,
+        7,
+        'variance-warning',
+        JSON.stringify({ invoiceLineItemHashes: ['b'.repeat(64)] }),
+      ],
+    );
+  });
+
+  it('rolls back transactional auth and billing writes and closes the pool', async () => {
+    const authFailureQuery = jest
+      .fn()
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockRejectedValueOnce(new Error('account insert failed'))
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+    const authRepository = createRepository(authFailureQuery);
+
+    await expect(
+      authRepository.createLocalAccountWithTeam({
+        email: 'architect@example.com',
+        externalSubjectHash: 'a'.repeat(64),
+        passwordHash: 'scrypt:v1:hash',
+        teamName: 'Architecture team',
+        teamSlug: 'architecture-team',
+      }),
+    ).rejects.toThrow('account insert failed');
+    expect(authFailureQuery).toHaveBeenNthCalledWith(1, 'BEGIN');
+    expect(authFailureQuery).toHaveBeenNthCalledWith(3, 'ROLLBACK');
+
+    const invitationFailureQuery = jest
+      .fn()
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+    const invitationRepository = createRepository(invitationFailureQuery);
+
+    await expect(
+      invitationRepository.acceptTeamInvitation({
+        invitationId: '88888888-8888-4888-8888-888888888888',
+        accountId: '11111111-1111-4111-8111-111111111111',
+        acceptedAt: '2026-07-06T00:00:00.000Z',
+      }),
+    ).rejects.toThrow('Team invitation is no longer pending');
+    expect(invitationFailureQuery).toHaveBeenNthCalledWith(1, 'BEGIN');
+    expect(invitationFailureQuery).toHaveBeenNthCalledWith(3, 'ROLLBACK');
+
+    const billingFailureQuery = jest
+      .fn()
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockRejectedValueOnce(new Error('billing insert failed'))
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+    const billingRepository = createRepository(billingFailureQuery);
+
+    await expect(
+      billingRepository.createBillingImport({
+        importInput: {
+          provider: 'aws',
+          sourceType: 'aws-cur',
+          billingPeriodStart: '2026-06-01',
+          billingPeriodEnd: '2026-06-30',
+          rows: [],
+        },
+        originalFileSha256: 'a'.repeat(64),
+        rows: [],
+      }),
+    ).rejects.toThrow('billing insert failed');
+    expect(billingFailureQuery).toHaveBeenNthCalledWith(1, 'BEGIN');
+    expect(billingFailureQuery).toHaveBeenNthCalledWith(3, 'ROLLBACK');
+
+    const missingSessionRepository = createRepository(
+      jest.fn(async () => ({
+        rows: [],
+        rowCount: 0,
+      })),
+    );
+    await expect(
+      missingSessionRepository.resolveSession('missing-token-hash', '2026-07-06T00:00:00.000Z'),
+    ).resolves.toBeUndefined();
+
+    const pool: PgPoolLike = {
+      query: jest.fn(async () => ({
+        rows: [],
+        rowCount: 0,
+      })),
+      end: jest.fn(async () => undefined),
+    };
+    const repository = new ApiDatabaseRepository(configService, secretsReader, () => pool);
+
+    await repository.getComparison(comparisonResult.comparisonId);
+    await repository.onModuleDestroy();
+
+    expect(pool.end).toHaveBeenCalledTimes(1);
+  });
 });
 
 function createRepository(query: jest.Mock): ApiDatabaseRepository {
