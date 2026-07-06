@@ -52,6 +52,22 @@ say so explicitly rather than marking it done.
 | Phase 2.8J - Diagram LLM fallback diagnostics          | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8K - Auth RBAC UI enforcement polish           | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8L - Release hygiene evidence polish           | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8M - Session policy documentation              | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8M - Session policy documentation
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Added README documentation for workspace session behavior: token hashes,
+  `AUTH_SESSION_TTL_HOURS`, expired/revoked session handling, logout semantics,
+  "sign out other devices", concurrent-session policy, failed-login lockout config,
+  and the anonymous-vs-account-gated feature boundary.
+- Verification evidence in this continuation:
+  - `npm run format:check` passed.
+- Known gaps carried forward: this documents the implemented local/session auth
+  policy, but production enterprise account UX, hosted team administration, full SSO
+  provider lifecycle, SCIM, and email delivery remain future phases.
 
 ## Phase 2.8L - Release hygiene evidence polish
 

@@ -157,6 +157,22 @@ The current self-hosted product does not yet include enterprise IdP login round-
 email delivery infrastructure, org billing plans, or a hosted account marketplace. Those
 remain release-track items rather than blockers for anonymous cost comparison.
 
+## Session And Account Security
+
+- Session tokens are random bearer tokens; the API stores only token hashes.
+- `AUTH_SESSION_TTL_HOURS` controls server-side expiry. Expired or revoked sessions
+  fail with the standard unauthorized API envelope.
+- Logout revokes the current server-side session. "Sign out other devices" revokes
+  other active sessions for the same account while preserving the current session.
+- Concurrent sessions are allowed by default so a user can demo from more than one
+  browser/device; administrators should shorten `AUTH_SESSION_TTL_HOURS` for stricter
+  self-hosted deployments.
+- Local password login enforces minimum length, failed-login tracking, and lockout
+  via `AUTH_MAX_FAILED_LOGIN_ATTEMPTS` and `AUTH_LOCKOUT_MINUTES`.
+- Anonymous compare, diagram import, reports, and share links remain available
+  without accounts. Team administration, SSO provider setup, and billing-export
+  reconciliation require a signed-in workspace session.
+
 ## Diagram Imports
 
 Supported Phase 2 inputs:
