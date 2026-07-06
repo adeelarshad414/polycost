@@ -280,6 +280,14 @@ export interface LocalAccountWithPassword {
   defaultTeam?: AccountTeamMembership;
 }
 
+export interface AccountSessionPrincipal {
+  accountId: string;
+  email: string;
+  displayName?: string;
+  status: 'active' | 'disabled' | 'invited';
+  defaultTeam?: AccountTeamMembership;
+}
+
 interface LocalAccountWithPasswordRow {
   account_id: string;
   email: string;
@@ -288,6 +296,16 @@ interface LocalAccountWithPasswordRow {
   password_hash: string;
   failed_attempts: number;
   locked_until: Date | null;
+  team_id: string | null;
+  team_name: string | null;
+  role: DatabaseTeamRole | null;
+}
+
+interface AccountSessionPrincipalRow {
+  account_id: string;
+  email: string;
+  display_name: string | null;
+  status: 'active' | 'disabled' | 'invited';
   team_id: string | null;
   team_name: string | null;
   role: DatabaseTeamRole | null;
@@ -1901,6 +1919,119 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     return row ? toLocalAccountWithPassword(row) : undefined;
   }
 
+  async upsertExternalAccountForTeam(input: {
+    email: string;
+    displayName?: string;
+    authProvider: 'oidc' | 'saml';
+    externalSubjectHash: string;
+    teamId: string;
+    defaultRole: Exclude<TeamRole, 'owner'>;
+  }): Promise<AccountSessionPrincipal | undefined> {
+    const pool = await this.getPool();
+
+    await pool.query('BEGIN');
+
+    try {
+      const existing = await pool.query<AccountProfileRow>(
+        `
+          SELECT id,
+                 email,
+                 display_name,
+                 status
+          FROM accounts
+          WHERE lower(email) = lower($1)
+          FOR UPDATE
+        `,
+        [input.email],
+      );
+      let account = existing.rows[0];
+
+      if (account?.status === 'disabled') {
+        await pool.query('ROLLBACK');
+        return undefined;
+      }
+
+      if (!account) {
+        const inserted = await pool.query<AccountProfileRow>(
+          `
+            INSERT INTO accounts (
+              email,
+              display_name,
+              auth_provider,
+              external_subject_hash
+            )
+            VALUES ($1, $2, $3, $4)
+            RETURNING id,
+                      email,
+                      display_name,
+                      status
+          `,
+          [input.email, input.displayName ?? null, input.authProvider, input.externalSubjectHash],
+        );
+        account = inserted.rows[0];
+      } else if (input.displayName && !account.display_name) {
+        const updated = await pool.query<AccountProfileRow>(
+          `
+            UPDATE accounts
+            SET display_name = $2,
+                updated_at = now()
+            WHERE id = $1
+            RETURNING id,
+                      email,
+                      display_name,
+                      status
+          `,
+          [account.id, input.displayName],
+        );
+        account = updated.rows[0];
+      }
+
+      await pool.query(
+        `
+          INSERT INTO team_memberships (
+            team_id,
+            account_id,
+            role,
+            last_active_at
+          )
+          VALUES ($1, $2, $3, now())
+          ON CONFLICT (team_id, account_id)
+          DO UPDATE SET
+            last_active_at = EXCLUDED.last_active_at
+        `,
+        [input.teamId, account.id, input.defaultRole],
+      );
+
+      const principal = await pool.query<AccountSessionPrincipalRow>(
+        `
+          SELECT accounts.id AS account_id,
+                 accounts.email,
+                 accounts.display_name,
+                 accounts.status,
+                 teams.id AS team_id,
+                 teams.name AS team_name,
+                 team_memberships.role
+          FROM accounts
+          JOIN team_memberships
+            ON team_memberships.account_id = accounts.id
+           AND team_memberships.team_id = $2
+          JOIN teams
+            ON teams.id = team_memberships.team_id
+          WHERE accounts.id = $1
+          LIMIT 1
+        `,
+        [account.id, input.teamId],
+      );
+
+      await pool.query('COMMIT');
+
+      return principal.rows[0] ? toAccountSessionPrincipal(principal.rows[0]) : undefined;
+    } catch (error) {
+      await pool.query('ROLLBACK');
+      throw error;
+    }
+  }
+
   async recordFailedLogin(input: {
     accountId: string;
     failedAttempts: number;
@@ -2516,6 +2647,32 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         LIMIT 1
       `,
       [tokenHash, now],
+    );
+
+    return result.rows[0] ? toTeamInvitationRecord(result.rows[0]) : undefined;
+  }
+
+  async findInvitationByTokenHash(tokenHash: string): Promise<TeamInvitationRecord | undefined> {
+    const result = await (
+      await this.getPool()
+    ).query<TeamInvitationRow>(
+      `
+        SELECT id,
+               team_id,
+               email,
+               role,
+               status,
+               invited_by_account_id,
+               accepted_by_account_id,
+               expires_at,
+               created_at,
+               accepted_at,
+               revoked_at
+        FROM team_invitations
+        WHERE token_hash = $1
+        LIMIT 1
+      `,
+      [tokenHash],
     );
 
     return result.rows[0] ? toTeamInvitationRecord(result.rows[0]) : undefined;
@@ -3316,6 +3473,26 @@ function toLocalAccountWithPassword(row: LocalAccountWithPasswordRow): LocalAcco
     passwordHash: row.password_hash,
     failedAttempts: row.failed_attempts,
     ...(row.locked_until ? { lockedUntil: row.locked_until.toISOString() } : {}),
+    ...(row.team_id && row.team_name && role
+      ? {
+          defaultTeam: {
+            teamId: row.team_id,
+            teamName: row.team_name,
+            role,
+          },
+        }
+      : {}),
+  };
+}
+
+function toAccountSessionPrincipal(row: AccountSessionPrincipalRow): AccountSessionPrincipal {
+  const role = row.role ? normalizeDatabaseTeamRole(row.role) : undefined;
+
+  return {
+    accountId: row.account_id,
+    email: row.email,
+    ...(row.display_name ? { displayName: row.display_name } : {}),
+    status: row.status,
     ...(row.team_id && row.team_name && role
       ? {
           defaultTeam: {

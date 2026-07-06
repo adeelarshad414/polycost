@@ -1080,6 +1080,92 @@ describe('ApiDatabaseRepository', () => {
     ]);
   });
 
+  it('upserts external SSO accounts into a team and previews invitation tokens', async () => {
+    const createdAt = new Date('2026-07-06T00:00:00.000Z');
+    const expiresAt = new Date('2026-07-13T00:00:00.000Z');
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            email: 'sso.user@example.com',
+            display_name: 'SSO User',
+            status: 'active',
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            account_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            email: 'sso.user@example.com',
+            display_name: 'SSO User',
+            status: 'active',
+            team_id: '22222222-2222-4222-8222-222222222222',
+            team_name: 'Architecture team',
+            role: 'member',
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: '88888888-8888-4888-8888-888888888888',
+            team_id: '22222222-2222-4222-8222-222222222222',
+            email: 'finops@example.com',
+            role: 'member',
+            status: 'pending',
+            invited_by_account_id: '11111111-1111-4111-8111-111111111111',
+            accepted_by_account_id: null,
+            expires_at: expiresAt,
+            created_at: createdAt,
+            accepted_at: null,
+            revoked_at: null,
+          },
+        ],
+        rowCount: 1,
+      });
+    const repository = createRepository(query);
+
+    await expect(
+      repository.upsertExternalAccountForTeam({
+        email: 'sso.user@example.com',
+        displayName: 'SSO User',
+        authProvider: 'oidc',
+        externalSubjectHash: 'a'.repeat(64),
+        teamId: '22222222-2222-4222-8222-222222222222',
+        defaultRole: 'member',
+      }),
+    ).resolves.toEqual({
+      accountId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      email: 'sso.user@example.com',
+      displayName: 'SSO User',
+      status: 'active',
+      defaultTeam: {
+        teamId: '22222222-2222-4222-8222-222222222222',
+        teamName: 'Architecture team',
+        role: 'member',
+      },
+    });
+    await expect(repository.findInvitationByTokenHash('b'.repeat(64))).resolves.toEqual(
+      expect.objectContaining({
+        email: 'finops@example.com',
+        role: 'member',
+        status: 'pending',
+      }),
+    );
+
+    expect(query).toHaveBeenNthCalledWith(1, 'BEGIN');
+    expect(query).toHaveBeenNthCalledWith(6, 'COMMIT');
+  });
+
   it('manages team invitations, members, and SSO provider config rows', async () => {
     const createdAt = new Date('2026-07-06T00:00:00.000Z');
     const lastActiveAt = new Date('2026-07-06T00:05:00.000Z');

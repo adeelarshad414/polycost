@@ -1,9 +1,13 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema';
 import { ApiForbiddenError, ApiUnauthorizedError, ApiValidationError } from './api-errors';
-import { ApiDatabaseRepository, LocalAccountWithPassword } from './api-database.repository';
+import {
+  AccountSessionPrincipal,
+  ApiDatabaseRepository,
+  LocalAccountWithPassword,
+} from './api-database.repository';
 import {
   AccountProfileResponse,
   AccountSessionRecord,
@@ -11,10 +15,13 @@ import {
   AuthMeResponse,
   AuthSessionResponse,
   RequestWithAuth,
+  SsoCallbackResponse,
   SsoConnectionTestResult,
   SsoConfigurationStatus,
+  SsoStartResponse,
   TeamSettingsRecord,
   TeamInvitationRecord,
+  TeamInvitationPreview,
   TeamMemberRecord,
   TeamRole,
 } from './auth.types';
@@ -31,6 +38,16 @@ const TEAM_OWNER_ROLE: TeamRole = 'owner';
 const INVITABLE_ROLES: Array<Exclude<TeamRole, 'owner'>> = ['admin', 'member'];
 const TEAM_ROLES: TeamRole[] = ['owner', 'admin', 'member'];
 const INVITATION_TTL_DAYS = 7;
+const SSO_STATE_TTL_MINUTES = 10;
+
+interface SsoStatePayload {
+  providerType: 'oidc';
+  teamId: string;
+  issuerUrl: string;
+  expiresAt: string;
+  nonce: string;
+  loginHint?: string;
+}
 
 @Injectable()
 export class AuthService {
@@ -294,6 +311,7 @@ export class AuthService {
     return {
       ...invitation,
       inviteToken,
+      inviteUrl: `${this.publicBaseUrl()}/?invite_token=${encodeURIComponent(inviteToken)}`,
     };
   }
 
@@ -328,6 +346,35 @@ export class AuthService {
     }
 
     return revoked;
+  }
+
+  async previewInvitation(token: string): Promise<TeamInvitationPreview> {
+    const invitation = await this.repository.findInvitationByTokenHash(sha256(token));
+
+    if (!invitation) {
+      return {
+        status: 'invalid',
+        message: 'Invitation token was not found.',
+      };
+    }
+
+    const now = Date.now();
+    const expiresAt = Date.parse(invitation.expiresAt);
+    const status =
+      invitation.status === 'pending' && Number.isFinite(expiresAt) && expiresAt <= now
+        ? 'expired'
+        : invitation.status;
+
+    return {
+      status,
+      email: invitation.email,
+      role: invitation.role,
+      teamId: invitation.teamId,
+      expiresAt: invitation.expiresAt,
+      ...(invitation.acceptedAt ? { acceptedAt: invitation.acceptedAt } : {}),
+      ...(invitation.revokedAt ? { revokedAt: invitation.revokedAt } : {}),
+      message: invitationPreviewMessage(status),
+    };
   }
 
   async acceptInvitation(body: unknown, identity: AuthIdentity): Promise<TeamInvitationRecord> {
@@ -440,8 +487,7 @@ export class AuthService {
       throw new ApiForbiddenError('An active team is required to view SSO configuration');
     }
 
-    const publicBaseUrl = this.configService.get('AUTH_PUBLIC_BASE_URL', { infer: true });
-    const baseUrl = publicBaseUrl.replace(/\/$/, '');
+    const baseUrl = this.publicBaseUrl();
     const configuredProviders = await this.repository.listSsoProviderConfigs(identity.teamId);
 
     return {
@@ -456,6 +502,98 @@ export class AuthService {
       callbackUrls: {
         oidc: `${baseUrl}/api/v1/auth/sso/oidc/callback`,
         saml: `${baseUrl}/api/v1/auth/sso/saml/acs`,
+      },
+    };
+  }
+
+  async startMockOidcLogin(body: unknown): Promise<SsoStartResponse> {
+    const input = parseSsoStartBody(body);
+    const provider = await this.resolveOidcProvider(input.teamId);
+    const baseUrl = this.publicBaseUrl();
+    const expiresAt = new Date(Date.now() + SSO_STATE_TTL_MINUTES * 60_000).toISOString();
+    const state = signSsoState(
+      {
+        providerType: 'oidc',
+        teamId: input.teamId,
+        issuerUrl: provider.issuerUrl,
+        expiresAt,
+        nonce: randomBytes(16).toString('base64url'),
+        ...(input.email ? { loginHint: input.email } : {}),
+      },
+      this.ssoStateSecret(),
+    );
+    const authorizationUrl = new URL(`${baseUrl}/api/v1/auth/sso/mock/oidc/authorize`);
+
+    authorizationUrl.searchParams.set('state', state);
+    if (input.email) {
+      authorizationUrl.searchParams.set('email', input.email);
+    }
+
+    return {
+      providerType: 'oidc',
+      mode: 'mock',
+      authorizationUrl: authorizationUrl.toString(),
+      callbackUrl: `${baseUrl}/api/v1/auth/sso/oidc/callback`,
+      state,
+      expiresAt,
+    };
+  }
+
+  mockOidcAuthorize(query: unknown): { redirectUrl: string; state: string; email: string } {
+    const input = parseSsoAuthorizeQuery(query);
+    const statePayload = verifySsoState(input.state, this.ssoStateSecret());
+    const email = input.email ?? statePayload.loginHint;
+
+    if (!email) {
+      throw new ApiValidationError('email is required for mock OIDC authorization', [
+        {
+          field: 'email',
+          issue: 'is required',
+        },
+      ]);
+    }
+
+    const callbackUrl = new URL(`${this.publicBaseUrl()}/api/v1/auth/sso/oidc/callback`);
+    callbackUrl.searchParams.set('state', input.state);
+    callbackUrl.searchParams.set('email', normalizeEmail(email));
+
+    return {
+      redirectUrl: callbackUrl.toString(),
+      state: input.state,
+      email: normalizeEmail(email),
+    };
+  }
+
+  async completeMockOidcCallback(
+    query: unknown,
+    metadata: AuthRequestMetadata = {},
+  ): Promise<SsoCallbackResponse> {
+    const input = parseSsoCallbackQuery(query);
+    const statePayload = verifySsoState(input.state, this.ssoStateSecret());
+    const email = normalizeEmail(input.email ?? statePayload.loginHint);
+    const subjectHash = sha256(`oidc:${statePayload.issuerUrl}:${email}`);
+    const principal = await this.repository.upsertExternalAccountForTeam({
+      email,
+      ...(input.displayName ? { displayName: input.displayName } : {}),
+      authProvider: 'oidc',
+      externalSubjectHash: subjectHash,
+      teamId: statePayload.teamId,
+      defaultRole: 'member',
+    });
+
+    if (!principal || principal.status !== 'active') {
+      throw new ApiUnauthorizedError('SSO account is not active');
+    }
+
+    const session = await this.issueSession(principal, metadata);
+
+    return {
+      ...session,
+      sso: {
+        providerType: 'oidc',
+        issuerUrl: statePayload.issuerUrl,
+        subjectHash,
+        stateVerified: true,
       },
     };
   }
@@ -498,8 +636,45 @@ export class AuthService {
     };
   }
 
+  private async resolveOidcProvider(teamId: string): Promise<{
+    issuerUrl: string;
+  }> {
+    const configured = await this.repository.listSsoProviderConfigs(teamId);
+    const storedProvider = configured.find(
+      (provider) => provider.providerType === 'oidc' && provider.status === 'configured',
+    );
+    const envIssuer = this.configService.get('AUTH_OIDC_ISSUER_URL', { infer: true });
+
+    if (storedProvider) {
+      return {
+        issuerUrl: storedProvider.issuerUrl,
+      };
+    }
+
+    if (envIssuer) {
+      return {
+        issuerUrl: envIssuer,
+      };
+    }
+
+    throw new ApiValidationError('OIDC provider is not configured for this team', [
+      {
+        field: 'teamId',
+        issue: 'must reference a team with OIDC configuration',
+      },
+    ]);
+  }
+
+  private publicBaseUrl(): string {
+    return this.configService.get('AUTH_PUBLIC_BASE_URL', { infer: true }).replace(/\/$/, '');
+  }
+
+  private ssoStateSecret(): string {
+    return this.configService.get('AUTH_SSO_STATE_SECRET', { infer: true });
+  }
+
   private async issueSession(
-    account: LocalAccountWithPassword,
+    account: AccountSessionPrincipal | LocalAccountWithPassword,
     metadata: AuthRequestMetadata,
   ): Promise<AuthSessionResponse> {
     const token = randomBytes(32).toString('base64url');
@@ -780,6 +955,144 @@ function parseSsoProviderBody(body: unknown): {
     issuerUrl,
     ...(clientId ? { clientId } : {}),
   };
+}
+
+function parseSsoStartBody(body: unknown): { teamId: string; email?: string } {
+  const record = requireRecord(body, 'SSO start request body must be an object');
+  const teamId = requiredString(record.teamId, 'teamId');
+  const email = record.email === undefined ? undefined : normalizeEmail(record.email);
+
+  return {
+    teamId,
+    ...(email ? { email } : {}),
+  };
+}
+
+function parseSsoAuthorizeQuery(query: unknown): { state: string; email?: string } {
+  const record = requireRecord(query, 'Mock OIDC authorization query must be an object');
+  const email = record.email === undefined ? undefined : normalizeEmail(record.email);
+
+  return {
+    state: requiredString(record.state, 'state'),
+    ...(email ? { email } : {}),
+  };
+}
+
+function parseSsoCallbackQuery(query: unknown): {
+  state: string;
+  email?: string;
+  displayName?: string;
+} {
+  const record = requireRecord(query, 'OIDC callback query must be an object');
+  const email = record.email === undefined ? undefined : normalizeEmail(record.email);
+  const displayName = optionalTrimmedString(record.displayName, 120);
+
+  return {
+    state: requiredString(record.state, 'state'),
+    ...(email ? { email } : {}),
+    ...(displayName ? { displayName } : {}),
+  };
+}
+
+function signSsoState(payload: SsoStatePayload, secret: string): string {
+  const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signature = createHmac('sha256', secret).update(encodedPayload).digest('base64url');
+
+  return `${encodedPayload}.${signature}`;
+}
+
+function verifySsoState(state: string, secret: string): SsoStatePayload {
+  const [encodedPayload, signature] = state.split('.');
+
+  if (!encodedPayload || !signature) {
+    throw new ApiValidationError('state is invalid', [
+      {
+        field: 'state',
+        issue: 'must include payload and signature',
+      },
+    ]);
+  }
+
+  const expected = createHmac('sha256', secret).update(encodedPayload).digest('base64url');
+  const signatureBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expected);
+
+  if (
+    signatureBuffer.length !== expectedBuffer.length ||
+    !timingSafeEqual(signatureBuffer, expectedBuffer)
+  ) {
+    throw new ApiValidationError('state signature is invalid', [
+      {
+        field: 'state',
+        issue: 'must be signed by this deployment',
+      },
+    ]);
+  }
+
+  let payload: Partial<SsoStatePayload>;
+
+  try {
+    payload = JSON.parse(
+      Buffer.from(encodedPayload, 'base64url').toString('utf8'),
+    ) as Partial<SsoStatePayload>;
+  } catch {
+    throw new ApiValidationError('state payload is invalid', [
+      {
+        field: 'state',
+        issue: 'must decode to valid JSON',
+      },
+    ]);
+  }
+
+  if (
+    payload.providerType !== 'oidc' ||
+    typeof payload.teamId !== 'string' ||
+    typeof payload.issuerUrl !== 'string' ||
+    typeof payload.expiresAt !== 'string' ||
+    typeof payload.nonce !== 'string'
+  ) {
+    throw new ApiValidationError('state payload is invalid', [
+      {
+        field: 'state',
+        issue: 'must contain OIDC provider, team, issuer, expiry, and nonce',
+      },
+    ]);
+  }
+
+  const expiresAtMs = Date.parse(payload.expiresAt);
+
+  if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
+    throw new ApiValidationError('state is expired', [
+      {
+        field: 'state',
+        issue: 'must be used before expiry',
+      },
+    ]);
+  }
+
+  return {
+    providerType: 'oidc',
+    teamId: payload.teamId,
+    issuerUrl: payload.issuerUrl,
+    expiresAt: payload.expiresAt,
+    nonce: payload.nonce,
+    ...(payload.loginHint ? { loginHint: payload.loginHint } : {}),
+  };
+}
+
+function invitationPreviewMessage(status: TeamInvitationPreview['status']): string {
+  switch (status) {
+    case 'pending':
+      return 'Invitation is ready to accept after sign-in.';
+    case 'expired':
+      return 'Invitation has expired. Ask a team owner or admin for a new invite.';
+    case 'accepted':
+      return 'Invitation has already been accepted.';
+    case 'revoked':
+      return 'Invitation was revoked by a team owner or admin.';
+    case 'invalid':
+      return 'Invitation token was not found.';
+  }
 }
 
 function clientIdHint(clientId: string): string {

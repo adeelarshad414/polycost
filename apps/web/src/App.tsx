@@ -64,6 +64,7 @@ import {
   AuthMeResponse,
   SsoConfigurationStatus,
   TeamInvitationRecord,
+  TeamInvitationPreview,
   TeamMemberRecord,
   TeamRole,
 } from './types';
@@ -1843,7 +1844,10 @@ function WorkspaceControlCenter({
   const [inviteEmail, setInviteEmail] = useState('finops@example.com');
   const [inviteRole, setInviteRole] = useState<Exclude<TeamRole, 'owner'>>('member');
   const [lastInviteToken, setLastInviteToken] = useState<string | null>(null);
-  const [acceptToken, setAcceptToken] = useState('');
+  const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null);
+  const [landingInviteToken] = useState(() => readInviteTokenFromUrl());
+  const [acceptToken, setAcceptToken] = useState(landingInviteToken);
+  const [invitePreview, setInvitePreview] = useState<TeamInvitationPreview | null>(null);
   const [ssoProviderType, setSsoProviderType] = useState<'oidc' | 'saml'>('oidc');
   const [ssoDisplayName, setSsoDisplayName] = useState('Corporate OIDC');
   const [ssoIssuerUrl, setSsoIssuerUrl] = useState('https://idp.example.com');
@@ -1859,6 +1863,34 @@ function WorkspaceControlCenter({
   const canManageTeam = activeTeam?.role === 'owner' || activeTeam?.role === 'admin';
   const canManageRoles = activeTeam?.role === 'owner';
   const sourceType = sourceTypeForProvider(provider);
+
+  useEffect(() => {
+    if (!landingInviteToken) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    void client
+      .previewTeamInvitation(landingInviteToken)
+      .then((preview) => {
+        if (isMounted) {
+          setInvitePreview(preview);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setInvitePreview({
+            status: 'invalid',
+            message: 'Invitation token was not found.',
+          });
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [client, landingInviteToken]);
 
   useEffect(() => {
     if (!token) {
@@ -2234,6 +2266,7 @@ function WorkspaceControlCenter({
         token,
       );
       setLastInviteToken(invitation.inviteToken ?? null);
+      setLastInviteUrl(invitation.inviteUrl ?? null);
       onNotice(
         'Invitation created. The one-time token is shown in the workspace panel for this demo.',
       );
@@ -2254,8 +2287,18 @@ function WorkspaceControlCenter({
     onError(null);
 
     try {
-      await client.acceptTeamInvitation(acceptToken, token);
+      const accepted = await client.acceptTeamInvitation(acceptToken, token);
       setAcceptToken('');
+      setInvitePreview((current) =>
+        current
+          ? {
+              ...current,
+              status: accepted.status,
+              acceptedAt: accepted.acceptedAt,
+              message: 'Invitation has been accepted.',
+            }
+          : current,
+      );
       onNotice('Invitation accepted. Sign in again if you want to switch the active team session.');
     } catch (acceptError) {
       onError(formatApiError(acceptError));
@@ -2439,6 +2482,15 @@ function WorkspaceControlCenter({
               {session ? 'Connected' : authMode === 'register' ? 'Register' : 'Sign in'}
             </strong>
           </div>
+          {invitePreview ? (
+            <div className={`workspace-invite-preview is-${invitePreview.status}`}>
+              <strong>
+                Invite {invitePreview.status}
+                {invitePreview.email ? ` · ${invitePreview.email}` : ''}
+              </strong>
+              <span>{invitePreview.message}</span>
+            </div>
+          ) : null}
           {session ? (
             <div className="workspace-session-summary">
               <span>{session.account.displayName ?? session.account.email}</span>
@@ -2700,7 +2752,10 @@ function WorkspaceControlCenter({
                 </Button>
               </form>
               {lastInviteToken ? (
-                <p className="workspace-token-output">Invite token: {lastInviteToken}</p>
+                <p className="workspace-token-output">
+                  Invite token: {lastInviteToken}
+                  {lastInviteUrl ? ` · URL: ${lastInviteUrl}` : ''}
+                </p>
               ) : null}
               <div className="workspace-member-list">
                 {members.map((member) => (
@@ -17864,6 +17919,10 @@ function storePricingModel(pricingModel: PricingModelKey): void {
 
 function readStoredAuthToken(): string {
   return window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY) ?? '';
+}
+
+function readInviteTokenFromUrl(): string {
+  return new URLSearchParams(window.location.search).get('invite_token')?.trim() ?? '';
 }
 
 function storeAuthToken(token: string): void {

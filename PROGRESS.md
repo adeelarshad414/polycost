@@ -41,6 +41,41 @@ say so explicitly rather than marking it done.
 | Phase 2.7 - Invoice/auth/VSDX gap closure              | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8 - Gap-closure production readiness           | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8A - Auth product UX continuation              | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8B - Invite/SSO auth hardening                 | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8B - Invite/SSO auth hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Invite flow hardened: invitation responses now include a local preview URL, the API
+  exposes token preview status without accepting the invite, and the SPA reads
+  `?invite_token=...` links to show pending/expired/revoked/accepted landing states.
+- Mock SSO round-trip added: the API now supports signed mock OIDC start,
+  mock-authorize handoff, and callback completion that upserts/links an external
+  account, adds team membership, and issues the normal server-side account session.
+- SSO state signing guard added: `AUTH_SSO_STATE_SECRET` defaults to a local
+  `CHANGE_ME_DEV_ONLY` value, is documented in `.env.example`, and is rejected by
+  existing staging/production dummy-value validation unless replaced.
+- Verification evidence in this continuation:
+  - Focused API repository/auth/config tests: 4 suites, 48 tests passed.
+  - Focused web app/API-client tests: 2 suites, 78 tests passed.
+  - `npm run format:check` passed.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run ci:unit` passed: API 49 suites / 360 tests, web 9 suites / 124 tests.
+  - `npm run ci:build` passed for API and web production builds.
+  - `npm run ci:integration` passed with no integration tests found in current
+    workspaces.
+  - `npm run db:validate` passed; live schema check skipped because Postgres was not
+    running in that standalone command.
+  - `npm run provider:credentials:check` passed in mock-provider mode.
+  - `npm run security:audit` passed the high/critical gate; the documented low
+    Graphify/Ollama transitive advisory remains.
+  - `npm run ci:e2e` passed against Docker Compose: API E2E 14/14 and Playwright
+    browser E2E 6/6.
+- Known gaps carried forward: mock OIDC verifies the application handshake shape but
+  does not replace a full enterprise IdP certification matrix, SAML login round-trip,
+  SCIM, or production email delivery infrastructure.
 
 ## Phase 2.8A - Auth product UX continuation
 

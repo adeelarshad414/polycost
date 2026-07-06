@@ -18,6 +18,8 @@ The explicit placeholder token is `CHANGE_ME_DEV_ONLY`. Production and staging c
 - Mock SSO provider connection tests and local-only invite tokens
 - Example SSO client identifiers or `CHANGE_ME_DEV_ONLY` values used only in
   development documentation
+- `AUTH_SSO_STATE_SECRET=CHANGE_ME_DEV_ONLY_SSO_STATE_SECRET` for local mock OIDC
+  callback signing
 - Local-only Docker Vault seed credentials
 
 ## Not Allowed In Staging Or Production
@@ -25,6 +27,7 @@ The explicit placeholder token is `CHANGE_ME_DEV_ONLY`. Production and staging c
 - `CHANGE_ME_DEV_ONLY`
 - `dummy`
 - `example`
+- Dummy `AUTH_SSO_STATE_SECRET` values
 - Any real provider mode without `VAULT_TOKEN_FILE`
 - Any strict provider credential check where Vault returns a dummy GCP access token or dummy LLM API key
 

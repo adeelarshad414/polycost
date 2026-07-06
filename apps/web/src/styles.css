@@ -1868,6 +1868,36 @@ summary:focus-visible,
   justify-content: start;
 }
 
+.workspace-invite-preview {
+  display: grid;
+  gap: 3px;
+  border: 1px solid color-mix(in srgb, var(--brand-blue) 28%, var(--pc-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--brand-blue) 7%, var(--pc-bg-surface));
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 700;
+  line-height: 1.45;
+  padding: 9px 10px;
+}
+
+.workspace-invite-preview strong {
+  color: var(--pc-text-primary);
+  font-size: var(--pc-text-sm);
+}
+
+.workspace-invite-preview.is-expired,
+.workspace-invite-preview.is-revoked,
+.workspace-invite-preview.is-invalid {
+  border-color: color-mix(in srgb, var(--pc-danger) 32%, var(--pc-border));
+  background: color-mix(in srgb, var(--pc-danger) 8%, var(--pc-bg-surface));
+}
+
+.workspace-invite-preview.is-accepted {
+  border-color: color-mix(in srgb, var(--brand-green) 32%, var(--pc-border));
+  background: color-mix(in srgb, var(--brand-green) 8%, var(--pc-bg-surface));
+}
+
 .workspace-session-summary span {
   color: var(--pc-text-secondary);
   font-size: var(--pc-text-sm);

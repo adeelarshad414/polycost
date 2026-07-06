@@ -458,10 +458,46 @@ describe('api client', () => {
       .mockResolvedValueOnce(jsonResponse(invitation))
       .mockResolvedValueOnce(jsonResponse([invitation]))
       .mockResolvedValueOnce(jsonResponse({ ...invitation, status: 'revoked' }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          status: 'pending',
+          email: 'finops@example.com',
+          role: 'member',
+          teamId: 'team-1',
+          expiresAt: '2026-07-13T00:00:00.000Z',
+          message: 'Invitation is ready to accept after sign-in.',
+        }),
+      )
       .mockResolvedValueOnce(jsonResponse(invitation))
       .mockResolvedValueOnce(jsonResponse({ ...member, role: 'admin' }))
       .mockResolvedValueOnce(jsonResponse({ removed: true }))
       .mockResolvedValueOnce(jsonResponse(ssoStatus))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          providerType: 'oidc',
+          mode: 'mock',
+          authorizationUrl: 'http://api.test/api/v1/auth/sso/mock/oidc/authorize?state=signed',
+          callbackUrl: 'http://api.test/api/v1/auth/sso/oidc/callback',
+          state: 'signed',
+          expiresAt: '2026-07-06T00:10:00.000Z',
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          token: 'sso-session-token',
+          expiresAt: '2026-07-07T00:00:00.000Z',
+          account: {
+            id: 'account-1',
+            email: 'finops@example.com',
+          },
+          sso: {
+            providerType: 'oidc',
+            issuerUrl: 'https://idp.example.com',
+            subjectHash: 'a'.repeat(64),
+            stateVerified: true,
+          },
+        }),
+      )
       .mockResolvedValueOnce(jsonResponse(ssoProvider))
       .mockResolvedValueOnce(jsonResponse(ssoTest))
       .mockResolvedValueOnce(jsonResponse(billingImport));
@@ -516,6 +552,9 @@ describe('api client', () => {
     await expect(
       client.revokeTeamInvitation('team-1', 'invite-1', 'session-token'),
     ).resolves.toEqual(expect.objectContaining({ status: 'revoked' }));
+    await expect(client.previewTeamInvitation('invite-token')).resolves.toEqual(
+      expect.objectContaining({ status: 'pending' }),
+    );
     await expect(client.acceptTeamInvitation('invite-token', 'session-token')).resolves.toEqual(
       invitation,
     );
@@ -526,6 +565,18 @@ describe('api client', () => {
       removed: true,
     });
     await expect(client.getSsoStatus('session-token')).resolves.toEqual(ssoStatus);
+    await expect(
+      client.startMockOidcLogin({
+        teamId: 'team-1',
+        email: 'finops@example.com',
+      }),
+    ).resolves.toEqual(expect.objectContaining({ mode: 'mock', state: 'signed' }));
+    await expect(
+      client.completeMockOidcCallback({
+        state: 'signed',
+        email: 'finops@example.com',
+      }),
+    ).resolves.toEqual(expect.objectContaining({ token: 'sso-session-token' }));
     await expect(
       client.configureSsoProvider(
         'team-1',
@@ -573,7 +624,7 @@ describe('api client', () => {
       }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      11,
+      12,
       'http://api.test/api/v1/auth/teams/team-1/members/account-1',
       expect.objectContaining({
         method: 'PATCH',
@@ -581,7 +632,7 @@ describe('api client', () => {
       }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      16,
+      19,
       'http://api.test/api/v1/billing/imports/provider-export',
       expect.objectContaining({
         method: 'POST',

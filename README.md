@@ -144,12 +144,14 @@ Accounts add workspace controls on top of that core flow:
 - Profile email/display-name update, password change, logout, account session list,
   and server-side "sign out other devices".
 - Team creation, team settings, member list, member removal, pending invitations,
-  invite-token acceptance, and invite revocation.
+  invite-token landing preview, expired/revoked invite states, invite-token
+  acceptance, and invite revocation.
 - Three-role RBAC: Owner, Admin, and Member. Owners manage role changes; owners and
   admins manage members, invitations, SSO provider configuration, and billing import
   workflows; members keep comparison and report access.
 - OIDC/SAML configuration readiness with redirect URI display, stored provider
-  metadata, and mock connection testing for development.
+  metadata, mock connection testing, and a signed mock OIDC start/authorize/callback
+  flow for development verification.
 
 The current self-hosted product does not yet include enterprise IdP login round-trips,
 email delivery infrastructure, org billing plans, or a hosted account marketplace. Those
@@ -234,6 +236,7 @@ Start from `.env.example`. Important local settings include:
 - `AUTH_SESSION_TTL_HOURS`
 - `AUTH_LOCAL_REGISTRATION_ENABLED`
 - `AUTH_PUBLIC_BASE_URL`
+- `AUTH_SSO_STATE_SECRET`
 - `RATE_LIMIT_NL_PARSE_PER_MINUTE`
 - `RATE_LIMIT_LIVE_REFRESH_PER_MINUTE`
 

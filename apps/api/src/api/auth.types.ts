@@ -28,6 +28,18 @@ export interface TeamInvitationRecord {
   acceptedAt?: string;
   revokedAt?: string;
   inviteToken?: string;
+  inviteUrl?: string;
+}
+
+export interface TeamInvitationPreview {
+  status: 'pending' | 'accepted' | 'revoked' | 'expired' | 'invalid';
+  email?: string;
+  role?: Exclude<TeamRole, 'owner'>;
+  teamId?: string;
+  expiresAt?: string;
+  acceptedAt?: string;
+  revokedAt?: string;
+  message: string;
 }
 
 export interface AccountSessionRecord {
@@ -78,6 +90,24 @@ export interface SsoConnectionTestResult {
   issuerUrl: string;
   checkedAt: string;
   message: string;
+}
+
+export interface SsoStartResponse {
+  providerType: 'oidc';
+  mode: 'mock';
+  authorizationUrl: string;
+  callbackUrl: string;
+  state: string;
+  expiresAt: string;
+}
+
+export interface SsoCallbackResponse extends AuthSessionResponse {
+  sso: {
+    providerType: 'oidc';
+    issuerUrl: string;
+    subjectHash: string;
+    stateVerified: true;
+  };
 }
 
 export interface AuthIdentity {

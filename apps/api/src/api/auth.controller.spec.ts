@@ -54,7 +54,11 @@ describe('AuthController', () => {
     expect(controller.listTeamInvitations('team-1', request)).toBe('invitations');
     expect(controller.revokeTeamInvitation('team-1', 'invite-1', request)).toBe('revoke-invite');
     expect(controller.acceptInvitation(body, request)).toBe('accept-invite');
+    expect(controller.previewInvitation('invite-token')).toBe('preview-invite');
     expect(controller.ssoStatus(request)).toBe('sso-status');
+    expect(controller.startMockOidcLogin(body)).toBe('sso-start');
+    expect(controller.mockOidcAuthorize(body)).toBe('sso-authorize');
+    expect(controller.completeMockOidcCallback(body, request)).toBe('sso-callback');
     expect(controller.configureSsoProvider('team-1', body, request)).toBe('sso-configure');
     expect(controller.testSsoConnection('team-1', body, request)).toBe('sso-test');
 
@@ -70,6 +74,13 @@ describe('AuthController', () => {
       identity,
     );
     expect(service.revokeTeamInvitation).toHaveBeenCalledWith('team-1', 'invite-1', identity);
+    expect(service.previewInvitation).toHaveBeenCalledWith('invite-token');
+    expect(service.startMockOidcLogin).toHaveBeenCalledWith(body);
+    expect(service.mockOidcAuthorize).toHaveBeenCalledWith(body);
+    expect(service.completeMockOidcCallback).toHaveBeenCalledWith(body, {
+      ip: '127.0.0.1',
+      userAgent: 'jest',
+    });
     expect(service.configureSsoProvider).toHaveBeenCalledWith('team-1', body, identity);
     expect(service.testSsoConnection).toHaveBeenCalledWith('team-1', body, identity);
   });
@@ -117,9 +128,13 @@ function createAuthServiceMock(): AuthService {
     listTeamInvitations: jest.fn(() => 'invitations'),
     revokeTeamInvitation: jest.fn(() => 'revoke-invite'),
     acceptInvitation: jest.fn(() => 'accept-invite'),
+    previewInvitation: jest.fn(() => 'preview-invite'),
     updateTeamMemberRole: jest.fn(() => 'member-role'),
     removeTeamMember: jest.fn(() => 'remove-member'),
     ssoStatus: jest.fn(() => 'sso-status'),
+    startMockOidcLogin: jest.fn(() => 'sso-start'),
+    mockOidcAuthorize: jest.fn(() => 'sso-authorize'),
+    completeMockOidcCallback: jest.fn(() => 'sso-callback'),
     configureSsoProvider: jest.fn(() => 'sso-configure'),
     testSsoConnection: jest.fn(() => 'sso-test'),
   } as unknown as AuthService;

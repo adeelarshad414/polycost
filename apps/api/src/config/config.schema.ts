@@ -58,6 +58,7 @@ export const configSchema = z
     AUTH_LOCKOUT_MINUTES: z.coerce.number().int().positive().default(15),
     AUTH_LOCAL_REGISTRATION_ENABLED: envBoolean(true),
     AUTH_PUBLIC_BASE_URL: z.string().url().default('http://localhost:3001'),
+    AUTH_SSO_STATE_SECRET: z.string().min(16).default('CHANGE_ME_DEV_ONLY_SSO_STATE_SECRET'),
     AUTH_OIDC_ISSUER_URL: z.string().url().optional(),
     AUTH_OIDC_CLIENT_ID: z.string().min(1).optional(),
     AUTH_SAML_ENTITY_ID: z.string().min(1).optional(),

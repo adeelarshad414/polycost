@@ -31,10 +31,13 @@ import {
   SharedReportResponse,
   ShareLinkAnalyticsResponse,
   ShareLinkResponse,
+  SsoCallbackResponse,
   SsoConfigurationStatus,
   SsoConnectionTestResult,
+  SsoStartResponse,
   TeamSettingsRecord,
   TeamInvitationRecord,
+  TeamInvitationPreview,
   TeamMemberRecord,
   TeamRole,
   WorkloadInput,
@@ -117,6 +120,7 @@ export interface PolyCostClient {
     invitationId: string,
     token: string,
   ): Promise<TeamInvitationRecord>;
+  previewTeamInvitation(tokenValue: string): Promise<TeamInvitationPreview>;
   acceptTeamInvitation(tokenValue: string, token: string): Promise<TeamInvitationRecord>;
   updateTeamMemberRole(
     teamId: string,
@@ -126,6 +130,12 @@ export interface PolyCostClient {
   ): Promise<TeamMemberRecord>;
   removeTeamMember(teamId: string, accountId: string, token: string): Promise<{ removed: true }>;
   getSsoStatus(token: string): Promise<SsoConfigurationStatus>;
+  startMockOidcLogin(input: { teamId: string; email?: string }): Promise<SsoStartResponse>;
+  completeMockOidcCallback(input: {
+    state: string;
+    email?: string;
+    displayName?: string;
+  }): Promise<SsoCallbackResponse>;
   configureSsoProvider(
     teamId: string,
     input: {
@@ -343,6 +353,12 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         body: JSON.stringify({ token: tokenValue }),
       });
     },
+    previewTeamInvitation(tokenValue) {
+      return requestJson<TeamInvitationPreview>(
+        baseUrl,
+        `/auth/invitations/preview/${encodeURIComponent(tokenValue)}`,
+      );
+    },
     updateTeamMemberRole(teamId, accountId, role, token) {
       return requestJson<TeamMemberRecord>(
         baseUrl,
@@ -368,6 +384,29 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
       return requestJson<SsoConfigurationStatus>(baseUrl, '/auth/sso/status', {
         headers: authorizationHeaders(token),
       });
+    },
+    startMockOidcLogin(input) {
+      return requestJson<SsoStartResponse>(baseUrl, '/auth/sso/oidc/start', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      });
+    },
+    completeMockOidcCallback(input) {
+      const params = new URLSearchParams({
+        state: input.state,
+      });
+
+      if (input.email) {
+        params.set('email', input.email);
+      }
+      if (input.displayName) {
+        params.set('displayName', input.displayName);
+      }
+
+      return requestJson<SsoCallbackResponse>(
+        baseUrl,
+        `/auth/sso/oidc/callback?${params.toString()}`,
+      );
     },
     configureSsoProvider(teamId, input, token) {
       return requestJson<SsoConfigurationStatus['configuredProviders'][number]>(

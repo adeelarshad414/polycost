@@ -37,6 +37,7 @@ describe('config schema', () => {
     expect(config.DIAGRAM_LLM_CLASSIFIER_ENDPOINT).toBeUndefined();
     expect(config.DIAGRAM_LLM_CLASSIFIER_MODEL).toBeUndefined();
     expect(config.FEATURE_RESERVED_PRICING).toBe(true);
+    expect(config.AUTH_SSO_STATE_SECRET).toBe('CHANGE_ME_DEV_ONLY_SSO_STATE_SECRET');
   });
 
   it('fails fast for invalid config', () => {
@@ -104,6 +105,7 @@ describe('config schema', () => {
       PRICING_ETL_RUN_ON_BOOT: 'false',
       CORS_ALLOWED_ORIGINS: 'https://polycost.example.com',
       VAULT_TOKEN_FILE: '/run/polycost-vault-auth/token',
+      AUTH_SSO_STATE_SECRET: 'production-sso-state-secret-value',
     });
 
     expect(config.USE_MOCK_PROVIDERS).toBe(false);

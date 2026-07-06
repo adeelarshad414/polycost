@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RequestWithAuth } from './auth.types';
 import { SessionAuthGuard } from './session-auth.guard';
@@ -134,10 +145,33 @@ export class AuthController {
     return this.authService.acceptInvitation(body, request.auth!);
   }
 
+  @Get('invitations/preview/:token')
+  previewInvitation(@Param('token') token: string) {
+    return this.authService.previewInvitation(token);
+  }
+
   @Get('sso/status')
   @UseGuards(SessionAuthGuard)
   ssoStatus(@Req() request: RequestWithAuth) {
     return this.authService.ssoStatus(request.auth!);
+  }
+
+  @Post('sso/oidc/start')
+  startMockOidcLogin(@Body() body: unknown) {
+    return this.authService.startMockOidcLogin(body);
+  }
+
+  @Get('sso/mock/oidc/authorize')
+  mockOidcAuthorize(@Query() query: Record<string, unknown>) {
+    return this.authService.mockOidcAuthorize(query);
+  }
+
+  @Get('sso/oidc/callback')
+  completeMockOidcCallback(
+    @Query() query: Record<string, unknown>,
+    @Req() request?: RequestWithAuth,
+  ) {
+    return this.authService.completeMockOidcCallback(query, requestMetadata(request));
   }
 
   @Post('teams/:teamId/sso/providers')

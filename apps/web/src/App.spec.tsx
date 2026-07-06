@@ -37,6 +37,7 @@ describe('App', () => {
     window.localStorage.removeItem('polycost-comparison-history-v1');
     window.localStorage.removeItem('polycost-auth-session-v1');
     window.sessionStorage.removeItem('polycost-current-requirements-v1');
+    window.history.pushState({}, '', '/');
     window.URL.createObjectURL = jest.fn(() => 'blob:polycost-report');
     window.URL.revokeObjectURL = jest.fn();
     HTMLAnchorElement.prototype.click = jest.fn();
@@ -53,6 +54,7 @@ describe('App', () => {
     window.localStorage.removeItem('polycost-comparison-history-v1');
     window.localStorage.removeItem('polycost-auth-session-v1');
     window.sessionStorage.removeItem('polycost-current-requirements-v1');
+    window.history.pushState({}, '', '/');
   });
 
   it('runs the structured-form comparison flow', async () => {
@@ -468,6 +470,29 @@ describe('App', () => {
     expect(client.listTeamMembers).not.toHaveBeenCalled();
     expect(client.listTeamInvitations).not.toHaveBeenCalled();
     expect(client.getSsoStatus).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('previews expired invite-token landing links before sign-in', async () => {
+    window.history.pushState({}, '', '/?invite_token=expired-token');
+    const client = clientMock({
+      previewTeamInvitation: jest.fn(async () => ({
+        status: 'expired' as const,
+        email: 'finops@example.com',
+        role: 'member' as const,
+        teamId: '22222222-2222-4222-8222-222222222222',
+        expiresAt: '2026-01-01T00:00:00.000Z',
+        message: 'Invitation has expired. Ask a team owner or admin for a new invite.',
+      })),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await settleAsyncEffects();
+
+    expect(client.previewTeamInvitation).toHaveBeenCalledWith('expired-token');
+    expect(text(container)).toContain('Invite expired · finops@example.com');
+    expect(text(container)).toContain('Invitation has expired');
 
     unmount();
   });
@@ -3484,6 +3509,7 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       expiresAt: '2026-07-13T00:00:00.000Z',
       createdAt: '2026-07-06T00:00:00.000Z',
       inviteToken: 'invite-token',
+      inviteUrl: 'http://localhost:3001/?invite_token=invite-token',
     })),
     listTeamInvitations: jest.fn(async () => []),
     revokeTeamInvitation: jest.fn(async () => ({
@@ -3525,6 +3551,36 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       callbackUrls: {
         oidc: 'http://localhost:3001/api/v1/auth/sso/oidc/callback',
         saml: 'http://localhost:3001/api/v1/auth/sso/saml/acs',
+      },
+    })),
+    previewTeamInvitation: jest.fn(async () => ({
+      status: 'pending' as const,
+      email: 'finops@example.com',
+      role: 'member' as const,
+      teamId: '22222222-2222-4222-8222-222222222222',
+      expiresAt: '2026-07-13T00:00:00.000Z',
+      message: 'Invitation is ready to accept after sign-in.',
+    })),
+    startMockOidcLogin: jest.fn(async () => ({
+      providerType: 'oidc' as const,
+      mode: 'mock' as const,
+      authorizationUrl: 'http://localhost:3001/api/v1/auth/sso/mock/oidc/authorize?state=signed',
+      callbackUrl: 'http://localhost:3001/api/v1/auth/sso/oidc/callback',
+      state: 'signed',
+      expiresAt: '2026-07-06T00:10:00.000Z',
+    })),
+    completeMockOidcCallback: jest.fn(async () => ({
+      token: 'sso-session-token',
+      expiresAt: '2026-07-07T00:00:00.000Z',
+      account: {
+        id: '11111111-1111-4111-8111-111111111111',
+        email: 'finops@example.com',
+      },
+      sso: {
+        providerType: 'oidc' as const,
+        issuerUrl: 'https://idp.example.com',
+        subjectHash: 'a'.repeat(64),
+        stateVerified: true as const,
       },
     })),
     configureSsoProvider: jest.fn(async (teamId, input) => ({
