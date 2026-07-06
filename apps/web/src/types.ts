@@ -258,6 +258,123 @@ export interface ParsedNwsDraft {
 export type DiagramInputFormat = 'mermaid' | 'drawio' | 'lucid_csv' | 'vsdx';
 export type DiagramClassificationConfidence = 'high' | 'moderate' | 'low';
 
+export type TeamRole = 'owner' | 'admin' | 'member' | 'viewer';
+
+export interface AuthSessionResponse {
+  token: string;
+  expiresAt: string;
+  account: {
+    id: string;
+    email: string;
+    displayName?: string;
+  };
+  team?: {
+    id: string;
+    name: string;
+    role: TeamRole;
+  };
+}
+
+export interface AuthMeResponse {
+  account: {
+    id: string;
+    email: string;
+    displayName?: string;
+  };
+  activeTeam?: {
+    id: string;
+    name: string;
+    role: TeamRole;
+  };
+  teams: Array<{
+    teamId: string;
+    teamName: string;
+    role: TeamRole;
+  }>;
+  session: {
+    id: string;
+    expiresAt: string;
+  };
+}
+
+export type BillingSourceType =
+  'aws-cur' | 'azure-cost-management' | 'gcp-billing-export' | 'normalized-csv';
+
+export interface BillingImportRowInput {
+  serviceName: string;
+  skuId?: string;
+  region?: string;
+  resourceId?: string;
+  usageStart?: string;
+  usageEnd?: string;
+  usageQuantity?: number;
+  usageUnit?: string;
+  costUsd: number;
+  currency?: string;
+  tags?: Record<string, string>;
+  rawPayload?: Record<string, unknown>;
+}
+
+export interface BillingImportInput {
+  provider: ProviderId;
+  sourceType: BillingSourceType;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  originalFileSha256?: string;
+  rows: BillingImportRowInput[];
+}
+
+export interface BillingImportResponse {
+  importRun: {
+    id: string;
+    teamId?: string;
+    provider: ProviderId;
+    sourceType: BillingSourceType;
+    status: 'processing' | 'completed' | 'failed';
+    billingPeriodStart: string;
+    billingPeriodEnd: string;
+    originalFileSha256: string;
+    rowsReceived: number;
+    rowsAccepted: number;
+    rowsRejected: number;
+    totalCostUsd: number;
+    createdByAccountId?: string;
+    createdAt: string;
+    completedAt?: string;
+    errorDetail?: string;
+  };
+  acceptedRows: number;
+  rejectedRows: number;
+  lineItems: Array<
+    BillingImportRowInput & {
+      id: string;
+      importRunId: string;
+      teamId?: string;
+      provider: ProviderId;
+      billingPeriodStart: string;
+      billingPeriodEnd: string;
+      lineItemHash: string;
+      matchedComparisonId?: string;
+      matchedTraceKey?: string;
+      createdAt: string;
+    }
+  >;
+}
+
+export interface InvoiceReconciliationRecord {
+  id: string;
+  importRunId: string;
+  comparisonId: string;
+  provider: ProviderId;
+  estimatedTotalUsd: number;
+  invoicedTotalUsd: number;
+  varianceUsd: number;
+  variancePercent: number;
+  status: 'matched' | 'variance-warning' | 'variance-critical' | 'unmatched';
+  evidence: Record<string, unknown>;
+  createdAt: string;
+}
+
 export interface DiagramParseRequest {
   content: string;
   encoding?: 'text' | 'base64';
@@ -289,6 +406,19 @@ export interface DiagramParseResult {
       kind: 'resource' | 'connector' | 'decorative' | 'unknown';
       sourceRef: string;
       stencilId?: string;
+      bounds?: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      };
+      visual?: {
+        pageRef?: string;
+        pageName?: string;
+        masterId?: string;
+        fillColor?: string;
+        lineColor?: string;
+      };
     }>;
     edges: Array<{
       id: string;

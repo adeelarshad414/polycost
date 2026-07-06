@@ -3586,6 +3586,8 @@ function DiagramReviewPanel({
   onClassifyNode: (nodeId: string, serviceType: string) => void;
   onAddRequirement: (serviceType: string) => void;
 }) {
+  const layoutPreview = diagramLayoutPreview(result.graph.nodes);
+
   return (
     <section className="diagram-review-panel" aria-label="Diagram parse review">
       <div className="diagram-review-summary">
@@ -3596,13 +3598,30 @@ function DiagramReviewPanel({
           {result.review.unresolvedClassifications.length} unresolved
         </small>
       </div>
-      <div className="diagram-preview-pane" aria-label="Diagram structure preview">
-        {result.graph.nodes.slice(0, 12).map((node) => (
-          <span className={`diagram-preview-node diagram-preview-node-${node.kind}`} key={node.id}>
-            {node.displayLabel}
-          </span>
-        ))}
-        {result.graph.nodes.length > 12 ? (
+      <div
+        className={`diagram-preview-pane${layoutPreview ? ' diagram-preview-pane-layout' : ''}`}
+        aria-label="Diagram structure preview"
+      >
+        {layoutPreview
+          ? layoutPreview.nodes.map((node) => (
+              <span
+                className={`diagram-preview-node diagram-preview-node-${node.kind}`}
+                key={node.id}
+                style={node.style}
+                title={node.visual?.pageName ?? node.sourceRef}
+              >
+                {node.displayLabel}
+              </span>
+            ))
+          : result.graph.nodes.slice(0, 12).map((node) => (
+              <span
+                className={`diagram-preview-node diagram-preview-node-${node.kind}`}
+                key={node.id}
+              >
+                {node.displayLabel}
+              </span>
+            ))}
+        {!layoutPreview && result.graph.nodes.length > 12 ? (
           <span className="diagram-preview-node diagram-preview-node-more">
             +{result.graph.nodes.length - 12} more
           </span>
@@ -3694,6 +3713,48 @@ function DiagramReviewPanel({
       </label>
     </section>
   );
+}
+
+function diagramLayoutPreview(nodes: DiagramParseResult['graph']['nodes']):
+  | {
+      nodes: Array<
+        DiagramParseResult['graph']['nodes'][number] & {
+          style: {
+            left: string;
+            top: string;
+            width: string;
+            minHeight: string;
+            borderColor?: string;
+          };
+        }
+      >;
+    }
+  | undefined {
+  const layoutNodes = nodes.filter((node) => node.bounds).slice(0, 18);
+
+  if (layoutNodes.length < 2) {
+    return undefined;
+  }
+
+  const minX = Math.min(...layoutNodes.map((node) => node.bounds!.x));
+  const minY = Math.min(...layoutNodes.map((node) => node.bounds!.y));
+  const maxX = Math.max(...layoutNodes.map((node) => node.bounds!.x + node.bounds!.width));
+  const maxY = Math.max(...layoutNodes.map((node) => node.bounds!.y + node.bounds!.height));
+  const spanX = Math.max(maxX - minX, 1);
+  const spanY = Math.max(maxY - minY, 1);
+
+  return {
+    nodes: layoutNodes.map((node) => ({
+      ...node,
+      style: {
+        left: `${((node.bounds!.x - minX) / spanX) * 82 + 4}%`,
+        top: `${((maxY - node.bounds!.y - node.bounds!.height) / spanY) * 68 + 10}%`,
+        width: `${Math.max((node.bounds!.width / spanX) * 72, 16)}%`,
+        minHeight: `${Math.max((node.bounds!.height / spanY) * 88, 30)}px`,
+        ...(node.visual?.lineColor ? { borderColor: node.visual.lineColor } : {}),
+      },
+    })),
+  };
 }
 
 function DescribePanel({

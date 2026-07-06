@@ -2193,6 +2193,22 @@ summary:focus-visible,
   padding: var(--pc-space-1);
 }
 
+.diagram-preview-pane-layout {
+  position: relative;
+  display: block;
+  min-height: 220px;
+  overflow: hidden;
+  background:
+    linear-gradient(color-mix(in srgb, var(--pc-border) 18%, transparent) 1px, transparent 1px),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--pc-border) 18%, transparent) 1px,
+      transparent 1px
+    ),
+    color-mix(in srgb, var(--pc-bg-surface) 86%, transparent);
+  background-size: 28px 28px;
+}
+
 .diagram-preview-node {
   max-width: 180px;
   overflow: hidden;
@@ -2205,6 +2221,18 @@ summary:focus-visible,
   padding: 5px 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.diagram-preview-pane-layout .diagram-preview-node {
+  position: absolute;
+  display: grid;
+  align-items: center;
+  max-width: none;
+  min-width: 72px;
+  border-radius: 8px;
+  box-shadow: var(--pc-shadow-sm);
+  text-align: center;
+  white-space: normal;
 }
 
 .diagram-preview-node-resource {

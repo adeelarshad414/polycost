@@ -48,7 +48,51 @@ describe('DiagramParserService', () => {
     expect(parsed.review.components.map((component) => component.serviceCategory)).toContain(
       'compute',
     );
+    expect(parsed.graph.nodes.some((node) => node.visual?.pageRef)).toBe(true);
     expect(parsed.draftNws.database).toHaveLength(1);
+  });
+
+  it('extracts layout and visual metadata from VSDX shape cells', () => {
+    const extracted = new VsdxExtractor().extract({
+      buffer: zipWithStoredEntry(
+        'visio/pages/page1.xml',
+        `
+          <PageContents>
+            <Shapes>
+              <Shape ID="7" NameU="EC2">
+                <Text>EC2 web</Text>
+                <Cell N="PinX" V="3"/>
+                <Cell N="PinY" V="5"/>
+                <Cell N="Width" V="4"/>
+                <Cell N="Height" V="6"/>
+                <Cell N="FillForegnd" V="#D85A30"/>
+                <Cell N="LineColor" V="RGB(55,138,221)"/>
+              </Shape>
+            </Shapes>
+          </PageContents>
+        `,
+      ),
+      sizeBytes: 1,
+      sha256: 'hash',
+      detectedFormat: 'vsdx',
+    });
+
+    expect(extracted.nodes[0]).toMatchObject({
+      id: '7',
+      rawLabel: 'EC2 web',
+      bounds: {
+        x: 1,
+        y: 2,
+        width: 4,
+        height: 6,
+      },
+      visual: {
+        pageRef: 'visio/pages/page1.xml',
+        pageName: 'Page 1',
+        fillColor: '#D85A30',
+        lineColor: '#378ADD',
+      },
+    });
   });
 
   it.each([
@@ -179,4 +223,59 @@ function readTextFixture(path: string): string {
 
 function readBinaryFixture(path: string): Buffer {
   return readFileSync(resolve(fixtureRoot, path));
+}
+
+function zipWithStoredEntry(path: string, content: string): Buffer {
+  const pathBuffer = Buffer.from(path);
+  const contentBuffer = Buffer.from(content);
+  const localHeader = Buffer.alloc(30);
+  localHeader.writeUInt32LE(0x04034b50, 0);
+  localHeader.writeUInt16LE(20, 4);
+  localHeader.writeUInt16LE(0, 6);
+  localHeader.writeUInt16LE(0, 8);
+  localHeader.writeUInt32LE(0, 10);
+  localHeader.writeUInt32LE(0, 14);
+  localHeader.writeUInt32LE(contentBuffer.length, 18);
+  localHeader.writeUInt32LE(contentBuffer.length, 22);
+  localHeader.writeUInt16LE(pathBuffer.length, 26);
+  localHeader.writeUInt16LE(0, 28);
+
+  const centralDirectory = Buffer.alloc(46);
+  const centralDirectoryOffset = localHeader.length + pathBuffer.length + contentBuffer.length;
+  centralDirectory.writeUInt32LE(0x02014b50, 0);
+  centralDirectory.writeUInt16LE(20, 4);
+  centralDirectory.writeUInt16LE(20, 6);
+  centralDirectory.writeUInt16LE(0, 8);
+  centralDirectory.writeUInt16LE(0, 10);
+  centralDirectory.writeUInt32LE(0, 12);
+  centralDirectory.writeUInt32LE(0, 16);
+  centralDirectory.writeUInt32LE(contentBuffer.length, 20);
+  centralDirectory.writeUInt32LE(contentBuffer.length, 24);
+  centralDirectory.writeUInt16LE(pathBuffer.length, 28);
+  centralDirectory.writeUInt16LE(0, 30);
+  centralDirectory.writeUInt16LE(0, 32);
+  centralDirectory.writeUInt16LE(0, 34);
+  centralDirectory.writeUInt16LE(0, 36);
+  centralDirectory.writeUInt32LE(0, 38);
+  centralDirectory.writeUInt32LE(0, 42);
+
+  const endOfCentralDirectory = Buffer.alloc(22);
+  const centralDirectorySize = centralDirectory.length + pathBuffer.length;
+  endOfCentralDirectory.writeUInt32LE(0x06054b50, 0);
+  endOfCentralDirectory.writeUInt16LE(0, 4);
+  endOfCentralDirectory.writeUInt16LE(0, 6);
+  endOfCentralDirectory.writeUInt16LE(1, 8);
+  endOfCentralDirectory.writeUInt16LE(1, 10);
+  endOfCentralDirectory.writeUInt32LE(centralDirectorySize, 12);
+  endOfCentralDirectory.writeUInt32LE(centralDirectoryOffset, 16);
+  endOfCentralDirectory.writeUInt16LE(0, 20);
+
+  return Buffer.concat([
+    localHeader,
+    pathBuffer,
+    contentBuffer,
+    centralDirectory,
+    pathBuffer,
+    endOfCentralDirectory,
+  ]);
 }

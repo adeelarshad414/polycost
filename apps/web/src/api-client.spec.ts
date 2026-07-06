@@ -213,6 +213,128 @@ describe('api client', () => {
     );
   });
 
+  it('wires authenticated session and billing actuals routes with bearer headers', async () => {
+    const session = {
+      token: 'session-token',
+      expiresAt: '2026-07-07T00:00:00.000Z',
+      account: {
+        id: 'account-1',
+        email: 'architect@example.com',
+      },
+      team: {
+        id: 'team-1',
+        name: 'Architecture team',
+        role: 'owner',
+      },
+    };
+    const billingImport = {
+      importRun: {
+        id: 'import-1',
+        teamId: 'team-1',
+        provider: 'aws',
+        sourceType: 'aws-cur',
+        status: 'completed',
+        billingPeriodStart: '2026-06-01',
+        billingPeriodEnd: '2026-06-30',
+        originalFileSha256: 'a'.repeat(64),
+        rowsReceived: 1,
+        rowsAccepted: 1,
+        rowsRejected: 0,
+        totalCostUsd: 107,
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+      acceptedRows: 1,
+      rejectedRows: 0,
+      lineItems: [],
+    };
+    const reconciliation = {
+      id: 'reconciliation-1',
+      importRunId: 'import-1',
+      comparisonId: 'comparison-1',
+      provider: 'aws',
+      estimatedTotalUsd: 100,
+      invoicedTotalUsd: 107,
+      varianceUsd: 7,
+      variancePercent: 7,
+      status: 'variance-warning',
+      evidence: {},
+      createdAt: '2026-07-06T00:00:02.000Z',
+    };
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(session))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          account: session.account,
+          activeTeam: session.team,
+          teams: [{ teamId: 'team-1', teamName: 'Architecture team', role: 'owner' }],
+          session: { id: 'session-1', expiresAt: session.expiresAt },
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse(billingImport))
+      .mockResolvedValueOnce(jsonResponse(reconciliation))
+      .mockResolvedValueOnce(jsonResponse([reconciliation]));
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(
+      client.register({
+        email: 'architect@example.com',
+        password: 'correct horse battery staple',
+        teamName: 'Architecture team',
+      }),
+    ).resolves.toEqual(session);
+    await expect(client.getCurrentSession('session-token')).resolves.toEqual(
+      expect.objectContaining({
+        activeTeam: session.team,
+      }),
+    );
+    await expect(
+      client.importBillingActuals(
+        {
+          provider: 'aws',
+          sourceType: 'aws-cur',
+          billingPeriodStart: '2026-06-01',
+          billingPeriodEnd: '2026-06-30',
+          rows: [{ serviceName: 'AmazonEC2', costUsd: 107 }],
+        },
+        'session-token',
+      ),
+    ).resolves.toEqual(billingImport);
+    await expect(
+      client.reconcileBillingImport('import-1', 'comparison-1', 'session-token'),
+    ).resolves.toEqual(reconciliation);
+    await expect(client.listBillingReconciliations('import-1', 'session-token')).resolves.toEqual([
+      reconciliation,
+    ]);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://api.test/api/v1/auth/me',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer session-token',
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      'http://api.test/api/v1/billing/imports',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer session-token',
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      'http://api.test/api/v1/billing/imports/import-1/reconcile',
+      expect.objectContaining({
+        body: JSON.stringify({ comparisonId: 'comparison-1' }),
+      }),
+    );
+  });
+
   it('maps API error envelopes', async () => {
     global.fetch = jest.fn(async () =>
       jsonResponse(

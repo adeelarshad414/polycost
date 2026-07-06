@@ -2968,6 +2968,55 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
   return {
     getHealth: jest.fn(async () => backendHealth),
     getDataHealth: jest.fn(async () => dataHealth),
+    register: jest.fn(async () => ({
+      token: 'session-token',
+      expiresAt: '2026-07-07T00:00:00.000Z',
+      account: {
+        id: '11111111-1111-4111-8111-111111111111',
+        email: 'architect@example.com',
+      },
+      team: {
+        id: '22222222-2222-4222-8222-222222222222',
+        name: 'Architecture team',
+        role: 'owner' as const,
+      },
+    })),
+    login: jest.fn(async () => ({
+      token: 'session-token',
+      expiresAt: '2026-07-07T00:00:00.000Z',
+      account: {
+        id: '11111111-1111-4111-8111-111111111111',
+        email: 'architect@example.com',
+      },
+      team: {
+        id: '22222222-2222-4222-8222-222222222222',
+        name: 'Architecture team',
+        role: 'owner' as const,
+      },
+    })),
+    getCurrentSession: jest.fn(async () => ({
+      account: {
+        id: '11111111-1111-4111-8111-111111111111',
+        email: 'architect@example.com',
+      },
+      activeTeam: {
+        id: '22222222-2222-4222-8222-222222222222',
+        name: 'Architecture team',
+        role: 'owner' as const,
+      },
+      teams: [
+        {
+          teamId: '22222222-2222-4222-8222-222222222222',
+          teamName: 'Architecture team',
+          role: 'owner' as const,
+        },
+      ],
+      session: {
+        id: '33333333-3333-4333-8333-333333333333',
+        expiresAt: '2026-07-07T00:00:00.000Z',
+      },
+    })),
+    logout: jest.fn(async () => ({ revoked: true as const })),
     parseWorkload: jest.fn(async () => parsed),
     parseDiagram: jest.fn(async () => ({
       importId: '77777777-7777-4777-8777-777777777777',
@@ -3365,6 +3414,40 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
         GBP: 0.79,
       },
     })),
+    importBillingActuals: jest.fn(async () => ({
+      importRun: {
+        id: '55555555-5555-4555-8555-555555555555',
+        teamId: '22222222-2222-4222-8222-222222222222',
+        provider: 'aws' as const,
+        sourceType: 'aws-cur' as const,
+        status: 'completed' as const,
+        billingPeriodStart: '2026-06-01',
+        billingPeriodEnd: '2026-06-30',
+        originalFileSha256: 'a'.repeat(64),
+        rowsReceived: 1,
+        rowsAccepted: 1,
+        rowsRejected: 0,
+        totalCostUsd: 107,
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+      acceptedRows: 1,
+      rejectedRows: 0,
+      lineItems: [],
+    })),
+    reconcileBillingImport: jest.fn(async () => ({
+      id: '66666666-6666-4666-8666-666666666666',
+      importRunId: '55555555-5555-4555-8555-555555555555',
+      comparisonId: comparisonResult.comparisonId,
+      provider: 'aws' as const,
+      estimatedTotalUsd: 100,
+      invoicedTotalUsd: 107,
+      varianceUsd: 7,
+      variancePercent: 7,
+      status: 'variance-warning' as const,
+      evidence: {},
+      createdAt: '2026-07-06T00:00:02.000Z',
+    })),
+    listBillingReconciliations: jest.fn(async () => []),
     ...overrides,
   };
 }
