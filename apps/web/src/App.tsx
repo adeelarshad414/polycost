@@ -4057,7 +4057,7 @@ function ResultQuickActions({
           disabled={busyAction !== null && busyAction !== 'refresh'}
         >
           <RefreshIcon />
-          Refresh live
+          Refresh live catalog
         </Button>
       </div>
     </section>
@@ -4169,7 +4169,7 @@ function StateDetailContent({
       >
         <ResultDetailHeading
           title="Official calculators, regions & exports"
-          description="Provider calculator links, official region references, refresh, and PDF/CSV/Excel report downloads."
+          description="Provider calculator links, official region references, live catalog refresh, and PDF/CSV/Excel report downloads."
         />
         <CloudCalculatorLinks regionCatalog={regionCatalog} />
         <div className="progressive-export-panel">
@@ -4188,7 +4188,7 @@ function StateDetailContent({
             disabled={busyAction !== null && busyAction !== 'refresh'}
           >
             <RefreshIcon />
-            Refresh live
+            Refresh live catalog
           </Button>
         </div>
       </section>
@@ -11147,8 +11147,8 @@ function CostFormulaEvidence({ comparison }: { comparison: ComparisonResult | nu
           <h3>Rate x quantity x time</h3>
         </div>
         <p title={HOURS_PER_MONTH_TOOLTIP}>
-          Monthly totals are derived from cached rates and the shared 730-hours/month constant; no
-          request-time cloud calculator calls are made.
+          Monthly totals are derived from cached catalog list rates and the shared 730-hours/month
+          constant; private discounts, credits, taxes, and actual billed usage are not included.
         </p>
       </div>
       <div className="formula-evidence-grid">

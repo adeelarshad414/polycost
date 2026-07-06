@@ -992,7 +992,7 @@ describe('App', () => {
           ),
         ),
       );
-      await click(buttonByText(container, 'Refresh live'));
+      await click(buttonByText(container, 'Refresh live catalog'));
 
       expect(
         buttonByText(container, 'Refreshing...').querySelector('.animate-spin'),
@@ -1031,7 +1031,7 @@ describe('App', () => {
     const { container, unmount } = render(<App client={client} />);
 
     await click(buttonByText(container, 'Compare costs'));
-    await click(buttonByText(container, 'Refresh live'));
+    await click(buttonByText(container, 'Refresh live catalog'));
 
     expect(client.refreshLiveComparison).toHaveBeenCalledWith(comparisonResult.comparisonId);
     expect(text(container)).toContain('Live pricing refresh is temporarily unavailable.');
@@ -1057,11 +1057,11 @@ describe('App', () => {
         resultDisclosureByTitle(container, 'Show full breakdown, pricing models & export options'),
       ),
     );
-    expect(buttonByText(container, 'Refresh live').disabled).toBe(false);
+    expect(buttonByText(container, 'Refresh live catalog').disabled).toBe(false);
     expect(buttonByText(container, 'PDF').disabled).toBe(false);
     expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);
 
-    await click(buttonByText(container, 'Refresh live'));
+    await click(buttonByText(container, 'Refresh live catalog'));
 
     await click(buttonByText(container, 'Clear'));
 
@@ -1150,7 +1150,7 @@ describe('App', () => {
     );
     await click(disclosureSummary(detailGate));
     await click(buttonByText(container, 'Yearly'));
-    await click(buttonByText(container, 'Refresh live'));
+    await click(buttonByText(container, 'Refresh live catalog'));
     await click(buttonByText(container, 'PDF'));
 
     expect(client.validateWorkload).toHaveBeenCalledWith(

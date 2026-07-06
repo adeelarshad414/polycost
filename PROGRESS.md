@@ -47,6 +47,26 @@ say so explicitly rather than marking it done.
 | Phase 2.8E - UI-priced service coverage guard          | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8F - SKU evidence derivation hardening         | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8G - Catalog lineage readback hardening        | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8H - Pricing honesty UI labeling               | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8H - Pricing honesty UI labeling
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Tightened visible pricing copy so refresh actions are labeled `Refresh live
+catalog`, reducing the chance that reviewers infer invoice/account-billing
+  refresh semantics.
+- Updated calculation evidence copy to state that monthly totals use cached catalog
+  list rates and the 730-hours/month constant, and that private discounts, credits,
+  taxes, and actual billed usage are not included.
+- Verification evidence in this continuation:
+  - Focused web App spec passed: 54 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: full invoice-grade billing coverage still remains
+  future work; this slice only hardens product wording around the current
+  decision-grade catalog-list-price model.
 
 ## Phase 2.8G - Catalog lineage readback hardening
 
