@@ -16,7 +16,14 @@ import {
   ReportInterval,
   ReportPricingModel,
 } from '../reports/report.types';
-import { AccountTeamMembership, AuthIdentity, TeamRole } from './auth.types';
+import {
+  AccountTeamMembership,
+  AuthIdentity,
+  SsoConfigurationStatus,
+  TeamInvitationRecord,
+  TeamMemberRecord,
+  TeamRole,
+} from './auth.types';
 import {
   BillingImportInput,
   BillingImportRecord,
@@ -298,6 +305,40 @@ interface TeamMembershipRow {
   team_id: string;
   team_name: string;
   role: TeamRole;
+}
+
+interface TeamMemberRow {
+  account_id: string;
+  email: string;
+  display_name: string | null;
+  role: TeamRole;
+  created_at: Date;
+  last_active_at: Date | null;
+}
+
+interface TeamInvitationRow {
+  id: string;
+  team_id: string;
+  email: string;
+  role: Exclude<TeamRole, 'owner'>;
+  status: TeamInvitationRecord['status'];
+  invited_by_account_id: string;
+  accepted_by_account_id: string | null;
+  expires_at: Date;
+  created_at: Date;
+  accepted_at: Date | null;
+  revoked_at: Date | null;
+}
+
+interface TeamInvitationWithTokenRow extends TeamInvitationRow {
+  token_hash: string;
+}
+
+interface SsoProviderConfigRow {
+  provider_type: 'oidc' | 'saml';
+  display_name: string;
+  issuer_url: string;
+  status: 'configured' | 'disabled';
 }
 
 interface BillingImportRow {
@@ -1998,6 +2039,352 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     return result.rows.map(toTeamMembership);
   }
 
+  async getTeamMembership(input: {
+    accountId: string;
+    teamId: string;
+  }): Promise<AccountTeamMembership | undefined> {
+    const result = await (
+      await this.getPool()
+    ).query<TeamMembershipRow>(
+      `
+        SELECT teams.id AS team_id,
+               teams.name AS team_name,
+               team_memberships.role
+        FROM team_memberships
+        JOIN teams
+          ON teams.id = team_memberships.team_id
+        WHERE team_memberships.account_id = $1
+          AND team_memberships.team_id = $2
+        LIMIT 1
+      `,
+      [input.accountId, input.teamId],
+    );
+
+    return result.rows[0] ? toTeamMembership(result.rows[0]) : undefined;
+  }
+
+  async listTeamMembers(teamId: string): Promise<TeamMemberRecord[]> {
+    const result = await (
+      await this.getPool()
+    ).query<TeamMemberRow>(
+      `
+        SELECT accounts.id AS account_id,
+               accounts.email,
+               accounts.display_name,
+               team_memberships.role,
+               team_memberships.created_at,
+               team_memberships.last_active_at
+        FROM team_memberships
+        JOIN accounts
+          ON accounts.id = team_memberships.account_id
+        WHERE team_memberships.team_id = $1
+        ORDER BY CASE team_memberships.role
+                   WHEN 'owner' THEN 1
+                   WHEN 'admin' THEN 2
+                   WHEN 'member' THEN 3
+                   ELSE 4
+                 END,
+                 accounts.email ASC
+      `,
+      [teamId],
+    );
+
+    return result.rows.map(toTeamMemberRecord);
+  }
+
+  async createTeamInvitation(input: {
+    teamId: string;
+    email: string;
+    role: Exclude<TeamRole, 'owner'>;
+    tokenHash: string;
+    invitedByAccountId: string;
+    expiresAt: string;
+  }): Promise<TeamInvitationRecord> {
+    const result = await (
+      await this.getPool()
+    ).query<TeamInvitationRow>(
+      `
+        INSERT INTO team_invitations (
+          team_id,
+          email,
+          role,
+          token_hash,
+          invited_by_account_id,
+          expires_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (team_id, email)
+          WHERE status = 'pending'
+        DO UPDATE SET
+          role = EXCLUDED.role,
+          token_hash = EXCLUDED.token_hash,
+          invited_by_account_id = EXCLUDED.invited_by_account_id,
+          expires_at = EXCLUDED.expires_at,
+          created_at = now(),
+          revoked_at = NULL
+        RETURNING id,
+                  team_id,
+                  email,
+                  role,
+                  status,
+                  invited_by_account_id,
+                  accepted_by_account_id,
+                  expires_at,
+                  created_at,
+                  accepted_at,
+                  revoked_at
+      `,
+      [
+        input.teamId,
+        input.email,
+        input.role,
+        input.tokenHash,
+        input.invitedByAccountId,
+        input.expiresAt,
+      ],
+    );
+
+    return toTeamInvitationRecord(result.rows[0]);
+  }
+
+  async listTeamInvitations(teamId: string): Promise<TeamInvitationRecord[]> {
+    const result = await (
+      await this.getPool()
+    ).query<TeamInvitationRow>(
+      `
+        SELECT id,
+               team_id,
+               email,
+               role,
+               CASE
+                 WHEN status = 'pending' AND expires_at <= now() THEN 'expired'
+                 ELSE status
+               END AS status,
+               invited_by_account_id,
+               accepted_by_account_id,
+               expires_at,
+               created_at,
+               accepted_at,
+               revoked_at
+        FROM team_invitations
+        WHERE team_id = $1
+        ORDER BY created_at DESC
+      `,
+      [teamId],
+    );
+
+    return result.rows.map(toTeamInvitationRecord);
+  }
+
+  async findPendingInvitationByTokenHash(
+    tokenHash: string,
+    now: string,
+  ): Promise<TeamInvitationRecord | undefined> {
+    const result = await (
+      await this.getPool()
+    ).query<TeamInvitationRow>(
+      `
+        SELECT id,
+               team_id,
+               email,
+               role,
+               status,
+               invited_by_account_id,
+               accepted_by_account_id,
+               expires_at,
+               created_at,
+               accepted_at,
+               revoked_at
+        FROM team_invitations
+        WHERE token_hash = $1
+          AND status = 'pending'
+          AND expires_at > $2
+        LIMIT 1
+      `,
+      [tokenHash, now],
+    );
+
+    return result.rows[0] ? toTeamInvitationRecord(result.rows[0]) : undefined;
+  }
+
+  async acceptTeamInvitation(input: {
+    invitationId: string;
+    accountId: string;
+    acceptedAt: string;
+  }): Promise<TeamInvitationRecord> {
+    const pool = await this.getPool();
+
+    await pool.query('BEGIN');
+
+    try {
+      const invitation = await pool.query<TeamInvitationWithTokenRow>(
+        `
+          SELECT id,
+                 team_id,
+                 email,
+                 role,
+                 status,
+                 token_hash,
+                 invited_by_account_id,
+                 accepted_by_account_id,
+                 expires_at,
+                 created_at,
+                 accepted_at,
+                 revoked_at
+          FROM team_invitations
+          WHERE id = $1
+            AND status = 'pending'
+          FOR UPDATE
+        `,
+        [input.invitationId],
+      );
+      const row = invitation.rows[0];
+
+      if (!row) {
+        throw new Error('Team invitation is no longer pending');
+      }
+
+      await pool.query(
+        `
+          INSERT INTO team_memberships (
+            team_id,
+            account_id,
+            role,
+            last_active_at
+          )
+          VALUES ($1, $2, $3, $4)
+          ON CONFLICT (team_id, account_id)
+          DO UPDATE SET
+            role = EXCLUDED.role,
+            last_active_at = EXCLUDED.last_active_at
+        `,
+        [row.team_id, input.accountId, row.role, input.acceptedAt],
+      );
+
+      const accepted = await pool.query<TeamInvitationRow>(
+        `
+          UPDATE team_invitations
+          SET status = 'accepted',
+              accepted_by_account_id = $2,
+              accepted_at = $3
+          WHERE id = $1
+          RETURNING id,
+                    team_id,
+                    email,
+                    role,
+                    status,
+                    invited_by_account_id,
+                    accepted_by_account_id,
+                    expires_at,
+                    created_at,
+                    accepted_at,
+                    revoked_at
+        `,
+        [input.invitationId, input.accountId, input.acceptedAt],
+      );
+
+      await pool.query('COMMIT');
+
+      return toTeamInvitationRecord(accepted.rows[0]);
+    } catch (error) {
+      await pool.query('ROLLBACK');
+      throw error;
+    }
+  }
+
+  async countTeamOwners(teamId: string): Promise<number> {
+    const result = await (
+      await this.getPool()
+    ).query<{ owners: string }>(
+      `
+        SELECT COUNT(*) AS owners
+        FROM team_memberships
+        WHERE team_id = $1
+          AND role = 'owner'
+      `,
+      [teamId],
+    );
+
+    return Number.parseInt(result.rows[0]?.owners ?? '0', 10);
+  }
+
+  async updateTeamMemberRole(input: {
+    teamId: string;
+    accountId: string;
+    role: TeamRole;
+  }): Promise<TeamMemberRecord | undefined> {
+    const result = await (
+      await this.getPool()
+    ).query<TeamMemberRow>(
+      `
+        WITH updated_membership AS (
+          UPDATE team_memberships
+          SET role = $3
+          WHERE team_id = $1
+            AND account_id = $2
+          RETURNING account_id,
+                    role,
+                    created_at,
+                    last_active_at
+        )
+        SELECT updated_membership.account_id,
+               accounts.email,
+               accounts.display_name,
+               updated_membership.role,
+               updated_membership.created_at,
+               updated_membership.last_active_at
+        FROM updated_membership
+        JOIN accounts
+          ON accounts.id = updated_membership.account_id
+      `,
+      [input.teamId, input.accountId, input.role],
+    );
+
+    return result.rows[0] ? toTeamMemberRecord(result.rows[0]) : undefined;
+  }
+
+  async removeTeamMember(input: { teamId: string; accountId: string }): Promise<boolean> {
+    const result = await (
+      await this.getPool()
+    ).query(
+      `
+        DELETE FROM team_memberships
+        WHERE team_id = $1
+          AND account_id = $2
+      `,
+      [input.teamId, input.accountId],
+    );
+
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async listSsoProviderConfigs(
+    teamId: string,
+  ): Promise<SsoConfigurationStatus['configuredProviders']> {
+    const result = await (
+      await this.getPool()
+    ).query<SsoProviderConfigRow>(
+      `
+        SELECT provider_type,
+               display_name,
+               issuer_url,
+               status
+        FROM sso_identity_provider_configs
+        WHERE team_id = $1
+        ORDER BY provider_type,
+                 display_name
+      `,
+      [teamId],
+    );
+
+    return result.rows.map((row) => ({
+      providerType: row.provider_type,
+      displayName: row.display_name,
+      issuerUrl: row.issuer_url,
+      status: row.status,
+    }));
+  }
+
   async createBillingImport(input: {
     importInput: BillingImportInput;
     originalFileSha256: string;
@@ -2591,6 +2978,33 @@ function toTeamMembership(row: TeamMembershipRow): AccountTeamMembership {
     teamId: row.team_id,
     teamName: row.team_name,
     role: row.role,
+  };
+}
+
+function toTeamMemberRecord(row: TeamMemberRow): TeamMemberRecord {
+  return {
+    accountId: row.account_id,
+    email: row.email,
+    ...(row.display_name ? { displayName: row.display_name } : {}),
+    role: row.role,
+    createdAt: row.created_at.toISOString(),
+    ...(row.last_active_at ? { lastActiveAt: row.last_active_at.toISOString() } : {}),
+  };
+}
+
+function toTeamInvitationRecord(row: TeamInvitationRow): TeamInvitationRecord {
+  return {
+    id: row.id,
+    teamId: row.team_id,
+    email: row.email,
+    role: row.role,
+    status: row.status,
+    invitedByAccountId: row.invited_by_account_id,
+    ...(row.accepted_by_account_id ? { acceptedByAccountId: row.accepted_by_account_id } : {}),
+    expiresAt: row.expires_at.toISOString(),
+    createdAt: row.created_at.toISOString(),
+    ...(row.accepted_at ? { acceptedAt: row.accepted_at.toISOString() } : {}),
+    ...(row.revoked_at ? { revokedAt: row.revoked_at.toISOString() } : {}),
   };
 }
 

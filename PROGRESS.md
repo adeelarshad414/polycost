@@ -38,6 +38,40 @@ say so explicitly rather than marking it done.
 | Post-Phase 10 Playwright browser journey coverage      | Complete                             | 2026-07-01   |
 | AI-native Phase 1 reimagining pass                     | Complete with known gaps (see notes) | 2026-07-01   |
 | Phase 2 - Diagram-to-cost intelligence                 | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.7 - Invoice/auth/VSDX gap closure              | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.7 - Invoice/auth/VSDX gap closure
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Provider billing export bridge added: `POST /api/v1/billing/imports/provider-export`
+  accepts bounded AWS CUR, Azure Cost Management, and GCP Billing Export CSV/JSON
+  snippets, maps provider-native columns into normalized invoice line items, hashes
+  the original payload, and reuses the reconciliation foundation.
+- Account/team UX foundation upgraded: backend routes now cover team members, role
+  changes with final-owner protection, invite creation/acceptance, and SSO readiness
+  status; frontend adds a compact workspace control center wired to those routes.
+- Auth config documented: public auth base URL plus OIDC/SAML readiness variables are
+  now in config schema and `.env.example`; no provider secrets are hardcoded.
+- VSDX support improved: Visio connector records are aggregated into direct topology
+  edges when possible, and the frontend diagram preview renders layout-aware nodes
+  plus SVG relationship lines using sanitized visual metadata.
+- Verification passed: `npm run format:check`, `npm run ci:lint`, API/web
+  typechecks, `npm run test:unit`, `npm run ci:build`, `npm run db:validate`,
+  `npm run security:audit`, focused API/web tests, and a production-preview
+  Playwright smoke at `http://127.0.0.1:4174/`.
+- Security notes: avoidable new `billing.service.ts` object-indexing warnings were
+  removed; remaining ESLint security findings are warning-only pre-existing parser,
+  adapter, report, temp-file, and test patterns. `npm audit --audit-level=high`
+  passes; low-severity Graphify/Ollama development-tooling advisories remain with no
+  upstream fix available.
+- Known gaps carried forward: this is still not full invoice-grade billing coverage
+  for every provider SKU, discount, tax, credit, marketplace/private-offer, and
+  enterprise agreement edge case; VSDX is a layout/topology preview rather than full
+  Visio visual rendering; auth has useful team/session/admin primitives and UI, but
+  full enterprise account lifecycle, SSO handshakes, invitation email delivery, and
+  complete RBAC product UX remain future phases.
 
 ## Phase 2 - Diagram-to-cost intelligence
 

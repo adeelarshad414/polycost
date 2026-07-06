@@ -32,6 +32,7 @@ const expectedMigrations = [
   '024_comparison_audit_pricing_trace.sql',
   '025_account_team_foundation.sql',
   '026_auth_sessions_and_billing_actuals.sql',
+  '027_team_invites_and_sso.sql',
 ];
 
 if (!['migrate', 'seed', 'reset', 'validate'].includes(command)) {

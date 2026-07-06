@@ -335,6 +335,128 @@ describe('api client', () => {
     );
   });
 
+  it('wires team administration, SSO status, and provider export import routes', async () => {
+    const member = {
+      accountId: 'account-1',
+      email: 'architect@example.com',
+      role: 'owner',
+      createdAt: '2026-07-06T00:00:00.000Z',
+    };
+    const invitation = {
+      id: 'invite-1',
+      teamId: 'team-1',
+      email: 'finops@example.com',
+      role: 'viewer',
+      status: 'pending',
+      invitedByAccountId: 'account-1',
+      expiresAt: '2026-07-13T00:00:00.000Z',
+      createdAt: '2026-07-06T00:00:00.000Z',
+      inviteToken: 'invite-token',
+    };
+    const ssoStatus = {
+      localLoginEnabled: true,
+      oidcConfigured: false,
+      samlConfigured: false,
+      configuredProviders: [],
+      callbackUrls: {
+        oidc: 'http://localhost:3001/api/v1/auth/sso/oidc/callback',
+        saml: 'http://localhost:3001/api/v1/auth/sso/saml/acs',
+      },
+    };
+    const billingImport = {
+      importRun: {
+        id: 'import-1',
+        teamId: 'team-1',
+        provider: 'aws',
+        sourceType: 'aws-cur',
+        status: 'completed',
+        billingPeriodStart: '2026-06-01',
+        billingPeriodEnd: '2026-06-30',
+        originalFileSha256: 'a'.repeat(64),
+        rowsReceived: 1,
+        rowsAccepted: 1,
+        rowsRejected: 0,
+        totalCostUsd: 107,
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+      acceptedRows: 1,
+      rejectedRows: 0,
+      lineItems: [],
+    };
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([member]))
+      .mockResolvedValueOnce(jsonResponse(invitation))
+      .mockResolvedValueOnce(jsonResponse([invitation]))
+      .mockResolvedValueOnce(jsonResponse(invitation))
+      .mockResolvedValueOnce(jsonResponse({ ...member, role: 'admin' }))
+      .mockResolvedValueOnce(jsonResponse({ removed: true }))
+      .mockResolvedValueOnce(jsonResponse(ssoStatus))
+      .mockResolvedValueOnce(jsonResponse(billingImport));
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(client.listTeamMembers('team-1', 'session-token')).resolves.toEqual([member]);
+    await expect(
+      client.inviteTeamMember(
+        'team-1',
+        { email: 'finops@example.com', role: 'viewer' },
+        'session-token',
+      ),
+    ).resolves.toEqual(invitation);
+    await expect(client.listTeamInvitations('team-1', 'session-token')).resolves.toEqual([
+      invitation,
+    ]);
+    await expect(client.acceptTeamInvitation('invite-token', 'session-token')).resolves.toEqual(
+      invitation,
+    );
+    await expect(
+      client.updateTeamMemberRole('team-1', 'account-1', 'admin', 'session-token'),
+    ).resolves.toEqual(expect.objectContaining({ role: 'admin' }));
+    await expect(client.removeTeamMember('team-1', 'account-1', 'session-token')).resolves.toEqual({
+      removed: true,
+    });
+    await expect(client.getSsoStatus('session-token')).resolves.toEqual(ssoStatus);
+    await expect(
+      client.importProviderBillingExport(
+        {
+          provider: 'aws',
+          sourceType: 'aws-cur',
+          billingPeriodStart: '2026-06-01',
+          billingPeriodEnd: '2026-06-30',
+          content: 'lineItem/ProductCode,lineItem/NetUnblendedCost\nAmazonEC2,107',
+        },
+        'session-token',
+      ),
+    ).resolves.toEqual(billingImport);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://api.test/api/v1/auth/teams/team-1/invitations',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ email: 'finops@example.com', role: 'viewer' }),
+        headers: expect.objectContaining({ Authorization: 'Bearer session-token' }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
+      'http://api.test/api/v1/auth/teams/team-1/members/account-1',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ role: 'admin' }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      8,
+      'http://api.test/api/v1/billing/imports/provider-export',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ Authorization: 'Bearer session-token' }),
+      }),
+    );
+  });
+
   it('maps API error envelopes', async () => {
     global.fetch = jest.fn(async () =>
       jsonResponse(

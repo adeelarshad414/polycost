@@ -169,6 +169,90 @@ describe('AuthService', () => {
       },
     });
   });
+
+  it('creates hashed team invitations without leaking raw token storage', async () => {
+    const repository = repositoryMock();
+    repository.createTeamInvitation.mockImplementation(async (input) => ({
+      id: '88888888-8888-4888-8888-888888888888',
+      teamId: input.teamId,
+      email: input.email,
+      role: input.role,
+      status: 'pending',
+      invitedByAccountId: input.invitedByAccountId,
+      expiresAt: input.expiresAt,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    }));
+    const service = new AuthService(repository as never, configService());
+
+    const invitation = await service.inviteTeamMember(
+      account.defaultTeam!.teamId,
+      {
+        email: 'FinOps@Example.com',
+        role: 'viewer',
+      },
+      identity,
+    );
+
+    expect(invitation.inviteToken).toEqual(expect.any(String));
+    expect(repository.createTeamInvitation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'finops@example.com',
+        role: 'viewer',
+        tokenHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }),
+    );
+    expect(repository.createTeamInvitation.mock.calls[0][0].tokenHash).not.toBe(
+      invitation.inviteToken,
+    );
+  });
+
+  it('protects the final team owner from accidental demotion', async () => {
+    const repository = repositoryMock();
+    repository.getTeamMembership.mockResolvedValue(account.defaultTeam!);
+    repository.countTeamOwners.mockResolvedValue(1);
+    const service = new AuthService(repository as never, configService());
+
+    await expect(
+      service.updateTeamMemberRole(
+        account.defaultTeam!.teamId,
+        account.accountId,
+        {
+          role: 'admin',
+        },
+        identity,
+      ),
+    ).rejects.toThrow(ApiForbiddenError);
+    expect(repository.updateTeamMemberRole).not.toHaveBeenCalled();
+  });
+
+  it('reports SSO readiness from environment and stored team provider configs', async () => {
+    const repository = repositoryMock();
+    repository.listSsoProviderConfigs.mockResolvedValue([
+      {
+        providerType: 'oidc',
+        displayName: 'Corporate OIDC',
+        issuerUrl: 'https://idp.example.com',
+        status: 'configured',
+      },
+    ]);
+    const service = new AuthService(repository as never, configService());
+
+    await expect(service.ssoStatus(identity)).resolves.toMatchObject({
+      localLoginEnabled: true,
+      oidcConfigured: true,
+      samlConfigured: false,
+      configuredProviders: [
+        {
+          providerType: 'oidc',
+          displayName: 'Corporate OIDC',
+        },
+      ],
+      callbackUrls: {
+        oidc: 'http://localhost:3001/api/v1/auth/sso/oidc/callback',
+        saml: 'http://localhost:3001/api/v1/auth/sso/saml/acs',
+      },
+    });
+  });
 });
 
 describe('BillingService', () => {
@@ -231,6 +315,75 @@ describe('BillingService', () => {
       expect.objectContaining({
         teamId: identity.teamId,
         createdByAccountId: identity.accountId,
+      }),
+    );
+  });
+
+  it('imports AWS CUR provider exports through the native mapper', async () => {
+    const repository = repositoryMock();
+    repository.createBillingImport.mockImplementation(async (input) => ({
+      importRun: {
+        id: '55555555-5555-4555-8555-555555555555',
+        teamId: identity.teamId,
+        provider: input.importInput.provider,
+        sourceType: input.importInput.sourceType,
+        status: 'completed',
+        billingPeriodStart: input.importInput.billingPeriodStart,
+        billingPeriodEnd: input.importInput.billingPeriodEnd,
+        originalFileSha256: input.originalFileSha256,
+        rowsReceived: input.rows.length,
+        rowsAccepted: input.rows.length,
+        rowsRejected: 0,
+        totalCostUsd: 107,
+        createdByAccountId: identity.accountId,
+        createdAt: '2026-07-06T00:00:00.000Z',
+        completedAt: '2026-07-06T00:00:01.000Z',
+      },
+      lineItems: input.rows.map((row, index) => ({
+        id: `line-${index}`,
+        importRunId: '55555555-5555-4555-8555-555555555555',
+        teamId: identity.teamId,
+        provider: input.importInput.provider,
+        billingPeriodStart: input.importInput.billingPeriodStart,
+        billingPeriodEnd: input.importInput.billingPeriodEnd,
+        ...row,
+        createdAt: '2026-07-06T00:00:01.000Z',
+      })),
+    }));
+    const service = new BillingService(repository as never);
+
+    const result = await service.importProviderExport(
+      {
+        provider: 'aws',
+        sourceType: 'aws-cur',
+        billingPeriodStart: '2026-06-01',
+        billingPeriodEnd: '2026-06-30',
+        content: [
+          'lineItem/ProductCode,product/sku,lineItem/UsageStartDate,lineItem/UsageAmount,pricing/unit,lineItem/NetUnblendedCost,lineItem/CurrencyCode,product/region,lineItem/ResourceId,resourceTags/user:cost_center',
+          'AmazonEC2,sku-compute,2026-06-01T00:00:00Z,730,Hrs,107.00,USD,us-east-1,i-demo,engineering',
+        ].join('\n'),
+      },
+      identity,
+    );
+
+    expect(result.importRun.originalFileSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(repository.createBillingImport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        importInput: expect.objectContaining({
+          provider: 'aws',
+          sourceType: 'aws-cur',
+        }),
+        rows: [
+          expect.objectContaining({
+            serviceName: 'AmazonEC2',
+            skuId: 'sku-compute',
+            region: 'us-east-1',
+            costUsd: 107,
+            tags: {
+              cost_center: 'engineering',
+            },
+          }),
+        ],
       }),
     );
   });
@@ -342,6 +495,16 @@ function repositoryMock() {
     resetFailedLogin: jest.fn(),
     resolveSession: jest.fn(),
     listAccountTeams: jest.fn(),
+    getTeamMembership: jest.fn(),
+    listTeamMembers: jest.fn(),
+    createTeamInvitation: jest.fn(),
+    listTeamInvitations: jest.fn(),
+    findPendingInvitationByTokenHash: jest.fn(),
+    acceptTeamInvitation: jest.fn(),
+    countTeamOwners: jest.fn(),
+    updateTeamMemberRole: jest.fn(),
+    removeTeamMember: jest.fn(),
+    listSsoProviderConfigs: jest.fn(),
     createBillingImport: jest.fn(),
     getBillingImport: jest.fn(),
     listInvoiceLineItems: jest.fn(),
@@ -365,6 +528,12 @@ function configService(): ConfigService<AppConfig, true> {
           return 15;
         case 'AUTH_LOCAL_REGISTRATION_ENABLED':
           return true;
+        case 'AUTH_PUBLIC_BASE_URL':
+          return 'http://localhost:3001';
+        case 'AUTH_OIDC_ISSUER_URL':
+          return 'https://idp.example.com';
+        case 'AUTH_SAML_ENTITY_ID':
+          return undefined;
         default:
           return undefined;
       }
