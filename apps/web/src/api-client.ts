@@ -1,6 +1,7 @@
 import {
   ApiErrorDetail,
   AccountSessionRecord,
+  AccountProfileResponse,
   AlertRecord,
   AuthMeResponse,
   AuthSessionResponse,
@@ -31,6 +32,8 @@ import {
   ShareLinkAnalyticsResponse,
   ShareLinkResponse,
   SsoConfigurationStatus,
+  SsoConnectionTestResult,
+  TeamSettingsRecord,
   TeamInvitationRecord,
   TeamMemberRecord,
   TeamRole,
@@ -82,8 +85,26 @@ export interface PolyCostClient {
   login(input: { email: string; password: string }): Promise<AuthSessionResponse>;
   getCurrentSession(token: string): Promise<AuthMeResponse>;
   logout(token: string): Promise<{ revoked: true }>;
+  updateAccountProfile(
+    input: { email: string; displayName?: string; currentPassword?: string },
+    token: string,
+  ): Promise<AccountProfileResponse>;
+  changePassword(
+    input: { currentPassword: string; newPassword: string },
+    token: string,
+  ): Promise<{ changed: true }>;
+  deleteAccount(
+    input: { currentPassword: string; confirmation: 'DELETE' },
+    token: string,
+  ): Promise<{ deleted: true }>;
   listAccountSessions(token: string): Promise<AccountSessionRecord[]>;
   revokeOtherSessions(token: string): Promise<{ revoked: number }>;
+  createTeam(input: { teamName: string }, token: string): Promise<TeamSettingsRecord>;
+  updateTeamSettings(
+    teamId: string,
+    input: { teamName: string },
+    token: string,
+  ): Promise<TeamSettingsRecord>;
   listTeamMembers(teamId: string, token: string): Promise<TeamMemberRecord[]>;
   inviteTeamMember(
     teamId: string,
@@ -91,6 +112,11 @@ export interface PolyCostClient {
     token: string,
   ): Promise<TeamInvitationRecord>;
   listTeamInvitations(teamId: string, token: string): Promise<TeamInvitationRecord[]>;
+  revokeTeamInvitation(
+    teamId: string,
+    invitationId: string,
+    token: string,
+  ): Promise<TeamInvitationRecord>;
   acceptTeamInvitation(tokenValue: string, token: string): Promise<TeamInvitationRecord>;
   updateTeamMemberRole(
     teamId: string,
@@ -100,6 +126,28 @@ export interface PolyCostClient {
   ): Promise<TeamMemberRecord>;
   removeTeamMember(teamId: string, accountId: string, token: string): Promise<{ removed: true }>;
   getSsoStatus(token: string): Promise<SsoConfigurationStatus>;
+  configureSsoProvider(
+    teamId: string,
+    input: {
+      providerType: 'oidc' | 'saml';
+      displayName: string;
+      issuerUrl: string;
+      clientId?: string;
+      clientSecret?: string;
+    },
+    token: string,
+  ): Promise<SsoConfigurationStatus['configuredProviders'][number]>;
+  testSsoConnection(
+    teamId: string,
+    input: {
+      providerType: 'oidc' | 'saml';
+      displayName: string;
+      issuerUrl: string;
+      clientId?: string;
+      clientSecret?: string;
+    },
+    token: string,
+  ): Promise<SsoConnectionTestResult>;
   parseWorkload(input: string): Promise<ParsedNwsDraft>;
   parseDiagram(input: DiagramParseRequest): Promise<DiagramParseResult>;
   validateWorkload(nws: NormalizedWorkloadSpec): Promise<{ valid: true }>;
@@ -201,6 +249,27 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         headers: authorizationHeaders(token),
       });
     },
+    updateAccountProfile(input, token) {
+      return requestJson<AccountProfileResponse>(baseUrl, '/auth/profile', {
+        method: 'PATCH',
+        headers: authorizationHeaders(token),
+        body: JSON.stringify(input),
+      });
+    },
+    changePassword(input, token) {
+      return requestJson<{ changed: true }>(baseUrl, '/auth/password', {
+        method: 'POST',
+        headers: authorizationHeaders(token),
+        body: JSON.stringify(input),
+      });
+    },
+    deleteAccount(input, token) {
+      return requestJson<{ deleted: true }>(baseUrl, '/auth/account', {
+        method: 'DELETE',
+        headers: authorizationHeaders(token),
+        body: JSON.stringify(input),
+      });
+    },
     listAccountSessions(token) {
       return requestJson<AccountSessionRecord[]>(baseUrl, '/auth/sessions', {
         headers: authorizationHeaders(token),
@@ -210,6 +279,20 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
       return requestJson<{ revoked: number }>(baseUrl, '/auth/sessions/revoke-other', {
         method: 'POST',
         headers: authorizationHeaders(token),
+      });
+    },
+    createTeam(input, token) {
+      return requestJson<TeamSettingsRecord>(baseUrl, '/auth/teams', {
+        method: 'POST',
+        headers: authorizationHeaders(token),
+        body: JSON.stringify(input),
+      });
+    },
+    updateTeamSettings(teamId, input, token) {
+      return requestJson<TeamSettingsRecord>(baseUrl, `/auth/teams/${encodeURIComponent(teamId)}`, {
+        method: 'PATCH',
+        headers: authorizationHeaders(token),
+        body: JSON.stringify(input),
       });
     },
     listTeamMembers(teamId, token) {
@@ -237,6 +320,18 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         baseUrl,
         `/auth/teams/${encodeURIComponent(teamId)}/invitations`,
         {
+          headers: authorizationHeaders(token),
+        },
+      );
+    },
+    revokeTeamInvitation(teamId, invitationId, token) {
+      return requestJson<TeamInvitationRecord>(
+        baseUrl,
+        `/auth/teams/${encodeURIComponent(teamId)}/invitations/${encodeURIComponent(
+          invitationId,
+        )}/revoke`,
+        {
+          method: 'POST',
           headers: authorizationHeaders(token),
         },
       );
@@ -273,6 +368,28 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
       return requestJson<SsoConfigurationStatus>(baseUrl, '/auth/sso/status', {
         headers: authorizationHeaders(token),
       });
+    },
+    configureSsoProvider(teamId, input, token) {
+      return requestJson<SsoConfigurationStatus['configuredProviders'][number]>(
+        baseUrl,
+        `/auth/teams/${encodeURIComponent(teamId)}/sso/providers`,
+        {
+          method: 'POST',
+          headers: authorizationHeaders(token),
+          body: JSON.stringify(input),
+        },
+      );
+    },
+    testSsoConnection(teamId, input, token) {
+      return requestJson<SsoConnectionTestResult>(
+        baseUrl,
+        `/auth/teams/${encodeURIComponent(teamId)}/sso/test-connection`,
+        {
+          method: 'POST',
+          headers: authorizationHeaders(token),
+          body: JSON.stringify(input),
+        },
+      );
     },
     parseWorkload(input) {
       return requestJson<ParsedNwsDraft>(baseUrl, '/workload/parse', {

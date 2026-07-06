@@ -157,7 +157,7 @@ describe('App', () => {
     expect(text(container)).toContain('Workspace session');
     expect(text(container)).toContain('Actuals reconciliation');
 
-    await submitForm(container.querySelector<HTMLFormElement>('.workspace-panel'));
+    await submitForm(container.querySelector<HTMLFormElement>('.workspace-auth-form'));
     await settleAsyncEffects();
     await settleAsyncEffects();
 
@@ -240,6 +240,128 @@ describe('App', () => {
     unmount();
   });
 
+  it('executes account lifecycle, team settings, invite revoke, and SSO actions', async () => {
+    window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
+    const client = clientMock({
+      listTeamInvitations: jest.fn(async () => [
+        {
+          id: '88888888-8888-4888-8888-888888888888',
+          teamId: '22222222-2222-4222-8222-222222222222',
+          email: 'finops@example.com',
+          role: 'member' as const,
+          status: 'pending' as const,
+          invitedByAccountId: '11111111-1111-4111-8111-111111111111',
+          expiresAt: '2026-07-13T00:00:00.000Z',
+          createdAt: '2026-07-06T00:00:00.000Z',
+        },
+      ]),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await settleAsyncEffects();
+    await settleAsyncEffects();
+
+    await changeInput(inputByWorkspaceLabel(container, 'Profile email'), 'principal@example.com');
+    await changeInput(inputByWorkspaceLabel(container, 'Display name'), 'Principal Architect');
+    await changeInput(
+      inputByWorkspaceLabel(container, 'Current password (email changes)'),
+      'current-password',
+    );
+    await submitForm(formContainingText(container, 'Profile email'));
+
+    expect(client.updateAccountProfile).toHaveBeenCalledWith(
+      {
+        email: 'principal@example.com',
+        displayName: 'Principal Architect',
+        currentPassword: 'current-password',
+      },
+      'session-token',
+    );
+
+    await changeInput(inputByWorkspaceLabel(container, 'Current password'), 'current-password');
+    await changeInput(inputByWorkspaceLabel(container, 'New password'), 'new-password-1234');
+    await submitForm(formContainingText(container, 'New password'));
+
+    expect(client.changePassword).toHaveBeenCalledWith(
+      {
+        currentPassword: 'current-password',
+        newPassword: 'new-password-1234',
+      },
+      'session-token',
+    );
+
+    await click(buttonByText(container, 'Revoke'));
+    expect(client.revokeTeamInvitation).toHaveBeenCalledWith(
+      '22222222-2222-4222-8222-222222222222',
+      '88888888-8888-4888-8888-888888888888',
+      'session-token',
+    );
+
+    await changeInput(inputByWorkspaceLabel(container, 'Issuer URL'), 'https://idp.example.com');
+    await changeInput(inputByWorkspaceLabel(container, 'Client ID'), 'polycost-client');
+    await submitForm(formContainingText(container, 'SSO provider'));
+
+    expect(client.configureSsoProvider).toHaveBeenCalledWith(
+      '22222222-2222-4222-8222-222222222222',
+      expect.objectContaining({
+        providerType: 'oidc',
+        issuerUrl: 'https://idp.example.com',
+        clientId: 'polycost-client',
+      }),
+      'session-token',
+    );
+
+    await click(buttonByText(container, 'Test connection'));
+    expect(client.testSsoConnection).toHaveBeenCalledWith(
+      '22222222-2222-4222-8222-222222222222',
+      expect.objectContaining({
+        providerType: 'oidc',
+        issuerUrl: 'https://idp.example.com',
+      }),
+      'session-token',
+    );
+
+    await changeInput(inputByWorkspaceLabel(container, 'New team'), 'Platform Council');
+    await submitForm(formContainingText(container, 'New team'));
+    await settleAsyncEffects();
+
+    expect(client.createTeam).toHaveBeenCalledWith(
+      {
+        teamName: 'Platform Council',
+      },
+      'session-token',
+    );
+
+    await changeInput(inputByWorkspaceLabel(container, 'Current team name'), 'Platform Guild');
+    await submitForm(formContainingText(container, 'Current team name'));
+
+    expect(client.updateTeamSettings).toHaveBeenCalledWith(
+      '55555555-5555-4555-8555-555555555555',
+      {
+        teamName: 'Platform Guild',
+      },
+      'session-token',
+    );
+
+    await changeInput(inputByWorkspaceLabel(container, 'Delete confirmation'), 'DELETE');
+    await changeInput(
+      inputByWorkspaceLabel(container, 'Delete current password'),
+      'current-password',
+    );
+    await submitForm(formContainingText(container, 'Delete confirmation'));
+
+    expect(client.deleteAccount).toHaveBeenCalledWith(
+      {
+        confirmation: 'DELETE',
+        currentPassword: 'current-password',
+      },
+      'session-token',
+    );
+    expect(window.localStorage.getItem('polycost-auth-session-v1')).toBeNull();
+
+    unmount();
+  });
+
   it('imports provider billing exports and reconciles them after a comparison exists', async () => {
     window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
     const client = clientMock();
@@ -290,7 +412,7 @@ describe('App', () => {
 
     await changeInput(inputByWorkspaceLabel(container, 'Display name'), 'Platform Owner');
     await changeInput(inputByWorkspaceLabel(container, 'Team name'), 'Coverage Team');
-    await submitForm(container.querySelector<HTMLFormElement>('form.workspace-panel'));
+    await submitForm(container.querySelector<HTMLFormElement>('.workspace-auth-form'));
     await settleAsyncEffects();
     await settleAsyncEffects();
 
@@ -306,7 +428,7 @@ describe('App', () => {
     unmount();
   });
 
-  it('shows the team admin empty state for viewer workspace sessions', async () => {
+  it('shows the team admin empty state for member workspace sessions', async () => {
     window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
     const client = clientMock({
       getCurrentSession: jest.fn(async () => ({
@@ -318,13 +440,13 @@ describe('App', () => {
         activeTeam: {
           id: '22222222-2222-4222-8222-222222222222',
           name: 'Architecture team',
-          role: 'viewer' as const,
+          role: 'member' as const,
         },
         teams: [
           {
             teamId: '22222222-2222-4222-8222-222222222222',
             teamName: 'Architecture team',
-            role: 'viewer' as const,
+            role: 'member' as const,
           },
         ],
         session: {
@@ -338,7 +460,7 @@ describe('App', () => {
     await settleAsyncEffects();
     await settleAsyncEffects();
 
-    expect(text(container)).toContain('Architecture team · viewer');
+    expect(text(container)).toContain('Architecture team · member');
     expect(text(container)).toContain('Admin required');
     expect(text(container)).toContain(
       'Sign in as a team owner or admin to manage members, issue invite tokens, and review SSO status.',
@@ -3300,6 +3422,14 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       },
     })),
     logout: jest.fn(async () => ({ revoked: true as const })),
+    updateAccountProfile: jest.fn(async (input) => ({
+      id: '11111111-1111-4111-8111-111111111111',
+      email: input.email,
+      ...(input.displayName ? { displayName: input.displayName } : {}),
+      status: 'active' as const,
+    })),
+    changePassword: jest.fn(async () => ({ changed: true as const })),
+    deleteAccount: jest.fn(async () => ({ deleted: true as const })),
     listAccountSessions: jest.fn(async () => [
       {
         id: '33333333-3333-4333-8333-333333333333',
@@ -3321,6 +3451,20 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       },
     ]),
     revokeOtherSessions: jest.fn(async () => ({ revoked: 1 })),
+    createTeam: jest.fn(async (input) => ({
+      teamId: '55555555-5555-4555-8555-555555555555',
+      teamName: input.teamName,
+      plan: 'oss' as const,
+      role: 'owner' as const,
+      updatedAt: '2026-07-06T00:00:00.000Z',
+    })),
+    updateTeamSettings: jest.fn(async (_teamId, input) => ({
+      teamId: '22222222-2222-4222-8222-222222222222',
+      teamName: input.teamName,
+      plan: 'oss' as const,
+      role: 'owner' as const,
+      updatedAt: '2026-07-06T00:00:00.000Z',
+    })),
     listTeamMembers: jest.fn(async () => [
       {
         accountId: '11111111-1111-4111-8111-111111111111',
@@ -3342,11 +3486,22 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       inviteToken: 'invite-token',
     })),
     listTeamInvitations: jest.fn(async () => []),
+    revokeTeamInvitation: jest.fn(async () => ({
+      id: '88888888-8888-4888-8888-888888888888',
+      teamId: '22222222-2222-4222-8222-222222222222',
+      email: 'finops@example.com',
+      role: 'member' as const,
+      status: 'revoked' as const,
+      invitedByAccountId: '11111111-1111-4111-8111-111111111111',
+      expiresAt: '2026-07-13T00:00:00.000Z',
+      createdAt: '2026-07-06T00:00:00.000Z',
+      revokedAt: '2026-07-06T00:00:01.000Z',
+    })),
     acceptTeamInvitation: jest.fn(async () => ({
       id: '88888888-8888-4888-8888-888888888888',
       teamId: '22222222-2222-4222-8222-222222222222',
       email: 'architect@example.com',
-      role: 'viewer' as const,
+      role: 'member' as const,
       status: 'accepted' as const,
       invitedByAccountId: '11111111-1111-4111-8111-111111111111',
       acceptedByAccountId: '11111111-1111-4111-8111-111111111111',
@@ -3371,6 +3526,19 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
         oidc: 'http://localhost:3001/api/v1/auth/sso/oidc/callback',
         saml: 'http://localhost:3001/api/v1/auth/sso/saml/acs',
       },
+    })),
+    configureSsoProvider: jest.fn(async (teamId, input) => ({
+      providerType: input.providerType,
+      displayName: input.displayName,
+      issuerUrl: input.issuerUrl,
+      status: 'configured' as const,
+    })),
+    testSsoConnection: jest.fn(async (_teamId, input) => ({
+      ok: true,
+      providerType: input.providerType,
+      issuerUrl: input.issuerUrl,
+      checkedAt: '2026-07-06T00:00:00.000Z',
+      message: 'Mock SSO connection accepted.',
     })),
     parseWorkload: jest.fn(async () => parsed),
     parseDiagram: jest.fn(async () => ({

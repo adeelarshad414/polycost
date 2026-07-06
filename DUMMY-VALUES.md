@@ -15,6 +15,9 @@ The explicit placeholder token is `CHANGE_ME_DEV_ONLY`. Production and staging c
 - Missing GCP Cloud Billing token
 - Missing diagram/NL LLM API key
 - Mock mailer/invite preview flows
+- Mock SSO provider connection tests and local-only invite tokens
+- Example SSO client identifiers or `CHANGE_ME_DEV_ONLY` values used only in
+  development documentation
 - Local-only Docker Vault seed credentials
 
 ## Not Allowed In Staging Or Production
@@ -38,3 +41,8 @@ docker compose exec vault vault kv put secret/polycost/llm api_key="<llm-api-key
 3. Set `USE_MOCK_PROVIDERS=false`.
 4. Run `npm run provider:credentials:check:strict`.
 5. Run a comparison and confirm each catalog-backed line item has source endpoint, source record ID, payload hash, transform version, and fetched timestamp.
+
+For SSO readiness, configure provider metadata through the workspace UI only after
+setting `AUTH_PUBLIC_BASE_URL` to the externally reachable API origin. The development
+"test connection" path validates OIDC/SAML issuer shape through the same API surface
+without performing a real enterprise login handshake.

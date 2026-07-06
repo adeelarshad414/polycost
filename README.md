@@ -133,6 +133,28 @@ The main API is versioned under `/api/v1`.
 - `GET /exchange-rates` returns cached exchange-rate data.
 - `GET /regions` returns the cloud region catalog used by the UI.
 
+## Anonymous And Workspace Features
+
+PolyCost keeps the core comparison workflow frictionless. Anonymous users can still
+parse requirements, upload diagrams, run comparisons, inspect pricing evidence, export
+reports, and create share links.
+
+Accounts add workspace controls on top of that core flow:
+
+- Profile email/display-name update, password change, logout, account session list,
+  and server-side "sign out other devices".
+- Team creation, team settings, member list, member removal, pending invitations,
+  invite-token acceptance, and invite revocation.
+- Three-role RBAC: Owner, Admin, and Member. Owners manage role changes; owners and
+  admins manage members, invitations, SSO provider configuration, and billing import
+  workflows; members keep comparison and report access.
+- OIDC/SAML configuration readiness with redirect URI display, stored provider
+  metadata, and mock connection testing for development.
+
+The current self-hosted product does not yet include enterprise IdP login round-trips,
+email delivery infrastructure, org billing plans, or a hosted account marketplace. Those
+remain release-track items rather than blockers for anonymous cost comparison.
+
 ## Diagram Imports
 
 Supported Phase 2 inputs:
@@ -209,6 +231,9 @@ Start from `.env.example`. Important local settings include:
 - `PRICING_ETL_RUN_ON_BOOT`
 - `FEATURE_LIVE_PRICING_REFRESH_ENABLED`
 - `FEATURE_RESERVED_PRICING`
+- `AUTH_SESSION_TTL_HOURS`
+- `AUTH_LOCAL_REGISTRATION_ENABLED`
+- `AUTH_PUBLIC_BASE_URL`
 - `RATE_LIMIT_NL_PARSE_PER_MINUTE`
 - `RATE_LIMIT_LIVE_REFRESH_PER_MINUTE`
 

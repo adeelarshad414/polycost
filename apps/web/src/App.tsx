@@ -1826,6 +1826,14 @@ function WorkspaceControlCenter({
   const [password, setPassword] = useState('correct horse battery staple');
   const [displayName, setDisplayName] = useState('Architecture Lead');
   const [teamName, setTeamName] = useState('PolyCost demo team');
+  const [profileEmail, setProfileEmail] = useState('architect@example.com');
+  const [profileDisplayName, setProfileDisplayName] = useState('Architecture Lead');
+  const [profileCurrentPassword, setProfileCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [deleteCurrentPassword, setDeleteCurrentPassword] = useState('');
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [newTeamName, setNewTeamName] = useState('Platform cost office');
+  const [teamSettingsName, setTeamSettingsName] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
   const [workspaceBusy, setWorkspaceBusy] = useState<string | null>(null);
   const [members, setMembers] = useState<TeamMemberRecord[]>([]);
@@ -1833,9 +1841,14 @@ function WorkspaceControlCenter({
   const [accountSessions, setAccountSessions] = useState<AccountSessionRecord[]>([]);
   const [ssoStatus, setSsoStatus] = useState<SsoConfigurationStatus | null>(null);
   const [inviteEmail, setInviteEmail] = useState('finops@example.com');
-  const [inviteRole, setInviteRole] = useState<Exclude<TeamRole, 'owner'>>('viewer');
+  const [inviteRole, setInviteRole] = useState<Exclude<TeamRole, 'owner'>>('member');
   const [lastInviteToken, setLastInviteToken] = useState<string | null>(null);
   const [acceptToken, setAcceptToken] = useState('');
+  const [ssoProviderType, setSsoProviderType] = useState<'oidc' | 'saml'>('oidc');
+  const [ssoDisplayName, setSsoDisplayName] = useState('Corporate OIDC');
+  const [ssoIssuerUrl, setSsoIssuerUrl] = useState('https://idp.example.com');
+  const [ssoClientId, setSsoClientId] = useState('polycost-demo-client');
+  const [ssoClientSecret, setSsoClientSecret] = useState('CHANGE_ME_DEV_ONLY');
   const [provider, setProvider] = useState<ProviderId>('aws');
   const [billingPeriodStart, setBillingPeriodStart] = useState('2026-06-01');
   const [billingPeriodEnd, setBillingPeriodEnd] = useState('2026-06-30');
@@ -1844,6 +1857,7 @@ function WorkspaceControlCenter({
   const [reconciliation, setReconciliation] = useState<InvoiceReconciliationRecord | null>(null);
   const activeTeam = session?.activeTeam;
   const canManageTeam = activeTeam?.role === 'owner' || activeTeam?.role === 'admin';
+  const canManageRoles = activeTeam?.role === 'owner';
   const sourceType = sourceTypeForProvider(provider);
 
   useEffect(() => {
@@ -1866,6 +1880,9 @@ function WorkspaceControlCenter({
         }
 
         setSession(currentSession);
+        setProfileEmail(currentSession.account.email);
+        setProfileDisplayName(currentSession.account.displayName ?? '');
+        setTeamSettingsName(currentSession.activeTeam?.name ?? '');
         onError(null);
       })
       .catch((sessionError) => {
@@ -1910,6 +1927,10 @@ function WorkspaceControlCenter({
       isMounted = false;
     };
   }, [client, onError, session, token, workspaceBusy]);
+
+  useEffect(() => {
+    setTeamSettingsName(activeTeam?.name ?? '');
+  }, [activeTeam?.name]);
 
   useEffect(() => {
     if (!token || !activeTeam || !canManageTeam) {
@@ -2013,6 +2034,187 @@ function WorkspaceControlCenter({
     }
   }
 
+  async function handleProfileUpdate(event: FormEvent) {
+    event.preventDefault();
+    if (!token) {
+      return;
+    }
+
+    setWorkspaceBusy('profile');
+    onError(null);
+
+    try {
+      const updated = await client.updateAccountProfile(
+        {
+          email: profileEmail,
+          displayName: profileDisplayName,
+          ...(profileEmail !== session?.account.email
+            ? { currentPassword: profileCurrentPassword }
+            : {}),
+        },
+        token,
+      );
+      setProfileCurrentPassword('');
+      setSession((current) =>
+        current
+          ? {
+              ...current,
+              account: {
+                ...current.account,
+                email: updated.email,
+                displayName: updated.displayName,
+              },
+            }
+          : current,
+      );
+      onNotice('Account profile updated.');
+    } catch (profileError) {
+      onError(formatApiError(profileError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handlePasswordChange(event: FormEvent) {
+    event.preventDefault();
+    if (!token) {
+      return;
+    }
+
+    setWorkspaceBusy('password');
+    onError(null);
+
+    try {
+      await client.changePassword(
+        {
+          currentPassword: profileCurrentPassword,
+          newPassword,
+        },
+        token,
+      );
+      setProfileCurrentPassword('');
+      setNewPassword('');
+      onNotice('Password changed. Existing sessions remain visible for review.');
+    } catch (passwordError) {
+      onError(formatApiError(passwordError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handleAccountDeletion(event: FormEvent) {
+    event.preventDefault();
+    if (!token || deleteConfirmation !== 'DELETE') {
+      return;
+    }
+
+    setWorkspaceBusy('delete-account');
+    onError(null);
+
+    try {
+      await client.deleteAccount(
+        {
+          currentPassword: deleteCurrentPassword,
+          confirmation: 'DELETE',
+        },
+        token,
+      );
+      clearStoredAuthToken();
+      setToken('');
+      setSession(null);
+      setDeleteCurrentPassword('');
+      setDeleteConfirmation('');
+      onNotice('Account disabled and active sessions revoked.');
+    } catch (deleteError) {
+      onError(formatApiError(deleteError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handleCreateTeam(event: FormEvent) {
+    event.preventDefault();
+    if (!token) {
+      return;
+    }
+
+    setWorkspaceBusy('create-team');
+    onError(null);
+
+    try {
+      const created = await client.createTeam({ teamName: newTeamName }, token);
+      setSession((current) =>
+        current
+          ? {
+              ...current,
+              activeTeam: {
+                id: created.teamId,
+                name: created.teamName,
+                role: created.role,
+              },
+              teams: [
+                ...current.teams,
+                {
+                  teamId: created.teamId,
+                  teamName: created.teamName,
+                  role: created.role,
+                },
+              ],
+            }
+          : current,
+      );
+      onNotice('Team created. Sign in again to make it your default active team.');
+    } catch (teamError) {
+      onError(formatApiError(teamError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handleTeamSettingsUpdate(event: FormEvent) {
+    event.preventDefault();
+    if (!token || !activeTeam) {
+      return;
+    }
+
+    setWorkspaceBusy('team-settings');
+    onError(null);
+
+    try {
+      const updated = await client.updateTeamSettings(
+        activeTeam.id,
+        { teamName: teamSettingsName },
+        token,
+      );
+      setSession((current) =>
+        current
+          ? {
+              ...current,
+              activeTeam: {
+                id: updated.teamId,
+                name: updated.teamName,
+                role: updated.role,
+              },
+              teams: current.teams.map((team) =>
+                team.teamId === updated.teamId
+                  ? {
+                      ...team,
+                      teamName: updated.teamName,
+                      role: updated.role,
+                    }
+                  : team,
+              ),
+            }
+          : current,
+      );
+      onNotice('Team settings updated.');
+    } catch (settingsError) {
+      onError(formatApiError(settingsError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
   async function handleInvite(event: FormEvent) {
     event.preventDefault();
     if (!token || !activeTeam) {
@@ -2062,6 +2264,24 @@ function WorkspaceControlCenter({
     }
   }
 
+  async function handleRevokeInvitation(invitationId: string) {
+    if (!token || !activeTeam) {
+      return;
+    }
+
+    setWorkspaceBusy(`revoke-invite-${invitationId}`);
+    onError(null);
+
+    try {
+      await client.revokeTeamInvitation(activeTeam.id, invitationId, token);
+      onNotice('Invitation revoked.');
+    } catch (inviteError) {
+      onError(formatApiError(inviteError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
   async function handleRoleChange(accountId: string, role: TeamRole) {
     if (!token || !activeTeam) {
       return;
@@ -2093,6 +2313,63 @@ function WorkspaceControlCenter({
       onNotice('Team member removed.');
     } catch (removeError) {
       onError(formatApiError(removeError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handleConfigureSso(event: FormEvent) {
+    event.preventDefault();
+    if (!token || !activeTeam) {
+      return;
+    }
+
+    setWorkspaceBusy('sso-configure');
+    onError(null);
+
+    try {
+      await client.configureSsoProvider(
+        activeTeam.id,
+        {
+          providerType: ssoProviderType,
+          displayName: ssoDisplayName,
+          issuerUrl: ssoIssuerUrl,
+          clientId: ssoClientId,
+          clientSecret: ssoClientSecret,
+        },
+        token,
+      );
+      onNotice('SSO provider configuration saved.');
+    } catch (ssoError) {
+      onError(formatApiError(ssoError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handleTestSsoConnection() {
+    if (!token || !activeTeam) {
+      return;
+    }
+
+    setWorkspaceBusy('sso-test');
+    onError(null);
+
+    try {
+      const result = await client.testSsoConnection(
+        activeTeam.id,
+        {
+          providerType: ssoProviderType,
+          displayName: ssoDisplayName,
+          issuerUrl: ssoIssuerUrl,
+          clientId: ssoClientId,
+          clientSecret: ssoClientSecret,
+        },
+        token,
+      );
+      onNotice(result.message);
+    } catch (ssoError) {
+      onError(formatApiError(ssoError));
     } finally {
       setWorkspaceBusy(null);
     }
@@ -2155,7 +2432,7 @@ function WorkspaceControlCenter({
       </div>
 
       <div className="workspace-control-grid">
-        <form className="workspace-panel" onSubmit={handleAuthSubmit}>
+        <section className="workspace-panel">
           <div className="workspace-panel-heading">
             <span>Workspace session</span>
             <strong>
@@ -2168,6 +2445,64 @@ function WorkspaceControlCenter({
               <strong>
                 {activeTeam ? `${activeTeam.name} · ${activeTeam.role}` : 'No active team'}
               </strong>
+              <form className="workspace-inline-form" onSubmit={handleProfileUpdate}>
+                <label className="workspace-field">
+                  <span>Profile email</span>
+                  <input
+                    value={profileEmail}
+                    onChange={(event) => setProfileEmail(event.currentTarget.value)}
+                  />
+                </label>
+                <label className="workspace-field">
+                  <span>Display name</span>
+                  <input
+                    value={profileDisplayName}
+                    onChange={(event) => setProfileDisplayName(event.currentTarget.value)}
+                  />
+                </label>
+                <label className="workspace-field">
+                  <span>Current password (email changes)</span>
+                  <input
+                    type="password"
+                    value={profileCurrentPassword}
+                    onChange={(event) => setProfileCurrentPassword(event.currentTarget.value)}
+                  />
+                </label>
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  loading={workspaceBusy === 'profile'}
+                  loadingLabel="Saving..."
+                >
+                  Save profile
+                </Button>
+              </form>
+              <form className="workspace-inline-form" onSubmit={handlePasswordChange}>
+                <label className="workspace-field">
+                  <span>Current password</span>
+                  <input
+                    type="password"
+                    value={profileCurrentPassword}
+                    onChange={(event) => setProfileCurrentPassword(event.currentTarget.value)}
+                  />
+                </label>
+                <label className="workspace-field">
+                  <span>New password</span>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.currentTarget.value)}
+                  />
+                </label>
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  loading={workspaceBusy === 'password'}
+                  loadingLabel="Changing..."
+                >
+                  Change password
+                </Button>
+              </form>
               <div className="workspace-session-list" aria-label="Active account sessions">
                 {accountSessions.slice(0, 3).map((accountSession) => (
                   <span key={accountSession.id}>
@@ -2195,9 +2530,36 @@ function WorkspaceControlCenter({
                 <SignInIcon />
                 Sign out
               </Button>
+              <form className="workspace-inline-form" onSubmit={handleAccountDeletion}>
+                <label className="workspace-field">
+                  <span>Delete confirmation</span>
+                  <input
+                    value={deleteConfirmation}
+                    placeholder="DELETE"
+                    onChange={(event) => setDeleteConfirmation(event.currentTarget.value)}
+                  />
+                </label>
+                <label className="workspace-field">
+                  <span>Delete current password</span>
+                  <input
+                    type="password"
+                    value={deleteCurrentPassword}
+                    onChange={(event) => setDeleteCurrentPassword(event.currentTarget.value)}
+                  />
+                </label>
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  loading={workspaceBusy === 'delete-account'}
+                  loadingLabel="Disabling..."
+                  disabled={deleteConfirmation !== 'DELETE'}
+                >
+                  Disable account
+                </Button>
+              </form>
             </div>
           ) : (
-            <>
+            <form className="workspace-auth-form" onSubmit={handleAuthSubmit}>
               <div
                 className="workspace-auth-toggle"
                 role="tablist"
@@ -2257,9 +2619,9 @@ function WorkspaceControlCenter({
                 <SignInIcon />
                 {authMode === 'register' ? 'Create workspace' : 'Sign in'}
               </Button>
-            </>
+            </form>
           )}
-        </form>
+        </section>
 
         <section className="workspace-panel">
           <div className="workspace-panel-heading">
@@ -2268,6 +2630,45 @@ function WorkspaceControlCenter({
           </div>
           {canManageTeam && activeTeam && token ? (
             <>
+              <form className="workspace-inline-form" onSubmit={handleCreateTeam}>
+                <label className="workspace-field">
+                  <span>New team</span>
+                  <input
+                    value={newTeamName}
+                    onChange={(event) => setNewTeamName(event.currentTarget.value)}
+                  />
+                </label>
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  loading={workspaceBusy === 'create-team'}
+                  loadingLabel="Creating..."
+                >
+                  Create team
+                </Button>
+              </form>
+              <form className="workspace-inline-form" onSubmit={handleTeamSettingsUpdate}>
+                <label className="workspace-field">
+                  <span>Current team name</span>
+                  <input
+                    value={teamSettingsName}
+                    onChange={(event) => setTeamSettingsName(event.currentTarget.value)}
+                  />
+                </label>
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  loading={workspaceBusy === 'team-settings'}
+                  loadingLabel="Saving..."
+                >
+                  Save team
+                </Button>
+              </form>
+              <div className="workspace-role-guide" aria-label="Role permissions">
+                <span>Owner: billing, SSO, roles, deletion</span>
+                <span>Admin: members, invites, SSO setup</span>
+                <span>Member: comparisons and shared evidence</span>
+              </div>
               <form className="workspace-inline-form" onSubmit={handleInvite}>
                 <label className="workspace-field">
                   <span>Invite email</span>
@@ -2284,7 +2685,6 @@ function WorkspaceControlCenter({
                       setInviteRole(event.currentTarget.value as Exclude<TeamRole, 'owner'>)
                     }
                   >
-                    <option value="viewer">Viewer</option>
                     <option value="member">Member</option>
                     <option value="admin">Admin</option>
                   </select>
@@ -2311,7 +2711,12 @@ function WorkspaceControlCenter({
                     </span>
                     <select
                       value={member.role}
-                      disabled={workspaceBusy === `role-${member.accountId}`}
+                      disabled={!canManageRoles || workspaceBusy === `role-${member.accountId}`}
+                      title={
+                        canManageRoles
+                          ? 'Owners can change team roles.'
+                          : 'Sign in as an owner to change team roles.'
+                      }
                       onChange={(event) =>
                         void handleRoleChange(
                           member.accountId,
@@ -2322,7 +2727,6 @@ function WorkspaceControlCenter({
                       <option value="owner">Owner</option>
                       <option value="admin">Admin</option>
                       <option value="member">Member</option>
-                      <option value="viewer">Viewer</option>
                     </select>
                     <button
                       type="button"
@@ -2334,6 +2738,29 @@ function WorkspaceControlCenter({
                     </button>
                   </div>
                 ))}
+              </div>
+              <div className="workspace-member-list" aria-label="Pending invitations">
+                {invitations
+                  .filter((invitation) => invitation.status === 'pending')
+                  .slice(0, 4)
+                  .map((invitation) => (
+                    <div className="workspace-member-row" key={invitation.id}>
+                      <span>
+                        <strong>{invitation.email}</strong>
+                        <small>
+                          {invitation.role} invite · expires {formatDateTime(invitation.expiresAt)}
+                        </small>
+                      </span>
+                      <button
+                        type="button"
+                        className="workspace-link-button"
+                        disabled={workspaceBusy === `revoke-invite-${invitation.id}`}
+                        onClick={() => void handleRevokeInvitation(invitation.id)}
+                      >
+                        Revoke
+                      </button>
+                    </div>
+                  ))}
               </div>
               <form className="workspace-inline-form" onSubmit={handleAcceptInvitation}>
                 <label className="workspace-field workspace-field-wide">
@@ -2363,6 +2790,66 @@ function WorkspaceControlCenter({
                   invitations
                 </small>
               </div>
+              <form className="workspace-inline-form" onSubmit={handleConfigureSso}>
+                <label className="workspace-field">
+                  <span>SSO provider</span>
+                  <select
+                    value={ssoProviderType}
+                    onChange={(event) =>
+                      setSsoProviderType(event.currentTarget.value as 'oidc' | 'saml')
+                    }
+                  >
+                    <option value="oidc">OIDC</option>
+                    <option value="saml">SAML</option>
+                  </select>
+                </label>
+                <label className="workspace-field">
+                  <span>Display name</span>
+                  <input
+                    value={ssoDisplayName}
+                    onChange={(event) => setSsoDisplayName(event.currentTarget.value)}
+                  />
+                </label>
+                <label className="workspace-field workspace-field-wide">
+                  <span>Issuer URL</span>
+                  <input
+                    value={ssoIssuerUrl}
+                    onChange={(event) => setSsoIssuerUrl(event.currentTarget.value)}
+                  />
+                </label>
+                <label className="workspace-field">
+                  <span>Client ID</span>
+                  <input
+                    value={ssoClientId}
+                    onChange={(event) => setSsoClientId(event.currentTarget.value)}
+                  />
+                </label>
+                <label className="workspace-field">
+                  <span>Client secret</span>
+                  <input
+                    type="password"
+                    value={ssoClientSecret}
+                    onChange={(event) => setSsoClientSecret(event.currentTarget.value)}
+                  />
+                </label>
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  loading={workspaceBusy === 'sso-configure'}
+                  loadingLabel="Saving..."
+                >
+                  Save SSO
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  loading={workspaceBusy === 'sso-test'}
+                  loadingLabel="Testing..."
+                  onClick={() => void handleTestSsoConnection()}
+                >
+                  Test connection
+                </Button>
+              </form>
             </>
           ) : (
             <p className="workspace-empty-state">

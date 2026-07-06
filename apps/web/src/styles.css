@@ -1840,6 +1840,23 @@ summary:focus-visible,
   grid-template-columns: minmax(130px, 0.8fr) repeat(2, minmax(150px, 1fr));
 }
 
+.workspace-role-guide {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.workspace-role-guide span {
+  border: 1px solid color-mix(in srgb, var(--pc-border) 72%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--brand-blue) 6%, var(--pc-bg-surface));
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 700;
+  line-height: 1.35;
+  padding: 8px;
+}
+
 .workspace-field-wide,
 .workspace-export-field {
   grid-column: 1 / -1;
@@ -7920,7 +7937,8 @@ select:disabled {
 
   .workspace-control-grid,
   .workspace-inline-form,
-  .workspace-billing-controls {
+  .workspace-billing-controls,
+  .workspace-role-guide {
     grid-template-columns: 1fr;
   }
 

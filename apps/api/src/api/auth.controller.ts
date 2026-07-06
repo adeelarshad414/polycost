@@ -29,6 +29,24 @@ export class AuthController {
     return this.authService.logout(request.auth!);
   }
 
+  @Patch('profile')
+  @UseGuards(SessionAuthGuard)
+  updateProfile(@Body() body: unknown, @Req() request: RequestWithAuth) {
+    return this.authService.updateProfile(body, request.auth!);
+  }
+
+  @Post('password')
+  @UseGuards(SessionAuthGuard)
+  changePassword(@Body() body: unknown, @Req() request: RequestWithAuth) {
+    return this.authService.changePassword(body, request.auth!);
+  }
+
+  @Delete('account')
+  @UseGuards(SessionAuthGuard)
+  deleteAccount(@Body() body: unknown, @Req() request: RequestWithAuth) {
+    return this.authService.deleteAccount(body, request.auth!);
+  }
+
   @Get('sessions')
   @UseGuards(SessionAuthGuard)
   listSessions(@Req() request: RequestWithAuth) {
@@ -39,6 +57,22 @@ export class AuthController {
   @UseGuards(SessionAuthGuard)
   revokeOtherSessions(@Req() request: RequestWithAuth) {
     return this.authService.revokeOtherSessions(request.auth!);
+  }
+
+  @Post('teams')
+  @UseGuards(SessionAuthGuard)
+  createTeam(@Body() body: unknown, @Req() request: RequestWithAuth) {
+    return this.authService.createTeam(body, request.auth!);
+  }
+
+  @Patch('teams/:teamId')
+  @UseGuards(SessionAuthGuard)
+  updateTeamSettings(
+    @Param('teamId') teamId: string,
+    @Body() body: unknown,
+    @Req() request: RequestWithAuth,
+  ) {
+    return this.authService.updateTeamSettings(teamId, body, request.auth!);
   }
 
   @Get('teams/:teamId/members')
@@ -84,6 +118,16 @@ export class AuthController {
     return this.authService.listTeamInvitations(teamId, request.auth!);
   }
 
+  @Post('teams/:teamId/invitations/:invitationId/revoke')
+  @UseGuards(SessionAuthGuard)
+  revokeTeamInvitation(
+    @Param('teamId') teamId: string,
+    @Param('invitationId') invitationId: string,
+    @Req() request: RequestWithAuth,
+  ) {
+    return this.authService.revokeTeamInvitation(teamId, invitationId, request.auth!);
+  }
+
   @Post('invitations/accept')
   @UseGuards(SessionAuthGuard)
   acceptInvitation(@Body() body: unknown, @Req() request: RequestWithAuth) {
@@ -94,6 +138,26 @@ export class AuthController {
   @UseGuards(SessionAuthGuard)
   ssoStatus(@Req() request: RequestWithAuth) {
     return this.authService.ssoStatus(request.auth!);
+  }
+
+  @Post('teams/:teamId/sso/providers')
+  @UseGuards(SessionAuthGuard)
+  configureSsoProvider(
+    @Param('teamId') teamId: string,
+    @Body() body: unknown,
+    @Req() request: RequestWithAuth,
+  ) {
+    return this.authService.configureSsoProvider(teamId, body, request.auth!);
+  }
+
+  @Post('teams/:teamId/sso/test-connection')
+  @UseGuards(SessionAuthGuard)
+  testSsoConnection(
+    @Param('teamId') teamId: string,
+    @Body() body: unknown,
+    @Req() request: RequestWithAuth,
+  ) {
+    return this.authService.testSsoConnection(teamId, body, request.auth!);
   }
 }
 

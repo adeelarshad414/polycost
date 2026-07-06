@@ -258,7 +258,7 @@ export interface ParsedNwsDraft {
 export type DiagramInputFormat = 'mermaid' | 'drawio' | 'lucid_csv' | 'vsdx';
 export type DiagramClassificationConfidence = 'high' | 'moderate' | 'low';
 
-export type TeamRole = 'owner' | 'admin' | 'member' | 'viewer';
+export type TeamRole = 'owner' | 'admin' | 'member';
 
 export interface AuthSessionResponse {
   token: string;
@@ -332,6 +332,21 @@ export interface AccountSessionRecord {
   hasIp: boolean;
 }
 
+export interface AccountProfileResponse {
+  id: string;
+  email: string;
+  displayName?: string;
+  status: 'active' | 'disabled' | 'invited';
+}
+
+export interface TeamSettingsRecord {
+  teamId: string;
+  teamName: string;
+  plan: 'oss' | 'team' | 'enterprise';
+  role: TeamRole;
+  updatedAt: string;
+}
+
 export interface SsoConfigurationStatus {
   localLoginEnabled: boolean;
   oidcConfigured: boolean;
@@ -346,6 +361,14 @@ export interface SsoConfigurationStatus {
     oidc: string;
     saml: string;
   };
+}
+
+export interface SsoConnectionTestResult {
+  ok: boolean;
+  providerType: 'oidc' | 'saml';
+  issuerUrl: string;
+  checkedAt: string;
+  message: string;
 }
 
 export type BillingSourceType =

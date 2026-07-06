@@ -5,12 +5,15 @@ import { AppConfig } from '../config/config.schema';
 import { ApiForbiddenError, ApiUnauthorizedError, ApiValidationError } from './api-errors';
 import { ApiDatabaseRepository, LocalAccountWithPassword } from './api-database.repository';
 import {
+  AccountProfileResponse,
   AccountSessionRecord,
   AuthIdentity,
   AuthMeResponse,
   AuthSessionResponse,
   RequestWithAuth,
+  SsoConnectionTestResult,
   SsoConfigurationStatus,
+  TeamSettingsRecord,
   TeamInvitationRecord,
   TeamMemberRecord,
   TeamRole,
@@ -25,8 +28,8 @@ interface AuthRequestMetadata {
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TEAM_ADMIN_ROLES = new Set<TeamRole>(['owner', 'admin']);
 const TEAM_OWNER_ROLE: TeamRole = 'owner';
-const INVITABLE_ROLES: Array<Exclude<TeamRole, 'owner'>> = ['admin', 'member', 'viewer'];
-const TEAM_ROLES: TeamRole[] = ['owner', 'admin', 'member', 'viewer'];
+const INVITABLE_ROLES: Array<Exclude<TeamRole, 'owner'>> = ['admin', 'member'];
+const TEAM_ROLES: TeamRole[] = ['owner', 'admin', 'member'];
 const INVITATION_TTL_DAYS = 7;
 
 @Injectable()
@@ -176,6 +179,95 @@ export class AuthService {
     return { revoked };
   }
 
+  async updateProfile(body: unknown, identity: AuthIdentity): Promise<AccountProfileResponse> {
+    const input = parseProfileBody(body, identity);
+
+    if (input.email !== identity.email) {
+      await this.verifyCurrentPassword(identity, input.currentPassword);
+    }
+
+    const updated = await this.repository.updateAccountProfile({
+      accountId: identity.accountId,
+      email: input.email,
+      ...(input.displayName ? { displayName: input.displayName } : {}),
+      externalSubjectHash: sha256(`local:${input.email}`),
+    });
+
+    if (!updated) {
+      throw new ApiUnauthorizedError('Session account is no longer active');
+    }
+
+    return updated;
+  }
+
+  async changePassword(body: unknown, identity: AuthIdentity): Promise<{ changed: true }> {
+    const input = parsePasswordChangeBody(
+      body,
+      this.configService.get('AUTH_PASSWORD_MIN_LENGTH', { infer: true }),
+    );
+
+    await this.verifyCurrentPassword(identity, input.currentPassword);
+
+    const changed = await this.repository.updateAccountPassword({
+      accountId: identity.accountId,
+      passwordHash: hashPassword(input.newPassword),
+      changedAt: new Date().toISOString(),
+    });
+
+    if (!changed) {
+      throw new ApiUnauthorizedError('Local password credential was not found');
+    }
+
+    return { changed: true };
+  }
+
+  async deleteAccount(body: unknown, identity: AuthIdentity): Promise<{ deleted: true }> {
+    const input = parseAccountDeletionBody(body);
+
+    await this.verifyCurrentPassword(identity, input.currentPassword);
+
+    const deactivated = await this.repository.deactivateAccount({
+      accountId: identity.accountId,
+      deactivatedAt: new Date().toISOString(),
+    });
+
+    if (!deactivated) {
+      throw new ApiUnauthorizedError('Session account is no longer active');
+    }
+
+    return { deleted: true };
+  }
+
+  async createTeam(body: unknown, identity: AuthIdentity): Promise<TeamSettingsRecord> {
+    const input = parseTeamSettingsBody(body);
+
+    return this.repository.createTeamForAccount({
+      accountId: identity.accountId,
+      teamName: input.teamName,
+      teamSlug: teamSlug(input.teamName, `${identity.email}:${Date.now()}`),
+    });
+  }
+
+  async updateTeamSettings(
+    teamId: string,
+    body: unknown,
+    identity: AuthIdentity,
+  ): Promise<TeamSettingsRecord> {
+    await this.requireTeamAdmin(identity, teamId);
+    const input = parseTeamSettingsBody(body);
+    const updated = await this.repository.updateTeamSettings({
+      teamId,
+      teamName: input.teamName,
+      actorAccountId: identity.accountId,
+    });
+
+    if (!updated) {
+      throw new ApiForbiddenError('Team membership is required to update team settings');
+    }
+
+    return updated;
+  }
+
   async listTeamMembers(teamId: string, identity: AuthIdentity): Promise<TeamMemberRecord[]> {
     await this.requireTeamAdmin(identity, teamId);
 
@@ -214,6 +306,30 @@ export class AuthService {
     return this.repository.listTeamInvitations(teamId);
   }
 
+  async revokeTeamInvitation(
+    teamId: string,
+    invitationId: string,
+    identity: AuthIdentity,
+  ): Promise<TeamInvitationRecord> {
+    await this.requireTeamAdmin(identity, teamId);
+    const revoked = await this.repository.revokeTeamInvitation({
+      teamId,
+      invitationId,
+      revokedAt: new Date().toISOString(),
+    });
+
+    if (!revoked) {
+      throw new ApiValidationError('Invitation was not found or is no longer pending', [
+        {
+          field: 'invitationId',
+          issue: 'must reference a pending invitation',
+        },
+      ]);
+    }
+
+    return revoked;
+  }
+
   async acceptInvitation(body: unknown, identity: AuthIdentity): Promise<TeamInvitationRecord> {
     const token = parseInvitationToken(body);
     const invitation = await this.repository.findPendingInvitationByTokenHash(
@@ -247,7 +363,7 @@ export class AuthService {
     body: unknown,
     identity: AuthIdentity,
   ): Promise<TeamMemberRecord> {
-    const actor = await this.requireTeamAdmin(identity, teamId);
+    const actor = await this.requireTeamOwner(identity, teamId);
     const role = parseTeamRoleBody(body);
     const target = await this.repository.getTeamMembership({ accountId, teamId });
 
@@ -330,13 +446,55 @@ export class AuthService {
 
     return {
       localLoginEnabled: this.configService.get('AUTH_LOCAL_REGISTRATION_ENABLED', { infer: true }),
-      oidcConfigured: Boolean(this.configService.get('AUTH_OIDC_ISSUER_URL', { infer: true })),
-      samlConfigured: Boolean(this.configService.get('AUTH_SAML_ENTITY_ID', { infer: true })),
+      oidcConfigured:
+        Boolean(this.configService.get('AUTH_OIDC_ISSUER_URL', { infer: true })) ||
+        configuredProviders.some((provider) => provider.providerType === 'oidc'),
+      samlConfigured:
+        Boolean(this.configService.get('AUTH_SAML_ENTITY_ID', { infer: true })) ||
+        configuredProviders.some((provider) => provider.providerType === 'saml'),
       configuredProviders,
       callbackUrls: {
         oidc: `${baseUrl}/api/v1/auth/sso/oidc/callback`,
         saml: `${baseUrl}/api/v1/auth/sso/saml/acs`,
       },
+    };
+  }
+
+  async configureSsoProvider(
+    teamId: string,
+    body: unknown,
+    identity: AuthIdentity,
+  ): Promise<SsoConfigurationStatus['configuredProviders'][number]> {
+    await this.requireTeamAdmin(identity, teamId);
+    const input = parseSsoProviderBody(body);
+
+    return this.repository.upsertSsoProviderConfig({
+      teamId,
+      providerType: input.providerType,
+      displayName: input.displayName,
+      issuerUrl: input.issuerUrl,
+      ...(input.clientId ? { clientIdHint: clientIdHint(input.clientId) } : {}),
+      createdByAccountId: identity.accountId,
+    });
+  }
+
+  async testSsoConnection(
+    teamId: string,
+    body: unknown,
+    identity: AuthIdentity,
+  ): Promise<SsoConnectionTestResult> {
+    await this.requireTeamAdmin(identity, teamId);
+    const input = parseSsoProviderBody(body);
+
+    return {
+      ok: true,
+      providerType: input.providerType,
+      issuerUrl: input.issuerUrl,
+      checkedAt: new Date().toISOString(),
+      message:
+        input.providerType === 'oidc'
+          ? 'Mock OIDC discovery endpoint accepted the issuer URL shape.'
+          : 'Mock SAML metadata probe accepted the issuer URL shape.',
     };
   }
 
@@ -396,11 +554,42 @@ export class AuthService {
     return membership;
   }
 
+  private async requireTeamOwner(
+    identity: AuthIdentity,
+    teamId: string,
+  ): Promise<{ role: TeamRole }> {
+    const membership =
+      identity.teamId === teamId && identity.role
+        ? { role: identity.role }
+        : await this.repository.getTeamMembership({
+            accountId: identity.accountId,
+            teamId,
+          });
+
+    if (!membership || membership.role !== TEAM_OWNER_ROLE) {
+      throw new ApiForbiddenError('Team owner access is required');
+    }
+
+    return membership;
+  }
+
   private async assertOwnerWillRemain(teamId: string): Promise<void> {
     const ownerCount = await this.repository.countTeamOwners(teamId);
 
     if (ownerCount <= 1) {
       throw new ApiForbiddenError('At least one team owner must remain');
+    }
+  }
+
+  private async verifyCurrentPassword(identity: AuthIdentity, currentPassword: string) {
+    const account = await this.repository.findLocalAccountByEmail(identity.email);
+
+    if (!account || account.accountId !== identity.accountId) {
+      throw new ApiUnauthorizedError('Local password credential was not found');
+    }
+
+    if (!verifyPassword(currentPassword, account.passwordHash)) {
+      throw new ApiUnauthorizedError('Current password is invalid');
     }
   }
 }
@@ -443,6 +632,84 @@ function parseLoginBody(body: unknown): { email: string; password: string } {
   };
 }
 
+function parseProfileBody(
+  body: unknown,
+  identity: AuthIdentity,
+): {
+  email: string;
+  displayName?: string;
+  currentPassword: string;
+} {
+  const record = requireRecord(body, 'Profile update request body must be an object');
+  const email = record.email === undefined ? identity.email : normalizeEmail(record.email);
+  const displayName =
+    record.displayName === undefined
+      ? identity.displayName
+      : optionalTrimmedString(record.displayName, 120);
+  const emailChanged = email !== identity.email;
+
+  return {
+    email,
+    ...(displayName ? { displayName } : {}),
+    currentPassword: emailChanged
+      ? requiredString(record.currentPassword, 'currentPassword')
+      : typeof record.currentPassword === 'string'
+        ? record.currentPassword
+        : '',
+  };
+}
+
+function parsePasswordChangeBody(
+  body: unknown,
+  minimumPasswordLength: number,
+): {
+  currentPassword: string;
+  newPassword: string;
+} {
+  const record = requireRecord(body, 'Password change request body must be an object');
+
+  return {
+    currentPassword: requiredString(record.currentPassword, 'currentPassword'),
+    newPassword: parsePassword(record.newPassword, minimumPasswordLength),
+  };
+}
+
+function parseAccountDeletionBody(body: unknown): {
+  currentPassword: string;
+} {
+  const record = requireRecord(body, 'Account deletion request body must be an object');
+  const confirmation = requiredString(record.confirmation, 'confirmation');
+
+  if (confirmation !== 'DELETE') {
+    throw new ApiValidationError('confirmation must be DELETE', [
+      {
+        field: 'confirmation',
+        issue: 'must exactly match DELETE',
+      },
+    ]);
+  }
+
+  return {
+    currentPassword: requiredString(record.currentPassword, 'currentPassword'),
+  };
+}
+
+function parseTeamSettingsBody(body: unknown): { teamName: string } {
+  const record = requireRecord(body, 'Team settings request body must be an object');
+  const teamName = optionalTrimmedString(record.teamName ?? record.name, 120);
+
+  if (!teamName) {
+    throw new ApiValidationError('teamName is required', [
+      {
+        field: 'teamName',
+        issue: 'is required',
+      },
+    ]);
+  }
+
+  return { teamName };
+}
+
 function parseInviteBody(body: unknown): { email: string; role: Exclude<TeamRole, 'owner'> } {
   const record = requireRecord(body, 'Team invitation request body must be an object');
   const role = record.role;
@@ -451,7 +718,7 @@ function parseInviteBody(body: unknown): { email: string; role: Exclude<TeamRole
     throw new ApiValidationError('role is invalid for invitations', [
       {
         field: 'role',
-        issue: 'must be admin, member, or viewer',
+        issue: 'must be admin or member',
       },
     ]);
   }
@@ -469,12 +736,58 @@ function parseTeamRoleBody(body: unknown): TeamRole {
     throw new ApiValidationError('role is invalid', [
       {
         field: 'role',
-        issue: 'must be owner, admin, member, or viewer',
+        issue: 'must be owner, admin, or member',
       },
     ]);
   }
 
   return record.role as TeamRole;
+}
+
+function parseSsoProviderBody(body: unknown): {
+  providerType: 'oidc' | 'saml';
+  displayName: string;
+  issuerUrl: string;
+  clientId?: string;
+} {
+  const record = requireRecord(body, 'SSO provider request body must be an object');
+  const providerType = requiredString(record.providerType, 'providerType').toLowerCase();
+  const displayName = optionalTrimmedString(record.displayName, 120) ?? providerType.toUpperCase();
+  const issuerUrl = requiredString(record.issuerUrl, 'issuerUrl');
+  const clientId = optionalTrimmedString(record.clientId, 160);
+
+  if (providerType !== 'oidc' && providerType !== 'saml') {
+    throw new ApiValidationError('providerType is invalid', [
+      {
+        field: 'providerType',
+        issue: 'must be oidc or saml',
+      },
+    ]);
+  }
+
+  if (!issuerUrl.startsWith('https://')) {
+    throw new ApiValidationError('issuerUrl must use https', [
+      {
+        field: 'issuerUrl',
+        issue: 'must start with https://',
+      },
+    ]);
+  }
+
+  return {
+    providerType,
+    displayName,
+    issuerUrl,
+    ...(clientId ? { clientId } : {}),
+  };
+}
+
+function clientIdHint(clientId: string): string {
+  if (clientId.length <= 12) {
+    return clientId;
+  }
+
+  return `${clientId.slice(0, 6)}...${clientId.slice(-4)}`;
 }
 
 function parseInvitationToken(body: unknown): string {

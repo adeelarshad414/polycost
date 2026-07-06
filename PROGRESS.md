@@ -40,6 +40,56 @@ say so explicitly rather than marking it done.
 | Phase 2 - Diagram-to-cost intelligence                 | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.7 - Invoice/auth/VSDX gap closure              | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8 - Gap-closure production readiness           | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8A - Auth product UX continuation              | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8A - Auth product UX continuation
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Account product UX deepened: the protected API and workspace UI now cover profile
+  email/display-name updates, password changes, server-side account disablement,
+  active session listing, and "sign out other devices". Anonymous compare, diagram,
+  export, and share workflows remain available without an account.
+- Team product UX deepened: the protected API and workspace UI now cover team
+  creation, team-name updates, member listing, member removal, pending invite
+  listing, invite-token acceptance, and invite revocation.
+- Three-role RBAC tightened: product-facing roles are Owner, Admin, and Member.
+  Owners can change roles; owners/admins can manage members, invites, SSO setup, and
+  billing-import workflows; members keep comparison/report access. Legacy stored
+  `viewer` rows are normalized to Member at the repository boundary instead of
+  requiring a non-additive migration.
+- SSO readiness UX extended: OIDC/SAML provider metadata can be configured from the
+  workspace UI, callback URLs are visible via status, and the development
+  test-connection flow exercises the same API route without requiring production IdP
+  secrets.
+- Frontend markup hardening: the workspace session panel no longer nests forms inside
+  another form; login/register is a dedicated auth form and signed-in account/team
+  forms are valid sibling forms.
+- Documentation updated: README now separates anonymous core features from
+  account-gated workspace features, and `DUMMY-VALUES.md` documents mock SSO/invite
+  readiness and the production swap caveat.
+- Verification evidence in this continuation:
+  - Focused API auth/database tests: 3 suites, 35 tests passed.
+  - Focused web app/API-client tests: 2 suites, 77 tests passed.
+  - `npm run format:check` passed.
+  - `npm run ci:lint` passed with lint and typecheck across API, web, and shared
+    types.
+  - `npm run ci:unit` passed: API 49 suites / 357 tests, web 9 suites / 123 tests.
+  - `npm run ci:integration` passed with no integration tests found in current
+    workspaces.
+  - `npm run ci:build` passed for API and web production builds.
+  - `npm run db:validate` passed; live `schema_migrations` check skipped because
+    Postgres was not running in that standalone command.
+  - `npm run security:audit` passed the high/critical gate; the documented low
+    Graphify/Ollama transitive advisory remains.
+  - `npm run ci:e2e` passed against Docker Compose: API E2E 14/14 and Playwright
+    browser E2E 6/6.
+- Known gaps carried forward: this is not invoice-grade billing coverage for every
+  enterprise pricing edge case; VSDX remains extraction/review oriented rather than
+  pixel-perfect Visio rendering; SSO has configuration/test readiness but not a full
+  enterprise IdP login round-trip, email delivery, SCIM, org billing plans, or a
+  complete hosted account/team suite.
 
 ## Phase 2.8 - Gap-closure production readiness
 
