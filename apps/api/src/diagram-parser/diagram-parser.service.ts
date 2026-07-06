@@ -18,6 +18,7 @@ import {
   DiagramParseResult,
   DiagramReviewComponent,
   ExtractedDiagram,
+  ExtractedDiagramNode,
 } from './diagram-parser.types';
 import { FormatDetectorService } from './format-detector.service';
 import { LucidCsvExtractor } from './lucid-csv.extractor';
@@ -122,7 +123,7 @@ export class DiagramParserService {
           confidence: classification.confidence,
           sourceRef: node.sourceRef,
           assumedDefaults: classification.assumedDefaults,
-          evidence: classification.reason,
+          evidence: classificationEvidence(classification.reason, node),
           editable: true,
         });
         assumedDefaults.push(...classification.assumedDefaults);
@@ -328,6 +329,26 @@ function parserConfidenceFor(
   }
 
   return 'high';
+}
+
+function classificationEvidence(reason: string, node: ExtractedDiagramNode): string {
+  const visual = node.visual;
+
+  if (!visual) {
+    return reason;
+  }
+
+  const visualEvidence = [
+    visual.pageName ? `Visio page ${sanitizeDisplayText(visual.pageName, 'page')}` : undefined,
+    visual.masterName
+      ? `Visio master ${sanitizeDisplayText(visual.masterName, 'master')}`
+      : undefined,
+    visual.containerId
+      ? `container ${sanitizeDisplayText(visual.containerId, 'container')}`
+      : undefined,
+  ].filter((value): value is string => Boolean(value));
+
+  return visualEvidence.length > 0 ? `${reason}; ${visualEvidence.join('; ')}` : reason;
 }
 
 function nwsReviewFields(nws: NormalizedWorkloadSpec): string[] {

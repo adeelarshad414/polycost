@@ -59,6 +59,29 @@ say so explicitly rather than marking it done.
 | Phase 2.8Q - Visible pricing evidence UI wiring        | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8R - Refresh-live evidence regression          | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8S - Reconciliation coverage hardening         | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8T - VSDX review evidence context              | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8T - VSDX review evidence context
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Enriched diagram review component evidence so VSDX-classified nodes preserve the
+  classifier reason and append Visio page, master/stencil, and container context when
+  those fields are available from extraction.
+- Added full parser coverage proving a VSDX node classified from master
+  `AWS19.EC2` carries `Matched stencil`, `Visio page Page 1`, `Visio master
+AWS19.EC2`, and `container 99` evidence through the review-card surface.
+- This makes the existing VSDX master/container/page extraction more reviewable in
+  UI/PDF/API evidence without changing existing API response shapes.
+- Verification evidence in this continuation:
+  - Focused diagram parser spec passed: 1 suite / 21 tests.
+  - `npm run test:production-readiness` passed: API 6 suites / 81 tests and web 2
+    suites / 80 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: VSDX parsing is more explainable and layout-aware, but
+  it is still extraction/review metadata rather than full Visio visual rendering.
 
 ## Phase 2.8S - Reconciliation coverage hardening
 

@@ -175,6 +175,50 @@ describe('DiagramParserService', () => {
     ]);
   });
 
+  it('carries VSDX page, master, and container context into review evidence', async () => {
+    const parsed = await service().parse({
+      content: zipWithStoredEntries([
+        {
+          path: 'visio/masters/master1.xml',
+          content: `
+            <Master ID="1" NameU="AWS19.EC2">
+              <Shapes><Shape ID="100" NameU="AWS19.EC2"><Text>EC2 master</Text></Shape></Shapes>
+            </Master>
+          `,
+        },
+        {
+          path: 'visio/pages/page1.xml',
+          content: `
+            <PageContents>
+              <Shapes>
+                <Shape ID="10" Master="1" Parent="99">
+                  <Text>web tier</Text>
+                </Shape>
+              </Shapes>
+            </PageContents>
+          `,
+        },
+      ]).toString('base64'),
+      encoding: 'base64',
+      fileName: 'evidence.vsdx',
+    });
+
+    expect(parsed.review.components).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          nodeId: '10',
+          serviceCategory: 'compute',
+          serviceType: 'vm-compute',
+          evidence: expect.stringContaining('Matched stencil "AWS19.EC2" -> vm-compute'),
+        }),
+      ]),
+    );
+    const component = parsed.review.components.find((item) => item.nodeId === '10');
+    expect(component?.evidence).toContain('Visio page Page 1');
+    expect(component?.evidence).toContain('Visio master AWS19.EC2');
+    expect(component?.evidence).toContain('container 99');
+  });
+
   it('keeps valid VSDX pages and reports page-level warnings for corrupt pages', async () => {
     const parsed = await service().parse({
       content: zipWithStoredEntries([
