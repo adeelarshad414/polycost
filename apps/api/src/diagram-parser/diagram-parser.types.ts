@@ -160,6 +160,15 @@ export interface LlmClassifierClient {
     diagramNodeId?: string;
     stencilId?: string;
   }): Promise<DiagramNodeClassification | undefined> | DiagramNodeClassification | undefined;
+  classifyBatch?(
+    inputs: Array<{
+      displayLabel: string;
+      diagramNodeId?: string;
+      stencilId?: string;
+    }>,
+  ):
+    | Promise<Array<DiagramNodeClassification | undefined>>
+    | Array<DiagramNodeClassification | undefined>;
   lastFailureReason?(): string | undefined;
 }
 

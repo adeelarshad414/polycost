@@ -340,6 +340,63 @@ describe('DiagramParserService', () => {
     });
   });
 
+  it('batches unresolved nodes through the Tier 3 LLM client when available', async () => {
+    const llmClient: LlmClassifierClient = {
+      classify: jest.fn(),
+      classifyBatch: jest.fn(async (inputs) =>
+        inputs.map((input) => ({
+          serviceCategory: 'integration',
+          serviceType: 'queue-or-event-bus',
+          confidence: 'low',
+          reason: `LLM classification, confidence low for ${input.displayLabel}`,
+          assumedDefaults: ['1 million messages per month'],
+          serviceRequirement: {
+            serviceCategory: 'integration',
+            serviceType: 'queue-or-event-bus',
+            quantity: 1,
+            scaleParams: {
+              classifier: 'llm',
+              diagramNodeId: input.diagramNodeId ?? 'unknown',
+            },
+          },
+        })),
+      ),
+    };
+
+    const parsed = await service(llmClient).parse({
+      content: 'graph TD\n  A[Quasar alpha]\n  B[Quasar beta]\n  C[EC2 web]',
+      fileName: 'batched-custom.mmd',
+      inputFormat: 'mermaid',
+    });
+
+    expect(llmClient.classifyBatch).toHaveBeenCalledTimes(1);
+    expect(llmClient.classifyBatch).toHaveBeenCalledWith([
+      expect.objectContaining({
+        displayLabel: 'Quasar alpha',
+        diagramNodeId: 'A',
+      }),
+      expect.objectContaining({
+        displayLabel: 'Quasar beta',
+        diagramNodeId: 'B',
+      }),
+    ]);
+    expect(llmClient.classify).not.toHaveBeenCalled();
+    expect(parsed.review.components).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          nodeId: 'A',
+          serviceCategory: 'integration',
+          evidence: expect.stringContaining('LLM classification'),
+        }),
+        expect.objectContaining({
+          nodeId: 'C',
+          serviceCategory: 'compute',
+          evidence: expect.stringContaining('Label matched alias'),
+        }),
+      ]),
+    );
+  });
+
   it('surfaces Tier 3 LLM fallback diagnostics on unresolved review rows', async () => {
     const llmClient: LlmClassifierClient = {
       classify: jest.fn(async () => undefined),

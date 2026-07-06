@@ -78,8 +78,10 @@ Last verified on 2026-07-06:
 - Tier 3 LLM classification is now optionally wired through an OpenAI-compatible
   JSON-schema classifier. Configure `DIAGRAM_LLM_CLASSIFIER_ENDPOINT`,
   `DIAGRAM_LLM_CLASSIFIER_MODEL`, and Vault `secret/polycost/llm` key `api_key` to use
-  it. When unset, the parser keeps deterministic stencil/alias classification and
-  manual review fallback.
+  it. Deterministic stencil/alias matches run first; only unresolved nodes enter the
+  bounded batch classifier, currently capped at 20 nodes per parse with manual review
+  fallback for overflow, missing config, malformed output, provider errors, or
+  timeouts.
 - VSDX parsing reads basic OpenXML pages, shapes, and connectors. It does not attempt
   full Visio rendering semantics.
 - Review controls update submitted `serviceRequirements`; deep service-specific

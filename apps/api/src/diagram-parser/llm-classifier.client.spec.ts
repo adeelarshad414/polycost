@@ -131,6 +131,139 @@ describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
     expect(fetchClient).not.toHaveBeenCalled();
   });
 
+  it('classifies unresolved diagram labels through one bounded batch request', async () => {
+    const fetchClient = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                classifications: [
+                  {
+                    diagramNodeId: 'node-a',
+                    classification: {
+                      serviceCategory: 'integration',
+                      serviceType: 'queue-or-event-bus',
+                      confidence: 'low',
+                      reason: 'label looks like an asynchronous handoff',
+                      assumedDefaults: ['1 million messages per month'],
+                      quantity: 1,
+                      scaleParams: {},
+                    },
+                  },
+                  {
+                    diagramNodeId: 'node-b',
+                    classification: null,
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      }),
+    })) as unknown as typeof fetch;
+    const client = new OpenAiCompatibleDiagramLlmClassifierClient(
+      configService({
+        DIAGRAM_LLM_CLASSIFIER_ENDPOINT: 'https://llm.example.test/v1/chat/completions',
+        DIAGRAM_LLM_CLASSIFIER_MODEL: 'diagram-classifier',
+      }),
+      secretsReader(),
+      fetchClient,
+    );
+
+    await expect(
+      client.classifyBatch([
+        {
+          displayLabel: 'Async handoff',
+          diagramNodeId: 'node-a',
+        },
+        {
+          displayLabel: 'Project note',
+          diagramNodeId: 'node-b',
+        },
+      ]),
+    ).resolves.toEqual([
+      {
+        serviceCategory: 'integration',
+        serviceType: 'queue-or-event-bus',
+        confidence: 'low',
+        reason: 'llm classifier: label looks like an asynchronous handoff',
+        assumedDefaults: ['1 million messages per month'],
+        serviceRequirement: {
+          serviceCategory: 'integration',
+          serviceType: 'queue-or-event-bus',
+          quantity: 1,
+          scaleParams: {
+            diagramNodeId: 'node-a',
+            classifier: 'llm',
+          },
+        },
+      },
+      undefined,
+    ]);
+
+    expect(fetchClient).toHaveBeenCalledTimes(1);
+    const requestBody = JSON.parse(String((fetchClient as jest.Mock).mock.calls[0][1].body));
+    expect(requestBody.response_format.json_schema.name).toBe(
+      'polycost_diagram_node_classification_batch',
+    );
+    expect(requestBody.messages[1].content).toBe(
+      JSON.stringify({
+        nodes: [
+          {
+            diagramNodeId: 'node-a',
+            displayLabel: 'Async handoff',
+            stencilId: null,
+          },
+          {
+            diagramNodeId: 'node-b',
+            displayLabel: 'Project note',
+            stencilId: null,
+          },
+        ],
+      }),
+    );
+    expect(client.lastFailureReason()).toBeUndefined();
+  });
+
+  it('caps direct batch requests at 20 nodes and returns same-length fallback results', async () => {
+    const fetchClient = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                classifications: [],
+              }),
+            },
+          },
+        ],
+      }),
+    })) as unknown as typeof fetch;
+    const client = new OpenAiCompatibleDiagramLlmClassifierClient(
+      configService({
+        DIAGRAM_LLM_CLASSIFIER_ENDPOINT: 'https://llm.example.test/v1/chat/completions',
+        DIAGRAM_LLM_CLASSIFIER_MODEL: 'diagram-classifier',
+      }),
+      secretsReader(),
+      fetchClient,
+    );
+
+    const results = await client.classifyBatch(
+      Array.from({ length: 25 }, (_, index) => ({
+        displayLabel: `Opaque service ${index}`,
+        diagramNodeId: `node-${index}`,
+      })),
+    );
+
+    expect(results).toHaveLength(25);
+    expect(results.every((result) => result === undefined)).toBe(true);
+    const requestBody = JSON.parse(String((fetchClient as jest.Mock).mock.calls[0][1].body));
+    expect(JSON.parse(requestBody.messages[1].content).nodes).toHaveLength(20);
+  });
+
   it('falls back to unresolved classification when provider output is malformed', async () => {
     const fetchClient = jest.fn(async () => ({
       ok: true,

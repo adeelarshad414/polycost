@@ -97,17 +97,38 @@ export class DiagramParserService {
     const fieldsRequiringReview: string[] = extractionWarnings.map(
       (warning) => `diagram.extraction.${warning.id}`,
     );
-    let llmClassificationsAttempted = 0;
+    const nodesToParse = extracted.nodes.slice(0, DIAGRAM_MAX_NODES);
+    const localClassifications = new Map<
+      string,
+      Awaited<ReturnType<NodeClassifierService['classify']>>
+    >();
+    const unresolvedNodesNeedingLlm: ExtractedDiagramNode[] = [];
 
-    for (const node of extracted.nodes.slice(0, DIAGRAM_MAX_NODES)) {
-      const displayLabel = sanitizeDisplayText(node.rawLabel, node.id);
-      const classification = await this.nodeClassifierService.classify(node, {
-        allowLlm: llmClassificationsAttempted < DIAGRAM_LLM_MAX_NODES_PER_PARSE,
+    for (const node of nodesToParse) {
+      const localClassification = this.nodeClassifierService.classifyLocal(node);
+
+      if (localClassification) {
+        localClassifications.set(node.id, localClassification);
+      } else {
+        unresolvedNodesNeedingLlm.push(node);
+      }
+    }
+
+    const llmClassifications = await this.nodeClassifierService.classifyUnresolvedBatch(
+      unresolvedNodesNeedingLlm,
+      {
+        maxLlmNodes: DIAGRAM_LLM_MAX_NODES_PER_PARSE,
         llmSkippedReason: `Tier 3 LLM classifier cost guard skipped after ${DIAGRAM_LLM_MAX_NODES_PER_PARSE} unresolved nodes`,
-        onLlmAttempt: () => {
-          llmClassificationsAttempted += 1;
-        },
-      });
+      },
+    );
+
+    for (const node of nodesToParse) {
+      const displayLabel = sanitizeDisplayText(node.rawLabel, node.id);
+      const classification = localClassifications.get(node.id) ?? llmClassifications.get(node.id);
+
+      if (!classification) {
+        continue;
+      }
 
       if ('serviceCategory' in classification) {
         const graphNode: ClassifiedDiagramNode = {

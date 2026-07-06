@@ -19,6 +19,12 @@ interface NodeClassificationOptions {
   onLlmAttempt?: () => void;
 }
 
+interface UnresolvedBatchClassificationOptions {
+  maxLlmNodes: number;
+  llmSkippedReason: string;
+  onLlmAttempt?: (nodeCount: number) => void;
+}
+
 @Injectable()
 export class NodeClassifierService {
   constructor(
@@ -31,6 +37,36 @@ export class NodeClassifierService {
     node: ExtractedDiagramNode,
     options: NodeClassificationOptions = {},
   ): Promise<DiagramNodeClassification | DiagramIgnoredNode> {
+    const localClassification = this.classifyLocal(node);
+
+    if (localClassification) {
+      return localClassification;
+    }
+
+    const displayLabel = sanitizeDisplayText(node.rawLabel, node.id);
+
+    if (options.allowLlm === false) {
+      return {
+        id: node.id,
+        displayLabel,
+        reason: options.llmSkippedReason ?? 'Tier 3 LLM classifier cost guard skipped this node',
+        sourceRef: node.sourceRef,
+      };
+    }
+
+    options.onLlmAttempt?.();
+    const llmMatch = await this.llmClassifierClient.classify({
+      displayLabel,
+      diagramNodeId: node.id,
+      stencilId: node.stencilId,
+    });
+
+    return llmMatch ?? this.unresolvedNode(node, displayLabel);
+  }
+
+  classifyLocal(
+    node: ExtractedDiagramNode,
+  ): DiagramNodeClassification | DiagramIgnoredNode | undefined {
     const displayLabel = sanitizeDisplayText(node.rawLabel, node.id);
 
     if (isDecorativeNode(displayLabel, node.style)) {
@@ -64,26 +100,64 @@ export class NodeClassifierService {
       );
     }
 
-    if (options.allowLlm === false) {
-      return {
+    return undefined;
+  }
+
+  async classifyUnresolvedBatch(
+    nodes: ExtractedDiagramNode[],
+    options: UnresolvedBatchClassificationOptions,
+  ): Promise<Map<string, DiagramNodeClassification | DiagramIgnoredNode>> {
+    const classifications = new Map<string, DiagramNodeClassification | DiagramIgnoredNode>();
+    const nodesAllowedForLlm = nodes.slice(0, options.maxLlmNodes);
+    const skippedNodes = nodes.slice(options.maxLlmNodes);
+
+    if (nodesAllowedForLlm.length > 0) {
+      options.onLlmAttempt?.(nodesAllowedForLlm.length);
+      const llmResults = await this.callLlmBatch(nodesAllowedForLlm);
+      const llmResultIterator = llmResults[Symbol.iterator]();
+
+      for (const node of nodesAllowedForLlm) {
+        const llmResult = llmResultIterator.next().value;
+        const displayLabel = sanitizeDisplayText(node.rawLabel, node.id);
+        classifications.set(node.id, llmResult ?? this.unresolvedNode(node, displayLabel));
+      }
+    }
+
+    for (const node of skippedNodes) {
+      classifications.set(node.id, {
         id: node.id,
-        displayLabel,
-        reason: options.llmSkippedReason ?? 'Tier 3 LLM classifier cost guard skipped this node',
+        displayLabel: sanitizeDisplayText(node.rawLabel, node.id),
+        reason: options.llmSkippedReason,
         sourceRef: node.sourceRef,
-      };
+      });
     }
 
-    options.onLlmAttempt?.();
-    const llmMatch = await this.llmClassifierClient.classify({
-      displayLabel,
+    return classifications;
+  }
+
+  private async callLlmBatch(
+    nodes: ExtractedDiagramNode[],
+  ): Promise<Array<DiagramNodeClassification | undefined>> {
+    const inputs = nodes.map((node) => ({
+      displayLabel: sanitizeDisplayText(node.rawLabel, node.id),
       diagramNodeId: node.id,
-      stencilId: node.stencilId,
-    });
+      ...(node.stencilId ? { stencilId: node.stencilId } : {}),
+    }));
 
-    if (llmMatch) {
-      return llmMatch;
+    if (this.llmClassifierClient.classifyBatch) {
+      return this.llmClassifierClient.classifyBatch(inputs);
     }
 
+    const results: Array<DiagramNodeClassification | undefined> = [];
+
+    for (const input of inputs) {
+      results.push(await this.llmClassifierClient.classify(input));
+    }
+
+    return results;
+  }
+
+  private unresolvedNode(node: ExtractedDiagramNode, displayLabel: string): DiagramIgnoredNode {
     const llmFailureReason = this.llmClassifierClient.lastFailureReason?.();
 
     return {

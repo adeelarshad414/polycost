@@ -61,6 +61,55 @@ say so explicitly rather than marking it done.
 | Phase 2.8S - Reconciliation coverage hardening         | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8T - VSDX review evidence context              | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8U - Diagram LLM cost guard                    | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8V - Diagram LLM batch classification          | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8W - Security advisory ledger refresh          | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8W - Security advisory ledger refresh
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Re-ran `npm audit --audit-level=low` with registry access. It still exits 1 only
+  for the already documented low-severity `@ai-sdk/provider-utils <=3.0.97`
+  advisory through `ollama-ai-provider` and `@sentropic/graphify`; npm reports no
+  fix available.
+- Refreshed `docs/SECURITY-SUPPRESSIONS.md` so the low-audit evidence is dated and
+  the new diagram LLM batch classifier path is explicitly covered as lint-clean
+  rather than suppressed.
+- Verification evidence in this continuation:
+  - `npm audit --audit-level=low` completed with the documented low advisory and no
+    safe fix available.
+  - `npm run security:audit` completed with exit code 0 at the high/critical gate.
+  - `npm run ci:lint` passed with no new security-plugin warnings after the batch
+    classifier implementation.
+- Known gaps carried forward: the low transitive Graphify/Ollama advisory remains
+  upstream-dependent; high/critical runtime gating remains clean via
+  `npm run security:audit`.
+
+## Phase 2.8V - Diagram LLM batch classification
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Added an optional batch method to the diagram LLM classifier interface so Tier 3
+  unresolved nodes can be classified in one bounded OpenAI-compatible JSON-schema
+  request instead of only node-by-node calls.
+- Reworked diagram parsing into a Tier 1/2 local pass followed by a bounded Tier 3
+  batch pass. Stencil and alias matches do not consume LLM budget; only unresolved
+  nodes are batched, and overflow remains reviewable with the existing cost-guard
+  message.
+- Added batch-response validation and node-id mapping in the OpenAI-compatible
+  client, while preserving the single-node `classify()` path and stub/no-key fallback
+  behavior.
+- Verification evidence in this continuation:
+  - Focused diagram parser + LLM classifier specs passed: 2 suites / 30 tests.
+  - `npm run test:production-readiness` passed: API 6 suites / 85 tests and web 2
+    suites / 80 tests.
+  - `npm run ci:lint` passed with no new security-plugin warnings.
+  - `npm run format:check` passed.
+- Known gaps carried forward: the production LLM path is now schema-based, retried,
+  timeout-protected, bounded, batched, and fallback-safe, but production prompt
+  evaluation/tuning and real provider-key smoke testing remain future hardening.
 
 ## Phase 2.8U - Diagram LLM cost guard
 
