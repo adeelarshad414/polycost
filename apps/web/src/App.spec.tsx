@@ -34,6 +34,7 @@ describe('App', () => {
     window.localStorage.removeItem('polycost-persona-view');
     window.localStorage.removeItem('polycost-dismissed-budget-alerts');
     window.localStorage.removeItem('polycost-comparison-history-v1');
+    window.localStorage.removeItem('polycost-auth-session-v1');
     window.sessionStorage.removeItem('polycost-current-requirements-v1');
     window.URL.createObjectURL = jest.fn(() => 'blob:polycost-report');
     window.URL.revokeObjectURL = jest.fn();
@@ -49,6 +50,7 @@ describe('App', () => {
     window.localStorage.removeItem('polycost-persona-view');
     window.localStorage.removeItem('polycost-dismissed-budget-alerts');
     window.localStorage.removeItem('polycost-comparison-history-v1');
+    window.localStorage.removeItem('polycost-auth-session-v1');
     window.sessionStorage.removeItem('polycost-current-requirements-v1');
   });
 
@@ -143,6 +145,225 @@ describe('App', () => {
     expect(text(container)).not.toContain('Export CSV');
     expect(text(container)).not.toContain('API JSON');
     expect(text(container)).not.toContain('SKU/spec pending API field');
+
+    unmount();
+  });
+
+  it('signs into the workspace control center and loads team readiness data', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    expect(text(container)).toContain('Workspace session');
+    expect(text(container)).toContain('Actuals reconciliation');
+
+    await submitForm(container.querySelector<HTMLFormElement>('.workspace-panel'));
+    await settleAsyncEffects();
+    await settleAsyncEffects();
+
+    expect(client.login).toHaveBeenCalledWith({
+      email: 'architect@example.com',
+      password: 'correct horse battery staple',
+    });
+    expect(window.localStorage.getItem('polycost-auth-session-v1')).toBe('session-token');
+    expect(client.getCurrentSession).toHaveBeenCalledWith('session-token');
+    expect(client.listTeamMembers).toHaveBeenCalledWith(
+      '22222222-2222-4222-8222-222222222222',
+      'session-token',
+    );
+    expect(client.listTeamInvitations).toHaveBeenCalled();
+    expect(client.getSsoStatus).toHaveBeenCalledWith('session-token');
+    expect(text(container)).toContain('Architecture team · owner');
+    expect(text(container)).toContain('Architect');
+    expect(text(container)).toContain('OIDC ready · SAML ready');
+
+    await click(buttonByText(container, 'Sign out'));
+    expect(client.logout).toHaveBeenCalledWith('session-token');
+    expect(window.localStorage.getItem('polycost-auth-session-v1')).toBeNull();
+
+    unmount();
+  });
+
+  it('executes team invite, role, remove, and invite-acceptance actions', async () => {
+    window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await settleAsyncEffects();
+    await settleAsyncEffects();
+
+    await changeInput(inputByWorkspaceLabel(container, 'Invite email'), 'new-finops@example.com');
+    await changeSelect(selectByWorkspaceLabel(container, 'Role'), 'admin');
+    await submitForm(formContainingText(container, 'Invite email'));
+
+    expect(client.inviteTeamMember).toHaveBeenCalledWith(
+      '22222222-2222-4222-8222-222222222222',
+      {
+        email: 'new-finops@example.com',
+        role: 'admin',
+      },
+      'session-token',
+    );
+    expect(text(container)).toContain('Invite token: invite-token');
+
+    const memberRoleSelect = container.querySelector<HTMLSelectElement>(
+      '.workspace-member-row select',
+    );
+    if (!(memberRoleSelect instanceof HTMLSelectElement)) {
+      throw new Error('Expected workspace member role select');
+    }
+
+    await changeSelect(memberRoleSelect, 'admin');
+    expect(client.updateTeamMemberRole).toHaveBeenCalledWith(
+      '22222222-2222-4222-8222-222222222222',
+      '11111111-1111-4111-8111-111111111111',
+      'admin',
+      'session-token',
+    );
+
+    await click(buttonByText(container, 'Remove'));
+    expect(client.removeTeamMember).toHaveBeenCalledWith(
+      '22222222-2222-4222-8222-222222222222',
+      '11111111-1111-4111-8111-111111111111',
+      'session-token',
+    );
+
+    await changeInput(inputByWorkspaceLabel(container, 'Accept invite token'), 'invite-token');
+    await submitForm(formContainingText(container, 'Accept invite token'));
+    expect(client.acceptTeamInvitation).toHaveBeenCalledWith('invite-token', 'session-token');
+
+    unmount();
+  });
+
+  it('imports provider billing exports and reconciles them after a comparison exists', async () => {
+    window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await settleAsyncEffects();
+    await click(buttonByText(container, 'Compare costs'));
+    await settleAsyncEffects();
+    await settleAsyncEffects();
+
+    await changeSelect(selectByWorkspaceLabel(container, 'Provider'), 'azure');
+    await submitForm(container.querySelector<HTMLFormElement>('.workspace-billing-panel'));
+
+    expect(client.importProviderBillingExport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'azure',
+        sourceType: 'azure-cost-management',
+        billingPeriodStart: '2026-06-01',
+        billingPeriodEnd: '2026-06-30',
+        content: expect.stringContaining('Virtual Machines'),
+      }),
+      'session-token',
+    );
+    expect(client.reconcileBillingImport).toHaveBeenCalledWith(
+      '55555555-5555-4555-8555-555555555555',
+      comparisonResult.comparisonId,
+      'session-token',
+    );
+    expect(text(container)).toContain('variance-warning');
+    expect(text(container)).toContain('$7.00 variance');
+
+    unmount();
+  });
+
+  it('guards billing import until sign-in and supports workspace registration', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await submitForm(container.querySelector<HTMLFormElement>('.workspace-billing-panel'));
+
+    expect(text(container)).toContain('Sign in before importing provider billing exports.');
+    expect(client.importProviderBillingExport).not.toHaveBeenCalled();
+
+    await click(buttonByText(container, 'Register'));
+
+    expect(text(container)).toContain('Display name');
+    expect(text(container)).toContain('Team name');
+
+    await changeInput(inputByWorkspaceLabel(container, 'Display name'), 'Platform Owner');
+    await changeInput(inputByWorkspaceLabel(container, 'Team name'), 'Coverage Team');
+    await submitForm(container.querySelector<HTMLFormElement>('form.workspace-panel'));
+    await settleAsyncEffects();
+    await settleAsyncEffects();
+
+    expect(client.register).toHaveBeenCalledWith({
+      email: 'architect@example.com',
+      password: 'correct horse battery staple',
+      displayName: 'Platform Owner',
+      teamName: 'Coverage Team',
+    });
+    expect(window.localStorage.getItem('polycost-auth-session-v1')).toBe('session-token');
+    expect(text(container)).toContain('Workspace registered.');
+
+    unmount();
+  });
+
+  it('shows the team admin empty state for viewer workspace sessions', async () => {
+    window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
+    const client = clientMock({
+      getCurrentSession: jest.fn(async () => ({
+        account: {
+          id: '11111111-1111-4111-8111-111111111111',
+          email: 'architect@example.com',
+          displayName: 'Viewer',
+        },
+        activeTeam: {
+          id: '22222222-2222-4222-8222-222222222222',
+          name: 'Architecture team',
+          role: 'viewer' as const,
+        },
+        teams: [
+          {
+            teamId: '22222222-2222-4222-8222-222222222222',
+            teamName: 'Architecture team',
+            role: 'viewer' as const,
+          },
+        ],
+        session: {
+          id: '33333333-3333-4333-8333-333333333333',
+          expiresAt: '2026-07-07T00:00:00.000Z',
+        },
+      })),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await settleAsyncEffects();
+    await settleAsyncEffects();
+
+    expect(text(container)).toContain('Architecture team · viewer');
+    expect(text(container)).toContain('Admin required');
+    expect(text(container)).toContain(
+      'Sign in as a team owner or admin to manage members, issue invite tokens, and review SSO status.',
+    );
+    expect(client.listTeamMembers).not.toHaveBeenCalled();
+    expect(client.listTeamInvitations).not.toHaveBeenCalled();
+    expect(client.getSsoStatus).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('imports provider billing exports without reconciliation before comparison runs', async () => {
+    window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await settleAsyncEffects();
+    await settleAsyncEffects();
+    await changeSelect(selectByWorkspaceLabel(container, 'Provider'), 'gcp');
+    await submitForm(container.querySelector<HTMLFormElement>('.workspace-billing-panel'));
+
+    expect(client.importProviderBillingExport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'gcp',
+        sourceType: 'gcp-billing-export',
+        content: expect.stringContaining('Compute Engine'),
+      }),
+      'session-token',
+    );
+    expect(client.reconcileBillingImport).not.toHaveBeenCalled();
+    expect(text(container)).toContain('Run a comparison to attach estimate-vs-actual evidence');
 
     unmount();
   });
@@ -2535,6 +2756,17 @@ async function click(element: HTMLElement): Promise<void> {
   });
 }
 
+async function submitForm(form: HTMLFormElement | null): Promise<void> {
+  if (!(form instanceof HTMLFormElement)) {
+    throw new Error('Expected form to exist');
+  }
+
+  await act(async () => {
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await Promise.resolve();
+  });
+}
+
 async function settleAsyncEffects(): Promise<void> {
   await act(async () => {
     await Promise.resolve();
@@ -2635,6 +2867,50 @@ function selectByAriaLabel(container: HTMLElement, label: string): HTMLSelectEle
   }
 
   return select;
+}
+
+function inputByWorkspaceLabel(container: HTMLElement, label: string): HTMLInputElement {
+  const input = workspaceFieldByLabel(container, label).querySelector('input');
+
+  if (!(input instanceof HTMLInputElement)) {
+    throw new Error(`Workspace input not found: ${label}`);
+  }
+
+  return input;
+}
+
+function selectByWorkspaceLabel(container: HTMLElement, label: string): HTMLSelectElement {
+  const select = workspaceFieldByLabel(container, label).querySelector('select');
+
+  if (!(select instanceof HTMLSelectElement)) {
+    throw new Error(`Workspace select not found: ${label}`);
+  }
+
+  return select;
+}
+
+function workspaceFieldByLabel(container: HTMLElement, label: string): HTMLLabelElement {
+  const field = Array.from(container.querySelectorAll<HTMLLabelElement>('.workspace-field')).find(
+    (candidate) => candidate.querySelector('span')?.textContent?.trim() === label,
+  );
+
+  if (!(field instanceof HTMLLabelElement)) {
+    throw new Error(`Workspace field not found: ${label}`);
+  }
+
+  return field;
+}
+
+function formContainingText(container: HTMLElement, label: string): HTMLFormElement {
+  const form = Array.from(container.querySelectorAll<HTMLFormElement>('form')).find((candidate) =>
+    candidate.textContent?.includes(label),
+  );
+
+  if (!(form instanceof HTMLFormElement)) {
+    throw new Error(`Form not found containing: ${label}`);
+  }
+
+  return form;
 }
 
 function checkboxByLabel(container: HTMLElement, label: string): HTMLInputElement {
