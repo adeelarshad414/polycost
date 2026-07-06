@@ -11,7 +11,7 @@ price on all three providers.
 
 ## Getting started: describing your workload
 
-You have two ways to tell PolyCost what you need.
+You have three ways to tell PolyCost what you need.
 
 ### Option 1 - Describe it in plain English
 
@@ -39,6 +39,28 @@ expected traffic, and region.
 
 Even if you used the text description first, the form that appears afterward is the
 same form. You can always switch to editing it directly.
+
+### Option 3 - Upload a diagram
+
+Use **Upload diagram** when you already have an architecture sketch. PolyCost accepts
+Mermaid text, draw.io XML, Lucid-style CSV exports, and VSDX files up to 5MB.
+
+Export paths:
+
+- draw.io / diagrams.net: `File > Save as` for `.drawio`, or `File > Export as > XML`.
+- Lucidchart shape data: `File > Export > CSV of Shape Data`.
+- Lucidchart Visio export: `File > Export > Visio (VSDX)`.
+- Mermaid: paste the `.mmd` source or flowchart text directly.
+
+After parsing, PolyCost shows a review panel with:
+
+- Classified services and confidence levels.
+- Assumed defaults such as compute size or storage capacity.
+- Unresolved nodes that need manual classification.
+- Decorative or ignored nodes.
+
+The parsed result becomes the same editable workload form used by the other input
+modes. Review and tune the sizing assumptions before comparing costs.
 
 ## Reading your comparison
 

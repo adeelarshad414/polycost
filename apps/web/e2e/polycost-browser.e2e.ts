@@ -1,3 +1,5 @@
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { expect, Page, test } from '@playwright/test';
 import type {
   ComparisonResult,
@@ -8,6 +10,9 @@ import type {
 } from '../src/types';
 
 const HOURS_PER_MONTH = 730;
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const FIXTURE_ROOT = resolve(__dirname, '../../../fixtures/diagrams');
+const E2E_COMPARISON_ID = '77777777-7777-4777-8777-000000000001';
 
 test('persists light and dark theme choices across reloads', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
@@ -96,6 +101,53 @@ test('surfaces provider pricing warnings in the engineering evidence view', asyn
   );
 });
 
+test('uploads a draw.io diagram, reviews extracted services, and runs a live comparison', async ({
+  page,
+}) => {
+  let submittedSourceType: string | undefined;
+  let submittedServiceCount = 0;
+
+  await page.route('**/api/v1/comparisons', async (route) => {
+    if (route.request().method() === 'POST') {
+      const payload = JSON.parse(route.request().postData() ?? '{}') as {
+        nws?: {
+          metadata?: {
+            sourceType?: string;
+          };
+          serviceRequirements?: unknown[];
+        };
+      };
+
+      submittedSourceType = payload.nws?.metadata?.sourceType;
+      submittedServiceCount = payload.nws?.serviceRequirements?.length ?? 0;
+    }
+
+    await route.continue();
+  });
+
+  await page.goto('/');
+  await page.getByRole('tab', { name: /upload diagram/i }).click();
+  await page
+    .getByLabel(/upload architecture diagram/i)
+    .setInputFiles(resolve(FIXTURE_ROOT, 'drawio/web-app.drawio'));
+  await expect(page.locator('.requirements-file-status')).toContainText(
+    'Loaded from web-app.drawio',
+  );
+
+  await page
+    .locator('.diagram-import-panel')
+    .getByRole('button', { name: /^Parse diagram$/ })
+    .click();
+  await expect(page.getByLabel('Diagram parse review')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('Parser confidence')).toBeVisible();
+  await expect(page.getByText(/services/i).first()).toBeVisible();
+
+  await page.getByRole('button', { name: /^Compare costs$/ }).click();
+  await expect(page.getByLabel('Provider cost summary')).toBeVisible({ timeout: 30_000 });
+  expect(submittedSourceType).toBe('drawio_diagram');
+  expect(submittedServiceCount).toBeGreaterThan(0);
+});
+
 test('requests PDF, CSV, and Excel exports with the selected scenario context', async ({
   page,
 }) => {
@@ -107,7 +159,7 @@ test('requests PDF, CSV, and Excel exports with the selected scenario context', 
 
   await mockRegionCatalog(page);
   await mockComparisonCreation(page, browserComparison());
-  await page.route('**/api/v1/comparisons/e2e-browser/export-jobs', async (route) => {
+  await page.route(`**/api/v1/comparisons/${E2E_COMPARISON_ID}/export-jobs`, async (route) => {
     if (route.request().method() !== 'POST') {
       await route.fallback();
       return;
@@ -137,7 +189,7 @@ test('requests PDF, CSV, and Excel exports with the selected scenario context', 
     });
   });
   await page.route(
-    '**/api/v1/comparisons/e2e-browser/export-jobs/job-*/download',
+    `**/api/v1/comparisons/${E2E_COMPARISON_ID}/export-jobs/job-*/download`,
     async (route) => {
       const url = new URL(route.request().url());
       const jobId = url.pathname.split('/').at(-2) ?? '';
@@ -150,22 +202,25 @@ test('requests PDF, CSV, and Excel exports with the selected scenario context', 
       });
     },
   );
-  await page.route('**/api/v1/comparisons/e2e-browser/export-jobs/job-*', async (route) => {
-    const url = new URL(route.request().url());
-    if (url.pathname.endsWith('/download')) {
-      await route.fallback();
-      return;
-    }
+  await page.route(
+    `**/api/v1/comparisons/${E2E_COMPARISON_ID}/export-jobs/job-*`,
+    async (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname.endsWith('/download')) {
+        await route.fallback();
+        return;
+      }
 
-    const jobId = url.pathname.split('/').at(-1) ?? '';
-    const format = jobId.replace(/^job-/, '') as ReportFormat;
+      const jobId = url.pathname.split('/').at(-1) ?? '';
+      const format = jobId.replace(/^job-/, '') as ReportFormat;
 
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(exportJob(format, 'completed')),
-    });
-  });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(exportJob(format, 'completed')),
+      });
+    },
+  );
 
   await page.goto('/');
   await page.getByRole('button', { name: /reserved 3yr/i }).click();
@@ -265,7 +320,7 @@ async function expectNoHorizontalOverflow(page: Page): Promise<void> {
 
 function browserComparison(overrides: Partial<ComparisonResult> = {}): ComparisonResult {
   return {
-    comparisonId: 'e2e-browser',
+    comparisonId: E2E_COMPARISON_ID,
     pricingAsOf: '2026-07-01T00:00:00.000Z',
     cheapestProviderId: 'gcp',
     requirements: {
@@ -411,11 +466,11 @@ function exportJob(
   status: ReportExportJobResponse['status'],
 ): ReportExportJobResponse {
   const jobId = `job-${format}`;
-  const statusUrl = `/api/v1/comparisons/e2e-browser/export-jobs/${jobId}`;
+  const statusUrl = `/api/v1/comparisons/${E2E_COMPARISON_ID}/export-jobs/${jobId}`;
 
   return {
     jobId,
-    comparisonId: 'e2e-browser',
+    comparisonId: E2E_COMPARISON_ID,
     format,
     interval: 'monthly',
     pricingModel: 'reserved-3yr',
@@ -447,7 +502,7 @@ function exportBody(format: ReportFormat): string {
   }
 
   if (format === 'csv') {
-    return 'Comparison ID,e2e-browser\n';
+    return `Comparison ID,${E2E_COMPARISON_ID}\n`;
   }
 
   return 'PK e2e';

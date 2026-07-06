@@ -658,6 +658,34 @@ export function workloadScopeRows(result: ComparisonResult): string[][] {
   ];
 }
 
+export function sourceDiagramRows(result: ComparisonResult): string[][] {
+  const requirements = result.requirements;
+
+  if (requirements?.sourceType !== 'drawio_diagram') {
+    return [];
+  }
+
+  const diagramRequirements = requirements.serviceRequirements.filter(
+    (requirement) => requirement.scaleParams?.confidence || requirement.scaleParams?.reason,
+  );
+  const assumedDefaults = diagramRequirements.reduce((total, requirement) => {
+    const count = requirement.scaleParams?.assumedDefaultCount;
+
+    return total + (typeof count === 'number' ? count : 0);
+  }, 0);
+
+  return [
+    ['Field', 'Value'],
+    ['Source diagram', 'Parsed diagram import reviewed through the Diagram-to-Cost workflow'],
+    ['Classified diagram nodes', diagramRequirements.length.toString()],
+    ['Assumed defaults requiring review', assumedDefaults.toString()],
+    [
+      'Review guidance',
+      'Validate diagram-derived service classifications, quantities, storage sizes, HA posture, and region before procurement.',
+    ],
+  ];
+}
+
 function availabilitySummary(
   availability: NonNullable<ComparisonResult['requirements']>['availability'],
 ): string {

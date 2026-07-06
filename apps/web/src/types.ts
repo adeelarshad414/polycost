@@ -255,6 +255,82 @@ export interface ParsedNwsDraft {
   fieldsRequiringReview: string[];
 }
 
+export type DiagramInputFormat = 'mermaid' | 'drawio' | 'lucid_csv' | 'vsdx';
+export type DiagramClassificationConfidence = 'high' | 'moderate' | 'low';
+
+export interface DiagramParseRequest {
+  content: string;
+  encoding?: 'text' | 'base64';
+  fileName?: string;
+  mimeType?: string;
+  inputFormat?: DiagramInputFormat | 'auto';
+}
+
+export interface DiagramParseResult {
+  importId: string;
+  parserConfidence: ParsedNwsDraft['parserConfidence'];
+  fieldsRequiringReview: string[];
+  source: {
+    format: DiagramInputFormat;
+    fileName?: string;
+    mimeType?: string;
+    sizeBytes: number;
+    sha256: string;
+    parsedAt: string;
+    persisted: boolean;
+    tempFileStored: boolean;
+    expiresAt?: string;
+  };
+  graph: {
+    format: DiagramInputFormat;
+    nodes: Array<{
+      id: string;
+      displayLabel: string;
+      kind: 'resource' | 'connector' | 'decorative' | 'unknown';
+      sourceRef: string;
+      stencilId?: string;
+    }>;
+    edges: Array<{
+      id: string;
+      sourceId: string;
+      targetId: string;
+      displayLabel?: string;
+    }>;
+    ignoredNodes: Array<{
+      id: string;
+      displayLabel: string;
+      reason: string;
+      sourceRef: string;
+    }>;
+  };
+  review: {
+    components: Array<{
+      nodeId: string;
+      displayLabel: string;
+      serviceCategory: ServiceRequirement['serviceCategory'];
+      serviceType: string;
+      confidence: DiagramClassificationConfidence;
+      sourceRef: string;
+      assumedDefaults: string[];
+      editable: true;
+    }>;
+    unresolvedClassifications: Array<{
+      id: string;
+      displayLabel: string;
+      reason: string;
+      sourceRef: string;
+    }>;
+    ignoredNodes: Array<{
+      id: string;
+      displayLabel: string;
+      reason: string;
+      sourceRef: string;
+    }>;
+    assumedDefaults: string[];
+  };
+  draftNws: NormalizedWorkloadSpec;
+}
+
 export interface CostIntervals {
   hourly?: number;
   daily: number;

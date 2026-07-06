@@ -44,6 +44,8 @@ import {
   ComparisonAnalyticsResponse,
   ComparisonResult,
   DataHealthResponse,
+  DiagramInputFormat,
+  DiagramParseResult,
   INTERVALS,
   IntervalKey,
   NormalizedWorkloadSpec,
@@ -52,6 +54,7 @@ import {
   ProviderId,
   RegionCatalogResponse,
   ReportFormat,
+  ServiceRequirement,
 } from './types';
 import {
   ARCHITECTURE_TEMPLATES,
@@ -67,7 +70,7 @@ import {
   WorkloadFormState,
 } from './workload';
 
-type InputMode = 'describe' | 'form';
+type InputMode = 'describe' | 'form' | 'diagram';
 type BusyAction = 'parse' | 'compare' | 'refresh' | 'export' | null;
 type ServiceCategory = ComparisonProviderResult['lineItems'][number]['category'];
 type ComparisonLineItem = ComparisonProviderResult['lineItems'][number];
@@ -79,6 +82,7 @@ type CostMatrixProviderFilter = ProviderId | 'all';
 type CostMatrixPricingModelFilter = PricingModelKey | 'all';
 type CostMatrixSortKey = 'service' | `${ProviderId}:${PricingModelKey}`;
 type CostMatrixColumnMode = 'summary' | 'technical';
+type ServiceRequirementCategory = ServiceRequirement['serviceCategory'];
 
 const INPUT_MODE_OPTIONS: Array<{
   key: InputMode;
@@ -98,6 +102,12 @@ const INPUT_MODE_OPTIONS: Array<{
     summaryLabel: 'Parsed from text',
     description: 'Natural language or pasted bill text',
   },
+  {
+    key: 'diagram',
+    label: 'Upload diagram',
+    summaryLabel: 'Parsed from diagram',
+    description: 'Mermaid, draw.io XML, Lucid CSV, or VSDX',
+  },
 ];
 
 const PRICING_MODEL_STORAGE_KEY = 'polycost-pricing-model';
@@ -105,6 +115,7 @@ const REQUIREMENT_SESSION_STORAGE_KEY = 'polycost-current-requirements-v1';
 const COMPARISON_HISTORY_STORAGE_KEY = 'polycost-comparison-history-v1';
 const MAX_COMPARISON_HISTORY_ENTRIES = 8;
 const REQUIREMENTS_FILE_MAX_BYTES = 128 * 1024;
+const DIAGRAM_FILE_MAX_BYTES = 5 * 1024 * 1024;
 const CONFIDENCE_TOOLTIP =
   'Confidence reflects how closely the equivalent service matches on specs, not just name.';
 const HOURS_PER_MONTH_TOOLTIP =
@@ -122,6 +133,22 @@ const REQUIREMENTS_FILE_MIME_TYPES = new Set([
   'application/x-yaml',
   'text/yaml',
 ]);
+const DIAGRAM_FILE_ACCEPT =
+  '.mmd,.mermaid,.drawio,.xml,.csv,.vsdx,text/plain,text/csv,application/xml,application/vnd.visio,application/vnd.ms-visio.drawing.main+xml,application/octet-stream';
+const DIAGRAM_REVIEW_SERVICE_OPTIONS: Array<{
+  label: string;
+  serviceCategory: ServiceRequirementCategory;
+  serviceType: string;
+}> = [
+  { label: 'Compute / VM', serviceCategory: 'compute', serviceType: 'vm-compute' },
+  { label: 'Container app', serviceCategory: 'containers', serviceType: 'container-app' },
+  { label: 'Object storage', serviceCategory: 'storage', serviceType: 'object-storage' },
+  { label: 'Relational database', serviceCategory: 'database', serviceType: 'relational-database' },
+  { label: 'Load balancer', serviceCategory: 'networking', serviceType: 'load-balancer' },
+  { label: 'CDN', serviceCategory: 'networking', serviceType: 'cdn' },
+  { label: 'Message queue', serviceCategory: 'integration', serviceType: 'queue' },
+  { label: 'Analytics warehouse', serviceCategory: 'analytics', serviceType: 'warehouse' },
+];
 const PRICING_MODEL_OPTIONS: Array<{
   key: PricingModelKey;
   label: string;
@@ -680,6 +707,12 @@ export function App({ client = polyCostClient }: AppProps) {
   const [naturalLanguageInput, setNaturalLanguageInput] = useState(
     () => initialRequirementSession?.naturalLanguageInput ?? sampleNaturalLanguageInput,
   );
+  const [diagramInput, setDiagramInput] = useState('');
+  const [diagramEncoding, setDiagramEncoding] = useState<'text' | 'base64'>('text');
+  const [diagramInputFormat, setDiagramInputFormat] = useState<DiagramInputFormat | 'auto'>('auto');
+  const [diagramMimeType, setDiagramMimeType] = useState<string | undefined>(undefined);
+  const [diagramFileName, setDiagramFileName] = useState<string | null>(null);
+  const [diagramParseResult, setDiagramParseResult] = useState<DiagramParseResult | null>(null);
   const [form, setForm] = useState<WorkloadFormState>(
     () => initialRequirementSession?.form ?? INITIAL_HOME_FORM,
   );
@@ -878,6 +911,52 @@ export function App({ client = polyCostClient }: AppProps) {
     }
   }
 
+  async function handleParseDiagram() {
+    if (!diagramInput.trim()) {
+      setError('Upload a diagram or paste Mermaid, draw.io XML, or Lucid CSV content first.');
+      setNotice(null);
+      return;
+    }
+
+    const actionId = startAsyncAction();
+    setError(null);
+    setNotice(null);
+    setBusyAction('parse');
+
+    try {
+      const parsed = await client.parseDiagram({
+        content: diagramInput,
+        encoding: diagramEncoding,
+        inputFormat: diagramInputFormat,
+        fileName: diagramFileName ?? undefined,
+        mimeType: diagramMimeType,
+      });
+      if (!isCurrentAsyncAction(actionId)) {
+        return;
+      }
+
+      setDiagramParseResult(parsed);
+      setForm(formFromNws(parsed.draftNws));
+      setFormValidationIssues([]);
+      setInputMode('diagram');
+      setRequirementsAwaitingReview(true);
+      setNotice(
+        `${reviewMessage(
+          parsed.parserConfidence,
+          parsed.fieldsRequiringReview,
+        )} Review the diagram-derived services, edit sizing assumptions, then compare.`,
+      );
+    } catch (parseError) {
+      if (isCurrentAsyncAction(actionId)) {
+        setError(formatApiError(parseError));
+      }
+    } finally {
+      if (isCurrentAsyncAction(actionId)) {
+        setBusyAction(null);
+      }
+    }
+  }
+
   async function handleCompare(event?: FormEvent) {
     event?.preventDefault();
 
@@ -886,7 +965,13 @@ export function App({ client = polyCostClient }: AppProps) {
       return;
     }
 
-    const validationIssues = inputMode === 'form' ? validateWorkloadForm(form) : [];
+    if (inputMode === 'diagram' && !diagramParseResult) {
+      await handleParseDiagram();
+      return;
+    }
+
+    const validationIssues =
+      inputMode === 'form' || inputMode === 'diagram' ? validateWorkloadForm(form) : [];
 
     if (validationIssues.length > 0) {
       setFormValidationIssues(validationIssues);
@@ -967,6 +1052,26 @@ export function App({ client = polyCostClient }: AppProps) {
     submittedComparisonForm: WorkloadFormState;
     submittedComparisonInputMode: InputMode;
   }> {
+    if (inputMode === 'diagram' && diagramParseResult) {
+      const nws = buildNwsFromForm(form, 'drawio_diagram');
+
+      return {
+        nws: {
+          ...nws,
+          serviceRequirements: diagramParseResult.draftNws.serviceRequirements,
+          sourceTraceability:
+            diagramParseResult.draftNws.sourceTraceability ??
+            serviceCatalogTraceability(form.selectedServiceFamilyIds),
+        },
+        parserNotice: reviewMessage(
+          diagramParseResult.parserConfidence,
+          diagramParseResult.fieldsRequiringReview,
+        ),
+        submittedComparisonForm: form,
+        submittedComparisonInputMode: 'diagram',
+      };
+    }
+
     if (inputMode !== 'describe') {
       return {
         nws: buildNwsFromForm(form, 'structured_form'),
@@ -1074,6 +1179,209 @@ export function App({ client = polyCostClient }: AppProps) {
     setRequirementsFileName(null);
   }
 
+  function handleDiagramInputChange(value: string) {
+    setDiagramInput(value);
+    setDiagramEncoding('text');
+    setDiagramInputFormat('auto');
+    setDiagramMimeType(undefined);
+    setDiagramFileName(null);
+    setDiagramParseResult(null);
+  }
+
+  function handleClearDiagramInput() {
+    setDiagramInput('');
+    setDiagramEncoding('text');
+    setDiagramInputFormat('auto');
+    setDiagramMimeType(undefined);
+    setDiagramFileName(null);
+    setDiagramParseResult(null);
+    setRequirementsAwaitingReview(false);
+    setFormValidationIssues([]);
+    setNotice(null);
+    setError(null);
+  }
+
+  function handleRemoveDiagramComponent(nodeId: string) {
+    setDiagramParseResult((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const removedComponent = current.review.components.find(
+        (component) => component.nodeId === nodeId,
+      );
+
+      return {
+        ...current,
+        fieldsRequiringReview: [
+          ...new Set([...current.fieldsRequiringReview, `diagram.nodes.${nodeId}.removed`]),
+        ],
+        draftNws: {
+          ...current.draftNws,
+          serviceRequirements: (current.draftNws.serviceRequirements ?? []).filter(
+            (requirement) => diagramNodeIdForRequirement(requirement) !== nodeId,
+          ),
+          sourceTraceability: current.draftNws.sourceTraceability?.filter(
+            (trace) => trace.sourceRef !== removedComponent?.sourceRef,
+          ),
+        },
+        review: {
+          ...current.review,
+          components: current.review.components.filter((component) => component.nodeId !== nodeId),
+          ignoredNodes: removedComponent
+            ? [
+                ...current.review.ignoredNodes,
+                {
+                  id: nodeId,
+                  displayLabel: removedComponent.displayLabel,
+                  reason: 'removed during review',
+                  sourceRef: removedComponent.sourceRef,
+                },
+              ]
+            : current.review.ignoredNodes,
+        },
+        graph: {
+          ...current.graph,
+          nodes: current.graph.nodes.filter((node) => node.id !== nodeId),
+          ignoredNodes: removedComponent
+            ? [
+                ...current.graph.ignoredNodes,
+                {
+                  id: nodeId,
+                  displayLabel: removedComponent.displayLabel,
+                  reason: 'removed during review',
+                  sourceRef: removedComponent.sourceRef,
+                },
+              ]
+            : current.graph.ignoredNodes,
+        },
+      };
+    });
+    setNotice('Removed the diagram service from the comparison review.');
+  }
+
+  function handleClassifyDiagramNode(nodeId: string, serviceType: string) {
+    if (!serviceType) {
+      return;
+    }
+
+    setDiagramParseResult((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const node = current.review.unresolvedClassifications.find((item) => item.id === nodeId);
+      if (!node) {
+        return current;
+      }
+
+      const requirement = serviceRequirementForManualClassification(nodeId, serviceType);
+      const component = diagramReviewComponentFromRequirement(node, requirement);
+
+      return {
+        ...current,
+        parserConfidence: 'low',
+        fieldsRequiringReview: [
+          ...new Set([...current.fieldsRequiringReview, `diagram.nodes.${nodeId}.classification`]),
+        ],
+        draftNws: {
+          ...current.draftNws,
+          serviceRequirements: [...(current.draftNws.serviceRequirements ?? []), requirement],
+          sourceTraceability: [
+            ...(current.draftNws.sourceTraceability ?? []),
+            {
+              nwsPath: `serviceRequirements.${nodeId}`,
+              sourceRef: node.sourceRef,
+            },
+          ],
+        },
+        review: {
+          ...current.review,
+          components: [...current.review.components, component],
+          unresolvedClassifications: current.review.unresolvedClassifications.filter(
+            (item) => item.id !== nodeId,
+          ),
+          assumedDefaults: [
+            ...new Set([...current.review.assumedDefaults, ...component.assumedDefaults]),
+          ],
+        },
+        graph: {
+          ...current.graph,
+          nodes: current.graph.nodes.map((graphNode) =>
+            graphNode.id === nodeId ? { ...graphNode, kind: 'resource' } : graphNode,
+          ),
+        },
+      };
+    });
+    setNotice(
+      'Classified the unresolved diagram node. Review the sizing assumptions before comparing.',
+    );
+  }
+
+  function handleAddDiagramRequirement(serviceType: string) {
+    if (!serviceType) {
+      return;
+    }
+
+    const nodeId = `manual-${Date.now()}`;
+    const sourceRef = `diagram:manual:${nodeId}`;
+    const requirement = serviceRequirementForManualClassification(nodeId, serviceType);
+
+    setDiagramParseResult((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const component = diagramReviewComponentFromRequirement(
+        {
+          id: nodeId,
+          displayLabel: serviceLabelForType(serviceType),
+          sourceRef,
+        },
+        requirement,
+      );
+
+      return {
+        ...current,
+        parserConfidence: 'low',
+        fieldsRequiringReview: [
+          ...new Set([...current.fieldsRequiringReview, `diagram.nodes.${nodeId}.manual`]),
+        ],
+        draftNws: {
+          ...current.draftNws,
+          serviceRequirements: [...(current.draftNws.serviceRequirements ?? []), requirement],
+          sourceTraceability: [
+            ...(current.draftNws.sourceTraceability ?? []),
+            {
+              nwsPath: `serviceRequirements.${nodeId}`,
+              sourceRef,
+            },
+          ],
+        },
+        review: {
+          ...current.review,
+          components: [...current.review.components, component],
+          assumedDefaults: [
+            ...new Set([...current.review.assumedDefaults, ...component.assumedDefaults]),
+          ],
+        },
+        graph: {
+          ...current.graph,
+          nodes: [
+            ...current.graph.nodes,
+            {
+              id: nodeId,
+              displayLabel: component.displayLabel,
+              kind: 'resource',
+              sourceRef,
+            },
+          ],
+        },
+      };
+    });
+    setNotice('Added a manual diagram service. Review the workload form before comparing.');
+  }
+
   function handleUseSampleRequirements() {
     setInputMode('describe');
     setNaturalLanguageInput(sampleNaturalLanguageInput);
@@ -1124,6 +1432,45 @@ export function App({ client = polyCostClient }: AppProps) {
     }
   }
 
+  async function handleDiagramFileLoad(file: File | null) {
+    if (!file) {
+      return;
+    }
+
+    if (file.size > DIAGRAM_FILE_MAX_BYTES) {
+      setError('Upload a diagram file under 5MB.');
+      setNotice(null);
+      return;
+    }
+
+    try {
+      const inputFormat = diagramFormatFromFile(file);
+      const isBinary = inputFormat === 'vsdx' || file.type === 'application/octet-stream';
+      const content = isBinary ? await fileToBase64(file) : await file.text();
+
+      if (!content.trim()) {
+        setError('The selected diagram file is empty.');
+        setNotice(null);
+        return;
+      }
+
+      setDiagramInput(content);
+      setDiagramEncoding(isBinary ? 'base64' : 'text');
+      setDiagramInputFormat(inputFormat);
+      setDiagramMimeType(file.type || undefined);
+      setDiagramFileName(file.name || 'diagram file');
+      setDiagramParseResult(null);
+      setInputMode('diagram');
+      setRequirementsAwaitingReview(false);
+      setFormValidationIssues([]);
+      setError(null);
+      setNotice(`Loaded ${file.name || 'diagram file'}. Parse the diagram to review services.`);
+    } catch {
+      setError('Could not read the selected diagram file.');
+      setNotice(null);
+    }
+  }
+
   function handleClearComparison() {
     cancelAsyncActions();
     setForm(INITIAL_HOME_FORM);
@@ -1134,6 +1481,12 @@ export function App({ client = polyCostClient }: AppProps) {
     setInputMode('form');
     setNaturalLanguageInput(sampleNaturalLanguageInput);
     setRequirementsFileName(null);
+    setDiagramInput('');
+    setDiagramEncoding('text');
+    setDiagramInputFormat('auto');
+    setDiagramMimeType(undefined);
+    setDiagramFileName(null);
+    setDiagramParseResult(null);
     setComparison(null);
     setIsEditingRequirements(false);
     setInterval('monthly');
@@ -1153,6 +1506,12 @@ export function App({ client = polyCostClient }: AppProps) {
     setInputMode('form');
     setNaturalLanguageInput(sampleNaturalLanguageInput);
     setRequirementsFileName(null);
+    setDiagramInput('');
+    setDiagramEncoding('text');
+    setDiagramInputFormat('auto');
+    setDiagramMimeType(undefined);
+    setDiagramFileName(null);
+    setDiagramParseResult(null);
     setPricingModel(entry.pricingModel);
     storePricingModel(entry.pricingModel);
     setComparison(null);
@@ -1246,6 +1605,9 @@ export function App({ client = polyCostClient }: AppProps) {
           notice={notice}
           error={error}
           naturalLanguageInput={naturalLanguageInput}
+          diagramInput={diagramInput}
+          diagramInputFormat={diagramInputFormat}
+          diagramParseResult={diagramParseResult}
           regionCatalog={regionCatalog}
           regionCatalogError={regionCatalogError}
           validationIssues={formValidationIssues}
@@ -1257,13 +1619,21 @@ export function App({ client = polyCostClient }: AppProps) {
           onInputModeChange={setInputMode}
           onPricingModelChange={handlePricingModelChange}
           onNaturalLanguageChange={handleNaturalLanguageChange}
+          onDiagramInputChange={handleDiagramInputChange}
+          onRemoveDiagramComponent={handleRemoveDiagramComponent}
+          onClassifyDiagramNode={handleClassifyDiagramNode}
+          onAddDiagramRequirement={handleAddDiagramRequirement}
           onFormChange={handleFormChange}
           onSubmit={handleCompare}
           onParse={handleParse}
+          onParseDiagram={handleParseDiagram}
           onClearRequirements={handleClearRequirements}
+          onClearDiagramInput={handleClearDiagramInput}
           onUseSample={handleUseSampleRequirements}
           onRequirementsFileLoad={handleRequirementsFileLoad}
+          onDiagramFileLoad={handleDiagramFileLoad}
           requirementsFileName={requirementsFileName}
+          diagramFileName={diagramFileName}
           onIntervalChange={setInterval}
           onRefreshLive={handleRefreshLive}
           onExport={(format) => void handleExport(format)}
@@ -1275,6 +1645,9 @@ export function App({ client = polyCostClient }: AppProps) {
           pricingModel={pricingModel}
           requirementsAwaitingReview={requirementsAwaitingReview}
           naturalLanguageInput={naturalLanguageInput}
+          diagramInput={diagramInput}
+          diagramInputFormat={diagramInputFormat}
+          diagramParseResult={diagramParseResult}
           regionCatalog={regionCatalog}
           regionCatalogError={regionCatalogError}
           notice={notice}
@@ -1287,14 +1660,22 @@ export function App({ client = polyCostClient }: AppProps) {
           onInputModeChange={setInputMode}
           onPricingModelChange={handlePricingModelChange}
           onNaturalLanguageChange={handleNaturalLanguageChange}
+          onDiagramInputChange={handleDiagramInputChange}
+          onRemoveDiagramComponent={handleRemoveDiagramComponent}
+          onClassifyDiagramNode={handleClassifyDiagramNode}
+          onAddDiagramRequirement={handleAddDiagramRequirement}
           onChange={handleFormChange}
           onClearRequirements={handleClearRequirements}
+          onClearDiagramInput={handleClearDiagramInput}
           onSubmit={handleCompare}
+          onParseDiagram={handleParseDiagram}
           onRestoreHistory={handleRestoreComparisonHistory}
           onClearHistory={handleClearComparisonHistory}
           onUseSample={handleUseSampleRequirements}
           onRequirementsFileLoad={handleRequirementsFileLoad}
+          onDiagramFileLoad={handleDiagramFileLoad}
           requirementsFileName={requirementsFileName}
+          diagramFileName={diagramFileName}
         />
       )}
     </main>
@@ -1452,6 +1833,9 @@ function InitialHomePage({
   inputMode,
   pricingModel,
   naturalLanguageInput,
+  diagramInput,
+  diagramInputFormat,
+  diagramParseResult,
   regionCatalog,
   regionCatalogError,
   notice,
@@ -1465,19 +1849,30 @@ function InitialHomePage({
   onInputModeChange,
   onPricingModelChange,
   onNaturalLanguageChange,
+  onDiagramInputChange,
+  onRemoveDiagramComponent,
+  onClassifyDiagramNode,
+  onAddDiagramRequirement,
   onChange,
   onClearRequirements,
+  onClearDiagramInput,
   onSubmit,
+  onParseDiagram,
   onRestoreHistory,
   onClearHistory,
   onUseSample,
   onRequirementsFileLoad,
+  onDiagramFileLoad,
   requirementsFileName,
+  diagramFileName,
 }: {
   form: WorkloadFormState;
   inputMode: InputMode;
   pricingModel: PricingModelKey;
   naturalLanguageInput: string;
+  diagramInput: string;
+  diagramInputFormat: DiagramInputFormat | 'auto';
+  diagramParseResult: DiagramParseResult | null;
   regionCatalog: RegionCatalogResponse | null;
   regionCatalogError: string | null;
   notice: string | null;
@@ -1491,14 +1886,22 @@ function InitialHomePage({
   onInputModeChange: (mode: InputMode) => void;
   onPricingModelChange: (model: PricingModelKey) => void;
   onNaturalLanguageChange: (value: string) => void;
+  onDiagramInputChange: (value: string) => void;
+  onRemoveDiagramComponent: (nodeId: string) => void;
+  onClassifyDiagramNode: (nodeId: string, serviceType: string) => void;
+  onAddDiagramRequirement: (serviceType: string) => void;
   onChange: (form: WorkloadFormState) => void;
   onClearRequirements: () => void;
-  onSubmit: (event: FormEvent) => void;
+  onClearDiagramInput: () => void;
+  onSubmit: (event?: FormEvent) => void;
+  onParseDiagram: () => void;
   onRestoreHistory: (entry: ComparisonHistoryEntry) => void;
   onClearHistory: () => void;
   onUseSample: () => void;
   onRequirementsFileLoad: (file: File | null) => void | Promise<void>;
+  onDiagramFileLoad: (file: File | null) => void | Promise<void>;
   requirementsFileName: string | null;
+  diagramFileName: string | null;
 }) {
   function update<K extends keyof WorkloadFormState>(key: K, value: WorkloadFormState[K]) {
     onChange(applyResidencyRegionLock({ ...form, [key]: value }));
@@ -1956,6 +2359,66 @@ function InitialHomePage({
               </div>
             </details>
           </form>
+        ) : inputMode === 'diagram' ? (
+          <div className="initial-diagram-form">
+            <DiagramImportPanel
+              value={diagramInput}
+              format={diagramInputFormat}
+              parseResult={diagramParseResult}
+              isParsing={isComparing}
+              onChange={onDiagramInputChange}
+              onClear={onClearDiagramInput}
+              onParse={onParseDiagram}
+              onFileLoad={onDiagramFileLoad}
+              fileName={diagramFileName}
+              onRemoveComponent={onRemoveDiagramComponent}
+              onClassifyNode={onClassifyDiagramNode}
+              onAddRequirement={onAddDiagramRequirement}
+            />
+            {diagramParseResult ? (
+              <div className="diagram-review-workspace">
+                <div className="diagram-review-workload">
+                  <RequirementReviewCards form={form} />
+                  <div className="diagram-review-edit-hint">
+                    <span>Editable sizing</span>
+                    <strong>Review services, tune assumptions, then compare.</strong>
+                  </div>
+                </div>
+                <details className="diagram-edit-details" open>
+                  <summary>Edit parsed sizing</summary>
+                  <WorkloadForm
+                    form={form}
+                    regionCatalog={regionCatalog}
+                    regionCatalogError={regionCatalogError}
+                    validationIssues={validationIssues}
+                    onChange={onChange}
+                    onSubmit={(event) => onSubmit(event)}
+                  />
+                </details>
+              </div>
+            ) : null}
+            <div className="initial-home-actions">
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => {
+                  if (diagramParseResult) {
+                    onSubmit();
+                  } else {
+                    onParseDiagram();
+                  }
+                }}
+                loading={isComparing}
+                loadingLabel={
+                  diagramParseResult ? 'Comparing costs...' : compareLoadingLabel(inputMode)
+                }
+                disabled={isComparing}
+              >
+                {diagramParseResult ? <CompareIcon /> : <ParseIcon />}
+                {diagramParseResult ? 'Compare costs' : compareButtonLabel(inputMode)}
+              </Button>
+            </div>
+          </div>
         ) : (
           <form className="initial-paste-form" onSubmit={onSubmit}>
             <DescribePanel
@@ -2007,6 +2470,9 @@ function ProgressiveComparisonPage({
   notice,
   error,
   naturalLanguageInput,
+  diagramInput,
+  diagramInputFormat,
+  diagramParseResult,
   regionCatalog,
   regionCatalogError,
   validationIssues,
@@ -2018,13 +2484,21 @@ function ProgressiveComparisonPage({
   onInputModeChange,
   onPricingModelChange,
   onNaturalLanguageChange,
+  onDiagramInputChange,
+  onRemoveDiagramComponent,
+  onClassifyDiagramNode,
+  onAddDiagramRequirement,
   onFormChange,
   onSubmit,
   onParse,
+  onParseDiagram,
   onClearRequirements,
+  onClearDiagramInput,
   onUseSample,
   onRequirementsFileLoad,
+  onDiagramFileLoad,
   requirementsFileName,
+  diagramFileName,
   onIntervalChange,
   onRefreshLive,
   onExport,
@@ -2047,6 +2521,9 @@ function ProgressiveComparisonPage({
   notice: string | null;
   error: string | null;
   naturalLanguageInput: string;
+  diagramInput: string;
+  diagramInputFormat: DiagramInputFormat | 'auto';
+  diagramParseResult: DiagramParseResult | null;
   regionCatalog: RegionCatalogResponse | null;
   regionCatalogError: string | null;
   validationIssues: WorkloadFormIssue[];
@@ -2058,13 +2535,21 @@ function ProgressiveComparisonPage({
   onInputModeChange: (mode: InputMode) => void;
   onPricingModelChange: (model: PricingModelKey) => void;
   onNaturalLanguageChange: (value: string) => void;
+  onDiagramInputChange: (value: string) => void;
+  onRemoveDiagramComponent: (nodeId: string) => void;
+  onClassifyDiagramNode: (nodeId: string, serviceType: string) => void;
+  onAddDiagramRequirement: (serviceType: string) => void;
   onFormChange: (form: WorkloadFormState) => void;
   onSubmit: (event?: FormEvent) => void;
   onParse: () => void;
+  onParseDiagram: () => void;
   onClearRequirements: () => void;
+  onClearDiagramInput: () => void;
   onUseSample: () => void;
   onRequirementsFileLoad: (file: File | null) => void | Promise<void>;
+  onDiagramFileLoad: (file: File | null) => void | Promise<void>;
   requirementsFileName: string | null;
+  diagramFileName: string | null;
   onIntervalChange: (interval: IntervalKey) => void;
   onRefreshLive: () => void;
   onExport: (format: ReportFormat) => void;
@@ -2078,6 +2563,9 @@ function ProgressiveComparisonPage({
               form={form}
               inputMode={inputMode}
               naturalLanguageInput={naturalLanguageInput}
+              diagramInput={diagramInput}
+              diagramInputFormat={diagramInputFormat}
+              diagramParseResult={diagramParseResult}
               pricingModel={pricingModel}
               regionCatalog={regionCatalog}
               regionCatalogError={regionCatalogError}
@@ -2085,15 +2573,23 @@ function ProgressiveComparisonPage({
               requirementsAwaitingReview={requirementsAwaitingReview}
               busyAction={busyAction}
               onClearRequirements={onClearRequirements}
+              onClearDiagramInput={onClearDiagramInput}
               onFormChange={onFormChange}
               onInputModeChange={onInputModeChange}
               onPricingModelChange={onPricingModelChange}
               onNaturalLanguageChange={onNaturalLanguageChange}
+              onDiagramInputChange={onDiagramInputChange}
+              onRemoveDiagramComponent={onRemoveDiagramComponent}
+              onClassifyDiagramNode={onClassifyDiagramNode}
+              onAddDiagramRequirement={onAddDiagramRequirement}
               onParse={onParse}
+              onParseDiagram={onParseDiagram}
               onSubmit={onSubmit}
               onUseSample={onUseSample}
               onRequirementsFileLoad={onRequirementsFileLoad}
+              onDiagramFileLoad={onDiagramFileLoad}
               requirementsFileName={requirementsFileName}
+              diagramFileName={diagramFileName}
             />
             <StatusMessage notice={editStatusNotice(notice)} error={error} />
           </>
@@ -2716,6 +3212,9 @@ function RequirementsEditPanel({
   form,
   inputMode,
   naturalLanguageInput,
+  diagramInput,
+  diagramInputFormat,
+  diagramParseResult,
   pricingModel,
   regionCatalog,
   regionCatalogError,
@@ -2723,19 +3222,30 @@ function RequirementsEditPanel({
   requirementsAwaitingReview,
   busyAction,
   onClearRequirements,
+  onClearDiagramInput,
   onFormChange,
   onInputModeChange,
   onPricingModelChange,
   onNaturalLanguageChange,
+  onDiagramInputChange,
+  onRemoveDiagramComponent,
+  onClassifyDiagramNode,
+  onAddDiagramRequirement,
   onParse,
+  onParseDiagram,
   onSubmit,
   onUseSample,
   onRequirementsFileLoad,
+  onDiagramFileLoad,
   requirementsFileName,
+  diagramFileName,
 }: {
   form: WorkloadFormState;
   inputMode: InputMode;
   naturalLanguageInput: string;
+  diagramInput: string;
+  diagramInputFormat: DiagramInputFormat | 'auto';
+  diagramParseResult: DiagramParseResult | null;
   pricingModel: PricingModelKey;
   regionCatalog: RegionCatalogResponse | null;
   regionCatalogError: string | null;
@@ -2743,15 +3253,23 @@ function RequirementsEditPanel({
   requirementsAwaitingReview: boolean;
   busyAction: BusyAction;
   onClearRequirements: () => void;
+  onClearDiagramInput: () => void;
   onFormChange: (form: WorkloadFormState) => void;
   onInputModeChange: (mode: InputMode) => void;
   onPricingModelChange: (model: PricingModelKey) => void;
   onNaturalLanguageChange: (value: string) => void;
+  onDiagramInputChange: (value: string) => void;
+  onRemoveDiagramComponent: (nodeId: string) => void;
+  onClassifyDiagramNode: (nodeId: string, serviceType: string) => void;
+  onAddDiagramRequirement: (serviceType: string) => void;
   onParse: () => void;
+  onParseDiagram: () => void;
   onSubmit: (event?: FormEvent) => void;
   onUseSample: () => void;
   onRequirementsFileLoad: (file: File | null) => void | Promise<void>;
+  onDiagramFileLoad: (file: File | null) => void | Promise<void>;
   requirementsFileName: string | null;
+  diagramFileName: string | null;
 }) {
   return (
     <section className="requirements-edit-panel" aria-label="Edit workload requirements">
@@ -2777,6 +3295,22 @@ function RequirementsEditPanel({
           onFileLoad={onRequirementsFileLoad}
           fileName={requirementsFileName}
         />
+      ) : inputMode === 'diagram' ? (
+        <DiagramImportPanel
+          value={diagramInput}
+          format={diagramInputFormat}
+          parseResult={diagramParseResult}
+          isParsing={busyAction === 'parse'}
+          onChange={onDiagramInputChange}
+          onClear={onClearDiagramInput}
+          onParse={onParseDiagram}
+          onFileLoad={onDiagramFileLoad}
+          fileName={diagramFileName}
+          onRemoveComponent={onRemoveDiagramComponent}
+          onClassifyNode={onClassifyDiagramNode}
+          onAddRequirement={onAddDiagramRequirement}
+          compact
+        />
       ) : (
         <WorkloadForm
           form={form}
@@ -2787,7 +3321,7 @@ function RequirementsEditPanel({
           onSubmit={onSubmit}
         />
       )}
-      {inputMode === 'form' && requirementsAwaitingReview ? (
+      {(inputMode === 'form' || inputMode === 'diagram') && requirementsAwaitingReview ? (
         <RequirementReviewCards form={form} compact />
       ) : null}
       <div className="requirements-edit-actions">
@@ -2796,13 +3330,19 @@ function RequirementsEditPanel({
           variant="primary"
           onClick={() => void onSubmit()}
           loading={busyAction === 'compare'}
-          loadingLabel={compareLoadingLabel(inputMode)}
+          loadingLabel={
+            inputMode === 'diagram' && diagramParseResult
+              ? 'Comparing...'
+              : compareLoadingLabel(inputMode)
+          }
           disabled={busyAction !== null && busyAction !== 'compare'}
         >
-          <CompareIcon />
+          {inputMode === 'diagram' && !diagramParseResult ? <ParseIcon /> : <CompareIcon />}
           {inputMode === 'form' && requirementsAwaitingReview
             ? 'Confirm & compare'
-            : compareButtonLabel(inputMode)}
+            : inputMode === 'diagram' && diagramParseResult
+              ? 'Compare diagram estimate'
+              : compareButtonLabel(inputMode)}
         </Button>
       </div>
     </section>
@@ -2924,6 +3464,238 @@ function ResultDetailHeading({ title, description }: { title: string; descriptio
   );
 }
 
+function DiagramImportPanel({
+  value,
+  format,
+  parseResult,
+  isParsing,
+  onChange,
+  onClear,
+  onParse,
+  onFileLoad,
+  fileName,
+  onRemoveComponent,
+  onClassifyNode,
+  onAddRequirement,
+  compact = false,
+}: {
+  value: string;
+  format: DiagramInputFormat | 'auto';
+  parseResult: DiagramParseResult | null;
+  isParsing: boolean;
+  onChange: (value: string) => void;
+  onClear: () => void;
+  onParse: () => void;
+  onFileLoad: (file: File | null) => void | Promise<void>;
+  fileName: string | null;
+  onRemoveComponent: (nodeId: string) => void;
+  onClassifyNode: (nodeId: string, serviceType: string) => void;
+  onAddRequirement: (serviceType: string) => void;
+  compact?: boolean;
+}) {
+  const supportedLabel = 'Mermaid, draw.io XML, Lucid CSV, or VSDX';
+
+  return (
+    <div className={compact ? 'diagram-import-panel is-compact' : 'diagram-import-panel'}>
+      <div className="diagram-import-header">
+        <div>
+          <span>Diagram input</span>
+          <strong>{supportedLabel}</strong>
+        </div>
+        <span className="diagram-format-pill">
+          {format === 'auto' ? 'Auto detect' : formatLabel(format)}
+        </span>
+      </div>
+      <label className="diagram-drop-zone" htmlFor={compact ? 'diagram-file-edit' : 'diagram-file'}>
+        <UploadIcon />
+        <span>Upload architecture diagram</span>
+        <small>5MB max. Files are parsed into editable cloud-neutral requirements.</small>
+      </label>
+      <input
+        id={compact ? 'diagram-file-edit' : 'diagram-file'}
+        className="sr-only"
+        type="file"
+        accept={DIAGRAM_FILE_ACCEPT}
+        disabled={isParsing}
+        onChange={(event) => {
+          const input = event.currentTarget;
+          const file = input.files?.[0] ?? null;
+
+          void Promise.resolve(onFileLoad(file)).finally(() => {
+            input.value = '';
+          });
+        }}
+      />
+      <label className="field-label" htmlFor={compact ? 'diagram-source-edit' : 'diagram-source'}>
+        Paste diagram source
+      </label>
+      <textarea
+        id={compact ? 'diagram-source-edit' : 'diagram-source'}
+        className="diagram-source-textarea"
+        value={value}
+        onChange={(event) => onChange(event.currentTarget.value)}
+        placeholder="Paste Mermaid flowchart text, draw.io XML, or Lucid CSV export content."
+      />
+      {fileName ? (
+        <p className="requirements-file-status" role="status">
+          Loaded from {fileName}
+        </p>
+      ) : null}
+      {parseResult ? (
+        <DiagramReviewPanel
+          result={parseResult}
+          onRemoveComponent={onRemoveComponent}
+          onClassifyNode={onClassifyNode}
+          onAddRequirement={onAddRequirement}
+        />
+      ) : null}
+      <div className="action-row">
+        <Button
+          type="button"
+          variant="primary"
+          onClick={onParse}
+          loading={isParsing}
+          loadingLabel="Parsing diagram..."
+          disabled={isParsing || value.trim().length === 0}
+        >
+          <ParseIcon />
+          Parse diagram
+        </Button>
+        <Button
+          type="button"
+          variant="destructive"
+          onClick={onClear}
+          disabled={isParsing || value.length === 0}
+        >
+          <ClearIcon />
+          Clear
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function DiagramReviewPanel({
+  result,
+  onRemoveComponent,
+  onClassifyNode,
+  onAddRequirement,
+}: {
+  result: DiagramParseResult;
+  onRemoveComponent: (nodeId: string) => void;
+  onClassifyNode: (nodeId: string, serviceType: string) => void;
+  onAddRequirement: (serviceType: string) => void;
+}) {
+  return (
+    <section className="diagram-review-panel" aria-label="Diagram parse review">
+      <div className="diagram-review-summary">
+        <span>Parser confidence</span>
+        <strong>{result.parserConfidence}</strong>
+        <small>
+          {result.review.components.length} services · {result.graph.edges.length} links ·{' '}
+          {result.review.unresolvedClassifications.length} unresolved
+        </small>
+      </div>
+      <div className="diagram-preview-pane" aria-label="Diagram structure preview">
+        {result.graph.nodes.slice(0, 12).map((node) => (
+          <span className={`diagram-preview-node diagram-preview-node-${node.kind}`} key={node.id}>
+            {node.displayLabel}
+          </span>
+        ))}
+        {result.graph.nodes.length > 12 ? (
+          <span className="diagram-preview-node diagram-preview-node-more">
+            +{result.graph.nodes.length - 12} more
+          </span>
+        ) : null}
+      </div>
+      <div className="diagram-review-grid">
+        {result.review.components.slice(0, 8).map((component) => (
+          <article className="diagram-review-card" key={component.nodeId}>
+            <span className={`confidence-badge confidence-${component.confidence}`}>
+              {component.confidence}
+            </span>
+            <strong>{component.displayLabel}</strong>
+            <small>
+              {component.serviceCategory} · {component.serviceType}
+            </small>
+            {component.assumedDefaults.length > 0 ? (
+              <em>{component.assumedDefaults.slice(0, 2).join(', ')}</em>
+            ) : null}
+            <button
+              type="button"
+              className="diagram-review-link-button"
+              onClick={() => onRemoveComponent(component.nodeId)}
+            >
+              Remove
+            </button>
+          </article>
+        ))}
+      </div>
+      {result.review.unresolvedClassifications.length > 0 ? (
+        <div className="diagram-review-callout diagram-review-callout-risk">
+          <span>Needs classification</span>
+          <div className="diagram-review-unresolved-list">
+            {result.review.unresolvedClassifications.slice(0, 4).map((node) => (
+              <label className="diagram-review-select-row" key={node.id}>
+                <span>{node.displayLabel}</span>
+                <select
+                  aria-label={`Classify ${node.displayLabel}`}
+                  defaultValue=""
+                  onChange={(event) => onClassifyNode(node.id, event.currentTarget.value)}
+                >
+                  <option value="" disabled>
+                    Classify as
+                  </option>
+                  {DIAGRAM_REVIEW_SERVICE_OPTIONS.map((option) => (
+                    <option key={option.serviceType} value={option.serviceType}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {result.review.ignoredNodes.length > 0 ? (
+        <details className="diagram-review-callout">
+          <summary>
+            <span>Ignored decorative nodes</span>
+            <strong>{result.review.ignoredNodes.length}</strong>
+          </summary>
+          <ul className="diagram-review-ignored-list">
+            {result.review.ignoredNodes.slice(0, 8).map((node) => (
+              <li key={`${node.sourceRef}-${node.id}`}>
+                {node.displayLabel} · {node.reason}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+      <label className="diagram-review-select-row diagram-review-add-row">
+        <span>Add missing service</span>
+        <select
+          aria-label="Add missing diagram service"
+          defaultValue=""
+          onChange={(event) => {
+            onAddRequirement(event.currentTarget.value);
+            event.currentTarget.value = '';
+          }}
+        >
+          <option value="" disabled>
+            Add service
+          </option>
+          {DIAGRAM_REVIEW_SERVICE_OPTIONS.map((option) => (
+            <option key={option.serviceType} value={option.serviceType}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+    </section>
+  );
+}
+
 function DescribePanel({
   value,
   isParsing,
@@ -3030,7 +3802,7 @@ function WorkloadForm({
   regionCatalogError: string | null;
   validationIssues: WorkloadFormIssue[];
   onChange: (form: WorkloadFormState) => void;
-  onSubmit: (event: FormEvent) => void;
+  onSubmit: (event?: FormEvent) => void;
 }) {
   function update<K extends keyof WorkloadFormState>(key: K, value: WorkloadFormState[K]) {
     onChange(applyResidencyRegionLock({ ...form, [key]: value }));
@@ -14732,6 +15504,8 @@ function ModeIcon({ mode }: { mode: InputMode }) {
     <svg viewBox="0 0 24 24" aria-hidden="true" className="segment-icon">
       {mode === 'describe' ? (
         <path d="M5 7h14M5 12h10M5 17h6" />
+      ) : mode === 'diagram' ? (
+        <path d="M5 6h14v10H5zM8 19h8M8 10h3M13 10h3M11 10l2 3" />
       ) : (
         <path d="M5 5h6v6H5zM13 5h6v6h-6zM5 13h6v6H5zM13 13h6v6h-6z" />
       )}
@@ -15756,11 +16530,27 @@ function intervalCostMultiplier(interval: IntervalKey): number {
 }
 
 function compareButtonLabel(inputMode: InputMode): string {
-  return inputMode === 'describe' ? 'Parse requirements' : 'Compare';
+  if (inputMode === 'describe') {
+    return 'Parse requirements';
+  }
+
+  if (inputMode === 'diagram') {
+    return 'Parse diagram';
+  }
+
+  return 'Compare';
 }
 
 function compareLoadingLabel(inputMode: InputMode): string {
-  return inputMode === 'describe' ? 'Parsing requirements...' : 'Comparing...';
+  if (inputMode === 'describe') {
+    return 'Parsing requirements...';
+  }
+
+  if (inputMode === 'diagram') {
+    return 'Parsing diagram...';
+  }
+
+  return 'Comparing...';
 }
 
 function inputModeSummaryLabel(inputMode: InputMode): string {
@@ -15891,7 +16681,7 @@ function sanitizeComparisonHistoryEntry(
         ? entry.createdAt
         : new Date().toISOString(),
     form,
-    inputMode: entry.inputMode === 'describe' ? 'describe' : 'form',
+    inputMode: sanitizeInputMode(entry.inputMode),
     pricingModel,
     cheapestProviderId,
     serviceCount:
@@ -15944,7 +16734,7 @@ function readStoredRequirementSession(): StoredRequirementSession | undefined {
     }
 
     const parsed = JSON.parse(stored) as Partial<StoredRequirementSession>;
-    const inputMode: InputMode = parsed.inputMode === 'describe' ? 'describe' : 'form';
+    const inputMode: InputMode = sanitizeInputMode(parsed.inputMode);
     const pricingModel = PRICING_MODEL_OPTIONS.some((option) => option.key === parsed.pricingModel)
       ? (parsed.pricingModel as PricingModelKey)
       : 'on-demand';
@@ -15971,6 +16761,10 @@ function readStoredRequirementSession(): StoredRequirementSession | undefined {
   }
 }
 
+function sanitizeInputMode(value: unknown): InputMode {
+  return INPUT_MODE_OPTIONS.some((option) => option.key === value) ? (value as InputMode) : 'form';
+}
+
 function storeRequirementSession(session: StoredRequirementSession): void {
   window.sessionStorage.setItem(REQUIREMENT_SESSION_STORAGE_KEY, JSON.stringify(session));
 }
@@ -15986,6 +16780,141 @@ function isSupportedRequirementsFile(file: File): boolean {
   );
 
   return hasSupportedExtension || REQUIREMENTS_FILE_MIME_TYPES.has(file.type);
+}
+
+function diagramNodeIdForRequirement(requirement: ServiceRequirement): string | undefined {
+  const value = requirement.scaleParams?.diagramNodeId;
+
+  return typeof value === 'string' ? value : undefined;
+}
+
+function serviceRequirementForManualClassification(
+  nodeId: string,
+  serviceType: string,
+): ServiceRequirement {
+  const option = diagramServiceOptionForType(serviceType);
+  const assumedDefaults = manualAssumptionsForService(option.serviceCategory, option.serviceType);
+
+  return {
+    serviceCategory: option.serviceCategory,
+    serviceType: option.serviceType,
+    quantity: 1,
+    scaleParams: {
+      confidence: 'low',
+      reason: 'manual diagram review classification',
+      diagramNodeId: nodeId,
+      assumedDefaultCount: assumedDefaults.length,
+    },
+  };
+}
+
+function diagramReviewComponentFromRequirement(
+  node: {
+    id: string;
+    displayLabel: string;
+    sourceRef: string;
+  },
+  requirement: ServiceRequirement,
+): DiagramParseResult['review']['components'][number] {
+  return {
+    nodeId: node.id,
+    displayLabel: node.displayLabel,
+    serviceCategory: requirement.serviceCategory,
+    serviceType: requirement.serviceType,
+    confidence: 'low',
+    sourceRef: node.sourceRef,
+    assumedDefaults: manualAssumptionsForService(
+      requirement.serviceCategory,
+      requirement.serviceType,
+    ),
+    editable: true,
+  };
+}
+
+function diagramServiceOptionForType(serviceType: string) {
+  return (
+    DIAGRAM_REVIEW_SERVICE_OPTIONS.find((option) => option.serviceType === serviceType) ??
+    DIAGRAM_REVIEW_SERVICE_OPTIONS[0]
+  );
+}
+
+function serviceLabelForType(serviceType: string): string {
+  return diagramServiceOptionForType(serviceType).label;
+}
+
+function manualAssumptionsForService(
+  serviceCategory: ServiceRequirementCategory,
+  serviceType: string,
+): string[] {
+  if (serviceCategory === 'compute' || serviceCategory === 'containers') {
+    return ['manual classification', '2 vCPU', '8 GB memory'];
+  }
+
+  if (serviceCategory === 'storage') {
+    return ['manual classification', '100 GB storage'];
+  }
+
+  if (serviceCategory === 'database') {
+    return ['manual classification', '100 GB database storage'];
+  }
+
+  if (serviceType === 'load-balancer') {
+    return ['manual classification', `${HOURS_PER_MONTH} load-balancer hours per month`];
+  }
+
+  if (serviceType === 'cdn') {
+    return ['manual classification', 'CDN enabled with 85% cache hit ratio'];
+  }
+
+  return ['manual classification'];
+}
+
+function diagramFormatFromFile(file: File): DiagramInputFormat | 'auto' {
+  const lowerName = file.name.toLowerCase();
+
+  if (lowerName.endsWith('.vsdx')) {
+    return 'vsdx';
+  }
+
+  if (lowerName.endsWith('.drawio') || lowerName.endsWith('.xml')) {
+    return 'drawio';
+  }
+
+  if (lowerName.endsWith('.csv')) {
+    return 'lucid_csv';
+  }
+
+  if (lowerName.endsWith('.mmd') || lowerName.endsWith('.mermaid')) {
+    return 'mermaid';
+  }
+
+  return 'auto';
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const value = typeof reader.result === 'string' ? reader.result : '';
+      resolve(value.replace(/^data:[^,]*,/, ''));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('File read failed'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function formatLabel(format: DiagramInputFormat): string {
+  switch (format) {
+    case 'drawio':
+      return 'draw.io';
+    case 'lucid_csv':
+      return 'Lucid CSV';
+    case 'mermaid':
+      return 'Mermaid';
+    case 'vsdx':
+      return 'VSDX';
+  }
 }
 
 function reportFormatLabel(format: ReportFormat): string {

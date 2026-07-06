@@ -1,0 +1,6 @@
+flowchart LR
+  users[Users] --> cdn[CloudFront CDN]
+  cdn --> alb[Application Load Balancer]
+  alb --> web[2x EC2 web servers 4 vCPU 16GB]
+  web --> db[(Postgres database 250GB)]
+  web --> bucket[S3 object storage 500GB]

@@ -1,0 +1,10 @@
+Id,Name,Shape,Text,Line Source,Line Destination
+1,Users,Actor,Users,,
+2,API Gateway,API Gateway,API Gateway,,
+3,Lambda Function,Lambda,Lambda function,,
+4,DynamoDB,DynamoDB,DynamoDB NoSQL database 100GB,,
+5,S3 Bucket,S3,S3 bucket 250GB,,
+edge-1,,,,1,2
+edge-2,,,,2,3
+edge-3,,,,3,4
+edge-4,,,,3,5

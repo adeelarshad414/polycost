@@ -1,0 +1,15 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="web-app" name="Web App">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="cdn" value="Azure Front Door CDN" style="shape=mxgraph.azure.cdn;" vertex="1" parent="1"/>
+        <mxCell id="app" value="App Service 4 vCPU 16GB" style="shape=mxgraph.azure.app_services;" vertex="1" parent="1"/>
+        <mxCell id="db" value="Azure SQL Database 200GB" style="shape=mxgraph.azure.sql_database;" vertex="1" parent="1"/>
+        <mxCell id="edge1" edge="1" source="cdn" target="app" parent="1"/>
+        <mxCell id="edge2" edge="1" source="app" target="db" parent="1"/>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

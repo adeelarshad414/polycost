@@ -1462,7 +1462,7 @@ export function validateWorkloadForm(form: WorkloadFormState): WorkloadFormIssue
 
 export function buildNwsFromForm(
   form: WorkloadFormState,
-  source: 'structured_form' | 'natural_language' = 'structured_form',
+  source: 'structured_form' | 'natural_language' | 'drawio_diagram' = 'structured_form',
   rawInput?: string,
 ): NormalizedWorkloadSpec {
   const compute = {

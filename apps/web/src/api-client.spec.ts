@@ -6,6 +6,7 @@ import {
   formatApiError,
   PolyCostApiError,
 } from './api-client';
+import { DiagramParseRequest, DiagramParseResult } from './types';
 import { buildNwsFromForm, defaultWorkloadForm } from './workload';
 
 const originalFetch = global.fetch;
@@ -389,6 +390,30 @@ describe('api client', () => {
     );
   });
 
+  it('fetches API health when the configured base URL is relative', async () => {
+    const fetchMock = jest.fn(async () =>
+      jsonResponse({
+        status: 'ok',
+        service: 'polycost-api',
+      }),
+    );
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('/api/v1');
+
+    await expect(client.getHealth()).resolves.toEqual({
+      status: 'ok',
+      service: 'polycost-api',
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/health',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+  });
+
   it('fetches the live cloud region catalog', async () => {
     const fetchMock = jest.fn(async () =>
       jsonResponse({
@@ -705,6 +730,84 @@ describe('api client', () => {
     );
   });
 
+  it('parses diagram uploads through the diagram ingestion endpoint', async () => {
+    const diagramParseResult: DiagramParseResult = {
+      importId: 'diagram-1',
+      parserConfidence: 'medium',
+      fieldsRequiringReview: ['diagram.nodes.web'],
+      source: {
+        format: 'drawio',
+        fileName: 'web-app.drawio',
+        mimeType: 'application/xml',
+        sizeBytes: 128,
+        sha256: 'a'.repeat(64),
+        parsedAt: '2026-07-06T00:00:00.000Z',
+        persisted: true,
+        tempFileStored: true,
+        expiresAt: '2026-07-07T00:00:00.000Z',
+      },
+      graph: {
+        format: 'drawio',
+        nodes: [
+          {
+            id: 'web',
+            displayLabel: 'Web tier',
+            kind: 'resource',
+            sourceRef: 'drawio:web',
+          },
+        ],
+        edges: [
+          {
+            id: 'edge-1',
+            sourceId: 'web',
+            targetId: 'db',
+            displayLabel: 'traffic',
+          },
+        ],
+        ignoredNodes: [],
+      },
+      review: {
+        components: [
+          {
+            nodeId: 'web',
+            displayLabel: 'Web tier',
+            serviceCategory: 'compute',
+            serviceType: 'vm-compute',
+            confidence: 'high',
+            sourceRef: 'drawio:web',
+            assumedDefaults: ['2 vCPU'],
+            editable: true,
+          },
+        ],
+        unresolvedClassifications: [],
+        ignoredNodes: [],
+        assumedDefaults: ['2 vCPU'],
+      },
+      draftNws: buildNwsFromForm(defaultWorkloadForm, 'drawio_diagram'),
+    };
+    const payload: DiagramParseRequest = {
+      content: '<mxfile><diagram><mxGraphModel /></diagram></mxfile>',
+      fileName: 'web-app.drawio',
+      inputFormat: 'drawio',
+      encoding: 'text',
+    };
+    const fetchMock = jest.fn(async () => jsonResponse(diagramParseResult));
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(client.parseDiagram(payload)).resolves.toEqual(diagramParseResult);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/parse/diagram',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify(payload),
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+  });
+
   it('uses budget, alert, and exchange-rate endpoints', async () => {
     const fetchMock = jest
       .fn()
@@ -799,6 +902,67 @@ describe('api client', () => {
     );
   });
 
+  it('uses default optional query parameters when omitted', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ token: 'public-token', workload: {}, breakdown: {} }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          base: 'USD',
+          lastUpdated: '2026-06-29T00:00:00.000Z',
+          rates: {
+            EUR: 0.93,
+          },
+        }),
+      );
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await client.getSharedReport('public-token');
+    await client.listAlerts();
+    await client.getExchangeRates();
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'http://api.test/api/v1/share/public-token',
+      expect.any(Object),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://api.test/api/v1/alerts',
+      expect.any(Object),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      'http://api.test/api/v1/exchange-rates?base=USD',
+      expect.any(Object),
+    );
+  });
+
+  it('maps failed binary export downloads through safe API errors', async () => {
+    global.fetch = jest.fn(
+      async () =>
+        ({
+          ok: false,
+          status: 503,
+          json: jest.fn(async () => {
+            throw new Error('invalid json');
+          }),
+        }) as unknown as Response,
+    ) as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(client.downloadExportJob('comparison-1', 'job-1')).rejects.toEqual(
+      expect.objectContaining({
+        status: 503,
+        code: 'HTTP_ERROR',
+        message:
+          'The PolyCost API is temporarily unavailable. Confirm the backend service is running, then try again.',
+      }) as PolyCostApiError,
+    );
+  });
+
   it('formats unknown and API errors for UI display', () => {
     expect(
       formatApiError(
@@ -825,8 +989,35 @@ describe('api client', () => {
     expect(formatApiError(new PolyCostApiError(422, 'BAD_BODY', '{"message":"bad"}'))).toBe(
       'PolyCost could not validate that workload. Review the highlighted fields and try again.',
     );
+    expect(formatApiError(new PolyCostApiError(401, 'AUTH', ''))).toBe(
+      'PolyCost needs a signed-in session for this request. Sign in again, then retry.',
+    );
+    expect(formatApiError(new PolyCostApiError(403, 'FORBIDDEN', ''))).toBe(
+      'PolyCost reached the API, but this account does not have access to that action.',
+    );
+    expect(formatApiError(new PolyCostApiError(404, 'MISSING', ''))).toBe(
+      'PolyCost could not find the requested API resource. Refresh the page and try again.',
+    );
+    expect(formatApiError(new PolyCostApiError(408, 'TIMEOUT', ''))).toBe(
+      'The PolyCost API took too long to respond. Retry once the pricing service catches up.',
+    );
+    expect(formatApiError(new PolyCostApiError(409, 'CONFLICT', ''))).toBe(
+      'PolyCost could not complete the request because the saved comparison changed. Refresh the comparison and try again.',
+    );
+    expect(formatApiError(new PolyCostApiError(429, 'RATE_LIMITED', ''))).toBe(
+      'The PolyCost API is receiving too many requests right now. Wait a moment, then retry.',
+    );
+    expect(formatApiError(new PolyCostApiError(500, 'SERVER_ERROR', ''))).toBe(
+      'The PolyCost API hit a server-side problem while processing this request. Try again after refreshing pricing data.',
+    );
+    expect(formatApiError(new PolyCostApiError(418, 'TEAPOT', ''))).toBe(
+      'PolyCost could not complete the API request (HTTP 418). Refresh the page and try again.',
+    );
     expect(formatApiError(new TypeError('Failed to fetch'))).toBe(
       'PolyCost could not reach the API service. Start the backend or check the API base URL, then try again.',
+    );
+    expect(formatApiError(new Error('   '))).toBe(
+      'PolyCost hit an unexpected browser-side issue while preparing the request. Refresh the page and try again.',
     );
     expect(formatApiError('bad')).toBe(
       'PolyCost hit an unexpected browser-side issue while preparing the request. Refresh the page and try again.',

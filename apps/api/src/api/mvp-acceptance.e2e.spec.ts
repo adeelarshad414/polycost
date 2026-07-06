@@ -1,9 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { ComparisonResult } from '../comparison/comparison.types';
+import { DiagramParseResult } from '../diagram-parser/diagram-parser.types';
 import { NormalizedWorkloadSpec } from '../nws/nws.types';
 import { RegionCatalogResponse } from './regions.types';
 
 const API_BASE_URL = 'http://localhost:3001/api/v1';
 const WEB_BASE_URL = 'http://localhost:3000';
+const DIAGRAM_FIXTURE_ROOT = resolve(__dirname, '../../../../fixtures/diagrams');
 
 interface ParsedNwsDraftResponse {
   draftNws: NormalizedWorkloadSpec;
@@ -133,6 +137,56 @@ describe('MVP acceptance criteria E2E', () => {
       gcp?.lineItems.some((lineItem) => lineItem.category === 'database' && lineItem.isApproximate),
     ).toBe(true);
   });
+
+  it.each([
+    ['Mermaid', 'mermaid/web-app.mmd', 'text', 'mermaid'],
+    ['draw.io', 'drawio/web-app.drawio', 'text', 'drawio'],
+    ['Lucid CSV', 'lucid/lucid-export.csv', 'text', 'lucid_csv'],
+    ['VSDX', 'vsdx/simple.vsdx', 'base64', 'vsdx'],
+  ] as const)(
+    'parses %s diagram fixtures through the versioned API and prices the result',
+    async (_label, fixturePath, encoding, expectedFormat) => {
+      const parsed = await parseDiagramFixture(fixturePath, encoding);
+
+      expect(parsed.source.format).toBe(expectedFormat);
+      expect(parsed.source.tempFileStored).toBe(true);
+      expect(parsed.source.expiresAt).toEqual(expect.any(String));
+      expect(parsed.graph.nodes.length).toBeGreaterThan(0);
+      expect(parsed.review.components.length).toBeGreaterThan(0);
+      expect(parsed.draftNws.metadata.sourceType).toBe('drawio_diagram');
+      expect(parsed.draftNws.serviceRequirements?.length).toBeGreaterThan(0);
+
+      const comparison = await createComparison(parsed.draftNws);
+
+      expectProviderComparison(comparison);
+    },
+    60_000,
+  );
+
+  it.each([
+    ['XXE draw.io XML', 'malicious/xxe.drawio', 'text'],
+    ['deflate bomb draw.io XML', 'malicious/deflate-bomb.drawio', 'text'],
+    ['PNG renamed as draw.io', 'malicious/png-renamed.drawio', 'base64'],
+    ['zip bomb VSDX', 'malicious/zip-bomb.vsdx', 'base64'],
+  ] as const)('rejects malicious diagram fixture: %s', async (_label, fixturePath, encoding) => {
+    const response = await fetch(`${API_BASE_URL}/parse/diagram`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        content: readDiagramFixture(fixturePath, encoding),
+        encoding,
+        fileName: fixturePath,
+      }),
+    });
+
+    expect(response.ok).toBe(false);
+    expect([400, 422]).toContain(response.status);
+
+    const health = await requestJson<{ status: string }>('http://localhost:3001/health');
+    expect(health.status).toBe('ok');
+  });
 });
 
 async function expectApiHealth(): Promise<void> {
@@ -164,6 +218,26 @@ async function createComparison(nws: NormalizedWorkloadSpec): Promise<Comparison
       },
     }),
   });
+}
+
+async function parseDiagramFixture(
+  fixturePath: string,
+  encoding: 'text' | 'base64',
+): Promise<DiagramParseResult> {
+  return requestJson<DiagramParseResult>('/parse/diagram', {
+    method: 'POST',
+    body: JSON.stringify({
+      content: readDiagramFixture(fixturePath, encoding),
+      encoding,
+      fileName: fixturePath,
+    }),
+  });
+}
+
+function readDiagramFixture(fixturePath: string, encoding: 'text' | 'base64'): string {
+  const buffer = readFileSync(resolve(DIAGRAM_FIXTURE_ROOT, fixturePath));
+
+  return encoding === 'base64' ? buffer.toString('base64') : buffer.toString('utf8');
 }
 
 async function requestJson<T>(pathOrUrl: string, init?: RequestInit): Promise<T> {

@@ -6,6 +6,8 @@ import {
   BackendHealthResponse,
   ComparisonResult,
   DataHealthResponse,
+  DiagramParseResult,
+  NormalizedWorkloadSpec,
   ParsedNwsDraft,
   PricingStatusResponse,
   RegionCatalogResponse,
@@ -1014,6 +1016,275 @@ describe('App', () => {
     );
     expect(client.parseWorkload).not.toHaveBeenCalled();
     expect(textareaById(container, 'natural-language-input').value).toContain('web app');
+
+    unmount();
+  });
+
+  it('parses diagram input into a reviewable editable comparison', async () => {
+    const diagramSource =
+      'flowchart LR\n  lb[Load Balancer] --> app[Cloud Run app]\n  app --> db[(Postgres 200GB)]';
+    const parsedNws = buildNwsFromForm(
+      {
+        ...defaultWorkloadForm,
+        workloadName: 'Diagram portal',
+        workloadType: 'api_backend',
+        vcpu: '4',
+        memoryGb: '16',
+      },
+      'drawio_diagram',
+    );
+    const parsedDiagram = diagramParseResult(parsedNws, {
+      displayLabel: 'Cloud Run app',
+      assumedDefaults: ['general-purpose compute family'],
+    });
+    parsedDiagram.review.unresolvedClassifications = [
+      {
+        id: 'unknown',
+        displayLabel: 'Legacy appliance',
+        reason: 'no service alias matched',
+        sourceRef: 'mermaid:line-4-unknown',
+      },
+    ];
+    parsedDiagram.review.ignoredNodes = [
+      {
+        id: 'note',
+        displayLabel: 'Review note',
+        reason: 'decorative or grouping shape',
+        sourceRef: 'mermaid:line-5-note',
+      },
+    ];
+    parsedDiagram.graph.ignoredNodes = parsedDiagram.review.ignoredNodes;
+    const client = clientMock({
+      parseDiagram: jest.fn(async () => parsedDiagram),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Upload diagram'));
+    expect(buttonByText(container, 'Upload diagram').getAttribute('aria-selected')).toBe('true');
+    await changeTextarea(textareaById(container, 'diagram-source'), diagramSource);
+    await click(buttonByText(container, 'Parse diagram'));
+
+    expect(client.parseDiagram).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: diagramSource,
+        encoding: 'text',
+        inputFormat: 'auto',
+      }),
+    );
+    expect(text(container)).toContain('Parser confidence');
+    expect(text(container)).toContain('Cloud Run app');
+    expect(text(container)).toContain('general-purpose compute family');
+    expect(text(container)).toContain('Needs classification');
+    expect(text(container)).toContain('Legacy appliance');
+    expect(text(container)).toContain('Ignored decorative nodes');
+    expect((container.querySelector('#name') as HTMLInputElement).value).toBe('Diagram portal');
+
+    await click(buttonByText(container, 'Remove'));
+    await changeSelect(selectByAriaLabel(container, 'Classify Legacy appliance'), 'queue');
+    await changeSelect(selectByAriaLabel(container, 'Add missing diagram service'), 'cdn');
+    await click(buttonByText(container, 'Compare costs'));
+
+    const submittedNws = (client.validateWorkload as jest.Mock).mock
+      .calls[0][0] as NormalizedWorkloadSpec;
+    expect(submittedNws).toEqual(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ sourceType: 'drawio_diagram' }),
+      }),
+    );
+    expect(submittedNws.serviceRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceType: 'queue',
+          scaleParams: expect.objectContaining({ diagramNodeId: 'unknown' }),
+        }),
+        expect.objectContaining({
+          serviceType: 'cdn',
+          scaleParams: expect.objectContaining({ reason: 'manual diagram review classification' }),
+        }),
+      ]),
+    );
+    expect(submittedNws.serviceRequirements).not.toEqual(parsedNws.serviceRequirements);
+    expect(client.createComparison).toHaveBeenCalled();
+    expect(text(container)).toContain('Parsed from diagram');
+
+    unmount();
+  });
+
+  it('supports manual diagram review defaults for storage, database, and network services', async () => {
+    const parsedNws = buildNwsFromForm(
+      {
+        ...defaultWorkloadForm,
+        workloadName: 'Diagram review lab',
+      },
+      'drawio_diagram',
+    );
+    const parsedDiagram = diagramParseResult(parsedNws);
+    parsedDiagram.review.unresolvedClassifications = [
+      {
+        id: 'bucket',
+        displayLabel: 'Object bucket',
+        reason: 'no stencil metadata',
+        sourceRef: 'drawio:node-bucket',
+      },
+    ];
+    parsedDiagram.graph.nodes.push({
+      id: 'bucket',
+      displayLabel: 'Object bucket',
+      kind: 'unknown',
+      sourceRef: 'drawio:node-bucket',
+    });
+    const client = clientMock({
+      parseDiagram: jest.fn(async () => parsedDiagram),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Upload diagram'));
+    await changeTextarea(textareaById(container, 'diagram-source'), '<mxfile>diagram</mxfile>');
+    await click(buttonByText(container, 'Parse diagram'));
+    await changeSelect(selectByAriaLabel(container, 'Classify Object bucket'), 'object-storage');
+    await changeSelect(
+      selectByAriaLabel(container, 'Add missing diagram service'),
+      'relational-database',
+    );
+    await changeSelect(
+      selectByAriaLabel(container, 'Add missing diagram service'),
+      'load-balancer',
+    );
+
+    expect(text(container)).toContain('100 GB storage');
+    expect(text(container)).toContain('100 GB database storage');
+    expect(text(container)).toContain('730 load-balancer hours per month');
+
+    await click(buttonByText(container, 'Clear'));
+
+    expect(textareaById(container, 'diagram-source').value).toBe('');
+    expect(text(container)).not.toContain('100 GB database storage');
+    expect(client.createComparison).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('shows a validation message before parsing an empty diagram', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Upload diagram'));
+    await click(lastButtonByText(container, 'Parse diagram'));
+
+    expect(text(container)).toContain(
+      'Upload a diagram or paste Mermaid, draw.io XML, or Lucid CSV content first.',
+    );
+    expect(client.parseDiagram).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('loads draw.io diagram files and submits them through the diagram parser', async () => {
+    const fileText = '<mxfile><diagram><mxGraphModel /></diagram></mxfile>';
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Upload diagram'));
+    const file = new File([fileText], 'architecture.drawio', { type: 'application/xml' });
+    Object.defineProperty(file, 'text', {
+      configurable: true,
+      value: jest.fn(async () => fileText),
+    });
+
+    await changeFileInput(inputById(container, 'diagram-file'), file);
+    expect(text(container)).toContain('Loaded from architecture.drawio');
+    expect(text(container)).toContain('draw.io');
+
+    await click(buttonByText(container, 'Parse diagram'));
+
+    expect(client.parseDiagram).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: fileText,
+        encoding: 'text',
+        inputFormat: 'drawio',
+        fileName: 'architecture.drawio',
+        mimeType: 'application/xml',
+      }),
+    );
+
+    unmount();
+  });
+
+  it('loads Mermaid diagram files as text parser input', async () => {
+    const fileText = 'flowchart LR\n  api[API] --> db[(Postgres)]';
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Upload diagram'));
+    const file = new File([fileText], 'architecture.mmd', { type: 'text/plain' });
+    Object.defineProperty(file, 'text', {
+      configurable: true,
+      value: jest.fn(async () => fileText),
+    });
+
+    await changeFileInput(inputById(container, 'diagram-file'), file);
+    expect(text(container)).toContain('Loaded from architecture.mmd');
+    expect(text(container)).toContain('Mermaid');
+
+    await click(buttonByText(container, 'Parse diagram'));
+
+    expect(client.parseDiagram).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: fileText,
+        encoding: 'text',
+        inputFormat: 'mermaid',
+        fileName: 'architecture.mmd',
+        mimeType: 'text/plain',
+      }),
+    );
+
+    unmount();
+  });
+
+  it('loads VSDX diagram files as base64 parser input', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Upload diagram'));
+    const file = new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04])], 'architecture.vsdx', {
+      type: 'application/octet-stream',
+    });
+
+    await changeFileInput(inputById(container, 'diagram-file'), file);
+    await settleAsyncEffects();
+    expect(text(container)).toContain('Loaded from architecture.vsdx');
+    expect(text(container)).toContain('VSDX');
+
+    await click(buttonByText(container, 'Parse diagram'));
+
+    expect(client.parseDiagram).toHaveBeenCalledWith(
+      expect.objectContaining({
+        encoding: 'base64',
+        inputFormat: 'vsdx',
+        fileName: 'architecture.vsdx',
+        mimeType: 'application/octet-stream',
+      }),
+    );
+    expect(String((client.parseDiagram as jest.Mock).mock.calls[0][0].content)).toMatch(/UEsD/);
+
+    unmount();
+  });
+
+  it('rejects oversized diagram files before calling the parser', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Upload diagram'));
+    const file = new File(['diagram'], 'large.drawio', { type: 'application/xml' });
+    Object.defineProperty(file, 'size', {
+      configurable: true,
+      value: 5 * 1024 * 1024 + 1,
+    });
+
+    await changeFileInput(inputById(container, 'diagram-file'), file);
+
+    expect(text(container)).toContain('Upload a diagram file under 5MB.');
+    expect(client.parseDiagram).not.toHaveBeenCalled();
 
     unmount();
   });
@@ -2312,6 +2583,19 @@ function selectByOptionValue(container: HTMLElement, value: string): HTMLSelectE
   return select;
 }
 
+function selectByAriaLabel(container: HTMLElement, label: string): HTMLSelectElement {
+  const select = Array.from(container.querySelectorAll('select')).find(
+    (candidate): candidate is HTMLSelectElement =>
+      candidate instanceof HTMLSelectElement && candidate.getAttribute('aria-label') === label,
+  );
+
+  if (!select) {
+    throw new Error(`Select not found for aria-label: ${label}`);
+  }
+
+  return select;
+}
+
 function checkboxByLabel(container: HTMLElement, label: string): HTMLInputElement {
   const field = Array.from(container.querySelectorAll('.checkbox-field')).find((candidate) =>
     candidate.textContent?.includes(label),
@@ -2342,6 +2626,20 @@ function buttonByText(container: HTMLElement, label: string): HTMLButtonElement 
   const button = Array.from(container.querySelectorAll('button')).find(
     (candidate) => candidate.textContent?.trim() === label,
   );
+
+  if (!(button instanceof HTMLButtonElement)) {
+    throw new Error(`Button not found: ${label}`);
+  }
+
+  return button;
+}
+
+function lastButtonByText(container: HTMLElement, label: string): HTMLButtonElement {
+  const buttons = Array.from(container.querySelectorAll('button')).filter(
+    (candidate): candidate is HTMLButtonElement =>
+      candidate instanceof HTMLButtonElement && candidate.textContent?.trim() === label,
+  );
+  const button = buttons.at(-1);
 
   if (!(button instanceof HTMLButtonElement)) {
     throw new Error(`Button not found: ${label}`);
@@ -2408,6 +2706,7 @@ function mobileProviderLabels(container: HTMLElement): string[] {
 function clearClientCalls(client: PolyCostClient): void {
   [
     client.parseWorkload,
+    client.parseDiagram,
     client.validateWorkload,
     client.createComparison,
     client.getComparisonAnalytics,
@@ -2457,6 +2756,73 @@ function freshCacheSummary(
       success: catalogRows + currentRateRows,
       partial: 0,
       failed: 0,
+    },
+  };
+}
+
+function diagramParseResult(
+  draftNws: DiagramParseResult['draftNws'],
+  component: {
+    displayLabel: string;
+    assumedDefaults: string[];
+  } = {
+    displayLabel: 'Diagram service',
+    assumedDefaults: [],
+  },
+): DiagramParseResult {
+  return {
+    importId: '77777777-7777-4777-8777-777777777777',
+    parserConfidence: 'high',
+    fieldsRequiringReview: component.assumedDefaults,
+    source: {
+      format: 'mermaid',
+      fileName: 'diagram.mmd',
+      sizeBytes: 256,
+      sha256: 'a'.repeat(64),
+      parsedAt: '2026-07-02T00:00:00.000Z',
+      persisted: false,
+      tempFileStored: true,
+      expiresAt: '2026-07-03T00:00:00.000Z',
+    },
+    graph: {
+      format: 'mermaid',
+      nodes: [
+        {
+          id: 'app',
+          displayLabel: component.displayLabel,
+          kind: 'resource',
+          sourceRef: 'mermaid:line-2-app',
+        },
+      ],
+      edges: [{ id: 'edge-1', sourceId: 'lb', targetId: 'app' }],
+      ignoredNodes: [],
+    },
+    review: {
+      components: [
+        {
+          nodeId: 'app',
+          displayLabel: component.displayLabel,
+          serviceCategory: 'compute',
+          serviceType: 'container-app',
+          confidence: 'moderate',
+          sourceRef: 'mermaid:line-2-app',
+          assumedDefaults: component.assumedDefaults,
+          editable: true,
+        },
+      ],
+      unresolvedClassifications: [],
+      ignoredNodes: [],
+      assumedDefaults: component.assumedDefaults,
+    },
+    draftNws: {
+      ...draftNws,
+      serviceRequirements: draftNws.serviceRequirements?.map((requirement) => ({
+        ...requirement,
+        scaleParams: {
+          ...requirement.scaleParams,
+          diagramNodeId: 'app',
+        },
+      })),
     },
   };
 }
@@ -2562,6 +2928,34 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     getHealth: jest.fn(async () => backendHealth),
     getDataHealth: jest.fn(async () => dataHealth),
     parseWorkload: jest.fn(async () => parsed),
+    parseDiagram: jest.fn(async () => ({
+      importId: '77777777-7777-4777-8777-777777777777',
+      parserConfidence: 'high' as const,
+      fieldsRequiringReview: [],
+      source: {
+        format: 'mermaid' as const,
+        fileName: 'diagram.mmd',
+        sizeBytes: 256,
+        sha256: 'a'.repeat(64),
+        parsedAt: '2026-07-02T00:00:00.000Z',
+        persisted: false,
+        tempFileStored: true,
+        expiresAt: '2026-07-03T00:00:00.000Z',
+      },
+      graph: {
+        format: 'mermaid' as const,
+        nodes: [],
+        edges: [],
+        ignoredNodes: [],
+      },
+      review: {
+        components: [],
+        unresolvedClassifications: [],
+        ignoredNodes: [],
+        assumedDefaults: [],
+      },
+      draftNws: parsed.draftNws,
+    })),
     validateWorkload: jest.fn(async () => ({ valid: true as const })),
     createComparison: jest.fn(async () => comparisonResult),
     getComparisonAnalytics: jest.fn(async () => ({

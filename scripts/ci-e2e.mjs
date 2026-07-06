@@ -9,6 +9,7 @@ let testsFailed = false;
 try {
   if (!skipCompose) {
     run('docker', ['compose', 'up', '--build', '-d', '--remove-orphans']);
+    run(npmCommand, ['run', 'db:migrate']);
   }
 
   await waitForJson('API health', 'http://localhost:3001/health', (body) => {
