@@ -45,6 +45,28 @@ say so explicitly rather than marking it done.
 | Phase 2.8C - Diagram partial-parse hardening           | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8D - Security suppression cleanup              | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8E - UI-priced service coverage guard          | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8F - SKU evidence derivation hardening         | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8F - SKU evidence derivation hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Fixed catalog-backed pricing traces so derivation evidence carries the actual
+  workload quantity and computed hourly/monthly cost used by the line item instead
+  of always reporting quantity `1`. This improves the UI/report promise that a
+  visible cost can be expanded to SKU, source row, rate, and math evidence.
+- Added regression assertions for both hourly compute math and non-hourly storage
+  math in the base cloud provider adapter spec.
+- Verification evidence in this continuation:
+  - Focused base provider adapter spec passed: 14 tests.
+  - Affected pricing specs passed: 3 suites / 50 tests across base adapter, live
+    pricing traceability, and comparison orchestrator coverage.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this closes a trace-math correctness gap for
+  catalog-backed line items, but full invoice-grade live provider SKU coverage and
+  account-level GitHub Actions runner availability remain outside this slice.
 
 ## Phase 2.8E - UI-priced service coverage guard
 

@@ -190,10 +190,25 @@ describe('BaseCloudProviderAdapter', () => {
         sourceSkuId: 'COMPUTE-RIGHT',
         catalogRegion: 'test-region',
         unitPriceUsd: 0.05,
+        derivation: expect.objectContaining({
+          expression: '0.05 USD/hour x 3 x 730 hour-month standard',
+          quantity: 3,
+          hourlyCostUsd: 0.15,
+          monthlyCostUsd: 109.5,
+          monthlyHours: 730,
+        }),
         isEstimate: false,
       }),
     );
     expect(result.lineItems[1].isApproximate).toBe(true);
+    expect(result.lineItems[1].pricingTrace?.derivation).toEqual(
+      expect.objectContaining({
+        expression: '0.02 USD/GB-Mo x 100',
+        quantity: 100,
+        hourlyCostUsd: 0,
+        monthlyCostUsd: 2,
+      }),
+    );
   });
 
   it('uses residency-locked canonical regions before querying provider pricing', async () => {

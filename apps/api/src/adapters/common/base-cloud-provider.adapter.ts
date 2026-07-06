@@ -597,6 +597,9 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
         costComponent: options.costComponent ?? this.costComponentForCategory(category),
         record,
         displayRegion,
+        quantity,
+        hourlyCostUsd: cost.hourlyCostUsd,
+        monthlyCostUsd: cost.monthlyCostUsd,
         isApproximate: options.isApproximate ?? record.attributes?.isApproximate === true,
         pricingBasis: cost.pricingBasis,
         pricingTermCode,
@@ -1172,6 +1175,9 @@ function catalogPricingTrace(input: {
   costComponent?: CostComponent;
   record: PricingCatalogRecord;
   displayRegion: string;
+  quantity: number;
+  hourlyCostUsd: number;
+  monthlyCostUsd: number;
   isApproximate: boolean;
   pricingBasis: PricingTrace['pricingBasis'];
   pricingTermCode?: string;
@@ -1188,9 +1194,12 @@ function catalogPricingTrace(input: {
     effectiveDate: input.record.effectiveDate,
   });
   const hourlyUnit = isHourlyUnit(input.record.unit);
-  const monthlyCostUsd = hourlyUnit
-    ? input.record.unitPriceUsd * HOURS_PER_MONTH
-    : input.record.unitPriceUsd;
+  const expression =
+    input.pricingBasis === 'tiered'
+      ? `${input.quantity} ${input.record.unit} through provider tiered rate card`
+      : `${input.record.unitPriceUsd} USD/${input.record.unit} x ${input.quantity}${
+          hourlyUnit ? ` x ${HOURS_PER_MONTH} hour-month standard` : ''
+        }`;
 
   return {
     providerId: input.providerId,
@@ -1214,15 +1223,12 @@ function catalogPricingTrace(input: {
     transformVersion: lineage.transformVersion,
     sourcePayloadHash: lineage.sourcePayloadHash,
     derivation: {
-      expression: `${input.record.unitPriceUsd} USD/${input.record.unit} x workload quantity${
-        hourlyUnit ? ` x ${HOURS_PER_MONTH} hour-month standard` : ''
-      }`,
+      expression,
       unitPriceUsd: input.record.unitPriceUsd,
-      quantity: 1,
-      monthlyCostUsd,
-      ...(hourlyUnit
-        ? { hourlyCostUsd: input.record.unitPriceUsd, monthlyHours: HOURS_PER_MONTH }
-        : {}),
+      quantity: input.quantity,
+      monthlyCostUsd: input.monthlyCostUsd,
+      hourlyCostUsd: input.hourlyCostUsd,
+      ...(hourlyUnit ? { monthlyHours: HOURS_PER_MONTH } : {}),
     },
     equivalenceConfidence: input.isApproximate ? 'approximate' : 'direct',
     ...(input.pricingTermCode ? { pricingTermCode: input.pricingTermCode } : {}),
