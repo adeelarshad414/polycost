@@ -1,10 +1,11 @@
 import React, { act } from 'react';
+import { flushSync } from 'react-dom';
 import { createRoot, Root } from 'react-dom/client';
 import { AppErrorBoundary } from './AppErrorBoundary';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-function CrashingWorkspace(): JSX.Element {
+function CrashingWorkspace(): React.ReactElement {
   throw new Error('[object Object]\n    at renderWorkspace (/tmp/polycost.js:1:2)');
 }
 
@@ -22,7 +23,7 @@ describe('AppErrorBoundary', () => {
 
   afterEach(() => {
     act(() => {
-      root.unmount();
+      flushSync(() => root.unmount());
     });
     host.remove();
     consoleErrorSpy.mockRestore();
@@ -30,10 +31,12 @@ describe('AppErrorBoundary', () => {
 
   it('renders a recovery state without raw exception text or stack traces', () => {
     act(() => {
-      root.render(
-        <AppErrorBoundary>
-          <CrashingWorkspace />
-        </AppErrorBoundary>,
+      flushSync(() =>
+        root.render(
+          <AppErrorBoundary>
+            <CrashingWorkspace />
+          </AppErrorBoundary>,
+        ),
       );
     });
 
