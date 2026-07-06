@@ -193,7 +193,24 @@ describe('App', () => {
 
   it('executes team invite, role, remove, and invite-acceptance actions', async () => {
     window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
-    const client = clientMock();
+    const client = clientMock({
+      listTeamMembers: jest.fn(async () => [
+        {
+          accountId: '11111111-1111-4111-8111-111111111111',
+          email: 'architect@example.com',
+          displayName: 'Architect',
+          role: 'owner' as const,
+          createdAt: '2026-07-06T00:00:00.000Z',
+        },
+        {
+          accountId: '22222222-aaaa-4aaa-8aaa-222222222222',
+          email: 'analyst@example.com',
+          displayName: 'FinOps Analyst',
+          role: 'member' as const,
+          createdAt: '2026-07-06T00:00:00.000Z',
+        },
+      ]),
+    });
     const { container, unmount } = render(<App client={client} />);
 
     await settleAsyncEffects();
@@ -213,25 +230,20 @@ describe('App', () => {
     );
     expect(text(container)).toContain('Invite token: invite-token');
 
-    const memberRoleSelect = container.querySelector<HTMLSelectElement>(
-      '.workspace-member-row select',
-    );
-    if (!(memberRoleSelect instanceof HTMLSelectElement)) {
-      throw new Error('Expected workspace member role select');
-    }
+    const memberRoleSelect = selectByAriaLabel(container, 'Change role for analyst@example.com');
 
     await changeSelect(memberRoleSelect, 'admin');
     expect(client.updateTeamMemberRole).toHaveBeenCalledWith(
       '22222222-2222-4222-8222-222222222222',
-      '11111111-1111-4111-8111-111111111111',
+      '22222222-aaaa-4aaa-8aaa-222222222222',
       'admin',
       'session-token',
     );
 
-    await click(buttonByText(container, 'Remove'));
+    await click(buttonByAriaLabel(container, 'Remove analyst@example.com'));
     expect(client.removeTeamMember).toHaveBeenCalledWith(
       '22222222-2222-4222-8222-222222222222',
-      '11111111-1111-4111-8111-111111111111',
+      '22222222-aaaa-4aaa-8aaa-222222222222',
       'session-token',
     );
 
@@ -470,6 +482,78 @@ describe('App', () => {
     expect(client.listTeamMembers).not.toHaveBeenCalled();
     expect(client.listTeamInvitations).not.toHaveBeenCalled();
     expect(client.getSsoStatus).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('surfaces admin RBAC limits in team controls before the API rejects them', async () => {
+    window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
+    const client = clientMock({
+      getCurrentSession: jest.fn(async () => ({
+        account: {
+          id: '33333333-aaaa-4aaa-8aaa-333333333333',
+          email: 'admin@example.com',
+          displayName: 'Team Admin',
+        },
+        activeTeam: {
+          id: '22222222-2222-4222-8222-222222222222',
+          name: 'Architecture team',
+          role: 'admin' as const,
+        },
+        teams: [
+          {
+            teamId: '22222222-2222-4222-8222-222222222222',
+            teamName: 'Architecture team',
+            role: 'admin' as const,
+          },
+        ],
+        session: {
+          id: '33333333-3333-4333-8333-333333333333',
+          expiresAt: '2026-07-07T00:00:00.000Z',
+        },
+      })),
+      listTeamMembers: jest.fn(async () => [
+        {
+          accountId: '11111111-1111-4111-8111-111111111111',
+          email: 'owner@example.com',
+          displayName: 'Owner',
+          role: 'owner' as const,
+          createdAt: '2026-07-06T00:00:00.000Z',
+        },
+        {
+          accountId: '44444444-aaaa-4aaa-8aaa-444444444444',
+          email: 'member@example.com',
+          displayName: 'Member',
+          role: 'member' as const,
+          createdAt: '2026-07-06T00:00:00.000Z',
+        },
+      ]),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await settleAsyncEffects();
+    await settleAsyncEffects();
+
+    expect(text(container)).toContain('Architecture team · admin');
+    expect(text(container)).toContain('2 members');
+    const ownerRoleSelect = selectByAriaLabel(container, 'Change role for owner@example.com');
+    const memberRoleSelect = selectByAriaLabel(container, 'Change role for member@example.com');
+    const removeOwnerButton = buttonByAriaLabel(container, 'Remove owner@example.com');
+    const removeMemberButton = buttonByAriaLabel(container, 'Remove member@example.com');
+
+    expect(ownerRoleSelect.disabled).toBe(true);
+    expect(ownerRoleSelect.title).toBe('Only team owners can change roles.');
+    expect(memberRoleSelect.disabled).toBe(true);
+    expect(removeOwnerButton.disabled).toBe(true);
+    expect(removeOwnerButton.title).toBe('Only team owners can remove owners.');
+    expect(removeMemberButton.disabled).toBe(false);
+
+    await click(removeMemberButton);
+    expect(client.removeTeamMember).toHaveBeenCalledWith(
+      '22222222-2222-4222-8222-222222222222',
+      '44444444-aaaa-4aaa-8aaa-444444444444',
+      'session-token',
+    );
 
     unmount();
   });
@@ -3099,6 +3183,19 @@ function buttonByText(container: HTMLElement, label: string): HTMLButtonElement 
 
   if (!(button instanceof HTMLButtonElement)) {
     throw new Error(`Button not found: ${label}`);
+  }
+
+  return button;
+}
+
+function buttonByAriaLabel(container: HTMLElement, label: string): HTMLButtonElement {
+  const button = Array.from(container.querySelectorAll('button')).find(
+    (candidate): candidate is HTMLButtonElement =>
+      candidate instanceof HTMLButtonElement && candidate.getAttribute('aria-label') === label,
+  );
+
+  if (!(button instanceof HTMLButtonElement)) {
+    throw new Error(`Button not found for aria-label: ${label}`);
   }
 
   return button;

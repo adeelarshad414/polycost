@@ -50,6 +50,30 @@ say so explicitly rather than marking it done.
 | Phase 2.8H - Pricing honesty UI labeling               | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8I - AWS ETL network SKU hardening             | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8J - Diagram LLM fallback diagnostics          | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8K - Auth RBAC UI enforcement polish           | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8K - Auth RBAC UI enforcement polish
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Tightened workspace team controls so role and removal buttons reflect the same
+  Owner/Admin/Member boundaries already enforced by the API.
+- Added member-row role badges, accessible role-change labels, accessible
+  member-specific remove buttons, and disabled-state reasons for admin-vs-owner
+  limits, self-removal, final-owner protection, and in-progress actions.
+- Updated the owner team-management test to act on a normal member rather than the
+  only owner, and added a focused admin RBAC UI regression proving admins can remove
+  members but cannot change roles or remove owners before the API would return 403.
+- Verification evidence in this continuation:
+  - Focused web App spec passed: 55 tests.
+  - Focused auth/API specs passed: 3 suites / 38 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this improves the existing auth product UX and UI-layer
+  RBAC proof, but full account/team product breadth such as SSO provider management
+  beyond the mock path, invitations UX at SaaS depth, and complete enterprise RBAC
+  workflows remain future phases.
 
 ## Phase 2.8J - Diagram LLM fallback diagnostics
 

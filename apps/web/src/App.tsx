@@ -1861,7 +1861,7 @@ function WorkspaceControlCenter({
   const [reconciliation, setReconciliation] = useState<InvoiceReconciliationRecord | null>(null);
   const activeTeam = session?.activeTeam;
   const canManageTeam = activeTeam?.role === 'owner' || activeTeam?.role === 'admin';
-  const canManageRoles = activeTeam?.role === 'owner';
+  const ownerCount = members.filter((member) => member.role === 'owner').length;
   const sourceType = sourceTypeForProvider(provider);
 
   useEffect(() => {
@@ -2680,7 +2680,7 @@ function WorkspaceControlCenter({
             <span>Team access</span>
             <strong>{canManageTeam ? `${members.length} members` : 'Admin required'}</strong>
           </div>
-          {canManageTeam && activeTeam && token ? (
+          {canManageTeam && activeTeam && session && token ? (
             <>
               <form className="workspace-inline-form" onSubmit={handleCreateTeam}>
                 <label className="workspace-field">
@@ -2758,41 +2758,60 @@ function WorkspaceControlCenter({
                 </p>
               ) : null}
               <div className="workspace-member-list">
-                {members.map((member) => (
-                  <div className="workspace-member-row" key={member.accountId}>
-                    <span>
-                      <strong>{member.displayName ?? member.email}</strong>
-                      <small>{member.email}</small>
-                    </span>
-                    <select
-                      value={member.role}
-                      disabled={!canManageRoles || workspaceBusy === `role-${member.accountId}`}
-                      title={
-                        canManageRoles
-                          ? 'Owners can change team roles.'
-                          : 'Sign in as an owner to change team roles.'
-                      }
-                      onChange={(event) =>
-                        void handleRoleChange(
-                          member.accountId,
-                          event.currentTarget.value as TeamRole,
-                        )
-                      }
-                    >
-                      <option value="owner">Owner</option>
-                      <option value="admin">Admin</option>
-                      <option value="member">Member</option>
-                    </select>
-                    <button
-                      type="button"
-                      className="workspace-link-button"
-                      disabled={workspaceBusy === `remove-${member.accountId}`}
-                      onClick={() => void handleRemoveMember(member.accountId)}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
+                {members.map((member) => {
+                  const roleControl = memberRoleControlState({
+                    actorRole: activeTeam.role,
+                    currentAccountId: session.account.id,
+                    member,
+                    ownerCount,
+                    busyKey: workspaceBusy,
+                  });
+                  const removeControl = memberRemoveControlState({
+                    actorRole: activeTeam.role,
+                    currentAccountId: session.account.id,
+                    member,
+                    ownerCount,
+                    busyKey: workspaceBusy,
+                  });
+
+                  return (
+                    <div className="workspace-member-row" key={member.accountId}>
+                      <span>
+                        <strong>{member.displayName ?? member.email}</strong>
+                        <small>{member.email}</small>
+                      </span>
+                      <span className={`workspace-role-badge is-${member.role}`}>
+                        {teamRoleLabel(member.role)}
+                      </span>
+                      <select
+                        value={member.role}
+                        aria-label={`Change role for ${member.email}`}
+                        disabled={roleControl.disabled}
+                        title={roleControl.reason}
+                        onChange={(event) =>
+                          void handleRoleChange(
+                            member.accountId,
+                            event.currentTarget.value as TeamRole,
+                          )
+                        }
+                      >
+                        <option value="owner">Owner</option>
+                        <option value="admin">Admin</option>
+                        <option value="member">Member</option>
+                      </select>
+                      <button
+                        type="button"
+                        className="workspace-link-button"
+                        aria-label={`Remove ${member.email}`}
+                        disabled={removeControl.disabled}
+                        title={removeControl.reason}
+                        onClick={() => void handleRemoveMember(member.accountId)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
               <div className="workspace-member-list" aria-label="Pending invitations">
                 {invitations
@@ -2984,6 +3003,111 @@ function WorkspaceControlCenter({
       </div>
     </section>
   );
+}
+
+function memberRoleControlState({
+  actorRole,
+  currentAccountId,
+  member,
+  ownerCount,
+  busyKey,
+}: {
+  actorRole: TeamRole;
+  currentAccountId: string;
+  member: TeamMemberRecord;
+  ownerCount: number;
+  busyKey: string | null;
+}): { disabled: boolean; reason: string } {
+  if (busyKey === `role-${member.accountId}`) {
+    return {
+      disabled: true,
+      reason: 'Role update is in progress.',
+    };
+  }
+
+  if (actorRole !== 'owner') {
+    return {
+      disabled: true,
+      reason: 'Only team owners can change roles.',
+    };
+  }
+
+  if (member.accountId === currentAccountId && member.role === 'owner' && ownerCount <= 1) {
+    return {
+      disabled: true,
+      reason: 'Promote another owner before changing the final owner role.',
+    };
+  }
+
+  return {
+    disabled: false,
+    reason: 'Owners can change team roles.',
+  };
+}
+
+function memberRemoveControlState({
+  actorRole,
+  currentAccountId,
+  member,
+  ownerCount,
+  busyKey,
+}: {
+  actorRole: TeamRole;
+  currentAccountId: string;
+  member: TeamMemberRecord;
+  ownerCount: number;
+  busyKey: string | null;
+}): { disabled: boolean; reason: string } {
+  if (busyKey === `remove-${member.accountId}`) {
+    return {
+      disabled: true,
+      reason: 'Member removal is in progress.',
+    };
+  }
+
+  if (member.accountId === currentAccountId) {
+    return {
+      disabled: true,
+      reason: 'Use account settings to disable your own account.',
+    };
+  }
+
+  if (actorRole === 'member') {
+    return {
+      disabled: true,
+      reason: 'Team admin access is required to remove members.',
+    };
+  }
+
+  if (member.role === 'owner' && actorRole !== 'owner') {
+    return {
+      disabled: true,
+      reason: 'Only team owners can remove owners.',
+    };
+  }
+
+  if (member.role === 'owner' && ownerCount <= 1) {
+    return {
+      disabled: true,
+      reason: 'At least one team owner must remain.',
+    };
+  }
+
+  return {
+    disabled: false,
+    reason: 'Remove this member from the team.',
+  };
+}
+
+function teamRoleLabel(role: TeamRole): string {
+  switch (role) {
+    case 'owner':
+      return 'Owner';
+    case 'admin':
+      return 'Admin';
+    case 'member':
+      return 'Member';
+  }
 }
 
 function AppHeader({

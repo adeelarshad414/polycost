@@ -1947,6 +1947,36 @@ summary:focus-visible,
   white-space: nowrap;
 }
 
+.workspace-role-badge {
+  border: 1px solid color-mix(in srgb, var(--pc-border) 78%, transparent);
+  border-radius: 999px;
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 800;
+  line-height: 1;
+  padding: 6px 8px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.workspace-role-badge.is-owner {
+  border-color: color-mix(in srgb, var(--brand-orange) 36%, var(--pc-border));
+  background: color-mix(in srgb, var(--brand-orange) 10%, transparent);
+  color: color-mix(in srgb, var(--brand-orange) 74%, var(--pc-text-primary));
+}
+
+.workspace-role-badge.is-admin {
+  border-color: color-mix(in srgb, var(--brand-blue) 36%, var(--pc-border));
+  background: color-mix(in srgb, var(--brand-blue) 10%, transparent);
+  color: color-mix(in srgb, var(--brand-blue) 74%, var(--pc-text-primary));
+}
+
+.workspace-role-badge.is-member {
+  border-color: color-mix(in srgb, var(--brand-green) 34%, var(--pc-border));
+  background: color-mix(in srgb, var(--brand-green) 9%, transparent);
+  color: color-mix(in srgb, var(--brand-green) 74%, var(--pc-text-primary));
+}
+
 .workspace-member-row small,
 .workspace-empty-state,
 .workspace-token-output,
@@ -1973,6 +2003,11 @@ summary:focus-visible,
 .workspace-link-button {
   color: var(--pc-danger);
   padding-inline: 0;
+}
+
+.workspace-link-button:disabled {
+  color: var(--pc-text-tertiary);
+  cursor: not-allowed;
 }
 
 .workspace-token-output {
