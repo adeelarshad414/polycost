@@ -17,13 +17,12 @@ export interface PricingSourceLineage {
 }
 
 export function pricingLineageForCatalogRecord(record: PricingCatalogRecord): PricingSourceLineage {
-  return {
-    sourceEndpoint: sourceEndpointForRecord(record),
-    sourceRecordId: sourceRecordIdForRecord(record),
-    sourceRecordKey: pricingSourceRecordKey(record),
-    fetchTimestamp: record.fetchedAt,
-    transformVersion: PRICING_TRANSFORM_VERSION,
-    sourcePayloadHash: sha256StableJson({
+  const sourceRecordKey =
+    stringAttribute(record, 'sourceRecordKey') ?? pricingSourceRecordKey(record);
+  const transformVersion = stringAttribute(record, 'transformVersion') ?? PRICING_TRANSFORM_VERSION;
+  const sourcePayloadHash =
+    stringAttribute(record, 'sourcePayloadHash') ??
+    sha256StableJson({
       provider: record.provider,
       serviceCategory: record.serviceCategory,
       serviceName: record.serviceName,
@@ -35,7 +34,15 @@ export function pricingLineageForCatalogRecord(record: PricingCatalogRecord): Pr
       attributes: record.attributes ?? {},
       effectiveDate: record.effectiveDate,
       fetchedAt: record.fetchedAt,
-    }),
+    });
+
+  return {
+    sourceEndpoint: sourceEndpointForRecord(record),
+    sourceRecordId: sourceRecordIdForRecord(record),
+    sourceRecordKey,
+    fetchTimestamp: record.fetchedAt,
+    transformVersion,
+    sourcePayloadHash,
   };
 }
 
@@ -159,6 +166,9 @@ type LineageAttributeKey =
   | 'providerEndpoint'
   | 'rawSourceRecordId'
   | 'sourceRecordId'
+  | 'sourceRecordKey'
+  | 'transformVersion'
+  | 'sourcePayloadHash'
   | 'meterId'
   | 'productId'
   | 'serviceName';
@@ -184,6 +194,12 @@ function stringAttribute(
       return stringFromUnknown(attributes.rawSourceRecordId);
     case 'sourceRecordId':
       return stringFromUnknown(attributes.sourceRecordId);
+    case 'sourceRecordKey':
+      return stringFromUnknown(attributes.sourceRecordKey);
+    case 'transformVersion':
+      return stringFromUnknown(attributes.transformVersion);
+    case 'sourcePayloadHash':
+      return stringFromUnknown(attributes.sourcePayloadHash);
     case 'meterId':
       return stringFromUnknown(attributes.meterId);
     case 'productId':

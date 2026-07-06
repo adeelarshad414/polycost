@@ -46,6 +46,31 @@ say so explicitly rather than marking it done.
 | Phase 2.8D - Security suppression cleanup              | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8E - UI-priced service coverage guard          | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8F - SKU evidence derivation hardening         | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8G - Catalog lineage readback hardening        | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8G - Catalog lineage readback hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Strengthened the persisted catalog lineage path: `pricing_catalog` reads now
+  select stored source endpoint, source record ID/key, transform version, and payload
+  hash columns and expose them back on catalog records for downstream trace
+  generation.
+- Updated the pricing lineage helper so it preserves persisted source record keys,
+  transform versions, and payload hashes when present instead of recomputing them
+  after a catalog row has been read from storage.
+- Added a repository regression test proving a catalog row read through
+  `PostgresPricingCatalogRepository.find()` can be turned into lineage evidence with
+  the persisted raw source ID/key/hash intact.
+- Verification evidence in this continuation:
+  - Focused repository/normalization/base-adapter specs passed: 4 suites / 32 tests.
+  - `npm run ci:lint` passed with zero warnings after removing a dynamic keyed
+    attribute write.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this improves queryable lineage for cached catalog
+  records, but full invoice-grade provider SKU coverage and GitHub Actions runner
+  availability still remain separate work.
 
 ## Phase 2.8F - SKU evidence derivation hardening
 

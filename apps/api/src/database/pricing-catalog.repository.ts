@@ -61,6 +61,11 @@ interface PricingCatalogRow {
   attributes: Record<string, unknown> | null;
   effective_date: Date;
   fetched_at: Date;
+  source_endpoint: string | null;
+  source_record_id: string | null;
+  source_record_key: string | null;
+  transform_version: string | null;
+  source_payload_hash: string | null;
 }
 
 const defaultPgPoolFactory: PgPoolFactory = (config) => new Pool(config);
@@ -115,7 +120,12 @@ export class PostgresPricingCatalogRepository
                unit_price_usd,
                attributes,
                effective_date,
-               fetched_at
+               fetched_at,
+               source_endpoint,
+               source_record_id,
+               source_record_key,
+               transform_version,
+               source_payload_hash
         FROM pricing_catalog
         WHERE ${conditions.join(' AND ')}
         ORDER BY CASE WHEN attributes->>'source' = 'local_seed' THEN 1 ELSE 0 END,
@@ -569,6 +579,8 @@ export class PostgresPricingCatalogRepository
 }
 
 function toPricingCatalogRecord(row: PricingCatalogRow): PricingCatalogRecord {
+  const attributes = catalogAttributesWithLineage(row);
+
   return {
     provider: row.provider,
     serviceCategory: row.service_category,
@@ -578,10 +590,37 @@ function toPricingCatalogRecord(row: PricingCatalogRow): PricingCatalogRecord {
     region: row.region,
     unit: row.unit,
     unitPriceUsd: Number.parseFloat(row.unit_price_usd),
-    attributes: row.attributes ?? undefined,
+    attributes,
     effectiveDate: row.effective_date.toISOString(),
     fetchedAt: row.fetched_at.toISOString(),
   };
+}
+
+function catalogAttributesWithLineage(row: PricingCatalogRow): Record<string, unknown> | undefined {
+  const attributes: Record<string, unknown> = {
+    ...(row.attributes ?? {}),
+    ...(stringOrUndefined(row.source_endpoint)
+      ? { sourceEndpoint: stringOrUndefined(row.source_endpoint) }
+      : {}),
+    ...(stringOrUndefined(row.source_record_id)
+      ? { sourceRecordId: stringOrUndefined(row.source_record_id) }
+      : {}),
+    ...(stringOrUndefined(row.source_record_key)
+      ? { sourceRecordKey: stringOrUndefined(row.source_record_key) }
+      : {}),
+    ...(stringOrUndefined(row.transform_version)
+      ? { transformVersion: stringOrUndefined(row.transform_version) }
+      : {}),
+    ...(stringOrUndefined(row.source_payload_hash)
+      ? { sourcePayloadHash: stringOrUndefined(row.source_payload_hash) }
+      : {}),
+  };
+
+  return Object.keys(attributes).length > 0 ? attributes : undefined;
+}
+
+function stringOrUndefined(value: string | null | undefined): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
 function pricingRateRowsForComputeRecord(
