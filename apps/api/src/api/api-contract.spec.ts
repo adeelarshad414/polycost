@@ -557,6 +557,42 @@ describe('API contracts', () => {
     });
   });
 
+  it('GET /pricing/coverage reports estimate-grade coverage without claiming invoice-grade pricing', () => {
+    const service = comparisonApplicationService();
+    const controller = new PricingStatusController(service as never);
+    const coverage = controller.getCoverage();
+
+    expect(coverage.invoiceGradeSupported).toBe(false);
+    expect(coverage.estimateGrade).toBe('decision_grade_estimate');
+    expect(coverage.invoiceGradeFutureWork).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('billing export ingestion'),
+        expect.stringContaining('Account-specific discounts'),
+      ]),
+    );
+    expect(coverage.providers.map((provider) => provider.providerId)).toEqual([
+      'aws',
+      'azure',
+      'gcp',
+    ]);
+    expect(
+      coverage.providers
+        .find((provider) => provider.providerId === 'gcp')
+        ?.categories.find((category) => category.category === 'compute'),
+    ).toMatchObject({
+      coverage: 'live_catalog',
+      traceLevel: 'sku_price_row',
+    });
+    expect(
+      coverage.providers
+        .find((provider) => provider.providerId === 'aws')
+        ?.categories.find((category) => category.category === 'support'),
+    ).toMatchObject({
+      coverage: 'modeled',
+      traceLevel: 'modeled_assumption',
+    });
+  });
+
   it('GET /data-health returns public pricing freshness through the controller', async () => {
     const service = comparisonApplicationService();
     const controller = new DataHealthController(

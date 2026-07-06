@@ -121,6 +121,7 @@ The main API is versioned under `/api/v1`.
 - `POST /workload/parse` parses natural language into workload structure.
 - `POST /workload/validate` validates workload input.
 - `POST /parse/diagram` parses Mermaid, draw.io XML, Lucid CSV, or VSDX into a reviewable NWS draft.
+- `GET /pricing/coverage` reports live-catalog versus modeled pricing coverage without claiming invoice-grade support.
 - `GET /pricing/status` returns pricing catalog status.
 - `GET /pricing/compare` compares cached pricing for a workload.
 - `GET /pricing/breakdown` returns detailed workload pricing breakdowns.
@@ -147,7 +148,11 @@ Limits and safety behavior:
 - Images, screenshots, and PDFs are not parsed in Phase 2; export the editable source format instead.
 - XML entities/DTDs, compressed draw.io bombs, VSDX ZIP bombs, spoofed image extensions, and oversized uploads are rejected.
 - Successful imports are copied to a randomized non-webroot temp path for the review step and expire after 24 hours.
-- If `DIAGRAM_LLM_CLASSIFIER_ENDPOINT` is unset, unresolved nodes stay in the review screen for manual classification. This is the default OSS path.
+- If `DIAGRAM_LLM_CLASSIFIER_ENDPOINT` and `DIAGRAM_LLM_CLASSIFIER_MODEL` are set,
+  unresolved nodes can use an OpenAI-compatible JSON-schema classifier with the API key
+  read from Vault at `secret/polycost/llm` key `api_key`.
+- If the diagram classifier endpoint/model are unset, unresolved nodes stay in the
+  review screen for manual classification. This is the default OSS path.
 
 ## Common Commands
 

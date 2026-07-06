@@ -55,6 +55,15 @@ Then seed provider secrets in Vault. GCP is required by the current adapter:
 docker compose exec vault vault kv put secret/polycost/providers/gcp access_token="<oauth-access-token>"
 ```
 
+Optional diagram Tier 3 classification uses the same OpenAI-compatible secret path as
+natural-language parsing. Configure both endpoint variables and seed the key:
+
+```bash
+DIAGRAM_LLM_CLASSIFIER_ENDPOINT="https://llm.example.com/v1/chat/completions"
+DIAGRAM_LLM_CLASSIFIER_MODEL="diagram-classifier-model"
+docker compose exec vault vault kv put secret/polycost/llm api_key="<llm-api-key>"
+```
+
 Validate readiness:
 
 ```bash
@@ -79,6 +88,10 @@ only provider-catalog or pricing-rate rows, persists raw plus normalized cache r
 then recomputes the saved workload. Modeled rows and local seed rows are skipped with a
 warning instead of being sent to provider APIs.
 
+`GET /api/v1/pricing/coverage` returns a machine-readable coverage matrix showing
+which provider/category combinations are live-catalog traceable, which are modeled,
+and why invoice-grade support remains future work.
+
 ## Remaining Production Coverage Gaps
 
 - AWS coverage is bulk-price-list based; account-specific private pricing, taxes,
@@ -91,6 +104,10 @@ warning instead of being sent to provider APIs.
   database, and network categories plus modeled operations/licensing/support dimensions.
 - Spot/preemptible and commitment data remains provider-availability dependent and is
   explicitly labeled when modeled.
+- The only remaining npm audit advisories after targeted overrides are low-severity
+  optional Graphify/Ollama development-tooling advisories with no upstream fix
+  available at the time of this pass. Runtime `npm run security:audit` still gates
+  high/critical findings.
 
 Do not start Terraform/V3 demo work until the chosen demo workload shows trace keys in
 the API result and exported reports.

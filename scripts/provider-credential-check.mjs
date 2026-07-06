@@ -5,6 +5,9 @@ const strict = process.argv.includes('--strict');
 const useMockProviders = envBoolean('USE_MOCK_PROVIDERS', true);
 const vaultAddr = process.env.VAULT_ADDR;
 const vaultTokenFile = process.env.VAULT_TOKEN_FILE;
+const diagramClassifierConfigured = Boolean(
+  process.env.DIAGRAM_LLM_CLASSIFIER_ENDPOINT && process.env.DIAGRAM_LLM_CLASSIFIER_MODEL,
+);
 
 const results = [];
 
@@ -30,6 +33,17 @@ if (useMockProviders) {
   });
 } else {
   results.push(await checkGcpVaultToken());
+}
+
+if (diagramClassifierConfigured) {
+  results.push(await checkLlmVaultApiKey());
+} else {
+  results.push({
+    provider: 'diagram-llm',
+    status: 'pass',
+    message:
+      'Diagram LLM classifier endpoint/model are not both configured; parser will use deterministic stencil and alias classification only.',
+  });
 }
 
 for (const result of results) {
@@ -93,6 +107,57 @@ async function checkGcpVaultToken() {
       provider: 'gcp',
       status: strict ? 'fail' : 'warn',
       message: `Could not verify GCP Vault token: ${error instanceof Error ? error.message : 'unknown error'}.`,
+    };
+  }
+}
+
+async function checkLlmVaultApiKey() {
+  if (!vaultAddr || !vaultTokenFile) {
+    return {
+      provider: 'diagram-llm',
+      status: strict ? 'fail' : 'warn',
+      message:
+        'DIAGRAM_LLM_CLASSIFIER_ENDPOINT and DIAGRAM_LLM_CLASSIFIER_MODEL require VAULT_ADDR and VAULT_TOKEN_FILE so PolyCost can read secret/polycost/llm api_key.',
+    };
+  }
+
+  if (!existsSync(vaultTokenFile)) {
+    return {
+      provider: 'diagram-llm',
+      status: strict ? 'fail' : 'warn',
+      message: `Vault token file is not readable at ${vaultTokenFile}.`,
+    };
+  }
+
+  try {
+    const token = (await readFile(vaultTokenFile, 'utf8')).trim();
+    const endpoint = `${vaultAddr.replace(/\/$/, '')}/v1/secret/data/polycost/llm`;
+    const response = await fetch(endpoint, {
+      headers: {
+        'X-Vault-Token': token,
+      },
+    });
+    const parsed = await response.json();
+    const apiKey = parsed?.data?.data?.api_key;
+
+    if (!response.ok || typeof apiKey !== 'string' || apiKey.length === 0) {
+      return {
+        provider: 'diagram-llm',
+        status: strict ? 'fail' : 'warn',
+        message: 'Vault path secret/polycost/llm does not contain a non-empty api_key.',
+      };
+    }
+
+    return {
+      provider: 'diagram-llm',
+      status: 'pass',
+      message: 'Vault contains a diagram/NL parser API key at secret/polycost/llm api_key.',
+    };
+  } catch (error) {
+    return {
+      provider: 'diagram-llm',
+      status: strict ? 'fail' : 'warn',
+      message: `Could not verify diagram LLM Vault key: ${error instanceof Error ? error.message : 'unknown error'}.`,
     };
   }
 }

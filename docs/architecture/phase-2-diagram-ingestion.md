@@ -75,9 +75,11 @@ Last verified on 2026-07-06:
 
 ## Known Gaps
 
-- Tier 3 LLM classification is represented by an interface/stub. Production use can
-  wire `DIAGRAM_LLM_CLASSIFIER_ENDPOINT` and model configuration without changing the
-  parser contract.
+- Tier 3 LLM classification is now optionally wired through an OpenAI-compatible
+  JSON-schema classifier. Configure `DIAGRAM_LLM_CLASSIFIER_ENDPOINT`,
+  `DIAGRAM_LLM_CLASSIFIER_MODEL`, and Vault `secret/polycost/llm` key `api_key` to use
+  it. When unset, the parser keeps deterministic stencil/alias classification and
+  manual review fallback.
 - VSDX parsing reads basic OpenXML pages, shapes, and connectors. It does not attempt
   full Visio rendering semantics.
 - Review controls update submitted `serviceRequirements`; deep service-specific
