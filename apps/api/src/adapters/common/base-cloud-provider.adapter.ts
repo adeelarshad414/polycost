@@ -15,6 +15,7 @@ import {
   CostComponent,
   PricingCatalogReader,
   PricingCatalogRecord,
+  PricingTrace,
   PricingModelCost,
   PricingModelKey,
   ProviderId,
@@ -588,6 +589,18 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       rateCurrency,
       rateValidFrom: record.effectiveDate,
       rateSourceFetchedAt: record.fetchedAt,
+      pricingTrace: catalogPricingTrace({
+        providerId: this.providerId,
+        category,
+        costComponent: options.costComponent ?? this.costComponentForCategory(category),
+        record,
+        displayRegion,
+        isApproximate: options.isApproximate ?? record.attributes?.isApproximate === true,
+        pricingBasis: cost.pricingBasis,
+        pricingTermCode,
+        paymentOptionCode,
+        rateCurrency,
+      }),
       ...(cost.egressTiers && cost.egressTiers.length > 0 ? { egressTiers: cost.egressTiers } : {}),
       ...(options.pricingModels ? { pricingModels: options.pricingModels } : {}),
     };
@@ -1149,6 +1162,70 @@ function normalizeStorageClass(value: string): StorageClass | undefined {
   }
 
   return undefined;
+}
+
+function catalogPricingTrace(input: {
+  providerId: ProviderId;
+  category: ServiceCategory;
+  costComponent?: CostComponent;
+  record: PricingCatalogRecord;
+  displayRegion: string;
+  isApproximate: boolean;
+  pricingBasis: PricingTrace['pricingBasis'];
+  pricingTermCode?: string;
+  paymentOptionCode?: string;
+  rateCurrency: string;
+}): PricingTrace {
+  const sourceRecordKey = pricingSourceRecordKey({
+    providerId: input.providerId,
+    category: input.category,
+    skuId: input.record.skuId,
+    region: input.record.region,
+    unit: input.record.unit,
+    effectiveDate: input.record.effectiveDate,
+  });
+
+  return {
+    providerId: input.providerId,
+    serviceCategory: input.category,
+    costComponent: input.costComponent,
+    source: 'pricing_catalog',
+    sourceRecordKey,
+    resolvedSkuId: input.record.skuId,
+    sourceSkuId: input.record.skuId,
+    providerServiceName: input.record.serviceName,
+    ...(input.record.skuDescription ? { skuDescription: input.record.skuDescription } : {}),
+    region: input.displayRegion,
+    catalogRegion: input.record.region,
+    unit: input.record.unit,
+    unitPriceUsd: input.record.unitPriceUsd,
+    currency: input.rateCurrency,
+    effectiveDate: input.record.effectiveDate,
+    fetchedAt: input.record.fetchedAt,
+    ...(input.pricingTermCode ? { pricingTermCode: input.pricingTermCode } : {}),
+    ...(input.paymentOptionCode ? { paymentOptionCode: input.paymentOptionCode } : {}),
+    pricingBasis: input.pricingBasis,
+    isApproximate: input.isApproximate,
+    isEstimate: false,
+  };
+}
+
+function pricingSourceRecordKey(input: {
+  providerId: ProviderId;
+  category: ServiceCategory;
+  skuId: string;
+  region: string;
+  unit: string;
+  effectiveDate: string;
+}): string {
+  return [
+    input.providerId,
+    input.category,
+    input.skuId,
+    input.region,
+    input.unit,
+    input.effectiveDate,
+  ].join('|');
 }
 
 function providerPricingModelMetadata(

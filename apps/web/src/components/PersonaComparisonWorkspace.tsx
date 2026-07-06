@@ -940,18 +940,53 @@ function engineeringRowFromLineItem(
 }
 
 function lineItemSpec(lineItem: ComparisonLineItem): string {
+  const trace = lineItem.pricingTrace;
   const parts = [
-    lineItem.skuId ? `SKU ${lineItem.skuId}` : undefined,
-    lineItem.unit ? `Unit ${lineItem.unit}` : undefined,
+    lineItem.skuId
+      ? `SKU ${lineItem.skuId}`
+      : trace?.resolvedSkuId
+        ? `SKU ${trace.resolvedSkuId}`
+        : undefined,
+    trace?.source
+      ? `Source ${trace.source.replace(/_/g, ' ')}`
+      : lineItem.rateSource
+        ? `Source ${lineItem.rateSource.replace(/_/g, ' ')}`
+        : undefined,
+    lineItem.unit ? `Unit ${lineItem.unit}` : trace?.unit ? `Unit ${trace.unit}` : undefined,
     lineItem.unitPriceUsd !== undefined
       ? `${formatCurrency(lineItem.unitPriceUsd)}/unit`
-      : undefined,
-    lineItem.pricingBasis ? `${capitalize(lineItem.pricingBasis)} pricing` : undefined,
+      : trace?.unitPriceUsd !== undefined
+        ? `${formatCurrency(trace.unitPriceUsd)}/unit`
+        : undefined,
+    trace?.effectiveDate ? `Effective ${shortDate(trace.effectiveDate)}` : undefined,
+    trace?.fetchedAt ? `Fetched ${shortDate(trace.fetchedAt)}` : undefined,
+    trace?.sourceRecordKey ? `Trace ${trace.sourceRecordKey}` : undefined,
+    trace?.isEstimate ? 'Estimate-backed' : undefined,
+    trace?.isApproximate ? 'Approximate mapping' : undefined,
+    lineItem.pricingBasis
+      ? `${capitalize(lineItem.pricingBasis)} pricing`
+      : trace?.pricingBasis
+        ? `${capitalize(trace.pricingBasis)} pricing`
+        : undefined,
   ].filter((part): part is string => Boolean(part));
 
   return parts.length > 0
     ? parts.join(' · ')
     : 'Modeled cost driver - provider SKU/rate metadata not returned by API';
+}
+
+function shortDate(value: string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(date);
 }
 
 function comparisonEvidenceSummary(data: PersonaComparisonData): string {

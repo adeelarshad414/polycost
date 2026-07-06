@@ -180,6 +180,19 @@ describe('BaseCloudProviderAdapter', () => {
       'DB-STORAGE',
       'NETWORK',
     ]);
+    expect(result.lineItems[0].pricingTrace).toEqual(
+      expect.objectContaining({
+        providerId: 'aws',
+        serviceCategory: 'compute',
+        source: 'pricing_catalog',
+        sourceRecordKey: 'aws|compute|COMPUTE-RIGHT|test-region|hour|2026-01-01T00:00:00Z',
+        resolvedSkuId: 'COMPUTE-RIGHT',
+        sourceSkuId: 'COMPUTE-RIGHT',
+        catalogRegion: 'test-region',
+        unitPriceUsd: 0.05,
+        isEstimate: false,
+      }),
+    );
     expect(result.lineItems[1].isApproximate).toBe(true);
   });
 

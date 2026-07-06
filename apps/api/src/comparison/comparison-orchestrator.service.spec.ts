@@ -2391,6 +2391,37 @@ describe('ComparisonOrchestratorService', () => {
     );
   });
 
+  it('adds public pricing trace evidence when provider line items only have flat rate fields', async () => {
+    const service = createService([
+      adapter(
+        'aws',
+        jest.fn(async () => providerResult('aws', [20])),
+      ),
+    ]);
+
+    const result = await service.compare(validWorkload);
+
+    expect(result.providers[0].lineItems[0]).toEqual(
+      expect.objectContaining({
+        rateSource: 'pricing_catalog',
+        rateSourceSkuId: 'aws-0',
+        pricingTrace: expect.objectContaining({
+          providerId: 'aws',
+          serviceCategory: 'compute',
+          source: 'pricing_catalog',
+          sourceRecordKey: 'aws|compute|aws-0|us-test-1|month|pricing_catalog',
+          resolvedSkuId: 'aws-0',
+          sourceSkuId: 'aws-0',
+          region: 'us-test-1',
+          unit: 'month',
+          unitPriceUsd: 20,
+          isApproximate: false,
+          isEstimate: false,
+        }),
+      }),
+    );
+  });
+
   it('throws when every provider fails', async () => {
     const service = createService([
       adapter(

@@ -1410,8 +1410,41 @@ describe('ComparisonView', () => {
   });
 
   it('renders executive persona metrics and engineering resource rows from shared costs', async () => {
+    const tracedComparison: ComparisonResult = {
+      ...comparisonResult,
+      providers: comparisonResult.providers.map((candidate) =>
+        candidate.providerId === 'aws'
+          ? {
+              ...candidate,
+              lineItems: candidate.lineItems.map((lineItem) => ({
+                ...lineItem,
+                pricingBasis: 'flat',
+                pricingTrace: {
+                  providerId: 'aws',
+                  serviceCategory: lineItem.category,
+                  source: 'pricing_catalog',
+                  sourceRecordKey: 'aws:ec2:us-east-1:c6i.large',
+                  resolvedSkuId: 'pc-aws-compute-001',
+                  providerServiceName: 'Amazon EC2',
+                  skuDescription: 'Linux shared c6i.large compute',
+                  region: 'us-east-1',
+                  catalogRegion: 'US East (N. Virginia)',
+                  unit: 'vCPU-hour',
+                  unitPriceUsd: 0.0425,
+                  currency: 'USD',
+                  effectiveDate: '2026-07-01T00:00:00.000Z',
+                  fetchedAt: '2026-07-06T08:30:00.000Z',
+                  pricingBasis: 'flat',
+                  isApproximate: false,
+                  isEstimate: false,
+                },
+              })),
+            }
+          : candidate,
+      ),
+    };
     const { container, unmount } = render(
-      <ComparisonView comparison={comparisonResult} interval="monthly" />,
+      <ComparisonView comparison={tracedComparison} interval="monthly" />,
     );
 
     expect(text(container)).toContain('$30.00');
@@ -1458,6 +1491,14 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain(
       'Modeled cost driver - provider SKU/rate metadata not returned by API',
     );
+    expect(text(container)).toContain('SKU pc-aws-compute-001');
+    expect(text(container)).toContain('Source pricing catalog');
+    expect(text(container)).toContain('Unit vCPU-hour');
+    expect(text(container)).toContain('$0.04/unit');
+    expect(text(container)).toContain('Effective Jul 1, 2026');
+    expect(text(container)).toContain('Fetched Jul 6, 2026');
+    expect(text(container)).toContain('Trace aws:ec2:us-east-1:c6i.large');
+    expect(text(container)).toContain('Flat pricing');
     expect(text(container)).not.toContain('Provider SKU detail unavailable');
     expect(text(container)).toContain('aws-compute-01');
     expect(text(container)).toContain('azure-compute-01');

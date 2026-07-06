@@ -39,6 +39,12 @@ Application configuration comes from environment variables validated by
 Secrets are read from Vault through `SecretsService`; do not place secret values in
 environment variables or committed files.
 
+For provider-specific live pricing setup, see
+`docs/operations/live-pricing-credentials.md`. In short: the current AWS and Azure
+adapters use public pricing endpoints, while the GCP Cloud Billing adapter requires a
+Vault secret at `secret/polycost/providers/gcp` key `access_token` when
+`USE_MOCK_PROVIDERS=false`.
+
 ## Secret Paths
 
 Local development seeds these paths:
@@ -89,6 +95,7 @@ Before production hosting, add:
 ```bash
 npm run cloud:check
 npm run devops:check
+npm run provider:credentials:check
 npm run check:full
 ```
 

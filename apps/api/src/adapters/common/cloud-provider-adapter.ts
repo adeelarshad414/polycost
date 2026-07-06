@@ -60,6 +60,30 @@ export interface PricingCatalogRecord {
   fetchedAt: string;
 }
 
+export interface PricingTrace {
+  providerId: ProviderId;
+  serviceCategory: ServiceCategory;
+  costComponent?: CostComponent;
+  source: RateSource;
+  sourceRecordKey: string;
+  resolvedSkuId?: string;
+  sourceSkuId?: string;
+  providerServiceName?: string;
+  skuDescription?: string;
+  region?: string;
+  catalogRegion?: string;
+  unit?: string;
+  unitPriceUsd?: number;
+  currency?: string;
+  effectiveDate?: string;
+  fetchedAt?: string;
+  pricingTermCode?: string;
+  paymentOptionCode?: string;
+  pricingBasis?: PricingBasis;
+  isApproximate: boolean;
+  isEstimate: boolean;
+}
+
 export interface ProviderPricingLineItem {
   category: ServiceCategory;
   costComponent?: CostComponent;
@@ -79,6 +103,7 @@ export interface ProviderPricingLineItem {
   rateCurrency?: string;
   rateValidFrom?: string;
   rateSourceFetchedAt?: string;
+  pricingTrace?: PricingTrace;
   egressTiers?: EgressTierBreakdown[];
   pricingModels?: PricingModelCost[];
 }

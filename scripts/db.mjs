@@ -29,6 +29,7 @@ const expectedMigrations = [
   '021_seed_distinct_payment_option_rates.sql',
   '022_diagram_imports.sql',
   '023_seed_sql_server_database_catalog.sql',
+  '024_comparison_audit_pricing_trace.sql',
 ];
 
 if (!['migrate', 'seed', 'reset', 'validate'].includes(command)) {

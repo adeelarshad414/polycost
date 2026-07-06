@@ -61,6 +61,19 @@ docker-compose.yml     Full local stack
 
 ## Quick Start
 
+For a clean-clone demo path that installs dependencies if needed, creates `.env`,
+boots Docker Compose, applies migrations, and waits for health checks:
+
+```bash
+npm run demo:up
+```
+
+Generate reviewer screenshots and a short walkthrough video from the running demo:
+
+```bash
+npm run demo:artifacts
+```
+
 Create a local environment file:
 
 ```bash
@@ -171,6 +184,7 @@ Security and quality checks:
 
 ```bash
 npm run security:audit
+npm run provider:credentials:check
 npm run qa
 npm run check
 ```
@@ -207,6 +221,8 @@ providers are disabled.
 - `PROGRESS.md` tracks project progress.
 - `docs/architecture/phase-10-cost-intelligence.md` documents the Phase 1
   cost-intelligence model and future import/Terraform hooks.
+- `docs/operations/live-pricing-credentials.md` documents live-pricing ETL,
+  credential readiness, and current provider coverage limits.
 - `specs/README.md` links the deeper product, architecture, data-model, API, security, and testing specs.
 
 ## Project Principles

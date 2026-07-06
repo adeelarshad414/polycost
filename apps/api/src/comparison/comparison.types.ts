@@ -2,6 +2,7 @@ import {
   CostComponent,
   EgressTierBreakdown,
   PricingBasis,
+  PricingTrace,
   PricingModelKey,
   PricingModelCost,
   ProviderId,
@@ -43,6 +44,7 @@ export interface ComparisonLineItem {
   rateCurrency?: string;
   rateValidFrom?: string;
   rateSourceFetchedAt?: string;
+  pricingTrace?: PricingTrace;
   egressTiers?: EgressTierBreakdown[];
   pricingModels?: PricingModelCost[];
 }

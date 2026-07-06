@@ -2,6 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   CloudProviderAdapter,
   CostComponent,
+  PricingTrace,
+  RateSource,
   PricingModelCost,
   PricingModelKey,
   ProviderId,
@@ -294,6 +296,7 @@ export class ComparisonOrchestratorService {
         rateCurrency: annotatedLineItem.rateCurrency,
         rateValidFrom: annotatedLineItem.rateValidFrom,
         rateSourceFetchedAt: annotatedLineItem.rateSourceFetchedAt,
+        pricingTrace: annotatedLineItem.pricingTrace,
         ...(annotatedLineItem.egressTiers ? { egressTiers: annotatedLineItem.egressTiers } : {}),
         ...(annotatedLineItem.pricingModels
           ? { pricingModels: this.normalizePricingModels(annotatedLineItem.pricingModels) }
@@ -308,7 +311,7 @@ export class ComparisonOrchestratorService {
     const lineItems = [
       ...resilienceAdjustedLineItems,
       ...this.modeledLineItems(nws, result.providerId, resilienceAdjustedLineItems),
-    ];
+    ].map((lineItem) => this.withPricingTrace(result.providerId, lineItem));
 
     const monthlyCostUsd = this.roundCurrency(
       lineItems.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0),
@@ -475,6 +478,112 @@ export class ComparisonOrchestratorService {
         ? { pricingModels: this.normalizePricingModels(lineItem.pricingModels) }
         : {}),
     };
+  }
+
+  private withPricingTrace(
+    providerId: ProviderId,
+    lineItem: ComparisonLineItem,
+  ): ComparisonLineItem {
+    const rateSource = lineItem.rateSource ?? this.defaultRateSource(lineItem);
+    const pricingTrace = this.pricingTraceForLineItem(providerId, lineItem, rateSource);
+
+    if (!pricingTrace) {
+      return lineItem;
+    }
+
+    return {
+      ...lineItem,
+      rateSource,
+      rateSourceSkuId: lineItem.rateSourceSkuId ?? lineItem.skuId,
+      rateCurrency:
+        lineItem.rateCurrency ??
+        (lineItem.unitPriceUsd !== undefined || lineItem.baseHourlyCostUsd !== undefined
+          ? 'USD'
+          : undefined),
+      pricingTrace,
+    };
+  }
+
+  private pricingTraceForLineItem(
+    providerId: ProviderId,
+    lineItem: ComparisonLineItem,
+    rateSource: RateSource | undefined,
+  ): PricingTrace | undefined {
+    const existing = lineItem.pricingTrace;
+
+    if (existing) {
+      return {
+        ...existing,
+        providerId,
+        serviceCategory: lineItem.category,
+        costComponent: lineItem.costComponent ?? existing.costComponent,
+        source: rateSource ?? existing.source,
+        resolvedSkuId: lineItem.skuId ?? existing.resolvedSkuId,
+        sourceSkuId: lineItem.rateSourceSkuId ?? existing.sourceSkuId ?? lineItem.skuId,
+        region: lineItem.region ?? existing.region,
+        unit: lineItem.unit ?? existing.unit,
+        unitPriceUsd: lineItem.unitPriceUsd ?? existing.unitPriceUsd,
+        currency: lineItem.rateCurrency ?? existing.currency,
+        effectiveDate: lineItem.rateValidFrom ?? existing.effectiveDate,
+        fetchedAt: lineItem.rateSourceFetchedAt ?? existing.fetchedAt,
+        pricingTermCode: lineItem.pricingTermCode ?? existing.pricingTermCode,
+        paymentOptionCode: lineItem.paymentOptionCode ?? existing.paymentOptionCode,
+        pricingBasis: lineItem.pricingBasis ?? existing.pricingBasis,
+        isApproximate: lineItem.isApproximate,
+        isEstimate: existing.isEstimate || this.isModeledLineItem(lineItem),
+      };
+    }
+
+    if (!rateSource) {
+      return undefined;
+    }
+
+    const sourceSkuId = lineItem.rateSourceSkuId ?? lineItem.skuId;
+    const sourceRecordKey = [
+      providerId,
+      lineItem.category,
+      sourceSkuId ?? lineItem.description,
+      lineItem.region ?? 'provider-default',
+      lineItem.unit ?? 'month',
+      lineItem.rateValidFrom ?? rateSource,
+    ].join('|');
+
+    return {
+      providerId,
+      serviceCategory: lineItem.category,
+      costComponent: lineItem.costComponent ?? this.costComponentForCategory(lineItem.category),
+      source: rateSource,
+      sourceRecordKey,
+      ...(lineItem.skuId ? { resolvedSkuId: lineItem.skuId } : {}),
+      ...(sourceSkuId ? { sourceSkuId } : {}),
+      ...(lineItem.region ? { region: lineItem.region } : {}),
+      ...(lineItem.unit ? { unit: lineItem.unit } : {}),
+      ...(lineItem.unitPriceUsd !== undefined ? { unitPriceUsd: lineItem.unitPriceUsd } : {}),
+      ...(lineItem.rateCurrency ? { currency: lineItem.rateCurrency } : {}),
+      ...(lineItem.rateValidFrom ? { effectiveDate: lineItem.rateValidFrom } : {}),
+      ...(lineItem.rateSourceFetchedAt ? { fetchedAt: lineItem.rateSourceFetchedAt } : {}),
+      ...(lineItem.pricingTermCode ? { pricingTermCode: lineItem.pricingTermCode } : {}),
+      ...(lineItem.paymentOptionCode ? { paymentOptionCode: lineItem.paymentOptionCode } : {}),
+      ...(lineItem.pricingBasis ? { pricingBasis: lineItem.pricingBasis } : {}),
+      isApproximate: lineItem.isApproximate,
+      isEstimate: rateSource === 'manual_model' || rateSource === 'modeled_estimate',
+    };
+  }
+
+  private defaultRateSource(lineItem: ComparisonLineItem): RateSource | undefined {
+    if (this.isModeledLineItem(lineItem)) {
+      return 'manual_model';
+    }
+
+    if (lineItem.skuId || lineItem.unitPriceUsd !== undefined) {
+      return 'pricing_catalog';
+    }
+
+    return undefined;
+  }
+
+  private isModeledLineItem(lineItem: ComparisonLineItem): boolean {
+    return lineItem.skuId?.startsWith('modeled-') === true;
   }
 
   private normalizePricingModels(pricingModels: PricingModelCost[]): PricingModelCost[] {
