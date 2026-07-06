@@ -167,6 +167,7 @@ describe('App', () => {
     });
     expect(window.localStorage.getItem('polycost-auth-session-v1')).toBe('session-token');
     expect(client.getCurrentSession).toHaveBeenCalledWith('session-token');
+    expect(client.listAccountSessions).toHaveBeenCalledWith('session-token');
     expect(client.listTeamMembers).toHaveBeenCalledWith(
       '22222222-2222-4222-8222-222222222222',
       'session-token',
@@ -176,6 +177,10 @@ describe('App', () => {
     expect(text(container)).toContain('Architecture team · owner');
     expect(text(container)).toContain('Architect');
     expect(text(container)).toContain('OIDC ready · SAML ready');
+    expect(text(container)).toContain('Current · last seen');
+
+    await click(buttonByText(container, 'Sign out other devices'));
+    expect(client.revokeOtherSessions).toHaveBeenCalledWith('session-token');
 
     await click(buttonByText(container, 'Sign out'));
     expect(client.logout).toHaveBeenCalledWith('session-token');
@@ -3125,6 +3130,7 @@ function diagramParseResult(
           confidence: 'moderate',
           sourceRef: 'mermaid:line-2-app',
           assumedDefaults: component.assumedDefaults,
+          evidence: 'Label matched alias /container/ -> container-app',
           editable: true,
         },
       ],
@@ -3294,6 +3300,27 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       },
     })),
     logout: jest.fn(async () => ({ revoked: true as const })),
+    listAccountSessions: jest.fn(async () => [
+      {
+        id: '33333333-3333-4333-8333-333333333333',
+        current: true,
+        createdAt: '2026-07-06T00:00:00.000Z',
+        lastSeenAt: '2026-07-06T00:10:00.000Z',
+        expiresAt: '2026-07-07T00:00:00.000Z',
+        hasUserAgent: true,
+        hasIp: true,
+      },
+      {
+        id: '99999999-9999-4999-8999-999999999999',
+        current: false,
+        createdAt: '2026-07-05T00:00:00.000Z',
+        lastSeenAt: '2026-07-05T00:10:00.000Z',
+        expiresAt: '2026-07-07T00:00:00.000Z',
+        hasUserAgent: true,
+        hasIp: false,
+      },
+    ]),
+    revokeOtherSessions: jest.fn(async () => ({ revoked: 1 })),
     listTeamMembers: jest.fn(async () => [
       {
         accountId: '11111111-1111-4111-8111-111111111111',

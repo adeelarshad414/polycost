@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: comparison maps use typed provider/service/region keys derived from validated NWS input; see docs/SECURITY-SUPPRESSIONS.md. */
 import { Inject, Injectable } from '@nestjs/common';
 import {
   CloudProviderAdapter,
@@ -526,6 +527,13 @@ export class ComparisonOrchestratorService {
         currency: lineItem.rateCurrency ?? existing.currency,
         effectiveDate: lineItem.rateValidFrom ?? existing.effectiveDate,
         fetchedAt: lineItem.rateSourceFetchedAt ?? existing.fetchedAt,
+        sourceEndpoint: existing.sourceEndpoint,
+        sourceRecordId: existing.sourceRecordId,
+        transformVersion: existing.transformVersion,
+        sourcePayloadHash: existing.sourcePayloadHash,
+        derivation: existing.derivation,
+        equivalenceConfidence:
+          existing.equivalenceConfidence ?? (lineItem.isApproximate ? 'approximate' : 'direct'),
         pricingTermCode: lineItem.pricingTermCode ?? existing.pricingTermCode,
         paymentOptionCode: lineItem.paymentOptionCode ?? existing.paymentOptionCode,
         pricingBasis: lineItem.pricingBasis ?? existing.pricingBasis,
@@ -562,6 +570,7 @@ export class ComparisonOrchestratorService {
       ...(lineItem.rateCurrency ? { currency: lineItem.rateCurrency } : {}),
       ...(lineItem.rateValidFrom ? { effectiveDate: lineItem.rateValidFrom } : {}),
       ...(lineItem.rateSourceFetchedAt ? { fetchedAt: lineItem.rateSourceFetchedAt } : {}),
+      equivalenceConfidence: lineItem.isApproximate ? 'approximate' : 'direct',
       ...(lineItem.pricingTermCode ? { pricingTermCode: lineItem.pricingTermCode } : {}),
       ...(lineItem.paymentOptionCode ? { paymentOptionCode: lineItem.paymentOptionCode } : {}),
       ...(lineItem.pricingBasis ? { pricingBasis: lineItem.pricingBasis } : {}),

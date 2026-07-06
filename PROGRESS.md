@@ -39,6 +39,66 @@ say so explicitly rather than marking it done.
 | AI-native Phase 1 reimagining pass                     | Complete with known gaps (see notes) | 2026-07-01   |
 | Phase 2 - Diagram-to-cost intelligence                 | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.7 - Invoice/auth/VSDX gap closure              | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8 - Gap-closure production readiness           | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8 - Gap-closure production readiness
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Pricing traceability deepened: catalog-backed comparison traces now include source
+  endpoint/fixture URI, raw source record ID, transform version, source payload hash,
+  derivation math, and equivalence confidence. Derived compute, storage, and egress
+  cache rows persist lineage via additive migration `028_pricing_lineage_metadata.sql`.
+- Provider ETL metadata improved: AWS, Azure, GCP, and mock adapters stamp source
+  endpoint and raw source record IDs into normalized catalog attributes. Mock
+  fixtures continue through the same adapter/normalizer path used by real providers.
+- Reconciliation proof added: `pricing-reconciliation.spec.ts` recomputes at least 20
+  stored-rate assertions per provider across compute/storage/egress from raw source
+  records and verifies lineage hashes.
+- Credential/docs hardening added: `docs/PROVIDER-CREDENTIALS.md`,
+  `DUMMY-VALUES.md`, and README links document AWS/Azure/GCP setup, dummy-value
+  rules, and the `USE_MOCK_PROVIDERS=false` production swap. Config validation and
+  `provider-credential-check.mjs` now reject dummy secrets outside development/strict
+  mode.
+- Diagram pipeline hardened: parser node cap is now 200 with review warning; VSDX
+  extraction resolves masters/stencils, container IDs, connector waypoint aggregation,
+  and multi-page metadata; diagram review components now include classification
+  evidence. LLM classifier requests are bounded, retried on transient failures,
+  timeout-protected, and gracefully fall back to unresolved.
+- Auth/session hardening added: account sessions can be listed and other sessions
+  revoked via protected API routes and the workspace UI. Auth tests now cover
+  member/viewer forbidden behavior for admin-only team actions.
+- Security/release hygiene added: `docs/SECURITY-SUPPRESSIONS.md` records fixed and
+  justified ESLint security findings plus low transitive npm advisory status;
+  `RELEASE-CHECKLIST.md` defines the private-to-public release gate; CI now runs
+  provider credential readiness and DB migration validation in addition to existing
+  unit/integration/build/e2e/security gates.
+- Verification evidence in this run:
+  - Main commit `06a5cc9` GitHub `quality` check confirmed success before branching.
+  - Pricing/config focused API tests: 6 suites, 42 tests passed.
+  - Diagram focused API tests: 2 suites, 22 tests passed.
+  - Auth/API database focused tests: 2 suites, 31 tests passed.
+  - Web app/API-client focused tests: 2 suites, 76 tests passed.
+  - `npm run ci:lint` passed with zero emitted ESLint security warnings after reviewed suppressions.
+  - `npm run ci:unit` passed: API 48 suites / 353 tests, web 9 suites / 122 tests.
+  - `npm run ci:build`, `npm run ci:integration`, and `npm run security:audit` passed.
+  - Full `npm run ci:e2e` was attempted; Docker/Colima stalled during the web image
+    build. The same live-stack E2E suites were then verified by starting Compose
+    infra + the already-built API image and local Vite: API MVP E2E 14/14 passed,
+    Playwright browser E2E 6/6 passed.
+  - `npm run demo:artifacts` passed and refreshed `docs/demo-artifacts/` screenshots/video.
+  - `npm audit --audit-level=low` was rerun with registry access; it exits 1 only
+    for the documented low Graphify/Ollama transitive advisory with no fix available.
+  - `npm run db:validate` passed; live schema check skipped because Postgres was not running.
+  - `npm run db:migrate` applied migration 028 successfully against Compose Postgres.
+  - `npm run provider:credentials:check` passed in mock-provider mode.
+  - `npm run security:audit` passed high/critical gate; low Graphify/Ollama advisory remains documented.
+- Known gaps carried forward: not full invoice-grade live billing/pricing coverage;
+  VSDX is stronger extraction and layout awareness, not pixel-perfect Visio visual
+  rendering; auth has sessions/team/invite/SSO readiness primitives and UI, but not
+  full enterprise SSO login, email delivery, account deletion, org billing plans, or
+  complete RBAC product experience.
 
 ## Phase 2.7 - Invoice/auth/VSDX gap closure
 

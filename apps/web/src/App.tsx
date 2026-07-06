@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: UI dictionaries are typed provider/form/report state maps, not privilege-bound object mutation; see docs/SECURITY-SUPPRESSIONS.md. */
 import { FormEvent, ReactNode, useEffect, useRef, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatApiError, PolyCostClient, PolyCostApiError, polyCostClient } from './api-client';
@@ -59,6 +60,7 @@ import {
   RegionCatalogResponse,
   ReportFormat,
   ServiceRequirement,
+  AccountSessionRecord,
   AuthMeResponse,
   SsoConfigurationStatus,
   TeamInvitationRecord,
@@ -1828,6 +1830,7 @@ function WorkspaceControlCenter({
   const [workspaceBusy, setWorkspaceBusy] = useState<string | null>(null);
   const [members, setMembers] = useState<TeamMemberRecord[]>([]);
   const [invitations, setInvitations] = useState<TeamInvitationRecord[]>([]);
+  const [accountSessions, setAccountSessions] = useState<AccountSessionRecord[]>([]);
   const [ssoStatus, setSsoStatus] = useState<SsoConfigurationStatus | null>(null);
   const [inviteEmail, setInviteEmail] = useState('finops@example.com');
   const [inviteRole, setInviteRole] = useState<Exclude<TeamRole, 'owner'>>('viewer');
@@ -1848,6 +1851,7 @@ function WorkspaceControlCenter({
       setSession(null);
       setMembers([]);
       setInvitations([]);
+      setAccountSessions([]);
       setSsoStatus(null);
       return undefined;
     }
@@ -1872,6 +1876,7 @@ function WorkspaceControlCenter({
         clearStoredAuthToken();
         setToken('');
         setSession(null);
+        setAccountSessions([]);
         onError(formatApiError(sessionError));
       });
 
@@ -1879,6 +1884,32 @@ function WorkspaceControlCenter({
       isMounted = false;
     };
   }, [client, onError, token]);
+
+  useEffect(() => {
+    if (!token || !session) {
+      setAccountSessions([]);
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    void client
+      .listAccountSessions(token)
+      .then((sessions) => {
+        if (isMounted) {
+          setAccountSessions(sessions);
+        }
+      })
+      .catch((sessionsError) => {
+        if (isMounted) {
+          onError(formatApiError(sessionsError));
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [client, onError, session, token, workspaceBusy]);
 
   useEffect(() => {
     if (!token || !activeTeam || !canManageTeam) {
@@ -1958,8 +1989,27 @@ function WorkspaceControlCenter({
       clearStoredAuthToken();
       setToken('');
       setSession(null);
+      setAccountSessions([]);
       setAuthBusy(false);
       onNotice('Signed out of the workspace.');
+    }
+  }
+
+  async function handleRevokeOtherSessions() {
+    if (!token) {
+      return;
+    }
+
+    setWorkspaceBusy('revoke-sessions');
+    onError(null);
+
+    try {
+      const result = await client.revokeOtherSessions(token);
+      onNotice(`Signed out ${result.revoked} other session${result.revoked === 1 ? '' : 's'}.`);
+    } catch (sessionError) {
+      onError(formatApiError(sessionError));
+    } finally {
+      setWorkspaceBusy(null);
     }
   }
 
@@ -2118,6 +2168,24 @@ function WorkspaceControlCenter({
               <strong>
                 {activeTeam ? `${activeTeam.name} · ${activeTeam.role}` : 'No active team'}
               </strong>
+              <div className="workspace-session-list" aria-label="Active account sessions">
+                {accountSessions.slice(0, 3).map((accountSession) => (
+                  <span key={accountSession.id}>
+                    {accountSession.current ? 'Current' : 'Other'} · last seen{' '}
+                    {formatDateTime(accountSession.lastSeenAt)}
+                  </span>
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => void handleRevokeOtherSessions()}
+                loading={workspaceBusy === 'revoke-sessions'}
+                disabled={accountSessions.filter((item) => !item.current).length === 0}
+              >
+                <ShieldIcon />
+                Sign out other devices
+              </Button>
               <Button
                 type="button"
                 variant="secondary"
@@ -4241,6 +4309,7 @@ function DiagramReviewPanel({
             {component.assumedDefaults.length > 0 ? (
               <em>{component.assumedDefaults.slice(0, 2).join(', ')}</em>
             ) : null}
+            <em>{component.evidence}</em>
             <button
               type="button"
               className="diagram-review-link-button"
@@ -16196,6 +16265,14 @@ function SignInIcon() {
   );
 }
 
+function ShieldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon">
+      <path d="M12 4l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V7l7-3zM9 12l2 2 4-5" />
+    </svg>
+  );
+}
+
 function CompareIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon">
@@ -17591,6 +17668,7 @@ function diagramReviewComponentFromRequirement(
       requirement.serviceCategory,
       requirement.serviceType,
     ),
+    evidence: `Manual review classification -> ${requirement.serviceType}`,
     editable: true,
   };
 }

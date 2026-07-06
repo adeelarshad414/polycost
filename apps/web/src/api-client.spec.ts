@@ -271,6 +271,20 @@ describe('api client', () => {
           session: { id: 'session-1', expiresAt: session.expiresAt },
         }),
       )
+      .mockResolvedValueOnce(
+        jsonResponse([
+          {
+            id: 'session-1',
+            current: true,
+            createdAt: '2026-07-06T00:00:00.000Z',
+            lastSeenAt: '2026-07-06T00:05:00.000Z',
+            expiresAt: session.expiresAt,
+            hasUserAgent: true,
+            hasIp: true,
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(jsonResponse({ revoked: 1 }))
       .mockResolvedValueOnce(jsonResponse(billingImport))
       .mockResolvedValueOnce(jsonResponse(reconciliation))
       .mockResolvedValueOnce(jsonResponse([reconciliation]));
@@ -289,6 +303,10 @@ describe('api client', () => {
         activeTeam: session.team,
       }),
     );
+    await expect(client.listAccountSessions('session-token')).resolves.toEqual([
+      expect.objectContaining({ id: 'session-1', current: true }),
+    ]);
+    await expect(client.revokeOtherSessions('session-token')).resolves.toEqual({ revoked: 1 });
     await expect(
       client.importBillingActuals(
         {
@@ -318,6 +336,25 @@ describe('api client', () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
+      'http://api.test/api/v1/auth/sessions',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer session-token',
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      'http://api.test/api/v1/auth/sessions/revoke-other',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer session-token',
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
       'http://api.test/api/v1/billing/imports',
       expect.objectContaining({
         method: 'POST',
@@ -327,7 +364,7 @@ describe('api client', () => {
       }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      4,
+      6,
       'http://api.test/api/v1/billing/imports/import-1/reconcile',
       expect.objectContaining({
         body: JSON.stringify({ comparisonId: 'comparison-1' }),
@@ -1020,6 +1057,7 @@ describe('api client', () => {
             confidence: 'high',
             sourceRef: 'drawio:web',
             assumedDefaults: ['2 vCPU'],
+            evidence: 'Matched stencil "EC2" -> vm-compute',
             editable: true,
           },
         ],

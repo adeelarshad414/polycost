@@ -129,6 +129,11 @@ export class RateResolverService {
       lastFetchedAt: rate.sourceFetchedAt,
       validFrom: rate.validFrom,
       source: rate.source,
+      ...(rate.sourceEndpoint ? { sourceEndpoint: rate.sourceEndpoint } : {}),
+      ...(rate.sourceRecordId ? { sourceRecordId: rate.sourceRecordId } : {}),
+      ...(rate.sourceRecordKey ? { sourceRecordKey: rate.sourceRecordKey } : {}),
+      ...(rate.transformVersion ? { transformVersion: rate.transformVersion } : {}),
+      ...(rate.sourcePayloadHash ? { sourcePayloadHash: rate.sourcePayloadHash } : {}),
       ...(rate.unavailableReason
         ? {
             unavailable: true,

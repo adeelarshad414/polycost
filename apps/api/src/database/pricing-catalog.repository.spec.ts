@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: repository test rows are controlled fixtures indexed by expected column names; see docs/SECURITY-SUPPRESSIONS.md. */
 import { ConfigService } from '@nestjs/config';
 import { PgPoolLike, PostgresPricingCatalogRepository } from './pricing-catalog.repository';
 import { AppConfig } from '../config/config.schema';
@@ -287,12 +288,36 @@ describe('PostgresPricingCatalogRepository', () => {
     expect(query).toHaveBeenNthCalledWith(
       3,
       expect.stringContaining('INSERT INTO storage_pricing'),
-      ['aws', 'us-east-1', 'standard', 0.023, 'USD', '2026-01-01T00:00:00.000Z'],
+      expect.arrayContaining([
+        'aws',
+        'us-east-1',
+        'standard',
+        0.023,
+        'USD',
+        '2026-01-01T00:00:00.000Z',
+        expect.stringContaining('pricing'),
+        'AWS-S3-STANDARD',
+        'aws|storage|AWS-S3-STANDARD|us-east-1|GB-Mo|2026-01-01T00:00:00.000Z',
+        '2026-06-28T00:00:00.000Z',
+        'pricing-normalization-v3',
+      ]),
     );
     expect(query).toHaveBeenNthCalledWith(
       4,
       expect.stringContaining('INSERT INTO egress_tier_rates'),
-      ['aws', 'us-east-1', 0, null, 0.09, '2026-01-01T00:00:00.000Z'],
+      expect.arrayContaining([
+        'aws',
+        'us-east-1',
+        0,
+        null,
+        0.09,
+        '2026-01-01T00:00:00.000Z',
+        expect.stringContaining('pricing'),
+        'AWS-EGRESS',
+        'aws|network|AWS-EGRESS|us-east-1|GB|2026-01-01T00:00:00.000Z',
+        '2026-06-28T00:00:00.000Z',
+        'pricing-normalization-v3',
+      ]),
     );
   });
 

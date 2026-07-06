@@ -1857,6 +1857,21 @@ summary:focus-visible,
   font-weight: 700;
 }
 
+.workspace-session-list {
+  display: grid;
+  width: 100%;
+  gap: 4px;
+}
+
+.workspace-session-list span {
+  border: 1px solid color-mix(in srgb, var(--pc-border) 72%, transparent);
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: color-mix(in srgb, var(--pc-surface-muted) 76%, transparent);
+  font-size: var(--pc-text-xs);
+  font-weight: 650;
+}
+
 .workspace-member-list {
   display: grid;
   max-height: 230px;

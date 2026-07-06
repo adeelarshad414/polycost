@@ -29,6 +29,18 @@ export class AuthController {
     return this.authService.logout(request.auth!);
   }
 
+  @Get('sessions')
+  @UseGuards(SessionAuthGuard)
+  listSessions(@Req() request: RequestWithAuth) {
+    return this.authService.listSessions(request.auth!);
+  }
+
+  @Post('sessions/revoke-other')
+  @UseGuards(SessionAuthGuard)
+  revokeOtherSessions(@Req() request: RequestWithAuth) {
+    return this.authService.revokeOtherSessions(request.auth!);
+  }
+
   @Get('teams/:teamId/members')
   @UseGuards(SessionAuthGuard)
   listTeamMembers(@Param('teamId') teamId: string, @Req() request: RequestWithAuth) {

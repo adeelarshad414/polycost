@@ -17,6 +17,7 @@ import {
   ReportPricingModel,
 } from '../reports/report.types';
 import {
+  AccountSessionRecord,
   AccountTeamMembership,
   AuthIdentity,
   SsoConfigurationStatus,
@@ -299,6 +300,16 @@ interface AccountSessionRow {
   team_name: string | null;
   role: TeamRole | null;
   expires_at: Date;
+}
+
+interface AccountSessionListRow {
+  session_id: string;
+  created_at: Date;
+  last_seen_at: Date;
+  expires_at: Date;
+  revoked_at: Date | null;
+  has_user_agent: boolean;
+  has_ip: boolean;
 }
 
 interface TeamMembershipRow {
@@ -2011,6 +2022,68 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
       `,
       [sessionId, now],
     );
+  }
+
+  async listAccountSessions(
+    accountId: string,
+    currentSessionId: string,
+    now: string,
+  ): Promise<AccountSessionRecord[]> {
+    const result = await (
+      await this.getPool()
+    ).query<AccountSessionListRow>(
+      `
+        SELECT id AS session_id,
+               created_at,
+               last_seen_at,
+               expires_at,
+               revoked_at,
+               user_agent_hash IS NOT NULL AS has_user_agent,
+               ip_hash IS NOT NULL AS has_ip
+        FROM account_sessions
+        WHERE account_id = $1
+          AND (
+            revoked_at IS NULL
+            OR id = $2
+          )
+          AND expires_at > $3
+        ORDER BY last_seen_at DESC,
+                 created_at DESC
+      `,
+      [accountId, currentSessionId, now],
+    );
+
+    return result.rows.map((row) => ({
+      id: row.session_id,
+      current: row.session_id === currentSessionId,
+      createdAt: row.created_at.toISOString(),
+      lastSeenAt: row.last_seen_at.toISOString(),
+      expiresAt: row.expires_at.toISOString(),
+      ...(row.revoked_at ? { revokedAt: row.revoked_at.toISOString() } : {}),
+      hasUserAgent: row.has_user_agent,
+      hasIp: row.has_ip,
+    }));
+  }
+
+  async revokeOtherSessions(input: {
+    accountId: string;
+    currentSessionId: string;
+    revokedAt: string;
+  }): Promise<number> {
+    const result = await (
+      await this.getPool()
+    ).query(
+      `
+        UPDATE account_sessions
+        SET revoked_at = $3
+        WHERE account_id = $1
+          AND id <> $2
+          AND revoked_at IS NULL
+      `,
+      [input.accountId, input.currentSessionId, input.revokedAt],
+    );
+
+    return result.rowCount ?? 0;
   }
 
   async listAccountTeams(accountId: string): Promise<AccountTeamMembership[]> {

@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: canonical header map access is generated from controlled HTTP signing inputs; see docs/SECURITY-SUPPRESSIONS.md. */
 import { createHash, createHmac } from 'node:crypto';
 
 export interface AwsCredentials {

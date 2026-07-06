@@ -217,12 +217,16 @@ Local Docker Compose runs Vault, Postgres, Redis, the API, and the web app. The 
 For self-hosted demos without cloud pricing credentials, keep `USE_MOCK_PROVIDERS=true`
 and `PRICING_ETL_RUN_ON_BOOT=true`. The API will seed a deterministic AWS/Azure/GCP
 pricing catalog on startup, while real provider adapters remain available when mock
-providers are disabled.
+providers are disabled. Use `docs/PROVIDER-CREDENTIALS.md` and `DUMMY-VALUES.md`
+before switching `USE_MOCK_PROVIDERS=false`.
 
 ## Documentation
 
 - `HOW-TO-USE.md` explains the product workflow.
 - `DEPLOY.md` covers deployment guidance.
+- `docs/PROVIDER-CREDENTIALS.md` covers AWS/Azure/GCP pricing-source setup and
+  traceability expectations.
+- `DUMMY-VALUES.md` lists development-only placeholders and production guardrails.
 - `PROGRESS.md` tracks project progress.
 - `CONTRIBUTING.md` explains how to contribute safely.
 - `SECURITY.md` explains private vulnerability reporting.

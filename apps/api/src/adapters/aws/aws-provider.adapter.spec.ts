@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- Reviewed 2026-07-06: fixture reads are resolved from repository-controlled test data; see docs/SECURITY-SUPPRESSIONS.md. */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { InMemoryPricingCatalogReader } from '../common/in-memory-pricing-catalog.reader';

@@ -12,6 +12,8 @@ import {
   DiagramGraph,
   DiagramGraphNode,
   DiagramIgnoredNode,
+  DIAGRAM_MAX_EDGES,
+  DIAGRAM_MAX_NODES,
   DiagramParseRequest,
   DiagramParseResult,
   DiagramReviewComponent,
@@ -91,7 +93,7 @@ export class DiagramParserService {
     const assumedDefaults: string[] = [];
     const fieldsRequiringReview: string[] = [];
 
-    for (const node of extracted.nodes.slice(0, 250)) {
+    for (const node of extracted.nodes.slice(0, DIAGRAM_MAX_NODES)) {
       const displayLabel = sanitizeDisplayText(node.rawLabel, node.id);
       const classification = await this.nodeClassifierService.classify(node);
 
@@ -117,6 +119,7 @@ export class DiagramParserService {
           confidence: classification.confidence,
           sourceRef: node.sourceRef,
           assumedDefaults: classification.assumedDefaults,
+          evidence: classification.reason,
           editable: true,
         });
         assumedDefaults.push(...classification.assumedDefaults);
@@ -155,11 +158,21 @@ export class DiagramParserService {
       }
     }
 
+    if (extracted.nodes.length > DIAGRAM_MAX_NODES) {
+      unresolvedClassifications.push({
+        id: 'diagram-node-cap',
+        displayLabel: 'Additional nodes not parsed',
+        reason: `diagram contains ${extracted.nodes.length} nodes; parsed first ${DIAGRAM_MAX_NODES}`,
+        sourceRef: 'diagram:node-cap',
+      });
+      fieldsRequiringReview.push('diagram.nodes.cap');
+    }
+
     return {
       graph: {
         format: extracted.format,
         nodes: graphNodes,
-        edges: extracted.edges.slice(0, 500),
+        edges: extracted.edges.slice(0, DIAGRAM_MAX_EDGES),
         ignoredNodes,
       },
       classifiedNodes,

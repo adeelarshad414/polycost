@@ -25,11 +25,13 @@ import {
   ServiceCategory,
 } from './cloud-provider-adapter';
 import { AdapterPricingError } from './adapter-errors';
+/* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: dynamic keys are typed provider service/dimension maps sourced from internal catalogs; see docs/SECURITY-SUPPRESSIONS.md. */
 import { HOURS_PER_MONTH } from '../../cost-time';
 import {
   normalizeInstanceFamily,
   NormalizedInstanceFamily,
 } from '../../pricing-normalization/family-normalizer';
+import { pricingLineageForCatalogRecord } from '../../pricing-normalization/pricing-lineage';
 
 const CATALOG_COMMITMENT_PRICING_MODELS: PricingModelKey[] = ['reserved-1yr', 'reserved-3yr'];
 const ESTIMATED_COMPUTE_PRICING_MODELS: PricingModelKey[] = ['spot', 'savings-plan'];
@@ -1176,6 +1178,7 @@ function catalogPricingTrace(input: {
   paymentOptionCode?: string;
   rateCurrency: string;
 }): PricingTrace {
+  const lineage = pricingLineageForCatalogRecord(input.record);
   const sourceRecordKey = pricingSourceRecordKey({
     providerId: input.providerId,
     category: input.category,
@@ -1184,6 +1187,10 @@ function catalogPricingTrace(input: {
     unit: input.record.unit,
     effectiveDate: input.record.effectiveDate,
   });
+  const hourlyUnit = isHourlyUnit(input.record.unit);
+  const monthlyCostUsd = hourlyUnit
+    ? input.record.unitPriceUsd * HOURS_PER_MONTH
+    : input.record.unitPriceUsd;
 
   return {
     providerId: input.providerId,
@@ -1202,12 +1209,33 @@ function catalogPricingTrace(input: {
     currency: input.rateCurrency,
     effectiveDate: input.record.effectiveDate,
     fetchedAt: input.record.fetchedAt,
+    sourceEndpoint: lineage.sourceEndpoint,
+    sourceRecordId: lineage.sourceRecordId,
+    transformVersion: lineage.transformVersion,
+    sourcePayloadHash: lineage.sourcePayloadHash,
+    derivation: {
+      expression: `${input.record.unitPriceUsd} USD/${input.record.unit} x workload quantity${
+        hourlyUnit ? ` x ${HOURS_PER_MONTH} hour-month standard` : ''
+      }`,
+      unitPriceUsd: input.record.unitPriceUsd,
+      quantity: 1,
+      monthlyCostUsd,
+      ...(hourlyUnit
+        ? { hourlyCostUsd: input.record.unitPriceUsd, monthlyHours: HOURS_PER_MONTH }
+        : {}),
+    },
+    equivalenceConfidence: input.isApproximate ? 'approximate' : 'direct',
     ...(input.pricingTermCode ? { pricingTermCode: input.pricingTermCode } : {}),
     ...(input.paymentOptionCode ? { paymentOptionCode: input.paymentOptionCode } : {}),
     pricingBasis: input.pricingBasis,
     isApproximate: input.isApproximate,
     isEstimate: false,
   };
+}
+
+function isHourlyUnit(unit: string): boolean {
+  const normalized = unit.toLowerCase();
+  return normalized.includes('hour') || normalized === 'h' || normalized === 'hrs';
 }
 
 function pricingSourceRecordKey(input: {

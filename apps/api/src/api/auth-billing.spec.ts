@@ -253,6 +253,96 @@ describe('AuthService', () => {
       },
     });
   });
+
+  it('lists active account sessions and revokes other devices without touching current session', async () => {
+    const repository = repositoryMock();
+    repository.listAccountSessions.mockResolvedValue([
+      {
+        id: identity.sessionId,
+        current: true,
+        createdAt: '2026-07-06T00:00:00.000Z',
+        lastSeenAt: '2026-07-06T00:10:00.000Z',
+        expiresAt: identity.expiresAt,
+        hasUserAgent: true,
+        hasIp: true,
+      },
+      {
+        id: '99999999-9999-4999-8999-999999999999',
+        current: false,
+        createdAt: '2026-07-05T00:00:00.000Z',
+        lastSeenAt: '2026-07-05T00:10:00.000Z',
+        expiresAt: identity.expiresAt,
+        hasUserAgent: true,
+        hasIp: false,
+      },
+    ]);
+    repository.revokeOtherSessions.mockResolvedValue(1);
+    const service = new AuthService(repository as never, configService());
+
+    await expect(service.listSessions(identity)).resolves.toEqual([
+      expect.objectContaining({
+        id: identity.sessionId,
+        current: true,
+        hasUserAgent: true,
+        hasIp: true,
+      }),
+      expect.objectContaining({
+        current: false,
+      }),
+    ]);
+    await expect(service.revokeOtherSessions(identity)).resolves.toEqual({ revoked: 1 });
+    expect(repository.revokeOtherSessions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountId: identity.accountId,
+        currentSessionId: identity.sessionId,
+        revokedAt: expect.any(String),
+      }),
+    );
+  });
+
+  it.each(['member', 'viewer'] as const)(
+    'returns structured forbidden errors when %s tries team-admin actions',
+    async (role) => {
+      const repository = repositoryMock();
+      repository.getTeamMembership.mockResolvedValue({
+        teamId: account.defaultTeam!.teamId,
+        teamName: account.defaultTeam!.teamName,
+        role,
+      });
+      const service = new AuthService(repository as never, configService());
+      const limitedIdentity: AuthIdentity = {
+        ...identity,
+        role,
+      };
+
+      await expect(
+        service.listTeamMembers(account.defaultTeam!.teamId, limitedIdentity),
+      ).rejects.toThrow(ApiForbiddenError);
+      await expect(
+        service.inviteTeamMember(
+          account.defaultTeam!.teamId,
+          {
+            email: 'new@example.com',
+            role: 'member',
+          },
+          limitedIdentity,
+        ),
+      ).rejects.toThrow(ApiForbiddenError);
+      await expect(
+        service.updateTeamMemberRole(
+          account.defaultTeam!.teamId,
+          account.accountId,
+          {
+            role: 'admin',
+          },
+          limitedIdentity,
+        ),
+      ).rejects.toThrow(ApiForbiddenError);
+      await expect(
+        service.removeTeamMember(account.defaultTeam!.teamId, account.accountId, limitedIdentity),
+      ).rejects.toThrow(ApiForbiddenError);
+    },
+  );
 });
 
 describe('BillingService', () => {
@@ -491,6 +581,8 @@ function repositoryMock() {
     findLocalAccountByEmail: jest.fn(),
     createLocalAccountWithTeam: jest.fn(),
     createSession: jest.fn(),
+    listAccountSessions: jest.fn(),
+    revokeOtherSessions: jest.fn(),
     recordFailedLogin: jest.fn(),
     resetFailedLogin: jest.fn(),
     resolveSession: jest.fn(),

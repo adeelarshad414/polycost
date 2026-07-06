@@ -4,6 +4,11 @@ import {
   ProviderId,
 } from '../adapters/common/cloud-provider-adapter';
 import { normalizeInstanceFamily, NormalizedInstanceFamily } from './family-normalizer';
+import {
+  combinePricingLineage,
+  pricingLineageForCatalogRecord,
+  PricingSourceLineage,
+} from './pricing-lineage';
 
 export type NormalizedPricingTerm =
   'on_demand' | 'reserved_1yr' | 'reserved_3yr' | 'spot' | 'savings_plan';
@@ -18,6 +23,7 @@ export interface NormalizedComputePricingRecord {
   region: string;
   os: string;
   rawPayload: Record<string, unknown>;
+  sourceLineage: PricingSourceLineage;
   lastSyncedAt: string;
   term: NormalizedPricingTerm;
   pricePerHour: number;
@@ -32,6 +38,7 @@ export interface NormalizedStoragePricingRecord {
   pricePerGbMonth: number;
   currency: 'USD';
   effectiveDate: string;
+  sourceLineage: PricingSourceLineage;
 }
 
 export interface NormalizedEgressTierRateRecord {
@@ -41,6 +48,7 @@ export interface NormalizedEgressTierRateRecord {
   tierToGb?: number;
   pricePerGb: number;
   effectiveDate: string;
+  sourceLineage: PricingSourceLineage;
 }
 
 export interface NormalizedPricingRecords {
@@ -122,6 +130,7 @@ function normalizeDirectComputeRecord(
     region: record.region,
     os: normalizeOs(record),
     rawPayload: { sourceRecord: record },
+    sourceLineage: pricingLineageForCatalogRecord(record),
     lastSyncedAt: record.fetchedAt,
     term,
     pricePerHour: roundCurrency(record.unitPriceUsd),
@@ -370,6 +379,7 @@ function normalizeGcpComponentCompute(
             ram,
           },
         },
+        sourceLineage: combinePricingLineage([core, ram]) ?? pricingLineageForCatalogRecord(core),
         lastSyncedAt: maxIso(core.fetchedAt, ram.fetchedAt),
         term: 'on_demand' as const,
         pricePerHour: roundCurrency(core.unitPriceUsd * vcpu + ram.unitPriceUsd * memoryGb),
@@ -421,6 +431,7 @@ function normalizeStorageRecord(
     pricePerGbMonth: roundCurrency(record.unitPriceUsd),
     currency: 'USD',
     effectiveDate: record.effectiveDate,
+    sourceLineage: pricingLineageForCatalogRecord(record),
   };
 }
 
@@ -468,6 +479,7 @@ function normalizeEgressRecord(record: PricingCatalogRecord): NormalizedEgressTi
         tierFromGb: 0,
         pricePerGb: roundCurrency(record.unitPriceUsd),
         effectiveDate: record.effectiveDate,
+        sourceLineage: pricingLineageForCatalogRecord(record),
       },
     ];
   }
@@ -509,6 +521,7 @@ function normalizeEgressTiers(record: PricingCatalogRecord): NormalizedEgressTie
       ...(sortedTiers[index + 1] ? { tierToGb: sortedTiers[index + 1].tierFromGb } : {}),
       pricePerGb: roundCurrency(tier.pricePerGb),
       effectiveDate: record.effectiveDate,
+      sourceLineage: pricingLineageForCatalogRecord(record),
     }));
 }
 

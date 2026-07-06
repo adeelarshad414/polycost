@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-object-injection, security/detect-unsafe-regex -- Reviewed 2026-07-06: provider catalog keys and bounded SKU parsing operate on controlled cloud catalog data; see docs/SECURITY-SUPPRESSIONS.md. */
 import { BaseCloudProviderAdapter } from '../common/base-cloud-provider.adapter';
 import {
   PricingCatalogReader,
@@ -225,6 +226,8 @@ export class AwsProviderAdapter extends BaseCloudProviderAdapter {
         pricingModel,
         productFamily: product.productFamily,
         rawServiceCode: serviceCode,
+        sourceEndpoint: `${AWS_BULK_PRICING_ENDPOINT}/${serviceCode}/current/index.json`,
+        rawSourceRecordId: `${product.sku}:${termCode}:${dimensionCode}`,
         ...(isReservedTerm(term) ? term.termAttributes : {}),
         ...(isReservedTerm(term) ? { upfrontOption: awsUpfrontOption(term) } : {}),
         vcpu: parseOptionalNumber(product.attributes.vcpu),

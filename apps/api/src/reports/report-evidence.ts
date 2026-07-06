@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-object-injection, security/detect-unsafe-regex -- Reviewed 2026-07-06: report dictionaries and bounded text cleanup operate on generated comparison/report data; see docs/SECURITY-SUPPRESSIONS.md. */
 import { PricingModelCost } from '../adapters/common/cloud-provider-adapter';
 import {
   ComparisonLineItem,
@@ -1196,6 +1197,12 @@ export function skuMappingAppendixRows(result: ComparisonResult): string[][] {
         pricingTraceSource(lineItem),
         pricingTraceKey(lineItem),
         lineItem.pricingTrace?.fetchedAt ?? lineItem.rateSourceFetchedAt ?? '',
+        lineItem.pricingTrace?.sourceEndpoint ?? '',
+        lineItem.pricingTrace?.sourceRecordId ?? '',
+        lineItem.pricingTrace?.transformVersion ?? '',
+        lineItem.pricingTrace?.sourcePayloadHash ?? '',
+        lineItem.pricingTrace?.derivation?.expression ?? '',
+        lineItem.pricingTrace?.equivalenceConfidence ?? '',
       ];
     }),
   );
@@ -1220,12 +1227,24 @@ export function skuMappingAppendixRows(result: ComparisonResult): string[][] {
       'Pricing trace source',
       'Pricing trace key',
       'Pricing trace fetched at',
+      'Source endpoint',
+      'Source record ID',
+      'Transform version',
+      'Source payload hash',
+      'Derivation math',
+      'Equivalence confidence',
     ],
     ...(rows.length > 0
       ? rows
       : [
           [
             'No SKU mapping rows were attached to this comparison.',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
             '',
             '',
             '',

@@ -30,6 +30,10 @@ jobs:
         run: npm run devops:check
       - name: Cloud readiness check
         run: npm run cloud:check
+      - name: Provider credential readiness check
+        run: npm run provider:credentials:check
+      - name: Database migration validation
+        run: npm run db:validate
       - name: Unit tests with coverage
         run: npm run ci:unit
       - name: Integration tests

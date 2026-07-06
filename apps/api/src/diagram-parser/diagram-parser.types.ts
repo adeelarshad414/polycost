@@ -6,7 +6,7 @@ export const DIAGRAM_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 export const DIAGRAM_INFLATED_MAX_BYTES = 20 * 1024 * 1024;
 export const DIAGRAM_JSON_BODY_MAX_BYTES = 8 * 1024 * 1024;
 export const DIAGRAM_TEMP_RETENTION_HOURS = 24;
-export const DIAGRAM_MAX_NODES = 250;
+export const DIAGRAM_MAX_NODES = 200;
 export const DIAGRAM_MAX_EDGES = 500;
 
 export type DiagramInputFormat = 'mermaid' | 'drawio' | 'lucid_csv' | 'vsdx';
@@ -91,6 +91,8 @@ export interface DiagramNodeVisualMetadata {
   pageRef?: string;
   pageName?: string;
   masterId?: string;
+  masterName?: string;
+  containerId?: string;
   fillColor?: string;
   lineColor?: string;
 }
@@ -121,6 +123,7 @@ export interface DiagramReviewComponent {
   confidence: DiagramClassificationConfidence;
   sourceRef: string;
   assumedDefaults: string[];
+  evidence: string;
   editable: true;
 }
 

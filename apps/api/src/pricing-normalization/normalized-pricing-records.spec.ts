@@ -159,31 +159,39 @@ describe('normalizePricingCatalogRecords', () => {
     const normalized = normalizePricingCatalogRecords(records);
 
     expect(normalized.storage).toEqual([
-      {
+      expect.objectContaining({
         provider: 'aws',
         region: 'us-east-1',
         tier: 'standard',
         pricePerGbMonth: 0.023,
         currency: 'USD',
         effectiveDate,
-      },
+        sourceLineage: expect.objectContaining({
+          sourceRecordId: 'AWS-S3-STANDARD',
+          transformVersion: 'pricing-normalization-v3',
+        }),
+      }),
     ]);
     expect(normalized.egress).toEqual([
-      {
+      expect.objectContaining({
         provider: 'gcp',
         region: 'us-central1',
         tierFromGb: 0,
         tierToGb: 10240,
         pricePerGb: 0.12,
         effectiveDate,
-      },
-      {
+        sourceLineage: expect.objectContaining({
+          sourceRecordId: 'GCP-EGRESS',
+          transformVersion: 'pricing-normalization-v3',
+        }),
+      }),
+      expect.objectContaining({
         provider: 'gcp',
         region: 'us-central1',
         tierFromGb: 10240,
         pricePerGb: 0.08,
         effectiveDate,
-      },
+      }),
     ]);
   });
 

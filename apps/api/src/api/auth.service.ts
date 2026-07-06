@@ -5,6 +5,7 @@ import { AppConfig } from '../config/config.schema';
 import { ApiForbiddenError, ApiUnauthorizedError, ApiValidationError } from './api-errors';
 import { ApiDatabaseRepository, LocalAccountWithPassword } from './api-database.repository';
 import {
+  AccountSessionRecord,
   AuthIdentity,
   AuthMeResponse,
   AuthSessionResponse,
@@ -155,6 +156,24 @@ export class AuthService {
     return {
       revoked: true,
     };
+  }
+
+  async listSessions(identity: AuthIdentity): Promise<AccountSessionRecord[]> {
+    return this.repository.listAccountSessions(
+      identity.accountId,
+      identity.sessionId,
+      new Date().toISOString(),
+    );
+  }
+
+  async revokeOtherSessions(identity: AuthIdentity): Promise<{ revoked: number }> {
+    const revoked = await this.repository.revokeOtherSessions({
+      accountId: identity.accountId,
+      currentSessionId: identity.sessionId,
+      revokedAt: new Date().toISOString(),
+    });
+
+    return { revoked };
   }
 
   async listTeamMembers(teamId: string, identity: AuthIdentity): Promise<TeamMemberRecord[]> {

@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-unsafe-regex, security/detect-non-literal-regexp -- Reviewed 2026-07-06: parser expressions run on bounded input and dynamic patterns are internal escaped dictionaries; see docs/SECURITY-SUPPRESSIONS.md. */
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema';

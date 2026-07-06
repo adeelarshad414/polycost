@@ -5,6 +5,10 @@ coverage for every cloud SKU. PolyCost still treats provider pricing APIs as cac
 decision evidence: catalog rows are refreshed, normalized, traced into comparison line
 items, and exported for reviewer verification.
 
+For exact setup steps, IAM policy JSON, dummy-value handling, and the production swap
+procedure, see [Provider Credentials](../PROVIDER-CREDENTIALS.md) and
+[Dummy Values](../../DUMMY-VALUES.md).
+
 ## Current Provider Sources
 
 | Provider | Current adapter source          | Credential requirement                   | Notes                                                                                                                                                                  |
@@ -81,6 +85,8 @@ Every catalog-backed comparison line item now includes:
 - provider, service category, SKU, source SKU, region, catalog region
 - unit, unit price, currency, pricing basis, term, payment option
 - effective date and fetched-at timestamp
+- source endpoint or fixture URI, raw source record ID, transform version, payload hash
+- derivation math and equivalence confidence
 - deterministic `sourceRecordKey`
 
 `POST /api/v1/comparisons/:id/refresh-live` extracts those trace references, refreshes

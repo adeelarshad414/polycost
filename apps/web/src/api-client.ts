@@ -1,5 +1,6 @@
 import {
   ApiErrorDetail,
+  AccountSessionRecord,
   AlertRecord,
   AuthMeResponse,
   AuthSessionResponse,
@@ -81,6 +82,8 @@ export interface PolyCostClient {
   login(input: { email: string; password: string }): Promise<AuthSessionResponse>;
   getCurrentSession(token: string): Promise<AuthMeResponse>;
   logout(token: string): Promise<{ revoked: true }>;
+  listAccountSessions(token: string): Promise<AccountSessionRecord[]>;
+  revokeOtherSessions(token: string): Promise<{ revoked: number }>;
   listTeamMembers(teamId: string, token: string): Promise<TeamMemberRecord[]>;
   inviteTeamMember(
     teamId: string,
@@ -194,6 +197,17 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
     },
     logout(token) {
       return requestJson<{ revoked: true }>(baseUrl, '/auth/logout', {
+        method: 'POST',
+        headers: authorizationHeaders(token),
+      });
+    },
+    listAccountSessions(token) {
+      return requestJson<AccountSessionRecord[]>(baseUrl, '/auth/sessions', {
+        headers: authorizationHeaders(token),
+      });
+    },
+    revokeOtherSessions(token) {
+      return requestJson<{ revoked: number }>(baseUrl, '/auth/sessions/revoke-other', {
         method: 'POST',
         headers: authorizationHeaders(token),
       });

@@ -321,6 +321,17 @@ export interface TeamInvitationRecord {
   inviteToken?: string;
 }
 
+export interface AccountSessionRecord {
+  id: string;
+  current: boolean;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  revokedAt?: string;
+  hasUserAgent: boolean;
+  hasIp: boolean;
+}
+
 export interface SsoConfigurationStatus {
   localLoginEnabled: boolean;
   oidcConfigured: boolean;
@@ -467,6 +478,8 @@ export interface DiagramParseResult {
         pageRef?: string;
         pageName?: string;
         masterId?: string;
+        masterName?: string;
+        containerId?: string;
         fillColor?: string;
         lineColor?: string;
       };
@@ -493,6 +506,7 @@ export interface DiagramParseResult {
       confidence: DiagramClassificationConfidence;
       sourceRef: string;
       assumedDefaults: string[];
+      evidence: string;
       editable: true;
     }>;
     unresolvedClassifications: Array<{
@@ -565,6 +579,19 @@ export interface ComparisonLineItem {
     currency?: string;
     effectiveDate?: string;
     fetchedAt?: string;
+    sourceEndpoint?: string;
+    sourceRecordId?: string;
+    transformVersion?: string;
+    sourcePayloadHash?: string;
+    derivation?: {
+      expression: string;
+      unitPriceUsd?: number;
+      quantity: number;
+      monthlyCostUsd: number;
+      hourlyCostUsd?: number;
+      monthlyHours?: number;
+    };
+    equivalenceConfidence?: 'direct' | 'approximate' | 'modeled';
     pricingTermCode?: string;
     paymentOptionCode?: string;
     pricingBasis?: PricingBasis;

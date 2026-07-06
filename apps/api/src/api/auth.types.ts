@@ -30,6 +30,17 @@ export interface TeamInvitationRecord {
   inviteToken?: string;
 }
 
+export interface AccountSessionRecord {
+  id: string;
+  current: boolean;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  revokedAt?: string;
+  hasUserAgent: boolean;
+  hasIp: boolean;
+}
+
 export interface SsoConfigurationStatus {
   localLoginEnabled: boolean;
   oidcConfigured: boolean;

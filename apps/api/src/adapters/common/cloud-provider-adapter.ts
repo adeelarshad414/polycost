@@ -77,6 +77,19 @@ export interface PricingTrace {
   currency?: string;
   effectiveDate?: string;
   fetchedAt?: string;
+  sourceEndpoint?: string;
+  sourceRecordId?: string;
+  transformVersion?: string;
+  sourcePayloadHash?: string;
+  derivation?: {
+    expression: string;
+    unitPriceUsd?: number;
+    quantity: number;
+    monthlyCostUsd: number;
+    hourlyCostUsd?: number;
+    monthlyHours?: number;
+  };
+  equivalenceConfidence?: 'direct' | 'approximate' | 'modeled';
   pricingTermCode?: string;
   paymentOptionCode?: string;
   pricingBasis?: PricingBasis;
