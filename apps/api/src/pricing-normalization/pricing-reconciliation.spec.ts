@@ -19,37 +19,58 @@ describe('pricing reconciliation evidence', () => {
         effectiveDate,
       });
       const normalized = normalizePricingCatalogRecords(records);
-      let reconciliationAssertions = 0;
+      const reconciliationAssertions = {
+        compute: 0,
+        storage: 0,
+        egress: 0,
+      };
 
       for (const compute of normalized.compute) {
         const raw = sourceRecordForCompute(compute);
         expect(compute.pricePerHour).toBe(raw.unitPriceUsd);
         expect(compute.sourceLineage).toEqual(pricingLineageForCatalogRecord(raw));
         expect(compute.sourceLineage.sourcePayloadHash).toMatch(/^[a-f0-9]{64}$/);
-        reconciliationAssertions += 3;
+        expect(compute.sourceLineage.sourceEndpoint).toBe(
+          `fixture://mock-pricing/${provider}/compute`,
+        );
+        reconciliationAssertions.compute += 4;
       }
 
       for (const storage of normalized.storage) {
-        const raw = records.find((record) => record.skuId === storage.sourceLineage.sourceRecordId);
+        const raw = sourceRecordForLineage(records, storage.sourceLineage.sourceRecordId);
 
-        expect(raw).toBeDefined();
-        expect(storage.pricePerGbMonth).toBe(raw?.unitPriceUsd);
+        expect(storage.pricePerGbMonth).toBe(raw.unitPriceUsd);
+        expect(storage.sourceLineage).toEqual(pricingLineageForCatalogRecord(raw));
         expect(storage.sourceLineage.sourcePayloadHash).toMatch(/^[a-f0-9]{64}$/);
-        reconciliationAssertions += 3;
+        expect(storage.sourceLineage.sourceEndpoint).toBe(
+          `fixture://mock-pricing/${provider}/storage`,
+        );
+        reconciliationAssertions.storage += 4;
       }
 
-      const networkRecord = records.find((record) => record.serviceCategory === 'network');
-      const rawTiers = egressTiersForRecord(networkRecord);
       for (const egress of normalized.egress) {
+        const raw = sourceRecordForLineage(records, egress.sourceLineage.sourceRecordId);
+        const rawTiers = egressTiersForRecord(raw);
         const rawTier = rawTiers.find((tier) => tier.startGb === egress.tierFromGb);
 
         expect(rawTier).toBeDefined();
         expect(egress.pricePerGb).toBe(rawTier?.pricePerGb);
+        expect(egress.sourceLineage).toEqual(pricingLineageForCatalogRecord(raw));
         expect(egress.sourceLineage.sourcePayloadHash).toMatch(/^[a-f0-9]{64}$/);
-        reconciliationAssertions += 3;
+        expect(egress.sourceLineage.sourceEndpoint).toBe(
+          `fixture://mock-pricing/${provider}/network`,
+        );
+        reconciliationAssertions.egress += 5;
       }
 
-      expect(reconciliationAssertions).toBeGreaterThanOrEqual(20);
+      expect(reconciliationAssertions.compute).toBeGreaterThan(0);
+      expect(reconciliationAssertions.storage).toBeGreaterThan(0);
+      expect(reconciliationAssertions.egress).toBeGreaterThan(0);
+      expect(
+        reconciliationAssertions.compute +
+          reconciliationAssertions.storage +
+          reconciliationAssertions.egress,
+      ).toBeGreaterThanOrEqual(20);
     },
   );
 });
@@ -59,6 +80,24 @@ function sourceRecordForCompute(record: NormalizedComputePricingRecord): Pricing
 
   if (!isPricingCatalogRecord(source)) {
     throw new Error(`Missing compute sourceRecord for ${record.provider}/${record.providerSkuId}`);
+  }
+
+  return source;
+}
+
+function sourceRecordForLineage(
+  records: PricingCatalogRecord[],
+  sourceRecordId: string,
+): PricingCatalogRecord {
+  const source = records.find(
+    (record) =>
+      record.skuId === sourceRecordId ||
+      record.attributes?.rawSourceRecordId === sourceRecordId ||
+      record.attributes?.sourceRecordId === sourceRecordId,
+  );
+
+  if (!source) {
+    throw new Error(`Missing raw source record for lineage id ${sourceRecordId}`);
   }
 
   return source;
