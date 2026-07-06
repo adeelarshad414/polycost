@@ -1,4 +1,5 @@
 import React, { act } from 'react';
+import { flushSync } from 'react-dom';
 import { createRoot, Root } from 'react-dom/client';
 import { TopLoadingBar } from './TopLoadingBar';
 
@@ -22,9 +23,7 @@ describe('TopLoadingBar', () => {
       HTMLElement,
     );
 
-    act(() => {
-      rerender(<TopLoadingBar isLoading={false} label="Refreshing" />);
-    });
+    rerender(<TopLoadingBar isLoading={false} label="Refreshing" />);
 
     expect(progress(container)?.getAttribute('aria-valuenow')).toBe('100');
     expect(container.querySelector('.top-loading-bar-fill.is-complete')).toBeInstanceOf(
@@ -57,14 +56,20 @@ function render(element: React.ReactElement): {
   const root: Root = createRoot(container);
 
   act(() => {
-    root.render(element);
+    flushSync(() => root.render(element));
   });
 
   return {
     container,
-    rerender: (nextElement) => root.render(nextElement),
+    rerender: (nextElement) => {
+      act(() => {
+        flushSync(() => root.render(nextElement));
+      });
+    },
     unmount: () => {
-      act(() => root.unmount());
+      act(() => {
+        flushSync(() => root.unmount());
+      });
       container.remove();
     },
   };

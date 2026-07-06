@@ -1,4 +1,5 @@
 import React, { act } from 'react';
+import { flushSync } from 'react-dom';
 import { createRoot, Root } from 'react-dom/client';
 import { ThemeSwitcher } from './ThemeSwitcher';
 
@@ -129,13 +130,15 @@ function render(element: React.ReactElement): {
   const root: Root = createRoot(container);
 
   act(() => {
-    root.render(element);
+    flushSync(() => root.render(element));
   });
 
   return {
     container,
     unmount: () => {
-      act(() => root.unmount());
+      act(() => {
+        flushSync(() => root.unmount());
+      });
       container.remove();
     },
   };
