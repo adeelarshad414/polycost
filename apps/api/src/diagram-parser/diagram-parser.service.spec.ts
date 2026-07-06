@@ -363,6 +363,49 @@ describe('DiagramParserService', () => {
     expect(parsed.fieldsRequiringReview).toContain('diagram.nodes.A.classification');
   });
 
+  it('caps Tier 3 LLM classifier calls per parse and leaves overflow nodes reviewable', async () => {
+    const llmClient: LlmClassifierClient = {
+      classify: jest.fn(async (input) => ({
+        serviceCategory: 'integration',
+        serviceType: 'queue-or-event-bus',
+        confidence: 'low',
+        reason: `LLM classification, confidence low for ${input.displayLabel}`,
+        assumedDefaults: [],
+        serviceRequirement: {
+          serviceCategory: 'integration',
+          serviceType: 'queue-or-event-bus',
+          quantity: 1,
+          scaleParams: {
+            classifier: 'llm',
+            diagramNodeId: input.diagramNodeId ?? 'unknown',
+          },
+        },
+      })),
+    };
+    const content = [
+      'graph TD',
+      ...Array.from({ length: 25 }, (_, index) => `  U${index}[Opaque custom tier ${index}]`),
+    ].join('\n');
+
+    const parsed = await service(llmClient).parse({
+      content,
+      fileName: 'many-unknowns.mmd',
+      inputFormat: 'mermaid',
+    });
+
+    expect(llmClient.classify).toHaveBeenCalledTimes(20);
+    expect(parsed.review.components).toHaveLength(20);
+    expect(parsed.review.unresolvedClassifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          displayLabel: 'Opaque custom tier 20',
+          reason: 'Tier 3 LLM classifier cost guard skipped after 20 unresolved nodes',
+        }),
+      ]),
+    );
+    expect(parsed.fieldsRequiringReview).toContain('diagram.nodes.U20.classification');
+  });
+
   it('caps oversized diagrams at 200 parsed nodes with a review warning', async () => {
     const content = [
       'graph TD',

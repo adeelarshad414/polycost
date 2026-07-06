@@ -8,6 +8,7 @@ export const DIAGRAM_JSON_BODY_MAX_BYTES = 8 * 1024 * 1024;
 export const DIAGRAM_TEMP_RETENTION_HOURS = 24;
 export const DIAGRAM_MAX_NODES = 200;
 export const DIAGRAM_MAX_EDGES = 500;
+export const DIAGRAM_LLM_MAX_NODES_PER_PARSE = 20;
 
 export type DiagramInputFormat = 'mermaid' | 'drawio' | 'lucid_csv' | 'vsdx';
 export type DiagramEncoding = 'text' | 'base64';

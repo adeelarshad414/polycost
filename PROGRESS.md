@@ -60,6 +60,29 @@ say so explicitly rather than marking it done.
 | Phase 2.8R - Refresh-live evidence regression          | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8S - Reconciliation coverage hardening         | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8T - VSDX review evidence context              | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8U - Diagram LLM cost guard                    | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8U - Diagram LLM cost guard
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Added a per-parse Tier 3 LLM classifier budget of 20 unresolved nodes so large
+  ambiguous diagrams remain bounded even when the optional OpenAI-compatible
+  classifier is configured.
+- Kept stencil and alias classification outside the LLM budget; only nodes that
+  would otherwise call the LLM consume the guard.
+- Overflow nodes remain reviewable with a clear unresolved reason:
+  `Tier 3 LLM classifier cost guard skipped after 20 unresolved nodes`.
+- Verification evidence in this continuation:
+  - Focused diagram parser spec passed: 1 suite / 22 tests.
+  - `npm run test:production-readiness` passed: API 6 suites / 82 tests and web 2
+    suites / 80 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: the classifier path is bounded, schema-based, retried,
+  timeout-protected, and fallback-safe, but production prompt tuning/evaluation
+  corpus work remains future hardening.
 
 ## Phase 2.8T - VSDX review evidence context
 

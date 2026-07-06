@@ -13,6 +13,12 @@ import { sanitizeDisplayText } from './diagram-security';
 import { StubLlmClassifierClient } from './llm-classifier.client';
 import { StencilMapRegistry } from './stencil-map.registry';
 
+interface NodeClassificationOptions {
+  allowLlm?: boolean;
+  llmSkippedReason?: string;
+  onLlmAttempt?: () => void;
+}
+
 @Injectable()
 export class NodeClassifierService {
   constructor(
@@ -23,6 +29,7 @@ export class NodeClassifierService {
 
   async classify(
     node: ExtractedDiagramNode,
+    options: NodeClassificationOptions = {},
   ): Promise<DiagramNodeClassification | DiagramIgnoredNode> {
     const displayLabel = sanitizeDisplayText(node.rawLabel, node.id);
 
@@ -57,6 +64,16 @@ export class NodeClassifierService {
       );
     }
 
+    if (options.allowLlm === false) {
+      return {
+        id: node.id,
+        displayLabel,
+        reason: options.llmSkippedReason ?? 'Tier 3 LLM classifier cost guard skipped this node',
+        sourceRef: node.sourceRef,
+      };
+    }
+
+    options.onLlmAttempt?.();
     const llmMatch = await this.llmClassifierClient.classify({
       displayLabel,
       diagramNodeId: node.id,
