@@ -1,0 +1,5 @@
+flowchart LR
+  app[API backend] --> queue[SQS queue]
+  queue --> trainer[SageMaker ML training GPU]
+  trainer --> model[Bedrock LLM inference]
+  model --> store[(Redis cache)]

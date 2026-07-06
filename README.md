@@ -1,12 +1,13 @@
 # PolyCost
 
-PolyCost is an open-source, self-hostable multi-cloud cost comparison platform. Describe a workload, or enter it through the guided form, and PolyCost maps the requirement to comparable AWS, Azure, and GCP services with side-by-side cost estimates and exportable reports.
+PolyCost is an open-source, self-hostable multi-cloud cost comparison platform. Describe a workload, upload an architecture diagram, or enter it through the guided form, and PolyCost maps the requirement to comparable AWS, Azure, and GCP services with side-by-side cost estimates and exportable reports.
 
 PolyCost is built for decision-grade planning. It estimates and compares costs; it is not a billing, invoicing, or live cloud-account spend management system.
 
 ## What PolyCost Does
 
 - Converts workload requirements into a Normalized Workload Specification (NWS).
+- Parses Mermaid, draw.io XML, Lucid-style CSV, and VSDX diagrams into reviewable requirements.
 - Compares AWS, Azure, and GCP costs across equivalent service mappings.
 - Shows daily, weekly, monthly, quarterly, and yearly cost views.
 - Combines executive decision summaries with engineering-level cost evidence.
@@ -18,14 +19,14 @@ PolyCost is built for decision-grade planning. It estimates and compares costs; 
 
 ## Current Scope
 
-This repository is focused on the V1 MVP:
+This repository currently includes the V1 MVP plus the Phase 2 diagram-ingestion path:
 
-1. Requirements in: natural language parsing or structured workload form.
+1. Requirements in: natural language parsing, structured workload form, or diagram import.
 2. NWS core: one cloud-neutral workload model.
 3. Comparison out: AWS, Azure, and GCP estimates with breakdowns.
 4. Reports out: on-screen analytics plus PDF, CSV, and Excel export.
 
-Future roadmap items include diagram input, Terraform generation, and reverse Terraform-to-diagram/cost workflows. Those are documented in the project specs but are not the active MVP runtime path.
+Future roadmap items include Terraform generation and reverse Terraform-to-diagram/cost workflows. Those are documented in the project specs but are not the active runtime path.
 
 ## Monorepo Layout
 
@@ -35,6 +36,7 @@ apps/
   web/                 React/Vite frontend dashboard
 database/              Postgres migrations and seed data
 docker/                Local Postgres bootstrap scripts
+fixtures/diagrams/     Diagram parser fixtures, including malicious safety cases
 scripts/               Developer, QA, database, and validation scripts
 specs/                 Product, API, data-model, and roadmap specifications
 vault-seed/            Local development Vault seed script
@@ -105,6 +107,7 @@ The main API is versioned under `/api/v1`.
 - `POST /comparisons/:id/refresh-live` refreshes a comparison against live pricing sources when enabled.
 - `POST /workload/parse` parses natural language into workload structure.
 - `POST /workload/validate` validates workload input.
+- `POST /parse/diagram` parses Mermaid, draw.io XML, Lucid CSV, or VSDX into a reviewable NWS draft.
 - `GET /pricing/status` returns pricing catalog status.
 - `GET /pricing/compare` compares cached pricing for a workload.
 - `GET /pricing/breakdown` returns detailed workload pricing breakdowns.

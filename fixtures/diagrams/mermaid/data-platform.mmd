@@ -1,0 +1,5 @@
+flowchart TD
+  source[Event stream] --> ingest[Kinesis streaming ingest]
+  ingest --> lake[S3 data lake 2TB]
+  lake --> warehouse[Redshift warehouse]
+  warehouse --> bi[BI dashboard]

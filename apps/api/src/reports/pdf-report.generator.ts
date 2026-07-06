@@ -22,6 +22,7 @@ import {
   selectedScenarioRows,
   serviceRequirementRows,
   skuMappingAppendixRows,
+  sourceDiagramRows,
   workloadScopeRows,
 } from './report-evidence';
 import { buildReportInsights } from './report-insights';
@@ -133,6 +134,7 @@ export class PdfReportGenerator {
           text: `${row[0]}: ${row[1]}`,
           fontSize: 10,
         })),
+      ...sourceDiagramPdfLines(result),
       { text: '', fontSize: 10 },
       { text: 'Architecture overview', fontSize: 14 },
       {
@@ -334,6 +336,23 @@ export class PdfReportGenerator {
 
 function visualDeckPageContents(result: ComparisonResult, options: ReportOptions): string[] {
   return [providerRunRateChartPage(result, options), serviceMixChartPage(result)];
+}
+
+function sourceDiagramPdfLines(result: ComparisonResult): PdfLine[] {
+  const rows = sourceDiagramRows(result);
+
+  if (rows.length === 0) {
+    return [];
+  }
+
+  return [
+    { text: '', fontSize: 10 },
+    { text: 'Source diagram', fontSize: 14 },
+    ...rows.slice(1).map((row) => ({
+      text: `${row[0]}: ${row[1]}`,
+      fontSize: 10,
+    })),
+  ];
 }
 
 function providerRunRateChartPage(result: ComparisonResult, options: ReportOptions): string {

@@ -37,6 +37,46 @@ say so explicitly rather than marking it done.
 | Post-Phase 10 report export evidence polish            | Complete                             | 2026-07-01   |
 | Post-Phase 10 Playwright browser journey coverage      | Complete                             | 2026-07-01   |
 | AI-native Phase 1 reimagining pass                     | Complete with known gaps (see notes) | 2026-07-01   |
+| Phase 2 - Diagram-to-cost intelligence                 | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2 - Diagram-to-cost intelligence
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Backend module added: `DiagramParserModule` with format detection, Mermaid,
+  draw.io XML, Lucid CSV, and VSDX extractors, tiered stencil/alias classification,
+  LLM-classifier interface stub, NWS draft generation, and `POST /api/v1/parse/diagram`.
+- Security hardening added: 5MB upload ceiling, content sniffing, PNG spoof rejection,
+  XXE/entity blocking, bounded draw.io deflate handling, bounded VSDX ZIP expansion,
+  rate limiting, sanitized display labels, and no webroot temp-file writes.
+- Database migration added: `022_diagram_imports.sql` records diagram import metadata,
+  graph snapshots, NWS snapshots, hashes, confidence, counts, and 24h expiry timestamps.
+- Fixture corpus added under `fixtures/diagrams`: 3 Mermaid, 3 draw.io, 1 Lucid CSV,
+  1 VSDX, plus malicious XXE XML, deflate bomb, ZIP bomb, oversized upload, and
+  PNG-renamed-as-draw.io cases.
+- Frontend input mode added: "Upload diagram" tab with file upload, paste support,
+  parse/review panel, confidence badges, assumed defaults, unresolved/ignored node
+  summaries, and editable sizing through the existing guided workload form.
+- Reports updated: PDF output now adds a conditional "Source diagram" section for
+  diagram-derived comparisons.
+- Verification passed: `npm run format:check`, `npm run ci:lint`,
+  `npm run ci:unit`, `npm run ci:integration`, `npm run ci:build`,
+  `npm run ci:e2e`, `npm run ci:security`, `npm run graphify:validate`,
+  `npm run db:validate`, `npm run qa`, `npm run devops:check`, and
+  `npm run cloud:check`.
+- Coverage/tests: API unit coverage passed with 44 suites / 315 tests; web unit
+  coverage passed with 9 suites / 111 tests; Compose-backed E2E passed with 6 API MVP
+  acceptance tests and 5 Playwright browser tests.
+- Security notes: production parser code avoids webroot temp-file writes, external
+  entity expansion, unbounded decompression, and dynamic object materialization from
+  Lucid CSV headers. `npm audit --audit-level=high` completed with no high/critical
+  blockers; it reported existing low/moderate transitive advisories in Graphify and
+  Google dependency paths.
+- Known gaps carried forward: diagram classification is deterministic stencil/alias
+  matching with an LLM-classifier interface stub; VSDX support extracts basic OpenXML
+  shape/connect metadata rather than full Visio semantics; diagram import persistence
+  is best-effort so parsing remains available if the database write fails.
 
 ## Phase 0 - Build plan & approval
 

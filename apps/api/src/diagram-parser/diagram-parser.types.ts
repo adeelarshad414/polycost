@@ -1,0 +1,148 @@
+import { NormalizedRequirementCategory } from '@polycost/types';
+import { NormalizedWorkloadSpec, ServiceRequirement } from '../nws/nws.types';
+import { ParserConfidence } from '../nws-parser/nws-parser.types';
+
+export const DIAGRAM_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
+export const DIAGRAM_INFLATED_MAX_BYTES = 5 * 1024 * 1024;
+export const DIAGRAM_MAX_NODES = 250;
+export const DIAGRAM_MAX_EDGES = 500;
+
+export type DiagramInputFormat = 'mermaid' | 'drawio' | 'lucid_csv' | 'vsdx';
+export type DiagramEncoding = 'text' | 'base64';
+export type DiagramNodeKind = 'resource' | 'connector' | 'decorative' | 'unknown';
+export type DiagramClassificationConfidence = 'high' | 'moderate' | 'low';
+
+export interface DiagramParseRequest {
+  content: string;
+  encoding?: DiagramEncoding;
+  fileName?: string;
+  mimeType?: string;
+  inputFormat?: DiagramInputFormat | 'auto';
+}
+
+export interface DecodedDiagramInput {
+  buffer: Buffer;
+  text?: string;
+  sizeBytes: number;
+  sha256: string;
+  requestedFormat?: DiagramInputFormat | 'auto';
+  detectedFormat: DiagramInputFormat;
+  fileName?: string;
+  mimeType?: string;
+}
+
+export interface DiagramGraph {
+  format: DiagramInputFormat;
+  nodes: DiagramGraphNode[];
+  edges: DiagramGraphEdge[];
+  ignoredNodes: DiagramIgnoredNode[];
+}
+
+export interface DiagramGraphNode {
+  id: string;
+  displayLabel: string;
+  kind: DiagramNodeKind;
+  sourceRef: string;
+  stencilId?: string;
+}
+
+export interface DiagramGraphEdge {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  displayLabel?: string;
+}
+
+export interface DiagramIgnoredNode {
+  id: string;
+  displayLabel: string;
+  reason: string;
+  sourceRef: string;
+}
+
+export interface ExtractedDiagram {
+  format: DiagramInputFormat;
+  nodes: ExtractedDiagramNode[];
+  edges: DiagramGraphEdge[];
+}
+
+export interface ExtractedDiagramNode {
+  id: string;
+  rawLabel: string;
+  style?: string;
+  stencilId?: string;
+  sourceRef: string;
+}
+
+export interface DiagramExtractor {
+  readonly format: DiagramInputFormat;
+  extract(input: DecodedDiagramInput): ExtractedDiagram;
+}
+
+export interface ClassifiedDiagramNode extends DiagramGraphNode {
+  classification?: DiagramNodeClassification;
+}
+
+export interface DiagramNodeClassification {
+  serviceCategory: NormalizedRequirementCategory;
+  serviceType: string;
+  confidence: DiagramClassificationConfidence;
+  reason: string;
+  assumedDefaults: string[];
+  serviceRequirement: ServiceRequirement;
+}
+
+export interface DiagramReviewComponent {
+  nodeId: string;
+  displayLabel: string;
+  serviceCategory: NormalizedRequirementCategory;
+  serviceType: string;
+  confidence: DiagramClassificationConfidence;
+  sourceRef: string;
+  assumedDefaults: string[];
+  editable: true;
+}
+
+export interface DiagramParseResult {
+  importId: string;
+  parserConfidence: ParserConfidence;
+  fieldsRequiringReview: string[];
+  source: {
+    format: DiagramInputFormat;
+    fileName?: string;
+    mimeType?: string;
+    sizeBytes: number;
+    sha256: string;
+    parsedAt: string;
+    persisted: boolean;
+  };
+  graph: DiagramGraph;
+  review: {
+    components: DiagramReviewComponent[];
+    unresolvedClassifications: DiagramIgnoredNode[];
+    ignoredNodes: DiagramIgnoredNode[];
+    assumedDefaults: string[];
+  };
+  draftNws: NormalizedWorkloadSpec;
+}
+
+export interface LlmClassifierClient {
+  classify(input: {
+    displayLabel: string;
+    stencilId?: string;
+  }): Promise<DiagramNodeClassification | undefined> | DiagramNodeClassification | undefined;
+}
+
+export interface DiagramImportRecordInput {
+  importId: string;
+  format: DiagramInputFormat;
+  fileName?: string;
+  mimeType?: string;
+  sizeBytes: number;
+  sha256: string;
+  parserConfidence: ParserConfidence;
+  unresolvedCount: number;
+  ignoredCount: number;
+  graph: DiagramGraph;
+  draftNws: NormalizedWorkloadSpec;
+}

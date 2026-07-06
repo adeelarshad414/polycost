@@ -1,0 +1,17 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="gcp-api" name="GCP API">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="lb" value="Cloud Load Balancer" style="shape=mxgraph.gcp2.cloud_load_balancing;" vertex="1" parent="1"/>
+        <mxCell id="run" value="Cloud Run container app" style="shape=mxgraph.gcp2.cloud_run;" vertex="1" parent="1"/>
+        <mxCell id="sql" value="Cloud SQL Postgres 150GB HA" style="shape=mxgraph.gcp2.cloud_sql;" vertex="1" parent="1"/>
+        <mxCell id="storage" value="Cloud Storage bucket 1TB" style="shape=mxgraph.gcp2.cloud_storage;" vertex="1" parent="1"/>
+        <mxCell id="edge1" edge="1" source="lb" target="run" parent="1"/>
+        <mxCell id="edge2" edge="1" source="run" target="sql" parent="1"/>
+        <mxCell id="edge3" edge="1" source="run" target="storage" parent="1"/>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

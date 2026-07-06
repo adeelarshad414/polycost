@@ -7,6 +7,8 @@ import {
   ComparisonAnalyticsResponse,
   ComparisonResult,
   DataHealthResponse,
+  DiagramParseRequest,
+  DiagramParseResult,
   ExchangeRatesResponse,
   IntervalKey,
   NormalizedWorkloadSpec,
@@ -61,6 +63,7 @@ export interface PolyCostClient {
   getHealth(): Promise<BackendHealthResponse>;
   getDataHealth(): Promise<DataHealthResponse>;
   parseWorkload(input: string): Promise<ParsedNwsDraft>;
+  parseDiagram(input: DiagramParseRequest): Promise<DiagramParseResult>;
   validateWorkload(nws: NormalizedWorkloadSpec): Promise<{ valid: true }>;
   createComparison(nws: NormalizedWorkloadSpec): Promise<ComparisonResult>;
   getComparisonAnalytics(comparisonId: string): Promise<ComparisonAnalyticsResponse>;
@@ -127,6 +130,12 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
       return requestJson<ParsedNwsDraft>(baseUrl, '/workload/parse', {
         method: 'POST',
         body: JSON.stringify({ naturalLanguageInput: input }),
+      });
+    },
+    parseDiagram(input) {
+      return requestJson<DiagramParseResult>(baseUrl, '/parse/diagram', {
+        method: 'POST',
+        body: JSON.stringify(input),
       });
     },
     validateWorkload(nws) {

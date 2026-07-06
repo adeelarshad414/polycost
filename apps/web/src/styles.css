@@ -2069,9 +2069,192 @@ summary:focus-visible,
 }
 
 .describe-panel,
+.diagram-import-panel,
+.initial-diagram-form,
 .structured-form {
   display: grid;
   gap: var(--pc-space-3);
+}
+
+.diagram-import-panel.is-compact {
+  gap: var(--pc-space-2);
+}
+
+.diagram-import-header,
+.diagram-review-summary,
+.diagram-review-callout,
+.diagram-review-edit-hint {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pc-space-2);
+}
+
+.diagram-import-header span,
+.diagram-review-summary span,
+.diagram-review-callout span,
+.diagram-review-edit-hint span {
+  color: var(--pc-action-primary);
+  font-size: var(--pc-text-xs);
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.diagram-import-header strong,
+.diagram-review-summary strong,
+.diagram-review-callout strong,
+.diagram-review-edit-hint strong {
+  color: var(--pc-text-primary);
+  font-family: var(--pc-font-display);
+  font-size: var(--pc-text-base);
+  line-height: 1.25;
+}
+
+.diagram-format-pill {
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--brand-blue) 34%, var(--pc-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-blue) 12%, var(--pc-bg-surface));
+  color: var(--brand-blue);
+  padding: 6px 10px;
+}
+
+.diagram-drop-zone {
+  display: grid;
+  min-height: 112px;
+  place-items: center;
+  gap: 6px;
+  border: 1px dashed color-mix(in srgb, var(--pc-action-primary) 52%, var(--pc-border));
+  border-radius: var(--pc-radius-card);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--brand-orange) 10%, transparent), transparent),
+    linear-gradient(315deg, color-mix(in srgb, var(--brand-green) 10%, transparent), transparent),
+    color-mix(in srgb, var(--pc-bg-surface-2) 68%, var(--pc-bg-surface));
+  color: var(--pc-text-primary);
+  cursor: pointer;
+  padding: var(--pc-space-3);
+  text-align: center;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+}
+
+.diagram-drop-zone:hover,
+.diagram-drop-zone:focus-within {
+  border-color: var(--pc-action-primary);
+  box-shadow: 0 0 0 4px var(--pc-focus-ring);
+  transform: translateY(-1px);
+}
+
+.diagram-drop-zone span {
+  font-weight: 900;
+}
+
+.diagram-drop-zone small,
+.diagram-review-summary small {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-sm);
+  font-weight: 700;
+}
+
+.diagram-source-textarea {
+  min-height: 164px;
+  font-family: var(--pc-font-mono);
+  font-size: var(--pc-text-sm);
+}
+
+.diagram-review-panel,
+.diagram-edit-details {
+  display: grid;
+  gap: var(--pc-space-2);
+  border: 1px solid color-mix(in srgb, var(--pc-border) 86%, transparent);
+  border-radius: var(--pc-radius-card);
+  background: color-mix(in srgb, var(--pc-bg-surface-2) 58%, var(--pc-bg-surface));
+  padding: var(--pc-space-2);
+}
+
+.diagram-review-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: var(--pc-space-1);
+}
+
+.diagram-review-card {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  border: 1px solid color-mix(in srgb, var(--pc-border) 88%, transparent);
+  border-radius: 8px;
+  background: var(--pc-bg-surface);
+  padding: var(--pc-space-1);
+}
+
+.diagram-review-card strong {
+  overflow-wrap: anywhere;
+  color: var(--pc-text-primary);
+  font-size: var(--pc-text-sm);
+  line-height: 1.25;
+}
+
+.diagram-review-card small,
+.diagram-review-card em {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  line-height: 1.35;
+}
+
+.diagram-review-card em {
+  color: var(--pc-warning);
+  font-style: normal;
+  font-weight: 800;
+}
+
+.confidence-badge {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: var(--pc-text-xs);
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.confidence-high {
+  background: var(--pc-success-soft);
+  color: var(--pc-success);
+}
+
+.confidence-moderate {
+  background: var(--pc-info-soft);
+  color: var(--pc-info);
+}
+
+.confidence-low {
+  background: var(--pc-warning-soft);
+  color: var(--pc-warning);
+}
+
+.diagram-review-callout {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-info-soft) 72%, var(--pc-bg-surface));
+  padding: var(--pc-space-1);
+}
+
+.diagram-review-callout-risk {
+  background: color-mix(in srgb, var(--pc-warning-soft) 74%, var(--pc-bg-surface));
+}
+
+.diagram-review-workspace {
+  display: grid;
+  gap: var(--pc-space-2);
+}
+
+.diagram-edit-details summary {
+  cursor: pointer;
+  color: var(--pc-text-primary);
+  font-weight: 900;
 }
 
 .requirements-file-loader {

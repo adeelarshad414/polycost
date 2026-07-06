@@ -1,0 +1,17 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="analytics" name="Analytics">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="events" value="EventBridge event bus" style="shape=mxgraph.aws4.eventbridge;" vertex="1" parent="1"/>
+        <mxCell id="etl" value="Glue ETL job" style="shape=mxgraph.aws4.glue;" vertex="1" parent="1"/>
+        <mxCell id="lake" value="S3 data lake 3TB" style="shape=mxgraph.aws4.s3;" vertex="1" parent="1"/>
+        <mxCell id="warehouse" value="Redshift data warehouse" style="shape=mxgraph.aws4.redshift;" vertex="1" parent="1"/>
+        <mxCell id="edge1" edge="1" source="events" target="etl" parent="1"/>
+        <mxCell id="edge2" edge="1" source="etl" target="lake" parent="1"/>
+        <mxCell id="edge3" edge="1" source="lake" target="warehouse" parent="1"/>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
