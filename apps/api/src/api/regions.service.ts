@@ -230,7 +230,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function stringField(record: Record<string, unknown>, key: string): string {
-  // Keys are internal parser literals used against provider-owned catalog records.
+  // Reviewed 2026-07-06: keys are internal parser literals used against provider-owned catalog records; see docs/SECURITY-SUPPRESSIONS.md.
   // eslint-disable-next-line security/detect-object-injection
   const value = record[key];
 
@@ -273,7 +273,7 @@ function regionCodeToLabel(id: string): string {
 }
 
 function gcpRegionLabel(id: string): string {
-  // IDs are validated with isGcpRegionId before this controlled label lookup.
+  // Reviewed 2026-07-06: IDs are validated with isGcpRegionId before this controlled label lookup; see docs/SECURITY-SUPPRESSIONS.md.
   // eslint-disable-next-line security/detect-object-injection
   return GCP_REGION_LABELS[id] ?? regionCodeToLabel(id);
 }

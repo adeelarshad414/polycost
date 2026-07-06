@@ -258,7 +258,7 @@ export interface ParsedNwsDraft {
 export type DiagramInputFormat = 'mermaid' | 'drawio' | 'lucid_csv' | 'vsdx';
 export type DiagramClassificationConfidence = 'high' | 'moderate' | 'low';
 
-export type TeamRole = 'owner' | 'admin' | 'member' | 'viewer';
+export type TeamRole = 'owner' | 'admin' | 'member';
 
 export interface AuthSessionResponse {
   token: string;
@@ -319,6 +319,44 @@ export interface TeamInvitationRecord {
   acceptedAt?: string;
   revokedAt?: string;
   inviteToken?: string;
+  inviteUrl?: string;
+}
+
+export interface TeamInvitationPreview {
+  status: 'pending' | 'accepted' | 'revoked' | 'expired' | 'invalid';
+  email?: string;
+  role?: Exclude<TeamRole, 'owner'>;
+  teamId?: string;
+  expiresAt?: string;
+  acceptedAt?: string;
+  revokedAt?: string;
+  message: string;
+}
+
+export interface AccountSessionRecord {
+  id: string;
+  current: boolean;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  revokedAt?: string;
+  hasUserAgent: boolean;
+  hasIp: boolean;
+}
+
+export interface AccountProfileResponse {
+  id: string;
+  email: string;
+  displayName?: string;
+  status: 'active' | 'disabled' | 'invited';
+}
+
+export interface TeamSettingsRecord {
+  teamId: string;
+  teamName: string;
+  plan: 'oss' | 'team' | 'enterprise';
+  role: TeamRole;
+  updatedAt: string;
 }
 
 export interface SsoConfigurationStatus {
@@ -334,6 +372,32 @@ export interface SsoConfigurationStatus {
   callbackUrls: {
     oidc: string;
     saml: string;
+  };
+}
+
+export interface SsoConnectionTestResult {
+  ok: boolean;
+  providerType: 'oidc' | 'saml';
+  issuerUrl: string;
+  checkedAt: string;
+  message: string;
+}
+
+export interface SsoStartResponse {
+  providerType: 'oidc';
+  mode: 'mock';
+  authorizationUrl: string;
+  callbackUrl: string;
+  state: string;
+  expiresAt: string;
+}
+
+export interface SsoCallbackResponse extends AuthSessionResponse {
+  sso: {
+    providerType: 'oidc';
+    issuerUrl: string;
+    subjectHash: string;
+    stateVerified: true;
   };
 }
 
@@ -467,6 +531,8 @@ export interface DiagramParseResult {
         pageRef?: string;
         pageName?: string;
         masterId?: string;
+        masterName?: string;
+        containerId?: string;
         fillColor?: string;
         lineColor?: string;
       };
@@ -493,6 +559,7 @@ export interface DiagramParseResult {
       confidence: DiagramClassificationConfidence;
       sourceRef: string;
       assumedDefaults: string[];
+      evidence: string;
       editable: true;
     }>;
     unresolvedClassifications: Array<{
@@ -565,6 +632,19 @@ export interface ComparisonLineItem {
     currency?: string;
     effectiveDate?: string;
     fetchedAt?: string;
+    sourceEndpoint?: string;
+    sourceRecordId?: string;
+    transformVersion?: string;
+    sourcePayloadHash?: string;
+    derivation?: {
+      expression: string;
+      unitPriceUsd?: number;
+      quantity: number;
+      monthlyCostUsd: number;
+      hourlyCostUsd?: number;
+      monthlyHours?: number;
+    };
+    equivalenceConfidence?: 'direct' | 'approximate' | 'modeled';
     pricingTermCode?: string;
     paymentOptionCode?: string;
     pricingBasis?: PricingBasis;
@@ -657,6 +737,69 @@ export interface ComparisonResult {
     code?: string;
     message: string;
   }>;
+}
+
+export interface ComparisonPricingEvidenceRow {
+  evidenceId: string;
+  providerId: ProviderId;
+  lineItemIndex: number;
+  category: ServiceCategory;
+  costComponent?: CostComponent;
+  description: string;
+  displayedAmounts: {
+    monthlyCostUsd: number;
+    hourlyCostUsd?: number;
+    providerTotals: CostIntervals;
+  };
+  sku: {
+    resolvedSkuId?: string;
+    sourceSkuId?: string;
+    rateSourceSkuId?: string;
+    providerServiceName?: string;
+    skuDescription?: string;
+    region?: string;
+    catalogRegion?: string;
+  };
+  rate: {
+    source: 'pricing_catalog' | 'pricing_rates' | 'modeled_estimate' | 'manual_model' | string;
+    sourceRecordKey: string;
+    sourceEndpoint?: string;
+    sourceRecordId?: string;
+    transformVersion?: string;
+    sourcePayloadHash?: string;
+    unit?: string;
+    unitPriceUsd?: number;
+    currency?: string;
+    effectiveDate?: string;
+    fetchedAt?: string;
+    pricingTermCode?: string;
+    paymentOptionCode?: string;
+    pricingBasis?: PricingBasis;
+  };
+  derivation: {
+    expression: string;
+    quantity?: number;
+    unitPriceUsd?: number;
+    hourlyCostUsd?: number;
+    monthlyCostUsd: number;
+    monthlyHours?: number;
+  };
+  equivalence: {
+    confidence: 'direct' | 'approximate' | 'modeled';
+    isApproximate: boolean;
+    isEstimate: boolean;
+  };
+  egressTiers?: EgressTierBreakdown[];
+  pricingModels?: PricingModelCost[];
+}
+
+export interface ComparisonPricingEvidenceResponse {
+  comparisonId: string;
+  pricingAsOf: string;
+  generatedAt: string;
+  providerCount: number;
+  lineItemCount: number;
+  evidence: ComparisonPricingEvidenceRow[];
 }
 
 export type AnalyticsDimension =

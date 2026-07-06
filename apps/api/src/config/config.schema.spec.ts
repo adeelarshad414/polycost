@@ -37,6 +37,7 @@ describe('config schema', () => {
     expect(config.DIAGRAM_LLM_CLASSIFIER_ENDPOINT).toBeUndefined();
     expect(config.DIAGRAM_LLM_CLASSIFIER_MODEL).toBeUndefined();
     expect(config.FEATURE_RESERVED_PRICING).toBe(true);
+    expect(config.AUTH_SSO_STATE_SECRET).toBe('CHANGE_ME_DEV_ONLY_SSO_STATE_SECRET');
   });
 
   it('fails fast for invalid config', () => {
@@ -103,10 +104,36 @@ describe('config schema', () => {
       USE_MOCK_PROVIDERS: 'false',
       PRICING_ETL_RUN_ON_BOOT: 'false',
       CORS_ALLOWED_ORIGINS: 'https://polycost.example.com',
+      VAULT_TOKEN_FILE: '/run/polycost-vault-auth/token',
+      AUTH_SSO_STATE_SECRET: 'production-sso-state-secret-value',
     });
 
     expect(config.USE_MOCK_PROVIDERS).toBe(false);
     expect(config.PRICING_ETL_RUN_ON_BOOT).toBe(false);
+  });
+
+  it('rejects real provider mode outside development when Vault token access is absent', () => {
+    expect(() =>
+      validateConfig({
+        ...baseConfig,
+        NODE_ENV: 'production',
+        USE_MOCK_PROVIDERS: 'false',
+        CORS_ALLOWED_ORIGINS: 'https://polycost.example.com',
+      }),
+    ).toThrow(
+      'VAULT_TOKEN_FILE is required when real provider pricing is enabled outside development.',
+    );
+  });
+
+  it('rejects dummy placeholder values outside development', () => {
+    expect(() =>
+      validateConfig({
+        ...baseConfig,
+        NODE_ENV: 'staging',
+        AUTH_OIDC_CLIENT_ID: 'CHANGE_ME_DEV_ONLY',
+        CORS_ALLOWED_ORIGINS: 'https://polycost.example.com',
+      }),
+    ).toThrow('CHANGE_ME_DEV_ONLY and dummy values are not allowed outside development.');
   });
 
   it('keeps secret-shaped values out of the schema', () => {

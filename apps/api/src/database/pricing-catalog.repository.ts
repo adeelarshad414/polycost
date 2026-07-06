@@ -9,6 +9,7 @@ import {
 } from '../adapters/common/cloud-provider-adapter';
 import { AppConfig } from '../config/config.schema';
 import { normalizePricingCatalogRecords } from '../pricing-normalization/normalized-pricing-records';
+import { pricingLineageForCatalogRecord } from '../pricing-normalization/pricing-lineage';
 import { SecretsReader } from '../secrets/secrets.service';
 import {
   NormalizedPricingWriter,
@@ -60,6 +61,11 @@ interface PricingCatalogRow {
   attributes: Record<string, unknown> | null;
   effective_date: Date;
   fetched_at: Date;
+  source_endpoint: string | null;
+  source_record_id: string | null;
+  source_record_key: string | null;
+  transform_version: string | null;
+  source_payload_hash: string | null;
 }
 
 const defaultPgPoolFactory: PgPoolFactory = (config) => new Pool(config);
@@ -114,7 +120,12 @@ export class PostgresPricingCatalogRepository
                unit_price_usd,
                attributes,
                effective_date,
-               fetched_at
+               fetched_at,
+               source_endpoint,
+               source_record_id,
+               source_record_key,
+               transform_version,
+               source_payload_hash
         FROM pricing_catalog
         WHERE ${conditions.join(' AND ')}
         ORDER BY CASE WHEN attributes->>'source' = 'local_seed' THEN 1 ELSE 0 END,
@@ -133,6 +144,7 @@ export class PostgresPricingCatalogRepository
 
     for (const record of records) {
       try {
+        const lineage = pricingLineageForCatalogRecord(record);
         const result = await pool.query(
           `
             INSERT INTO pricing_catalog (
@@ -147,9 +159,14 @@ export class PostgresPricingCatalogRepository
               attributes,
               effective_date,
               fetched_at,
-              sync_status
+              sync_status,
+              source_endpoint,
+              source_record_id,
+              source_record_key,
+              transform_version,
+              source_payload_hash
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17)
             ON CONFLICT (provider, sku_id, region, effective_date)
             DO UPDATE SET
               service_category = EXCLUDED.service_category,
@@ -159,7 +176,12 @@ export class PostgresPricingCatalogRepository
               unit_price_usd = EXCLUDED.unit_price_usd,
               attributes = EXCLUDED.attributes,
               fetched_at = EXCLUDED.fetched_at,
-              sync_status = EXCLUDED.sync_status
+              sync_status = EXCLUDED.sync_status,
+              source_endpoint = EXCLUDED.source_endpoint,
+              source_record_id = EXCLUDED.source_record_id,
+              source_record_key = EXCLUDED.source_record_key,
+              transform_version = EXCLUDED.transform_version,
+              source_payload_hash = EXCLUDED.source_payload_hash
           `,
           [
             record.provider,
@@ -174,6 +196,11 @@ export class PostgresPricingCatalogRepository
             record.effectiveDate,
             record.fetchedAt,
             'success',
+            lineage.sourceEndpoint,
+            lineage.sourceRecordId,
+            lineage.sourceRecordKey,
+            lineage.transformVersion,
+            lineage.sourcePayloadHash,
           ],
         );
 
@@ -275,13 +302,25 @@ export class PostgresPricingCatalogRepository
               tier,
               price_per_gb_month,
               currency,
-              effective_date
+              effective_date,
+              source_endpoint,
+              source_record_id,
+              source_record_key,
+              source_fetched_at,
+              transform_version,
+              source_payload_hash
             )
-            VALUES ($1, $2, $3, $4, $5, $6)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             ON CONFLICT (provider, region, tier, effective_date)
             DO UPDATE SET
               price_per_gb_month = EXCLUDED.price_per_gb_month,
-              currency = EXCLUDED.currency
+              currency = EXCLUDED.currency,
+              source_endpoint = EXCLUDED.source_endpoint,
+              source_record_id = EXCLUDED.source_record_id,
+              source_record_key = EXCLUDED.source_record_key,
+              source_fetched_at = EXCLUDED.source_fetched_at,
+              transform_version = EXCLUDED.transform_version,
+              source_payload_hash = EXCLUDED.source_payload_hash
           `,
           [
             record.provider,
@@ -290,6 +329,12 @@ export class PostgresPricingCatalogRepository
             record.pricePerGbMonth,
             record.currency,
             record.effectiveDate,
+            record.sourceLineage.sourceEndpoint,
+            record.sourceLineage.sourceRecordId,
+            record.sourceLineage.sourceRecordKey,
+            record.sourceLineage.fetchTimestamp,
+            record.sourceLineage.transformVersion,
+            record.sourceLineage.sourcePayloadHash,
           ],
         );
 
@@ -309,13 +354,25 @@ export class PostgresPricingCatalogRepository
               tier_from_gb,
               tier_to_gb,
               price_per_gb,
-              effective_date
+              effective_date,
+              source_endpoint,
+              source_record_id,
+              source_record_key,
+              source_fetched_at,
+              transform_version,
+              source_payload_hash
             )
-            VALUES ($1, $2, $3, $4, $5, $6)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             ON CONFLICT (provider, region, tier_from_gb, effective_date)
             DO UPDATE SET
               tier_to_gb = EXCLUDED.tier_to_gb,
-              price_per_gb = EXCLUDED.price_per_gb
+              price_per_gb = EXCLUDED.price_per_gb,
+              source_endpoint = EXCLUDED.source_endpoint,
+              source_record_id = EXCLUDED.source_record_id,
+              source_record_key = EXCLUDED.source_record_key,
+              source_fetched_at = EXCLUDED.source_fetched_at,
+              transform_version = EXCLUDED.transform_version,
+              source_payload_hash = EXCLUDED.source_payload_hash
           `,
           [
             record.provider,
@@ -324,6 +381,12 @@ export class PostgresPricingCatalogRepository
             record.tierToGb ?? null,
             record.pricePerGb,
             record.effectiveDate,
+            record.sourceLineage.sourceEndpoint,
+            record.sourceLineage.sourceRecordId,
+            record.sourceLineage.sourceRecordKey,
+            record.sourceLineage.fetchTimestamp,
+            record.sourceLineage.transformVersion,
+            record.sourceLineage.sourcePayloadHash,
           ],
         );
 
@@ -375,6 +438,7 @@ export class PostgresPricingCatalogRepository
     record: ReturnType<typeof normalizePricingCatalogRecords>['compute'][number],
   ): Promise<number> {
     let recordsUpdated = 0;
+    const lineage = record.sourceLineage;
 
     for (const rate of pricingRateRowsForComputeRecord(record)) {
       const result = await pool.query(
@@ -419,7 +483,12 @@ export class PostgresPricingCatalogRepository
             estimate_range_high_usd,
             source_fetched_at,
             valid_from,
-            sync_status
+            sync_status,
+            source_endpoint,
+            source_record_id,
+            source_record_key,
+            transform_version,
+            source_payload_hash
           )
           SELECT resolved.sku_id,
                  $3,
@@ -432,7 +501,12 @@ export class PostgresPricingCatalogRepository
                  $10::numeric,
                  $11::timestamptz,
                  $12::timestamptz,
-                 'success'
+                 'success',
+                 $13,
+                 $14,
+                 $15,
+                 $16,
+                 $17
           FROM resolved
           ON CONFLICT (
             sku_id,
@@ -449,7 +523,12 @@ export class PostgresPricingCatalogRepository
             estimate_range_high_usd = EXCLUDED.estimate_range_high_usd,
             source_fetched_at = EXCLUDED.source_fetched_at,
             valid_to = NULL,
-            sync_status = EXCLUDED.sync_status
+            sync_status = EXCLUDED.sync_status,
+            source_endpoint = EXCLUDED.source_endpoint,
+            source_record_id = EXCLUDED.source_record_id,
+            source_record_key = EXCLUDED.source_record_key,
+            transform_version = EXCLUDED.transform_version,
+            source_payload_hash = EXCLUDED.source_payload_hash
         `,
         [
           record.provider,
@@ -464,6 +543,11 @@ export class PostgresPricingCatalogRepository
           rate.estimateRangeHighUsd ?? null,
           record.lastSyncedAt,
           record.effectiveDate,
+          lineage.sourceEndpoint,
+          lineage.sourceRecordId,
+          lineage.sourceRecordKey,
+          lineage.transformVersion,
+          lineage.sourcePayloadHash,
         ],
       );
 
@@ -495,6 +579,8 @@ export class PostgresPricingCatalogRepository
 }
 
 function toPricingCatalogRecord(row: PricingCatalogRow): PricingCatalogRecord {
+  const attributes = catalogAttributesWithLineage(row);
+
   return {
     provider: row.provider,
     serviceCategory: row.service_category,
@@ -504,10 +590,37 @@ function toPricingCatalogRecord(row: PricingCatalogRow): PricingCatalogRecord {
     region: row.region,
     unit: row.unit,
     unitPriceUsd: Number.parseFloat(row.unit_price_usd),
-    attributes: row.attributes ?? undefined,
+    attributes,
     effectiveDate: row.effective_date.toISOString(),
     fetchedAt: row.fetched_at.toISOString(),
   };
+}
+
+function catalogAttributesWithLineage(row: PricingCatalogRow): Record<string, unknown> | undefined {
+  const attributes: Record<string, unknown> = {
+    ...(row.attributes ?? {}),
+    ...(stringOrUndefined(row.source_endpoint)
+      ? { sourceEndpoint: stringOrUndefined(row.source_endpoint) }
+      : {}),
+    ...(stringOrUndefined(row.source_record_id)
+      ? { sourceRecordId: stringOrUndefined(row.source_record_id) }
+      : {}),
+    ...(stringOrUndefined(row.source_record_key)
+      ? { sourceRecordKey: stringOrUndefined(row.source_record_key) }
+      : {}),
+    ...(stringOrUndefined(row.transform_version)
+      ? { transformVersion: stringOrUndefined(row.transform_version) }
+      : {}),
+    ...(stringOrUndefined(row.source_payload_hash)
+      ? { sourcePayloadHash: stringOrUndefined(row.source_payload_hash) }
+      : {}),
+  };
+
+  return Object.keys(attributes).length > 0 ? attributes : undefined;
+}
+
+function stringOrUndefined(value: string | null | undefined): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
 function pricingRateRowsForComputeRecord(

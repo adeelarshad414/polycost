@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: fixture expansion uses trusted provider/category dictionaries generated in-repo; see docs/SECURITY-SUPPRESSIONS.md. */
 import {
   PricingCatalogRecord,
   PricingModelKey,
@@ -175,6 +176,12 @@ const PROVIDER_SHAPES: Record<ProviderId, MockProviderShape> = {
         engine: 'generic_nosql',
         hourlyUsd: 0.11,
       },
+      {
+        sku: 'aws-elasticache-redis-cache-node',
+        serviceName: 'Amazon ElastiCache Redis',
+        engine: 'redis',
+        hourlyUsd: 0.068,
+      },
     ],
     egressTiers: [
       { tierFromGb: 0, tierToGb: 10_240, pricePerGb: 0.09 },
@@ -301,6 +308,12 @@ const PROVIDER_SHAPES: Record<ProviderId, MockProviderShape> = {
         engine: 'generic_nosql',
         hourlyUsd: 0.096,
       },
+      {
+        sku: 'azure-managed-redis-cache-node',
+        serviceName: 'Azure Managed Redis',
+        engine: 'redis',
+        hourlyUsd: 0.071,
+      },
     ],
     egressTiers: [
       { tierFromGb: 0, tierToGb: 10_240, pricePerGb: 0.087 },
@@ -426,6 +439,12 @@ const PROVIDER_SHAPES: Record<ProviderId, MockProviderShape> = {
         engine: 'generic_nosql',
         hourlyUsd: 0.09,
       },
+      {
+        sku: 'gcp-memorystore-redis-node',
+        serviceName: 'Memorystore for Redis',
+        engine: 'redis',
+        hourlyUsd: 0.064,
+      },
     ],
     egressTiers: [
       { tierFromGb: 0, tierToGb: 10_240, pricePerGb: 0.085 },
@@ -482,6 +501,8 @@ function computeRecords(
         unitPriceUsd,
         attributes: {
           source: 'mock_provider',
+          sourceEndpoint: `fixture://mock-pricing/${shape.provider}/compute`,
+          rawSourceRecordId: skuId,
           pricingModel,
           [shape.skuAttribute]: compute.sku,
           instanceFamily: compute.family,
@@ -529,6 +550,8 @@ function storageRecords(
     unitPriceUsd: item.unitPriceUsd,
     attributes: {
       source: 'mock_provider',
+      sourceEndpoint: `fixture://mock-pricing/${shape.provider}/storage`,
+      rawSourceRecordId: item.sku,
       type: item.type,
       storageClass: item.storageClass,
       accessPattern: item.accessPattern,
@@ -561,6 +584,8 @@ function databaseRecords(
     unitPriceUsd: item.hourlyUsd,
     attributes: {
       source: 'mock_provider',
+      sourceEndpoint: `fixture://mock-pricing/${shape.provider}/database`,
+      rawSourceRecordId: item.sku,
       engine: item.engine,
       multiAzPremiumPercent: 100,
       backupStorageUsdPerGbMonth: 0.095,
@@ -587,6 +612,8 @@ function networkRecord(
     unitPriceUsd: shape.egressTiers[0]?.pricePerGb ?? 0,
     attributes: {
       source: 'mock_provider',
+      sourceEndpoint: `fixture://mock-pricing/${shape.provider}/network`,
+      rawSourceRecordId: `${shape.provider}-internet-egress-tiered`,
       egressType: 'internet',
       egressTiers: shape.egressTiers.map((tier) => ({
         tierFromGb: tier.tierFromGb,

@@ -25,11 +25,13 @@ import {
   ServiceCategory,
 } from './cloud-provider-adapter';
 import { AdapterPricingError } from './adapter-errors';
+/* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: dynamic keys are typed provider service/dimension maps sourced from internal catalogs; see docs/SECURITY-SUPPRESSIONS.md. */
 import { HOURS_PER_MONTH } from '../../cost-time';
 import {
   normalizeInstanceFamily,
   NormalizedInstanceFamily,
 } from '../../pricing-normalization/family-normalizer';
+import { pricingLineageForCatalogRecord } from '../../pricing-normalization/pricing-lineage';
 
 const CATALOG_COMMITMENT_PRICING_MODELS: PricingModelKey[] = ['reserved-1yr', 'reserved-3yr'];
 const ESTIMATED_COMPUTE_PRICING_MODELS: PricingModelKey[] = ['spot', 'savings-plan'];
@@ -595,6 +597,9 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
         costComponent: options.costComponent ?? this.costComponentForCategory(category),
         record,
         displayRegion,
+        quantity,
+        hourlyCostUsd: cost.hourlyCostUsd,
+        monthlyCostUsd: cost.monthlyCostUsd,
         isApproximate: options.isApproximate ?? record.attributes?.isApproximate === true,
         pricingBasis: cost.pricingBasis,
         pricingTermCode,
@@ -1170,12 +1175,16 @@ function catalogPricingTrace(input: {
   costComponent?: CostComponent;
   record: PricingCatalogRecord;
   displayRegion: string;
+  quantity: number;
+  hourlyCostUsd: number;
+  monthlyCostUsd: number;
   isApproximate: boolean;
   pricingBasis: PricingTrace['pricingBasis'];
   pricingTermCode?: string;
   paymentOptionCode?: string;
   rateCurrency: string;
 }): PricingTrace {
+  const lineage = pricingLineageForCatalogRecord(input.record);
   const sourceRecordKey = pricingSourceRecordKey({
     providerId: input.providerId,
     category: input.category,
@@ -1184,6 +1193,13 @@ function catalogPricingTrace(input: {
     unit: input.record.unit,
     effectiveDate: input.record.effectiveDate,
   });
+  const hourlyUnit = isHourlyUnit(input.record.unit);
+  const expression =
+    input.pricingBasis === 'tiered'
+      ? `${input.quantity} ${input.record.unit} through provider tiered rate card`
+      : `${input.record.unitPriceUsd} USD/${input.record.unit} x ${input.quantity}${
+          hourlyUnit ? ` x ${HOURS_PER_MONTH} hour-month standard` : ''
+        }`;
 
   return {
     providerId: input.providerId,
@@ -1202,12 +1218,30 @@ function catalogPricingTrace(input: {
     currency: input.rateCurrency,
     effectiveDate: input.record.effectiveDate,
     fetchedAt: input.record.fetchedAt,
+    sourceEndpoint: lineage.sourceEndpoint,
+    sourceRecordId: lineage.sourceRecordId,
+    transformVersion: lineage.transformVersion,
+    sourcePayloadHash: lineage.sourcePayloadHash,
+    derivation: {
+      expression,
+      unitPriceUsd: input.record.unitPriceUsd,
+      quantity: input.quantity,
+      monthlyCostUsd: input.monthlyCostUsd,
+      hourlyCostUsd: input.hourlyCostUsd,
+      ...(hourlyUnit ? { monthlyHours: HOURS_PER_MONTH } : {}),
+    },
+    equivalenceConfidence: input.isApproximate ? 'approximate' : 'direct',
     ...(input.pricingTermCode ? { pricingTermCode: input.pricingTermCode } : {}),
     ...(input.paymentOptionCode ? { paymentOptionCode: input.paymentOptionCode } : {}),
     pricingBasis: input.pricingBasis,
     isApproximate: input.isApproximate,
     isEstimate: false,
   };
+}
+
+function isHourlyUnit(unit: string): boolean {
+  const normalized = unit.toLowerCase();
+  return normalized.includes('hour') || normalized === 'h' || normalized === 'hrs';
 }
 
 function pricingSourceRecordKey(input: {

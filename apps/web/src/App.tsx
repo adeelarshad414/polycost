@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: UI dictionaries are typed provider/form/report state maps, not privilege-bound object mutation; see docs/SECURITY-SUPPRESSIONS.md. */
 import { FormEvent, ReactNode, useEffect, useRef, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatApiError, PolyCostClient, PolyCostApiError, polyCostClient } from './api-client';
@@ -42,6 +43,7 @@ import {
 import {
   ComparisonProviderResult,
   ComparisonAnalyticsResponse,
+  ComparisonPricingEvidenceResponse,
   ComparisonResult,
   DataHealthResponse,
   BillingImportResponse,
@@ -59,9 +61,11 @@ import {
   RegionCatalogResponse,
   ReportFormat,
   ServiceRequirement,
+  AccountSessionRecord,
   AuthMeResponse,
   SsoConfigurationStatus,
   TeamInvitationRecord,
+  TeamInvitationPreview,
   TeamMemberRecord,
   TeamRole,
 } from './types';
@@ -733,6 +737,13 @@ export function App({ client = polyCostClient }: AppProps) {
     useState<ComparisonAnalyticsResponse | null>(null);
   const [comparisonAnalyticsError, setComparisonAnalyticsError] = useState<string | null>(null);
   const [isComparisonAnalyticsLoading, setIsComparisonAnalyticsLoading] = useState(false);
+  const [comparisonPricingEvidence, setComparisonPricingEvidence] =
+    useState<ComparisonPricingEvidenceResponse | null>(null);
+  const [comparisonPricingEvidenceError, setComparisonPricingEvidenceError] = useState<
+    string | null
+  >(null);
+  const [isComparisonPricingEvidenceLoading, setIsComparisonPricingEvidenceLoading] =
+    useState(false);
   const [comparisonHistory, setComparisonHistory] = useState<ComparisonHistoryEntry[]>(() =>
     readStoredComparisonHistory(),
   );
@@ -844,6 +855,50 @@ export function App({ client = polyCostClient }: AppProps) {
         }
 
         setIsComparisonAnalyticsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [client, comparison]);
+
+  useEffect(() => {
+    if (!comparison) {
+      setComparisonPricingEvidence(null);
+      setComparisonPricingEvidenceError(null);
+      setIsComparisonPricingEvidenceLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    setIsComparisonPricingEvidenceLoading(true);
+    setComparisonPricingEvidenceError(null);
+
+    void client
+      .getComparisonPricingEvidence(comparison.comparisonId)
+      .then((evidence) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setComparisonPricingEvidence(evidence);
+        setComparisonPricingEvidenceError(null);
+      })
+      .catch((evidenceError) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setComparisonPricingEvidence(null);
+        setComparisonPricingEvidenceError(formatApiError(evidenceError));
+      })
+      .finally(() => {
+        if (!isMounted) {
+          return;
+        }
+
+        setIsComparisonPricingEvidenceLoading(false);
       });
 
     return () => {
@@ -1609,6 +1664,8 @@ export function App({ client = polyCostClient }: AppProps) {
           comparison={comparison}
           comparisonAnalytics={comparisonAnalytics}
           comparisonAnalyticsError={comparisonAnalyticsError}
+          comparisonPricingEvidence={comparisonPricingEvidence}
+          comparisonPricingEvidenceError={comparisonPricingEvidenceError}
           form={form}
           submittedForm={submittedForm}
           submittedInputMode={submittedInputMode}
@@ -1632,6 +1689,7 @@ export function App({ client = polyCostClient }: AppProps) {
           dataHealth={dataHealth}
           dataHealthError={dataHealthError}
           isComparisonAnalyticsLoading={isComparisonAnalyticsLoading}
+          isComparisonPricingEvidenceLoading={isComparisonPricingEvidenceLoading}
           onClear={handleClearComparison}
           onEdit={handleEditComparison}
           onInputModeChange={setInputMode}
@@ -1824,15 +1882,32 @@ function WorkspaceControlCenter({
   const [password, setPassword] = useState('correct horse battery staple');
   const [displayName, setDisplayName] = useState('Architecture Lead');
   const [teamName, setTeamName] = useState('PolyCost demo team');
+  const [profileEmail, setProfileEmail] = useState('architect@example.com');
+  const [profileDisplayName, setProfileDisplayName] = useState('Architecture Lead');
+  const [profileCurrentPassword, setProfileCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [deleteCurrentPassword, setDeleteCurrentPassword] = useState('');
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [newTeamName, setNewTeamName] = useState('Platform cost office');
+  const [teamSettingsName, setTeamSettingsName] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
   const [workspaceBusy, setWorkspaceBusy] = useState<string | null>(null);
   const [members, setMembers] = useState<TeamMemberRecord[]>([]);
   const [invitations, setInvitations] = useState<TeamInvitationRecord[]>([]);
+  const [accountSessions, setAccountSessions] = useState<AccountSessionRecord[]>([]);
   const [ssoStatus, setSsoStatus] = useState<SsoConfigurationStatus | null>(null);
   const [inviteEmail, setInviteEmail] = useState('finops@example.com');
-  const [inviteRole, setInviteRole] = useState<Exclude<TeamRole, 'owner'>>('viewer');
+  const [inviteRole, setInviteRole] = useState<Exclude<TeamRole, 'owner'>>('member');
   const [lastInviteToken, setLastInviteToken] = useState<string | null>(null);
-  const [acceptToken, setAcceptToken] = useState('');
+  const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null);
+  const [landingInviteToken] = useState(() => readInviteTokenFromUrl());
+  const [acceptToken, setAcceptToken] = useState(landingInviteToken);
+  const [invitePreview, setInvitePreview] = useState<TeamInvitationPreview | null>(null);
+  const [ssoProviderType, setSsoProviderType] = useState<'oidc' | 'saml'>('oidc');
+  const [ssoDisplayName, setSsoDisplayName] = useState('Corporate OIDC');
+  const [ssoIssuerUrl, setSsoIssuerUrl] = useState('https://idp.example.com');
+  const [ssoClientId, setSsoClientId] = useState('polycost-demo-client');
+  const [ssoClientSecret, setSsoClientSecret] = useState('CHANGE_ME_DEV_ONLY');
   const [provider, setProvider] = useState<ProviderId>('aws');
   const [billingPeriodStart, setBillingPeriodStart] = useState('2026-06-01');
   const [billingPeriodEnd, setBillingPeriodEnd] = useState('2026-06-30');
@@ -1841,13 +1916,43 @@ function WorkspaceControlCenter({
   const [reconciliation, setReconciliation] = useState<InvoiceReconciliationRecord | null>(null);
   const activeTeam = session?.activeTeam;
   const canManageTeam = activeTeam?.role === 'owner' || activeTeam?.role === 'admin';
+  const ownerCount = members.filter((member) => member.role === 'owner').length;
   const sourceType = sourceTypeForProvider(provider);
+
+  useEffect(() => {
+    if (!landingInviteToken) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    void client
+      .previewTeamInvitation(landingInviteToken)
+      .then((preview) => {
+        if (isMounted) {
+          setInvitePreview(preview);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setInvitePreview({
+            status: 'invalid',
+            message: 'Invitation token was not found.',
+          });
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [client, landingInviteToken]);
 
   useEffect(() => {
     if (!token) {
       setSession(null);
       setMembers([]);
       setInvitations([]);
+      setAccountSessions([]);
       setSsoStatus(null);
       return undefined;
     }
@@ -1862,6 +1967,9 @@ function WorkspaceControlCenter({
         }
 
         setSession(currentSession);
+        setProfileEmail(currentSession.account.email);
+        setProfileDisplayName(currentSession.account.displayName ?? '');
+        setTeamSettingsName(currentSession.activeTeam?.name ?? '');
         onError(null);
       })
       .catch((sessionError) => {
@@ -1872,6 +1980,7 @@ function WorkspaceControlCenter({
         clearStoredAuthToken();
         setToken('');
         setSession(null);
+        setAccountSessions([]);
         onError(formatApiError(sessionError));
       });
 
@@ -1879,6 +1988,36 @@ function WorkspaceControlCenter({
       isMounted = false;
     };
   }, [client, onError, token]);
+
+  useEffect(() => {
+    if (!token || !session) {
+      setAccountSessions([]);
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    void client
+      .listAccountSessions(token)
+      .then((sessions) => {
+        if (isMounted) {
+          setAccountSessions(sessions);
+        }
+      })
+      .catch((sessionsError) => {
+        if (isMounted) {
+          onError(formatApiError(sessionsError));
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [client, onError, session, token, workspaceBusy]);
+
+  useEffect(() => {
+    setTeamSettingsName(activeTeam?.name ?? '');
+  }, [activeTeam?.name]);
 
   useEffect(() => {
     if (!token || !activeTeam || !canManageTeam) {
@@ -1958,8 +2097,208 @@ function WorkspaceControlCenter({
       clearStoredAuthToken();
       setToken('');
       setSession(null);
+      setAccountSessions([]);
       setAuthBusy(false);
       onNotice('Signed out of the workspace.');
+    }
+  }
+
+  async function handleRevokeOtherSessions() {
+    if (!token) {
+      return;
+    }
+
+    setWorkspaceBusy('revoke-sessions');
+    onError(null);
+
+    try {
+      const result = await client.revokeOtherSessions(token);
+      onNotice(`Signed out ${result.revoked} other session${result.revoked === 1 ? '' : 's'}.`);
+    } catch (sessionError) {
+      onError(formatApiError(sessionError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handleProfileUpdate(event: FormEvent) {
+    event.preventDefault();
+    if (!token) {
+      return;
+    }
+
+    setWorkspaceBusy('profile');
+    onError(null);
+
+    try {
+      const updated = await client.updateAccountProfile(
+        {
+          email: profileEmail,
+          displayName: profileDisplayName,
+          ...(profileEmail !== session?.account.email
+            ? { currentPassword: profileCurrentPassword }
+            : {}),
+        },
+        token,
+      );
+      setProfileCurrentPassword('');
+      setSession((current) =>
+        current
+          ? {
+              ...current,
+              account: {
+                ...current.account,
+                email: updated.email,
+                displayName: updated.displayName,
+              },
+            }
+          : current,
+      );
+      onNotice('Account profile updated.');
+    } catch (profileError) {
+      onError(formatApiError(profileError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handlePasswordChange(event: FormEvent) {
+    event.preventDefault();
+    if (!token) {
+      return;
+    }
+
+    setWorkspaceBusy('password');
+    onError(null);
+
+    try {
+      await client.changePassword(
+        {
+          currentPassword: profileCurrentPassword,
+          newPassword,
+        },
+        token,
+      );
+      setProfileCurrentPassword('');
+      setNewPassword('');
+      onNotice('Password changed. Existing sessions remain visible for review.');
+    } catch (passwordError) {
+      onError(formatApiError(passwordError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handleAccountDeletion(event: FormEvent) {
+    event.preventDefault();
+    if (!token || deleteConfirmation !== 'DELETE') {
+      return;
+    }
+
+    setWorkspaceBusy('delete-account');
+    onError(null);
+
+    try {
+      await client.deleteAccount(
+        {
+          currentPassword: deleteCurrentPassword,
+          confirmation: 'DELETE',
+        },
+        token,
+      );
+      clearStoredAuthToken();
+      setToken('');
+      setSession(null);
+      setDeleteCurrentPassword('');
+      setDeleteConfirmation('');
+      onNotice('Account disabled and active sessions revoked.');
+    } catch (deleteError) {
+      onError(formatApiError(deleteError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handleCreateTeam(event: FormEvent) {
+    event.preventDefault();
+    if (!token) {
+      return;
+    }
+
+    setWorkspaceBusy('create-team');
+    onError(null);
+
+    try {
+      const created = await client.createTeam({ teamName: newTeamName }, token);
+      setSession((current) =>
+        current
+          ? {
+              ...current,
+              activeTeam: {
+                id: created.teamId,
+                name: created.teamName,
+                role: created.role,
+              },
+              teams: [
+                ...current.teams,
+                {
+                  teamId: created.teamId,
+                  teamName: created.teamName,
+                  role: created.role,
+                },
+              ],
+            }
+          : current,
+      );
+      onNotice('Team created. Sign in again to make it your default active team.');
+    } catch (teamError) {
+      onError(formatApiError(teamError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handleTeamSettingsUpdate(event: FormEvent) {
+    event.preventDefault();
+    if (!token || !activeTeam) {
+      return;
+    }
+
+    setWorkspaceBusy('team-settings');
+    onError(null);
+
+    try {
+      const updated = await client.updateTeamSettings(
+        activeTeam.id,
+        { teamName: teamSettingsName },
+        token,
+      );
+      setSession((current) =>
+        current
+          ? {
+              ...current,
+              activeTeam: {
+                id: updated.teamId,
+                name: updated.teamName,
+                role: updated.role,
+              },
+              teams: current.teams.map((team) =>
+                team.teamId === updated.teamId
+                  ? {
+                      ...team,
+                      teamName: updated.teamName,
+                      role: updated.role,
+                    }
+                  : team,
+              ),
+            }
+          : current,
+      );
+      onNotice('Team settings updated.');
+    } catch (settingsError) {
+      onError(formatApiError(settingsError));
+    } finally {
+      setWorkspaceBusy(null);
     }
   }
 
@@ -1982,6 +2321,7 @@ function WorkspaceControlCenter({
         token,
       );
       setLastInviteToken(invitation.inviteToken ?? null);
+      setLastInviteUrl(invitation.inviteUrl ?? null);
       onNotice(
         'Invitation created. The one-time token is shown in the workspace panel for this demo.',
       );
@@ -2002,11 +2342,39 @@ function WorkspaceControlCenter({
     onError(null);
 
     try {
-      await client.acceptTeamInvitation(acceptToken, token);
+      const accepted = await client.acceptTeamInvitation(acceptToken, token);
       setAcceptToken('');
+      setInvitePreview((current) =>
+        current
+          ? {
+              ...current,
+              status: accepted.status,
+              acceptedAt: accepted.acceptedAt,
+              message: 'Invitation has been accepted.',
+            }
+          : current,
+      );
       onNotice('Invitation accepted. Sign in again if you want to switch the active team session.');
     } catch (acceptError) {
       onError(formatApiError(acceptError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handleRevokeInvitation(invitationId: string) {
+    if (!token || !activeTeam) {
+      return;
+    }
+
+    setWorkspaceBusy(`revoke-invite-${invitationId}`);
+    onError(null);
+
+    try {
+      await client.revokeTeamInvitation(activeTeam.id, invitationId, token);
+      onNotice('Invitation revoked.');
+    } catch (inviteError) {
+      onError(formatApiError(inviteError));
     } finally {
       setWorkspaceBusy(null);
     }
@@ -2043,6 +2411,63 @@ function WorkspaceControlCenter({
       onNotice('Team member removed.');
     } catch (removeError) {
       onError(formatApiError(removeError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handleConfigureSso(event: FormEvent) {
+    event.preventDefault();
+    if (!token || !activeTeam) {
+      return;
+    }
+
+    setWorkspaceBusy('sso-configure');
+    onError(null);
+
+    try {
+      await client.configureSsoProvider(
+        activeTeam.id,
+        {
+          providerType: ssoProviderType,
+          displayName: ssoDisplayName,
+          issuerUrl: ssoIssuerUrl,
+          clientId: ssoClientId,
+          clientSecret: ssoClientSecret,
+        },
+        token,
+      );
+      onNotice('SSO provider configuration saved.');
+    } catch (ssoError) {
+      onError(formatApiError(ssoError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handleTestSsoConnection() {
+    if (!token || !activeTeam) {
+      return;
+    }
+
+    setWorkspaceBusy('sso-test');
+    onError(null);
+
+    try {
+      const result = await client.testSsoConnection(
+        activeTeam.id,
+        {
+          providerType: ssoProviderType,
+          displayName: ssoDisplayName,
+          issuerUrl: ssoIssuerUrl,
+          clientId: ssoClientId,
+          clientSecret: ssoClientSecret,
+        },
+        token,
+      );
+      onNotice(result.message);
+    } catch (ssoError) {
+      onError(formatApiError(ssoError));
     } finally {
       setWorkspaceBusy(null);
     }
@@ -2105,19 +2530,104 @@ function WorkspaceControlCenter({
       </div>
 
       <div className="workspace-control-grid">
-        <form className="workspace-panel" onSubmit={handleAuthSubmit}>
+        <section className="workspace-panel">
           <div className="workspace-panel-heading">
             <span>Workspace session</span>
             <strong>
               {session ? 'Connected' : authMode === 'register' ? 'Register' : 'Sign in'}
             </strong>
           </div>
+          {invitePreview ? (
+            <div className={`workspace-invite-preview is-${invitePreview.status}`}>
+              <strong>
+                Invite {invitePreview.status}
+                {invitePreview.email ? ` · ${invitePreview.email}` : ''}
+              </strong>
+              <span>{invitePreview.message}</span>
+            </div>
+          ) : null}
           {session ? (
             <div className="workspace-session-summary">
               <span>{session.account.displayName ?? session.account.email}</span>
               <strong>
                 {activeTeam ? `${activeTeam.name} · ${activeTeam.role}` : 'No active team'}
               </strong>
+              <form className="workspace-inline-form" onSubmit={handleProfileUpdate}>
+                <label className="workspace-field">
+                  <span>Profile email</span>
+                  <input
+                    value={profileEmail}
+                    onChange={(event) => setProfileEmail(event.currentTarget.value)}
+                  />
+                </label>
+                <label className="workspace-field">
+                  <span>Display name</span>
+                  <input
+                    value={profileDisplayName}
+                    onChange={(event) => setProfileDisplayName(event.currentTarget.value)}
+                  />
+                </label>
+                <label className="workspace-field">
+                  <span>Current password (email changes)</span>
+                  <input
+                    type="password"
+                    value={profileCurrentPassword}
+                    onChange={(event) => setProfileCurrentPassword(event.currentTarget.value)}
+                  />
+                </label>
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  loading={workspaceBusy === 'profile'}
+                  loadingLabel="Saving..."
+                >
+                  Save profile
+                </Button>
+              </form>
+              <form className="workspace-inline-form" onSubmit={handlePasswordChange}>
+                <label className="workspace-field">
+                  <span>Current password</span>
+                  <input
+                    type="password"
+                    value={profileCurrentPassword}
+                    onChange={(event) => setProfileCurrentPassword(event.currentTarget.value)}
+                  />
+                </label>
+                <label className="workspace-field">
+                  <span>New password</span>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.currentTarget.value)}
+                  />
+                </label>
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  loading={workspaceBusy === 'password'}
+                  loadingLabel="Changing..."
+                >
+                  Change password
+                </Button>
+              </form>
+              <div className="workspace-session-list" aria-label="Active account sessions">
+                {accountSessions.slice(0, 3).map((accountSession) => (
+                  <span key={accountSession.id}>
+                    {accountSession.current ? 'Current' : 'Other'} · last seen{' '}
+                    {formatDateTime(accountSession.lastSeenAt)}
+                  </span>
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => void handleRevokeOtherSessions()}
+                loading={workspaceBusy === 'revoke-sessions'}
+                disabled={accountSessions.filter((item) => !item.current).length === 0}
+              >
+                <ShieldIcon />
+                Sign out other devices
+              </Button>
               <Button
                 type="button"
                 variant="secondary"
@@ -2127,9 +2637,36 @@ function WorkspaceControlCenter({
                 <SignInIcon />
                 Sign out
               </Button>
+              <form className="workspace-inline-form" onSubmit={handleAccountDeletion}>
+                <label className="workspace-field">
+                  <span>Delete confirmation</span>
+                  <input
+                    value={deleteConfirmation}
+                    placeholder="DELETE"
+                    onChange={(event) => setDeleteConfirmation(event.currentTarget.value)}
+                  />
+                </label>
+                <label className="workspace-field">
+                  <span>Delete current password</span>
+                  <input
+                    type="password"
+                    value={deleteCurrentPassword}
+                    onChange={(event) => setDeleteCurrentPassword(event.currentTarget.value)}
+                  />
+                </label>
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  loading={workspaceBusy === 'delete-account'}
+                  loadingLabel="Disabling..."
+                  disabled={deleteConfirmation !== 'DELETE'}
+                >
+                  Disable account
+                </Button>
+              </form>
             </div>
           ) : (
-            <>
+            <form className="workspace-auth-form" onSubmit={handleAuthSubmit}>
               <div
                 className="workspace-auth-toggle"
                 role="tablist"
@@ -2189,17 +2726,56 @@ function WorkspaceControlCenter({
                 <SignInIcon />
                 {authMode === 'register' ? 'Create workspace' : 'Sign in'}
               </Button>
-            </>
+            </form>
           )}
-        </form>
+        </section>
 
         <section className="workspace-panel">
           <div className="workspace-panel-heading">
             <span>Team access</span>
             <strong>{canManageTeam ? `${members.length} members` : 'Admin required'}</strong>
           </div>
-          {canManageTeam && activeTeam && token ? (
+          {canManageTeam && activeTeam && session && token ? (
             <>
+              <form className="workspace-inline-form" onSubmit={handleCreateTeam}>
+                <label className="workspace-field">
+                  <span>New team</span>
+                  <input
+                    value={newTeamName}
+                    onChange={(event) => setNewTeamName(event.currentTarget.value)}
+                  />
+                </label>
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  loading={workspaceBusy === 'create-team'}
+                  loadingLabel="Creating..."
+                >
+                  Create team
+                </Button>
+              </form>
+              <form className="workspace-inline-form" onSubmit={handleTeamSettingsUpdate}>
+                <label className="workspace-field">
+                  <span>Current team name</span>
+                  <input
+                    value={teamSettingsName}
+                    onChange={(event) => setTeamSettingsName(event.currentTarget.value)}
+                  />
+                </label>
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  loading={workspaceBusy === 'team-settings'}
+                  loadingLabel="Saving..."
+                >
+                  Save team
+                </Button>
+              </form>
+              <div className="workspace-role-guide" aria-label="Role permissions">
+                <span>Owner: billing, SSO, roles, deletion</span>
+                <span>Admin: members, invites, SSO setup</span>
+                <span>Member: comparisons and shared evidence</span>
+              </div>
               <form className="workspace-inline-form" onSubmit={handleInvite}>
                 <label className="workspace-field">
                   <span>Invite email</span>
@@ -2216,7 +2792,6 @@ function WorkspaceControlCenter({
                       setInviteRole(event.currentTarget.value as Exclude<TeamRole, 'owner'>)
                     }
                   >
-                    <option value="viewer">Viewer</option>
                     <option value="member">Member</option>
                     <option value="admin">Admin</option>
                   </select>
@@ -2232,40 +2807,89 @@ function WorkspaceControlCenter({
                 </Button>
               </form>
               {lastInviteToken ? (
-                <p className="workspace-token-output">Invite token: {lastInviteToken}</p>
+                <p className="workspace-token-output">
+                  Invite token: {lastInviteToken}
+                  {lastInviteUrl ? ` · URL: ${lastInviteUrl}` : ''}
+                </p>
               ) : null}
               <div className="workspace-member-list">
-                {members.map((member) => (
-                  <div className="workspace-member-row" key={member.accountId}>
-                    <span>
-                      <strong>{member.displayName ?? member.email}</strong>
-                      <small>{member.email}</small>
-                    </span>
-                    <select
-                      value={member.role}
-                      disabled={workspaceBusy === `role-${member.accountId}`}
-                      onChange={(event) =>
-                        void handleRoleChange(
-                          member.accountId,
-                          event.currentTarget.value as TeamRole,
-                        )
-                      }
-                    >
-                      <option value="owner">Owner</option>
-                      <option value="admin">Admin</option>
-                      <option value="member">Member</option>
-                      <option value="viewer">Viewer</option>
-                    </select>
-                    <button
-                      type="button"
-                      className="workspace-link-button"
-                      disabled={workspaceBusy === `remove-${member.accountId}`}
-                      onClick={() => void handleRemoveMember(member.accountId)}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
+                {members.map((member) => {
+                  const roleControl = memberRoleControlState({
+                    actorRole: activeTeam.role,
+                    currentAccountId: session.account.id,
+                    member,
+                    ownerCount,
+                    busyKey: workspaceBusy,
+                  });
+                  const removeControl = memberRemoveControlState({
+                    actorRole: activeTeam.role,
+                    currentAccountId: session.account.id,
+                    member,
+                    ownerCount,
+                    busyKey: workspaceBusy,
+                  });
+
+                  return (
+                    <div className="workspace-member-row" key={member.accountId}>
+                      <span>
+                        <strong>{member.displayName ?? member.email}</strong>
+                        <small>{member.email}</small>
+                      </span>
+                      <span className={`workspace-role-badge is-${member.role}`}>
+                        {teamRoleLabel(member.role)}
+                      </span>
+                      <select
+                        value={member.role}
+                        aria-label={`Change role for ${member.email}`}
+                        disabled={roleControl.disabled}
+                        title={roleControl.reason}
+                        onChange={(event) =>
+                          void handleRoleChange(
+                            member.accountId,
+                            event.currentTarget.value as TeamRole,
+                          )
+                        }
+                      >
+                        <option value="owner">Owner</option>
+                        <option value="admin">Admin</option>
+                        <option value="member">Member</option>
+                      </select>
+                      <button
+                        type="button"
+                        className="workspace-link-button"
+                        aria-label={`Remove ${member.email}`}
+                        disabled={removeControl.disabled}
+                        title={removeControl.reason}
+                        onClick={() => void handleRemoveMember(member.accountId)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="workspace-member-list" aria-label="Pending invitations">
+                {invitations
+                  .filter((invitation) => invitation.status === 'pending')
+                  .slice(0, 4)
+                  .map((invitation) => (
+                    <div className="workspace-member-row" key={invitation.id}>
+                      <span>
+                        <strong>{invitation.email}</strong>
+                        <small>
+                          {invitation.role} invite · expires {formatDateTime(invitation.expiresAt)}
+                        </small>
+                      </span>
+                      <button
+                        type="button"
+                        className="workspace-link-button"
+                        disabled={workspaceBusy === `revoke-invite-${invitation.id}`}
+                        onClick={() => void handleRevokeInvitation(invitation.id)}
+                      >
+                        Revoke
+                      </button>
+                    </div>
+                  ))}
               </div>
               <form className="workspace-inline-form" onSubmit={handleAcceptInvitation}>
                 <label className="workspace-field workspace-field-wide">
@@ -2295,6 +2919,66 @@ function WorkspaceControlCenter({
                   invitations
                 </small>
               </div>
+              <form className="workspace-inline-form" onSubmit={handleConfigureSso}>
+                <label className="workspace-field">
+                  <span>SSO provider</span>
+                  <select
+                    value={ssoProviderType}
+                    onChange={(event) =>
+                      setSsoProviderType(event.currentTarget.value as 'oidc' | 'saml')
+                    }
+                  >
+                    <option value="oidc">OIDC</option>
+                    <option value="saml">SAML</option>
+                  </select>
+                </label>
+                <label className="workspace-field">
+                  <span>Display name</span>
+                  <input
+                    value={ssoDisplayName}
+                    onChange={(event) => setSsoDisplayName(event.currentTarget.value)}
+                  />
+                </label>
+                <label className="workspace-field workspace-field-wide">
+                  <span>Issuer URL</span>
+                  <input
+                    value={ssoIssuerUrl}
+                    onChange={(event) => setSsoIssuerUrl(event.currentTarget.value)}
+                  />
+                </label>
+                <label className="workspace-field">
+                  <span>Client ID</span>
+                  <input
+                    value={ssoClientId}
+                    onChange={(event) => setSsoClientId(event.currentTarget.value)}
+                  />
+                </label>
+                <label className="workspace-field">
+                  <span>Client secret</span>
+                  <input
+                    type="password"
+                    value={ssoClientSecret}
+                    onChange={(event) => setSsoClientSecret(event.currentTarget.value)}
+                  />
+                </label>
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  loading={workspaceBusy === 'sso-configure'}
+                  loadingLabel="Saving..."
+                >
+                  Save SSO
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  loading={workspaceBusy === 'sso-test'}
+                  loadingLabel="Testing..."
+                  onClick={() => void handleTestSsoConnection()}
+                >
+                  Test connection
+                </Button>
+              </form>
             </>
           ) : (
             <p className="workspace-empty-state">
@@ -2374,6 +3058,111 @@ function WorkspaceControlCenter({
       </div>
     </section>
   );
+}
+
+function memberRoleControlState({
+  actorRole,
+  currentAccountId,
+  member,
+  ownerCount,
+  busyKey,
+}: {
+  actorRole: TeamRole;
+  currentAccountId: string;
+  member: TeamMemberRecord;
+  ownerCount: number;
+  busyKey: string | null;
+}): { disabled: boolean; reason: string } {
+  if (busyKey === `role-${member.accountId}`) {
+    return {
+      disabled: true,
+      reason: 'Role update is in progress.',
+    };
+  }
+
+  if (actorRole !== 'owner') {
+    return {
+      disabled: true,
+      reason: 'Only team owners can change roles.',
+    };
+  }
+
+  if (member.accountId === currentAccountId && member.role === 'owner' && ownerCount <= 1) {
+    return {
+      disabled: true,
+      reason: 'Promote another owner before changing the final owner role.',
+    };
+  }
+
+  return {
+    disabled: false,
+    reason: 'Owners can change team roles.',
+  };
+}
+
+function memberRemoveControlState({
+  actorRole,
+  currentAccountId,
+  member,
+  ownerCount,
+  busyKey,
+}: {
+  actorRole: TeamRole;
+  currentAccountId: string;
+  member: TeamMemberRecord;
+  ownerCount: number;
+  busyKey: string | null;
+}): { disabled: boolean; reason: string } {
+  if (busyKey === `remove-${member.accountId}`) {
+    return {
+      disabled: true,
+      reason: 'Member removal is in progress.',
+    };
+  }
+
+  if (member.accountId === currentAccountId) {
+    return {
+      disabled: true,
+      reason: 'Use account settings to disable your own account.',
+    };
+  }
+
+  if (actorRole === 'member') {
+    return {
+      disabled: true,
+      reason: 'Team admin access is required to remove members.',
+    };
+  }
+
+  if (member.role === 'owner' && actorRole !== 'owner') {
+    return {
+      disabled: true,
+      reason: 'Only team owners can remove owners.',
+    };
+  }
+
+  if (member.role === 'owner' && ownerCount <= 1) {
+    return {
+      disabled: true,
+      reason: 'At least one team owner must remain.',
+    };
+  }
+
+  return {
+    disabled: false,
+    reason: 'Remove this member from the team.',
+  };
+}
+
+function teamRoleLabel(role: TeamRole): string {
+  switch (role) {
+    case 'owner':
+      return 'Owner';
+    case 'admin':
+      return 'Admin';
+    case 'member':
+      return 'Member';
+  }
 }
 
 function AppHeader({
@@ -3044,6 +3833,8 @@ function ProgressiveComparisonPage({
   comparison,
   comparisonAnalytics,
   comparisonAnalyticsError,
+  comparisonPricingEvidence,
+  comparisonPricingEvidenceError,
   form,
   submittedForm,
   submittedInputMode,
@@ -3067,6 +3858,7 @@ function ProgressiveComparisonPage({
   dataHealth,
   dataHealthError,
   isComparisonAnalyticsLoading,
+  isComparisonPricingEvidenceLoading,
   onClear,
   onEdit,
   onInputModeChange,
@@ -3095,6 +3887,8 @@ function ProgressiveComparisonPage({
   comparison: ComparisonResult;
   comparisonAnalytics: ComparisonAnalyticsResponse | null;
   comparisonAnalyticsError: string | null;
+  comparisonPricingEvidence: ComparisonPricingEvidenceResponse | null;
+  comparisonPricingEvidenceError: string | null;
   form: WorkloadFormState;
   submittedForm: WorkloadFormState;
   submittedInputMode: InputMode;
@@ -3118,6 +3912,7 @@ function ProgressiveComparisonPage({
   dataHealth: DataHealthResponse | null;
   dataHealthError: string | null;
   isComparisonAnalyticsLoading: boolean;
+  isComparisonPricingEvidenceLoading: boolean;
   onClear: () => void;
   onEdit: () => void;
   onInputModeChange: (mode: InputMode) => void;
@@ -3236,6 +4031,8 @@ function ProgressiveComparisonPage({
                   client={client}
                   comparison={comparison}
                   comparisonAnalytics={comparisonAnalytics}
+                  comparisonPricingEvidence={comparisonPricingEvidence}
+                  comparisonPricingEvidenceError={comparisonPricingEvidenceError}
                   error={error}
                   exportingFormat={exportingFormat}
                   completedExportFormat={completedExportFormat}
@@ -3247,6 +4044,7 @@ function ProgressiveComparisonPage({
                   onIntervalChange={onIntervalChange}
                   onPricingModelChange={onPricingModelChange}
                   onRefreshLive={onRefreshLive}
+                  isComparisonPricingEvidenceLoading={isComparisonPricingEvidenceLoading}
                 />
               </ResultDisclosureSection>
             </div>
@@ -3447,7 +4245,7 @@ function ResultQuickActions({
           disabled={busyAction !== null && busyAction !== 'refresh'}
         >
           <RefreshIcon />
-          Refresh live
+          Refresh live catalog
         </Button>
       </div>
     </section>
@@ -3459,6 +4257,8 @@ function StateDetailContent({
   client,
   comparison,
   comparisonAnalytics,
+  comparisonPricingEvidence,
+  comparisonPricingEvidenceError,
   error,
   exportingFormat,
   completedExportFormat,
@@ -3466,6 +4266,7 @@ function StateDetailContent({
   interval,
   pricingModel,
   regionCatalog,
+  isComparisonPricingEvidenceLoading,
   onExport,
   onIntervalChange,
   onPricingModelChange,
@@ -3475,6 +4276,8 @@ function StateDetailContent({
   client: PolyCostClient;
   comparison: ComparisonResult;
   comparisonAnalytics: ComparisonAnalyticsResponse | null;
+  comparisonPricingEvidence: ComparisonPricingEvidenceResponse | null;
+  comparisonPricingEvidenceError: string | null;
   error: string | null;
   exportingFormat: ReportFormat | null;
   completedExportFormat: ReportFormat | null;
@@ -3482,6 +4285,7 @@ function StateDetailContent({
   interval: IntervalKey;
   pricingModel: PricingModelKey;
   regionCatalog: RegionCatalogResponse | null;
+  isComparisonPricingEvidenceLoading: boolean;
   onExport: (format: ReportFormat) => void;
   onIntervalChange: (interval: IntervalKey) => void;
   onPricingModelChange: (model: PricingModelKey) => void;
@@ -3521,6 +4325,11 @@ function StateDetailContent({
         />
         <FullCostMatrixTable comparison={comparison} />
         <CostFormulaEvidence comparison={comparison} />
+        <PricingEvidencePanel
+          evidence={comparisonPricingEvidence}
+          error={comparisonPricingEvidenceError}
+          isLoading={isComparisonPricingEvidenceLoading}
+        />
         <ComparisonToolbar interval={interval} onIntervalChange={onIntervalChange} />
         <FinOpsFeatureLayer
           client={client}
@@ -3559,7 +4368,7 @@ function StateDetailContent({
       >
         <ResultDetailHeading
           title="Official calculators, regions & exports"
-          description="Provider calculator links, official region references, refresh, and PDF/CSV/Excel report downloads."
+          description="Provider calculator links, official region references, live catalog refresh, and PDF/CSV/Excel report downloads."
         />
         <CloudCalculatorLinks regionCatalog={regionCatalog} />
         <div className="progressive-export-panel">
@@ -3578,7 +4387,7 @@ function StateDetailContent({
             disabled={busyAction !== null && busyAction !== 'refresh'}
           >
             <RefreshIcon />
-            Refresh live
+            Refresh live catalog
           </Button>
         </div>
       </section>
@@ -4241,6 +5050,7 @@ function DiagramReviewPanel({
             {component.assumedDefaults.length > 0 ? (
               <em>{component.assumedDefaults.slice(0, 2).join(', ')}</em>
             ) : null}
+            <em>{component.evidence}</em>
             <button
               type="button"
               className="diagram-review-link-button"
@@ -10536,8 +11346,8 @@ function CostFormulaEvidence({ comparison }: { comparison: ComparisonResult | nu
           <h3>Rate x quantity x time</h3>
         </div>
         <p title={HOURS_PER_MONTH_TOOLTIP}>
-          Monthly totals are derived from cached rates and the shared 730-hours/month constant; no
-          request-time cloud calculator calls are made.
+          Monthly totals are derived from cached catalog list rates and the shared 730-hours/month
+          constant; private discounts, credits, taxes, and actual billed usage are not included.
         </p>
       </div>
       <div className="formula-evidence-grid">
@@ -10559,6 +11369,129 @@ function CostFormulaEvidence({ comparison }: { comparison: ComparisonResult | nu
       </div>
     </section>
   );
+}
+
+function PricingEvidencePanel({
+  evidence,
+  error,
+  isLoading,
+}: {
+  evidence: ComparisonPricingEvidenceResponse | null;
+  error: string | null;
+  isLoading: boolean;
+}) {
+  const rows = evidence?.evidence ?? [];
+  const visibleRows = rows.slice(0, 6);
+
+  return (
+    <section
+      className={`pricing-evidence-panel pricing-evidence-${error ? 'error' : isLoading ? 'loading' : 'ready'}`}
+      aria-label="Traceable pricing evidence"
+    >
+      <div className="engineering-dashboard-heading">
+        <div>
+          <span>Traceable pricing evidence</span>
+          <h3>SKU, source row, rate, math</h3>
+        </div>
+        <p>
+          {error
+            ? 'Saved comparison lineage could not be loaded from the API.'
+            : isLoading
+              ? 'Loading the stored SKU-to-estimate chain for this comparison.'
+              : evidence
+                ? `${evidence.lineItemCount} line item(s) traced from ${evidence.providerCount} provider result(s), priced as of ${formatDateTime(evidence.pricingAsOf)}.`
+                : 'Run a comparison to load stored line item evidence.'}
+        </p>
+      </div>
+
+      {isLoading ? (
+        <div className="pricing-evidence-loading" role="status">
+          <span className="pricing-evidence-spinner" aria-hidden="true" />
+          <strong>Syncing pricing evidence</strong>
+          <small>Reading stored lineage from the comparison API.</small>
+        </div>
+      ) : null}
+
+      {error ? (
+        <p className="pricing-evidence-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      {!isLoading && !error && visibleRows.length > 0 ? (
+        <div className="pricing-evidence-grid">
+          {visibleRows.map((row) => (
+            <article
+              className={`pricing-evidence-card pricing-evidence-card-${row.providerId}`}
+              key={row.evidenceId}
+            >
+              <span>
+                {providerLabel(row.providerId)} · {capitalize(row.category)}
+              </span>
+              <strong>{formatCurrency(row.displayedAmounts.monthlyCostUsd)} / mo</strong>
+              <p>{row.description}</p>
+              <dl>
+                <div>
+                  <dt>SKU</dt>
+                  <dd>{evidenceSkuLabel(row)}</dd>
+                </div>
+                <div>
+                  <dt>Source</dt>
+                  <dd>{evidenceSourceLabel(row)}</dd>
+                </div>
+                <div>
+                  <dt>Rate</dt>
+                  <dd>{evidenceRateLabel(row)}</dd>
+                </div>
+                <div>
+                  <dt>Math</dt>
+                  <dd>{row.derivation.expression}</dd>
+                </div>
+                <div>
+                  <dt>Confidence</dt>
+                  <dd>{capitalize(row.equivalence.confidence)}</dd>
+                </div>
+              </dl>
+            </article>
+          ))}
+        </div>
+      ) : null}
+
+      {!isLoading && !error && rows.length > visibleRows.length ? (
+        <p className="pricing-evidence-more">
+          {rows.length - visibleRows.length} additional evidence row(s) available through the API.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function evidenceSkuLabel(row: ComparisonPricingEvidenceResponse['evidence'][number]): string {
+  return (
+    row.sku.resolvedSkuId ??
+    row.sku.sourceSkuId ??
+    row.sku.rateSourceSkuId ??
+    row.sku.providerServiceName ??
+    'Modeled service'
+  );
+}
+
+function evidenceSourceLabel(row: ComparisonPricingEvidenceResponse['evidence'][number]): string {
+  const endpoint = row.rate.sourceEndpoint ?? row.rate.source;
+  const sourceId = row.rate.sourceRecordId ?? row.rate.sourceRecordKey;
+  const hashSuffix = row.rate.sourcePayloadHash
+    ? ` · hash ${row.rate.sourcePayloadHash.slice(0, 10)}`
+    : '';
+
+  return sourceId ? `${endpoint} · ${sourceId}${hashSuffix}` : `${endpoint}${hashSuffix}`;
+}
+
+function evidenceRateLabel(row: ComparisonPricingEvidenceResponse['evidence'][number]): string {
+  if (row.rate.unitPriceUsd === undefined) {
+    return row.rate.source;
+  }
+
+  return `${formatCurrency(row.rate.unitPriceUsd)} / ${row.rate.unit ?? 'unit'}`;
 }
 
 function serviceCheapestRows(
@@ -16196,6 +17129,14 @@ function SignInIcon() {
   );
 }
 
+function ShieldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon">
+      <path d="M12 4l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V7l7-3zM9 12l2 2 4-5" />
+    </svg>
+  );
+}
+
 function CompareIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon">
@@ -17302,6 +18243,10 @@ function readStoredAuthToken(): string {
   return window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY) ?? '';
 }
 
+function readInviteTokenFromUrl(): string {
+  return new URLSearchParams(window.location.search).get('invite_token')?.trim() ?? '';
+}
+
 function storeAuthToken(token: string): void {
   window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, token);
 }
@@ -17591,6 +18536,7 @@ function diagramReviewComponentFromRequirement(
       requirement.serviceCategory,
       requirement.serviceType,
     ),
+    evidence: `Manual review classification -> ${requirement.serviceType}`,
     editable: true,
   };
 }

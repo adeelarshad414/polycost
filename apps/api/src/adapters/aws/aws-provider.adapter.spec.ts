@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- Reviewed 2026-07-06: fixture reads are resolved from repository-controlled test data; see docs/SECURITY-SUPPRESSIONS.md. */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { InMemoryPricingCatalogReader } from '../common/in-memory-pricing-catalog.reader';
@@ -46,6 +47,79 @@ const awsBulkFixture = (relativePath: string) => {
     },
     publicationDate,
   };
+};
+
+const emptyAwsBulkCatalog = {
+  products: {},
+  terms: {
+    OnDemand: {},
+    Reserved: {},
+  },
+  publicationDate: '2026-01-01T00:00:00Z',
+};
+
+const mixedEc2BulkCatalog = {
+  products: {
+    'AWS-EC2-T3SMALL': {
+      sku: 'AWS-EC2-T3SMALL',
+      productFamily: 'Compute Instance',
+      attributes: {
+        servicecode: 'AmazonEC2',
+        servicename: 'Amazon Elastic Compute Cloud',
+        location: 'US East (N. Virginia)',
+        regionCode: 'us-east-1',
+        instanceType: 't3.small',
+        vcpu: '2',
+        memory: '2 GiB',
+      },
+    },
+    'AWS-DATA-TRANSFER-OUT': {
+      sku: 'AWS-DATA-TRANSFER-OUT',
+      productFamily: 'Data Transfer',
+      attributes: {
+        servicecode: 'AmazonEC2',
+        servicename: 'AWS Data Transfer',
+        location: 'US East (N. Virginia)',
+        regionCode: 'us-east-1',
+        transferType: 'AWS Outbound',
+        usagetype: 'DataTransfer-Out-Bytes',
+      },
+    },
+  },
+  terms: {
+    OnDemand: {
+      'AWS-EC2-T3SMALL': {
+        'AWS-EC2-T3SMALL.JRTCKXETXF': {
+          effectiveDate: '2026-01-01T00:00:00Z',
+          priceDimensions: {
+            'AWS-EC2-T3SMALL.JRTCKXETXF.6YS6EN2CT7': {
+              unit: 'Hrs',
+              description: 'Linux t3.small instance hour',
+              pricePerUnit: {
+                USD: '0.0208000000',
+              },
+            },
+          },
+        },
+      },
+      'AWS-DATA-TRANSFER-OUT': {
+        'AWS-DATA-TRANSFER-OUT.JRTCKXETXF': {
+          effectiveDate: '2026-01-01T00:00:00Z',
+          priceDimensions: {
+            'AWS-DATA-TRANSFER-OUT.JRTCKXETXF.6YS6EN2CT7': {
+              unit: 'GB',
+              description: 'Data Transfer Out from Amazon EC2 to Internet',
+              pricePerUnit: {
+                USD: '0.0900000000',
+              },
+            },
+          },
+        },
+      },
+    },
+    Reserved: {},
+  },
+  publicationDate: '2026-01-01T00:00:00Z',
 };
 
 const minimalNws = {
@@ -214,6 +288,55 @@ describe('AwsProviderAdapter', () => {
     expect(records[0].skuId).toBe('AWS-S3-STANDARD');
   });
 
+  it('separates EC2 instance compute rows from EC2 data-transfer network rows', async () => {
+    const computeFetchClient = jest.fn(async () => jsonResponse(mixedEc2BulkCatalog)) as FetchLike;
+    const computeAdapter = new AwsProviderAdapter(
+      new InMemoryPricingCatalogReader([]),
+      'us-east-1',
+      computeFetchClient,
+    );
+
+    const computeRecords = await computeAdapter.refreshPricingCatalog({
+      categories: ['compute'],
+      fetchedAt: '2026-06-28T00:00:00.000Z',
+    });
+
+    expect(computeRecords.map((record) => record.skuId)).toEqual(['AWS-EC2-T3SMALL']);
+
+    const networkFetchClient = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(emptyAwsBulkCatalog))
+      .mockResolvedValueOnce(jsonResponse(mixedEc2BulkCatalog)) as FetchLike;
+    const networkAdapter = new AwsProviderAdapter(
+      new InMemoryPricingCatalogReader([]),
+      'us-east-1',
+      networkFetchClient,
+    );
+
+    const networkRecords = await networkAdapter.refreshPricingCatalog({
+      categories: ['network'],
+      fetchedAt: '2026-06-28T00:00:00.000Z',
+    });
+
+    expect(networkRecords).toEqual([
+      expect.objectContaining({
+        provider: 'aws',
+        serviceCategory: 'network',
+        serviceName: 'AWS Data Transfer',
+        skuId: 'AWS-DATA-TRANSFER-OUT',
+        region: 'us-east-1',
+        unit: 'GB',
+        unitPriceUsd: 0.09,
+      }),
+    ]);
+    expect(networkRecords[0].attributes).toEqual(
+      expect.objectContaining({
+        rawServiceCode: 'AmazonEC2',
+        transferType: 'AWS Outbound',
+      }),
+    );
+  });
+
   it('drops AWS records outside the requested region or without a USD price', async () => {
     const noPriceRecord = {
       products: {
@@ -264,6 +387,7 @@ describe('AwsProviderAdapter', () => {
       products: {
         'AWS-FALLBACK-SKU': {
           sku: 'AWS-FALLBACK-SKU',
+          productFamily: 'Compute Instance',
           attributes: {
             servicecode: 'AmazonEC2',
             location: 'US East (N. Virginia)',

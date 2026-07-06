@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: aggregation keys are typed provider/service/time buckets from comparison results; see docs/SECURITY-SUPPRESSIONS.md. */
 import { Injectable } from '@nestjs/common';
 import { PricingModelKey, ProviderId } from '../adapters/common/cloud-provider-adapter';
 import {

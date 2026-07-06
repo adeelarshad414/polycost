@@ -37,6 +37,7 @@ describe('App', () => {
     window.localStorage.removeItem('polycost-comparison-history-v1');
     window.localStorage.removeItem('polycost-auth-session-v1');
     window.sessionStorage.removeItem('polycost-current-requirements-v1');
+    window.history.pushState({}, '', '/');
     window.URL.createObjectURL = jest.fn(() => 'blob:polycost-report');
     window.URL.revokeObjectURL = jest.fn();
     HTMLAnchorElement.prototype.click = jest.fn();
@@ -53,6 +54,7 @@ describe('App', () => {
     window.localStorage.removeItem('polycost-comparison-history-v1');
     window.localStorage.removeItem('polycost-auth-session-v1');
     window.sessionStorage.removeItem('polycost-current-requirements-v1');
+    window.history.pushState({}, '', '/');
   });
 
   it('runs the structured-form comparison flow', async () => {
@@ -99,6 +101,7 @@ describe('App', () => {
     );
     expect(client.createComparison).toHaveBeenCalled();
     expect(client.getComparisonAnalytics).toHaveBeenCalledWith(comparisonResult.comparisonId);
+    expect(client.getComparisonPricingEvidence).toHaveBeenCalledWith(comparisonResult.comparisonId);
     expect(text(container)).not.toContain('Comparison ready.');
     expect(text(container)).toContain('Server analytics');
     expect(text(container)).toContain('Coverage');
@@ -157,7 +160,7 @@ describe('App', () => {
     expect(text(container)).toContain('Workspace session');
     expect(text(container)).toContain('Actuals reconciliation');
 
-    await submitForm(container.querySelector<HTMLFormElement>('.workspace-panel'));
+    await submitForm(container.querySelector<HTMLFormElement>('.workspace-auth-form'));
     await settleAsyncEffects();
     await settleAsyncEffects();
 
@@ -167,6 +170,7 @@ describe('App', () => {
     });
     expect(window.localStorage.getItem('polycost-auth-session-v1')).toBe('session-token');
     expect(client.getCurrentSession).toHaveBeenCalledWith('session-token');
+    expect(client.listAccountSessions).toHaveBeenCalledWith('session-token');
     expect(client.listTeamMembers).toHaveBeenCalledWith(
       '22222222-2222-4222-8222-222222222222',
       'session-token',
@@ -176,6 +180,10 @@ describe('App', () => {
     expect(text(container)).toContain('Architecture team · owner');
     expect(text(container)).toContain('Architect');
     expect(text(container)).toContain('OIDC ready · SAML ready');
+    expect(text(container)).toContain('Current · last seen');
+
+    await click(buttonByText(container, 'Sign out other devices'));
+    expect(client.revokeOtherSessions).toHaveBeenCalledWith('session-token');
 
     await click(buttonByText(container, 'Sign out'));
     expect(client.logout).toHaveBeenCalledWith('session-token');
@@ -186,7 +194,24 @@ describe('App', () => {
 
   it('executes team invite, role, remove, and invite-acceptance actions', async () => {
     window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
-    const client = clientMock();
+    const client = clientMock({
+      listTeamMembers: jest.fn(async () => [
+        {
+          accountId: '11111111-1111-4111-8111-111111111111',
+          email: 'architect@example.com',
+          displayName: 'Architect',
+          role: 'owner' as const,
+          createdAt: '2026-07-06T00:00:00.000Z',
+        },
+        {
+          accountId: '22222222-aaaa-4aaa-8aaa-222222222222',
+          email: 'analyst@example.com',
+          displayName: 'FinOps Analyst',
+          role: 'member' as const,
+          createdAt: '2026-07-06T00:00:00.000Z',
+        },
+      ]),
+    });
     const { container, unmount } = render(<App client={client} />);
 
     await settleAsyncEffects();
@@ -206,31 +231,148 @@ describe('App', () => {
     );
     expect(text(container)).toContain('Invite token: invite-token');
 
-    const memberRoleSelect = container.querySelector<HTMLSelectElement>(
-      '.workspace-member-row select',
-    );
-    if (!(memberRoleSelect instanceof HTMLSelectElement)) {
-      throw new Error('Expected workspace member role select');
-    }
+    const memberRoleSelect = selectByAriaLabel(container, 'Change role for analyst@example.com');
 
     await changeSelect(memberRoleSelect, 'admin');
     expect(client.updateTeamMemberRole).toHaveBeenCalledWith(
       '22222222-2222-4222-8222-222222222222',
-      '11111111-1111-4111-8111-111111111111',
+      '22222222-aaaa-4aaa-8aaa-222222222222',
       'admin',
       'session-token',
     );
 
-    await click(buttonByText(container, 'Remove'));
+    await click(buttonByAriaLabel(container, 'Remove analyst@example.com'));
     expect(client.removeTeamMember).toHaveBeenCalledWith(
       '22222222-2222-4222-8222-222222222222',
-      '11111111-1111-4111-8111-111111111111',
+      '22222222-aaaa-4aaa-8aaa-222222222222',
       'session-token',
     );
 
     await changeInput(inputByWorkspaceLabel(container, 'Accept invite token'), 'invite-token');
     await submitForm(formContainingText(container, 'Accept invite token'));
     expect(client.acceptTeamInvitation).toHaveBeenCalledWith('invite-token', 'session-token');
+
+    unmount();
+  });
+
+  it('executes account lifecycle, team settings, invite revoke, and SSO actions', async () => {
+    window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
+    const client = clientMock({
+      listTeamInvitations: jest.fn(async () => [
+        {
+          id: '88888888-8888-4888-8888-888888888888',
+          teamId: '22222222-2222-4222-8222-222222222222',
+          email: 'finops@example.com',
+          role: 'member' as const,
+          status: 'pending' as const,
+          invitedByAccountId: '11111111-1111-4111-8111-111111111111',
+          expiresAt: '2026-07-13T00:00:00.000Z',
+          createdAt: '2026-07-06T00:00:00.000Z',
+        },
+      ]),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await settleAsyncEffects();
+    await settleAsyncEffects();
+
+    await changeInput(inputByWorkspaceLabel(container, 'Profile email'), 'principal@example.com');
+    await changeInput(inputByWorkspaceLabel(container, 'Display name'), 'Principal Architect');
+    await changeInput(
+      inputByWorkspaceLabel(container, 'Current password (email changes)'),
+      'current-password',
+    );
+    await submitForm(formContainingText(container, 'Profile email'));
+
+    expect(client.updateAccountProfile).toHaveBeenCalledWith(
+      {
+        email: 'principal@example.com',
+        displayName: 'Principal Architect',
+        currentPassword: 'current-password',
+      },
+      'session-token',
+    );
+
+    await changeInput(inputByWorkspaceLabel(container, 'Current password'), 'current-password');
+    await changeInput(inputByWorkspaceLabel(container, 'New password'), 'new-password-1234');
+    await submitForm(formContainingText(container, 'New password'));
+
+    expect(client.changePassword).toHaveBeenCalledWith(
+      {
+        currentPassword: 'current-password',
+        newPassword: 'new-password-1234',
+      },
+      'session-token',
+    );
+
+    await click(buttonByText(container, 'Revoke'));
+    expect(client.revokeTeamInvitation).toHaveBeenCalledWith(
+      '22222222-2222-4222-8222-222222222222',
+      '88888888-8888-4888-8888-888888888888',
+      'session-token',
+    );
+
+    await changeInput(inputByWorkspaceLabel(container, 'Issuer URL'), 'https://idp.example.com');
+    await changeInput(inputByWorkspaceLabel(container, 'Client ID'), 'polycost-client');
+    await submitForm(formContainingText(container, 'SSO provider'));
+
+    expect(client.configureSsoProvider).toHaveBeenCalledWith(
+      '22222222-2222-4222-8222-222222222222',
+      expect.objectContaining({
+        providerType: 'oidc',
+        issuerUrl: 'https://idp.example.com',
+        clientId: 'polycost-client',
+      }),
+      'session-token',
+    );
+
+    await click(buttonByText(container, 'Test connection'));
+    expect(client.testSsoConnection).toHaveBeenCalledWith(
+      '22222222-2222-4222-8222-222222222222',
+      expect.objectContaining({
+        providerType: 'oidc',
+        issuerUrl: 'https://idp.example.com',
+      }),
+      'session-token',
+    );
+
+    await changeInput(inputByWorkspaceLabel(container, 'New team'), 'Platform Council');
+    await submitForm(formContainingText(container, 'New team'));
+    await settleAsyncEffects();
+
+    expect(client.createTeam).toHaveBeenCalledWith(
+      {
+        teamName: 'Platform Council',
+      },
+      'session-token',
+    );
+
+    await changeInput(inputByWorkspaceLabel(container, 'Current team name'), 'Platform Guild');
+    await submitForm(formContainingText(container, 'Current team name'));
+
+    expect(client.updateTeamSettings).toHaveBeenCalledWith(
+      '55555555-5555-4555-8555-555555555555',
+      {
+        teamName: 'Platform Guild',
+      },
+      'session-token',
+    );
+
+    await changeInput(inputByWorkspaceLabel(container, 'Delete confirmation'), 'DELETE');
+    await changeInput(
+      inputByWorkspaceLabel(container, 'Delete current password'),
+      'current-password',
+    );
+    await submitForm(formContainingText(container, 'Delete confirmation'));
+
+    expect(client.deleteAccount).toHaveBeenCalledWith(
+      {
+        confirmation: 'DELETE',
+        currentPassword: 'current-password',
+      },
+      'session-token',
+    );
+    expect(window.localStorage.getItem('polycost-auth-session-v1')).toBeNull();
 
     unmount();
   });
@@ -285,7 +427,7 @@ describe('App', () => {
 
     await changeInput(inputByWorkspaceLabel(container, 'Display name'), 'Platform Owner');
     await changeInput(inputByWorkspaceLabel(container, 'Team name'), 'Coverage Team');
-    await submitForm(container.querySelector<HTMLFormElement>('form.workspace-panel'));
+    await submitForm(container.querySelector<HTMLFormElement>('.workspace-auth-form'));
     await settleAsyncEffects();
     await settleAsyncEffects();
 
@@ -301,7 +443,7 @@ describe('App', () => {
     unmount();
   });
 
-  it('shows the team admin empty state for viewer workspace sessions', async () => {
+  it('shows the team admin empty state for member workspace sessions', async () => {
     window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
     const client = clientMock({
       getCurrentSession: jest.fn(async () => ({
@@ -313,13 +455,13 @@ describe('App', () => {
         activeTeam: {
           id: '22222222-2222-4222-8222-222222222222',
           name: 'Architecture team',
-          role: 'viewer' as const,
+          role: 'member' as const,
         },
         teams: [
           {
             teamId: '22222222-2222-4222-8222-222222222222',
             teamName: 'Architecture team',
-            role: 'viewer' as const,
+            role: 'member' as const,
           },
         ],
         session: {
@@ -333,7 +475,7 @@ describe('App', () => {
     await settleAsyncEffects();
     await settleAsyncEffects();
 
-    expect(text(container)).toContain('Architecture team · viewer');
+    expect(text(container)).toContain('Architecture team · member');
     expect(text(container)).toContain('Admin required');
     expect(text(container)).toContain(
       'Sign in as a team owner or admin to manage members, issue invite tokens, and review SSO status.',
@@ -341,6 +483,101 @@ describe('App', () => {
     expect(client.listTeamMembers).not.toHaveBeenCalled();
     expect(client.listTeamInvitations).not.toHaveBeenCalled();
     expect(client.getSsoStatus).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('surfaces admin RBAC limits in team controls before the API rejects them', async () => {
+    window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
+    const client = clientMock({
+      getCurrentSession: jest.fn(async () => ({
+        account: {
+          id: '33333333-aaaa-4aaa-8aaa-333333333333',
+          email: 'admin@example.com',
+          displayName: 'Team Admin',
+        },
+        activeTeam: {
+          id: '22222222-2222-4222-8222-222222222222',
+          name: 'Architecture team',
+          role: 'admin' as const,
+        },
+        teams: [
+          {
+            teamId: '22222222-2222-4222-8222-222222222222',
+            teamName: 'Architecture team',
+            role: 'admin' as const,
+          },
+        ],
+        session: {
+          id: '33333333-3333-4333-8333-333333333333',
+          expiresAt: '2026-07-07T00:00:00.000Z',
+        },
+      })),
+      listTeamMembers: jest.fn(async () => [
+        {
+          accountId: '11111111-1111-4111-8111-111111111111',
+          email: 'owner@example.com',
+          displayName: 'Owner',
+          role: 'owner' as const,
+          createdAt: '2026-07-06T00:00:00.000Z',
+        },
+        {
+          accountId: '44444444-aaaa-4aaa-8aaa-444444444444',
+          email: 'member@example.com',
+          displayName: 'Member',
+          role: 'member' as const,
+          createdAt: '2026-07-06T00:00:00.000Z',
+        },
+      ]),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await settleAsyncEffects();
+    await settleAsyncEffects();
+
+    expect(text(container)).toContain('Architecture team · admin');
+    expect(text(container)).toContain('2 members');
+    const ownerRoleSelect = selectByAriaLabel(container, 'Change role for owner@example.com');
+    const memberRoleSelect = selectByAriaLabel(container, 'Change role for member@example.com');
+    const removeOwnerButton = buttonByAriaLabel(container, 'Remove owner@example.com');
+    const removeMemberButton = buttonByAriaLabel(container, 'Remove member@example.com');
+
+    expect(ownerRoleSelect.disabled).toBe(true);
+    expect(ownerRoleSelect.title).toBe('Only team owners can change roles.');
+    expect(memberRoleSelect.disabled).toBe(true);
+    expect(removeOwnerButton.disabled).toBe(true);
+    expect(removeOwnerButton.title).toBe('Only team owners can remove owners.');
+    expect(removeMemberButton.disabled).toBe(false);
+
+    await click(removeMemberButton);
+    expect(client.removeTeamMember).toHaveBeenCalledWith(
+      '22222222-2222-4222-8222-222222222222',
+      '44444444-aaaa-4aaa-8aaa-444444444444',
+      'session-token',
+    );
+
+    unmount();
+  });
+
+  it('previews expired invite-token landing links before sign-in', async () => {
+    window.history.pushState({}, '', '/?invite_token=expired-token');
+    const client = clientMock({
+      previewTeamInvitation: jest.fn(async () => ({
+        status: 'expired' as const,
+        email: 'finops@example.com',
+        role: 'member' as const,
+        teamId: '22222222-2222-4222-8222-222222222222',
+        expiresAt: '2026-01-01T00:00:00.000Z',
+        message: 'Invitation has expired. Ask a team owner or admin for a new invite.',
+      })),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await settleAsyncEffects();
+
+    expect(client.previewTeamInvitation).toHaveBeenCalledWith('expired-token');
+    expect(text(container)).toContain('Invite expired · finops@example.com');
+    expect(text(container)).toContain('Invitation has expired');
 
     unmount();
   });
@@ -687,6 +924,7 @@ describe('App', () => {
     const { container, unmount } = render(<App client={client} />);
 
     await click(buttonByText(container, 'Compare costs'));
+    await settleAsyncEffects();
 
     const disclosures = Array.from(container.querySelectorAll<HTMLElement>('.result-disclosure'));
     expect(disclosures).toHaveLength(1);
@@ -722,6 +960,10 @@ describe('App', () => {
     expect(text(container)).toContain('Engineering cost controls');
     expect(text(container)).toContain('Service driver split');
     expect(text(container)).toContain('Provider cost by mapped service family');
+    expect(text(container)).toContain('Traceable pricing evidence');
+    expect(text(container)).toContain('SKU, source row, rate, math');
+    expect(text(container)).toContain('m7i.large');
+    expect(text(container)).toContain('mock://aws/pricing');
     expect(text(container)).toContain('Backend cost coverage map');
     expect(text(container)).toContain('Backend-modeled baseline region sensitivity.');
     expect(text(container)).toContain('Backend commitment exposure');
@@ -840,7 +1082,7 @@ describe('App', () => {
           ),
         ),
       );
-      await click(buttonByText(container, 'Refresh live'));
+      await click(buttonByText(container, 'Refresh live catalog'));
 
       expect(
         buttonByText(container, 'Refreshing...').querySelector('.animate-spin'),
@@ -879,7 +1121,7 @@ describe('App', () => {
     const { container, unmount } = render(<App client={client} />);
 
     await click(buttonByText(container, 'Compare costs'));
-    await click(buttonByText(container, 'Refresh live'));
+    await click(buttonByText(container, 'Refresh live catalog'));
 
     expect(client.refreshLiveComparison).toHaveBeenCalledWith(comparisonResult.comparisonId);
     expect(text(container)).toContain('Live pricing refresh is temporarily unavailable.');
@@ -905,11 +1147,11 @@ describe('App', () => {
         resultDisclosureByTitle(container, 'Show full breakdown, pricing models & export options'),
       ),
     );
-    expect(buttonByText(container, 'Refresh live').disabled).toBe(false);
+    expect(buttonByText(container, 'Refresh live catalog').disabled).toBe(false);
     expect(buttonByText(container, 'PDF').disabled).toBe(false);
     expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);
 
-    await click(buttonByText(container, 'Refresh live'));
+    await click(buttonByText(container, 'Refresh live catalog'));
 
     await click(buttonByText(container, 'Clear'));
 
@@ -998,7 +1240,7 @@ describe('App', () => {
     );
     await click(disclosureSummary(detailGate));
     await click(buttonByText(container, 'Yearly'));
-    await click(buttonByText(container, 'Refresh live'));
+    await click(buttonByText(container, 'Refresh live catalog'));
     await click(buttonByText(container, 'PDF'));
 
     expect(client.validateWorkload).toHaveBeenCalledWith(
@@ -2952,6 +3194,19 @@ function buttonByText(container: HTMLElement, label: string): HTMLButtonElement 
   return button;
 }
 
+function buttonByAriaLabel(container: HTMLElement, label: string): HTMLButtonElement {
+  const button = Array.from(container.querySelectorAll('button')).find(
+    (candidate): candidate is HTMLButtonElement =>
+      candidate instanceof HTMLButtonElement && candidate.getAttribute('aria-label') === label,
+  );
+
+  if (!(button instanceof HTMLButtonElement)) {
+    throw new Error(`Button not found for aria-label: ${label}`);
+  }
+
+  return button;
+}
+
 function lastButtonByText(container: HTMLElement, label: string): HTMLButtonElement {
   const buttons = Array.from(container.querySelectorAll('button')).filter(
     (candidate): candidate is HTMLButtonElement =>
@@ -3125,6 +3380,7 @@ function diagramParseResult(
           confidence: 'moderate',
           sourceRef: 'mermaid:line-2-app',
           assumedDefaults: component.assumedDefaults,
+          evidence: 'Label matched alias /container/ -> container-app',
           editable: true,
         },
       ],
@@ -3294,6 +3550,49 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       },
     })),
     logout: jest.fn(async () => ({ revoked: true as const })),
+    updateAccountProfile: jest.fn(async (input) => ({
+      id: '11111111-1111-4111-8111-111111111111',
+      email: input.email,
+      ...(input.displayName ? { displayName: input.displayName } : {}),
+      status: 'active' as const,
+    })),
+    changePassword: jest.fn(async () => ({ changed: true as const })),
+    deleteAccount: jest.fn(async () => ({ deleted: true as const })),
+    listAccountSessions: jest.fn(async () => [
+      {
+        id: '33333333-3333-4333-8333-333333333333',
+        current: true,
+        createdAt: '2026-07-06T00:00:00.000Z',
+        lastSeenAt: '2026-07-06T00:10:00.000Z',
+        expiresAt: '2026-07-07T00:00:00.000Z',
+        hasUserAgent: true,
+        hasIp: true,
+      },
+      {
+        id: '99999999-9999-4999-8999-999999999999',
+        current: false,
+        createdAt: '2026-07-05T00:00:00.000Z',
+        lastSeenAt: '2026-07-05T00:10:00.000Z',
+        expiresAt: '2026-07-07T00:00:00.000Z',
+        hasUserAgent: true,
+        hasIp: false,
+      },
+    ]),
+    revokeOtherSessions: jest.fn(async () => ({ revoked: 1 })),
+    createTeam: jest.fn(async (input) => ({
+      teamId: '55555555-5555-4555-8555-555555555555',
+      teamName: input.teamName,
+      plan: 'oss' as const,
+      role: 'owner' as const,
+      updatedAt: '2026-07-06T00:00:00.000Z',
+    })),
+    updateTeamSettings: jest.fn(async (_teamId, input) => ({
+      teamId: '22222222-2222-4222-8222-222222222222',
+      teamName: input.teamName,
+      plan: 'oss' as const,
+      role: 'owner' as const,
+      updatedAt: '2026-07-06T00:00:00.000Z',
+    })),
     listTeamMembers: jest.fn(async () => [
       {
         accountId: '11111111-1111-4111-8111-111111111111',
@@ -3313,13 +3612,25 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       expiresAt: '2026-07-13T00:00:00.000Z',
       createdAt: '2026-07-06T00:00:00.000Z',
       inviteToken: 'invite-token',
+      inviteUrl: 'http://localhost:3001/?invite_token=invite-token',
     })),
     listTeamInvitations: jest.fn(async () => []),
+    revokeTeamInvitation: jest.fn(async () => ({
+      id: '88888888-8888-4888-8888-888888888888',
+      teamId: '22222222-2222-4222-8222-222222222222',
+      email: 'finops@example.com',
+      role: 'member' as const,
+      status: 'revoked' as const,
+      invitedByAccountId: '11111111-1111-4111-8111-111111111111',
+      expiresAt: '2026-07-13T00:00:00.000Z',
+      createdAt: '2026-07-06T00:00:00.000Z',
+      revokedAt: '2026-07-06T00:00:01.000Z',
+    })),
     acceptTeamInvitation: jest.fn(async () => ({
       id: '88888888-8888-4888-8888-888888888888',
       teamId: '22222222-2222-4222-8222-222222222222',
       email: 'architect@example.com',
-      role: 'viewer' as const,
+      role: 'member' as const,
       status: 'accepted' as const,
       invitedByAccountId: '11111111-1111-4111-8111-111111111111',
       acceptedByAccountId: '11111111-1111-4111-8111-111111111111',
@@ -3344,6 +3655,49 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
         oidc: 'http://localhost:3001/api/v1/auth/sso/oidc/callback',
         saml: 'http://localhost:3001/api/v1/auth/sso/saml/acs',
       },
+    })),
+    previewTeamInvitation: jest.fn(async () => ({
+      status: 'pending' as const,
+      email: 'finops@example.com',
+      role: 'member' as const,
+      teamId: '22222222-2222-4222-8222-222222222222',
+      expiresAt: '2026-07-13T00:00:00.000Z',
+      message: 'Invitation is ready to accept after sign-in.',
+    })),
+    startMockOidcLogin: jest.fn(async () => ({
+      providerType: 'oidc' as const,
+      mode: 'mock' as const,
+      authorizationUrl: 'http://localhost:3001/api/v1/auth/sso/mock/oidc/authorize?state=signed',
+      callbackUrl: 'http://localhost:3001/api/v1/auth/sso/oidc/callback',
+      state: 'signed',
+      expiresAt: '2026-07-06T00:10:00.000Z',
+    })),
+    completeMockOidcCallback: jest.fn(async () => ({
+      token: 'sso-session-token',
+      expiresAt: '2026-07-07T00:00:00.000Z',
+      account: {
+        id: '11111111-1111-4111-8111-111111111111',
+        email: 'finops@example.com',
+      },
+      sso: {
+        providerType: 'oidc' as const,
+        issuerUrl: 'https://idp.example.com',
+        subjectHash: 'a'.repeat(64),
+        stateVerified: true as const,
+      },
+    })),
+    configureSsoProvider: jest.fn(async (teamId, input) => ({
+      providerType: input.providerType,
+      displayName: input.displayName,
+      issuerUrl: input.issuerUrl,
+      status: 'configured' as const,
+    })),
+    testSsoConnection: jest.fn(async (_teamId, input) => ({
+      ok: true,
+      providerType: input.providerType,
+      issuerUrl: input.issuerUrl,
+      checkedAt: '2026-07-06T00:00:00.000Z',
+      message: 'Mock SSO connection accepted.',
     })),
     parseWorkload: jest.fn(async () => parsed),
     parseDiagram: jest.fn(async () => ({
@@ -3582,6 +3936,59 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
           recommendation: 'Backend identified egress driver from cached totals.',
           estimatedMonthlyImpactUsd: 8,
           providerId: 'gcp' as const,
+        },
+      ],
+    })),
+    getComparisonPricingEvidence: jest.fn(async () => ({
+      comparisonId: comparisonResult.comparisonId,
+      pricingAsOf: comparisonResult.pricingAsOf,
+      generatedAt: '2026-07-02T12:00:00.000Z',
+      providerCount: 1,
+      lineItemCount: 1,
+      evidence: [
+        {
+          evidenceId: 'aws:0:test-trace',
+          providerId: 'aws' as const,
+          lineItemIndex: 0,
+          category: 'compute' as const,
+          description: 'aws compute',
+          displayedAmounts: {
+            monthlyCostUsd: 42,
+            hourlyCostUsd: 42 * intervalMultiplierFromMonthly('hourly'),
+            providerTotals: comparisonResult.providers[0]!.totals,
+          },
+          sku: {
+            resolvedSkuId: 'm7i.large',
+            sourceSkuId: 'aws-compute-m7i-large',
+            providerServiceName: 'AmazonEC2',
+            region: 'us-east-1',
+            catalogRegion: 'us-east-1',
+          },
+          rate: {
+            source: 'pricing_catalog',
+            sourceRecordKey: 'test-trace',
+            sourceEndpoint: 'mock://aws/pricing',
+            sourceRecordId: 'aws-compute-m7i-large',
+            transformVersion: 'mock-v1',
+            sourcePayloadHash: 'a'.repeat(64),
+            unit: 'hour',
+            unitPriceUsd: 0.057534,
+            currency: 'USD',
+            effectiveDate: '2026-07-01T00:00:00.000Z',
+            fetchedAt: '2026-07-02T00:00:00.000Z',
+            pricingBasis: 'flat' as const,
+          },
+          derivation: {
+            expression: '0.057534 hourly USD x 730 monthly hours',
+            hourlyCostUsd: 42 * intervalMultiplierFromMonthly('hourly'),
+            monthlyCostUsd: 42,
+            monthlyHours: 730,
+          },
+          equivalence: {
+            confidence: 'direct' as const,
+            isApproximate: false,
+            isEstimate: false,
+          },
         },
       ],
     })),

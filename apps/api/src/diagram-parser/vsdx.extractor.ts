@@ -3,6 +3,7 @@ import {
   DecodedDiagramInput,
   DiagramExtractor,
   DiagramGraphEdge,
+  DiagramIgnoredNode,
   ExtractedDiagram,
   ExtractedDiagramNode,
 } from './diagram-parser.types';
@@ -15,29 +16,81 @@ export class VsdxExtractor implements DiagramExtractor {
 
   extract(input: DecodedDiagramInput): ExtractedDiagram {
     const entries = readZipEntries(input.buffer, /^visio\/pages\/page\d+\.xml$/i);
+    const masters = extractMasters(
+      readZipEntries(input.buffer, /^visio\/masters\/master\d+\.xml$/i),
+    );
     const nodes = new Map<string, ExtractedDiagramNode>();
     const edges: DiagramGraphEdge[] = [];
+    const extractionWarnings: DiagramIgnoredNode[] = [];
 
     for (const entry of entries) {
       const xml = entry.content.toString('utf8');
       assertXmlSafe(xml);
 
-      for (const node of extractShapes(xml, entry.path)) {
-        nodes.set(node.id, node);
-      }
+      try {
+        assertPageXmlParseable(xml, entry.path);
 
-      edges.push(...extractConnections(xml, entry.path));
+        for (const node of extractShapes(xml, entry.path, masters)) {
+          nodes.set(node.id, node);
+        }
+
+        edges.push(...extractConnections(xml, entry.path));
+      } catch (error) {
+        extractionWarnings.push(pageParseWarning(entry.path, error));
+      }
     }
 
     return {
       format: this.format,
       nodes: [...nodes.values()],
       edges,
+      ...(extractionWarnings.length > 0 ? { extractionWarnings } : {}),
     };
   }
 }
 
-function extractShapes(xml: string, path: string): ExtractedDiagramNode[] {
+interface VsdxMasterMetadata {
+  id: string;
+  name?: string;
+  label?: string;
+}
+
+function extractMasters(
+  entries: Array<{ path: string; content: Buffer }>,
+): Map<string, VsdxMasterMetadata> {
+  const masters = new Map<string, VsdxMasterMetadata>();
+
+  for (const entry of entries) {
+    const xml = entry.content.toString('utf8');
+    assertXmlSafe(xml);
+    const masterAttributes = parseXmlAttributes(xml.match(/<Master\b([^>]*)>/i)?.[1] ?? '');
+    const shapeAttributes = parseXmlAttributes(xml.match(/<Shape\b([^>]*)>/i)?.[1] ?? '');
+    const id = masterAttributes.ID ?? masterAttributes.Id ?? masterAttributes.id;
+
+    if (!id) {
+      continue;
+    }
+
+    const text = xml.match(/<Text[^>]*>([\s\S]*?)<\/Text>/i)?.[1];
+    masters.set(id, {
+      id,
+      name:
+        masterAttributes.NameU ??
+        masterAttributes.Name ??
+        shapeAttributes.NameU ??
+        shapeAttributes.Name,
+      label: text ? sanitizeDisplayText(text, id) : undefined,
+    });
+  }
+
+  return masters;
+}
+
+function extractShapes(
+  xml: string,
+  path: string,
+  masters: Map<string, VsdxMasterMetadata>,
+): ExtractedDiagramNode[] {
   const nodes: ExtractedDiagramNode[] = [];
   const shapePattern = /<Shape\b([^>]*)>([\s\S]*?)<\/Shape>/gi;
   const pageName = pageNameFromPath(path);
@@ -52,8 +105,9 @@ function extractShapes(xml: string, path: string): ExtractedDiagramNode[] {
     }
 
     const text = match[2].match(/<Text[^>]*>([\s\S]*?)<\/Text>/i)?.[1];
+    const master = attributes.Master ? masters.get(attributes.Master) : undefined;
     const label = sanitizeDisplayText(
-      text ?? attributes.NameU ?? attributes.Name ?? attributes.Master ?? '',
+      text ?? attributes.NameU ?? attributes.Name ?? master?.label ?? master?.name ?? '',
       id,
     );
     const cells = extractCells(match[2]);
@@ -61,16 +115,21 @@ function extractShapes(xml: string, path: string): ExtractedDiagramNode[] {
     const fillColor = colorFromCell(cells.get('FillForegnd') ?? cells.get('FillBkgnd'));
     const lineColor = colorFromCell(cells.get('LineColor'));
 
+    const stencilId = attributes.NameU ?? attributes.Name ?? master?.name ?? attributes.Master;
+
     nodes.push({
       id,
       rawLabel: label,
-      stencilId: attributes.NameU ?? attributes.Name ?? attributes.Master,
+      stencilId,
       sourceRef: sanitizeSourceRef('vsdx', `${path}:${id}`),
       ...(bounds ? { bounds } : {}),
       visual: {
         pageRef: path,
         pageName,
         ...(attributes.Master ? { masterId: attributes.Master } : {}),
+        ...(master?.name ? { masterName: master.name } : {}),
+        ...(attributes.Parent ? { containerId: attributes.Parent } : {}),
+        ...(attributes.Container ? { containerId: attributes.Container } : {}),
         ...(fillColor ? { fillColor } : {}),
         ...(lineColor ? { lineColor } : {}),
       },
@@ -168,6 +227,33 @@ function colorFromCell(value: string | undefined): string | undefined {
 
 function pageNameFromPath(path: string): string {
   return path.match(/page(\d+)\.xml$/i)?.[1] ? `Page ${path.match(/page(\d+)\.xml$/i)?.[1]}` : path;
+}
+
+function pageIdFromPath(path: string): string {
+  return `page${path.match(/page(\d+)\.xml$/i)?.[1] ?? 'unknown'}`;
+}
+
+function assertPageXmlParseable(xml: string, path: string): void {
+  if (!/<PageContents\b/i.test(xml)) {
+    throw new Error(`${pageNameFromPath(path)} is missing PageContents`);
+  }
+
+  if (!/<\/PageContents>/i.test(xml)) {
+    throw new Error(`${pageNameFromPath(path)} ended before PageContents closed`);
+  }
+}
+
+function pageParseWarning(path: string, error: unknown): DiagramIgnoredNode {
+  const pageId = pageIdFromPath(path);
+  const pageName = pageNameFromPath(path);
+  const message = error instanceof Error ? error.message : 'unknown parser error';
+
+  return {
+    id: `vsdx-page-parse-error-${pageId}`,
+    displayLabel: pageName,
+    reason: `Unable to parse ${pageName}: ${sanitizeDisplayText(message, 'page parser error')}`,
+    sourceRef: sanitizeSourceRef('vsdx', `${path}:parse-error`),
+  };
 }
 
 function roundLayout(value: number): number {

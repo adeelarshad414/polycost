@@ -213,6 +213,69 @@ describe('api client', () => {
     );
   });
 
+  it('fetches comparison pricing evidence for saved line items', async () => {
+    const evidence = {
+      comparisonId: 'comparison-1',
+      pricingAsOf: '2026-07-02T00:00:00.000Z',
+      generatedAt: '2026-07-02T00:00:00.000Z',
+      providerCount: 1,
+      lineItemCount: 1,
+      evidence: [
+        {
+          evidenceId: 'aws:0:trace-key',
+          providerId: 'aws',
+          lineItemIndex: 0,
+          category: 'compute',
+          description: 'web compute',
+          displayedAmounts: {
+            monthlyCostUsd: 70.08,
+            hourlyCostUsd: 0.096,
+            providerTotals: {
+              daily: 2.3,
+              weekly: 16.13,
+              monthly: 70.08,
+              quarterly: 210.24,
+              yearly: 840.96,
+            },
+          },
+          sku: {
+            resolvedSkuId: 'm7i.large',
+            sourceSkuId: 'aws-compute-m7i-large',
+          },
+          rate: {
+            source: 'pricing_catalog',
+            sourceRecordKey: 'trace-key',
+            sourcePayloadHash: 'a'.repeat(64),
+          },
+          derivation: {
+            expression: '0.096 hourly USD x 730 monthly hours',
+            hourlyCostUsd: 0.096,
+            monthlyCostUsd: 70.08,
+            monthlyHours: 730,
+          },
+          equivalence: {
+            confidence: 'direct',
+            isApproximate: false,
+            isEstimate: false,
+          },
+        },
+      ],
+    };
+    const fetchMock = jest.fn(async () => jsonResponse(evidence));
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(client.getComparisonPricingEvidence('comparison-1')).resolves.toEqual(evidence);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/comparisons/comparison-1/evidence',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+  });
+
   it('wires authenticated session and billing actuals routes with bearer headers', async () => {
     const session = {
       token: 'session-token',
@@ -271,6 +334,20 @@ describe('api client', () => {
           session: { id: 'session-1', expiresAt: session.expiresAt },
         }),
       )
+      .mockResolvedValueOnce(
+        jsonResponse([
+          {
+            id: 'session-1',
+            current: true,
+            createdAt: '2026-07-06T00:00:00.000Z',
+            lastSeenAt: '2026-07-06T00:05:00.000Z',
+            expiresAt: session.expiresAt,
+            hasUserAgent: true,
+            hasIp: true,
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(jsonResponse({ revoked: 1 }))
       .mockResolvedValueOnce(jsonResponse(billingImport))
       .mockResolvedValueOnce(jsonResponse(reconciliation))
       .mockResolvedValueOnce(jsonResponse([reconciliation]));
@@ -289,6 +366,10 @@ describe('api client', () => {
         activeTeam: session.team,
       }),
     );
+    await expect(client.listAccountSessions('session-token')).resolves.toEqual([
+      expect.objectContaining({ id: 'session-1', current: true }),
+    ]);
+    await expect(client.revokeOtherSessions('session-token')).resolves.toEqual({ revoked: 1 });
     await expect(
       client.importBillingActuals(
         {
@@ -318,6 +399,25 @@ describe('api client', () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
+      'http://api.test/api/v1/auth/sessions',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer session-token',
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      'http://api.test/api/v1/auth/sessions/revoke-other',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer session-token',
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
       'http://api.test/api/v1/billing/imports',
       expect.objectContaining({
         method: 'POST',
@@ -327,7 +427,7 @@ describe('api client', () => {
       }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      4,
+      6,
       'http://api.test/api/v1/billing/imports/import-1/reconcile',
       expect.objectContaining({
         body: JSON.stringify({ comparisonId: 'comparison-1' }),
@@ -335,7 +435,7 @@ describe('api client', () => {
     );
   });
 
-  it('wires team administration, SSO status, and provider export import routes', async () => {
+  it('wires account lifecycle, team administration, SSO, and provider export routes', async () => {
     const member = {
       accountId: 'account-1',
       email: 'architect@example.com',
@@ -346,7 +446,7 @@ describe('api client', () => {
       id: 'invite-1',
       teamId: 'team-1',
       email: 'finops@example.com',
-      role: 'viewer',
+      role: 'member',
       status: 'pending',
       invitedByAccountId: 'account-1',
       expiresAt: '2026-07-13T00:00:00.000Z',
@@ -362,6 +462,26 @@ describe('api client', () => {
         oidc: 'http://localhost:3001/api/v1/auth/sso/oidc/callback',
         saml: 'http://localhost:3001/api/v1/auth/sso/saml/acs',
       },
+    };
+    const teamSettings = {
+      teamId: 'team-1',
+      teamName: 'Architecture platform',
+      plan: 'oss',
+      role: 'owner',
+      updatedAt: '2026-07-06T00:00:00.000Z',
+    };
+    const ssoProvider = {
+      providerType: 'oidc',
+      displayName: 'Corporate OIDC',
+      issuerUrl: 'https://idp.example.com',
+      status: 'configured',
+    };
+    const ssoTest = {
+      ok: true,
+      providerType: 'oidc',
+      issuerUrl: 'https://idp.example.com',
+      checkedAt: '2026-07-06T00:00:00.000Z',
+      message: 'Mock OIDC discovery endpoint accepted the issuer URL shape.',
     };
     const billingImport = {
       importRun: {
@@ -385,28 +505,119 @@ describe('api client', () => {
     };
     const fetchMock = jest
       .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: 'account-1',
+          email: 'lead@example.com',
+          displayName: 'Lead Architect',
+          status: 'active',
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ changed: true }))
+      .mockResolvedValueOnce(jsonResponse({ deleted: true }))
+      .mockResolvedValueOnce(jsonResponse(teamSettings))
+      .mockResolvedValueOnce(jsonResponse(teamSettings))
       .mockResolvedValueOnce(jsonResponse([member]))
       .mockResolvedValueOnce(jsonResponse(invitation))
       .mockResolvedValueOnce(jsonResponse([invitation]))
+      .mockResolvedValueOnce(jsonResponse({ ...invitation, status: 'revoked' }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          status: 'pending',
+          email: 'finops@example.com',
+          role: 'member',
+          teamId: 'team-1',
+          expiresAt: '2026-07-13T00:00:00.000Z',
+          message: 'Invitation is ready to accept after sign-in.',
+        }),
+      )
       .mockResolvedValueOnce(jsonResponse(invitation))
       .mockResolvedValueOnce(jsonResponse({ ...member, role: 'admin' }))
       .mockResolvedValueOnce(jsonResponse({ removed: true }))
       .mockResolvedValueOnce(jsonResponse(ssoStatus))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          providerType: 'oidc',
+          mode: 'mock',
+          authorizationUrl: 'http://api.test/api/v1/auth/sso/mock/oidc/authorize?state=signed',
+          callbackUrl: 'http://api.test/api/v1/auth/sso/oidc/callback',
+          state: 'signed',
+          expiresAt: '2026-07-06T00:10:00.000Z',
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          token: 'sso-session-token',
+          expiresAt: '2026-07-07T00:00:00.000Z',
+          account: {
+            id: 'account-1',
+            email: 'finops@example.com',
+          },
+          sso: {
+            providerType: 'oidc',
+            issuerUrl: 'https://idp.example.com',
+            subjectHash: 'a'.repeat(64),
+            stateVerified: true,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse(ssoProvider))
+      .mockResolvedValueOnce(jsonResponse(ssoTest))
       .mockResolvedValueOnce(jsonResponse(billingImport));
     global.fetch = fetchMock as typeof fetch;
     const client = createPolyCostClient('http://api.test/api/v1');
 
+    await expect(
+      client.updateAccountProfile(
+        {
+          email: 'lead@example.com',
+          displayName: 'Lead Architect',
+          currentPassword: 'correct horse battery staple',
+        },
+        'session-token',
+      ),
+    ).resolves.toEqual(expect.objectContaining({ email: 'lead@example.com' }));
+    await expect(
+      client.changePassword(
+        {
+          currentPassword: 'correct horse battery staple',
+          newPassword: 'new correct horse battery staple',
+        },
+        'session-token',
+      ),
+    ).resolves.toEqual({ changed: true });
+    await expect(
+      client.deleteAccount(
+        {
+          currentPassword: 'correct horse battery staple',
+          confirmation: 'DELETE',
+        },
+        'session-token',
+      ),
+    ).resolves.toEqual({ deleted: true });
+    await expect(
+      client.createTeam({ teamName: 'Architecture platform' }, 'session-token'),
+    ).resolves.toEqual(teamSettings);
+    await expect(
+      client.updateTeamSettings('team-1', { teamName: 'Architecture platform' }, 'session-token'),
+    ).resolves.toEqual(teamSettings);
     await expect(client.listTeamMembers('team-1', 'session-token')).resolves.toEqual([member]);
     await expect(
       client.inviteTeamMember(
         'team-1',
-        { email: 'finops@example.com', role: 'viewer' },
+        { email: 'finops@example.com', role: 'member' },
         'session-token',
       ),
     ).resolves.toEqual(invitation);
     await expect(client.listTeamInvitations('team-1', 'session-token')).resolves.toEqual([
       invitation,
     ]);
+    await expect(
+      client.revokeTeamInvitation('team-1', 'invite-1', 'session-token'),
+    ).resolves.toEqual(expect.objectContaining({ status: 'revoked' }));
+    await expect(client.previewTeamInvitation('invite-token')).resolves.toEqual(
+      expect.objectContaining({ status: 'pending' }),
+    );
     await expect(client.acceptTeamInvitation('invite-token', 'session-token')).resolves.toEqual(
       invitation,
     );
@@ -417,6 +628,42 @@ describe('api client', () => {
       removed: true,
     });
     await expect(client.getSsoStatus('session-token')).resolves.toEqual(ssoStatus);
+    await expect(
+      client.startMockOidcLogin({
+        teamId: 'team-1',
+        email: 'finops@example.com',
+      }),
+    ).resolves.toEqual(expect.objectContaining({ mode: 'mock', state: 'signed' }));
+    await expect(
+      client.completeMockOidcCallback({
+        state: 'signed',
+        email: 'finops@example.com',
+      }),
+    ).resolves.toEqual(expect.objectContaining({ token: 'sso-session-token' }));
+    await expect(
+      client.configureSsoProvider(
+        'team-1',
+        {
+          providerType: 'oidc',
+          displayName: 'Corporate OIDC',
+          issuerUrl: 'https://idp.example.com',
+          clientId: 'polycost-client',
+          clientSecret: 'CHANGE_ME_DEV_ONLY',
+        },
+        'session-token',
+      ),
+    ).resolves.toEqual(ssoProvider);
+    await expect(
+      client.testSsoConnection(
+        'team-1',
+        {
+          providerType: 'oidc',
+          displayName: 'Corporate OIDC',
+          issuerUrl: 'https://idp.example.com',
+        },
+        'session-token',
+      ),
+    ).resolves.toEqual(ssoTest);
     await expect(
       client.importProviderBillingExport(
         {
@@ -431,16 +678,16 @@ describe('api client', () => {
     ).resolves.toEqual(billingImport);
 
     expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
+      7,
       'http://api.test/api/v1/auth/teams/team-1/invitations',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ email: 'finops@example.com', role: 'viewer' }),
+        body: JSON.stringify({ email: 'finops@example.com', role: 'member' }),
         headers: expect.objectContaining({ Authorization: 'Bearer session-token' }),
       }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      5,
+      12,
       'http://api.test/api/v1/auth/teams/team-1/members/account-1',
       expect.objectContaining({
         method: 'PATCH',
@@ -448,7 +695,7 @@ describe('api client', () => {
       }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      8,
+      19,
       'http://api.test/api/v1/billing/imports/provider-export',
       expect.objectContaining({
         method: 'POST',
@@ -1020,6 +1267,7 @@ describe('api client', () => {
             confidence: 'high',
             sourceRef: 'drawio:web',
             assumedDefaults: ['2 vCPU'],
+            evidence: 'Matched stencil "EC2" -> vm-compute',
             editable: true,
           },
         ],

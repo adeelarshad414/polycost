@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- Reviewed 2026-07-06: temp paths are generated filenames under a configured upload directory with cleanup limits; see docs/SECURITY-SUPPRESSIONS.md. */
 import { randomUUID } from 'node:crypto';
 import { mkdir, readdir, stat, unlink, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';

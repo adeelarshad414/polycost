@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- Reviewed 2026-07-06: diagram fixture reads are resolved from repository-controlled generated fixtures; see docs/SECURITY-SUPPRESSIONS.md. */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ConfigService } from '@nestjs/config';
@@ -16,6 +17,7 @@ import { MermaidExtractor } from './mermaid.extractor';
 import { NodeClassifierService } from './node-classifier.service';
 import { StencilMapRegistry } from './stencil-map.registry';
 import { VsdxExtractor } from './vsdx.extractor';
+import { LlmClassifierClient } from './diagram-parser.types';
 
 const fixtureRoot = resolve(__dirname, '../../../../fixtures/diagrams');
 
@@ -93,6 +95,252 @@ describe('DiagramParserService', () => {
         lineColor: '#378ADD',
       },
     });
+  });
+
+  it('resolves VSDX masters, containers, connector waypoints, and multiple pages', () => {
+    const extracted = new VsdxExtractor().extract({
+      buffer: zipWithStoredEntries([
+        {
+          path: 'visio/masters/master1.xml',
+          content: `
+            <Master ID="1" NameU="AWS19.EC2">
+              <Shapes><Shape ID="100" NameU="AWS19.EC2"><Text>EC2 master</Text></Shape></Shapes>
+            </Master>
+          `,
+        },
+        {
+          path: 'visio/pages/page1.xml',
+          content: `
+            <PageContents>
+              <Shapes>
+                <Shape ID="10" Master="1" Parent="99">
+                  <Text>web tier</Text>
+                  <Cell N="PinX" V="3"/>
+                  <Cell N="PinY" V="5"/>
+                  <Cell N="Width" V="4"/>
+                  <Cell N="Height" V="6"/>
+                </Shape>
+                <Shape ID="20" NameU="AWS19.RDS"><Text>database</Text></Shape>
+                <Shape ID="30" NameU="Connector"><Text>route</Text></Shape>
+              </Shapes>
+              <Connects>
+                <Connect FromSheet="30" ToSheet="10"/>
+                <Connect FromSheet="30" ToSheet="20"/>
+              </Connects>
+            </PageContents>
+          `,
+        },
+        {
+          path: 'visio/pages/page2.xml',
+          content: `
+            <PageContents>
+              <Shapes>
+                <Shape ID="40" NameU="AWS19.S3"><Text>archive bucket</Text></Shape>
+              </Shapes>
+            </PageContents>
+          `,
+        },
+      ]),
+      sizeBytes: 1,
+      sha256: 'hash',
+      detectedFormat: 'vsdx',
+    });
+
+    expect(extracted.nodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: '10',
+          stencilId: 'AWS19.EC2',
+          visual: expect.objectContaining({
+            pageName: 'Page 1',
+            masterId: '1',
+            masterName: 'AWS19.EC2',
+            containerId: '99',
+          }),
+        }),
+        expect.objectContaining({
+          id: '40',
+          visual: expect.objectContaining({
+            pageName: 'Page 2',
+          }),
+        }),
+      ]),
+    );
+    expect(extracted.edges).toEqual([
+      expect.objectContaining({
+        sourceId: '10',
+        targetId: '20',
+        displayLabel: 'Connector',
+      }),
+    ]);
+  });
+
+  it('keeps valid VSDX pages and reports page-level warnings for corrupt pages', async () => {
+    const parsed = await service().parse({
+      content: zipWithStoredEntries([
+        {
+          path: 'visio/pages/page1.xml',
+          content: `
+            <PageContents>
+              <Shapes>
+                <Shape ID="10" NameU="AWS19.EC2"><Text>EC2 web</Text></Shape>
+              </Shapes>
+            </PageContents>
+          `,
+        },
+        {
+          path: 'visio/pages/page2.xml',
+          content: `
+            <PageContents>
+              <Shapes>
+                <Shape ID="20" NameU="AWS19.RDS"><Text>broken database</Text></Shape>
+              </Shapes>
+          `,
+        },
+      ]).toString('base64'),
+      encoding: 'base64',
+      fileName: 'partial.vsdx',
+    });
+
+    expect(parsed.graph.format).toBe('vsdx');
+    expect(parsed.review.components).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          displayLabel: 'EC2 web',
+          serviceCategory: 'compute',
+        }),
+      ]),
+    );
+    expect(parsed.review.unresolvedClassifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'vsdx-page-parse-error-page2',
+          displayLabel: 'Page 2',
+          reason: expect.stringContaining('Unable to parse Page 2'),
+          sourceRef: 'vsdx:visio_pages_page2.xml:parse-error',
+        }),
+      ]),
+    );
+    expect(parsed.fieldsRequiringReview).toContain(
+      'diagram.extraction.vsdx-page-parse-error-page2',
+    );
+  });
+
+  it('still rejects unsafe VSDX XML instead of downgrading it to a parse warning', async () => {
+    await expect(
+      service().parse({
+        content: zipWithStoredEntries([
+          {
+            path: 'visio/pages/page1.xml',
+            content: `
+              <PageContents>
+                <Shapes>
+                  <Shape ID="10" NameU="AWS19.EC2"><Text>EC2 web</Text></Shape>
+                </Shapes>
+              </PageContents>
+            `,
+          },
+          {
+            path: 'visio/pages/page2.xml',
+            content: `
+              <!DOCTYPE foo [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]>
+              <PageContents>
+                <Shapes>
+                  <Shape ID="20" NameU="AWS19.RDS"><Text>&xxe;</Text></Shape>
+                </Shapes>
+              </PageContents>
+            `,
+          },
+        ]).toString('base64'),
+        encoding: 'base64',
+        fileName: 'unsafe.vsdx',
+      }),
+    ).rejects.toThrow(ApiValidationError);
+  });
+
+  it('classifies unresolved nodes through the mocked Tier 3 LLM path', async () => {
+    const llmClient: LlmClassifierClient = {
+      classify: jest.fn(async (input) => ({
+        serviceCategory: 'integration',
+        serviceType: 'queue-or-event-bus',
+        confidence: 'low',
+        reason: `LLM classification, confidence low for ${input.displayLabel}`,
+        assumedDefaults: ['1 million messages per month'],
+        serviceRequirement: {
+          serviceCategory: 'integration',
+          serviceType: 'queue-or-event-bus',
+          quantity: 1,
+          scaleParams: {
+            classifier: 'llm',
+            diagramNodeId: input.diagramNodeId ?? 'unknown',
+          },
+        },
+      })),
+    };
+
+    const parsed = await service(llmClient).parse({
+      content: 'graph TD\n  A[Unmapped async processor]',
+      fileName: 'custom.mmd',
+      inputFormat: 'mermaid',
+    });
+
+    expect(llmClient.classify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        displayLabel: 'Unmapped async processor',
+      }),
+    );
+    expect(parsed.review.components[0]).toMatchObject({
+      serviceCategory: 'integration',
+      serviceType: 'queue-or-event-bus',
+      evidence: expect.stringContaining('LLM classification'),
+    });
+  });
+
+  it('surfaces Tier 3 LLM fallback diagnostics on unresolved review rows', async () => {
+    const llmClient: LlmClassifierClient = {
+      classify: jest.fn(async () => undefined),
+      lastFailureReason: jest.fn(() => 'Tier 3 LLM classifier request failed or timed out'),
+    };
+
+    const parsed = await service(llmClient).parse({
+      content: 'graph TD\n  A[Mystery foobar node]',
+      fileName: 'custom.mmd',
+      inputFormat: 'mermaid',
+    });
+
+    expect(parsed.review.unresolvedClassifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          displayLabel: 'Mystery foobar node',
+          reason: 'no service alias matched; Tier 3 LLM classifier request failed or timed out',
+        }),
+      ]),
+    );
+    expect(parsed.fieldsRequiringReview).toContain('diagram.nodes.A.classification');
+  });
+
+  it('caps oversized diagrams at 200 parsed nodes with a review warning', async () => {
+    const content = [
+      'graph TD',
+      ...Array.from({ length: 205 }, (_, index) => `  N${index}[EC2 worker ${index}]`),
+    ].join('\n');
+
+    const parsed = await service().parse({
+      content,
+      fileName: 'large.mmd',
+      inputFormat: 'mermaid',
+    });
+
+    expect(parsed.graph.nodes).toHaveLength(200);
+    expect(parsed.review.unresolvedClassifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'diagram-node-cap',
+          reason: 'diagram contains 205 nodes; parsed first 200',
+        }),
+      ]),
+    );
+    expect(parsed.fieldsRequiringReview).toContain('diagram.nodes.cap');
   });
 
   it.each([
@@ -198,12 +446,16 @@ describe('DiagramParserController', () => {
   });
 });
 
-function service(): DiagramParserService {
+function service(llmClassifierClient?: LlmClassifierClient): DiagramParserService {
   const aliasDictionary = new AliasDictionary();
 
   return new DiagramParserService(
     new FormatDetectorService(),
-    new NodeClassifierService(new StencilMapRegistry(aliasDictionary), aliasDictionary),
+    new NodeClassifierService(
+      new StencilMapRegistry(aliasDictionary),
+      aliasDictionary,
+      llmClassifierClient,
+    ),
     new MermaidExtractor(),
     new DrawioExtractor(),
     new LucidCsvExtractor(),
@@ -226,56 +478,64 @@ function readBinaryFixture(path: string): Buffer {
 }
 
 function zipWithStoredEntry(path: string, content: string): Buffer {
-  const pathBuffer = Buffer.from(path);
-  const contentBuffer = Buffer.from(content);
-  const localHeader = Buffer.alloc(30);
-  localHeader.writeUInt32LE(0x04034b50, 0);
-  localHeader.writeUInt16LE(20, 4);
-  localHeader.writeUInt16LE(0, 6);
-  localHeader.writeUInt16LE(0, 8);
-  localHeader.writeUInt32LE(0, 10);
-  localHeader.writeUInt32LE(0, 14);
-  localHeader.writeUInt32LE(contentBuffer.length, 18);
-  localHeader.writeUInt32LE(contentBuffer.length, 22);
-  localHeader.writeUInt16LE(pathBuffer.length, 26);
-  localHeader.writeUInt16LE(0, 28);
+  return zipWithStoredEntries([{ path, content }]);
+}
 
-  const centralDirectory = Buffer.alloc(46);
-  const centralDirectoryOffset = localHeader.length + pathBuffer.length + contentBuffer.length;
-  centralDirectory.writeUInt32LE(0x02014b50, 0);
-  centralDirectory.writeUInt16LE(20, 4);
-  centralDirectory.writeUInt16LE(20, 6);
-  centralDirectory.writeUInt16LE(0, 8);
-  centralDirectory.writeUInt16LE(0, 10);
-  centralDirectory.writeUInt32LE(0, 12);
-  centralDirectory.writeUInt32LE(0, 16);
-  centralDirectory.writeUInt32LE(contentBuffer.length, 20);
-  centralDirectory.writeUInt32LE(contentBuffer.length, 24);
-  centralDirectory.writeUInt16LE(pathBuffer.length, 28);
-  centralDirectory.writeUInt16LE(0, 30);
-  centralDirectory.writeUInt16LE(0, 32);
-  centralDirectory.writeUInt16LE(0, 34);
-  centralDirectory.writeUInt16LE(0, 36);
-  centralDirectory.writeUInt32LE(0, 38);
-  centralDirectory.writeUInt32LE(0, 42);
+function zipWithStoredEntries(entries: Array<{ path: string; content: string }>): Buffer {
+  const localParts: Buffer[] = [];
+  const centralParts: Buffer[] = [];
+  let localOffset = 0;
 
+  for (const entry of entries) {
+    const pathBuffer = Buffer.from(entry.path);
+    const contentBuffer = Buffer.from(entry.content);
+    const localHeader = Buffer.alloc(30);
+    localHeader.writeUInt32LE(0x04034b50, 0);
+    localHeader.writeUInt16LE(20, 4);
+    localHeader.writeUInt16LE(0, 6);
+    localHeader.writeUInt16LE(0, 8);
+    localHeader.writeUInt32LE(0, 10);
+    localHeader.writeUInt32LE(0, 14);
+    localHeader.writeUInt32LE(contentBuffer.length, 18);
+    localHeader.writeUInt32LE(contentBuffer.length, 22);
+    localHeader.writeUInt16LE(pathBuffer.length, 26);
+    localHeader.writeUInt16LE(0, 28);
+
+    const centralDirectory = Buffer.alloc(46);
+    centralDirectory.writeUInt32LE(0x02014b50, 0);
+    centralDirectory.writeUInt16LE(20, 4);
+    centralDirectory.writeUInt16LE(20, 6);
+    centralDirectory.writeUInt16LE(0, 8);
+    centralDirectory.writeUInt16LE(0, 10);
+    centralDirectory.writeUInt32LE(0, 12);
+    centralDirectory.writeUInt32LE(0, 16);
+    centralDirectory.writeUInt32LE(contentBuffer.length, 20);
+    centralDirectory.writeUInt32LE(contentBuffer.length, 24);
+    centralDirectory.writeUInt16LE(pathBuffer.length, 28);
+    centralDirectory.writeUInt16LE(0, 30);
+    centralDirectory.writeUInt16LE(0, 32);
+    centralDirectory.writeUInt16LE(0, 34);
+    centralDirectory.writeUInt16LE(0, 36);
+    centralDirectory.writeUInt32LE(0, 38);
+    centralDirectory.writeUInt32LE(localOffset, 42);
+
+    const localPart = Buffer.concat([localHeader, pathBuffer, contentBuffer]);
+    localParts.push(localPart);
+    centralParts.push(centralDirectory, pathBuffer);
+    localOffset += localPart.length;
+  }
+
+  const centralDirectoryOffset = localOffset;
+  const centralDirectoryContent = Buffer.concat(centralParts);
   const endOfCentralDirectory = Buffer.alloc(22);
-  const centralDirectorySize = centralDirectory.length + pathBuffer.length;
   endOfCentralDirectory.writeUInt32LE(0x06054b50, 0);
   endOfCentralDirectory.writeUInt16LE(0, 4);
   endOfCentralDirectory.writeUInt16LE(0, 6);
-  endOfCentralDirectory.writeUInt16LE(1, 8);
-  endOfCentralDirectory.writeUInt16LE(1, 10);
-  endOfCentralDirectory.writeUInt32LE(centralDirectorySize, 12);
+  endOfCentralDirectory.writeUInt16LE(entries.length, 8);
+  endOfCentralDirectory.writeUInt16LE(entries.length, 10);
+  endOfCentralDirectory.writeUInt32LE(centralDirectoryContent.length, 12);
   endOfCentralDirectory.writeUInt32LE(centralDirectoryOffset, 16);
   endOfCentralDirectory.writeUInt16LE(0, 20);
 
-  return Buffer.concat([
-    localHeader,
-    pathBuffer,
-    contentBuffer,
-    centralDirectory,
-    pathBuffer,
-    endOfCentralDirectory,
-  ]);
+  return Buffer.concat([...localParts, centralDirectoryContent, endOfCentralDirectory]);
 }

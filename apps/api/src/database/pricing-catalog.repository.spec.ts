@@ -1,8 +1,10 @@
+/* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: repository test rows are controlled fixtures indexed by expected column names; see docs/SECURITY-SUPPRESSIONS.md. */
 import { ConfigService } from '@nestjs/config';
 import { PgPoolLike, PostgresPricingCatalogRepository } from './pricing-catalog.repository';
 import { AppConfig } from '../config/config.schema';
 import { SecretsReader } from '../secrets/secrets.service';
 import { PricingCatalogRecord } from '../adapters/common/cloud-provider-adapter';
+import { pricingLineageForCatalogRecord } from '../pricing-normalization/pricing-lineage';
 
 const configService = () =>
   ({
@@ -138,6 +140,71 @@ describe('PostgresPricingCatalogRepository', () => {
       minimalRecord,
     ]);
     expect(query).toHaveBeenCalledWith(expect.any(String), ['azure']);
+  });
+
+  it('returns persisted catalog source lineage as queryable record attributes', async () => {
+    const sourcePayloadHash = 'a'.repeat(64);
+    const sourceRecordKey = 'aws|compute|SKU-1|us-east-1|Hrs|2026-01-01T00:00:00.000Z';
+    const query = jest.fn(async () => ({
+      rows: [
+        {
+          provider: 'aws',
+          service_category: 'compute',
+          service_name: 'Amazon EC2',
+          sku_id: 'SKU-1',
+          sku_description: 'Compute hour',
+          region: 'us-east-1',
+          unit: 'Hrs',
+          unit_price_usd: '0.010000',
+          attributes: {
+            vcpu: 2,
+          },
+          effective_date: new Date('2026-01-01T00:00:00.000Z'),
+          fetched_at: new Date('2026-06-28T00:00:00.000Z'),
+          source_endpoint:
+            'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/index.json',
+          source_record_id: 'SKU-1:rate-code',
+          source_record_key: sourceRecordKey,
+          transform_version: 'pricing-normalization-v3',
+          source_payload_hash: sourcePayloadHash,
+        },
+      ],
+      rowCount: 1,
+    }));
+    const pool: PgPoolLike = {
+      query: query as PgPoolLike['query'],
+      end: jest.fn(async () => undefined),
+    };
+    const repository = new PostgresPricingCatalogRepository(
+      configService(),
+      secretsReader(),
+      () => pool,
+    );
+
+    const [catalogRecord] = await repository.find({
+      provider: 'aws',
+      category: 'compute',
+      region: 'us-east-1',
+      serviceIds: ['SKU-1'],
+    });
+
+    expect(catalogRecord.attributes).toEqual(
+      expect.objectContaining({
+        vcpu: 2,
+        sourceRecordId: 'SKU-1:rate-code',
+        sourceRecordKey,
+        transformVersion: 'pricing-normalization-v3',
+        sourcePayloadHash,
+      }),
+    );
+    expect(pricingLineageForCatalogRecord(catalogRecord)).toEqual(
+      expect.objectContaining({
+        sourceRecordId: 'SKU-1:rate-code',
+        sourceRecordKey,
+        transformVersion: 'pricing-normalization-v3',
+        sourcePayloadHash,
+      }),
+    );
   });
 
   it('upserts valid records and reports row-level rejects without logging values', async () => {
@@ -287,12 +354,36 @@ describe('PostgresPricingCatalogRepository', () => {
     expect(query).toHaveBeenNthCalledWith(
       3,
       expect.stringContaining('INSERT INTO storage_pricing'),
-      ['aws', 'us-east-1', 'standard', 0.023, 'USD', '2026-01-01T00:00:00.000Z'],
+      expect.arrayContaining([
+        'aws',
+        'us-east-1',
+        'standard',
+        0.023,
+        'USD',
+        '2026-01-01T00:00:00.000Z',
+        expect.stringContaining('pricing'),
+        'AWS-S3-STANDARD',
+        'aws|storage|AWS-S3-STANDARD|us-east-1|GB-Mo|2026-01-01T00:00:00.000Z',
+        '2026-06-28T00:00:00.000Z',
+        'pricing-normalization-v3',
+      ]),
     );
     expect(query).toHaveBeenNthCalledWith(
       4,
       expect.stringContaining('INSERT INTO egress_tier_rates'),
-      ['aws', 'us-east-1', 0, null, 0.09, '2026-01-01T00:00:00.000Z'],
+      expect.arrayContaining([
+        'aws',
+        'us-east-1',
+        0,
+        null,
+        0.09,
+        '2026-01-01T00:00:00.000Z',
+        expect.stringContaining('pricing'),
+        'AWS-EGRESS',
+        'aws|network|AWS-EGRESS|us-east-1|GB|2026-01-01T00:00:00.000Z',
+        '2026-06-28T00:00:00.000Z',
+        'pricing-normalization-v3',
+      ]),
     );
   });
 

@@ -87,12 +87,17 @@ async function checkGcpVaultToken() {
     const parsed = await response.json();
     const accessToken = parsed?.data?.data?.access_token;
 
-    if (!response.ok || typeof accessToken !== 'string' || accessToken.length === 0) {
+    if (
+      !response.ok ||
+      typeof accessToken !== 'string' ||
+      accessToken.length === 0 ||
+      isDummyCredential(accessToken)
+    ) {
       return {
         provider: 'gcp',
         status: strict ? 'fail' : 'warn',
         message:
-          'Vault path secret/polycost/providers/gcp does not contain a non-empty access_token.',
+          'Vault path secret/polycost/providers/gcp does not contain a production-safe access_token.',
       };
     }
 
@@ -140,11 +145,16 @@ async function checkLlmVaultApiKey() {
     const parsed = await response.json();
     const apiKey = parsed?.data?.data?.api_key;
 
-    if (!response.ok || typeof apiKey !== 'string' || apiKey.length === 0) {
+    if (
+      !response.ok ||
+      typeof apiKey !== 'string' ||
+      apiKey.length === 0 ||
+      isDummyCredential(apiKey)
+    ) {
       return {
         provider: 'diagram-llm',
         status: strict ? 'fail' : 'warn',
-        message: 'Vault path secret/polycost/llm does not contain a non-empty api_key.',
+        message: 'Vault path secret/polycost/llm does not contain a production-safe api_key.',
       };
     }
 
@@ -170,4 +180,14 @@ function envBoolean(name, defaultValue) {
   }
 
   return value.trim().toLowerCase() === 'true';
+}
+
+function isDummyCredential(value) {
+  const normalized = value.trim().toLowerCase();
+  return (
+    normalized === 'change_me_dev_only' ||
+    normalized === 'dummy' ||
+    normalized === 'example' ||
+    normalized.includes('change_me')
+  );
 }

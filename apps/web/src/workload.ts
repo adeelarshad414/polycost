@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: workload normalization indexes typed form fields validated before API submission; see docs/SECURITY-SUPPRESSIONS.md. */
 import { NormalizedWorkloadSpec, ServiceRequirement } from './types';
 import {
   CLOUD_SERVICE_CATALOG,

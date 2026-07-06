@@ -116,6 +116,8 @@ The main API is versioned under `/api/v1`.
 
 - `POST /comparisons` creates a comparison from an NWS payload.
 - `GET /comparisons/:id` retrieves a saved comparison.
+- `GET /comparisons/:id/evidence` returns line-item SKU lineage, rate source,
+  derivation math, and equivalence confidence for saved comparison numbers.
 - `GET /comparisons/:id/export` exports comparison reports.
 - `POST /comparisons/:id/refresh-live` refreshes a comparison against live pricing sources when enabled.
 - `POST /workload/parse` parses natural language into workload structure.
@@ -132,6 +134,46 @@ The main API is versioned under `/api/v1`.
 - `GET /share/:token` reads a shared report.
 - `GET /exchange-rates` returns cached exchange-rate data.
 - `GET /regions` returns the cloud region catalog used by the UI.
+
+## Anonymous And Workspace Features
+
+PolyCost keeps the core comparison workflow frictionless. Anonymous users can still
+parse requirements, upload diagrams, run comparisons, inspect pricing evidence, export
+reports, and create share links.
+
+Accounts add workspace controls on top of that core flow:
+
+- Profile email/display-name update, password change, logout, account session list,
+  and server-side "sign out other devices".
+- Team creation, team settings, member list, member removal, pending invitations,
+  invite-token landing preview, expired/revoked invite states, invite-token
+  acceptance, and invite revocation.
+- Three-role RBAC: Owner, Admin, and Member. Owners manage role changes; owners and
+  admins manage members, invitations, SSO provider configuration, and billing import
+  workflows; members keep comparison and report access.
+- OIDC/SAML configuration readiness with redirect URI display, stored provider
+  metadata, mock connection testing, and a signed mock OIDC start/authorize/callback
+  flow for development verification.
+
+The current self-hosted product does not yet include enterprise IdP login round-trips,
+email delivery infrastructure, org billing plans, or a hosted account marketplace. Those
+remain release-track items rather than blockers for anonymous cost comparison.
+
+## Session And Account Security
+
+- Session tokens are random bearer tokens; the API stores only token hashes.
+- `AUTH_SESSION_TTL_HOURS` controls server-side expiry. Expired or revoked sessions
+  fail with the standard unauthorized API envelope.
+- Logout revokes the current server-side session. "Sign out other devices" revokes
+  other active sessions for the same account while preserving the current session.
+- Concurrent sessions are allowed by default so a user can demo from more than one
+  browser/device; administrators should shorten `AUTH_SESSION_TTL_HOURS` for stricter
+  self-hosted deployments.
+- Local password login enforces minimum length, failed-login tracking, and lockout
+  via `AUTH_MAX_FAILED_LOGIN_ATTEMPTS` and `AUTH_LOCKOUT_MINUTES`.
+- Anonymous compare, diagram import, reports, and share links remain available
+  without accounts. Team administration, SSO provider setup, and billing-export
+  reconciliation require a signed-in workspace session.
 
 ## Diagram Imports
 
@@ -209,6 +251,10 @@ Start from `.env.example`. Important local settings include:
 - `PRICING_ETL_RUN_ON_BOOT`
 - `FEATURE_LIVE_PRICING_REFRESH_ENABLED`
 - `FEATURE_RESERVED_PRICING`
+- `AUTH_SESSION_TTL_HOURS`
+- `AUTH_LOCAL_REGISTRATION_ENABLED`
+- `AUTH_PUBLIC_BASE_URL`
+- `AUTH_SSO_STATE_SECRET`
 - `RATE_LIMIT_NL_PARSE_PER_MINUTE`
 - `RATE_LIMIT_LIVE_REFRESH_PER_MINUTE`
 
@@ -217,12 +263,16 @@ Local Docker Compose runs Vault, Postgres, Redis, the API, and the web app. The 
 For self-hosted demos without cloud pricing credentials, keep `USE_MOCK_PROVIDERS=true`
 and `PRICING_ETL_RUN_ON_BOOT=true`. The API will seed a deterministic AWS/Azure/GCP
 pricing catalog on startup, while real provider adapters remain available when mock
-providers are disabled.
+providers are disabled. Use `docs/PROVIDER-CREDENTIALS.md` and `DUMMY-VALUES.md`
+before switching `USE_MOCK_PROVIDERS=false`.
 
 ## Documentation
 
 - `HOW-TO-USE.md` explains the product workflow.
 - `DEPLOY.md` covers deployment guidance.
+- `docs/PROVIDER-CREDENTIALS.md` covers AWS/Azure/GCP pricing-source setup and
+  traceability expectations.
+- `DUMMY-VALUES.md` lists development-only placeholders and production guardrails.
 - `PROGRESS.md` tracks project progress.
 - `CONTRIBUTING.md` explains how to contribute safely.
 - `SECURITY.md` explains private vulnerability reporting.

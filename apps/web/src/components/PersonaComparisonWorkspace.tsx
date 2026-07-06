@@ -960,7 +960,13 @@ function lineItemSpec(lineItem: ComparisonLineItem): string {
         : undefined,
     trace?.effectiveDate ? `Effective ${shortDate(trace.effectiveDate)}` : undefined,
     trace?.fetchedAt ? `Fetched ${shortDate(trace.fetchedAt)}` : undefined,
+    trace?.sourceEndpoint ? `Endpoint ${trace.sourceEndpoint}` : undefined,
+    trace?.sourceRecordId ? `Record ${trace.sourceRecordId}` : undefined,
+    trace?.transformVersion ? `Transform ${trace.transformVersion}` : undefined,
+    trace?.sourcePayloadHash ? `Hash ${trace.sourcePayloadHash.slice(0, 12)}` : undefined,
     trace?.sourceRecordKey ? `Trace ${trace.sourceRecordKey}` : undefined,
+    trace?.derivation?.expression ? `Math ${trace.derivation.expression}` : undefined,
+    trace?.equivalenceConfidence ? `Confidence ${trace.equivalenceConfidence}` : undefined,
     trace?.isEstimate ? 'Estimate-backed' : undefined,
     trace?.isApproximate ? 'Approximate mapping' : undefined,
     lineItem.pricingBasis

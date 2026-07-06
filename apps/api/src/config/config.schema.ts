@@ -58,6 +58,7 @@ export const configSchema = z
     AUTH_LOCKOUT_MINUTES: z.coerce.number().int().positive().default(15),
     AUTH_LOCAL_REGISTRATION_ENABLED: envBoolean(true),
     AUTH_PUBLIC_BASE_URL: z.string().url().default('http://localhost:3001'),
+    AUTH_SSO_STATE_SECRET: z.string().min(16).default('CHANGE_ME_DEV_ONLY_SSO_STATE_SECRET'),
     AUTH_OIDC_ISSUER_URL: z.string().url().optional(),
     AUTH_OIDC_CLIENT_ID: z.string().min(1).optional(),
     AUTH_SAML_ENTITY_ID: z.string().min(1).optional(),
@@ -92,10 +93,45 @@ export const configSchema = z
         message: 'Wildcard CORS origins are not allowed in staging or production.',
       });
     }
+
+    if (config.NODE_ENV === 'production' || config.NODE_ENV === 'staging') {
+      for (const [key, value] of Object.entries(config)) {
+        if (typeof value === 'string' && isDummyValue(value)) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [key],
+            message: 'CHANGE_ME_DEV_ONLY and dummy values are not allowed outside development.',
+          });
+        }
+      }
+    }
+
+    if (
+      (config.NODE_ENV === 'production' || config.NODE_ENV === 'staging') &&
+      !config.USE_MOCK_PROVIDERS &&
+      !config.VAULT_TOKEN_FILE
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['VAULT_TOKEN_FILE'],
+        message:
+          'VAULT_TOKEN_FILE is required when real provider pricing is enabled outside development.',
+      });
+    }
   });
 
 export type AppConfig = z.infer<typeof configSchema>;
 
 export function validateConfig(env: Record<string, unknown>): AppConfig {
   return configSchema.parse(env);
+}
+
+function isDummyValue(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return (
+    normalized === 'change_me_dev_only' ||
+    normalized === 'dummy' ||
+    normalized === 'example' ||
+    normalized.includes('change_me')
+  );
 }

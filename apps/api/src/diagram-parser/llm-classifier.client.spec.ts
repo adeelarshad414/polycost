@@ -113,6 +113,7 @@ describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
         }),
       ]),
     });
+    expect(client.lastFailureReason()).toBeUndefined();
   });
 
   it('does not fetch secrets when classifier endpoint or model config is missing', async () => {
@@ -125,6 +126,7 @@ describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
     );
 
     await expect(client.classify({ displayLabel: 'Unknown service' })).resolves.toBeUndefined();
+    expect(client.lastFailureReason()).toBe('Tier 3 LLM classifier not configured');
     expect(secrets.getSecret).not.toHaveBeenCalled();
     expect(fetchClient).not.toHaveBeenCalled();
   });
@@ -146,5 +148,73 @@ describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
     );
 
     await expect(client.classify({ displayLabel: 'Mystery tier' })).resolves.toBeUndefined();
+    expect(client.lastFailureReason()).toBe(
+      'Tier 3 LLM classifier returned no usable classification',
+    );
+  });
+
+  it('retries transient provider failures and keeps graceful fallback semantics', async () => {
+    const fetchClient = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        json: async () => ({}),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  classification: {
+                    serviceCategory: 'integration',
+                    serviceType: 'queue-or-event-bus',
+                    confidence: 'moderate',
+                    reason: 'label looks like a work queue',
+                    assumedDefaults: [],
+                    quantity: 1,
+                    scaleParams: {},
+                  },
+                }),
+              },
+            },
+          ],
+        }),
+      }) as unknown as typeof fetch;
+    const client = new OpenAiCompatibleDiagramLlmClassifierClient(
+      configService({
+        DIAGRAM_LLM_CLASSIFIER_ENDPOINT: 'https://llm.example.test/v1/chat/completions',
+        DIAGRAM_LLM_CLASSIFIER_MODEL: 'diagram-classifier',
+      }),
+      secretsReader(),
+      fetchClient,
+    );
+
+    await expect(client.classify({ displayLabel: 'Work queue' })).resolves.toMatchObject({
+      serviceCategory: 'integration',
+      serviceType: 'queue-or-event-bus',
+      reason: 'llm classifier: label looks like a work queue',
+    });
+    expect(fetchClient).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns unresolved when the provider call throws or times out', async () => {
+    const fetchClient = jest.fn(async () => {
+      throw new Error('network timeout');
+    }) as unknown as typeof fetch;
+    const client = new OpenAiCompatibleDiagramLlmClassifierClient(
+      configService({
+        DIAGRAM_LLM_CLASSIFIER_ENDPOINT: 'https://llm.example.test/v1/chat/completions',
+        DIAGRAM_LLM_CLASSIFIER_MODEL: 'diagram-classifier',
+      }),
+      secretsReader(),
+      fetchClient,
+    );
+
+    await expect(client.classify({ displayLabel: 'Mystery service' })).resolves.toBeUndefined();
+    expect(client.lastFailureReason()).toBe('Tier 3 LLM classifier request failed or timed out');
   });
 });

@@ -37,12 +37,24 @@ export class NodeClassifierService {
 
     const stencilMatch = this.stencilMapRegistry.match(node.stencilId ?? node.style);
     if (stencilMatch) {
-      return classificationFromMatch(stencilMatch, displayLabel, 'high', 'stencil match', node.id);
+      return classificationFromMatch(
+        stencilMatch,
+        displayLabel,
+        'high',
+        `Matched stencil "${node.stencilId ?? node.style ?? 'unknown'}" -> ${stencilMatch.serviceType}`,
+        node.id,
+      );
     }
 
     const labelMatch = this.aliasDictionary.match(displayLabel);
     if (labelMatch) {
-      return classificationFromMatch(labelMatch, displayLabel, 'moderate', 'label alias', node.id);
+      return classificationFromMatch(
+        labelMatch,
+        displayLabel,
+        'moderate',
+        `Label matched alias ${labelMatch.pattern.toString()} -> ${labelMatch.serviceType}`,
+        node.id,
+      );
     }
 
     const llmMatch = await this.llmClassifierClient.classify({
@@ -55,10 +67,14 @@ export class NodeClassifierService {
       return llmMatch;
     }
 
+    const llmFailureReason = this.llmClassifierClient.lastFailureReason?.();
+
     return {
       id: node.id,
       displayLabel,
-      reason: 'no service alias matched; classify before pricing',
+      reason: llmFailureReason
+        ? `no service alias matched; ${llmFailureReason}`
+        : 'no service alias matched; classify before pricing',
       sourceRef: node.sourceRef,
     };
   }

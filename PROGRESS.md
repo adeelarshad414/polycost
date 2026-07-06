@@ -39,6 +39,543 @@ say so explicitly rather than marking it done.
 | AI-native Phase 1 reimagining pass                     | Complete with known gaps (see notes) | 2026-07-01   |
 | Phase 2 - Diagram-to-cost intelligence                 | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.7 - Invoice/auth/VSDX gap closure              | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8 - Gap-closure production readiness           | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8A - Auth product UX continuation              | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8B - Invite/SSO auth hardening                 | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8C - Diagram partial-parse hardening           | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8D - Security suppression cleanup              | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8E - UI-priced service coverage guard          | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8F - SKU evidence derivation hardening         | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8G - Catalog lineage readback hardening        | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8H - Pricing honesty UI labeling               | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8I - AWS ETL network SKU hardening             | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8J - Diagram LLM fallback diagnostics          | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8K - Auth RBAC UI enforcement polish           | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8L - Release hygiene evidence polish           | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8M - Session policy documentation              | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8N - API RBAC matrix hardening                 | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8O - Production-readiness CI gate              | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8P - Queryable comparison pricing evidence     | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8Q - Visible pricing evidence UI wiring        | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8R - Refresh-live evidence regression          | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8R - Refresh-live evidence regression
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Strengthened the live-pricing traceability regression so it now proves a refreshed
+  provider catalog row changes the comparison total and is visible through
+  `getComparisonPricingEvidence()` with the refreshed unit rate, fetched timestamp,
+  source endpoint, raw source record ID, derivation math, and changed payload hash.
+- Added explicit fixture source metadata (`fixture://aws/traceability/compute` and
+  `aws-price-row-ec2-trace`) to the traceability row so the test verifies source-row
+  identity remains stable while the payload hash changes when the refreshed catalog
+  price changes.
+- Added `src/api/live-pricing-traceability.spec.ts` to `npm run
+test:production-readiness`, making refresh-live SKU lineage part of the named
+  production hardening gate rather than an isolated focused test.
+- Verification evidence in this continuation:
+  - Focused live-pricing traceability spec passed: 1 suite / 1 test.
+  - `npm run test:production-readiness` passed: API 6 suites / 80 tests and web 2
+    suites / 80 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this proves exact refreshed catalog-row changes flow
+  into saved comparison evidence for the current refresh path, but it does not turn
+  PolyCost into full invoice-grade live cloud billing. Private pricing, billing
+  account discounts, and provider-invoice reconciliation remain separate future
+  hardening work.
+
+## Phase 2.8Q - Visible pricing evidence UI wiring
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Wired the web app to call `getComparisonPricingEvidence()` automatically for the
+  active comparison, including loading, error, and reset behavior aligned with the
+  existing backend analytics fetch lifecycle.
+- Added a compact `Traceable pricing evidence` panel inside the expanded Engineering
+  section so reviewers can inspect visible line-item cost, matched SKU, source
+  endpoint/record/hash, rate, derivation math, and confidence without cluttering the
+  default executive view.
+- Kept the design logo-free and provider-accent based, with responsive one/two/three
+  column behavior and a professional brand-colored spinner for evidence loading.
+- Verification evidence in this continuation:
+  - Focused web App/API-client specs passed: 2 suites / 80 tests.
+  - `npm run test:production-readiness` passed before the final formatting-only test
+    wrap: API 5 suites / 79 tests and web 2 suites / 80 tests.
+  - `npm run ci:lint` passed across API, web, and shared types before the final
+    formatting-only test wrap.
+  - `npm run format:check` passed after formatting.
+- Known gaps carried forward: the UI now exposes stored comparison evidence
+  end-to-end, but the data remains decision-grade catalog/list-price lineage rather
+  than full invoice-grade billing, private discount, or negotiated contract pricing.
+
+## Phase 2.8P - Queryable comparison pricing evidence
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Added `GET /api/v1/comparisons/:id/evidence`, a read-only comparison evidence
+  endpoint that returns each stored line item's displayed monthly/hourly amount,
+  provider totals, matched SKU fields, source endpoint/record/key/hash/transform
+  lineage, unit rate, derivation math, and equivalence confidence.
+- Added typed web client support through `getComparisonPricingEvidence()` and shared
+  frontend response types so UI/report surfaces can expand saved comparison numbers
+  without inventing a second evidence contract.
+- Extended the focused production-readiness gate to include the API contract and web
+  API-client evidence specs, keeping SKU-to-estimate traceability in the named
+  regression path.
+- Verification evidence in this continuation:
+  - Focused API contract spec passed: 34 tests.
+  - Focused web API client spec passed: 25 tests.
+  - `npm run test:production-readiness` passed: API 5 suites / 79 tests and web 2
+    suites / 80 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: the endpoint proves stored catalog/list-price estimate
+  lineage and derivation for saved comparisons, but full invoice-grade provider
+  billing coverage, private contract pricing, and account billing reconciliation
+  remain future work. GitHub-hosted CI still cannot start until the account billing
+  or spending-limit issue is resolved in GitHub settings.
+
+## Phase 2.8O - Production-readiness CI gate
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Added `npm run test:production-readiness`, a focused regression command that
+  explicitly runs pricing reconciliation evidence, auth/RBAC and billing
+  reconciliation, diagram parser fallback/malicious-file/VSDX coverage, Tier 3 LLM
+  classifier fallback coverage, and the web App workspace/comparison coverage.
+- Added a GitHub Actions `Production-readiness focused regressions` step so these
+  named hardening surfaces remain visible in CI in addition to the broad coverage
+  suite.
+- Verification evidence in this continuation:
+  - `npm run test:production-readiness` passed: API 4 suites / 45 tests and web
+    1 suite / 55 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: the CI definition is updated, but GitHub-hosted runs
+  still cannot execute until the repository/account billing or spending-limit issue
+  is fixed in GitHub settings.
+
+## Phase 2.8N - API RBAC matrix hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Replaced the narrow member-only authorization check with an explicit
+  Owner/Admin/Member RBAC matrix in `auth-billing.spec.ts`.
+- The matrix now proves members are blocked from team-admin actions, admins can
+  update settings/list members/invite/revoke invites/test SSO/remove non-owner
+  members, admins cannot change roles or remove owners, and owners can perform
+  owner-only role changes/removals while the final-owner guard remains covered by
+  the existing dedicated test.
+- Verification evidence in this continuation:
+  - Focused auth/billing spec passed: 17 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this strengthens API-layer RBAC proof, but the broader
+  hosted enterprise auth product surface remains future work.
+
+## Phase 2.8M - Session policy documentation
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Added README documentation for workspace session behavior: token hashes,
+  `AUTH_SESSION_TTL_HOURS`, expired/revoked session handling, logout semantics,
+  "sign out other devices", concurrent-session policy, failed-login lockout config,
+  and the anonymous-vs-account-gated feature boundary.
+- Verification evidence in this continuation:
+  - `npm run format:check` passed.
+- Known gaps carried forward: this documents the implemented local/session auth
+  policy, but production enterprise account UX, hosted team administration, full SSO
+  provider lifecycle, SCIM, and email delivery remain future phases.
+
+## Phase 2.8L - Release hygiene evidence polish
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Audited open-source/community health files and confirmed the repo includes
+  `README.md`, `LICENSE`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`,
+  `SUPPORT.md`, `GOVERNANCE.md`, `CHANGELOG.md`, GitHub issue templates, PR
+  template, CODEOWNERS, and Dependabot configuration while the GitHub repository
+  remains private.
+- Updated `CHANGELOG.md` so the Unreleased section reflects the current
+  production-readiness hardening work and the remaining honest future phases.
+- Updated `RELEASE-CHECKLIST.md` to require proof that GitHub Actions jobs can
+  actually start, explicitly calling out billing, spending-limit, and runner-quota
+  blockers, and added `npm run demo:up` to the clean-clone verification list.
+- Verification evidence in this continuation:
+  - `npm run format:check` passed.
+- Known gaps carried forward: GitHub PR `quality` remains externally blocked before
+  runner startup by account billing/spending-limit settings; that is a repository
+  administration task, not a code/test failure.
+
+## Phase 2.8K - Auth RBAC UI enforcement polish
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Tightened workspace team controls so role and removal buttons reflect the same
+  Owner/Admin/Member boundaries already enforced by the API.
+- Added member-row role badges, accessible role-change labels, accessible
+  member-specific remove buttons, and disabled-state reasons for admin-vs-owner
+  limits, self-removal, final-owner protection, and in-progress actions.
+- Updated the owner team-management test to act on a normal member rather than the
+  only owner, and added a focused admin RBAC UI regression proving admins can remove
+  members but cannot change roles or remove owners before the API would return 403.
+- Verification evidence in this continuation:
+  - Focused web App spec passed: 55 tests.
+  - Focused auth/API specs passed: 3 suites / 38 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this improves the existing auth product UX and UI-layer
+  RBAC proof, but full account/team product breadth such as SSO provider management
+  beyond the mock path, invitations UX at SaaS depth, and complete enterprise RBAC
+  workflows remain future phases.
+
+## Phase 2.8J - Diagram LLM fallback diagnostics
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Added optional Tier 3 LLM classifier diagnostics so unresolved review rows can
+  explain whether the classifier was unconfigured, returned malformed/no content, or
+  failed/timed out.
+- The default stub classifier now reports `Tier 3 LLM classifier not configured`,
+  preserving credential-free local behavior while making the fallback explicit.
+- Added parser-level coverage proving unresolved diagram nodes carry the LLM fallback
+  reason into `review.unresolvedClassifications`.
+- Verification evidence in this continuation:
+  - Focused diagram parser and LLM classifier specs passed: 2 suites / 25 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this hardens fallback transparency, but full visual VSDX
+  rendering and a production prompt/classifier evaluation corpus remain future work.
+
+## Phase 2.8I - AWS ETL network SKU hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Tightened AWS bulk catalog category filtering so Amazon EC2 instance products stay
+  in compute refreshes while EC2 data-transfer products can be ingested as network
+  catalog rows.
+- Expanded AWS network refresh coverage to include EC2 data-transfer rows in addition
+  to Amazon VPC rows, improving mainstream egress catalog coverage without requiring
+  live credentials in tests.
+- Added a mixed EC2 catalog regression test proving compute refresh excludes
+  data-transfer SKUs and network refresh includes a data-transfer SKU with source
+  metadata intact.
+- Verification evidence in this continuation:
+  - Focused AWS adapter spec passed: 8 tests.
+  - Provider/comparison adapter affected specs passed: 5 suites / 68 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this materially improves AWS public catalog ETL
+  coverage for egress-like rows, but complete invoice-grade live pricing across every
+  provider SKU remains future work.
+
+## Phase 2.8H - Pricing honesty UI labeling
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Tightened visible pricing copy so refresh actions are labeled `Refresh live catalog`,
+  reducing the chance that reviewers infer invoice/account-billing refresh semantics.
+- Updated calculation evidence copy to state that monthly totals use cached catalog
+  list rates and the 730-hours/month constant, and that private discounts, credits,
+  taxes, and actual billed usage are not included.
+- Verification evidence in this continuation:
+  - Focused web App spec passed: 54 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: full invoice-grade billing coverage still remains
+  future work; this slice only hardens product wording around the current
+  decision-grade catalog-list-price model.
+
+## Phase 2.8G - Catalog lineage readback hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Strengthened the persisted catalog lineage path: `pricing_catalog` reads now
+  select stored source endpoint, source record ID/key, transform version, and payload
+  hash columns and expose them back on catalog records for downstream trace
+  generation.
+- Updated the pricing lineage helper so it preserves persisted source record keys,
+  transform versions, and payload hashes when present instead of recomputing them
+  after a catalog row has been read from storage.
+- Added a repository regression test proving a catalog row read through
+  `PostgresPricingCatalogRepository.find()` can be turned into lineage evidence with
+  the persisted raw source ID/key/hash intact.
+- Verification evidence in this continuation:
+  - Focused repository/normalization/base-adapter specs passed: 4 suites / 32 tests.
+  - `npm run ci:lint` passed with zero warnings after removing a dynamic keyed
+    attribute write.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this improves queryable lineage for cached catalog
+  records, but full invoice-grade provider SKU coverage and GitHub Actions runner
+  availability still remain separate work.
+
+## Phase 2.8F - SKU evidence derivation hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Fixed catalog-backed pricing traces so derivation evidence carries the actual
+  workload quantity and computed hourly/monthly cost used by the line item instead
+  of always reporting quantity `1`. This improves the UI/report promise that a
+  visible cost can be expanded to SKU, source row, rate, and math evidence.
+- Added regression assertions for both hourly compute math and non-hourly storage
+  math in the base cloud provider adapter spec.
+- Verification evidence in this continuation:
+  - Focused base provider adapter spec passed: 14 tests.
+  - Affected pricing specs passed: 3 suites / 50 tests across base adapter, live
+    pricing traceability, and comparison orchestrator coverage.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this closes a trace-math correctness gap for
+  catalog-backed line items, but full invoice-grade live provider SKU coverage and
+  account-level GitHub Actions runner availability remain outside this slice.
+
+## Phase 2.8E - UI-priced service coverage guard
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Added an API comparison regression guard that snapshots the UI families currently
+  labeled `priced` and compares a coverage workload through AWS, Azure, and GCP mock
+  catalog adapters. The guard asserts catalog-backed compute/storage/database rows
+  plus modeled service-family SKUs for operations, runtime, analytics, integration,
+  networking, and security surfaces.
+- Closed a real mock-catalog gap found by that guard: managed cache was labeled
+  priced in the UI but mock provider database fixtures did not include Redis/cache
+  rows. Added Amazon ElastiCache Redis, Azure Managed Redis, and GCP Memorystore
+  rows so local/demo pricing does not fail that mainstream family.
+- Verification evidence in this continuation:
+  - Focused comparison orchestrator spec passed: 35 tests, including the new
+    all-priced-family coverage guard.
+  - Focused mock/pricing normalization specs passed: 3 suites / 9 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this materially improves local/mock no-rate coverage,
+  but it is still not full invoice-grade live provider SKU coverage. GitHub PR
+  `quality` remains externally blocked by account billing/spending-limit runner
+  startup failure.
+
+## Phase 2.8D - Security suppression cleanup
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Closed a suppression-ledger gap for `apps/api/src/api/regions.service.ts`: both
+  inline `security/detect-object-injection` suppressions now have dated comments
+  pointing to `docs/SECURITY-SUPPRESSIONS.md`, and the file is listed in the ledger.
+- Tightened the advisory ledger by linking the remaining low
+  `@ai-sdk/provider-utils` advisory directly to
+  `https://github.com/advisories/GHSA-866g-f22w-33x8`.
+- Added a CI workflow comment beside the QA step documenting why `npm run qa` can
+  pass on Node 20 while `scripts/impeccable-check.mjs` skips the Node 24-only
+  `impeccable@3.1.0` check.
+- Verification evidence in this continuation:
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run qa` passed and printed the documented Node 24-only impeccable skip.
+  - `npm run security:audit` passed the high/critical gate.
+  - `npm audit --audit-level=low` exits 1 only for the documented low
+    Graphify/Ollama transitive advisory with no fix available.
+- Known gaps carried forward: the low transitive advisory still requires an upstream
+  `@sentropic/graphify` / `ollama-ai-provider` dependency fix or dependency removal
+  decision before public release. GitHub PR `quality` remains externally blocked by
+  account billing/spending-limit runner startup failure.
+
+## Phase 2.8C - Diagram partial-parse hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- VSDX extraction now preserves valid pages when a later page has non-security XML
+  structure corruption. The API returns a review warning with page ID, page label,
+  source reference, and a `diagram.extraction.*` review field instead of silently
+  dropping the failure or discarding all valid pages.
+- Security boundary preserved: VSDX pages containing blocked XML entity declarations
+  still fail hard with `ApiValidationError` before partial-parse recovery is allowed.
+- Parser review model extended with extractor-level warnings so future diagram
+  extractors can report per-page/per-node recovery evidence without changing the
+  public comparison contract.
+- Verification evidence in this continuation:
+  - Focused API diagram parser test passed: 1 suite / 19 tests, including partial
+    VSDX recovery, unsafe VSDX rejection, VSDX masters/containers/connectors,
+    Tier-3 mocked LLM classification, oversized-node cap, and malicious fixture
+    rejection.
+  - `npm run format:check` passed.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run ci:unit` passed across API and web coverage suites.
+  - `npm run ci:build` passed for API and web production builds; the existing
+    `%VITE_API_BASE_URL%` build warning remains unchanged.
+  - `npm run ci:integration` passed with no integration tests found in current
+    workspaces.
+  - `npm run db:validate` passed; live `schema_migrations` check skipped because
+    Postgres was not running in that standalone command.
+  - `npm run provider:credentials:check` passed in mock-provider mode.
+  - `npm run security:audit` passed the high/critical gate while reporting the
+    already documented low Graphify/Ollama transitive advisory.
+  - `npm run graphify:validate`, `npm run qa`, `npm run devops:check`, and
+    `npm run cloud:check` passed. `qa` continues to document the Node 24-only
+    impeccable skip while the repo target remains Node 20.
+- Known gaps carried forward: this is extraction/review hardening, not full Visio
+  visual rendering. `npm run ci:e2e` was attempted with Docker access, but the local
+  Docker/Colima layer stopped returning `docker compose ps`/log diagnostics after API
+  startup failed; do not treat this as green evidence. PR `quality` CI failed before
+  any runner steps started because GitHub reported an account billing/spending-limit
+  issue; this is an external repository/account action, not a code failure.
+
+## Phase 2.8B - Invite/SSO auth hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Invite flow hardened: invitation responses now include a local preview URL, the API
+  exposes token preview status without accepting the invite, and the SPA reads
+  `?invite_token=...` links to show pending/expired/revoked/accepted landing states.
+- Mock SSO round-trip added: the API now supports signed mock OIDC start,
+  mock-authorize handoff, and callback completion that upserts/links an external
+  account, adds team membership, and issues the normal server-side account session.
+- SSO state signing guard added: `AUTH_SSO_STATE_SECRET` defaults to a local
+  `CHANGE_ME_DEV_ONLY` value, is documented in `.env.example`, and is rejected by
+  existing staging/production dummy-value validation unless replaced.
+- Verification evidence in this continuation:
+  - Focused API repository/auth/config tests: 4 suites, 48 tests passed.
+  - Focused web app/API-client tests: 2 suites, 78 tests passed.
+  - `npm run format:check` passed.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run ci:unit` passed: API 49 suites / 360 tests, web 9 suites / 124 tests.
+  - `npm run ci:build` passed for API and web production builds.
+  - `npm run ci:integration` passed with no integration tests found in current
+    workspaces.
+  - `npm run db:validate` passed; live schema check skipped because Postgres was not
+    running in that standalone command.
+  - `npm run provider:credentials:check` passed in mock-provider mode.
+  - `npm run security:audit` passed the high/critical gate; the documented low
+    Graphify/Ollama transitive advisory remains.
+  - `npm run ci:e2e` passed against Docker Compose: API E2E 14/14 and Playwright
+    browser E2E 6/6.
+- Known gaps carried forward: mock OIDC verifies the application handshake shape but
+  does not replace a full enterprise IdP certification matrix, SAML login round-trip,
+  SCIM, or production email delivery infrastructure.
+
+## Phase 2.8A - Auth product UX continuation
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Account product UX deepened: the protected API and workspace UI now cover profile
+  email/display-name updates, password changes, server-side account disablement,
+  active session listing, and "sign out other devices". Anonymous compare, diagram,
+  export, and share workflows remain available without an account.
+- Team product UX deepened: the protected API and workspace UI now cover team
+  creation, team-name updates, member listing, member removal, pending invite
+  listing, invite-token acceptance, and invite revocation.
+- Three-role RBAC tightened: product-facing roles are Owner, Admin, and Member.
+  Owners can change roles; owners/admins can manage members, invites, SSO setup, and
+  billing-import workflows; members keep comparison/report access. Legacy stored
+  `viewer` rows are normalized to Member at the repository boundary instead of
+  requiring a non-additive migration.
+- SSO readiness UX extended: OIDC/SAML provider metadata can be configured from the
+  workspace UI, callback URLs are visible via status, and the development
+  test-connection flow exercises the same API route without requiring production IdP
+  secrets.
+- Frontend markup hardening: the workspace session panel no longer nests forms inside
+  another form; login/register is a dedicated auth form and signed-in account/team
+  forms are valid sibling forms.
+- Documentation updated: README now separates anonymous core features from
+  account-gated workspace features, and `DUMMY-VALUES.md` documents mock SSO/invite
+  readiness and the production swap caveat.
+- Verification evidence in this continuation:
+  - Focused API auth/database tests: 3 suites, 35 tests passed.
+  - Focused web app/API-client tests: 2 suites, 77 tests passed.
+  - `npm run format:check` passed.
+  - `npm run ci:lint` passed with lint and typecheck across API, web, and shared
+    types.
+  - `npm run ci:unit` passed: API 49 suites / 357 tests, web 9 suites / 123 tests.
+  - `npm run ci:integration` passed with no integration tests found in current
+    workspaces.
+  - `npm run ci:build` passed for API and web production builds.
+  - `npm run db:validate` passed; live `schema_migrations` check skipped because
+    Postgres was not running in that standalone command.
+  - `npm run security:audit` passed the high/critical gate; the documented low
+    Graphify/Ollama transitive advisory remains.
+  - `npm run ci:e2e` passed against Docker Compose: API E2E 14/14 and Playwright
+    browser E2E 6/6.
+- Known gaps carried forward: this is not invoice-grade billing coverage for every
+  enterprise pricing edge case; VSDX remains extraction/review oriented rather than
+  pixel-perfect Visio rendering; SSO has configuration/test readiness but not a full
+  enterprise IdP login round-trip, email delivery, SCIM, org billing plans, or a
+  complete hosted account/team suite.
+
+## Phase 2.8 - Gap-closure production readiness
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Pricing traceability deepened: catalog-backed comparison traces now include source
+  endpoint/fixture URI, raw source record ID, transform version, source payload hash,
+  derivation math, and equivalence confidence. Derived compute, storage, and egress
+  cache rows persist lineage via additive migration `028_pricing_lineage_metadata.sql`.
+- Provider ETL metadata improved: AWS, Azure, GCP, and mock adapters stamp source
+  endpoint and raw source record IDs into normalized catalog attributes. Mock
+  fixtures continue through the same adapter/normalizer path used by real providers.
+- Reconciliation proof added: `pricing-reconciliation.spec.ts` recomputes at least 20
+  stored-rate assertions per provider across compute/storage/egress from raw source
+  records and verifies lineage hashes.
+- Credential/docs hardening added: `docs/PROVIDER-CREDENTIALS.md`,
+  `DUMMY-VALUES.md`, and README links document AWS/Azure/GCP setup, dummy-value
+  rules, and the `USE_MOCK_PROVIDERS=false` production swap. Config validation and
+  `provider-credential-check.mjs` now reject dummy secrets outside development/strict
+  mode.
+- Diagram pipeline hardened: parser node cap is now 200 with review warning; VSDX
+  extraction resolves masters/stencils, container IDs, connector waypoint aggregation,
+  and multi-page metadata; diagram review components now include classification
+  evidence. LLM classifier requests are bounded, retried on transient failures,
+  timeout-protected, and gracefully fall back to unresolved.
+- Auth/session hardening added: account sessions can be listed and other sessions
+  revoked via protected API routes and the workspace UI. Auth tests now cover
+  member/viewer forbidden behavior for admin-only team actions.
+- Security/release hygiene added: `docs/SECURITY-SUPPRESSIONS.md` records fixed and
+  justified ESLint security findings plus low transitive npm advisory status;
+  `RELEASE-CHECKLIST.md` defines the private-to-public release gate; CI now runs
+  provider credential readiness and DB migration validation in addition to existing
+  unit/integration/build/e2e/security gates.
+- Verification evidence in this run:
+  - Main commit `06a5cc9` GitHub `quality` check confirmed success before branching.
+  - Pricing/config focused API tests: 6 suites, 42 tests passed.
+  - Diagram focused API tests: 2 suites, 22 tests passed.
+  - Auth/API database focused tests: 2 suites, 31 tests passed.
+  - Web app/API-client focused tests: 2 suites, 76 tests passed.
+  - `npm run ci:lint` passed with zero emitted ESLint security warnings after reviewed suppressions.
+  - `npm run ci:unit` passed: API 48 suites / 353 tests, web 9 suites / 122 tests.
+  - `npm run ci:build`, `npm run ci:integration`, and `npm run security:audit` passed.
+  - Full `npm run ci:e2e` was attempted; Docker/Colima stalled during the web image
+    build. The same live-stack E2E suites were then verified by starting Compose
+    infra + the already-built API image and local Vite: API MVP E2E 14/14 passed,
+    Playwright browser E2E 6/6 passed.
+  - `npm run demo:artifacts` passed and refreshed `docs/demo-artifacts/` screenshots/video.
+  - `npm audit --audit-level=low` was rerun with registry access; it exits 1 only
+    for the documented low Graphify/Ollama transitive advisory with no fix available.
+  - `npm run db:validate` passed; live schema check skipped because Postgres was not running.
+  - `npm run db:migrate` applied migration 028 successfully against Compose Postgres.
+  - `npm run provider:credentials:check` passed in mock-provider mode.
+  - `npm run security:audit` passed high/critical gate; low Graphify/Ollama advisory remains documented.
+- Known gaps carried forward: not full invoice-grade live billing/pricing coverage;
+  VSDX is stronger extraction and layout awareness, not pixel-perfect Visio visual
+  rendering; auth has sessions/team/invite/SSO readiness primitives and UI, but not
+  full enterprise SSO login, email delivery, account deletion, org billing plans, or
+  complete RBAC product experience.
 
 ## Phase 2.7 - Invoice/auth/VSDX gap closure
 

@@ -4,8 +4,9 @@ import { AppConfig } from '../config/config.schema';
 import { ApiForbiddenError, ApiUnauthorizedError } from './api-errors';
 import { ApiDatabaseRepository, LocalAccountWithPassword } from './api-database.repository';
 import { AuthService } from './auth.service';
-import { AuthIdentity } from './auth.types';
+import { AuthIdentity, TeamRole } from './auth.types';
 import { BillingService } from './billing.service';
+import { hashPassword } from './password-hash';
 
 const account: LocalAccountWithPassword = {
   accountId: '11111111-1111-4111-8111-111111111111',
@@ -188,22 +189,216 @@ describe('AuthService', () => {
       account.defaultTeam!.teamId,
       {
         email: 'FinOps@Example.com',
-        role: 'viewer',
+        role: 'member',
       },
       identity,
     );
 
     expect(invitation.inviteToken).toEqual(expect.any(String));
+    expect(invitation.inviteUrl).toContain('/?invite_token=');
     expect(repository.createTeamInvitation).toHaveBeenCalledWith(
       expect.objectContaining({
         email: 'finops@example.com',
-        role: 'viewer',
+        role: 'member',
         tokenHash: expect.stringMatching(/^[a-f0-9]{64}$/),
       }),
     );
     expect(repository.createTeamInvitation.mock.calls[0][0].tokenHash).not.toBe(
       invitation.inviteToken,
     );
+  });
+
+  it('previews invalid and expired invitation landing states without accepting them', async () => {
+    const repository = repositoryMock();
+    const service = new AuthService(repository as never, configService());
+
+    repository.findInvitationByTokenHash.mockResolvedValueOnce(undefined);
+    await expect(service.previewInvitation('missing-token')).resolves.toEqual({
+      status: 'invalid',
+      message: 'Invitation token was not found.',
+    });
+
+    repository.findInvitationByTokenHash.mockResolvedValueOnce({
+      id: '88888888-8888-4888-8888-888888888888',
+      teamId: account.defaultTeam!.teamId,
+      email: 'finops@example.com',
+      role: 'member',
+      status: 'pending',
+      invitedByAccountId: account.accountId,
+      expiresAt: '2026-01-01T00:00:00.000Z',
+      createdAt: '2025-12-25T00:00:00.000Z',
+    });
+
+    await expect(service.previewInvitation('expired-token')).resolves.toMatchObject({
+      status: 'expired',
+      email: 'finops@example.com',
+      message: expect.stringContaining('expired'),
+    });
+  });
+
+  it('updates account profile, changes password, and deactivates account with current password checks', async () => {
+    const repository = repositoryMock();
+    repository.findLocalAccountByEmail.mockResolvedValue({
+      ...account,
+      passwordHash: hashPassword('correct horse battery staple'),
+    });
+    repository.updateAccountProfile.mockResolvedValue({
+      id: account.accountId,
+      email: 'lead@example.com',
+      displayName: 'Lead Architect',
+      status: 'active',
+    });
+    repository.updateAccountPassword.mockResolvedValue(true);
+    repository.deactivateAccount.mockResolvedValue({
+      id: account.accountId,
+      email: account.email,
+      displayName: account.displayName,
+      status: 'disabled',
+    });
+    const service = new AuthService(repository as never, configService());
+
+    await expect(
+      service.updateProfile(
+        {
+          email: 'lead@example.com',
+          displayName: 'Lead Architect',
+          currentPassword: 'correct horse battery staple',
+        },
+        identity,
+      ),
+    ).resolves.toMatchObject({
+      email: 'lead@example.com',
+      displayName: 'Lead Architect',
+    });
+    expect(repository.updateAccountProfile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountId: account.accountId,
+        email: 'lead@example.com',
+        externalSubjectHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }),
+    );
+
+    await expect(
+      service.changePassword(
+        {
+          currentPassword: 'correct horse battery staple',
+          newPassword: 'new correct horse battery staple',
+        },
+        identity,
+      ),
+    ).resolves.toEqual({ changed: true });
+    expect(repository.updateAccountPassword).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountId: account.accountId,
+        passwordHash: expect.stringMatching(/^scrypt:v1:/),
+      }),
+    );
+
+    await expect(
+      service.deleteAccount(
+        {
+          currentPassword: 'correct horse battery staple',
+          confirmation: 'DELETE',
+        },
+        identity,
+      ),
+    ).resolves.toEqual({ deleted: true });
+    expect(repository.deactivateAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountId: account.accountId,
+      }),
+    );
+  });
+
+  it('creates teams, updates team settings, revokes invites, and configures mock-tested SSO', async () => {
+    const repository = repositoryMock();
+    repository.createTeamForAccount.mockResolvedValue({
+      teamId: '55555555-5555-4555-8555-555555555555',
+      teamName: 'Platform team',
+      plan: 'oss',
+      role: 'owner',
+      updatedAt: '2026-07-06T00:00:00.000Z',
+    });
+    repository.updateTeamSettings.mockResolvedValue({
+      teamId: account.defaultTeam!.teamId,
+      teamName: 'Architecture platform',
+      plan: 'oss',
+      role: 'owner',
+      updatedAt: '2026-07-06T00:00:00.000Z',
+    });
+    repository.revokeTeamInvitation.mockResolvedValue({
+      id: '88888888-8888-4888-8888-888888888888',
+      teamId: account.defaultTeam!.teamId,
+      email: 'finops@example.com',
+      role: 'member',
+      status: 'revoked',
+      invitedByAccountId: account.accountId,
+      expiresAt: '2026-07-13T00:00:00.000Z',
+      createdAt: '2026-07-06T00:00:00.000Z',
+      revokedAt: '2026-07-06T00:05:00.000Z',
+    });
+    repository.upsertSsoProviderConfig.mockResolvedValue({
+      providerType: 'oidc',
+      displayName: 'Corporate OIDC',
+      issuerUrl: 'https://idp.example.com',
+      status: 'configured',
+    });
+    const service = new AuthService(repository as never, configService());
+
+    await expect(
+      service.createTeam({ teamName: 'Platform team' }, identity),
+    ).resolves.toMatchObject({
+      teamName: 'Platform team',
+      role: 'owner',
+    });
+    await expect(
+      service.updateTeamSettings(
+        account.defaultTeam!.teamId,
+        { teamName: 'Architecture platform' },
+        identity,
+      ),
+    ).resolves.toMatchObject({
+      teamName: 'Architecture platform',
+    });
+    await expect(
+      service.revokeTeamInvitation(
+        account.defaultTeam!.teamId,
+        '88888888-8888-4888-8888-888888888888',
+        identity,
+      ),
+    ).resolves.toMatchObject({
+      status: 'revoked',
+    });
+    await expect(
+      service.configureSsoProvider(
+        account.defaultTeam!.teamId,
+        {
+          providerType: 'oidc',
+          displayName: 'Corporate OIDC',
+          issuerUrl: 'https://idp.example.com',
+          clientId: 'polycost-client-id',
+          clientSecret: 'CHANGE_ME_DEV_ONLY',
+        },
+        identity,
+      ),
+    ).resolves.toMatchObject({
+      providerType: 'oidc',
+      status: 'configured',
+    });
+    await expect(
+      service.testSsoConnection(
+        account.defaultTeam!.teamId,
+        {
+          providerType: 'oidc',
+          displayName: 'Corporate OIDC',
+          issuerUrl: 'https://idp.example.com',
+        },
+        identity,
+      ),
+    ).resolves.toMatchObject({
+      ok: true,
+      providerType: 'oidc',
+    });
   });
 
   it('protects the final team owner from accidental demotion', async () => {
@@ -220,6 +415,32 @@ describe('AuthService', () => {
           role: 'admin',
         },
         identity,
+      ),
+    ).rejects.toThrow(ApiForbiddenError);
+    expect(repository.updateTeamMemberRole).not.toHaveBeenCalled();
+  });
+
+  it('requires owner access for role changes', async () => {
+    const repository = repositoryMock();
+    repository.getTeamMembership.mockResolvedValue({
+      teamId: account.defaultTeam!.teamId,
+      teamName: account.defaultTeam!.teamName,
+      role: 'admin',
+    });
+    const service = new AuthService(repository as never, configService());
+    const adminIdentity: AuthIdentity = {
+      ...identity,
+      role: 'admin',
+    };
+
+    await expect(
+      service.updateTeamMemberRole(
+        account.defaultTeam!.teamId,
+        account.accountId,
+        {
+          role: 'member',
+        },
+        adminIdentity,
       ),
     ).rejects.toThrow(ApiForbiddenError);
     expect(repository.updateTeamMemberRole).not.toHaveBeenCalled();
@@ -252,6 +473,299 @@ describe('AuthService', () => {
         saml: 'http://localhost:3001/api/v1/auth/sso/saml/acs',
       },
     });
+  });
+
+  it('runs the mock OIDC start, authorize, and callback flow through server sessions', async () => {
+    const repository = repositoryMock();
+    repository.listSsoProviderConfigs.mockResolvedValue([
+      {
+        providerType: 'oidc',
+        displayName: 'Corporate OIDC',
+        issuerUrl: 'https://idp.example.com',
+        status: 'configured',
+      },
+    ]);
+    repository.upsertExternalAccountForTeam.mockResolvedValue({
+      accountId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      email: 'sso.user@example.com',
+      displayName: 'SSO User',
+      status: 'active',
+      defaultTeam: {
+        teamId: account.defaultTeam!.teamId,
+        teamName: account.defaultTeam!.teamName,
+        role: 'member',
+      },
+    });
+    repository.createSession.mockResolvedValue({
+      sessionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      expiresAt: '2026-07-07T00:00:00.000Z',
+    });
+    const service = new AuthService(repository as never, configService());
+
+    const start = await service.startMockOidcLogin({
+      teamId: account.defaultTeam!.teamId,
+      email: 'sso.user@example.com',
+    });
+    expect(start.authorizationUrl).toContain('/api/v1/auth/sso/mock/oidc/authorize');
+
+    const authorize = service.mockOidcAuthorize({
+      state: start.state,
+      email: 'sso.user@example.com',
+    });
+    expect(authorize.redirectUrl).toContain('/api/v1/auth/sso/oidc/callback');
+
+    const callback = await service.completeMockOidcCallback(
+      {
+        state: start.state,
+        email: 'sso.user@example.com',
+        displayName: 'SSO User',
+      },
+      {
+        ip: '127.0.0.1',
+        userAgent: 'jest',
+      },
+    );
+
+    expect(callback.token).toEqual(expect.any(String));
+    expect(callback.account.email).toBe('sso.user@example.com');
+    expect(callback.team?.role).toBe('member');
+    expect(callback.sso).toMatchObject({
+      providerType: 'oidc',
+      issuerUrl: 'https://idp.example.com',
+      stateVerified: true,
+    });
+    expect(repository.upsertExternalAccountForTeam).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authProvider: 'oidc',
+        defaultRole: 'member',
+        externalSubjectHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }),
+    );
+    expect(repository.createSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        teamId: account.defaultTeam!.teamId,
+        tokenHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }),
+    );
+  });
+
+  it('lists active account sessions and revokes other devices without touching current session', async () => {
+    const repository = repositoryMock();
+    repository.listAccountSessions.mockResolvedValue([
+      {
+        id: identity.sessionId,
+        current: true,
+        createdAt: '2026-07-06T00:00:00.000Z',
+        lastSeenAt: '2026-07-06T00:10:00.000Z',
+        expiresAt: identity.expiresAt,
+        hasUserAgent: true,
+        hasIp: true,
+      },
+      {
+        id: '99999999-9999-4999-8999-999999999999',
+        current: false,
+        createdAt: '2026-07-05T00:00:00.000Z',
+        lastSeenAt: '2026-07-05T00:10:00.000Z',
+        expiresAt: identity.expiresAt,
+        hasUserAgent: true,
+        hasIp: false,
+      },
+    ]);
+    repository.revokeOtherSessions.mockResolvedValue(1);
+    const service = new AuthService(repository as never, configService());
+
+    await expect(service.listSessions(identity)).resolves.toEqual([
+      expect.objectContaining({
+        id: identity.sessionId,
+        current: true,
+        hasUserAgent: true,
+        hasIp: true,
+      }),
+      expect.objectContaining({
+        current: false,
+      }),
+    ]);
+    await expect(service.revokeOtherSessions(identity)).resolves.toEqual({ revoked: 1 });
+    expect(repository.revokeOtherSessions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountId: identity.accountId,
+        currentSessionId: identity.sessionId,
+        revokedAt: expect.any(String),
+      }),
+    );
+  });
+
+  it('enforces the team RBAC matrix for member, admin, and owner actions', async () => {
+    const repository = repositoryMock();
+    repository.listTeamMembers.mockResolvedValue([
+      {
+        accountId: account.accountId,
+        email: account.email,
+        displayName: account.displayName,
+        role: 'owner',
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+      {
+        accountId: '99999999-9999-4999-8999-999999999999',
+        email: 'member@example.com',
+        role: 'member',
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+    ]);
+    repository.updateTeamSettings.mockImplementation(async (input) => ({
+      teamId: input.teamId,
+      teamName: input.teamName,
+      plan: 'oss',
+      role: 'admin',
+      updatedAt: '2026-07-06T00:00:00.000Z',
+    }));
+    repository.createTeamInvitation.mockImplementation(async (input) => ({
+      id: '88888888-8888-4888-8888-888888888888',
+      teamId: input.teamId,
+      email: input.email,
+      role: input.role,
+      status: 'pending',
+      invitedByAccountId: input.invitedByAccountId,
+      expiresAt: input.expiresAt,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    }));
+    repository.revokeTeamInvitation.mockResolvedValue({
+      id: '88888888-8888-4888-8888-888888888888',
+      teamId: account.defaultTeam!.teamId,
+      email: 'finops@example.com',
+      role: 'member',
+      status: 'revoked',
+      invitedByAccountId: account.accountId,
+      expiresAt: '2026-07-13T00:00:00.000Z',
+      createdAt: '2026-07-06T00:00:00.000Z',
+      revokedAt: '2026-07-06T00:05:00.000Z',
+    });
+    repository.upsertSsoProviderConfig.mockResolvedValue({
+      providerType: 'oidc',
+      displayName: 'Corporate OIDC',
+      issuerUrl: 'https://idp.example.com',
+      status: 'configured',
+    });
+    repository.getTeamMembership.mockImplementation(async ({ accountId }) => ({
+      teamId: account.defaultTeam!.teamId,
+      teamName: account.defaultTeam!.teamName,
+      role: accountId === account.accountId ? 'owner' : 'member',
+    }));
+    repository.updateTeamMemberRole.mockImplementation(async (input) => ({
+      accountId: input.accountId,
+      email: 'member@example.com',
+      role: input.role,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    }));
+    repository.removeTeamMember.mockResolvedValue(true);
+    repository.countTeamOwners.mockResolvedValue(2);
+    const service = new AuthService(repository as never, configService());
+    const memberIdentity = identityWithRole('member');
+    const adminIdentity = identityWithRole('admin');
+    const ownerIdentity = identityWithRole('owner');
+
+    await expectForbidden(
+      service.updateTeamSettings(
+        account.defaultTeam!.teamId,
+        { teamName: 'Member edit' },
+        memberIdentity,
+      ),
+      'Team admin access is required',
+    );
+    await expectForbidden(
+      service.listTeamMembers(account.defaultTeam!.teamId, memberIdentity),
+      'Team admin access is required',
+    );
+    await expectForbidden(
+      service.inviteTeamMember(
+        account.defaultTeam!.teamId,
+        { email: 'new@example.com', role: 'member' },
+        memberIdentity,
+      ),
+      'Team admin access is required',
+    );
+    await expectForbidden(
+      service.configureSsoProvider(
+        account.defaultTeam!.teamId,
+        {
+          providerType: 'oidc',
+          displayName: 'Corporate OIDC',
+          issuerUrl: 'https://idp.example.com',
+        },
+        memberIdentity,
+      ),
+      'Team admin access is required',
+    );
+
+    await expect(
+      service.updateTeamSettings(
+        account.defaultTeam!.teamId,
+        { teamName: 'Admin edit' },
+        adminIdentity,
+      ),
+    ).resolves.toMatchObject({ teamName: 'Admin edit' });
+    await expect(
+      service.listTeamMembers(account.defaultTeam!.teamId, adminIdentity),
+    ).resolves.toHaveLength(2);
+    await expect(
+      service.inviteTeamMember(
+        account.defaultTeam!.teamId,
+        { email: 'new@example.com', role: 'member' },
+        adminIdentity,
+      ),
+    ).resolves.toMatchObject({ email: 'new@example.com', role: 'member' });
+    await expect(
+      service.revokeTeamInvitation(
+        account.defaultTeam!.teamId,
+        '88888888-8888-4888-8888-888888888888',
+        adminIdentity,
+      ),
+    ).resolves.toMatchObject({ status: 'revoked' });
+    await expect(
+      service.testSsoConnection(
+        account.defaultTeam!.teamId,
+        {
+          providerType: 'oidc',
+          displayName: 'Corporate OIDC',
+          issuerUrl: 'https://idp.example.com',
+        },
+        adminIdentity,
+      ),
+    ).resolves.toMatchObject({ ok: true });
+    await expect(
+      service.removeTeamMember(
+        account.defaultTeam!.teamId,
+        '99999999-9999-4999-8999-999999999999',
+        adminIdentity,
+      ),
+    ).resolves.toEqual({ removed: true });
+
+    await expectForbidden(
+      service.updateTeamMemberRole(
+        account.defaultTeam!.teamId,
+        '99999999-9999-4999-8999-999999999999',
+        { role: 'admin' },
+        adminIdentity,
+      ),
+      'Team owner access is required',
+    );
+    await expectForbidden(
+      service.removeTeamMember(account.defaultTeam!.teamId, account.accountId, adminIdentity),
+      'Only team owners can remove owners',
+    );
+
+    await expect(
+      service.updateTeamMemberRole(
+        account.defaultTeam!.teamId,
+        '99999999-9999-4999-8999-999999999999',
+        { role: 'admin' },
+        ownerIdentity,
+      ),
+    ).resolves.toMatchObject({ role: 'admin' });
+    await expect(
+      service.removeTeamMember(account.defaultTeam!.teamId, account.accountId, ownerIdentity),
+    ).resolves.toEqual({ removed: true });
   });
 });
 
@@ -490,21 +1004,32 @@ function repositoryMock() {
   return {
     findLocalAccountByEmail: jest.fn(),
     createLocalAccountWithTeam: jest.fn(),
+    updateAccountProfile: jest.fn(),
+    updateAccountPassword: jest.fn(),
+    deactivateAccount: jest.fn(),
     createSession: jest.fn(),
+    listAccountSessions: jest.fn(),
+    revokeOtherSessions: jest.fn(),
     recordFailedLogin: jest.fn(),
     resetFailedLogin: jest.fn(),
     resolveSession: jest.fn(),
     listAccountTeams: jest.fn(),
+    createTeamForAccount: jest.fn(),
+    updateTeamSettings: jest.fn(),
     getTeamMembership: jest.fn(),
     listTeamMembers: jest.fn(),
     createTeamInvitation: jest.fn(),
     listTeamInvitations: jest.fn(),
+    revokeTeamInvitation: jest.fn(),
+    findInvitationByTokenHash: jest.fn(),
     findPendingInvitationByTokenHash: jest.fn(),
     acceptTeamInvitation: jest.fn(),
     countTeamOwners: jest.fn(),
     updateTeamMemberRole: jest.fn(),
     removeTeamMember: jest.fn(),
     listSsoProviderConfigs: jest.fn(),
+    upsertSsoProviderConfig: jest.fn(),
+    upsertExternalAccountForTeam: jest.fn(),
     createBillingImport: jest.fn(),
     getBillingImport: jest.fn(),
     listInvoiceLineItems: jest.fn(),
@@ -512,6 +1037,18 @@ function repositoryMock() {
     saveInvoiceReconciliation: jest.fn(),
     listInvoiceReconciliations: jest.fn(),
   } as unknown as jest.Mocked<ApiDatabaseRepository>;
+}
+
+function identityWithRole(role: TeamRole): AuthIdentity {
+  return {
+    ...identity,
+    role,
+  };
+}
+
+async function expectForbidden(promise: Promise<unknown>, message: string): Promise<void> {
+  await expect(promise).rejects.toThrow(ApiForbiddenError);
+  await expect(promise).rejects.toThrow(message);
 }
 
 function configService(): ConfigService<AppConfig, true> {
@@ -530,6 +1067,8 @@ function configService(): ConfigService<AppConfig, true> {
           return true;
         case 'AUTH_PUBLIC_BASE_URL':
           return 'http://localhost:3001';
+        case 'AUTH_SSO_STATE_SECRET':
+          return 'test-sso-state-secret-value';
         case 'AUTH_OIDC_ISSUER_URL':
           return 'https://idp.example.com';
         case 'AUTH_SAML_ENTITY_ID':

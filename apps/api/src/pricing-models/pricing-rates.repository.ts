@@ -47,6 +47,11 @@ interface PricingRateSqlRow {
   estimate_range_high_usd: string | null;
   source_fetched_at: Date;
   valid_from: Date;
+  source_endpoint: string | null;
+  source_record_id: string | null;
+  source_record_key: string | null;
+  transform_version: string | null;
+  source_payload_hash: string | null;
 }
 
 const defaultPgPoolFactory: PgPoolFactory = (config) => new Pool(config);
@@ -134,7 +139,12 @@ export class PostgresPricingRatesRepository implements PricingRateReader, OnModu
                pricing_rates.estimate_range_low_usd,
                pricing_rates.estimate_range_high_usd,
                pricing_rates.source_fetched_at,
-               pricing_rates.valid_from
+               pricing_rates.valid_from,
+               pricing_rates.source_endpoint,
+               pricing_rates.source_record_id,
+               pricing_rates.source_record_key,
+               pricing_rates.transform_version,
+               pricing_rates.source_payload_hash
         FROM provider_skus
         JOIN pricing_rates
           ON pricing_rates.sku_id = provider_skus.id
@@ -206,6 +216,11 @@ function toPricingRateRecord(row: PricingRateSqlRow): PricingRateRecord {
     sourceFetchedAt: row.source_fetched_at.toISOString(),
     validFrom: row.valid_from.toISOString(),
     source: 'pricing_rates',
+    ...(row.source_endpoint ? { sourceEndpoint: row.source_endpoint } : {}),
+    ...(row.source_record_id ? { sourceRecordId: row.source_record_id } : {}),
+    ...(row.source_record_key ? { sourceRecordKey: row.source_record_key } : {}),
+    ...(row.transform_version ? { transformVersion: row.transform_version } : {}),
+    ...(row.source_payload_hash ? { sourcePayloadHash: row.source_payload_hash } : {}),
   };
 }
 

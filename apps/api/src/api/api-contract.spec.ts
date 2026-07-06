@@ -109,6 +109,76 @@ const comparisonResult: ComparisonResult = {
   ],
 };
 
+const traceableComparisonResult: ComparisonResult = {
+  ...comparisonResult,
+  providers: [
+    {
+      providerId: 'aws',
+      lineItems: [
+        {
+          category: 'compute',
+          costComponent: 'compute',
+          description: 'web compute',
+          isApproximate: false,
+          baseHourlyCostUsd: 0.096,
+          baseMonthlyCostUsd: 70.08,
+          skuId: 'm7i.large',
+          region: 'us-east-1',
+          unit: 'hour',
+          unitPriceUsd: 0.096,
+          pricingBasis: 'flat',
+          rateSource: 'pricing_catalog',
+          rateSourceSkuId: 'aws-compute-m7i-large',
+          rateCurrency: 'USD',
+          rateValidFrom: '2026-07-01T00:00:00.000Z',
+          rateSourceFetchedAt: '2026-07-06T01:00:00.000Z',
+          pricingTrace: {
+            providerId: 'aws',
+            serviceCategory: 'compute',
+            costComponent: 'compute',
+            source: 'pricing_catalog',
+            sourceRecordKey: 'aws|compute|m7i.large|us-east-1|hour|2026-07-01T00:00:00.000Z',
+            resolvedSkuId: 'm7i.large',
+            sourceSkuId: 'aws-compute-m7i-large',
+            providerServiceName: 'AmazonEC2',
+            skuDescription: 'm7i.large Linux shared tenancy',
+            region: 'us-east-1',
+            catalogRegion: 'us-east-1',
+            unit: 'hour',
+            unitPriceUsd: 0.096,
+            currency: 'USD',
+            effectiveDate: '2026-07-01T00:00:00.000Z',
+            fetchedAt: '2026-07-06T01:00:00.000Z',
+            sourceEndpoint: 'mock://aws/pricing',
+            sourceRecordId: 'aws-compute-m7i-large',
+            transformVersion: 'mock-v1',
+            sourcePayloadHash: 'a'.repeat(64),
+            derivation: {
+              expression: '0.096 hourly USD x 730 monthly hours',
+              unitPriceUsd: 0.096,
+              quantity: 1,
+              hourlyCostUsd: 0.096,
+              monthlyCostUsd: 70.08,
+              monthlyHours: 730,
+            },
+            equivalenceConfidence: 'direct',
+            pricingBasis: 'flat',
+            isApproximate: false,
+            isEstimate: false,
+          },
+        },
+      ],
+      totals: {
+        daily: 2.3,
+        weekly: 16.13,
+        monthly: 70.08,
+        quarterly: 210.24,
+        yearly: 840.96,
+      },
+    },
+  ],
+};
+
 const freshDataHealth: DataHealthResponse = {
   generatedAt: '2026-07-01T00:00:00.000Z',
   freshnessPolicyHours: 48,
@@ -371,6 +441,82 @@ describe('API contracts', () => {
         response,
       ),
     ).resolves.toEqual(comparisonResult);
+    expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
+  });
+
+  it('GET /comparisons/:id/evidence returns SKU-to-estimate lineage and derivation math', async () => {
+    const service = comparisonApplicationService(traceableComparisonResult);
+    const controller = comparisonsController(service);
+    const response = {
+      header: jest.fn(),
+    };
+
+    await expect(
+      controller.evidence(
+        traceableComparisonResult.comparisonId,
+        {
+          ip: '127.0.0.1',
+          headers: {},
+        },
+        response,
+      ),
+    ).resolves.toMatchObject({
+      comparisonId: traceableComparisonResult.comparisonId,
+      pricingAsOf: traceableComparisonResult.pricingAsOf,
+      providerCount: 1,
+      lineItemCount: 1,
+      evidence: [
+        {
+          providerId: 'aws',
+          lineItemIndex: 0,
+          category: 'compute',
+          description: 'web compute',
+          displayedAmounts: {
+            monthlyCostUsd: 70.08,
+            hourlyCostUsd: 0.096,
+            providerTotals: traceableComparisonResult.providers[0].totals,
+          },
+          sku: {
+            resolvedSkuId: 'm7i.large',
+            sourceSkuId: 'aws-compute-m7i-large',
+            providerServiceName: 'AmazonEC2',
+            skuDescription: 'm7i.large Linux shared tenancy',
+            region: 'us-east-1',
+            catalogRegion: 'us-east-1',
+          },
+          rate: {
+            source: 'pricing_catalog',
+            sourceRecordKey: 'aws|compute|m7i.large|us-east-1|hour|2026-07-01T00:00:00.000Z',
+            sourceEndpoint: 'mock://aws/pricing',
+            sourceRecordId: 'aws-compute-m7i-large',
+            transformVersion: 'mock-v1',
+            sourcePayloadHash: 'a'.repeat(64),
+            unit: 'hour',
+            unitPriceUsd: 0.096,
+            currency: 'USD',
+            effectiveDate: '2026-07-01T00:00:00.000Z',
+            fetchedAt: '2026-07-06T01:00:00.000Z',
+            pricingBasis: 'flat',
+          },
+          derivation: {
+            expression: '0.096 hourly USD x 730 monthly hours',
+            unitPriceUsd: 0.096,
+            quantity: 1,
+            hourlyCostUsd: 0.096,
+            monthlyCostUsd: 70.08,
+            monthlyHours: 730,
+          },
+          equivalence: {
+            confidence: 'direct',
+            isApproximate: false,
+            isEstimate: false,
+          },
+        },
+      ],
+    });
+    expect(service.getComparisonPricingEvidence).toHaveBeenCalledWith(
+      traceableComparisonResult.comparisonId,
+    );
     expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
   });
 
@@ -1197,6 +1343,50 @@ describe('API contracts', () => {
     await expect(service.getPricingStatus()).resolves.toEqual({ providers: [] });
   });
 
+  it('builds comparison pricing evidence from stored snapshots', async () => {
+    const repository = {
+      getComparison: jest.fn(async () => ({
+        nwsSnapshot: validNws,
+        resultSnapshot: traceableComparisonResult,
+      })),
+    };
+    const service = new ComparisonApplicationService(
+      {
+        compare: jest.fn(),
+      } as never,
+      repository as never,
+    );
+
+    await expect(
+      service.getComparisonPricingEvidence(traceableComparisonResult.comparisonId),
+    ).resolves.toMatchObject({
+      comparisonId: traceableComparisonResult.comparisonId,
+      pricingAsOf: traceableComparisonResult.pricingAsOf,
+      providerCount: 1,
+      lineItemCount: 1,
+      evidence: [
+        expect.objectContaining({
+          evidenceId: expect.stringContaining('aws:0:aws|compute|m7i.large'),
+          providerId: 'aws',
+          displayedAmounts: expect.objectContaining({
+            monthlyCostUsd: 70.08,
+            hourlyCostUsd: 0.096,
+          }),
+          rate: expect.objectContaining({
+            sourceRecordId: 'aws-compute-m7i-large',
+            sourcePayloadHash: 'a'.repeat(64),
+            fetchedAt: '2026-07-06T01:00:00.000Z',
+          }),
+          derivation: expect.objectContaining({
+            expression: '0.096 hourly USD x 730 monthly hours',
+            monthlyCostUsd: 70.08,
+            monthlyHours: 730,
+          }),
+        }),
+      ],
+    });
+  });
+
   it('merges live-refresh warnings into refreshed comparison snapshots', async () => {
     const refreshedResult: ComparisonResult = {
       ...comparisonResult,
@@ -1329,14 +1519,27 @@ describe('API contracts', () => {
   });
 });
 
-function comparisonApplicationService() {
+function comparisonApplicationService(result: ComparisonResult = comparisonResult) {
   return {
-    createComparison: jest.fn(async () => comparisonResult),
+    createComparison: jest.fn(async () => result),
     getComparison: jest.fn(async () => ({
       nwsSnapshot: validNws,
-      resultSnapshot: comparisonResult,
+      resultSnapshot: result,
     })),
-    refreshLiveComparison: jest.fn(async () => comparisonResult),
+    getComparisonPricingEvidence: jest.fn(async () =>
+      new ComparisonApplicationService(
+        {
+          compare: jest.fn(),
+        } as never,
+        {
+          getComparison: jest.fn(async () => ({
+            nwsSnapshot: validNws,
+            resultSnapshot: result,
+          })),
+        } as never,
+      ).getComparisonPricingEvidence(result.comparisonId),
+    ),
+    refreshLiveComparison: jest.fn(async () => result),
     getPricingStatus: jest.fn(async () => ({
       providers: [
         {

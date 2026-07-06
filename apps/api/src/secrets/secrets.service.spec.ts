@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-object-injection, security/detect-non-literal-fs-filename -- Reviewed 2026-07-06: secret tests use controlled env keys and temp fixture files only; see docs/SECURITY-SUPPRESSIONS.md. */
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

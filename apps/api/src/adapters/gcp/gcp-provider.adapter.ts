@@ -1,4 +1,5 @@
 import { SecretsReader } from '../../secrets/secrets.service';
+/* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: provider catalog keys are controlled GCP Cloud Billing fields, not arbitrary user mutation; see docs/SECURITY-SUPPRESSIONS.md. */
 import { BaseCloudProviderAdapter } from '../common/base-cloud-provider.adapter';
 import {
   PricingCatalogReader,
@@ -178,7 +179,9 @@ export class GcpProviderAdapter extends BaseCloudProviderAdapter {
       const parsed = await parseJsonResponse<GcpSkusResponse>(this.providerId, response);
 
       records.push(
-        ...parsed.skus.flatMap((sku) => this.normalizeSku(sku, category, fetchedAt, region)),
+        ...parsed.skus.flatMap((sku) =>
+          this.normalizeSku(serviceName, sku, category, fetchedAt, region),
+        ),
       );
       pageToken = parsed.nextPageToken;
     } while (pageToken);
@@ -187,6 +190,7 @@ export class GcpProviderAdapter extends BaseCloudProviderAdapter {
   }
 
   private normalizeSku(
+    serviceName: string,
     sku: GcpSku,
     category: ServiceCategory,
     fetchedAt: string,
@@ -214,6 +218,8 @@ export class GcpProviderAdapter extends BaseCloudProviderAdapter {
       unitPriceUsd: moneyToNumber(price.units, price.nanos),
       attributes: {
         pricingModel: 'on-demand',
+        sourceEndpoint: `https://cloudbilling.googleapis.com/v1/${serviceName}/skus`,
+        rawSourceRecordId: sku.skuId,
         resourceFamily: sku.category.resourceFamily,
         resourceGroup: sku.category.resourceGroup,
         usageType: sku.category.usageType,

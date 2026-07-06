@@ -51,6 +51,11 @@ export interface PricingRateRecord {
   sourceFetchedAt: string;
   validFrom: string;
   source: PricingRateSource;
+  sourceEndpoint?: string;
+  sourceRecordId?: string;
+  sourceRecordKey?: string;
+  transformVersion?: string;
+  sourcePayloadHash?: string;
   unavailableReason?: string;
 }
 
@@ -90,6 +95,11 @@ export interface RateResult {
   lastFetchedAt: string;
   validFrom: string;
   source: PricingRateSource;
+  sourceEndpoint?: string;
+  sourceRecordId?: string;
+  sourceRecordKey?: string;
+  transformVersion?: string;
+  sourcePayloadHash?: string;
   unavailable?: boolean;
   reason?: string;
   disclaimer?: string;

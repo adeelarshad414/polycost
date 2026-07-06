@@ -71,6 +71,22 @@ export class ComparisonsController {
     return snapshot.resultSnapshot;
   }
 
+  @Get(':id/evidence')
+  async evidence(
+    @Param('id') comparisonId: string,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: HeaderResponse,
+  ) {
+    this.consumeRateLimit(
+      'comparison_evidence',
+      request,
+      response,
+      'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
+    );
+
+    return this.comparisonApplicationService.getComparisonPricingEvidence(comparisonId);
+  }
+
   @Get(':id/analytics')
   async analytics(
     @Param('id') comparisonId: string,

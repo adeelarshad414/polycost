@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-object-injection, security/detect-unsafe-regex -- Reviewed 2026-07-06: provider catalog keys and bounded SKU parsing operate on controlled cloud catalog data; see docs/SECURITY-SUPPRESSIONS.md. */
 import { BaseCloudProviderAdapter } from '../common/base-cloud-provider.adapter';
 import {
   PricingCatalogReader,
@@ -50,7 +51,7 @@ const CATEGORY_SERVICE_CODES: Record<CatalogRefreshCategory, string[]> = {
   compute: ['AmazonEC2'],
   storage: ['AmazonS3'],
   database: ['AmazonRDS', 'AmazonElastiCache'],
-  network: ['AmazonVPC'],
+  network: ['AmazonVPC', 'AmazonEC2'],
 };
 
 const AWS_LOCATION_TO_REGION: Record<string, string> = {
@@ -148,6 +149,10 @@ export class AwsProviderAdapter extends BaseCloudProviderAdapter {
     regionFilter?: string,
   ): PricingCatalogRecord[] {
     return Object.values(priceList.products).flatMap((product) => {
+      if (!awsProductMatchesCategory(product, category, serviceCode)) {
+        return [];
+      }
+
       const region =
         product.attributes.regionCode ??
         AWS_LOCATION_TO_REGION[product.attributes.location] ??
@@ -225,6 +230,8 @@ export class AwsProviderAdapter extends BaseCloudProviderAdapter {
         pricingModel,
         productFamily: product.productFamily,
         rawServiceCode: serviceCode,
+        sourceEndpoint: `${AWS_BULK_PRICING_ENDPOINT}/${serviceCode}/current/index.json`,
+        rawSourceRecordId: `${product.sku}:${termCode}:${dimensionCode}`,
         ...(isReservedTerm(term) ? term.termAttributes : {}),
         ...(isReservedTerm(term) ? { upfrontOption: awsUpfrontOption(term) } : {}),
         vcpu: parseOptionalNumber(product.attributes.vcpu),
@@ -302,6 +309,48 @@ function parseMemoryGb(value: string | undefined): number | undefined {
   const normalized = value.replace(/,/g, '');
   const match = normalized.match(/(?<amount>\d+(\.\d+)?)\s*GiB/i);
   return match?.groups?.amount ? Number.parseFloat(match.groups.amount) : undefined;
+}
+
+function awsProductMatchesCategory(
+  product: AwsProduct,
+  category: ServiceCategory,
+  serviceCode: string,
+): boolean {
+  if (serviceCode !== 'AmazonEC2') {
+    return true;
+  }
+
+  switch (category) {
+    case 'compute':
+      return (
+        product.attributes.instanceType !== undefined ||
+        normalizedProductFamily(product).includes('compute')
+      );
+    case 'network':
+      return (
+        normalizedProductFamily(product).includes('data transfer') ||
+        normalizedTransferType(product).length > 0 ||
+        normalizedUsageType(product).includes('data')
+      );
+    case 'storage':
+    case 'database':
+    case 'support':
+    case 'licensing':
+    case 'operations':
+      return true;
+  }
+}
+
+function normalizedProductFamily(product: AwsProduct): string {
+  return (product.productFamily ?? '').toLowerCase();
+}
+
+function normalizedTransferType(product: AwsProduct): string {
+  return (product.attributes.transferType ?? '').toLowerCase();
+}
+
+function normalizedUsageType(product: AwsProduct): string {
+  return (product.attributes.usagetype ?? '').toLowerCase();
 }
 
 function awsReservedPricingModel(term: AwsReservedTerm): PricingModelKey | undefined {

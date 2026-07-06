@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: provider catalog keys are controlled Azure Retail Prices fields, not arbitrary user mutation; see docs/SECURITY-SUPPRESSIONS.md. */
 import { BaseCloudProviderAdapter } from '../common/base-cloud-provider.adapter';
 import {
   PricingCatalogReader,
@@ -134,6 +135,8 @@ export class AzureProviderAdapter extends BaseCloudProviderAdapter {
       unitPriceUsd: item.unitPrice,
       attributes: {
         currencyCode: item.currencyCode,
+        sourceEndpoint: AZURE_RETAIL_PRICES_ENDPOINT,
+        rawSourceRecordId: `${item.meterId}:${item.productId}:${item.skuId}`,
         meterId: item.meterId,
         productId: item.productId,
         skuName: item.skuName,
