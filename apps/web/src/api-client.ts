@@ -1,9 +1,13 @@
 import {
   ApiErrorDetail,
   AlertRecord,
+  AuthMeResponse,
+  AuthSessionResponse,
   BackendHealthResponse,
   BudgetInput,
   BudgetRecord,
+  BillingImportInput,
+  BillingImportResponse,
   ComparisonAnalyticsResponse,
   ComparisonResult,
   DataHealthResponse,
@@ -11,6 +15,7 @@ import {
   DiagramParseResult,
   ExchangeRatesResponse,
   IntervalKey,
+  InvoiceReconciliationRecord,
   NormalizedWorkloadSpec,
   ParsedNwsDraft,
   PricingModelCatalogResponse,
@@ -62,6 +67,15 @@ export class PolyCostApiError extends Error {
 export interface PolyCostClient {
   getHealth(): Promise<BackendHealthResponse>;
   getDataHealth(): Promise<DataHealthResponse>;
+  register(input: {
+    email: string;
+    password: string;
+    displayName?: string;
+    teamName?: string;
+  }): Promise<AuthSessionResponse>;
+  login(input: { email: string; password: string }): Promise<AuthSessionResponse>;
+  getCurrentSession(token: string): Promise<AuthMeResponse>;
+  logout(token: string): Promise<{ revoked: true }>;
   parseWorkload(input: string): Promise<ParsedNwsDraft>;
   parseDiagram(input: DiagramParseRequest): Promise<DiagramParseResult>;
   validateWorkload(nws: NormalizedWorkloadSpec): Promise<{ valid: true }>;
@@ -104,6 +118,16 @@ export interface PolyCostClient {
   listAlerts(workloadId?: string): Promise<AlertRecord[]>;
   updateAlertDismissed(alertId: string, dismissed: boolean): Promise<AlertRecord>;
   getExchangeRates(base?: string): Promise<ExchangeRatesResponse>;
+  importBillingActuals(input: BillingImportInput, token: string): Promise<BillingImportResponse>;
+  reconcileBillingImport(
+    importRunId: string,
+    comparisonId: string,
+    token: string,
+  ): Promise<InvoiceReconciliationRecord>;
+  listBillingReconciliations(
+    importRunId: string,
+    token: string,
+  ): Promise<InvoiceReconciliationRecord[]>;
 }
 
 export function configuredApiBaseUrl(documentRef: Document = document): string {
@@ -125,6 +149,29 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
     },
     getDataHealth() {
       return requestJson<DataHealthResponse>(baseUrl, '/data-health');
+    },
+    register(input) {
+      return requestJson<AuthSessionResponse>(baseUrl, '/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      });
+    },
+    login(input) {
+      return requestJson<AuthSessionResponse>(baseUrl, '/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      });
+    },
+    getCurrentSession(token) {
+      return requestJson<AuthMeResponse>(baseUrl, '/auth/me', {
+        headers: authorizationHeaders(token),
+      });
+    },
+    logout(token) {
+      return requestJson<{ revoked: true }>(baseUrl, '/auth/logout', {
+        method: 'POST',
+        headers: authorizationHeaders(token),
+      });
     },
     parseWorkload(input) {
       return requestJson<ParsedNwsDraft>(baseUrl, '/workload/parse', {
@@ -254,6 +301,39 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         `/exchange-rates?base=${encodeURIComponent(base)}`,
       );
     },
+    importBillingActuals(input, token) {
+      return requestJson<BillingImportResponse>(baseUrl, '/billing/imports', {
+        method: 'POST',
+        headers: authorizationHeaders(token),
+        body: JSON.stringify(input),
+      });
+    },
+    reconcileBillingImport(importRunId, comparisonId, token) {
+      return requestJson<InvoiceReconciliationRecord>(
+        baseUrl,
+        `/billing/imports/${encodeURIComponent(importRunId)}/reconcile`,
+        {
+          method: 'POST',
+          headers: authorizationHeaders(token),
+          body: JSON.stringify({ comparisonId }),
+        },
+      );
+    },
+    listBillingReconciliations(importRunId, token) {
+      return requestJson<InvoiceReconciliationRecord[]>(
+        baseUrl,
+        `/billing/imports/${encodeURIComponent(importRunId)}/reconciliation`,
+        {
+          headers: authorizationHeaders(token),
+        },
+      );
+    },
+  };
+}
+
+function authorizationHeaders(token: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${token}`,
   };
 }
 

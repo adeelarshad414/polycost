@@ -10,6 +10,7 @@ import { ComparisonUnavailableError } from '../comparison/comparison-orchestrato
 import { NWSMigrationError, NWSValidationError } from '../nws/nws-validator';
 import { NWSParseInputError } from '../nws-parser/nl-parser.service';
 import {
+  ApiForbiddenError,
   ApiNotFoundError,
   ApiUnauthorizedError,
   ApiValidationError,
@@ -118,6 +119,15 @@ function mapException(exception: unknown): {
     return {
       statusCode: 401,
       code: 'UNAUTHORIZED',
+      message: exception.message,
+      details: [],
+    };
+  }
+
+  if (exception instanceof ApiForbiddenError) {
+    return {
+      statusCode: 403,
+      code: 'FORBIDDEN',
       message: exception.message,
       details: [],
     };

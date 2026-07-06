@@ -16,6 +16,16 @@ import {
   ReportInterval,
   ReportPricingModel,
 } from '../reports/report.types';
+import { AccountTeamMembership, AuthIdentity, TeamRole } from './auth.types';
+import {
+  BillingImportInput,
+  BillingImportRecord,
+  BillingImportRowInput,
+  BillingSourceType,
+  InvoiceLineItemRecord,
+  InvoiceReconciliationRecord,
+  InvoiceReconciliationStatus,
+} from './billing.types';
 import {
   AlertRecord,
   BudgetInput,
@@ -247,6 +257,105 @@ interface ComparisonPrewarmJobRow {
   created_at: Date;
   started_at: Date | null;
   completed_at: Date | null;
+}
+
+export interface LocalAccountWithPassword {
+  accountId: string;
+  email: string;
+  displayName?: string;
+  status: 'active' | 'disabled' | 'invited';
+  passwordHash: string;
+  failedAttempts: number;
+  lockedUntil?: string;
+  defaultTeam?: AccountTeamMembership;
+}
+
+interface LocalAccountWithPasswordRow {
+  account_id: string;
+  email: string;
+  display_name: string | null;
+  status: 'active' | 'disabled' | 'invited';
+  password_hash: string;
+  failed_attempts: number;
+  locked_until: Date | null;
+  team_id: string | null;
+  team_name: string | null;
+  role: TeamRole | null;
+}
+
+interface AccountSessionRow {
+  session_id: string;
+  account_id: string;
+  email: string;
+  display_name: string | null;
+  team_id: string | null;
+  team_name: string | null;
+  role: TeamRole | null;
+  expires_at: Date;
+}
+
+interface TeamMembershipRow {
+  team_id: string;
+  team_name: string;
+  role: TeamRole;
+}
+
+interface BillingImportRow {
+  id: string;
+  team_id: string | null;
+  provider: ProviderId;
+  source_type: BillingSourceType;
+  status: BillingImportRecord['status'];
+  billing_period_start: Date | string;
+  billing_period_end: Date | string;
+  original_file_sha256: string;
+  rows_received: number;
+  rows_accepted: number;
+  rows_rejected: number;
+  total_cost_usd: string;
+  created_by_account_id: string | null;
+  created_at: Date;
+  completed_at: Date | null;
+  error_detail: string | null;
+}
+
+interface InvoiceLineItemRow {
+  id: string;
+  import_run_id: string;
+  team_id: string | null;
+  provider: ProviderId;
+  billing_period_start: Date | string;
+  billing_period_end: Date | string;
+  usage_start: Date | null;
+  usage_end: Date | null;
+  service_name: string;
+  sku_id: string | null;
+  region: string | null;
+  resource_id: string | null;
+  usage_quantity: string | null;
+  usage_unit: string | null;
+  cost_usd: string;
+  currency: string;
+  tags: Record<string, string>;
+  raw_payload: Record<string, unknown>;
+  line_item_hash: string;
+  matched_comparison_id: string | null;
+  matched_trace_key: string | null;
+  created_at: Date;
+}
+
+interface InvoiceReconciliationRow {
+  id: string;
+  import_run_id: string;
+  comparison_id: string;
+  provider: ProviderId;
+  estimated_total_usd: string;
+  invoiced_total_usd: string;
+  variance_usd: string;
+  variance_percent: string;
+  status: InvoiceReconciliationStatus;
+  evidence: Record<string, unknown>;
+  created_at: Date;
 }
 
 const PROVIDERS: ProviderId[] = ['aws', 'azure', 'gcp'];
@@ -1579,6 +1688,647 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     return result.rowCount ?? 0;
   }
 
+  async createLocalAccountWithTeam(input: {
+    email: string;
+    displayName?: string;
+    externalSubjectHash: string;
+    passwordHash: string;
+    teamName: string;
+    teamSlug: string;
+  }): Promise<LocalAccountWithPassword> {
+    const pool = await this.getPool();
+
+    await pool.query('BEGIN');
+
+    try {
+      const accountResult = await pool.query<{
+        id: string;
+        email: string;
+        display_name: string | null;
+        status: 'active' | 'disabled' | 'invited';
+      }>(
+        `
+          INSERT INTO accounts (
+            email,
+            display_name,
+            auth_provider,
+            external_subject_hash
+          )
+          VALUES ($1, $2, 'local', $3)
+          RETURNING id,
+                    email,
+                    display_name,
+                    status
+        `,
+        [input.email, input.displayName ?? null, input.externalSubjectHash],
+      );
+      const account = accountResult.rows[0];
+
+      await pool.query(
+        `
+          INSERT INTO account_password_credentials (
+            account_id,
+            password_hash
+          )
+          VALUES ($1, $2)
+        `,
+        [account.id, input.passwordHash],
+      );
+
+      const teamResult = await pool.query<{
+        id: string;
+        name: string;
+      }>(
+        `
+          INSERT INTO teams (
+            owner_account_id,
+            slug,
+            name
+          )
+          VALUES ($1, $2, $3)
+          RETURNING id,
+                    name
+        `,
+        [account.id, input.teamSlug, input.teamName],
+      );
+      const team = teamResult.rows[0];
+
+      await pool.query(
+        `
+          INSERT INTO team_memberships (
+            team_id,
+            account_id,
+            role
+          )
+          VALUES ($1, $2, 'owner')
+        `,
+        [team.id, account.id],
+      );
+
+      await pool.query('COMMIT');
+
+      return {
+        accountId: account.id,
+        email: account.email,
+        ...(account.display_name ? { displayName: account.display_name } : {}),
+        status: account.status,
+        passwordHash: input.passwordHash,
+        failedAttempts: 0,
+        defaultTeam: {
+          teamId: team.id,
+          teamName: team.name,
+          role: 'owner',
+        },
+      };
+    } catch (error) {
+      await pool.query('ROLLBACK');
+      throw error;
+    }
+  }
+
+  async findLocalAccountByEmail(email: string): Promise<LocalAccountWithPassword | undefined> {
+    const result = await (
+      await this.getPool()
+    ).query<LocalAccountWithPasswordRow>(
+      `
+        SELECT accounts.id AS account_id,
+               accounts.email,
+               accounts.display_name,
+               accounts.status,
+               account_password_credentials.password_hash,
+               account_password_credentials.failed_attempts,
+               account_password_credentials.locked_until,
+               team_membership.team_id,
+               teams.name AS team_name,
+               team_membership.role
+        FROM accounts
+        JOIN account_password_credentials
+          ON account_password_credentials.account_id = accounts.id
+        LEFT JOIN LATERAL (
+          SELECT team_id,
+                 role
+          FROM team_memberships
+          WHERE team_memberships.account_id = accounts.id
+          ORDER BY CASE role
+                     WHEN 'owner' THEN 1
+                     WHEN 'admin' THEN 2
+                     WHEN 'member' THEN 3
+                     ELSE 4
+                   END,
+                   created_at ASC
+          LIMIT 1
+        ) AS team_membership ON TRUE
+        LEFT JOIN teams
+          ON teams.id = team_membership.team_id
+        WHERE accounts.auth_provider = 'local'
+          AND accounts.email = $1
+        LIMIT 1
+      `,
+      [email],
+    );
+    const row = result.rows[0];
+
+    return row ? toLocalAccountWithPassword(row) : undefined;
+  }
+
+  async recordFailedLogin(input: {
+    accountId: string;
+    failedAttempts: number;
+    lockedUntil?: string;
+  }): Promise<void> {
+    await (
+      await this.getPool()
+    ).query(
+      `
+        UPDATE account_password_credentials
+        SET failed_attempts = $2,
+            locked_until = $3,
+            updated_at = now()
+        WHERE account_id = $1
+      `,
+      [input.accountId, input.failedAttempts, input.lockedUntil ?? null],
+    );
+  }
+
+  async resetFailedLogin(accountId: string): Promise<void> {
+    await (
+      await this.getPool()
+    ).query(
+      `
+        UPDATE account_password_credentials
+        SET failed_attempts = 0,
+            locked_until = NULL,
+            updated_at = now()
+        WHERE account_id = $1
+      `,
+      [accountId],
+    );
+  }
+
+  async createSession(input: {
+    accountId: string;
+    teamId?: string;
+    tokenHash: string;
+    expiresAt: string;
+    userAgentHash?: string;
+    ipHash?: string;
+  }): Promise<{ sessionId: string; expiresAt: string }> {
+    const result = await (
+      await this.getPool()
+    ).query<{
+      id: string;
+      expires_at: Date;
+    }>(
+      `
+        INSERT INTO account_sessions (
+          account_id,
+          team_id,
+          token_hash,
+          expires_at,
+          user_agent_hash,
+          ip_hash
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id,
+                  expires_at
+      `,
+      [
+        input.accountId,
+        input.teamId ?? null,
+        input.tokenHash,
+        input.expiresAt,
+        input.userAgentHash ?? null,
+        input.ipHash ?? null,
+      ],
+    );
+    const row = result.rows[0];
+
+    return {
+      sessionId: row.id,
+      expiresAt: row.expires_at.toISOString(),
+    };
+  }
+
+  async resolveSession(tokenHash: string, now: string): Promise<AuthIdentity | undefined> {
+    const result = await (
+      await this.getPool()
+    ).query<AccountSessionRow>(
+      `
+        SELECT account_sessions.id AS session_id,
+               accounts.id AS account_id,
+               accounts.email,
+               accounts.display_name,
+               account_sessions.team_id,
+               teams.name AS team_name,
+               team_memberships.role,
+               account_sessions.expires_at
+        FROM account_sessions
+        JOIN accounts
+          ON accounts.id = account_sessions.account_id
+        LEFT JOIN teams
+          ON teams.id = account_sessions.team_id
+        LEFT JOIN team_memberships
+          ON team_memberships.team_id = account_sessions.team_id
+         AND team_memberships.account_id = account_sessions.account_id
+        WHERE account_sessions.token_hash = $1
+          AND account_sessions.revoked_at IS NULL
+          AND account_sessions.expires_at > $2
+          AND accounts.status = 'active'
+        LIMIT 1
+      `,
+      [tokenHash, now],
+    );
+    const row = result.rows[0];
+
+    if (!row) {
+      return undefined;
+    }
+
+    await (
+      await this.getPool()
+    ).query(
+      `
+        UPDATE account_sessions
+        SET last_seen_at = $2
+        WHERE id = $1
+      `,
+      [row.session_id, now],
+    );
+
+    return toAuthIdentity(row);
+  }
+
+  async revokeSession(sessionId: string, now: string): Promise<void> {
+    await (
+      await this.getPool()
+    ).query(
+      `
+        UPDATE account_sessions
+        SET revoked_at = $2
+        WHERE id = $1
+          AND revoked_at IS NULL
+      `,
+      [sessionId, now],
+    );
+  }
+
+  async listAccountTeams(accountId: string): Promise<AccountTeamMembership[]> {
+    const result = await (
+      await this.getPool()
+    ).query<TeamMembershipRow>(
+      `
+        SELECT teams.id AS team_id,
+               teams.name AS team_name,
+               team_memberships.role
+        FROM team_memberships
+        JOIN teams
+          ON teams.id = team_memberships.team_id
+        WHERE team_memberships.account_id = $1
+        ORDER BY CASE team_memberships.role
+                   WHEN 'owner' THEN 1
+                   WHEN 'admin' THEN 2
+                   WHEN 'member' THEN 3
+                   ELSE 4
+                 END,
+                 teams.name ASC
+      `,
+      [accountId],
+    );
+
+    return result.rows.map(toTeamMembership);
+  }
+
+  async createBillingImport(input: {
+    importInput: BillingImportInput;
+    originalFileSha256: string;
+    teamId?: string;
+    createdByAccountId?: string;
+    rows: Array<BillingImportRowInput & { lineItemHash: string }>;
+  }): Promise<{
+    importRun: BillingImportRecord;
+    lineItems: InvoiceLineItemRecord[];
+  }> {
+    const pool = await this.getPool();
+    const importedLineItems: InvoiceLineItemRecord[] = [];
+
+    await pool.query('BEGIN');
+
+    try {
+      const importResult = await pool.query<BillingImportRow>(
+        `
+          INSERT INTO billing_import_runs (
+            team_id,
+            provider,
+            source_type,
+            billing_period_start,
+            billing_period_end,
+            original_file_sha256,
+            rows_received,
+            created_by_account_id
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          RETURNING id,
+                    team_id,
+                    provider,
+                    source_type,
+                    status,
+                    billing_period_start,
+                    billing_period_end,
+                    original_file_sha256,
+                    rows_received,
+                    rows_accepted,
+                    rows_rejected,
+                    total_cost_usd,
+                    created_by_account_id,
+                    created_at,
+                    completed_at,
+                    error_detail
+        `,
+        [
+          input.teamId ?? null,
+          input.importInput.provider,
+          input.importInput.sourceType,
+          input.importInput.billingPeriodStart,
+          input.importInput.billingPeriodEnd,
+          input.originalFileSha256,
+          input.rows.length,
+          input.createdByAccountId ?? null,
+        ],
+      );
+      const importRunId = importResult.rows[0].id;
+
+      for (const row of input.rows) {
+        const inserted = await pool.query<InvoiceLineItemRow>(
+          `
+            INSERT INTO invoice_line_items (
+              import_run_id,
+              team_id,
+              provider,
+              billing_period_start,
+              billing_period_end,
+              usage_start,
+              usage_end,
+              service_name,
+              sku_id,
+              region,
+              resource_id,
+              usage_quantity,
+              usage_unit,
+              cost_usd,
+              currency,
+              tags,
+              raw_payload,
+              line_item_hash
+            )
+            VALUES (
+              $1, $2, $3, $4, $5, $6, $7, $8,
+              $9, $10, $11, $12, $13, $14, $15,
+              $16::jsonb, $17::jsonb, $18
+            )
+            ON CONFLICT (import_run_id, line_item_hash)
+            DO NOTHING
+            RETURNING id,
+                      import_run_id,
+                      team_id,
+                      provider,
+                      billing_period_start,
+                      billing_period_end,
+                      usage_start,
+                      usage_end,
+                      service_name,
+                      sku_id,
+                      region,
+                      resource_id,
+                      usage_quantity,
+                      usage_unit,
+                      cost_usd,
+                      currency,
+                      tags,
+                      raw_payload,
+                      line_item_hash,
+                      matched_comparison_id,
+                      matched_trace_key,
+                      created_at
+          `,
+          [
+            importRunId,
+            input.teamId ?? null,
+            input.importInput.provider,
+            input.importInput.billingPeriodStart,
+            input.importInput.billingPeriodEnd,
+            row.usageStart ?? null,
+            row.usageEnd ?? null,
+            row.serviceName,
+            row.skuId ?? null,
+            row.region ?? null,
+            row.resourceId ?? null,
+            row.usageQuantity ?? null,
+            row.usageUnit ?? null,
+            row.costUsd,
+            row.currency ?? 'USD',
+            JSON.stringify(row.tags ?? {}),
+            JSON.stringify(row.rawPayload ?? {}),
+            row.lineItemHash,
+          ],
+        );
+
+        if (inserted.rows[0]) {
+          importedLineItems.push(toInvoiceLineItemRecord(inserted.rows[0]));
+        }
+      }
+
+      const acceptedRows = importedLineItems.length;
+      const totalCostUsd = importedLineItems.reduce((total, row) => total + row.costUsd, 0);
+      const finalImport = await pool.query<BillingImportRow>(
+        `
+          UPDATE billing_import_runs
+          SET status = 'completed',
+              rows_accepted = $2,
+              rows_rejected = $3,
+              total_cost_usd = $4,
+              completed_at = now()
+          WHERE id = $1
+          RETURNING id,
+                    team_id,
+                    provider,
+                    source_type,
+                    status,
+                    billing_period_start,
+                    billing_period_end,
+                    original_file_sha256,
+                    rows_received,
+                    rows_accepted,
+                    rows_rejected,
+                    total_cost_usd,
+                    created_by_account_id,
+                    created_at,
+                    completed_at,
+                    error_detail
+        `,
+        [importRunId, acceptedRows, input.rows.length - acceptedRows, totalCostUsd],
+      );
+
+      await pool.query('COMMIT');
+
+      return {
+        importRun: toBillingImportRecord(finalImport.rows[0]),
+        lineItems: importedLineItems,
+      };
+    } catch (error) {
+      await pool.query('ROLLBACK');
+      throw error;
+    }
+  }
+
+  async getBillingImport(importRunId: string): Promise<BillingImportRecord | undefined> {
+    const result = await (
+      await this.getPool()
+    ).query<BillingImportRow>(
+      `
+        SELECT id,
+               team_id,
+               provider,
+               source_type,
+               status,
+               billing_period_start,
+               billing_period_end,
+               original_file_sha256,
+               rows_received,
+               rows_accepted,
+               rows_rejected,
+               total_cost_usd,
+               created_by_account_id,
+               created_at,
+               completed_at,
+               error_detail
+        FROM billing_import_runs
+        WHERE id = $1
+      `,
+      [importRunId],
+    );
+
+    return result.rows[0] ? toBillingImportRecord(result.rows[0]) : undefined;
+  }
+
+  async listInvoiceLineItems(importRunId: string): Promise<InvoiceLineItemRecord[]> {
+    const result = await (
+      await this.getPool()
+    ).query<InvoiceLineItemRow>(
+      `
+        SELECT id,
+               import_run_id,
+               team_id,
+               provider,
+               billing_period_start,
+               billing_period_end,
+               usage_start,
+               usage_end,
+               service_name,
+               sku_id,
+               region,
+               resource_id,
+               usage_quantity,
+               usage_unit,
+               cost_usd,
+               currency,
+               tags,
+               raw_payload,
+               line_item_hash,
+               matched_comparison_id,
+               matched_trace_key,
+               created_at
+        FROM invoice_line_items
+        WHERE import_run_id = $1
+        ORDER BY created_at ASC,
+                 id ASC
+      `,
+      [importRunId],
+    );
+
+    return result.rows.map(toInvoiceLineItemRecord);
+  }
+
+  async saveInvoiceReconciliation(input: {
+    importRunId: string;
+    comparisonId: string;
+    provider: ProviderId;
+    estimatedTotalUsd: number;
+    invoicedTotalUsd: number;
+    varianceUsd: number;
+    variancePercent: number;
+    status: InvoiceReconciliationStatus;
+    evidence: Record<string, unknown>;
+  }): Promise<InvoiceReconciliationRecord> {
+    const result = await (
+      await this.getPool()
+    ).query<InvoiceReconciliationRow>(
+      `
+        INSERT INTO invoice_reconciliation_results (
+          import_run_id,
+          comparison_id,
+          provider,
+          estimated_total_usd,
+          invoiced_total_usd,
+          variance_usd,
+          variance_percent,
+          status,
+          evidence
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+        RETURNING id,
+                  import_run_id,
+                  comparison_id,
+                  provider,
+                  estimated_total_usd,
+                  invoiced_total_usd,
+                  variance_usd,
+                  variance_percent,
+                  status,
+                  evidence,
+                  created_at
+      `,
+      [
+        input.importRunId,
+        input.comparisonId,
+        input.provider,
+        input.estimatedTotalUsd,
+        input.invoicedTotalUsd,
+        input.varianceUsd,
+        input.variancePercent,
+        input.status,
+        JSON.stringify(input.evidence),
+      ],
+    );
+
+    return toInvoiceReconciliationRecord(result.rows[0]);
+  }
+
+  async listInvoiceReconciliations(importRunId: string): Promise<InvoiceReconciliationRecord[]> {
+    const result = await (
+      await this.getPool()
+    ).query<InvoiceReconciliationRow>(
+      `
+        SELECT id,
+               import_run_id,
+               comparison_id,
+               provider,
+               estimated_total_usd,
+               invoiced_total_usd,
+               variance_usd,
+               variance_percent,
+               status,
+               evidence,
+               created_at
+        FROM invoice_reconciliation_results
+        WHERE import_run_id = $1
+        ORDER BY created_at DESC
+      `,
+      [importRunId],
+    );
+
+    return result.rows.map(toInvoiceReconciliationRecord);
+  }
+
   async onModuleDestroy(): Promise<void> {
     if (this.pool) {
       await this.pool.end();
@@ -1801,6 +2551,117 @@ function toComparisonPrewarmJobRecord(row: ComparisonPrewarmJobRow): ComparisonP
     ...(row.started_at ? { startedAt: row.started_at.toISOString() } : {}),
     ...(row.completed_at ? { completedAt: row.completed_at.toISOString() } : {}),
   };
+}
+
+function toLocalAccountWithPassword(row: LocalAccountWithPasswordRow): LocalAccountWithPassword {
+  return {
+    accountId: row.account_id,
+    email: row.email,
+    ...(row.display_name ? { displayName: row.display_name } : {}),
+    status: row.status,
+    passwordHash: row.password_hash,
+    failedAttempts: row.failed_attempts,
+    ...(row.locked_until ? { lockedUntil: row.locked_until.toISOString() } : {}),
+    ...(row.team_id && row.team_name && row.role
+      ? {
+          defaultTeam: {
+            teamId: row.team_id,
+            teamName: row.team_name,
+            role: row.role,
+          },
+        }
+      : {}),
+  };
+}
+
+function toAuthIdentity(row: AccountSessionRow): AuthIdentity {
+  return {
+    accountId: row.account_id,
+    email: row.email,
+    ...(row.display_name ? { displayName: row.display_name } : {}),
+    ...(row.team_id ? { teamId: row.team_id } : {}),
+    ...(row.role ? { role: row.role } : {}),
+    sessionId: row.session_id,
+    expiresAt: row.expires_at.toISOString(),
+  };
+}
+
+function toTeamMembership(row: TeamMembershipRow): AccountTeamMembership {
+  return {
+    teamId: row.team_id,
+    teamName: row.team_name,
+    role: row.role,
+  };
+}
+
+function toBillingImportRecord(row: BillingImportRow): BillingImportRecord {
+  return {
+    id: row.id,
+    ...(row.team_id ? { teamId: row.team_id } : {}),
+    provider: row.provider,
+    sourceType: row.source_type,
+    status: row.status,
+    billingPeriodStart: dateOnly(row.billing_period_start),
+    billingPeriodEnd: dateOnly(row.billing_period_end),
+    originalFileSha256: row.original_file_sha256,
+    rowsReceived: row.rows_received,
+    rowsAccepted: row.rows_accepted,
+    rowsRejected: row.rows_rejected,
+    totalCostUsd: Number.parseFloat(row.total_cost_usd),
+    ...(row.created_by_account_id ? { createdByAccountId: row.created_by_account_id } : {}),
+    createdAt: row.created_at.toISOString(),
+    ...(row.completed_at ? { completedAt: row.completed_at.toISOString() } : {}),
+    ...(row.error_detail ? { errorDetail: row.error_detail } : {}),
+  };
+}
+
+function toInvoiceLineItemRecord(row: InvoiceLineItemRow): InvoiceLineItemRecord {
+  return {
+    id: row.id,
+    importRunId: row.import_run_id,
+    ...(row.team_id ? { teamId: row.team_id } : {}),
+    provider: row.provider,
+    billingPeriodStart: dateOnly(row.billing_period_start),
+    billingPeriodEnd: dateOnly(row.billing_period_end),
+    serviceName: row.service_name,
+    ...(row.sku_id ? { skuId: row.sku_id } : {}),
+    ...(row.region ? { region: row.region } : {}),
+    ...(row.resource_id ? { resourceId: row.resource_id } : {}),
+    ...(row.usage_start ? { usageStart: row.usage_start.toISOString() } : {}),
+    ...(row.usage_end ? { usageEnd: row.usage_end.toISOString() } : {}),
+    ...(row.usage_quantity !== null
+      ? { usageQuantity: Number.parseFloat(row.usage_quantity) }
+      : {}),
+    ...(row.usage_unit ? { usageUnit: row.usage_unit } : {}),
+    costUsd: Number.parseFloat(row.cost_usd),
+    currency: row.currency,
+    tags: row.tags,
+    rawPayload: row.raw_payload,
+    lineItemHash: row.line_item_hash,
+    ...(row.matched_comparison_id ? { matchedComparisonId: row.matched_comparison_id } : {}),
+    ...(row.matched_trace_key ? { matchedTraceKey: row.matched_trace_key } : {}),
+    createdAt: row.created_at.toISOString(),
+  };
+}
+
+function toInvoiceReconciliationRecord(row: InvoiceReconciliationRow): InvoiceReconciliationRecord {
+  return {
+    id: row.id,
+    importRunId: row.import_run_id,
+    comparisonId: row.comparison_id,
+    provider: row.provider,
+    estimatedTotalUsd: Number.parseFloat(row.estimated_total_usd),
+    invoicedTotalUsd: Number.parseFloat(row.invoiced_total_usd),
+    varianceUsd: Number.parseFloat(row.variance_usd),
+    variancePercent: Number.parseFloat(row.variance_percent),
+    status: row.status,
+    evidence: row.evidence,
+    createdAt: row.created_at.toISOString(),
+  };
+}
+
+function dateOnly(value: Date | string): string {
+  return value instanceof Date ? value.toISOString().slice(0, 10) : value.slice(0, 10);
 }
 
 function latestDate(dates: Array<Date | null>): string | undefined {

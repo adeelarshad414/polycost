@@ -46,6 +46,8 @@ export interface DiagramGraphNode {
   kind: DiagramNodeKind;
   sourceRef: string;
   stencilId?: string;
+  bounds?: DiagramNodeBounds;
+  visual?: DiagramNodeVisualMetadata;
 }
 
 export interface DiagramGraphEdge {
@@ -74,6 +76,23 @@ export interface ExtractedDiagramNode {
   style?: string;
   stencilId?: string;
   sourceRef: string;
+  bounds?: DiagramNodeBounds;
+  visual?: DiagramNodeVisualMetadata;
+}
+
+export interface DiagramNodeBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface DiagramNodeVisualMetadata {
+  pageRef?: string;
+  pageName?: string;
+  masterId?: string;
+  fillColor?: string;
+  lineColor?: string;
 }
 
 export interface DiagramExtractor {

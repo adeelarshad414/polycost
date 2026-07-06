@@ -102,6 +102,8 @@ export class DiagramParserService {
           kind: 'resource',
           sourceRef: node.sourceRef,
           ...(node.stencilId ? { stencilId: node.stencilId } : {}),
+          ...(node.bounds ? { bounds: node.bounds } : {}),
+          ...(node.visual ? { visual: node.visual } : {}),
           classification,
         };
 
@@ -135,6 +137,8 @@ export class DiagramParserService {
           kind: 'decorative',
           sourceRef: node.sourceRef,
           ...(node.stencilId ? { stencilId: node.stencilId } : {}),
+          ...(node.bounds ? { bounds: node.bounds } : {}),
+          ...(node.visual ? { visual: node.visual } : {}),
         });
       } else {
         unresolvedClassifications.push(ignored);
@@ -144,6 +148,8 @@ export class DiagramParserService {
           kind: 'unknown',
           sourceRef: node.sourceRef,
           ...(node.stencilId ? { stencilId: node.stencilId } : {}),
+          ...(node.bounds ? { bounds: node.bounds } : {}),
+          ...(node.visual ? { visual: node.visual } : {}),
         });
         fieldsRequiringReview.push(`diagram.nodes.${node.id}.classification`);
       }

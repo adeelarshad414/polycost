@@ -19,6 +19,10 @@ import { AdminApiKeyGuard } from './admin-api-key.guard';
 import { ApiDatabaseRepository } from './api-database.repository';
 import { ApiExceptionFilter } from './api-exception.filter';
 import { ApiRateLimitService } from './rate-limit.service';
+import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
+import { BillingController } from './billing.controller';
+import { BillingService } from './billing.service';
 import { ComparisonAnalyticsService } from './comparison-analytics.service';
 import { ComparisonApplicationService } from './comparison-application.service';
 import { ComparisonPrewarmService } from './comparison-prewarm.service';
@@ -39,6 +43,7 @@ import { PricingStatusController } from './pricing-status.controller';
 import { RegionsController } from './regions.controller';
 import { RegionsService } from './regions.service';
 import { ReportExportJobsService } from './report-export-jobs.service';
+import { SessionAuthGuard } from './session-auth.guard';
 import { WorkloadController } from './workload.controller';
 
 @Module({
@@ -62,6 +67,8 @@ import { WorkloadController } from './workload.controller';
     ShareLinksController,
     SharedReportsController,
     ExchangeRatesController,
+    AuthController,
+    BillingController,
   ],
   providers: [
     SecretsService,
@@ -76,6 +83,9 @@ import { WorkloadController } from './workload.controller';
       useFactory: () => new ApiRateLimitService(),
     },
     AdminApiKeyGuard,
+    AuthService,
+    SessionAuthGuard,
+    BillingService,
     ComparisonAnalyticsService,
     {
       provide: LivePricingRefreshService,

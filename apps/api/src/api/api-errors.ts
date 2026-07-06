@@ -32,6 +32,14 @@ export class ApiUnauthorizedError extends Error {
   }
 }
 
+export class ApiForbiddenError extends Error {
+  constructor(message = 'Forbidden') {
+    super(message);
+    this.name = 'ApiForbiddenError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
 export class RateLimitExceededError extends Error {
   constructor(
     message: string,
