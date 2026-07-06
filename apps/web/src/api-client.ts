@@ -12,6 +12,7 @@ import {
   BillingImportResponse,
   BillingProviderExportInput,
   ComparisonAnalyticsResponse,
+  ComparisonPricingEvidenceResponse,
   ComparisonResult,
   DataHealthResponse,
   DiagramParseRequest,
@@ -163,6 +164,7 @@ export interface PolyCostClient {
   validateWorkload(nws: NormalizedWorkloadSpec): Promise<{ valid: true }>;
   createComparison(nws: NormalizedWorkloadSpec): Promise<ComparisonResult>;
   getComparisonAnalytics(comparisonId: string): Promise<ComparisonAnalyticsResponse>;
+  getComparisonPricingEvidence(comparisonId: string): Promise<ComparisonPricingEvidenceResponse>;
   refreshLiveComparison(comparisonId: string): Promise<ComparisonResult>;
   createExportJob(
     comparisonId: string,
@@ -463,6 +465,12 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
       return requestJson<ComparisonAnalyticsResponse>(
         baseUrl,
         `/comparisons/${encodeURIComponent(comparisonId)}/analytics`,
+      );
+    },
+    getComparisonPricingEvidence(comparisonId) {
+      return requestJson<ComparisonPricingEvidenceResponse>(
+        baseUrl,
+        `/comparisons/${encodeURIComponent(comparisonId)}/evidence`,
       );
     },
     refreshLiveComparison(comparisonId) {

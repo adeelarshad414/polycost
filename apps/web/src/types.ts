@@ -739,6 +739,69 @@ export interface ComparisonResult {
   }>;
 }
 
+export interface ComparisonPricingEvidenceRow {
+  evidenceId: string;
+  providerId: ProviderId;
+  lineItemIndex: number;
+  category: ServiceCategory;
+  costComponent?: CostComponent;
+  description: string;
+  displayedAmounts: {
+    monthlyCostUsd: number;
+    hourlyCostUsd?: number;
+    providerTotals: CostIntervals;
+  };
+  sku: {
+    resolvedSkuId?: string;
+    sourceSkuId?: string;
+    rateSourceSkuId?: string;
+    providerServiceName?: string;
+    skuDescription?: string;
+    region?: string;
+    catalogRegion?: string;
+  };
+  rate: {
+    source: 'pricing_catalog' | 'pricing_rates' | 'modeled_estimate' | 'manual_model' | string;
+    sourceRecordKey: string;
+    sourceEndpoint?: string;
+    sourceRecordId?: string;
+    transformVersion?: string;
+    sourcePayloadHash?: string;
+    unit?: string;
+    unitPriceUsd?: number;
+    currency?: string;
+    effectiveDate?: string;
+    fetchedAt?: string;
+    pricingTermCode?: string;
+    paymentOptionCode?: string;
+    pricingBasis?: PricingBasis;
+  };
+  derivation: {
+    expression: string;
+    quantity?: number;
+    unitPriceUsd?: number;
+    hourlyCostUsd?: number;
+    monthlyCostUsd: number;
+    monthlyHours?: number;
+  };
+  equivalence: {
+    confidence: 'direct' | 'approximate' | 'modeled';
+    isApproximate: boolean;
+    isEstimate: boolean;
+  };
+  egressTiers?: EgressTierBreakdown[];
+  pricingModels?: PricingModelCost[];
+}
+
+export interface ComparisonPricingEvidenceResponse {
+  comparisonId: string;
+  pricingAsOf: string;
+  generatedAt: string;
+  providerCount: number;
+  lineItemCount: number;
+  evidence: ComparisonPricingEvidenceRow[];
+}
+
 export type AnalyticsDimension =
   | 'compute'
   | 'storage'

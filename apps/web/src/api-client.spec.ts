@@ -213,6 +213,69 @@ describe('api client', () => {
     );
   });
 
+  it('fetches comparison pricing evidence for saved line items', async () => {
+    const evidence = {
+      comparisonId: 'comparison-1',
+      pricingAsOf: '2026-07-02T00:00:00.000Z',
+      generatedAt: '2026-07-02T00:00:00.000Z',
+      providerCount: 1,
+      lineItemCount: 1,
+      evidence: [
+        {
+          evidenceId: 'aws:0:trace-key',
+          providerId: 'aws',
+          lineItemIndex: 0,
+          category: 'compute',
+          description: 'web compute',
+          displayedAmounts: {
+            monthlyCostUsd: 70.08,
+            hourlyCostUsd: 0.096,
+            providerTotals: {
+              daily: 2.3,
+              weekly: 16.13,
+              monthly: 70.08,
+              quarterly: 210.24,
+              yearly: 840.96,
+            },
+          },
+          sku: {
+            resolvedSkuId: 'm7i.large',
+            sourceSkuId: 'aws-compute-m7i-large',
+          },
+          rate: {
+            source: 'pricing_catalog',
+            sourceRecordKey: 'trace-key',
+            sourcePayloadHash: 'a'.repeat(64),
+          },
+          derivation: {
+            expression: '0.096 hourly USD x 730 monthly hours',
+            hourlyCostUsd: 0.096,
+            monthlyCostUsd: 70.08,
+            monthlyHours: 730,
+          },
+          equivalence: {
+            confidence: 'direct',
+            isApproximate: false,
+            isEstimate: false,
+          },
+        },
+      ],
+    };
+    const fetchMock = jest.fn(async () => jsonResponse(evidence));
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(client.getComparisonPricingEvidence('comparison-1')).resolves.toEqual(evidence);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/comparisons/comparison-1/evidence',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+  });
+
   it('wires authenticated session and billing actuals routes with bearer headers', async () => {
     const session = {
       token: 'session-token',

@@ -55,6 +55,35 @@ say so explicitly rather than marking it done.
 | Phase 2.8M - Session policy documentation              | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8N - API RBAC matrix hardening                 | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8O - Production-readiness CI gate              | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8P - Queryable comparison pricing evidence     | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8P - Queryable comparison pricing evidence
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Added `GET /api/v1/comparisons/:id/evidence`, a read-only comparison evidence
+  endpoint that returns each stored line item's displayed monthly/hourly amount,
+  provider totals, matched SKU fields, source endpoint/record/key/hash/transform
+  lineage, unit rate, derivation math, and equivalence confidence.
+- Added typed web client support through `getComparisonPricingEvidence()` and shared
+  frontend response types so UI/report surfaces can expand saved comparison numbers
+  without inventing a second evidence contract.
+- Extended the focused production-readiness gate to include the API contract and web
+  API-client evidence specs, keeping SKU-to-estimate traceability in the named
+  regression path.
+- Verification evidence in this continuation:
+  - Focused API contract spec passed: 34 tests.
+  - Focused web API client spec passed: 25 tests.
+  - `npm run test:production-readiness` passed: API 5 suites / 79 tests and web 2
+    suites / 80 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: the endpoint proves stored catalog/list-price estimate
+  lineage and derivation for saved comparisons, but full invoice-grade provider
+  billing coverage, private contract pricing, and account billing reconciliation
+  remain future work. GitHub-hosted CI still cannot start until the account billing
+  or spending-limit issue is resolved in GitHub settings.
 
 ## Phase 2.8O - Production-readiness CI gate
 

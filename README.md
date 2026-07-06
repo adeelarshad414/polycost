@@ -116,6 +116,8 @@ The main API is versioned under `/api/v1`.
 
 - `POST /comparisons` creates a comparison from an NWS payload.
 - `GET /comparisons/:id` retrieves a saved comparison.
+- `GET /comparisons/:id/evidence` returns line-item SKU lineage, rate source,
+  derivation math, and equivalence confidence for saved comparison numbers.
 - `GET /comparisons/:id/export` exports comparison reports.
 - `POST /comparisons/:id/refresh-live` refreshes a comparison against live pricing sources when enabled.
 - `POST /workload/parse` parses natural language into workload structure.
