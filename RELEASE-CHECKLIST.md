@@ -16,6 +16,8 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Keep the repository private until this checklist is complete.
 - Enable branch protection on `main`.
 - Require the CI workflow to pass before merge.
+- Confirm GitHub Actions jobs can start. Resolve account billing, spending-limit,
+  or runner-quota blockers before treating CI as release evidence.
 - Require pull request review for external contributions.
 - Enable Dependabot alerts and security updates.
 - Confirm issue templates and PR template render correctly.
@@ -37,6 +39,7 @@ Complete this checklist before changing the GitHub repository visibility from pr
 ## Verification
 
 - Run `npm ci`.
+- Run `npm run demo:up` from a clean clone or freshly reset local workspace.
 - Run `npm run format:check`.
 - Run `npm run lint`.
 - Run `npm run typecheck`.

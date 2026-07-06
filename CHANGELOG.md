@@ -12,11 +12,21 @@ once tagged releases begin.
 - Open-source readiness files: license, contribution guide, support policy,
   governance notes, issue templates, pull request template, CODEOWNERS, and
   dependency update configuration.
+- One-command self-hosted demo startup and demo artifact capture scripts.
+- Account, team, invite, session, billing-reconciliation, and mock SSO readiness
+  surfaces on top of the anonymous comparison workflow.
 
 ### Notes
 
 - The repository is prepared for an eventual public open-source launch while the
   GitHub repository remains private.
+- Production-readiness hardening now includes pricing catalog lineage, SKU evidence
+  derivation checks, UI-priced service coverage guards, VSDX partial-parse evidence,
+  Tier 3 diagram classifier fallback diagnostics, RBAC UI controls aligned to API
+  authorization, and an explicit security suppression/advisory ledger.
+- Remaining future work is intentionally documented: full invoice-grade live cloud
+  billing coverage, full Visio visual rendering, hosted/team account product depth,
+  production email/SSO/SCIM workflows, and Terraform generation.
 
 ## 0.1.0
 

@@ -51,6 +51,28 @@ say so explicitly rather than marking it done.
 | Phase 2.8I - AWS ETL network SKU hardening             | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8J - Diagram LLM fallback diagnostics          | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8K - Auth RBAC UI enforcement polish           | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8L - Release hygiene evidence polish           | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8L - Release hygiene evidence polish
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Audited open-source/community health files and confirmed the repo includes
+  `README.md`, `LICENSE`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`,
+  `SUPPORT.md`, `GOVERNANCE.md`, `CHANGELOG.md`, GitHub issue templates, PR
+  template, CODEOWNERS, and Dependabot configuration while the GitHub repository
+  remains private.
+- Updated `CHANGELOG.md` so the Unreleased section reflects the current
+  production-readiness hardening work and the remaining honest future phases.
+- Updated `RELEASE-CHECKLIST.md` to require proof that GitHub Actions jobs can
+  actually start, explicitly calling out billing, spending-limit, and runner-quota
+  blockers, and added `npm run demo:up` to the clean-clone verification list.
+- Verification evidence in this continuation:
+  - `npm run format:check` passed.
+- Known gaps carried forward: GitHub PR `quality` remains externally blocked before
+  runner startup by account billing/spending-limit settings; that is a repository
+  administration task, not a code/test failure.
 
 ## Phase 2.8K - Auth RBAC UI enforcement polish
 
