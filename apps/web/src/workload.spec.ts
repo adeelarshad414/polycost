@@ -1,4 +1,13 @@
 import {
+  canonicalRegionForRegionPreference,
+  canonicalRegionsForResidencyScope,
+  comparisonRegionLabel,
+  COMPARISON_REGION_GROUPS,
+  isRegionPreferenceAllowedForResidency,
+  providerRegionSummary,
+  regionPreferenceForResidencyLock,
+} from './region-normalization';
+import {
   applyTheme,
   resolveTheme,
   storedTheme,
@@ -1247,6 +1256,8 @@ describe('theme helpers', () => {
     expect(storedTheme(storageLike)).toBe('dark');
     storage.set(THEME_STORAGE_KEY, 'system');
     expect(storedTheme(storageLike)).toBe('system');
+    storage.set(THEME_STORAGE_KEY, 'blue');
+    expect(storedTheme(storageLike)).toBe('system');
 
     const resolved = applyTheme('system', root, storageLike, () => ({ matches: true }));
 
@@ -1255,6 +1266,10 @@ describe('theme helpers', () => {
     expect(root.dataset.themeChoice).toBe('system');
     expect(root.style.colorScheme).toBe('dark');
     expect(storageLike.setItem).toHaveBeenCalledWith(THEME_STORAGE_KEY, 'system');
+
+    expect(applyTheme('dark', root, storageLike)).toBe('dark');
+    expect(root.dataset.theme).toBe('dark');
+    expect(root.dataset.themeChoice).toBe('dark');
   });
 
   it('subscribes to live system theme changes', () => {
@@ -1276,5 +1291,78 @@ describe('theme helpers', () => {
     expect(onChange).toHaveBeenCalledWith('dark');
     expect(mediaQuery.addEventListener).toHaveBeenCalledWith('change', expect.any(Function));
     expect(mediaQuery.removeEventListener).toHaveBeenCalledWith('change', expect.any(Function));
+  });
+
+  it('supports legacy system theme listeners and missing listener APIs', () => {
+    let listener: (() => void) | undefined;
+    const legacyMediaQuery = {
+      matches: true,
+      addListener: jest.fn((nextListener: () => void) => {
+        listener = nextListener;
+      }),
+      removeListener: jest.fn(),
+    };
+    const onLegacyChange = jest.fn();
+
+    const unsubscribeLegacy = subscribeToSystemTheme(onLegacyChange, () => legacyMediaQuery);
+    legacyMediaQuery.matches = false;
+    listener?.();
+    unsubscribeLegacy();
+
+    expect(onLegacyChange).toHaveBeenCalledWith('light');
+    expect(legacyMediaQuery.addListener).toHaveBeenCalledWith(expect.any(Function));
+    expect(legacyMediaQuery.removeListener).toHaveBeenCalledWith(expect.any(Function));
+
+    const onUnsupportedChange = jest.fn();
+    const unsubscribeUnsupported = subscribeToSystemTheme(onUnsupportedChange, () => ({
+      matches: true,
+    }));
+    unsubscribeUnsupported();
+
+    expect(onUnsupportedChange).not.toHaveBeenCalled();
+  });
+});
+
+describe('region normalization helpers', () => {
+  it('maps canonical and provider-specific region values to comparison groups', () => {
+    expect(canonicalRegionForRegionPreference(' us-east ')).toBe('us-east');
+    expect(canonicalRegionForRegionPreference('eastus')).toBe('us-east');
+    expect(canonicalRegionForRegionPreference('EUROPE-WEST3')).toBe('eu-central');
+    expect(canonicalRegionForRegionPreference('')).toBeUndefined();
+    expect(canonicalRegionForRegionPreference('antarctica-east-1')).toBeUndefined();
+
+    expect(comparisonRegionLabel('eastus')).toBe(
+      'US East (AWS us-east-1 · Azure eastus · GCP us-east1)',
+    );
+    expect(comparisonRegionLabel('unknown-region')).toBeUndefined();
+    expect(providerRegionSummary(COMPARISON_REGION_GROUPS[1])).toBe(
+      'AWS us-east-2 · Azure centralus · GCP us-central1',
+    );
+  });
+
+  it('normalizes residency scopes into allowed comparison regions', () => {
+    expect(canonicalRegionsForResidencyScope('United States')).toEqual([
+      'us-east',
+      'us-central',
+      'us-west',
+    ]);
+    expect(canonicalRegionsForResidencyScope('GDPR')).toEqual(['eu-west', 'eu-central']);
+    expect(canonicalRegionsForResidencyScope('Great Britain')).toEqual(['uk']);
+    expect(canonicalRegionsForResidencyScope('Asia Pacific')).toEqual(['ap-south', 'ap-southeast']);
+    expect(canonicalRegionsForResidencyScope('CA')).toEqual(['canada']);
+    expect(canonicalRegionsForResidencyScope('anywhere')).toBeUndefined();
+    expect(canonicalRegionsForResidencyScope('')).toBeUndefined();
+    expect(canonicalRegionsForResidencyScope('lunar')).toBeUndefined();
+  });
+
+  it('checks residency compatibility and chooses a safe fallback region', () => {
+    expect(isRegionPreferenceAllowedForResidency('us-west-2', 'USA')).toBe(true);
+    expect(isRegionPreferenceAllowedForResidency('eu-west-1', 'USA')).toBe(false);
+    expect(isRegionPreferenceAllowedForResidency('unknown-region', 'EU')).toBe(false);
+    expect(isRegionPreferenceAllowedForResidency('moonbase-1', 'global')).toBe(true);
+
+    expect(regionPreferenceForResidencyLock('westeurope', 'Europe')).toBe('eu-west');
+    expect(regionPreferenceForResidencyLock('eastus', 'GDPR')).toBe('eu-west');
+    expect(regionPreferenceForResidencyLock('eastus', 'global')).toBeUndefined();
   });
 });

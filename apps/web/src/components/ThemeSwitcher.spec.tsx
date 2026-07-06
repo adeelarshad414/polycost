@@ -38,6 +38,86 @@ describe('ThemeSwitcher', () => {
     expect(onThemeChange).toHaveBeenCalledWith('dark');
     unmount();
   });
+
+  it('wraps theme choices across arrow keys and edge positions', () => {
+    const onThemeChange = jest.fn();
+    const { container, unmount } = render(
+      <ThemeSwitcher themeChoice="system" onThemeChange={onThemeChange} />,
+    );
+
+    act(() => {
+      themeButton(container, 'Use system theme').dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }),
+      );
+    });
+
+    act(() => {
+      themeButton(container, 'Use dark theme').dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }),
+      );
+    });
+
+    expect(onThemeChange).toHaveBeenNthCalledWith(1, 'dark');
+    expect(onThemeChange).toHaveBeenNthCalledWith(2, 'system');
+    unmount();
+  });
+
+  it('handles home, end, and ignored keyboard input without changing invalidly', () => {
+    const onThemeChange = jest.fn();
+    const { container, unmount } = render(
+      <ThemeSwitcher themeChoice="dark" onThemeChange={onThemeChange} />,
+    );
+
+    act(() => {
+      themeButton(container, 'Use dark theme').dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Home', bubbles: true }),
+      );
+    });
+
+    act(() => {
+      themeButton(container, 'Use system theme').dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'End', bubbles: true }),
+      );
+    });
+
+    act(() => {
+      themeButton(container, 'Use dark theme').dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      );
+    });
+
+    expect(onThemeChange).toHaveBeenCalledTimes(2);
+    expect(onThemeChange).toHaveBeenNthCalledWith(1, 'system');
+    expect(onThemeChange).toHaveBeenNthCalledWith(2, 'dark');
+    unmount();
+  });
+
+  it('falls back to immediate focus when requestAnimationFrame is unavailable', () => {
+    const onThemeChange = jest.fn();
+    const originalRequestAnimationFrame = window.requestAnimationFrame;
+    Object.defineProperty(window, 'requestAnimationFrame', {
+      configurable: true,
+      value: undefined,
+    });
+    const { container, unmount } = render(
+      <ThemeSwitcher themeChoice="light" onThemeChange={onThemeChange} />,
+    );
+
+    act(() => {
+      themeButton(container, 'Use light theme').dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }),
+      );
+    });
+
+    expect(onThemeChange).toHaveBeenCalledWith('system');
+    expect(document.activeElement).toBe(themeButton(container, 'Use system theme'));
+
+    unmount();
+    Object.defineProperty(window, 'requestAnimationFrame', {
+      configurable: true,
+      value: originalRequestAnimationFrame,
+    });
+  });
 });
 
 function render(element: React.ReactElement): {
