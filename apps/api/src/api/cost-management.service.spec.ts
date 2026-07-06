@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { ApiNotFoundError, ApiUnauthorizedError } from './api-errors';
 import { CostManagementService } from './cost-management.service';
 import {
@@ -126,7 +127,7 @@ describe('CostManagementService', () => {
   it('enforces password-protected shared reports and revokes active tokens', async () => {
     const protectedShareLink: ShareLinkRecord = {
       ...shareLink,
-      passwordHash: 'b7a8c8e152719b77eae7427ed619b63293589940c877c3a2122e4b642307cc29',
+      passwordHash: hashedPassword('client-demo'),
     };
     const repository = repositoryMock({
       getActiveShareLink: jest.fn(async () => protectedShareLink),
@@ -191,4 +192,8 @@ function repositoryMock(overrides: Record<string, unknown> = {}) {
     getExchangeRates: jest.fn(),
     ...overrides,
   };
+}
+
+function hashedPassword(password: string): string {
+  return createHash('sha256').update(password, 'utf8').digest('hex');
 }
