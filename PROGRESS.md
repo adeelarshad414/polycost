@@ -56,6 +56,32 @@ say so explicitly rather than marking it done.
 | Phase 2.8N - API RBAC matrix hardening                 | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8O - Production-readiness CI gate              | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8P - Queryable comparison pricing evidence     | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8Q - Visible pricing evidence UI wiring        | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8Q - Visible pricing evidence UI wiring
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Wired the web app to call `getComparisonPricingEvidence()` automatically for the
+  active comparison, including loading, error, and reset behavior aligned with the
+  existing backend analytics fetch lifecycle.
+- Added a compact `Traceable pricing evidence` panel inside the expanded Engineering
+  section so reviewers can inspect visible line-item cost, matched SKU, source
+  endpoint/record/hash, rate, derivation math, and confidence without cluttering the
+  default executive view.
+- Kept the design logo-free and provider-accent based, with responsive one/two/three
+  column behavior and a professional brand-colored spinner for evidence loading.
+- Verification evidence in this continuation:
+  - Focused web App/API-client specs passed: 2 suites / 80 tests.
+  - `npm run test:production-readiness` passed before the final formatting-only test
+    wrap: API 5 suites / 79 tests and web 2 suites / 80 tests.
+  - `npm run ci:lint` passed across API, web, and shared types before the final
+    formatting-only test wrap.
+  - `npm run format:check` passed after formatting.
+- Known gaps carried forward: the UI now exposes stored comparison evidence
+  end-to-end, but the data remains decision-grade catalog/list-price lineage rather
+  than full invoice-grade billing, private discount, or negotiated contract pricing.
 
 ## Phase 2.8P - Queryable comparison pricing evidence
 

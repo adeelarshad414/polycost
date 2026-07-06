@@ -5849,7 +5849,8 @@ select:disabled {
 .service-cheapest-matrix,
 .production-depth-analytics,
 .full-cost-matrix,
-.cost-formula-evidence {
+.cost-formula-evidence,
+.pricing-evidence-panel {
   display: grid;
   gap: var(--pc-space-2);
   border: 1px solid var(--pc-border);
@@ -6711,6 +6712,132 @@ select:disabled {
   font-family: var(--pc-font-mono);
   font-size: var(--pc-text-xs);
   line-height: 1.45;
+}
+
+.pricing-evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--pc-space-1);
+}
+
+.pricing-evidence-card {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  border: 1px solid var(--pc-border);
+  border-top: 4px solid var(--pc-border-strong);
+  border-radius: 8px;
+  background: var(--pc-bg-surface);
+  padding: 12px;
+}
+
+.pricing-evidence-card-aws {
+  border-top-color: var(--pc-provider-aws);
+}
+
+.pricing-evidence-card-azure {
+  border-top-color: var(--pc-provider-azure);
+}
+
+.pricing-evidence-card-gcp {
+  border-top-color: var(--pc-provider-gcp);
+}
+
+.pricing-evidence-card span {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.pricing-evidence-card strong,
+.pricing-evidence-card p,
+.pricing-evidence-card dl,
+.pricing-evidence-card dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.pricing-evidence-card strong {
+  color: var(--pc-text-primary);
+  font-size: var(--pc-text-sm);
+  line-height: 1.35;
+}
+
+.pricing-evidence-card p,
+.pricing-evidence-card dd {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  line-height: 1.4;
+}
+
+.pricing-evidence-card dl {
+  display: grid;
+  gap: 6px;
+}
+
+.pricing-evidence-card dl div {
+  display: grid;
+  gap: 2px;
+}
+
+.pricing-evidence-card dt {
+  color: var(--pc-text-tertiary);
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.pricing-evidence-card dd {
+  font-family: var(--pc-font-mono);
+}
+
+.pricing-evidence-loading,
+.pricing-evidence-error,
+.pricing-evidence-more {
+  margin: 0;
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: var(--pc-bg-surface);
+  padding: 12px;
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-sm);
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.pricing-evidence-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pricing-evidence-loading strong,
+.pricing-evidence-loading small {
+  display: block;
+  margin: 0;
+}
+
+.pricing-evidence-loading strong {
+  color: var(--pc-text-primary);
+}
+
+.pricing-evidence-spinner {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  border: 3px solid color-mix(in srgb, var(--pc-provider-azure) 24%, transparent);
+  border-top-color: var(--pc-provider-aws);
+  border-right-color: var(--pc-provider-gcp);
+  border-radius: 999px;
+  animation: pc-spin 0.9s linear infinite;
+}
+
+.pricing-evidence-error {
+  border-color: color-mix(in srgb, var(--pc-error) 35%, var(--pc-border));
+  color: var(--pc-error);
 }
 
 .engineering-chart-grid {
@@ -7843,6 +7970,12 @@ select:disabled {
   }
 }
 
+@keyframes pc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @keyframes progressive-panel-enter {
   from {
     opacity: 0;
@@ -8036,7 +8169,8 @@ select:disabled {
     justify-content: start;
   }
 
-  .production-depth-grid {
+  .production-depth-grid,
+  .pricing-evidence-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -8686,7 +8820,8 @@ select:disabled {
 
   .service-selector-grid,
   .production-depth-grid,
-  .formula-evidence-grid {
+  .formula-evidence-grid,
+  .pricing-evidence-grid {
     grid-template-columns: 1fr;
   }
 }

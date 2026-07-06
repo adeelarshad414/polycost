@@ -101,6 +101,7 @@ describe('App', () => {
     );
     expect(client.createComparison).toHaveBeenCalled();
     expect(client.getComparisonAnalytics).toHaveBeenCalledWith(comparisonResult.comparisonId);
+    expect(client.getComparisonPricingEvidence).toHaveBeenCalledWith(comparisonResult.comparisonId);
     expect(text(container)).not.toContain('Comparison ready.');
     expect(text(container)).toContain('Server analytics');
     expect(text(container)).toContain('Coverage');
@@ -923,6 +924,7 @@ describe('App', () => {
     const { container, unmount } = render(<App client={client} />);
 
     await click(buttonByText(container, 'Compare costs'));
+    await settleAsyncEffects();
 
     const disclosures = Array.from(container.querySelectorAll<HTMLElement>('.result-disclosure'));
     expect(disclosures).toHaveLength(1);
@@ -958,6 +960,10 @@ describe('App', () => {
     expect(text(container)).toContain('Engineering cost controls');
     expect(text(container)).toContain('Service driver split');
     expect(text(container)).toContain('Provider cost by mapped service family');
+    expect(text(container)).toContain('Traceable pricing evidence');
+    expect(text(container)).toContain('SKU, source row, rate, math');
+    expect(text(container)).toContain('m7i.large');
+    expect(text(container)).toContain('mock://aws/pricing');
     expect(text(container)).toContain('Backend cost coverage map');
     expect(text(container)).toContain('Backend-modeled baseline region sensitivity.');
     expect(text(container)).toContain('Backend commitment exposure');

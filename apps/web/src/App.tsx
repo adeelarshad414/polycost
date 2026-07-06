@@ -43,6 +43,7 @@ import {
 import {
   ComparisonProviderResult,
   ComparisonAnalyticsResponse,
+  ComparisonPricingEvidenceResponse,
   ComparisonResult,
   DataHealthResponse,
   BillingImportResponse,
@@ -736,6 +737,13 @@ export function App({ client = polyCostClient }: AppProps) {
     useState<ComparisonAnalyticsResponse | null>(null);
   const [comparisonAnalyticsError, setComparisonAnalyticsError] = useState<string | null>(null);
   const [isComparisonAnalyticsLoading, setIsComparisonAnalyticsLoading] = useState(false);
+  const [comparisonPricingEvidence, setComparisonPricingEvidence] =
+    useState<ComparisonPricingEvidenceResponse | null>(null);
+  const [comparisonPricingEvidenceError, setComparisonPricingEvidenceError] = useState<
+    string | null
+  >(null);
+  const [isComparisonPricingEvidenceLoading, setIsComparisonPricingEvidenceLoading] =
+    useState(false);
   const [comparisonHistory, setComparisonHistory] = useState<ComparisonHistoryEntry[]>(() =>
     readStoredComparisonHistory(),
   );
@@ -847,6 +855,50 @@ export function App({ client = polyCostClient }: AppProps) {
         }
 
         setIsComparisonAnalyticsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [client, comparison]);
+
+  useEffect(() => {
+    if (!comparison) {
+      setComparisonPricingEvidence(null);
+      setComparisonPricingEvidenceError(null);
+      setIsComparisonPricingEvidenceLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    setIsComparisonPricingEvidenceLoading(true);
+    setComparisonPricingEvidenceError(null);
+
+    void client
+      .getComparisonPricingEvidence(comparison.comparisonId)
+      .then((evidence) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setComparisonPricingEvidence(evidence);
+        setComparisonPricingEvidenceError(null);
+      })
+      .catch((evidenceError) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setComparisonPricingEvidence(null);
+        setComparisonPricingEvidenceError(formatApiError(evidenceError));
+      })
+      .finally(() => {
+        if (!isMounted) {
+          return;
+        }
+
+        setIsComparisonPricingEvidenceLoading(false);
       });
 
     return () => {
@@ -1612,6 +1664,8 @@ export function App({ client = polyCostClient }: AppProps) {
           comparison={comparison}
           comparisonAnalytics={comparisonAnalytics}
           comparisonAnalyticsError={comparisonAnalyticsError}
+          comparisonPricingEvidence={comparisonPricingEvidence}
+          comparisonPricingEvidenceError={comparisonPricingEvidenceError}
           form={form}
           submittedForm={submittedForm}
           submittedInputMode={submittedInputMode}
@@ -1635,6 +1689,7 @@ export function App({ client = polyCostClient }: AppProps) {
           dataHealth={dataHealth}
           dataHealthError={dataHealthError}
           isComparisonAnalyticsLoading={isComparisonAnalyticsLoading}
+          isComparisonPricingEvidenceLoading={isComparisonPricingEvidenceLoading}
           onClear={handleClearComparison}
           onEdit={handleEditComparison}
           onInputModeChange={setInputMode}
@@ -3778,6 +3833,8 @@ function ProgressiveComparisonPage({
   comparison,
   comparisonAnalytics,
   comparisonAnalyticsError,
+  comparisonPricingEvidence,
+  comparisonPricingEvidenceError,
   form,
   submittedForm,
   submittedInputMode,
@@ -3801,6 +3858,7 @@ function ProgressiveComparisonPage({
   dataHealth,
   dataHealthError,
   isComparisonAnalyticsLoading,
+  isComparisonPricingEvidenceLoading,
   onClear,
   onEdit,
   onInputModeChange,
@@ -3829,6 +3887,8 @@ function ProgressiveComparisonPage({
   comparison: ComparisonResult;
   comparisonAnalytics: ComparisonAnalyticsResponse | null;
   comparisonAnalyticsError: string | null;
+  comparisonPricingEvidence: ComparisonPricingEvidenceResponse | null;
+  comparisonPricingEvidenceError: string | null;
   form: WorkloadFormState;
   submittedForm: WorkloadFormState;
   submittedInputMode: InputMode;
@@ -3852,6 +3912,7 @@ function ProgressiveComparisonPage({
   dataHealth: DataHealthResponse | null;
   dataHealthError: string | null;
   isComparisonAnalyticsLoading: boolean;
+  isComparisonPricingEvidenceLoading: boolean;
   onClear: () => void;
   onEdit: () => void;
   onInputModeChange: (mode: InputMode) => void;
@@ -3970,6 +4031,8 @@ function ProgressiveComparisonPage({
                   client={client}
                   comparison={comparison}
                   comparisonAnalytics={comparisonAnalytics}
+                  comparisonPricingEvidence={comparisonPricingEvidence}
+                  comparisonPricingEvidenceError={comparisonPricingEvidenceError}
                   error={error}
                   exportingFormat={exportingFormat}
                   completedExportFormat={completedExportFormat}
@@ -3981,6 +4044,7 @@ function ProgressiveComparisonPage({
                   onIntervalChange={onIntervalChange}
                   onPricingModelChange={onPricingModelChange}
                   onRefreshLive={onRefreshLive}
+                  isComparisonPricingEvidenceLoading={isComparisonPricingEvidenceLoading}
                 />
               </ResultDisclosureSection>
             </div>
@@ -4193,6 +4257,8 @@ function StateDetailContent({
   client,
   comparison,
   comparisonAnalytics,
+  comparisonPricingEvidence,
+  comparisonPricingEvidenceError,
   error,
   exportingFormat,
   completedExportFormat,
@@ -4200,6 +4266,7 @@ function StateDetailContent({
   interval,
   pricingModel,
   regionCatalog,
+  isComparisonPricingEvidenceLoading,
   onExport,
   onIntervalChange,
   onPricingModelChange,
@@ -4209,6 +4276,8 @@ function StateDetailContent({
   client: PolyCostClient;
   comparison: ComparisonResult;
   comparisonAnalytics: ComparisonAnalyticsResponse | null;
+  comparisonPricingEvidence: ComparisonPricingEvidenceResponse | null;
+  comparisonPricingEvidenceError: string | null;
   error: string | null;
   exportingFormat: ReportFormat | null;
   completedExportFormat: ReportFormat | null;
@@ -4216,6 +4285,7 @@ function StateDetailContent({
   interval: IntervalKey;
   pricingModel: PricingModelKey;
   regionCatalog: RegionCatalogResponse | null;
+  isComparisonPricingEvidenceLoading: boolean;
   onExport: (format: ReportFormat) => void;
   onIntervalChange: (interval: IntervalKey) => void;
   onPricingModelChange: (model: PricingModelKey) => void;
@@ -4255,6 +4325,11 @@ function StateDetailContent({
         />
         <FullCostMatrixTable comparison={comparison} />
         <CostFormulaEvidence comparison={comparison} />
+        <PricingEvidencePanel
+          evidence={comparisonPricingEvidence}
+          error={comparisonPricingEvidenceError}
+          isLoading={isComparisonPricingEvidenceLoading}
+        />
         <ComparisonToolbar interval={interval} onIntervalChange={onIntervalChange} />
         <FinOpsFeatureLayer
           client={client}
@@ -11294,6 +11369,129 @@ function CostFormulaEvidence({ comparison }: { comparison: ComparisonResult | nu
       </div>
     </section>
   );
+}
+
+function PricingEvidencePanel({
+  evidence,
+  error,
+  isLoading,
+}: {
+  evidence: ComparisonPricingEvidenceResponse | null;
+  error: string | null;
+  isLoading: boolean;
+}) {
+  const rows = evidence?.evidence ?? [];
+  const visibleRows = rows.slice(0, 6);
+
+  return (
+    <section
+      className={`pricing-evidence-panel pricing-evidence-${error ? 'error' : isLoading ? 'loading' : 'ready'}`}
+      aria-label="Traceable pricing evidence"
+    >
+      <div className="engineering-dashboard-heading">
+        <div>
+          <span>Traceable pricing evidence</span>
+          <h3>SKU, source row, rate, math</h3>
+        </div>
+        <p>
+          {error
+            ? 'Saved comparison lineage could not be loaded from the API.'
+            : isLoading
+              ? 'Loading the stored SKU-to-estimate chain for this comparison.'
+              : evidence
+                ? `${evidence.lineItemCount} line item(s) traced from ${evidence.providerCount} provider result(s), priced as of ${formatDateTime(evidence.pricingAsOf)}.`
+                : 'Run a comparison to load stored line item evidence.'}
+        </p>
+      </div>
+
+      {isLoading ? (
+        <div className="pricing-evidence-loading" role="status">
+          <span className="pricing-evidence-spinner" aria-hidden="true" />
+          <strong>Syncing pricing evidence</strong>
+          <small>Reading stored lineage from the comparison API.</small>
+        </div>
+      ) : null}
+
+      {error ? (
+        <p className="pricing-evidence-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      {!isLoading && !error && visibleRows.length > 0 ? (
+        <div className="pricing-evidence-grid">
+          {visibleRows.map((row) => (
+            <article
+              className={`pricing-evidence-card pricing-evidence-card-${row.providerId}`}
+              key={row.evidenceId}
+            >
+              <span>
+                {providerLabel(row.providerId)} · {capitalize(row.category)}
+              </span>
+              <strong>{formatCurrency(row.displayedAmounts.monthlyCostUsd)} / mo</strong>
+              <p>{row.description}</p>
+              <dl>
+                <div>
+                  <dt>SKU</dt>
+                  <dd>{evidenceSkuLabel(row)}</dd>
+                </div>
+                <div>
+                  <dt>Source</dt>
+                  <dd>{evidenceSourceLabel(row)}</dd>
+                </div>
+                <div>
+                  <dt>Rate</dt>
+                  <dd>{evidenceRateLabel(row)}</dd>
+                </div>
+                <div>
+                  <dt>Math</dt>
+                  <dd>{row.derivation.expression}</dd>
+                </div>
+                <div>
+                  <dt>Confidence</dt>
+                  <dd>{capitalize(row.equivalence.confidence)}</dd>
+                </div>
+              </dl>
+            </article>
+          ))}
+        </div>
+      ) : null}
+
+      {!isLoading && !error && rows.length > visibleRows.length ? (
+        <p className="pricing-evidence-more">
+          {rows.length - visibleRows.length} additional evidence row(s) available through the API.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function evidenceSkuLabel(row: ComparisonPricingEvidenceResponse['evidence'][number]): string {
+  return (
+    row.sku.resolvedSkuId ??
+    row.sku.sourceSkuId ??
+    row.sku.rateSourceSkuId ??
+    row.sku.providerServiceName ??
+    'Modeled service'
+  );
+}
+
+function evidenceSourceLabel(row: ComparisonPricingEvidenceResponse['evidence'][number]): string {
+  const endpoint = row.rate.sourceEndpoint ?? row.rate.source;
+  const sourceId = row.rate.sourceRecordId ?? row.rate.sourceRecordKey;
+  const hashSuffix = row.rate.sourcePayloadHash
+    ? ` · hash ${row.rate.sourcePayloadHash.slice(0, 10)}`
+    : '';
+
+  return sourceId ? `${endpoint} · ${sourceId}${hashSuffix}` : `${endpoint}${hashSuffix}`;
+}
+
+function evidenceRateLabel(row: ComparisonPricingEvidenceResponse['evidence'][number]): string {
+  if (row.rate.unitPriceUsd === undefined) {
+    return row.rate.source;
+  }
+
+  return `${formatCurrency(row.rate.unitPriceUsd)} / ${row.rate.unit ?? 'unit'}`;
 }
 
 function serviceCheapestRows(
