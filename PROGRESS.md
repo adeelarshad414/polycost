@@ -43,6 +43,32 @@ say so explicitly rather than marking it done.
 | Phase 2.8A - Auth product UX continuation              | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8B - Invite/SSO auth hardening                 | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8C - Diagram partial-parse hardening           | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8D - Security suppression cleanup              | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8D - Security suppression cleanup
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Closed a suppression-ledger gap for `apps/api/src/api/regions.service.ts`: both
+  inline `security/detect-object-injection` suppressions now have dated comments
+  pointing to `docs/SECURITY-SUPPRESSIONS.md`, and the file is listed in the ledger.
+- Tightened the advisory ledger by linking the remaining low
+  `@ai-sdk/provider-utils` advisory directly to
+  `https://github.com/advisories/GHSA-866g-f22w-33x8`.
+- Added a CI workflow comment beside the QA step documenting why `npm run qa` can
+  pass on Node 20 while `scripts/impeccable-check.mjs` skips the Node 24-only
+  `impeccable@3.1.0` check.
+- Verification evidence in this continuation:
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run qa` passed and printed the documented Node 24-only impeccable skip.
+  - `npm run security:audit` passed the high/critical gate.
+  - `npm audit --audit-level=low` exits 1 only for the documented low
+    Graphify/Ollama transitive advisory with no fix available.
+- Known gaps carried forward: the low transitive advisory still requires an upstream
+  `@sentropic/graphify` / `ollama-ai-provider` dependency fix or dependency removal
+  decision before public release. GitHub PR `quality` remains externally blocked by
+  account billing/spending-limit runner startup failure.
 
 ## Phase 2.8C - Diagram partial-parse hardening
 

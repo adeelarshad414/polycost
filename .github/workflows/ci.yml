@@ -22,6 +22,9 @@ jobs:
         run: npm run format:check
       - name: Lint and typecheck
         run: npm run ci:lint
+      # `npm run qa` invokes `npm run impeccable`; scripts/impeccable-check.mjs
+      # exits 0 with a documented warning on Node 20 until the project adds a
+      # Node 24 auxiliary quality job or intentionally raises engines.node.
       - name: Spec and workflow QA
         run: npm run qa
       - name: Graph validation
