@@ -34,6 +34,8 @@ Application configuration comes from environment variables validated by
 - `NL_PARSE_MAX_INPUT_CHARS`
 - `LLM_PARSE_ENDPOINT`
 - `LLM_PARSE_MODEL`
+- `DIAGRAM_LLM_CLASSIFIER_ENDPOINT`
+- `DIAGRAM_LLM_CLASSIFIER_MODEL`
 - `FEATURE_LIVE_PRICING_REFRESH_ENABLED`
 
 Secrets are read from Vault through `SecretsService`; do not place secret values in
@@ -58,6 +60,7 @@ Provider adapter secret paths:
 - AWS pricing credentials: `secret/polycost/providers/aws`
 - GCP billing token: `secret/polycost/providers/gcp`
 - Azure Retail Prices currently requires no secret
+- Optional NL/diagram LLM key: `secret/polycost/llm` key `api_key`
 
 ## Deployment Notes
 
@@ -70,6 +73,9 @@ Provider adapter secret paths:
   limits are reviewed.
 - Confirm BullMQ repeatable jobs exist for pricing ETL, currency sync, alert
   evaluation, and share-link cleanup before enabling production traffic.
+- Review `GET /api/v1/pricing/coverage` before demos or production rehearsals. It
+  intentionally reports decision-grade coverage and the remaining invoice-grade future
+  work instead of implying billing/export parity.
 
 ## Rollback Notes
 

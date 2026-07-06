@@ -30,6 +30,7 @@ const expectedMigrations = [
   '022_diagram_imports.sql',
   '023_seed_sql_server_database_catalog.sql',
   '024_comparison_audit_pricing_trace.sql',
+  '025_account_team_foundation.sql',
 ];
 
 if (!['migrate', 'seed', 'reset', 'validate'].includes(command)) {

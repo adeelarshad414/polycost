@@ -10,12 +10,17 @@ import { DiagramParserService } from './diagram-parser.service';
 import { DiagramTempFileStore } from './diagram-temp-file.store';
 import { DrawioExtractor } from './drawio.extractor';
 import { FormatDetectorService } from './format-detector.service';
-import { StubLlmClassifierClient } from './llm-classifier.client';
+import {
+  DIAGRAM_LLM_CLASSIFIER_CLIENT,
+  OpenAiCompatibleDiagramLlmClassifierClient,
+  StubLlmClassifierClient,
+} from './llm-classifier.client';
 import { LucidCsvExtractor } from './lucid-csv.extractor';
 import { MermaidExtractor } from './mermaid.extractor';
 import { NodeClassifierService } from './node-classifier.service';
 import { StencilMapRegistry } from './stencil-map.registry';
 import { VsdxExtractor } from './vsdx.extractor';
+import { LlmClassifierClient } from './diagram-parser.types';
 
 @Module({
   controllers: [DiagramParserController],
@@ -30,12 +35,27 @@ import { VsdxExtractor } from './vsdx.extractor';
     StencilMapRegistry,
     StubLlmClassifierClient,
     {
+      provide: DIAGRAM_LLM_CLASSIFIER_CLIENT,
+      inject: [ConfigService, SecretsService],
+      useFactory: (
+        configService: ConfigService<AppConfig, true>,
+        secretsService: SecretsService,
+      ): LlmClassifierClient => {
+        const endpoint = configService.get('DIAGRAM_LLM_CLASSIFIER_ENDPOINT', { infer: true });
+        const model = configService.get('DIAGRAM_LLM_CLASSIFIER_MODEL', { infer: true });
+
+        return endpoint && model
+          ? new OpenAiCompatibleDiagramLlmClassifierClient(configService, secretsService)
+          : new StubLlmClassifierClient();
+      },
+    },
+    {
       provide: NodeClassifierService,
-      inject: [StencilMapRegistry, AliasDictionary, StubLlmClassifierClient],
+      inject: [StencilMapRegistry, AliasDictionary, DIAGRAM_LLM_CLASSIFIER_CLIENT],
       useFactory: (
         stencilMapRegistry: StencilMapRegistry,
         aliasDictionary: AliasDictionary,
-        llmClassifierClient: StubLlmClassifierClient,
+        llmClassifierClient: LlmClassifierClient,
       ) => new NodeClassifierService(stencilMapRegistry, aliasDictionary, llmClassifierClient),
     },
     DiagramParserService,

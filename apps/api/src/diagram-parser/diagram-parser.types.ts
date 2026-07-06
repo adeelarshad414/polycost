@@ -133,6 +133,7 @@ export interface DiagramParseResult {
 export interface LlmClassifierClient {
   classify(input: {
     displayLabel: string;
+    diagramNodeId?: string;
     stencilId?: string;
   }): Promise<DiagramNodeClassification | undefined> | DiagramNodeClassification | undefined;
 }

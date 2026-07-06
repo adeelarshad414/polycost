@@ -47,6 +47,7 @@ export class NodeClassifierService {
 
     const llmMatch = await this.llmClassifierClient.classify({
       displayLabel,
+      diagramNodeId: node.id,
       stencilId: node.stencilId,
     });
 
