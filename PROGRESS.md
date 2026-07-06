@@ -81,8 +81,9 @@ say so explicitly rather than marking it done.
 - Known gaps carried forward: this is extraction/review hardening, not full Visio
   visual rendering. `npm run ci:e2e` was attempted with Docker access, but the local
   Docker/Colima layer stopped returning `docker compose ps`/log diagnostics after API
-  startup failed; do not treat this as green evidence. PR `quality` CI is still
-  pending on GitHub as of this checkpoint.
+  startup failed; do not treat this as green evidence. PR `quality` CI failed before
+  any runner steps started because GitHub reported an account billing/spending-limit
+  issue; this is an external repository/account action, not a code failure.
 
 ## Phase 2.8B - Invite/SSO auth hardening
 
