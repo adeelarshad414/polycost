@@ -101,12 +101,65 @@ describe('LivePricingRefreshService', () => {
         category: 'compute',
         skuId: 'AWS-COMPUTE-1',
         region: 'us-east-1',
+        source: 'pricing_catalog',
       },
       {
         providerId: 'aws',
         category: 'storage',
         skuId: 'AWS-STORAGE-1',
         region: 'us-east-1',
+        source: 'pricing_catalog',
+      },
+    ]);
+  });
+
+  it('prefers pricingTrace source record identity when extracting live references', () => {
+    expect(
+      livePricingReferences({
+        ...snapshot.resultSnapshot,
+        providers: [
+          {
+            ...snapshot.resultSnapshot.providers[0],
+            lineItems: [
+              {
+                category: 'compute',
+                description: 'web compute',
+                isApproximate: false,
+                baseMonthlyCostUsd: 36.5,
+                skuId: 'DISPLAY-SKU',
+                region: 'us-east-1',
+                unit: 'hour',
+                unitPriceUsd: 0.05,
+                pricingTrace: {
+                  providerId: 'aws',
+                  serviceCategory: 'compute',
+                  source: 'pricing_catalog',
+                  sourceRecordKey:
+                    'aws|compute|TRACE-SKU|catalog-us-east-1|hour|2026-06-30T00:00:00.000Z',
+                  resolvedSkuId: 'DISPLAY-SKU',
+                  sourceSkuId: 'TRACE-SKU',
+                  region: 'us-east-1',
+                  catalogRegion: 'catalog-us-east-1',
+                  unit: 'hour',
+                  unitPriceUsd: 0.05,
+                  effectiveDate: '2026-06-30T00:00:00.000Z',
+                  fetchedAt: '2026-06-30T01:00:00.000Z',
+                  isApproximate: false,
+                  isEstimate: false,
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    ).toEqual([
+      {
+        providerId: 'aws',
+        category: 'compute',
+        skuId: 'TRACE-SKU',
+        region: 'catalog-us-east-1',
+        source: 'pricing_catalog',
+        sourceRecordKey: 'aws|compute|TRACE-SKU|catalog-us-east-1|hour|2026-06-30T00:00:00.000Z',
       },
     ]);
   });
@@ -196,7 +249,7 @@ describe('LivePricingRefreshService', () => {
         providerId: 'aws',
         code: 'live_refresh_failed',
         message:
-          'aws live refresh skipped local seed provider SKUs; cached baseline pricing remains in use',
+          'aws live refresh skipped local seed or modeled references; cached baseline pricing remains in use',
       },
     ]);
     expect(adapter.refreshLivePricing).not.toHaveBeenCalled();

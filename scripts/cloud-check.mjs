@@ -8,9 +8,17 @@ const warnings = [];
 
 const envExamplePath = path.join(root, '.env.example');
 const cloudReadinessPath = path.join(root, 'docs/cloud/cloud-readiness.md');
+const livePricingCredentialsPath = path.join(root, 'docs/operations/live-pricing-credentials.md');
 const deployPath = path.join(root, 'DEPLOY.md');
+const providerCredentialCheckPath = path.join(root, 'scripts/provider-credential-check.mjs');
 
-for (const filePath of [envExamplePath, cloudReadinessPath, deployPath]) {
+for (const filePath of [
+  envExamplePath,
+  cloudReadinessPath,
+  livePricingCredentialsPath,
+  deployPath,
+  providerCredentialCheckPath,
+]) {
   if (!existsSync(filePath)) {
     failures.push(`Missing cloud readiness file: ${path.relative(root, filePath)}`);
   }

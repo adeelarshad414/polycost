@@ -1036,6 +1036,9 @@ export function lineItemEvidenceRows(result: ComparisonResult): string[][] {
       'Monthly USD',
       'Calculation',
       'Pricing model evidence',
+      'Pricing trace source',
+      'Pricing trace key',
+      'Pricing trace fetched at',
     ],
     ...result.providers.flatMap((provider) =>
       provider.lineItems.map((lineItem) => [
@@ -1049,6 +1052,9 @@ export function lineItemEvidenceRows(result: ComparisonResult): string[][] {
         formatNumber(lineItem.baseMonthlyCostUsd),
         calculationText(lineItem),
         pricingModelEvidence(lineItem),
+        pricingTraceSource(lineItem),
+        pricingTraceKey(lineItem),
+        lineItem.pricingTrace?.fetchedAt ?? lineItem.rateSourceFetchedAt ?? '',
       ]),
     ),
   ];
@@ -1187,6 +1193,9 @@ export function skuMappingAppendixRows(result: ComparisonResult): string[][] {
         lineItem.pricingBasis ?? 'flat',
         calculationText(lineItem),
         pricingModelEvidence(lineItem),
+        pricingTraceSource(lineItem),
+        pricingTraceKey(lineItem),
+        lineItem.pricingTrace?.fetchedAt ?? lineItem.rateSourceFetchedAt ?? '',
       ];
     }),
   );
@@ -1208,10 +1217,34 @@ export function skuMappingAppendixRows(result: ComparisonResult): string[][] {
       'Pricing basis',
       'Calculation',
       'Pricing model evidence',
+      'Pricing trace source',
+      'Pricing trace key',
+      'Pricing trace fetched at',
     ],
     ...(rows.length > 0
       ? rows
-      : [['No SKU mapping rows were attached to this comparison.', '', '', '', '', '', '', '', '', '', '', '', '', '', '']]),
+      : [
+          [
+            'No SKU mapping rows were attached to this comparison.',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+          ],
+        ]),
   ];
 }
 
@@ -2378,6 +2411,28 @@ function pricingModelEvidence(lineItem: ComparisonLineItem): string {
         : `${model.model}: unavailable (${model.unavailableReason ?? 'not offered'})`,
     )
     .join('; ');
+}
+
+function pricingTraceSource(lineItem: ComparisonLineItem): string {
+  const trace = lineItem.pricingTrace;
+
+  if (trace) {
+    return `${trace.source}${trace.isEstimate ? ' estimate' : ''}${trace.isApproximate ? ' approximate' : ''}`;
+  }
+
+  return lineItem.rateSource ?? 'missing trace';
+}
+
+function pricingTraceKey(lineItem: ComparisonLineItem): string {
+  const trace = lineItem.pricingTrace;
+
+  if (trace?.sourceRecordKey) {
+    return trace.sourceRecordKey;
+  }
+
+  const skuId = lineItem.rateSourceSkuId ?? lineItem.skuId;
+
+  return skuId ? `${lineItem.rateSource ?? 'pricing_catalog'}:${skuId}` : 'missing trace key';
 }
 
 function modelEstimateFlag(

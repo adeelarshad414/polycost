@@ -2,7 +2,8 @@
 
 This guide covers two deployment paths: self-hosting via Docker Compose and
 production deployment to a cloud platform. Read `09-CONFIG-AND-SECRETS.md` and
-`11-SECURITY.md` before deploying beyond local development.
+`11-SECURITY.md` before deploying beyond local development. For live-pricing provider
+coverage and credentials, read `docs/operations/live-pricing-credentials.md`.
 
 ## Part 1 - Self-hosting with Docker Compose
 
@@ -37,7 +38,7 @@ infrastructure expertise.
 3. Start the stack.
 
    ```bash
-   docker-compose up -d
+   docker compose up -d
    ```
 
    This starts Postgres, Redis, the Vault dev-server, the `vault-seed` job, the
@@ -49,7 +50,7 @@ infrastructure expertise.
    add the key directly into the running Vault instance:
 
    ```bash
-   docker-compose exec vault vault kv put secret/polycost/llm api_key="<your key here>"
+   docker compose exec vault vault kv put secret/polycost/llm api_key="<your key here>"
    ```
 
    If this step is skipped, structured-form input still works. Only natural-language
@@ -58,13 +59,14 @@ infrastructure expertise.
 5. Run database migrations.
 
    ```bash
-   docker-compose exec api npm run migrate
+   npm run db:migrate
    ```
 
 6. Trigger an initial pricing catalog fetch.
 
    ```bash
-   docker-compose exec api npm run pricing:fetch-now
+   npm run provider:credentials:check
+   docker compose restart api
    ```
 
 7. Open the app.
@@ -77,7 +79,7 @@ The self-host flow must work from a genuinely clean checkout with no leftover st
 For development verification, tear down completely first:
 
 ```bash
-docker-compose down -v
+docker compose down -v
 ```
 
 Then run the self-hosting steps again.
@@ -86,9 +88,9 @@ Then run the self-hosting steps again.
 
 ```bash
 git pull
-docker-compose pull
-docker-compose up -d --build
-docker-compose exec api npm run migrate
+docker compose pull
+docker compose up -d --build
+npm run db:migrate
 ```
 
 ### Backups

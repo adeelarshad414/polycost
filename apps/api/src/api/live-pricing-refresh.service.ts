@@ -3,6 +3,7 @@ import {
   CloudProviderAdapter,
   PricingCatalogRecord,
   ProviderId,
+  RateSource,
   ServiceCategory,
 } from '../adapters/common/cloud-provider-adapter';
 import { ComparisonResult, ComparisonWarning } from '../comparison/comparison.types';
@@ -18,6 +19,8 @@ interface LivePricingReference {
   category: ServiceCategory;
   skuId: string;
   region: string;
+  source: RateSource;
+  sourceRecordKey?: string;
 }
 
 interface LivePricingReferenceGroup {
@@ -75,14 +78,17 @@ export class LivePricingRefreshService {
     }
 
     const refreshableReferences = providerReferences.filter(
-      (reference) => !reference.skuId.startsWith('local-seed-'),
+      (reference) =>
+        (reference.source === 'pricing_catalog' || reference.source === 'pricing_rates') &&
+        !reference.skuId.startsWith('local-seed-') &&
+        !reference.skuId.startsWith('modeled-'),
     );
 
     if (refreshableReferences.length === 0) {
       return {
         providerId: adapter.providerId,
         code: 'live_refresh_failed',
-        message: `${adapter.providerId} live refresh skipped local seed provider SKUs; cached baseline pricing remains in use`,
+        message: `${adapter.providerId} live refresh skipped local seed or modeled references; cached baseline pricing remains in use`,
       };
     }
 
@@ -158,16 +164,23 @@ export class LivePricingRefreshService {
 export function livePricingReferences(result: ComparisonResult): LivePricingReference[] {
   return result.providers.flatMap((provider) =>
     provider.lineItems.flatMap((lineItem) => {
-      if (!lineItem.skuId || !lineItem.region) {
+      const trace = lineItem.pricingTrace;
+      const skuId = trace?.sourceSkuId ?? lineItem.rateSourceSkuId ?? lineItem.skuId;
+      const region = trace?.catalogRegion ?? trace?.region ?? lineItem.region;
+      const source = trace?.source ?? lineItem.rateSource ?? 'pricing_catalog';
+
+      if (!skuId || !region) {
         return [];
       }
 
       return [
         {
           providerId: provider.providerId,
-          category: lineItem.category,
-          skuId: lineItem.skuId,
-          region: lineItem.region,
+          category: trace?.serviceCategory ?? lineItem.category,
+          skuId,
+          region,
+          source,
+          ...(trace?.sourceRecordKey ? { sourceRecordKey: trace.sourceRecordKey } : {}),
         },
       ];
     }),

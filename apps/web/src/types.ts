@@ -360,6 +360,36 @@ export interface ComparisonLineItem {
   unit?: string;
   unitPriceUsd?: number;
   pricingBasis?: PricingBasis;
+  rateSource?: 'pricing_catalog' | 'pricing_rates' | 'modeled_estimate' | 'manual_model';
+  rateSourceSkuId?: string;
+  pricingTermCode?: string;
+  paymentOptionCode?: string;
+  rateCurrency?: string;
+  rateValidFrom?: string;
+  rateSourceFetchedAt?: string;
+  pricingTrace?: {
+    providerId: ProviderId;
+    serviceCategory: ServiceCategory;
+    costComponent?: CostComponent;
+    source: 'pricing_catalog' | 'pricing_rates' | 'modeled_estimate' | 'manual_model';
+    sourceRecordKey: string;
+    resolvedSkuId?: string;
+    sourceSkuId?: string;
+    providerServiceName?: string;
+    skuDescription?: string;
+    region?: string;
+    catalogRegion?: string;
+    unit?: string;
+    unitPriceUsd?: number;
+    currency?: string;
+    effectiveDate?: string;
+    fetchedAt?: string;
+    pricingTermCode?: string;
+    paymentOptionCode?: string;
+    pricingBasis?: PricingBasis;
+    isApproximate: boolean;
+    isEstimate: boolean;
+  };
   egressTiers?: EgressTierBreakdown[];
   pricingModels?: PricingModelCost[];
 }
