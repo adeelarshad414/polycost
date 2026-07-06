@@ -176,6 +176,12 @@ const PROVIDER_SHAPES: Record<ProviderId, MockProviderShape> = {
         engine: 'generic_nosql',
         hourlyUsd: 0.11,
       },
+      {
+        sku: 'aws-elasticache-redis-cache-node',
+        serviceName: 'Amazon ElastiCache Redis',
+        engine: 'redis',
+        hourlyUsd: 0.068,
+      },
     ],
     egressTiers: [
       { tierFromGb: 0, tierToGb: 10_240, pricePerGb: 0.09 },
@@ -302,6 +308,12 @@ const PROVIDER_SHAPES: Record<ProviderId, MockProviderShape> = {
         engine: 'generic_nosql',
         hourlyUsd: 0.096,
       },
+      {
+        sku: 'azure-managed-redis-cache-node',
+        serviceName: 'Azure Managed Redis',
+        engine: 'redis',
+        hourlyUsd: 0.071,
+      },
     ],
     egressTiers: [
       { tierFromGb: 0, tierToGb: 10_240, pricePerGb: 0.087 },
@@ -426,6 +438,12 @@ const PROVIDER_SHAPES: Record<ProviderId, MockProviderShape> = {
         serviceName: 'Firestore Native Mode',
         engine: 'generic_nosql',
         hourlyUsd: 0.09,
+      },
+      {
+        sku: 'gcp-memorystore-redis-node',
+        serviceName: 'Memorystore for Redis',
+        engine: 'redis',
+        hourlyUsd: 0.064,
       },
     ],
     egressTiers: [

@@ -3,7 +3,9 @@ import {
   ProviderId,
   ProviderPricingResult,
 } from '../adapters/common/cloud-provider-adapter';
-import { NormalizedWorkloadSpec } from '../nws/nws.types';
+import { InMemoryPricingCatalogReader } from '../adapters/common/in-memory-pricing-catalog.reader';
+import { MockProviderAdapter } from '../adapters/mock/mock-provider.adapter';
+import { NormalizedWorkloadSpec, ServiceRequirement } from '../nws/nws.types';
 import {
   ComparisonOrchestratorService,
   ComparisonUnavailableError,
@@ -107,6 +109,303 @@ const createService = (adapters: CloudProviderAdapter[]) =>
     () => 'comparison-123',
     () => new Date('2026-06-28T12:00:00.000Z'),
   );
+
+const UI_PRICED_SERVICE_FAMILY_IDS = [
+  'vm-compute',
+  'burstable-compute',
+  'autoscaling-compute',
+  'serverless-functions',
+  'container-orchestration',
+  'serverless-containers',
+  'container-registry',
+  'app-platform',
+  'api-gateway',
+  'object-storage',
+  'block-storage',
+  'file-storage',
+  'archive-storage',
+  'relational-database',
+  'nosql-database',
+  'cache',
+  'managed-search',
+  'data-warehouse',
+  'data-lake',
+  'data-integration',
+  'streaming-analytics',
+  'business-intelligence',
+  'queues-messaging',
+  'eventing',
+  'workflow-orchestration',
+  'cdn-edge',
+  'load-balancing',
+  'dns',
+  'private-networking',
+  'dedicated-connectivity',
+  'keys-secrets',
+  'security-posture',
+  'waf-ddos',
+  'monitoring',
+  'logging-audit',
+  'tracing-apm',
+] as const;
+
+const uiPricedServiceCoverageWorkload: NormalizedWorkloadSpec = {
+  schemaVersion: '1.0',
+  metadata: {
+    sourceType: 'structured_form',
+    createdAt: '2026-07-06T00:00:00.000Z',
+  },
+  workload: {
+    type: 'web_app',
+    region: {
+      preference: 'us-east',
+      isDefault: false,
+    },
+  },
+  compute: [
+    {
+      role: 'general-purpose',
+      scalingType: 'fixed',
+      instanceCount: 1,
+      vcpu: 2,
+      memoryGb: 8,
+      instanceFamily: 'general-purpose',
+    },
+    {
+      role: 'burstable',
+      scalingType: 'fixed',
+      instanceCount: 1,
+      vcpu: 2,
+      memoryGb: 4,
+      instanceFamily: 'burstable',
+    },
+    {
+      role: 'autoscaling',
+      scalingType: 'autoscaling',
+      autoscalingRange: {
+        min: 1,
+        max: 3,
+      },
+      vcpu: 4,
+      memoryGb: 16,
+      instanceFamily: 'general-purpose',
+    },
+  ],
+  storage: [
+    {
+      role: 'object',
+      type: 'object',
+      sizeGb: 500,
+      accessPattern: 'frequent',
+      storageClass: 'standard',
+    },
+    {
+      role: 'block',
+      type: 'block',
+      sizeGb: 250,
+      accessPattern: 'frequent',
+      storageClass: 'standard',
+    },
+    {
+      role: 'file',
+      type: 'file',
+      sizeGb: 250,
+      accessPattern: 'frequent',
+      storageClass: 'standard',
+    },
+    {
+      role: 'object archive',
+      type: 'object',
+      sizeGb: 1_000,
+      accessPattern: 'archive',
+      storageClass: 'archive',
+    },
+  ],
+  database: [
+    {
+      role: 'relational',
+      engine: 'postgres',
+      sizeGb: 200,
+      highAvailability: false,
+    },
+    {
+      role: 'nosql',
+      engine: 'generic_nosql',
+      sizeGb: 100,
+      highAvailability: false,
+      nosqlReadRequestUnitsMillion: 25,
+      nosqlWriteRequestUnitsMillion: 10,
+      ruPerSecond: 1_000,
+    },
+    {
+      role: 'cache',
+      engine: 'redis',
+      sizeGb: 20,
+      highAvailability: false,
+      cacheReplicaCount: 2,
+    },
+  ],
+  network: {
+    cdn: true,
+    loadBalancer: true,
+    estimatedMonthlyEgressGb: 5_000,
+    cdnTrafficGb: 4_000,
+    cdnCacheHitRatioPercent: 85,
+    cdnRequestsMillion: 75,
+    loadBalancerProcessedGb: 2_000,
+    loadBalancerHours: 730,
+    loadBalancerNewConnectionsPerSecond: 25,
+    loadBalancerActiveConnections: 4_000,
+    loadBalancerRuleEvaluationsPerSecond: 250,
+    dnsHostedZones: 2,
+    dnsQueriesMillion: 20,
+    natGatewayGb: 1_000,
+    natGatewayHours: 730,
+    vpnConnectionCount: 2,
+    vpnConnectionHours: 730,
+    vpnDataTransferGb: 300,
+    privateCircuitCount: 1,
+    privateCircuitPortHours: 730,
+    privateCircuitDataTransferGb: 500,
+  },
+  availability: {
+    multiAz: false,
+    multiRegion: false,
+    faultTolerance: 'single-zone',
+  },
+  serviceRequirements: UI_PRICED_SERVICE_FAMILY_IDS.map(serviceRequirementForPricedFamily),
+};
+
+function serviceRequirementForPricedFamily(serviceType: string): ServiceRequirement {
+  return {
+    serviceCategory: serviceCategoryForPricedFamily(serviceType),
+    serviceType,
+    quantity: 1,
+    scaleParams: {
+      observabilityMetricsMillion: 10,
+      observabilityLogsIngestGb: 250,
+      observabilityLogRetentionGb: 500,
+      observabilityAlarms: 25,
+      observabilityDashboards: 3,
+      observabilityTracesMillion: 20,
+      secretsCount: 50,
+      secretApiCallsTenThousand: 100,
+      securityProtectedResources: 120,
+      securityFindingsThousand: 10,
+      wafWebAclCount: 2,
+      wafRuleCount: 20,
+      wafRequestsMillion: 120,
+      ddosProtectedResources: 1,
+      functionInvocationsMillion: 40,
+      functionDurationMs: 120,
+      functionMemoryMb: 512,
+      appPlatformRequestsMillion: 60,
+      appPlatformRequestDurationMs: 250,
+      appPlatformVcpu: 1,
+      appPlatformMemoryGb: 0.5,
+      kubernetesClusterCount: 1,
+      kubernetesWorkerNodeCount: 3,
+      kubernetesWorkerVcpu: 2,
+      kubernetesWorkerMemoryGb: 8,
+      registryStorageGb: 250,
+      registryEgressGb: 100,
+      databaseRole: 'search',
+      searchNodeCount: 2,
+      searchNodeHours: 730,
+      searchStorageGb: 200,
+      searchQueriesMillion: 5,
+      analyticsWarehouseStorageGb: 1_000,
+      analyticsWarehouseQueryTb: 20,
+      analyticsDataLakeStorageGb: 2_000,
+      analyticsIntegrationJobHours: 120,
+      analyticsStreamingIngestGb: 500,
+      analyticsBiUsers: 10,
+      integrationQueueMessagesMillion: 50,
+      integrationEventsMillion: 50,
+      integrationWorkflowTransitionsThousand: 250,
+      integrationApiGatewayRequestsMillion: 100,
+    },
+  };
+}
+
+function serviceCategoryForPricedFamily(
+  serviceType: string,
+): ServiceRequirement['serviceCategory'] {
+  if (
+    ['vm-compute', 'burstable-compute', 'autoscaling-compute', 'serverless-functions'].includes(
+      serviceType,
+    )
+  ) {
+    return 'compute';
+  }
+
+  if (
+    ['container-orchestration', 'serverless-containers', 'container-registry'].includes(serviceType)
+  ) {
+    return 'containers';
+  }
+
+  if (['app-platform', 'api-gateway'].includes(serviceType)) {
+    return 'application';
+  }
+
+  if (
+    ['object-storage', 'block-storage', 'file-storage', 'archive-storage'].includes(serviceType)
+  ) {
+    return 'storage';
+  }
+
+  if (['relational-database', 'nosql-database', 'cache', 'managed-search'].includes(serviceType)) {
+    return 'database';
+  }
+
+  if (
+    [
+      'data-warehouse',
+      'data-lake',
+      'data-integration',
+      'streaming-analytics',
+      'business-intelligence',
+    ].includes(serviceType)
+  ) {
+    return 'analytics';
+  }
+
+  if (['queues-messaging', 'eventing', 'workflow-orchestration'].includes(serviceType)) {
+    return 'integration';
+  }
+
+  if (
+    ['cdn-edge', 'load-balancing', 'dns', 'private-networking', 'dedicated-connectivity'].includes(
+      serviceType,
+    )
+  ) {
+    return 'networking';
+  }
+
+  if (['keys-secrets', 'security-posture', 'waf-ddos'].includes(serviceType)) {
+    return 'security';
+  }
+
+  return 'operations';
+}
+
+async function mockCatalogAdapter(providerId: ProviderId): Promise<CloudProviderAdapter> {
+  const seedAdapter = new MockProviderAdapter(
+    providerId,
+    new InMemoryPricingCatalogReader([]),
+    providerId === 'azure' ? 'eastus' : providerId === 'gcp' ? 'us-central1' : 'us-east-1',
+    () => new Date('2026-07-06T00:00:00.000Z'),
+  );
+  const records = await seedAdapter.refreshPricingCatalog();
+
+  return new MockProviderAdapter(
+    providerId,
+    new InMemoryPricingCatalogReader(records),
+    providerId === 'azure' ? 'eastus' : providerId === 'gcp' ? 'us-central1' : 'us-east-1',
+    () => new Date('2026-07-06T00:00:00.000Z'),
+  );
+}
 
 describe('ComparisonOrchestratorService', () => {
   it('fans out to provider adapters and returns interval totals and cheapest provider', async () => {
@@ -407,6 +706,104 @@ describe('ComparisonOrchestratorService', () => {
         monthlyCostUsd: 15,
       },
     ]);
+  });
+
+  it('prices every UI family currently labeled priced through mock catalog coverage', async () => {
+    const service = createService([
+      await mockCatalogAdapter('aws'),
+      await mockCatalogAdapter('azure'),
+      await mockCatalogAdapter('gcp'),
+    ]);
+
+    const result = await service.compare(uiPricedServiceCoverageWorkload);
+    const requiredSkuIds = [
+      'modeled-serverless-function-requests',
+      'modeled-app-platform-requests',
+      'modeled-kubernetes-control-plane',
+      'modeled-container-registry-storage',
+      'modeled-application-api-gateway-requests',
+      'modeled-database-nosql-read-units',
+      'modeled-database-cache-replicas',
+      'modeled-database-search-capacity',
+      'modeled-analytics-warehouse-storage',
+      'modeled-analytics-data-lake-storage',
+      'modeled-analytics-integration-job-hours',
+      'modeled-analytics-streaming-ingest',
+      'modeled-analytics-bi-users',
+      'modeled-integration-queue-messages',
+      'modeled-integration-event-routing',
+      'modeled-integration-workflow-transitions',
+      'modeled-cdn-viewer-transfer',
+      'modeled-load-balancer-capacity',
+      'modeled-dns',
+      'modeled-nat-gateway',
+      'modeled-vpn-connectivity',
+      'modeled-private-circuit',
+      'modeled-security-secrets',
+      'modeled-security-posture-resources',
+      'modeled-security-waf-acls',
+      'modeled-operations-metrics',
+      'modeled-operations-log-ingestion',
+      'modeled-operations-traces',
+    ];
+
+    expect(result.warnings).toBeUndefined();
+    expect(result.providers).toHaveLength(3);
+    expect(
+      result.requirements?.serviceRequirements.map((requirement) => requirement.serviceType),
+    ).toEqual(expect.arrayContaining(UI_PRICED_SERVICE_FAMILY_IDS));
+
+    for (const provider of result.providers) {
+      const skuIds = new Set(provider.lineItems.map((lineItem) => lineItem.skuId));
+
+      expect(provider.totals.monthly).toBeGreaterThan(0);
+      expect(provider.lineItems).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            category: 'compute',
+            description: expect.stringContaining('general-purpose compute'),
+          }),
+          expect.objectContaining({
+            category: 'compute',
+            description: expect.stringContaining('burstable compute'),
+          }),
+          expect.objectContaining({
+            category: 'compute',
+            description: expect.stringContaining('autoscaling compute'),
+          }),
+          expect.objectContaining({
+            category: 'storage',
+            description: expect.stringContaining('object standard storage'),
+          }),
+          expect.objectContaining({
+            category: 'storage',
+            description: expect.stringContaining('block standard storage'),
+          }),
+          expect.objectContaining({
+            category: 'storage',
+            description: expect.stringContaining('file standard storage'),
+          }),
+          expect.objectContaining({
+            category: 'storage',
+            description: expect.stringContaining('object archive'),
+          }),
+          expect.objectContaining({
+            category: 'database',
+            description: expect.stringContaining('relational database'),
+          }),
+          expect.objectContaining({
+            category: 'database',
+            description: expect.stringContaining('nosql database'),
+          }),
+          expect.objectContaining({
+            category: 'database',
+            description: expect.stringContaining('cache database'),
+          }),
+        ]),
+      );
+
+      expect(requiredSkuIds.filter((skuId) => !skuIds.has(skuId))).toEqual([]);
+    }
   });
 
   it('recommends 3-year reserved pricing for production workloads with high commitment appetite', async () => {

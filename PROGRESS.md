@@ -44,6 +44,32 @@ say so explicitly rather than marking it done.
 | Phase 2.8B - Invite/SSO auth hardening                 | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8C - Diagram partial-parse hardening           | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8D - Security suppression cleanup              | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8E - UI-priced service coverage guard          | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8E - UI-priced service coverage guard
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Added an API comparison regression guard that snapshots the UI families currently
+  labeled `priced` and compares a coverage workload through AWS, Azure, and GCP mock
+  catalog adapters. The guard asserts catalog-backed compute/storage/database rows
+  plus modeled service-family SKUs for operations, runtime, analytics, integration,
+  networking, and security surfaces.
+- Closed a real mock-catalog gap found by that guard: managed cache was labeled
+  priced in the UI but mock provider database fixtures did not include Redis/cache
+  rows. Added Amazon ElastiCache Redis, Azure Managed Redis, and GCP Memorystore
+  rows so local/demo pricing does not fail that mainstream family.
+- Verification evidence in this continuation:
+  - Focused comparison orchestrator spec passed: 35 tests, including the new
+    all-priced-family coverage guard.
+  - Focused mock/pricing normalization specs passed: 3 suites / 9 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this materially improves local/mock no-rate coverage,
+  but it is still not full invoice-grade live provider SKU coverage. GitHub PR
+  `quality` remains externally blocked by account billing/spending-limit runner
+  startup failure.
 
 ## Phase 2.8D - Security suppression cleanup
 
