@@ -224,8 +224,15 @@ providers are disabled.
 - `HOW-TO-USE.md` explains the product workflow.
 - `DEPLOY.md` covers deployment guidance.
 - `PROGRESS.md` tracks project progress.
+- `CONTRIBUTING.md` explains how to contribute safely.
+- `SECURITY.md` explains private vulnerability reporting.
+- `SUPPORT.md` explains community support scope.
+- `GOVERNANCE.md` explains current maintainer-led project governance.
+- `CHANGELOG.md` tracks notable changes.
 - `docs/architecture/phase-10-cost-intelligence.md` documents the Phase 1
   cost-intelligence model and future import/Terraform hooks.
+- `docs/development/open-source-readiness.md` tracks the private-to-public launch
+  checklist.
 - `docs/operations/live-pricing-credentials.md` documents live-pricing ETL,
   credential readiness, and current provider coverage limits.
 - `specs/README.md` links the deeper product, architecture, data-model, API, security, and testing specs.
@@ -240,4 +247,7 @@ providers are disabled.
 
 ## License
 
-License is not yet declared.
+PolyCost is licensed under the MIT License. See `LICENSE`.
+
+The repository is prepared for an eventual public open-source launch, but GitHub
+visibility can remain private until the maintainer intentionally changes it.

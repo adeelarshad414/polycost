@@ -1,0 +1,10 @@
+# Default ownership for review routing.
+* @adeelarshad414
+
+# High-risk areas should always receive maintainer review.
+/apps/api/src/api/ @adeelarshad414
+/apps/api/src/comparison/ @adeelarshad414
+/apps/api/src/pricing-etl/ @adeelarshad414
+/apps/api/src/adapters/ @adeelarshad414
+/database/ @adeelarshad414
+/.github/ @adeelarshad414

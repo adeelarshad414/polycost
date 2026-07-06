@@ -1,0 +1,48 @@
+name: Feature request
+description: Suggest an improvement or roadmap item.
+title: '[Feature]: '
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or opportunity
+      description: What user problem should PolyCost solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior, workflow, or API you want.
+    validations:
+      required: true
+  - type: dropdown
+    id: persona
+    attributes:
+      label: Primary persona
+      options:
+        - Executive/finance reviewer
+        - Solution architect
+        - FinOps practitioner
+        - DevOps/platform engineer
+        - Product/program stakeholder
+        - Student/learner
+        - Other
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - Given ...
+        - When ...
+        - Then ...
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional context

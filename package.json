@@ -1,7 +1,28 @@
 {
   "name": "polycost",
   "version": "0.1.0",
+  "description": "Open-source, self-hostable multi-cloud cost comparison for AWS, Azure, and GCP.",
+  "license": "MIT",
   "private": true,
+  "author": "Adeel Arshad",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adeelarshad414/polycost.git"
+  },
+  "bugs": {
+    "url": "https://github.com/adeelarshad414/polycost/issues"
+  },
+  "homepage": "https://github.com/adeelarshad414/polycost#readme",
+  "keywords": [
+    "aws",
+    "azure",
+    "cloud-cost",
+    "finops",
+    "gcp",
+    "multi-cloud",
+    "pricing",
+    "self-hosted"
+  ],
   "workspaces": [
     "apps/*",
     "packages/*"

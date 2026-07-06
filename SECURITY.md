@@ -3,13 +3,37 @@
 Please report security vulnerabilities privately. Do not open a public GitHub issue
 for suspected vulnerabilities.
 
-For now, contact the project maintainer directly with:
+If GitHub private vulnerability reporting is enabled for this repository, use:
+
+`https://github.com/adeelarshad414/polycost/security/advisories/new`
+
+If that page is unavailable while the repository is private, contact the maintainer
+directly with:
 
 - A clear description of the issue.
 - Steps to reproduce.
 - Any known affected versions or deployment modes.
+- Impact and suggested remediation if known.
 
 Reported vulnerabilities are triaged before new feature work.
+
+## Supported Versions
+
+PolyCost is pre-1.0. Security fixes target the current `main` branch unless a
+tagged release explicitly documents longer support.
+
+| Version   | Supported |
+| --------- | --------- |
+| `main`    | Yes       |
+| `< 0.1.0` | No        |
+
+## Handling Expectations
+
+- Do not include secrets, provider credentials, customer diagrams, invoices, or
+  confidential pricing agreements in reports.
+- Maintainers will acknowledge validated reports as soon as practical.
+- Fixes may be handled privately before public disclosure.
+- Public advisories should avoid exploit details until a fix is available.
 
 ## Local Security Checks
 
