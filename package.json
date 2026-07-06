@@ -39,6 +39,7 @@
     "test:integration": "npm run test:integration --workspaces --if-present",
     "test:e2e": "npm run test:e2e --workspaces --if-present",
     "test:coverage": "npm run test:coverage --workspaces --if-present",
+    "test:production-readiness": "npm run test:unit --workspace @polycost/api -- --runInBand src/pricing-normalization/pricing-reconciliation.spec.ts src/api/auth-billing.spec.ts src/diagram-parser/diagram-parser.service.spec.ts src/diagram-parser/llm-classifier.client.spec.ts && npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx",
     "build": "npm run build --workspaces --if-present",
     "api:dev": "npm run start:dev --workspace @polycost/api",
     "web:dev": "npm run dev --workspace @polycost/web",

@@ -54,6 +54,28 @@ say so explicitly rather than marking it done.
 | Phase 2.8L - Release hygiene evidence polish           | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8M - Session policy documentation              | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8N - API RBAC matrix hardening                 | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8O - Production-readiness CI gate              | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8O - Production-readiness CI gate
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Added `npm run test:production-readiness`, a focused regression command that
+  explicitly runs pricing reconciliation evidence, auth/RBAC and billing
+  reconciliation, diagram parser fallback/malicious-file/VSDX coverage, Tier 3 LLM
+  classifier fallback coverage, and the web App workspace/comparison coverage.
+- Added a GitHub Actions `Production-readiness focused regressions` step so these
+  named hardening surfaces remain visible in CI in addition to the broad coverage
+  suite.
+- Verification evidence in this continuation:
+  - `npm run test:production-readiness` passed: API 4 suites / 45 tests and web
+    1 suite / 55 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: the CI definition is updated, but GitHub-hosted runs
+  still cannot execute until the repository/account billing or spending-limit issue
+  is fixed in GitHub settings.
 
 ## Phase 2.8N - API RBAC matrix hardening
 

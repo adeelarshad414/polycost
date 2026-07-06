@@ -39,6 +39,8 @@ jobs:
         run: npm run db:validate
       - name: Unit tests with coverage
         run: npm run ci:unit
+      - name: Production-readiness focused regressions
+        run: npm run test:production-readiness
       - name: Integration tests
         run: npm run ci:integration
       - name: Build
