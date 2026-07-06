@@ -48,15 +48,38 @@ say so explicitly rather than marking it done.
 | Phase 2.8F - SKU evidence derivation hardening         | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8G - Catalog lineage readback hardening        | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8H - Pricing honesty UI labeling               | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8I - AWS ETL network SKU hardening             | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8I - AWS ETL network SKU hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Tightened AWS bulk catalog category filtering so Amazon EC2 instance products stay
+  in compute refreshes while EC2 data-transfer products can be ingested as network
+  catalog rows.
+- Expanded AWS network refresh coverage to include EC2 data-transfer rows in addition
+  to Amazon VPC rows, improving mainstream egress catalog coverage without requiring
+  live credentials in tests.
+- Added a mixed EC2 catalog regression test proving compute refresh excludes
+  data-transfer SKUs and network refresh includes a data-transfer SKU with source
+  metadata intact.
+- Verification evidence in this continuation:
+  - Focused AWS adapter spec passed: 8 tests.
+  - Provider/comparison adapter affected specs passed: 5 suites / 68 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this materially improves AWS public catalog ETL
+  coverage for egress-like rows, but complete invoice-grade live pricing across every
+  provider SKU remains future work.
 
 ## Phase 2.8H - Pricing honesty UI labeling
 
 **Status:** Complete with known gaps (see notes)
 **Date:** 2026-07-06
 
-- Tightened visible pricing copy so refresh actions are labeled `Refresh live
-catalog`, reducing the chance that reviewers infer invoice/account-billing
-  refresh semantics.
+- Tightened visible pricing copy so refresh actions are labeled `Refresh live catalog`,
+  reducing the chance that reviewers infer invoice/account-billing refresh semantics.
 - Updated calculation evidence copy to state that monthly totals use cached catalog
   list rates and the 730-hours/month constant, and that private discounts, credits,
   taxes, and actual billed usage are not included.
