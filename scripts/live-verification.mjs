@@ -112,8 +112,6 @@ async function verifyTemplateRecommendationJourney() {
     markStep('opened home page');
     await page.getByRole('button', { name: /web app tier/i }).click();
     markStep('selected web app tier template');
-    await page.getByRole('button', { name: /3yr reserved/i }).click();
-    markStep('selected reserved 3yr pricing model');
     await page.getByRole('button', { name: /compare costs/i }).click();
     markStep('submitted comparison');
     await page.getByLabel('Provider cost summary').waitFor({
@@ -130,6 +128,16 @@ async function verifyTemplateRecommendationJourney() {
     const quickActions = page.getByLabel('Comparison quick actions');
     await quickActions.waitFor({ state: 'visible', timeout: 15_000 });
     markStep('comparison quick actions visible');
+
+    await page.getByRole('button', { name: /show full breakdown/i }).click();
+    await page.getByRole('button', { name: /hide full breakdown/i }).waitFor({
+      state: 'visible',
+      timeout: 15_000,
+    });
+    markStep('expanded full breakdown');
+
+    await page.getByRole('button', { name: /3yr reserved/i }).click();
+    markStep('selected reserved 3yr pricing model');
 
     const downloads = [];
     downloads.push(
@@ -159,13 +167,6 @@ async function verifyTemplateRecommendationJourney() {
         markStep,
       }),
     );
-
-    await page.getByRole('button', { name: /show full breakdown/i }).click();
-    await page.getByRole('button', { name: /hide full breakdown/i }).waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    });
-    markStep('expanded full breakdown');
 
     await page
       .getByLabel('Region and scale what-if')
@@ -673,8 +674,11 @@ async function waitForJson(url, label, predicate) {
 
 async function apiJson(
   pathOrUrl,
-  { method = 'GET', token, body, expectedStatus = 200, label = pathOrUrl, headers = {} } = {},
+  { method = 'GET', token, body, expectedStatus, label = pathOrUrl, headers = {} } = {},
 ) {
+  const expectedStatuses = Array.isArray(expectedStatus)
+    ? expectedStatus
+    : [expectedStatus ?? (method.toUpperCase() === 'POST' ? [200, 201] : 200)].flat();
   const requestHeaders = {
     accept: 'application/json',
     ...headers,
@@ -704,9 +708,9 @@ async function apiJson(
     }
   }
 
-  if (response.status !== expectedStatus) {
+  if (!expectedStatuses.includes(response.status)) {
     throw new Error(
-      `${label} returned HTTP ${response.status}, expected ${expectedStatus}: ${redactedJson(parsed)}`,
+      `${label} returned HTTP ${response.status}, expected ${expectedStatuses.join('/')}: ${redactedJson(parsed)}`,
     );
   }
 
@@ -715,6 +719,14 @@ async function apiJson(
 
 function buildApiUrl(pathOrUrl) {
   if (/^https?:\/\//i.test(pathOrUrl)) {
+    const url = new URL(pathOrUrl);
+    if (url.pathname.startsWith('/api/v1/')) {
+      const origin = new URL(apiOrigin);
+      url.protocol = origin.protocol;
+      url.host = origin.host;
+      return url.toString();
+    }
+
     return pathOrUrl;
   }
 

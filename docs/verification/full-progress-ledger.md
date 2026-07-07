@@ -88,6 +88,10 @@ Evidence:
   template-to-recommendation and diagram-to-PDF timed journeys, including thresholds,
   step labels, durations, reserved-pricing what-if, PDF/CSV/Excel exports,
   share-link creation, and Redis-degradation status.
+- Latest isolated local run (`POLYCOST_WEB_BASE_URL=http://127.0.0.1:3200`,
+  `POLYCOST_API_ORIGIN=http://127.0.0.1:3201`) passed with
+  template-to-recommendation at `8547ms` / `60000ms` and diagram-to-PDF at `2924ms`
+  / `180000ms`.
 
 Deferred:
 
@@ -157,6 +161,8 @@ Evidence:
   acceptance, member role change, mock OIDC start/authorize/callback, structured
   `403` for member billing import, and server-side revoke-other-sessions. Tokens,
   invite secrets, and OIDC state are intentionally excluded from the transcript.
+- Latest isolated local run completed `workspace-auth-rbac-sso` in `720ms` /
+  `60000ms`, including `rbacDeniedStatus: 403` and `stateVerified: true`.
 - Anonymous compare remains available in `apps/web/src/App.spec.tsx` and is
   documented in `README.md`.
 
@@ -203,6 +209,8 @@ These commands have been used as evidence gates in this run:
 - `npm run format:check`
 - `npm run release:check`
 - `npm run provider:credentials:check`
+- `npm run live:verify` against isolated local ports (`WEB_PORT=3200`,
+  `API_HOST_PORT=3201`, `VAULT_HOST_PORT=8320`)
 - `npm run progress:verify`
 - `npm run test:production-readiness`
 - `npm run check`
@@ -214,6 +222,9 @@ anonymous smoke path covers compare -> reserved-pricing what-if -> PDF/CSV/Excel
 exports -> share link, plus diagram upload -> review -> comparison -> PDF. The
 authenticated smoke path records `workspace-auth-rbac-sso`: signup -> team/session
 hydration -> invite/accept -> role change -> mock OIDC -> structured RBAC 403.
+The latest local transcript was captured at
+`.tmp/live-verification/latest-local-3200.json`; that artifact is intentionally
+local/ignored, while the timings above are recorded here for release review.
 
 ## Honest Release Verdict
 

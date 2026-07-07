@@ -96,6 +96,57 @@ say so explicitly rather than marking it done.
 | Phase 2.8BB - Live verification transcript artifact     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8BC - Anonymous full-smoke transcript           | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8BD - Workspace auth live transcript            | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8BE - Isolated live runtime verification        | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8BE - Isolated live runtime verification
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Ran the documented demo boot path against an isolated local Compose project
+  (`COMPOSE_PROJECT_NAME=polycost_live_verify`) on non-default ports:
+  `WEB_PORT=3200`, `API_HOST_PORT=3201`, and `VAULT_HOST_PORT=8320`.
+- The first boot attempt found a real release-readiness hazard: host Vault port
+  `8200` can already be allocated. Retrying with `VAULT_HOST_PORT=8320` proved the
+  existing port-override path works; `scripts/clean-clone-demo-check.mjs` already
+  defaults its clean-clone verifier to isolated Vault port `18210`.
+- Fixed `scripts/live-verification.mjs` to match the actual production UI flow:
+  compare from the Web App Tier template first, expand the full breakdown, then
+  select `Reserved 3yr` before export/what-if/share actions.
+- Hardened live verification for isolated host-port runs by accepting Nest's `201`
+  responses for successful POST creates and rewriting internal `/api/v1/...` URLs
+  returned by the API to the configured `POLYCOST_API_ORIGIN`. This lets mock OIDC
+  start/authorize/callback work when the API container listens on `3001` internally
+  but is exposed on another host port.
+- Captured a passing live transcript at `.tmp/live-verification/latest-local-3200.json`.
+
+Runtime evidence:
+
+- `npm run demo:up` on isolated ports reported the web app ready at
+  `http://127.0.0.1:3200/`, API health ready at `http://127.0.0.1:3201/health`,
+  and the web-origin API proxy returning JSON at
+  `http://127.0.0.1:3200/api/v1/data-health`.
+- `npm run live:verify` passed against that stack:
+  template-to-recommendation `8547ms` / `60000ms`, diagram-to-PDF `2924ms` /
+  `180000ms`, workspace-auth-rbac-sso `720ms` / `60000ms`, and Redis degradation
+  `/health=degraded`, `/health/deep=degraded`, `/api/v1/data-health HTTP 200`.
+- Transcript redaction check found no bearer tokens, invite tokens, invite URLs,
+  OIDC state, passwords, or client secrets. The only token-like field left is the
+  intentionally redacted share `tokenPrefix`.
+
+Verification:
+
+- `node --check scripts/live-verification.mjs`
+- `npm run live:verify` against the isolated Compose stack
+
+Known remaining gaps:
+
+- Hosted GitHub Actions still cannot prove this path remotely because the `quality`
+  job fails before runner assignment (`runner_id: 0`, empty runner name/group,
+  `steps: []`). Local runtime evidence is now stronger, but hosted CI remains an
+  external account/runner blocker.
 
 ## Phase 2.8BD - Workspace auth live transcript
 
