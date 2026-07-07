@@ -79,6 +79,38 @@ say so explicitly rather than marking it done.
 | Phase 2.8AK - Pricing reconciliation breadth guard     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AL - Auth team UX state hardening             | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AM - VSDX visual evidence polish              | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AN - Local credential readiness gate          | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AN - Local credential readiness gate
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added `npm run provider:credentials:check` to the aggregate `npm run check` path,
+  matching the CI workflow and demo bootstrap credential/dummy-value readiness gate.
+- Extended `scripts/release-readiness-check.mjs` so release readiness fails if the
+  provider credential checker script is missing or removed from `npm run check`.
+- This makes local release verification cover the same mock-vs-real provider swap
+  guardrails that CI and `npm run demo:up` already exercise.
+
+Verification:
+
+- `npm run format:check` passes.
+- `npm run release:check` passes and now asserts the credential readiness gate remains
+  part of `npm run check`.
+- `npm run provider:credentials:check` passes in mock-provider mode for AWS, Azure,
+  GCP, and diagram-LLM readiness.
+- `npm run check` passes end-to-end and now includes `npm run provider:credentials:check`;
+  the optional impeccable check is still skipped because the repo targets Node.js 20
+  and the tool requires Node.js 24.
+
+Known remaining gaps:
+
+- GitHub Actions still fails before job execution because of the account billing /
+  spending-limit blocker; this gate improves local and future CI coverage but cannot
+  resolve that external runner-account condition.
 
 ## Phase 2.8AM - VSDX visual evidence polish
 

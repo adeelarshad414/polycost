@@ -32,6 +32,14 @@ for (const filePath of requiredFiles) {
   }
 }
 
+const packageJson = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
+if (!packageJson.scripts?.['provider:credentials:check']) {
+  failures.push('package.json is missing provider:credentials:check');
+}
+if (!packageJson.scripts?.check?.includes('npm run provider:credentials:check')) {
+  failures.push('package.json check script must include npm run provider:credentials:check');
+}
+
 await assertFileContains('README.md', [
   ['one-command demo startup', 'npm run demo:up'],
   ['demo artifact capture', 'npm run demo:artifacts'],
