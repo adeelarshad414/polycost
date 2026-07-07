@@ -1240,7 +1240,8 @@ describe('App', () => {
     expect(text(container)).toContain('Private topology');
     expect(text(container)).toContain('google_compute_instance.app');
     expect(text(container)).toContain('required-provider-pinned');
-    expect(buttonByText(container, 'Download bundle JSON')).toBeInstanceOf(HTMLButtonElement);
+    expect(buttonByText(container, 'Download Terraform ZIP')).toBeInstanceOf(HTMLButtonElement);
+    expect(buttonByText(container, 'Download evidence JSON')).toBeInstanceOf(HTMLButtonElement);
 
     unmount();
   });
@@ -3685,6 +3686,14 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
         sha256: 'b'.repeat(64),
       },
     ],
+    archive: {
+      filename: 'client-portal-gcp-terraform.zip',
+      format: 'zip',
+      mimeType: 'application/zip',
+      contentBase64: 'UEsDBAoAAAAAAAEAIQAAAAAA',
+      sha256: 'c'.repeat(64),
+      sizeBytes: 256,
+    },
     validation: {
       status: 'passed',
       executionMode: 'static-plus-policy',

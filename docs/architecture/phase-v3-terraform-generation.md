@@ -21,12 +21,15 @@ Terraform execution.
   - `terraform.tfvars.example`
   - `Makefile`
   - `FRAMEWORK-ALIGNMENT.md`
+  - `BUNDLE-MANIFEST.json`
+  - `scripts/validate-bundle.mjs`
   - `.tflint.hcl`
   - `tests/static_validation.tftest.hcl`
   - `policies/terraform-plan.rego`
-  - `modules/` boundary documentation
+  - `modules/` network, compute, and data starter modules
   - `README.md`
   - SHA-256 hash per generated file
+  - downloadable ZIP archive with archive SHA-256 evidence
   - static validation checks, assumptions, security notes, and next steps
 
 ## Provider Baselines
@@ -74,17 +77,21 @@ PolyCost performs request-time static plus policy-pack checks only:
 - CAF/WAF/Terraform framework alignment evidence is present
 - Public ingress and load-balancer exposure respect the selected network topology
 - Policy, lint, test, Makefile, and module boundary artifacts are present
+- Bundle manifest, ZIP archive, and operator-side validation runner are present
+- Network, compute, and data starter module files are present
 
 PolyCost does not run `terraform init`, `terraform validate`, `terraform plan`, or
 `terraform apply` during request handling. The generated README instructs operators
 to run those commands after saving files and authenticating to the target account.
 
 See `docs/architecture/phase-v3-1-terraform-hardening.md` for the V3.1 hardening detail.
+See `docs/architecture/phase-v3-3-terraform-bundle-export.md` for the V3.3 bundle export detail.
+See `docs/architecture/phase-v3-4-terraform-module-library.md` for the V3.4 module library detail.
 
 ## Known Gaps
 
-- Generated Terraform is a hardened root bundle plus module-boundary documentation, not a complete
-  enterprise module library.
+- Generated Terraform now includes starter modules, but it is not a complete enterprise module
+  registry or landing-zone integration.
 - VM-first compute remains the deployable baseline. Kubernetes, containers, serverless, PaaS app
   hosting, WAF, CDN distribution details, and active-active DR require follow-up module selection.
 - Full provider credential execution and plan validation must happen outside PolyCost

@@ -16766,7 +16766,18 @@ function TerraformGenerationPanel({
     }
   }
 
-  function handleDownloadBundle() {
+  function handleDownloadArchive() {
+    if (!bundle) {
+      return;
+    }
+
+    downloadBlob(
+      base64ToBlob(bundle.archive.contentBase64, bundle.archive.mimeType),
+      bundle.archive.filename,
+    );
+  }
+
+  function handleDownloadBundleJson() {
     if (!bundle) {
       return;
     }
@@ -16905,11 +16916,20 @@ function TerraformGenerationPanel({
         <Button
           type="button"
           variant="secondary"
-          onClick={handleDownloadBundle}
+          onClick={handleDownloadArchive}
           disabled={!bundle || isGenerating}
         >
           <DownloadIcon />
-          Download bundle JSON
+          Download Terraform ZIP
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={handleDownloadBundleJson}
+          disabled={!bundle || isGenerating}
+        >
+          <DownloadIcon />
+          Download evidence JSON
         </Button>
       </div>
 
@@ -16930,6 +16950,7 @@ function TerraformGenerationPanel({
               <span>{bundle.resourceSummary.objectStorageBuckets} object store</span>
               <span>{bundle.resourceSummary.relationalDatabases} database</span>
               <span>{bundle.files.length} files</span>
+              <span>{formatFileSize(bundle.archive.sizeBytes)} ZIP</span>
             </div>
           </div>
 
@@ -19491,4 +19512,27 @@ function downloadBlob(blob: Blob, fileName: string): void {
   link.rel = 'noopener';
   link.click();
   window.URL.revokeObjectURL(url);
+}
+
+function base64ToBlob(contentBase64: string, mimeType: string): Blob {
+  const binary = window.atob(contentBase64);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return new Blob([bytes], { type: mimeType });
+}
+
+function formatFileSize(sizeBytes: number): string {
+  if (sizeBytes < 1024) {
+    return `${sizeBytes}B`;
+  }
+
+  if (sizeBytes < 1024 * 1024) {
+    return `${(sizeBytes / 1024).toFixed(1)}KB`;
+  }
+
+  return `${(sizeBytes / (1024 * 1024)).toFixed(1)}MB`;
 }

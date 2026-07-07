@@ -102,6 +102,97 @@ say so explicitly rather than marking it done.
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase V3.3 - Terraform bundle export                    | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase V3.4 - Terraform module library                   | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase V3.4 - Terraform module library
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Upgraded generated `modules/` from documentation-only boundaries to real
+  provider-specific starter module files.
+- Added network, compute, and data module `variables.tf`, `main.tf`, and
+  `outputs.tf` for AWS, Azure, and GCP bundles.
+- Added the `module-library-generated` static validation check.
+- Updated module documentation so reviewers understand the root bundle remains
+  the immediate review baseline while modules are the platform extraction path.
+- Added `docs/architecture/phase-v3-4-terraform-module-library.md`.
+
+Verification:
+
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/terraform/terraform-generation.service.spec.ts src/api/api-contract.spec.ts`
+  - API focused: `2` suites / `42` tests.
+- `npm run test:unit --workspace @polycost/web -- --runInBand src/api-client.spec.ts src/App.spec.tsx`
+  - Web focused: `2` suites / `84` tests.
+- `npm run check`
+  - API unit: `51` suites / `400` tests.
+  - Web unit: `9` suites / `132` tests.
+  - Graph validation, pricing coverage, progress verification, QA/security
+    suppression, database, DevOps, cloud, release, and provider credential gates
+    passed.
+  - `impeccable` skipped by documented Node 20 vs Node 24 constraint.
+- `npm run ci:build`
+  - API TypeScript build passed.
+  - Web production build passed with the existing Vite environment-placeholder and
+    chunk-size warnings.
+
+Known remaining gaps:
+
+- Generated modules are starter modules, not a published enterprise module
+  registry or landing-zone integration.
+- Edge, observability, WAF/CDN, autoscaling, container/serverless/Kubernetes,
+  and active-active DR modules remain future Terraform phases.
+- Provider-authenticated `terraform init`, `validate`, `test`, and `plan` still
+  run outside PolyCost request handling.
+
+## Phase V3.3 - Terraform bundle export
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added `archive` metadata to `TerraformGenerationResult` with ZIP filename,
+  MIME type, base64 payload, archive SHA-256, and size in bytes.
+- Added deterministic ZIP packaging for every generated Terraform bundle without
+  adding a new runtime dependency.
+- Added generated `BUNDLE-MANIFEST.json` with bundle metadata, file hashes,
+  file sizes, generation profile, resource summary, and validation commands.
+- Added generated `scripts/validate-bundle.mjs` that operators can run after
+  saving the bundle to execute Terraform fmt/init/validate plus optional test,
+  tflint, and conftest checks.
+- Added `bundle-manifest-generated`, `validation-runner-generated`, and
+  `zip-archive-generated` static validation checks.
+- Updated the frontend Terraform panel with separate `Download Terraform ZIP`
+  and `Download evidence JSON` actions.
+- Added `docs/architecture/phase-v3-3-terraform-bundle-export.md`.
+
+Verification:
+
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/terraform/terraform-generation.service.spec.ts src/api/api-contract.spec.ts`
+  - API focused: `2` suites / `42` tests.
+- `npm run test:unit --workspace @polycost/web -- --runInBand src/api-client.spec.ts src/App.spec.tsx`
+  - Web focused: `2` suites / `84` tests.
+- `npm run check`
+  - API unit: `51` suites / `400` tests.
+  - Web unit: `9` suites / `132` tests.
+  - Graph validation, pricing coverage, progress verification, QA/security
+    suppression, database, DevOps, cloud, release, and provider credential gates
+    passed.
+  - `impeccable` skipped by documented Node 20 vs Node 24 constraint.
+- `npm run ci:build`
+  - API TypeScript build passed.
+  - Web production build passed with the existing Vite environment-placeholder and
+    chunk-size warnings.
+
+Known remaining gaps:
+
+- PolyCost packages Terraform but does not execute it server-side.
+- Provider credentials, remote-state bootstrap, plan review, and policy
+  enforcement remain operator or CI responsibilities outside request handling.
 
 ## Phase V3.2 - Terraform framework assurance
 

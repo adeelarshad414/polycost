@@ -26,7 +26,9 @@ This repository currently includes the V1 MVP plus the Phase 2 diagram-ingestion
 3. Comparison out: AWS, Azure, and GCP estimates with breakdowns.
 4. Reports out: on-screen analytics plus PDF, CSV, and Excel export.
 
-Future roadmap items include Terraform generation and reverse Terraform-to-diagram/cost workflows. Those are documented in the project specs but are not the active runtime path.
+Terraform generation is now available as a reviewed starter-bundle workflow for AWS, Azure, and GCP,
+including ZIP export, validation evidence, and starter module libraries. Reverse
+Terraform-to-diagram/cost workflows remain future roadmap scope.
 
 ## Monorepo Layout
 

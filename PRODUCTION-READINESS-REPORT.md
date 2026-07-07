@@ -33,6 +33,8 @@ cloud, LLM, SSO, or billing inputs.
 | TF-GEN-001     | Added         | V3 Terraform generation endpoint and UI panel now generate AWS/Azure/GCP starter bundles from NWS with provider pinning, remote-state examples, static checks, and explicit caveats |
 | TF-GEN-002     | Improved      | V3.1 hardening adds generation profiles, private database networking checks, runtime identity baselines, policy/test/Makefile artifacts, and module-boundary documentation          |
 | TF-GEN-003     | Improved      | V3.2 assurance adds generated CAF/WAF/Terraform framework-alignment evidence and topology-aware public/private ingress/load-balancer controls                                       |
+| TF-GEN-004     | Improved      | V3.3 adds downloadable Terraform ZIP export, bundle manifest hash evidence, generated validation runner, and frontend ZIP/evidence download actions                                 |
+| TF-GEN-005     | Improved      | V3.4 replaces Terraform module placeholders with AWS/Azure/GCP network, compute, and data starter modules plus static module-library validation                                     |
 
 ## Verification
 
@@ -77,6 +79,24 @@ Local static/regression gates:
 - Phase V3.2 Terraform framework assurance focused checks passed:
   - API focused: `src/terraform/terraform-generation.service.spec.ts` and
     `src/api/api-contract.spec.ts`: 2 suites / 42 tests.
+- Phase V3.3/V3.4 Terraform delivery focused checks passed:
+  - API focused: `src/terraform/terraform-generation.service.spec.ts` and
+    `src/api/api-contract.spec.ts`: 2 suites / 42 tests.
+  - Web focused: `src/api-client.spec.ts` and `src/App.spec.tsx`: 2 suites /
+    84 tests.
+- Phase V3.3/V3.4 full local regression floor passed with `npm run check`:
+  - API unit: 51 suites / 400 tests.
+  - Web unit: 9 suites / 132 tests.
+  - Graph validation: 298 nodes / 298 edges.
+  - Pricing coverage guard: 36 frontend priced families covered.
+  - Progress verification: 153 phase evidence anchors.
+  - Security suppression check: 22 reviewed suppressions.
+  - Database, DevOps, cloud, release, and provider credential gates passed.
+  - `impeccable` skipped by documented Node 20 vs Node 24 constraint.
+- Phase V3.3/V3.4 build gate passed with `npm run ci:build`:
+  - API TypeScript build passed.
+  - Web production build passed with the existing Vite environment-placeholder
+    and chunk-size warnings.
 - Phase V3 full regression floor passed with `npm run check`:
   - API unit: 51 suites / 398 tests.
   - Web unit: 9 suites / 132 tests.
@@ -161,12 +181,14 @@ Machine-readable token evidence:
   surface so stub/unconfigured mode is not reported as production-connected.
 - Full enterprise auth product polish remains future scope: production email, SSO/SAML,
   org billing UX, and complete team/account lifecycle polish.
-- Terraform generation now has a hardened root bundle, generation profile,
-  private database networking, runtime identity baselines, and policy/test
-  scaffolding. Full production IaC remains future scope: complete module libraries,
-  landing-zone integration, container/serverless/Kubernetes module generation,
-  active-active DR, and real `terraform init/validate/test/plan` execution with
-  provider credentials are not run by PolyCost request handling.
+- Terraform generation now has a hardened root bundle, ZIP export, bundle
+  manifest, validation runner, generation profile, private database networking,
+  runtime identity baselines, policy/test scaffolding, and AWS/Azure/GCP starter
+  modules for network, compute, and data. Full production IaC remains future
+  scope: landing-zone integration, edge/observability/DR modules,
+  container/serverless/Kubernetes module generation, active-active DR, and real
+  `terraform init/validate/test/plan` execution with provider credentials are not
+  run by PolyCost request handling.
 
 ## Rollback
 

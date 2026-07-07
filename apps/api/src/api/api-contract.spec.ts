@@ -419,6 +419,13 @@ describe('API contracts', () => {
           runtimeTarget: 'vm',
           networkTopology: 'public',
         }),
+        archive: expect.objectContaining({
+          filename: 'client-portal-aws-terraform.zip',
+          format: 'zip',
+          mimeType: 'application/zip',
+          contentBase64: expect.stringMatching(/^UEsDB/),
+          sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+        }),
         files: expect.arrayContaining([
           expect.objectContaining({
             path: 'versions.tf',
@@ -436,6 +443,14 @@ describe('API contracts', () => {
           expect.objectContaining({
             path: 'FRAMEWORK-ALIGNMENT.md',
             content: expect.stringContaining('Cloud Framework Alignment'),
+          }),
+          expect.objectContaining({
+            path: 'BUNDLE-MANIFEST.json',
+            content: expect.stringContaining('polycost.terraform.bundle.v1'),
+          }),
+          expect.objectContaining({
+            path: 'modules/network/main.tf',
+            content: expect.stringContaining('aws_vpc'),
           }),
         ]),
       }),
