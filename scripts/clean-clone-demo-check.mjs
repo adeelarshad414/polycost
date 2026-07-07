@@ -37,6 +37,7 @@ try {
     PORT: '3001',
     VAULT_HOST_PORT: vaultHostPort,
     VITE_API_BASE_URL: apiBaseUrl,
+    POLYCOST_DEMO_COMMAND_TIMEOUT_MS: String(thresholdMs),
     CORS_ALLOWED_ORIGINS: [
       `http://localhost:${webPort}`,
       `http://127.0.0.1:${webPort}`,
@@ -45,7 +46,7 @@ try {
     ].join(','),
   };
 
-  run('npm', ['run', 'demo:up'], { cwd: cloneDir, env });
+  run('npm', ['run', 'demo:up'], { cwd: cloneDir, env, timeoutMs: thresholdMs });
 
   const durationMs = Date.now() - startedAt;
   assertWithin(durationMs, thresholdMs, 'clean-clone-to-running');
@@ -65,6 +66,7 @@ try {
         cwd: cloneDir,
         env: { ...process.env, COMPOSE_PROJECT_NAME: composeProjectName },
         allowFailure: true,
+        timeoutMs: 60_000,
       });
     }
 
@@ -72,6 +74,7 @@ try {
       cwd: cloneDir,
       env: { ...process.env, COMPOSE_PROJECT_NAME: composeProjectName },
       allowFailure: true,
+      timeoutMs: 60_000,
     });
   }
 
@@ -88,15 +91,23 @@ function run(command, args, options = {}) {
     cwd: options.cwd ?? root,
     stdio: 'inherit',
     env: options.env ?? process.env,
+    timeout: options.timeoutMs,
   });
 
   if (result.error) {
+    const detail =
+      result.error.code === 'ETIMEDOUT'
+        ? `timed out after ${options.timeoutMs}ms`
+        : result.error.message;
+
     if (options.allowFailure) {
-      console.warn(`${command} failed to start: ${result.error.message}`);
+      console.warn(`${command} failed: ${detail}`);
       return result;
     }
 
-    throw result.error;
+    throw new Error(`${command} ${args.join(' ')} failed: ${detail}`, {
+      cause: result.error,
+    });
   }
 
   if (result.status !== 0 && !options.allowFailure) {

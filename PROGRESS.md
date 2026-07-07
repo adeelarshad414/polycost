@@ -87,6 +87,43 @@ say so explicitly rather than marking it done.
 | Phase 2.8AS - Full progress verification gate           | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AT - Live timed journey and Redis verification | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AU - Clean-clone demo verifier                 | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AV - Verification timeout hardening            | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AV - Verification timeout hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added bounded command execution to `scripts/ci-e2e.mjs` so Docker Compose build,
+  migration, E2E test, and live-verification commands fail with explicit timeout
+  errors instead of hanging indefinitely.
+- Added shorter bounded timeouts around Compose diagnostics (`docker compose ps` and
+  logs) so an unhealthy Docker daemon cannot also hang the failure-reporting path.
+- Added bounded command execution to `scripts/demo-ready.mjs` and wired
+  `scripts/clean-clone-demo-check.mjs` to pass the clean-clone startup budget into
+  the demo bootstrap as `POLYCOST_DEMO_COMMAND_TIMEOUT_MS`.
+- Documented the demo/E2E timeout knobs in the README configuration list.
+
+Verification:
+
+- `npm run format:check` passes.
+- `npm run progress:verify` passes: 99 phase evidence anchors verified.
+- `npm run release:check` passes.
+- `npm run check` passes with API unit tests `49 suites / 385 tests`, web unit tests
+  `9 suites / 128 tests`, graph validation, pricing coverage, progress verification,
+  QA, DB validation, DevOps/cloud/release, and provider credential readiness all
+  green.
+
+Known remaining gaps:
+
+- A follow-up full `ci:e2e` rerun was attempted after the clean-clone commit, but the
+  local Docker/Colima image build stalled inside `docker compose up --build` before
+  containers were created. This hardening turns that class of stall into a bounded
+  failure on future runs; it is not counted as a successful E2E result.
+- Hosted GitHub Actions still fails before repository steps run because no runner is
+  assigned (`runner_id: 0`, empty `steps` array).
 
 ## Phase 2.8AU - Clean-clone demo verifier
 

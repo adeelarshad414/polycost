@@ -10,6 +10,7 @@ const webPort = process.env.WEB_PORT ?? '3000';
 const apiHealthUrl = `http://127.0.0.1:${apiHostPort}/health`;
 const webUrl = `http://127.0.0.1:${webPort}/`;
 const webApiDataHealthUrl = `http://127.0.0.1:${webPort}/api/v1/data-health`;
+const commandTimeoutMs = Number(process.env.POLYCOST_DEMO_COMMAND_TIMEOUT_MS ?? 900_000);
 
 console.log('PolyCost demo bootstrap starting.');
 ensureNodeVersion();
@@ -114,10 +115,15 @@ function run(command, args) {
     cwd: root,
     stdio: 'inherit',
     env: process.env,
+    timeout: commandTimeoutMs,
   });
 
   if (result.error) {
-    fail(`${command} failed to start: ${result.error.message}`);
+    const detail =
+      result.error.code === 'ETIMEDOUT'
+        ? `timed out after ${commandTimeoutMs}ms`
+        : result.error.message;
+    fail(`${command} failed: ${detail}`);
   }
 
   if (result.status !== 0) {

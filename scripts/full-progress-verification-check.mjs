@@ -225,7 +225,11 @@ async function assertPhaseEvidenceAnchors() {
   ]);
 
   await assertFileContains('scripts/ci-e2e.mjs', [
-    ['live verification runs inside Compose E2E', "run(npmCommand, ['run', 'live:verify'])"],
+    ['E2E command timeout knob', 'POLYCOST_E2E_COMMAND_TIMEOUT_MS'],
+    [
+      'live verification runs inside Compose E2E',
+      "run(npmCommand, ['run', 'live:verify'], { timeoutMs: commandTimeoutMs })",
+    ],
   ]);
 
   await assertFileContains('scripts/live-verification.mjs', [
