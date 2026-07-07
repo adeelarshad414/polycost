@@ -64,6 +64,8 @@ import {
   RegionCatalogResponse,
   ReportFormat,
   ServiceRequirement,
+  TerraformGenerationResult,
+  TerraformTargetCloud,
   AccountSessionRecord,
   AuthMeResponse,
   SsoConfigurationStatus,
@@ -4571,6 +4573,7 @@ function StateDetailContent({
           description="Solution architecture review, governance checks, sortable resource rows, CSV export, and API-facing JSON."
         />
         <ArchitectureWorkspace comparison={comparison} interval={interval} form={form} />
+        <TerraformGenerationPanel client={client} comparison={comparison} form={form} />
         <PersonaComparisonWorkspace
           comparison={comparison}
           interval={interval}
@@ -8586,6 +8589,7 @@ export function ComparisonView({
           />
           <EngineeringAnalyticsDashboard comparison={comparison} interval={interval} />
           <ArchitectureWorkspace comparison={comparison} interval={interval} form={form} />
+          <TerraformGenerationPanel client={client} comparison={comparison} form={form} />
           <ServiceCheapestMatrix comparison={comparison} interval={interval} />
           <ProductionDepthAnalytics
             comparison={comparison}
@@ -16661,6 +16665,221 @@ function ProviderCostWorkspace({
   );
 }
 
+function TerraformGenerationPanel({
+  client,
+  comparison,
+  form,
+}: {
+  client: PolyCostClient;
+  comparison: ComparisonResult | null;
+  form: WorkloadFormState;
+}) {
+  const [targetCloud, setTargetCloud] = useState<TerraformTargetCloud>(
+    comparison?.cheapestProviderId ?? 'aws',
+  );
+  const [bundle, setBundle] = useState<TerraformGenerationResult | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (comparison?.cheapestProviderId) {
+      setTargetCloud(comparison.cheapestProviderId);
+    }
+  }, [comparison?.comparisonId, comparison?.cheapestProviderId]);
+
+  async function handleGenerateTerraform() {
+    if (!comparison) {
+      return;
+    }
+
+    setIsGenerating(true);
+    setGenerationError(null);
+
+    try {
+      const nws = buildNwsFromForm(form, 'structured_form');
+      const result = await client.generateTerraform({
+        targetCloud,
+        nws,
+        workspaceName: form.workloadName.trim() || comparison.requirements?.workloadName,
+      });
+      setBundle(result);
+    } catch (terraformError) {
+      setBundle(null);
+      setGenerationError(formatApiError(terraformError));
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  function handleDownloadBundle() {
+    if (!bundle) {
+      return;
+    }
+
+    downloadBlob(
+      new Blob([JSON.stringify(bundle, null, 2)], {
+        type: 'application/json',
+      }),
+      `${bundle.bundleName}.json`,
+    );
+  }
+
+  const selectedProviderTotal = comparison?.providers.find(
+    (provider) => provider.providerId === targetCloud,
+  )?.totals.monthly;
+  const previewFile = bundle?.files.find((file) => file.path === 'main.tf') ?? bundle?.files[0];
+
+  return (
+    <section className="terraform-generation-panel" aria-label="Terraform generation">
+      <div className="terraform-generation-heading">
+        <div>
+          <span>Infrastructure as Code</span>
+          <h3>Terraform starter bundle</h3>
+          <p>
+            Generate a provider-specific baseline from the reviewed workload. PolyCost validates
+            static safety signals here; run Terraform init, fmt, validate, and plan in your target
+            account before treating it as deployable.
+          </p>
+        </div>
+        {bundle ? (
+          <span className={`terraform-status terraform-status-${bundle.validation.status}`}>
+            {capitalize(bundle.validation.status)}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="terraform-target-grid" role="radiogroup" aria-label="Terraform target cloud">
+        {PROVIDER_ORDER.map((providerId) => (
+          <button
+            key={providerId}
+            type="button"
+            className={[
+              'terraform-target-card',
+              `terraform-target-${providerId}`,
+              providerId === targetCloud ? 'is-selected' : undefined,
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            role="radio"
+            aria-checked={providerId === targetCloud}
+            onClick={() => {
+              setTargetCloud(providerId);
+              setBundle(null);
+              setGenerationError(null);
+            }}
+          >
+            <span>{providerLabel(providerId)}</span>
+            <strong>
+              {comparison
+                ? selectedProviderTotal !== undefined && providerId === targetCloud
+                  ? formatCurrency(selectedProviderTotal)
+                  : formatCurrency(
+                      comparison.providers.find((provider) => provider.providerId === providerId)
+                        ?.totals.monthly ?? 0,
+                    )
+                : 'Pending'}
+            </strong>
+            <small>{providerTerraformResourceLabel(providerId)}</small>
+          </button>
+        ))}
+      </div>
+
+      <div className="terraform-generation-actions">
+        <Button
+          type="button"
+          variant="primary"
+          onClick={handleGenerateTerraform}
+          disabled={!comparison || isGenerating}
+          loading={isGenerating}
+          loadingLabel="Generating Terraform..."
+        >
+          <TerraformIcon />
+          Generate Terraform
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={handleDownloadBundle}
+          disabled={!bundle || isGenerating}
+        >
+          <DownloadIcon />
+          Download bundle JSON
+        </Button>
+      </div>
+
+      {generationError ? <p className="terraform-generation-error">{generationError}</p> : null}
+
+      {bundle ? (
+        <div className="terraform-result-grid">
+          <div className="terraform-result-summary">
+            <span>
+              {providerLabel(bundle.targetCloud)} · {bundle.region}
+            </span>
+            <strong>{bundle.bundleName}</strong>
+            <div className="terraform-resource-chips" aria-label="Generated Terraform resources">
+              <span>{bundle.resourceSummary.computeInstances} VM</span>
+              <span>{bundle.resourceSummary.objectStorageBuckets} object store</span>
+              <span>{bundle.resourceSummary.relationalDatabases} database</span>
+              <span>{bundle.files.length} files</span>
+            </div>
+          </div>
+
+          <div className="terraform-validation-list" aria-label="Terraform validation checks">
+            {bundle.validation.checks.map((check) => (
+              <span key={check.id} className={`terraform-check terraform-check-${check.status}`}>
+                {check.id}
+              </span>
+            ))}
+          </div>
+
+          <div className="terraform-file-list" aria-label="Generated Terraform files">
+            {bundle.files.map((file) => (
+              <span key={file.path}>
+                <strong>{file.path}</strong>
+                <small>{file.sha256.slice(0, 10)}</small>
+              </span>
+            ))}
+          </div>
+
+          {previewFile ? (
+            <div className="terraform-file-preview">
+              <strong>{previewFile.path}</strong>
+              <pre>{previewTerraformContent(previewFile.content)}</pre>
+            </div>
+          ) : null}
+
+          <div className="terraform-evidence-columns">
+            <TerraformEvidenceList
+              title="Mappings"
+              items={bundle.serviceMappings.map(mappingLabel)}
+            />
+            <TerraformEvidenceList title="Assumptions" items={bundle.assumptions.slice(0, 4)} />
+            <TerraformEvidenceList title="Security" items={bundle.securityNotes.slice(0, 4)} />
+          </div>
+        </div>
+      ) : (
+        <p className="terraform-empty-state">
+          Run generation after the cost comparison is ready. The output is a starter IaC bundle with
+          backend examples, provider pinning, and explicit review notes.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function TerraformEvidenceList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div>
+      <strong>{title}</strong>
+      <ul>
+        {items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function ArchitectureWorkspace({
   comparison,
   interval,
@@ -17440,6 +17659,14 @@ function DownloadIcon() {
   );
 }
 
+function TerraformIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon">
+      <path d="M5 5h6v6H5zM13 5h6v6h-6zM9 13h6v6H9zM11 8h2M12 11v2" />
+    </svg>
+  );
+}
+
 function ExternalLinkIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon">
@@ -17515,6 +17742,28 @@ function providerSubtitle(provider: ProviderId): string {
     case 'gcp':
       return 'Google Cloud Platform';
   }
+}
+
+function providerTerraformResourceLabel(provider: ProviderId): string {
+  switch (provider) {
+    case 'aws':
+      return 'EC2 · S3 · RDS · ALB';
+    case 'azure':
+      return 'VM · Storage · PostgreSQL · LB';
+    case 'gcp':
+      return 'Compute · Storage · Cloud SQL';
+  }
+}
+
+function previewTerraformContent(content: string): string {
+  const lines = content.trimEnd().split('\n');
+  const preview = lines.slice(0, 42).join('\n');
+
+  return lines.length > 42 ? `${preview}\n# ... ${lines.length - 42} more lines` : preview;
+}
+
+function mappingLabel(mapping: TerraformGenerationResult['serviceMappings'][number]): string {
+  return `${mapping.requirement}: ${mapping.terraformResource} (${mapping.confidence})`;
 }
 
 function roleClassName(role: ExecutiveLens['role']): string {

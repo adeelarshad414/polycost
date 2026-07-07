@@ -52,6 +52,8 @@ import { ComparisonAnalyticsService } from './comparison-analytics.service';
 import { PricingStatusController } from './pricing-status.controller';
 import { RegionsController } from './regions.controller';
 import { WorkloadController } from './workload.controller';
+import { TerraformGenerationController } from '../terraform/terraform-generation.controller';
+import { TerraformGenerationService } from '../terraform/terraform-generation.service';
 
 const validNws: NormalizedWorkloadSpec = {
   schemaVersion: '1.0',
@@ -394,6 +396,49 @@ describe('API contracts', () => {
       ),
     ).resolves.toEqual({ valid: true });
     expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
+  });
+
+  it('POST /terraform/generate returns a provider-specific Terraform bundle', async () => {
+    const controller = new TerraformGenerationController(new TerraformGenerationService());
+
+    expect(
+      controller.generate({
+        targetCloud: 'aws',
+        workspaceName: 'Client Portal',
+        nws: validNws,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        targetCloud: 'aws',
+        bundleName: 'client-portal-aws-terraform',
+        validation: expect.objectContaining({
+          status: 'passed',
+          executionMode: 'static',
+        }),
+        files: expect.arrayContaining([
+          expect.objectContaining({
+            path: 'versions.tf',
+            content: expect.stringContaining('hashicorp/aws'),
+            sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+          }),
+          expect.objectContaining({
+            path: 'backend.tf.example',
+            content: expect.stringContaining('backend "s3"'),
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it('POST /terraform/generate rejects unsupported target cloud values', async () => {
+    const controller = new TerraformGenerationController(new TerraformGenerationService());
+
+    expect(() =>
+      controller.generate({
+        targetCloud: 'oracle',
+        nws: validNws,
+      }),
+    ).toThrow(ApiValidationError);
   });
 
   it('POST /comparisons persists and returns the comparison result', async () => {

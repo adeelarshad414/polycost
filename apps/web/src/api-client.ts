@@ -41,6 +41,8 @@ import {
   TeamInvitationPreview,
   TeamMemberRecord,
   TeamRole,
+  TerraformGenerationResult,
+  TerraformTargetCloud,
   WorkloadInput,
   WorkloadRecord,
 } from './types';
@@ -163,6 +165,12 @@ export interface PolyCostClient {
   parseDiagram(input: DiagramParseRequest): Promise<DiagramParseResult>;
   validateWorkload(nws: NormalizedWorkloadSpec): Promise<{ valid: true }>;
   createComparison(nws: NormalizedWorkloadSpec): Promise<ComparisonResult>;
+  generateTerraform(input: {
+    targetCloud: TerraformTargetCloud;
+    nws: NormalizedWorkloadSpec;
+    workspaceName?: string;
+    region?: string;
+  }): Promise<TerraformGenerationResult>;
   getComparisonAnalytics(comparisonId: string): Promise<ComparisonAnalyticsResponse>;
   getComparisonPricingEvidence(comparisonId: string): Promise<ComparisonPricingEvidenceResponse>;
   refreshLiveComparison(comparisonId: string): Promise<ComparisonResult>;
@@ -459,6 +467,12 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
             useLivePricing: false,
           },
         }),
+      });
+    },
+    generateTerraform(input) {
+      return requestJson<TerraformGenerationResult>(baseUrl, '/terraform/generate', {
+        method: 'POST',
+        body: JSON.stringify(input),
       });
     },
     getComparisonAnalytics(comparisonId) {

@@ -13,6 +13,7 @@ import {
   PricingStatusResponse,
   RegionCatalogResponse,
   ReportExportJobResponse,
+  TerraformGenerationResult,
 } from './types';
 import { intervalMultiplierFromMonthly } from './cost-time';
 import { buildNwsFromForm, defaultWorkloadForm } from './workload';
@@ -1201,6 +1202,39 @@ describe('App', () => {
     } finally {
       unmount();
     }
+  });
+
+  it('generates a Terraform bundle from the completed comparison workspace', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Compare costs'));
+    await click(
+      disclosureSummary(
+        resultDisclosureByTitle(container, 'Show full breakdown, pricing models & export options'),
+      ),
+    );
+    await click(buttonByText(container, 'Generate Terraform'));
+    await settleAsyncEffects();
+
+    expect(client.generateTerraform).toHaveBeenCalledWith(
+      expect.objectContaining({
+        targetCloud: 'gcp',
+        nws: expect.objectContaining({
+          schemaVersion: '1.0',
+          workload: expect.objectContaining({
+            type: 'web_app',
+          }),
+        }),
+      }),
+    );
+    expect(text(container)).toContain('Terraform starter bundle');
+    expect(text(container)).toContain('client-portal-gcp-terraform');
+    expect(text(container)).toContain('google_compute_instance.app');
+    expect(text(container)).toContain('required-provider-pinned');
+    expect(buttonByText(container, 'Download bundle JSON')).toBeInstanceOf(HTMLButtonElement);
+
+    unmount();
   });
 
   it('shows quick refresh API errors on the results page', async () => {
@@ -3592,6 +3626,72 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     statusUrl: `/api/v1/comparisons/${comparisonResult.comparisonId}/export-jobs/66666666-6666-4666-8666-666666666666`,
     downloadUrl: `/api/v1/comparisons/${comparisonResult.comparisonId}/export-jobs/66666666-6666-4666-8666-666666666666/download`,
   };
+  const terraformBundle: TerraformGenerationResult = {
+    targetCloud: 'gcp',
+    generatedAt: '2026-07-07T00:00:00.000Z',
+    bundleName: 'client-portal-gcp-terraform',
+    workspaceName: 'client-portal',
+    region: 'us-central1',
+    source: {
+      schemaVersion: '1.0',
+      workloadName: 'Client Portal',
+      workloadType: 'web_app',
+      sourceType: 'structured_form',
+    },
+    resourceSummary: {
+      computeInstances: 1,
+      objectStorageBuckets: 1,
+      blockStorageVolumes: 0,
+      fileShares: 0,
+      relationalDatabases: 1,
+      loadBalancers: 1,
+      cdnEnabled: false,
+      multiAz: true,
+      multiRegion: false,
+    },
+    serviceMappings: [
+      {
+        requirement: 'compute',
+        terraformResource: 'google_compute_instance.app',
+        confidence: 'direct',
+        note: 'NWS compute maps to VM compute.',
+      },
+    ],
+    files: [
+      {
+        path: 'versions.tf',
+        content:
+          'terraform {\n  required_providers {\n    google = {\n      source = "hashicorp/google"\n    }\n  }\n}\n',
+        sha256: 'a'.repeat(64),
+      },
+      {
+        path: 'main.tf',
+        content: 'resource "google_compute_instance" "app" {\n  name = "client-portal"\n}\n',
+        sha256: 'b'.repeat(64),
+      },
+    ],
+    validation: {
+      status: 'passed',
+      executionMode: 'static',
+      checks: [
+        {
+          id: 'required-provider-pinned',
+          status: 'passed',
+          message: 'Provider is pinned.',
+        },
+      ],
+      commands: [
+        {
+          command: 'terraform validate',
+          status: 'not-run',
+          message: 'Run after terraform init.',
+        },
+      ],
+    },
+    assumptions: ['Compute Engine is the baseline compute target.'],
+    securityNotes: ['GCP credentials are not written into generated Terraform files.'],
+    nextSteps: ['Run terraform fmt -check and terraform validate.'],
+  };
 
   return {
     getHealth: jest.fn(async () => backendHealth),
@@ -3825,6 +3925,7 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     })),
     validateWorkload: jest.fn(async () => ({ valid: true as const })),
     createComparison: jest.fn(async () => comparisonResult),
+    generateTerraform: jest.fn(async () => terraformBundle),
     getComparisonAnalytics: jest.fn(async () => ({
       comparisonId: comparisonResult.comparisonId,
       generatedAt: '2026-07-02T12:00:00.000Z',

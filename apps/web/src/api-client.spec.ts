@@ -71,6 +71,69 @@ describe('api client', () => {
     );
   });
 
+  it('sends Terraform generation requests for the selected cloud', async () => {
+    const nws = buildNwsFromForm(defaultWorkloadForm);
+    const terraformResponse = {
+      targetCloud: 'aws',
+      generatedAt: '2026-07-07T00:00:00.000Z',
+      bundleName: 'portal-aws-terraform',
+      workspaceName: 'portal',
+      region: 'us-east-1',
+      source: {
+        schemaVersion: '1.0',
+        workloadType: 'web_app',
+        sourceType: 'structured_form',
+      },
+      resourceSummary: {
+        computeInstances: 1,
+        objectStorageBuckets: 0,
+        blockStorageVolumes: 0,
+        fileShares: 0,
+        relationalDatabases: 0,
+        loadBalancers: 0,
+        cdnEnabled: false,
+        multiAz: false,
+        multiRegion: false,
+      },
+      serviceMappings: [],
+      files: [],
+      validation: {
+        status: 'passed',
+        executionMode: 'static',
+        checks: [],
+        commands: [],
+      },
+      assumptions: [],
+      securityNotes: [],
+      nextSteps: [],
+    };
+    const fetchMock = jest.fn(async () => jsonResponse(terraformResponse));
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(
+      client.generateTerraform({
+        targetCloud: 'aws',
+        nws,
+        workspaceName: 'Portal',
+        region: 'us-east-1',
+      }),
+    ).resolves.toEqual(terraformResponse);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/terraform/generate',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          targetCloud: 'aws',
+          nws,
+          workspaceName: 'Portal',
+          region: 'us-east-1',
+        }),
+      }),
+    );
+  });
+
   it('fetches backend comparison analytics for saved results', async () => {
     const analytics = {
       comparisonId: 'comparison-1',

@@ -144,6 +144,43 @@ Deferred:
 - Production LLM accuracy depends on the operator configuring a real endpoint/model
   and Vault API key, then evaluating the chosen model against a production corpus.
 
+## Phase V3 - Terraform Generation
+
+Verdict: `verified (mock)`
+
+Evidence:
+
+- `apps/api/src/terraform/terraform-generation.service.ts` consumes the existing
+  NWS validator and generates AWS, Azure, and GCP Terraform starter bundles with
+  pinned providers, backend examples, variables, main resources, outputs, tfvars
+  examples, README guidance, assumptions, security notes, and SHA-256 file hashes.
+- `apps/api/src/terraform/terraform-generation.service.spec.ts` verifies provider
+  pinning, static safety checks, region override handling, secure defaults, service
+  mappings, and unsupported-resource caveats across AWS, Azure, and GCP.
+- `apps/api/src/api/api-contract.spec.ts` covers `POST /api/v1/terraform/generate`.
+- `apps/web/src/api-client.spec.ts` verifies the frontend client request to
+  `/terraform/generate`.
+- `apps/web/src/App.spec.tsx` verifies the comparison workspace can generate and
+  display a Terraform bundle after a completed comparison.
+- `docs/architecture/phase-v3-terraform-generation.md` documents scope, provider
+  baselines, validation model, and known gaps.
+- Phase V3 focused checks passed: API `2` suites / `40` tests and web `2` suites /
+  `84` tests.
+- Phase V3 full `npm run check` passed with API `51` suites / `398` tests, web
+  `9` suites / `132` tests, graph validation, pricing coverage, progress
+  verification, QA/security suppression, database, DevOps, cloud, release, and
+  provider credential gates.
+- `npm run ci:build` passed for API and web.
+
+Deferred:
+
+- Request-time validation is static. Real `terraform init`, `terraform validate`,
+  policy checks, and `terraform plan` require saving files and authenticating to
+  target cloud accounts outside PolyCost.
+- Production landing-zone modules, private endpoints, WAF/CDN wiring, IAM
+  least-privilege policies, Kubernetes/serverless modules, active-active DR, and
+  provider-specific organization controls remain future IaC phases.
+
 ## Phase F - Auth, Teams And RBAC
 
 Verdict: `verified (mock)`
@@ -255,6 +292,8 @@ These commands have been used as evidence gates in this run:
 - `npm run check`
 - `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/diagram-parser/diagram-parser.service.spec.ts src/diagram-parser/llm-classifier.client.spec.ts`
 - `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx`
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/terraform/terraform-generation.service.spec.ts src/api/api-contract.spec.ts`
+- `npm run test:unit --workspace @polycost/web -- --runInBand src/api-client.spec.ts src/App.spec.tsx`
 
 `npm run live:verify` writes its latest smoke/timing transcript to
 `.tmp/live-verification/latest.json` by default. Set

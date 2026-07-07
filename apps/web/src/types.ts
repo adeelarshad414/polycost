@@ -10,6 +10,7 @@ export type AiCostNarrative = SharedAiCostNarrative;
 
 export const PROVIDER_ORDER = ['aws', 'azure', 'gcp'] as const;
 export type ProviderId = (typeof PROVIDER_ORDER)[number];
+export type TerraformTargetCloud = ProviderId;
 export type ServiceCategory =
   'compute' | 'storage' | 'database' | 'network' | 'support' | 'licensing' | 'operations';
 export type CostComponent =
@@ -253,6 +254,59 @@ export interface ParsedNwsDraft {
   draftNws: NormalizedWorkloadSpec;
   parserConfidence: 'low' | 'medium' | 'high';
   fieldsRequiringReview: string[];
+}
+
+export interface TerraformGenerationResult {
+  targetCloud: TerraformTargetCloud;
+  generatedAt: string;
+  bundleName: string;
+  workspaceName: string;
+  region: string;
+  source: {
+    schemaVersion: NormalizedWorkloadSpec['schemaVersion'];
+    workloadName?: string;
+    workloadType: NormalizedWorkloadSpec['workload']['type'];
+    sourceType: NormalizedWorkloadSpec['metadata']['sourceType'];
+  };
+  resourceSummary: {
+    computeInstances: number;
+    objectStorageBuckets: number;
+    blockStorageVolumes: number;
+    fileShares: number;
+    relationalDatabases: number;
+    loadBalancers: number;
+    cdnEnabled: boolean;
+    multiAz: boolean;
+    multiRegion: boolean;
+  };
+  serviceMappings: Array<{
+    requirement: string;
+    terraformResource: string;
+    confidence: 'direct' | 'approximate' | 'manual-review';
+    note: string;
+  }>;
+  files: Array<{
+    path: string;
+    content: string;
+    sha256: string;
+  }>;
+  validation: {
+    status: 'passed' | 'warning' | 'failed';
+    executionMode: 'static';
+    checks: Array<{
+      id: string;
+      status: 'passed' | 'warning' | 'failed';
+      message: string;
+    }>;
+    commands: Array<{
+      command: string;
+      status: 'not-run' | 'passed' | 'failed';
+      message: string;
+    }>;
+  };
+  assumptions: string[];
+  securityNotes: string[];
+  nextSteps: string[];
 }
 
 export type DiagramInputFormat = 'mermaid' | 'drawio' | 'lucid_csv' | 'vsdx';

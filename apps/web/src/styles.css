@@ -4665,7 +4665,8 @@ select:disabled {
 .result-view-section,
 .demo-overview,
 .provider-cost-workspace,
-.architecture-workspace {
+.architecture-workspace,
+.terraform-generation-panel {
   display: grid;
   min-width: 0;
   gap: var(--pc-space-2);
@@ -4719,6 +4720,286 @@ select:disabled {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--pc-space-2);
+}
+
+.terraform-generation-panel {
+  border: 1px solid color-mix(in srgb, var(--pc-border) 86%, transparent);
+  border-radius: 8px;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--brand-orange) 7%, transparent),
+      color-mix(in srgb, var(--brand-blue) 7%, transparent),
+      color-mix(in srgb, var(--brand-green) 7%, transparent)
+    ),
+    var(--pc-bg-surface);
+  box-shadow: var(--pc-shadow-soft);
+  padding: clamp(var(--pc-space-2), 2.4vw, var(--pc-space-3));
+}
+
+.terraform-generation-heading,
+.terraform-generation-actions,
+.terraform-result-summary,
+.terraform-evidence-columns {
+  display: flex;
+  min-width: 0;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--pc-space-2);
+}
+
+.terraform-generation-heading {
+  align-items: center;
+}
+
+.terraform-generation-heading span,
+.terraform-result-summary span,
+.terraform-file-list small {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.terraform-generation-heading h3 {
+  margin: 2px 0 0;
+  color: var(--pc-text-primary);
+  font-family: var(--pc-font-display);
+  font-size: var(--pc-text-lg);
+  line-height: 1.15;
+}
+
+.terraform-generation-heading p,
+.terraform-empty-state,
+.terraform-generation-error {
+  max-width: 82ch;
+  margin: 6px 0 0;
+  color: var(--pc-text-secondary);
+  line-height: 1.5;
+}
+
+.terraform-generation-error {
+  border: 1px solid color-mix(in srgb, var(--pc-danger) 34%, var(--pc-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-danger) 8%, var(--pc-bg-surface));
+  color: var(--pc-danger);
+  padding: 10px 12px;
+}
+
+.terraform-status {
+  flex: 0 0 auto;
+  border: 1px solid var(--pc-border);
+  border-radius: var(--radius-full);
+  padding: 6px 10px;
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+}
+
+.terraform-status-passed {
+  border-color: color-mix(in srgb, var(--brand-green) 36%, var(--pc-border));
+  background: color-mix(in srgb, var(--brand-green) 10%, transparent);
+  color: color-mix(in srgb, var(--brand-green) 82%, var(--pc-text-primary));
+}
+
+.terraform-status-warning {
+  border-color: color-mix(in srgb, var(--brand-orange) 38%, var(--pc-border));
+  background: color-mix(in srgb, var(--brand-orange) 10%, transparent);
+  color: color-mix(in srgb, var(--brand-orange) 82%, var(--pc-text-primary));
+}
+
+.terraform-status-failed {
+  border-color: color-mix(in srgb, var(--pc-danger) 44%, var(--pc-border));
+  background: color-mix(in srgb, var(--pc-danger) 10%, transparent);
+  color: var(--pc-danger);
+}
+
+.terraform-target-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--pc-space-2);
+}
+
+.terraform-target-card {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  border: 1px solid var(--pc-border);
+  border-top: 3px solid var(--pc-provider-aws);
+  border-radius: 8px;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--pc-bg-surface) 88%, var(--pc-bg-surface-2));
+  color: var(--pc-text-primary);
+  padding: 12px;
+  text-align: left;
+  transition:
+    border-color 140ms ease,
+    transform 140ms ease,
+    background-color 140ms ease;
+}
+
+.terraform-target-card:hover,
+.terraform-target-card.is-selected {
+  border-color: color-mix(in srgb, currentColor 38%, var(--pc-border));
+  background: color-mix(in srgb, currentColor 8%, var(--pc-bg-surface));
+  transform: translateY(-1px);
+}
+
+.terraform-target-aws {
+  border-top-color: var(--brand-orange);
+  color: color-mix(in srgb, var(--brand-orange) 88%, var(--pc-text-primary));
+}
+
+.terraform-target-azure {
+  border-top-color: var(--brand-blue);
+  color: color-mix(in srgb, var(--brand-blue) 88%, var(--pc-text-primary));
+}
+
+.terraform-target-gcp {
+  border-top-color: var(--brand-green);
+  color: color-mix(in srgb, var(--brand-green) 88%, var(--pc-text-primary));
+}
+
+.terraform-target-card span,
+.terraform-target-card small {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 800;
+}
+
+.terraform-target-card strong {
+  color: var(--pc-text-primary);
+  font-size: var(--pc-text-lg);
+  line-height: 1.1;
+}
+
+.terraform-generation-actions {
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.terraform-result-grid {
+  display: grid;
+  gap: var(--pc-space-2);
+}
+
+.terraform-result-summary {
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--pc-border) 82%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface-2) 62%, transparent);
+  padding: 12px;
+}
+
+.terraform-result-summary strong {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--pc-text-primary);
+  font-size: var(--pc-text-lg);
+  line-height: 1.2;
+}
+
+.terraform-resource-chips,
+.terraform-validation-list,
+.terraform-file-list {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.terraform-resource-chips span,
+.terraform-check,
+.terraform-file-list span {
+  border: 1px solid color-mix(in srgb, var(--pc-border) 82%, transparent);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--pc-bg-surface) 88%, transparent);
+  color: var(--pc-text-secondary);
+  padding: 7px 10px;
+  font-size: var(--pc-text-xs);
+  font-weight: 800;
+}
+
+.terraform-check-passed {
+  border-color: color-mix(in srgb, var(--brand-green) 32%, var(--pc-border));
+  color: color-mix(in srgb, var(--brand-green) 82%, var(--pc-text-primary));
+}
+
+.terraform-check-warning {
+  border-color: color-mix(in srgb, var(--brand-orange) 34%, var(--pc-border));
+  color: color-mix(in srgb, var(--brand-orange) 82%, var(--pc-text-primary));
+}
+
+.terraform-check-failed {
+  border-color: color-mix(in srgb, var(--pc-danger) 42%, var(--pc-border));
+  color: var(--pc-danger);
+}
+
+.terraform-file-list span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+}
+
+.terraform-file-list strong {
+  color: var(--pc-text-primary);
+}
+
+.terraform-file-preview {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--pc-border) 86%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-canvas) 72%, var(--pc-bg-surface));
+  padding: 12px;
+}
+
+.terraform-file-preview strong {
+  color: var(--pc-text-primary);
+}
+
+.terraform-file-preview pre {
+  max-height: 360px;
+  overflow: auto;
+  margin: 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface-2) 78%, var(--pc-bg-canvas));
+  color: var(--pc-text-primary);
+  font-size: var(--pc-text-xs);
+  line-height: 1.55;
+  padding: 12px;
+  white-space: pre;
+}
+
+.terraform-evidence-columns {
+  align-items: stretch;
+}
+
+.terraform-evidence-columns > div {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--pc-border) 82%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface) 82%, transparent);
+  padding: 12px;
+}
+
+.terraform-evidence-columns strong {
+  color: var(--pc-text-primary);
+}
+
+.terraform-evidence-columns ul {
+  display: grid;
+  gap: 7px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-sm);
+  line-height: 1.45;
 }
 
 .cost-dashboard {
@@ -7994,7 +8275,8 @@ select:disabled {
   .dashboard-grid,
   .analysis-grid,
   .financial-chart-grid,
-  .finops-advisor-grid {
+  .finops-advisor-grid,
+  .terraform-target-grid {
     grid-template-columns: 1fr;
   }
 
@@ -8040,6 +8322,12 @@ select:disabled {
 
   .data-health-providers {
     justify-content: start;
+  }
+
+  .terraform-generation-heading,
+  .terraform-result-summary,
+  .terraform-evidence-columns {
+    flex-direction: column;
   }
 
   .production-depth-grid,
@@ -8172,9 +8460,14 @@ select:disabled {
   .result-quick-actions,
   .server-analytics-strip,
   .requirements-edit-header,
-  .progressive-export-panel {
+  .progressive-export-panel,
+  .terraform-generation-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .terraform-generation-actions .pc-button {
+    width: 100%;
   }
 
   .result-quick-actions {

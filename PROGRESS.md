@@ -99,6 +99,60 @@ say so explicitly rather than marking it done.
 | Phase 2.8BE - Isolated live runtime verification        | Complete with known gaps (see notes) | 2026-07-07   |
 | Production readiness orchestrator v2 pass               | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.9 - Production gap closure continuation         | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase V3 - Terraform generation MVP
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added `POST /api/v1/terraform/generate`, backed by the existing NWS validator,
+  for `aws`, `azure`, and `gcp` Terraform starter bundles.
+- Generated bundles include pinned official HashiCorp providers, provider-native
+  auth expectations, remote-state examples, variables with validation blocks,
+  cost-allocation tags/labels, baseline network/compute/object-storage/database
+  resources, outputs, tfvars examples, SHA-256 file hashes, static validation
+  checks, assumptions, security notes, and next steps.
+- Added frontend client wiring and an Infrastructure as Code panel in the
+  comparison workspace with target-cloud selection, validation chips, file
+  inventory, mappings, assumptions, security notes, preview, and bundle JSON
+  download.
+- Added `docs/architecture/phase-v3-terraform-generation.md` and wired the
+  Terraform generator spec into `npm run test:production-readiness`.
+
+Verification:
+
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/terraform/terraform-generation.service.spec.ts src/api/api-contract.spec.ts`
+  - API focused: `2` suites / `40` tests.
+- `npm run test:unit --workspace @polycost/web -- --runInBand src/api-client.spec.ts src/App.spec.tsx`
+  - Web focused: `2` suites / `84` tests.
+- `npm run test:production-readiness`
+  - API focused: `10` suites / `133` tests.
+  - Web focused: `2` suites / `84` tests.
+- `npm run check`
+  - API unit: `51` suites / `398` tests.
+  - Web unit: `9` suites / `132` tests.
+  - Graph validation, pricing coverage, progress verification, QA/security
+    suppression, database, DevOps, cloud, release, and provider credential gates
+    passed.
+- `npm run ci:build`
+  - API TypeScript build passed.
+  - Web production build passed with the existing Vite environment-placeholder and
+    chunk-size warnings.
+
+Known remaining gaps:
+
+- Generated Terraform is a reviewed starter bundle, not a full module library or
+  production landing-zone implementation.
+- Request-time validation is static. Operators still need to save the generated
+  files and run `terraform init`, `terraform fmt -check`, `terraform validate`,
+  policy checks, and `terraform plan` with real cloud credentials.
+- VM-first compute is generated for portability. Container, serverless, Kubernetes,
+  advanced networking, private endpoints, CDN distributions, WAF, IAM role
+  minimization, multi-account/multi-subscription/multi-project layouts, and
+  active-active DR modules remain future refinement.
 
 ## Phase 2.9 - Production gap closure continuation
 
