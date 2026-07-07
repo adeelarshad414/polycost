@@ -84,6 +84,22 @@ await assertFileContains('README.md', [
   ['open-source launch documentation link', 'docs/development/open-source-readiness.md'],
 ]);
 
+await assertFileContains('docs/PROVIDER-CREDENTIALS.md', [
+  ['credential matrix', '## Credential Matrix'],
+  ['AWS current credential scope', 'no AWS access keys should be stored for the current adapter'],
+  ['Azure no app registration scope', 'Exact app registration scope today: none'],
+  ['GCP Vault path', 'secret/polycost/providers/gcp'],
+  [
+    'GCP strict validation command',
+    'USE_MOCK_PROVIDERS=false npm run provider:credentials:check:strict',
+  ],
+  ['diagram LLM Vault path', 'secret/polycost/llm'],
+  [
+    'no env secret storage',
+    'Do not put provider access tokens, service account JSON, OIDC client secrets, or LLM',
+  ],
+]);
+
 await assertFileContains('RELEASE-CHECKLIST.md', [
   [
     'private-to-public visibility gate',

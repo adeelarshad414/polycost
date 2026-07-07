@@ -91,6 +91,40 @@ say so explicitly rather than marking it done.
 | Phase 2.8AW - Pricing logic coverage gate               | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AX - Locked breakpoint UI proof                | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AY - FinOps manual proof gate                  | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AZ - Provider credential matrix hardening      | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AZ - Provider credential matrix hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Hardened `docs/PROVIDER-CREDENTIALS.md` with a release-grade credential matrix
+  covering AWS public catalog, Azure public catalog, GCP Cloud Billing Catalog, and
+  the optional diagram/NL LLM classifier.
+- Made the current AWS and Azure credential scope explicit: neither adapter reads
+  provider secrets today; Azure's current app registration scope is `none` because
+  the Retail Prices API path is unauthenticated.
+- Clarified the exact GCP Vault path (`secret/polycost/providers/gcp`), accepted
+  keys (`access_token`, `service_account_json`, legacy
+  `service_account_key_json`), strict validation command, and the rule that provider
+  tokens/JSON, OIDC client secrets, and LLM API keys must not be stored in `.env`.
+- Extended `npm run release:check` so the credential matrix, Azure no-scope
+  statement, GCP Vault path, strict validation command, and diagram LLM Vault path
+  remain required release evidence.
+
+Verification:
+
+- `npm run release:check` passes with the new provider-credential evidence anchors.
+
+Known remaining gaps:
+
+- This closes a documentation precision gap for production swaps from mock to real
+  catalog providers. It does not add invoice-grade billing exports, private
+  contract pricing, taxes, or actual billed-usage ingestion.
+- Hosted GitHub Actions still fails before repository steps run because no runner is
+  assigned (`runner_id: 0`, empty `steps` array).
 
 ## Phase 2.8AY - FinOps manual proof gate
 
