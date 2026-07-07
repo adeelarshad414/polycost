@@ -112,6 +112,7 @@ async function assertPhaseEvidenceAnchors() {
     'node scripts/clean-clone-demo-check.mjs',
   ]);
   assertScriptIncludes(packageJson, 'test:production-readiness', [
+    'src/api/finops-proof.spec.ts',
     'src/pricing-normalization/pricing-reconciliation.spec.ts',
     'src/api/live-pricing-traceability.spec.ts',
     'src/api/auth-billing.spec.ts',
@@ -137,6 +138,14 @@ async function assertPhaseEvidenceAnchors() {
   await assertFileContains('apps/api/src/pricing-normalization/egress-tier-calculator.spec.ts', [
     ['80TB manual egress regression', 'matches the manual AWS-style tier calculation for 80TB'],
     ['manual 80TB total', '6553.6'],
+  ]);
+
+  await assertFileContains('apps/api/src/api/finops-proof.spec.ts', [
+    ['shared 730-hour proof', 'HOURS_PER_MONTH).toBe(730)'],
+    ['manual 80TB egress proof', 'manualMonthlyCostUsd).toBe(6553.6)'],
+    ['manual commitment break-even proof', 'Math.ceil(600 / (1000 - 850))'],
+    ['reserved terms are distinct', 'not.toBe(reserved3yr?.committedMonthlyUsd)'],
+    ['spot estimate proof', "volatility: 'volatile'"],
   ]);
 
   await assertFileContains('apps/api/src/pricing-normalization/pricing-reconciliation.spec.ts', [

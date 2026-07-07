@@ -90,6 +90,45 @@ say so explicitly rather than marking it done.
 | Phase 2.8AV - Verification timeout hardening            | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AW - Pricing logic coverage gate               | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AX - Locked breakpoint UI proof                | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AY - FinOps manual proof gate                  | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AY - FinOps manual proof gate
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added `apps/api/src/api/finops-proof.spec.ts` as a focused executable proof for
+  the FinOps math called out in the full-verification DoD.
+- The spec verifies the shared `730` hour constant through the production interval
+  helper, the independent manual 80TB egress tier total, commitment break-even math,
+  distinct reserved 1-year vs 3-year recurring rates/break-even months, and spot
+  estimate volatility/approximation flags.
+- Wired the proof spec into `npm run test:production-readiness` and the
+  progress/release readiness gates.
+
+Verification:
+
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/api/finops-proof.spec.ts`
+  passes: `1 suite / 4 tests`.
+- Manual-vs-app FinOps values now proven by the focused spec:
+  - 730-hour month: hourly `$2` -> monthly `$1460`, quarterly `$4380`, yearly
+    `$17520`.
+  - 80TB egress: `10240*0.09 + 40960*0.085 + 30720*0.07 = $6553.60/mo`, matching
+    `calculateEgressCost`.
+  - Reserved 1-year break-even: `ceil(600 / (1000 - 850)) = 4` months.
+  - Reserved 3-year break-even: `ceil(2400 / (1000 - 700)) = 8` months.
+  - Reserved 1-year and 3-year recurring rates differ; spot remains estimated and
+    volatile in the comparison evidence fixture.
+
+Known remaining gaps:
+
+- This strengthens the FinOps math DoD with executable proof. It does not change the
+  product's honest catalog-list-price scope into invoice-grade billing, private
+  discounts, taxes, or actual account spend reconciliation.
+- Hosted GitHub Actions still fails before repository steps run because no runner is
+  assigned (`runner_id: 0`, empty `steps` array).
 
 ## Phase 2.8AX - Locked breakpoint UI proof
 

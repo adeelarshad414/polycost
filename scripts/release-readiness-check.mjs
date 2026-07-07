@@ -59,6 +59,7 @@ if (!packageJson.scripts?.check?.includes('npm run progress:verify')) {
 }
 
 assertScriptIncludes('test:production-readiness', [
+  'src/api/finops-proof.spec.ts',
   'src/pricing-normalization/pricing-reconciliation.spec.ts',
   'src/api/live-pricing-traceability.spec.ts',
   'src/api/auth-billing.spec.ts',
@@ -162,6 +163,13 @@ await assertFileContains('apps/api/src/pricing-normalization/pricing-reconciliat
   ['20-rate reconciliation floor', 'at least 20 distinct'],
   ['complete lineage assertion', 'expectCompleteLineage'],
   ['provider breadth coverage', 'covers mainstream %s compute families'],
+]);
+
+await assertFileContains('apps/api/src/api/finops-proof.spec.ts', [
+  ['shared 730-hour proof', 'HOURS_PER_MONTH).toBe(730)'],
+  ['manual egress proof', 'manualMonthlyCostUsd).toBe(6553.6)'],
+  ['manual break-even proof', 'Math.ceil(600 / (1000 - 850))'],
+  ['spot estimate proof', "volatility: 'volatile'"],
 ]);
 
 await assertFileContains('apps/api/src/api/auth-billing.spec.ts', [
