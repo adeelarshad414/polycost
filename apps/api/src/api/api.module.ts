@@ -15,6 +15,8 @@ import { PricingMatrixService } from '../pricing-models/pricing-matrix.service';
 import { ReportModule } from '../reports/report.module';
 import { ReportService } from '../reports/report.service';
 import { SecretsService } from '../secrets/secrets.service';
+import { TerraformGenerationController } from '../terraform/terraform-generation.controller';
+import { TerraformGenerationService } from '../terraform/terraform-generation.service';
 import { AdminApiKeyGuard } from './admin-api-key.guard';
 import { ApiDatabaseRepository } from './api-database.repository';
 import { ApiExceptionFilter } from './api-exception.filter';
@@ -69,9 +71,11 @@ import { WorkloadController } from './workload.controller';
     ExchangeRatesController,
     AuthController,
     BillingController,
+    TerraformGenerationController,
   ],
   providers: [
     SecretsService,
+    TerraformGenerationService,
     {
       provide: ApiDatabaseRepository,
       inject: [ConfigService, SecretsService],

@@ -14,22 +14,23 @@ cloud, LLM, SSO, or billing inputs.
 
 ## Findings And Disposition
 
-| ID             | Disposition   | Evidence                                                                                                                                                             |
-| -------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P0-FMT-001     | Fixed         | `npm run check` initially failed on unformatted orchestrator docs; after formatting, `npm run format:check` and `npm run check` passed                               |
-| P0-DOC-001     | Fixed         | Orchestrator docs moved from `docs/orchestrators/*` to requested `docs/design/*`                                                                                     |
-| P0-SYNC-001    | Fixed         | `STATE-SYNC.md` created with product detection, CI state, phase classification, and gate register                                                                    |
-| P0-INV-001     | Fixed         | `THEME-INVENTORY.md` created with route/component inventory and P0 findings                                                                                          |
-| TKN-001        | Fixed         | Token hex values isolated to `apps/web/src/styles/tokens.css`; `npm run theme:hex:check` passed                                                                      |
-| TKN-002        | Fixed         | Added persisted `data-accent="default                                                                                                                                | terracotta"` axis, pre-hydration application, and Appearance control |
-| TKN-003        | Fixed         | Added `theme:hex:check` script and CI workflow gate                                                                                                                  |
-| API-HEALTH-001 | Fixed         | Added additive `/health/live`, `/api/v1/health/live`, `/health/ready`, and `/api/v1/health/ready` endpoints                                                          |
-| UI-ARCHIVE-001 | Fixed (smoke) | `docs/theme-audit/2026-07-07/` contains dark/light default screenshots and dark/light terracotta screenshots with token evidence                                     |
-| CI-REMOTE-001  | Blocked       | GitHub Actions job `85608851518` for prior head showed `runner_id: 0`, empty runner name/group, `steps: []`; remote runner/account infra is not executing repo steps |
-| INV-TRACE-002  | Improved      | Provider-export rows now persist `_polycost` source fingerprints/column coverage; reconciliation evidence reports coverage, match summary, readiness, and caveats    |
-| VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                          |
-| LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode     |
-| UI-AUTH-002    | Improved      | Workspace billing panel now surfaces reconciliation readiness, source-fingerprint coverage, SKU match coverage, and the invoice-of-record caveat                     |
+| ID             | Disposition   | Evidence                                                                                                                                                                            |
+| -------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0-FMT-001     | Fixed         | `npm run check` initially failed on unformatted orchestrator docs; after formatting, `npm run format:check` and `npm run check` passed                                              |
+| P0-DOC-001     | Fixed         | Orchestrator docs moved from `docs/orchestrators/*` to requested `docs/design/*`                                                                                                    |
+| P0-SYNC-001    | Fixed         | `STATE-SYNC.md` created with product detection, CI state, phase classification, and gate register                                                                                   |
+| P0-INV-001     | Fixed         | `THEME-INVENTORY.md` created with route/component inventory and P0 findings                                                                                                         |
+| TKN-001        | Fixed         | Token hex values isolated to `apps/web/src/styles/tokens.css`; `npm run theme:hex:check` passed                                                                                     |
+| TKN-002        | Fixed         | Added persisted `data-accent="default                                                                                                                                               | terracotta"` axis, pre-hydration application, and Appearance control |
+| TKN-003        | Fixed         | Added `theme:hex:check` script and CI workflow gate                                                                                                                                 |
+| API-HEALTH-001 | Fixed         | Added additive `/health/live`, `/api/v1/health/live`, `/health/ready`, and `/api/v1/health/ready` endpoints                                                                         |
+| UI-ARCHIVE-001 | Fixed (smoke) | `docs/theme-audit/2026-07-07/` contains dark/light default screenshots and dark/light terracotta screenshots with token evidence                                                    |
+| CI-REMOTE-001  | Blocked       | GitHub Actions job `85608851518` for prior head showed `runner_id: 0`, empty runner name/group, `steps: []`; remote runner/account infra is not executing repo steps                |
+| INV-TRACE-002  | Improved      | Provider-export rows now persist `_polycost` source fingerprints/column coverage; reconciliation evidence reports coverage, match summary, readiness, and caveats                   |
+| VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                         |
+| LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                    |
+| UI-AUTH-002    | Improved      | Workspace billing panel now surfaces reconciliation readiness, source-fingerprint coverage, SKU match coverage, and the invoice-of-record caveat                                    |
+| TF-GEN-001     | Added         | V3 Terraform generation endpoint and UI panel now generate AWS/Azure/GCP starter bundles from NWS with provider pinning, remote-state examples, static checks, and explicit caveats |
 
 ## Verification
 
@@ -47,8 +48,8 @@ Local static/regression gates:
   - Security suppression check: 21 reviewed suppressions.
   - `impeccable` skipped by documented Node 20 vs Node 24 constraint.
 - `npm run test:production-readiness` passed.
-  - API focused: 9 suites / 125 tests.
-  - Web focused: 2 suites / 82 tests.
+  - API focused: 10 suites / 133 tests.
+  - Web focused: 2 suites / 84 tests.
 - `npm run ci:build` passed for API and web.
 - Phase 2.9 focused continuation passed:
   - API focused: `src/api/auth-billing.spec.ts`,
@@ -61,6 +62,19 @@ Local static/regression gates:
   - Graph validation, pricing coverage, progress verification, QA/security
     suppression, database, DevOps, cloud, release, and provider credential gates
     passed.
+- Phase V3 Terraform generation focused checks passed:
+  - API focused: `src/terraform/terraform-generation.service.spec.ts` and
+    `src/api/api-contract.spec.ts`: 2 suites / 40 tests.
+  - Web focused: `src/api-client.spec.ts` and `src/App.spec.tsx`: 2 suites /
+    84 tests.
+- Phase V3 full regression floor passed with `npm run check`:
+  - API unit: 51 suites / 398 tests.
+  - Web unit: 9 suites / 132 tests.
+  - Graph validation, pricing coverage, progress verification, QA/security
+    suppression, database, DevOps, cloud, release, and provider credential gates
+    passed.
+- `npm run ci:build` passed for API and web; Vite reported the existing
+  `%VITE_API_BASE_URL%` placeholder and large-chunk warnings.
 
 Full-stack evidence:
 
@@ -123,6 +137,11 @@ Machine-readable token evidence:
   surface so stub/unconfigured mode is not reported as production-connected.
 - Full enterprise auth product polish remains future scope: production email, SSO/SAML,
   org billing UX, and complete team/account lifecycle polish.
+- Terraform generation is now available as a starter bundle flow, but full
+  production IaC remains future scope: module libraries, landing-zone integration,
+  private networking, IAM least-privilege policies, policy-as-code gates, and real
+  `terraform init/validate/plan` execution with provider credentials are not run by
+  PolyCost request handling.
 
 ## Rollback
 
