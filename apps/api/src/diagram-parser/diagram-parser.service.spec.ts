@@ -279,6 +279,67 @@ describe('DiagramParserService', () => {
     expect(component?.evidence).toContain('container 99');
   });
 
+  it('uses VSDX page names and container labels as review and region evidence', async () => {
+    const parsed = await service().parse({
+      content: zipWithStoredEntries([
+        {
+          path: 'visio/pages/pages.xml',
+          content: `
+            <Pages>
+              <Page ID="0" Name="Application us-east-1">
+                <Rel r:id="rId1"/>
+              </Page>
+            </Pages>
+          `,
+        },
+        {
+          path: 'visio/pages/_rels/pages.xml.rels',
+          content: `
+            <Relationships>
+              <Relationship Id="rId1" Target="page1.xml"/>
+            </Relationships>
+          `,
+        },
+        {
+          path: 'visio/masters/master1.xml',
+          content: `
+            <Master ID="1" NameU="AWS19.EC2">
+              <Shapes><Shape ID="100" NameU="AWS19.EC2"><Text>EC2 master</Text></Shape></Shapes>
+            </Master>
+          `,
+        },
+        {
+          path: 'visio/pages/page1.xml',
+          content: `
+            <PageContents>
+              <Shapes>
+                <Shape ID="99" NameU="Container"><Text>Production VPC us-east-1</Text></Shape>
+                <Shape ID="10" Master="1" Parent="99"><Text>web tier</Text></Shape>
+              </Shapes>
+            </PageContents>
+          `,
+        },
+      ]).toString('base64'),
+      encoding: 'base64',
+      fileName: 'named-container.vsdx',
+    });
+
+    const component = parsed.review.components.find((item) => item.nodeId === '10');
+    const graphNode = parsed.graph.nodes.find((node) => node.id === '10');
+
+    expect(graphNode?.visual).toEqual(
+      expect.objectContaining({
+        pageName: 'Application us-east-1',
+        containerId: '99',
+        containerLabel: 'Production VPC us-east-1',
+      }),
+    );
+    expect(component?.evidence).toContain('Visio page Application us-east-1');
+    expect(component?.evidence).toContain('container 99 (Production VPC us-east-1)');
+    expect(parsed.draftNws.workload.region.preference).toBe('us-east-1');
+    expect(parsed.draftNws.workload.region.isDefault).toBe(false);
+  });
+
   it('keeps valid VSDX pages and reports page-level warnings for corrupt pages', async () => {
     const parsed = await service().parse({
       content: zipWithStoredEntries([

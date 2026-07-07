@@ -373,7 +373,14 @@ function classificationEvidence(reason: string, node: ExtractedDiagramNode): str
       ? `Visio master ${sanitizeDisplayText(visual.masterName, 'master')}`
       : undefined,
     visual.containerId
-      ? `container ${sanitizeDisplayText(visual.containerId, 'container')}`
+      ? [
+          `container ${sanitizeDisplayText(visual.containerId, 'container')}`,
+          visual.containerLabel
+            ? `(${sanitizeDisplayText(visual.containerLabel, 'container')})`
+            : undefined,
+        ]
+          .filter((value): value is string => Boolean(value))
+          .join(' ')
       : undefined,
   ].filter((value): value is string => Boolean(value));
 
@@ -455,10 +462,19 @@ function regionPreferenceFromNodes(nodes: ClassifiedDiagramNode[]): string | und
   ];
 
   for (const node of nodes) {
+    const searchableLabels = [
+      node.displayLabel,
+      node.visual?.containerLabel,
+      node.visual?.pageName,
+      node.visual?.masterName,
+    ].filter((value): value is string => Boolean(value));
+
     for (const pattern of regionPatterns) {
-      const match = node.displayLabel.match(pattern);
-      if (match?.[0]) {
-        return match[0].toLowerCase();
+      for (const label of searchableLabels) {
+        const match = label.match(pattern);
+        if (match?.[0]) {
+          return match[0].toLowerCase();
+        }
       }
     }
   }

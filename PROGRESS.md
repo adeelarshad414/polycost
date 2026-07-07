@@ -68,6 +68,33 @@ say so explicitly rather than marking it done.
 | Phase 2.8Z - Diagram fixture corpus tier table         | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AA - UI-priced SKU evidence guard             | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AB - GCP pricing credential fallback          | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AC - VSDX page/container evidence             | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AC - VSDX page/container evidence
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+- Hardened VSDX extraction by reading `visio/pages/pages.xml` plus
+  `visio/pages/_rels/pages.xml.rels` so review evidence can show real Visio page
+  names instead of only path-derived `Page N` labels.
+- Resolved same-page container labels from VSDX shapes and carried them through graph
+  metadata and review evidence, e.g. `container 99 (Production VPC us-east-1)`.
+- Extended diagram-derived region inference to consider node labels, Visio page names,
+  container labels, and master names, so a resource inside a named regional container/page can
+  set the NWS region preference without requiring the resource label itself to repeat the
+  region.
+- Verification evidence in this continuation:
+  - Focused diagram parser spec passed: 25 tests, including the new page/container
+    evidence and region-hint regression.
+  - Production-readiness gate passed: API 6 suites / 87 tests and web 2 suites / 82 tests.
+  - `npm run ci:lint` passed with no ESLint security warnings.
+  - `npm run security:audit` passed the high-severity gate; npm still reports the known low
+    `@ai-sdk/provider-utils` advisory chain with no safe fix available.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this improves VSDX metadata extraction and review evidence, but
+  PolyCost still does not render full Visio visuals; VSDX support remains structured
+  extraction rather than pixel-perfect visual rendering.
 
 ## Phase 2.8AB - GCP pricing credential fallback
 

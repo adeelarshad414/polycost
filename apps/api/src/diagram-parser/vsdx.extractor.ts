@@ -16,6 +16,11 @@ export class VsdxExtractor implements DiagramExtractor {
 
   extract(input: DecodedDiagramInput): ExtractedDiagram {
     const entries = readZipEntries(input.buffer, /^visio\/pages\/page\d+\.xml$/i);
+    const pageMetadata = extractPageMetadata(
+      readZipEntries(input.buffer, /^visio\/pages\/pages\.xml$/i),
+      readZipEntries(input.buffer, /^visio\/pages\/_rels\/pages\.xml\.rels$/i),
+      entries.map((entry) => entry.path),
+    );
     const masters = extractMasters(
       readZipEntries(input.buffer, /^visio\/masters\/master\d+\.xml$/i),
     );
@@ -30,7 +35,7 @@ export class VsdxExtractor implements DiagramExtractor {
       try {
         assertPageXmlParseable(xml, entry.path);
 
-        for (const node of extractShapes(xml, entry.path, masters)) {
+        for (const node of extractShapes(xml, entry.path, masters, pageMetadata.get(entry.path))) {
           nodes.set(node.id, node);
         }
 
@@ -53,6 +58,77 @@ interface VsdxMasterMetadata {
   id: string;
   name?: string;
   label?: string;
+}
+
+interface VsdxPageMetadata {
+  id?: string;
+  name?: string;
+}
+
+function extractPageMetadata(
+  pageEntries: Array<{ path: string; content: Buffer }>,
+  relationshipEntries: Array<{ path: string; content: Buffer }>,
+  pagePaths: string[],
+): Map<string, VsdxPageMetadata> {
+  const metadata = new Map<string, VsdxPageMetadata>();
+  const pageXml = pageEntries[0]?.content.toString('utf8');
+
+  if (!pageXml) {
+    return metadata;
+  }
+
+  assertXmlSafe(pageXml);
+  const relationshipMap = extractPageRelationships(relationshipEntries);
+  const orderedPagePathQueue = [...pagePaths].sort(comparePagePaths);
+  const pagePattern = /<Page\b([^>]*)>([\s\S]*?)<\/Page>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = pagePattern.exec(pageXml))) {
+    const attributes = parseXmlAttributes(match[1]);
+    const id = attributes.ID ?? attributes.Id ?? attributes.id;
+    const relId = match[2].match(/\b(?:r:id|Id)="([^"]+)"/i)?.[1];
+    const path =
+      (relId ? relationshipMap.get(relId) : undefined) ??
+      orderedPagePathQueue.shift() ??
+      (id !== undefined ? `visio/pages/page${Number.parseInt(id, 10) + 1}.xml` : undefined);
+    const name = attributes.Name ?? attributes.NameU ?? attributes.name ?? attributes.nameU;
+
+    if (path) {
+      metadata.set(path, {
+        ...(id ? { id } : {}),
+        ...(name ? { name: sanitizeDisplayText(name, pageNameFromPath(path)) } : {}),
+      });
+    }
+  }
+
+  return metadata;
+}
+
+function extractPageRelationships(
+  entries: Array<{ path: string; content: Buffer }>,
+): Map<string, string> {
+  const relationships = new Map<string, string>();
+  const xml = entries[0]?.content.toString('utf8');
+
+  if (!xml) {
+    return relationships;
+  }
+
+  assertXmlSafe(xml);
+  const relationshipPattern = /<Relationship\b([^>]*)\/?>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = relationshipPattern.exec(xml))) {
+    const attributes = parseXmlAttributes(match[1]);
+    const id = attributes.Id ?? attributes.ID ?? attributes.id;
+    const target = attributes.Target ?? attributes.target;
+
+    if (id && target) {
+      relationships.set(id, normalizePageTarget(target));
+    }
+  }
+
+  return relationships;
 }
 
 function extractMasters(
@@ -90,10 +166,11 @@ function extractShapes(
   xml: string,
   path: string,
   masters: Map<string, VsdxMasterMetadata>,
+  pageMetadata: VsdxPageMetadata | undefined,
 ): ExtractedDiagramNode[] {
   const nodes: ExtractedDiagramNode[] = [];
   const shapePattern = /<Shape\b([^>]*)>([\s\S]*?)<\/Shape>/gi;
-  const pageName = pageNameFromPath(path);
+  const pageName = pageMetadata?.name ?? pageNameFromPath(path);
   let match: RegExpExecArray | null;
 
   while ((match = shapePattern.exec(xml))) {
@@ -136,7 +213,29 @@ function extractShapes(
     });
   }
 
-  return nodes;
+  return withContainerLabels(nodes);
+}
+
+function withContainerLabels(nodes: ExtractedDiagramNode[]): ExtractedDiagramNode[] {
+  const labelsById = new Map(nodes.map((node) => [node.id, node.rawLabel]));
+
+  return nodes.map((node) => {
+    const containerId = node.visual?.containerId;
+    const containerLabel =
+      containerId && containerId !== node.id ? labelsById.get(containerId) : undefined;
+
+    if (!containerLabel || !node.visual) {
+      return node;
+    }
+
+    return {
+      ...node,
+      visual: {
+        ...node.visual,
+        containerLabel,
+      },
+    };
+  });
 }
 
 function extractCells(shapeXml: string): Map<string, string> {
@@ -231,6 +330,28 @@ function pageNameFromPath(path: string): string {
 
 function pageIdFromPath(path: string): string {
   return `page${path.match(/page(\d+)\.xml$/i)?.[1] ?? 'unknown'}`;
+}
+
+function comparePagePaths(left: string, right: string): number {
+  return pageNumberFromPath(left) - pageNumberFromPath(right);
+}
+
+function pageNumberFromPath(path: string): number {
+  return Number.parseInt(path.match(/page(\d+)\.xml$/i)?.[1] ?? '999999', 10);
+}
+
+function normalizePageTarget(target: string): string {
+  const normalized = target.replace(/^\/+/, '').replace(/^\.?\//, '');
+
+  if (normalized.startsWith('visio/pages/')) {
+    return normalized;
+  }
+
+  if (normalized.startsWith('pages/')) {
+    return `visio/${normalized}`;
+  }
+
+  return `visio/pages/${normalized.replace(/^.*\//, '')}`;
 }
 
 function assertPageXmlParseable(xml: string, path: string): void {

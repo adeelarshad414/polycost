@@ -95,6 +95,7 @@ export interface DiagramNodeVisualMetadata {
   masterId?: string;
   masterName?: string;
   containerId?: string;
+  containerLabel?: string;
   fillColor?: string;
   lineColor?: string;
 }
