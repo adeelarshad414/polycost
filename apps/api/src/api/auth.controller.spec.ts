@@ -1,6 +1,8 @@
+import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AuthIdentity, RequestWithAuth } from './auth.types';
+import { SessionAuthGuard } from './session-auth.guard';
 
 describe('AuthController', () => {
   const identity: AuthIdentity = {
@@ -107,7 +109,51 @@ describe('AuthController', () => {
       },
     );
   });
+
+  it('keeps workspace account/team endpoints behind the session guard', () => {
+    const protectedHandlers = [
+      AuthController.prototype.me,
+      AuthController.prototype.logout,
+      AuthController.prototype.updateProfile,
+      AuthController.prototype.changePassword,
+      AuthController.prototype.deleteAccount,
+      AuthController.prototype.listSessions,
+      AuthController.prototype.revokeOtherSessions,
+      AuthController.prototype.createTeam,
+      AuthController.prototype.updateTeamSettings,
+      AuthController.prototype.listTeamMembers,
+      AuthController.prototype.updateTeamMemberRole,
+      AuthController.prototype.removeTeamMember,
+      AuthController.prototype.inviteTeamMember,
+      AuthController.prototype.listTeamInvitations,
+      AuthController.prototype.revokeTeamInvitation,
+      AuthController.prototype.acceptInvitation,
+      AuthController.prototype.ssoStatus,
+      AuthController.prototype.configureSsoProvider,
+      AuthController.prototype.testSsoConnection,
+    ];
+    const anonymousHandlers = [
+      AuthController.prototype.register,
+      AuthController.prototype.login,
+      AuthController.prototype.previewInvitation,
+      AuthController.prototype.startMockOidcLogin,
+      AuthController.prototype.mockOidcAuthorize,
+      AuthController.prototype.completeMockOidcCallback,
+    ];
+
+    for (const handler of protectedHandlers) {
+      expect(guardMetadataFor(handler)).toContain(SessionAuthGuard);
+    }
+
+    for (const handler of anonymousHandlers) {
+      expect(guardMetadataFor(handler)).not.toContain(SessionAuthGuard);
+    }
+  });
 });
+
+function guardMetadataFor(handler: (...args: never[]) => unknown): unknown[] {
+  return Reflect.getMetadata(GUARDS_METADATA, handler) ?? [];
+}
 
 function createAuthServiceMock(): AuthService {
   return {

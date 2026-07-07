@@ -69,6 +69,32 @@ say so explicitly rather than marking it done.
 | Phase 2.8AA - UI-priced SKU evidence guard             | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AB - GCP pricing credential fallback          | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AC - VSDX page/container evidence             | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AD - Auth controller guard coverage           | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AD - Auth controller guard coverage
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+- Added an API-layer regression in `auth.controller.spec.ts` that asserts every
+  workspace account/team/session/invite/SSO administration endpoint remains protected by
+  `SessionAuthGuard`.
+- The same guard test asserts intentionally anonymous entry points remain open:
+  register, login, invite preview, mock OIDC start/authorize, and OIDC callback. This
+  protects the additive-auth contract: anonymous comparison flows stay frictionless while
+  privileged workspace actions require a session.
+- Extended `npm run test:production-readiness` to include the auth controller guard
+  coverage alongside the existing service-level RBAC matrix and web RBAC visibility tests.
+- Verification evidence in this continuation:
+  - Focused auth controller spec passed: 3 tests.
+  - Production-readiness gate passed: API 7 suites / 90 tests and web 2 suites / 82 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run security:audit` passed the high-severity gate; npm still reports the known low
+    `@ai-sdk/provider-utils` advisory chain with no safe fix available.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this strengthens API guard proof, but full enterprise SSO
+  login with a real external IdP, email delivery, hosted org billing plans, and complete
+  account/team administration product polish remain future work.
 
 ## Phase 2.8AC - VSDX page/container evidence
 
