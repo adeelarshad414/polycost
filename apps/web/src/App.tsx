@@ -1942,6 +1942,9 @@ function WorkspaceControlCenter({
   const ownerCount = members.filter((member) => member.role === 'owner').length;
   const sourceType = sourceTypeForProvider(provider);
   const sessionStatus = session ? workspaceSessionStatus(session.session.expiresAt) : null;
+  const reconciliationSummary = reconciliation
+    ? reconciliationEvidenceSummary(reconciliation)
+    : null;
 
   useEffect(() => {
     if (!landingInviteToken) {
@@ -3253,6 +3256,16 @@ function WorkspaceControlCenter({
                     )} variance`
                   : 'Run a comparison to attach estimate-vs-actual evidence'}
               </small>
+              {reconciliationSummary ? (
+                <div className="workspace-reconciliation-audit">
+                  <span>{reconciliationSummary.readiness}</span>
+                  <small>
+                    {reconciliationSummary.sourceFingerprintPercent}% source fingerprinted ·{' '}
+                    {reconciliationSummary.skuMatchPercent}% SKU matched
+                  </small>
+                  <small>{reconciliationSummary.primaryCaveat}</small>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </form>
@@ -5194,6 +5207,9 @@ function DiagramReviewPanel({
   onAddRequirement: (serviceType: string) => void;
 }) {
   const layoutPreview = diagramLayoutPreview(result.graph.nodes, result.graph.edges);
+  const renderingCaveat = result.graph.nodes
+    .map((node) => node.visual?.renderingWarnings?.[0])
+    .find((warning): warning is string => Boolean(warning));
 
   return (
     <section className="diagram-review-panel" aria-label="Diagram parse review">
@@ -5204,6 +5220,7 @@ function DiagramReviewPanel({
           {result.review.components.length} services · {result.graph.edges.length} links ·{' '}
           {result.review.unresolvedClassifications.length} unresolved
         </small>
+        {renderingCaveat ? <small>{renderingCaveat}</small> : null}
       </div>
       <div
         className={`diagram-preview-pane${layoutPreview ? ' diagram-preview-pane-layout' : ''}`}
@@ -18554,6 +18571,50 @@ function sourceTypeForProvider(provider: ProviderId): BillingSourceType {
     case 'gcp':
       return 'gcp-billing-export';
   }
+}
+
+function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
+  readiness: string;
+  sourceFingerprintPercent: number;
+  skuMatchPercent: number;
+  primaryCaveat: string;
+} {
+  const evidence = record.evidence;
+  const coverage = objectValue(evidence.invoiceCoverage);
+  const matchSummary = objectValue(evidence.invoiceMatchSummary);
+  const caveats = stringArrayValue(matchSummary.caveats);
+  const readiness =
+    stringValue(matchSummary.readiness) ??
+    (record.status === 'matched' ? 'reconciled-evidence-ready' : 'reconciliation-foundation');
+
+  return {
+    readiness: readiness.replace(/-/g, ' '),
+    sourceFingerprintPercent: numberValue(coverage.sourceFingerprintPercent),
+    skuMatchPercent: numberValue(coverage.skuMatchPercent),
+    primaryCaveat:
+      caveats[0] ??
+      'Estimate-vs-actual evidence is available, but invoice-grade billing remains a separate provider-led control.',
+  };
+}
+
+function objectValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function stringArrayValue(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string' && Boolean(item.trim()))
+    : [];
+}
+
+function numberValue(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
 function providerExportSample(provider: ProviderId): string {

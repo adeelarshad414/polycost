@@ -896,6 +896,19 @@ describe('BillingService', () => {
             tags: {
               cost_center: 'engineering',
             },
+            rawPayload: expect.objectContaining({
+              _polycost: expect.objectContaining({
+                provider: 'aws',
+                sourceRowFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+                recognizedColumns: expect.arrayContaining([
+                  'lineItem/NetUnblendedCost',
+                  'lineItem/ProductCode',
+                  'product/sku',
+                ]),
+                missingRecommendedFields: ['usageEnd'],
+                normalizationStatus: 'partial-provider-export',
+              }),
+            }),
           }),
         ],
       }),
@@ -929,10 +942,19 @@ describe('BillingService', () => {
         billingPeriodEnd: '2026-06-30',
         serviceName: 'AmazonEC2',
         skuId: 'sku-compute',
+        region: 'us-east-1',
+        resourceId: 'i-demo',
+        usageStart: '2026-06-01T00:00:00.000Z',
+        usageEnd: '2026-06-30T23:59:59.000Z',
         costUsd: 107,
         currency: 'USD',
         tags: {},
-        rawPayload: {},
+        rawPayload: {
+          _polycost: {
+            sourceRowFingerprint: 'c'.repeat(64),
+            missingRecommendedFields: [],
+          },
+        },
         lineItemHash: 'b'.repeat(64),
         createdAt: '2026-07-06T00:00:01.000Z',
       },
@@ -964,6 +986,22 @@ describe('BillingService', () => {
       status: 'variance-warning',
       evidence: expect.objectContaining({
         invoiceLineItemHashes: ['b'.repeat(64)],
+        invoiceSourceRowFingerprints: ['c'.repeat(64)],
+        invoiceCoverage: expect.objectContaining({
+          rowCount: 1,
+          rowsWithSkuId: 1,
+          rowsWithRegion: 1,
+          rowsWithResourceId: 1,
+          rowsWithUsageWindow: 1,
+          rowsWithSourceFingerprint: 1,
+          sourceFingerprintPercent: 100,
+        }),
+        invoiceMatchSummary: expect.objectContaining({
+          readiness: 'audit-ready-with-caveats',
+          caveats: [
+            'Reconciliation compares provider-export actuals with PolyCost estimate evidence; it is not an invoice-of-record.',
+          ],
+        }),
         comparisonTraceKeys: expect.any(Array),
       }),
     });

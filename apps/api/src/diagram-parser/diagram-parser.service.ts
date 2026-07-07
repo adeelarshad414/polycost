@@ -369,6 +369,9 @@ function classificationEvidence(reason: string, node: ExtractedDiagramNode): str
 
   const visualEvidence = [
     visual.pageName ? `Visio page ${sanitizeDisplayText(visual.pageName, 'page')}` : undefined,
+    visual.pageWidth && visual.pageHeight
+      ? `Visio page size w=${visual.pageWidth} h=${visual.pageHeight}`
+      : undefined,
     visual.masterName
       ? `Visio master ${sanitizeDisplayText(visual.masterName, 'master')}`
       : undefined,
@@ -385,6 +388,10 @@ function classificationEvidence(reason: string, node: ExtractedDiagramNode): str
     node.bounds
       ? `Visio bounds x=${node.bounds.x} y=${node.bounds.y} w=${node.bounds.width} h=${node.bounds.height}`
       : undefined,
+    visual.normalizedBounds
+      ? `Visio preview box x=${visual.normalizedBounds.x}% y=${visual.normalizedBounds.y}% w=${visual.normalizedBounds.width}% h=${visual.normalizedBounds.height}%`
+      : undefined,
+    visual.geometryHint ? `Visio geometry ${visual.geometryHint}` : undefined,
     visual.fillColor || visual.lineColor
       ? [
           'Visio style',
@@ -393,6 +400,11 @@ function classificationEvidence(reason: string, node: ExtractedDiagramNode): str
         ]
           .filter((value): value is string => Boolean(value))
           .join(' ')
+      : undefined,
+    visual.renderingMode
+      ? `Visio rendering ${visual.renderingMode}; ${
+          visual.renderingWarnings?.[0] ?? 'not full Visio visual rendering'
+        }`
       : undefined,
   ].filter((value): value is string => Boolean(value));
 

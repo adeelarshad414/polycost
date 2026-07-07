@@ -25,6 +25,48 @@ const SOURCE_TYPES: BillingSourceType[] = [
   'normalized-csv',
 ];
 
+const AWS_CUR_COLUMNS = {
+  serviceName: ['lineItem/ProductCode', 'product/ProductName', 'product/productName'],
+  skuId: ['product/sku', 'pricing/RateId', 'lineItem/UsageType'],
+  region: ['product/region', 'product/regionCode', 'lineItem/AvailabilityZone'],
+  resourceId: ['lineItem/ResourceId'],
+  usageStart: ['lineItem/UsageStartDate'],
+  usageEnd: ['lineItem/UsageEndDate'],
+  usageQuantity: ['lineItem/UsageAmount'],
+  usageUnit: ['pricing/unit', 'lineItem/UsageType'],
+  costUsd: ['lineItem/NetUnblendedCost', 'lineItem/UnblendedCost', 'lineItem/BlendedCost'],
+  currency: ['lineItem/CurrencyCode', 'bill/BillingCurrencyCode'],
+} as const;
+
+const AZURE_COST_COLUMNS = {
+  serviceName: ['ServiceName', 'serviceName', 'ConsumedService', 'consumedService'],
+  skuId: ['MeterId', 'meterId', 'ProductId', 'productId'],
+  region: ['ResourceLocation', 'resourceLocation', 'Region', 'region'],
+  resourceId: ['ResourceId', 'resourceId', 'InstanceId', 'instanceId'],
+  usageStart: ['UsageDateTime', 'usageDateTime', 'Date', 'date'],
+  usageEnd: ['UsageEndDate', 'usageEndDate'],
+  usageQuantity: ['Quantity', 'quantity'],
+  usageUnit: ['UnitOfMeasure', 'unitOfMeasure', 'Unit', 'unit'],
+  costUsd: ['CostInUSD', 'costInUSD', 'CostUSD', 'costUSD'],
+  fallbackCost: ['CostInBillingCurrency', 'costInBillingCurrency', 'PreTaxCost', 'pretaxCost'],
+  currency: ['BillingCurrencyCode', 'billingCurrencyCode', 'Currency', 'currency'],
+} as const;
+
+const GCP_BILLING_COLUMNS = {
+  serviceName: ['service.description', 'service_description', 'service.id', 'service_id'],
+  skuId: ['sku.id', 'sku_id', 'sku.description', 'sku_description'],
+  region: ['location.region', 'location_region', 'region'],
+  resourceId: ['resource.name', 'resource_name', 'project.id', 'project_id'],
+  usageStart: ['usage_start_time', 'usage.start_time', 'usageStartTime'],
+  usageEnd: ['usage_end_time', 'usage.end_time', 'usageEndTime'],
+  usageQuantity: ['usage.amount', 'usage_amount'],
+  usageUnit: ['usage.unit', 'usage_unit'],
+  costUsd: ['cost'],
+  currency: ['currency'],
+} as const;
+
+type ProviderExportColumnMap = Record<string, readonly string[]>;
+
 @Injectable()
 export class BillingService {
   constructor(private readonly repository: ApiDatabaseRepository) {}
@@ -299,22 +341,17 @@ function awsCurRow(row: Record<string, unknown>, index: number): BillingImportRo
     row,
     index,
     provider: 'aws',
-    serviceName:
-      firstString(row, ['lineItem/ProductCode', 'product/ProductName', 'product/productName']) ??
-      'AWS usage',
-    skuId: firstString(row, ['product/sku', 'pricing/RateId', 'lineItem/UsageType']),
-    region: firstString(row, ['product/region', 'product/regionCode', 'lineItem/AvailabilityZone']),
-    resourceId: firstString(row, ['lineItem/ResourceId']),
-    usageStart: firstIso(row, ['lineItem/UsageStartDate']),
-    usageEnd: firstIso(row, ['lineItem/UsageEndDate']),
-    usageQuantity: firstNumber(row, ['lineItem/UsageAmount']),
-    usageUnit: firstString(row, ['pricing/unit', 'lineItem/UsageType']),
-    costUsd: firstNumber(row, [
-      'lineItem/NetUnblendedCost',
-      'lineItem/UnblendedCost',
-      'lineItem/BlendedCost',
-    ]),
-    currency: firstString(row, ['lineItem/CurrencyCode', 'bill/BillingCurrencyCode']),
+    columnMap: AWS_CUR_COLUMNS,
+    serviceName: firstString(row, AWS_CUR_COLUMNS.serviceName) ?? 'AWS usage',
+    skuId: firstString(row, AWS_CUR_COLUMNS.skuId),
+    region: firstString(row, AWS_CUR_COLUMNS.region),
+    resourceId: firstString(row, AWS_CUR_COLUMNS.resourceId),
+    usageStart: firstIso(row, AWS_CUR_COLUMNS.usageStart),
+    usageEnd: firstIso(row, AWS_CUR_COLUMNS.usageEnd),
+    usageQuantity: firstNumber(row, AWS_CUR_COLUMNS.usageQuantity),
+    usageUnit: firstString(row, AWS_CUR_COLUMNS.usageUnit),
+    costUsd: firstNumber(row, AWS_CUR_COLUMNS.costUsd),
+    currency: firstString(row, AWS_CUR_COLUMNS.currency),
     tags: prefixedTags(row, ['resourceTags/user:', 'resourceTags/aws:']),
   });
 }
@@ -324,29 +361,18 @@ function azureCostRow(row: Record<string, unknown>, index: number): BillingImpor
     row,
     index,
     provider: 'azure',
-    serviceName:
-      firstString(row, ['ServiceName', 'serviceName', 'ConsumedService', 'consumedService']) ??
-      'Azure usage',
-    skuId: firstString(row, ['MeterId', 'meterId', 'ProductId', 'productId']),
-    region: firstString(row, ['ResourceLocation', 'resourceLocation', 'Region', 'region']),
-    resourceId: firstString(row, ['ResourceId', 'resourceId', 'InstanceId', 'instanceId']),
-    usageStart: firstIso(row, ['UsageDateTime', 'usageDateTime', 'Date', 'date']),
-    usageEnd: firstIso(row, ['UsageEndDate', 'usageEndDate']),
-    usageQuantity: firstNumber(row, ['Quantity', 'quantity']),
-    usageUnit: firstString(row, ['UnitOfMeasure', 'unitOfMeasure', 'Unit', 'unit']),
-    costUsd: firstNumber(row, ['CostInUSD', 'costInUSD', 'CostUSD', 'costUSD']),
-    fallbackCost: firstNumber(row, [
-      'CostInBillingCurrency',
-      'costInBillingCurrency',
-      'PreTaxCost',
-      'pretaxCost',
-    ]),
-    currency: firstString(row, [
-      'BillingCurrencyCode',
-      'billingCurrencyCode',
-      'Currency',
-      'currency',
-    ]),
+    columnMap: AZURE_COST_COLUMNS,
+    serviceName: firstString(row, AZURE_COST_COLUMNS.serviceName) ?? 'Azure usage',
+    skuId: firstString(row, AZURE_COST_COLUMNS.skuId),
+    region: firstString(row, AZURE_COST_COLUMNS.region),
+    resourceId: firstString(row, AZURE_COST_COLUMNS.resourceId),
+    usageStart: firstIso(row, AZURE_COST_COLUMNS.usageStart),
+    usageEnd: firstIso(row, AZURE_COST_COLUMNS.usageEnd),
+    usageQuantity: firstNumber(row, AZURE_COST_COLUMNS.usageQuantity),
+    usageUnit: firstString(row, AZURE_COST_COLUMNS.usageUnit),
+    costUsd: firstNumber(row, AZURE_COST_COLUMNS.costUsd),
+    fallbackCost: firstNumber(row, AZURE_COST_COLUMNS.fallbackCost),
+    currency: firstString(row, AZURE_COST_COLUMNS.currency),
     tags: tagsFromJsonish(row, ['Tags', 'tags']),
   });
 }
@@ -356,22 +382,17 @@ function gcpBillingRow(row: Record<string, unknown>, index: number): BillingImpo
     row,
     index,
     provider: 'gcp',
-    serviceName:
-      firstString(row, [
-        'service.description',
-        'service_description',
-        'service.id',
-        'service_id',
-      ]) ?? 'GCP usage',
-    skuId: firstString(row, ['sku.id', 'sku_id', 'sku.description', 'sku_description']),
-    region: firstString(row, ['location.region', 'location_region', 'region']),
-    resourceId: firstString(row, ['resource.name', 'resource_name', 'project.id', 'project_id']),
-    usageStart: firstIso(row, ['usage_start_time', 'usage.start_time', 'usageStartTime']),
-    usageEnd: firstIso(row, ['usage_end_time', 'usage.end_time', 'usageEndTime']),
-    usageQuantity: firstNumber(row, ['usage.amount', 'usage_amount']),
-    usageUnit: firstString(row, ['usage.unit', 'usage_unit']),
-    costUsd: firstNumber(row, ['cost']),
-    currency: firstString(row, ['currency']),
+    columnMap: GCP_BILLING_COLUMNS,
+    serviceName: firstString(row, GCP_BILLING_COLUMNS.serviceName) ?? 'GCP usage',
+    skuId: firstString(row, GCP_BILLING_COLUMNS.skuId),
+    region: firstString(row, GCP_BILLING_COLUMNS.region),
+    resourceId: firstString(row, GCP_BILLING_COLUMNS.resourceId),
+    usageStart: firstIso(row, GCP_BILLING_COLUMNS.usageStart),
+    usageEnd: firstIso(row, GCP_BILLING_COLUMNS.usageEnd),
+    usageQuantity: firstNumber(row, GCP_BILLING_COLUMNS.usageQuantity),
+    usageUnit: firstString(row, GCP_BILLING_COLUMNS.usageUnit),
+    costUsd: firstNumber(row, GCP_BILLING_COLUMNS.costUsd),
+    currency: firstString(row, GCP_BILLING_COLUMNS.currency),
     tags: tagsFromJsonish(row, ['labels', 'project.labels', 'system_labels']),
   });
 }
@@ -380,6 +401,7 @@ function providerRow(input: {
   row: Record<string, unknown>;
   index: number;
   provider: BillingImportInput['provider'];
+  columnMap: ProviderExportColumnMap;
   serviceName: string;
   skuId?: string;
   region?: string;
@@ -416,8 +438,57 @@ function providerRow(input: {
     costUsd,
     currency: input.currency ?? 'USD',
     tags: input.tags,
-    rawPayload: input.row,
+    rawPayload: withNormalizationAudit(input.row, input.provider, input.columnMap),
   };
+}
+
+function withNormalizationAudit(
+  row: Record<string, unknown>,
+  provider: BillingImportInput['provider'],
+  columnMap: ProviderExportColumnMap,
+): Record<string, unknown> {
+  const missingFields = missingRecommendedFields(row, columnMap);
+
+  return {
+    ...row,
+    _polycost: {
+      version: 1,
+      provider,
+      sourceRowFingerprint: sha256(stableJson(row)),
+      recognizedColumns: recognizedSourceColumns(row, columnMap),
+      missingRecommendedFields: missingFields,
+      normalizationStatus: missingFields.length
+        ? 'partial-provider-export'
+        : 'provider-export-audit-ready',
+    },
+  };
+}
+
+function recognizedSourceColumns(
+  row: Record<string, unknown>,
+  columnMap: ProviderExportColumnMap,
+): string[] {
+  return [
+    ...new Set(
+      Object.values(columnMap).flatMap((keys) => keys.filter((key) => hasSourceValue(row, key))),
+    ),
+  ].sort((left, right) => left.localeCompare(right));
+}
+
+function missingRecommendedFields(
+  row: Record<string, unknown>,
+  columnMap: ProviderExportColumnMap,
+): string[] {
+  return Object.entries(columnMap)
+    .filter(([field]) => field !== 'fallbackCost')
+    .filter(([, keys]) => !keys.some((key) => hasSourceValue(row, key)))
+    .map(([field]) => field);
+}
+
+function hasSourceValue(row: Record<string, unknown>, key: string): boolean {
+  const value = rowValue(row, key);
+
+  return value !== undefined && value !== null && String(value).trim() !== '';
 }
 
 function parseJsonRows(content: string): Record<string, unknown>[] {
@@ -554,7 +625,7 @@ function parseRows(value: unknown): BillingImportRowInput[] {
   return value.map((row, index) => parseRow(row, index));
 }
 
-function firstString(row: Record<string, unknown>, keys: string[]): string | undefined {
+function firstString(row: Record<string, unknown>, keys: readonly string[]): string | undefined {
   for (const key of keys) {
     const value = rowValue(row, key);
 
@@ -570,7 +641,7 @@ function firstString(row: Record<string, unknown>, keys: string[]): string | und
   return undefined;
 }
 
-function firstNumber(row: Record<string, unknown>, keys: string[]): number | undefined {
+function firstNumber(row: Record<string, unknown>, keys: readonly string[]): number | undefined {
   for (const key of keys) {
     const value = rowValue(row, key);
     const parsed =
@@ -588,7 +659,7 @@ function firstNumber(row: Record<string, unknown>, keys: string[]): number | und
   return undefined;
 }
 
-function firstIso(row: Record<string, unknown>, keys: string[]): string | undefined {
+function firstIso(row: Record<string, unknown>, keys: readonly string[]): string | undefined {
   const value = firstString(row, keys);
 
   if (!value || Number.isNaN(Date.parse(value))) {
@@ -912,7 +983,17 @@ function reconciliationStatus(
 function reconciliationEvidence(
   comparison: ComparisonResult,
   importRunId: string,
-  lineItems: Array<{ lineItemHash: string; skuId?: string; serviceName: string }>,
+  lineItems: Array<{
+    lineItemHash: string;
+    skuId?: string;
+    serviceName: string;
+    region?: string;
+    resourceId?: string;
+    usageStart?: string;
+    usageEnd?: string;
+    costUsd: number;
+    rawPayload?: Record<string, unknown>;
+  }>,
 ): Record<string, unknown> {
   const traceKeys = comparison.providers.flatMap((provider) =>
     provider.lineItems.map((lineItem) => ({
@@ -923,16 +1004,163 @@ function reconciliationEvidence(
       pricingTrace: lineItem.pricingTrace ?? null,
     })),
   );
+  const invoiceSkuIds = [
+    ...new Set(
+      lineItems
+        .map((lineItem) => lineItem.skuId)
+        .filter((skuId): skuId is string => typeof skuId === 'string' && Boolean(skuId)),
+    ),
+  ];
+  const invoiceServices = [...new Set(lineItems.map((lineItem) => lineItem.serviceName))];
+  const comparisonSkuIds = [
+    ...new Set(
+      traceKeys
+        .map((trace) => trace.skuId)
+        .filter((skuId): skuId is string => typeof skuId === 'string' && Boolean(skuId)),
+    ),
+  ];
+  const comparisonCategories = [
+    ...new Set(traceKeys.map((trace) => trace.category).filter(Boolean)),
+  ];
+  const sourceFingerprints = lineItems
+    .map((lineItem) => sourceRowFingerprint(lineItem.rawPayload))
+    .filter((fingerprint): fingerprint is string => Boolean(fingerprint));
+  const missingRecommendedFields = [
+    ...new Set(lineItems.flatMap((lineItem) => sourceMissingFields(lineItem.rawPayload))),
+  ].sort((left, right) => left.localeCompare(right));
+  const skuMatches = invoiceSkuIds.filter((skuId) => comparisonSkuIds.includes(skuId));
+  const serviceMatches = invoiceServices.filter((serviceName) =>
+    comparisonCategories.some(
+      (category) =>
+        serviceName.toLowerCase().includes(String(category).toLowerCase()) ||
+        String(category).toLowerCase().includes(serviceName.toLowerCase()),
+    ),
+  );
+  const rowsWithUsageWindow = lineItems.filter(
+    (lineItem) => lineItem.usageStart && lineItem.usageEnd,
+  ).length;
+  const rowCount = lineItems.length;
+  const traceCoverage = {
+    rowCount,
+    rowsWithSkuId: lineItems.filter((lineItem) => lineItem.skuId).length,
+    rowsWithRegion: lineItems.filter((lineItem) => lineItem.region).length,
+    rowsWithResourceId: lineItems.filter((lineItem) => lineItem.resourceId).length,
+    rowsWithUsageWindow,
+    rowsWithSourceFingerprint: sourceFingerprints.length,
+    skuMatchCount: skuMatches.length,
+    serviceMatchCount: serviceMatches.length,
+    skuMatchPercent: percentOf(skuMatches.length, Math.max(invoiceSkuIds.length, 1)),
+    sourceFingerprintPercent: percentOf(sourceFingerprints.length, Math.max(rowCount, 1)),
+  };
 
   return {
     importRunId,
     comparisonId: comparison.comparisonId,
     pricingAsOf: comparison.pricingAsOf,
     invoiceLineItemHashes: lineItems.map((lineItem) => lineItem.lineItemHash),
-    invoiceSkuIds: [...new Set(lineItems.map((lineItem) => lineItem.skuId).filter(Boolean))],
-    invoiceServices: [...new Set(lineItems.map((lineItem) => lineItem.serviceName))],
+    invoiceSkuIds,
+    invoiceServices,
+    invoiceSourceRowFingerprints: sourceFingerprints,
+    invoiceSourceMissingRecommendedFields: missingRecommendedFields,
+    invoiceCoverage: {
+      totalCostUsd: roundCurrency(
+        lineItems.reduce((total, lineItem) => total + lineItem.costUsd, 0),
+      ),
+      ...traceCoverage,
+    },
+    invoiceMatchSummary: {
+      comparisonSkuIds,
+      comparisonCategories,
+      matchedSkuIds: skuMatches,
+      matchedServices: serviceMatches,
+      readiness: invoiceEvidenceReadiness(traceCoverage, missingRecommendedFields),
+      caveats: invoiceEvidenceCaveats(traceCoverage, missingRecommendedFields),
+    },
     comparisonTraceKeys: traceKeys,
   };
+}
+
+function sourceRowFingerprint(rawPayload: Record<string, unknown> | undefined): string | undefined {
+  const metadata = rawPayload?._polycost;
+
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    return undefined;
+  }
+
+  const fingerprint = (metadata as Record<string, unknown>).sourceRowFingerprint;
+
+  return typeof fingerprint === 'string' ? fingerprint : undefined;
+}
+
+function sourceMissingFields(rawPayload: Record<string, unknown> | undefined): string[] {
+  const metadata = rawPayload?._polycost;
+
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    return [];
+  }
+
+  const fields = (metadata as Record<string, unknown>).missingRecommendedFields;
+
+  return Array.isArray(fields)
+    ? fields.filter((field): field is string => typeof field === 'string')
+    : [];
+}
+
+function invoiceEvidenceReadiness(
+  coverage: {
+    rowCount: number;
+    rowsWithSourceFingerprint: number;
+    skuMatchCount: number;
+    serviceMatchCount: number;
+  },
+  missingRecommendedFields: string[],
+): 'audit-ready-with-caveats' | 'reconciled-evidence-ready' | 'reconciliation-foundation' {
+  if (coverage.rowCount === 0 || coverage.rowsWithSourceFingerprint === 0) {
+    return 'reconciliation-foundation';
+  }
+
+  if (missingRecommendedFields.length === 0 && coverage.skuMatchCount > 0) {
+    return 'audit-ready-with-caveats';
+  }
+
+  if (coverage.skuMatchCount > 0 || coverage.serviceMatchCount > 0) {
+    return 'reconciled-evidence-ready';
+  }
+
+  return 'reconciliation-foundation';
+}
+
+function invoiceEvidenceCaveats(
+  coverage: {
+    rowsWithSourceFingerprint: number;
+    skuMatchCount: number;
+    serviceMatchCount: number;
+  },
+  missingRecommendedFields: string[],
+): string[] {
+  const caveats: string[] = [
+    'Reconciliation compares provider-export actuals with PolyCost estimate evidence; it is not an invoice-of-record.',
+  ];
+
+  if (coverage.rowsWithSourceFingerprint === 0) {
+    caveats.push('No provider source-row fingerprints were available for imported rows.');
+  }
+
+  if (coverage.skuMatchCount === 0 && coverage.serviceMatchCount === 0) {
+    caveats.push('No direct SKU or service-name match was found against comparison line items.');
+  }
+
+  if (missingRecommendedFields.length > 0) {
+    caveats.push(
+      `Provider export is missing recommended fields: ${missingRecommendedFields.join(', ')}.`,
+    );
+  }
+
+  return caveats;
+}
+
+function percentOf(value: number, total: number): number {
+  return total === 0 ? 0 : roundPercent((value / total) * 100);
 }
 
 function stableJson(value: unknown): string {

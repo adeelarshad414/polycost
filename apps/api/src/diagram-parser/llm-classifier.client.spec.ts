@@ -1,7 +1,10 @@
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema';
 import { SecretsReader } from '../secrets/secrets.service';
-import { OpenAiCompatibleDiagramLlmClassifierClient } from './llm-classifier.client';
+import {
+  OpenAiCompatibleDiagramLlmClassifierClient,
+  StubLlmClassifierClient,
+} from './llm-classifier.client';
 
 const configService = (values: Partial<AppConfig>) =>
   ({
@@ -29,6 +32,51 @@ const secretsReader = (): SecretsReader => ({
 });
 
 describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
+  it('reports whether the production classifier path is configured without reading secrets', () => {
+    const secrets = secretsReader();
+    const fetchClient = jest.fn() as unknown as typeof fetch;
+    const client = new OpenAiCompatibleDiagramLlmClassifierClient(
+      configService({
+        DIAGRAM_LLM_CLASSIFIER_ENDPOINT: 'https://llm.example.test/v1/chat/completions',
+        DIAGRAM_LLM_CLASSIFIER_MODEL: 'diagram-classifier',
+      }),
+      secrets,
+      fetchClient,
+    );
+
+    expect(client.readiness()).toEqual({
+      mode: 'openai-compatible',
+      configured: true,
+      endpointConfigured: true,
+      modelConfigured: true,
+      secretPath: 'polycost/llm',
+      safetyControls: expect.arrayContaining([
+        'strict JSON schema response_format',
+        'untrusted labels sent as JSON data',
+      ]),
+      caveats: expect.arrayContaining([
+        expect.stringContaining('Production quality still depends on the selected model'),
+        expect.stringContaining('API key is read from Vault'),
+      ]),
+    });
+    expect(secrets.getSecret).not.toHaveBeenCalled();
+    expect(fetchClient).not.toHaveBeenCalled();
+  });
+
+  it('keeps the stub classifier explicitly marked unconfigured', () => {
+    const client = new StubLlmClassifierClient();
+
+    expect(client.readiness()).toEqual({
+      mode: 'stub',
+      configured: false,
+      endpointConfigured: false,
+      modelConfigured: false,
+      secretPath: 'polycost/llm',
+      safetyControls: expect.arrayContaining(['schema-bound output', 'cost guard']),
+      caveats: ['Tier 3 LLM classifier is disabled; unresolved nodes require manual review.'],
+    });
+  });
+
   it('classifies unresolved diagram labels through an OpenAI-compatible JSON schema request', async () => {
     const fetchClient = jest.fn(async () => ({
       ok: true,

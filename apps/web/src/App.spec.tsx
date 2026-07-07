@@ -487,6 +487,9 @@ describe('App', () => {
     );
     expect(text(container)).toContain('variance-warning');
     expect(text(container)).toContain('$7.00 variance');
+    expect(text(container)).toContain('reconciled evidence ready');
+    expect(text(container)).toContain('100% source fingerprinted');
+    expect(text(container)).toContain('100% SKU matched');
 
     unmount();
   });
@@ -4291,7 +4294,18 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       varianceUsd: 7,
       variancePercent: 7,
       status: 'variance-warning' as const,
-      evidence: {},
+      evidence: {
+        invoiceCoverage: {
+          sourceFingerprintPercent: 100,
+          skuMatchPercent: 100,
+        },
+        invoiceMatchSummary: {
+          readiness: 'reconciled-evidence-ready',
+          caveats: [
+            'Reconciliation compares provider-export actuals with PolyCost estimate evidence; it is not an invoice-of-record.',
+          ],
+        },
+      },
       createdAt: '2026-07-06T00:00:02.000Z',
     })),
     listBillingReconciliations: jest.fn(async () => []),

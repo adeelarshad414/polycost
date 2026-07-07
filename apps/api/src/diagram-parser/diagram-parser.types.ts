@@ -91,13 +91,20 @@ export interface DiagramNodeBounds {
 
 export interface DiagramNodeVisualMetadata {
   pageRef?: string;
+  pageId?: string;
   pageName?: string;
+  pageWidth?: number;
+  pageHeight?: number;
   masterId?: string;
   masterName?: string;
   containerId?: string;
   containerLabel?: string;
   fillColor?: string;
   lineColor?: string;
+  normalizedBounds?: DiagramNodeBounds;
+  geometryHint?: 'rectangle' | 'connector' | 'group' | 'unknown';
+  renderingMode?: 'layout-extraction';
+  renderingWarnings?: string[];
 }
 
 export interface DiagramExtractor {
