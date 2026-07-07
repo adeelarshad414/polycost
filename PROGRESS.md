@@ -81,6 +81,42 @@ say so explicitly rather than marking it done.
 | Phase 2.8AM - VSDX visual evidence polish              | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AN - Local credential readiness gate          | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AO - Production-readiness suite drift guard   | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AP - Security ledger coverage enforcement     | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AP - Security ledger coverage enforcement
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Strengthened `scripts/security-suppression-check.mjs` so each reviewed inline
+  security-rule ESLint suppression must also appear in
+  `docs/SECURITY-SUPPRESSIONS.md`.
+- Added security-ledger guards for the low-threshold npm audit command, the remaining
+  low Graphify/Ollama advisory ID, and the Node 24 `impeccable` tracking note.
+- Re-ran `npm audit --audit-level=low`; the current result remains the documented
+  low-severity `GHSA-866g-f22w-33x8` advisory through `@sentropic/graphify` with no
+  fix available.
+- Updated `docs/SECURITY-SUPPRESSIONS.md` with the 2026-07-07 low-audit evidence.
+
+Verification:
+
+- `npm audit --audit-level=low` was re-run with registry access and still exits 1 for
+  the documented low `GHSA-866g-f22w-33x8` Graphify/Ollama advisory with no fix
+  available.
+- `npm run format:check` passes.
+- `npm run security:suppressions` passes with 21 reviewed suppressions and now proves
+  each suppressed file is present in `docs/SECURITY-SUPPRESSIONS.md`.
+- `npm run security:audit` passes at the high/critical gate while reporting only the
+  documented low advisory.
+- `npm run release:check` passes.
+- `npm run check` passes end-to-end.
+
+Known remaining gaps:
+
+- The high/critical security audit gate remains clean, but the low-severity transitive
+  development-tooling advisory still depends on an upstream package fix or replacement.
 
 ## Phase 2.8AO - Production-readiness suite drift guard
 

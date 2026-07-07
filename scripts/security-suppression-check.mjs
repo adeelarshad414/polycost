@@ -4,8 +4,21 @@ import path from 'node:path';
 const root = process.cwd();
 const ignoredDirectories = new Set(['.git', 'coverage', 'dist', 'node_modules']);
 const checkedExtensions = new Set(['.cjs', '.js', '.jsx', '.mjs', '.ts', '.tsx']);
+const ledgerRelativePath = 'docs/SECURITY-SUPPRESSIONS.md';
+const ledgerContent = await readFile(path.join(root, ledgerRelativePath), 'utf8');
 const failures = [];
 let reviewedSuppressions = 0;
+const suppressedFiles = new Set();
+
+for (const [label, snippet] of [
+  ['npm audit low-threshold command', 'npm audit --audit-level=low'],
+  ['remaining npm advisory ID', 'GHSA-866g-f22w-33x8'],
+  ['Node 24 impeccable tracking', 'impeccable@3.1.0'],
+]) {
+  if (!ledgerContent.includes(snippet)) {
+    failures.push(`${ledgerRelativePath} is missing ${label}: ${snippet}`);
+  }
+}
 
 for (const filePath of await listSourceFiles(root)) {
   const relativePath = path.relative(root, filePath);
@@ -28,7 +41,16 @@ for (const filePath of await listSourceFiles(root)) {
     }
 
     reviewedSuppressions += 1;
+    suppressedFiles.add(relativePath);
   });
+}
+
+for (const relativePath of suppressedFiles) {
+  if (!ledgerContent.includes(relativePath)) {
+    failures.push(
+      `${relativePath} has a reviewed security ESLint suppression but is missing from ${ledgerRelativePath}`,
+    );
+  }
 }
 
 if (failures.length > 0) {

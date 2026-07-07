@@ -45,7 +45,7 @@ Command evidence:
 
 - `npm run security:audit` completed on 2026-07-07 with exit code 0 under `--audit-level=high`.
 - `npm run security:suppressions` completed on 2026-07-07 with exit code 0 and 21 reviewed suppressions.
-- `npm audit --audit-level=low` completed on 2026-07-06 with exit code 1 because the low advisory below remains present.
+- `npm audit --audit-level=low` completed on 2026-07-07 with exit code 1 because the low advisory below remains present.
 - Remaining advisory: `@ai-sdk/provider-utils <=3.0.97` via `ollama-ai-provider` via `@sentropic/graphify`.
 - Severity: low.
 - Advisory: `GHSA-866g-f22w-33x8`
