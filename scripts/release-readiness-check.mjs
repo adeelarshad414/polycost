@@ -45,6 +45,12 @@ if (!packageJson.scripts?.['live:verify']) {
 if (!packageJson.scripts?.['demo:verify-clean']) {
   failures.push('package.json is missing demo:verify-clean');
 }
+if (!packageJson.scripts?.['pricing:logic:coverage']) {
+  failures.push('package.json is missing pricing:logic:coverage');
+}
+if (!packageJson.scripts?.['ci:unit']?.includes('npm run pricing:logic:coverage')) {
+  failures.push('package.json ci:unit script must include npm run pricing:logic:coverage');
+}
 if (!packageJson.scripts?.check?.includes('npm run provider:credentials:check')) {
   failures.push('package.json check script must include npm run provider:credentials:check');
 }
@@ -95,6 +101,8 @@ await assertFileContains('RELEASE-CHECKLIST.md', [
   ['clean-clone demo command', 'npm run demo:up'],
   ['clean-clone timed verifier command', 'npm run demo:verify-clean'],
   ['demo artifact command', 'npm run demo:artifacts'],
+  ['unit coverage command', 'npm run ci:unit'],
+  ['pricing logic coverage command', 'npm run pricing:logic:coverage'],
   ['Node 24 impeccable decision', 'On Node 24, run `npm run impeccable`'],
 ]);
 
@@ -119,8 +127,15 @@ await assertFileContains('.github/workflows/ci.yml', [
   ['full progress verification CI gate', 'npm run progress:verify'],
   ['production-readiness focused regression CI gate', 'npm run test:production-readiness'],
   ['live E2E verification CI gate', 'npm run ci:e2e'],
+  ['pricing logic coverage CI path', 'npm run ci:unit'],
   ['Node 20 impeccable skip reason', 'impeccable@3.1.0'],
   ['Node 24 release tracking note', 'RELEASE-CHECKLIST.md'],
+]);
+
+await assertFileContains('scripts/pricing-logic-coverage-check.mjs', [
+  ['pricing logic threshold', 'POLYCOST_PRICING_LOGIC_COVERAGE_THRESHOLD'],
+  ['pricing branch threshold', 'POLYCOST_PRICING_LOGIC_BRANCH_THRESHOLD'],
+  ['pricing coverage artifact', 'coverage/api/coverage-final.json'],
 ]);
 
 await assertFileContains('scripts/ci-e2e.mjs', [

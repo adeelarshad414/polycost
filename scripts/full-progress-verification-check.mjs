@@ -102,6 +102,10 @@ async function assertPhaseEvidenceAnchors() {
     'npm run pricing:coverage:check',
     'npm run provider:credentials:check',
   ]);
+  assertScriptIncludes(packageJson, 'ci:unit', [
+    'npm run test:coverage',
+    'npm run pricing:logic:coverage',
+  ]);
   assertScriptIncludes(packageJson, 'ci:e2e', ['node scripts/ci-e2e.mjs']);
   assertScriptIncludes(packageJson, 'live:verify', ['node scripts/live-verification.mjs']);
   assertScriptIncludes(packageJson, 'demo:verify-clean', [
@@ -248,6 +252,15 @@ async function assertPhaseEvidenceAnchors() {
     ['isolated Compose project', 'COMPOSE_PROJECT_NAME'],
     ['API host port wiring', 'API_HOST_PORT'],
     ['clean-clone timing label', 'clean-clone-to-running'],
+  ]);
+
+  await assertFileContains('scripts/pricing-logic-coverage-check.mjs', [
+    ['pricing coverage threshold', 'POLYCOST_PRICING_LOGIC_COVERAGE_THRESHOLD'],
+    ['pricing branch threshold', 'POLYCOST_PRICING_LOGIC_BRANCH_THRESHOLD'],
+    ['pricing coverage source', 'coverage/api/coverage-final.json'],
+    ['pricing engine coverage fragment', 'apps/api/src/comparison/'],
+    ['pricing model coverage fragment', 'apps/api/src/pricing-models/'],
+    ['pricing normalization coverage fragment', 'apps/api/src/pricing-normalization/'],
   ]);
 
   evidenceAnchors += 1;

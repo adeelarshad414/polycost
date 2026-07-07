@@ -46,7 +46,9 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Run `npm run release:check`.
 - Run `npm run lint`.
 - Run `npm run typecheck`.
-- Run `npm run test:coverage`.
+- Run `npm run ci:unit` to execute coverage and the pricing-logic coverage gate.
+- If coverage was run manually, run `npm run pricing:logic:coverage` after
+  `npm run test:coverage`.
 - Run `npm run ci:integration`.
 - Run `npm run ci:build`.
 - Run `npm run ci:e2e`.
