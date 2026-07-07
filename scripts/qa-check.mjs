@@ -22,6 +22,7 @@ const requiredScripts = [
   'pricing:coverage:check',
   'qa',
   'security:audit',
+  'security:suppressions',
   'security:scan',
   'devops:check',
   'cloud:check',

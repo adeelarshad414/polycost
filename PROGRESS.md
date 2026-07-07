@@ -74,6 +74,45 @@ say so explicitly rather than marking it done.
 | Phase 2.8AF - Billing reconciliation RBAC hardening    | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AG - UI priced-family coverage drift guard    | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AH - Diagram export evidence hardening        | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AI - Security suppression hygiene gate        | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AI - Security suppression hygiene gate
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Removed two inline `security/detect-object-injection` suppressions from
+  `apps/api/src/api/regions.service.ts` by replacing dynamic object lookups with
+  typed `Map`/accessor-based reads.
+- Added `npm run security:suppressions`, backed by
+  `scripts/security-suppression-check.mjs`, to require every security-rule ESLint
+  suppression to include a `Reviewed YYYY-MM-DD` marker and
+  `docs/SECURITY-SUPPRESSIONS.md` reference.
+- Wired the suppression hygiene gate into `npm run qa`, `scripts/qa-check.mjs`, and
+  release-readiness documentation checks.
+- Updated `SECURITY.md` and `docs/SECURITY-SUPPRESSIONS.md` so maintainers know how
+  to run and interpret the new gate.
+
+Verification:
+
+- `npm run security:suppressions` passes with 21 reviewed suppressions.
+- `npm run ci:lint` passes.
+- `npm run security:audit` passes at the high/critical gate; npm still reports the
+  known low-severity Graphify/Ollama development-tooling advisory with no fix
+  available.
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/api/regions.service.spec.ts`
+  passes.
+- `npm run qa`, `npm run release:check`, and `npm run check` pass.
+
+Known remaining gaps:
+
+- The Graphify/Ollama low-severity transitive advisory remains until upstream
+  releases a safe fix or the visualization toolchain is replaced.
+- Suppressed ESLint security findings remain documented and gated; converting every
+  suppressible dynamic lookup to typed accessors is still an opportunistic hardening
+  task as files are touched.
 
 ## Phase 2.8AH - Diagram export evidence hardening
 

@@ -75,6 +75,7 @@ await assertFileContains('docs/development/open-source-readiness.md', [
 
 await assertFileContains('docs/SECURITY-SUPPRESSIONS.md', [
   ['eslint warning ledger', 'ESLint Security Plugin Warnings'],
+  ['eslint suppression hygiene gate', 'npm run security:suppressions'],
   ['npm audit advisory ledger', 'GHSA-866g-f22w-33x8'],
   ['impeccable Node 24 tracking', 'impeccable@3.1.0'],
 ]);

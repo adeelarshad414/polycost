@@ -229,10 +229,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function stringField(record: Record<string, unknown>, key: string): string {
-  // Reviewed 2026-07-06: keys are internal parser literals used against provider-owned catalog records; see docs/SECURITY-SUPPRESSIONS.md.
-  // eslint-disable-next-line security/detect-object-injection
-  const value = record[key];
+type AwsIpRangeStringField = 'code' | 'continent' | 'label' | 'name' | 'type';
+
+const AWS_IP_RANGE_STRING_FIELD_READERS = new Map<
+  AwsIpRangeStringField,
+  (record: Record<string, unknown>) => unknown
+>([
+  ['code', (record) => record.code],
+  ['continent', (record) => record.continent],
+  ['label', (record) => record.label],
+  ['name', (record) => record.name],
+  ['type', (record) => record.type],
+]);
+
+function stringField(record: Record<string, unknown>, key: AwsIpRangeStringField): string {
+  const value = AWS_IP_RANGE_STRING_FIELD_READERS.get(key)?.(record);
 
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -273,9 +284,7 @@ function regionCodeToLabel(id: string): string {
 }
 
 function gcpRegionLabel(id: string): string {
-  // Reviewed 2026-07-06: IDs are validated with isGcpRegionId before this controlled label lookup; see docs/SECURITY-SUPPRESSIONS.md.
-  // eslint-disable-next-line security/detect-object-injection
-  return GCP_REGION_LABELS[id] ?? regionCodeToLabel(id);
+  return GCP_REGION_LABEL_LOOKUP.get(id) ?? regionCodeToLabel(id);
 }
 
 function calculatorUrlForProvider(providerId: ProviderId): string {
@@ -460,6 +469,8 @@ const GCP_REGION_LABELS: Record<string, string> = {
   'us-west4': 'US West (Las Vegas)',
   'us-west8': 'US West (Phoenix)',
 };
+
+const GCP_REGION_LABEL_LOOKUP = new Map(Object.entries(GCP_REGION_LABELS));
 
 const GCP_FALLBACK_REGIONS: RawRegion[] = Object.entries(GCP_REGION_LABELS).map(([id, label]) => ({
   id,
