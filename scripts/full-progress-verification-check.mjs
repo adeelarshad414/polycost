@@ -104,6 +104,9 @@ async function assertPhaseEvidenceAnchors() {
   ]);
   assertScriptIncludes(packageJson, 'ci:e2e', ['node scripts/ci-e2e.mjs']);
   assertScriptIncludes(packageJson, 'live:verify', ['node scripts/live-verification.mjs']);
+  assertScriptIncludes(packageJson, 'demo:verify-clean', [
+    'node scripts/clean-clone-demo-check.mjs',
+  ]);
   assertScriptIncludes(packageJson, 'test:production-readiness', [
     'src/pricing-normalization/pricing-reconciliation.spec.ts',
     'src/api/live-pricing-traceability.spec.ts',
@@ -233,6 +236,14 @@ async function assertPhaseEvidenceAnchors() {
     ['Redis stop verification', "['compose', 'stop', 'redis']"],
     ['degraded health assertion', 'degraded health'],
     ['PDF download assertion', 'Expected a PDF download'],
+  ]);
+
+  await assertFileContains('scripts/clean-clone-demo-check.mjs', [
+    ['clean-clone startup threshold', 'POLYCOST_CLEAN_CLONE_MAX_MS'],
+    ['README quick-start command', "['run', 'demo:up']"],
+    ['isolated Compose project', 'COMPOSE_PROJECT_NAME'],
+    ['API host port wiring', 'API_HOST_PORT'],
+    ['clean-clone timing label', 'clean-clone-to-running'],
   ]);
 
   evidenceAnchors += 1;

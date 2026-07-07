@@ -5,8 +5,9 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const apiPort = process.env.API_PORT ?? process.env.PORT ?? '3001';
+const apiHostPort = process.env.API_HOST_PORT ?? apiPort;
 const webPort = process.env.WEB_PORT ?? '3000';
-const apiHealthUrl = `http://127.0.0.1:${apiPort}/health`;
+const apiHealthUrl = `http://127.0.0.1:${apiHostPort}/health`;
 const webUrl = `http://127.0.0.1:${webPort}/`;
 const webApiDataHealthUrl = `http://127.0.0.1:${webPort}/api/v1/data-health`;
 
@@ -25,7 +26,7 @@ console.log('');
 console.log('PolyCost demo is ready.');
 console.log(`Web app: ${webUrl}`);
 console.log(`API health: ${apiHealthUrl}`);
-console.log(`API base: http://127.0.0.1:${apiPort}/api/v1`);
+console.log(`API base: http://127.0.0.1:${apiHostPort}/api/v1`);
 console.log('');
 console.log('Suggested next command: npm run demo:artifacts');
 

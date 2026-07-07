@@ -68,6 +68,7 @@
     "provider:credentials:check:strict": "node scripts/provider-credential-check.mjs --strict",
     "demo:up": "node scripts/demo-ready.mjs",
     "demo:artifacts": "node scripts/capture-demo-artifacts.mjs",
+    "demo:verify-clean": "node scripts/clean-clone-demo-check.mjs",
     "live:verify": "node scripts/live-verification.mjs",
     "hooks:install": "node scripts/install-hooks.mjs",
     "security:audit": "npm audit --audit-level=high",

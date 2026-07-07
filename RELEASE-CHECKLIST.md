@@ -40,6 +40,8 @@ Complete this checklist before changing the GitHub repository visibility from pr
 
 - Run `npm ci`.
 - Run `npm run demo:up` from a clean clone or freshly reset local workspace.
+- Run `npm run demo:verify-clean` to prove the clean-clone demo path stays under
+  the 10-minute startup budget.
 - Run `npm run format:check`.
 - Run `npm run release:check`.
 - Run `npm run lint`.

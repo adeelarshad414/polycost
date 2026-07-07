@@ -86,6 +86,55 @@ say so explicitly rather than marking it done.
 | Phase 2.8AR - End-to-end smoke proof hardening          | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AS - Full progress verification gate           | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AT - Live timed journey and Redis verification | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AU - Clean-clone demo verifier                 | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AU - Clean-clone demo verifier
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added `npm run demo:verify-clean`, backed by
+  `scripts/clean-clone-demo-check.mjs`, as a timed README/demo-readiness proof. The
+  verifier creates a temporary clone from the current checkout, runs the demo
+  bootstrap command, verifies the web app, direct API health, and web-origin API
+  proxy, then tears down the isolated Docker Compose project and volumes.
+- Added `API_HOST_PORT` to `.env.example`, `docker-compose.yml`, and
+  `scripts/demo-ready.mjs` so a clean-clone verifier can bind the API to an
+  alternate host port while leaving the container's internal API port stable.
+- Defaulted clean-clone verifier workspaces to `.tmp/clean-clones` under the repo and
+  ignored `.tmp/` in git. Earlier temp-clone attempts under macOS temp directories
+  exposed a real Colima bind-mount issue where `vault-seed` could not see
+  `/vault-seed/seed.sh`; keeping the clone under the repo path makes the proof use a
+  mount location Docker can actually see.
+- Extended release/progress guards and release hygiene docs so the clean-clone demo
+  verifier remains part of the public-release checklist.
+
+Verification:
+
+- `npm run progress:verify` passes: 98 phase evidence anchors verified.
+- `npm run release:check` passes.
+- `docker compose config --quiet` passes.
+- `env DOCKER_CONTEXT=colima npm run demo:verify-clean` passes against an isolated
+  temporary clone:
+  - `npm ci` completed in the clone.
+  - Provider credential readiness passed in mock mode.
+  - Docker Compose built/started Vault, Redis, Postgres, API, and Web.
+  - `npm run db:migrate` reported no pending migrations on the fresh stack.
+  - API health responded at `http://127.0.0.1:3201/health`.
+  - Web responded at `http://127.0.0.1:3200/`.
+  - Web-origin proxy returned JSON at `http://127.0.0.1:3200/api/v1/data-health`.
+  - Clean-clone-to-running duration: `70171ms` against the `600000ms` limit.
+
+Known remaining gaps:
+
+- This closes the local clean-clone-to-running evidence gap for the mock/self-hosted
+  demo path. It does not turn fixture-backed provider pricing into invoice-grade live
+  billing coverage.
+- Hosted GitHub Actions for PR #24 remains externally blocked before workflow steps
+  run (`runner_id: 0` / no assigned runner in prior checks). Local release gates and
+  the clean-clone verifier are green.
 
 ## Phase 2.8AT - Live timed journey and Redis verification
 

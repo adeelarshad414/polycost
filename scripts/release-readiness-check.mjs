@@ -42,6 +42,9 @@ if (!packageJson.scripts?.['progress:verify']) {
 if (!packageJson.scripts?.['live:verify']) {
   failures.push('package.json is missing live:verify');
 }
+if (!packageJson.scripts?.['demo:verify-clean']) {
+  failures.push('package.json is missing demo:verify-clean');
+}
 if (!packageJson.scripts?.check?.includes('npm run provider:credentials:check')) {
   failures.push('package.json check script must include npm run provider:credentials:check');
 }
@@ -63,6 +66,7 @@ assertScriptIncludes('test:production-readiness', [
 
 await assertFileContains('README.md', [
   ['one-command demo startup', 'npm run demo:up'],
+  ['clean-clone timed verifier', 'npm run demo:verify-clean'],
   ['demo artifact capture', 'npm run demo:artifacts'],
   [
     'catalog list-price honesty',
@@ -89,6 +93,7 @@ await assertFileContains('RELEASE-CHECKLIST.md', [
   ['known future gaps task', 'full visual VSDX rendering'],
   ['security audit gate', 'npm run security:audit'],
   ['clean-clone demo command', 'npm run demo:up'],
+  ['clean-clone timed verifier command', 'npm run demo:verify-clean'],
   ['demo artifact command', 'npm run demo:artifacts'],
   ['Node 24 impeccable decision', 'On Node 24, run `npm run impeccable`'],
 ]);
@@ -120,6 +125,14 @@ await assertFileContains('.github/workflows/ci.yml', [
 
 await assertFileContains('scripts/ci-e2e.mjs', [
   ['live verification inside compose E2E', "npmCommand, ['run', 'live:verify']"],
+]);
+
+await assertFileContains('scripts/clean-clone-demo-check.mjs', [
+  ['10-minute clean-clone budget', 'POLYCOST_CLEAN_CLONE_MAX_MS'],
+  ['README demo command', "['run', 'demo:up']"],
+  ['isolated compose project', 'COMPOSE_PROJECT_NAME'],
+  ['host API port isolation', 'API_HOST_PORT'],
+  ['clean clone timing assertion', 'clean-clone-to-running'],
 ]);
 
 await assertFileContains('apps/api/src/pricing-normalization/pricing-reconciliation.spec.ts', [
