@@ -54,6 +54,66 @@ describe('DiagramParserService', () => {
     expect(parsed.draftNws.database).toHaveLength(1);
   });
 
+  it('summarizes diagram fixture corpus classification tiers by format', async () => {
+    const parser = service();
+    const summary = new Map<string, DiagramCorpusSummary>();
+
+    for (const fixture of diagramCorpusFixtures) {
+      const parsed = await parser.parse({
+        content:
+          fixture.encoding === 'base64'
+            ? readBinaryFixture(fixture.path).toString('base64')
+            : readTextFixture(fixture.path),
+        ...(fixture.encoding === 'base64' ? { encoding: 'base64' as const } : {}),
+        fileName: fixture.path,
+        inputFormat: 'auto',
+      });
+
+      addDiagramCorpusSummary(summary, parsed);
+    }
+
+    expect(summary.get('mermaid')).toEqual({
+      fixtures: 3,
+      graphNodes: 16,
+      components: 12,
+      tier1: 0,
+      tier2: 12,
+      tier3: 0,
+      unresolved: 4,
+      ignored: 0,
+    });
+    expect(summary.get('drawio')).toEqual({
+      fixtures: 3,
+      graphNodes: 11,
+      components: 10,
+      tier1: 8,
+      tier2: 2,
+      tier3: 0,
+      unresolved: 1,
+      ignored: 0,
+    });
+    expect(summary.get('lucid_csv')).toEqual({
+      fixtures: 1,
+      graphNodes: 5,
+      components: 4,
+      tier1: 4,
+      tier2: 0,
+      tier3: 0,
+      unresolved: 1,
+      ignored: 0,
+    });
+    expect(summary.get('vsdx')).toEqual({
+      fixtures: 1,
+      graphNodes: 3,
+      components: 3,
+      tier1: 3,
+      tier2: 0,
+      tier3: 0,
+      unresolved: 0,
+      ignored: 0,
+    });
+  });
+
   it('extracts layout and visual metadata from VSDX shape cells', () => {
     const extracted = new VsdxExtractor().extract({
       buffer: zipWithStoredEntry(
@@ -589,6 +649,83 @@ describe('DiagramParserController', () => {
     expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
   });
 });
+
+interface DiagramCorpusFixture {
+  path: string;
+  encoding?: 'base64';
+}
+
+const diagramCorpusFixtures: DiagramCorpusFixture[] = [
+  { path: 'mermaid/web-app.mmd' },
+  { path: 'mermaid/data-platform.mmd' },
+  { path: 'mermaid/ml-platform.mmd' },
+  { path: 'drawio/web-app.drawio' },
+  { path: 'drawio/gcp-api.drawio' },
+  { path: 'drawio/analytics.drawio' },
+  { path: 'lucid/lucid-export.csv' },
+  { path: 'vsdx/simple.vsdx', encoding: 'base64' as const },
+];
+
+interface DiagramCorpusSummary {
+  fixtures: number;
+  graphNodes: number;
+  components: number;
+  tier1: number;
+  tier2: number;
+  tier3: number;
+  unresolved: number;
+  ignored: number;
+}
+
+type ParsedDiagram = Awaited<ReturnType<DiagramParserService['parse']>>;
+
+function addDiagramCorpusSummary(
+  summary: Map<string, DiagramCorpusSummary>,
+  parsed: ParsedDiagram,
+): void {
+  const current = summary.get(parsed.graph.format) ?? {
+    fixtures: 0,
+    graphNodes: 0,
+    components: 0,
+    tier1: 0,
+    tier2: 0,
+    tier3: 0,
+    unresolved: 0,
+    ignored: 0,
+  };
+
+  current.fixtures += 1;
+  current.graphNodes += parsed.graph.nodes.length;
+  current.components += parsed.review.components.length;
+  current.unresolved += parsed.review.unresolvedClassifications.length;
+  current.ignored += parsed.review.ignoredNodes.length;
+
+  for (const component of parsed.review.components) {
+    const tier = classificationTier(component.evidence);
+
+    if (tier === 1) {
+      current.tier1 += 1;
+    } else if (tier === 2) {
+      current.tier2 += 1;
+    } else {
+      current.tier3 += 1;
+    }
+  }
+
+  summary.set(parsed.graph.format, current);
+}
+
+function classificationTier(evidence: string): 1 | 2 | 3 {
+  if (evidence.startsWith('Matched stencil')) {
+    return 1;
+  }
+
+  if (evidence.startsWith('Label matched alias')) {
+    return 2;
+  }
+
+  return 3;
+}
 
 function service(llmClassifierClient?: LlmClassifierClient): DiagramParserService {
   const aliasDictionary = new AliasDictionary();

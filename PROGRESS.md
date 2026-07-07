@@ -65,6 +65,34 @@ say so explicitly rather than marking it done.
 | Phase 2.8W - Security advisory ledger refresh          | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8X - Workspace session expiry UX               | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8Y - Mock OIDC workspace UX                    | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8Z - Diagram fixture corpus tier table         | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8Z - Diagram fixture corpus tier table
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+- Added a fixture-corpus regression to `diagram-parser.service.spec.ts` that parses
+  Mermaid, draw.io, Lucid CSV, and VSDX fixtures and locks a format-by-format Tier 1
+  / Tier 2 / Tier 3 / unresolved summary table.
+- Current enforced corpus table:
+
+| Format    | Fixtures | Graph nodes | Components | Tier 1 | Tier 2 | Tier 3 | Unresolved | Ignored |
+| --------- | -------- | ----------- | ---------- | ------ | ------ | ------ | ---------- | ------- |
+| Mermaid   | 3        | 16          | 12         | 0      | 12     | 0      | 4          | 0       |
+| draw.io   | 3        | 11          | 10         | 8      | 2      | 0      | 1          | 0       |
+| Lucid CSV | 1        | 5           | 4          | 4      | 0      | 0      | 1          | 0       |
+| VSDX      | 1        | 3           | 3          | 3      | 0      | 0      | 0          | 0       |
+
+- Verification evidence in this continuation:
+  - Focused diagram parser spec passed: 1 suite / 24 tests.
+  - `npm run test:production-readiness` passed: API 6 suites / 86 tests and web 2
+    suites / 82 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: the table makes parser drift visible across the
+  current fixture corpus, but it is still fixture accuracy evidence rather than full
+  real-world diagram benchmark coverage or full Visio visual rendering.
 
 ## Phase 2.8Y - Mock OIDC workspace UX
 
