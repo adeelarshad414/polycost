@@ -31,6 +31,7 @@ describe('config schema', () => {
     expect(config.RATE_LIMIT_SHARE_LINK_PER_MINUTE).toBe(20);
     expect(config.RATE_LIMIT_PUBLIC_READ_PER_MINUTE).toBe(60);
     expect(config.RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE).toBe(30);
+    expect(config.RATE_LIMIT_AUTH_PER_MINUTE).toBe(10);
     expect(config.RATE_LIMIT_DIAGRAM_PARSE_PER_MINUTE).toBe(10);
     expect(config.NL_PARSE_MAX_INPUT_CHARS).toBe(4000);
     expect(config.DIAGRAM_TEMP_DIR).toBe('/tmp/polycost-diagram-imports');

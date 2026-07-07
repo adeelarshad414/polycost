@@ -75,6 +75,43 @@ say so explicitly rather than marking it done.
 | Phase 2.8AG - UI priced-family coverage drift guard    | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AH - Diagram export evidence hardening        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AI - Security suppression hygiene gate        | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AJ - Auth endpoint rate-limit hardening       | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AJ - Auth endpoint rate-limit hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added `RATE_LIMIT_AUTH_PER_MINUTE` to typed API config and `.env.example`.
+- Reused the shared `ApiRateLimitService` in `AuthController` so anonymous auth
+  entry points emit standard rate-limit headers and return 429 when the configured
+  per-minute identity bucket is exhausted.
+- Covered local registration, login, invitation preview, mock OIDC start, mock OIDC
+  authorize, and mock OIDC callback entry points with the auth rate limiter.
+- Added controller tests proving login and mock OIDC start are rate-limited by
+  request identity.
+- Updated README and cloud readiness docs so self-hosted operators can tune the auth
+  limiter alongside parse/refresh limits.
+
+Verification:
+
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth.controller.spec.ts src/api/auth-billing.spec.ts src/config/config.schema.spec.ts`
+  passes.
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/api/api-contract.spec.ts`
+  passes.
+- `npm run ci:lint` passes.
+- `npm run test:production-readiness` and `npm run check` pass.
+
+Known remaining gaps:
+
+- The auth flow now has local/session/team/invite/mock-SSO UI and API coverage, but
+  production OIDC/SAML handshakes and email delivery for invites remain future
+  provider-integration work.
+- The in-memory limiter is appropriate for local/demo and single API instances;
+  horizontally scaled production deployments should back auth throttling with Redis
+  or an ingress/API-gateway limiter.
 
 ## Phase 2.8AI - Security suppression hygiene gate
 

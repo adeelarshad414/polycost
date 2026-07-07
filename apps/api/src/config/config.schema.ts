@@ -49,6 +49,7 @@ export const configSchema = z
     RATE_LIMIT_SHARE_LINK_PER_MINUTE: z.coerce.number().int().positive().default(20),
     RATE_LIMIT_PUBLIC_READ_PER_MINUTE: z.coerce.number().int().positive().default(60),
     RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE: z.coerce.number().int().positive().default(30),
+    RATE_LIMIT_AUTH_PER_MINUTE: z.coerce.number().int().positive().default(10),
     RATE_LIMIT_NL_PARSE_PER_MINUTE: z.coerce.number().default(10),
     RATE_LIMIT_DIAGRAM_PARSE_PER_MINUTE: z.coerce.number().int().positive().default(10),
     RATE_LIMIT_LIVE_REFRESH_PER_MINUTE: z.coerce.number().default(5),
