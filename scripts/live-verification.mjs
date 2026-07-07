@@ -95,6 +95,8 @@ async function verifyTemplateRecommendationJourney() {
     markStep('opened home page');
     await page.getByRole('button', { name: /web app tier/i }).click();
     markStep('selected web app tier template');
+    await page.getByRole('button', { name: /3yr reserved/i }).click();
+    markStep('selected reserved 3yr pricing model');
     await page.getByRole('button', { name: /compare costs/i }).click();
     markStep('submitted comparison');
     await page.getByLabel('Provider cost summary').waitFor({
@@ -107,6 +109,72 @@ async function verifyTemplateRecommendationJourney() {
       timeout: 15_000,
     });
     markStep('executive recommendation visible');
+
+    const quickActions = page.getByLabel('Comparison quick actions');
+    await quickActions.waitFor({ state: 'visible', timeout: 15_000 });
+    markStep('comparison quick actions visible');
+
+    const downloads = [];
+    downloads.push(
+      await downloadReport(page, quickActions, {
+        buttonName: /^PDF$/,
+        notice: 'PDF report generated and downloaded.',
+        extension: '.pdf',
+        format: 'pdf',
+        markStep,
+      }),
+    );
+    downloads.push(
+      await downloadReport(page, quickActions, {
+        buttonName: /^CSV$/,
+        notice: 'CSV report generated and downloaded.',
+        extension: '.csv',
+        format: 'csv',
+        markStep,
+      }),
+    );
+    downloads.push(
+      await downloadReport(page, quickActions, {
+        buttonName: /^Excel$/,
+        notice: 'XLSX report generated and downloaded.',
+        extension: '.xlsx',
+        format: 'xlsx',
+        markStep,
+      }),
+    );
+
+    await page.getByRole('button', { name: /show full breakdown/i }).click();
+    await page.getByRole('button', { name: /hide full breakdown/i }).waitFor({
+      state: 'visible',
+      timeout: 15_000,
+    });
+    markStep('expanded full breakdown');
+
+    await page
+      .getByLabel('Region and scale what-if')
+      .getByRole('button', { name: /run what-if/i })
+      .click();
+    await page.getByText(/Scenario comparison .* was generated/).waitFor({
+      state: 'visible',
+      timeout: 45_000,
+    });
+    markStep('ran cached region and scale what-if');
+
+    await page.getByRole('button', { name: /create & copy link/i }).click();
+    await page.getByText('Public report ready.').waitFor({
+      state: 'visible',
+      timeout: 45_000,
+    });
+    markStep('created read-only share link');
+    const shareText = await page
+      .getByText(/token .+ ·/)
+      .first()
+      .textContent();
+    const shareToken = shareText?.match(/token\s+([A-Za-z0-9._-]+)/)?.[1];
+    if (!shareToken) {
+      throw new Error(`Expected share token in public report text, got ${shareText ?? 'empty'}`);
+    }
+
     await expectNoHorizontalOverflow(page, 'template recommendation desktop');
     markStep('desktop overflow check passed');
 
@@ -119,6 +187,16 @@ async function verifyTemplateRecommendationJourney() {
       durationMs,
       thresholdMs: templateThresholdMs,
       steps,
+      pricingModel: 'reserved-3yr',
+      exports: downloads,
+      whatIf: {
+        status: 'passed',
+        evidence: 'Scenario comparison generated from existing reviewed form',
+      },
+      share: {
+        status: 'passed',
+        tokenPrefix: shareToken.slice(0, 8),
+      },
     };
   } finally {
     await context.close();
@@ -208,6 +286,33 @@ async function verifyDiagramToPdfJourney() {
   } finally {
     await context.close();
   }
+}
+
+async function downloadReport(
+  page,
+  quickActions,
+  { buttonName, notice, extension, format, markStep },
+) {
+  const downloadPromise = page.waitForEvent('download', { timeout: 60_000 });
+  await quickActions.getByRole('button', { name: buttonName }).click();
+  markStep(`requested ${format} export`);
+  await page.locator('.status-message').filter({ hasText: notice }).waitFor({
+    state: 'visible',
+    timeout: 60_000,
+  });
+
+  const download = await downloadPromise;
+  const suggestedFilename = download.suggestedFilename();
+  if (!suggestedFilename.toLowerCase().endsWith(extension)) {
+    throw new Error(`Expected ${format} download ending ${extension}, got ${suggestedFilename}`);
+  }
+
+  markStep(`${format} downloaded: ${suggestedFilename}`);
+
+  return {
+    format,
+    suggestedFilename,
+  };
 }
 
 async function verifyRedisDegradation() {

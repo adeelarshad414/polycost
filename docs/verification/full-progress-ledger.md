@@ -86,7 +86,8 @@ Evidence:
   interactive controls.
 - `scripts/live-verification.mjs` records a JSON transcript for the
   template-to-recommendation and diagram-to-PDF timed journeys, including thresholds,
-  step labels, durations, and Redis-degradation status.
+  step labels, durations, reserved-pricing what-if, PDF/CSV/Excel exports,
+  share-link creation, and Redis-degradation status.
 
 Deferred:
 
@@ -203,7 +204,9 @@ These commands have been used as evidence gates in this run:
 
 `npm run live:verify` writes its latest smoke/timing transcript to
 `.tmp/live-verification/latest.json` by default. Set
-`POLYCOST_LIVE_VERIFY_TRANSCRIPT_PATH` to redirect the artifact in CI.
+`POLYCOST_LIVE_VERIFY_TRANSCRIPT_PATH` to redirect the artifact in CI. The
+anonymous smoke path covers compare -> reserved-pricing what-if -> PDF/CSV/Excel
+exports -> share link, plus diagram upload -> review -> comparison -> PDF.
 
 ## Honest Release Verdict
 

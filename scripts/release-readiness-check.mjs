@@ -186,6 +186,11 @@ await assertFileContains('scripts/live-verification.mjs', [
   ['live verification transcript schema', "schemaVersion: '1.0'"],
   ['template transcript entry', "name: 'template-to-recommendation'"],
   ['diagram transcript entry', "name: 'diagram-to-PDF'"],
+  ['reserved pricing live smoke', 'selected reserved 3yr pricing model'],
+  ['CSV export live smoke', 'CSV report generated and downloaded.'],
+  ['Excel export live smoke', 'XLSX report generated and downloaded.'],
+  ['what-if live smoke', 'ran cached region and scale what-if'],
+  ['share-link live smoke', 'created read-only share link'],
   ['redis transcript event', 'redis-degradation'],
   ['live verification transcript writer', 'writeTranscript'],
 ]);

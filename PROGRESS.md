@@ -94,6 +94,38 @@ say so explicitly rather than marking it done.
 | Phase 2.8AZ - Provider credential matrix hardening      | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8BA - PR-facing verification ledger             | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8BB - Live verification transcript artifact     | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8BC - Anonymous full-smoke transcript           | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8BC - Anonymous full-smoke transcript
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Extended `scripts/live-verification.mjs` so the template-to-recommendation journey
+  now covers the full anonymous smoke path required by the goal: reserved-pricing
+  selection, comparison, PDF/CSV/Excel exports, expanded details, cached region/scale
+  what-if, share-link creation, and horizontal-overflow validation.
+- The live transcript now records export filenames, the selected `reserved-3yr`
+  pricing model, what-if evidence, and a redacted share-token prefix.
+- Kept the separate diagram-to-PDF journey intact for diagram upload -> parse review
+  -> comparison -> PDF evidence.
+- Extended `npm run progress:verify` and `npm run release:check` with anchors for
+  reserved-pricing selection, CSV/Excel export, what-if, and share-link smoke steps.
+- Updated `docs/verification/full-progress-ledger.md` so release reviewers can see
+  the anonymous smoke path coverage in the PR-facing ledger.
+
+Verification:
+
+- `npm run progress:verify` requires the full anonymous smoke path anchors.
+- `npm run release:check` requires the full anonymous smoke path anchors.
+
+Known remaining gaps:
+
+- This strengthens the anonymous live-smoke transcript. Authenticated workspace flows
+  remain covered by API/UI regression tests and can be promoted to live-browser smoke
+  in a later slice once hosted CI runners are available.
 
 ## Phase 2.8BB - Live verification transcript artifact
 
