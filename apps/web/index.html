@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="light" data-theme-choice="system">
+<html lang="en" data-theme="light" data-theme-choice="system" data-accent="default">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -37,9 +37,17 @@
           document.documentElement.dataset.theme = resolved;
           document.documentElement.dataset.themeChoice = choice;
           document.documentElement.style.colorScheme = resolved;
+          var accent = localStorage.getItem('polycost-accent');
+          if (accent !== 'default' && accent !== 'terracotta') {
+            accent = 'default';
+          }
+          document.documentElement.dataset.accent = accent;
+          document.documentElement.dataset.accentChoice = accent;
         } catch (error) {
           document.documentElement.dataset.theme = 'light';
           document.documentElement.dataset.themeChoice = 'system';
+          document.documentElement.dataset.accent = 'default';
+          document.documentElement.dataset.accentChoice = 'default';
           document.documentElement.style.colorScheme = 'light';
         }
       })();

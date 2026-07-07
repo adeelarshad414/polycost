@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { POLYCOST_HERO_SUBHEAD, POLYCOST_TAGLINE } from '../brand';
-import { ResolvedTheme, ThemeChoice } from '../theme';
+import { AccentChoice, ResolvedTheme, ThemeChoice } from '../theme';
 import { ComparisonProviderResult, ComparisonResult, PROVIDER_ORDER, ProviderId } from '../types';
 import { WorkloadFormState } from '../workload';
 import { Button } from './Button';
@@ -11,8 +11,10 @@ interface LandingPageProps {
   form: WorkloadFormState;
   resolvedTheme: ResolvedTheme;
   themeChoice: ThemeChoice;
+  accentChoice: AccentChoice;
   onStartComparing: () => void;
   onThemeChange: (choice: ThemeChoice) => void;
+  onAccentChange: (choice: AccentChoice) => void;
   onViewDemo: () => void;
   onSignIn: () => void;
 }
@@ -38,8 +40,10 @@ export function LandingPage({
   form,
   resolvedTheme,
   themeChoice,
+  accentChoice,
   onStartComparing,
   onThemeChange,
+  onAccentChange,
   onViewDemo,
   onSignIn,
 }: LandingPageProps) {
@@ -70,7 +74,9 @@ export function LandingPage({
           <ThemeSwitcher
             className="landing-theme-switcher"
             themeChoice={themeChoice}
+            accentChoice={accentChoice}
             onThemeChange={onThemeChange}
+            onAccentChange={onAccentChange}
           />
         </nav>
 

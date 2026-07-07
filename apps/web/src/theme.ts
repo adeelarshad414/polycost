@@ -1,5 +1,6 @@
 export type ThemeChoice = 'system' | 'light' | 'dark';
 export type ResolvedTheme = 'light' | 'dark';
+export type AccentChoice = 'default' | 'terracotta';
 type ThemeMediaQueryList = Pick<MediaQueryList, 'matches'> &
   Partial<Pick<MediaQueryList, 'addEventListener' | 'removeEventListener'>> & {
     addListener?: (listener: () => void) => void;
@@ -7,9 +8,14 @@ type ThemeMediaQueryList = Pick<MediaQueryList, 'matches'> &
   };
 
 export const THEME_STORAGE_KEY = 'polycost-theme';
+export const ACCENT_STORAGE_KEY = 'polycost-accent';
 
 export function isThemeChoice(value: string | null): value is ThemeChoice {
   return value === 'system' || value === 'light' || value === 'dark';
+}
+
+export function isAccentChoice(value: string | null): value is AccentChoice {
+  return value === 'default' || value === 'terracotta';
 }
 
 export function storedTheme(storage: Pick<Storage, 'getItem'> = localStorage): ThemeChoice {
@@ -20,6 +26,16 @@ export function storedTheme(storage: Pick<Storage, 'getItem'> = localStorage): T
   }
 
   return 'system';
+}
+
+export function storedAccent(storage: Pick<Storage, 'getItem'> = localStorage): AccentChoice {
+  const value = storage.getItem(ACCENT_STORAGE_KEY);
+
+  if (isAccentChoice(value)) {
+    return value;
+  }
+
+  return 'default';
 }
 
 export function resolveTheme(
@@ -61,6 +77,17 @@ export function applyTheme(
   root.style.colorScheme = resolved;
   storage.setItem(THEME_STORAGE_KEY, choice);
   return resolved;
+}
+
+export function applyAccent(
+  choice: AccentChoice,
+  root: HTMLElement = document.documentElement,
+  storage: Pick<Storage, 'setItem'> = localStorage,
+): AccentChoice {
+  root.dataset.accent = choice;
+  root.dataset.accentChoice = choice;
+  storage.setItem(ACCENT_STORAGE_KEY, choice);
+  return choice;
 }
 
 export function subscribeToSystemTheme(

@@ -34,8 +34,11 @@ import {
 } from './service-catalog';
 import {
   applyTheme,
+  applyAccent,
+  AccentChoice,
   ResolvedTheme,
   resolveTheme,
+  storedAccent,
   storedTheme,
   subscribeToSystemTheme,
   ThemeChoice,
@@ -714,6 +717,7 @@ export function App({ client = polyCostClient }: AppProps) {
   const activeAsyncActionId = useRef(0);
   const initialRequirementSession = useRef(readStoredRequirementSession()).current;
   const [themeChoice, setThemeChoice] = useState<ThemeChoice>(() => storedTheme());
+  const [accentChoice, setAccentChoice] = useState<AccentChoice>(() => storedAccent());
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
     resolveTheme(storedTheme()),
   );
@@ -782,6 +786,10 @@ export function App({ client = polyCostClient }: AppProps) {
       setResolvedTheme(nextTheme);
     });
   }, [themeChoice]);
+
+  useEffect(() => {
+    applyAccent(accentChoice);
+  }, [accentChoice]);
 
   useEffect(() => {
     storeRequirementSession({
@@ -1651,8 +1659,10 @@ export function App({ client = polyCostClient }: AppProps) {
       <AppHeader
         resolvedTheme={resolvedTheme}
         themeChoice={themeChoice}
+        accentChoice={accentChoice}
         onSignIn={handleSignIn}
         onThemeChange={setThemeChoice}
+        onAccentChange={setAccentChoice}
       />
       <WorkspaceControlCenter
         client={client}
@@ -3359,13 +3369,17 @@ function teamRoleLabel(role: TeamRole): string {
 function AppHeader({
   resolvedTheme,
   themeChoice,
+  accentChoice,
   onSignIn,
   onThemeChange,
+  onAccentChange,
 }: {
   resolvedTheme: ResolvedTheme;
   themeChoice: ThemeChoice;
+  accentChoice: AccentChoice;
   onSignIn: () => void;
   onThemeChange: (choice: ThemeChoice) => void;
+  onAccentChange: (choice: AccentChoice) => void;
 }) {
   return (
     <header className="app-header" aria-label="PolyCost workspace header">
@@ -3380,7 +3394,12 @@ function AppHeader({
       </a>
 
       <div className="app-header-actions">
-        <ThemeSwitcher themeChoice={themeChoice} onThemeChange={onThemeChange} />
+        <ThemeSwitcher
+          themeChoice={themeChoice}
+          accentChoice={accentChoice}
+          onThemeChange={onThemeChange}
+          onAccentChange={onAccentChange}
+        />
         <Button
           type="button"
           variant="secondary"

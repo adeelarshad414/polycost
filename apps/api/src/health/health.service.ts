@@ -15,6 +15,11 @@ export interface HealthDependency {
   error?: string;
 }
 
+export interface LiveHealthResponse {
+  status: 'ok';
+  service: 'polycost-api';
+}
+
 export interface HealthResponse {
   status: 'ok' | 'degraded';
   service: 'polycost-api';
@@ -47,6 +52,13 @@ export class HealthService {
     @Optional()
     private readonly apiDatabaseRepository?: ApiDatabaseRepository,
   ) {}
+
+  getLiveHealth(): LiveHealthResponse {
+    return {
+      status: 'ok',
+      service: 'polycost-api',
+    };
+  }
 
   async getHealth(): Promise<HealthResponse> {
     const [db, cache] = await Promise.all([

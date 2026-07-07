@@ -11,7 +11,7 @@
 Bring every screen and every component of the target application into conformance with:
 
 1. The **shared portfolio design system** (§2) — dark-first surfaces, typography, spacing, component anatomy, accent discipline (identical structure to the CPN reference).
-2. The **product's own brand pack** (§3) — each tool has exactly one brand accent; all five packs share the same token *shape* so components are portable across products.
+2. The **product's own brand pack** (§3) — each tool has exactly one brand accent; all five packs share the same token _shape_ so components are portable across products.
 
 The run is a **find → audit → update** loop: discover every screen/component, audit against this spec, remediate, verify, report. The run is complete only when the Definition of Done (§9) is satisfied or every remaining item is in the Blocked section.
 
@@ -31,21 +31,21 @@ The run is a **find → audit → update** loop: discover every screen/component
 
 ## 2. SHARED PORTFOLIO DESIGN SYSTEM (all five products)
 
-Structure is inherited 1:1 from the CPN reference (`cpn-design-system.md` §5–§8): fixed collapsible sidebar → top bar → optional announcement banner → canvas with cards; flat depth via surface steps + 1px borders; radii 8–10px; one accent doing all the work. Only the *palette base* differs: the portfolio is **dark-first**.
+Structure is inherited 1:1 from the CPN reference (`cpn-design-system.md` §5–§8): fixed collapsible sidebar → top bar → optional announcement banner → canvas with cards; flat depth via surface steps + 1px borders; radii 8–10px; one accent doing all the work. Only the _palette base_ differs: the portfolio is **dark-first**.
 
 ### 2.1 Neutral tokens (identical across all products — IMMUTABLE)
 
-| Token | Hex | Usage |
-|---|---|---|
-| `surface-canvas` | `#0B0E14` | App/page background |
-| `surface-card` | `#141824` | Cards, top bar, sidebar base*, inputs, popovers |
-| `surface-raised` | `#1B2130` | Card header strips, hover rows, table headers, skeletons |
-| `border-default` | `#232A3B` | Card borders, dividers, input borders |
-| `border-strong` | `#2F3850` | Badge borders, hover borders, focused table rows |
-| `ink-900` | `#EDEFF5` | Headings, primary text |
-| `ink-600` | `#9AA1B2` | Body text, descriptions |
-| `ink-400` | `#646C80` | Placeholders, tertiary meta, inactive icons |
-| `on-brand` | `#0B0E14` or `#FFFFFF` | Per brand pack (§3) — whichever passes AA on `brand-500` |
+| Token            | Hex                    | Usage                                                    |
+| ---------------- | ---------------------- | -------------------------------------------------------- |
+| `surface-canvas` | `#0B0E14`              | App/page background                                      |
+| `surface-card`   | `#141824`              | Cards, top bar, sidebar base*, inputs, popovers          |
+| `surface-raised` | `#1B2130`              | Card header strips, hover rows, table headers, skeletons |
+| `border-default` | `#232A3B`              | Card borders, dividers, input borders                    |
+| `border-strong`  | `#2F3850`              | Badge borders, hover borders, focused table rows         |
+| `ink-900`        | `#EDEFF5`              | Headings, primary text                                   |
+| `ink-600`        | `#9AA1B2`              | Body text, descriptions                                  |
+| `ink-400`        | `#646C80`              | Placeholders, tertiary meta, inactive icons              |
+| `on-brand`       | `#0B0E14` or `#FFFFFF` | Per brand pack (§3) — whichever passes AA on `brand-500` |
 
 *Sidebar note: unlike CPN's brand-filled sidebar, the dark-first shell uses `surface-card` sidebar with a **brand-500 active-item block and a 3px brand left rail** — the brand identifies the product without flooding a huge surface. This is a locked adaptation of the CPN pattern for dark mode.
 
@@ -57,12 +57,12 @@ Structure is inherited 1:1 from the CPN reference (`cpn-design-system.md` §5–
 
 ### 2.3 Reserved semantic colors (NEVER brand, NEVER decorative)
 
-| Group | Tokens | Rule |
-|---|---|---|
-| RAG status | `status-ok #3FB68B` · `status-warn #F59E0B` · `status-crit #E5484D` | Status semantics only (health, severity, budget breach, SLO). Never used as accents, chart series defaults, or decoration. |
-| Provider accents | AWS `#D85A30` · Azure `#378ADD` · GCP `#1D9E75` | Provider identification only (chips, chart series keyed to a provider, logos). Accent-only — never button fills or large backgrounds. |
+| Group            | Tokens                                                              | Rule                                                                                                                                  |
+| ---------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| RAG status       | `status-ok #3FB68B` · `status-warn #F59E0B` · `status-crit #E5484D` | Status semantics only (health, severity, budget breach, SLO). Never used as accents, chart series defaults, or decoration.            |
+| Provider accents | AWS `#D85A30` · Azure `#378ADD` · GCP `#1D9E75`                     | Provider identification only (chips, chart series keyed to a provider, logos). Accent-only — never button fills or large backgrounds. |
 
-**Collision guard:** no product brand hue may be visually confusable with RAG or provider tokens *in the same component class*. Brand color never conveys status; status color never decorates.
+**Collision guard:** no product brand hue may be visually confusable with RAG or provider tokens _in the same component class_. Brand color never conveys status; status color never decorates.
 
 ### 2.4 Token architecture (config-driven, CI-enforced)
 
@@ -74,11 +74,20 @@ Structure is inherited 1:1 from the CPN reference (`cpn-design-system.md` §5–
 ```css
 /* tokens.css — same file shape in every repo; only §3 brand block differs */
 :root {
-  --surface-canvas:#0B0E14; --surface-card:#141824; --surface-raised:#1B2130;
-  --border-default:#232A3B; --border-strong:#2F3850;
-  --ink-900:#EDEFF5; --ink-600:#9AA1B2; --ink-400:#646C80;
-  --status-ok:#3FB68B; --status-warn:#F59E0B; --status-crit:#E5484D;
-  --aws:#D85A30; --azure:#378ADD; --gcp:#1D9E75;
+  --surface-canvas: #0b0e14;
+  --surface-card: #141824;
+  --surface-raised: #1b2130;
+  --border-default: #232a3b;
+  --border-strong: #2f3850;
+  --ink-900: #edeff5;
+  --ink-600: #9aa1b2;
+  --ink-400: #646c80;
+  --status-ok: #3fb68b;
+  --status-warn: #f59e0b;
+  --status-crit: #e5484d;
+  --aws: #d85a30;
+  --azure: #378add;
+  --gcp: #1d9e75;
   /* --brand-* injected from the product's brand pack (§3) */
 }
 ```
@@ -121,24 +130,66 @@ Each pack is the **same 5-step shape** as the CPN terracotta scale: `600` (hover
 
 Hue choices follow the CPN discipline (one warm, confident, mid-saturation accent per tool) and were selected for product semantics + mutual distinctness + non-collision with RAG/provider tokens. **Final hue sign-off = `HUMAN_DECISION_GATE` per product** (record, don't wait).
 
-| Product | Identity rationale | `600` | `500` (primary) | `400` | `on-brand` |
-|---|---|---|---|---|---|
-| **Postura** (CSPM) | Trust/guardian → indigo; unmistakably "security", far from Azure blue's hue/saturation | `#5566E0` | `#6B7CF5` | `#8B99F8` | `#0B0E14` |
-| **PolyCost** (AI cost intel) | AI-native → violet; reads "intelligence", distinct from Postura's indigo | `#8F5FE0` | `#A879F0` | `#BD95F4` | `#0B0E14` |
-| **Lumen** (observability) | Light/spectra → luminous cyan; "signal" without touching GCP green or Azure blue | `#2BA9BA` | `#3BC4D6` | `#63D2E0` | `#0B0E14` |
-| **Costalyx** (FinOps) | Currency/value → gold; deliberately darker & warmer than `status-warn` amber and never used in status position | `#C08A2E` | `#D9A63B` | `#E2B95F` | `#0B0E14` |
-| **Vecta** (migration intel) 🔒 | Transit Fuchsia — journey/transit; only unused hue family in the portfolio | `#C026D3` | `#D946EF` | `#E879F9` | `#0B0E14` |
+| Product                        | Identity rationale                                                                                             | `600`     | `500` (primary) | `400`     | `on-brand` |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------- | --------- | --------------- | --------- | ---------- |
+| **Postura** (CSPM)             | Trust/guardian → indigo; unmistakably "security", far from Azure blue's hue/saturation                         | `#5566E0` | `#6B7CF5`       | `#8B99F8` | `#0B0E14`  |
+| **PolyCost** (AI cost intel)   | AI-native → violet; reads "intelligence", distinct from Postura's indigo                                       | `#8F5FE0` | `#A879F0`       | `#BD95F4` | `#0B0E14`  |
+| **Lumen** (observability)      | Light/spectra → luminous cyan; "signal" without touching GCP green or Azure blue                               | `#2BA9BA` | `#3BC4D6`       | `#63D2E0` | `#0B0E14`  |
+| **Costalyx** (FinOps)          | Currency/value → gold; deliberately darker & warmer than `status-warn` amber and never used in status position | `#C08A2E` | `#D9A63B`       | `#E2B95F` | `#0B0E14`  |
+| **Vecta** (migration intel) 🔒 | Transit Fuchsia — journey/transit; only unused hue family in the portfolio                                     | `#C026D3` | `#D946EF`       | `#E879F9` | `#0B0E14`  |
 
 🔒 Vecta is **locked by the product owner** and carries a secondary hue: Vector Cyan `#22D0EE`, permitted only in the cyan→fuchsia source→target brand gradient and motion/transit elements — never in accent-budget positions. Full pack, gradient tokens, and naming fallback (Migrata) are defined in `master-production-readiness-orchestrator-v2.md` §3.1, which supersedes this table for Vecta.
 
 Per-repo injection (only block that differs between repos) — additionally, every repo appends the universal **Terracotta accent theme** block (user-selectable via Settings → Appearance; see `master-production-readiness-orchestrator-v2.md` §3.3):
 
 ```css
-/* POSTURA */  :root{--brand-600:#5566E0;--brand-500:#6B7CF5;--brand-400:#8B99F8;--brand-100:rgba(107,124,245,.18);--brand-50:rgba(107,124,245,.08);--on-brand:#0B0E14;}
-/* POLYCOST */ :root{--brand-600:#8F5FE0;--brand-500:#A879F0;--brand-400:#BD95F4;--brand-100:rgba(168,121,240,.18);--brand-50:rgba(168,121,240,.08);--on-brand:#0B0E14;}
-/* LUMEN */    :root{--brand-600:#2BA9BA;--brand-500:#3BC4D6;--brand-400:#63D2E0;--brand-100:rgba(59,196,214,.18);--brand-50:rgba(59,196,214,.08);--on-brand:#0B0E14;}
-/* COSTALYX */ :root{--brand-600:#C08A2E;--brand-500:#D9A63B;--brand-400:#E2B95F;--brand-100:rgba(217,166,59,.18);--brand-50:rgba(217,166,59,.08);--on-brand:#0B0E14;}
-/* VECTA */    :root{--brand-600:#C026D3;--brand-500:#D946EF;--brand-400:#E879F9;--brand-100:rgba(217,70,239,.18);--brand-50:rgba(217,70,239,.08);--on-brand:#0B0E14;--vector-cyan:#22D0EE;--brand-gradient:linear-gradient(90deg,var(--vector-cyan) 0%,var(--brand-500) 100%);}
+/* POSTURA */
+:root {
+  --brand-600: #5566e0;
+  --brand-500: #6b7cf5;
+  --brand-400: #8b99f8;
+  --brand-100: rgba(107, 124, 245, 0.18);
+  --brand-50: rgba(107, 124, 245, 0.08);
+  --on-brand: #0b0e14;
+}
+/* POLYCOST */
+:root {
+  --brand-600: #8f5fe0;
+  --brand-500: #a879f0;
+  --brand-400: #bd95f4;
+  --brand-100: rgba(168, 121, 240, 0.18);
+  --brand-50: rgba(168, 121, 240, 0.08);
+  --on-brand: #0b0e14;
+}
+/* LUMEN */
+:root {
+  --brand-600: #2ba9ba;
+  --brand-500: #3bc4d6;
+  --brand-400: #63d2e0;
+  --brand-100: rgba(59, 196, 214, 0.18);
+  --brand-50: rgba(59, 196, 214, 0.08);
+  --on-brand: #0b0e14;
+}
+/* COSTALYX */
+:root {
+  --brand-600: #c08a2e;
+  --brand-500: #d9a63b;
+  --brand-400: #e2b95f;
+  --brand-100: rgba(217, 166, 59, 0.18);
+  --brand-50: rgba(217, 166, 59, 0.08);
+  --on-brand: #0b0e14;
+}
+/* VECTA */
+:root {
+  --brand-600: #c026d3;
+  --brand-500: #d946ef;
+  --brand-400: #e879f9;
+  --brand-100: rgba(217, 70, 239, 0.18);
+  --brand-50: rgba(217, 70, 239, 0.08);
+  --on-brand: #0b0e14;
+  --vector-cyan: #22d0ee;
+  --brand-gradient: linear-gradient(90deg, var(--vector-cyan) 0%, var(--brand-500) 100%);
+}
 ```
 
 ### 3.1 Product-specific surface rules (append-only)
@@ -153,11 +204,13 @@ Per-repo injection (only block that differs between repos) — additionally, eve
 ## 4. GOAL RUN — PHASES
 
 ### Phase 0 — DISCOVER (reality-check)
+
 1. Enumerate every route/page (router config, file-based routes, nav definitions) and every component (`src/components`, `src/pages`, design-system folders, storybook if present).
 2. Build `THEME-INVENTORY.md`: table of `route/component · status(implemented/not built/blocked) · evidence(path)`.
 3. Detect stack (Tailwind version, shadcn presence, CSS modules, styled-components remnants) — remediation strategy depends on it. Non-Tailwind styling found = finding with migration note, not silent rewrite.
 
 ### Phase 1 — TOKEN AUDIT
+
 1. Verify/create `tokens.css` + Tailwind mapping (§2.4) + shadcn mapping (§2.5) + this product's brand block (§3).
 2. Run the hex-grep. Every raw hex outside tokens = finding `TKN-###` with file:line evidence.
 3. Find off-system Tailwind palette usage (`bg-slate-*`, `text-blue-*`, `bg-red-500` as status, etc.) — each = finding with proposed token mapping.
@@ -175,16 +228,19 @@ Per-repo injection (only block that differs between repos) — additionally, eve
 Each violation = finding: `id · screen · component · rule violated (§ref) · evidence · proposed fix · risk`.
 
 ### Phase 3 — REMEDIATE
+
 - Fix in dependency order: tokens → shared primitives → shell → screens.
 - Additive-only: introduce `*-v2` component variants only when in-place change would break the regression floor; otherwise edit in place.
 - Conventional commits per logical unit: `fix(theme): map cost tables to token system [TKN-014, CMP-007]`.
 
 ### Phase 4 — VERIFY
+
 - Full test suites (regression floor). Hex-grep CI guard green. Lint/build green.
 - Screenshot every audited screen (before/after where changed) → `docs/theme-audit/<date>/`. Playwright screenshot pass where configured; otherwise storybook/manual = `verified (mock)`.
 - Contrast re-check on all changed pairs.
 
 ### Phase 5 — REPORT (single end-of-run)
+
 `THEME-AUDIT-REPORT.md`: inventory summary · findings table with disposition (`fixed / deferred / blocked`) · evidence links · screenshots index · regression-floor confirmation (suite names + counts) · **Blocked section (mandatory)** · `HUMAN_DECISION_GATE` register (at minimum: final brand-hue sign-off; any font-license question; any trademark-dependent brand asset for Vecta/Lumen) · `DUMMY-VALUES.md` delta. Update `PROGRESS.md`. Push.
 
 ---
@@ -192,6 +248,7 @@ Each violation = finding: `id · screen · component · rule violated (§ref) ·
 ## 5. REVIEW BOARD (validation personas — apply during Phase 2 & 4)
 
 Audit every screen through each lens; a screen passes only when all lenses pass:
+
 1. **Brand steward** — accent budget respected; product hue unmistakable; no cross-product hue leakage.
 2. **UI engineer** — zero raw hex; tokens resolve; Tailwind classes canonical; shadcn vars mapped.
 3. **UX** — hierarchy, empty/error/loading states designed, copy active-voice and consistent.
@@ -214,4 +271,4 @@ Audit every screen through each lens; a screen passes only when all lenses pass:
 
 ---
 
-*Precedence: this file > repo-local styling habits. Conflicts with locked architectural decisions are surfaced in the report, never papered over. Anything this file doesn't answer resolves in favor of: dark neutral surface, single product accent, 1px border, 8–10px radius, mono numerals, no shadow.*
+_Precedence: this file > repo-local styling habits. Conflicts with locked architectural decisions are surfaced in the report, never papered over. Anything this file doesn't answer resolves in favor of: dark neutral surface, single product accent, 1px border, 8–10px radius, mono numerals, no shadow._

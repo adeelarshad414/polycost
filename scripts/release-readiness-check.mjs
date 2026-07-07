@@ -49,8 +49,14 @@ if (!packageJson.scripts?.['demo:verify-clean']) {
 if (!packageJson.scripts?.['pricing:logic:coverage']) {
   failures.push('package.json is missing pricing:logic:coverage');
 }
+if (!packageJson.scripts?.['theme:hex:check']) {
+  failures.push('package.json is missing theme:hex:check');
+}
 if (!packageJson.scripts?.['ci:unit']?.includes('npm run pricing:logic:coverage')) {
   failures.push('package.json ci:unit script must include npm run pricing:logic:coverage');
+}
+if (!packageJson.scripts?.check?.includes('npm run theme:hex:check')) {
+  failures.push('package.json check script must include npm run theme:hex:check');
 }
 if (!packageJson.scripts?.check?.includes('npm run provider:credentials:check')) {
   failures.push('package.json check script must include npm run provider:credentials:check');
@@ -154,6 +160,7 @@ await assertFileContains('docs/verification/full-progress-ledger.md', [
 ]);
 
 await assertFileContains('.github/workflows/ci.yml', [
+  ['theme hex guard CI gate', 'npm run theme:hex:check'],
   ['provider credential readiness CI gate', 'npm run provider:credentials:check'],
   ['full progress verification CI gate', 'npm run progress:verify'],
   ['production-readiness focused regression CI gate', 'npm run test:production-readiness'],
@@ -175,6 +182,13 @@ await assertFileContains('apps/web/e2e/polycost-browser.e2e.ts', [
   ['768px breakpoint proof', "label: 'tablet 768'"],
   ['1440px breakpoint proof', "label: 'desktop 1440'"],
   ['interactive accessible-name audit', 'expectInteractiveControlsAreNamed'],
+]);
+
+await assertFileContains('apps/web/src/styles/tokens.css', [
+  ['PolyCost default accent', '--brand-500: #7c4fd0'],
+  ['terracotta accent axis', "[data-accent='terracotta']"],
+  ['provider accent tokens', '--aws: #d85a30'],
+  ['status semantic tokens', '--status-ok: #2e9e76'],
 ]);
 
 await assertFileContains('scripts/ci-e2e.mjs', [

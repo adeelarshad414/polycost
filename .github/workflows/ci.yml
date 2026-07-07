@@ -22,6 +22,8 @@ jobs:
         run: npm run format:check
       - name: Lint and typecheck
         run: npm run ci:lint
+      - name: Theme token hex guard
+        run: npm run theme:hex:check
       # `npm run qa` invokes `npm run impeccable`; scripts/impeccable-check.mjs
       # exits 0 with a documented warning on Node 20 because impeccable@3.1.0
       # requires Node 24+. Tracking: docs/SECURITY-SUPPRESSIONS.md and

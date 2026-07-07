@@ -97,6 +97,71 @@ say so explicitly rather than marking it done.
 | Phase 2.8BC - Anonymous full-smoke transcript           | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8BD - Workspace auth live transcript            | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8BE - Isolated live runtime verification        | Complete with known gaps (see notes) | 2026-07-07   |
+| Production readiness orchestrator v2 pass               | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Production readiness orchestrator v2 pass
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Moved the production-readiness orchestrator documents into the requested
+  `docs/design/*` entrypoint path.
+- Added `STATE-SYNC.md` and `THEME-INVENTORY.md` for the v2 continuation protocol.
+- Split frontend tokens into `apps/web/src/styles/tokens.css`, added the PolyCost
+  violet default accent, added the terracotta accent axis, and wired the existing
+  Appearance control to persist both Mode and Accent before hydration.
+- Added `npm run theme:hex:check` and the matching CI gate so raw hex values in
+  frontend source are blocked outside the dedicated token file.
+- Added additive `/health/live`, `/api/v1/health/live`, `/health/ready`, and
+  `/api/v1/health/ready` endpoints while preserving existing `/health` and
+  `/health/deep` behavior.
+- Captured the dual-mode/default-accent and dual-mode/terracotta smoke archive in
+  `docs/theme-audit/2026-07-07/`.
+- Added `PRODUCTION-READINESS-REPORT.md`.
+
+Runtime evidence:
+
+- Theme archive token checks:
+  - dark/default: `--brand-500=#a879f0`, `--surface-canvas=#0b0e14`
+  - light/default: `--brand-500=#7c4fd0`, `--surface-canvas=#f5f4ef`
+  - dark/terracotta: `--brand-500=#d97757`, `--surface-canvas=#0b0e14`
+  - light/terracotta: `--brand-500=#d97757`, `--surface-canvas=#f5f4ef`
+- Isolated full-stack retry on `WEB_PORT=3230`, `API_HOST_PORT=3231`,
+  `VAULT_HOST_PORT=8340`:
+  - API E2E passed `16/16`.
+  - Direct web Playwright passed `7/7`.
+  - Direct `live:verify` passed with template-to-recommendation `4201ms`,
+    diagram-to-PDF `3448ms`, workspace auth/RBAC `507ms`, and Redis degradation
+    `/health=degraded`, `/health/deep=degraded`, data-health HTTP `200`.
+- Transcript `.tmp/live-verification/latest-v2-prod-ready.json` was scanned for
+  secret-like fields; only benign labels and `stateVerified: true` were present.
+
+Verification:
+
+- `npm run format:check`
+- `npm run ci:lint`
+- `npm run theme:hex:check`
+- `npm run check`
+- `npm run test:production-readiness`
+- `npm run ci:build`
+- API E2E directly through the isolated `ci:e2e` retry: `16/16`
+- `env POLYCOST_WEB_BASE_URL=http://127.0.0.1:3230 npm run test:e2e --workspace @polycost/web`
+- `npm run live:verify` against the isolated Compose stack
+
+Known remaining gaps:
+
+- Hosted GitHub Actions remains externally blocked before repository steps execute
+  (`runner_id: 0`, empty runner name/group, `steps: []` on the latest inspected
+  jobs).
+- The first isolated `ci:e2e` attempt failed before tests during Docker web image
+  `npm ci` with npm `ECONNRESET`; retry progressed through stack startup. The wrapper
+  later exited with SIGTERM after API E2E and partial Playwright output, so the same
+  healthy stack was verified directly with Playwright `7/7` and `live:verify`.
+- Full invoice-grade billing, full Visio visual rendering, production LLM corpus
+  quality, production email/SSO/SAML, and complete enterprise account/team UX remain
+  future phases.
 
 ## Phase 2.8BE - Isolated live runtime verification
 

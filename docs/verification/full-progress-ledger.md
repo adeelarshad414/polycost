@@ -195,6 +195,20 @@ Evidence:
   decision.
 - `RELEASE-CHECKLIST.md` states the human actions needed before making the private
   repository public.
+- `STATE-SYNC.md` and `THEME-INVENTORY.md` record the v2 continuation protocol,
+  product detection, route/component inventory, and human decision gates.
+- `apps/web/src/styles/tokens.css` now contains the v2 dual-mode token layer,
+  PolyCost default accent, and terracotta accent axis; `npm run theme:hex:check`
+  enforces zero raw hex outside that token file.
+- `docs/theme-audit/2026-07-07/` contains dark/light default screenshots plus
+  dark/light terracotta smoke screenshots with token evidence.
+- Additive liveness/readiness aliases are exposed through `/health/live`,
+  `/api/v1/health/live`, `/health/ready`, and `/api/v1/health/ready`.
+- The latest isolated v2 runtime stack on `WEB_PORT=3230`, `API_HOST_PORT=3231`,
+  and `VAULT_HOST_PORT=8340` passed API E2E `16/16`, direct web Playwright `7/7`,
+  and direct `live:verify` with template-to-recommendation `4201ms` / `60000ms`,
+  diagram-to-PDF `3448ms` / `180000ms`, workspace auth/RBAC `507ms` / `60000ms`,
+  and Redis degradation data-health HTTP `200`.
 
 Blocked:
 
@@ -215,12 +229,18 @@ These commands have been used as evidence gates in this run:
 - `npm run format:check`
 - `npm run release:check`
 - `npm run provider:credentials:check`
+- `npm run theme:hex:check`
 - `npm run live:verify` against isolated local ports (`WEB_PORT=3200`,
   `API_HOST_PORT=3201`, `VAULT_HOST_PORT=8320`)
 - `npm run ci:e2e` against isolated local ports (`WEB_PORT=3210`,
   `API_HOST_PORT=3211`, `VAULT_HOST_PORT=8330`)
+- API E2E directly through the isolated v2 stack: `16/16`
+- Direct web Playwright against the isolated v2 stack: `7/7`
+- `npm run live:verify` against the isolated v2 stack (`WEB_PORT=3230`,
+  `API_HOST_PORT=3231`, `VAULT_HOST_PORT=8340`)
 - `npm run progress:verify`
 - `npm run test:production-readiness`
+- `npm run ci:build`
 - `npm run check`
 
 `npm run live:verify` writes its latest smoke/timing transcript to
@@ -235,6 +255,8 @@ The latest local transcript was captured at
 local/ignored, while the timings above are recorded here for release review. The
 latest CI-orchestrated local transcript was captured at
 `.tmp/live-verification/latest-ci-e2e-local.json`, also local/ignored.
+The latest v2 production-readiness transcript was captured at
+`.tmp/live-verification/latest-v2-prod-ready.json`, also local/ignored.
 
 ## Honest Release Verdict
 

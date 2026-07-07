@@ -41,16 +41,16 @@ Components reference **semantic tokens only**; modes swap variable values. Zero 
 
 ### 2.2 Neutral tokens — both modes (IMMUTABLE)
 
-| Token | Dark (default) | Light |
-|---|---|---|
-| `surface-canvas` | `#0B0E14` | `#F5F4EF` |
-| `surface-card` | `#141824` | `#FFFFFF` |
-| `surface-raised` | `#1B2130` | `#EAE8E2` |
-| `border-default` | `#232A3B` | `#E4E2DB` |
-| `border-strong` | `#2F3850` | `#D6D3CB` |
-| `ink-900` | `#EDEFF5` | `#26241F` |
-| `ink-600` | `#9AA1B2` | `#5C5A57` |
-| `ink-400` | `#646C80` | `#8B8880` |
+| Token            | Dark (default) | Light     |
+| ---------------- | -------------- | --------- |
+| `surface-canvas` | `#0B0E14`      | `#F5F4EF` |
+| `surface-card`   | `#141824`      | `#FFFFFF` |
+| `surface-raised` | `#1B2130`      | `#EAE8E2` |
+| `border-default` | `#232A3B`      | `#E4E2DB` |
+| `border-strong`  | `#2F3850`      | `#D6D3CB` |
+| `ink-900`        | `#EDEFF5`      | `#26241F` |
+| `ink-600`        | `#9AA1B2`      | `#5C5A57` |
+| `ink-400`        | `#646C80`      | `#8B8880` |
 
 Light mode = the CPN warm-neutral palette exactly; dark mode = the portfolio dark-first surfaces. Same component anatomy in both (shell, cards, 1px borders, 8–10px radii, flat depth, Inter + JetBrains Mono for all numerics).
 
@@ -61,17 +61,32 @@ RAG (`ok #3FB68B / #2E9E76`, `warn #F59E0B / #B45309`, `crit #E5484D / #C93338` 
 ### 2.4 tokens.css shape (every repo identical except brand block)
 
 ```css
-:root, [data-theme="dark"] {
-  --surface-canvas:#0B0E14; --surface-card:#141824; --surface-raised:#1B2130;
-  --border-default:#232A3B; --border-strong:#2F3850;
-  --ink-900:#EDEFF5; --ink-600:#9AA1B2; --ink-400:#646C80;
-  --status-ok:#3FB68B; --status-warn:#F59E0B; --status-crit:#E5484D;
+:root,
+[data-theme='dark'] {
+  --surface-canvas: #0b0e14;
+  --surface-card: #141824;
+  --surface-raised: #1b2130;
+  --border-default: #232a3b;
+  --border-strong: #2f3850;
+  --ink-900: #edeff5;
+  --ink-600: #9aa1b2;
+  --ink-400: #646c80;
+  --status-ok: #3fb68b;
+  --status-warn: #f59e0b;
+  --status-crit: #e5484d;
 }
-[data-theme="light"] {
-  --surface-canvas:#F5F4EF; --surface-card:#FFFFFF; --surface-raised:#EAE8E2;
-  --border-default:#E4E2DB; --border-strong:#D6D3CB;
-  --ink-900:#26241F; --ink-600:#5C5A57; --ink-400:#8B8880;
-  --status-ok:#2E9E76; --status-warn:#B45309; --status-crit:#C93338;
+[data-theme='light'] {
+  --surface-canvas: #f5f4ef;
+  --surface-card: #ffffff;
+  --surface-raised: #eae8e2;
+  --border-default: #e4e2db;
+  --border-strong: #d6d3cb;
+  --ink-900: #26241f;
+  --ink-600: #5c5a57;
+  --ink-400: #8b8880;
+  --status-ok: #2e9e76;
+  --status-warn: #b45309;
+  --status-crit: #c93338;
 }
 ```
 
@@ -81,27 +96,36 @@ RAG (`ok #3FB68B / #2E9E76`, `warn #F59E0B / #B45309`, `crit #E5484D / #C93338` 
 
 Same five hues as v1; each pack now defines **mode-specific values** because a `brand-500` tuned for dark canvases can fail AA as text/fill on white. Rule: `brand-500` = fills/buttons/rails; `brand-text` = links & accent text (AA-checked per mode); `100/50` = alpha tints (work in both modes automatically).
 
-| Product | Dark `500` | Dark `on-brand` | Light `500` | Light `text` | Light `on-brand` |
-|---|---|---|---|---|---|
-| **Postura** (indigo) | `#6B7CF5` | `#0B0E14` | `#4F5FD6` | `#4353C4` | `#FFFFFF` |
-| **PolyCost** (violet) | `#A879F0` | `#0B0E14` | `#7C4FD0` | `#6B3FC0` | `#FFFFFF` |
-| **Lumen** (cyan) | `#3BC4D6` | `#0B0E14` | `#1E93A6` | `#177A8A` | `#FFFFFF` |
-| **Costalyx** (gold) | `#D9A63B` | `#0B0E14` | `#A87A1E` | `#8F6710` | `#FFFFFF` |
-| **Vecta** (transit fuchsia) 🔒 | `#D946EF` | `#0B0E14` | `#C026D3` | `#A21CAF` | `#FFFFFF` |
+| Product                        | Dark `500` | Dark `on-brand` | Light `500` | Light `text` | Light `on-brand` |
+| ------------------------------ | ---------- | --------------- | ----------- | ------------ | ---------------- |
+| **Postura** (indigo)           | `#6B7CF5`  | `#0B0E14`       | `#4F5FD6`   | `#4353C4`    | `#FFFFFF`        |
+| **PolyCost** (violet)          | `#A879F0`  | `#0B0E14`       | `#7C4FD0`   | `#6B3FC0`    | `#FFFFFF`        |
+| **Lumen** (cyan)               | `#3BC4D6`  | `#0B0E14`       | `#1E93A6`   | `#177A8A`    | `#FFFFFF`        |
+| **Costalyx** (gold)            | `#D9A63B`  | `#0B0E14`       | `#A87A1E`   | `#8F6710`    | `#FFFFFF`        |
+| **Vecta** (transit fuchsia) 🔒 | `#D946EF`  | `#0B0E14`       | `#C026D3`   | `#A21CAF`    | `#FFFFFF`        |
 
 🔒 = **locked by the product owner** (supersedes any earlier proposal in v1/v2). Vecta's earlier terracotta proposal is retired.
 
 ```css
 /* Example — LUMEN; same shape for all five, swap values from table */
-:root, [data-theme="dark"] {
-  --brand-600:#2BA9BA; --brand-500:#3BC4D6; --brand-400:#63D2E0;
-  --brand-100:rgba(59,196,214,.18); --brand-50:rgba(59,196,214,.08);
-  --brand-text:#3BC4D6; --on-brand:#0B0E14;
+:root,
+[data-theme='dark'] {
+  --brand-600: #2ba9ba;
+  --brand-500: #3bc4d6;
+  --brand-400: #63d2e0;
+  --brand-100: rgba(59, 196, 214, 0.18);
+  --brand-50: rgba(59, 196, 214, 0.08);
+  --brand-text: #3bc4d6;
+  --on-brand: #0b0e14;
 }
-[data-theme="light"] {
-  --brand-600:#177A8A; --brand-500:#1E93A6; --brand-400:#4DB2C2;
-  --brand-100:rgba(30,147,166,.14); --brand-50:rgba(30,147,166,.07);
-  --brand-text:#177A8A; --on-brand:#FFFFFF;
+[data-theme='light'] {
+  --brand-600: #177a8a;
+  --brand-500: #1e93a6;
+  --brand-400: #4db2c2;
+  --brand-100: rgba(30, 147, 166, 0.14);
+  --brand-50: rgba(30, 147, 166, 0.07);
+  --brand-text: #177a8a;
+  --on-brand: #ffffff;
 }
 ```
 
@@ -117,19 +141,30 @@ Vecta is the only product with a **two-hue system**. Roles are strict:
 
 ```css
 /* VECTA — locked */
-:root, [data-theme="dark"] {
-  --brand-600:#C026D3; --brand-500:#D946EF; --brand-400:#E879F9;
-  --brand-100:rgba(217,70,239,.18); --brand-50:rgba(217,70,239,.08);
-  --brand-text:#E879F9; --on-brand:#0B0E14;
-  --vector-cyan:#22D0EE; --vector-cyan-dim:rgba(34,208,238,.35);
-  --brand-gradient:linear-gradient(90deg,var(--vector-cyan) 0%,var(--brand-500) 100%);
+:root,
+[data-theme='dark'] {
+  --brand-600: #c026d3;
+  --brand-500: #d946ef;
+  --brand-400: #e879f9;
+  --brand-100: rgba(217, 70, 239, 0.18);
+  --brand-50: rgba(217, 70, 239, 0.08);
+  --brand-text: #e879f9;
+  --on-brand: #0b0e14;
+  --vector-cyan: #22d0ee;
+  --vector-cyan-dim: rgba(34, 208, 238, 0.35);
+  --brand-gradient: linear-gradient(90deg, var(--vector-cyan) 0%, var(--brand-500) 100%);
 }
-[data-theme="light"] {
-  --brand-600:#A21CAF; --brand-500:#C026D3; --brand-400:#D946EF;
-  --brand-100:rgba(192,38,211,.14); --brand-50:rgba(192,38,211,.07);
-  --brand-text:#A21CAF; --on-brand:#FFFFFF;
-  --vector-cyan:#0E9CB8; --vector-cyan-dim:rgba(14,156,184,.30);
-  --brand-gradient:linear-gradient(90deg,var(--vector-cyan) 0%,var(--brand-500) 100%);
+[data-theme='light'] {
+  --brand-600: #a21caf;
+  --brand-500: #c026d3;
+  --brand-400: #d946ef;
+  --brand-100: rgba(192, 38, 211, 0.14);
+  --brand-50: rgba(192, 38, 211, 0.07);
+  --brand-text: #a21caf;
+  --on-brand: #ffffff;
+  --vector-cyan: #0e9cb8;
+  --vector-cyan-dim: rgba(14, 156, 184, 0.3);
+  --brand-gradient: linear-gradient(90deg, var(--vector-cyan) 0%, var(--brand-500) 100%);
 }
 ```
 
@@ -139,7 +174,7 @@ Vecta-specific audit rules (extend v1 §3.1): 7Rs decision chips keep their docu
 
 Dark `600` = hover-darken of dark `500`; light `600` = the light `text` value (hover deepens). All v1 rules stand: accent budget, collision guards (Costalyx gold vs `status-warn` in both modes — the **position rule is the enforcement**: brand gold only in chrome/accent positions, amber only in status positions), product-specific surface rules (severity, cost deltas, telemetry mono).
 
-**Hue registry reconciliation (`HUMAN_DECISION_GATE`, run proceeds on repo evidence):** the owner's brand notes describe the portfolio as *teal/violet = Lumen, indigo = Costalyx*, which differs from this file's proposals (Lumen cyan `#3BC4D6`, Costalyx gold `#D9A63B`, Postura indigo `#6B7CF5`). Only **Vecta (§3.1) is locked**. For the other four products, resolution order during any run: (1) hues already committed in the product's own brand kit / 00-BRANDING doc win; (2) absent that, this file's proposals apply; (3) either way, record the resolved hue in the gate register and verify no two products share a hue family and none collides with RAG/provider tokens. If Lumen resolves to teal/violet and Costalyx to indigo, Postura's indigo proposal must be re-derived (registry uniqueness rule) — flag, don't improvise silently.
+**Hue registry reconciliation (`HUMAN_DECISION_GATE`, run proceeds on repo evidence):** the owner's brand notes describe the portfolio as _teal/violet = Lumen, indigo = Costalyx_, which differs from this file's proposals (Lumen cyan `#3BC4D6`, Costalyx gold `#D9A63B`, Postura indigo `#6B7CF5`). Only **Vecta (§3.1) is locked**. For the other four products, resolution order during any run: (1) hues already committed in the product's own brand kit / 00-BRANDING doc win; (2) absent that, this file's proposals apply; (3) either way, record the resolved hue in the gate register and verify no two products share a hue family and none collides with RAG/provider tokens. If Lumen resolves to teal/violet and Costalyx to indigo, Postura's indigo proposal must be re-derived (registry uniqueness rule) — flag, don't improvise silently.
 
 ### 3.3 TERRACOTTA ACCENT THEME — universal user option (all five products)
 
@@ -152,44 +187,53 @@ Because every component references semantic `--brand-*` tokens, the terracotta a
 
 ```css
 /* Terracotta accent — identical block in every repo, appended after the product pack */
-[data-accent="terracotta"], [data-accent="terracotta"][data-theme="dark"] {
-  --brand-600:#C96442; --brand-500:#D97757; --brand-400:#E08D6F;
-  --brand-100:rgba(217,119,87,.18); --brand-50:rgba(217,119,87,.08);
-  --brand-text:#E08D6F; --on-brand:#FFFFFF;
+[data-accent='terracotta'],
+[data-accent='terracotta'][data-theme='dark'] {
+  --brand-600: #c96442;
+  --brand-500: #d97757;
+  --brand-400: #e08d6f;
+  --brand-100: rgba(217, 119, 87, 0.18);
+  --brand-50: rgba(217, 119, 87, 0.08);
+  --brand-text: #e08d6f;
+  --on-brand: #ffffff;
 }
-[data-accent="terracotta"][data-theme="light"] {
-  --brand-600:#C05B3C; --brand-500:#D97757; --brand-400:#E08D6F;
-  --brand-100:rgba(217,119,87,.14); --brand-50:rgba(217,119,87,.07);
-  --brand-text:#C05B3C; --on-brand:#FFFFFF;
+[data-accent='terracotta'][data-theme='light'] {
+  --brand-600: #c05b3c;
+  --brand-500: #d97757;
+  --brand-400: #e08d6f;
+  --brand-100: rgba(217, 119, 87, 0.14);
+  --brand-50: rgba(217, 119, 87, 0.07);
+  --brand-text: #c05b3c;
+  --on-brand: #ffffff;
 }
 ```
 
 **Settings UI (uniform across all products):** Settings → **Appearance** panel with two controls — **Mode:** System / Dark / Light, and **Accent:** Product default / Terracotta (swatch previews next to each option; product-default swatch shows the product's own hue). Both persisted per user (user-preference store where a backend profile exists, localStorage fallback), applied pre-hydration. Live preview on change, no reload.
 
 **Scope & guard rules:**
+
 - Terracotta replaces the **accent only**. Logos, product wordmarks, provider badges, RAG status, and (Vecta) `--vector-cyan` are untouched — brand identity assets never recolor with user preference.
 - **Vecta under terracotta:** `--brand-gradient` references `var(--brand-500)`, so the signature gradient automatically becomes cyan→terracotta. This is intended (source→target semantics survive; direction is still labels/arrows). Cyan's role rules are unchanged.
 - **Costalyx under terracotta:** terracotta (hue ~18°) vs `status-warn` amber — same position-rule enforcement as gold; no special handling needed.
-- Contrast pairs for terracotta in both modes are pre-checked above (white on `#D97757` is AA for ≥14px-medium button text per the CPN reference; links use the darker `brand-text` values). The P2 contrast audit re-verifies any *new* pair a product introduces.
+- Contrast pairs for terracotta in both modes are pre-checked above (white on `#D97757` is AA for ≥14px-medium button text per the CPN reference; links use the darker `brand-text` values). The P2 contrast audit re-verifies any _new_ pair a product introduces.
 
 **Verification burden (pragmatic):** full dual-mode screenshot matrix runs on the **default accent**. Terracotta is verified via a smoke set — shell, all §2 primitives (button/link/badge/card/highlight/focus states), and one representative screen per product area — in both modes, archived under `docs/theme-audit/<date>/{dark,light}-terracotta/`. Token discipline guarantees the rest; any smoke failure escalates to a full terracotta pass.
 
-
-**Light-mode sidebar (locked adaptation):** in light mode the shell may use either (a) the CPN pattern — sidebar filled `brand-500` with `on-brand` text and `brand-400` active block, or (b) the neutral sidebar with brand rail (same as dark). Pick per product's existing shell and record the choice; (a) is the default for marketing-adjacent portals, (b) for dense data tools (Lumen, Postura). Consistency within a product across modes' *anatomy* is mandatory — only surface colors swap.
+**Light-mode sidebar (locked adaptation):** in light mode the shell may use either (a) the CPN pattern — sidebar filled `brand-500` with `on-brand` text and `brand-400` active block, or (b) the neutral sidebar with brand rail (same as dark). Pick per product's existing shell and record the choice; (a) is the default for marketing-adjacent portals, (b) for dense data tools (Lumen, Postura). Consistency within a product across modes' _anatomy_ is mandatory — only surface colors swap.
 
 ---
 
 ## 4. PHASE MAP (after Continuation Protocol §1)
 
-| Phase | Scope | Gate to pass |
-|---|---|---|
-| **P0** | Discover + continuation sync (§1) — `THEME-INVENTORY.md` + `STATE-SYNC.md` (milestone classification table) | Inventory complete, all milestones classified with evidence |
-| **P1** | Token layer: dual-mode `tokens.css`, Tailwind map, shadcn map, brand pack injection (Vecta additionally maps `vector: "var(--vector-cyan)"` in Tailwind colors and a `bg-brand-gradient` utility → `background-image: var(--brand-gradient)`), terracotta accent block (§3.3), Appearance settings panel — Mode (system/dark/light) + Accent (default/terracotta), both persisted, no-FOUC — CI hex-grep guard | Both modes × both accents render; guard green |
-| **P2** | Frontend conformance: full v1 §4 Phase-2 coverage checklist, executed **twice (dark + light)**; fix in dependency order tokens → primitives → shell → screens | Review board (§7) passes every implemented screen in both modes |
-| **P3** | Backend production readiness (§6) | §6 checklist items `pass` or `blocked (evidenced)` |
-| **P4** | Verification: full regression floor, e2e, dual-mode screenshot archive `docs/theme-audit/<date>/{dark,light}/`, contrast re-checks, OpenAPI ↔ implementation sync check | All suites green locally; evidence archived |
-| **P5** | Git ops: commit, push, PR lifecycle, merge per policy (§8) | Default branch contains all work; branches cleaned |
-| **P6** | Report: `PRODUCTION-READINESS-REPORT.md` + `PROGRESS.md` update | Blocked section + gate register present; pushed |
+| Phase  | Scope                                                                                                                                                                                                                                                                                                                                                                                                          | Gate to pass                                                    |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| **P0** | Discover + continuation sync (§1) — `THEME-INVENTORY.md` + `STATE-SYNC.md` (milestone classification table)                                                                                                                                                                                                                                                                                                    | Inventory complete, all milestones classified with evidence     |
+| **P1** | Token layer: dual-mode `tokens.css`, Tailwind map, shadcn map, brand pack injection (Vecta additionally maps `vector: "var(--vector-cyan)"` in Tailwind colors and a `bg-brand-gradient` utility → `background-image: var(--brand-gradient)`), terracotta accent block (§3.3), Appearance settings panel — Mode (system/dark/light) + Accent (default/terracotta), both persisted, no-FOUC — CI hex-grep guard | Both modes × both accents render; guard green                   |
+| **P2** | Frontend conformance: full v1 §4 Phase-2 coverage checklist, executed **twice (dark + light)**; fix in dependency order tokens → primitives → shell → screens                                                                                                                                                                                                                                                  | Review board (§7) passes every implemented screen in both modes |
+| **P3** | Backend production readiness (§6)                                                                                                                                                                                                                                                                                                                                                                              | §6 checklist items `pass` or `blocked (evidenced)`              |
+| **P4** | Verification: full regression floor, e2e, dual-mode screenshot archive `docs/theme-audit/<date>/{dark,light}/`, contrast re-checks, OpenAPI ↔ implementation sync check                                                                                                                                                                                                                                        | All suites green locally; evidence archived                     |
+| **P5** | Git ops: commit, push, PR lifecycle, merge per policy (§8)                                                                                                                                                                                                                                                                                                                                                     | Default branch contains all work; branches cleaned              |
+| **P6** | Report: `PRODUCTION-READINESS-REPORT.md` + `PROGRESS.md` update                                                                                                                                                                                                                                                                                                                                                | Blocked section + gate register present; pushed                 |
 
 Phases may interleave with the product's own remaining milestones from §1.4 — the product's documented milestone order takes precedence for sequencing; v2 phases fill the gaps.
 
@@ -239,8 +283,8 @@ Brand steward · UI engineer · UX writer/designer · Accessibility · Data-viz 
 3. **PR lifecycle:** open/refresh PRs to the default branch with a summary generated from the report. Then merge, governed by:
    - **CI green → merge.** Squash-merge unless repo convention says otherwise; delete merged branches.
    - **CI failing → classify the failure first (mandatory, evidence-logged):**
-     - **(a) Infrastructure/billing failure** — GitHub Actions payment/quota/billing errors, runner unavailable, spending-limit reached, `The job was not started because…` billing messages, network/runner infra flakes. → **Bypass allowed:** run the *entire* regression floor + lint + build **locally**, attach local results (suite names + counts + exit codes) to the PR/report as evidence, annotate the merge commit/PR with `ci-bypass: billing/infra — local floor green <evidence-link>`, then **merge (admin-merge if branch protection permits; otherwise log as blocked)**. Also log a `HUMAN_DECISION_GATE`: "GitHub Actions billing needs attention."
-     - **(b) Genuine code/test failure** — **never bypass.** Fix, or revert the offending commit, or leave the PR open and log Blocked. The regression floor is sacred; a billing bypass is an exception for *infrastructure*, never a loophole for red tests.
+     - **(a) Infrastructure/billing failure** — GitHub Actions payment/quota/billing errors, runner unavailable, spending-limit reached, `The job was not started because…` billing messages, network/runner infra flakes. → **Bypass allowed:** run the _entire_ regression floor + lint + build **locally**, attach local results (suite names + counts + exit codes) to the PR/report as evidence, annotate the merge commit/PR with `ci-bypass: billing/infra — local floor green <evidence-link>`, then **merge (admin-merge if branch protection permits; otherwise log as blocked)**. Also log a `HUMAN_DECISION_GATE`: "GitHub Actions billing needs attention."
+     - **(b) Genuine code/test failure** — **never bypass.** Fix, or revert the offending commit, or leave the PR open and log Blocked. The regression floor is sacred; a billing bypass is an exception for _infrastructure_, never a loophole for red tests.
    - Merge conflicts: rebase onto default branch, re-run local floor, proceed.
 4. **Multiple stale PRs found during continuation:** triage each — mergeable & floor-green (locally if CI is billing-broken) → merge; superseded → close with comment referencing the superseding work; conflicting → rebase or log Blocked.
 5. Never force-push shared branches; never rewrite default-branch history; never delete unmerged work.
@@ -259,4 +303,4 @@ Brand steward · UI engineer · UX writer/designer · Accessibility · Data-viz 
 
 ---
 
-*Precedence: v2 > v1 > repo-local habits. Product's own doc chain governs milestone sequencing; this file governs quality bars and delivery. Anything unanswered resolves in favor of: semantic tokens in both modes, single product accent, additive-only changes, evidence over assertion, local floor green before any merge.*
+_Precedence: v2 > v1 > repo-local habits. Product's own doc chain governs milestone sequencing; this file governs quality bars and delivery. Anything unanswered resolves in favor of: semantic tokens in both modes, single product accent, additive-only changes, evidence over assertion, local floor green before any merge._

@@ -28,6 +28,22 @@ const freshDataHealth = {
 };
 
 describe('HealthController', () => {
+  it('returns process liveness without probing dependencies', () => {
+    const service = new HealthService(configService as never, async () => {
+      throw new Error('should not probe dependencies for liveness');
+    });
+    const controller = new HealthController(service);
+
+    expect(controller.getLiveHealth()).toEqual({
+      status: 'ok',
+      service: 'polycost-api',
+    });
+    expect(controller.getApiLiveHealth()).toEqual({
+      status: 'ok',
+      service: 'polycost-api',
+    });
+  });
+
   it('returns a stable health payload with dependency status', async () => {
     const controller = new HealthController(
       new HealthService(configService as never, async (host, port) => ({
@@ -39,6 +55,24 @@ describe('HealthController', () => {
     );
 
     await expect(controller.getHealth()).resolves.toEqual({
+      status: 'ok',
+      service: 'polycost-api',
+      dependencies: {
+        db: {
+          status: 'ok',
+          host: 'postgres',
+          port: 5432,
+          latencyMs: 3,
+        },
+        cache: {
+          status: 'ok',
+          host: 'redis',
+          port: 6379,
+          latencyMs: 3,
+        },
+      },
+    });
+    await expect(controller.getReadyHealth()).resolves.toEqual({
       status: 'ok',
       service: 'polycost-api',
       dependencies: {
