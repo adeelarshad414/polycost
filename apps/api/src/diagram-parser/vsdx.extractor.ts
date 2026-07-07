@@ -35,7 +35,13 @@ export class VsdxExtractor implements DiagramExtractor {
       try {
         assertPageXmlParseable(xml, entry.path);
 
-        for (const node of extractShapes(xml, entry.path, masters, pageMetadata.get(entry.path))) {
+        for (const node of extractShapes(
+          xml,
+          entry.path,
+          masters,
+          pageMetadata.get(entry.path),
+          extractPageGeometry(xml),
+        )) {
           nodes.set(node.id, node);
         }
 
@@ -63,6 +69,11 @@ interface VsdxMasterMetadata {
 interface VsdxPageMetadata {
   id?: string;
   name?: string;
+}
+
+interface VsdxPageGeometry {
+  width?: number;
+  height?: number;
 }
 
 function extractPageMetadata(
@@ -167,6 +178,7 @@ function extractShapes(
   path: string,
   masters: Map<string, VsdxMasterMetadata>,
   pageMetadata: VsdxPageMetadata | undefined,
+  pageGeometry: VsdxPageGeometry,
 ): ExtractedDiagramNode[] {
   const nodes: ExtractedDiagramNode[] = [];
   const shapePattern = /<Shape\b([^>]*)>([\s\S]*?)<\/Shape>/gi;
@@ -191,6 +203,13 @@ function extractShapes(
     const bounds = boundsFromCells(cells);
     const fillColor = colorFromCell(cells.get('FillForegnd') ?? cells.get('FillBkgnd'));
     const lineColor = colorFromCell(cells.get('LineColor'));
+    const normalizedBounds =
+      bounds && pageGeometry.width !== undefined && pageGeometry.height !== undefined
+        ? normalizedBoundsFromPage(bounds, {
+            width: pageGeometry.width,
+            height: pageGeometry.height,
+          })
+        : undefined;
 
     const stencilId = attributes.NameU ?? attributes.Name ?? master?.name ?? attributes.Master;
 
@@ -202,13 +221,20 @@ function extractShapes(
       ...(bounds ? { bounds } : {}),
       visual: {
         pageRef: path,
+        pageId: pageMetadata?.id ?? pageIdFromPath(path),
         pageName,
+        ...(pageGeometry.width ? { pageWidth: pageGeometry.width } : {}),
+        ...(pageGeometry.height ? { pageHeight: pageGeometry.height } : {}),
         ...(attributes.Master ? { masterId: attributes.Master } : {}),
         ...(master?.name ? { masterName: master.name } : {}),
         ...(attributes.Parent ? { containerId: attributes.Parent } : {}),
         ...(attributes.Container ? { containerId: attributes.Container } : {}),
         ...(fillColor ? { fillColor } : {}),
         ...(lineColor ? { lineColor } : {}),
+        ...(normalizedBounds ? { normalizedBounds } : {}),
+        geometryHint: geometryHint(attributes, cells),
+        renderingMode: 'layout-extraction',
+        renderingWarnings: ['layout extraction is not full Visio visual rendering'],
       },
     });
   }
@@ -254,6 +280,23 @@ function extractCells(shapeXml: string): Map<string, string> {
   }
 
   return cells;
+}
+
+function extractPageGeometry(xml: string): VsdxPageGeometry {
+  const pageSheetXml = xml.match(/<PageSheet\b[^>]*>([\s\S]*?)<\/PageSheet>/i)?.[1];
+
+  if (!pageSheetXml) {
+    return {};
+  }
+
+  const cells = extractCells(pageSheetXml);
+  const width = parseNumberCell(cells.get('PageWidth'));
+  const height = parseNumberCell(cells.get('PageHeight'));
+
+  return {
+    ...(width !== undefined ? { width } : {}),
+    ...(height !== undefined ? { height } : {}),
+  };
 }
 
 function boundsFromCells(cells: Map<string, string>):
@@ -322,6 +365,40 @@ function colorFromCell(value: string | undefined): string | undefined {
   }
 
   return `#${channels.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`.toUpperCase();
+}
+
+function normalizedBoundsFromPage(
+  bounds: { x: number; y: number; width: number; height: number },
+  pageGeometry: { width: number; height: number },
+): { x: number; y: number; width: number; height: number } {
+  return {
+    x: roundLayout((bounds.x / pageGeometry.width) * 100),
+    y: roundLayout((bounds.y / pageGeometry.height) * 100),
+    width: roundLayout((bounds.width / pageGeometry.width) * 100),
+    height: roundLayout((bounds.height / pageGeometry.height) * 100),
+  };
+}
+
+function geometryHint(
+  attributes: Record<string, string>,
+  cells: Map<string, string>,
+): 'rectangle' | 'connector' | 'group' | 'unknown' {
+  const name = `${attributes.NameU ?? ''} ${attributes.Name ?? ''}`.toLowerCase();
+  const type = (attributes.Type ?? attributes.type ?? '').toLowerCase();
+
+  if (type === 'group') {
+    return 'group';
+  }
+
+  if (name.includes('connector') || cells.has('BeginX') || cells.has('EndX')) {
+    return 'connector';
+  }
+
+  if (cells.has('Width') && cells.has('Height')) {
+    return 'rectangle';
+  }
+
+  return 'unknown';
 }
 
 function pageNameFromPath(path: string): string {

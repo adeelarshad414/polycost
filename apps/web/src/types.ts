@@ -529,12 +529,25 @@ export interface DiagramParseResult {
       };
       visual?: {
         pageRef?: string;
+        pageId?: string;
         pageName?: string;
+        pageWidth?: number;
+        pageHeight?: number;
         masterId?: string;
         masterName?: string;
         containerId?: string;
+        containerLabel?: string;
         fillColor?: string;
         lineColor?: string;
+        normalizedBounds?: {
+          x: number;
+          y: number;
+          width: number;
+          height: number;
+        };
+        geometryHint?: 'rectangle' | 'connector' | 'group' | 'unknown';
+        renderingMode?: 'layout-extraction';
+        renderingWarnings?: string[];
       };
     }>;
     edges: Array<{

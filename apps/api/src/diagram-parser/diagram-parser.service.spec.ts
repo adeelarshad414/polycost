@@ -120,6 +120,10 @@ describe('DiagramParserService', () => {
         'visio/pages/page1.xml',
         `
           <PageContents>
+            <PageSheet>
+              <Cell N="PageWidth" V="10"/>
+              <Cell N="PageHeight" V="20"/>
+            </PageSheet>
             <Shapes>
               <Shape ID="7" NameU="EC2">
                 <Text>EC2 web</Text>
@@ -150,9 +154,21 @@ describe('DiagramParserService', () => {
       },
       visual: {
         pageRef: 'visio/pages/page1.xml',
+        pageId: 'page1',
         pageName: 'Page 1',
+        pageWidth: 10,
+        pageHeight: 20,
         fillColor: '#D85A30',
         lineColor: '#378ADD',
+        normalizedBounds: {
+          x: 10,
+          y: 10,
+          width: 40,
+          height: 30,
+        },
+        geometryHint: 'rectangle',
+        renderingMode: 'layout-extraction',
+        renderingWarnings: ['layout extraction is not full Visio visual rendering'],
       },
     });
   });
@@ -172,6 +188,10 @@ describe('DiagramParserService', () => {
           path: 'visio/pages/page1.xml',
           content: `
             <PageContents>
+              <PageSheet>
+                <Cell N="PageWidth" V="10"/>
+                <Cell N="PageHeight" V="20"/>
+              </PageSheet>
               <Shapes>
                 <Shape ID="10" Master="1" Parent="99">
                   <Text>web tier</Text>
@@ -250,6 +270,10 @@ describe('DiagramParserService', () => {
           path: 'visio/pages/page1.xml',
           content: `
             <PageContents>
+              <PageSheet>
+                <Cell N="PageWidth" V="10"/>
+                <Cell N="PageHeight" V="20"/>
+              </PageSheet>
               <Shapes>
                 <Shape ID="10" Master="1" Parent="99">
                   <Text>web tier</Text>
@@ -283,8 +307,14 @@ describe('DiagramParserService', () => {
     expect(component?.evidence).toContain('Visio page Page 1');
     expect(component?.evidence).toContain('Visio master AWS19.EC2');
     expect(component?.evidence).toContain('container 99');
+    expect(component?.evidence).toContain('Visio page size w=10 h=20');
     expect(component?.evidence).toContain('Visio bounds x=1 y=2 w=4 h=6');
+    expect(component?.evidence).toContain('Visio preview box x=10% y=10% w=40% h=30%');
+    expect(component?.evidence).toContain('Visio geometry rectangle');
     expect(component?.evidence).toContain('Visio style fill #D85A30 line #378ADD');
+    expect(component?.evidence).toContain(
+      'Visio rendering layout-extraction; layout extraction is not full Visio visual rendering',
+    );
   });
 
   it('uses VSDX page names and container labels as review and region evidence', async () => {

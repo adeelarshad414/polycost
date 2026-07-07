@@ -98,6 +98,60 @@ say so explicitly rather than marking it done.
 | Phase 2.8BD - Workspace auth live transcript            | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8BE - Isolated live runtime verification        | Complete with known gaps (see notes) | 2026-07-07   |
 | Production readiness orchestrator v2 pass               | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.9 - Production gap closure continuation         | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.9 - Production gap closure continuation
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added provider-export column registries for AWS CUR, Azure Cost Management, and
+  GCP Billing Export so import normalization and trace evidence use the same source
+  map.
+- Added `_polycost` normalization audit metadata to imported provider-export line
+  item `rawPayload`, including source-row fingerprint, recognized source columns,
+  missing recommended fields, and a provider-export audit status.
+- Expanded invoice reconciliation evidence with source-row fingerprints, coverage
+  percentages, SKU/service match summaries, readiness labels, and explicit caveats
+  that reconciliation is not an invoice of record.
+- Surfaced reconciliation readiness, source-fingerprint coverage, SKU match coverage,
+  and the primary invoice caveat in the workspace billing panel.
+- Enriched VSDX extraction with page ID, page size, normalized preview bounds,
+  geometry hints, layout-extraction mode, and the explicit caveat that PolyCost is
+  not doing full Visio visual rendering.
+- Added an LLM classifier readiness surface that distinguishes stub/unconfigured mode
+  from OpenAI-compatible configured mode without reading secrets or calling the model.
+
+Verification:
+
+- `npm run format:check`
+- `npm run ci:lint`
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/diagram-parser/diagram-parser.service.spec.ts src/diagram-parser/llm-classifier.client.spec.ts`
+  - API focused: `3` suites / `52` tests.
+- `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx`
+  - Web focused: `1` suite / `57` tests.
+- `npm run check`
+  - API unit: `50` suites / `392` tests.
+  - Web unit: `9` suites / `130` tests.
+  - Graph validation, pricing coverage, progress verification, QA/security suppression,
+    database, DevOps, cloud, release, and provider credential gates passed.
+
+Known remaining gaps:
+
+- Invoice reconciliation now has stronger traceability and coverage proof, but full
+  invoice-grade billing remains future work because private discounts, credits,
+  taxes, enterprise agreements, marketplace charges, and provider invoice-of-record
+  reconciliation still require provider/account-specific controls.
+- VSDX parsing now carries layout geometry and preview caveats, but it is still not a
+  full Visio renderer.
+- The LLM classifier now reports readiness clearly, but production quality still
+  requires a real endpoint/model, Vault secret, monitored corpus evaluation, and
+  false-positive tracking.
+- Account/team UX is clearer around billing evidence, but production email delivery,
+  SSO/SAML handshakes, org billing UX, and full account/team lifecycle polish remain
+  future phases.
 
 ## Production readiness orchestrator v2 pass
 

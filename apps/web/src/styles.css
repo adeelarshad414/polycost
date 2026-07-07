@@ -1835,6 +1835,22 @@ summary:focus-visible,
   padding: var(--pc-space-1);
 }
 
+.workspace-reconciliation-audit {
+  display: grid;
+  width: 100%;
+  gap: 4px;
+  border-top: 1px solid color-mix(in srgb, var(--brand-green) 24%, transparent);
+  margin-top: 2px;
+  padding-top: 8px;
+}
+
+.workspace-reconciliation-audit span {
+  color: var(--pc-text-primary);
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+  text-transform: capitalize;
+}
+
 .top-nav {
   gap: var(--pc-space-2);
 }

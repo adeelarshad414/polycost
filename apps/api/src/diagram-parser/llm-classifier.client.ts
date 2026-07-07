@@ -140,6 +140,16 @@ interface OpenAiChatResponse {
   }>;
 }
 
+export interface DiagramLlmClassifierReadiness {
+  mode: 'stub' | 'openai-compatible';
+  configured: boolean;
+  endpointConfigured: boolean;
+  modelConfigured: boolean;
+  secretPath: string;
+  safetyControls: string[];
+  caveats: string[];
+}
+
 @Injectable()
 export class StubLlmClassifierClient implements LlmClassifierClient {
   classify(): DiagramNodeClassification | undefined {
@@ -154,6 +164,18 @@ export class StubLlmClassifierClient implements LlmClassifierClient {
 
   lastFailureReason(): string {
     return 'Tier 3 LLM classifier not configured';
+  }
+
+  readiness(): DiagramLlmClassifierReadiness {
+    return {
+      mode: 'stub',
+      configured: false,
+      endpointConfigured: false,
+      modelConfigured: false,
+      secretPath: DIAGRAM_LLM_SECRET_PATH,
+      safetyControls: ['schema-bound output', 'cost guard', 'prompt-injection framing'],
+      caveats: ['Tier 3 LLM classifier is disabled; unresolved nodes require manual review.'],
+    };
   }
 }
 
@@ -301,6 +323,30 @@ export class OpenAiCompatibleDiagramLlmClassifierClient implements LlmClassifier
 
   lastFailureReason(): string | undefined {
     return this.lastFailureReasonValue;
+  }
+
+  readiness(): DiagramLlmClassifierReadiness {
+    const endpoint = this.configService.get('DIAGRAM_LLM_CLASSIFIER_ENDPOINT', { infer: true });
+    const model = this.configService.get('DIAGRAM_LLM_CLASSIFIER_MODEL', { infer: true });
+
+    return {
+      mode: 'openai-compatible',
+      configured: Boolean(endpoint && model),
+      endpointConfigured: Boolean(endpoint),
+      modelConfigured: Boolean(model),
+      secretPath: DIAGRAM_LLM_SECRET_PATH,
+      safetyControls: [
+        'strict JSON schema response_format',
+        `timeout ${DIAGRAM_LLM_TIMEOUT_MS}ms`,
+        `max attempts ${DIAGRAM_LLM_MAX_ATTEMPTS}`,
+        `batch cap ${DIAGRAM_LLM_MAX_BATCH_NODES}`,
+        'untrusted labels sent as JSON data',
+      ],
+      caveats: [
+        'Production quality still depends on the selected model, prompt-eval corpus, and monitored false-positive rate.',
+        'API key is read from Vault at polycost/llm:api_key and is never included in parse results.',
+      ],
+    };
   }
 }
 

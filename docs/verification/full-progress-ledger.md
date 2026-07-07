@@ -204,6 +204,17 @@ Evidence:
   dark/light terracotta smoke screenshots with token evidence.
 - Additive liveness/readiness aliases are exposed through `/health/live`,
   `/api/v1/health/live`, `/health/ready`, and `/api/v1/health/ready`.
+- Phase 2.9 adds provider-export source-row fingerprints, recognized/missing column
+  metadata, invoice reconciliation coverage/readiness evidence, VSDX page geometry
+  and layout-extraction caveats, plus an LLM classifier readiness surface that keeps
+  stub/unconfigured mode distinct from production-connected mode.
+- Phase 2.9 focused regressions passed: API `3` suites / `52` tests
+  (`auth-billing`, `diagram-parser`, `llm-classifier`) and web `1` suite / `57`
+  tests (`App.spec.tsx`).
+- Phase 2.9 full `npm run check` passed with API `50` suites / `392` tests, web
+  `9` suites / `130` tests, graph validation, pricing coverage, progress
+  verification, QA/security suppression, database, DevOps, cloud, release, and
+  provider credential gates.
 - The latest isolated v2 runtime stack on `WEB_PORT=3230`, `API_HOST_PORT=3231`,
   and `VAULT_HOST_PORT=8340` passed API E2E `16/16`, direct web Playwright `7/7`,
   and direct `live:verify` with template-to-recommendation `4201ms` / `60000ms`,
@@ -242,6 +253,8 @@ These commands have been used as evidence gates in this run:
 - `npm run test:production-readiness`
 - `npm run ci:build`
 - `npm run check`
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/diagram-parser/diagram-parser.service.spec.ts src/diagram-parser/llm-classifier.client.spec.ts`
+- `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx`
 
 `npm run live:verify` writes its latest smoke/timing transcript to
 `.tmp/live-verification/latest.json` by default. Set

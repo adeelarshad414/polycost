@@ -26,6 +26,10 @@ cloud, LLM, SSO, or billing inputs.
 | API-HEALTH-001 | Fixed         | Added additive `/health/live`, `/api/v1/health/live`, `/health/ready`, and `/api/v1/health/ready` endpoints                                                          |
 | UI-ARCHIVE-001 | Fixed (smoke) | `docs/theme-audit/2026-07-07/` contains dark/light default screenshots and dark/light terracotta screenshots with token evidence                                     |
 | CI-REMOTE-001  | Blocked       | GitHub Actions job `85608851518` for prior head showed `runner_id: 0`, empty runner name/group, `steps: []`; remote runner/account infra is not executing repo steps |
+| INV-TRACE-002  | Improved      | Provider-export rows now persist `_polycost` source fingerprints/column coverage; reconciliation evidence reports coverage, match summary, readiness, and caveats    |
+| VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                          |
+| LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode     |
+| UI-AUTH-002    | Improved      | Workspace billing panel now surfaces reconciliation readiness, source-fingerprint coverage, SKU match coverage, and the invoice-of-record caveat                     |
 
 ## Verification
 
@@ -46,6 +50,17 @@ Local static/regression gates:
   - API focused: 9 suites / 125 tests.
   - Web focused: 2 suites / 82 tests.
 - `npm run ci:build` passed for API and web.
+- Phase 2.9 focused continuation passed:
+  - API focused: `src/api/auth-billing.spec.ts`,
+    `src/diagram-parser/diagram-parser.service.spec.ts`, and
+    `src/diagram-parser/llm-classifier.client.spec.ts`: 3 suites / 52 tests.
+  - Web focused: `src/App.spec.tsx`: 1 suite / 57 tests.
+- Phase 2.9 full regression floor passed with `npm run check`:
+  - API unit: 50 suites / 392 tests.
+  - Web unit: 9 suites / 130 tests.
+  - Graph validation, pricing coverage, progress verification, QA/security
+    suppression, database, DevOps, cloud, release, and provider credential gates
+    passed.
 
 Full-stack evidence:
 
@@ -97,11 +112,15 @@ Machine-readable token evidence:
   allocation. A maintainer must fix Actions runner/account/billing/quota state or
   rerun once the account can allocate runners.
 - Full invoice-grade pricing remains future scope: negotiated discounts, credits,
-  taxes, enterprise agreements, and actual provider invoice reconciliation are not
-  complete.
+  taxes, enterprise agreements, marketplace charges, and actual provider invoice-of-record
+  reconciliation are not complete. Phase 2.9 improves source-row traceability and
+  estimate-vs-actual reconciliation evidence.
 - VSDX support remains extraction/evidence oriented, not full Visio visual rendering.
-- Production LLM classifier quality requires a real endpoint/model and corpus
-  evaluation.
+  Phase 2.9 adds page geometry, normalized preview bounds, and explicit layout-extraction
+  caveats.
+- Production LLM classifier quality requires a real endpoint/model, Vault secret, monitored
+  corpus evaluation, and false-positive tracking. Phase 2.9 adds an explicit readiness
+  surface so stub/unconfigured mode is not reported as production-connected.
 - Full enterprise auth product polish remains future scope: production email, SSO/SAML,
   org billing UX, and complete team/account lifecycle polish.
 
