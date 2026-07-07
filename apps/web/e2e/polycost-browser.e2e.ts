@@ -2,7 +2,10 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, Page, test } from '@playwright/test';
 import type {
+  ComparisonAnalyticsResponse,
+  ComparisonPricingEvidenceResponse,
   ComparisonResult,
+  DataHealthResponse,
   ProviderId,
   RegionCatalogResponse,
   ReportExportJobResponse,
@@ -71,6 +74,35 @@ test('compares the default workload on mobile without page-level horizontal over
   await expect(page.getByLabel('Architecture and engineering evidence')).toBeVisible();
   await expect(page.getByLabel('Official cloud pricing and region references')).toBeVisible();
   await expectNoHorizontalOverflow(page);
+});
+
+test('keeps the primary comparison workflow accessible across locked breakpoints', async ({
+  page,
+}) => {
+  await mockRegionCatalog(page);
+  await mockComparisonCreation(page, browserComparison());
+
+  for (const viewport of [
+    { label: 'mobile 375', width: 375, height: 812 },
+    { label: 'tablet 768', width: 768, height: 1024 },
+    { label: 'desktop 1440', width: 1440, height: 1000 },
+  ]) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto('/');
+    await expect(page.getByRole('tab', { name: /guided form/i })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await expectInteractiveControlsAreNamed(page, `${viewport.label} initial state`);
+    await expectNoHorizontalOverflow(page);
+
+    await page.getByRole('button', { name: /compare costs/i }).click();
+    await expect(page.getByLabel('Provider cost summary')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('Executive monthly baseline')).toBeVisible();
+    await expect(page.getByLabel('Comparison quick actions')).toBeVisible();
+    await expectInteractiveControlsAreNamed(page, `${viewport.label} comparison state`);
+    await expectNoHorizontalOverflow(page);
+  }
 });
 
 test('surfaces provider pricing warnings in the engineering evidence view', async ({ page }) => {
@@ -284,6 +316,8 @@ async function mockRegionCatalog(page: Page): Promise<void> {
 }
 
 async function mockComparisonCreation(page: Page, comparison: ComparisonResult): Promise<void> {
+  await mockBackgroundComparisonData(page, comparison);
+
   await page.route('**/api/v1/workload/validate', async (route) => {
     await route.fulfill({
       status: 200,
@@ -305,6 +339,33 @@ async function mockComparisonCreation(page: Page, comparison: ComparisonResult):
   });
 }
 
+async function mockBackgroundComparisonData(
+  page: Page,
+  comparison: ComparisonResult,
+): Promise<void> {
+  await page.route('**/api/v1/data-health', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(dataHealth()),
+    });
+  });
+  await page.route(`**/api/v1/comparisons/${comparison.comparisonId}/analytics`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(comparisonAnalytics(comparison)),
+    });
+  });
+  await page.route(`**/api/v1/comparisons/${comparison.comparisonId}/evidence`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(comparisonPricingEvidence(comparison)),
+    });
+  });
+}
+
 async function expectNoHorizontalOverflow(page: Page): Promise<void> {
   const overflowPixels = await page.evaluate(() => {
     const root = document.documentElement;
@@ -316,6 +377,156 @@ async function expectNoHorizontalOverflow(page: Page): Promise<void> {
   });
 
   expect(overflowPixels).toBeLessThanOrEqual(1);
+}
+
+async function expectInteractiveControlsAreNamed(page: Page, label: string): Promise<void> {
+  const unnamedControls = await page.evaluate(() => {
+    const candidates = [
+      ...document.querySelectorAll<HTMLElement>(
+        [
+          'button',
+          'a[href]',
+          'input:not([type="hidden"])',
+          'select',
+          'textarea',
+          '[role="button"]',
+          '[role="tab"]',
+          '[role="radio"]',
+        ].join(','),
+      ),
+    ];
+
+    return candidates
+      .filter((element) => {
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+
+        return (
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          rect.width > 0 &&
+          rect.height > 0 &&
+          !hasAccessibleName(element)
+        );
+      })
+      .map((element) => {
+        return element.outerHTML.replace(/\s+/g, ' ').slice(0, 180);
+      });
+
+    function hasAccessibleName(element: HTMLElement): boolean {
+      const directName =
+        element.getAttribute('aria-label') ?? element.getAttribute('title') ?? element.textContent;
+
+      if (directName?.trim()) {
+        return true;
+      }
+
+      const labelledBy = element.getAttribute('aria-labelledby');
+      if (labelledBy) {
+        const labelText = labelledBy
+          .split(/\s+/)
+          .map((id) => document.getElementById(id)?.textContent?.trim() ?? '')
+          .join(' ')
+          .trim();
+
+        if (labelText) {
+          return true;
+        }
+      }
+
+      if (element instanceof HTMLInputElement && element.id) {
+        return Boolean(document.querySelector(`label[for="${CSS.escape(element.id)}"]`));
+      }
+
+      const parentLabel = element.closest('label');
+      if (parentLabel?.textContent?.trim()) {
+        return true;
+      }
+
+      return false;
+    }
+  });
+
+  expect(unnamedControls, `${label} unnamed controls`).toEqual([]);
+}
+
+function dataHealth(): DataHealthResponse {
+  return {
+    generatedAt: '2026-07-01T00:00:00.000Z',
+    freshnessPolicyHours: 24,
+    overallStatus: 'fresh',
+    alertCount: 0,
+    alerts: [],
+    providers: (['aws', 'azure', 'gcp'] as ProviderId[]).map((providerId) => ({
+      providerId,
+      status: 'success',
+      freshness: 'fresh',
+      lastSuccessfulRun: '2026-07-01T00:00:00.000Z',
+      ageHours: 1,
+      recordsUpdated: 20,
+      recordsRejected: 0,
+      recordsSkipped: 0,
+      cache: {
+        catalogRows: 20,
+        currentRateRows: 20,
+        latestCatalogSyncAt: '2026-07-01T00:00:00.000Z',
+        latestRateSyncAt: '2026-07-01T00:00:00.000Z',
+        ageHours: 1,
+        freshness: 'fresh',
+        syncStatusCounts: {
+          success: 20,
+          partial: 0,
+          failed: 0,
+        },
+      },
+      message: 'Fresh mock browser coverage data.',
+    })),
+  };
+}
+
+function comparisonAnalytics(comparison: ComparisonResult): ComparisonAnalyticsResponse {
+  return {
+    comparisonId: comparison.comparisonId,
+    generatedAt: '2026-07-01T00:00:00.000Z',
+    pricingAsOf: comparison.pricingAsOf,
+    executiveForecast: {
+      horizonDays: 90,
+      assumption: 'Mock browser coverage forecast.',
+      providerForecasts: comparison.providers.map((provider) => ({
+        providerId: provider.providerId,
+        monthlyRunRateUsd: provider.totals.monthly,
+        ninetyDayRunRateUsd: round(provider.totals.monthly * 3),
+        annualizedRunRateUsd: provider.totals.yearly,
+      })),
+    },
+    costCoverageMap: [],
+    costComposition: [],
+    providerDeltaAnalysis: [],
+    regionVarianceHeatMap: [],
+    egressNetworkingDetails: [],
+    sensitivityScenarios: [],
+    commitmentRoiTimelines: [],
+    commitmentCoverage: [],
+    tcoSignals: [],
+    optimizationOpportunities: [],
+    finOpsFindings: [],
+  };
+}
+
+function comparisonPricingEvidence(
+  comparison: ComparisonResult,
+): ComparisonPricingEvidenceResponse {
+  return {
+    comparisonId: comparison.comparisonId,
+    pricingAsOf: comparison.pricingAsOf,
+    generatedAt: '2026-07-01T00:00:00.000Z',
+    providerCount: comparison.providers.length,
+    lineItemCount: comparison.providers.reduce(
+      (count, provider) => count + provider.lineItems.length,
+      0,
+    ),
+    evidence: [],
+  };
 }
 
 function browserComparison(overrides: Partial<ComparisonResult> = {}): ComparisonResult {

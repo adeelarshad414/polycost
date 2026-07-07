@@ -138,6 +138,14 @@ await assertFileContains('scripts/pricing-logic-coverage-check.mjs', [
   ['pricing coverage artifact', 'coverage/api/coverage-final.json'],
 ]);
 
+await assertFileContains('apps/web/e2e/polycost-browser.e2e.ts', [
+  ['locked breakpoint browser proof', 'accessible across locked breakpoints'],
+  ['375px breakpoint proof', "label: 'mobile 375'"],
+  ['768px breakpoint proof', "label: 'tablet 768'"],
+  ['1440px breakpoint proof', "label: 'desktop 1440'"],
+  ['interactive accessible-name audit', 'expectInteractiveControlsAreNamed'],
+]);
+
 await assertFileContains('scripts/ci-e2e.mjs', [
   ['live verification inside compose E2E', "npmCommand, ['run', 'live:verify']"],
 ]);

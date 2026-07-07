@@ -89,6 +89,43 @@ say so explicitly rather than marking it done.
 | Phase 2.8AU - Clean-clone demo verifier                 | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AV - Verification timeout hardening            | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AW - Pricing logic coverage gate               | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AX - Locked breakpoint UI proof                | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AX - Locked breakpoint UI proof
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added a Playwright browser regression for the primary comparison workflow at the
+  locked UI verification breakpoints: `375px`, `768px`, and `1440px`.
+- The regression verifies the guided-form default state, comparison execution,
+  executive summary visibility, quick actions visibility, page-level horizontal
+  overflow, and accessible names for visible interactive controls at every
+  breakpoint.
+- Extended the Playwright mock helper to cover background data-health, analytics, and
+  pricing-evidence calls so the breakpoint proof can run against a local Vite server
+  without requiring a live API process.
+- Extended progress and release-readiness gates so the locked-breakpoint proof cannot
+  be silently removed.
+
+Verification:
+
+- `npm run lint --workspace @polycost/web` passes.
+- `npm run typecheck --workspace @polycost/web` passes.
+- `npm run format:check` passes.
+- Focused Playwright run passes against local Vite:
+  `npx playwright test --config apps/web/playwright.config.ts -g "keeps the primary comparison workflow accessible across locked breakpoints"`.
+
+Known remaining gaps:
+
+- This strengthens the UI/UX DoD evidence for the primary comparison workflow across
+  the locked viewport widths. It is not a complete WCAG audit of every possible
+  screen state; the broader browser suite and unit tests still cover theme,
+  keyboard-only comparison, loading states, exports, and diagram upload.
+- Hosted GitHub Actions still fails before repository steps run because no runner is
+  assigned (`runner_id: 0`, empty `steps` array).
 
 ## Phase 2.8AW - Pricing logic coverage gate
 

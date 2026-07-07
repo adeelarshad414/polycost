@@ -167,6 +167,15 @@ async function assertPhaseEvidenceAnchors() {
     ['pricing model what-if evidence', '3yr reserved'],
   ]);
 
+  await assertFileContains('apps/web/e2e/polycost-browser.e2e.ts', [
+    ['locked breakpoint UI proof', 'accessible across locked breakpoints'],
+    ['mobile 375 viewport', "label: 'mobile 375'"],
+    ['tablet 768 viewport', "label: 'tablet 768'"],
+    ['desktop 1440 viewport', "label: 'desktop 1440'"],
+    ['interactive accessible-name audit', 'expectInteractiveControlsAreNamed'],
+    ['horizontal overflow audit', 'expectNoHorizontalOverflow(page)'],
+  ]);
+
   await assertFileContains('apps/api/src/api/mvp-acceptance.e2e.spec.ts', [
     ['natural language E2E source', "sourceType).toBe('natural_language')"],
     ['PDF export E2E', 'export?format=pdf'],
