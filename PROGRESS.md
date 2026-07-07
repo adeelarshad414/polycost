@@ -73,6 +73,44 @@ say so explicitly rather than marking it done.
 | Phase 2.8AE - Release readiness automation             | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AF - Billing reconciliation RBAC hardening    | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AG - UI priced-family coverage drift guard    | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AH - Diagram export evidence hardening        | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AH - Diagram export evidence hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Preserved NWS `sourceTraceability` in `ComparisonResult.requirements` so diagram
+  node/source references survive the comparison engine boundary.
+- Kept Tier 3 LLM classifier reason, confidence, classifier marker, and assumed
+  default count in diagram-derived `serviceRequirement.scaleParams`.
+- Expanded report source-diagram evidence rows to include per-node service category,
+  service type, quantity, confidence, classifier, source reference, classifier
+  evidence string, and assumed-default count.
+- Wired source-diagram evidence into CSV and XLSX exports alongside the existing PDF
+  source-diagram section, with a conditional `Source Diagram` XLSX evidence sheet.
+- Added report-generator coverage proving stencil evidence and LLM evidence strings
+  appear in CSV, PDF, and XLSX artifacts.
+- Added `src/reports/report-generators.spec.ts` to `npm run test:production-readiness`
+  so diagram export evidence remains part of the production-readiness gate.
+
+Verification:
+
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/reports/report-generators.spec.ts`
+  passes.
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/diagram-parser/llm-classifier.client.spec.ts src/diagram-parser/diagram-parser.service.spec.ts`
+  passes.
+- `npm run format:check`, `npm run ci:lint`, `npm run test:production-readiness`,
+  and `npm run check` pass.
+
+Known remaining gaps:
+
+- The diagram pipeline is still extraction/classification evidence, not full Visio
+  visual rendering.
+- LLM classifier production behavior still depends on real endpoint/model/Vault
+  configuration; deterministic local parsing remains the default fallback.
 
 ## Phase 2.8AG - UI priced-family coverage drift guard
 

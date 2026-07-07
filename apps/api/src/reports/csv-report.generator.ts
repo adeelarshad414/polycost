@@ -21,6 +21,7 @@ import {
   reportCoverRows,
   selectedScenarioRows,
   serviceRequirementRows,
+  sourceDiagramRows,
   skuMappingAppendixRows,
   workloadScopeRows,
 } from './report-evidence';
@@ -51,6 +52,7 @@ export class CsvReportGenerator {
       [],
       ['Architecture Overview'],
       ...architectureOverviewRows(result).map((row) => row.map(sanitizeSpreadsheetText)),
+      ...sourceDiagramCsvRows(result),
       [],
       ['FinOps Summary'],
       ['Metric', 'Value'],
@@ -143,6 +145,16 @@ export class CsvReportGenerator {
 
     return Buffer.from(`${rows.map((row) => row.map(csvCell).join(',')).join('\n')}\n`, 'utf8');
   }
+}
+
+function sourceDiagramCsvRows(result: ComparisonResult): string[][] {
+  const rows = sourceDiagramRows(result);
+
+  if (rows.length === 0) {
+    return [];
+  }
+
+  return [[], ['Source Diagram'], ...rows.map((row) => row.map(sanitizeSpreadsheetText))];
 }
 
 function csvCell(value: string): string {

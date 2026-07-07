@@ -12,6 +12,7 @@ import {
 import {
   NormalizedWorkloadSpec,
   ServiceRequirement,
+  SourceTraceability,
   WorkloadSourceType,
   WorkloadType,
 } from '../nws/nws.types';
@@ -99,6 +100,7 @@ export interface ComparisonRequirementSummary {
     | 'tags'
   >;
   serviceRequirements: ServiceRequirement[];
+  sourceTraceability?: SourceTraceability[];
 }
 
 type ComparisonWorkloadProfile = NormalizedWorkloadSpec['workloadProfile'];

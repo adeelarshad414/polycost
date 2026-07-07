@@ -83,6 +83,9 @@ describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
         scaleParams: {
           engine: 'postgres',
           diagramNodeId: 'node-9',
+          confidence: 'low',
+          reason: 'llm classifier: label mentions Postgres but no managed service icon was present',
+          assumedDefaultCount: 1,
           classifier: 'llm',
         },
       },
@@ -196,6 +199,9 @@ describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
           quantity: 1,
           scaleParams: {
             diagramNodeId: 'node-a',
+            confidence: 'low',
+            reason: 'llm classifier: label looks like an asynchronous handoff',
+            assumedDefaultCount: 1,
             classifier: 'llm',
           },
         },

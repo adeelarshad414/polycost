@@ -482,9 +482,13 @@ function classificationFromParsed(
   classification: NonNullable<DiagramClassifierOutput>,
   diagramNodeId: string | undefined,
 ): DiagramNodeClassification {
+  const reason = `llm classifier: ${classification.reason}`;
   const scaleParams = {
     ...(classification.scaleParams ?? {}),
     ...(diagramNodeId ? { diagramNodeId } : {}),
+    confidence: classification.confidence,
+    reason,
+    assumedDefaultCount: classification.assumedDefaults.length,
     classifier: 'llm',
   };
 
@@ -492,7 +496,7 @@ function classificationFromParsed(
     serviceCategory: classification.serviceCategory,
     serviceType: classification.serviceType,
     confidence: classification.confidence,
-    reason: `llm classifier: ${classification.reason}`,
+    reason,
     assumedDefaults: classification.assumedDefaults,
     serviceRequirement: {
       serviceCategory: classification.serviceCategory,

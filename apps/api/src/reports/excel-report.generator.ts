@@ -22,6 +22,7 @@ import {
   reportCoverRows,
   selectedScenarioRows,
   serviceRequirementRows,
+  sourceDiagramRows,
   skuMappingAppendixRows,
   workloadScopeRows,
 } from './report-evidence';
@@ -148,6 +149,7 @@ export class ExcelReportGenerator {
           rows: breakEvenSheet.rows,
         },
         evidenceSheet('Break-Even Summary', breakEvenSummaryRows(result)),
+        ...sourceDiagramSheets(result),
         evidenceSheet('Methodology & Sources', methodologySourceRows(result)),
         evidenceSheet('SKU Mapping Appendix', skuMappingAppendixRows(result)),
         evidenceSheet('Data Freshness', dataFreshnessRows(options)),
@@ -216,6 +218,7 @@ export class ExcelReportGenerator {
         cells: row.map(sanitizeSpreadsheetText),
         ...(index === 0 ? { style: 2 } : {}),
       })),
+      ...sourceDiagramComparisonRows(result),
       {
         cells: [],
       },
@@ -620,6 +623,34 @@ function evidenceSheet(name: string, sourceRows: string[][]): SheetDefinition {
       })),
     ],
   };
+}
+
+function sourceDiagramSheets(result: ComparisonResult): SheetDefinition[] {
+  const rows = sourceDiagramRows(result);
+
+  return rows.length > 0 ? [evidenceSheet('Source Diagram', rows)] : [];
+}
+
+function sourceDiagramComparisonRows(result: ComparisonResult): WorksheetRow[] {
+  const rows = sourceDiagramRows(result);
+
+  if (rows.length === 0) {
+    return [];
+  }
+
+  return [
+    {
+      cells: [],
+    },
+    {
+      cells: ['Source Diagram'],
+      style: 2,
+    },
+    ...rows.map((row, index) => ({
+      cells: row.map(sanitizeSpreadsheetText),
+      ...(index === 0 ? { style: 2 } : {}),
+    })),
+  ];
 }
 
 function breakEvenRows(result: ComparisonResult): BreakEvenSheet {
