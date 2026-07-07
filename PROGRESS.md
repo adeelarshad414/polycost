@@ -72,6 +72,35 @@ say so explicitly rather than marking it done.
 | Phase 2.8AD - Auth controller guard coverage           | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AE - Release readiness automation             | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AF - Billing reconciliation RBAC hardening    | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AG - UI priced-family coverage drift guard    | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AG - UI priced-family coverage drift guard
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+- Added `scripts/pricing-service-coverage-check.mjs`, an AST-based guard that reads
+  `apps/web/src/service-catalog.ts` and confirms every frontend service family marked
+  `priced` is present in the API comparison-orchestrator pricing coverage workload.
+- Wired `npm run pricing:coverage:check` into `package.json`, the aggregate
+  `npm run check` path, `scripts/qa-check.mjs` inventory, GitHub Actions CI, and
+  `docs/development/devops.md`.
+- This prevents a future UI service-catalog change from silently advertising a priced
+  AWS/Azure/GCP family without extending the backend coverage regression that proves
+  catalog-backed or explicit modeled estimate evidence exists.
+- Verification evidence in this continuation:
+  - `npm run pricing:coverage:check` passed and reported 36 frontend priced families
+    covered by the API pricing guard.
+  - Focused comparison-orchestrator spec passed: 35 tests, including the UI-priced
+    service coverage workload.
+  - `npm run format:check` passed.
+  - `npm run check` passed end-to-end: API unit suite 49 suites / 380 tests, web unit
+    suite 9 suites / 128 tests, graph validation 282 nodes / 282 edges, pricing coverage
+    drift guard, QA, DB validation, DevOps, cloud, and release readiness.
+- Known gaps carried forward: this closes a pricing coverage drift risk, but it is
+  still not full invoice-grade live cloud billing coverage. Private discounts, taxes,
+  every provider SKU edge case, billing-account exports, and invoice reconciliation at
+  provider-account depth remain future release-track work.
 
 ## Phase 2.8AF - Billing reconciliation RBAC hardening
 

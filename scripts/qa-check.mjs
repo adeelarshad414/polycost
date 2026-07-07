@@ -19,6 +19,7 @@ const requiredScripts = [
   'db:seed',
   'db:reset',
   'graphify',
+  'pricing:coverage:check',
   'qa',
   'security:audit',
   'security:scan',

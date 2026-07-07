@@ -27,13 +27,14 @@ GitHub Actions runs:
 3. `npm run ci:lint`
 4. `npm run qa`
 5. `npm run graphify:validate`
-6. `npm run devops:check`
-7. `npm run cloud:check`
-8. `npm run ci:unit`
-9. `npm run ci:integration`
-10. `npm run ci:build`
-11. `npm run ci:e2e`
-12. `npm run security:audit`
+6. `npm run pricing:coverage:check`
+7. `npm run devops:check`
+8. `npm run cloud:check`
+9. `npm run ci:unit`
+10. `npm run ci:integration`
+11. `npm run ci:build`
+12. `npm run ci:e2e`
+13. `npm run security:audit`
 
 ## Database Operations
 
