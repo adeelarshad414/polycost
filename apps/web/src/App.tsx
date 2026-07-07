@@ -127,6 +127,7 @@ const PRICING_MODEL_STORAGE_KEY = 'polycost-pricing-model';
 const REQUIREMENT_SESSION_STORAGE_KEY = 'polycost-current-requirements-v1';
 const COMPARISON_HISTORY_STORAGE_KEY = 'polycost-comparison-history-v1';
 const AUTH_SESSION_STORAGE_KEY = 'polycost-auth-session-v1';
+const AUTH_SESSION_EXPIRES_AT_STORAGE_KEY = 'polycost-auth-session-expires-at-v1';
 const MAX_COMPARISON_HISTORY_ENTRIES = 8;
 const REQUIREMENTS_FILE_MAX_BYTES = 128 * 1024;
 const DIAGRAM_FILE_MAX_BYTES = 5 * 1024 * 1024;
@@ -1875,8 +1876,10 @@ function WorkspaceControlCenter({
   onNotice: (message: string | null) => void;
   onError: (message: string | null) => void;
 }) {
+  const [initialStoredAuth] = useState(() => readStoredAuthState());
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [token, setToken] = useState(() => readStoredAuthToken());
+  const [token, setToken] = useState(initialStoredAuth.token);
+  const [sessionExpiredNotice, setSessionExpiredNotice] = useState(initialStoredAuth.expired);
   const [session, setSession] = useState<AuthMeResponse | null>(null);
   const [email, setEmail] = useState('architect@example.com');
   const [password, setPassword] = useState('correct horse battery staple');
@@ -1918,6 +1921,7 @@ function WorkspaceControlCenter({
   const canManageTeam = activeTeam?.role === 'owner' || activeTeam?.role === 'admin';
   const ownerCount = members.filter((member) => member.role === 'owner').length;
   const sourceType = sourceTypeForProvider(provider);
+  const sessionStatus = session ? workspaceSessionStatus(session.session.expiresAt) : null;
 
   useEffect(() => {
     if (!landingInviteToken) {
@@ -1967,6 +1971,8 @@ function WorkspaceControlCenter({
         }
 
         setSession(currentSession);
+        storeAuthSession(token, currentSession.session.expiresAt);
+        setSessionExpiredNotice(false);
         setProfileEmail(currentSession.account.email);
         setProfileDisplayName(currentSession.account.displayName ?? '');
         setTeamSettingsName(currentSession.activeTeam?.name ?? '');
@@ -1981,6 +1987,7 @@ function WorkspaceControlCenter({
         setToken('');
         setSession(null);
         setAccountSessions([]);
+        setSessionExpiredNotice(isSessionExpiredError(sessionError));
         onError(formatApiError(sessionError));
       });
 
@@ -2071,8 +2078,9 @@ function WorkspaceControlCenter({
             })
           : await client.login({ email, password });
 
-      storeAuthToken(response.token);
+      storeAuthSession(response.token, response.expiresAt);
       setToken(response.token);
+      setSessionExpiredNotice(false);
       onNotice(
         authMode === 'register'
           ? 'Workspace registered. Team controls and billing import are now available.'
@@ -2098,6 +2106,7 @@ function WorkspaceControlCenter({
       setToken('');
       setSession(null);
       setAccountSessions([]);
+      setSessionExpiredNotice(false);
       setAuthBusy(false);
       onNotice('Signed out of the workspace.');
     }
@@ -2209,6 +2218,7 @@ function WorkspaceControlCenter({
       clearStoredAuthToken();
       setToken('');
       setSession(null);
+      setSessionExpiredNotice(false);
       setDeleteCurrentPassword('');
       setDeleteConfirmation('');
       onNotice('Account disabled and active sessions revoked.');
@@ -2546,12 +2556,27 @@ function WorkspaceControlCenter({
               <span>{invitePreview.message}</span>
             </div>
           ) : null}
+          {sessionExpiredNotice && !session ? (
+            <div className="workspace-session-policy is-expired" role="status">
+              <strong>Workspace session expired</strong>
+              <span>
+                Anonymous comparisons still work. Sign in again for team, SSO, and billing-export
+                controls.
+              </span>
+            </div>
+          ) : null}
           {session ? (
             <div className="workspace-session-summary">
               <span>{session.account.displayName ?? session.account.email}</span>
               <strong>
                 {activeTeam ? `${activeTeam.name} · ${activeTeam.role}` : 'No active team'}
               </strong>
+              {sessionStatus ? (
+                <div className={`workspace-session-policy is-${sessionStatus.tone}`} role="status">
+                  <strong>{sessionStatus.label}</strong>
+                  <span>{sessionStatus.detail}</span>
+                </div>
+              ) : null}
               <form className="workspace-inline-form" onSubmit={handleProfileUpdate}>
                 <label className="workspace-field">
                   <span>Profile email</span>
@@ -2614,7 +2639,8 @@ function WorkspaceControlCenter({
                 {accountSessions.slice(0, 3).map((accountSession) => (
                   <span key={accountSession.id}>
                     {accountSession.current ? 'Current' : 'Other'} · last seen{' '}
-                    {formatDateTime(accountSession.lastSeenAt)}
+                    {formatDateTime(accountSession.lastSeenAt)} · expires{' '}
+                    {formatDateTime(accountSession.expiresAt)}
                   </span>
                 ))}
               </div>
@@ -18239,20 +18265,100 @@ function storePricingModel(pricingModel: PricingModelKey): void {
   window.localStorage.setItem(PRICING_MODEL_STORAGE_KEY, pricingModel);
 }
 
-function readStoredAuthToken(): string {
-  return window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY) ?? '';
+function readStoredAuthState(): { token: string; expired: boolean } {
+  const token = window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY) ?? '';
+  const expiresAt = window.localStorage.getItem(AUTH_SESSION_EXPIRES_AT_STORAGE_KEY) ?? '';
+
+  if (!token) {
+    window.localStorage.removeItem(AUTH_SESSION_EXPIRES_AT_STORAGE_KEY);
+    return { token: '', expired: false };
+  }
+
+  if (isPastIsoTimestamp(expiresAt)) {
+    clearStoredAuthToken();
+    return { token: '', expired: true };
+  }
+
+  return { token, expired: false };
 }
 
 function readInviteTokenFromUrl(): string {
   return new URLSearchParams(window.location.search).get('invite_token')?.trim() ?? '';
 }
 
-function storeAuthToken(token: string): void {
+function storeAuthSession(token: string, expiresAt: string | undefined): void {
   window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, token);
+
+  if (expiresAt) {
+    window.localStorage.setItem(AUTH_SESSION_EXPIRES_AT_STORAGE_KEY, expiresAt);
+  } else {
+    window.localStorage.removeItem(AUTH_SESSION_EXPIRES_AT_STORAGE_KEY);
+  }
 }
 
 function clearStoredAuthToken(): void {
   window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
+  window.localStorage.removeItem(AUTH_SESSION_EXPIRES_AT_STORAGE_KEY);
+}
+
+function isPastIsoTimestamp(value: string): boolean {
+  if (!value) {
+    return false;
+  }
+
+  const timestamp = Date.parse(value);
+
+  return Number.isFinite(timestamp) && timestamp <= Date.now();
+}
+
+function isSessionExpiredError(error: unknown): boolean {
+  return (
+    error instanceof PolyCostApiError &&
+    error.status === 401 &&
+    /expired|invalid|unauthorized/i.test(error.message)
+  );
+}
+
+function workspaceSessionStatus(expiresAt: string): {
+  label: string;
+  detail: string;
+  tone: 'active' | 'soon' | 'expired';
+} {
+  const expiresAtMs = Date.parse(expiresAt);
+
+  if (!Number.isFinite(expiresAtMs)) {
+    return {
+      label: 'Session expiry pending',
+      detail:
+        'Server-side expiry is enforced. No silent refresh is used; sign in again if this session is rejected.',
+      tone: 'active',
+    };
+  }
+
+  const remainingMs = expiresAtMs - Date.now();
+  const detail = `Expires ${formatDateTime(expiresAt)}. No silent refresh; expired or revoked sessions are cleared on the next check.`;
+
+  if (remainingMs <= 0) {
+    return {
+      label: 'Session expired',
+      detail,
+      tone: 'expired',
+    };
+  }
+
+  if (remainingMs <= 2 * 60 * 60 * 1000) {
+    return {
+      label: 'Session expires soon',
+      detail,
+      tone: 'soon',
+    };
+  }
+
+  return {
+    label: 'Session active',
+    detail,
+    tone: 'active',
+  };
 }
 
 function sourceTypeForProvider(provider: ProviderId): BillingSourceType {

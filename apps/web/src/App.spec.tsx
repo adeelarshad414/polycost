@@ -36,6 +36,7 @@ describe('App', () => {
     window.localStorage.removeItem('polycost-dismissed-budget-alerts');
     window.localStorage.removeItem('polycost-comparison-history-v1');
     window.localStorage.removeItem('polycost-auth-session-v1');
+    window.localStorage.removeItem('polycost-auth-session-expires-at-v1');
     window.sessionStorage.removeItem('polycost-current-requirements-v1');
     window.history.pushState({}, '', '/');
     window.URL.createObjectURL = jest.fn(() => 'blob:polycost-report');
@@ -53,6 +54,7 @@ describe('App', () => {
     window.localStorage.removeItem('polycost-dismissed-budget-alerts');
     window.localStorage.removeItem('polycost-comparison-history-v1');
     window.localStorage.removeItem('polycost-auth-session-v1');
+    window.localStorage.removeItem('polycost-auth-session-expires-at-v1');
     window.sessionStorage.removeItem('polycost-current-requirements-v1');
     window.history.pushState({}, '', '/');
   });
@@ -179,8 +181,14 @@ describe('App', () => {
     expect(client.getSsoStatus).toHaveBeenCalledWith('session-token');
     expect(text(container)).toContain('Architecture team · owner');
     expect(text(container)).toContain('Architect');
+    expect(window.localStorage.getItem('polycost-auth-session-expires-at-v1')).toBe(
+      '2099-07-07T00:00:00.000Z',
+    );
+    expect(text(container)).toContain('Session active');
+    expect(text(container)).toContain('No silent refresh');
     expect(text(container)).toContain('OIDC ready · SAML ready');
     expect(text(container)).toContain('Current · last seen');
+    expect(text(container)).toContain('expires');
 
     await click(buttonByText(container, 'Sign out other devices'));
     expect(client.revokeOtherSessions).toHaveBeenCalledWith('session-token');
@@ -188,6 +196,29 @@ describe('App', () => {
     await click(buttonByText(container, 'Sign out'));
     expect(client.logout).toHaveBeenCalledWith('session-token');
     expect(window.localStorage.getItem('polycost-auth-session-v1')).toBeNull();
+
+    unmount();
+  });
+
+  it('clears expired stored workspace sessions while leaving anonymous comparison usable', async () => {
+    window.localStorage.setItem('polycost-auth-session-v1', 'expired-token');
+    window.localStorage.setItem('polycost-auth-session-expires-at-v1', '2000-01-01T00:00:00.000Z');
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await settleAsyncEffects();
+
+    expect(client.getCurrentSession).not.toHaveBeenCalled();
+    expect(window.localStorage.getItem('polycost-auth-session-v1')).toBeNull();
+    expect(window.localStorage.getItem('polycost-auth-session-expires-at-v1')).toBeNull();
+    expect(text(container)).toContain('Workspace session expired');
+    expect(text(container)).toContain('Anonymous comparisons still work');
+
+    await click(buttonByText(container, 'Compare costs'));
+    await settleAsyncEffects();
+
+    expect(client.createComparison).toHaveBeenCalled();
+    expect(text(container)).toContain('GCP leads at $30.00');
 
     unmount();
   });
@@ -3503,7 +3534,7 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     getDataHealth: jest.fn(async () => dataHealth),
     register: jest.fn(async () => ({
       token: 'session-token',
-      expiresAt: '2026-07-07T00:00:00.000Z',
+      expiresAt: '2099-07-07T00:00:00.000Z',
       account: {
         id: '11111111-1111-4111-8111-111111111111',
         email: 'architect@example.com',
@@ -3516,7 +3547,7 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     })),
     login: jest.fn(async () => ({
       token: 'session-token',
-      expiresAt: '2026-07-07T00:00:00.000Z',
+      expiresAt: '2099-07-07T00:00:00.000Z',
       account: {
         id: '11111111-1111-4111-8111-111111111111',
         email: 'architect@example.com',
@@ -3546,7 +3577,7 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       ],
       session: {
         id: '33333333-3333-4333-8333-333333333333',
-        expiresAt: '2026-07-07T00:00:00.000Z',
+        expiresAt: '2099-07-07T00:00:00.000Z',
       },
     })),
     logout: jest.fn(async () => ({ revoked: true as const })),
@@ -3564,7 +3595,7 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
         current: true,
         createdAt: '2026-07-06T00:00:00.000Z',
         lastSeenAt: '2026-07-06T00:10:00.000Z',
-        expiresAt: '2026-07-07T00:00:00.000Z',
+        expiresAt: '2099-07-07T00:00:00.000Z',
         hasUserAgent: true,
         hasIp: true,
       },
@@ -3573,7 +3604,7 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
         current: false,
         createdAt: '2026-07-05T00:00:00.000Z',
         lastSeenAt: '2026-07-05T00:10:00.000Z',
-        expiresAt: '2026-07-07T00:00:00.000Z',
+        expiresAt: '2099-07-07T00:00:00.000Z',
         hasUserAgent: true,
         hasIp: false,
       },

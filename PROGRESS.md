@@ -63,6 +63,35 @@ say so explicitly rather than marking it done.
 | Phase 2.8U - Diagram LLM cost guard                    | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8V - Diagram LLM batch classification          | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8W - Security advisory ledger refresh          | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8X - Workspace session expiry UX               | Complete with known gaps (see notes) | 2026-07-06   |
+
+## Phase 2.8X - Workspace session expiry UX
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Added browser-side session expiry persistence separate from the bearer token so
+  newly issued workspace sessions can be cleared locally before privileged workspace
+  calls when the stored expiry is already past.
+- Added a signed-in workspace session policy/status band that shows whether the
+  session is active, expiring soon, or expired, and states the honest refresh policy:
+  there is no silent refresh; expired/revoked sessions are cleared on the next
+  workspace session check.
+- Extended the active session list to show each session's expiry timestamp, making
+  "sign out other devices" easier to evaluate before revocation.
+- Added regression coverage proving an expired stored workspace token is removed
+  before `getCurrentSession()` is called while the anonymous comparison flow remains
+  available.
+- Verification evidence in this continuation:
+  - Focused App spec passed: 1 suite / 56 tests.
+  - `npm run test:production-readiness` passed: API 6 suites / 85 tests and web 2
+    suites / 81 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this strengthens local/session UX and anonymous-flow
+  preservation, but full enterprise account/team UX such as production IdP login,
+  email delivery, org plans, SCIM, and a hosted account marketplace remains future
+  work.
 
 ## Phase 2.8W - Security advisory ledger refresh
 

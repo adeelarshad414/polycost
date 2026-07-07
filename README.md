@@ -164,6 +164,9 @@ remain release-track items rather than blockers for anonymous cost comparison.
 - Session tokens are random bearer tokens; the API stores only token hashes.
 - `AUTH_SESSION_TTL_HOURS` controls server-side expiry. Expired or revoked sessions
   fail with the standard unauthorized API envelope.
+- The SPA stores only the bearer token and expiry timestamp locally. There is no
+  silent refresh flow; expired or revoked sessions are cleared on the next workspace
+  session check and the anonymous comparison flow remains usable.
 - Logout revokes the current server-side session. "Sign out other devices" revokes
   other active sessions for the same account while preserving the current session.
 - Concurrent sessions are allowed by default so a user can demo from more than one
