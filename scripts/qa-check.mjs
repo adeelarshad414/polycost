@@ -24,6 +24,7 @@ const requiredScripts = [
   'security:scan',
   'devops:check',
   'cloud:check',
+  'release:check',
   'check',
   'check:full',
 ];

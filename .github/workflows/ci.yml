@@ -33,6 +33,8 @@ jobs:
         run: npm run devops:check
       - name: Cloud readiness check
         run: npm run cloud:check
+      - name: Release readiness check
+        run: npm run release:check
       - name: Provider credential readiness check
         run: npm run provider:credentials:check
       - name: Database migration validation

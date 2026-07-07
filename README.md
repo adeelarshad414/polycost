@@ -235,6 +235,7 @@ Security and quality checks:
 ```bash
 npm run security:audit
 npm run provider:credentials:check
+npm run release:check
 npm run qa
 npm run check
 ```

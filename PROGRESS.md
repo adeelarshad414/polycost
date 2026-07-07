@@ -70,6 +70,42 @@ say so explicitly rather than marking it done.
 | Phase 2.8AB - GCP pricing credential fallback          | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AC - VSDX page/container evidence             | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AD - Auth controller guard coverage           | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AE - Release readiness automation             | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AE - Release readiness automation
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+- Added `scripts/release-readiness-check.mjs`, a machine-readable release hygiene guard
+  for the required open-source/community files, README demo path, public-release
+  checklist language, issue templates, PR template, and security suppression ledger.
+- Wired `npm run release:check` into `package.json`, the aggregate `npm run check`
+  command, `scripts/qa-check.mjs` script inventory, and GitHub Actions CI so public
+  release drift is caught in the normal quality path.
+- Updated `docs/development/open-source-readiness.md`, `RELEASE-CHECKLIST.md`,
+  `README.md`, and `CHANGELOG.md` to document the new release guard alongside the
+  existing human checklist.
+- Verification evidence in this continuation:
+  - `npm run release:check` passed.
+  - `npm run format:check` passed.
+  - `npm run qa` passed and printed the documented Node 24-only `impeccable` skip.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run devops:check` passed.
+  - `npm run cloud:check` passed with the existing warning that deployable IaC is not
+    present yet.
+  - `npm run security:audit` passed the high-severity gate; npm still reports the known
+    low `@ai-sdk/provider-utils` advisory chain with no safe fix available.
+  - `npm run test:production-readiness` passed: API 7 suites / 90 tests and web 2 suites /
+    82 tests.
+  - `npm run check` passed end-to-end: API unit suite 49 suites / 379 tests, web unit
+    suite 9 suites / 128 tests, graph validation 282 nodes / 282 edges, QA, DB
+    validation, DevOps, cloud, and release readiness.
+- Known gaps carried forward: GitHub-hosted CI for the PR remains externally blocked by
+  the account billing/spending-limit runner issue, so local evidence is green but remote
+  check-run completion still needs the maintainer to resolve billing/quota. Full
+  invoice-grade billing coverage, full Visio visual rendering, and complete hosted
+  auth/team/SSO product UX remain future release-track work.
 
 ## Phase 2.8AD - Auth controller guard coverage
 
