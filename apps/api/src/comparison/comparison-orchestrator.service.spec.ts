@@ -10,6 +10,7 @@ import {
   ComparisonOrchestratorService,
   ComparisonUnavailableError,
 } from './comparison-orchestrator.service';
+import { ComparisonLineItem, ComparisonProviderResult } from './comparison.types';
 import { EquivalentServiceMapper } from './equivalent-service-mapper';
 import { IntervalCostCalculator } from './interval-cost-calculator';
 
@@ -404,6 +405,103 @@ async function mockCatalogAdapter(providerId: ProviderId): Promise<CloudProvider
     new InMemoryPricingCatalogReader(records),
     providerId === 'azure' ? 'eastus' : providerId === 'gcp' ? 'us-central1' : 'us-east-1',
     () => new Date('2026-07-06T00:00:00.000Z'),
+  );
+}
+
+function expectProviderPricingEvidence(
+  provider: ComparisonProviderResult,
+  requiredModeledSkuIds: readonly string[],
+): void {
+  const catalogLineItems = provider.lineItems.filter(
+    (lineItem) => lineItem.skuId?.startsWith('modeled-') !== true,
+  );
+  const modeledLineItems = provider.lineItems.filter(
+    (lineItem) => lineItem.skuId?.startsWith('modeled-') === true,
+  );
+
+  expect(catalogLineItems.length).toBeGreaterThanOrEqual(11);
+  expect(catalogLineItems.map((lineItem) => lineItem.category)).toEqual(
+    expect.arrayContaining(['compute', 'storage', 'database', 'network']),
+  );
+
+  for (const lineItem of catalogLineItems) {
+    expectCatalogLineItemEvidence(provider.providerId, lineItem);
+  }
+
+  for (const skuId of requiredModeledSkuIds) {
+    const lineItem = modeledLineItems.find((candidate) => candidate.skuId === skuId);
+
+    expect(lineItem).toBeDefined();
+    if (lineItem) {
+      expectModeledLineItemEvidence(provider.providerId, lineItem);
+    }
+  }
+}
+
+function expectCatalogLineItemEvidence(providerId: ProviderId, lineItem: ComparisonLineItem): void {
+  expect(lineItem.rateSource).toBe('pricing_catalog');
+  expect(lineItem.rateSourceSkuId).toBe(lineItem.skuId);
+  expect(lineItem.rateCurrency).toBe('USD');
+  expect(lineItem.rateValidFrom).toMatch(/^\d{4}-\d{2}-\d{2}/);
+  expect(lineItem.rateSourceFetchedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  expect(lineItem.region).toEqual(expect.any(String));
+  expect(lineItem.unit).toEqual(expect.any(String));
+  expect(lineItem.unitPriceUsd).toEqual(expect.any(Number));
+  expect(lineItem.baseMonthlyCostUsd).toBeGreaterThan(0);
+  expect(lineItem.pricingTrace).toEqual(
+    expect.objectContaining({
+      providerId,
+      serviceCategory: lineItem.category,
+      costComponent: lineItem.costComponent,
+      source: 'pricing_catalog',
+      sourceRecordKey: expect.stringContaining(
+        `${providerId}|${lineItem.category}|${lineItem.skuId}|`,
+      ),
+      resolvedSkuId: lineItem.skuId,
+      sourceSkuId: lineItem.skuId,
+      region: lineItem.region,
+      unit: lineItem.unit,
+      unitPriceUsd: lineItem.unitPriceUsd,
+      currency: 'USD',
+      effectiveDate: lineItem.rateValidFrom,
+      fetchedAt: lineItem.rateSourceFetchedAt,
+      sourceEndpoint: expect.stringMatching(/^(fixture|https):/),
+      sourceRecordId: expect.any(String),
+      transformVersion: 'pricing-normalization-v3',
+      sourcePayloadHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      derivation: expect.objectContaining({
+        unitPriceUsd: lineItem.unitPriceUsd,
+        monthlyCostUsd: lineItem.baseMonthlyCostUsd,
+      }),
+      isApproximate: lineItem.isApproximate,
+      isEstimate: false,
+    }),
+  );
+}
+
+function expectModeledLineItemEvidence(providerId: ProviderId, lineItem: ComparisonLineItem): void {
+  expect(lineItem.rateSource).toBe('manual_model');
+  expect(lineItem.rateSourceSkuId).toBe(lineItem.skuId);
+  expect(lineItem.rateCurrency).toBe('USD');
+  expect(lineItem.unit).toEqual(expect.any(String));
+  expect(lineItem.unitPriceUsd).toEqual(expect.any(Number));
+  expect(lineItem.pricingTrace).toEqual(
+    expect.objectContaining({
+      providerId,
+      serviceCategory: lineItem.category,
+      costComponent: lineItem.costComponent,
+      source: 'manual_model',
+      sourceRecordKey: expect.stringContaining(
+        `${providerId}|${lineItem.category}|${lineItem.skuId}|`,
+      ),
+      resolvedSkuId: lineItem.skuId,
+      sourceSkuId: lineItem.skuId,
+      unit: lineItem.unit,
+      unitPriceUsd: lineItem.unitPriceUsd,
+      equivalenceConfidence: lineItem.isApproximate ? 'approximate' : 'direct',
+      isApproximate: lineItem.isApproximate,
+      isEstimate: true,
+    }),
   );
 }
 
@@ -803,6 +901,7 @@ describe('ComparisonOrchestratorService', () => {
       );
 
       expect(requiredSkuIds.filter((skuId) => !skuIds.has(skuId))).toEqual([]);
+      expectProviderPricingEvidence(provider, requiredSkuIds);
     }
   });
 

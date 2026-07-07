@@ -66,6 +66,32 @@ say so explicitly rather than marking it done.
 | Phase 2.8X - Workspace session expiry UX               | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8Y - Mock OIDC workspace UX                    | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8Z - Diagram fixture corpus tier table         | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AA - UI-priced SKU evidence guard             | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AA - UI-priced SKU evidence guard
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+- Strengthened the all-priced-family comparison guard so every provider result now proves
+  catalog-backed line items carry explicit `pricing_catalog` evidence: source record key,
+  resolved/source SKU, region, unit, unit price, effective/fetched timestamps, transform
+  version, payload hash, derivation, and estimate flags.
+- Added matching assertions for required modeled service-family SKUs so manual model rows
+  must remain explicitly labeled as `manual_model` with resolved/source SKU evidence instead
+  of silently blending into catalog-backed pricing.
+- Verification evidence in this continuation:
+  - Focused comparison orchestrator spec passed: 35 tests, including the hardened
+    all-priced-family SKU evidence guard.
+  - Production-readiness gate passed: API 6 suites / 86 tests and web 2 suites / 82 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run security:audit` passed the high-severity gate; npm still reports the known low
+    `@ai-sdk/provider-utils` advisory chain with no safe fix available.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this improves SKU-to-estimate traceability for local/mock and
+  modeled comparison paths, but full invoice-grade live cloud billing coverage remains future
+  work. GitHub PR `quality` remains externally blocked by account billing/spending-limit
+  runner startup failure.
 
 ## Phase 2.8Z - Diagram fixture corpus tier table
 
