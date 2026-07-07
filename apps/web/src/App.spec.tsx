@@ -1370,7 +1370,7 @@ describe('App', () => {
     });
 
     unmount();
-  });
+  }, 10_000);
 
   it('imports bulk service rows into the editable guided form', async () => {
     const client = clientMock();

@@ -95,6 +95,48 @@ say so explicitly rather than marking it done.
 | Phase 2.8BA - PR-facing verification ledger             | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8BB - Live verification transcript artifact     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8BC - Anonymous full-smoke transcript           | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8BD - Workspace auth live transcript            | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8BD - Workspace auth live transcript
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Extended `scripts/live-verification.mjs` with a running-stack authenticated smoke
+  path named `workspace-auth-rbac-sso`.
+- The new transcript journey covers owner signup, team/session hydration, session
+  listing, invitation creation, invitation preview, invited member registration,
+  invitation acceptance, owner-driven role promote/demote, mock OIDC provider
+  configuration, mock OIDC start/authorize/callback, structured member RBAC `403`
+  for billing import, and server-side revoke-other-sessions.
+- Transcript output records only non-secret evidence such as team ID, roles, step
+  timings, RBAC status/code, and SSO `stateVerified`; bearer tokens, invite tokens,
+  and raw OIDC state are deliberately not written.
+- Extended `npm run progress:verify` and `npm run release:check` with anchors for
+  the auth live-smoke markers so this evidence cannot be silently removed.
+- Updated `docs/verification/full-progress-ledger.md` so Phase F now points to both
+  regression-test evidence and the authenticated live transcript.
+- Stabilized the existing broad web form-edit/refresh/export unit workflow with an
+  explicit 10-second timeout after full-suite execution showed it can run just over
+  Jest's default 5-second budget under load; assertions and coverage are unchanged.
+
+Verification:
+
+- `node --check scripts/live-verification.mjs`
+- `npm run progress:verify`
+- `npm run release:check`
+- `npm run test:unit --workspace @polycost/web -- --runInBand`
+- `npm run test:production-readiness`
+- `npm run check`
+
+Known remaining gaps:
+
+- This promotes authenticated workspace/RBAC/SSO proof into the live transcript. It
+  does not turn the product into a complete enterprise IAM suite: production email,
+  real OIDC/SAML handshakes, SSO administration depth, and full account/team UX
+  remain future phases.
 
 ## Phase 2.8BC - Anonymous full-smoke transcript
 

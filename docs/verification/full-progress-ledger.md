@@ -152,6 +152,11 @@ Evidence:
 - `apps/web/src/App.spec.tsx` verifies workspace session UX, invitation state,
   member/role UI state, SSO readiness labels, and RBAC visibility/disabled-control
   behavior.
+- `scripts/live-verification.mjs` records a `workspace-auth-rbac-sso` smoke journey
+  against the running stack: owner signup, session hydration, invite preview and
+  acceptance, member role change, mock OIDC start/authorize/callback, structured
+  `403` for member billing import, and server-side revoke-other-sessions. Tokens,
+  invite secrets, and OIDC state are intentionally excluded from the transcript.
 - Anonymous compare remains available in `apps/web/src/App.spec.tsx` and is
   documented in `README.md`.
 
@@ -206,7 +211,9 @@ These commands have been used as evidence gates in this run:
 `.tmp/live-verification/latest.json` by default. Set
 `POLYCOST_LIVE_VERIFY_TRANSCRIPT_PATH` to redirect the artifact in CI. The
 anonymous smoke path covers compare -> reserved-pricing what-if -> PDF/CSV/Excel
-exports -> share link, plus diagram upload -> review -> comparison -> PDF.
+exports -> share link, plus diagram upload -> review -> comparison -> PDF. The
+authenticated smoke path records `workspace-auth-rbac-sso`: signup -> team/session
+hydration -> invite/accept -> role change -> mock OIDC -> structured RBAC 403.
 
 ## Honest Release Verdict
 

@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 import path from 'node:path';
@@ -12,6 +13,7 @@ const fixtureRoot = path.join(root, 'fixtures/diagrams');
 const browserChannel = process.env.PLAYWRIGHT_BROWSER_CHANNEL ?? 'chrome';
 const templateThresholdMs = Number(process.env.POLYCOST_TEMPLATE_JOURNEY_MAX_MS ?? 60_000);
 const diagramThresholdMs = Number(process.env.POLYCOST_DIAGRAM_JOURNEY_MAX_MS ?? 180_000);
+const authThresholdMs = Number(process.env.POLYCOST_AUTH_JOURNEY_MAX_MS ?? 60_000);
 const verifyRedisDown = process.env.POLYCOST_VERIFY_REDIS_DOWN !== '0';
 const transcriptPath =
   process.env.POLYCOST_LIVE_VERIFY_TRANSCRIPT_PATH ??
@@ -27,11 +29,23 @@ const transcript = {
   thresholdsMs: {
     templateToRecommendation: templateThresholdMs,
     diagramToPdf: diagramThresholdMs,
+    workspaceAuth: authThresholdMs,
   },
   verifyRedisDown,
   journeys: [],
   events: [],
 };
+const sensitiveTranscriptKeys = new Set([
+  'authorization',
+  'authorizationUrl',
+  'clientSecret',
+  'inviteToken',
+  'inviteUrl',
+  'password',
+  'redirectUrl',
+  'state',
+  'token',
+]);
 
 let browser;
 
@@ -45,6 +59,8 @@ try {
   transcript.journeys.push(template);
   const diagram = await verifyDiagramToPdfJourney();
   transcript.journeys.push(diagram);
+  const auth = await verifyWorkspaceAuthJourney();
+  transcript.journeys.push(auth);
   const redis = verifyRedisDown ? await verifyRedisDegradation() : undefined;
 
   transcript.status = 'passed';
@@ -58,6 +74,7 @@ try {
     `- Template to recommendation: ${template.durationMs}ms (limit ${templateThresholdMs}ms)`,
   );
   console.log(`- Diagram to PDF: ${diagram.durationMs}ms (limit ${diagramThresholdMs}ms)`);
+  console.log(`- Workspace auth/RBAC: ${auth.durationMs}ms (limit ${authThresholdMs}ms)`);
   if (redis) {
     console.log(
       `- Redis-down degradation: /health=${redis.healthStatus}, /health/deep=${redis.deepHealthStatus}, data-health HTTP ${redis.dataHealthStatus}`,
@@ -288,6 +305,269 @@ async function verifyDiagramToPdfJourney() {
   }
 }
 
+async function verifyWorkspaceAuthJourney() {
+  const startedAt = Date.now();
+  const steps = [];
+  const markStep = (label) => {
+    steps.push({ label, atMs: Date.now() - startedAt });
+  };
+  const suffix = randomUUID().slice(0, 8);
+  const password = `LiveVerifyPassw0rd!-${suffix}`;
+  const ownerEmail = `owner-${suffix}@example.com`;
+  const memberEmail = `member-${suffix}@example.com`;
+
+  const owner = await apiJson('/api/v1/auth/register', {
+    method: 'POST',
+    body: {
+      email: ownerEmail,
+      password,
+      displayName: 'Live Verify Owner',
+      teamName: `Live Verify Team ${suffix}`,
+    },
+    label: 'owner registration',
+  });
+  const teamId = owner?.team?.id;
+  if (!teamId || owner.team?.role !== 'owner' || !owner.token) {
+    throw new Error(`Owner registration returned unexpected payload: ${redactedJson(owner)}`);
+  }
+  markStep('registered owner account and workspace');
+
+  const ownerMe = await apiJson('/api/v1/auth/me', {
+    token: owner.token,
+    label: 'owner current session',
+  });
+  if (ownerMe?.activeTeam?.id !== teamId || ownerMe.activeTeam?.role !== 'owner') {
+    throw new Error(`Owner session did not hydrate workspace role: ${redactedJson(ownerMe)}`);
+  }
+  markStep('hydrated owner session and active team role');
+
+  const sessions = await apiJson('/api/v1/auth/sessions', {
+    token: owner.token,
+    label: 'owner session list',
+  });
+  if (!Array.isArray(sessions) || !sessions.some((session) => session.current)) {
+    throw new Error(
+      `Owner sessions did not include the current session: ${redactedJson(sessions)}`,
+    );
+  }
+  markStep('listed current server-side session');
+
+  const invitation = await apiJson(`/api/v1/auth/teams/${teamId}/invitations`, {
+    method: 'POST',
+    token: owner.token,
+    body: {
+      email: memberEmail,
+      role: 'member',
+    },
+    label: 'member invitation',
+  });
+  if (invitation?.status !== 'pending' || invitation.role !== 'member' || !invitation.inviteToken) {
+    throw new Error(`Invitation returned unexpected payload: ${redactedJson(invitation)}`);
+  }
+  markStep('created pending member invitation');
+
+  const preview = await apiJson(
+    `/api/v1/auth/invitations/preview/${encodeURIComponent(invitation.inviteToken)}`,
+    {
+      label: 'invitation preview',
+    },
+  );
+  if (preview?.status !== 'pending' || preview.email !== memberEmail || preview.teamId !== teamId) {
+    throw new Error(`Invitation preview returned unexpected payload: ${redactedJson(preview)}`);
+  }
+  markStep('previewed invitation landing state');
+
+  const member = await apiJson('/api/v1/auth/register', {
+    method: 'POST',
+    body: {
+      email: memberEmail,
+      password,
+      displayName: 'Live Verify Member',
+      teamName: `Live Verify Member ${suffix}`,
+    },
+    label: 'member registration',
+  });
+  if (!member?.token || !member.account?.id) {
+    throw new Error(`Member registration returned unexpected payload: ${redactedJson(member)}`);
+  }
+  markStep('registered invited member account');
+
+  const acceptedInvitation = await apiJson('/api/v1/auth/invitations/accept', {
+    method: 'POST',
+    token: member.token,
+    body: {
+      token: invitation.inviteToken,
+    },
+    label: 'invitation acceptance',
+  });
+  if (
+    acceptedInvitation?.status !== 'accepted' ||
+    acceptedInvitation.acceptedByAccountId !== member.account.id
+  ) {
+    throw new Error(
+      `Invitation acceptance returned unexpected payload: ${redactedJson(acceptedInvitation)}`,
+    );
+  }
+  markStep('accepted invitation into owner workspace');
+
+  const members = await apiJson(`/api/v1/auth/teams/${teamId}/members`, {
+    token: owner.token,
+    label: 'team member list',
+  });
+  const invitedMember = Array.isArray(members)
+    ? members.find((candidate) => candidate.email === memberEmail)
+    : undefined;
+  if (
+    !invitedMember ||
+    invitedMember.accountId !== member.account.id ||
+    invitedMember.role !== 'member'
+  ) {
+    throw new Error(`Team member list did not include accepted member: ${redactedJson(members)}`);
+  }
+  markStep('confirmed member appears in workspace member list');
+
+  const promoted = await apiJson(`/api/v1/auth/teams/${teamId}/members/${member.account.id}`, {
+    method: 'PATCH',
+    token: owner.token,
+    body: { role: 'admin' },
+    label: 'member promotion',
+  });
+  if (promoted?.role !== 'admin') {
+    throw new Error(`Role promotion returned unexpected payload: ${redactedJson(promoted)}`);
+  }
+  markStep('promoted member to admin');
+
+  const demoted = await apiJson(`/api/v1/auth/teams/${teamId}/members/${member.account.id}`, {
+    method: 'PATCH',
+    token: owner.token,
+    body: { role: 'member' },
+    label: 'member demotion',
+  });
+  if (demoted?.role !== 'member') {
+    throw new Error(`Role demotion returned unexpected payload: ${redactedJson(demoted)}`);
+  }
+  markStep('demoted member back to member');
+
+  const ssoProvider = {
+    providerType: 'oidc',
+    displayName: 'PolyCost Live Mock OIDC',
+    issuerUrl: 'https://mock-idp.polycost.local',
+    clientId: 'polycost-live-verification',
+  };
+  await apiJson(`/api/v1/auth/teams/${teamId}/sso/providers`, {
+    method: 'POST',
+    token: owner.token,
+    body: ssoProvider,
+    label: 'OIDC provider configuration',
+  });
+  markStep('configured mock OIDC provider');
+
+  const ssoTest = await apiJson(`/api/v1/auth/teams/${teamId}/sso/test-connection`, {
+    method: 'POST',
+    token: owner.token,
+    body: ssoProvider,
+    label: 'OIDC provider test connection',
+  });
+  if (ssoTest?.ok !== true || ssoTest.providerType !== 'oidc') {
+    throw new Error(`OIDC test connection returned unexpected payload: ${redactedJson(ssoTest)}`);
+  }
+  markStep('verified mock OIDC provider connection');
+
+  const ssoStart = await apiJson('/api/v1/auth/sso/oidc/start', {
+    method: 'POST',
+    body: {
+      teamId,
+      email: memberEmail,
+    },
+    label: 'OIDC start',
+  });
+  if (!ssoStart?.authorizationUrl || ssoStart.providerType !== 'oidc') {
+    throw new Error(`OIDC start returned unexpected payload: ${redactedJson(ssoStart)}`);
+  }
+  markStep('started mock OIDC login');
+
+  const authorize = await apiJson(ssoStart.authorizationUrl, {
+    label: 'mock OIDC authorization',
+  });
+  if (!authorize?.redirectUrl || authorize.email !== memberEmail) {
+    throw new Error(`OIDC authorization returned unexpected payload: ${redactedJson(authorize)}`);
+  }
+  markStep('completed mock OIDC authorization');
+
+  const teamScopedMember = await apiJson(authorize.redirectUrl, {
+    label: 'mock OIDC callback',
+  });
+  if (
+    !teamScopedMember?.token ||
+    teamScopedMember.team?.id !== teamId ||
+    teamScopedMember.team?.role !== 'member' ||
+    teamScopedMember.sso?.stateVerified !== true
+  ) {
+    throw new Error(`OIDC callback returned unexpected payload: ${redactedJson(teamScopedMember)}`);
+  }
+  markStep('completed mock OIDC callback with team-scoped member session');
+
+  const forbidden = await apiJson('/api/v1/billing/imports/provider-export', {
+    method: 'POST',
+    token: teamScopedMember.token,
+    body: {
+      provider: 'aws',
+      sourceType: 'aws-cur',
+      billingPeriodStart: '2026-07-01',
+      billingPeriodEnd: '2026-07-31',
+      content:
+        'lineItem/ProductCode,lineItem/UsageStartDate,lineItem/UnblendedCost\nAmazonEC2,2026-07-01T00:00:00Z,12.34\n',
+      encoding: 'text',
+      fileName: 'live-rbac-denial.csv',
+    },
+    expectedStatus: 403,
+    label: 'member billing import RBAC denial',
+  });
+  if (forbidden?.error?.code !== 'FORBIDDEN') {
+    throw new Error(`RBAC denial returned unexpected payload: ${redactedJson(forbidden)}`);
+  }
+  markStep('confirmed structured 403 for member-only billing import attempt');
+
+  const revoked = await apiJson('/api/v1/auth/sessions/revoke-other', {
+    method: 'POST',
+    token: owner.token,
+    label: 'revoke other sessions',
+  });
+  if (typeof revoked?.revoked !== 'number') {
+    throw new Error(`Session revocation returned unexpected payload: ${redactedJson(revoked)}`);
+  }
+  markStep('verified server-side revoke-other-sessions endpoint');
+
+  const durationMs = Date.now() - startedAt;
+  assertWithin(durationMs, authThresholdMs, 'workspace auth/RBAC journey');
+
+  return {
+    name: 'workspace-auth-rbac-sso',
+    status: 'passed',
+    durationMs,
+    thresholdMs: authThresholdMs,
+    steps,
+    workspace: {
+      teamId,
+      ownerRole: owner.team.role,
+      memberRole: demoted.role,
+      invitationStatus: acceptedInvitation.status,
+      sessionsListed: sessions.length,
+      revokeOtherSessionsStatus: 'passed',
+    },
+    rbac: {
+      deniedEndpoint: '/api/v1/billing/imports/provider-export',
+      rbacDeniedStatus: 403,
+      errorCode: forbidden.error.code,
+    },
+    sso: {
+      providerType: 'oidc',
+      mode: ssoStart.mode,
+      stateVerified: teamScopedMember.sso.stateVerified,
+    },
+  };
+}
+
 async function downloadReport(
   page,
   quickActions,
@@ -389,6 +669,62 @@ async function waitForJson(url, label, predicate) {
   }
 
   throw lastError ?? new Error(`${label} was not ready`);
+}
+
+async function apiJson(
+  pathOrUrl,
+  { method = 'GET', token, body, expectedStatus = 200, label = pathOrUrl, headers = {} } = {},
+) {
+  const requestHeaders = {
+    accept: 'application/json',
+    ...headers,
+  };
+  if (body !== undefined) {
+    requestHeaders['content-type'] = 'application/json';
+  }
+  if (token) {
+    requestHeaders.authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(buildApiUrl(pathOrUrl), {
+    method,
+    headers: requestHeaders,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await response.text();
+  let parsed;
+
+  if (text) {
+    try {
+      parsed = JSON.parse(text);
+    } catch (error) {
+      throw new Error(
+        `${label} returned non-JSON HTTP ${response.status}: ${text.slice(0, 200)} (${error.message})`,
+      );
+    }
+  }
+
+  if (response.status !== expectedStatus) {
+    throw new Error(
+      `${label} returned HTTP ${response.status}, expected ${expectedStatus}: ${redactedJson(parsed)}`,
+    );
+  }
+
+  return parsed;
+}
+
+function buildApiUrl(pathOrUrl) {
+  if (/^https?:\/\//i.test(pathOrUrl)) {
+    return pathOrUrl;
+  }
+
+  return `${apiOrigin}${pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`}`;
+}
+
+function redactedJson(value) {
+  return JSON.stringify(value, (key, nestedValue) =>
+    sensitiveTranscriptKeys.has(key) ? '[redacted]' : nestedValue,
+  );
 }
 
 async function expectNoHorizontalOverflow(page, label) {
