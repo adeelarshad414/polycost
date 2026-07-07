@@ -4,12 +4,33 @@ import { NormalizedWorkloadSpec } from '../nws/nws.types';
 export type TerraformTargetCloud = ProviderId;
 export type TerraformValidationStatus = 'passed' | 'warning' | 'failed';
 export type TerraformCommandStatus = 'not-run' | 'passed' | 'failed';
+export type TerraformRuntimeTarget = 'vm' | 'containers' | 'serverless' | 'kubernetes';
+export type TerraformNetworkTopology = 'public' | 'private' | 'landing-zone';
+export type TerraformAvailabilityMode =
+  'single-region' | 'multi-az' | 'multi-region-dr' | 'active-active';
+
+export interface TerraformGenerateOptions {
+  runtimeTarget?: TerraformRuntimeTarget;
+  networkTopology?: TerraformNetworkTopology;
+  availabilityMode?: TerraformAvailabilityMode;
+  includePolicyPack?: boolean;
+  includeModuleScaffold?: boolean;
+}
+
+export interface TerraformGenerationProfile {
+  runtimeTarget: TerraformRuntimeTarget;
+  networkTopology: TerraformNetworkTopology;
+  availabilityMode: TerraformAvailabilityMode;
+  policyPackIncluded: boolean;
+  moduleScaffoldIncluded: boolean;
+}
 
 export interface TerraformGenerateInput {
   targetCloud: TerraformTargetCloud;
   nws: unknown;
   workspaceName?: string;
   region?: string;
+  options?: TerraformGenerateOptions;
 }
 
 export interface TerraformGeneratedFile {
@@ -32,7 +53,7 @@ export interface TerraformValidationCommand {
 
 export interface TerraformGenerationValidation {
   status: TerraformValidationStatus;
-  executionMode: 'static';
+  executionMode: 'static' | 'static-plus-policy';
   checks: TerraformValidationCheck[];
   commands: TerraformValidationCommand[];
 }
@@ -55,6 +76,7 @@ export interface TerraformGenerationResult {
   bundleName: string;
   workspaceName: string;
   region: string;
+  generationProfile: TerraformGenerationProfile;
   source: {
     schemaVersion: NormalizedWorkloadSpec['schemaVersion'];
     workloadName?: string;

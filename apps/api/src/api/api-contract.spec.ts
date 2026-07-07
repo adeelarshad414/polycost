@@ -413,7 +413,11 @@ describe('API contracts', () => {
         bundleName: 'client-portal-aws-terraform',
         validation: expect.objectContaining({
           status: 'passed',
-          executionMode: 'static',
+          executionMode: 'static-plus-policy',
+        }),
+        generationProfile: expect.objectContaining({
+          runtimeTarget: 'vm',
+          networkTopology: 'public',
         }),
         files: expect.arrayContaining([
           expect.objectContaining({
@@ -425,9 +429,27 @@ describe('API contracts', () => {
             path: 'backend.tf.example',
             content: expect.stringContaining('backend "s3"'),
           }),
+          expect.objectContaining({
+            path: 'policies/terraform-plan.rego',
+            content: expect.stringContaining('package polycost.terraform'),
+          }),
         ]),
       }),
     );
+  });
+
+  it('POST /terraform/generate validates generation options', async () => {
+    const controller = new TerraformGenerationController(new TerraformGenerationService());
+
+    expect(() =>
+      controller.generate({
+        targetCloud: 'aws',
+        nws: validNws,
+        options: {
+          runtimeTarget: 'mainframe',
+        },
+      }),
+    ).toThrow(ApiValidationError);
   });
 
   it('POST /terraform/generate rejects unsupported target cloud values', async () => {

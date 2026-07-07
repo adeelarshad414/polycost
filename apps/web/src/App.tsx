@@ -64,7 +64,10 @@ import {
   RegionCatalogResponse,
   ReportFormat,
   ServiceRequirement,
+  TerraformAvailabilityMode,
   TerraformGenerationResult,
+  TerraformNetworkTopology,
+  TerraformRuntimeTarget,
   TerraformTargetCloud,
   AccountSessionRecord,
   AuthMeResponse,
@@ -538,6 +541,26 @@ const FAULT_TOLERANCE_OPTIONS: Array<[WorkloadFormState['faultTolerance'], strin
   ['single-zone', 'Single-zone'],
   ['multi-az', 'Multi-AZ'],
   ['multi-region', 'Multi-region'],
+  ['active-active', 'Active-active'],
+];
+
+const TERRAFORM_RUNTIME_OPTIONS: Array<[TerraformRuntimeTarget, string]> = [
+  ['vm', 'VM baseline'],
+  ['containers', 'Containers'],
+  ['serverless', 'Serverless'],
+  ['kubernetes', 'Kubernetes'],
+];
+
+const TERRAFORM_NETWORK_OPTIONS: Array<[TerraformNetworkTopology, string]> = [
+  ['private', 'Private first'],
+  ['public', 'Public demo'],
+  ['landing-zone', 'Landing zone'],
+];
+
+const TERRAFORM_AVAILABILITY_OPTIONS: Array<[TerraformAvailabilityMode, string]> = [
+  ['single-region', 'Single region'],
+  ['multi-az', 'Multi-AZ'],
+  ['multi-region-dr', 'Multi-region DR'],
   ['active-active', 'Active-active'],
 ];
 
@@ -16677,6 +16700,15 @@ function TerraformGenerationPanel({
   const [targetCloud, setTargetCloud] = useState<TerraformTargetCloud>(
     comparison?.cheapestProviderId ?? 'aws',
   );
+  const [runtimeTarget, setRuntimeTarget] = useState<TerraformRuntimeTarget>('vm');
+  const [networkTopology, setNetworkTopology] = useState<TerraformNetworkTopology>(
+    form.environment === 'production' || form.databaseEnabled || form.loadBalancer
+      ? 'private'
+      : 'public',
+  );
+  const [availabilityMode, setAvailabilityMode] = useState<TerraformAvailabilityMode>(
+    terraformAvailabilityModeFromForm(form),
+  );
   const [bundle, setBundle] = useState<TerraformGenerationResult | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
@@ -16686,6 +16718,22 @@ function TerraformGenerationPanel({
       setTargetCloud(comparison.cheapestProviderId);
     }
   }, [comparison?.comparisonId, comparison?.cheapestProviderId]);
+
+  useEffect(() => {
+    setNetworkTopology(
+      form.environment === 'production' || form.databaseEnabled || form.loadBalancer
+        ? 'private'
+        : 'public',
+    );
+    setAvailabilityMode(terraformAvailabilityModeFromForm(form));
+  }, [
+    comparison?.comparisonId,
+    form.databaseEnabled,
+    form.environment,
+    form.loadBalancer,
+    form.multiAz,
+    form.multiRegion,
+  ]);
 
   async function handleGenerateTerraform() {
     if (!comparison) {
@@ -16701,6 +16749,13 @@ function TerraformGenerationPanel({
         targetCloud,
         nws,
         workspaceName: form.workloadName.trim() || comparison.requirements?.workloadName,
+        options: {
+          runtimeTarget,
+          networkTopology,
+          availabilityMode,
+          includePolicyPack: true,
+          includeModuleScaffold: true,
+        },
       });
       setBundle(result);
     } catch (terraformError) {
@@ -16784,6 +16839,57 @@ function TerraformGenerationPanel({
         ))}
       </div>
 
+      <div className="terraform-option-grid" aria-label="Terraform generation profile">
+        <label>
+          <span>Runtime</span>
+          <select
+            value={runtimeTarget}
+            onChange={(event) => {
+              setRuntimeTarget(event.target.value as TerraformRuntimeTarget);
+              setBundle(null);
+            }}
+          >
+            {TERRAFORM_RUNTIME_OPTIONS.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Topology</span>
+          <select
+            value={networkTopology}
+            onChange={(event) => {
+              setNetworkTopology(event.target.value as TerraformNetworkTopology);
+              setBundle(null);
+            }}
+          >
+            {TERRAFORM_NETWORK_OPTIONS.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Availability</span>
+          <select
+            value={availabilityMode}
+            onChange={(event) => {
+              setAvailabilityMode(event.target.value as TerraformAvailabilityMode);
+              setBundle(null);
+            }}
+          >
+            {TERRAFORM_AVAILABILITY_OPTIONS.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
       <div className="terraform-generation-actions">
         <Button
           type="button"
@@ -16817,6 +16923,9 @@ function TerraformGenerationPanel({
             </span>
             <strong>{bundle.bundleName}</strong>
             <div className="terraform-resource-chips" aria-label="Generated Terraform resources">
+              <span>{runtimeProfileLabel(bundle.generationProfile.runtimeTarget)}</span>
+              <span>{topologyProfileLabel(bundle.generationProfile.networkTopology)}</span>
+              <span>{availabilityProfileLabel(bundle.generationProfile.availabilityMode)}</span>
               <span>{bundle.resourceSummary.computeInstances} VM</span>
               <span>{bundle.resourceSummary.objectStorageBuckets} object store</span>
               <span>{bundle.resourceSummary.relationalDatabases} database</span>
@@ -17753,6 +17862,59 @@ function providerTerraformResourceLabel(provider: ProviderId): string {
     case 'gcp':
       return 'Compute · Storage · Cloud SQL';
   }
+}
+
+function runtimeProfileLabel(runtimeTarget: TerraformRuntimeTarget): string {
+  switch (runtimeTarget) {
+    case 'vm':
+      return 'VM baseline';
+    case 'containers':
+      return 'Container boundary';
+    case 'serverless':
+      return 'Serverless boundary';
+    case 'kubernetes':
+      return 'Kubernetes boundary';
+  }
+}
+
+function topologyProfileLabel(networkTopology: TerraformNetworkTopology): string {
+  switch (networkTopology) {
+    case 'public':
+      return 'Public topology';
+    case 'private':
+      return 'Private topology';
+    case 'landing-zone':
+      return 'Landing-zone topology';
+  }
+}
+
+function availabilityProfileLabel(availabilityMode: TerraformAvailabilityMode): string {
+  switch (availabilityMode) {
+    case 'single-region':
+      return 'Single region';
+    case 'multi-az':
+      return 'Multi-AZ';
+    case 'multi-region-dr':
+      return 'Multi-region DR';
+    case 'active-active':
+      return 'Active-active';
+  }
+}
+
+function terraformAvailabilityModeFromForm(form: WorkloadFormState): TerraformAvailabilityMode {
+  if (form.faultTolerance === 'active-active') {
+    return 'active-active';
+  }
+
+  if (form.multiRegion || form.faultTolerance === 'multi-region') {
+    return 'multi-region-dr';
+  }
+
+  if (form.multiAz || form.faultTolerance === 'multi-az') {
+    return 'multi-az';
+  }
+
+  return 'single-region';
 }
 
 function previewTerraformContent(content: string): string {

@@ -4874,6 +4874,42 @@ select:disabled {
   line-height: 1.1;
 }
 
+.terraform-option-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--pc-space-2);
+}
+
+.terraform-option-grid label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--pc-border) 82%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pc-bg-surface) 82%, transparent);
+  padding: 10px;
+}
+
+.terraform-option-grid span {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.terraform-option-grid select {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--pc-border) 86%, transparent);
+  border-radius: 8px;
+  background: var(--pc-bg-surface);
+  color: var(--pc-text-primary);
+  font: inherit;
+  font-size: var(--pc-text-sm);
+  padding: 9px 10px;
+}
+
 .terraform-generation-actions {
   flex-wrap: wrap;
   align-items: center;
@@ -8276,7 +8312,8 @@ select:disabled {
   .analysis-grid,
   .financial-chart-grid,
   .finops-advisor-grid,
-  .terraform-target-grid {
+  .terraform-target-grid,
+  .terraform-option-grid {
     grid-template-columns: 1fr;
   }
 

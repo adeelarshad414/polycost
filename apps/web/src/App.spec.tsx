@@ -1220,6 +1220,13 @@ describe('App', () => {
     expect(client.generateTerraform).toHaveBeenCalledWith(
       expect.objectContaining({
         targetCloud: 'gcp',
+        options: expect.objectContaining({
+          runtimeTarget: 'vm',
+          networkTopology: 'private',
+          availabilityMode: 'multi-az',
+          includePolicyPack: true,
+          includeModuleScaffold: true,
+        }),
         nws: expect.objectContaining({
           schemaVersion: '1.0',
           workload: expect.objectContaining({
@@ -1230,6 +1237,7 @@ describe('App', () => {
     );
     expect(text(container)).toContain('Terraform starter bundle');
     expect(text(container)).toContain('client-portal-gcp-terraform');
+    expect(text(container)).toContain('Private topology');
     expect(text(container)).toContain('google_compute_instance.app');
     expect(text(container)).toContain('required-provider-pinned');
     expect(buttonByText(container, 'Download bundle JSON')).toBeInstanceOf(HTMLButtonElement);
@@ -3632,6 +3640,13 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     bundleName: 'client-portal-gcp-terraform',
     workspaceName: 'client-portal',
     region: 'us-central1',
+    generationProfile: {
+      runtimeTarget: 'vm',
+      networkTopology: 'private',
+      availabilityMode: 'multi-az',
+      policyPackIncluded: true,
+      moduleScaffoldIncluded: true,
+    },
     source: {
       schemaVersion: '1.0',
       workloadName: 'Client Portal',
@@ -3672,7 +3687,7 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     ],
     validation: {
       status: 'passed',
-      executionMode: 'static',
+      executionMode: 'static-plus-policy',
       checks: [
         {
           id: 'required-provider-pinned',

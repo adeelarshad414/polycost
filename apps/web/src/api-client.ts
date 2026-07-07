@@ -41,6 +41,7 @@ import {
   TeamInvitationPreview,
   TeamMemberRecord,
   TeamRole,
+  TerraformGenerateOptions,
   TerraformGenerationResult,
   TerraformTargetCloud,
   WorkloadInput,
@@ -170,6 +171,7 @@ export interface PolyCostClient {
     nws: NormalizedWorkloadSpec;
     workspaceName?: string;
     region?: string;
+    options?: TerraformGenerateOptions;
   }): Promise<TerraformGenerationResult>;
   getComparisonAnalytics(comparisonId: string): Promise<ComparisonAnalyticsResponse>;
   getComparisonPricingEvidence(comparisonId: string): Promise<ComparisonPricingEvidenceResponse>;

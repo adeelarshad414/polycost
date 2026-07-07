@@ -100,6 +100,69 @@ say so explicitly rather than marking it done.
 | Production readiness orchestrator v2 pass               | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.9 - Production gap closure continuation         | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase V3.1 - Terraform hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added Terraform generation profile options for runtime target, network topology,
+  availability mode, policy-pack inclusion, and module-scaffold inclusion.
+- Added response-level `generationProfile` evidence for every generated bundle.
+- Added hardened bundle artifacts: `Makefile`, `.tflint.hcl`,
+  `tests/static_validation.tftest.hcl`, `policies/terraform-plan.rego`, and
+  `modules/` boundary documentation.
+- Hardened AWS output with private subnets, private RDS subnet group, explicit
+  non-public RDS exposure, and EC2 role/instance-profile baseline.
+- Hardened Azure output with optional direct public IPs, VM managed identity,
+  delegated PostgreSQL subnet, private DNS link, and PostgreSQL public network
+  access disabled.
+- Hardened GCP output with optional external access configs, VM service account,
+  Private Google Access, Cloud Storage public-access prevention, and Cloud SQL
+  private service access.
+- Expanded static validation to check private database networking, runtime identity,
+  policy artifacts, Terraform test harness, and module boundary documentation.
+- Updated the frontend Terraform panel with runtime/topology/availability controls
+  and profile chips.
+- Added `docs/architecture/phase-v3-1-terraform-hardening.md`.
+
+Verification:
+
+- `npm run format:check`
+  - Prettier check passed.
+- `npm run ci:lint`
+  - ESLint and TypeScript checks passed.
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/terraform/terraform-generation.service.spec.ts src/api/api-contract.spec.ts`
+  - API focused: `2` suites / `42` tests.
+- `npm run test:unit --workspace @polycost/web -- --runInBand src/api-client.spec.ts src/App.spec.tsx`
+  - Web focused: `2` suites / `84` tests.
+- `npm run test:production-readiness`
+  - API focused: `10` suites / `135` tests.
+  - Web focused: `2` suites / `84` tests.
+- `npm run check`
+  - API unit: `51` suites / `400` tests.
+  - Web unit: `9` suites / `132` tests.
+  - Graph validation, pricing coverage, progress verification, QA/security
+    suppression, database, DevOps, cloud, release, and provider credential gates
+    passed.
+  - `impeccable` skipped by documented Node 20 vs Node 24 constraint.
+- `npm run ci:build`
+  - API TypeScript build passed.
+  - Web production build passed with the existing Vite environment-placeholder and
+    chunk-size warnings.
+
+Known remaining gaps:
+
+- This is still not a full enterprise landing-zone module library.
+- Container, serverless, and Kubernetes targets are explicit manual-review module
+  boundaries until provider-native runtime modules are implemented.
+- Active-active and multi-region DR remain recorded generation intent, not full
+  generated multi-region topology.
+- Real provider `terraform init`, `validate`, `test`, `plan`, and policy execution
+  still run outside PolyCost with real credentials and destination account controls.
 
 ## Phase V3 - Terraform generation MVP
 

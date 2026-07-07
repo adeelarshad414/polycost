@@ -79,6 +79,13 @@ describe('api client', () => {
       bundleName: 'portal-aws-terraform',
       workspaceName: 'portal',
       region: 'us-east-1',
+      generationProfile: {
+        runtimeTarget: 'vm',
+        networkTopology: 'private',
+        availabilityMode: 'multi-az',
+        policyPackIncluded: true,
+        moduleScaffoldIncluded: true,
+      },
       source: {
         schemaVersion: '1.0',
         workloadType: 'web_app',
@@ -117,6 +124,13 @@ describe('api client', () => {
         nws,
         workspaceName: 'Portal',
         region: 'us-east-1',
+        options: {
+          runtimeTarget: 'vm',
+          networkTopology: 'private',
+          availabilityMode: 'multi-az',
+          includePolicyPack: true,
+          includeModuleScaffold: true,
+        },
       }),
     ).resolves.toEqual(terraformResponse);
 
@@ -129,6 +143,13 @@ describe('api client', () => {
           nws,
           workspaceName: 'Portal',
           region: 'us-east-1',
+          options: {
+            runtimeTarget: 'vm',
+            networkTopology: 'private',
+            availabilityMode: 'multi-az',
+            includePolicyPack: true,
+            includeModuleScaffold: true,
+          },
         }),
       }),
     );
