@@ -2,38 +2,46 @@ import { mockPricingCatalogRecords } from '../adapters/mock/mock-pricing-fixture
 import { PricingCatalogRecord, ProviderId } from '../adapters/common/cloud-provider-adapter';
 import {
   NormalizedComputePricingRecord,
+  NormalizedEgressTierRateRecord,
   normalizePricingCatalogRecords,
+  NormalizedPricingRecords,
+  NormalizedStoragePricingRecord,
 } from './normalized-pricing-records';
 import { pricingLineageForCatalogRecord } from './pricing-lineage';
 
 const providers: ProviderId[] = ['aws', 'azure', 'gcp'];
 const fetchedAt = '2026-07-06T00:00:00.000Z';
 const effectiveDate = '2026-07-01T00:00:00.000Z';
+const expectedComputeFamilies = [
+  'accelerated-computing',
+  'burstable',
+  'compute-optimized',
+  'general-purpose',
+  'memory-optimized',
+  'storage-optimized',
+] as const;
+const expectedStorageTiers = ['archive', 'infrequent_access', 'standard'] as const;
 
 describe('pricing reconciliation evidence', () => {
   it.each(providers)(
-    'recomputes at least 20 %s stored rates from raw source records',
+    'recomputes at least 20 distinct %s normalized rates from raw source records',
     (provider) => {
       const records = mockPricingCatalogRecords(provider, {
         fetchedAt,
         effectiveDate,
       });
       const normalized = normalizePricingCatalogRecords(records);
-      const reconciliationAssertions = {
-        compute: 0,
-        storage: 0,
-        egress: 0,
-      };
+      const reconciledRows = new Set<string>();
 
       for (const compute of normalized.compute) {
         const raw = sourceRecordForCompute(compute);
         expect(compute.pricePerHour).toBe(raw.unitPriceUsd);
         expect(compute.sourceLineage).toEqual(pricingLineageForCatalogRecord(raw));
-        expect(compute.sourceLineage.sourcePayloadHash).toMatch(/^[a-f0-9]{64}$/);
+        expectCompleteLineage(compute.sourceLineage);
         expect(compute.sourceLineage.sourceEndpoint).toBe(
           `fixture://mock-pricing/${provider}/compute`,
         );
-        reconciliationAssertions.compute += 4;
+        reconciledRows.add(`compute:${compute.providerSkuId}:${compute.term}`);
       }
 
       for (const storage of normalized.storage) {
@@ -41,11 +49,11 @@ describe('pricing reconciliation evidence', () => {
 
         expect(storage.pricePerGbMonth).toBe(raw.unitPriceUsd);
         expect(storage.sourceLineage).toEqual(pricingLineageForCatalogRecord(raw));
-        expect(storage.sourceLineage.sourcePayloadHash).toMatch(/^[a-f0-9]{64}$/);
+        expectCompleteLineage(storage.sourceLineage);
         expect(storage.sourceLineage.sourceEndpoint).toBe(
           `fixture://mock-pricing/${provider}/storage`,
         );
-        reconciliationAssertions.storage += 4;
+        reconciledRows.add(`storage:${storage.tier}`);
       }
 
       for (const egress of normalized.egress) {
@@ -56,24 +64,79 @@ describe('pricing reconciliation evidence', () => {
         expect(rawTier).toBeDefined();
         expect(egress.pricePerGb).toBe(rawTier?.pricePerGb);
         expect(egress.sourceLineage).toEqual(pricingLineageForCatalogRecord(raw));
-        expect(egress.sourceLineage.sourcePayloadHash).toMatch(/^[a-f0-9]{64}$/);
+        expectCompleteLineage(egress.sourceLineage);
         expect(egress.sourceLineage.sourceEndpoint).toBe(
           `fixture://mock-pricing/${provider}/network`,
         );
-        reconciliationAssertions.egress += 5;
+        reconciledRows.add(`egress:${egress.tierFromGb}`);
       }
 
-      expect(reconciliationAssertions.compute).toBeGreaterThan(0);
-      expect(reconciliationAssertions.storage).toBeGreaterThan(0);
-      expect(reconciliationAssertions.egress).toBeGreaterThan(0);
-      expect(
-        reconciliationAssertions.compute +
-          reconciliationAssertions.storage +
-          reconciliationAssertions.egress,
-      ).toBeGreaterThanOrEqual(20);
+      expect(normalized.compute.length).toBeGreaterThanOrEqual(30);
+      expect(normalized.storage.length).toBeGreaterThanOrEqual(3);
+      expect(normalized.egress.length).toBeGreaterThanOrEqual(4);
+      expect(reconciledRows.size).toBeGreaterThanOrEqual(20);
+    },
+  );
+
+  it.each(providers)(
+    'covers mainstream %s compute families, storage tiers, and egress dimensions',
+    (provider) => {
+      const records = mockPricingCatalogRecords(provider, {
+        fetchedAt,
+        effectiveDate,
+      });
+      const normalized = normalizePricingCatalogRecords(records);
+      const storageTypes = new Set(
+        records
+          .filter((record) => record.serviceCategory === 'storage')
+          .map((record) => record.attributes?.type),
+      );
+      const storageAccessPatterns = new Set(
+        records
+          .filter((record) => record.serviceCategory === 'storage')
+          .map((record) => record.attributes?.accessPattern),
+      );
+
+      expect(familiesFor(normalized)).toEqual(expectedComputeFamilies);
+      expect(storageTiersFor(normalized)).toEqual(expectedStorageTiers);
+      expect(egressTierStartsFor(normalized)).toEqual([0, 10_240, 51_200, 153_600]);
+      expect(storageTypes).toEqual(new Set(['object', 'block', 'file']));
+      expect(storageAccessPatterns).toEqual(new Set(['frequent', 'infrequent', 'archive']));
+      expect(records.every((record) => record.fetchedAt === fetchedAt)).toBe(true);
+      expect(records.every((record) => record.effectiveDate === effectiveDate)).toBe(true);
     },
   );
 });
+
+function familiesFor(
+  normalized: NormalizedPricingRecords,
+): Array<(typeof expectedComputeFamilies)[number]> {
+  return [...new Set(normalized.compute.map((record) => record.family))].sort();
+}
+
+function storageTiersFor(
+  normalized: NormalizedPricingRecords,
+): Array<(typeof expectedStorageTiers)[number]> {
+  return [...new Set(normalized.storage.map((record) => record.tier))].sort();
+}
+
+function egressTierStartsFor(normalized: NormalizedPricingRecords): number[] {
+  return normalized.egress.map((record) => record.tierFromGb).sort((left, right) => left - right);
+}
+
+function expectCompleteLineage(
+  lineage:
+    | NormalizedComputePricingRecord['sourceLineage']
+    | NormalizedStoragePricingRecord['sourceLineage']
+    | NormalizedEgressTierRateRecord['sourceLineage'],
+): void {
+  expect(lineage.sourceEndpoint).toBeTruthy();
+  expect(lineage.sourceRecordId).toBeTruthy();
+  expect(lineage.sourceRecordKey).toBeTruthy();
+  expect(lineage.fetchTimestamp).toBe(fetchedAt);
+  expect(lineage.transformVersion).toBe('pricing-normalization-v3');
+  expect(lineage.sourcePayloadHash).toMatch(/^[a-f0-9]{64}$/);
+}
 
 function sourceRecordForCompute(record: NormalizedComputePricingRecord): PricingCatalogRecord {
   const source = record.rawPayload.sourceRecord;

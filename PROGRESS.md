@@ -76,6 +76,43 @@ say so explicitly rather than marking it done.
 | Phase 2.8AH - Diagram export evidence hardening        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AI - Security suppression hygiene gate        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AJ - Auth endpoint rate-limit hardening       | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AK - Pricing reconciliation breadth guard     | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AK - Pricing reconciliation breadth guard
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added explicit Azure and GCP burstable/shared-core mock catalog rows so the mock ETL
+  path covers all six normalized compute families for every provider.
+- Updated normalized pricing so trusted adapter-provided `normalizedFamily` /
+  `instanceFamily` metadata is used before SKU-prefix fallback.
+- Strengthened `pricing-reconciliation.spec.ts` so each provider must reconcile at
+  least 20 distinct normalized rates from raw source records, with complete source
+  endpoint, source record ID/key, fetch timestamp, transform version, and payload hash.
+- Added coverage assertions for compute family breadth, normalized storage tiers,
+  raw storage object/block/file dimensions, raw storage access patterns, and egress
+  tier starts across AWS, Azure, and GCP mock catalogs.
+
+Verification:
+
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/pricing-normalization/pricing-reconciliation.spec.ts src/pricing-normalization/normalized-pricing-records.spec.ts src/adapters/mock/mock-provider.adapter.spec.ts`
+  passes.
+- `npm run pricing:coverage:check` passes.
+- `npm run test:production-readiness` passes.
+- `npm run check` passes end-to-end; the optional impeccable check is still skipped
+  because the repo targets Node.js 20 and the tool requires Node.js 24.
+
+Known remaining gaps:
+
+- The breadth guard proves fixture-backed ETL and lineage depth; full invoice-grade
+  live provider catalog coverage still depends on real provider credentials and wider
+  production sync rehearsal.
+- Database and higher-level modeled services remain covered by comparison/model
+  evidence, while this normalization gate intentionally focuses on compute, storage,
+  and egress rate rows.
 
 ## Phase 2.8AJ - Auth endpoint rate-limit hardening
 
