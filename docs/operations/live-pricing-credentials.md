@@ -11,11 +11,11 @@ procedure, see [Provider Credentials](../PROVIDER-CREDENTIALS.md) and
 
 ## Current Provider Sources
 
-| Provider | Current adapter source          | Credential requirement                   | Notes                                                                                                                                                                  |
-| -------- | ------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AWS      | AWS Price List bulk offer files | None for the default bulk-file path      | The current adapter reads public bulk JSON by service/region. Query API or account-specific discount support would require AWS credentials in a later hardening phase. |
-| Azure    | Azure Retail Prices API         | None                                     | Retail prices are public and unauthenticated. PolyCost requests USD and filters by service family, region, and price type.                                             |
-| GCP      | Cloud Billing Catalog API       | Required when `USE_MOCK_PROVIDERS=false` | Store an OAuth access token in Vault at `secret/polycost/providers/gcp` key `access_token`. The token needs Cloud Billing Catalog read access.                         |
+| Provider | Current adapter source          | Credential requirement                   | Notes                                                                                                                                                                                    |
+| -------- | ------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AWS      | AWS Price List bulk offer files | None for the default bulk-file path      | The current adapter reads public bulk JSON by service/region. Query API or account-specific discount support would require AWS credentials in a later hardening phase.                   |
+| Azure    | Azure Retail Prices API         | None                                     | Retail prices are public and unauthenticated. PolyCost requests USD and filters by service family, region, and price type.                                                               |
+| GCP      | Cloud Billing Catalog API       | Required when `USE_MOCK_PROVIDERS=false` | Store a short-lived OAuth token at `access_token`, or service account JSON at `service_account_json` for runtime token exchange. The credential needs Cloud Billing Catalog read access. |
 
 Official references:
 
@@ -57,6 +57,12 @@ Then seed provider secrets in Vault. GCP is required by the current adapter:
 
 ```bash
 docker compose exec vault vault kv put secret/polycost/providers/gcp access_token="<oauth-access-token>"
+```
+
+If your deployment cannot mint a token before startup, use the service-account fallback:
+
+```bash
+docker compose exec vault vault kv put secret/polycost/providers/gcp service_account_json=@/secure/path/polycost-pricing-reader.json
 ```
 
 Optional diagram Tier 3 classification uses the same OpenAI-compatible secret path as
@@ -104,8 +110,9 @@ and why invoice-grade support remains future work.
   credits, and negotiated discounts are intentionally out of scope.
 - Azure coverage uses retail pricing only; enterprise agreements and private offers are
   not represented.
-- GCP requires an operational token refresh strategy. The current secret is an access
-  token, not a full service-account credential exchange flow.
+- GCP supports either a short-lived access token or a Vault-stored service account JSON
+  fallback. Workload identity and externally minted short-lived tokens are still the
+  preferred production pattern.
 - Provider category mapping is still filtered to PolyCost-supported compute, storage,
   database, and network categories plus modeled operations/licensing/support dimensions.
 - Spot/preemptible and commitment data remains provider-availability dependent and is

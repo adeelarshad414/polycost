@@ -67,6 +67,38 @@ say so explicitly rather than marking it done.
 | Phase 2.8Y - Mock OIDC workspace UX                    | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8Z - Diagram fixture corpus tier table         | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AA - UI-priced SKU evidence guard             | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AB - GCP pricing credential fallback          | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AB - GCP pricing credential fallback
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+- Hardened real-provider GCP pricing readiness by allowing the Cloud Billing adapter to use
+  either a Vault-stored `access_token` or a Vault-stored `service_account_json` /
+  `service_account_key_json` fallback.
+- Added runtime service-account JWT signing and OAuth token exchange against the service
+  account `token_uri` or Google's default token endpoint, scoped to
+  `https://www.googleapis.com/auth/cloud-billing.readonly`.
+- Updated the provider credential readiness checker so strict mode accepts either a
+  production-safe short-lived access token or a valid service-account JSON shape, while still
+  rejecting missing, malformed, or placeholder values.
+- Updated live-pricing credential docs with the new Vault keys, recommended production
+  preference for workload-identity/short-lived tokens, and service-account JSON as a sensitive
+  self-hosted fallback.
+- Verification evidence in this continuation:
+  - Focused GCP adapter spec passed: 10 tests covering token use, service-account exchange,
+    catalog normalization, live SKU filtering, pagination, and credential failures.
+  - `npm run provider:credentials:check` passed in local demo/mock mode.
+  - `npm run provider:credentials:check:strict` passed in local demo/mock mode.
+  - Production-readiness gate passed: API 6 suites / 86 tests and web 2 suites / 82 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run security:audit` passed the high-severity gate; npm still reports the known low
+    `@ai-sdk/provider-utils` advisory chain with no safe fix available.
+  - `npm run format:check` passed.
+- Known gaps carried forward: GCP can now exchange service-account JSON, but full
+  invoice-grade billing coverage, private discounts, taxes, credits, and live account usage
+  reconciliation remain future work.
 
 ## Phase 2.8AA - UI-priced SKU evidence guard
 
