@@ -80,6 +80,37 @@ say so explicitly rather than marking it done.
 | Phase 2.8AL - Auth team UX state hardening             | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AM - VSDX visual evidence polish              | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AN - Local credential readiness gate          | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AO - Production-readiness suite drift guard   | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AO - Production-readiness suite drift guard
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Extended `scripts/release-readiness-check.mjs` to assert the focused
+  `test:production-readiness` command still includes pricing reconciliation,
+  refresh-live traceability, auth/RBAC, diagram parser, LLM classifier, report
+  evidence, web app, and API-client specs.
+- Added release-readiness assertions that CI keeps both the provider credential
+  readiness gate and the production-readiness focused regression gate.
+- Added source-content guards proving the named suite still covers the 20-rate
+  reconciliation floor, complete pricing lineage assertions, team/billing RBAC,
+  malicious diagram fixtures, oversized diagram fallback, and unsafe VSDX rejection.
+
+Verification:
+
+- `npm run release:check` passes.
+- `npm run format:check` passes.
+- `npm run test:production-readiness` passes.
+- `npm run check` passes end-to-end with the stricter release-readiness assertions
+  and provider credential gate in the aggregate path.
+
+Known remaining gaps:
+
+- This prevents local/CI test-suite drift, but GitHub-hosted execution still depends
+  on resolving the repository account billing/spending-limit runner blocker.
 
 ## Phase 2.8AN - Local credential readiness gate
 

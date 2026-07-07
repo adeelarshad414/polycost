@@ -40,6 +40,18 @@ if (!packageJson.scripts?.check?.includes('npm run provider:credentials:check'))
   failures.push('package.json check script must include npm run provider:credentials:check');
 }
 
+assertScriptIncludes('test:production-readiness', [
+  'src/pricing-normalization/pricing-reconciliation.spec.ts',
+  'src/api/live-pricing-traceability.spec.ts',
+  'src/api/auth-billing.spec.ts',
+  'src/api/auth.controller.spec.ts',
+  'src/diagram-parser/diagram-parser.service.spec.ts',
+  'src/diagram-parser/llm-classifier.client.spec.ts',
+  'src/reports/report-generators.spec.ts',
+  'src/App.spec.tsx',
+  'src/api-client.spec.ts',
+]);
+
 await assertFileContains('README.md', [
   ['one-command demo startup', 'npm run demo:up'],
   ['demo artifact capture', 'npm run demo:artifacts'],
@@ -88,6 +100,29 @@ await assertFileContains('docs/SECURITY-SUPPRESSIONS.md', [
   ['impeccable Node 24 tracking', 'impeccable@3.1.0'],
 ]);
 
+await assertFileContains('.github/workflows/ci.yml', [
+  ['provider credential readiness CI gate', 'npm run provider:credentials:check'],
+  ['production-readiness focused regression CI gate', 'npm run test:production-readiness'],
+]);
+
+await assertFileContains('apps/api/src/pricing-normalization/pricing-reconciliation.spec.ts', [
+  ['20-rate reconciliation floor', 'at least 20 distinct'],
+  ['complete lineage assertion', 'expectCompleteLineage'],
+  ['provider breadth coverage', 'covers mainstream %s compute families'],
+]);
+
+await assertFileContains('apps/api/src/api/auth-billing.spec.ts', [
+  ['team RBAC matrix', 'enforces the team RBAC matrix'],
+  ['billing admin RBAC', 'requires owner or admin access for billing imports'],
+]);
+
+await assertFileContains('apps/api/src/diagram-parser/diagram-parser.service.spec.ts', [
+  ['malicious XXE fixture', 'malicious/xxe.drawio'],
+  ['malicious zip-bomb fixture', 'malicious/zip-bomb.vsdx'],
+  ['oversized diagram fallback', 'caps oversized diagrams at 200 parsed nodes'],
+  ['unsafe VSDX guard', 'still rejects unsafe VSDX XML'],
+]);
+
 await assertFileContains('.github/PULL_REQUEST_TEMPLATE.md', [
   ['format validation checkbox', 'npm run format:check'],
   ['lint validation checkbox', 'npm run ci:lint'],
@@ -118,6 +153,21 @@ console.log('Release readiness check passed.');
 
 async function assertIssueTemplate(fileName, expectations) {
   await assertFileContains(path.join('.github/ISSUE_TEMPLATE', fileName), expectations);
+}
+
+function assertScriptIncludes(scriptName, snippets) {
+  const script = packageJson.scripts?.[scriptName];
+
+  if (!script) {
+    failures.push(`package.json is missing ${scriptName}`);
+    return;
+  }
+
+  for (const snippet of snippets) {
+    if (!script.includes(snippet)) {
+      failures.push(`package.json ${scriptName} script is missing ${snippet}`);
+    }
+  }
 }
 
 async function assertFileContains(relativePath, expectations) {
