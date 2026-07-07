@@ -11,6 +11,17 @@ export type AiCostNarrative = SharedAiCostNarrative;
 export const PROVIDER_ORDER = ['aws', 'azure', 'gcp'] as const;
 export type ProviderId = (typeof PROVIDER_ORDER)[number];
 export type TerraformTargetCloud = ProviderId;
+export type TerraformRuntimeTarget = 'vm' | 'containers' | 'serverless' | 'kubernetes';
+export type TerraformNetworkTopology = 'public' | 'private' | 'landing-zone';
+export type TerraformAvailabilityMode =
+  'single-region' | 'multi-az' | 'multi-region-dr' | 'active-active';
+export interface TerraformGenerateOptions {
+  runtimeTarget?: TerraformRuntimeTarget;
+  networkTopology?: TerraformNetworkTopology;
+  availabilityMode?: TerraformAvailabilityMode;
+  includePolicyPack?: boolean;
+  includeModuleScaffold?: boolean;
+}
 export type ServiceCategory =
   'compute' | 'storage' | 'database' | 'network' | 'support' | 'licensing' | 'operations';
 export type CostComponent =
@@ -262,6 +273,13 @@ export interface TerraformGenerationResult {
   bundleName: string;
   workspaceName: string;
   region: string;
+  generationProfile: {
+    runtimeTarget: TerraformRuntimeTarget;
+    networkTopology: TerraformNetworkTopology;
+    availabilityMode: TerraformAvailabilityMode;
+    policyPackIncluded: boolean;
+    moduleScaffoldIncluded: boolean;
+  };
   source: {
     schemaVersion: NormalizedWorkloadSpec['schemaVersion'];
     workloadName?: string;
@@ -292,7 +310,7 @@ export interface TerraformGenerationResult {
   }>;
   validation: {
     status: 'passed' | 'warning' | 'failed';
-    executionMode: 'static';
+    executionMode: 'static' | 'static-plus-policy';
     checks: Array<{
       id: string;
       status: 'passed' | 'warning' | 'failed';

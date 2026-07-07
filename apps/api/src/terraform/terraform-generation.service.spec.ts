@@ -86,6 +86,13 @@ describe('TerraformGenerationService', () => {
     expect(result.targetCloud).toBe('aws');
     expect(result.bundleName).toBe('revenue-portal-aws-terraform');
     expect(result.region).toBe('us-east-1');
+    expect(result.generationProfile).toMatchObject({
+      runtimeTarget: 'vm',
+      networkTopology: 'private',
+      availabilityMode: 'multi-az',
+      policyPackIncluded: true,
+      moduleScaffoldIncluded: true,
+    });
     expect(result.resourceSummary).toMatchObject({
       computeInstances: 2,
       objectStorageBuckets: 1,
@@ -95,14 +102,25 @@ describe('TerraformGenerationService', () => {
       multiAz: true,
     });
     expect(result.validation.status).toBe('passed');
-    expect(result.validation.executionMode).toBe('static');
+    expect(result.validation.executionMode).toBe('static-plus-policy');
     expect(file(result, 'versions.tf')).toContain('hashicorp/aws');
     expect(file(result, 'versions.tf')).toContain('~> 5.0');
     expect(file(result, 'main.tf')).toContain('resource "aws_instance" "app"');
     expect(file(result, 'main.tf')).toContain('metadata_options');
+    expect(file(result, 'main.tf')).toContain('resource "aws_subnet" "private"');
+    expect(file(result, 'main.tf')).toContain('aws_iam_instance_profile');
+    expect(file(result, 'main.tf')).toContain('publicly_accessible    = false');
     expect(file(result, 'main.tf')).toContain('storage_encrypted      = true');
     expect(file(result, 'backend.tf.example')).toContain('backend "s3"');
+    expect(file(result, 'Makefile')).toContain('terraform validate');
+    expect(file(result, '.tflint.hcl')).toContain('plugin "terraform"');
+    expect(file(result, 'policies/terraform-plan.rego')).toContain('publicly accessible');
+    expect(file(result, 'tests/static_validation.tftest.hcl')).toContain(
+      'static_configuration_contract',
+    );
+    expect(file(result, 'modules/README.md')).toContain('Module Boundary Review');
     expect(file(result, 'variables.tf')).toContain('sensitive   = true');
+    expect(file(result, 'variables.tf')).toContain('variable "network_topology"');
     expect(file(result, 'variables.tf')).toContain('variable "database_password"');
     expect(
       file(result, 'variables.tf')
@@ -134,6 +152,9 @@ describe('TerraformGenerationService', () => {
     expect(file(result, 'providers.tf')).toContain('features');
     expect(file(result, 'main.tf')).toContain('resource "azurerm_linux_virtual_machine" "app"');
     expect(file(result, 'main.tf')).toContain('disable_password_authentication = true');
+    expect(file(result, 'main.tf')).toContain('identity {');
+    expect(file(result, 'main.tf')).toContain('public_network_access_enabled = false');
+    expect(file(result, 'main.tf')).toContain('private_dns_zone_id');
     expect(file(result, 'backend.tf.example')).toContain('backend "azurerm"');
     expect(result.securityNotes.join(' ')).toContain('SSH public keys');
   });
@@ -150,6 +171,9 @@ describe('TerraformGenerationService', () => {
     expect(file(result, 'versions.tf')).toContain('hashicorp/google');
     expect(file(result, 'main.tf')).toContain('resource "google_compute_instance" "app"');
     expect(file(result, 'main.tf')).toContain('shielded_instance_config');
+    expect(file(result, 'main.tf')).toContain('google_service_account');
+    expect(file(result, 'main.tf')).toContain('google_service_networking_connection');
+    expect(file(result, 'main.tf')).toContain('public_access_prevention    = "enforced"');
     expect(file(result, 'main.tf')).toContain('resource "google_sql_database_instance" "main"');
     expect(file(result, 'backend.tf.example')).toContain('backend "gcs"');
     expect(file(result, 'variables.tf')).toContain('"costcenter" = "finops"');
@@ -186,6 +210,36 @@ describe('TerraformGenerationService', () => {
     expect(result.assumptions.join(' ')).toContain('File storage was detected');
     expect(result.assumptions.join(' ')).toContain('NoSQL/cache/search/analytics');
     expect(result.assumptions.join(' ')).toContain('Multi-region was requested');
+  });
+
+  it('keeps non-VM runtime targets as explicit module-boundary work', () => {
+    const result = service.generate({
+      targetCloud: 'azure',
+      nws: validNws,
+      workspaceName: 'Revenue Portal',
+      options: {
+        runtimeTarget: 'kubernetes',
+        networkTopology: 'landing-zone',
+        availabilityMode: 'active-active',
+      },
+    });
+
+    expect(result.generationProfile).toMatchObject({
+      runtimeTarget: 'kubernetes',
+      networkTopology: 'landing-zone',
+      availabilityMode: 'active-active',
+    });
+    expect(result.assumptions.join(' ')).toContain('Runtime target kubernetes was requested');
+    expect(result.serviceMappings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          requirement: 'kubernetes runtime',
+          terraformResource: 'module.aks (module boundary)',
+          confidence: 'manual-review',
+        }),
+      ]),
+    );
+    expect(file(result, 'modules/README.md')).toContain('Runtime target: kubernetes');
   });
 });
 

@@ -6,6 +6,7 @@ import { NWSValidator } from '../nws/nws-validator';
 import {
   TerraformGeneratedFile,
   TerraformGenerateInput,
+  TerraformGenerationProfile,
   TerraformGenerationResult,
   TerraformGenerationValidation,
   TerraformResourceSummary,
@@ -39,6 +40,7 @@ interface WorkloadFacts {
   databaseStorageGb: number;
   resourceSummary: TerraformResourceSummary;
   tags: Record<string, string>;
+  generationProfile: TerraformGenerationProfile;
 }
 
 @Injectable()
@@ -47,7 +49,8 @@ export class TerraformGenerationService {
     const nws = NWSValidator.validate(input.nws);
     const targetCloud = input.targetCloud;
     const workspaceName = sanitizeSlug(input.workspaceName ?? nws.workload.name ?? 'polycost-app');
-    const facts = workloadFacts(nws, targetCloud, input.region, workspaceName);
+    const generationProfile = generationProfileFor(input, nws);
+    const facts = workloadFacts(nws, targetCloud, input.region, workspaceName, generationProfile);
     const draft = bundleForTarget(targetCloud, nws, facts);
     const files = draft.files.map((file) => ({
       path: file.path,
@@ -61,6 +64,7 @@ export class TerraformGenerationService {
       bundleName: `${workspaceName}-${targetCloud}-terraform`,
       workspaceName,
       region: facts.region,
+      generationProfile,
       source: {
         schemaVersion: nws.schemaVersion,
         ...(nws.workload.name ? { workloadName: nws.workload.name } : {}),
@@ -93,11 +97,52 @@ function bundleForTarget(
   }
 }
 
+function generationProfileFor(
+  input: TerraformGenerateInput,
+  nws: NormalizedWorkloadSpec,
+): TerraformGenerationProfile {
+  const inferredAvailabilityMode = input.options?.availabilityMode ?? availabilityModeFromNws(nws);
+  const networkTopology =
+    input.options?.networkTopology ??
+    (nws.workloadProfile?.environment === 'production' ||
+    nws.database.length > 0 ||
+    nws.network.loadBalancer
+      ? 'private'
+      : 'public');
+
+  return {
+    runtimeTarget: input.options?.runtimeTarget ?? 'vm',
+    networkTopology,
+    availabilityMode: inferredAvailabilityMode,
+    policyPackIncluded: input.options?.includePolicyPack ?? true,
+    moduleScaffoldIncluded: input.options?.includeModuleScaffold ?? true,
+  };
+}
+
+function availabilityModeFromNws(
+  nws: NormalizedWorkloadSpec,
+): TerraformGenerationProfile['availabilityMode'] {
+  if (nws.availability.faultTolerance === 'active-active') {
+    return 'active-active';
+  }
+
+  if (nws.availability.multiRegion || nws.availability.faultTolerance === 'multi-region') {
+    return 'multi-region-dr';
+  }
+
+  if (nws.availability.multiAz || nws.availability.faultTolerance === 'multi-az') {
+    return 'multi-az';
+  }
+
+  return 'single-region';
+}
+
 function workloadFacts(
   nws: NormalizedWorkloadSpec,
   targetCloud: TerraformTargetCloud,
   requestedRegion: string | undefined,
   workspaceName: string,
+  generationProfile: TerraformGenerationProfile,
 ): WorkloadFacts {
   const computeCount = Math.max(
     1,
@@ -140,6 +185,7 @@ function workloadFacts(
       multiRegion: nws.availability.multiRegion,
     },
     tags,
+    generationProfile,
   };
 }
 
@@ -189,6 +235,7 @@ function awsBundle(nws: NormalizedWorkloadSpec, facts: WorkloadFacts): Terraform
     file('outputs.tf', awsOutputs()),
     file('terraform.tfvars.example', awsTfvarsExample(facts)),
     file('README.md', bundleReadme('aws', facts)),
+    ...hardeningFiles('aws', facts),
   ];
 
   return {
@@ -196,6 +243,7 @@ function awsBundle(nws: NormalizedWorkloadSpec, facts: WorkloadFacts): Terraform
     assumptions: commonAssumptions(nws, facts, 'AWS').concat([
       'EC2 uses the latest Amazon Linux 2 AMI data source by default; verify OS, AMI hardening, and golden-image requirements before apply.',
       'Relational databases map to RDS for PostgreSQL/MySQL-compatible workloads; SQL Server and specialty engines require solution-architect review.',
+      'Generated IAM creates an EC2 instance profile without broad inline policies; add workload-specific least-privilege statements only after access review.',
     ]),
     securityNotes: commonSecurityNotes('AWS').concat([
       'S3 buckets include public-access blocking, versioning, and server-side encryption.',
@@ -219,6 +267,7 @@ function azureBundle(nws: NormalizedWorkloadSpec, facts: WorkloadFacts): Terrafo
     file('outputs.tf', azureOutputs()),
     file('terraform.tfvars.example', azureTfvarsExample(facts)),
     file('README.md', bundleReadme('azure', facts)),
+    ...hardeningFiles('azure', facts),
   ];
 
   return {
@@ -226,6 +275,7 @@ function azureBundle(nws: NormalizedWorkloadSpec, facts: WorkloadFacts): Terrafo
     assumptions: commonAssumptions(nws, facts, 'Azure').concat([
       'Linux VM generation is the default compute path; Windows, AKS, App Service, and specialized PaaS shapes require a follow-up module selection pass.',
       'Database generation uses Azure Database for PostgreSQL Flexible Server as the relational baseline unless the user edits variables.',
+      'Generated VMs use system-assigned managed identities; attach role assignments only after the target workload access matrix is reviewed.',
     ]),
     securityNotes: commonSecurityNotes('Azure').concat([
       'Storage accounts require HTTPS, TLS 1.2, private container access, and versioning.',
@@ -249,6 +299,7 @@ function gcpBundle(nws: NormalizedWorkloadSpec, facts: WorkloadFacts): Terraform
     file('outputs.tf', gcpOutputs()),
     file('terraform.tfvars.example', gcpTfvarsExample(facts)),
     file('README.md', bundleReadme('gcp', facts)),
+    ...hardeningFiles('gcp', facts),
   ];
 
   return {
@@ -256,6 +307,7 @@ function gcpBundle(nws: NormalizedWorkloadSpec, facts: WorkloadFacts): Terraform
     assumptions: commonAssumptions(nws, facts, 'GCP').concat([
       'Compute Engine is the baseline compute target; GKE, Cloud Run, and App Engine should be selected in a follow-up module pass when requested explicitly.',
       'Cloud SQL is generated for relational database needs; NoSQL, cache, and analytics engines require manual module selection.',
+      'Generated VM service accounts include only logging/monitoring scopes; grant application permissions through explicit IAM review.',
     ]),
     securityNotes: commonSecurityNotes('GCP').concat([
       'Cloud Storage buckets use uniform bucket-level access and versioning.',
@@ -267,6 +319,247 @@ function gcpBundle(nws: NormalizedWorkloadSpec, facts: WorkloadFacts): Terraform
     ]),
     serviceMappings: serviceMappings('gcp', facts),
   };
+}
+
+function hardeningFiles(
+  targetCloud: TerraformTargetCloud,
+  facts: WorkloadFacts,
+): TerraformBundleDraft['files'] {
+  const files: TerraformBundleDraft['files'] = [file('Makefile', validationMakefile())];
+
+  if (facts.generationProfile.policyPackIncluded) {
+    files.push(
+      file('.tflint.hcl', tflintConfig()),
+      file('tests/static_validation.tftest.hcl', terraformStaticTest(targetCloud, facts)),
+      file('policies/terraform-plan.rego', terraformPlanPolicy()),
+    );
+  }
+
+  if (facts.generationProfile.moduleScaffoldIncluded) {
+    files.push(
+      file('modules/README.md', moduleScaffoldReadme(targetCloud, facts)),
+      file('modules/network/README.md', moduleReadme('network', targetCloud)),
+      file('modules/compute/README.md', moduleReadme('compute', targetCloud)),
+      file('modules/data/README.md', moduleReadme('data', targetCloud)),
+    );
+  }
+
+  return files;
+}
+
+function validationMakefile(): string {
+  return `.PHONY: fmt init-local validate test plan policy clean
+
+fmt:
+\tterraform fmt -check -recursive
+
+init-local:
+\tterraform init -backend=false
+
+validate: fmt init-local
+\tterraform validate
+
+test:
+\tterraform test
+
+plan:
+\tterraform plan -var-file=terraform.tfvars -out=tfplan
+\tterraform show -json tfplan > tfplan.json
+
+policy:
+\tconftest test tfplan.json --policy policies
+
+clean:
+\trm -f tfplan tfplan.json
+`;
+}
+
+function tflintConfig(): string {
+  return `config {
+  call_module_type = "local"
+  force            = false
+}
+
+plugin "terraform" {
+  enabled = true
+  preset  = "recommended"
+}
+`;
+}
+
+function terraformStaticTest(targetCloud: TerraformTargetCloud, facts: WorkloadFacts): string {
+  const providerVariables = terraformTestVariables(targetCloud, facts);
+
+  return `run "static_configuration_contract" {
+  command = plan
+
+  variables {
+${providerVariables}
+  }
+
+  assert {
+    condition     = var.project_name != ""
+    error_message = "project_name must be populated for deterministic naming."
+  }
+
+  assert {
+    condition     = contains(["production", "staging", "development", "test"], var.environment)
+    error_message = "environment must remain one of PolyCost's supported values."
+  }
+}
+`;
+}
+
+function terraformTestVariables(targetCloud: TerraformTargetCloud, facts: WorkloadFacts): string {
+  const common = [
+    `    project_name = "${facts.projectName}"`,
+    '    environment  = "test"',
+    '    compute_instance_count = 0',
+    '    enable_object_storage = false',
+    '    enable_relational_database = false',
+    '    enable_load_balancer = false',
+  ];
+
+  if (targetCloud === 'aws') {
+    return common.concat(['    database_password = "CHANGE_ME_DEV_ONLY_TEST_ONLY"']).join('\n');
+  }
+
+  if (targetCloud === 'azure') {
+    return common
+      .concat([
+        '    subscription_id = "00000000-0000-0000-0000-000000000000"',
+        '    tenant_id = "00000000-0000-0000-0000-000000000000"',
+        '    admin_ssh_public_key = "ssh-rsa CHANGE_ME_DEV_ONLY_TEST_ONLY"',
+        '    database_admin_password = "CHANGE_ME_DEV_ONLY_TEST_ONLY"',
+      ])
+      .join('\n');
+  }
+
+  return common
+    .concat([
+      '    project_id = "CHANGE_ME_DEV_ONLY_GCP_PROJECT_ID"',
+      '    database_password = "CHANGE_ME_DEV_ONLY_TEST_ONLY"',
+    ])
+    .join('\n');
+}
+
+function terraformPlanPolicy(): string {
+  return `package polycost.terraform
+
+deny[msg] {
+  change := input.resource_changes[_]
+  change.type == "aws_db_instance"
+  change.change.after.publicly_accessible == true
+  msg := sprintf("RDS instance %s must not be publicly accessible", [change.address])
+}
+
+deny[msg] {
+  change := input.resource_changes[_]
+  change.type == "google_sql_database_instance"
+  change.change.after.settings.ip_configuration.ipv4_enabled == true
+  msg := sprintf("Cloud SQL instance %s must keep public IPv4 disabled", [change.address])
+}
+
+deny[msg] {
+  change := input.resource_changes[_]
+  change.type == "azurerm_postgresql_flexible_server"
+  change.change.after.public_network_access_enabled == true
+  msg := sprintf("Azure PostgreSQL server %s must keep public network access disabled", [change.address])
+}
+
+deny[msg] {
+  change := input.resource_changes[_]
+  taggable_aws_resource(change.type)
+  not change.change.after.tags
+  msg := sprintf("AWS resource %s is missing tags", [change.address])
+}
+
+deny[msg] {
+  change := input.resource_changes[_]
+  taggable_azure_resource(change.type)
+  not change.change.after.tags
+  msg := sprintf("Azure resource %s is missing tags", [change.address])
+}
+
+deny[msg] {
+  change := input.resource_changes[_]
+  taggable_gcp_resource(change.type)
+  not change.change.after.labels
+  msg := sprintf("GCP resource %s is missing labels", [change.address])
+}
+
+taggable_aws_resource(type) {
+  type == "aws_instance"
+} {
+  type == "aws_s3_bucket"
+} {
+  type == "aws_db_instance"
+} {
+  type == "aws_lb"
+}
+
+taggable_azure_resource(type) {
+  type == "azurerm_resource_group"
+} {
+  type == "azurerm_virtual_network"
+} {
+  type == "azurerm_linux_virtual_machine"
+} {
+  type == "azurerm_storage_account"
+} {
+  type == "azurerm_postgresql_flexible_server"
+} {
+  type == "azurerm_lb"
+}
+
+taggable_gcp_resource(type) {
+  type == "google_compute_instance"
+} {
+  type == "google_storage_bucket"
+}
+`;
+}
+
+function moduleScaffoldReadme(targetCloud: TerraformTargetCloud, facts: WorkloadFacts): string {
+  return `# Module Boundary Review
+
+PolyCost generated a root module for immediate review and these module-boundary notes for the
+next hardening pass. Keep generated root files as the contract test, then extract these boundaries
+into versioned internal modules once the target platform team approves naming, network, IAM, and
+state conventions.
+
+## Generation Profile
+
+- Runtime target: ${facts.generationProfile.runtimeTarget}
+- Network topology: ${facts.generationProfile.networkTopology}
+- Availability mode: ${facts.generationProfile.availabilityMode}
+- Provider: ${providerDisplayName(targetCloud)}
+
+## Recommended Internal Modules
+
+- \`modules/network\`: VPC/VNet/VPC network, subnets, route tables, DNS, private service access.
+- \`modules/compute\`: VM/container/serverless runtime, identity attachment, autoscaling rules.
+- \`modules/data\`: object storage, relational databases, backup/restore, private endpoints.
+- \`modules/edge\`: load balancer, CDN, WAF, certificates, health checks.
+- \`modules/observability\`: logs, metrics, alerts, dashboards, audit trails.
+
+## Promotion Gate
+
+Do not promote this bundle to production until \`make validate\`, \`make plan\`, policy checks, and
+a human architecture review have all passed in the destination account/subscription/project.
+`;
+}
+
+function moduleReadme(moduleName: string, targetCloud: TerraformTargetCloud): string {
+  const providerName = providerDisplayName(targetCloud);
+
+  return `# ${moduleName} Module Placeholder
+
+This directory documents the intended ${moduleName} module boundary for ${providerName}. The V3.1
+bundle keeps deployable Terraform in the root module so reviewers can inspect one complete baseline.
+Extract this boundary into a versioned module only after the platform team confirms inputs, outputs,
+provider aliases, state ownership, and policy requirements.
+`;
 }
 
 function awsVersions(): string {
@@ -354,6 +647,35 @@ variable "public_subnets" {
     a = { cidr_block = "10.40.1.0/24", az_suffix = "a" }
     b = { cidr_block = "10.40.2.0/24", az_suffix = "b" }
   }
+}
+
+variable "private_subnets" {
+  description = "Private subnet map keyed by availability-zone suffix."
+  type = map(object({
+    cidr_block = string
+    az_suffix  = string
+  }))
+  default = {
+    a = { cidr_block = "10.40.101.0/24", az_suffix = "a" }
+    b = { cidr_block = "10.40.102.0/24", az_suffix = "b" }
+  }
+}
+
+variable "network_topology" {
+  description = "Network exposure model for compute placement."
+  type        = string
+  default     = "${facts.generationProfile.networkTopology === 'public' ? 'public' : 'private'}"
+
+  validation {
+    condition     = contains(["public", "private", "landing-zone"], var.network_topology)
+    error_message = "network_topology must be public, private, or landing-zone."
+  }
+}
+
+variable "enable_public_compute_ip" {
+  description = "Attach public IPs directly to compute instances. Prefer false behind a load balancer or private ingress."
+  type        = bool
+  default     = ${facts.generationProfile.networkTopology === 'public'}
 }
 
 variable "compute_instance_count" {
@@ -450,6 +772,7 @@ function awsMain(): string {
   return `locals {
   name_prefix   = "\${var.project_name}-\${var.environment}"
   bucket_prefix = substr(replace(local.name_prefix, "_", "-"), 0, 36)
+  app_subnet_ids = var.network_topology == "public" ? values(aws_subnet.public)[*].id : values(aws_subnet.private)[*].id
   common_tags = merge(
     {
       Project     = var.project_name
@@ -508,6 +831,47 @@ resource "aws_subnet" "public" {
   }
 }
 
+resource "aws_subnet" "private" {
+  for_each = var.private_subnets
+
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = each.value.cidr_block
+  availability_zone       = "\${var.aws_region}\${each.value.az_suffix}"
+  map_public_ip_on_launch = false
+
+  tags = {
+    Name = "\${local.name_prefix}-private-\${each.key}"
+    Type = "private"
+  }
+}
+
+data "aws_iam_policy_document" "app_assume_role" {
+  statement {
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["ec2.amazonaws.com"]
+    }
+
+    actions = ["sts:AssumeRole"]
+  }
+}
+
+resource "aws_iam_role" "app" {
+  name               = "\${local.name_prefix}-app-role"
+  assume_role_policy = data.aws_iam_policy_document.app_assume_role.json
+
+  tags = {
+    Name = "\${local.name_prefix}-app-role"
+  }
+}
+
+resource "aws_iam_instance_profile" "app" {
+  name = "\${local.name_prefix}-app-profile"
+  role = aws_iam_role.app.name
+}
+
 resource "aws_security_group" "app" {
   name        = "\${local.name_prefix}-app-sg"
   description = "Application ingress for PolyCost generated workload"
@@ -539,8 +903,10 @@ resource "aws_instance" "app" {
 
   ami                    = data.aws_ami.linux.id
   instance_type          = var.instance_type
-  subnet_id              = values(aws_subnet.public)[count.index % length(values(aws_subnet.public))].id
+  subnet_id              = local.app_subnet_ids[count.index % length(local.app_subnet_ids)]
   vpc_security_group_ids = [aws_security_group.app.id]
+  associate_public_ip_address = var.enable_public_compute_ip
+  iam_instance_profile        = aws_iam_instance_profile.app.name
 
   root_block_device {
     encrypted   = true
@@ -563,6 +929,10 @@ resource "aws_s3_bucket" "object_storage" {
   count = var.enable_object_storage ? 1 : 0
 
   bucket = var.object_storage_bucket_name != "" ? var.object_storage_bucket_name : "\${local.bucket_prefix}-objects"
+
+  tags = {
+    Name = "\${local.name_prefix}-objects"
+  }
 }
 
 resource "aws_s3_bucket_public_access_block" "object_storage" {
@@ -601,7 +971,7 @@ resource "aws_db_subnet_group" "main" {
   count = var.enable_relational_database ? 1 : 0
 
   name       = "\${local.name_prefix}-db-subnets"
-  subnet_ids = values(aws_subnet.public)[*].id
+  subnet_ids = values(aws_subnet.private)[*].id
 
   tags = {
     Name = "\${local.name_prefix}-db-subnets"
@@ -644,6 +1014,7 @@ resource "aws_db_instance" "main" {
   db_subnet_group_name   = aws_db_subnet_group.main[0].name
   vpc_security_group_ids = [aws_security_group.database[0].id]
   storage_encrypted      = true
+  publicly_accessible    = false
   multi_az               = var.database_multi_az
   deletion_protection    = var.environment == "production"
   skip_final_snapshot    = var.environment != "production"
@@ -790,6 +1161,29 @@ variable "app_subnet_cidr_block" {
   default     = "10.50.1.0/24"
 }
 
+variable "database_subnet_cidr_block" {
+  description = "CIDR block for private database subnet."
+  type        = string
+  default     = "10.50.101.0/24"
+}
+
+variable "network_topology" {
+  description = "Network exposure model for compute placement."
+  type        = string
+  default     = "${facts.generationProfile.networkTopology === 'public' ? 'public' : 'private'}"
+
+  validation {
+    condition     = contains(["public", "private", "landing-zone"], var.network_topology)
+    error_message = "network_topology must be public, private, or landing-zone."
+  }
+}
+
+variable "enable_public_compute_ip" {
+  description = "Attach public IPs directly to compute instances. Prefer false behind a load balancer, VPN, Bastion, or private ingress."
+  type        = bool
+  default     = ${facts.generationProfile.networkTopology === 'public'}
+}
+
 variable "compute_instance_count" {
   description = "Number of Linux VMs generated from the NWS baseline."
   type        = number
@@ -914,6 +1308,22 @@ resource "azurerm_subnet" "app" {
   address_prefixes     = [var.app_subnet_cidr_block]
 }
 
+resource "azurerm_subnet" "database" {
+  name                 = "\${local.name_prefix}-db-subnet"
+  resource_group_name  = azurerm_resource_group.main.name
+  virtual_network_name = azurerm_virtual_network.main.name
+  address_prefixes     = [var.database_subnet_cidr_block]
+
+  delegation {
+    name = "postgres-flexible-server"
+
+    service_delegation {
+      name    = "Microsoft.DBforPostgreSQL/flexibleServers"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
+    }
+  }
+}
+
 resource "azurerm_network_security_group" "app" {
   name                = "\${local.name_prefix}-app-nsg"
   location            = azurerm_resource_group.main.location
@@ -939,7 +1349,7 @@ resource "azurerm_subnet_network_security_group_association" "app" {
 }
 
 resource "azurerm_public_ip" "app" {
-  count = var.compute_instance_count
+  count = var.enable_public_compute_ip ? var.compute_instance_count : 0
 
   name                = "\${local.name_prefix}-pip-\${count.index + 1}"
   location            = azurerm_resource_group.main.location
@@ -961,7 +1371,7 @@ resource "azurerm_network_interface" "app" {
     name                          = "primary"
     subnet_id                     = azurerm_subnet.app.id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = azurerm_public_ip.app[count.index].id
+    public_ip_address_id          = var.enable_public_compute_ip ? azurerm_public_ip.app[count.index].id : null
   }
 }
 
@@ -978,6 +1388,10 @@ resource "azurerm_linux_virtual_machine" "app" {
   ]
   tags                            = local.common_tags
   disable_password_authentication = true
+
+  identity {
+    type = "SystemAssigned"
+  }
 
   admin_ssh_key {
     username   = var.admin_username
@@ -1023,6 +1437,24 @@ resource "azurerm_storage_container" "object_storage" {
   container_access_type = "private"
 }
 
+resource "azurerm_private_dns_zone" "postgres" {
+  count = var.enable_relational_database ? 1 : 0
+
+  name                = "\${local.name_prefix}.postgres.database.azure.com"
+  resource_group_name = azurerm_resource_group.main.name
+  tags                = local.common_tags
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "postgres" {
+  count = var.enable_relational_database ? 1 : 0
+
+  name                  = "\${local.name_prefix}-postgres-vnet-link"
+  resource_group_name   = azurerm_resource_group.main.name
+  private_dns_zone_name = azurerm_private_dns_zone.postgres[0].name
+  virtual_network_id    = azurerm_virtual_network.main.id
+  tags                  = local.common_tags
+}
+
 resource "azurerm_postgresql_flexible_server" "main" {
   count = var.enable_relational_database ? 1 : 0
 
@@ -1035,8 +1467,15 @@ resource "azurerm_postgresql_flexible_server" "main" {
   sku_name               = var.database_sku_name
   storage_mb             = var.database_storage_gb * 1024
   backup_retention_days  = var.environment == "production" ? 35 : 7
+  delegated_subnet_id    = azurerm_subnet.database.id
+  private_dns_zone_id    = azurerm_private_dns_zone.postgres[0].id
+  public_network_access_enabled = false
   zone                   = "1"
   tags                   = local.common_tags
+
+  depends_on = [
+    azurerm_private_dns_zone_virtual_network_link.postgres
+  ]
 }
 
 resource "azurerm_public_ip" "load_balancer" {
@@ -1170,6 +1609,23 @@ variable "vpc_cidr_block" {
   default     = "10.60.1.0/24"
 }
 
+variable "network_topology" {
+  description = "Network exposure model for compute placement."
+  type        = string
+  default     = "${facts.generationProfile.networkTopology === 'public' ? 'public' : 'private'}"
+
+  validation {
+    condition     = contains(["public", "private", "landing-zone"], var.network_topology)
+    error_message = "network_topology must be public, private, or landing-zone."
+  }
+}
+
+variable "enable_public_compute_ip" {
+  description = "Attach external NAT access configs directly to compute instances. Prefer false behind a load balancer, VPN, IAP, or private ingress."
+  type        = bool
+  default     = ${facts.generationProfile.networkTopology === 'public'}
+}
+
 variable "compute_instance_count" {
   description = "Number of Compute Engine instances generated from the NWS baseline."
   type        = number
@@ -1286,10 +1742,11 @@ resource "google_compute_network" "main" {
 }
 
 resource "google_compute_subnetwork" "app" {
-  name          = "\${local.name_prefix}-app-subnet"
-  ip_cidr_range = var.vpc_cidr_block
-  network       = google_compute_network.main.id
-  region        = var.region
+  name                  = "\${local.name_prefix}-app-subnet"
+  ip_cidr_range         = var.vpc_cidr_block
+  network               = google_compute_network.main.id
+  region                = var.region
+  private_ip_google_access = true
 }
 
 resource "google_compute_firewall" "https" {
@@ -1303,6 +1760,11 @@ resource "google_compute_firewall" "https" {
 
   source_ranges = ["0.0.0.0/0"]
   target_tags   = ["https"]
+}
+
+resource "google_service_account" "app" {
+  account_id   = substr(replace(local.name_prefix, "-", ""), 0, 28)
+  display_name = "\${local.name_prefix} application runtime"
 }
 
 resource "google_compute_instance" "app" {
@@ -1325,7 +1787,19 @@ resource "google_compute_instance" "app" {
   network_interface {
     subnetwork = google_compute_subnetwork.app.id
 
-    access_config {}
+    dynamic "access_config" {
+      for_each = var.enable_public_compute_ip ? [1] : []
+
+      content {}
+    }
+  }
+
+  service_account {
+    email = google_service_account.app.email
+    scopes = [
+      "https://www.googleapis.com/auth/logging.write",
+      "https://www.googleapis.com/auth/monitoring.write",
+    ]
   }
 
   metadata = {
@@ -1345,11 +1819,30 @@ resource "google_storage_bucket" "object_storage" {
   name                        = var.storage_bucket_name != "" ? var.storage_bucket_name : "\${local.bucket_prefix}-objects"
   location                    = var.region
   uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
   labels                      = local.common_labels
 
   versioning {
     enabled = true
   }
+}
+
+resource "google_compute_global_address" "private_service_access" {
+  count = var.enable_relational_database ? 1 : 0
+
+  name          = "\${local.name_prefix}-private-service-access"
+  purpose       = "VPC_PEERING"
+  address_type  = "INTERNAL"
+  prefix_length = 16
+  network       = google_compute_network.main.id
+}
+
+resource "google_service_networking_connection" "private_vpc_connection" {
+  count = var.enable_relational_database ? 1 : 0
+
+  network                 = google_compute_network.main.id
+  service                 = "servicenetworking.googleapis.com"
+  reserved_peering_ranges = [google_compute_global_address.private_service_access[0].name]
 }
 
 resource "google_sql_database_instance" "main" {
@@ -1365,6 +1858,7 @@ resource "google_sql_database_instance" "main" {
     availability_type = var.environment == "production" ? "REGIONAL" : "ZONAL"
     disk_size         = var.database_storage_gb
     disk_type         = "PD_SSD"
+    user_labels       = local.common_labels
 
     backup_configuration {
       enabled                        = true
@@ -1373,8 +1867,13 @@ resource "google_sql_database_instance" "main" {
 
     ip_configuration {
       ipv4_enabled = false
+      private_network = google_compute_network.main.id
     }
   }
+
+  depends_on = [
+    google_service_networking_connection.private_vpc_connection
+  ]
 }
 
 resource "google_sql_user" "app" {
@@ -1424,6 +1923,8 @@ function awsTfvarsExample(facts: WorkloadFacts): string {
   return `project_name = "${facts.projectName}"
 environment  = "${facts.environment}"
 aws_region   = "${facts.region}"
+network_topology = "${facts.generationProfile.networkTopology === 'public' ? 'public' : 'private'}"
+enable_public_compute_ip = ${facts.generationProfile.networkTopology === 'public'}
 
 # database_password = "CHANGE_ME_DEV_ONLY_SUPPLIED_BY_SECRET_MANAGER"
 `;
@@ -1433,6 +1934,8 @@ function azureTfvarsExample(facts: WorkloadFacts): string {
   return `project_name = "${facts.projectName}"
 environment  = "${facts.environment}"
 location     = "${facts.region}"
+network_topology = "${facts.generationProfile.networkTopology === 'public' ? 'public' : 'private'}"
+enable_public_compute_ip = ${facts.generationProfile.networkTopology === 'public'}
 
 subscription_id = "CHANGE_ME_DEV_ONLY_AZURE_SUBSCRIPTION_ID"
 tenant_id       = "CHANGE_ME_DEV_ONLY_AZURE_TENANT_ID"
@@ -1447,6 +1950,8 @@ function gcpTfvarsExample(facts: WorkloadFacts): string {
 environment  = "${facts.environment}"
 region       = "${facts.region}"
 zone         = "${facts.region}-a"
+network_topology = "${facts.generationProfile.networkTopology === 'public' ? 'public' : 'private'}"
+enable_public_compute_ip = ${facts.generationProfile.networkTopology === 'public'}
 
 project_id = "CHANGE_ME_DEV_ONLY_GCP_PROJECT_ID"
 
@@ -1466,6 +1971,16 @@ Generated from a PolyCost Normalized Workload Specification for \`${facts.projec
 - Network, compute, object storage, optional relational database, and optional load-balancer baseline resources.
 - Cost-allocation tags or labels generated from the workload profile.
 - \`backend.tf.example\` for encrypted remote state and locking where the provider supports explicit locks.
+- \`Makefile\`, \`.tflint.hcl\`, \`tests/static_validation.tftest.hcl\`, and \`policies/terraform-plan.rego\` when hardening artifacts are enabled.
+- \`modules/\` boundary documentation for extracting the reviewed root bundle into internal platform modules.
+
+## Generation profile
+
+- Runtime target: \`${facts.generationProfile.runtimeTarget}\`
+- Network topology: \`${facts.generationProfile.networkTopology}\`
+- Availability mode: \`${facts.generationProfile.availabilityMode}\`
+- Policy pack included: \`${facts.generationProfile.policyPackIncluded}\`
+- Module scaffold included: \`${facts.generationProfile.moduleScaffoldIncluded}\`
 
 ## Before running
 
@@ -1477,10 +1992,11 @@ Generated from a PolyCost Normalized Workload Specification for \`${facts.projec
 ## Verification
 
 \`\`\`bash
-terraform init
-terraform fmt -check
-terraform validate
-terraform plan -var-file=terraform.tfvars
+make validate
+terraform test
+terraform plan -var-file=terraform.tfvars -out=tfplan
+terraform show -json tfplan > tfplan.json
+conftest test tfplan.json --policy policies
 \`\`\`
 
 PolyCost does not run \`apply\`. Treat this as reviewed starter infrastructure, not a managed deployment platform.
@@ -1495,8 +2011,18 @@ function commonAssumptions(
   const assumptions = [
     `Generated from NWS ${nws.schemaVersion} for ${providerName}; verify provider quotas, naming constraints, and organization guardrails before plan/apply.`,
     `Region defaults to ${facts.region}; edit region variables when latency, residency, or existing landing-zone placement requires a different region.`,
-    'Generated compute is VM-first for portability across clouds. Container/serverless modules should be selected in a follow-up pass when the workload explicitly requires them.',
+    `Generation profile selected ${facts.generationProfile.runtimeTarget} runtime, ${facts.generationProfile.networkTopology} topology, and ${facts.generationProfile.availabilityMode} availability mode.`,
   ];
+
+  if (facts.generationProfile.runtimeTarget === 'vm') {
+    assumptions.push(
+      'Generated compute is VM-first for portability across clouds. Container/serverless modules should be selected in a follow-up pass when the workload explicitly requires them.',
+    );
+  } else {
+    assumptions.push(
+      `Runtime target ${facts.generationProfile.runtimeTarget} was requested; this bundle keeps a VM baseline plus module-boundary documentation until provider-specific runtime modules are approved.`,
+    );
+  }
 
   if (facts.storageSummary.fileCount > 0) {
     assumptions.push(
@@ -1524,6 +2050,7 @@ function commonSecurityNotes(providerName: string): string[] {
     `${providerName} credentials are not written into generated Terraform files.`,
     'Remote state is provided as an example file so teams can wire encrypted state after creating the storage backend.',
     'Generated variables mark database passwords and SSH key material as sensitive.',
+    'Generated policy scaffolding checks for public database exposure, missing cost tags/labels, and plan-time guardrail drift.',
     'Apply should run only from a controlled CI/CD runner or reviewed operator workstation.',
   ];
 }
@@ -1531,7 +2058,7 @@ function commonSecurityNotes(providerName: string): string[] {
 function commonNextSteps(providerName: string): string[] {
   return [
     `Save the ${providerName} bundle to a new branch or infrastructure repository.`,
-    'Run formatting and validation locally before adding environment-specific tfvars.',
+    'Run make validate, terraform test, terraform plan, and policy checks before adding environment-specific tfvars.',
     'Attach policy-as-code checks for required tags, encryption, public exposure, and deletion protection.',
   ];
 }
@@ -1548,6 +2075,15 @@ function serviceMappings(
       terraformResource: computeResource(targetCloud),
       confidence: 'direct',
       note: 'NWS compute maps to VM compute for the first deployable baseline.',
+    });
+  }
+
+  if (facts.generationProfile.runtimeTarget !== 'vm') {
+    mappings.push({
+      requirement: `${facts.generationProfile.runtimeTarget} runtime`,
+      terraformResource: `${providerRuntimeModule(targetCloud, facts.generationProfile.runtimeTarget)} (module boundary)`,
+      confidence: 'manual-review',
+      note: 'Runtime-specific Terraform is documented as a module boundary until provider, networking, identity, and deployment conventions are selected.',
     });
   }
 
@@ -1621,27 +2157,109 @@ function validateGeneratedFiles(
           : 'failed',
       message: 'Generated resources include cost-allocation tags or labels.',
     },
+    {
+      id: 'private-database-networking',
+      status: hasPrivateDatabaseNetworking(targetCloud, joined) ? 'passed' : 'warning',
+      message:
+        'Relational database resources are generated with private network exposure controls.',
+    },
+    {
+      id: 'runtime-identity-baseline',
+      status: hasRuntimeIdentity(targetCloud, joined) ? 'passed' : 'warning',
+      message:
+        'Generated compute includes a provider-native runtime identity baseline for least-privilege review.',
+    },
+    {
+      id: 'policy-pack-generated',
+      status:
+        files.some((file) => file.path === 'policies/terraform-plan.rego') &&
+        files.some((file) => file.path === '.tflint.hcl')
+          ? 'passed'
+          : 'warning',
+      message: 'Generated bundle includes policy-as-code and lint scaffolding.',
+    },
+    {
+      id: 'terraform-test-harness',
+      status:
+        files.some((file) => file.path === 'Makefile') &&
+        files.some((file) => file.path === 'tests/static_validation.tftest.hcl')
+          ? 'passed'
+          : 'warning',
+      message: 'Generated bundle includes local validation and terraform test entry points.',
+    },
+    {
+      id: 'module-boundary-scaffold',
+      status: files.some((file) => file.path === 'modules/README.md') ? 'passed' : 'warning',
+      message: 'Generated bundle includes module boundary documentation for platform extraction.',
+    },
   ] satisfies TerraformGenerationValidation['checks'];
-  const status = checks.some((check) => check.status === 'failed') ? 'failed' : 'passed';
+  const status = checks.some((check) => check.status === 'failed')
+    ? 'failed'
+    : checks.some((check) => check.status === 'warning')
+      ? 'warning'
+      : 'passed';
 
   return {
     status,
-    executionMode: 'static',
+    executionMode: 'static-plus-policy',
     checks,
     commands: [
       {
-        command: 'terraform fmt -check',
+        command: 'make validate',
         status: 'not-run',
         message:
-          'Run after saving the generated files; request-time generation does not shell out.',
+          'Runs terraform fmt -check -recursive, init -backend=false, and validate after saving files.',
       },
       {
-        command: 'terraform validate',
+        command: 'terraform test',
         status: 'not-run',
-        message: 'Run after terraform init with provider credentials/backend configuration.',
+        message: 'Runs generated static Terraform tests after provider configuration is available.',
+      },
+      {
+        command: 'terraform plan -var-file=terraform.tfvars -out=tfplan',
+        status: 'not-run',
+        message: 'Creates the provider-authenticated plan artifact in the destination account.',
+      },
+      {
+        command: 'conftest test tfplan.json --policy policies',
+        status: 'not-run',
+        message: 'Evaluates generated policy-as-code against the Terraform plan JSON.',
       },
     ],
   };
+}
+
+function hasPrivateDatabaseNetworking(targetCloud: TerraformTargetCloud, content: string): boolean {
+  switch (targetCloud) {
+    case 'aws':
+      return (
+        content.includes('subnet_ids = values(aws_subnet.private)[*].id') &&
+        content.includes('publicly_accessible    = false')
+      );
+    case 'azure':
+      return (
+        content.includes('delegated_subnet_id') &&
+        content.includes('private_dns_zone_id') &&
+        content.includes('public_network_access_enabled = false')
+      );
+    case 'gcp':
+      return (
+        content.includes('google_service_networking_connection') &&
+        content.includes('private_network = google_compute_network.main.id') &&
+        content.includes('ipv4_enabled = false')
+      );
+  }
+}
+
+function hasRuntimeIdentity(targetCloud: TerraformTargetCloud, content: string): boolean {
+  switch (targetCloud) {
+    case 'aws':
+      return content.includes('aws_iam_instance_profile') && content.includes('aws_iam_role');
+    case 'azure':
+      return content.includes('identity {') && content.includes('type = "SystemAssigned"');
+    case 'gcp':
+      return content.includes('google_service_account') && content.includes('service_account {');
+  }
 }
 
 function containsHardcodedSecretDefault(content: string): boolean {
@@ -1735,6 +2353,42 @@ function loadBalancerResource(providerId: ProviderId): string {
       return 'azurerm_lb.app';
     case 'gcp':
       return 'google_compute_global_address.load_balancer';
+  }
+}
+
+function providerRuntimeModule(
+  providerId: ProviderId,
+  runtimeTarget: TerraformGenerationProfile['runtimeTarget'],
+): string {
+  if (runtimeTarget === 'containers') {
+    switch (providerId) {
+      case 'aws':
+        return 'module.ecs_or_eks';
+      case 'azure':
+        return 'module.aks_or_container_apps';
+      case 'gcp':
+        return 'module.gke_or_cloud_run';
+    }
+  }
+
+  if (runtimeTarget === 'serverless') {
+    switch (providerId) {
+      case 'aws':
+        return 'module.lambda_apigateway';
+      case 'azure':
+        return 'module.functions_app_service';
+      case 'gcp':
+        return 'module.cloud_functions_cloud_run';
+    }
+  }
+
+  switch (providerId) {
+    case 'aws':
+      return 'module.eks';
+    case 'azure':
+      return 'module.aks';
+    case 'gcp':
+      return 'module.gke';
   }
 }
 
