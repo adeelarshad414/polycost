@@ -1,6 +1,12 @@
+import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { ConfigService } from '@nestjs/config';
+import { AppConfig } from '../config/config.schema';
+import { RateLimitExceededError } from './api-errors';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AuthIdentity, RequestWithAuth } from './auth.types';
+import { ApiRateLimitService } from './rate-limit.service';
+import { SessionAuthGuard } from './session-auth.guard';
 
 describe('AuthController', () => {
   const identity: AuthIdentity = {
@@ -21,7 +27,7 @@ describe('AuthController', () => {
 
   it('delegates account, session, team, invite, and SSO endpoints to AuthService', () => {
     const service = createAuthServiceMock();
-    const controller = new AuthController(service);
+    const controller = authController(service);
     const body = { email: 'architect@example.com' };
 
     expect(controller.register(body, request)).toBe('register');
@@ -87,7 +93,7 @@ describe('AuthController', () => {
 
   it('omits missing request metadata for anonymous register/login calls', () => {
     const service = createAuthServiceMock();
-    const controller = new AuthController(service);
+    const controller = authController(service);
 
     controller.register({}, undefined);
     controller.login(
@@ -107,7 +113,88 @@ describe('AuthController', () => {
       },
     );
   });
+
+  it('rate limits public auth entry points by request identity', () => {
+    const service = createAuthServiceMock();
+    const controller = authController(service, 2);
+    const response = {
+      header: jest.fn(),
+    };
+    const request: RequestWithAuth = {
+      ip: '203.0.113.10',
+      headers: {},
+    };
+
+    controller.login({ email: 'architect@example.com' }, request, response);
+    controller.login({ email: 'architect@example.com' }, request, response);
+    expect(() => controller.login({ email: 'architect@example.com' }, request, response)).toThrow(
+      RateLimitExceededError,
+    );
+    expect(response.header).toHaveBeenCalledWith('X-RateLimit-Limit', '2');
+
+    controller.startMockOidcLogin({ teamId: 'team-1' }, request, response);
+    controller.startMockOidcLogin({ teamId: 'team-1' }, request, response);
+    expect(() => controller.startMockOidcLogin({ teamId: 'team-1' }, request, response)).toThrow(
+      RateLimitExceededError,
+    );
+  });
+
+  it('keeps workspace account/team endpoints behind the session guard', () => {
+    const protectedHandlers = [
+      AuthController.prototype.me,
+      AuthController.prototype.logout,
+      AuthController.prototype.updateProfile,
+      AuthController.prototype.changePassword,
+      AuthController.prototype.deleteAccount,
+      AuthController.prototype.listSessions,
+      AuthController.prototype.revokeOtherSessions,
+      AuthController.prototype.createTeam,
+      AuthController.prototype.updateTeamSettings,
+      AuthController.prototype.listTeamMembers,
+      AuthController.prototype.updateTeamMemberRole,
+      AuthController.prototype.removeTeamMember,
+      AuthController.prototype.inviteTeamMember,
+      AuthController.prototype.listTeamInvitations,
+      AuthController.prototype.revokeTeamInvitation,
+      AuthController.prototype.acceptInvitation,
+      AuthController.prototype.ssoStatus,
+      AuthController.prototype.configureSsoProvider,
+      AuthController.prototype.testSsoConnection,
+    ];
+    const anonymousHandlers = [
+      AuthController.prototype.register,
+      AuthController.prototype.login,
+      AuthController.prototype.previewInvitation,
+      AuthController.prototype.startMockOidcLogin,
+      AuthController.prototype.mockOidcAuthorize,
+      AuthController.prototype.completeMockOidcCallback,
+    ];
+
+    for (const handler of protectedHandlers) {
+      expect(guardMetadataFor(handler)).toContain(SessionAuthGuard);
+    }
+
+    for (const handler of anonymousHandlers) {
+      expect(guardMetadataFor(handler)).not.toContain(SessionAuthGuard);
+    }
+  });
 });
+
+function authController(service: AuthService, limitPerMinute = 10): AuthController {
+  return new AuthController(service, new ApiRateLimitService(() => 0), {
+    get: jest.fn((key: keyof AppConfig) => {
+      if (key === 'RATE_LIMIT_AUTH_PER_MINUTE') {
+        return limitPerMinute;
+      }
+
+      return undefined;
+    }),
+  } as unknown as ConfigService<AppConfig, true>);
+}
+
+function guardMetadataFor(handler: (...args: never[]) => unknown): unknown[] {
+  return Reflect.getMetadata(GUARDS_METADATA, handler) ?? [];
+}
 
 function createAuthServiceMock(): AuthService {
   return {

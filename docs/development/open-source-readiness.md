@@ -41,12 +41,18 @@ PolyCost includes:
 Run:
 
 ```bash
+npm run release:check
 npm run format:check
 npm run ci:lint
 npm run test:coverage
 npm run ci:build
 npm run security:audit
 ```
+
+`npm run release:check` is the machine-readable guard for this page and
+`RELEASE-CHECKLIST.md`. It verifies the required community health files, issue
+templates, PR template, README demo path, security ledger, and private-to-public
+human checklist language are still present before a release candidate is cut.
 
 Recommended local scans before changing repo visibility:
 

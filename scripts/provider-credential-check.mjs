@@ -32,7 +32,7 @@ if (useMockProviders) {
       'Mock provider mode is enabled, so GCP Cloud Billing credentials are not required for local demo boot.',
   });
 } else {
-  results.push(await checkGcpVaultToken());
+  results.push(await checkGcpVaultCredential());
 }
 
 if (diagramClassifierConfigured) {
@@ -58,13 +58,13 @@ if (failures.length > 0 || (strict && warnings.length > 0)) {
   process.exit(1);
 }
 
-async function checkGcpVaultToken() {
+async function checkGcpVaultCredential() {
   if (!vaultAddr || !vaultTokenFile) {
     return {
       provider: 'gcp',
       status: strict ? 'fail' : 'warn',
       message:
-        'USE_MOCK_PROVIDERS=false requires VAULT_ADDR and VAULT_TOKEN_FILE so PolyCost can read secret/polycost/providers/gcp access_token.',
+        'USE_MOCK_PROVIDERS=false requires VAULT_ADDR and VAULT_TOKEN_FILE so PolyCost can read secret/polycost/providers/gcp access_token or service_account_json.',
     };
   }
 
@@ -85,27 +85,47 @@ async function checkGcpVaultToken() {
       },
     });
     const parsed = await response.json();
-    const accessToken = parsed?.data?.data?.access_token;
+    const secretData = parsed?.data?.data;
+    const accessToken = secretData?.access_token;
+    const serviceAccountJson =
+      secretData?.service_account_json ?? secretData?.service_account_key_json;
 
-    if (
-      !response.ok ||
-      typeof accessToken !== 'string' ||
-      accessToken.length === 0 ||
-      isDummyCredential(accessToken)
-    ) {
+    if (!response.ok) {
       return {
         provider: 'gcp',
         status: strict ? 'fail' : 'warn',
         message:
-          'Vault path secret/polycost/providers/gcp does not contain a production-safe access_token.',
+          'Vault path secret/polycost/providers/gcp is not readable for GCP pricing credentials.',
+      };
+    }
+
+    if (
+      typeof accessToken === 'string' &&
+      accessToken.length > 0 &&
+      !isDummyCredential(accessToken)
+    ) {
+      return {
+        provider: 'gcp',
+        status: 'pass',
+        message:
+          'Vault contains a GCP Cloud Billing access token at secret/polycost/providers/gcp access_token.',
+      };
+    }
+
+    const serviceAccountCheck = validateGcpServiceAccountJson(serviceAccountJson);
+    if (serviceAccountCheck.ok) {
+      return {
+        provider: 'gcp',
+        status: 'pass',
+        message:
+          'Vault contains a GCP service account JSON credential at secret/polycost/providers/gcp; the adapter can exchange it for Cloud Billing read tokens.',
       };
     }
 
     return {
       provider: 'gcp',
-      status: 'pass',
-      message:
-        'Vault contains a GCP Cloud Billing access token at secret/polycost/providers/gcp access_token.',
+      status: strict ? 'fail' : 'warn',
+      message: `Vault path secret/polycost/providers/gcp must contain a production-safe access_token or service_account_json. ${serviceAccountCheck.reason}`,
     };
   } catch (error) {
     return {
@@ -190,4 +210,41 @@ function isDummyCredential(value) {
     normalized === 'example' ||
     normalized.includes('change_me')
   );
+}
+
+function validateGcpServiceAccountJson(value) {
+  if (typeof value !== 'string' || value.trim().length === 0 || isDummyCredential(value)) {
+    return {
+      ok: false,
+      reason: 'No non-placeholder service_account_json was found.',
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+
+    if (typeof parsed.client_email !== 'string' || !parsed.client_email.includes('@')) {
+      return {
+        ok: false,
+        reason: 'service_account_json is missing a client_email.',
+      };
+    }
+
+    if (
+      typeof parsed.private_key !== 'string' ||
+      !parsed.private_key.includes('BEGIN PRIVATE KEY')
+    ) {
+      return {
+        ok: false,
+        reason: 'service_account_json is missing a private_key.',
+      };
+    }
+
+    return { ok: true };
+  } catch {
+    return {
+      ok: false,
+      reason: 'service_account_json is not valid JSON.',
+    };
+  }
 }

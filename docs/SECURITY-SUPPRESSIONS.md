@@ -1,12 +1,12 @@
 # Security Warning And Advisory Ledger
 
-Reviewer date: 2026-07-06
+Reviewer date: 2026-07-07
 
-This ledger tracks security-plugin findings reviewed during the production-readiness pass. Runtime security gating remains `npm run security:audit`, which fails on high/critical npm advisories. `npm run lint` now exits cleanly; remaining reviewed findings are covered by explicit file-level ESLint suppressions with dated justifications.
+This ledger tracks security-plugin findings reviewed during the production-readiness pass. Runtime security gating remains `npm run security:audit`, which fails on high/critical npm advisories. `npm run lint` now exits cleanly; remaining reviewed findings are covered by explicit file-level ESLint suppressions with dated justifications. `npm run security:suppressions` enforces that every security-rule suppression includes a review date and a pointer back to this ledger.
 
 ## ESLint Security Plugin Warnings
 
-Status: warnings reviewed, categorized, and either fixed or suppressed with dated comments that point back to this ledger. New code added in this pass was adjusted so `apps/api/src/pricing-normalization/pricing-lineage.ts` no longer emits object-injection warnings.
+Status: warnings reviewed, categorized, and either fixed or suppressed with dated comments that point back to this ledger. New code added in this pass was adjusted so `apps/api/src/pricing-normalization/pricing-lineage.ts`, `apps/api/src/api/regions.service.ts`, and the diagram LLM batch classifier path do not emit object-injection warnings.
 
 | Rule                                      | Locations                                                                                                                                                | Reasoning                                                                                                                                                                                                                                                        | Follow-up                                                                                                                         |
 | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
@@ -27,7 +27,6 @@ Suppression locations reviewed on 2026-07-06:
 - `apps/api/src/adapters/gcp/gcp-provider.adapter.ts`
 - `apps/api/src/adapters/mock/mock-pricing-fixtures.ts`
 - `apps/api/src/api/comparison-analytics.service.ts`
-- `apps/api/src/api/regions.service.ts`
 - `apps/api/src/api/mvp-acceptance.e2e.spec.ts`
 - `apps/api/src/comparison/comparison-orchestrator.service.ts`
 - `apps/api/src/database/pricing-catalog.repository.spec.ts`
@@ -44,8 +43,9 @@ Suppression locations reviewed on 2026-07-06:
 
 Command evidence:
 
-- `npm run security:audit` completed with exit code 0 under `--audit-level=high`.
-- `npm audit --audit-level=low` completed with exit code 1 because the low advisory below remains present.
+- `npm run security:audit` completed on 2026-07-07 with exit code 0 under `--audit-level=high`.
+- `npm run security:suppressions` completed on 2026-07-07 with exit code 0 and 21 reviewed suppressions.
+- `npm audit --audit-level=low` completed on 2026-07-06 with exit code 1 because the low advisory below remains present.
 - Remaining advisory: `@ai-sdk/provider-utils <=3.0.97` via `ollama-ai-provider` via `@sentropic/graphify`.
 - Severity: low.
 - Advisory: `GHSA-866g-f22w-33x8`

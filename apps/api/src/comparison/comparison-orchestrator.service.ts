@@ -3479,6 +3479,9 @@ export class ComparisonOrchestratorService {
           }
         : {}),
       serviceRequirements: nws.serviceRequirements ?? this.serviceRequirementsFromNws(nws),
+      ...(nws.sourceTraceability && nws.sourceTraceability.length > 0
+        ? { sourceTraceability: nws.sourceTraceability }
+        : {}),
     };
   }
 

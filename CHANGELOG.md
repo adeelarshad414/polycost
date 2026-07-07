@@ -15,6 +15,8 @@ once tagged releases begin.
 - One-command self-hosted demo startup and demo artifact capture scripts.
 - Account, team, invite, session, billing-reconciliation, and mock SSO readiness
   surfaces on top of the anonymous comparison workflow.
+- Machine-readable release readiness check covering community files, README demo
+  path, public-release checklist language, issue templates, and the security ledger.
 
 ### Notes
 

@@ -54,6 +54,66 @@ describe('DiagramParserService', () => {
     expect(parsed.draftNws.database).toHaveLength(1);
   });
 
+  it('summarizes diagram fixture corpus classification tiers by format', async () => {
+    const parser = service();
+    const summary = new Map<string, DiagramCorpusSummary>();
+
+    for (const fixture of diagramCorpusFixtures) {
+      const parsed = await parser.parse({
+        content:
+          fixture.encoding === 'base64'
+            ? readBinaryFixture(fixture.path).toString('base64')
+            : readTextFixture(fixture.path),
+        ...(fixture.encoding === 'base64' ? { encoding: 'base64' as const } : {}),
+        fileName: fixture.path,
+        inputFormat: 'auto',
+      });
+
+      addDiagramCorpusSummary(summary, parsed);
+    }
+
+    expect(summary.get('mermaid')).toEqual({
+      fixtures: 3,
+      graphNodes: 16,
+      components: 12,
+      tier1: 0,
+      tier2: 12,
+      tier3: 0,
+      unresolved: 4,
+      ignored: 0,
+    });
+    expect(summary.get('drawio')).toEqual({
+      fixtures: 3,
+      graphNodes: 11,
+      components: 10,
+      tier1: 8,
+      tier2: 2,
+      tier3: 0,
+      unresolved: 1,
+      ignored: 0,
+    });
+    expect(summary.get('lucid_csv')).toEqual({
+      fixtures: 1,
+      graphNodes: 5,
+      components: 4,
+      tier1: 4,
+      tier2: 0,
+      tier3: 0,
+      unresolved: 1,
+      ignored: 0,
+    });
+    expect(summary.get('vsdx')).toEqual({
+      fixtures: 1,
+      graphNodes: 3,
+      components: 3,
+      tier1: 3,
+      tier2: 0,
+      tier3: 0,
+      unresolved: 0,
+      ignored: 0,
+    });
+  });
+
   it('extracts layout and visual metadata from VSDX shape cells', () => {
     const extracted = new VsdxExtractor().extract({
       buffer: zipWithStoredEntry(
@@ -173,6 +233,111 @@ describe('DiagramParserService', () => {
         displayLabel: 'Connector',
       }),
     ]);
+  });
+
+  it('carries VSDX page, master, and container context into review evidence', async () => {
+    const parsed = await service().parse({
+      content: zipWithStoredEntries([
+        {
+          path: 'visio/masters/master1.xml',
+          content: `
+            <Master ID="1" NameU="AWS19.EC2">
+              <Shapes><Shape ID="100" NameU="AWS19.EC2"><Text>EC2 master</Text></Shape></Shapes>
+            </Master>
+          `,
+        },
+        {
+          path: 'visio/pages/page1.xml',
+          content: `
+            <PageContents>
+              <Shapes>
+                <Shape ID="10" Master="1" Parent="99">
+                  <Text>web tier</Text>
+                </Shape>
+              </Shapes>
+            </PageContents>
+          `,
+        },
+      ]).toString('base64'),
+      encoding: 'base64',
+      fileName: 'evidence.vsdx',
+    });
+
+    expect(parsed.review.components).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          nodeId: '10',
+          serviceCategory: 'compute',
+          serviceType: 'vm-compute',
+          evidence: expect.stringContaining('Matched stencil "AWS19.EC2" -> vm-compute'),
+        }),
+      ]),
+    );
+    const component = parsed.review.components.find((item) => item.nodeId === '10');
+    expect(component?.evidence).toContain('Visio page Page 1');
+    expect(component?.evidence).toContain('Visio master AWS19.EC2');
+    expect(component?.evidence).toContain('container 99');
+  });
+
+  it('uses VSDX page names and container labels as review and region evidence', async () => {
+    const parsed = await service().parse({
+      content: zipWithStoredEntries([
+        {
+          path: 'visio/pages/pages.xml',
+          content: `
+            <Pages>
+              <Page ID="0" Name="Application us-east-1">
+                <Rel r:id="rId1"/>
+              </Page>
+            </Pages>
+          `,
+        },
+        {
+          path: 'visio/pages/_rels/pages.xml.rels',
+          content: `
+            <Relationships>
+              <Relationship Id="rId1" Target="page1.xml"/>
+            </Relationships>
+          `,
+        },
+        {
+          path: 'visio/masters/master1.xml',
+          content: `
+            <Master ID="1" NameU="AWS19.EC2">
+              <Shapes><Shape ID="100" NameU="AWS19.EC2"><Text>EC2 master</Text></Shape></Shapes>
+            </Master>
+          `,
+        },
+        {
+          path: 'visio/pages/page1.xml',
+          content: `
+            <PageContents>
+              <Shapes>
+                <Shape ID="99" NameU="Container"><Text>Production VPC us-east-1</Text></Shape>
+                <Shape ID="10" Master="1" Parent="99"><Text>web tier</Text></Shape>
+              </Shapes>
+            </PageContents>
+          `,
+        },
+      ]).toString('base64'),
+      encoding: 'base64',
+      fileName: 'named-container.vsdx',
+    });
+
+    const component = parsed.review.components.find((item) => item.nodeId === '10');
+    const graphNode = parsed.graph.nodes.find((node) => node.id === '10');
+
+    expect(graphNode?.visual).toEqual(
+      expect.objectContaining({
+        pageName: 'Application us-east-1',
+        containerId: '99',
+        containerLabel: 'Production VPC us-east-1',
+      }),
+    );
+    expect(component?.evidence).toContain('Visio page Application us-east-1');
+    expect(component?.evidence).toContain('container 99 (Production VPC us-east-1)');
+    expect(parsed.draftNws.workload.region.preference).toBe('us-east-1');
+    expect(parsed.draftNws.workload.region.isDefault).toBe(false);
   });
 
   it('keeps valid VSDX pages and reports page-level warnings for corrupt pages', async () => {
@@ -296,6 +461,63 @@ describe('DiagramParserService', () => {
     });
   });
 
+  it('batches unresolved nodes through the Tier 3 LLM client when available', async () => {
+    const llmClient: LlmClassifierClient = {
+      classify: jest.fn(),
+      classifyBatch: jest.fn(async (inputs) =>
+        inputs.map((input) => ({
+          serviceCategory: 'integration',
+          serviceType: 'queue-or-event-bus',
+          confidence: 'low',
+          reason: `LLM classification, confidence low for ${input.displayLabel}`,
+          assumedDefaults: ['1 million messages per month'],
+          serviceRequirement: {
+            serviceCategory: 'integration',
+            serviceType: 'queue-or-event-bus',
+            quantity: 1,
+            scaleParams: {
+              classifier: 'llm',
+              diagramNodeId: input.diagramNodeId ?? 'unknown',
+            },
+          },
+        })),
+      ),
+    };
+
+    const parsed = await service(llmClient).parse({
+      content: 'graph TD\n  A[Quasar alpha]\n  B[Quasar beta]\n  C[EC2 web]',
+      fileName: 'batched-custom.mmd',
+      inputFormat: 'mermaid',
+    });
+
+    expect(llmClient.classifyBatch).toHaveBeenCalledTimes(1);
+    expect(llmClient.classifyBatch).toHaveBeenCalledWith([
+      expect.objectContaining({
+        displayLabel: 'Quasar alpha',
+        diagramNodeId: 'A',
+      }),
+      expect.objectContaining({
+        displayLabel: 'Quasar beta',
+        diagramNodeId: 'B',
+      }),
+    ]);
+    expect(llmClient.classify).not.toHaveBeenCalled();
+    expect(parsed.review.components).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          nodeId: 'A',
+          serviceCategory: 'integration',
+          evidence: expect.stringContaining('LLM classification'),
+        }),
+        expect.objectContaining({
+          nodeId: 'C',
+          serviceCategory: 'compute',
+          evidence: expect.stringContaining('Label matched alias'),
+        }),
+      ]),
+    );
+  });
+
   it('surfaces Tier 3 LLM fallback diagnostics on unresolved review rows', async () => {
     const llmClient: LlmClassifierClient = {
       classify: jest.fn(async () => undefined),
@@ -317,6 +539,49 @@ describe('DiagramParserService', () => {
       ]),
     );
     expect(parsed.fieldsRequiringReview).toContain('diagram.nodes.A.classification');
+  });
+
+  it('caps Tier 3 LLM classifier calls per parse and leaves overflow nodes reviewable', async () => {
+    const llmClient: LlmClassifierClient = {
+      classify: jest.fn(async (input) => ({
+        serviceCategory: 'integration',
+        serviceType: 'queue-or-event-bus',
+        confidence: 'low',
+        reason: `LLM classification, confidence low for ${input.displayLabel}`,
+        assumedDefaults: [],
+        serviceRequirement: {
+          serviceCategory: 'integration',
+          serviceType: 'queue-or-event-bus',
+          quantity: 1,
+          scaleParams: {
+            classifier: 'llm',
+            diagramNodeId: input.diagramNodeId ?? 'unknown',
+          },
+        },
+      })),
+    };
+    const content = [
+      'graph TD',
+      ...Array.from({ length: 25 }, (_, index) => `  U${index}[Opaque custom tier ${index}]`),
+    ].join('\n');
+
+    const parsed = await service(llmClient).parse({
+      content,
+      fileName: 'many-unknowns.mmd',
+      inputFormat: 'mermaid',
+    });
+
+    expect(llmClient.classify).toHaveBeenCalledTimes(20);
+    expect(parsed.review.components).toHaveLength(20);
+    expect(parsed.review.unresolvedClassifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          displayLabel: 'Opaque custom tier 20',
+          reason: 'Tier 3 LLM classifier cost guard skipped after 20 unresolved nodes',
+        }),
+      ]),
+    );
+    expect(parsed.fieldsRequiringReview).toContain('diagram.nodes.U20.classification');
   });
 
   it('caps oversized diagrams at 200 parsed nodes with a review warning', async () => {
@@ -445,6 +710,83 @@ describe('DiagramParserController', () => {
     expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
   });
 });
+
+interface DiagramCorpusFixture {
+  path: string;
+  encoding?: 'base64';
+}
+
+const diagramCorpusFixtures: DiagramCorpusFixture[] = [
+  { path: 'mermaid/web-app.mmd' },
+  { path: 'mermaid/data-platform.mmd' },
+  { path: 'mermaid/ml-platform.mmd' },
+  { path: 'drawio/web-app.drawio' },
+  { path: 'drawio/gcp-api.drawio' },
+  { path: 'drawio/analytics.drawio' },
+  { path: 'lucid/lucid-export.csv' },
+  { path: 'vsdx/simple.vsdx', encoding: 'base64' as const },
+];
+
+interface DiagramCorpusSummary {
+  fixtures: number;
+  graphNodes: number;
+  components: number;
+  tier1: number;
+  tier2: number;
+  tier3: number;
+  unresolved: number;
+  ignored: number;
+}
+
+type ParsedDiagram = Awaited<ReturnType<DiagramParserService['parse']>>;
+
+function addDiagramCorpusSummary(
+  summary: Map<string, DiagramCorpusSummary>,
+  parsed: ParsedDiagram,
+): void {
+  const current = summary.get(parsed.graph.format) ?? {
+    fixtures: 0,
+    graphNodes: 0,
+    components: 0,
+    tier1: 0,
+    tier2: 0,
+    tier3: 0,
+    unresolved: 0,
+    ignored: 0,
+  };
+
+  current.fixtures += 1;
+  current.graphNodes += parsed.graph.nodes.length;
+  current.components += parsed.review.components.length;
+  current.unresolved += parsed.review.unresolvedClassifications.length;
+  current.ignored += parsed.review.ignoredNodes.length;
+
+  for (const component of parsed.review.components) {
+    const tier = classificationTier(component.evidence);
+
+    if (tier === 1) {
+      current.tier1 += 1;
+    } else if (tier === 2) {
+      current.tier2 += 1;
+    } else {
+      current.tier3 += 1;
+    }
+  }
+
+  summary.set(parsed.graph.format, current);
+}
+
+function classificationTier(evidence: string): 1 | 2 | 3 {
+  if (evidence.startsWith('Matched stencil')) {
+    return 1;
+  }
+
+  if (evidence.startsWith('Label matched alias')) {
+    return 2;
+  }
+
+  return 3;
+}
 
 function service(llmClassifierClient?: LlmClassifierClient): DiagramParserService {
   const aliasDictionary = new AliasDictionary();

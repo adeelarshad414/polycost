@@ -41,14 +41,18 @@ Run these before phase checkpoints and releases:
 
 ```bash
 npm run security:audit
+npm run security:suppressions
 npm run security:scan
 npm run qa
 ```
 
 - `security:audit` runs the high/critical npm audit gate.
+- `security:suppressions` verifies security-rule ESLint suppressions include dated
+  review evidence and a ledger reference.
 - `security:scan` runs gitleaks and Trivy when those CLIs are installed.
 - `qa` checks required workflow files and verifies application source does not add
-  direct `process.env` access outside the config/secrets boundary.
+  direct `process.env` access outside the config/secrets boundary, then runs the
+  suppression hygiene gate.
 
 ## Review Checklist
 

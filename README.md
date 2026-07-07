@@ -152,8 +152,8 @@ Accounts add workspace controls on top of that core flow:
   admins manage members, invitations, SSO provider configuration, and billing import
   workflows; members keep comparison and report access.
 - OIDC/SAML configuration readiness with redirect URI display, stored provider
-  metadata, mock connection testing, and a signed mock OIDC start/authorize/callback
-  flow for development verification.
+  metadata, mock connection testing, and a signed mock OIDC start/callback flow in
+  the workspace UI for development verification.
 
 The current self-hosted product does not yet include enterprise IdP login round-trips,
 email delivery infrastructure, org billing plans, or a hosted account marketplace. Those
@@ -164,6 +164,9 @@ remain release-track items rather than blockers for anonymous cost comparison.
 - Session tokens are random bearer tokens; the API stores only token hashes.
 - `AUTH_SESSION_TTL_HOURS` controls server-side expiry. Expired or revoked sessions
   fail with the standard unauthorized API envelope.
+- The SPA stores only the bearer token and expiry timestamp locally. There is no
+  silent refresh flow; expired or revoked sessions are cleared on the next workspace
+  session check and the anonymous comparison flow remains usable.
 - Logout revokes the current server-side session. "Sign out other devices" revokes
   other active sessions for the same account while preserving the current session.
 - Concurrent sessions are allowed by default so a user can demo from more than one
@@ -173,7 +176,7 @@ remain release-track items rather than blockers for anonymous cost comparison.
   via `AUTH_MAX_FAILED_LOGIN_ATTEMPTS` and `AUTH_LOCKOUT_MINUTES`.
 - Anonymous compare, diagram import, reports, and share links remain available
   without accounts. Team administration, SSO provider setup, and billing-export
-  reconciliation require a signed-in workspace session.
+  reconciliation require a signed-in owner/admin workspace session.
 
 ## Diagram Imports
 
@@ -232,6 +235,7 @@ Security and quality checks:
 ```bash
 npm run security:audit
 npm run provider:credentials:check
+npm run release:check
 npm run qa
 npm run check
 ```
@@ -255,6 +259,7 @@ Start from `.env.example`. Important local settings include:
 - `AUTH_LOCAL_REGISTRATION_ENABLED`
 - `AUTH_PUBLIC_BASE_URL`
 - `AUTH_SSO_STATE_SECRET`
+- `RATE_LIMIT_AUTH_PER_MINUTE`
 - `RATE_LIMIT_NL_PARSE_PER_MINUTE`
 - `RATE_LIMIT_LIVE_REFRESH_PER_MINUTE`
 

@@ -58,6 +58,525 @@ say so explicitly rather than marking it done.
 | Phase 2.8P - Queryable comparison pricing evidence     | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8Q - Visible pricing evidence UI wiring        | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8R - Refresh-live evidence regression          | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8S - Reconciliation coverage hardening         | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8T - VSDX review evidence context              | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8U - Diagram LLM cost guard                    | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8V - Diagram LLM batch classification          | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8W - Security advisory ledger refresh          | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8X - Workspace session expiry UX               | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8Y - Mock OIDC workspace UX                    | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8Z - Diagram fixture corpus tier table         | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AA - UI-priced SKU evidence guard             | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AB - GCP pricing credential fallback          | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AC - VSDX page/container evidence             | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AD - Auth controller guard coverage           | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AE - Release readiness automation             | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AF - Billing reconciliation RBAC hardening    | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AG - UI priced-family coverage drift guard    | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AH - Diagram export evidence hardening        | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AI - Security suppression hygiene gate        | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AJ - Auth endpoint rate-limit hardening       | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AJ - Auth endpoint rate-limit hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added `RATE_LIMIT_AUTH_PER_MINUTE` to typed API config and `.env.example`.
+- Reused the shared `ApiRateLimitService` in `AuthController` so anonymous auth
+  entry points emit standard rate-limit headers and return 429 when the configured
+  per-minute identity bucket is exhausted.
+- Covered local registration, login, invitation preview, mock OIDC start, mock OIDC
+  authorize, and mock OIDC callback entry points with the auth rate limiter.
+- Added controller tests proving login and mock OIDC start are rate-limited by
+  request identity.
+- Updated README and cloud readiness docs so self-hosted operators can tune the auth
+  limiter alongside parse/refresh limits.
+
+Verification:
+
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth.controller.spec.ts src/api/auth-billing.spec.ts src/config/config.schema.spec.ts`
+  passes.
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/api/api-contract.spec.ts`
+  passes.
+- `npm run ci:lint` passes.
+- `npm run test:production-readiness` and `npm run check` pass.
+
+Known remaining gaps:
+
+- The auth flow now has local/session/team/invite/mock-SSO UI and API coverage, but
+  production OIDC/SAML handshakes and email delivery for invites remain future
+  provider-integration work.
+- The in-memory limiter is appropriate for local/demo and single API instances;
+  horizontally scaled production deployments should back auth throttling with Redis
+  or an ingress/API-gateway limiter.
+
+## Phase 2.8AI - Security suppression hygiene gate
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Removed two inline `security/detect-object-injection` suppressions from
+  `apps/api/src/api/regions.service.ts` by replacing dynamic object lookups with
+  typed `Map`/accessor-based reads.
+- Added `npm run security:suppressions`, backed by
+  `scripts/security-suppression-check.mjs`, to require every security-rule ESLint
+  suppression to include a `Reviewed YYYY-MM-DD` marker and
+  `docs/SECURITY-SUPPRESSIONS.md` reference.
+- Wired the suppression hygiene gate into `npm run qa`, `scripts/qa-check.mjs`, and
+  release-readiness documentation checks.
+- Updated `SECURITY.md` and `docs/SECURITY-SUPPRESSIONS.md` so maintainers know how
+  to run and interpret the new gate.
+
+Verification:
+
+- `npm run security:suppressions` passes with 21 reviewed suppressions.
+- `npm run ci:lint` passes.
+- `npm run security:audit` passes at the high/critical gate; npm still reports the
+  known low-severity Graphify/Ollama development-tooling advisory with no fix
+  available.
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/api/regions.service.spec.ts`
+  passes.
+- `npm run qa`, `npm run release:check`, and `npm run check` pass.
+
+Known remaining gaps:
+
+- The Graphify/Ollama low-severity transitive advisory remains until upstream
+  releases a safe fix or the visualization toolchain is replaced.
+- Suppressed ESLint security findings remain documented and gated; converting every
+  suppressible dynamic lookup to typed accessors is still an opportunistic hardening
+  task as files are touched.
+
+## Phase 2.8AH - Diagram export evidence hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Preserved NWS `sourceTraceability` in `ComparisonResult.requirements` so diagram
+  node/source references survive the comparison engine boundary.
+- Kept Tier 3 LLM classifier reason, confidence, classifier marker, and assumed
+  default count in diagram-derived `serviceRequirement.scaleParams`.
+- Expanded report source-diagram evidence rows to include per-node service category,
+  service type, quantity, confidence, classifier, source reference, classifier
+  evidence string, and assumed-default count.
+- Wired source-diagram evidence into CSV and XLSX exports alongside the existing PDF
+  source-diagram section, with a conditional `Source Diagram` XLSX evidence sheet.
+- Added report-generator coverage proving stencil evidence and LLM evidence strings
+  appear in CSV, PDF, and XLSX artifacts.
+- Added `src/reports/report-generators.spec.ts` to `npm run test:production-readiness`
+  so diagram export evidence remains part of the production-readiness gate.
+
+Verification:
+
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/reports/report-generators.spec.ts`
+  passes.
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/diagram-parser/llm-classifier.client.spec.ts src/diagram-parser/diagram-parser.service.spec.ts`
+  passes.
+- `npm run format:check`, `npm run ci:lint`, `npm run test:production-readiness`,
+  and `npm run check` pass.
+
+Known remaining gaps:
+
+- The diagram pipeline is still extraction/classification evidence, not full Visio
+  visual rendering.
+- LLM classifier production behavior still depends on real endpoint/model/Vault
+  configuration; deterministic local parsing remains the default fallback.
+
+## Phase 2.8AG - UI priced-family coverage drift guard
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+- Added `scripts/pricing-service-coverage-check.mjs`, an AST-based guard that reads
+  `apps/web/src/service-catalog.ts` and confirms every frontend service family marked
+  `priced` is present in the API comparison-orchestrator pricing coverage workload.
+- Wired `npm run pricing:coverage:check` into `package.json`, the aggregate
+  `npm run check` path, `scripts/qa-check.mjs` inventory, GitHub Actions CI, and
+  `docs/development/devops.md`.
+- This prevents a future UI service-catalog change from silently advertising a priced
+  AWS/Azure/GCP family without extending the backend coverage regression that proves
+  catalog-backed or explicit modeled estimate evidence exists.
+- Verification evidence in this continuation:
+  - `npm run pricing:coverage:check` passed and reported 36 frontend priced families
+    covered by the API pricing guard.
+  - Focused comparison-orchestrator spec passed: 35 tests, including the UI-priced
+    service coverage workload.
+  - `npm run format:check` passed.
+  - `npm run check` passed end-to-end: API unit suite 49 suites / 380 tests, web unit
+    suite 9 suites / 128 tests, graph validation 282 nodes / 282 edges, pricing coverage
+    drift guard, QA, DB validation, DevOps, cloud, and release readiness.
+- Known gaps carried forward: this closes a pricing coverage drift risk, but it is
+  still not full invoice-grade live cloud billing coverage. Private discounts, taxes,
+  every provider SKU edge case, billing-account exports, and invoice reconciliation at
+  provider-account depth remain future release-track work.
+
+## Phase 2.8AF - Billing reconciliation RBAC hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+- Closed a concrete auth-product gap where billing import/reconciliation required a
+  workspace session and team-boundary check, but not the documented Owner/Admin role.
+- Added API defense in depth: `BillingService` now rejects billing imports, provider
+  exports, reconciliation creation, and reconciliation reads unless the active identity
+  is an Owner or Admin on a workspace team.
+- Matched the frontend contract: member sessions see the actuals reconciliation panel
+  disabled with an explicit "Owner or admin role required" explanation, and programmatic
+  form submission still does not call the billing import API.
+- Updated README auth scope wording so billing-export reconciliation is documented as
+  requiring a signed-in owner/admin workspace session.
+- Verification evidence in this continuation:
+  - Focused API auth/billing spec passed: 18 tests.
+  - Focused web App spec passed: 57 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run test:production-readiness` passed: API 7 suites / 91 tests and web 2 suites /
+    82 tests.
+  - `npm run security:audit` passed the high-severity gate; npm still reports the known
+    low `@ai-sdk/provider-utils` advisory chain with no safe fix available.
+- Known gaps carried forward: this closes the billing-import RBAC mismatch, but full
+  hosted account/team UX, external IdP SSO, email delivery, SCIM, and enterprise org
+  administration remain future release-track work.
+
+## Phase 2.8AE - Release readiness automation
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+- Added `scripts/release-readiness-check.mjs`, a machine-readable release hygiene guard
+  for the required open-source/community files, README demo path, public-release
+  checklist language, issue templates, PR template, and security suppression ledger.
+- Wired `npm run release:check` into `package.json`, the aggregate `npm run check`
+  command, `scripts/qa-check.mjs` script inventory, and GitHub Actions CI so public
+  release drift is caught in the normal quality path.
+- Updated `docs/development/open-source-readiness.md`, `RELEASE-CHECKLIST.md`,
+  `README.md`, and `CHANGELOG.md` to document the new release guard alongside the
+  existing human checklist.
+- Verification evidence in this continuation:
+  - `npm run release:check` passed.
+  - `npm run format:check` passed.
+  - `npm run qa` passed and printed the documented Node 24-only `impeccable` skip.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run devops:check` passed.
+  - `npm run cloud:check` passed with the existing warning that deployable IaC is not
+    present yet.
+  - `npm run security:audit` passed the high-severity gate; npm still reports the known
+    low `@ai-sdk/provider-utils` advisory chain with no safe fix available.
+  - `npm run test:production-readiness` passed: API 7 suites / 90 tests and web 2 suites /
+    82 tests.
+  - `npm run check` passed end-to-end: API unit suite 49 suites / 379 tests, web unit
+    suite 9 suites / 128 tests, graph validation 282 nodes / 282 edges, QA, DB
+    validation, DevOps, cloud, and release readiness.
+- Known gaps carried forward: GitHub-hosted CI for the PR remains externally blocked by
+  the account billing/spending-limit runner issue, so local evidence is green but remote
+  check-run completion still needs the maintainer to resolve billing/quota. Full
+  invoice-grade billing coverage, full Visio visual rendering, and complete hosted
+  auth/team/SSO product UX remain future release-track work.
+
+## Phase 2.8AD - Auth controller guard coverage
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+- Added an API-layer regression in `auth.controller.spec.ts` that asserts every
+  workspace account/team/session/invite/SSO administration endpoint remains protected by
+  `SessionAuthGuard`.
+- The same guard test asserts intentionally anonymous entry points remain open:
+  register, login, invite preview, mock OIDC start/authorize, and OIDC callback. This
+  protects the additive-auth contract: anonymous comparison flows stay frictionless while
+  privileged workspace actions require a session.
+- Extended `npm run test:production-readiness` to include the auth controller guard
+  coverage alongside the existing service-level RBAC matrix and web RBAC visibility tests.
+- Verification evidence in this continuation:
+  - Focused auth controller spec passed: 3 tests.
+  - Production-readiness gate passed: API 7 suites / 90 tests and web 2 suites / 82 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run security:audit` passed the high-severity gate; npm still reports the known low
+    `@ai-sdk/provider-utils` advisory chain with no safe fix available.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this strengthens API guard proof, but full enterprise SSO
+  login with a real external IdP, email delivery, hosted org billing plans, and complete
+  account/team administration product polish remain future work.
+
+## Phase 2.8AC - VSDX page/container evidence
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+- Hardened VSDX extraction by reading `visio/pages/pages.xml` plus
+  `visio/pages/_rels/pages.xml.rels` so review evidence can show real Visio page
+  names instead of only path-derived `Page N` labels.
+- Resolved same-page container labels from VSDX shapes and carried them through graph
+  metadata and review evidence, e.g. `container 99 (Production VPC us-east-1)`.
+- Extended diagram-derived region inference to consider node labels, Visio page names,
+  container labels, and master names, so a resource inside a named regional container/page can
+  set the NWS region preference without requiring the resource label itself to repeat the
+  region.
+- Verification evidence in this continuation:
+  - Focused diagram parser spec passed: 25 tests, including the new page/container
+    evidence and region-hint regression.
+  - Production-readiness gate passed: API 6 suites / 87 tests and web 2 suites / 82 tests.
+  - `npm run ci:lint` passed with no ESLint security warnings.
+  - `npm run security:audit` passed the high-severity gate; npm still reports the known low
+    `@ai-sdk/provider-utils` advisory chain with no safe fix available.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this improves VSDX metadata extraction and review evidence, but
+  PolyCost still does not render full Visio visuals; VSDX support remains structured
+  extraction rather than pixel-perfect visual rendering.
+
+## Phase 2.8AB - GCP pricing credential fallback
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+- Hardened real-provider GCP pricing readiness by allowing the Cloud Billing adapter to use
+  either a Vault-stored `access_token` or a Vault-stored `service_account_json` /
+  `service_account_key_json` fallback.
+- Added runtime service-account JWT signing and OAuth token exchange against the service
+  account `token_uri` or Google's default token endpoint, scoped to
+  `https://www.googleapis.com/auth/cloud-billing.readonly`.
+- Updated the provider credential readiness checker so strict mode accepts either a
+  production-safe short-lived access token or a valid service-account JSON shape, while still
+  rejecting missing, malformed, or placeholder values.
+- Updated live-pricing credential docs with the new Vault keys, recommended production
+  preference for workload-identity/short-lived tokens, and service-account JSON as a sensitive
+  self-hosted fallback.
+- Verification evidence in this continuation:
+  - Focused GCP adapter spec passed: 10 tests covering token use, service-account exchange,
+    catalog normalization, live SKU filtering, pagination, and credential failures.
+  - `npm run provider:credentials:check` passed in local demo/mock mode.
+  - `npm run provider:credentials:check:strict` passed in local demo/mock mode.
+  - Production-readiness gate passed: API 6 suites / 86 tests and web 2 suites / 82 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run security:audit` passed the high-severity gate; npm still reports the known low
+    `@ai-sdk/provider-utils` advisory chain with no safe fix available.
+  - `npm run format:check` passed.
+- Known gaps carried forward: GCP can now exchange service-account JSON, but full
+  invoice-grade billing coverage, private discounts, taxes, credits, and live account usage
+  reconciliation remain future work.
+
+## Phase 2.8AA - UI-priced SKU evidence guard
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+- Strengthened the all-priced-family comparison guard so every provider result now proves
+  catalog-backed line items carry explicit `pricing_catalog` evidence: source record key,
+  resolved/source SKU, region, unit, unit price, effective/fetched timestamps, transform
+  version, payload hash, derivation, and estimate flags.
+- Added matching assertions for required modeled service-family SKUs so manual model rows
+  must remain explicitly labeled as `manual_model` with resolved/source SKU evidence instead
+  of silently blending into catalog-backed pricing.
+- Verification evidence in this continuation:
+  - Focused comparison orchestrator spec passed: 35 tests, including the hardened
+    all-priced-family SKU evidence guard.
+  - Production-readiness gate passed: API 6 suites / 86 tests and web 2 suites / 82 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run security:audit` passed the high-severity gate; npm still reports the known low
+    `@ai-sdk/provider-utils` advisory chain with no safe fix available.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this improves SKU-to-estimate traceability for local/mock and
+  modeled comparison paths, but full invoice-grade live cloud billing coverage remains future
+  work. GitHub PR `quality` remains externally blocked by account billing/spending-limit
+  runner startup failure.
+
+## Phase 2.8Z - Diagram fixture corpus tier table
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+- Added a fixture-corpus regression to `diagram-parser.service.spec.ts` that parses
+  Mermaid, draw.io, Lucid CSV, and VSDX fixtures and locks a format-by-format Tier 1
+  / Tier 2 / Tier 3 / unresolved summary table.
+- Current enforced corpus table:
+
+| Format    | Fixtures | Graph nodes | Components | Tier 1 | Tier 2 | Tier 3 | Unresolved | Ignored |
+| --------- | -------- | ----------- | ---------- | ------ | ------ | ------ | ---------- | ------- |
+| Mermaid   | 3        | 16          | 12         | 0      | 12     | 0      | 4          | 0       |
+| draw.io   | 3        | 11          | 10         | 8      | 2      | 0      | 1          | 0       |
+| Lucid CSV | 1        | 5           | 4          | 4      | 0      | 0      | 1          | 0       |
+| VSDX      | 1        | 3           | 3          | 3      | 0      | 0      | 0          | 0       |
+
+- Verification evidence in this continuation:
+  - Focused diagram parser spec passed: 1 suite / 24 tests.
+  - `npm run test:production-readiness` passed: API 6 suites / 86 tests and web 2
+    suites / 82 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: the table makes parser drift visible across the
+  current fixture corpus, but it is still fixture accuracy evidence rather than full
+  real-world diagram benchmark coverage or full Visio visual rendering.
+
+## Phase 2.8Y - Mock OIDC workspace UX
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+- Added workspace UI controls for the existing mock OIDC start/callback API path so
+  an owner/admin can generate a signed mock authorization URL, see callback/state
+  evidence, and complete the callback into a normal workspace session.
+- Reused the existing session storage path for callback-issued sessions so mock SSO
+  tokens carry the same expiry persistence and session reload behavior as local
+  login/register sessions.
+- Exposed the configured OIDC callback URL inside the SSO readiness summary so
+  self-hosted operators can verify redirect URI alignment from the app surface.
+- Verification evidence in this continuation:
+  - Focused App spec passed: 1 suite / 57 tests.
+  - `npm run test:production-readiness` passed: API 6 suites / 85 tests and web 2
+    suites / 82 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed after formatting the touched web file.
+- Known gaps carried forward: the SPA now verifies the mock OIDC round-trip through
+  existing API contracts, but production enterprise IdP onboarding, SCIM, hosted org
+  policy, and real customer IdP smoke testing remain future release-track work.
+
+## Phase 2.8X - Workspace session expiry UX
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Added browser-side session expiry persistence separate from the bearer token so
+  newly issued workspace sessions can be cleared locally before privileged workspace
+  calls when the stored expiry is already past.
+- Added a signed-in workspace session policy/status band that shows whether the
+  session is active, expiring soon, or expired, and states the honest refresh policy:
+  there is no silent refresh; expired/revoked sessions are cleared on the next
+  workspace session check.
+- Extended the active session list to show each session's expiry timestamp, making
+  "sign out other devices" easier to evaluate before revocation.
+- Added regression coverage proving an expired stored workspace token is removed
+  before `getCurrentSession()` is called while the anonymous comparison flow remains
+  available.
+- Verification evidence in this continuation:
+  - Focused App spec passed: 1 suite / 56 tests.
+  - `npm run test:production-readiness` passed: API 6 suites / 85 tests and web 2
+    suites / 81 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this strengthens local/session UX and anonymous-flow
+  preservation, but full enterprise account/team UX such as production IdP login,
+  email delivery, org plans, SCIM, and a hosted account marketplace remains future
+  work.
+
+## Phase 2.8W - Security advisory ledger refresh
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Re-ran `npm audit --audit-level=low` with registry access. It still exits 1 only
+  for the already documented low-severity `@ai-sdk/provider-utils <=3.0.97`
+  advisory through `ollama-ai-provider` and `@sentropic/graphify`; npm reports no
+  fix available.
+- Refreshed `docs/SECURITY-SUPPRESSIONS.md` so the low-audit evidence is dated and
+  the new diagram LLM batch classifier path is explicitly covered as lint-clean
+  rather than suppressed.
+- Verification evidence in this continuation:
+  - `npm audit --audit-level=low` completed with the documented low advisory and no
+    safe fix available.
+  - `npm run security:audit` completed with exit code 0 at the high/critical gate.
+  - `npm run ci:lint` passed with no new security-plugin warnings after the batch
+    classifier implementation.
+- Known gaps carried forward: the low transitive Graphify/Ollama advisory remains
+  upstream-dependent; high/critical runtime gating remains clean via
+  `npm run security:audit`.
+
+## Phase 2.8V - Diagram LLM batch classification
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Added an optional batch method to the diagram LLM classifier interface so Tier 3
+  unresolved nodes can be classified in one bounded OpenAI-compatible JSON-schema
+  request instead of only node-by-node calls.
+- Reworked diagram parsing into a Tier 1/2 local pass followed by a bounded Tier 3
+  batch pass. Stencil and alias matches do not consume LLM budget; only unresolved
+  nodes are batched, and overflow remains reviewable with the existing cost-guard
+  message.
+- Added batch-response validation and node-id mapping in the OpenAI-compatible
+  client, while preserving the single-node `classify()` path and stub/no-key fallback
+  behavior.
+- Verification evidence in this continuation:
+  - Focused diagram parser + LLM classifier specs passed: 2 suites / 30 tests.
+  - `npm run test:production-readiness` passed: API 6 suites / 85 tests and web 2
+    suites / 80 tests.
+  - `npm run ci:lint` passed with no new security-plugin warnings.
+  - `npm run format:check` passed.
+- Known gaps carried forward: the production LLM path is now schema-based, retried,
+  timeout-protected, bounded, batched, and fallback-safe, but production prompt
+  evaluation/tuning and real provider-key smoke testing remain future hardening.
+
+## Phase 2.8U - Diagram LLM cost guard
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Added a per-parse Tier 3 LLM classifier budget of 20 unresolved nodes so large
+  ambiguous diagrams remain bounded even when the optional OpenAI-compatible
+  classifier is configured.
+- Kept stencil and alias classification outside the LLM budget; only nodes that
+  would otherwise call the LLM consume the guard.
+- Overflow nodes remain reviewable with a clear unresolved reason:
+  `Tier 3 LLM classifier cost guard skipped after 20 unresolved nodes`.
+- Verification evidence in this continuation:
+  - Focused diagram parser spec passed: 1 suite / 22 tests.
+  - `npm run test:production-readiness` passed: API 6 suites / 82 tests and web 2
+    suites / 80 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: the classifier path is bounded, schema-based, retried,
+  timeout-protected, and fallback-safe, but production prompt tuning/evaluation
+  corpus work remains future hardening.
+
+## Phase 2.8T - VSDX review evidence context
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Enriched diagram review component evidence so VSDX-classified nodes preserve the
+  classifier reason and append Visio page, master/stencil, and container context when
+  those fields are available from extraction.
+- Added full parser coverage proving a VSDX node classified from master
+  `AWS19.EC2` carries `Matched stencil`, `Visio page Page 1`, `Visio master
+AWS19.EC2`, and `container 99` evidence through the review-card surface.
+- This makes the existing VSDX master/container/page extraction more reviewable in
+  UI/PDF/API evidence without changing existing API response shapes.
+- Verification evidence in this continuation:
+  - Focused diagram parser spec passed: 1 suite / 21 tests.
+  - `npm run test:production-readiness` passed: API 6 suites / 81 tests and web 2
+    suites / 80 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: VSDX parsing is more explainable and layout-aware, but
+  it is still extraction/review metadata rather than full Visio visual rendering.
+
+## Phase 2.8S - Reconciliation coverage hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-06
+
+- Tightened the provider pricing reconciliation test so AWS, Azure, and GCP each
+  prove compute, storage, and egress reconciliation independently instead of only
+  satisfying a single aggregate assertion counter.
+- Strengthened raw-record checks for storage and egress to compare full source
+  lineage against `pricingLineageForCatalogRecord()`, including provider fixture
+  endpoint and SHA-256 payload hash, matching the existing compute trace rigor.
+- Kept the explicit `>= 20` reconciliation assertion floor per provider while making
+  zero coverage in any required category fail fast.
+- Verification evidence in this continuation:
+  - Focused pricing reconciliation spec passed: 1 suite / 3 tests.
+  - `npm run test:production-readiness` passed: API 6 suites / 80 tests and web 2
+    suites / 80 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed.
+- Known gaps carried forward: this strengthens transform-drift detection for the
+  current mock/provider-normalization path, but full invoice-grade coverage of every
+  provider SKU, private pricing agreement, and live account billing export remains a
+  future hardening phase.
 
 ## Phase 2.8R - Refresh-live evidence regression
 

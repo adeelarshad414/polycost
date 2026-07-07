@@ -29,10 +29,14 @@ jobs:
         run: npm run qa
       - name: Graph validation
         run: npm run graphify:validate
+      - name: Pricing service coverage check
+        run: npm run pricing:coverage:check
       - name: DevOps configuration check
         run: npm run devops:check
       - name: Cloud readiness check
         run: npm run cloud:check
+      - name: Release readiness check
+        run: npm run release:check
       - name: Provider credential readiness check
         run: npm run provider:credentials:check
       - name: Database migration validation

@@ -8,23 +8,48 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { AppConfig } from '../config/config.schema';
 import { AuthService } from './auth.service';
 import { RequestWithAuth } from './auth.types';
+import {
+  ApiRateLimitService,
+  RateLimitHeaderResponse,
+  requestIdentity,
+  writeRateLimitHeaders,
+} from './rate-limit.service';
 import { SessionAuthGuard } from './session-auth.guard';
 
 @Controller('api/v1/auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly apiRateLimitService: ApiRateLimitService,
+    private readonly configService: ConfigService<AppConfig, true>,
+  ) {}
 
   @Post('register')
-  register(@Body() body: unknown, @Req() request?: RequestWithAuth) {
+  register(
+    @Body() body: unknown,
+    @Req() request?: RequestWithAuth,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    this.consumeAuthRateLimit('auth_register', request, response);
+
     return this.authService.register(body, requestMetadata(request));
   }
 
   @Post('login')
-  login(@Body() body: unknown, @Req() request?: RequestWithAuth) {
+  login(
+    @Body() body: unknown,
+    @Req() request?: RequestWithAuth,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    this.consumeAuthRateLimit('auth_login', request, response);
+
     return this.authService.login(body, requestMetadata(request));
   }
 
@@ -146,7 +171,13 @@ export class AuthController {
   }
 
   @Get('invitations/preview/:token')
-  previewInvitation(@Param('token') token: string) {
+  previewInvitation(
+    @Param('token') token: string,
+    @Req() request?: RequestWithAuth,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    this.consumeAuthRateLimit('auth_invitation_preview', request, response);
+
     return this.authService.previewInvitation(token);
   }
 
@@ -157,12 +188,24 @@ export class AuthController {
   }
 
   @Post('sso/oidc/start')
-  startMockOidcLogin(@Body() body: unknown) {
+  startMockOidcLogin(
+    @Body() body: unknown,
+    @Req() request?: RequestWithAuth,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    this.consumeAuthRateLimit('auth_sso_start', request, response);
+
     return this.authService.startMockOidcLogin(body);
   }
 
   @Get('sso/mock/oidc/authorize')
-  mockOidcAuthorize(@Query() query: Record<string, unknown>) {
+  mockOidcAuthorize(
+    @Query() query: Record<string, unknown>,
+    @Req() request?: RequestWithAuth,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    this.consumeAuthRateLimit('auth_sso_authorize', request, response);
+
     return this.authService.mockOidcAuthorize(query);
   }
 
@@ -170,7 +213,10 @@ export class AuthController {
   completeMockOidcCallback(
     @Query() query: Record<string, unknown>,
     @Req() request?: RequestWithAuth,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
+    this.consumeAuthRateLimit('auth_sso_callback', request, response);
+
     return this.authService.completeMockOidcCallback(query, requestMetadata(request));
   }
 
@@ -192,6 +238,19 @@ export class AuthController {
     @Req() request: RequestWithAuth,
   ) {
     return this.authService.testSsoConnection(teamId, body, request.auth!);
+  }
+
+  private consumeAuthRateLimit(
+    scope: string,
+    request: RequestWithAuth | undefined,
+    response: RateLimitHeaderResponse | undefined,
+  ): void {
+    const state = this.apiRateLimitService.consume(
+      scope,
+      requestIdentity(request ?? {}),
+      this.configService.get('RATE_LIMIT_AUTH_PER_MINUTE', { infer: true }),
+    );
+    writeRateLimitHeaders(response, state);
   }
 }
 

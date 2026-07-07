@@ -24,6 +24,7 @@ import {
   reportCoverRows,
   selectedScenarioRows,
   serviceRequirementRows,
+  sourceDiagramRows,
   skuMappingAppendixRows,
   workloadScopeRows,
 } from './report-evidence';
@@ -368,6 +369,79 @@ describe('report generators', () => {
         [
           'Data health status',
           expect.stringContaining('stale; policy 48h; aws fresh'),
+        ],
+      ]),
+    );
+  });
+
+  it('embeds source-diagram node evidence across report formats when supplied', () => {
+    const diagramComparison: ComparisonResult = {
+      ...comparison,
+      requirements: {
+        ...comparison.requirements!,
+        sourceType: 'drawio_diagram',
+        serviceRequirements: [
+          {
+            serviceCategory: 'compute',
+            serviceType: 'vm-compute',
+            quantity: 2,
+            scaleParams: {
+              diagramNodeId: 'web',
+              confidence: 'high',
+              reason: 'Matched Visio stencil AWS19.EC2 -> vm-compute',
+              assumedDefaultCount: 2,
+            },
+          },
+          {
+            serviceCategory: 'integration',
+            serviceType: 'queue-or-event-bus',
+            quantity: 1,
+            scaleParams: {
+              diagramNodeId: 'queue',
+              confidence: 'low',
+              classifier: 'llm',
+              reason: 'LLM classification, confidence 0.72 for async jobs',
+              assumedDefaultCount: 1,
+            },
+          },
+        ],
+        sourceTraceability: [
+          {
+            nwsPath: 'serviceRequirements.web',
+            sourceRef: 'diagram:page:main/node:web',
+          },
+          {
+            nwsPath: 'serviceRequirements.queue',
+            sourceRef: 'diagram:page:main/node:queue',
+          },
+        ],
+      },
+    };
+    const csv = new CsvReportGenerator().generate(diagramComparison).toString('utf8');
+    const pdf = new PdfReportGenerator().generate(diagramComparison).toString('utf8');
+    const xlsx = new ExcelReportGenerator().generate(diagramComparison).toString('utf8');
+
+    expect(csv).toContain('Source Diagram');
+    expect(csv).toContain('Classified diagram nodes,2');
+    expect(csv).toContain('Assumed defaults requiring review,3');
+    expect(csv).toContain('Diagram node web');
+    expect(csv).toContain('Matched Visio stencil AWS19.EC2 -> vm-compute');
+    expect(csv).toContain('LLM classification, confidence 0.72 for async jobs');
+    expect(csv).toContain('source diagram:page:main/node:queue');
+    expect(pdf).toContain('Source diagram');
+    expect(pdf).toContain('Classified diagram nodes: 2');
+    expect(pdf).toContain('Matched Visio stencil AWS19.EC2 -> vm-compute');
+    expect(pdf).toContain('LLM classification, confidence 0.72 for async jobs');
+    expect(xlsx).toContain('<sheet name="Source Diagram"');
+    expect(xlsx).toContain('Diagram node queue evidence');
+    expect(xlsx).toContain('classifier llm');
+    expect(xlsx).toContain('source diagram:page:main/node:web');
+    expect(sourceDiagramRows(diagramComparison)).toEqual(
+      expect.arrayContaining([
+        ['Diagram node web evidence', 'Matched Visio stencil AWS19.EC2 -> vm-compute | assumed defaults 2'],
+        [
+          'Diagram node queue evidence',
+          'LLM classification, confidence 0.72 for async jobs | assumed defaults 1',
         ],
       ]),
     );

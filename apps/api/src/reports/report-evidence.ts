@@ -667,8 +667,13 @@ export function sourceDiagramRows(result: ComparisonResult): string[][] {
   }
 
   const diagramRequirements = requirements.serviceRequirements.filter(
-    (requirement) => requirement.scaleParams?.confidence || requirement.scaleParams?.reason,
+    (requirement) =>
+      requirement.scaleParams?.diagramNodeId ||
+      requirement.scaleParams?.confidence ||
+      requirement.scaleParams?.reason ||
+      requirement.scaleParams?.classifier,
   );
+  const sourceRefsByNodeId = sourceRefsByDiagramNodeId(requirements.sourceTraceability);
   const assumedDefaults = diagramRequirements.reduce((total, requirement) => {
     const count = requirement.scaleParams?.assumedDefaultCount;
 
@@ -684,7 +689,81 @@ export function sourceDiagramRows(result: ComparisonResult): string[][] {
       'Review guidance',
       'Validate diagram-derived service classifications, quantities, storage sizes, HA posture, and region before procurement.',
     ],
+    ...diagramRequirements.flatMap((requirement, index) =>
+      sourceDiagramNodeRows(requirement, index, sourceRefsByNodeId),
+    ),
   ];
+}
+
+function sourceRefsByDiagramNodeId(
+  sourceTraceability: NonNullable<ComparisonResult['requirements']>['sourceTraceability'],
+): Map<string, string> {
+  const refs = new Map<string, string>();
+
+  for (const trace of sourceTraceability ?? []) {
+    const nodeId = trace.nwsPath.split('.').at(-1);
+
+    if (nodeId) {
+      refs.set(nodeId, trace.sourceRef);
+    }
+  }
+
+  return refs;
+}
+
+function sourceDiagramNodeRows(
+  requirement: NonNullable<ComparisonResult['requirements']>['serviceRequirements'][number],
+  index: number,
+  sourceRefsByNodeId: Map<string, string>,
+): string[][] {
+  const scaleParams = requirement.scaleParams ?? {};
+  const nodeId = stringScaleParam(scaleParams.diagramNodeId);
+  const confidence = stringScaleParam(scaleParams.confidence);
+  const classifier = stringScaleParam(scaleParams.classifier);
+  const reason = stringScaleParam(scaleParams.reason);
+  const assumedDefaultCount = numericDiagramScaleParam(scaleParams.assumedDefaultCount);
+  const sourceRef = nodeId ? sourceRefsByNodeId.get(nodeId) : undefined;
+  const label = nodeId ? `Diagram node ${nodeId}` : `Diagram node ${index + 1}`;
+  const summary = [
+    `${requirement.serviceCategory}/${requirement.serviceType}`,
+    `quantity ${requirement.quantity}`,
+    confidence ? `confidence ${confidence}` : undefined,
+    classifier ? `classifier ${classifier}` : undefined,
+    sourceRef ? `source ${sourceRef}` : undefined,
+  ].filter((value): value is string => Boolean(value));
+  const evidence = [
+    reason ?? 'No classifier evidence retained on this service requirement',
+    assumedDefaultCount !== undefined ? `assumed defaults ${assumedDefaultCount}` : undefined,
+    requirement.region ? `region ${requirement.region}` : undefined,
+    requirement.az ? `availability ${requirement.az}` : undefined,
+  ].filter((value): value is string => Boolean(value));
+
+  return [
+    [label, summary.join(' | ')],
+    [`${label} evidence`, evidence.join(' | ')],
+  ];
+}
+
+function stringScaleParam(value: string | number | boolean | undefined): string | undefined {
+  if (value === undefined || value === '') {
+    return undefined;
+  }
+
+  return String(value);
+}
+
+function numericDiagramScaleParam(value: string | number | boolean | undefined): number | undefined {
+  if (typeof value === 'number') {
+    return value;
+  }
+
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function availabilitySummary(

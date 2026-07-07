@@ -1,4 +1,5 @@
 /* eslint-disable security/detect-non-literal-fs-filename -- Reviewed 2026-07-06: fixture reads are resolved from repository-controlled test data; see docs/SECURITY-SUPPRESSIONS.md. */
+import { generateKeyPairSync } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { SecretsReader } from '../../secrets/secrets.service';
@@ -26,6 +27,29 @@ const secretsReader = (): SecretsReader => ({
     throw new Error('missing secret');
   }),
 });
+
+const serviceAccountSecretsReader = (serviceAccountJson: string): SecretsReader => ({
+  getSecret: jest.fn(async (_path, key) => {
+    if (key === 'access_token') {
+      throw new Error('missing access token');
+    }
+
+    if (key === 'service_account_json') {
+      return serviceAccountJson;
+    }
+
+    throw new Error('missing secret');
+  }),
+});
+
+function serviceAccountJson(): string {
+  const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+
+  return JSON.stringify({
+    client_email: 'polycost-pricing-reader@example.iam.gserviceaccount.com',
+    private_key: privateKey.export({ type: 'pkcs8', format: 'pem' }),
+  });
+}
 
 describe('GcpProviderAdapter', () => {
   it('normalizes GCP Cloud Billing Catalog responses into catalog records', async () => {
@@ -143,6 +167,55 @@ describe('GcpProviderAdapter', () => {
 
     expect(records).toHaveLength(1);
     expect(records[0].skuId).toBe('GCP-STORAGE-STANDARD');
+  });
+
+  it('exchanges service account JSON for a GCP Cloud Billing access token', async () => {
+    const fetchClient = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ access_token: 'service-account-token' }))
+      .mockResolvedValueOnce(jsonResponse(fixture('test/fixtures/pricing/gcp/services.json')))
+      .mockResolvedValueOnce(
+        jsonResponse(fixture('test/fixtures/pricing/gcp/compute-skus.json')),
+      ) as FetchLike;
+    const adapter = new GcpProviderAdapter(
+      new InMemoryPricingCatalogReader([]),
+      'us-central1',
+      serviceAccountSecretsReader(serviceAccountJson()),
+      fetchClient,
+      () => new Date('2026-07-07T00:00:00.000Z'),
+    );
+
+    const records = await adapter.refreshPricingCatalog({ categories: ['compute'] });
+
+    expect(records).toHaveLength(1);
+    expect(fetchClient).toHaveBeenNthCalledWith(
+      1,
+      'https://oauth2.googleapis.com/token',
+      expect.objectContaining({
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+        },
+        body: expect.stringContaining(
+          'grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer',
+        ),
+      }),
+    );
+    expect(fetchClient).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('https://cloudbilling.googleapis.com/v1/services'),
+      expect.objectContaining({
+        headers: {
+          authorization: 'Bearer service-account-token',
+        },
+      }),
+    );
+
+    const fetchMock = fetchClient as jest.MockedFunction<FetchLike>;
+    const tokenRequest = fetchMock.mock.calls[0]?.[1];
+
+    expect(typeof tokenRequest?.body).toBe('string');
+    expect(new URLSearchParams(tokenRequest?.body).get('assertion')?.split('.')).toHaveLength(3);
   });
 
   it('follows GCP service and SKU pagination while applying region filters', async () => {
@@ -284,7 +357,36 @@ describe('GcpProviderAdapter', () => {
     });
 
     await expect(adapter.refreshPricingCatalog({ categories: ['compute'] })).rejects.toThrow(
-      'missing required GCP Cloud Billing access token',
+      'missing required GCP Cloud Billing access token or service account JSON',
+    );
+  });
+
+  it('fails clearly when GCP service account JSON is malformed', async () => {
+    const adapter = new GcpProviderAdapter(
+      new InMemoryPricingCatalogReader([]),
+      'us-central1',
+      serviceAccountSecretsReader('{not-json'),
+    );
+
+    await expect(adapter.refreshPricingCatalog({ categories: ['compute'] })).rejects.toThrow(
+      'GCP service account JSON is not valid JSON',
+    );
+  });
+
+  it('fails clearly when the GCP service account private key cannot sign tokens', async () => {
+    const adapter = new GcpProviderAdapter(
+      new InMemoryPricingCatalogReader([]),
+      'us-central1',
+      serviceAccountSecretsReader(
+        JSON.stringify({
+          client_email: 'polycost-pricing-reader@example.iam.gserviceaccount.com',
+          private_key: '-----BEGIN PRIVATE KEY-----\ninvalid\n-----END PRIVATE KEY-----',
+        }),
+      ),
+    );
+
+    await expect(adapter.refreshPricingCatalog({ categories: ['compute'] })).rejects.toThrow(
+      'GCP service account private_key could not sign a JWT assertion',
     );
   });
 });
