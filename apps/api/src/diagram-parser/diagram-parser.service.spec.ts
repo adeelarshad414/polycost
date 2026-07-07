@@ -253,6 +253,12 @@ describe('DiagramParserService', () => {
               <Shapes>
                 <Shape ID="10" Master="1" Parent="99">
                   <Text>web tier</Text>
+                  <Cell N="PinX" V="3"/>
+                  <Cell N="PinY" V="5"/>
+                  <Cell N="Width" V="4"/>
+                  <Cell N="Height" V="6"/>
+                  <Cell N="FillForegnd" V="#D85A30"/>
+                  <Cell N="LineColor" V="RGB(55,138,221)"/>
                 </Shape>
               </Shapes>
             </PageContents>
@@ -277,6 +283,8 @@ describe('DiagramParserService', () => {
     expect(component?.evidence).toContain('Visio page Page 1');
     expect(component?.evidence).toContain('Visio master AWS19.EC2');
     expect(component?.evidence).toContain('container 99');
+    expect(component?.evidence).toContain('Visio bounds x=1 y=2 w=4 h=6');
+    expect(component?.evidence).toContain('Visio style fill #D85A30 line #378ADD');
   });
 
   it('uses VSDX page names and container labels as review and region evidence', async () => {

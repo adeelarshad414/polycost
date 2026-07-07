@@ -78,6 +78,35 @@ say so explicitly rather than marking it done.
 | Phase 2.8AJ - Auth endpoint rate-limit hardening       | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AK - Pricing reconciliation breadth guard     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AL - Auth team UX state hardening             | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AM - VSDX visual evidence polish              | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AM - VSDX visual evidence polish
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Extended diagram review evidence for VSDX nodes to include extracted Visio bounds
+  and style colors when the OpenXML shape cells provide them.
+- Kept the existing API shape intact: bounds and visual metadata were already exposed
+  on graph nodes; this pass makes that visual extraction easier to audit in review
+  cards and report evidence text.
+- Added parser regression coverage proving VSDX review evidence now includes page,
+  master, container, bounds, fill color, and line color context.
+
+Verification:
+
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/diagram-parser/diagram-parser.service.spec.ts`
+  passes.
+- `npm run test:production-readiness` passes.
+- `npm run check` passes end-to-end; the optional impeccable check is still skipped
+  because the repo targets Node.js 20 and the tool requires Node.js 24.
+
+Known remaining gaps:
+
+- This improves layout/style traceability for VSDX extraction, but PolyCost still does
+  not perform full Visio visual rendering or pixel-perfect visual comparison.
 
 ## Phase 2.8AL - Auth team UX state hardening
 
