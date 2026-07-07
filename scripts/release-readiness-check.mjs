@@ -103,6 +103,8 @@ await assertFileContains('docs/SECURITY-SUPPRESSIONS.md', [
 await assertFileContains('.github/workflows/ci.yml', [
   ['provider credential readiness CI gate', 'npm run provider:credentials:check'],
   ['production-readiness focused regression CI gate', 'npm run test:production-readiness'],
+  ['Node 20 impeccable skip reason', 'impeccable@3.1.0'],
+  ['Node 24 release tracking note', 'RELEASE-CHECKLIST.md'],
 ]);
 
 await assertFileContains('apps/api/src/pricing-normalization/pricing-reconciliation.spec.ts', [

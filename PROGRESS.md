@@ -82,6 +82,38 @@ say so explicitly rather than marking it done.
 | Phase 2.8AN - Local credential readiness gate          | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AO - Production-readiness suite drift guard   | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AP - Security ledger coverage enforcement     | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AQ - Impeccable CI tracking guard             | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AQ - Impeccable CI tracking guard
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Updated the GitHub Actions quality workflow comment to name the exact
+  `impeccable@3.1.0` Node 24 requirement while keeping Node 20 as the supported repo
+  runtime.
+- Pointed the CI comment at `docs/SECURITY-SUPPRESSIONS.md` and
+  `RELEASE-CHECKLIST.md`, where the Node 24 public-release follow-up is tracked.
+- Extended `scripts/release-readiness-check.mjs` so release readiness fails if the CI
+  workflow loses the `impeccable` Node 24 skip reason or release-checklist tracking
+  pointer.
+
+Verification:
+
+- `npm run format:check` passes.
+- `npm run release:check` passes and now asserts the CI workflow keeps the
+  `impeccable@3.1.0` Node 24 skip/tracking note.
+- `npm run security:suppressions` passes.
+- `npm run check` passes end-to-end; `impeccable` remains an intentional Node 20
+  skip with public-release Node 24 follow-up documented.
+
+Known remaining gaps:
+
+- A real Node 24 `npm run impeccable` execution is still a human/public-release
+  checklist item unless the project later raises the supported runtime or adds a
+  separate Node 24 CI job.
 
 ## Phase 2.8AP - Security ledger coverage enforcement
 
