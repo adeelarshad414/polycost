@@ -92,6 +92,9 @@ Evidence:
   `POLYCOST_API_ORIGIN=http://127.0.0.1:3201`) passed with
   template-to-recommendation at `8547ms` / `60000ms` and diagram-to-PDF at `2924ms`
   / `180000ms`.
+- Isolated local `npm run ci:e2e` also passed API E2E `16/16`, web Playwright
+  `7/7`, then `live:verify` with template-to-recommendation at `5542ms` /
+  `60000ms` and diagram-to-PDF at `3111ms` / `180000ms`.
 
 Deferred:
 
@@ -163,6 +166,9 @@ Evidence:
   invite secrets, and OIDC state are intentionally excluded from the transcript.
 - Latest isolated local run completed `workspace-auth-rbac-sso` in `720ms` /
   `60000ms`, including `rbacDeniedStatus: 403` and `stateVerified: true`.
+- The isolated local `ci:e2e` run completed the same journey in `794ms` /
+  `60000ms` after API E2E verified the signup/invite/role-change/mock-SSO/RBAC
+  acceptance path `16/16`.
 - Anonymous compare remains available in `apps/web/src/App.spec.tsx` and is
   documented in `README.md`.
 
@@ -211,6 +217,8 @@ These commands have been used as evidence gates in this run:
 - `npm run provider:credentials:check`
 - `npm run live:verify` against isolated local ports (`WEB_PORT=3200`,
   `API_HOST_PORT=3201`, `VAULT_HOST_PORT=8320`)
+- `npm run ci:e2e` against isolated local ports (`WEB_PORT=3210`,
+  `API_HOST_PORT=3211`, `VAULT_HOST_PORT=8330`)
 - `npm run progress:verify`
 - `npm run test:production-readiness`
 - `npm run check`
@@ -224,7 +232,9 @@ authenticated smoke path records `workspace-auth-rbac-sso`: signup -> team/sessi
 hydration -> invite/accept -> role change -> mock OIDC -> structured RBAC 403.
 The latest local transcript was captured at
 `.tmp/live-verification/latest-local-3200.json`; that artifact is intentionally
-local/ignored, while the timings above are recorded here for release review.
+local/ignored, while the timings above are recorded here for release review. The
+latest CI-orchestrated local transcript was captured at
+`.tmp/live-verification/latest-ci-e2e-local.json`, also local/ignored.
 
 ## Honest Release Verdict
 

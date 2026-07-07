@@ -614,6 +614,15 @@ async function requestRaw(pathOrUrl: string, init?: RequestInit): Promise<Respon
 
 function toUrl(pathOrUrl: string): string {
   if (pathOrUrl.startsWith('http')) {
+    const url = new URL(pathOrUrl);
+
+    if (url.pathname.startsWith('/api/v1/')) {
+      const origin = new URL(API_ORIGIN);
+      url.protocol = origin.protocol;
+      url.host = origin.host;
+      return url.toString();
+    }
+
     return pathOrUrl;
   }
 

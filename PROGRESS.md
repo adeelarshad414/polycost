@@ -120,6 +120,9 @@ What changed:
   returned by the API to the configured `POLYCOST_API_ORIGIN`. This lets mock OIDC
   start/authorize/callback work when the API container listens on `3001` internally
   but is exposed on another host port.
+- Applied the same internal `/api/v1/...` URL normalization to
+  `apps/api/src/api/mvp-acceptance.e2e.spec.ts` after isolated `ci:e2e` proved the
+  API E2E mock OIDC round trip had the same host-port assumption.
 - Captured a passing live transcript at `.tmp/live-verification/latest-local-3200.json`.
 
 Runtime evidence:
@@ -132,6 +135,10 @@ Runtime evidence:
   template-to-recommendation `8547ms` / `60000ms`, diagram-to-PDF `2924ms` /
   `180000ms`, workspace-auth-rbac-sso `720ms` / `60000ms`, and Redis degradation
   `/health=degraded`, `/health/deep=degraded`, `/api/v1/data-health HTTP 200`.
+- Isolated `npm run ci:e2e` also passed on `WEB_PORT=3210`, `API_HOST_PORT=3211`,
+  and `VAULT_HOST_PORT=8330`: API E2E `16/16`, web Playwright `7/7`, then
+  live verification template-to-recommendation `5542ms`, diagram-to-PDF `3111ms`,
+  workspace-auth-rbac-sso `794ms`, and Redis degradation data-health HTTP `200`.
 - Transcript redaction check found no bearer tokens, invite tokens, invite URLs,
   OIDC state, passwords, or client secrets. The only token-like field left is the
   intentionally redacted share `tokenPrefix`.
@@ -140,6 +147,7 @@ Verification:
 
 - `node --check scripts/live-verification.mjs`
 - `npm run live:verify` against the isolated Compose stack
+- `npm run ci:e2e` against the isolated Compose stack
 
 Known remaining gaps:
 
