@@ -408,6 +408,40 @@ describe('App', () => {
     unmount();
   });
 
+  it('starts and completes the mock OIDC workspace session flow', async () => {
+    window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await settleAsyncEffects();
+    await settleAsyncEffects();
+
+    await changeInput(inputByWorkspaceLabel(container, 'Mock OIDC email'), 'sso-user@example.com');
+    await click(buttonByText(container, 'Start mock OIDC'));
+
+    expect(client.startMockOidcLogin).toHaveBeenCalledWith({
+      teamId: '22222222-2222-4222-8222-222222222222',
+      email: 'sso-user@example.com',
+    });
+    expect(text(container)).toContain('Mock authorization:');
+    expect(text(container)).toContain('/api/v1/auth/sso/mock/oidc/authorize');
+
+    await click(buttonByText(container, 'Complete callback'));
+    await settleAsyncEffects();
+
+    expect(client.completeMockOidcCallback).toHaveBeenCalledWith({
+      state: 'signed',
+      email: 'sso-user@example.com',
+    });
+    expect(window.localStorage.getItem('polycost-auth-session-v1')).toBe('sso-session-token');
+    expect(window.localStorage.getItem('polycost-auth-session-expires-at-v1')).toBe(
+      '2099-07-07T00:00:00.000Z',
+    );
+    expect(client.getCurrentSession).toHaveBeenCalledWith('sso-session-token');
+
+    unmount();
+  });
+
   it('imports provider billing exports and reconciles them after a comparison exists', async () => {
     window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
     const client = clientMock();
@@ -3705,7 +3739,7 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     })),
     completeMockOidcCallback: jest.fn(async () => ({
       token: 'sso-session-token',
-      expiresAt: '2026-07-07T00:00:00.000Z',
+      expiresAt: '2099-07-07T00:00:00.000Z',
       account: {
         id: '11111111-1111-4111-8111-111111111111',
         email: 'finops@example.com',

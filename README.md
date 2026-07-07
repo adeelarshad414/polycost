@@ -152,8 +152,8 @@ Accounts add workspace controls on top of that core flow:
   admins manage members, invitations, SSO provider configuration, and billing import
   workflows; members keep comparison and report access.
 - OIDC/SAML configuration readiness with redirect URI display, stored provider
-  metadata, mock connection testing, and a signed mock OIDC start/authorize/callback
-  flow for development verification.
+  metadata, mock connection testing, and a signed mock OIDC start/callback flow in
+  the workspace UI for development verification.
 
 The current self-hosted product does not yet include enterprise IdP login round-trips,
 email delivery infrastructure, org billing plans, or a hosted account marketplace. Those

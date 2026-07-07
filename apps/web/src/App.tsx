@@ -64,6 +64,7 @@ import {
   AccountSessionRecord,
   AuthMeResponse,
   SsoConfigurationStatus,
+  SsoStartResponse,
   TeamInvitationRecord,
   TeamInvitationPreview,
   TeamMemberRecord,
@@ -1911,6 +1912,8 @@ function WorkspaceControlCenter({
   const [ssoIssuerUrl, setSsoIssuerUrl] = useState('https://idp.example.com');
   const [ssoClientId, setSsoClientId] = useState('polycost-demo-client');
   const [ssoClientSecret, setSsoClientSecret] = useState('CHANGE_ME_DEV_ONLY');
+  const [ssoLoginEmail, setSsoLoginEmail] = useState('finops@example.com');
+  const [ssoStart, setSsoStart] = useState<SsoStartResponse | null>(null);
   const [provider, setProvider] = useState<ProviderId>('aws');
   const [billingPeriodStart, setBillingPeriodStart] = useState('2026-06-01');
   const [billingPeriodEnd, setBillingPeriodEnd] = useState('2026-06-30');
@@ -2483,6 +2486,59 @@ function WorkspaceControlCenter({
     }
   }
 
+  async function handleStartMockOidcLogin() {
+    if (!activeTeam) {
+      return;
+    }
+
+    setWorkspaceBusy('sso-start');
+    onError(null);
+
+    try {
+      const emailHint = ssoLoginEmail || session?.account.email;
+      const start = await client.startMockOidcLogin({
+        teamId: activeTeam.id,
+        ...(emailHint ? { email: emailHint } : {}),
+      });
+
+      setSsoStart(start);
+      onNotice('Mock OIDC authorization URL generated.');
+    } catch (ssoError) {
+      onError(formatApiError(ssoError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handleCompleteMockOidcCallback() {
+    if (!ssoStart) {
+      return;
+    }
+
+    setWorkspaceBusy('sso-complete');
+    onError(null);
+
+    try {
+      const emailHint = ssoLoginEmail || session?.account.email;
+      const displayNameHint = profileDisplayName || undefined;
+      const response = await client.completeMockOidcCallback({
+        state: ssoStart.state,
+        ...(emailHint ? { email: emailHint } : {}),
+        ...(displayNameHint ? { displayName: displayNameHint } : {}),
+      });
+
+      storeAuthSession(response.token, response.expiresAt);
+      setToken(response.token);
+      setSessionExpiredNotice(false);
+      setSsoStart(null);
+      onNotice('Mock OIDC callback verified and workspace session issued.');
+    } catch (ssoError) {
+      onError(formatApiError(ssoError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
   async function handleImportProviderExport(event: FormEvent) {
     event.preventDefault();
     if (!token) {
@@ -2943,8 +2999,45 @@ function WorkspaceControlCenter({
                 <small>
                   {invitations.filter((item) => item.status === 'pending').length} pending
                   invitations
+                  {ssoStatus?.callbackUrls.oidc
+                    ? ` · OIDC callback ${ssoStatus.callbackUrls.oidc}`
+                    : ''}
                 </small>
               </div>
+              <div className="workspace-inline-form">
+                <label className="workspace-field">
+                  <span>Mock OIDC email</span>
+                  <input
+                    value={ssoLoginEmail}
+                    onChange={(event) => setSsoLoginEmail(event.currentTarget.value)}
+                  />
+                </label>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  loading={workspaceBusy === 'sso-start'}
+                  loadingLabel="Starting..."
+                  onClick={() => void handleStartMockOidcLogin()}
+                >
+                  Start mock OIDC
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  loading={workspaceBusy === 'sso-complete'}
+                  loadingLabel="Completing..."
+                  disabled={!ssoStart}
+                  onClick={() => void handleCompleteMockOidcCallback()}
+                >
+                  Complete callback
+                </Button>
+              </div>
+              {ssoStart ? (
+                <p className="workspace-token-output">
+                  Mock authorization: {ssoStart.authorizationUrl} · callback {ssoStart.callbackUrl}{' '}
+                  · state expires {formatDateTime(ssoStart.expiresAt)}
+                </p>
+              ) : null}
               <form className="workspace-inline-form" onSubmit={handleConfigureSso}>
                 <label className="workspace-field">
                   <span>SSO provider</span>

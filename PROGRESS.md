@@ -64,6 +64,30 @@ say so explicitly rather than marking it done.
 | Phase 2.8V - Diagram LLM batch classification          | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8W - Security advisory ledger refresh          | Complete with known gaps (see notes) | 2026-07-06   |
 | Phase 2.8X - Workspace session expiry UX               | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8Y - Mock OIDC workspace UX                    | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8Y - Mock OIDC workspace UX
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+- Added workspace UI controls for the existing mock OIDC start/callback API path so
+  an owner/admin can generate a signed mock authorization URL, see callback/state
+  evidence, and complete the callback into a normal workspace session.
+- Reused the existing session storage path for callback-issued sessions so mock SSO
+  tokens carry the same expiry persistence and session reload behavior as local
+  login/register sessions.
+- Exposed the configured OIDC callback URL inside the SSO readiness summary so
+  self-hosted operators can verify redirect URI alignment from the app surface.
+- Verification evidence in this continuation:
+  - Focused App spec passed: 1 suite / 57 tests.
+  - `npm run test:production-readiness` passed: API 6 suites / 85 tests and web 2
+    suites / 82 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run format:check` passed after formatting the touched web file.
+- Known gaps carried forward: the SPA now verifies the mock OIDC round-trip through
+  existing API contracts, but production enterprise IdP onboarding, SCIM, hosted org
+  policy, and real customer IdP smoke testing remain future release-track work.
 
 ## Phase 2.8X - Workspace session expiry UX
 
