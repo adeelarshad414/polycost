@@ -325,7 +325,10 @@ function hardeningFiles(
   targetCloud: TerraformTargetCloud,
   facts: WorkloadFacts,
 ): TerraformBundleDraft['files'] {
-  const files: TerraformBundleDraft['files'] = [file('Makefile', validationMakefile())];
+  const files: TerraformBundleDraft['files'] = [
+    file('Makefile', validationMakefile()),
+    file('FRAMEWORK-ALIGNMENT.md', frameworkAlignmentReadme(targetCloud, facts)),
+  ];
 
   if (facts.generationProfile.policyPackIncluded) {
     files.push(
@@ -385,6 +388,75 @@ plugin "terraform" {
   preset  = "recommended"
 }
 `;
+}
+
+function frameworkAlignmentReadme(targetCloud: TerraformTargetCloud, facts: WorkloadFacts): string {
+  return `# Cloud Framework Alignment
+
+This bundle is generated for ${providerDisplayName(targetCloud)} and should be reviewed against the
+provider architecture framework plus Terraform platform standards before any production plan/apply.
+
+## Generation Profile
+
+- Runtime target: ${facts.generationProfile.runtimeTarget}
+- Network topology: ${facts.generationProfile.networkTopology}
+- Availability mode: ${facts.generationProfile.availabilityMode}
+- Environment: ${facts.environment}
+- Region: ${facts.region}
+
+## Universal Terraform Controls
+
+| Control | Bundle evidence | Required production review |
+| --- | --- | --- |
+| Version pinning | \`versions.tf\` pins Terraform and official provider constraints | Confirm provider major version against platform baseline |
+| Remote state | \`backend.tf.example\` uses provider-native encrypted remote state | Create state backend and locking before team use |
+| Input validation | \`variables.tf\` uses typed variables and validation blocks | Add organization-specific policy and naming validation |
+| Secrets handling | Sensitive variables have no committed runtime defaults | Source secrets from CI/Vault/cloud secret manager |
+| Policy as code | \`policies/terraform-plan.rego\`, \`.tflint.hcl\`, and \`Makefile\` are generated | Run plan JSON through policy gates in CI |
+| Module lifecycle | \`modules/\` documents extraction boundaries | Promote into versioned internal modules after review |
+
+## Architecture Framework Mapping
+
+| Framework area | Bundle evidence | Gap to close before production |
+| --- | --- | --- |
+| Operational excellence | Makefile, Terraform test skeleton, module boundary docs | Add runbooks, dashboards, alerts, release rollback playbooks |
+| Security | Private database networking, runtime identities, sensitive variables, policy pack | Attach least-privilege permissions, secrets manager, WAF/CDN rules, audit logging |
+| Reliability | Multi-AZ intent, private subnets/managed database HA where supported | Add DR runbooks, restore tests, active-active/multi-region modules when required |
+| Performance efficiency | Workload-size-driven VM defaults and review notes | Benchmark selected SKUs, autoscaling, cache/CDN, database sizing |
+| Cost optimization | Cost-allocation tags/labels and FinOps review notes | Add budgets, commitment strategy, lifecycle policies, right-sizing telemetry |
+| Sustainability | Right-sizing, lifecycle placeholders, managed service defaults | Add utilization targets and low-carbon/regional placement review where relevant |
+
+## Provider-Specific Review Notes
+
+${providerFrameworkNotes(targetCloud)}
+
+## Promotion Gate
+
+Production promotion requires:
+
+1. Platform owner approval of naming, identity, network, state, and module boundaries.
+2. \`make validate\`, \`terraform test\`, \`terraform plan\`, and policy checks passing in CI.
+3. Security review for public ingress, secrets, encryption, logging, WAF/CDN, and least privilege.
+4. Reliability review for backup, restore, failover, RTO/RPO, and region/zone placement.
+5. FinOps review for tags/labels, budgets, commitment model, and lifecycle policies.
+`;
+}
+
+function providerFrameworkNotes(targetCloud: TerraformTargetCloud): string {
+  switch (targetCloud) {
+    case 'aws':
+      return `- AWS Well-Architected: review all six pillars, especially IAM least privilege, private subnet placement, encrypted RDS/S3, and ALB/WAF/CDN edge decisions.
+- AWS Cloud Adoption Framework: validate business, people, governance, platform, security, and operations perspectives before promotion.
+- AWS Terraform: confirm S3/DynamoDB backend, account/region provider aliases, SCP/permission-boundary alignment, and tagging standards.`;
+    case 'azure':
+      return `- Azure Well-Architected: review reliability, security, cost, operational excellence, and performance efficiency pillars.
+- Azure Cloud Adoption Framework: validate landing-zone design areas including identity, management, connectivity, resource organization, governance, and security.
+- Azure Terraform: confirm AzureRM backend, subscription/tenant provider configuration, managed identity, private DNS, policy assignments, and naming standards.`;
+    case 'gcp':
+      return `- Google Cloud Architecture Framework: review operational excellence, security/privacy/compliance, reliability, cost optimization, performance optimization, and sustainability.
+- Google Cloud landing-zone foundations: validate project/folder structure, IAM, VPC/service networking, logging, organization policies, and billing labels.
+- Google Terraform: confirm GCS backend, service-account impersonation, provider aliases, private service access, labels, and policy validation.`;
+  }
 }
 
 function terraformStaticTest(targetCloud: TerraformTargetCloud, facts: WorkloadFacts): string {
@@ -761,6 +833,12 @@ variable "enable_load_balancer" {
   default     = ${facts.resourceSummary.loadBalancers > 0}
 }
 
+variable "enable_public_load_balancer" {
+  description = "Create an internet-facing load balancer when load balancing is requested."
+  type        = bool
+  default     = ${facts.generationProfile.networkTopology === 'public'}
+}
+
 variable "tags" {
   description = "Additional AWS tags."
   type        = map(string)
@@ -882,7 +960,7 @@ resource "aws_security_group" "app" {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.network_topology == "public" ? ["0.0.0.0/0"] : [var.vpc_cidr_block]
   }
 
   egress {
@@ -1028,10 +1106,10 @@ resource "aws_lb" "app" {
   count = var.enable_load_balancer ? 1 : 0
 
   name               = "\${local.name_prefix}-alb"
-  internal           = false
+  internal           = !var.enable_public_load_balancer
   load_balancer_type = "application"
   security_groups    = [aws_security_group.app.id]
-  subnets            = values(aws_subnet.public)[*].id
+  subnets            = var.enable_public_load_balancer ? values(aws_subnet.public)[*].id : values(aws_subnet.private)[*].id
 
   tags = {
     Name = "\${local.name_prefix}-alb"
@@ -1261,6 +1339,12 @@ variable "enable_load_balancer" {
   default     = ${facts.resourceSummary.loadBalancers > 0}
 }
 
+variable "enable_public_load_balancer" {
+  description = "Create a public Azure Load Balancer frontend when load balancing is requested."
+  type        = bool
+  default     = ${facts.generationProfile.networkTopology === 'public'}
+}
+
 variable "tags" {
   description = "Additional Azure tags."
   type        = map(string)
@@ -1338,7 +1422,7 @@ resource "azurerm_network_security_group" "app" {
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_range     = "443"
-    source_address_prefix      = "Internet"
+    source_address_prefix      = var.network_topology == "public" ? "Internet" : "VirtualNetwork"
     destination_address_prefix = "*"
   }
 }
@@ -1479,7 +1563,7 @@ resource "azurerm_postgresql_flexible_server" "main" {
 }
 
 resource "azurerm_public_ip" "load_balancer" {
-  count = var.enable_load_balancer ? 1 : 0
+  count = var.enable_load_balancer && var.enable_public_load_balancer ? 1 : 0
 
   name                = "\${local.name_prefix}-lb-pip"
   location            = azurerm_resource_group.main.location
@@ -1499,8 +1583,10 @@ resource "azurerm_lb" "app" {
   tags                = local.common_tags
 
   frontend_ip_configuration {
-    name                 = "public"
-    public_ip_address_id = azurerm_public_ip.load_balancer[0].id
+    name                          = var.enable_public_load_balancer ? "public" : "private"
+    public_ip_address_id          = var.enable_public_load_balancer ? azurerm_public_ip.load_balancer[0].id : null
+    subnet_id                     = var.enable_public_load_balancer ? null : azurerm_subnet.app.id
+    private_ip_address_allocation = var.enable_public_load_balancer ? null : "Dynamic"
   }
 }`;
 }
@@ -1709,6 +1795,12 @@ variable "enable_load_balancer" {
   default     = ${facts.resourceSummary.loadBalancers > 0}
 }
 
+variable "enable_public_load_balancer" {
+  description = "Reserve a public global address when load balancing is requested."
+  type        = bool
+  default     = ${facts.generationProfile.networkTopology === 'public'}
+}
+
 variable "labels" {
   description = "Additional GCP labels."
   type        = map(string)
@@ -1758,7 +1850,7 @@ resource "google_compute_firewall" "https" {
     ports    = ["443"]
   }
 
-  source_ranges = ["0.0.0.0/0"]
+  source_ranges = var.network_topology == "public" ? ["0.0.0.0/0"] : [var.vpc_cidr_block]
   target_tags   = ["https"]
 }
 
@@ -1885,7 +1977,7 @@ resource "google_sql_user" "app" {
 }
 
 resource "google_compute_global_address" "load_balancer" {
-  count = var.enable_load_balancer ? 1 : 0
+  count = var.enable_load_balancer && var.enable_public_load_balancer ? 1 : 0
 
   name = "\${local.name_prefix}-lb-ip"
 }`;
@@ -1915,7 +2007,7 @@ output "database_connection_name" {
 
 output "load_balancer_address" {
   description = "Reserved load-balancer address, when enabled."
-  value       = var.enable_load_balancer ? google_compute_global_address.load_balancer[0].address : null
+  value       = var.enable_load_balancer && var.enable_public_load_balancer ? google_compute_global_address.load_balancer[0].address : null
 }`;
 }
 
@@ -1925,6 +2017,7 @@ environment  = "${facts.environment}"
 aws_region   = "${facts.region}"
 network_topology = "${facts.generationProfile.networkTopology === 'public' ? 'public' : 'private'}"
 enable_public_compute_ip = ${facts.generationProfile.networkTopology === 'public'}
+enable_public_load_balancer = ${facts.generationProfile.networkTopology === 'public'}
 
 # database_password = "CHANGE_ME_DEV_ONLY_SUPPLIED_BY_SECRET_MANAGER"
 `;
@@ -1936,6 +2029,7 @@ environment  = "${facts.environment}"
 location     = "${facts.region}"
 network_topology = "${facts.generationProfile.networkTopology === 'public' ? 'public' : 'private'}"
 enable_public_compute_ip = ${facts.generationProfile.networkTopology === 'public'}
+enable_public_load_balancer = ${facts.generationProfile.networkTopology === 'public'}
 
 subscription_id = "CHANGE_ME_DEV_ONLY_AZURE_SUBSCRIPTION_ID"
 tenant_id       = "CHANGE_ME_DEV_ONLY_AZURE_TENANT_ID"
@@ -1952,6 +2046,7 @@ region       = "${facts.region}"
 zone         = "${facts.region}-a"
 network_topology = "${facts.generationProfile.networkTopology === 'public' ? 'public' : 'private'}"
 enable_public_compute_ip = ${facts.generationProfile.networkTopology === 'public'}
+enable_public_load_balancer = ${facts.generationProfile.networkTopology === 'public'}
 
 project_id = "CHANGE_ME_DEV_ONLY_GCP_PROJECT_ID"
 
@@ -2192,6 +2287,17 @@ function validateGeneratedFiles(
       status: files.some((file) => file.path === 'modules/README.md') ? 'passed' : 'warning',
       message: 'Generated bundle includes module boundary documentation for platform extraction.',
     },
+    {
+      id: 'framework-alignment-pack',
+      status: files.some((file) => file.path === 'FRAMEWORK-ALIGNMENT.md') ? 'passed' : 'warning',
+      message: 'Generated bundle includes CAF/WAF/Terraform framework alignment evidence.',
+    },
+    {
+      id: 'topology-aware-ingress',
+      status: hasTopologyAwareIngress(targetCloud, joined) ? 'passed' : 'warning',
+      message:
+        'Generated public ingress and load-balancer exposure follow the selected network topology.',
+    },
   ] satisfies TerraformGenerationValidation['checks'];
   const status = checks.some((check) => check.status === 'failed')
     ? 'failed'
@@ -2259,6 +2365,29 @@ function hasRuntimeIdentity(targetCloud: TerraformTargetCloud, content: string):
       return content.includes('identity {') && content.includes('type = "SystemAssigned"');
     case 'gcp':
       return content.includes('google_service_account') && content.includes('service_account {');
+  }
+}
+
+function hasTopologyAwareIngress(targetCloud: TerraformTargetCloud, content: string): boolean {
+  switch (targetCloud) {
+    case 'aws':
+      return (
+        content.includes('var.network_topology == "public" ? ["0.0.0.0/0"]') &&
+        content.includes('internal           = !var.enable_public_load_balancer') &&
+        content.includes('enable_public_load_balancer')
+      );
+    case 'azure':
+      return (
+        content.includes('var.network_topology == "public" ? "Internet" : "VirtualNetwork"') &&
+        content.includes('var.enable_public_load_balancer ? "public" : "private"') &&
+        content.includes('enable_public_load_balancer')
+      );
+    case 'gcp':
+      return (
+        content.includes('var.network_topology == "public" ? ["0.0.0.0/0"]') &&
+        content.includes('var.enable_load_balancer && var.enable_public_load_balancer') &&
+        content.includes('enable_public_load_balancer')
+      );
   }
 }
 

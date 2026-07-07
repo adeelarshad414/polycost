@@ -113,6 +113,8 @@ describe('TerraformGenerationService', () => {
     expect(file(result, 'main.tf')).toContain('storage_encrypted      = true');
     expect(file(result, 'backend.tf.example')).toContain('backend "s3"');
     expect(file(result, 'Makefile')).toContain('terraform validate');
+    expect(file(result, 'FRAMEWORK-ALIGNMENT.md')).toContain('Cloud Framework Alignment');
+    expect(file(result, 'FRAMEWORK-ALIGNMENT.md')).toContain('AWS Well-Architected');
     expect(file(result, '.tflint.hcl')).toContain('plugin "terraform"');
     expect(file(result, 'policies/terraform-plan.rego')).toContain('publicly accessible');
     expect(file(result, 'tests/static_validation.tftest.hcl')).toContain(
@@ -121,6 +123,7 @@ describe('TerraformGenerationService', () => {
     expect(file(result, 'modules/README.md')).toContain('Module Boundary Review');
     expect(file(result, 'variables.tf')).toContain('sensitive   = true');
     expect(file(result, 'variables.tf')).toContain('variable "network_topology"');
+    expect(file(result, 'variables.tf')).toContain('variable "enable_public_load_balancer"');
     expect(file(result, 'variables.tf')).toContain('variable "database_password"');
     expect(
       file(result, 'variables.tf')
@@ -134,6 +137,12 @@ describe('TerraformGenerationService', () => {
           terraformResource: 'aws_instance.app',
           confidence: 'direct',
         }),
+      ]),
+    );
+    expect(result.validation.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'framework-alignment-pack', status: 'passed' }),
+        expect.objectContaining({ id: 'topology-aware-ingress', status: 'passed' }),
       ]),
     );
   });
@@ -155,6 +164,10 @@ describe('TerraformGenerationService', () => {
     expect(file(result, 'main.tf')).toContain('identity {');
     expect(file(result, 'main.tf')).toContain('public_network_access_enabled = false');
     expect(file(result, 'main.tf')).toContain('private_dns_zone_id');
+    expect(file(result, 'main.tf')).toContain(
+      'var.network_topology == "public" ? "Internet" : "VirtualNetwork"',
+    );
+    expect(file(result, 'FRAMEWORK-ALIGNMENT.md')).toContain('Azure Cloud Adoption Framework');
     expect(file(result, 'backend.tf.example')).toContain('backend "azurerm"');
     expect(result.securityNotes.join(' ')).toContain('SSH public keys');
   });
@@ -174,9 +187,11 @@ describe('TerraformGenerationService', () => {
     expect(file(result, 'main.tf')).toContain('google_service_account');
     expect(file(result, 'main.tf')).toContain('google_service_networking_connection');
     expect(file(result, 'main.tf')).toContain('public_access_prevention    = "enforced"');
+    expect(file(result, 'main.tf')).toContain('var.network_topology == "public" ? ["0.0.0.0/0"]');
     expect(file(result, 'main.tf')).toContain('resource "google_sql_database_instance" "main"');
     expect(file(result, 'backend.tf.example')).toContain('backend "gcs"');
     expect(file(result, 'variables.tf')).toContain('"costcenter" = "finops"');
+    expect(file(result, 'FRAMEWORK-ALIGNMENT.md')).toContain('Google Cloud Architecture Framework');
   });
 
   it('surfaces explicit assumptions instead of overclaiming unsupported resources', () => {
