@@ -125,10 +125,10 @@ Known remaining gaps:
 
 - This proves the complete local/mock live-stack smoke path and fixes the auth-table
   runtime privilege gap, but GitHub-hosted CI for PR #24 still fails before repo code
-  executes: the `quality` job for run `28852975535` completed in two seconds with
-  zero steps, `runner_id: 0`, and no downloadable log. That remains an external
-  Actions runner/account provisioning blocker, not a local test failure; rerun CI
-  after the account/runner condition is cleared.
+  executes: the latest checked `quality` job completed in two seconds with zero
+  steps, `runner_id: 0`, and no downloadable log. That remains an external Actions
+  runner/account provisioning blocker, not a local test failure; rerun CI after the
+  account/runner condition is cleared.
 
 ## Phase 2.8AQ - Impeccable CI tracking guard
 
