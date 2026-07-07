@@ -1,0 +1,117 @@
+# PolyCost Production Readiness Report
+
+Date: 2026-07-07
+Branch: `codex/reconciliation-coverage-hardening`
+PR: #24, `Production readiness verification hardening`
+Run spec: `docs/design/master-production-readiness-orchestrator-v2.md`
+
+## Verdict
+
+PolyCost is stronger and locally release-checkable after this run, but not fully
+production-ready in the strict v2 sense until the blocked items below are cleared.
+The core OSS demo path remains `verified (mock)` where it depends on fixture-backed
+cloud, LLM, SSO, or billing inputs.
+
+## Findings And Disposition
+
+| ID             | Disposition   | Evidence                                                                                                                                                             |
+| -------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0-FMT-001     | Fixed         | `npm run check` initially failed on unformatted orchestrator docs; after formatting, `npm run format:check` and `npm run check` passed                               |
+| P0-DOC-001     | Fixed         | Orchestrator docs moved from `docs/orchestrators/*` to requested `docs/design/*`                                                                                     |
+| P0-SYNC-001    | Fixed         | `STATE-SYNC.md` created with product detection, CI state, phase classification, and gate register                                                                    |
+| P0-INV-001     | Fixed         | `THEME-INVENTORY.md` created with route/component inventory and P0 findings                                                                                          |
+| TKN-001        | Fixed         | Token hex values isolated to `apps/web/src/styles/tokens.css`; `npm run theme:hex:check` passed                                                                      |
+| TKN-002        | Fixed         | Added persisted `data-accent="default                                                                                                                                | terracotta"` axis, pre-hydration application, and Appearance control |
+| TKN-003        | Fixed         | Added `theme:hex:check` script and CI workflow gate                                                                                                                  |
+| API-HEALTH-001 | Fixed         | Added additive `/health/live`, `/api/v1/health/live`, `/health/ready`, and `/api/v1/health/ready` endpoints                                                          |
+| UI-ARCHIVE-001 | Fixed (smoke) | `docs/theme-audit/2026-07-07/` contains dark/light default screenshots and dark/light terracotta screenshots with token evidence                                     |
+| CI-REMOTE-001  | Blocked       | GitHub Actions job `85608851518` for prior head showed `runner_id: 0`, empty runner name/group, `steps: []`; remote runner/account infra is not executing repo steps |
+
+## Verification
+
+Local static/regression gates:
+
+- `npm run format:check` passed.
+- `npm run ci:lint` passed with zero ESLint warnings.
+- `npm run theme:hex:check` passed.
+- `npm run check` passed.
+  - API unit: 50 suites / 390 tests.
+  - Web unit: 9 suites / 130 tests.
+  - Graph validation: 290 nodes / 290 edges.
+  - Pricing coverage guard: 36 frontend priced families covered.
+  - Progress verification: 153 phase evidence anchors.
+  - Security suppression check: 21 reviewed suppressions.
+  - `impeccable` skipped by documented Node 20 vs Node 24 constraint.
+- `npm run test:production-readiness` passed.
+  - API focused: 9 suites / 125 tests.
+  - Web focused: 2 suites / 82 tests.
+- `npm run ci:build` passed for API and web.
+
+Full-stack evidence:
+
+- First isolated `npm run ci:e2e` attempt failed before tests during Docker web
+  image `npm ci` with npm `ECONNRESET`.
+- Retry built images and reached runtime verification:
+  - API E2E: 16/16 passed.
+  - The wrapper process later exited with SIGTERM after six of seven Playwright
+    tests printed; the stack remained healthy.
+  - Direct Playwright against the same stack passed 7/7.
+  - Direct `npm run live:verify` against the same stack passed:
+    - template-to-recommendation: `4201ms` / `60000ms`
+    - diagram-to-PDF: `3448ms` / `180000ms`
+    - workspace-auth/RBAC: `507ms` / `60000ms`
+    - Redis degradation: `/health=degraded`, `/health/deep=degraded`,
+      `/api/v1/data-health HTTP 200`
+- Transcript path: `.tmp/live-verification/latest-v2-prod-ready.json`.
+- Transcript secret scan found only benign labels and `stateVerified: true`.
+- Isolated Compose stack was cleaned with `docker compose down --remove-orphans --volumes`.
+
+## Screenshot Index
+
+See `docs/theme-audit/2026-07-07/README.md`.
+
+Captured screenshots:
+
+- `docs/theme-audit/2026-07-07/dark/home.png`
+- `docs/theme-audit/2026-07-07/light/home.png`
+- `docs/theme-audit/2026-07-07/dark-terracotta/home.png`
+- `docs/theme-audit/2026-07-07/light-terracotta/home.png`
+
+Machine-readable token evidence:
+
+- `docs/theme-audit/2026-07-07/evidence.json`
+
+## HUMAN_DECISION_GATE Register
+
+| Gate                           | Default Applied                                                 | Status                                                     |
+| ------------------------------ | --------------------------------------------------------------- | ---------------------------------------------------------- |
+| PolyCost brand hue             | Use v2 PolyCost violet as default accent                        | Needs owner sign-off before portfolio-wide standardization |
+| Terracotta axis                | Enabled as user-selectable accent                               | Implemented                                                |
+| Light sidebar pattern          | Neutral/dense data-tool pattern, not filled CPN sidebar         | Implemented by preserving existing shell anatomy           |
+| GitHub Actions runner/account  | Treat no-runner jobs as infra/billing blocker, not code failure | Blocked externally                                         |
+| Real cloud/LLM/SSO credentials | Keep fixture-backed paths marked `verified (mock)`              | Still applies                                              |
+
+## Blocked / Deferred
+
+- Hosted GitHub Actions still cannot prove branch CI while jobs fail before runner
+  allocation. A maintainer must fix Actions runner/account/billing/quota state or
+  rerun once the account can allocate runners.
+- Full invoice-grade pricing remains future scope: negotiated discounts, credits,
+  taxes, enterprise agreements, and actual provider invoice reconciliation are not
+  complete.
+- VSDX support remains extraction/evidence oriented, not full Visio visual rendering.
+- Production LLM classifier quality requires a real endpoint/model and corpus
+  evaluation.
+- Full enterprise auth product polish remains future scope: production email, SSO/SAML,
+  org billing UX, and complete team/account lifecycle polish.
+
+## Rollback
+
+Revert the final production-readiness commit from this branch, or selectively revert:
+
+- Frontend theme/accent files: `apps/web/src/theme.ts`,
+  `apps/web/src/components/ThemeSwitcher.tsx`, `apps/web/src/styles/tokens.css`,
+  `apps/web/src/styles.css`, `apps/web/src/main.tsx`, and `apps/web/index.html`.
+- Backend health aliases: `apps/api/src/health/*`.
+- Docs/artifacts: `STATE-SYNC.md`, `THEME-INVENTORY.md`,
+  `docs/theme-audit/2026-07-07/`, and this report.

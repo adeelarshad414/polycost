@@ -74,6 +74,13 @@ Generate reviewer screenshots and a short walkthrough video from the running dem
 npm run demo:artifacts
 ```
 
+Verify the clean-clone demo path with an isolated temporary clone and a
+10-minute startup budget:
+
+```bash
+npm run demo:verify-clean
+```
+
 Create a local environment file:
 
 ```bash
@@ -245,7 +252,11 @@ npm run check
 Start from `.env.example`. Important local settings include:
 
 - `API_PORT`
+- `API_HOST_PORT`
 - `WEB_PORT`
+- `POLYCOST_DEMO_COMMAND_TIMEOUT_MS`
+- `POLYCOST_E2E_COMMAND_TIMEOUT_MS`
+- `POLYCOST_E2E_DIAGNOSTICS_TIMEOUT_MS`
 - `VITE_API_BASE_URL`
 - `CORS_ALLOWED_ORIGINS`
 - `PRICING_SYNC_ALERT_WEBHOOK_URL`

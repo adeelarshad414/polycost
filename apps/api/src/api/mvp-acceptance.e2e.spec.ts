@@ -1,13 +1,32 @@
 /* eslint-disable security/detect-non-literal-fs-filename -- Reviewed 2026-07-06: E2E fixture reads are resolved under repository fixture roots; see docs/SECURITY-SUPPRESSIONS.md. */
+import { randomUUID } from 'node:crypto';
+import { env } from 'node:process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ComparisonResult } from '../comparison/comparison.types';
 import { DiagramParseResult } from '../diagram-parser/diagram-parser.types';
 import { NormalizedWorkloadSpec } from '../nws/nws.types';
+import {
+  AuthMeResponse,
+  AuthSessionResponse,
+  SsoCallbackResponse,
+  SsoStartResponse,
+  TeamInvitationPreview,
+  TeamInvitationRecord,
+  TeamMemberRecord,
+} from './auth.types';
+import { ComparisonPricingEvidenceResponse } from './comparison-application.service';
+import {
+  ShareLinkAnalyticsResponse,
+  SharedReportResponse,
+  ShareLinkResponse,
+  WorkloadRecord,
+} from './cost-management.types';
 import { RegionCatalogResponse } from './regions.types';
 
-const API_BASE_URL = 'http://localhost:3001/api/v1';
-const WEB_BASE_URL = 'http://localhost:3000';
+const API_ORIGIN = env.POLYCOST_API_ORIGIN ?? `http://localhost:${env.API_PORT ?? '3001'}`;
+const API_BASE_URL = env.POLYCOST_API_BASE_URL ?? `${API_ORIGIN}/api/v1`;
+const WEB_BASE_URL = env.POLYCOST_WEB_BASE_URL ?? `http://localhost:${env.WEB_PORT ?? '3000'}`;
 const DIAGRAM_FIXTURE_ROOT = resolve(__dirname, '../../../../fixtures/diagrams');
 
 interface ParsedNwsDraftResponse {
@@ -15,6 +34,8 @@ interface ParsedNwsDraftResponse {
   parserConfidence: 'high' | 'medium' | 'low';
   fieldsRequiringReview: string[];
 }
+
+jest.setTimeout(60_000);
 
 describe('MVP acceptance criteria E2E', () => {
   let structuredComparison: ComparisonResult;
@@ -119,6 +140,126 @@ describe('MVP acceptance criteria E2E', () => {
     expect(xlsx.byteLength).toBeGreaterThan(500);
   });
 
+  it('expands SKU evidence and opens a passworded public share report read-only', async () => {
+    const evidence = await requestJson<ComparisonPricingEvidenceResponse>(
+      `/comparisons/${structuredComparison.comparisonId}/evidence`,
+    );
+    const firstEvidenceRow = evidence.evidence[0];
+
+    expect(evidence.comparisonId).toBe(structuredComparison.comparisonId);
+    expect(evidence.providerCount).toBe(3);
+    expect(evidence.lineItemCount).toBeGreaterThanOrEqual(3);
+    expect(firstEvidenceRow).toEqual(
+      expect.objectContaining({
+        evidenceId: expect.any(String),
+        providerId: expect.stringMatching(/^(aws|azure|gcp)$/),
+        description: expect.any(String),
+        displayedAmounts: expect.objectContaining({
+          monthlyCostUsd: expect.any(Number),
+          providerTotals: expect.objectContaining({
+            monthly: expect.any(Number),
+            yearly: expect.any(Number),
+          }),
+        }),
+        rate: expect.objectContaining({
+          source: expect.any(String),
+          sourceRecordKey: expect.any(String),
+        }),
+        derivation: expect.objectContaining({
+          expression: expect.stringContaining('730'),
+          monthlyCostUsd: expect.any(Number),
+        }),
+        equivalence: expect.objectContaining({
+          confidence: expect.stringMatching(/^(direct|approximate|modeled)$/),
+        }),
+      }),
+    );
+    expect(
+      firstEvidenceRow?.sku.resolvedSkuId ??
+        firstEvidenceRow?.sku.sourceSkuId ??
+        firstEvidenceRow?.sku.rateSourceSkuId,
+    ).toEqual(expect.any(String));
+    expect(firstEvidenceRow?.rate.sourceEndpoint ?? firstEvidenceRow?.rate.sourceRecordId).toEqual(
+      expect.any(String),
+    );
+    expect(firstEvidenceRow?.derivation.monthlyCostUsd).toBeGreaterThan(0);
+    expect(firstEvidenceRow?.displayedAmounts.monthlyCostUsd).toBeGreaterThan(0);
+
+    const workload = await requestJson<WorkloadRecord>('/workloads', {
+      method: 'POST',
+      body: JSON.stringify({
+        instanceFamily: 'general-purpose',
+        vcpu: 4,
+        memoryGb: 16,
+        region: 'us-east',
+        instanceCount: 2,
+        hoursPerMonth: 730,
+        storageGb: 500,
+        storageTier: 'standard',
+        egressGbPerMonth: 1200,
+      }),
+    });
+    const password = `client-demo-${randomUUID()}`;
+    const share = await requestJson<ShareLinkResponse>('/share-links', {
+      method: 'POST',
+      body: JSON.stringify({
+        workloadId: workload.id,
+        watermark: true,
+        expiresInDays: 30,
+        pricingModel: 'reserved-3yr',
+        granularity: 'yearly',
+        password,
+      }),
+    });
+
+    expect(share.token).toEqual(expect.any(String));
+    expect(share.url).toContain(share.token);
+
+    const report = await requestJson<SharedReportResponse>(
+      `/share/${encodeURIComponent(share.token)}?password=${encodeURIComponent(
+        password,
+      )}&section=summary`,
+      {
+        headers: {
+          'user-agent': 'polycost-e2e',
+          'cf-ipcountry': 'US',
+        },
+      },
+    );
+
+    expect(report).toEqual(
+      expect.objectContaining({
+        token: share.token,
+        watermark: true,
+        pricingModel: 'reserved-3yr',
+        granularity: 'yearly',
+        passwordProtected: true,
+      }),
+    );
+    expect(report.workload.id).toBe(workload.id);
+    expect(report.breakdown.workloadId).toBe(workload.id);
+    expect(report.breakdown.providers.map((provider) => provider.provider).sort()).toEqual([
+      'aws',
+      'azure',
+      'gcp',
+    ]);
+
+    const analytics = await requestJson<ShareLinkAnalyticsResponse>(
+      `/share-links/${encodeURIComponent(share.token)}/analytics`,
+    );
+    expect(analytics.token).toBe(share.token);
+    expect(analytics.totalViews).toBeGreaterThanOrEqual(1);
+    expect(analytics.sectionViews.some((view) => view.section === 'summary')).toBe(true);
+
+    await requestJson<ShareLinkResponse>(`/share-links/${encodeURIComponent(share.token)}/revoke`, {
+      method: 'POST',
+    });
+    const revoked = await requestRaw(
+      `/share/${encodeURIComponent(share.token)}?password=${encodeURIComponent(password)}`,
+    );
+    expect(revoked.status).toBe(404);
+  });
+
   it('labels non-native equivalents when the requirement names an AWS-specific service', async () => {
     const comparison = await createComparison(
       buildStructuredWorkload('Phase 10 Aurora portability', 'Amazon Aurora PostgreSQL'),
@@ -185,8 +326,172 @@ describe('MVP acceptance criteria E2E', () => {
     expect(response.ok).toBe(false);
     expect([400, 422]).toContain(response.status);
 
-    const health = await requestJson<{ status: string }>('http://localhost:3001/health');
+    const health = await requestJson<{ status: string }>(`${API_ORIGIN}/health`);
     expect(health.status).toBe('ok');
+  });
+
+  it('runs signup, invite, role-change, mock SSO, and member RBAC denial end to end', async () => {
+    const suffix = randomUUID().slice(0, 8);
+    const ownerEmail = `owner-${suffix}@example.com`;
+    const memberEmail = `member-${suffix}@example.com`;
+    const password = 'correct horse battery staple';
+    const owner = await requestJson<AuthSessionResponse>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: ownerEmail,
+        password,
+        displayName: 'E2E Owner',
+        teamName: `PolyCost E2E ${suffix}`,
+      }),
+    });
+    const teamId = owner.team?.id;
+
+    expect(teamId).toEqual(expect.any(String));
+    expect(owner.team?.role).toBe('owner');
+
+    const ownerMe = await requestJson<AuthMeResponse>('/auth/me', {
+      headers: authHeaders(owner.token),
+    });
+    expect(ownerMe.activeTeam).toEqual(
+      expect.objectContaining({
+        id: teamId,
+        role: 'owner',
+      }),
+    );
+
+    const invitation = await requestJson<TeamInvitationRecord>(
+      `/auth/teams/${teamId}/invitations`,
+      {
+        method: 'POST',
+        headers: authHeaders(owner.token),
+        body: JSON.stringify({
+          email: memberEmail,
+          role: 'member',
+        }),
+      },
+    );
+
+    expect(invitation.status).toBe('pending');
+    expect(invitation.role).toBe('member');
+    expect(invitation.inviteToken).toEqual(expect.any(String));
+
+    const preview = await requestJson<TeamInvitationPreview>(
+      `/auth/invitations/preview/${encodeURIComponent(invitation.inviteToken!)}`,
+    );
+    expect(preview).toEqual(
+      expect.objectContaining({
+        status: 'pending',
+        email: memberEmail,
+        role: 'member',
+        teamId,
+      }),
+    );
+
+    const member = await requestJson<AuthSessionResponse>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: memberEmail,
+        password,
+        displayName: 'E2E Member',
+        teamName: `Member personal ${suffix}`,
+      }),
+    });
+    await requestJson<TeamInvitationRecord>('/auth/invitations/accept', {
+      method: 'POST',
+      headers: authHeaders(member.token),
+      body: JSON.stringify({
+        token: invitation.inviteToken,
+      }),
+    });
+
+    const membersAfterAccept = await requestJson<TeamMemberRecord[]>(
+      `/auth/teams/${teamId}/members`,
+      {
+        headers: authHeaders(owner.token),
+      },
+    );
+    const invitedMember = membersAfterAccept.find((candidate) => candidate.email === memberEmail);
+    expect(invitedMember).toEqual(
+      expect.objectContaining({
+        accountId: member.account.id,
+        role: 'member',
+      }),
+    );
+
+    const promoted = await requestJson<TeamMemberRecord>(
+      `/auth/teams/${teamId}/members/${member.account.id}`,
+      {
+        method: 'PATCH',
+        headers: authHeaders(owner.token),
+        body: JSON.stringify({ role: 'admin' }),
+      },
+    );
+    expect(promoted.role).toBe('admin');
+
+    const demoted = await requestJson<TeamMemberRecord>(
+      `/auth/teams/${teamId}/members/${member.account.id}`,
+      {
+        method: 'PATCH',
+        headers: authHeaders(owner.token),
+        body: JSON.stringify({ role: 'member' }),
+      },
+    );
+    expect(demoted.role).toBe('member');
+
+    await requestJson(`/auth/teams/${teamId}/sso/providers`, {
+      method: 'POST',
+      headers: authHeaders(owner.token),
+      body: JSON.stringify({
+        providerType: 'oidc',
+        displayName: 'PolyCost Mock OIDC',
+        issuerUrl: 'https://mock-idp.polycost.local',
+        clientId: 'polycost-e2e-client',
+      }),
+    });
+    const ssoStart = await requestJson<SsoStartResponse>('/auth/sso/oidc/start', {
+      method: 'POST',
+      body: JSON.stringify({
+        teamId,
+        email: memberEmail,
+      }),
+    });
+    const authorize = await requestJson<{ redirectUrl: string; state: string; email: string }>(
+      ssoStart.authorizationUrl,
+    );
+    expect(authorize.email).toBe(memberEmail);
+
+    const teamScopedMember = await requestJson<SsoCallbackResponse>(authorize.redirectUrl);
+    expect(teamScopedMember.team).toEqual(
+      expect.objectContaining({
+        id: teamId,
+        role: 'member',
+      }),
+    );
+    expect(teamScopedMember.sso.stateVerified).toBe(true);
+
+    const forbidden = await requestRaw('/billing/imports/provider-export', {
+      method: 'POST',
+      headers: authHeaders(teamScopedMember.token),
+      body: JSON.stringify({
+        provider: 'aws',
+        sourceType: 'aws-cur',
+        billingPeriodStart: '2026-07-01',
+        billingPeriodEnd: '2026-07-31',
+        content:
+          'lineItem/ProductCode,lineItem/UsageStartDate,lineItem/UnblendedCost\nAmazonEC2,2026-07-01T00:00:00Z,12.34\n',
+        encoding: 'text',
+        fileName: 'aws-cur-e2e.csv',
+      }),
+    });
+    const error = await forbidden.json();
+
+    expect(forbidden.status).toBe(403);
+    expect(error).toEqual({
+      error: {
+        code: 'FORBIDDEN',
+        message: expect.stringContaining('Team admin access is required'),
+      },
+    });
   });
 });
 
@@ -195,7 +500,7 @@ async function expectApiHealth(): Promise<void> {
     status: string;
     service: string;
     dependencies?: unknown;
-  }>('http://localhost:3001/health');
+  }>(`${API_ORIGIN}/health`);
 
   expect(health).toMatchObject({
     status: 'ok',
@@ -292,8 +597,32 @@ async function request(pathOrUrl: string, init?: RequestInit): Promise<Response>
   return response;
 }
 
+async function requestRaw(pathOrUrl: string, init?: RequestInit): Promise<Response> {
+  const headers =
+    init?.body === undefined
+      ? init?.headers
+      : {
+          'content-type': 'application/json',
+          ...(init.headers ?? {}),
+        };
+
+  return fetch(toUrl(pathOrUrl), {
+    ...init,
+    headers,
+  });
+}
+
 function toUrl(pathOrUrl: string): string {
   if (pathOrUrl.startsWith('http')) {
+    const url = new URL(pathOrUrl);
+
+    if (url.pathname.startsWith('/api/v1/')) {
+      const origin = new URL(API_ORIGIN);
+      url.protocol = origin.protocol;
+      url.host = origin.host;
+      return url.toString();
+    }
+
     return pathOrUrl;
   }
 
@@ -318,6 +647,12 @@ function expectProviderComparison(result: ComparisonResult): void {
     expect(provider.totals.quarterly).toBeGreaterThan(0);
     expect(provider.totals.yearly).toBeGreaterThan(0);
   });
+}
+
+function authHeaders(token: string): HeadersInit {
+  return {
+    authorization: `Bearer ${token}`,
+  };
 }
 
 function buildStructuredWorkload(

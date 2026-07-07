@@ -382,6 +382,18 @@ function classificationEvidence(reason: string, node: ExtractedDiagramNode): str
           .filter((value): value is string => Boolean(value))
           .join(' ')
       : undefined,
+    node.bounds
+      ? `Visio bounds x=${node.bounds.x} y=${node.bounds.y} w=${node.bounds.width} h=${node.bounds.height}`
+      : undefined,
+    visual.fillColor || visual.lineColor
+      ? [
+          'Visio style',
+          visual.fillColor ? `fill ${visual.fillColor}` : undefined,
+          visual.lineColor ? `line ${visual.lineColor}` : undefined,
+        ]
+          .filter((value): value is string => Boolean(value))
+          .join(' ')
+      : undefined,
   ].filter((value): value is string => Boolean(value));
 
   return visualEvidence.length > 0 ? `${reason}; ${visualEvidence.join('; ')}` : reason;

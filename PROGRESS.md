@@ -21,61 +21,947 @@ say so explicitly rather than marking it done.
 
 ## Phase status overview
 
-| Phase                                                  | Status                               | Last updated |
-| ------------------------------------------------------ | ------------------------------------ | ------------ |
-| 0 - Build plan & approval                              | Complete                             | 2026-06-28   |
-| 1 - Repo scaffold                                      | Complete                             | 2026-06-28   |
-| 2 - Data layer (Postgres schema, NWS types, validator) | Complete                             | 2026-06-28   |
-| 3 - Cloud provider adapters                            | Complete                             | 2026-06-28   |
-| 4 - Pricing ETL job                                    | Complete                             | 2026-06-28   |
-| 5 - NWS Parser Module                                  | Complete                             | 2026-06-28   |
-| 6 - Comparison Engine                                  | Complete                             | 2026-06-29   |
-| 7 - Report Module                                      | Complete                             | 2026-06-29   |
-| 8 - API layer                                          | Complete                             | 2026-06-29   |
-| 9 - Frontend                                           | Complete                             | 2026-06-29   |
-| 10 - E2E verification against MVP acceptance criteria  | Complete                             | 2026-07-01   |
-| Post-Phase 10 report export evidence polish            | Complete                             | 2026-07-01   |
-| Post-Phase 10 Playwright browser journey coverage      | Complete                             | 2026-07-01   |
-| AI-native Phase 1 reimagining pass                     | Complete with known gaps (see notes) | 2026-07-01   |
-| Phase 2 - Diagram-to-cost intelligence                 | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.7 - Invoice/auth/VSDX gap closure              | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8 - Gap-closure production readiness           | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8A - Auth product UX continuation              | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8B - Invite/SSO auth hardening                 | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8C - Diagram partial-parse hardening           | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8D - Security suppression cleanup              | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8E - UI-priced service coverage guard          | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8F - SKU evidence derivation hardening         | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8G - Catalog lineage readback hardening        | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8H - Pricing honesty UI labeling               | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8I - AWS ETL network SKU hardening             | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8J - Diagram LLM fallback diagnostics          | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8K - Auth RBAC UI enforcement polish           | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8L - Release hygiene evidence polish           | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8M - Session policy documentation              | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8N - API RBAC matrix hardening                 | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8O - Production-readiness CI gate              | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8P - Queryable comparison pricing evidence     | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8Q - Visible pricing evidence UI wiring        | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8R - Refresh-live evidence regression          | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8S - Reconciliation coverage hardening         | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8T - VSDX review evidence context              | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8U - Diagram LLM cost guard                    | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8V - Diagram LLM batch classification          | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8W - Security advisory ledger refresh          | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8X - Workspace session expiry UX               | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8Y - Mock OIDC workspace UX                    | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8Z - Diagram fixture corpus tier table         | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AA - UI-priced SKU evidence guard             | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AB - GCP pricing credential fallback          | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AC - VSDX page/container evidence             | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AD - Auth controller guard coverage           | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AE - Release readiness automation             | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AF - Billing reconciliation RBAC hardening    | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AG - UI priced-family coverage drift guard    | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AH - Diagram export evidence hardening        | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AI - Security suppression hygiene gate        | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AJ - Auth endpoint rate-limit hardening       | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase                                                   | Status                               | Last updated |
+| ------------------------------------------------------- | ------------------------------------ | ------------ |
+| 0 - Build plan & approval                               | Complete                             | 2026-06-28   |
+| 1 - Repo scaffold                                       | Complete                             | 2026-06-28   |
+| 2 - Data layer (Postgres schema, NWS types, validator)  | Complete                             | 2026-06-28   |
+| 3 - Cloud provider adapters                             | Complete                             | 2026-06-28   |
+| 4 - Pricing ETL job                                     | Complete                             | 2026-06-28   |
+| 5 - NWS Parser Module                                   | Complete                             | 2026-06-28   |
+| 6 - Comparison Engine                                   | Complete                             | 2026-06-29   |
+| 7 - Report Module                                       | Complete                             | 2026-06-29   |
+| 8 - API layer                                           | Complete                             | 2026-06-29   |
+| 9 - Frontend                                            | Complete                             | 2026-06-29   |
+| 10 - E2E verification against MVP acceptance criteria   | Complete                             | 2026-07-01   |
+| Post-Phase 10 report export evidence polish             | Complete                             | 2026-07-01   |
+| Post-Phase 10 Playwright browser journey coverage       | Complete                             | 2026-07-01   |
+| AI-native Phase 1 reimagining pass                      | Complete with known gaps (see notes) | 2026-07-01   |
+| Phase 2 - Diagram-to-cost intelligence                  | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.7 - Invoice/auth/VSDX gap closure               | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8 - Gap-closure production readiness            | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8A - Auth product UX continuation               | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8B - Invite/SSO auth hardening                  | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8C - Diagram partial-parse hardening            | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8D - Security suppression cleanup               | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8E - UI-priced service coverage guard           | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8F - SKU evidence derivation hardening          | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8G - Catalog lineage readback hardening         | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8H - Pricing honesty UI labeling                | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8I - AWS ETL network SKU hardening              | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8J - Diagram LLM fallback diagnostics           | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8K - Auth RBAC UI enforcement polish            | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8L - Release hygiene evidence polish            | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8M - Session policy documentation               | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8N - API RBAC matrix hardening                  | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8O - Production-readiness CI gate               | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8P - Queryable comparison pricing evidence      | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8Q - Visible pricing evidence UI wiring         | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8R - Refresh-live evidence regression           | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8S - Reconciliation coverage hardening          | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8T - VSDX review evidence context               | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8U - Diagram LLM cost guard                     | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8V - Diagram LLM batch classification           | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8W - Security advisory ledger refresh           | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8X - Workspace session expiry UX                | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8Y - Mock OIDC workspace UX                     | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8Z - Diagram fixture corpus tier table          | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AA - UI-priced SKU evidence guard              | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AB - GCP pricing credential fallback           | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AC - VSDX page/container evidence              | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AD - Auth controller guard coverage            | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AE - Release readiness automation              | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AF - Billing reconciliation RBAC hardening     | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AG - UI priced-family coverage drift guard     | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AH - Diagram export evidence hardening         | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AI - Security suppression hygiene gate         | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AJ - Auth endpoint rate-limit hardening        | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AK - Pricing reconciliation breadth guard      | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AL - Auth team UX state hardening              | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AM - VSDX visual evidence polish               | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AN - Local credential readiness gate           | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AO - Production-readiness suite drift guard    | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AP - Security ledger coverage enforcement      | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AQ - Impeccable CI tracking guard              | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AR - End-to-end smoke proof hardening          | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AS - Full progress verification gate           | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AT - Live timed journey and Redis verification | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AU - Clean-clone demo verifier                 | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AV - Verification timeout hardening            | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AW - Pricing logic coverage gate               | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AX - Locked breakpoint UI proof                | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AY - FinOps manual proof gate                  | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AZ - Provider credential matrix hardening      | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8BA - PR-facing verification ledger             | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8BB - Live verification transcript artifact     | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8BC - Anonymous full-smoke transcript           | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8BD - Workspace auth live transcript            | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8BE - Isolated live runtime verification        | Complete with known gaps (see notes) | 2026-07-07   |
+| Production readiness orchestrator v2 pass               | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Production readiness orchestrator v2 pass
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Moved the production-readiness orchestrator documents into the requested
+  `docs/design/*` entrypoint path.
+- Added `STATE-SYNC.md` and `THEME-INVENTORY.md` for the v2 continuation protocol.
+- Split frontend tokens into `apps/web/src/styles/tokens.css`, added the PolyCost
+  violet default accent, added the terracotta accent axis, and wired the existing
+  Appearance control to persist both Mode and Accent before hydration.
+- Added `npm run theme:hex:check` and the matching CI gate so raw hex values in
+  frontend source are blocked outside the dedicated token file.
+- Added additive `/health/live`, `/api/v1/health/live`, `/health/ready`, and
+  `/api/v1/health/ready` endpoints while preserving existing `/health` and
+  `/health/deep` behavior.
+- Captured the dual-mode/default-accent and dual-mode/terracotta smoke archive in
+  `docs/theme-audit/2026-07-07/`.
+- Added `PRODUCTION-READINESS-REPORT.md`.
+
+Runtime evidence:
+
+- Theme archive token checks:
+  - dark/default: `--brand-500=#a879f0`, `--surface-canvas=#0b0e14`
+  - light/default: `--brand-500=#7c4fd0`, `--surface-canvas=#f5f4ef`
+  - dark/terracotta: `--brand-500=#d97757`, `--surface-canvas=#0b0e14`
+  - light/terracotta: `--brand-500=#d97757`, `--surface-canvas=#f5f4ef`
+- Isolated full-stack retry on `WEB_PORT=3230`, `API_HOST_PORT=3231`,
+  `VAULT_HOST_PORT=8340`:
+  - API E2E passed `16/16`.
+  - Direct web Playwright passed `7/7`.
+  - Direct `live:verify` passed with template-to-recommendation `4201ms`,
+    diagram-to-PDF `3448ms`, workspace auth/RBAC `507ms`, and Redis degradation
+    `/health=degraded`, `/health/deep=degraded`, data-health HTTP `200`.
+- Transcript `.tmp/live-verification/latest-v2-prod-ready.json` was scanned for
+  secret-like fields; only benign labels and `stateVerified: true` were present.
+
+Verification:
+
+- `npm run format:check`
+- `npm run ci:lint`
+- `npm run theme:hex:check`
+- `npm run check`
+- `npm run test:production-readiness`
+- `npm run ci:build`
+- API E2E directly through the isolated `ci:e2e` retry: `16/16`
+- `env POLYCOST_WEB_BASE_URL=http://127.0.0.1:3230 npm run test:e2e --workspace @polycost/web`
+- `npm run live:verify` against the isolated Compose stack
+
+Known remaining gaps:
+
+- Hosted GitHub Actions remains externally blocked before repository steps execute
+  (`runner_id: 0`, empty runner name/group, `steps: []` on the latest inspected
+  jobs).
+- The first isolated `ci:e2e` attempt failed before tests during Docker web image
+  `npm ci` with npm `ECONNRESET`; retry progressed through stack startup. The wrapper
+  later exited with SIGTERM after API E2E and partial Playwright output, so the same
+  healthy stack was verified directly with Playwright `7/7` and `live:verify`.
+- Full invoice-grade billing, full Visio visual rendering, production LLM corpus
+  quality, production email/SSO/SAML, and complete enterprise account/team UX remain
+  future phases.
+
+## Phase 2.8BE - Isolated live runtime verification
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Ran the documented demo boot path against an isolated local Compose project
+  (`COMPOSE_PROJECT_NAME=polycost_live_verify`) on non-default ports:
+  `WEB_PORT=3200`, `API_HOST_PORT=3201`, and `VAULT_HOST_PORT=8320`.
+- The first boot attempt found a real release-readiness hazard: host Vault port
+  `8200` can already be allocated. Retrying with `VAULT_HOST_PORT=8320` proved the
+  existing port-override path works; `scripts/clean-clone-demo-check.mjs` already
+  defaults its clean-clone verifier to isolated Vault port `18210`.
+- Fixed `scripts/live-verification.mjs` to match the actual production UI flow:
+  compare from the Web App Tier template first, expand the full breakdown, then
+  select `Reserved 3yr` before export/what-if/share actions.
+- Hardened live verification for isolated host-port runs by accepting Nest's `201`
+  responses for successful POST creates and rewriting internal `/api/v1/...` URLs
+  returned by the API to the configured `POLYCOST_API_ORIGIN`. This lets mock OIDC
+  start/authorize/callback work when the API container listens on `3001` internally
+  but is exposed on another host port.
+- Applied the same internal `/api/v1/...` URL normalization to
+  `apps/api/src/api/mvp-acceptance.e2e.spec.ts` after isolated `ci:e2e` proved the
+  API E2E mock OIDC round trip had the same host-port assumption.
+- Captured a passing live transcript at `.tmp/live-verification/latest-local-3200.json`.
+
+Runtime evidence:
+
+- `npm run demo:up` on isolated ports reported the web app ready at
+  `http://127.0.0.1:3200/`, API health ready at `http://127.0.0.1:3201/health`,
+  and the web-origin API proxy returning JSON at
+  `http://127.0.0.1:3200/api/v1/data-health`.
+- `npm run live:verify` passed against that stack:
+  template-to-recommendation `8547ms` / `60000ms`, diagram-to-PDF `2924ms` /
+  `180000ms`, workspace-auth-rbac-sso `720ms` / `60000ms`, and Redis degradation
+  `/health=degraded`, `/health/deep=degraded`, `/api/v1/data-health HTTP 200`.
+- Isolated `npm run ci:e2e` also passed on `WEB_PORT=3210`, `API_HOST_PORT=3211`,
+  and `VAULT_HOST_PORT=8330`: API E2E `16/16`, web Playwright `7/7`, then
+  live verification template-to-recommendation `5542ms`, diagram-to-PDF `3111ms`,
+  workspace-auth-rbac-sso `794ms`, and Redis degradation data-health HTTP `200`.
+- Transcript redaction check found no bearer tokens, invite tokens, invite URLs,
+  OIDC state, passwords, or client secrets. The only token-like field left is the
+  intentionally redacted share `tokenPrefix`.
+
+Verification:
+
+- `node --check scripts/live-verification.mjs`
+- `npm run live:verify` against the isolated Compose stack
+- `npm run ci:e2e` against the isolated Compose stack
+
+Known remaining gaps:
+
+- Hosted GitHub Actions still cannot prove this path remotely because the `quality`
+  job fails before runner assignment (`runner_id: 0`, empty runner name/group,
+  `steps: []`). Local runtime evidence is now stronger, but hosted CI remains an
+  external account/runner blocker.
+
+## Phase 2.8BD - Workspace auth live transcript
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Extended `scripts/live-verification.mjs` with a running-stack authenticated smoke
+  path named `workspace-auth-rbac-sso`.
+- The new transcript journey covers owner signup, team/session hydration, session
+  listing, invitation creation, invitation preview, invited member registration,
+  invitation acceptance, owner-driven role promote/demote, mock OIDC provider
+  configuration, mock OIDC start/authorize/callback, structured member RBAC `403`
+  for billing import, and server-side revoke-other-sessions.
+- Transcript output records only non-secret evidence such as team ID, roles, step
+  timings, RBAC status/code, and SSO `stateVerified`; bearer tokens, invite tokens,
+  and raw OIDC state are deliberately not written.
+- Extended `npm run progress:verify` and `npm run release:check` with anchors for
+  the auth live-smoke markers so this evidence cannot be silently removed.
+- Updated `docs/verification/full-progress-ledger.md` so Phase F now points to both
+  regression-test evidence and the authenticated live transcript.
+- Stabilized the existing broad web form-edit/refresh/export unit workflow with an
+  explicit 10-second timeout after full-suite execution showed it can run just over
+  Jest's default 5-second budget under load; assertions and coverage are unchanged.
+
+Verification:
+
+- `node --check scripts/live-verification.mjs`
+- `npm run progress:verify`
+- `npm run release:check`
+- `npm run test:unit --workspace @polycost/web -- --runInBand`
+- `npm run test:production-readiness`
+- `npm run check`
+
+Known remaining gaps:
+
+- This promotes authenticated workspace/RBAC/SSO proof into the live transcript. It
+  does not turn the product into a complete enterprise IAM suite: production email,
+  real OIDC/SAML handshakes, SSO administration depth, and full account/team UX
+  remain future phases.
+
+## Phase 2.8BC - Anonymous full-smoke transcript
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Extended `scripts/live-verification.mjs` so the template-to-recommendation journey
+  now covers the full anonymous smoke path required by the goal: reserved-pricing
+  selection, comparison, PDF/CSV/Excel exports, expanded details, cached region/scale
+  what-if, share-link creation, and horizontal-overflow validation.
+- The live transcript now records export filenames, the selected `reserved-3yr`
+  pricing model, what-if evidence, and a redacted share-token prefix.
+- Kept the separate diagram-to-PDF journey intact for diagram upload -> parse review
+  -> comparison -> PDF evidence.
+- Extended `npm run progress:verify` and `npm run release:check` with anchors for
+  reserved-pricing selection, CSV/Excel export, what-if, and share-link smoke steps.
+- Updated `docs/verification/full-progress-ledger.md` so release reviewers can see
+  the anonymous smoke path coverage in the PR-facing ledger.
+
+Verification:
+
+- `npm run progress:verify` requires the full anonymous smoke path anchors.
+- `npm run release:check` requires the full anonymous smoke path anchors.
+
+Known remaining gaps:
+
+- This strengthens the anonymous live-smoke transcript. Authenticated workspace flows
+  remain covered by API/UI regression tests and can be promoted to live-browser smoke
+  in a later slice once hosted CI runners are available.
+
+## Phase 2.8BB - Live verification transcript artifact
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Extended `scripts/live-verification.mjs` so `npm run live:verify` writes a
+  persistent JSON transcript at `.tmp/live-verification/latest.json` by default.
+- Added `POLYCOST_LIVE_VERIFY_TRANSCRIPT_PATH` for CI or release reviewers to
+  redirect the transcript artifact without changing code.
+- The transcript records schema version, origins, thresholds, browser channel,
+  template-to-recommendation steps/duration, diagram-to-PDF steps/duration/download
+  filename, Redis-degradation events/status, and failure details if the run fails.
+- Extended `npm run progress:verify` and `npm run release:check` so live transcript
+  support cannot be silently removed.
+- Updated `docs/verification/full-progress-ledger.md` to point reviewers at the
+  transcript artifact path.
+
+Verification:
+
+- `npm run progress:verify` requires the live transcript schema/path/journey anchors.
+- `npm run release:check` requires the live transcript schema/path/journey anchors.
+
+Known remaining gaps:
+
+- This preserves live-run evidence when the live verifier is executed. It does not
+  remove the external GitHub Actions runner/account blocker currently preventing
+  hosted CI from producing its own transcript artifact.
+
+## Phase 2.8BA - PR-facing verification ledger
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added `docs/verification/full-progress-ledger.md` as the concise phase-by-phase
+  ledger for release/PR review, separate from this chronological build journal.
+- The ledger classifies Phase A through Phase G with evidence pointers and keeps
+  `verified`, `verified (mock)`, `deferred`, and `blocked` distinct.
+- Captured the current honest deferred items in one place: invoice-grade billing,
+  full Visio/VSDX visual rendering, production LLM corpus evaluation, enterprise
+  account/team/SSO polish, and the Node 24 `impeccable` follow-up.
+- Captured the external GitHub Actions blocker with the observed `runner_id: 0` /
+  empty-steps signature.
+- Extended `npm run progress:verify` and `npm run release:check` so this ledger and
+  its Phase A-G/deferred/blocked anchors cannot be silently removed.
+
+Verification:
+
+- `npm run progress:verify` now requires the PR-facing ledger anchors.
+- `npm run release:check` now requires the PR-facing ledger file and key release
+  verdict phrases.
+
+Known remaining gaps:
+
+- This closes the stale-PR-body/process evidence gap by adding a current checked-in
+  ledger artifact. It does not remove the external GitHub Actions runner/account
+  blocker and does not convert deferred future-product scope into completed scope.
+
+## Phase 2.8AZ - Provider credential matrix hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Hardened `docs/PROVIDER-CREDENTIALS.md` with a release-grade credential matrix
+  covering AWS public catalog, Azure public catalog, GCP Cloud Billing Catalog, and
+  the optional diagram/NL LLM classifier.
+- Made the current AWS and Azure credential scope explicit: neither adapter reads
+  provider secrets today; Azure's current app registration scope is `none` because
+  the Retail Prices API path is unauthenticated.
+- Clarified the exact GCP Vault path (`secret/polycost/providers/gcp`), accepted
+  keys (`access_token`, `service_account_json`, legacy
+  `service_account_key_json`), strict validation command, and the rule that provider
+  tokens/JSON, OIDC client secrets, and LLM API keys must not be stored in `.env`.
+- Extended `npm run release:check` so the credential matrix, Azure no-scope
+  statement, GCP Vault path, strict validation command, and diagram LLM Vault path
+  remain required release evidence.
+
+Verification:
+
+- `npm run release:check` passes with the new provider-credential evidence anchors.
+
+Known remaining gaps:
+
+- This closes a documentation precision gap for production swaps from mock to real
+  catalog providers. It does not add invoice-grade billing exports, private
+  contract pricing, taxes, or actual billed-usage ingestion.
+- Hosted GitHub Actions still fails before repository steps run because no runner is
+  assigned (`runner_id: 0`, empty `steps` array).
+
+## Phase 2.8AY - FinOps manual proof gate
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added `apps/api/src/api/finops-proof.spec.ts` as a focused executable proof for
+  the FinOps math called out in the full-verification DoD.
+- The spec verifies the shared `730` hour constant through the production interval
+  helper, the independent manual 80TB egress tier total, commitment break-even math,
+  distinct reserved 1-year vs 3-year recurring rates/break-even months, and spot
+  estimate volatility/approximation flags.
+- Wired the proof spec into `npm run test:production-readiness` and the
+  progress/release readiness gates.
+
+Verification:
+
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/api/finops-proof.spec.ts`
+  passes: `1 suite / 4 tests`.
+- Manual-vs-app FinOps values now proven by the focused spec:
+  - 730-hour month: hourly `$2` -> monthly `$1460`, quarterly `$4380`, yearly
+    `$17520`.
+  - 80TB egress: `10240*0.09 + 40960*0.085 + 30720*0.07 = $6553.60/mo`, matching
+    `calculateEgressCost`.
+  - Reserved 1-year break-even: `ceil(600 / (1000 - 850)) = 4` months.
+  - Reserved 3-year break-even: `ceil(2400 / (1000 - 700)) = 8` months.
+  - Reserved 1-year and 3-year recurring rates differ; spot remains estimated and
+    volatile in the comparison evidence fixture.
+
+Known remaining gaps:
+
+- This strengthens the FinOps math DoD with executable proof. It does not change the
+  product's honest catalog-list-price scope into invoice-grade billing, private
+  discounts, taxes, or actual account spend reconciliation.
+- Hosted GitHub Actions still fails before repository steps run because no runner is
+  assigned (`runner_id: 0`, empty `steps` array).
+
+## Phase 2.8AX - Locked breakpoint UI proof
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added a Playwright browser regression for the primary comparison workflow at the
+  locked UI verification breakpoints: `375px`, `768px`, and `1440px`.
+- The regression verifies the guided-form default state, comparison execution,
+  executive summary visibility, quick actions visibility, page-level horizontal
+  overflow, and accessible names for visible interactive controls at every
+  breakpoint.
+- Extended the Playwright mock helper to cover background data-health, analytics, and
+  pricing-evidence calls so the breakpoint proof can run against a local Vite server
+  without requiring a live API process.
+- Extended progress and release-readiness gates so the locked-breakpoint proof cannot
+  be silently removed.
+
+Verification:
+
+- `npm run lint --workspace @polycost/web` passes.
+- `npm run typecheck --workspace @polycost/web` passes.
+- `npm run format:check` passes.
+- Focused Playwright run passes against local Vite:
+  `npx playwright test --config apps/web/playwright.config.ts -g "keeps the primary comparison workflow accessible across locked breakpoints"`.
+
+Known remaining gaps:
+
+- This strengthens the UI/UX DoD evidence for the primary comparison workflow across
+  the locked viewport widths. It is not a complete WCAG audit of every possible
+  screen state; the broader browser suite and unit tests still cover theme,
+  keyboard-only comparison, loading states, exports, and diagram upload.
+- Hosted GitHub Actions still fails before repository steps run because no runner is
+  assigned (`runner_id: 0`, empty `steps` array).
+
+## Phase 2.8AW - Pricing logic coverage gate
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added `npm run pricing:logic:coverage`, backed by
+  `scripts/pricing-logic-coverage-check.mjs`, to compute coverage directly from
+  `coverage/api/coverage-final.json` for pricing-specific files only:
+  `cost-time`, provider adapters, comparison engine, pricing ETL, pricing models,
+  and pricing normalization.
+- Wired the pricing-logic coverage gate into `npm run ci:unit` after
+  `npm run test:coverage`, so the CI unit lane proves both global coverage and the
+  pricing-specific DoD.
+- Extended progress and release-readiness checks so the coverage gate cannot be
+  silently removed from the unit CI path.
+- Updated `RELEASE-CHECKLIST.md` so human release verification runs `npm run ci:unit`
+  or explicitly runs `npm run pricing:logic:coverage` after manual coverage.
+
+Verification:
+
+- `npm run test:coverage` passes:
+  - API coverage: `49 suites / 385 tests`, global lines `87.02%`, statements
+    `87.22%`, functions `92.75%`, branches `71.10%`.
+  - Web coverage: `9 suites / 128 tests`, global lines `83.39%`, statements
+    `83.44%`, functions `81.12%`, branches `75.42%`.
+- `npm run pricing:logic:coverage` passes across `33` pricing files:
+  - statements: `2358/2648` (`89.05%`).
+  - functions: `551/578` (`95.33%`).
+  - lines: `2293/2576` (`89.01%`).
+  - branches: `2072/2691` (`77.00%`) against the explicit `75.00%` branch floor.
+- `npm run progress:verify` passes: 107 phase evidence anchors verified.
+- `npm run release:check` passes.
+
+Known remaining gaps:
+
+- The pricing-logic DoD is now executable for line/statement/function coverage above
+  80%. Branch coverage is reported and gated at 75% because current pricing-model
+  optional/fallback branches are below 80%; this remains honest evidence rather than
+  an overstated 80% branch claim.
+- Hosted GitHub Actions still fails before repository steps run because no runner is
+  assigned (`runner_id: 0`, empty `steps` array).
+
+## Phase 2.8AV - Verification timeout hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added bounded command execution to `scripts/ci-e2e.mjs` so Docker Compose build,
+  migration, E2E test, and live-verification commands fail with explicit timeout
+  errors instead of hanging indefinitely.
+- Added shorter bounded timeouts around Compose diagnostics (`docker compose ps` and
+  logs) so an unhealthy Docker daemon cannot also hang the failure-reporting path.
+- Added bounded command execution to `scripts/demo-ready.mjs` and wired
+  `scripts/clean-clone-demo-check.mjs` to pass the clean-clone startup budget into
+  the demo bootstrap as `POLYCOST_DEMO_COMMAND_TIMEOUT_MS`.
+- Documented the demo/E2E timeout knobs in the README configuration list.
+
+Verification:
+
+- `npm run format:check` passes.
+- `npm run progress:verify` passes: 99 phase evidence anchors verified.
+- `npm run release:check` passes.
+- `npm run check` passes with API unit tests `49 suites / 385 tests`, web unit tests
+  `9 suites / 128 tests`, graph validation, pricing coverage, progress verification,
+  QA, DB validation, DevOps/cloud/release, and provider credential readiness all
+  green.
+
+Known remaining gaps:
+
+- A follow-up full `ci:e2e` rerun was attempted after the clean-clone commit, but the
+  local Docker/Colima image build stalled inside `docker compose up --build` before
+  containers were created. This hardening turns that class of stall into a bounded
+  failure on future runs; it is not counted as a successful E2E result.
+- Hosted GitHub Actions still fails before repository steps run because no runner is
+  assigned (`runner_id: 0`, empty `steps` array).
+
+## Phase 2.8AU - Clean-clone demo verifier
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added `npm run demo:verify-clean`, backed by
+  `scripts/clean-clone-demo-check.mjs`, as a timed README/demo-readiness proof. The
+  verifier creates a temporary clone from the current checkout, runs the demo
+  bootstrap command, verifies the web app, direct API health, and web-origin API
+  proxy, then tears down the isolated Docker Compose project and volumes.
+- Added `API_HOST_PORT` to `.env.example`, `docker-compose.yml`, and
+  `scripts/demo-ready.mjs` so a clean-clone verifier can bind the API to an
+  alternate host port while leaving the container's internal API port stable.
+- Defaulted clean-clone verifier workspaces to `.tmp/clean-clones` under the repo and
+  ignored `.tmp/` in git. Earlier temp-clone attempts under macOS temp directories
+  exposed a real Colima bind-mount issue where `vault-seed` could not see
+  `/vault-seed/seed.sh`; keeping the clone under the repo path makes the proof use a
+  mount location Docker can actually see.
+- Extended release/progress guards and release hygiene docs so the clean-clone demo
+  verifier remains part of the public-release checklist.
+
+Verification:
+
+- `npm run progress:verify` passes: 98 phase evidence anchors verified.
+- `npm run release:check` passes.
+- `docker compose config --quiet` passes.
+- `env DOCKER_CONTEXT=colima npm run demo:verify-clean` passes against an isolated
+  temporary clone:
+  - `npm ci` completed in the clone.
+  - Provider credential readiness passed in mock mode.
+  - Docker Compose built/started Vault, Redis, Postgres, API, and Web.
+  - `npm run db:migrate` reported no pending migrations on the fresh stack.
+  - API health responded at `http://127.0.0.1:3201/health`.
+  - Web responded at `http://127.0.0.1:3200/`.
+  - Web-origin proxy returned JSON at `http://127.0.0.1:3200/api/v1/data-health`.
+  - Clean-clone-to-running duration: `70171ms` against the `600000ms` limit.
+
+Known remaining gaps:
+
+- This closes the local clean-clone-to-running evidence gap for the mock/self-hosted
+  demo path. It does not turn fixture-backed provider pricing into invoice-grade live
+  billing coverage.
+- Hosted GitHub Actions for PR #24 remains externally blocked before workflow steps
+  run (`runner_id: 0` / no assigned runner in prior checks). Local release gates and
+  the clean-clone verifier are green.
+
+## Phase 2.8AT - Live timed journey and Redis verification
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added `npm run live:verify`, backed by `scripts/live-verification.mjs`, as a
+  Compose-aware production-readiness browser/runtime proof. The verifier opens the
+  built web app through the configured host port, runs a template comparison,
+  uploads the draw.io fixture, generates a real PDF download, checks page-level
+  horizontal overflow, and deliberately stops/restarts Redis to validate degraded
+  health behavior.
+- Wired `npm run ci:e2e` to run `npm run live:verify` after the existing API E2E
+  and Playwright browser suites pass, making the timed UX and runtime-degradation
+  checks part of the local E2E gate.
+- Extended `scripts/release-readiness-check.mjs` and
+  `scripts/full-progress-verification-check.mjs` so release/progress gates fail if
+  the live verifier or its CI wiring is removed.
+
+Verification:
+
+- `npm run progress:verify` passes: 92 phase evidence anchors verified.
+- `npm run release:check` passes.
+- `npm run check` passes end-to-end:
+  - API unit tests: `49 suites / 385 tests`.
+  - Web unit tests: `9 suites / 128 tests`.
+  - Graph validation: `282 nodes / 282 edges`.
+  - Pricing service coverage: `36 frontend priced families` covered by the API
+    pricing guard.
+  - QA, security suppressions, devops/cloud/release, and provider-credential
+    readiness checks all pass; `impeccable` remains the documented Node 24-only
+    skip on the Node 20 target runtime.
+- `npm run security:audit` passes at the high-severity gate; npm still reports the
+  documented low transitive Graphify/Ollama advisory with no available safe fix.
+- `env DOCKER_CONTEXT=colima VAULT_HOST_PORT=18200 WEB_PORT=3002 npm run ci:e2e`
+  passes end-to-end:
+  - API E2E: `16 passed, 16 total`.
+  - Web Playwright: `6 passed`.
+  - Live verifier: template-to-recommendation `395ms` under the `60000ms` limit.
+  - Live verifier: diagram-to-PDF `2522ms` under the `180000ms` limit.
+  - Live verifier: Redis stopped and `/health=degraded`,
+    `/health/deep=degraded`, `/api/v1/data-health` remained HTTP `200`, then Redis
+    restarted and health returned to `ok`.
+
+Known remaining gaps:
+
+- This closes the previously unproved live timed-journey and Redis-degradation
+  evidence gap for the local/mock Compose stack. It is still `verified (mock)` for
+  pricing-provider behavior because real provider credentials are intentionally not
+  required in CI.
+- Hosted GitHub Actions for PR #24 remains the same external runner/account blocker
+  documented in Phase 2.8AS unless the remote run is manually rerun and reaches
+  actual workflow steps. Local gates remain green and now include the live verifier.
+
+## Phase 2.8AS - Full progress verification gate
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added `npm run progress:verify`, backed by
+  `scripts/full-progress-verification-check.mjs`, as a first-class phase evidence
+  gate. The check currently verifies 82 source/test/fixture/CI evidence anchors
+  across Phase A-G promises instead of trusting README/PROGRESS claims.
+- The verifier locks the FinOps invariants named by the full-verification goal:
+  `packages/types/monthly-hour-standard.json` is the shared 730-hour source, cost
+  intervals derive from `HOURS_PER_MONTH`, bare `720`/`24*30`/`365/12` month-math
+  regressions fail unless they are explicitly allowlisted non-time fixture values,
+  and the 80TB tiered-egress manual regression remains present.
+- The verifier also checks schema and pricing-evidence anchors: hourly stored rate
+  unit, `is_estimate`, `valid_from`/`valid_to`, pricing-lineage metadata, 20+ raw
+  reconciliation floor, SKU evidence, refresh-live traceability, and UI-priced family
+  coverage wiring.
+- Added phase-pipeline anchors for the swappable requirement parser contract,
+  `PHASE_2_HOOK` / `PHASE_3_HOOK`, natural-language editable confirmation, export
+  formats, share revocation, diagram fixture/malicious upload coverage, auth/RBAC
+  matrix coverage, data-health/rate-limit evidence, reduced-motion CSS, brand-token
+  usage, CI, and release-readiness wiring.
+- Wired `progress:verify` into `npm run check`, GitHub Actions, and
+  `scripts/release-readiness-check.mjs` so future PRs cannot silently drop the
+  full-progress evidence gate.
+
+Verification:
+
+- `npm run progress:verify` passes: 82 phase evidence anchors verified.
+- `npm run release:check` passes and now enforces the progress-verification gate.
+- `npm run qa` passes; `impeccable` remains the documented Node 24-only skip on the
+  Node 20 toolchain.
+- `npm run format:check` passes after formatting the new verifier.
+- `npm run test:production-readiness` passes: API focused regressions
+  `8 suites / 121 tests`; web focused regressions `2 suites / 82 tests`.
+
+Known remaining gaps:
+
+- This closes a real evidence-gap by making the phase walk partially executable and
+  regression-protected, but it does not replace the full live timed UX walk required
+  by the active goal. The <60s template-to-recommendation journey, <3min
+  diagram-to-PDF journey, Redis-kill runtime degradation, clean-clone timing, and
+  hosted CI green state still need live evidence before the full objective can be
+  marked complete.
+- GitHub-hosted CI for PR #24 is still externally blocked before workflow steps run
+  (`runner_id: 0`, zero steps, no log). Local gates remain the authoritative code
+  evidence until the account/runner condition is cleared and CI can be rerun.
+
+## Phase 2.8AR - End-to-end smoke proof hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Extended the Compose-backed API MVP acceptance suite from 14 to 16 tests. The new
+  coverage proves anonymous comparison evidence expansion, passworded public share
+  report access/analytics/revocation, and the authenticated signup -> invite ->
+  accept -> owner role-change -> mock OIDC team-scoped login -> member 403 billing
+  denial flow.
+- Added migration `029_auth_billing_runtime_privileges.sql` so the least-privilege
+  runtime `polycost_app` role can use the auth, team, invite, SSO, billing import,
+  and reconciliation tables created after the original privilege migration.
+- Updated fresh Postgres bootstrap to run migrations 024-029 before first API use,
+  closing a clean-clone/demo readiness gap for later auth and pricing-lineage tables.
+- Made the Compose/E2E host ports resilient to local developer collisions:
+  `VAULT_HOST_PORT` now controls the Vault host port, and `ci:e2e` propagates
+  `WEB_PORT` / `POLYCOST_WEB_BASE_URL` into both API E2E and Playwright.
+
+Verification:
+
+- `npm run format:check` passes.
+- `npm run typecheck --workspace @polycost/api` passes.
+- `npm run db:validate` passes; live migration `029` was also applied during the
+  Compose E2E run.
+- `npm run check` passes end-to-end, including lint, typecheck, unit tests, graph
+  validation, pricing coverage, QA, DB validation, DevOps/cloud/release checks, and
+  provider credential readiness.
+- `npm run security:audit` passes at the repo's high-severity gate; it still reports
+  only the documented low Graphify/Ollama transitive advisory with no available safe
+  fix.
+- `VAULT_HOST_PORT=18200 WEB_PORT=3002 npm run ci:e2e` passes end-to-end:
+  API E2E `16 passed, 16 total`; web Playwright `6 passed`.
+
+Known remaining gaps:
+
+- This proves the complete local/mock live-stack smoke path and fixes the auth-table
+  runtime privilege gap, but GitHub-hosted CI for PR #24 still fails before repo code
+  executes: the latest checked `quality` job completed in two seconds with zero
+  steps, `runner_id: 0`, and no downloadable log. That remains an external Actions
+  runner/account provisioning blocker, not a local test failure; rerun CI after the
+  account/runner condition is cleared.
+
+## Phase 2.8AQ - Impeccable CI tracking guard
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Updated the GitHub Actions quality workflow comment to name the exact
+  `impeccable@3.1.0` Node 24 requirement while keeping Node 20 as the supported repo
+  runtime.
+- Pointed the CI comment at `docs/SECURITY-SUPPRESSIONS.md` and
+  `RELEASE-CHECKLIST.md`, where the Node 24 public-release follow-up is tracked.
+- Extended `scripts/release-readiness-check.mjs` so release readiness fails if the CI
+  workflow loses the `impeccable` Node 24 skip reason or release-checklist tracking
+  pointer.
+
+Verification:
+
+- `npm run format:check` passes.
+- `npm run release:check` passes and now asserts the CI workflow keeps the
+  `impeccable@3.1.0` Node 24 skip/tracking note.
+- `npm run security:suppressions` passes.
+- `npm run check` passes end-to-end; `impeccable` remains an intentional Node 20
+  skip with public-release Node 24 follow-up documented.
+
+Known remaining gaps:
+
+- A real Node 24 `npm run impeccable` execution is still a human/public-release
+  checklist item unless the project later raises the supported runtime or adds a
+  separate Node 24 CI job.
+
+## Phase 2.8AP - Security ledger coverage enforcement
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Strengthened `scripts/security-suppression-check.mjs` so each reviewed inline
+  security-rule ESLint suppression must also appear in
+  `docs/SECURITY-SUPPRESSIONS.md`.
+- Added security-ledger guards for the low-threshold npm audit command, the remaining
+  low Graphify/Ollama advisory ID, and the Node 24 `impeccable` tracking note.
+- Re-ran `npm audit --audit-level=low`; the current result remains the documented
+  low-severity `GHSA-866g-f22w-33x8` advisory through `@sentropic/graphify` with no
+  fix available.
+- Updated `docs/SECURITY-SUPPRESSIONS.md` with the 2026-07-07 low-audit evidence.
+
+Verification:
+
+- `npm audit --audit-level=low` was re-run with registry access and still exits 1 for
+  the documented low `GHSA-866g-f22w-33x8` Graphify/Ollama advisory with no fix
+  available.
+- `npm run format:check` passes.
+- `npm run security:suppressions` passes with 21 reviewed suppressions and now proves
+  each suppressed file is present in `docs/SECURITY-SUPPRESSIONS.md`.
+- `npm run security:audit` passes at the high/critical gate while reporting only the
+  documented low advisory.
+- `npm run release:check` passes.
+- `npm run check` passes end-to-end.
+
+Known remaining gaps:
+
+- The high/critical security audit gate remains clean, but the low-severity transitive
+  development-tooling advisory still depends on an upstream package fix or replacement.
+
+## Phase 2.8AO - Production-readiness suite drift guard
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Extended `scripts/release-readiness-check.mjs` to assert the focused
+  `test:production-readiness` command still includes pricing reconciliation,
+  refresh-live traceability, auth/RBAC, diagram parser, LLM classifier, report
+  evidence, web app, and API-client specs.
+- Added release-readiness assertions that CI keeps both the provider credential
+  readiness gate and the production-readiness focused regression gate.
+- Added source-content guards proving the named suite still covers the 20-rate
+  reconciliation floor, complete pricing lineage assertions, team/billing RBAC,
+  malicious diagram fixtures, oversized diagram fallback, and unsafe VSDX rejection.
+
+Verification:
+
+- `npm run release:check` passes.
+- `npm run format:check` passes.
+- `npm run test:production-readiness` passes.
+- `npm run check` passes end-to-end with the stricter release-readiness assertions
+  and provider credential gate in the aggregate path.
+
+Known remaining gaps:
+
+- This prevents local/CI test-suite drift, but GitHub-hosted execution still depends
+  on resolving the repository account billing/spending-limit runner blocker.
+
+## Phase 2.8AN - Local credential readiness gate
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added `npm run provider:credentials:check` to the aggregate `npm run check` path,
+  matching the CI workflow and demo bootstrap credential/dummy-value readiness gate.
+- Extended `scripts/release-readiness-check.mjs` so release readiness fails if the
+  provider credential checker script is missing or removed from `npm run check`.
+- This makes local release verification cover the same mock-vs-real provider swap
+  guardrails that CI and `npm run demo:up` already exercise.
+
+Verification:
+
+- `npm run format:check` passes.
+- `npm run release:check` passes and now asserts the credential readiness gate remains
+  part of `npm run check`.
+- `npm run provider:credentials:check` passes in mock-provider mode for AWS, Azure,
+  GCP, and diagram-LLM readiness.
+- `npm run check` passes end-to-end and now includes `npm run provider:credentials:check`;
+  the optional impeccable check is still skipped because the repo targets Node.js 20
+  and the tool requires Node.js 24.
+
+Known remaining gaps:
+
+- GitHub Actions still fails before job execution because of the account billing /
+  spending-limit blocker; this gate improves local and future CI coverage but cannot
+  resolve that external runner-account condition.
+
+## Phase 2.8AM - VSDX visual evidence polish
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Extended diagram review evidence for VSDX nodes to include extracted Visio bounds
+  and style colors when the OpenXML shape cells provide them.
+- Kept the existing API shape intact: bounds and visual metadata were already exposed
+  on graph nodes; this pass makes that visual extraction easier to audit in review
+  cards and report evidence text.
+- Added parser regression coverage proving VSDX review evidence now includes page,
+  master, container, bounds, fill color, and line color context.
+
+Verification:
+
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/diagram-parser/diagram-parser.service.spec.ts`
+  passes.
+- `npm run test:production-readiness` passes.
+- `npm run check` passes end-to-end; the optional impeccable check is still skipped
+  because the repo targets Node.js 20 and the tool requires Node.js 24.
+
+Known remaining gaps:
+
+- This improves layout/style traceability for VSDX extraction, but PolyCost still does
+  not perform full Visio visual rendering or pixel-perfect visual comparison.
+
+## Phase 2.8AL - Auth team UX state hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Removed broad workspace reload coupling from `workspaceBusy` state so team/admin
+  panels do not refetch on every busy-state transition.
+- Made account session revocation, invite creation/revocation, invite acceptance,
+  role changes, member removal, and SSO provider saves update the visible workspace
+  state immediately after the API action succeeds.
+- Kept owner/admin RBAC affordances in the UI while ensuring self-role changes update
+  the active session/team role shown on screen.
+- Extended `App.spec.tsx` to prove revoked sessions disappear, new invitations are
+  shown, role changes are reflected, removed members leave the list, revoked invites
+  leave the pending view, and saved OIDC state changes the SSO readiness label.
+
+Verification:
+
+- `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx`
+  passes.
+- `npm run test:production-readiness` passes.
+- `npm run check` passes end-to-end; the optional impeccable check is still skipped
+  because the repo targets Node.js 20 and the tool requires Node.js 24.
+
+Known remaining gaps:
+
+- This improves the local/demo account and team product UX; production-grade SSO,
+  email invite delivery, organization billing plans, and a dedicated account settings
+  route remain future auth product work.
+
+## Phase 2.8AK - Pricing reconciliation breadth guard
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added explicit Azure and GCP burstable/shared-core mock catalog rows so the mock ETL
+  path covers all six normalized compute families for every provider.
+- Updated normalized pricing so trusted adapter-provided `normalizedFamily` /
+  `instanceFamily` metadata is used before SKU-prefix fallback.
+- Strengthened `pricing-reconciliation.spec.ts` so each provider must reconcile at
+  least 20 distinct normalized rates from raw source records, with complete source
+  endpoint, source record ID/key, fetch timestamp, transform version, and payload hash.
+- Added coverage assertions for compute family breadth, normalized storage tiers,
+  raw storage object/block/file dimensions, raw storage access patterns, and egress
+  tier starts across AWS, Azure, and GCP mock catalogs.
+
+Verification:
+
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/pricing-normalization/pricing-reconciliation.spec.ts src/pricing-normalization/normalized-pricing-records.spec.ts src/adapters/mock/mock-provider.adapter.spec.ts`
+  passes.
+- `npm run pricing:coverage:check` passes.
+- `npm run test:production-readiness` passes.
+- `npm run check` passes end-to-end; the optional impeccable check is still skipped
+  because the repo targets Node.js 20 and the tool requires Node.js 24.
+
+Known remaining gaps:
+
+- The breadth guard proves fixture-backed ETL and lineage depth; full invoice-grade
+  live provider catalog coverage still depends on real provider credentials and wider
+  production sync rehearsal.
+- Database and higher-level modeled services remain covered by comparison/model
+  evidence, while this normalization gate intentionally focuses on compute, storage,
+  and egress rate rows.
 
 ## Phase 2.8AJ - Auth endpoint rate-limit hardening
 

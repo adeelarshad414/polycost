@@ -8,8 +8,14 @@ import { ThemeSwitcher } from './ThemeSwitcher';
 describe('ThemeSwitcher', () => {
   it('renders system, light, and dark theme choices', () => {
     const onThemeChange = jest.fn();
+    const onAccentChange = jest.fn();
     const { container, unmount } = render(
-      <ThemeSwitcher themeChoice="system" onThemeChange={onThemeChange} />,
+      <ThemeSwitcher
+        themeChoice="system"
+        accentChoice="default"
+        onThemeChange={onThemeChange}
+        onAccentChange={onAccentChange}
+      />,
     );
 
     expect(themeButton(container, 'Use system theme').getAttribute('aria-checked')).toBe('true');
@@ -26,8 +32,14 @@ describe('ThemeSwitcher', () => {
 
   it('moves theme choices with radio-group keyboard controls', () => {
     const onThemeChange = jest.fn();
+    const onAccentChange = jest.fn();
     const { container, unmount } = render(
-      <ThemeSwitcher themeChoice="light" onThemeChange={onThemeChange} />,
+      <ThemeSwitcher
+        themeChoice="light"
+        accentChoice="default"
+        onThemeChange={onThemeChange}
+        onAccentChange={onAccentChange}
+      />,
     );
 
     act(() => {
@@ -42,8 +54,14 @@ describe('ThemeSwitcher', () => {
 
   it('wraps theme choices across arrow keys and edge positions', () => {
     const onThemeChange = jest.fn();
+    const onAccentChange = jest.fn();
     const { container, unmount } = render(
-      <ThemeSwitcher themeChoice="system" onThemeChange={onThemeChange} />,
+      <ThemeSwitcher
+        themeChoice="system"
+        accentChoice="default"
+        onThemeChange={onThemeChange}
+        onAccentChange={onAccentChange}
+      />,
     );
 
     act(() => {
@@ -65,8 +83,14 @@ describe('ThemeSwitcher', () => {
 
   it('handles home, end, and ignored keyboard input without changing invalidly', () => {
     const onThemeChange = jest.fn();
+    const onAccentChange = jest.fn();
     const { container, unmount } = render(
-      <ThemeSwitcher themeChoice="dark" onThemeChange={onThemeChange} />,
+      <ThemeSwitcher
+        themeChoice="dark"
+        accentChoice="default"
+        onThemeChange={onThemeChange}
+        onAccentChange={onAccentChange}
+      />,
     );
 
     act(() => {
@@ -95,13 +119,19 @@ describe('ThemeSwitcher', () => {
 
   it('falls back to immediate focus when requestAnimationFrame is unavailable', () => {
     const onThemeChange = jest.fn();
+    const onAccentChange = jest.fn();
     const originalRequestAnimationFrame = window.requestAnimationFrame;
     Object.defineProperty(window, 'requestAnimationFrame', {
       configurable: true,
       value: undefined,
     });
     const { container, unmount } = render(
-      <ThemeSwitcher themeChoice="light" onThemeChange={onThemeChange} />,
+      <ThemeSwitcher
+        themeChoice="light"
+        accentChoice="default"
+        onThemeChange={onThemeChange}
+        onAccentChange={onAccentChange}
+      />,
     );
 
     act(() => {
@@ -118,6 +148,55 @@ describe('ThemeSwitcher', () => {
       configurable: true,
       value: originalRequestAnimationFrame,
     });
+  });
+
+  it('renders and changes accent choices', () => {
+    const onThemeChange = jest.fn();
+    const onAccentChange = jest.fn();
+    const { container, unmount } = render(
+      <ThemeSwitcher
+        themeChoice="system"
+        accentChoice="default"
+        onThemeChange={onThemeChange}
+        onAccentChange={onAccentChange}
+      />,
+    );
+
+    expect(themeButton(container, 'Use PolyCost violet accent').getAttribute('aria-checked')).toBe(
+      'true',
+    );
+    expect(themeButton(container, 'Use terracotta accent').getAttribute('aria-checked')).toBe(
+      'false',
+    );
+
+    act(() => {
+      themeButton(container, 'Use terracotta accent').click();
+    });
+
+    expect(onAccentChange).toHaveBeenCalledWith('terracotta');
+    unmount();
+  });
+
+  it('moves accent choices with radio-group keyboard controls', () => {
+    const onThemeChange = jest.fn();
+    const onAccentChange = jest.fn();
+    const { container, unmount } = render(
+      <ThemeSwitcher
+        themeChoice="system"
+        accentChoice="default"
+        onThemeChange={onThemeChange}
+        onAccentChange={onAccentChange}
+      />,
+    );
+
+    act(() => {
+      themeButton(container, 'Use PolyCost violet accent').dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'End', bubbles: true }),
+      );
+    });
+
+    expect(onAccentChange).toHaveBeenCalledWith('terracotta');
+    unmount();
   });
 });
 

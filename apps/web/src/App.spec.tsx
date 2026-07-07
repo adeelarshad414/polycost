@@ -189,9 +189,11 @@ describe('App', () => {
     expect(text(container)).toContain('OIDC ready · SAML ready');
     expect(text(container)).toContain('Current · last seen');
     expect(text(container)).toContain('expires');
+    expect(text(container)).toContain('Other · last seen');
 
     await click(buttonByText(container, 'Sign out other devices'));
     expect(client.revokeOtherSessions).toHaveBeenCalledWith('session-token');
+    expect(text(container)).not.toContain('Other · last seen');
 
     await click(buttonByText(container, 'Sign out'));
     expect(client.logout).toHaveBeenCalledWith('session-token');
@@ -242,6 +244,13 @@ describe('App', () => {
           createdAt: '2026-07-06T00:00:00.000Z',
         },
       ]),
+      updateTeamMemberRole: jest.fn(async (_teamId, accountId, role) => ({
+        accountId,
+        email: 'analyst@example.com',
+        displayName: 'FinOps Analyst',
+        role,
+        createdAt: '2026-07-06T00:00:00.000Z',
+      })),
     });
     const { container, unmount } = render(<App client={client} />);
 
@@ -261,6 +270,8 @@ describe('App', () => {
       'session-token',
     );
     expect(text(container)).toContain('Invite token: invite-token');
+    expect(text(container)).toContain('new-finops@example.com');
+    expect(text(container)).toContain('admin invite');
 
     const memberRoleSelect = selectByAriaLabel(container, 'Change role for analyst@example.com');
 
@@ -271,6 +282,7 @@ describe('App', () => {
       'admin',
       'session-token',
     );
+    expect(text(container)).toContain('Admin');
 
     await click(buttonByAriaLabel(container, 'Remove analyst@example.com'));
     expect(client.removeTeamMember).toHaveBeenCalledWith(
@@ -278,6 +290,7 @@ describe('App', () => {
       '22222222-aaaa-4aaa-8aaa-222222222222',
       'session-token',
     );
+    expect(text(container)).not.toContain('FinOps Analyst');
 
     await changeInput(inputByWorkspaceLabel(container, 'Accept invite token'), 'invite-token');
     await submitForm(formContainingText(container, 'Accept invite token'));
@@ -342,6 +355,7 @@ describe('App', () => {
       '88888888-8888-4888-8888-888888888888',
       'session-token',
     );
+    expect(text(container)).not.toContain('finops@example.com');
 
     await changeInput(inputByWorkspaceLabel(container, 'Issuer URL'), 'https://idp.example.com');
     await changeInput(inputByWorkspaceLabel(container, 'Client ID'), 'polycost-client');
@@ -356,6 +370,7 @@ describe('App', () => {
       }),
       'session-token',
     );
+    expect(text(container)).toContain('OIDC configured · SAML ready');
 
     await click(buttonByText(container, 'Test connection'));
     expect(client.testSsoConnection).toHaveBeenCalledWith(
@@ -1355,7 +1370,7 @@ describe('App', () => {
     });
 
     unmount();
-  });
+  }, 10_000);
 
   it('imports bulk service rows into the editable guided form', async () => {
     const client = clientMock();

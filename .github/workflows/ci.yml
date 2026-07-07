@@ -22,15 +22,21 @@ jobs:
         run: npm run format:check
       - name: Lint and typecheck
         run: npm run ci:lint
+      - name: Theme token hex guard
+        run: npm run theme:hex:check
       # `npm run qa` invokes `npm run impeccable`; scripts/impeccable-check.mjs
-      # exits 0 with a documented warning on Node 20 until the project adds a
-      # Node 24 auxiliary quality job or intentionally raises engines.node.
+      # exits 0 with a documented warning on Node 20 because impeccable@3.1.0
+      # requires Node 24+. Tracking: docs/SECURITY-SUPPRESSIONS.md and
+      # RELEASE-CHECKLIST.md require a Node 24 run before public release unless
+      # the project intentionally raises engines.node.
       - name: Spec and workflow QA
         run: npm run qa
       - name: Graph validation
         run: npm run graphify:validate
       - name: Pricing service coverage check
         run: npm run pricing:coverage:check
+      - name: Full progress verification check
+        run: npm run progress:verify
       - name: DevOps configuration check
         run: npm run devops:check
       - name: Cloud readiness check

@@ -42,6 +42,7 @@ Run:
 
 ```bash
 npm run release:check
+npm run demo:verify-clean
 npm run format:check
 npm run ci:lint
 npm run test:coverage

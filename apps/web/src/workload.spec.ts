@@ -9,7 +9,10 @@ import {
 } from './region-normalization';
 import {
   applyTheme,
+  applyAccent,
+  ACCENT_STORAGE_KEY,
   resolveTheme,
+  storedAccent,
   storedTheme,
   subscribeToSystemTheme,
   systemTheme,
@@ -1258,6 +1261,11 @@ describe('theme helpers', () => {
     expect(storedTheme(storageLike)).toBe('system');
     storage.set(THEME_STORAGE_KEY, 'blue');
     expect(storedTheme(storageLike)).toBe('system');
+    expect(storedAccent(storageLike)).toBe('default');
+    storage.set(ACCENT_STORAGE_KEY, 'terracotta');
+    expect(storedAccent(storageLike)).toBe('terracotta');
+    storage.set(ACCENT_STORAGE_KEY, 'purple');
+    expect(storedAccent(storageLike)).toBe('default');
 
     const resolved = applyTheme('system', root, storageLike, () => ({ matches: true }));
 
@@ -1270,6 +1278,11 @@ describe('theme helpers', () => {
     expect(applyTheme('dark', root, storageLike)).toBe('dark');
     expect(root.dataset.theme).toBe('dark');
     expect(root.dataset.themeChoice).toBe('dark');
+
+    expect(applyAccent('terracotta', root, storageLike)).toBe('terracotta');
+    expect(root.dataset.accent).toBe('terracotta');
+    expect(root.dataset.accentChoice).toBe('terracotta');
+    expect(storageLike.setItem).toHaveBeenCalledWith(ACCENT_STORAGE_KEY, 'terracotta');
   });
 
   it('subscribes to live system theme changes', () => {

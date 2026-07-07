@@ -1,0 +1,58 @@
+{
+  "capturedAt": "2026-07-07T12:05:53.598Z",
+  "baseUrl": "http://127.0.0.1:3220/",
+  "evidence": [
+    {
+      "mode": "dark",
+      "accent": "default",
+      "dir": "dark",
+      "expectedBrand": "#a879f0",
+      "path": "docs/theme-audit/2026-07-07/dark/home.png",
+      "vars": {
+        "theme": "dark",
+        "accent": "default",
+        "brand500": "#a879f0",
+        "surfaceCanvas": "#0b0e14"
+      }
+    },
+    {
+      "mode": "light",
+      "accent": "default",
+      "dir": "light",
+      "expectedBrand": "#7c4fd0",
+      "path": "docs/theme-audit/2026-07-07/light/home.png",
+      "vars": {
+        "theme": "light",
+        "accent": "default",
+        "brand500": "#7c4fd0",
+        "surfaceCanvas": "#f5f4ef"
+      }
+    },
+    {
+      "mode": "dark",
+      "accent": "terracotta",
+      "dir": "dark-terracotta",
+      "expectedBrand": "#d97757",
+      "path": "docs/theme-audit/2026-07-07/dark-terracotta/home.png",
+      "vars": {
+        "theme": "dark",
+        "accent": "terracotta",
+        "brand500": "#d97757",
+        "surfaceCanvas": "#0b0e14"
+      }
+    },
+    {
+      "mode": "light",
+      "accent": "terracotta",
+      "dir": "light-terracotta",
+      "expectedBrand": "#d97757",
+      "path": "docs/theme-audit/2026-07-07/light-terracotta/home.png",
+      "vars": {
+        "theme": "light",
+        "accent": "terracotta",
+        "brand500": "#d97757",
+        "surfaceCanvas": "#f5f4ef"
+      }
+    }
+  ]
+}

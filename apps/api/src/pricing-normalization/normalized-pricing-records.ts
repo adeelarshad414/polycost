@@ -147,6 +147,7 @@ function computeShapeFromRecord(record: PricingCatalogRecord): ComputeShape | un
   const vcpu = directVcpu ?? derivedShape?.vcpu;
   const memoryGb = directMemoryGb ?? derivedShape?.memoryGb;
   const family =
+    attributeComputeFamily(record) ??
     localSeedComputeFamily(record) ??
     derivedShape?.family ??
     normalizeInstanceFamily(record.provider, providerSkuId) ??
@@ -166,6 +167,28 @@ function computeShapeFromRecord(record: PricingCatalogRecord): ComputeShape | un
     vcpu,
     memoryGb,
   };
+}
+
+function attributeComputeFamily(
+  record: PricingCatalogRecord,
+): NormalizedInstanceFamily | undefined {
+  const value = record.attributes?.normalizedFamily ?? record.attributes?.instanceFamily;
+
+  return isNormalizedInstanceFamily(value) ? value : undefined;
+}
+
+function isNormalizedInstanceFamily(value: unknown): value is NormalizedInstanceFamily {
+  switch (value) {
+    case 'accelerated-computing':
+    case 'burstable':
+    case 'compute-optimized':
+    case 'general-purpose':
+    case 'memory-optimized':
+    case 'storage-optimized':
+      return true;
+    default:
+      return false;
+  }
 }
 
 function providerSpecificShape(

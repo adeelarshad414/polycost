@@ -5,6 +5,7 @@ coverage/
 /reports/
 .turbo/
 .vite/
+.tmp/
 apps/web/tsconfig.tsbuildinfo
 *.tsbuildinfo
 .DS_Store

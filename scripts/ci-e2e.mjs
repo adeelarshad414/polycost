@@ -3,35 +3,55 @@ import { spawnSync } from 'node:child_process';
 const root = process.cwd();
 const skipCompose = process.env.POLYCOST_E2E_SKIP_COMPOSE === '1';
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const commandTimeoutMs = Number(process.env.POLYCOST_E2E_COMMAND_TIMEOUT_MS ?? 900_000);
+const diagnosticsTimeoutMs = Number(process.env.POLYCOST_E2E_DIAGNOSTICS_TIMEOUT_MS ?? 60_000);
+const apiOrigin =
+  process.env.POLYCOST_API_ORIGIN ?? `http://localhost:${process.env.API_PORT ?? '3001'}`;
+const webOrigin =
+  process.env.POLYCOST_WEB_BASE_URL ?? `http://localhost:${process.env.WEB_PORT ?? '3000'}`;
 let runnerFailure;
 let testsFailed = false;
 
 try {
+  process.env.POLYCOST_API_BASE_URL = process.env.POLYCOST_API_BASE_URL ?? `${apiOrigin}/api/v1`;
+  process.env.POLYCOST_WEB_BASE_URL = webOrigin;
+
   if (!skipCompose) {
-    run('docker', ['compose', 'up', '--build', '-d', '--remove-orphans']);
-    run(npmCommand, ['run', 'db:migrate']);
+    run('docker', ['compose', 'up', '--build', '-d', '--remove-orphans'], {
+      timeoutMs: commandTimeoutMs,
+    });
+    run(npmCommand, ['run', 'db:migrate'], { timeoutMs: commandTimeoutMs });
   }
 
-  await waitForJson('API health', 'http://localhost:3001/health', (body) => {
+  await waitForJson('API health', `${apiOrigin}/health`, (body) => {
     return body?.status === 'ok' && body?.service === 'polycost-api';
   });
-  await waitForText('web shell', 'http://localhost:3000', (body) => {
+  await waitForText('web shell', webOrigin, (body) => {
     return body.includes('PolyCost') && body.includes('<div id="root">');
   });
 
   const result = spawnSync(npmCommand, ['run', 'test:e2e', '--workspaces', '--if-present'], {
     cwd: root,
     stdio: 'inherit',
+    timeout: commandTimeoutMs,
   });
 
   if (result.error) {
-    throw result.error;
+    const detail =
+      result.error.code === 'ETIMEDOUT'
+        ? `timed out after ${commandTimeoutMs}ms`
+        : result.error.message;
+    throw new Error(`${npmCommand} run test:e2e --workspaces --if-present failed: ${detail}`, {
+      cause: result.error,
+    });
   }
 
   testsFailed = result.status !== 0;
   if (testsFailed) {
     process.exitCode = result.status ?? 1;
     printComposeDiagnostics();
+  } else {
+    run(npmCommand, ['run', 'live:verify'], { timeoutMs: commandTimeoutMs });
   }
 } catch (error) {
   runnerFailure = error;
@@ -65,15 +85,23 @@ function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: root,
     stdio: 'inherit',
+    timeout: options.timeoutMs ?? commandTimeoutMs,
   });
 
   if (result.error) {
+    const detail =
+      result.error.code === 'ETIMEDOUT'
+        ? `timed out after ${options.timeoutMs ?? commandTimeoutMs}ms`
+        : result.error.message;
+
     if (options.allowFailure) {
-      console.warn(`${command} ${args.join(' ')} failed: ${result.error.message}`);
+      console.warn(`${command} ${args.join(' ')} failed: ${detail}`);
       return result;
     }
 
-    throw result.error;
+    throw new Error(`${command} ${args.join(' ')} failed: ${detail}`, {
+      cause: result.error,
+    });
   }
 
   if (result.status !== 0 && !options.allowFailure) {
@@ -130,10 +158,11 @@ async function waitFor(label, probe) {
 
 function printComposeDiagnostics() {
   console.error('E2E tests failed. Compose service status:');
-  run('docker', ['compose', 'ps'], { allowFailure: true });
+  run('docker', ['compose', 'ps'], { allowFailure: true, timeoutMs: diagnosticsTimeoutMs });
   console.error('Recent Compose logs:');
   run('docker', ['compose', 'logs', '--tail', '120', 'api', 'web', 'postgres', 'vault-seed'], {
     allowFailure: true,
+    timeoutMs: diagnosticsTimeoutMs,
   });
 }
 
