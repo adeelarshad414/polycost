@@ -181,6 +181,15 @@ await assertFileContains('scripts/ci-e2e.mjs', [
   ['live verification inside compose E2E', "npmCommand, ['run', 'live:verify']"],
 ]);
 
+await assertFileContains('scripts/live-verification.mjs', [
+  ['live verification transcript path', 'POLYCOST_LIVE_VERIFY_TRANSCRIPT_PATH'],
+  ['live verification transcript schema', "schemaVersion: '1.0'"],
+  ['template transcript entry', "name: 'template-to-recommendation'"],
+  ['diagram transcript entry', "name: 'diagram-to-PDF'"],
+  ['redis transcript event', 'redis-degradation'],
+  ['live verification transcript writer', 'writeTranscript'],
+]);
+
 await assertFileContains('scripts/clean-clone-demo-check.mjs', [
   ['10-minute clean-clone budget', 'POLYCOST_CLEAN_CLONE_MAX_MS'],
   ['README demo command', "['run', 'demo:up']"],

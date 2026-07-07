@@ -93,6 +93,37 @@ say so explicitly rather than marking it done.
 | Phase 2.8AY - FinOps manual proof gate                  | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AZ - Provider credential matrix hardening      | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8BA - PR-facing verification ledger             | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8BB - Live verification transcript artifact     | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8BB - Live verification transcript artifact
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Extended `scripts/live-verification.mjs` so `npm run live:verify` writes a
+  persistent JSON transcript at `.tmp/live-verification/latest.json` by default.
+- Added `POLYCOST_LIVE_VERIFY_TRANSCRIPT_PATH` for CI or release reviewers to
+  redirect the transcript artifact without changing code.
+- The transcript records schema version, origins, thresholds, browser channel,
+  template-to-recommendation steps/duration, diagram-to-PDF steps/duration/download
+  filename, Redis-degradation events/status, and failure details if the run fails.
+- Extended `npm run progress:verify` and `npm run release:check` so live transcript
+  support cannot be silently removed.
+- Updated `docs/verification/full-progress-ledger.md` to point reviewers at the
+  transcript artifact path.
+
+Verification:
+
+- `npm run progress:verify` requires the live transcript schema/path/journey anchors.
+- `npm run release:check` requires the live transcript schema/path/journey anchors.
+
+Known remaining gaps:
+
+- This preserves live-run evidence when the live verifier is executed. It does not
+  remove the external GitHub Actions runner/account blocker currently preventing
+  hosted CI from producing its own transcript artifact.
 
 ## Phase 2.8BA - PR-facing verification ledger
 

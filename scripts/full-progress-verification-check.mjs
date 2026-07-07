@@ -257,11 +257,17 @@ async function assertPhaseEvidenceAnchors() {
   await assertFileContains('scripts/live-verification.mjs', [
     ['template timing threshold', 'POLYCOST_TEMPLATE_JOURNEY_MAX_MS'],
     ['diagram timing threshold', 'POLYCOST_DIAGRAM_JOURNEY_MAX_MS'],
+    ['live transcript env path', 'POLYCOST_LIVE_VERIFY_TRANSCRIPT_PATH'],
+    ['live transcript schema', "schemaVersion: '1.0'"],
+    ['live transcript default path', '.tmp/live-verification/latest.json'],
     ['template-to-recommendation assertion', 'template-to-recommendation journey'],
     ['diagram-to-PDF assertion', 'diagram-to-PDF journey'],
+    ['template journey transcript name', "name: 'template-to-recommendation'"],
+    ['diagram journey transcript name', "name: 'diagram-to-PDF'"],
     ['Redis stop verification', "['compose', 'stop', 'redis']"],
     ['degraded health assertion', 'degraded health'],
     ['PDF download assertion', 'Expected a PDF download'],
+    ['transcript writer', 'writeTranscript'],
   ]);
 
   await assertFileContains('scripts/clean-clone-demo-check.mjs', [

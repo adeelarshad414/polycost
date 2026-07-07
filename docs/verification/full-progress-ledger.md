@@ -84,6 +84,9 @@ Evidence:
 - `apps/web/e2e/polycost-browser.e2e.ts` verifies the primary browser workflow at
   `375px`, `768px`, and `1440px` without horizontal overflow and with named
   interactive controls.
+- `scripts/live-verification.mjs` records a JSON transcript for the
+  template-to-recommendation and diagram-to-PDF timed journeys, including thresholds,
+  step labels, durations, and Redis-degradation status.
 
 Deferred:
 
@@ -197,6 +200,10 @@ These commands have been used as evidence gates in this run:
 - `npm run progress:verify`
 - `npm run test:production-readiness`
 - `npm run check`
+
+`npm run live:verify` writes its latest smoke/timing transcript to
+`.tmp/live-verification/latest.json` by default. Set
+`POLYCOST_LIVE_VERIFY_TRANSCRIPT_PATH` to redirect the artifact in CI.
 
 ## Honest Release Verdict
 
