@@ -433,6 +433,10 @@ describe('API contracts', () => {
             path: 'policies/terraform-plan.rego',
             content: expect.stringContaining('package polycost.terraform'),
           }),
+          expect.objectContaining({
+            path: 'FRAMEWORK-ALIGNMENT.md',
+            content: expect.stringContaining('Cloud Framework Alignment'),
+          }),
         ]),
       }),
     );

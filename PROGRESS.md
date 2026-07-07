@@ -101,6 +101,59 @@ say so explicitly rather than marking it done.
 | Phase 2.9 - Production gap closure continuation         | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase V3.2 - Terraform framework assurance
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added generated `FRAMEWORK-ALIGNMENT.md` to every Terraform bundle so reviewers
+  can map output to AWS/Azure/GCP architecture frameworks plus Terraform platform
+  controls.
+- Added `framework-alignment-pack` and `topology-aware-ingress` static validation
+  checks.
+- Added `enable_public_load_balancer` to AWS, Azure, and GCP generated variables
+  and tfvars examples.
+- Tightened generated private-topology ingress:
+  - AWS HTTPS ingress uses VPC CIDR and ALB becomes internal/private-subnet based.
+  - Azure NSG source becomes `VirtualNetwork` and load balancer can use an internal
+    frontend.
+  - GCP HTTPS firewall uses workload subnet CIDR and public global address
+    reservation is disabled unless explicitly requested.
+
+Verification:
+
+- `npm run format:check`
+  - Prettier check passed.
+- `npm run ci:lint`
+  - ESLint and TypeScript checks passed.
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/terraform/terraform-generation.service.spec.ts src/api/api-contract.spec.ts`
+  - API focused: `2` suites / `42` tests.
+- `npm run test:production-readiness`
+  - API focused: `10` suites / `135` tests.
+  - Web focused: `2` suites / `84` tests.
+- `npm run check`
+  - API unit: `51` suites / `400` tests.
+  - Web unit: `9` suites / `132` tests.
+  - Graph validation, pricing coverage, progress verification, QA/security
+    suppression, database, DevOps, cloud, release, and provider credential gates
+    passed.
+  - `impeccable` skipped by documented Node 20 vs Node 24 constraint.
+- `npm run ci:build`
+  - API TypeScript build passed.
+  - Web production build passed with the existing Vite environment-placeholder and
+    chunk-size warnings.
+
+Known remaining gaps:
+
+- Framework alignment is generated review evidence, not a substitute for a real
+  provider Well-Architected/CAF assessment workshop.
+- Provider-native WAF/CDN, autoscaling groups, organization policy assignments,
+  full logging/audit modules, and active-active DR remain future Terraform module
+  phases.
 
 ## Phase V3.1 - Terraform hardening
 

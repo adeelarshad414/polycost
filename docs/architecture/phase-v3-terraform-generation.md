@@ -20,6 +20,7 @@ Terraform execution.
   - `outputs.tf`
   - `terraform.tfvars.example`
   - `Makefile`
+  - `FRAMEWORK-ALIGNMENT.md`
   - `.tflint.hcl`
   - `tests/static_validation.tftest.hcl`
   - `policies/terraform-plan.rego`
@@ -70,6 +71,8 @@ PolyCost performs request-time static plus policy-pack checks only:
 - Cost-allocation tags or labels are present
 - Private database networking controls are present
 - Runtime identity baseline is present
+- CAF/WAF/Terraform framework alignment evidence is present
+- Public ingress and load-balancer exposure respect the selected network topology
 - Policy, lint, test, Makefile, and module boundary artifacts are present
 
 PolyCost does not run `terraform init`, `terraform validate`, `terraform plan`, or
