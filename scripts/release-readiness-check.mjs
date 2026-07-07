@@ -18,6 +18,7 @@ const requiredFiles = [
   'RELEASE-CHECKLIST.md',
   'docs/development/open-source-readiness.md',
   'docs/SECURITY-SUPPRESSIONS.md',
+  'docs/verification/full-progress-ledger.md',
   '.github/CODEOWNERS',
   '.github/dependabot.yml',
   '.github/PULL_REQUEST_TEMPLATE.md',
@@ -137,6 +138,19 @@ await assertFileContains('docs/SECURITY-SUPPRESSIONS.md', [
   ['eslint suppression hygiene gate', 'npm run security:suppressions'],
   ['npm audit advisory ledger', 'GHSA-866g-f22w-33x8'],
   ['impeccable Node 24 tracking', 'impeccable@3.1.0'],
+]);
+
+await assertFileContains('docs/verification/full-progress-ledger.md', [
+  ['phase A ledger', '## Phase A - Foundation And Core Pricing Engine'],
+  ['phase B ledger', '## Phase B - Input Modes And Requirement Pipeline'],
+  ['phase C ledger', '## Phase C - Dashboards, Personas And Analytics'],
+  ['phase D ledger', '## Phase D - Exports, Reports And Sharing'],
+  ['phase E ledger', '## Phase E - Diagram Ingestion'],
+  ['phase F ledger', '## Phase F - Auth, Teams And RBAC'],
+  ['phase G ledger', '## Phase G - Operations, Security And Release Readiness'],
+  ['mock verification distinction', 'verified (mock)'],
+  ['blocked CI runner evidence', 'runner_id: 0'],
+  ['honest release verdict', 'not yet a full invoice-grade billing platform'],
 ]);
 
 await assertFileContains('.github/workflows/ci.yml', [

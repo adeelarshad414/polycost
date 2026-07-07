@@ -281,6 +281,21 @@ async function assertPhaseEvidenceAnchors() {
     ['pricing normalization coverage fragment', 'apps/api/src/pricing-normalization/'],
   ]);
 
+  await assertFileContains('docs/verification/full-progress-ledger.md', [
+    ['phase A ledger verdict', '## Phase A - Foundation And Core Pricing Engine'],
+    ['phase B ledger verdict', '## Phase B - Input Modes And Requirement Pipeline'],
+    ['phase C ledger verdict', '## Phase C - Dashboards, Personas And Analytics'],
+    ['phase D ledger verdict', '## Phase D - Exports, Reports And Sharing'],
+    ['phase E ledger verdict', '## Phase E - Diagram Ingestion'],
+    ['phase F ledger verdict', '## Phase F - Auth, Teams And RBAC'],
+    ['phase G ledger verdict', '## Phase G - Operations, Security And Release Readiness'],
+    ['verified mock distinction', 'verified (mock)'],
+    ['invoice-grade deferred ledger', 'Full invoice-grade billing remains future work'],
+    ['VSDX visual rendering deferred ledger', 'not full Visio visual rendering'],
+    ['auth enterprise deferred ledger', 'Full enterprise account/team UX'],
+    ['external CI blocker ledger', 'runner_id: 0'],
+  ]);
+
   evidenceAnchors += 1;
 }
 

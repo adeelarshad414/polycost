@@ -92,6 +92,38 @@ say so explicitly rather than marking it done.
 | Phase 2.8AX - Locked breakpoint UI proof                | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AY - FinOps manual proof gate                  | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AZ - Provider credential matrix hardening      | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8BA - PR-facing verification ledger             | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8BA - PR-facing verification ledger
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added `docs/verification/full-progress-ledger.md` as the concise phase-by-phase
+  ledger for release/PR review, separate from this chronological build journal.
+- The ledger classifies Phase A through Phase G with evidence pointers and keeps
+  `verified`, `verified (mock)`, `deferred`, and `blocked` distinct.
+- Captured the current honest deferred items in one place: invoice-grade billing,
+  full Visio/VSDX visual rendering, production LLM corpus evaluation, enterprise
+  account/team/SSO polish, and the Node 24 `impeccable` follow-up.
+- Captured the external GitHub Actions blocker with the observed `runner_id: 0` /
+  empty-steps signature.
+- Extended `npm run progress:verify` and `npm run release:check` so this ledger and
+  its Phase A-G/deferred/blocked anchors cannot be silently removed.
+
+Verification:
+
+- `npm run progress:verify` now requires the PR-facing ledger anchors.
+- `npm run release:check` now requires the PR-facing ledger file and key release
+  verdict phrases.
+
+Known remaining gaps:
+
+- This closes the stale-PR-body/process evidence gap by adding a current checked-in
+  ledger artifact. It does not remove the external GitHub Actions runner/account
+  blocker and does not convert deferred future-product scope into completed scope.
 
 ## Phase 2.8AZ - Provider credential matrix hardening
 
