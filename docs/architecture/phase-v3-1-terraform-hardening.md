@@ -16,6 +16,7 @@ save, validate, plan, and promote through their own controls.
 - `tests/static_validation.tftest.hcl` for Terraform test entry point.
 - `policies/terraform-plan.rego` for plan-time policy checks.
 - `modules/` boundary documentation for network, compute, and data extraction.
+  V3.4 later turns those boundaries into provider-specific starter module files.
 - Stronger static validation checks for private database networking, runtime identity, policy
   pack presence, Terraform test harness, and module boundary docs.
 
@@ -54,8 +55,8 @@ GCP:
 
 ## Remaining Honest Gaps
 
-- This is not a full enterprise module library. It is a root bundle plus documented module
-  boundaries for platform extraction.
+- V3.1 is not a full enterprise module library. V3.4 adds starter modules, but production
+  promotion still requires platform ownership, versioning, and landing-zone integration.
 - Container, serverless, and Kubernetes targets are represented as explicit manual-review module
   boundaries, not fully generated provider-native runtime stacks.
 - Active-active and multi-region DR are recorded in the generation profile and assumptions, but the

@@ -115,12 +115,27 @@ describe('TerraformGenerationService', () => {
     expect(file(result, 'Makefile')).toContain('terraform validate');
     expect(file(result, 'FRAMEWORK-ALIGNMENT.md')).toContain('Cloud Framework Alignment');
     expect(file(result, 'FRAMEWORK-ALIGNMENT.md')).toContain('AWS Well-Architected');
+    expect(file(result, 'BUNDLE-MANIFEST.json')).toContain('polycost.terraform.bundle.v1');
+    expect(file(result, 'scripts/validate-bundle.mjs')).toContain(
+      'terraform-validation-result.json',
+    );
     expect(file(result, '.tflint.hcl')).toContain('plugin "terraform"');
     expect(file(result, 'policies/terraform-plan.rego')).toContain('publicly accessible');
     expect(file(result, 'tests/static_validation.tftest.hcl')).toContain(
       'static_configuration_contract',
     );
-    expect(file(result, 'modules/README.md')).toContain('Module Boundary Review');
+    expect(file(result, 'modules/README.md')).toContain('Module Library Review');
+    expect(file(result, 'modules/network/main.tf')).toContain('resource "aws_vpc" "this"');
+    expect(file(result, 'modules/compute/main.tf')).toContain('resource "aws_instance" "app"');
+    expect(file(result, 'modules/data/main.tf')).toContain('resource "aws_s3_bucket"');
+    expect(result.archive).toMatchObject({
+      filename: 'revenue-portal-aws-terraform.zip',
+      format: 'zip',
+      mimeType: 'application/zip',
+    });
+    expect(result.archive.contentBase64).toMatch(/^UEsDB/);
+    expect(result.archive.sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.archive.sizeBytes).toBeGreaterThan(1000);
     expect(file(result, 'variables.tf')).toContain('sensitive   = true');
     expect(file(result, 'variables.tf')).toContain('variable "network_topology"');
     expect(file(result, 'variables.tf')).toContain('variable "enable_public_load_balancer"');
@@ -143,6 +158,10 @@ describe('TerraformGenerationService', () => {
       expect.arrayContaining([
         expect.objectContaining({ id: 'framework-alignment-pack', status: 'passed' }),
         expect.objectContaining({ id: 'topology-aware-ingress', status: 'passed' }),
+        expect.objectContaining({ id: 'bundle-manifest-generated', status: 'passed' }),
+        expect.objectContaining({ id: 'validation-runner-generated', status: 'passed' }),
+        expect.objectContaining({ id: 'zip-archive-generated', status: 'passed' }),
+        expect.objectContaining({ id: 'module-library-generated', status: 'passed' }),
       ]),
     );
   });
@@ -168,6 +187,15 @@ describe('TerraformGenerationService', () => {
       'var.network_topology == "public" ? "Internet" : "VirtualNetwork"',
     );
     expect(file(result, 'FRAMEWORK-ALIGNMENT.md')).toContain('Azure Cloud Adoption Framework');
+    expect(file(result, 'modules/network/main.tf')).toContain(
+      'resource "azurerm_virtual_network" "this"',
+    );
+    expect(file(result, 'modules/compute/main.tf')).toContain(
+      'resource "azurerm_linux_virtual_machine" "app"',
+    );
+    expect(file(result, 'modules/data/main.tf')).toContain(
+      'resource "azurerm_storage_account" "object_storage"',
+    );
     expect(file(result, 'backend.tf.example')).toContain('backend "azurerm"');
     expect(result.securityNotes.join(' ')).toContain('SSH public keys');
   });
@@ -192,6 +220,15 @@ describe('TerraformGenerationService', () => {
     expect(file(result, 'backend.tf.example')).toContain('backend "gcs"');
     expect(file(result, 'variables.tf')).toContain('"costcenter" = "finops"');
     expect(file(result, 'FRAMEWORK-ALIGNMENT.md')).toContain('Google Cloud Architecture Framework');
+    expect(file(result, 'modules/network/main.tf')).toContain(
+      'resource "google_compute_network" "this"',
+    );
+    expect(file(result, 'modules/compute/main.tf')).toContain(
+      'resource "google_compute_instance" "app"',
+    );
+    expect(file(result, 'modules/data/main.tf')).toContain(
+      'resource "google_storage_bucket" "object_storage"',
+    );
   });
 
   it('surfaces explicit assumptions instead of overclaiming unsupported resources', () => {
@@ -255,6 +292,7 @@ describe('TerraformGenerationService', () => {
       ]),
     );
     expect(file(result, 'modules/README.md')).toContain('Runtime target: kubernetes');
+    expect(file(result, 'modules/compute/main.tf')).toContain('azurerm_linux_virtual_machine');
   });
 });
 

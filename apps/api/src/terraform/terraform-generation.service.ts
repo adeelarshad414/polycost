@@ -4,6 +4,7 @@ import { ProviderId } from '../adapters/common/cloud-provider-adapter';
 import { DatabaseComponent, NormalizedWorkloadSpec, StorageComponent } from '../nws/nws.types';
 import { NWSValidator } from '../nws/nws-validator';
 import {
+  TerraformBundleArchive,
   TerraformGeneratedFile,
   TerraformGenerateInput,
   TerraformGenerationProfile,
@@ -52,16 +53,31 @@ export class TerraformGenerationService {
     const generationProfile = generationProfileFor(input, nws);
     const facts = workloadFacts(nws, targetCloud, input.region, workspaceName, generationProfile);
     const draft = bundleForTarget(targetCloud, nws, facts);
-    const files = draft.files.map((file) => ({
+    const generatedAt = new Date().toISOString();
+    const bundleName = `${workspaceName}-${targetCloud}-terraform`;
+    const baseFiles = draft.files.map((file) => ({
       path: file.path,
       content: ensureTrailingNewline(file.content),
       sha256: sha256(ensureTrailingNewline(file.content)),
     }));
+    const files = baseFiles.concat(
+      generatedFile(
+        'BUNDLE-MANIFEST.json',
+        bundleManifest({
+          bundleName,
+          generatedAt,
+          targetCloud,
+          facts,
+          files: baseFiles,
+        }),
+      ),
+    );
+    const archive = zipArchive(`${bundleName}.zip`, files);
 
     return {
       targetCloud,
-      generatedAt: new Date().toISOString(),
-      bundleName: `${workspaceName}-${targetCloud}-terraform`,
+      generatedAt,
+      bundleName,
       workspaceName,
       region: facts.region,
       generationProfile,
@@ -74,7 +90,8 @@ export class TerraformGenerationService {
       resourceSummary: facts.resourceSummary,
       serviceMappings: draft.serviceMappings,
       files,
-      validation: validateGeneratedFiles(targetCloud, files),
+      archive,
+      validation: validateGeneratedFiles(targetCloud, files, archive),
       assumptions: draft.assumptions,
       securityNotes: draft.securityNotes,
       nextSteps: draft.nextSteps,
@@ -328,6 +345,7 @@ function hardeningFiles(
   const files: TerraformBundleDraft['files'] = [
     file('Makefile', validationMakefile()),
     file('FRAMEWORK-ALIGNMENT.md', frameworkAlignmentReadme(targetCloud, facts)),
+    file('scripts/validate-bundle.mjs', validationRunnerScript()),
   ];
 
   if (facts.generationProfile.policyPackIncluded) {
@@ -344,6 +362,7 @@ function hardeningFiles(
       file('modules/network/README.md', moduleReadme('network', targetCloud)),
       file('modules/compute/README.md', moduleReadme('compute', targetCloud)),
       file('modules/data/README.md', moduleReadme('data', targetCloud)),
+      ...moduleLibraryFiles(targetCloud),
     );
   }
 
@@ -374,6 +393,70 @@ policy:
 
 clean:
 \trm -f tfplan tfplan.json
+`;
+}
+
+function validationRunnerScript(): string {
+  return `#!/usr/bin/env node
+import { spawnSync } from 'node:child_process';
+import { existsSync, writeFileSync } from 'node:fs';
+
+const commands = [
+  { id: 'terraform-fmt', command: 'terraform', args: ['fmt', '-check', '-recursive'], required: true },
+  { id: 'terraform-init', command: 'terraform', args: ['init', '-backend=false'], required: true },
+  { id: 'terraform-validate', command: 'terraform', args: ['validate'], required: true },
+  { id: 'terraform-test', command: 'terraform', args: ['test'], required: false },
+  { id: 'tflint', command: 'tflint', args: ['--recursive'], required: false },
+];
+
+if (existsSync('tfplan.json') && existsSync('policies/terraform-plan.rego')) {
+  commands.push({
+    id: 'conftest-policy',
+    command: 'conftest',
+    args: ['test', 'tfplan.json', '--policy', 'policies'],
+    required: false,
+  });
+}
+
+const results = commands.map((step) => {
+  const probe = spawnSync(step.command, ['--version'], { encoding: 'utf8' });
+
+  if (probe.error && probe.error.code === 'ENOENT') {
+    return {
+      id: step.id,
+      status: step.required ? 'failed' : 'skipped',
+      command: [step.command, ...step.args].join(' '),
+      message: step.required
+        ? step.command + ' is required but was not found on PATH.'
+        : step.command + ' was not found on PATH; optional check skipped.',
+    };
+  }
+
+  const run = spawnSync(step.command, step.args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+
+  return {
+    id: step.id,
+    status: run.status === 0 ? 'passed' : step.required ? 'failed' : 'warning',
+    command: [step.command, ...step.args].join(' '),
+    exitCode: run.status,
+    stdout: run.stdout?.slice(0, 4000) ?? '',
+    stderr: run.stderr?.slice(0, 4000) ?? '',
+  };
+});
+
+const summary = {
+  generatedAt: new Date().toISOString(),
+  status: results.some((result) => result.status === 'failed')
+    ? 'failed'
+    : results.some((result) => result.status === 'warning')
+      ? 'warning'
+      : 'passed',
+  results,
+};
+
+writeFileSync('terraform-validation-result.json', JSON.stringify(summary, null, 2) + '\\n');
+console.log(JSON.stringify(summary, null, 2));
+process.exit(summary.status === 'failed' ? 1 : 0);
 `;
 }
 
@@ -593,12 +676,12 @@ taggable_gcp_resource(type) {
 }
 
 function moduleScaffoldReadme(targetCloud: TerraformTargetCloud, facts: WorkloadFacts): string {
-  return `# Module Boundary Review
+  return `# Module Library Review
 
-PolyCost generated a root module for immediate review and these module-boundary notes for the
-next hardening pass. Keep generated root files as the contract test, then extract these boundaries
-into versioned internal modules once the target platform team approves naming, network, IAM, and
-state conventions.
+PolyCost generated a root module for immediate review plus provider-specific starter modules for
+the platform team's extraction path. Keep generated root files as the contract test, then promote
+the module library into versioned internal modules once naming, network, IAM, and state conventions
+are approved.
 
 ## Generation Profile
 
@@ -607,13 +690,17 @@ state conventions.
 - Availability mode: ${facts.generationProfile.availabilityMode}
 - Provider: ${providerDisplayName(targetCloud)}
 
-## Recommended Internal Modules
+## Generated Starter Modules
 
-- \`modules/network\`: VPC/VNet/VPC network, subnets, route tables, DNS, private service access.
-- \`modules/compute\`: VM/container/serverless runtime, identity attachment, autoscaling rules.
-- \`modules/data\`: object storage, relational databases, backup/restore, private endpoints.
+- \`modules/network\`: VPC/VNet/VPC network, subnets, firewall/security group baseline, and private service hooks.
+- \`modules/compute\`: VM runtime, least-privilege identity attachment, and provider-native hardening defaults.
+- \`modules/data\`: object storage plus relational database starter resources with sensitive credentials.
+
+## Future Internal Modules
+
 - \`modules/edge\`: load balancer, CDN, WAF, certificates, health checks.
 - \`modules/observability\`: logs, metrics, alerts, dashboards, audit trails.
+- \`modules/dr\`: backup, restore, replicated storage, and active-active or active-passive failover.
 
 ## Promotion Gate
 
@@ -625,12 +712,1147 @@ a human architecture review have all passed in the destination account/subscript
 function moduleReadme(moduleName: string, targetCloud: TerraformTargetCloud): string {
   const providerName = providerDisplayName(targetCloud);
 
-  return `# ${moduleName} Module Placeholder
+  return `# ${moduleName} Starter Module
 
-This directory documents the intended ${moduleName} module boundary for ${providerName}. The V3.1
-bundle keeps deployable Terraform in the root module so reviewers can inspect one complete baseline.
-Extract this boundary into a versioned module only after the platform team confirms inputs, outputs,
-provider aliases, state ownership, and policy requirements.
+This directory contains a provider-specific ${moduleName} starter module for ${providerName}. The
+root module remains the immediate review baseline, while this module gives the platform team a clean
+extraction point for versioned internal module ownership.
+
+Before production promotion, confirm provider aliases, state ownership, naming standards, policy
+requirements, and environment-specific security controls with the platform team.
+`;
+}
+
+function moduleLibraryFiles(targetCloud: TerraformTargetCloud): TerraformBundleDraft['files'] {
+  switch (targetCloud) {
+    case 'aws':
+      return awsModuleLibraryFiles();
+    case 'azure':
+      return azureModuleLibraryFiles();
+    case 'gcp':
+      return gcpModuleLibraryFiles();
+  }
+}
+
+function awsModuleLibraryFiles(): TerraformBundleDraft['files'] {
+  return [
+    file('modules/network/variables.tf', awsNetworkModuleVariables()),
+    file('modules/network/main.tf', awsNetworkModuleMain()),
+    file('modules/network/outputs.tf', awsNetworkModuleOutputs()),
+    file('modules/compute/variables.tf', awsComputeModuleVariables()),
+    file('modules/compute/main.tf', awsComputeModuleMain()),
+    file('modules/compute/outputs.tf', awsComputeModuleOutputs()),
+    file('modules/data/variables.tf', awsDataModuleVariables()),
+    file('modules/data/main.tf', awsDataModuleMain()),
+    file('modules/data/outputs.tf', awsDataModuleOutputs()),
+  ];
+}
+
+function azureModuleLibraryFiles(): TerraformBundleDraft['files'] {
+  return [
+    file('modules/network/variables.tf', azureNetworkModuleVariables()),
+    file('modules/network/main.tf', azureNetworkModuleMain()),
+    file('modules/network/outputs.tf', azureNetworkModuleOutputs()),
+    file('modules/compute/variables.tf', azureComputeModuleVariables()),
+    file('modules/compute/main.tf', azureComputeModuleMain()),
+    file('modules/compute/outputs.tf', azureComputeModuleOutputs()),
+    file('modules/data/variables.tf', azureDataModuleVariables()),
+    file('modules/data/main.tf', azureDataModuleMain()),
+    file('modules/data/outputs.tf', azureDataModuleOutputs()),
+  ];
+}
+
+function gcpModuleLibraryFiles(): TerraformBundleDraft['files'] {
+  return [
+    file('modules/network/variables.tf', gcpNetworkModuleVariables()),
+    file('modules/network/main.tf', gcpNetworkModuleMain()),
+    file('modules/network/outputs.tf', gcpNetworkModuleOutputs()),
+    file('modules/compute/variables.tf', gcpComputeModuleVariables()),
+    file('modules/compute/main.tf', gcpComputeModuleMain()),
+    file('modules/compute/outputs.tf', gcpComputeModuleOutputs()),
+    file('modules/data/variables.tf', gcpDataModuleVariables()),
+    file('modules/data/main.tf', gcpDataModuleMain()),
+    file('modules/data/outputs.tf', gcpDataModuleOutputs()),
+  ];
+}
+
+function awsNetworkModuleVariables(): string {
+  return `variable "project_name" {
+  description = "Lowercase project slug used in resource names."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9-]{1,23}$", var.project_name))
+    error_message = "project_name must start with a letter and contain only lowercase letters, numbers, and hyphens."
+  }
+}
+
+variable "vpc_cidr" {
+  description = "CIDR block for the application VPC."
+  type        = string
+  default     = "10.40.0.0/16"
+
+  validation {
+    condition     = can(cidrnetmask(var.vpc_cidr))
+    error_message = "vpc_cidr must be a valid CIDR block."
+  }
+}
+
+variable "availability_zones" {
+  description = "Optional explicit availability zones. Defaults to the first available zones in the provider region."
+  type        = list(string)
+  default     = []
+}
+
+variable "public_subnet_count" {
+  description = "Number of public subnets to create."
+  type        = number
+  default     = 2
+
+  validation {
+    condition     = var.public_subnet_count >= 0 && var.public_subnet_count <= 6
+    error_message = "public_subnet_count must be between 0 and 6."
+  }
+}
+
+variable "private_subnet_count" {
+  description = "Number of private subnets to create."
+  type        = number
+  default     = 2
+
+  validation {
+    condition     = var.private_subnet_count >= 1 && var.private_subnet_count <= 6
+    error_message = "private_subnet_count must be between 1 and 6."
+  }
+}
+
+variable "tags" {
+  description = "Tags to apply to all supported AWS resources."
+  type        = map(string)
+  default     = {}
+}
+`;
+}
+
+function awsNetworkModuleMain(): string {
+  return `data "aws_availability_zones" "available" {
+  state = "available"
+}
+
+locals {
+  subnet_azs = length(var.availability_zones) > 0 ? var.availability_zones : slice(data.aws_availability_zones.available.names, 0, max(var.public_subnet_count, var.private_subnet_count))
+}
+
+resource "aws_vpc" "this" {
+  cidr_block           = var.vpc_cidr
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+
+  tags = merge(var.tags, {
+    Name = format("%s-vpc", var.project_name)
+  })
+}
+
+resource "aws_subnet" "public" {
+  count                   = var.public_subnet_count
+  vpc_id                  = aws_vpc.this.id
+  availability_zone       = local.subnet_azs[count.index % length(local.subnet_azs)]
+  cidr_block              = cidrsubnet(var.vpc_cidr, 8, count.index)
+  map_public_ip_on_launch = true
+
+  tags = merge(var.tags, {
+    Name = format("%s-public-%02d", var.project_name, count.index + 1)
+    Tier = "public"
+  })
+}
+
+resource "aws_subnet" "private" {
+  count             = var.private_subnet_count
+  vpc_id            = aws_vpc.this.id
+  availability_zone = local.subnet_azs[count.index % length(local.subnet_azs)]
+  cidr_block        = cidrsubnet(var.vpc_cidr, 8, count.index + 16)
+
+  tags = merge(var.tags, {
+    Name = format("%s-private-%02d", var.project_name, count.index + 1)
+    Tier = "private"
+  })
+}
+
+resource "aws_security_group" "app" {
+  name        = format("%s-app-sg", var.project_name)
+  description = "Application ingress and egress baseline"
+  vpc_id      = aws_vpc.this.id
+
+  ingress {
+    description = "HTTPS from inside the VPC by default"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(var.tags, {
+    Name = format("%s-app-sg", var.project_name)
+  })
+}
+`;
+}
+
+function awsNetworkModuleOutputs(): string {
+  return `output "vpc_id" {
+  description = "ID of the generated VPC."
+  value       = aws_vpc.this.id
+}
+
+output "public_subnet_ids" {
+  description = "IDs of public subnets."
+  value       = aws_subnet.public[*].id
+}
+
+output "private_subnet_ids" {
+  description = "IDs of private subnets."
+  value       = aws_subnet.private[*].id
+}
+
+output "app_security_group_id" {
+  description = "Application security group ID."
+  value       = aws_security_group.app.id
+}
+`;
+}
+
+function awsComputeModuleVariables(): string {
+  return `variable "project_name" {
+  description = "Lowercase project slug used in resource names."
+  type        = string
+}
+
+variable "ami_id" {
+  description = "Approved AMI ID from the platform image pipeline."
+  type        = string
+}
+
+variable "instance_type" {
+  description = "EC2 instance type."
+  type        = string
+  default     = "t3.micro"
+}
+
+variable "instance_count" {
+  description = "Number of application instances."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.instance_count >= 1 && var.instance_count <= 50
+    error_message = "instance_count must be between 1 and 50."
+  }
+}
+
+variable "subnet_ids" {
+  description = "Private subnet IDs for application instances."
+  type        = list(string)
+}
+
+variable "security_group_ids" {
+  description = "Security group IDs attached to each instance."
+  type        = list(string)
+}
+
+variable "iam_instance_profile_name" {
+  description = "Optional least-privilege IAM instance profile name."
+  type        = string
+  default     = null
+}
+
+variable "enable_public_ip" {
+  description = "Whether instances should receive public IP addresses."
+  type        = bool
+  default     = false
+}
+
+variable "root_volume_gb" {
+  description = "Root EBS volume size in GiB."
+  type        = number
+  default     = 30
+}
+
+variable "tags" {
+  description = "Tags to apply to all supported AWS resources."
+  type        = map(string)
+  default     = {}
+}
+`;
+}
+
+function awsComputeModuleMain(): string {
+  return `resource "aws_instance" "app" {
+  count                       = var.instance_count
+  ami                         = var.ami_id
+  instance_type               = var.instance_type
+  subnet_id                   = var.subnet_ids[count.index % length(var.subnet_ids)]
+  vpc_security_group_ids      = var.security_group_ids
+  associate_public_ip_address = var.enable_public_ip
+  iam_instance_profile        = var.iam_instance_profile_name
+
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 1
+  }
+
+  root_block_device {
+    encrypted   = true
+    volume_size = var.root_volume_gb
+    volume_type = "gp3"
+  }
+
+  tags = merge(var.tags, {
+    Name = format("%s-app-%02d", var.project_name, count.index + 1)
+  })
+}
+`;
+}
+
+function awsComputeModuleOutputs(): string {
+  return `output "instance_ids" {
+  description = "Application instance IDs."
+  value       = aws_instance.app[*].id
+}
+
+output "private_ips" {
+  description = "Private IP addresses for application instances."
+  value       = aws_instance.app[*].private_ip
+}
+`;
+}
+
+function awsDataModuleVariables(): string {
+  return `variable "project_name" {
+  description = "Lowercase project slug used in resource names."
+  type        = string
+}
+
+variable "bucket_name" {
+  description = "Globally unique S3 bucket name for object storage."
+  type        = string
+}
+
+variable "enable_database" {
+  description = "Whether to create the relational database starter resource."
+  type        = bool
+  default     = false
+}
+
+variable "database_subnet_ids" {
+  description = "Private subnet IDs for database placement."
+  type        = list(string)
+  default     = []
+}
+
+variable "database_security_group_ids" {
+  description = "Security groups allowed to reach the database."
+  type        = list(string)
+  default     = []
+}
+
+variable "database_engine" {
+  description = "RDS engine."
+  type        = string
+  default     = "postgres"
+}
+
+variable "database_instance_class" {
+  description = "RDS instance class."
+  type        = string
+  default     = "db.t4g.micro"
+}
+
+variable "database_allocated_storage_gb" {
+  description = "Allocated database storage in GiB."
+  type        = number
+  default     = 20
+}
+
+variable "db_username" {
+  description = "Database administrator username."
+  type        = string
+  default     = "appadmin"
+}
+
+variable "db_password" {
+  description = "Database administrator password. Provide from a secret manager or CI secret."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "tags" {
+  description = "Tags to apply to all supported AWS resources."
+  type        = map(string)
+  default     = {}
+}
+`;
+}
+
+function awsDataModuleMain(): string {
+  return `resource "aws_s3_bucket" "object_storage" {
+  bucket = var.bucket_name
+  tags   = var.tags
+}
+
+resource "aws_s3_bucket_public_access_block" "object_storage" {
+  bucket                  = aws_s3_bucket.object_storage.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "object_storage" {
+  bucket = aws_s3_bucket.object_storage.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_db_subnet_group" "main" {
+  count      = var.enable_database ? 1 : 0
+  name       = format("%s-db-subnets", var.project_name)
+  subnet_ids = var.database_subnet_ids
+  tags       = var.tags
+}
+
+resource "aws_db_instance" "main" {
+  count                  = var.enable_database ? 1 : 0
+  identifier             = format("%s-db", var.project_name)
+  engine                 = var.database_engine
+  instance_class         = var.database_instance_class
+  allocated_storage      = var.database_allocated_storage_gb
+  storage_encrypted      = true
+  username               = var.db_username
+  password               = var.db_password
+  db_subnet_group_name   = aws_db_subnet_group.main[0].name
+  vpc_security_group_ids = var.database_security_group_ids
+  publicly_accessible    = false
+  skip_final_snapshot    = false
+  tags                   = var.tags
+}
+`;
+}
+
+function awsDataModuleOutputs(): string {
+  return `output "bucket_id" {
+  description = "S3 bucket ID."
+  value       = aws_s3_bucket.object_storage.id
+}
+
+output "bucket_arn" {
+  description = "S3 bucket ARN."
+  value       = aws_s3_bucket.object_storage.arn
+}
+
+output "database_endpoint" {
+  description = "RDS endpoint when database creation is enabled."
+  value       = try(aws_db_instance.main[0].address, null)
+}
+`;
+}
+
+function azureNetworkModuleVariables(): string {
+  return `variable "project_name" {
+  description = "Lowercase project slug used in resource names."
+  type        = string
+}
+
+variable "location" {
+  description = "Azure region for network resources."
+  type        = string
+}
+
+variable "address_space" {
+  description = "Virtual network address space."
+  type        = list(string)
+  default     = ["10.50.0.0/16"]
+}
+
+variable "app_subnet_prefix" {
+  description = "Application subnet CIDR prefix."
+  type        = string
+  default     = "10.50.1.0/24"
+}
+
+variable "database_subnet_prefix" {
+  description = "Delegated database subnet CIDR prefix."
+  type        = string
+  default     = "10.50.10.0/24"
+}
+
+variable "ingress_source_prefix" {
+  description = "Source prefix allowed to reach HTTPS."
+  type        = string
+  default     = "VirtualNetwork"
+}
+
+variable "tags" {
+  description = "Tags to apply to all supported Azure resources."
+  type        = map(string)
+  default     = {}
+}
+`;
+}
+
+function azureNetworkModuleMain(): string {
+  return `resource "azurerm_resource_group" "this" {
+  name     = format("%s-rg", var.project_name)
+  location = var.location
+  tags     = var.tags
+}
+
+resource "azurerm_virtual_network" "this" {
+  name                = format("%s-vnet", var.project_name)
+  resource_group_name = azurerm_resource_group.this.name
+  location            = azurerm_resource_group.this.location
+  address_space       = var.address_space
+  tags                = var.tags
+}
+
+resource "azurerm_subnet" "app" {
+  name                 = "app"
+  resource_group_name  = azurerm_resource_group.this.name
+  virtual_network_name = azurerm_virtual_network.this.name
+  address_prefixes     = [var.app_subnet_prefix]
+}
+
+resource "azurerm_subnet" "database" {
+  name                 = "database"
+  resource_group_name  = azurerm_resource_group.this.name
+  virtual_network_name = azurerm_virtual_network.this.name
+  address_prefixes     = [var.database_subnet_prefix]
+
+  delegation {
+    name = "postgresql-flexible-server"
+
+    service_delegation {
+      name    = "Microsoft.DBforPostgreSQL/flexibleServers"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
+    }
+  }
+}
+
+resource "azurerm_network_security_group" "app" {
+  name                = format("%s-app-nsg", var.project_name)
+  resource_group_name = azurerm_resource_group.this.name
+  location            = azurerm_resource_group.this.location
+  tags                = var.tags
+
+  security_rule {
+    name                       = "AllowHttps"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "443"
+    source_address_prefix      = var.ingress_source_prefix
+    destination_address_prefix = "*"
+  }
+}
+
+resource "azurerm_subnet_network_security_group_association" "app" {
+  subnet_id                 = azurerm_subnet.app.id
+  network_security_group_id = azurerm_network_security_group.app.id
+}
+`;
+}
+
+function azureNetworkModuleOutputs(): string {
+  return `output "resource_group_name" {
+  description = "Generated resource group name."
+  value       = azurerm_resource_group.this.name
+}
+
+output "virtual_network_id" {
+  description = "Generated virtual network ID."
+  value       = azurerm_virtual_network.this.id
+}
+
+output "app_subnet_id" {
+  description = "Application subnet ID."
+  value       = azurerm_subnet.app.id
+}
+
+output "database_subnet_id" {
+  description = "Delegated database subnet ID."
+  value       = azurerm_subnet.database.id
+}
+
+output "app_network_security_group_id" {
+  description = "Application NSG ID."
+  value       = azurerm_network_security_group.app.id
+}
+`;
+}
+
+function azureComputeModuleVariables(): string {
+  return `variable "project_name" {
+  description = "Lowercase project slug used in resource names."
+  type        = string
+}
+
+variable "resource_group_name" {
+  description = "Resource group for compute resources."
+  type        = string
+}
+
+variable "location" {
+  description = "Azure region for compute resources."
+  type        = string
+}
+
+variable "subnet_id" {
+  description = "Subnet ID for VM network interfaces."
+  type        = string
+}
+
+variable "vm_size" {
+  description = "Azure VM size."
+  type        = string
+  default     = "Standard_B1s"
+}
+
+variable "instance_count" {
+  description = "Number of Linux VMs."
+  type        = number
+  default     = 1
+}
+
+variable "admin_username" {
+  description = "Admin username for SSH access."
+  type        = string
+  default     = "azureuser"
+}
+
+variable "ssh_public_key" {
+  description = "SSH public key from the platform secrets process."
+  type        = string
+  sensitive   = true
+}
+
+variable "tags" {
+  description = "Tags to apply to all supported Azure resources."
+  type        = map(string)
+  default     = {}
+}
+`;
+}
+
+function azureComputeModuleMain(): string {
+  return `resource "azurerm_network_interface" "app" {
+  count               = var.instance_count
+  name                = format("%s-nic-%02d", var.project_name, count.index + 1)
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  tags                = var.tags
+
+  ip_configuration {
+    name                          = "primary"
+    subnet_id                     = var.subnet_id
+    private_ip_address_allocation = "Dynamic"
+  }
+}
+
+resource "azurerm_linux_virtual_machine" "app" {
+  count                           = var.instance_count
+  name                            = format("%s-vm-%02d", var.project_name, count.index + 1)
+  resource_group_name             = var.resource_group_name
+  location                        = var.location
+  size                            = var.vm_size
+  admin_username                  = var.admin_username
+  disable_password_authentication = true
+  network_interface_ids           = [azurerm_network_interface.app[count.index].id]
+  tags                            = var.tags
+
+  admin_ssh_key {
+    username   = var.admin_username
+    public_key = var.ssh_public_key
+  }
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Premium_LRS"
+  }
+
+  source_image_reference {
+    publisher = "Canonical"
+    offer     = "0001-com-ubuntu-server-jammy"
+    sku       = "22_04-lts-gen2"
+    version   = "latest"
+  }
+}
+`;
+}
+
+function azureComputeModuleOutputs(): string {
+  return `output "virtual_machine_ids" {
+  description = "Linux VM IDs."
+  value       = azurerm_linux_virtual_machine.app[*].id
+}
+
+output "principal_ids" {
+  description = "System-assigned managed identity principal IDs."
+  value       = azurerm_linux_virtual_machine.app[*].identity[0].principal_id
+}
+
+output "private_ip_addresses" {
+  description = "Private IP addresses for VM NICs."
+  value       = azurerm_network_interface.app[*].private_ip_address
+}
+`;
+}
+
+function azureDataModuleVariables(): string {
+  return `variable "project_name" {
+  description = "Lowercase project slug used in resource names."
+  type        = string
+}
+
+variable "resource_group_name" {
+  description = "Resource group for data resources."
+  type        = string
+}
+
+variable "location" {
+  description = "Azure region for data resources."
+  type        = string
+}
+
+variable "enable_database" {
+  description = "Whether to create the PostgreSQL Flexible Server starter resource."
+  type        = bool
+  default     = false
+}
+
+variable "database_subnet_id" {
+  description = "Delegated subnet ID for PostgreSQL Flexible Server."
+  type        = string
+  default     = null
+}
+
+variable "private_dns_zone_id" {
+  description = "Private DNS zone ID for PostgreSQL private name resolution."
+  type        = string
+  default     = null
+}
+
+variable "db_admin_username" {
+  description = "Database administrator username."
+  type        = string
+  default     = "appadmin"
+}
+
+variable "db_admin_password" {
+  description = "Database administrator password. Provide from a secret manager or CI secret."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "tags" {
+  description = "Tags to apply to all supported Azure resources."
+  type        = map(string)
+  default     = {}
+}
+`;
+}
+
+function azureDataModuleMain(): string {
+  return `resource "azurerm_storage_account" "object_storage" {
+  name                            = lower(substr(replace(format("%sst", var.project_name), "-", ""), 0, 24))
+  resource_group_name             = var.resource_group_name
+  location                        = var.location
+  account_tier                    = "Standard"
+  account_replication_type        = "LRS"
+  min_tls_version                 = "TLS1_2"
+  allow_nested_items_to_be_public = false
+  tags                            = var.tags
+
+  blob_properties {
+    versioning_enabled = true
+  }
+}
+
+resource "azurerm_storage_container" "object_storage" {
+  name                  = "app-data"
+  storage_account_name  = azurerm_storage_account.object_storage.name
+  container_access_type = "private"
+}
+
+resource "azurerm_postgresql_flexible_server" "main" {
+  count                         = var.enable_database && var.database_subnet_id != null && var.private_dns_zone_id != null && var.db_admin_password != null ? 1 : 0
+  name                          = format("%s-pg", var.project_name)
+  resource_group_name           = var.resource_group_name
+  location                      = var.location
+  version                       = "16"
+  delegated_subnet_id           = var.database_subnet_id
+  private_dns_zone_id           = var.private_dns_zone_id
+  public_network_access_enabled = false
+  administrator_login           = var.db_admin_username
+  administrator_password        = var.db_admin_password
+  sku_name                      = "B_Standard_B1ms"
+  storage_mb                    = 32768
+  tags                          = var.tags
+}
+`;
+}
+
+function azureDataModuleOutputs(): string {
+  return `output "storage_account_id" {
+  description = "Storage account ID."
+  value       = azurerm_storage_account.object_storage.id
+}
+
+output "storage_container_name" {
+  description = "Private storage container name."
+  value       = azurerm_storage_container.object_storage.name
+}
+
+output "database_fqdn" {
+  description = "PostgreSQL FQDN when database creation is enabled."
+  value       = try(azurerm_postgresql_flexible_server.main[0].fqdn, null)
+}
+`;
+}
+
+function gcpNetworkModuleVariables(): string {
+  return `variable "project_name" {
+  description = "Lowercase project slug used in resource names."
+  type        = string
+}
+
+variable "region" {
+  description = "Google Cloud region for network resources."
+  type        = string
+}
+
+variable "network_cidr" {
+  description = "CIDR range for the application subnet."
+  type        = string
+  default     = "10.60.0.0/20"
+}
+
+variable "ingress_source_ranges" {
+  description = "CIDR ranges allowed to reach HTTPS."
+  type        = list(string)
+  default     = ["10.60.0.0/20"]
+}
+
+variable "labels" {
+  description = "Labels to apply to supported Google Cloud resources."
+  type        = map(string)
+  default     = {}
+}
+`;
+}
+
+function gcpNetworkModuleMain(): string {
+  return `resource "google_compute_network" "this" {
+  name                    = format("%s-vpc", var.project_name)
+  auto_create_subnetworks = false
+  routing_mode            = "REGIONAL"
+}
+
+resource "google_compute_subnetwork" "app" {
+  name                     = format("%s-app", var.project_name)
+  region                   = var.region
+  network                  = google_compute_network.this.id
+  ip_cidr_range            = var.network_cidr
+  private_ip_google_access = true
+}
+
+resource "google_compute_firewall" "https" {
+  name          = format("%s-allow-https", var.project_name)
+  network       = google_compute_network.this.name
+  source_ranges = var.ingress_source_ranges
+  target_tags   = [format("%s-app", var.project_name)]
+
+  allow {
+    protocol = "tcp"
+    ports    = ["443"]
+  }
+}
+`;
+}
+
+function gcpNetworkModuleOutputs(): string {
+  return `output "network_id" {
+  description = "Generated VPC network ID."
+  value       = google_compute_network.this.id
+}
+
+output "network_self_link" {
+  description = "Generated VPC network self link."
+  value       = google_compute_network.this.self_link
+}
+
+output "subnetwork_id" {
+  description = "Application subnetwork ID."
+  value       = google_compute_subnetwork.app.id
+}
+
+output "subnetwork_self_link" {
+  description = "Application subnetwork self link."
+  value       = google_compute_subnetwork.app.self_link
+}
+`;
+}
+
+function gcpComputeModuleVariables(): string {
+  return `variable "project_name" {
+  description = "Lowercase project slug used in resource names."
+  type        = string
+}
+
+variable "zone" {
+  description = "Google Cloud zone for Compute Engine instances."
+  type        = string
+}
+
+variable "machine_type" {
+  description = "Compute Engine machine type."
+  type        = string
+  default     = "e2-micro"
+}
+
+variable "instance_count" {
+  description = "Number of Compute Engine instances."
+  type        = number
+  default     = 1
+}
+
+variable "subnetwork_self_link" {
+  description = "Subnetwork self link for VM network interfaces."
+  type        = string
+}
+
+variable "image" {
+  description = "Approved boot image from the platform image pipeline."
+  type        = string
+  default     = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts"
+}
+
+variable "boot_disk_gb" {
+  description = "Boot disk size in GiB."
+  type        = number
+  default     = 30
+}
+
+variable "labels" {
+  description = "Labels to apply to supported Google Cloud resources."
+  type        = map(string)
+  default     = {}
+}
+`;
+}
+
+function gcpComputeModuleMain(): string {
+  return `resource "google_service_account" "app" {
+  account_id   = substr(format("%s-app", var.project_name), 0, 30)
+  display_name = format("%s application runtime", var.project_name)
+}
+
+resource "google_compute_instance" "app" {
+  count        = var.instance_count
+  name         = format("%s-app-%02d", var.project_name, count.index + 1)
+  zone         = var.zone
+  machine_type = var.machine_type
+  labels       = var.labels
+  tags         = [format("%s-app", var.project_name)]
+
+  boot_disk {
+    initialize_params {
+      image = var.image
+      size  = var.boot_disk_gb
+      type  = "pd-balanced"
+    }
+  }
+
+  network_interface {
+    subnetwork = var.subnetwork_self_link
+  }
+
+  metadata = {
+    enable-oslogin = "TRUE"
+  }
+
+  service_account {
+    email  = google_service_account.app.email
+    scopes = ["https://www.googleapis.com/auth/cloud-platform"]
+  }
+
+  shielded_instance_config {
+    enable_integrity_monitoring = true
+    enable_secure_boot          = true
+    enable_vtpm                 = true
+  }
+}
+`;
+}
+
+function gcpComputeModuleOutputs(): string {
+  return `output "instance_ids" {
+  description = "Compute Engine instance IDs."
+  value       = google_compute_instance.app[*].id
+}
+
+output "service_account_email" {
+  description = "Runtime service account email."
+  value       = google_service_account.app.email
+}
+
+output "private_ips" {
+  description = "Private IP addresses for instances."
+  value       = google_compute_instance.app[*].network_interface[0].network_ip
+}
+`;
+}
+
+function gcpDataModuleVariables(): string {
+  return `variable "project_name" {
+  description = "Lowercase project slug used in resource names."
+  type        = string
+}
+
+variable "region" {
+  description = "Google Cloud region for data resources."
+  type        = string
+}
+
+variable "bucket_name" {
+  description = "Globally unique Cloud Storage bucket name."
+  type        = string
+}
+
+variable "enable_database" {
+  description = "Whether to create the Cloud SQL starter resource."
+  type        = bool
+  default     = false
+}
+
+variable "private_network" {
+  description = "VPC network ID or self link for private Cloud SQL access."
+  type        = string
+  default     = null
+}
+
+variable "database_tier" {
+  description = "Cloud SQL instance tier."
+  type        = string
+  default     = "db-f1-micro"
+}
+
+variable "db_username" {
+  description = "Database username."
+  type        = string
+  default     = "appuser"
+}
+
+variable "db_password" {
+  description = "Database password. Provide from Secret Manager or CI secret."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "deletion_protection" {
+  description = "Whether Cloud SQL deletion protection is enabled."
+  type        = bool
+  default     = true
+}
+
+variable "labels" {
+  description = "Labels to apply to supported Google Cloud resources."
+  type        = map(string)
+  default     = {}
+}
+`;
+}
+
+function gcpDataModuleMain(): string {
+  return `resource "google_storage_bucket" "object_storage" {
+  name                        = var.bucket_name
+  location                    = var.region
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+  labels                      = var.labels
+
+  versioning {
+    enabled = true
+  }
+}
+
+resource "google_sql_database_instance" "main" {
+  count               = var.enable_database && var.private_network != null && var.db_password != null ? 1 : 0
+  name                = format("%s-sql", var.project_name)
+  region              = var.region
+  database_version    = "POSTGRES_16"
+  deletion_protection = var.deletion_protection
+
+  settings {
+    tier              = var.database_tier
+    availability_type = "ZONAL"
+    disk_autoresize   = true
+
+    ip_configuration {
+      ipv4_enabled    = false
+      private_network = var.private_network
+    }
+
+    backup_configuration {
+      enabled                        = true
+      point_in_time_recovery_enabled = true
+    }
+  }
+}
+
+resource "google_sql_user" "app" {
+  count    = var.enable_database && var.private_network != null && var.db_password != null ? 1 : 0
+  name     = var.db_username
+  instance = google_sql_database_instance.main[0].name
+  password = var.db_password
+}
+`;
+}
+
+function gcpDataModuleOutputs(): string {
+  return `output "bucket_name" {
+  description = "Cloud Storage bucket name."
+  value       = google_storage_bucket.object_storage.name
+}
+
+output "bucket_url" {
+  description = "Cloud Storage bucket URL."
+  value       = google_storage_bucket.object_storage.url
+}
+
+output "database_connection_name" {
+  description = "Cloud SQL connection name when database creation is enabled."
+  value       = try(google_sql_database_instance.main[0].connection_name, null)
+}
 `;
 }
 
@@ -2218,6 +3440,7 @@ function serviceMappings(
 function validateGeneratedFiles(
   targetCloud: TerraformTargetCloud,
   files: TerraformGeneratedFile[],
+  archive: TerraformBundleArchive,
 ): TerraformGenerationValidation {
   const joined = files.map((file) => file.content).join('\n');
   const checks = [
@@ -2283,9 +3506,45 @@ function validateGeneratedFiles(
       message: 'Generated bundle includes local validation and terraform test entry points.',
     },
     {
+      id: 'bundle-manifest-generated',
+      status:
+        files.some((file) => file.path === 'BUNDLE-MANIFEST.json') &&
+        joined.includes('polycost.terraform.bundle.v1')
+          ? 'passed'
+          : 'warning',
+      message: 'Generated bundle includes a manifest with file hashes and validation commands.',
+    },
+    {
+      id: 'validation-runner-generated',
+      status:
+        files.some((file) => file.path === 'scripts/validate-bundle.mjs') &&
+        joined.includes('terraform-validation-result.json')
+          ? 'passed'
+          : 'warning',
+      message: 'Generated bundle includes an operator-side validation runner script.',
+    },
+    {
+      id: 'zip-archive-generated',
+      status:
+        archive.format === 'zip' &&
+        archive.mimeType === 'application/zip' &&
+        archive.contentBase64.length > 0 &&
+        archive.sha256.length === 64 &&
+        archive.sizeBytes > 0
+          ? 'passed'
+          : 'warning',
+      message: 'Generated Terraform files are packaged into a downloadable ZIP archive.',
+    },
+    {
       id: 'module-boundary-scaffold',
       status: files.some((file) => file.path === 'modules/README.md') ? 'passed' : 'warning',
       message: 'Generated bundle includes module boundary documentation for platform extraction.',
+    },
+    {
+      id: 'module-library-generated',
+      status: hasModuleLibrary(files) ? 'passed' : 'warning',
+      message:
+        'Generated bundle includes reusable network, compute, and data starter module files.',
     },
     {
       id: 'framework-alignment-pack',
@@ -2311,6 +3570,12 @@ function validateGeneratedFiles(
     checks,
     commands: [
       {
+        command: 'node scripts/validate-bundle.mjs',
+        status: 'not-run',
+        message:
+          'Runs generated validation steps and writes terraform-validation-result.json after saving files.',
+      },
+      {
         command: 'make validate',
         status: 'not-run',
         message:
@@ -2333,6 +3598,23 @@ function validateGeneratedFiles(
       },
     ],
   };
+}
+
+function hasModuleLibrary(files: TerraformGeneratedFile[]): boolean {
+  const paths = new Set(files.map((file) => file.path));
+  const requiredFiles = [
+    'modules/network/variables.tf',
+    'modules/network/main.tf',
+    'modules/network/outputs.tf',
+    'modules/compute/variables.tf',
+    'modules/compute/main.tf',
+    'modules/compute/outputs.tf',
+    'modules/data/variables.tf',
+    'modules/data/main.tf',
+    'modules/data/outputs.tf',
+  ];
+
+  return requiredFiles.every((path) => paths.has(path));
 }
 
 function hasPrivateDatabaseNetworking(targetCloud: TerraformTargetCloud, content: string): boolean {
@@ -2399,9 +3681,158 @@ function containsHardcodedSecretDefault(content: string): boolean {
     const name = chunk.match(/variable\s+"([^"]+)"/)?.[1] ?? '';
     const secretLike =
       /(password|secret|token|private_key|client_secret)/i.test(name) && !/public_key/i.test(name);
+    const defaultValue = chunk.match(/\n\s*default\s*=\s*([^\n]+)/)?.[1]?.trim();
 
-    return secretLike && /\n\s*default\s*=/.test(chunk);
+    return secretLike && defaultValue !== undefined && defaultValue !== 'null';
   });
+}
+
+function generatedFile(path: string, content: string): TerraformGeneratedFile {
+  const normalizedContent = ensureTrailingNewline(content);
+
+  return {
+    path,
+    content: normalizedContent,
+    sha256: sha256(normalizedContent),
+  };
+}
+
+function bundleManifest(input: {
+  bundleName: string;
+  generatedAt: string;
+  targetCloud: TerraformTargetCloud;
+  facts: WorkloadFacts;
+  files: TerraformGeneratedFile[];
+}): string {
+  return JSON.stringify(
+    {
+      schemaVersion: 'polycost.terraform.bundle.v1',
+      bundleName: input.bundleName,
+      generatedAt: input.generatedAt,
+      targetCloud: input.targetCloud,
+      workspaceName: input.facts.projectName,
+      region: input.facts.region,
+      generationProfile: input.facts.generationProfile,
+      resourceSummary: input.facts.resourceSummary,
+      validationRunner: 'scripts/validate-bundle.mjs',
+      validationCommands: [
+        'node scripts/validate-bundle.mjs',
+        'make validate',
+        'terraform test',
+        'terraform plan -var-file=terraform.tfvars -out=tfplan',
+        'conftest test tfplan.json --policy policies',
+      ],
+      files: input.files.map((file) => ({
+        path: file.path,
+        sha256: file.sha256,
+        sizeBytes: Buffer.byteLength(file.content, 'utf8'),
+      })),
+    },
+    null,
+    2,
+  );
+}
+
+function zipArchive(filename: string, files: TerraformGeneratedFile[]): TerraformBundleArchive {
+  const localParts: Buffer[] = [];
+  const centralParts: Buffer[] = [];
+  let localOffset = 0;
+
+  for (const entry of files) {
+    const pathBuffer = Buffer.from(entry.path, 'utf8');
+    const contentBuffer = Buffer.from(entry.content, 'utf8');
+    const checksum = crc32(contentBuffer);
+    const localHeader = Buffer.alloc(30);
+
+    localHeader.writeUInt32LE(0x04034b50, 0);
+    localHeader.writeUInt16LE(20, 4);
+    localHeader.writeUInt16LE(0x0800, 6);
+    localHeader.writeUInt16LE(0, 8);
+    localHeader.writeUInt16LE(0, 10);
+    localHeader.writeUInt16LE(33, 12);
+    localHeader.writeUInt32LE(checksum, 14);
+    localHeader.writeUInt32LE(contentBuffer.length, 18);
+    localHeader.writeUInt32LE(contentBuffer.length, 22);
+    localHeader.writeUInt16LE(pathBuffer.length, 26);
+    localHeader.writeUInt16LE(0, 28);
+
+    localParts.push(localHeader, pathBuffer, contentBuffer);
+
+    const centralHeader = Buffer.alloc(46);
+    centralHeader.writeUInt32LE(0x02014b50, 0);
+    centralHeader.writeUInt16LE(20, 4);
+    centralHeader.writeUInt16LE(20, 6);
+    centralHeader.writeUInt16LE(0x0800, 8);
+    centralHeader.writeUInt16LE(0, 10);
+    centralHeader.writeUInt16LE(0, 12);
+    centralHeader.writeUInt16LE(33, 14);
+    centralHeader.writeUInt32LE(checksum, 16);
+    centralHeader.writeUInt32LE(contentBuffer.length, 20);
+    centralHeader.writeUInt32LE(contentBuffer.length, 24);
+    centralHeader.writeUInt16LE(pathBuffer.length, 28);
+    centralHeader.writeUInt16LE(0, 30);
+    centralHeader.writeUInt16LE(0, 32);
+    centralHeader.writeUInt16LE(0, 34);
+    centralHeader.writeUInt16LE(0, 36);
+    centralHeader.writeUInt32LE(0, 38);
+    centralHeader.writeUInt32LE(localOffset, 42);
+
+    centralParts.push(centralHeader, pathBuffer);
+    localOffset += localHeader.length + pathBuffer.length + contentBuffer.length;
+  }
+
+  const centralDirectory = Buffer.concat(centralParts);
+  const endOfCentralDirectory = Buffer.alloc(22);
+
+  endOfCentralDirectory.writeUInt32LE(0x06054b50, 0);
+  endOfCentralDirectory.writeUInt16LE(0, 4);
+  endOfCentralDirectory.writeUInt16LE(0, 6);
+  endOfCentralDirectory.writeUInt16LE(files.length, 8);
+  endOfCentralDirectory.writeUInt16LE(files.length, 10);
+  endOfCentralDirectory.writeUInt32LE(centralDirectory.length, 12);
+  endOfCentralDirectory.writeUInt32LE(localOffset, 16);
+  endOfCentralDirectory.writeUInt16LE(0, 20);
+
+  const archive = Buffer.concat([...localParts, centralDirectory, endOfCentralDirectory]);
+
+  return {
+    filename,
+    format: 'zip',
+    mimeType: 'application/zip',
+    contentBase64: archive.toString('base64'),
+    sha256: sha256Buffer(archive),
+    sizeBytes: archive.length,
+  };
+}
+
+const CRC32_TABLE = createCrc32Table();
+
+function createCrc32Table(): number[] {
+  const table: number[] = [];
+
+  for (let index = 0; index < 256; index += 1) {
+    let checksum = index;
+
+    for (let bit = 0; bit < 8; bit += 1) {
+      checksum = checksum & 1 ? 0xedb88320 ^ (checksum >>> 1) : checksum >>> 1;
+    }
+
+    table.push(checksum >>> 0);
+  }
+
+  return table;
+}
+
+function crc32(data: Buffer): number {
+  let checksum = 0xffffffff;
+
+  for (const byte of data) {
+    const tableIndex = (checksum ^ byte) & 0xff;
+    // eslint-disable-next-line security/detect-object-injection -- Reviewed 2026-07-07: CRC table index is masked to 0-255; see docs/SECURITY-SUPPRESSIONS.md.
+    checksum = (checksum >>> 8) ^ CRC32_TABLE[tableIndex];
+  }
+
+  return (checksum ^ 0xffffffff) >>> 0;
 }
 
 function file(path: string, content: string): TerraformBundleDraft['files'][number] {
@@ -2710,5 +4141,9 @@ function ensureTrailingNewline(value: string): string {
 }
 
 function sha256(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function sha256Buffer(value: Buffer): string {
   return createHash('sha256').update(value).digest('hex');
 }

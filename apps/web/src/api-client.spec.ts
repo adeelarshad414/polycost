@@ -104,6 +104,14 @@ describe('api client', () => {
       },
       serviceMappings: [],
       files: [],
+      archive: {
+        filename: 'portal-aws-terraform.zip',
+        format: 'zip',
+        mimeType: 'application/zip',
+        contentBase64: 'UEsDBAoAAAAAAAEAIQAAAAAA',
+        sha256: 'a'.repeat(64),
+        sizeBytes: 128,
+      },
       validation: {
         status: 'passed',
         executionMode: 'static',

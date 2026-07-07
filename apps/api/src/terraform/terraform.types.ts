@@ -39,6 +39,15 @@ export interface TerraformGeneratedFile {
   sha256: string;
 }
 
+export interface TerraformBundleArchive {
+  filename: string;
+  format: 'zip';
+  mimeType: 'application/zip';
+  contentBase64: string;
+  sha256: string;
+  sizeBytes: number;
+}
+
 export interface TerraformValidationCheck {
   id: string;
   status: TerraformValidationStatus;
@@ -91,6 +100,7 @@ export interface TerraformGenerationResult {
     note: string;
   }>;
   files: TerraformGeneratedFile[];
+  archive: TerraformBundleArchive;
   validation: TerraformGenerationValidation;
   assumptions: string[];
   securityNotes: string[];

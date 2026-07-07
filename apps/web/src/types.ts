@@ -308,6 +308,14 @@ export interface TerraformGenerationResult {
     content: string;
     sha256: string;
   }>;
+  archive: {
+    filename: string;
+    format: 'zip';
+    mimeType: 'application/zip';
+    contentBase64: string;
+    sha256: string;
+    sizeBytes: number;
+  };
   validation: {
     status: 'passed' | 'warning' | 'failed';
     executionMode: 'static' | 'static-plus-policy';
