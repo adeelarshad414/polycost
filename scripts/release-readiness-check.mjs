@@ -39,6 +39,9 @@ if (!packageJson.scripts?.['provider:credentials:check']) {
 if (!packageJson.scripts?.['progress:verify']) {
   failures.push('package.json is missing progress:verify');
 }
+if (!packageJson.scripts?.['live:verify']) {
+  failures.push('package.json is missing live:verify');
+}
 if (!packageJson.scripts?.check?.includes('npm run provider:credentials:check')) {
   failures.push('package.json check script must include npm run provider:credentials:check');
 }
@@ -110,8 +113,13 @@ await assertFileContains('.github/workflows/ci.yml', [
   ['provider credential readiness CI gate', 'npm run provider:credentials:check'],
   ['full progress verification CI gate', 'npm run progress:verify'],
   ['production-readiness focused regression CI gate', 'npm run test:production-readiness'],
+  ['live E2E verification CI gate', 'npm run ci:e2e'],
   ['Node 20 impeccable skip reason', 'impeccable@3.1.0'],
   ['Node 24 release tracking note', 'RELEASE-CHECKLIST.md'],
+]);
+
+await assertFileContains('scripts/ci-e2e.mjs', [
+  ['live verification inside compose E2E', "npmCommand, ['run', 'live:verify']"],
 ]);
 
 await assertFileContains('apps/api/src/pricing-normalization/pricing-reconciliation.spec.ts', [

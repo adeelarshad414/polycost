@@ -21,70 +21,126 @@ say so explicitly rather than marking it done.
 
 ## Phase status overview
 
-| Phase                                                  | Status                               | Last updated |
-| ------------------------------------------------------ | ------------------------------------ | ------------ |
-| 0 - Build plan & approval                              | Complete                             | 2026-06-28   |
-| 1 - Repo scaffold                                      | Complete                             | 2026-06-28   |
-| 2 - Data layer (Postgres schema, NWS types, validator) | Complete                             | 2026-06-28   |
-| 3 - Cloud provider adapters                            | Complete                             | 2026-06-28   |
-| 4 - Pricing ETL job                                    | Complete                             | 2026-06-28   |
-| 5 - NWS Parser Module                                  | Complete                             | 2026-06-28   |
-| 6 - Comparison Engine                                  | Complete                             | 2026-06-29   |
-| 7 - Report Module                                      | Complete                             | 2026-06-29   |
-| 8 - API layer                                          | Complete                             | 2026-06-29   |
-| 9 - Frontend                                           | Complete                             | 2026-06-29   |
-| 10 - E2E verification against MVP acceptance criteria  | Complete                             | 2026-07-01   |
-| Post-Phase 10 report export evidence polish            | Complete                             | 2026-07-01   |
-| Post-Phase 10 Playwright browser journey coverage      | Complete                             | 2026-07-01   |
-| AI-native Phase 1 reimagining pass                     | Complete with known gaps (see notes) | 2026-07-01   |
-| Phase 2 - Diagram-to-cost intelligence                 | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.7 - Invoice/auth/VSDX gap closure              | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8 - Gap-closure production readiness           | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8A - Auth product UX continuation              | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8B - Invite/SSO auth hardening                 | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8C - Diagram partial-parse hardening           | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8D - Security suppression cleanup              | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8E - UI-priced service coverage guard          | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8F - SKU evidence derivation hardening         | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8G - Catalog lineage readback hardening        | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8H - Pricing honesty UI labeling               | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8I - AWS ETL network SKU hardening             | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8J - Diagram LLM fallback diagnostics          | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8K - Auth RBAC UI enforcement polish           | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8L - Release hygiene evidence polish           | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8M - Session policy documentation              | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8N - API RBAC matrix hardening                 | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8O - Production-readiness CI gate              | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8P - Queryable comparison pricing evidence     | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8Q - Visible pricing evidence UI wiring        | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8R - Refresh-live evidence regression          | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8S - Reconciliation coverage hardening         | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8T - VSDX review evidence context              | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8U - Diagram LLM cost guard                    | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8V - Diagram LLM batch classification          | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8W - Security advisory ledger refresh          | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8X - Workspace session expiry UX               | Complete with known gaps (see notes) | 2026-07-06   |
-| Phase 2.8Y - Mock OIDC workspace UX                    | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8Z - Diagram fixture corpus tier table         | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AA - UI-priced SKU evidence guard             | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AB - GCP pricing credential fallback          | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AC - VSDX page/container evidence             | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AD - Auth controller guard coverage           | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AE - Release readiness automation             | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AF - Billing reconciliation RBAC hardening    | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AG - UI priced-family coverage drift guard    | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AH - Diagram export evidence hardening        | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AI - Security suppression hygiene gate        | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AJ - Auth endpoint rate-limit hardening       | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AK - Pricing reconciliation breadth guard     | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AL - Auth team UX state hardening             | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AM - VSDX visual evidence polish              | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AN - Local credential readiness gate          | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AO - Production-readiness suite drift guard   | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AP - Security ledger coverage enforcement     | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AQ - Impeccable CI tracking guard             | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AR - End-to-end smoke proof hardening         | Complete with known gaps (see notes) | 2026-07-07   |
-| Phase 2.8AS - Full progress verification gate          | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase                                                   | Status                               | Last updated |
+| ------------------------------------------------------- | ------------------------------------ | ------------ |
+| 0 - Build plan & approval                               | Complete                             | 2026-06-28   |
+| 1 - Repo scaffold                                       | Complete                             | 2026-06-28   |
+| 2 - Data layer (Postgres schema, NWS types, validator)  | Complete                             | 2026-06-28   |
+| 3 - Cloud provider adapters                             | Complete                             | 2026-06-28   |
+| 4 - Pricing ETL job                                     | Complete                             | 2026-06-28   |
+| 5 - NWS Parser Module                                   | Complete                             | 2026-06-28   |
+| 6 - Comparison Engine                                   | Complete                             | 2026-06-29   |
+| 7 - Report Module                                       | Complete                             | 2026-06-29   |
+| 8 - API layer                                           | Complete                             | 2026-06-29   |
+| 9 - Frontend                                            | Complete                             | 2026-06-29   |
+| 10 - E2E verification against MVP acceptance criteria   | Complete                             | 2026-07-01   |
+| Post-Phase 10 report export evidence polish             | Complete                             | 2026-07-01   |
+| Post-Phase 10 Playwright browser journey coverage       | Complete                             | 2026-07-01   |
+| AI-native Phase 1 reimagining pass                      | Complete with known gaps (see notes) | 2026-07-01   |
+| Phase 2 - Diagram-to-cost intelligence                  | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.7 - Invoice/auth/VSDX gap closure               | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8 - Gap-closure production readiness            | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8A - Auth product UX continuation               | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8B - Invite/SSO auth hardening                  | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8C - Diagram partial-parse hardening            | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8D - Security suppression cleanup               | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8E - UI-priced service coverage guard           | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8F - SKU evidence derivation hardening          | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8G - Catalog lineage readback hardening         | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8H - Pricing honesty UI labeling                | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8I - AWS ETL network SKU hardening              | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8J - Diagram LLM fallback diagnostics           | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8K - Auth RBAC UI enforcement polish            | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8L - Release hygiene evidence polish            | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8M - Session policy documentation               | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8N - API RBAC matrix hardening                  | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8O - Production-readiness CI gate               | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8P - Queryable comparison pricing evidence      | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8Q - Visible pricing evidence UI wiring         | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8R - Refresh-live evidence regression           | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8S - Reconciliation coverage hardening          | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8T - VSDX review evidence context               | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8U - Diagram LLM cost guard                     | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8V - Diagram LLM batch classification           | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8W - Security advisory ledger refresh           | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8X - Workspace session expiry UX                | Complete with known gaps (see notes) | 2026-07-06   |
+| Phase 2.8Y - Mock OIDC workspace UX                     | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8Z - Diagram fixture corpus tier table          | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AA - UI-priced SKU evidence guard              | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AB - GCP pricing credential fallback           | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AC - VSDX page/container evidence              | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AD - Auth controller guard coverage            | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AE - Release readiness automation              | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AF - Billing reconciliation RBAC hardening     | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AG - UI priced-family coverage drift guard     | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AH - Diagram export evidence hardening         | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AI - Security suppression hygiene gate         | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AJ - Auth endpoint rate-limit hardening        | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AK - Pricing reconciliation breadth guard      | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AL - Auth team UX state hardening              | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AM - VSDX visual evidence polish               | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AN - Local credential readiness gate           | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AO - Production-readiness suite drift guard    | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AP - Security ledger coverage enforcement      | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AQ - Impeccable CI tracking guard              | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AR - End-to-end smoke proof hardening          | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AS - Full progress verification gate           | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AT - Live timed journey and Redis verification | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AT - Live timed journey and Redis verification
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added `npm run live:verify`, backed by `scripts/live-verification.mjs`, as a
+  Compose-aware production-readiness browser/runtime proof. The verifier opens the
+  built web app through the configured host port, runs a template comparison,
+  uploads the draw.io fixture, generates a real PDF download, checks page-level
+  horizontal overflow, and deliberately stops/restarts Redis to validate degraded
+  health behavior.
+- Wired `npm run ci:e2e` to run `npm run live:verify` after the existing API E2E
+  and Playwright browser suites pass, making the timed UX and runtime-degradation
+  checks part of the local E2E gate.
+- Extended `scripts/release-readiness-check.mjs` and
+  `scripts/full-progress-verification-check.mjs` so release/progress gates fail if
+  the live verifier or its CI wiring is removed.
+
+Verification:
+
+- `npm run progress:verify` passes: 92 phase evidence anchors verified.
+- `npm run release:check` passes.
+- `npm run check` passes end-to-end:
+  - API unit tests: `49 suites / 385 tests`.
+  - Web unit tests: `9 suites / 128 tests`.
+  - Graph validation: `282 nodes / 282 edges`.
+  - Pricing service coverage: `36 frontend priced families` covered by the API
+    pricing guard.
+  - QA, security suppressions, devops/cloud/release, and provider-credential
+    readiness checks all pass; `impeccable` remains the documented Node 24-only
+    skip on the Node 20 target runtime.
+- `npm run security:audit` passes at the high-severity gate; npm still reports the
+  documented low transitive Graphify/Ollama advisory with no available safe fix.
+- `env DOCKER_CONTEXT=colima VAULT_HOST_PORT=18200 WEB_PORT=3002 npm run ci:e2e`
+  passes end-to-end:
+  - API E2E: `16 passed, 16 total`.
+  - Web Playwright: `6 passed`.
+  - Live verifier: template-to-recommendation `395ms` under the `60000ms` limit.
+  - Live verifier: diagram-to-PDF `2522ms` under the `180000ms` limit.
+  - Live verifier: Redis stopped and `/health=degraded`,
+    `/health/deep=degraded`, `/api/v1/data-health` remained HTTP `200`, then Redis
+    restarted and health returned to `ok`.
+
+Known remaining gaps:
+
+- This closes the previously unproved live timed-journey and Redis-degradation
+  evidence gap for the local/mock Compose stack. It is still `verified (mock)` for
+  pricing-provider behavior because real provider credentials are intentionally not
+  required in CI.
+- Hosted GitHub Actions for PR #24 remains the same external runner/account blocker
+  documented in Phase 2.8AS unless the remote run is manually rerun and reaches
+  actual workflow steps. Local gates remain green and now include the live verifier.
 
 ## Phase 2.8AS - Full progress verification gate
 

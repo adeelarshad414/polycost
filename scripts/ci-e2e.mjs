@@ -39,6 +39,8 @@ try {
   if (testsFailed) {
     process.exitCode = result.status ?? 1;
     printComposeDiagnostics();
+  } else {
+    run(npmCommand, ['run', 'live:verify']);
   }
 } catch (error) {
   runnerFailure = error;

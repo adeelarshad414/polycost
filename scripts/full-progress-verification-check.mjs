@@ -102,6 +102,8 @@ async function assertPhaseEvidenceAnchors() {
     'npm run pricing:coverage:check',
     'npm run provider:credentials:check',
   ]);
+  assertScriptIncludes(packageJson, 'ci:e2e', ['node scripts/ci-e2e.mjs']);
+  assertScriptIncludes(packageJson, 'live:verify', ['node scripts/live-verification.mjs']);
   assertScriptIncludes(packageJson, 'test:production-readiness', [
     'src/pricing-normalization/pricing-reconciliation.spec.ts',
     'src/api/live-pricing-traceability.spec.ts',
@@ -217,6 +219,20 @@ async function assertPhaseEvidenceAnchors() {
     ['production-readiness CI gate', 'npm run test:production-readiness'],
     ['E2E CI gate', 'npm run ci:e2e'],
     ['security audit CI gate', 'npm run security:audit'],
+  ]);
+
+  await assertFileContains('scripts/ci-e2e.mjs', [
+    ['live verification runs inside Compose E2E', "run(npmCommand, ['run', 'live:verify'])"],
+  ]);
+
+  await assertFileContains('scripts/live-verification.mjs', [
+    ['template timing threshold', 'POLYCOST_TEMPLATE_JOURNEY_MAX_MS'],
+    ['diagram timing threshold', 'POLYCOST_DIAGRAM_JOURNEY_MAX_MS'],
+    ['template-to-recommendation assertion', 'template-to-recommendation journey'],
+    ['diagram-to-PDF assertion', 'diagram-to-PDF journey'],
+    ['Redis stop verification', "['compose', 'stop', 'redis']"],
+    ['degraded health assertion', 'degraded health'],
+    ['PDF download assertion', 'Expected a PDF download'],
   ]);
 
   evidenceAnchors += 1;
