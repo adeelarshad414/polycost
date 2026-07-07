@@ -83,6 +83,50 @@ say so explicitly rather than marking it done.
 | Phase 2.8AO - Production-readiness suite drift guard   | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AP - Security ledger coverage enforcement     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AQ - Impeccable CI tracking guard             | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AR - End-to-end smoke proof hardening         | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AR - End-to-end smoke proof hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Extended the Compose-backed API MVP acceptance suite from 14 to 16 tests. The new
+  coverage proves anonymous comparison evidence expansion, passworded public share
+  report access/analytics/revocation, and the authenticated signup -> invite ->
+  accept -> owner role-change -> mock OIDC team-scoped login -> member 403 billing
+  denial flow.
+- Added migration `029_auth_billing_runtime_privileges.sql` so the least-privilege
+  runtime `polycost_app` role can use the auth, team, invite, SSO, billing import,
+  and reconciliation tables created after the original privilege migration.
+- Updated fresh Postgres bootstrap to run migrations 024-029 before first API use,
+  closing a clean-clone/demo readiness gap for later auth and pricing-lineage tables.
+- Made the Compose/E2E host ports resilient to local developer collisions:
+  `VAULT_HOST_PORT` now controls the Vault host port, and `ci:e2e` propagates
+  `WEB_PORT` / `POLYCOST_WEB_BASE_URL` into both API E2E and Playwright.
+
+Verification:
+
+- `npm run format:check` passes.
+- `npm run typecheck --workspace @polycost/api` passes.
+- `npm run db:validate` passes; live migration `029` was also applied during the
+  Compose E2E run.
+- `npm run check` passes end-to-end, including lint, typecheck, unit tests, graph
+  validation, pricing coverage, QA, DB validation, DevOps/cloud/release checks, and
+  provider credential readiness.
+- `npm run security:audit` passes at the repo's high-severity gate; it still reports
+  only the documented low Graphify/Ollama transitive advisory with no available safe
+  fix.
+- `VAULT_HOST_PORT=18200 WEB_PORT=3002 npm run ci:e2e` passes end-to-end:
+  API E2E `16 passed, 16 total`; web Playwright `6 passed`.
+
+Known remaining gaps:
+
+- This proves the complete local/mock live-stack smoke path and fixes the auth-table
+  runtime privilege gap, but GitHub-hosted CI remains externally blocked by the
+  repository account billing/spending-limit condition until the account issue is
+  resolved.
 
 ## Phase 2.8AQ - Impeccable CI tracking guard
 

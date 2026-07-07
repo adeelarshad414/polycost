@@ -34,6 +34,7 @@ const expectedMigrations = [
   '026_auth_sessions_and_billing_actuals.sql',
   '027_team_invites_and_sso.sql',
   '028_pricing_lineage_metadata.sql',
+  '029_auth_billing_runtime_privileges.sql',
 ];
 
 if (!['migrate', 'seed', 'reset', 'validate'].includes(command)) {

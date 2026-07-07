@@ -3,19 +3,26 @@ import { spawnSync } from 'node:child_process';
 const root = process.cwd();
 const skipCompose = process.env.POLYCOST_E2E_SKIP_COMPOSE === '1';
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const apiOrigin =
+  process.env.POLYCOST_API_ORIGIN ?? `http://localhost:${process.env.API_PORT ?? '3001'}`;
+const webOrigin =
+  process.env.POLYCOST_WEB_BASE_URL ?? `http://localhost:${process.env.WEB_PORT ?? '3000'}`;
 let runnerFailure;
 let testsFailed = false;
 
 try {
+  process.env.POLYCOST_API_BASE_URL = process.env.POLYCOST_API_BASE_URL ?? `${apiOrigin}/api/v1`;
+  process.env.POLYCOST_WEB_BASE_URL = webOrigin;
+
   if (!skipCompose) {
     run('docker', ['compose', 'up', '--build', '-d', '--remove-orphans']);
     run(npmCommand, ['run', 'db:migrate']);
   }
 
-  await waitForJson('API health', 'http://localhost:3001/health', (body) => {
+  await waitForJson('API health', `${apiOrigin}/health`, (body) => {
     return body?.status === 'ok' && body?.service === 'polycost-api';
   });
-  await waitForText('web shell', 'http://localhost:3000', (body) => {
+  await waitForText('web shell', webOrigin, (body) => {
     return body.includes('PolyCost') && body.includes('<div id="root">');
   });
 

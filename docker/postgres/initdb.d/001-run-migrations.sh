@@ -52,7 +52,13 @@ for migration in \
   020_pricing_rates_estimate_only_guard.sql \
   021_seed_distinct_payment_option_rates.sql \
   022_diagram_imports.sql \
-  023_seed_sql_server_database_catalog.sql
+  023_seed_sql_server_database_catalog.sql \
+  024_comparison_audit_pricing_trace.sql \
+  025_account_team_foundation.sql \
+  026_auth_sessions_and_billing_actuals.sql \
+  027_team_invites_and_sso.sql \
+  028_pricing_lineage_metadata.sql \
+  029_auth_billing_runtime_privileges.sql
 do
   psql \
     --username "$POSTGRES_USER" \
