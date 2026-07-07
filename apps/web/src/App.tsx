@@ -2030,7 +2030,7 @@ function WorkspaceControlCenter({
     return () => {
       isMounted = false;
     };
-  }, [client, onError, session, token, workspaceBusy]);
+  }, [client, onError, session, token]);
 
   useEffect(() => {
     setTeamSettingsName(activeTeam?.name ?? '');
@@ -2069,7 +2069,7 @@ function WorkspaceControlCenter({
     return () => {
       isMounted = false;
     };
-  }, [activeTeam, canManageTeam, client, onError, token, workspaceBusy]);
+  }, [activeTeam?.id, canManageTeam, client, onError, token]);
 
   async function handleAuthSubmit(event: FormEvent) {
     event.preventDefault();
@@ -2132,6 +2132,7 @@ function WorkspaceControlCenter({
 
     try {
       const result = await client.revokeOtherSessions(token);
+      setAccountSessions((current) => current.filter((accountSession) => accountSession.current));
       onNotice(`Signed out ${result.revoked} other session${result.revoked === 1 ? '' : 's'}.`);
     } catch (sessionError) {
       onError(formatApiError(sessionError));
@@ -2340,6 +2341,10 @@ function WorkspaceControlCenter({
         },
         token,
       );
+      setInvitations((current) => [
+        invitation,
+        ...current.filter((currentInvitation) => currentInvitation.id !== invitation.id),
+      ]);
       setLastInviteToken(invitation.inviteToken ?? null);
       setLastInviteUrl(invitation.inviteUrl ?? null);
       onNotice(
@@ -2364,6 +2369,9 @@ function WorkspaceControlCenter({
     try {
       const accepted = await client.acceptTeamInvitation(acceptToken, token);
       setAcceptToken('');
+      setInvitations((current) =>
+        current.map((invitation) => (invitation.id === accepted.id ? accepted : invitation)),
+      );
       setInvitePreview((current) =>
         current
           ? {
@@ -2391,7 +2399,10 @@ function WorkspaceControlCenter({
     onError(null);
 
     try {
-      await client.revokeTeamInvitation(activeTeam.id, invitationId, token);
+      const revoked = await client.revokeTeamInvitation(activeTeam.id, invitationId, token);
+      setInvitations((current) =>
+        current.map((invitation) => (invitation.id === revoked.id ? revoked : invitation)),
+      );
       onNotice('Invitation revoked.');
     } catch (inviteError) {
       onError(formatApiError(inviteError));
@@ -2409,7 +2420,33 @@ function WorkspaceControlCenter({
     onError(null);
 
     try {
-      await client.updateTeamMemberRole(activeTeam.id, accountId, role, token);
+      const updated = await client.updateTeamMemberRole(activeTeam.id, accountId, role, token);
+      setMembers((current) =>
+        current.map((member) => (member.accountId === updated.accountId ? updated : member)),
+      );
+      if (session?.account.id === updated.accountId) {
+        setSession((current) =>
+          current
+            ? {
+                ...current,
+                activeTeam: current.activeTeam
+                  ? {
+                      ...current.activeTeam,
+                      role: updated.role,
+                    }
+                  : current.activeTeam,
+                teams: current.teams.map((team) =>
+                  team.teamId === activeTeam.id
+                    ? {
+                        ...team,
+                        role: updated.role,
+                      }
+                    : team,
+                ),
+              }
+            : current,
+        );
+      }
       onNotice('Team role updated.');
     } catch (roleError) {
       onError(formatApiError(roleError));
@@ -2428,6 +2465,7 @@ function WorkspaceControlCenter({
 
     try {
       await client.removeTeamMember(activeTeam.id, accountId, token);
+      setMembers((current) => current.filter((member) => member.accountId !== accountId));
       onNotice('Team member removed.');
     } catch (removeError) {
       onError(formatApiError(removeError));
@@ -2446,7 +2484,7 @@ function WorkspaceControlCenter({
     onError(null);
 
     try {
-      await client.configureSsoProvider(
+      const configured = await client.configureSsoProvider(
         activeTeam.id,
         {
           providerType: ssoProviderType,
@@ -2456,6 +2494,21 @@ function WorkspaceControlCenter({
           clientSecret: ssoClientSecret,
         },
         token,
+      );
+      setSsoStatus((current) =>
+        current
+          ? {
+              ...current,
+              oidcConfigured: configured.providerType === 'oidc' ? true : current.oidcConfigured,
+              samlConfigured: configured.providerType === 'saml' ? true : current.samlConfigured,
+              configuredProviders: [
+                configured,
+                ...current.configuredProviders.filter(
+                  (providerConfig) => providerConfig.providerType !== configured.providerType,
+                ),
+              ],
+            }
+          : current,
       );
       onNotice('SSO provider configuration saved.');
     } catch (ssoError) {

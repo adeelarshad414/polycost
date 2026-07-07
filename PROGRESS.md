@@ -77,6 +77,39 @@ say so explicitly rather than marking it done.
 | Phase 2.8AI - Security suppression hygiene gate        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AJ - Auth endpoint rate-limit hardening       | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AK - Pricing reconciliation breadth guard     | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AL - Auth team UX state hardening             | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AL - Auth team UX state hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Removed broad workspace reload coupling from `workspaceBusy` state so team/admin
+  panels do not refetch on every busy-state transition.
+- Made account session revocation, invite creation/revocation, invite acceptance,
+  role changes, member removal, and SSO provider saves update the visible workspace
+  state immediately after the API action succeeds.
+- Kept owner/admin RBAC affordances in the UI while ensuring self-role changes update
+  the active session/team role shown on screen.
+- Extended `App.spec.tsx` to prove revoked sessions disappear, new invitations are
+  shown, role changes are reflected, removed members leave the list, revoked invites
+  leave the pending view, and saved OIDC state changes the SSO readiness label.
+
+Verification:
+
+- `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx`
+  passes.
+- `npm run test:production-readiness` passes.
+- `npm run check` passes end-to-end; the optional impeccable check is still skipped
+  because the repo targets Node.js 20 and the tool requires Node.js 24.
+
+Known remaining gaps:
+
+- This improves the local/demo account and team product UX; production-grade SSO,
+  email invite delivery, organization billing plans, and a dedicated account settings
+  route remain future auth product work.
 
 ## Phase 2.8AK - Pricing reconciliation breadth guard
 
