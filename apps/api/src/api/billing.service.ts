@@ -30,6 +30,7 @@ export class BillingService {
   constructor(private readonly repository: ApiDatabaseRepository) {}
 
   async importActuals(body: unknown, identity: AuthIdentity): Promise<BillingImportResponse> {
+    assertBillingAdmin(identity);
     const parsed = parseBillingImportInput(body);
     const originalFileSha256 = parsed.originalFileSha256 ?? sha256(stableJson(parsed));
     const rows = parsed.rows.map((row, index) => ({
@@ -64,6 +65,7 @@ export class BillingService {
     body: unknown,
     identity: AuthIdentity,
   ): Promise<BillingImportResponse> {
+    assertBillingAdmin(identity);
     const input = parseBillingProviderExportInput(body);
     const decoded = decodeProviderExport(input);
     const rows = providerExportRows(input, decoded.text);
@@ -86,6 +88,7 @@ export class BillingService {
     body: unknown,
     identity: AuthIdentity,
   ): Promise<InvoiceReconciliationRecord> {
+    assertBillingAdmin(identity);
     const comparisonId = parseComparisonId(body);
     const importRun = await this.repository.getBillingImport(importRunId);
 
@@ -148,6 +151,7 @@ export class BillingService {
     importRunId: string,
     identity: AuthIdentity,
   ): Promise<InvoiceReconciliationRecord[]> {
+    assertBillingAdmin(identity);
     const importRun = await this.repository.getBillingImport(importRunId);
 
     if (!importRun) {
@@ -879,6 +883,12 @@ function requireRecord(value: unknown, message: string): Record<string, unknown>
 function assertTeamAccess(teamId: string | undefined, identity: AuthIdentity): void {
   if (teamId && teamId !== identity.teamId) {
     throw new ApiForbiddenError('Billing import belongs to a different active team');
+  }
+}
+
+function assertBillingAdmin(identity: AuthIdentity): void {
+  if (!identity.teamId || (identity.role !== 'owner' && identity.role !== 'admin')) {
+    throw new ApiForbiddenError('Team admin access is required for billing reconciliation');
   }
 }
 

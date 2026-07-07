@@ -71,6 +71,34 @@ say so explicitly rather than marking it done.
 | Phase 2.8AC - VSDX page/container evidence             | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AD - Auth controller guard coverage           | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AE - Release readiness automation             | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AF - Billing reconciliation RBAC hardening    | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AF - Billing reconciliation RBAC hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+- Closed a concrete auth-product gap where billing import/reconciliation required a
+  workspace session and team-boundary check, but not the documented Owner/Admin role.
+- Added API defense in depth: `BillingService` now rejects billing imports, provider
+  exports, reconciliation creation, and reconciliation reads unless the active identity
+  is an Owner or Admin on a workspace team.
+- Matched the frontend contract: member sessions see the actuals reconciliation panel
+  disabled with an explicit "Owner or admin role required" explanation, and programmatic
+  form submission still does not call the billing import API.
+- Updated README auth scope wording so billing-export reconciliation is documented as
+  requiring a signed-in owner/admin workspace session.
+- Verification evidence in this continuation:
+  - Focused API auth/billing spec passed: 18 tests.
+  - Focused web App spec passed: 57 tests.
+  - `npm run ci:lint` passed across API, web, and shared types.
+  - `npm run test:production-readiness` passed: API 7 suites / 91 tests and web 2 suites /
+    82 tests.
+  - `npm run security:audit` passed the high-severity gate; npm still reports the known
+    low `@ai-sdk/provider-utils` advisory chain with no safe fix available.
+- Known gaps carried forward: this closes the billing-import RBAC mismatch, but full
+  hosted account/team UX, external IdP SSO, email delivery, SCIM, and enterprise org
+  administration remain future release-track work.
 
 ## Phase 2.8AE - Release readiness automation
 

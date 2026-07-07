@@ -176,7 +176,7 @@ remain release-track items rather than blockers for anonymous cost comparison.
   via `AUTH_MAX_FAILED_LOGIN_ATTEMPTS` and `AUTH_LOCKOUT_MINUTES`.
 - Anonymous compare, diagram import, reports, and share links remain available
   without accounts. Team administration, SSO provider setup, and billing-export
-  reconciliation require a signed-in workspace session.
+  reconciliation require a signed-in owner/admin workspace session.
 
 ## Diagram Imports
 

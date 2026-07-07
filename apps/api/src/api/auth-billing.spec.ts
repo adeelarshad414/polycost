@@ -998,6 +998,62 @@ describe('BillingService', () => {
       ),
     ).rejects.toThrow(ApiForbiddenError);
   });
+
+  it('requires owner or admin access for billing imports and reconciliation reads', async () => {
+    const repository = repositoryMock();
+    const service = new BillingService(repository as never);
+    const memberIdentity = identityWithRole('member');
+
+    await expectForbidden(
+      service.importActuals(
+        {
+          provider: 'aws',
+          sourceType: 'aws-cur',
+          billingPeriodStart: '2026-06-01',
+          billingPeriodEnd: '2026-06-30',
+          rows: [
+            {
+              serviceName: 'AmazonEC2',
+              costUsd: 107,
+            },
+          ],
+        },
+        memberIdentity,
+      ),
+      'Team admin access is required for billing reconciliation',
+    );
+    await expectForbidden(
+      service.importProviderExport(
+        {
+          provider: 'aws',
+          sourceType: 'aws-cur',
+          billingPeriodStart: '2026-06-01',
+          billingPeriodEnd: '2026-06-30',
+          content: 'lineItem/ProductCode,lineItem/NetUnblendedCost\nAmazonEC2,107.00',
+        },
+        memberIdentity,
+      ),
+      'Team admin access is required for billing reconciliation',
+    );
+    await expectForbidden(
+      service.reconcile(
+        '55555555-5555-4555-8555-555555555555',
+        {
+          comparisonId: comparisonResult.comparisonId,
+        },
+        memberIdentity,
+      ),
+      'Team admin access is required for billing reconciliation',
+    );
+    await expectForbidden(
+      service.listReconciliations('55555555-5555-4555-8555-555555555555', memberIdentity),
+      'Team admin access is required for billing reconciliation',
+    );
+
+    expect(repository.createBillingImport).not.toHaveBeenCalled();
+    expect(repository.getBillingImport).not.toHaveBeenCalled();
+    expect(repository.listInvoiceReconciliations).not.toHaveBeenCalled();
+  });
 });
 
 function repositoryMock() {

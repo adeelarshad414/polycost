@@ -545,9 +545,21 @@ describe('App', () => {
     expect(text(container)).toContain(
       'Sign in as a team owner or admin to manage members, issue invite tokens, and review SSO status.',
     );
+    expect(text(container)).toContain(
+      'Owner or admin role required for billing import and reconciliation.',
+    );
+    expect(selectByWorkspaceLabel(container, 'Provider').disabled).toBe(true);
+    expect(buttonByText(container, 'Import & reconcile').disabled).toBe(true);
     expect(client.listTeamMembers).not.toHaveBeenCalled();
     expect(client.listTeamInvitations).not.toHaveBeenCalled();
     expect(client.getSsoStatus).not.toHaveBeenCalled();
+
+    await submitForm(container.querySelector<HTMLFormElement>('.workspace-billing-panel'));
+
+    expect(text(container)).toContain(
+      'Owner or admin role required for billing import and reconciliation.',
+    );
+    expect(client.importProviderBillingExport).not.toHaveBeenCalled();
 
     unmount();
   });

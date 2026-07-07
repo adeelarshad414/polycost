@@ -1922,6 +1922,13 @@ function WorkspaceControlCenter({
   const [reconciliation, setReconciliation] = useState<InvoiceReconciliationRecord | null>(null);
   const activeTeam = session?.activeTeam;
   const canManageTeam = activeTeam?.role === 'owner' || activeTeam?.role === 'admin';
+  const billingAccessMessage = !token
+    ? 'Sign in before importing provider billing exports.'
+    : !activeTeam
+      ? 'Join or create a team before importing provider billing exports.'
+      : !canManageTeam
+        ? 'Owner or admin role required for billing import and reconciliation.'
+        : null;
   const ownerCount = members.filter((member) => member.role === 'owner').length;
   const sourceType = sourceTypeForProvider(provider);
   const sessionStatus = session ? workspaceSessionStatus(session.session.expiresAt) : null;
@@ -2541,8 +2548,8 @@ function WorkspaceControlCenter({
 
   async function handleImportProviderExport(event: FormEvent) {
     event.preventDefault();
-    if (!token) {
-      onError('Sign in before importing provider billing exports.');
+    if (!token || billingAccessMessage) {
+      onError(billingAccessMessage ?? 'Sign in before importing provider billing exports.');
       return;
     }
 
@@ -3114,14 +3121,22 @@ function WorkspaceControlCenter({
           <div className="workspace-panel-heading">
             <span>Actuals reconciliation</span>
             <strong>
-              {billingImport ? `${billingImport.acceptedRows} rows imported` : 'Provider export'}
+              {billingImport
+                ? `${billingImport.acceptedRows} rows imported`
+                : billingAccessMessage
+                  ? 'Admin required'
+                  : 'Provider export'}
             </strong>
           </div>
+          {billingAccessMessage ? (
+            <p className="workspace-empty-state">{billingAccessMessage}</p>
+          ) : null}
           <div className="workspace-billing-controls">
             <label className="workspace-field">
               <span>Provider</span>
               <select
                 value={provider}
+                disabled={Boolean(billingAccessMessage)}
                 onChange={(event) => {
                   const nextProvider = event.currentTarget.value as ProviderId;
                   setProvider(nextProvider);
@@ -3136,11 +3151,13 @@ function WorkspaceControlCenter({
             <TextField
               label="Billing period start"
               value={billingPeriodStart}
+              disabled={Boolean(billingAccessMessage)}
               onChange={setBillingPeriodStart}
             />
             <TextField
               label="Billing period end"
               value={billingPeriodEnd}
+              disabled={Boolean(billingAccessMessage)}
               onChange={setBillingPeriodEnd}
             />
           </div>
@@ -3148,6 +3165,7 @@ function WorkspaceControlCenter({
             <span>{sourceType} CSV or JSON content</span>
             <textarea
               value={exportContent}
+              disabled={Boolean(billingAccessMessage)}
               onChange={(event) => setExportContent(event.currentTarget.value)}
             />
           </label>
@@ -3156,6 +3174,7 @@ function WorkspaceControlCenter({
             variant="primary"
             loading={workspaceBusy === 'billing-import'}
             loadingLabel="Importing actuals..."
+            disabled={Boolean(billingAccessMessage)}
           >
             <CompareIcon />
             Import & reconcile
