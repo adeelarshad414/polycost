@@ -33,6 +33,8 @@ jobs:
         run: npm run graphify:validate
       - name: Pricing service coverage check
         run: npm run pricing:coverage:check
+      - name: Full progress verification check
+        run: npm run progress:verify
       - name: DevOps configuration check
         run: npm run devops:check
       - name: Cloud readiness check

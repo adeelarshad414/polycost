@@ -84,6 +84,58 @@ say so explicitly rather than marking it done.
 | Phase 2.8AP - Security ledger coverage enforcement     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AQ - Impeccable CI tracking guard             | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.8AR - End-to-end smoke proof hardening         | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.8AS - Full progress verification gate          | Complete with known gaps (see notes) | 2026-07-07   |
+
+## Phase 2.8AS - Full progress verification gate
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added `npm run progress:verify`, backed by
+  `scripts/full-progress-verification-check.mjs`, as a first-class phase evidence
+  gate. The check currently verifies 82 source/test/fixture/CI evidence anchors
+  across Phase A-G promises instead of trusting README/PROGRESS claims.
+- The verifier locks the FinOps invariants named by the full-verification goal:
+  `packages/types/monthly-hour-standard.json` is the shared 730-hour source, cost
+  intervals derive from `HOURS_PER_MONTH`, bare `720`/`24*30`/`365/12` month-math
+  regressions fail unless they are explicitly allowlisted non-time fixture values,
+  and the 80TB tiered-egress manual regression remains present.
+- The verifier also checks schema and pricing-evidence anchors: hourly stored rate
+  unit, `is_estimate`, `valid_from`/`valid_to`, pricing-lineage metadata, 20+ raw
+  reconciliation floor, SKU evidence, refresh-live traceability, and UI-priced family
+  coverage wiring.
+- Added phase-pipeline anchors for the swappable requirement parser contract,
+  `PHASE_2_HOOK` / `PHASE_3_HOOK`, natural-language editable confirmation, export
+  formats, share revocation, diagram fixture/malicious upload coverage, auth/RBAC
+  matrix coverage, data-health/rate-limit evidence, reduced-motion CSS, brand-token
+  usage, CI, and release-readiness wiring.
+- Wired `progress:verify` into `npm run check`, GitHub Actions, and
+  `scripts/release-readiness-check.mjs` so future PRs cannot silently drop the
+  full-progress evidence gate.
+
+Verification:
+
+- `npm run progress:verify` passes: 82 phase evidence anchors verified.
+- `npm run release:check` passes and now enforces the progress-verification gate.
+- `npm run qa` passes; `impeccable` remains the documented Node 24-only skip on the
+  Node 20 toolchain.
+- `npm run format:check` passes after formatting the new verifier.
+- `npm run test:production-readiness` passes: API focused regressions
+  `8 suites / 121 tests`; web focused regressions `2 suites / 82 tests`.
+
+Known remaining gaps:
+
+- This closes a real evidence-gap by making the phase walk partially executable and
+  regression-protected, but it does not replace the full live timed UX walk required
+  by the active goal. The <60s template-to-recommendation journey, <3min
+  diagram-to-PDF journey, Redis-kill runtime degradation, clean-clone timing, and
+  hosted CI green state still need live evidence before the full objective can be
+  marked complete.
+- GitHub-hosted CI for PR #24 is still externally blocked before workflow steps run
+  (`runner_id: 0`, zero steps, no log). Local gates remain the authoritative code
+  evidence until the account/runner condition is cleared and CI can be rerun.
 
 ## Phase 2.8AR - End-to-end smoke proof hardening
 
