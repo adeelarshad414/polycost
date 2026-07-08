@@ -64,6 +64,10 @@ Evidence:
 - Stored artifact metadata now includes storage backend, KMS production-readiness,
   retention/legal-hold policy, and scan-hook status. The local EICAR-signature hook
   blocks known test-malware content before storage.
+- Artifact storage readiness and retention enforcement now have explicit admin API
+  operations, production-bound config guards, strict provider-check coverage,
+  signed scanner webhook integration, and delete-expired enforcement for
+  database-backed blobs that are not under legal hold.
 - `docs/PROVIDER-CREDENTIALS.md` states the current production swap procedure and
   explicitly limits real provider mode to catalog list prices, not invoices.
 

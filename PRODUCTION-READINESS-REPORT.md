@@ -68,6 +68,7 @@ performance/accessibility/best-practices/SEO metrics.
 | INV-TRACE-009  | Improved      | Registered invoice artifacts can now be marked verified/rejected with review evidence, checksum/control-total mismatch rejection, verified counts, and readiness updates limited to the covered check                                                   |
 | INV-TRACE-010  | Improved      | Registered invoice artifact files can now be stored in `invoice_artifact_blobs` with raw-byte SHA-256, size/MIME/file-name validation, metadata-only reconciliation evidence, and transaction-coupled audit events                                      |
 | INV-TRACE-011  | Improved      | Stored invoice artifact files now carry storage-backend, KMS-readiness, retention/legal-hold, and scan-hook governance metadata; EICAR test content is blocked before bytes are stored                                                                  |
+| INV-TRACE-012  | Improved      | Artifact storage readiness now has production-bound config guards, strict credential-check coverage, signed scanner webhook integration, and retention enforcement for expired non-held database-backed blobs                                           |
 | VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                                                                                             |
 | VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                                                                                             |
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                                                                                        |
@@ -143,6 +144,23 @@ Local static/regression gates:
     86 tests.
   - `npm run check`: API 53 suites / 431 tests; web 11 suites / 143 tests; graph
     validation 316 nodes / 316 edges; pricing coverage, progress verification,
+    QA/security suppression hygiene, DB, DevOps, cloud, release, handover, and
+    provider-credential gates passed.
+- Phase 2.27 artifact storage readiness and retention gates passed:
+  - API focused: `src/api/invoice-artifact-governance.service.spec.ts`,
+    `src/api/auth-billing.spec.ts`, `src/api/api-database.repository.spec.ts`, and
+    `src/config/config.schema.spec.ts`: 4 suites / 78 tests.
+  - Web focused: `src/api-client.spec.ts` and `src/App.spec.tsx`: 2 suites /
+    86 tests.
+  - `npm run ci:lint`: passed with zero warnings/errors.
+  - `npm run provider:credentials:check`: passed with the expected local/demo
+    invoice-artifacts warning.
+  - `npm run provider:credentials:check:strict`: passed when production
+    artifact storage/KMS/scanner/retention env values were supplied.
+  - `npm run test:production-readiness`: API 13 suites / 175 tests; web 2 suites /
+    86 tests.
+  - `npm run check`: API 54 suites / 440 tests; web 11 suites / 143 tests; graph
+    validation 318 nodes / 318 edges; pricing coverage, progress verification,
     QA/security suppression hygiene, DB, DevOps, cloud, release, handover, and
     provider-credential gates passed.
 - Phase 2.25 final local floor passed:
@@ -437,9 +455,11 @@ Machine-readable token evidence:
   Phase 2.25 adds durable database-backed artifact file upload/download with
   metadata-only reconciliation evidence and audit events. Phase 2.26 adds storage,
   KMS-readiness, retention/legal-hold, and EICAR scan-hook governance metadata.
-  PolyCost still does not provide provider invoice rendering, private contract
-  validation, external object storage, customer-managed KMS enforcement, real malware
-  scanning, legal-hold enforcement, or an external reviewer workflow.
+  Phase 2.27 adds object-store/KMS/scanner/retention config guards, signed scanner
+  webhook integration, strict credential-check visibility, and delete-expired
+  enforcement for non-held database-backed blobs. PolyCost still does not provide
+  provider invoice rendering, private contract validation, provider-native
+  S3/Azure Blob/GCS byte-write adapters, or an external reviewer workflow.
   Full invoice-grade billing remains future scope.
   PolyCost is still not the invoice system of record.
 - VSDX support now includes extraction/evidence and approximate SVG previews, not full

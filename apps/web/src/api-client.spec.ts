@@ -507,6 +507,29 @@ describe('api client', () => {
           uploadedAt: '2026-07-06T00:00:05.000Z',
           ...artifactGovernance(),
         }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          storageBackend: 'database-bytea',
+          scannerMode: 'eicar-signature-only',
+          retentionEnforcementMode: 'report-only',
+          productionReady: false,
+          credentialSource: 'database-connection',
+          gaps: [
+            'database-bytea keeps artifact bytes in Postgres and is not invoice-grade storage',
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          mode: 'report-only',
+          evaluatedAt: '2026-07-08T00:00:00.000Z',
+          dryRun: true,
+          storageBackend: 'database-bytea',
+          expiredCandidates: 2,
+          legalHoldSkipped: 1,
+          deleted: 0,
+        }),
       );
     global.fetch = fetchMock as typeof fetch;
     const client = createPolyCostClient('http://api.test/api/v1');
@@ -624,6 +647,21 @@ describe('api client', () => {
         contentBase64: 'aW52b2ljZQ==',
       }),
     );
+    await expect(client.getInvoiceArtifactStorageReadiness('session-token')).resolves.toEqual(
+      expect.objectContaining({
+        storageBackend: 'database-bytea',
+        productionReady: false,
+      }),
+    );
+    await expect(
+      client.enforceInvoiceArtifactRetention({ dryRun: true }, 'session-token'),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        mode: 'report-only',
+        dryRun: true,
+        deleted: 0,
+      }),
+    );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       'http://api.test/api/v1/auth/me',
@@ -729,6 +767,26 @@ describe('api client', () => {
         headers: expect.objectContaining({
           Authorization: 'Bearer session-token',
         }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      12,
+      'http://api.test/api/v1/billing/artifact-storage/readiness',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer session-token',
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      13,
+      'http://api.test/api/v1/billing/artifact-storage/retention/enforce',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer session-token',
+        }),
+        body: JSON.stringify({ dryRun: true }),
       }),
     );
   });

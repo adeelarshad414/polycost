@@ -19,6 +19,14 @@ const envBoolean = (defaultValue: boolean) =>
     }, z.boolean())
     .default(defaultValue);
 
+const optionalUrl = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z.string().url().optional(),
+);
+
+const optionalNonEmptyString = (minLength = 1) =>
+  z.preprocess((value) => (value === '' ? undefined : value), z.string().min(minLength).optional());
+
 export const configSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'staging', 'production']),
@@ -85,6 +93,21 @@ export const configSchema = z
     AUTH_AUDIT_EXPORT_SCHEDULE_CRON: z.string().default('*/5 * * * *'),
     AUTH_AUDIT_EXPORT_BATCH_SIZE: z.coerce.number().int().min(1).max(500).default(50),
     AUTH_AUDIT_EXPORT_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5),
+    INVOICE_ARTIFACT_STORAGE_BACKEND: z
+      .enum(['database-bytea', 'aws-s3', 'azure-blob', 'gcp-gcs'])
+      .default('database-bytea'),
+    INVOICE_ARTIFACT_OBJECT_STORE_NAME: optionalNonEmptyString(3),
+    INVOICE_ARTIFACT_OBJECT_STORE_REGION: optionalNonEmptyString(2),
+    INVOICE_ARTIFACT_OBJECT_STORE_PREFIX: z.string().min(1).default('invoice-artifacts'),
+    INVOICE_ARTIFACT_KMS_KEY_REFERENCE: optionalNonEmptyString(3),
+    INVOICE_ARTIFACT_MALWARE_SCANNER_MODE: z
+      .enum(['eicar-signature-only', 'http-webhook'])
+      .default('eicar-signature-only'),
+    INVOICE_ARTIFACT_MALWARE_SCANNER_URL: optionalUrl,
+    INVOICE_ARTIFACT_MALWARE_SCANNER_SECRET: optionalNonEmptyString(16),
+    INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE: z
+      .enum(['report-only', 'delete-expired'])
+      .default('report-only'),
     AUTH_OIDC_ISSUER_URL: z.string().url().optional(),
     AUTH_OIDC_CLIENT_ID: z.string().min(1).optional(),
     AUTH_SAML_ENTITY_ID: z.string().min(1).optional(),
@@ -204,6 +227,95 @@ export const configSchema = z
           code: z.ZodIssueCode.custom,
           path: ['AUTH_AUDIT_EXPORT_WEBHOOK_URL'],
           message: 'Audit export webhook URL must use HTTPS outside development.',
+        });
+      }
+    }
+
+    if (config.INVOICE_ARTIFACT_STORAGE_BACKEND !== 'database-bytea') {
+      if (!config.INVOICE_ARTIFACT_OBJECT_STORE_NAME) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['INVOICE_ARTIFACT_OBJECT_STORE_NAME'],
+          message:
+            'INVOICE_ARTIFACT_OBJECT_STORE_NAME is required for external invoice artifact storage.',
+        });
+      }
+
+      if (!config.INVOICE_ARTIFACT_OBJECT_STORE_REGION) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['INVOICE_ARTIFACT_OBJECT_STORE_REGION'],
+          message:
+            'INVOICE_ARTIFACT_OBJECT_STORE_REGION is required for external invoice artifact storage.',
+        });
+      }
+    }
+
+    if (config.INVOICE_ARTIFACT_MALWARE_SCANNER_MODE === 'http-webhook') {
+      if (!config.INVOICE_ARTIFACT_MALWARE_SCANNER_URL) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['INVOICE_ARTIFACT_MALWARE_SCANNER_URL'],
+          message:
+            'INVOICE_ARTIFACT_MALWARE_SCANNER_URL is required for webhook artifact scanning.',
+        });
+      }
+
+      if (!config.INVOICE_ARTIFACT_MALWARE_SCANNER_SECRET) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['INVOICE_ARTIFACT_MALWARE_SCANNER_SECRET'],
+          message:
+            'INVOICE_ARTIFACT_MALWARE_SCANNER_SECRET is required for webhook artifact scanning.',
+        });
+      }
+
+      if (
+        (config.NODE_ENV === 'production' || config.NODE_ENV === 'staging') &&
+        config.INVOICE_ARTIFACT_MALWARE_SCANNER_URL &&
+        !config.INVOICE_ARTIFACT_MALWARE_SCANNER_URL.startsWith('https://')
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['INVOICE_ARTIFACT_MALWARE_SCANNER_URL'],
+          message: 'Invoice artifact scanner webhook URL must use HTTPS outside development.',
+        });
+      }
+    }
+
+    if (config.NODE_ENV === 'production' || config.NODE_ENV === 'staging') {
+      if (config.INVOICE_ARTIFACT_STORAGE_BACKEND === 'database-bytea') {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['INVOICE_ARTIFACT_STORAGE_BACKEND'],
+          message:
+            'Staging and production invoice artifact storage must use external object storage.',
+        });
+      }
+
+      if (!config.INVOICE_ARTIFACT_KMS_KEY_REFERENCE) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['INVOICE_ARTIFACT_KMS_KEY_REFERENCE'],
+          message:
+            'INVOICE_ARTIFACT_KMS_KEY_REFERENCE is required for staging and production invoice artifacts.',
+        });
+      }
+
+      if (config.INVOICE_ARTIFACT_MALWARE_SCANNER_MODE !== 'http-webhook') {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['INVOICE_ARTIFACT_MALWARE_SCANNER_MODE'],
+          message: 'Staging and production invoice artifact scanning must use the webhook scanner.',
+        });
+      }
+
+      if (config.INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE !== 'delete-expired') {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE'],
+          message:
+            'Staging and production invoice artifact retention enforcement must delete expired non-held artifacts.',
         });
       }
     }

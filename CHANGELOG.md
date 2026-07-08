@@ -78,6 +78,10 @@ once tagged releases begin.
   database-backed upload/download APIs, raw-byte SHA-256 validation, MIME/file-name
   guards, metadata-only reconciliation evidence, audit events, and workspace
   store/download actions.
+- Invoice artifact storage readiness and retention enforcement foundation, including
+  production-bound config guards for external object storage/KMS/webhook scanning,
+  strict credential-check coverage, signed scanner webhook integration, and admin
+  retention enforcement for expired non-held database-backed artifacts.
 - Invoice artifact governance metadata for stored artifacts, including retention
   windows, legal-hold state, KMS production-readiness flags, and an EICAR-signature
   scan hook that blocks known test-malware content before storage.

@@ -7,6 +7,7 @@ import { ApiDatabaseRepository, LocalAccountWithPassword } from './api-database.
 import { AuthService } from './auth.service';
 import { AuthIdentity, TeamRole } from './auth.types';
 import { BillingService } from './billing.service';
+import { InvoiceArtifactGovernanceService } from './invoice-artifact-governance.service';
 import { hashPassword } from './password-hash';
 
 const account: LocalAccountWithPassword = {
@@ -2314,6 +2315,70 @@ describe('BillingService', () => {
     );
   });
 
+  it('reports invoice artifact storage readiness for billing admins', () => {
+    const repository = repositoryMock();
+    const service = new BillingService(repository as never);
+
+    expect(service.getInvoiceArtifactStorageReadiness(identity)).toMatchObject({
+      storageBackend: 'database-bytea',
+      scannerMode: 'eicar-signature-only',
+      retentionEnforcementMode: 'report-only',
+      productionReady: false,
+      gaps: expect.arrayContaining([
+        'database-bytea keeps artifact bytes in Postgres and is not invoice-grade storage',
+      ]),
+    });
+  });
+
+  it('keeps invoice artifact retention enforcement report-only by default', async () => {
+    const repository = repositoryMock();
+    repository.summarizeInvoiceArtifactRetention.mockResolvedValue({
+      expiredCandidates: 2,
+      legalHoldSkipped: 1,
+    });
+    const service = new BillingService(repository as never);
+
+    await expect(
+      service.enforceInvoiceArtifactRetention({ dryRun: false }, identity),
+    ).resolves.toMatchObject({
+      mode: 'report-only',
+      dryRun: true,
+      expiredCandidates: 2,
+      legalHoldSkipped: 1,
+      deleted: 0,
+      storageBackend: 'database-bytea',
+    });
+    expect(repository.deleteExpiredInvoiceArtifactBlobs).not.toHaveBeenCalled();
+  });
+
+  it('deletes expired non-held invoice artifacts when retention enforcement is enabled', async () => {
+    const repository = repositoryMock();
+    repository.summarizeInvoiceArtifactRetention.mockResolvedValue({
+      expiredCandidates: 3,
+      legalHoldSkipped: 2,
+    });
+    repository.deleteExpiredInvoiceArtifactBlobs.mockResolvedValue(3);
+    const service = new BillingService(
+      repository as never,
+      new InvoiceArtifactGovernanceService(
+        configService({
+          INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE: 'delete-expired',
+        }),
+      ),
+    );
+
+    await expect(
+      service.enforceInvoiceArtifactRetention({ dryRun: false }, identity),
+    ).resolves.toMatchObject({
+      mode: 'delete-expired',
+      dryRun: false,
+      expiredCandidates: 3,
+      legalHoldSkipped: 2,
+      deleted: 3,
+    });
+    expect(repository.deleteExpiredInvoiceArtifactBlobs).toHaveBeenCalledWith(expect.any(String));
+  });
+
   it('rejects artifact blob uploads when bytes do not match registered checksum metadata', async () => {
     const repository = repositoryMock();
     repository.getInvoiceReconciliation.mockResolvedValue({
@@ -2688,6 +2753,8 @@ function repositoryMock() {
     updateInvoiceReconciliationEvidence: jest.fn(),
     saveInvoiceArtifactBlobAndUpdateEvidence: jest.fn(),
     getInvoiceArtifactBlob: jest.fn(),
+    summarizeInvoiceArtifactRetention: jest.fn(),
+    deleteExpiredInvoiceArtifactBlobs: jest.fn(),
   } as unknown as jest.Mocked<ApiDatabaseRepository>;
 }
 
@@ -2703,9 +2770,15 @@ async function expectForbidden(promise: Promise<unknown>, message: string): Prom
   await expect(promise).rejects.toThrow(message);
 }
 
-function configService(): ConfigService<AppConfig, true> {
+function configService(overrides: Partial<AppConfig> = {}): ConfigService<AppConfig, true> {
+  const overrideMap = new Map(Object.entries(overrides));
+
   return {
     get: jest.fn((key: keyof AppConfig) => {
+      if (overrideMap.has(key)) {
+        return overrideMap.get(key);
+      }
+
       switch (key) {
         case 'AUTH_SESSION_TTL_HOURS':
           return 12;

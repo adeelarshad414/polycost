@@ -24,6 +24,12 @@ The explicit placeholder token is `CHANGE_ME_DEV_ONLY`. Production and staging c
   panel
 - `AUTH_AUDIT_EXPORT_MODE=disabled` for local/demo audit trails that stay in the
   app database only
+- `INVOICE_ARTIFACT_STORAGE_BACKEND=database-bytea` for local/demo invoice
+  artifact byte storage in Postgres
+- `INVOICE_ARTIFACT_MALWARE_SCANNER_MODE=eicar-signature-only` for local/demo
+  scanner safety checks
+- `INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE=report-only` for local/demo
+  retention checks that do not delete bytes
 - Local-only Docker Vault seed credentials
 
 ## Not Allowed In Staging Or Production
@@ -36,6 +42,14 @@ The explicit placeholder token is `CHANGE_ME_DEV_ONLY`. Production and staging c
 - Dummy `AUTH_INVITE_DELIVERY_WEBHOOK_SECRET` values
 - `AUTH_AUDIT_EXPORT_MODE=disabled`
 - Dummy `AUTH_AUDIT_EXPORT_WEBHOOK_SECRET` values
+- `INVOICE_ARTIFACT_STORAGE_BACKEND=database-bytea`
+- Missing `INVOICE_ARTIFACT_OBJECT_STORE_NAME` or
+  `INVOICE_ARTIFACT_OBJECT_STORE_REGION` when external artifact storage is enabled
+- Missing `INVOICE_ARTIFACT_KMS_KEY_REFERENCE`
+- `INVOICE_ARTIFACT_MALWARE_SCANNER_MODE=eicar-signature-only`
+- Missing `INVOICE_ARTIFACT_MALWARE_SCANNER_URL` or non-dummy scanner secret when
+  scanner webhook mode is enabled
+- `INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE=report-only`
 - Any real provider mode without `VAULT_TOKEN_FILE`
 - Any strict provider credential check where Vault returns a dummy GCP access token or dummy LLM API key
 
@@ -58,8 +72,14 @@ docker compose exec vault vault kv put secret/polycost/llm api_key="<llm-api-key
    `AUTH_AUDIT_EXPORT_WEBHOOK_URL`, and a non-dummy
    `AUTH_AUDIT_EXPORT_WEBHOOK_SECRET` before enabling staging or production
    team administration.
-6. Run `npm run provider:credentials:check:strict`.
-7. Run a comparison and confirm each catalog-backed line item has source endpoint,
+6. Set `INVOICE_ARTIFACT_STORAGE_BACKEND` to `aws-s3`, `azure-blob`, or
+   `gcp-gcs`, configure `INVOICE_ARTIFACT_OBJECT_STORE_NAME`,
+   `INVOICE_ARTIFACT_OBJECT_STORE_REGION`, and
+   `INVOICE_ARTIFACT_KMS_KEY_REFERENCE`, switch
+   `INVOICE_ARTIFACT_MALWARE_SCANNER_MODE=http-webhook` with a non-dummy scanner
+   secret, and set `INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE=delete-expired`.
+7. Run `npm run provider:credentials:check:strict`.
+8. Run a comparison and confirm each catalog-backed line item has source endpoint,
    source record ID, payload hash, transform version, and fetched timestamp.
 
 For SSO readiness, configure provider metadata through the workspace UI only after

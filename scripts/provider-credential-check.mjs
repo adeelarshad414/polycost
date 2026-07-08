@@ -46,6 +46,8 @@ if (diagramClassifierConfigured) {
   });
 }
 
+results.push(checkInvoiceArtifactControls());
+
 for (const result of results) {
   const marker = result.status === 'pass' ? 'PASS' : result.status === 'warn' ? 'WARN' : 'FAIL';
   console.log(`[${marker}] ${result.provider}: ${result.message}`);
@@ -200,6 +202,62 @@ function envBoolean(name, defaultValue) {
   }
 
   return value.trim().toLowerCase() === 'true';
+}
+
+function checkInvoiceArtifactControls() {
+  const backend = process.env.INVOICE_ARTIFACT_STORAGE_BACKEND ?? 'database-bytea';
+  const scannerMode = process.env.INVOICE_ARTIFACT_MALWARE_SCANNER_MODE ?? 'eicar-signature-only';
+  const retentionMode = process.env.INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE ?? 'report-only';
+  const gaps = [];
+
+  if (backend === 'database-bytea') {
+    gaps.push('artifact bytes are stored in Postgres instead of object storage');
+  } else {
+    if (!hasValue(process.env.INVOICE_ARTIFACT_OBJECT_STORE_NAME)) {
+      gaps.push('object store bucket/container is missing');
+    }
+    if (!hasValue(process.env.INVOICE_ARTIFACT_OBJECT_STORE_REGION)) {
+      gaps.push('object store region is missing');
+    }
+  }
+
+  if (!hasValue(process.env.INVOICE_ARTIFACT_KMS_KEY_REFERENCE)) {
+    gaps.push('customer-managed KMS reference is missing');
+  }
+
+  if (scannerMode !== 'http-webhook') {
+    gaps.push('scanner mode is not http-webhook');
+  } else {
+    if (!hasValue(process.env.INVOICE_ARTIFACT_MALWARE_SCANNER_URL)) {
+      gaps.push('scanner webhook URL is missing');
+    }
+    if (!hasValue(process.env.INVOICE_ARTIFACT_MALWARE_SCANNER_SECRET)) {
+      gaps.push('scanner webhook secret is missing');
+    }
+  }
+
+  if (retentionMode !== 'delete-expired') {
+    gaps.push('retention mode is not delete-expired');
+  }
+
+  if (gaps.length === 0) {
+    return {
+      provider: 'invoice-artifacts',
+      status: 'pass',
+      message:
+        'External object storage, KMS reference, webhook scanner, and retention enforcement are configured.',
+    };
+  }
+
+  return {
+    provider: 'invoice-artifacts',
+    status: strict ? 'fail' : 'warn',
+    message: `Artifact governance is demo/local only: ${gaps.join('; ')}.`,
+  };
+}
+
+function hasValue(value) {
+  return typeof value === 'string' && value.trim().length > 0 && !isDummyCredential(value);
 }
 
 function isDummyCredential(value) {

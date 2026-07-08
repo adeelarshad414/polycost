@@ -597,6 +597,9 @@ export type InvoiceGradeArtifactType =
   | 'allocation-map'
   | 'currency-policy'
   | 'provider-sku-map';
+export type InvoiceArtifactStorageBackend = 'database-bytea' | 'aws-s3' | 'azure-blob' | 'gcp-gcs';
+export type InvoiceArtifactMalwareScannerMode = 'eicar-signature-only' | 'http-webhook';
+export type InvoiceArtifactRetentionEnforcementMode = 'report-only' | 'delete-expired';
 
 export interface InvoiceGradeArtifactRegistrationInput {
   type: InvoiceGradeArtifactType;
@@ -630,8 +633,13 @@ export interface InvoiceArtifactBlobUploadInput {
 
 export interface InvoiceArtifactBlobGovernance {
   storageProfile: {
-    storageBackend: 'database-bytea';
-    encryptionStatus: 'database-managed';
+    storageBackend: InvoiceArtifactStorageBackend;
+    encryptionStatus: 'database-managed' | 'customer-managed-kms';
+    objectStore?: {
+      bucketOrContainer: string;
+      prefix: string;
+      region?: string;
+    };
     kmsKeyReference?: string;
     kmsKeyRequiredForProduction: boolean;
   };
@@ -646,6 +654,31 @@ export interface InvoiceArtifactBlobGovernance {
     checkedAt: string;
     findings: string[];
   };
+}
+
+export interface InvoiceArtifactStorageReadiness {
+  storageBackend: InvoiceArtifactStorageBackend;
+  scannerMode: InvoiceArtifactMalwareScannerMode;
+  retentionEnforcementMode: InvoiceArtifactRetentionEnforcementMode;
+  productionReady: boolean;
+  credentialSource: 'database-connection' | 'vault-or-workload-identity';
+  objectStore?: {
+    bucketOrContainer: string;
+    prefix: string;
+    region?: string;
+  };
+  kmsKeyReference?: string;
+  gaps: string[];
+}
+
+export interface InvoiceArtifactRetentionEnforcementResult {
+  mode: InvoiceArtifactRetentionEnforcementMode;
+  evaluatedAt: string;
+  dryRun: boolean;
+  storageBackend: InvoiceArtifactStorageBackend;
+  expiredCandidates: number;
+  legalHoldSkipped: number;
+  deleted: number;
 }
 
 export interface InvoiceArtifactBlobRecord extends InvoiceArtifactBlobGovernance {
