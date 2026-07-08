@@ -99,6 +99,7 @@ say so explicitly rather than marking it done.
 | Phase 2.8BE - Isolated live runtime verification        | Complete with known gaps (see notes) | 2026-07-07   |
 | Production readiness orchestrator v2 pass               | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.9 - Production gap closure continuation         | Complete with known gaps (see notes) | 2026-07-07   |
+| Phase 2.10 - Billing export mapper hardening            | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -112,6 +113,47 @@ say so explicitly rather than marking it done.
 | Browser audit artifact hardening                        | Complete with known gaps (see notes) | 2026-07-08   |
 | Formal browser audit tooling                            | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3.5 - Terraform bundle integrity validation      | Complete with known gaps (see notes) | 2026-07-08   |
+
+## Phase 2.10 - Billing export mapper hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-08
+
+What changed:
+
+- Hardened provider billing export normalization so literal CSV headers still win,
+  while JSON rows can also resolve dotted paths such as `service.description`,
+  `sku.id`, `location.region`, `usage.amount`, and `project.labels`.
+- Counted Azure `CostInBillingCurrency`/`PreTaxCost` fallback cost columns as valid
+  cost evidence when `CostInUSD` is absent.
+- Added Azure tag and GCP label columns to provider-export recognition metadata so
+  `_polycost.recognizedColumns` and readiness labels reflect parsed allocation
+  evidence.
+- Added focused billing tests for Azure Cost Management CSV export ingestion and
+  nested GCP Billing Export JSON ingestion.
+
+Verification performed:
+
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts`
+  passed: 1 suite / 20 tests.
+- `npm run test:production-readiness` passed: API 10 suites / 138 tests and web
+  2 suites / 84 tests.
+- `npm run check` passed: API 51 suites / 403 tests, web 11 suites / 141 tests,
+  graph validation 312 nodes / 312 edges, pricing coverage, progress
+  verification, QA/security suppressions, database, DevOps, cloud, release,
+  handover, and provider credential gates.
+- `npm run ci:build` passed for API and web.
+- `npm audit --audit-level=high` passed; it still reports the documented low
+  transitive Graphify advisory with no available fix.
+
+Known remaining gaps:
+
+- This strengthens native provider billing export ingestion for reconciliation
+  evidence, but it is still not invoice-grade billing: private discounts, credits,
+  taxes, enterprise agreements, marketplace/private offers, amortization semantics,
+  and provider invoice-of-record reconciliation remain future release-track work.
+- Real customer exports still need customer-controlled data handling, redaction, and
+  account-specific validation before public production use.
 
 ## Phase V3.5 - Terraform bundle integrity validation
 

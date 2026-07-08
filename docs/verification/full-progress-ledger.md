@@ -43,8 +43,10 @@ Evidence:
 Deferred:
 
 - Full invoice-grade billing remains future work: private discounts, enterprise
-  agreements, credits, taxes, actual billed usage, and billing-export
-  reconciliation across provider invoices are not complete.
+  agreements, credits, taxes, amortization semantics, actual billed usage, and
+  provider invoice-of-record reconciliation are not complete. Native AWS CUR,
+  Azure Cost Management CSV, and nested GCP Billing Export JSON mapper coverage now
+  exists for estimate-vs-actual reconciliation evidence.
 
 ## Phase B - Input Modes And Requirement Pipeline
 
@@ -249,6 +251,12 @@ Evidence:
   metadata, invoice reconciliation coverage/readiness evidence, VSDX page geometry
   and layout-extraction caveats, plus an LLM classifier readiness surface that keeps
   stub/unconfigured mode distinct from production-connected mode.
+- Phase 2.10 adds focused Azure Cost Management CSV and nested GCP Billing Export JSON
+  mapper proof, including fallback-cost recognition and allocation tag/label evidence.
+- Phase 2.10 full `npm run check` passed with API `51` suites / `403` tests, web
+  `11` suites / `141` tests, graph validation `312` nodes / `312` edges, pricing
+  coverage, progress verification, QA/security suppression, database, DevOps, cloud,
+  release, handover, and provider credential gates.
 - Phase 2.9 focused regressions passed: API `3` suites / `52` tests
   (`auth-billing`, `diagram-parser`, `llm-classifier`) and web `1` suite / `57`
   tests (`App.spec.tsx`).

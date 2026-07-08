@@ -61,6 +61,8 @@ Pricing evidence is intentionally first-class:
 - comparison evidence rows connect screen totals back to source data
 - refresh-live recomputes saved workloads from refreshed source rows where the
   adapter can trace them
+- provider billing exports from AWS CUR, Azure Cost Management CSV, and GCP Billing
+  Export JSON can be normalized into estimate-vs-actual reconciliation evidence
 - exports carry methodology and data-freshness context
 
 This supports decision-grade traceability. It is not yet invoice-grade billing.
@@ -143,7 +145,8 @@ Health and operations:
 
 ## Known Architecture Boundaries
 
-- Full invoice-grade pricing and actual billing reconciliation remain future work.
+- Full invoice-grade pricing and provider invoice-of-record reconciliation remain
+  future work.
 - VSDX parsing is layout-aware extraction, not full Visio rendering.
 - Production LLM quality depends on a real endpoint/model, Vault secret, and corpus
   evaluation.

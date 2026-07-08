@@ -37,6 +37,8 @@ once tagged releases begin.
   button variants, and the `npm run overlay:check` guard.
 - Terraform bundle integrity verifier generated in every ZIP handoff, with
   manifest hash/size checks and tamper-detection regression coverage.
+- Azure Cost Management and nested GCP Billing Export mapper hardening with
+  allocation tag/label evidence for estimate-vs-actual reconciliation.
 
 ### Notes
 
@@ -52,6 +54,9 @@ once tagged releases begin.
   derivation checks, UI-priced service coverage guards, VSDX partial-parse evidence,
   Tier 3 diagram classifier fallback diagnostics, RBAC UI controls aligned to API
   authorization, and an explicit security suppression/advisory ledger.
+- Billing reconciliation now has native export mapper evidence for AWS CUR, Azure
+  Cost Management CSV, and nested GCP Billing Export JSON, while invoice-of-record
+  reconciliation remains future scope.
 - Remaining future work is intentionally documented: full invoice-grade live cloud
   billing coverage, full Visio visual rendering, hosted/team account product depth,
   production email/SSO/SCIM workflows, and provider-authenticated Terraform plan

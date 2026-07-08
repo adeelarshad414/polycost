@@ -50,6 +50,7 @@ const AZURE_COST_COLUMNS = {
   costUsd: ['CostInUSD', 'costInUSD', 'CostUSD', 'costUSD'],
   fallbackCost: ['CostInBillingCurrency', 'costInBillingCurrency', 'PreTaxCost', 'pretaxCost'],
   currency: ['BillingCurrencyCode', 'billingCurrencyCode', 'Currency', 'currency'],
+  tags: ['Tags', 'tags'],
 } as const;
 
 const GCP_BILLING_COLUMNS = {
@@ -63,6 +64,7 @@ const GCP_BILLING_COLUMNS = {
   usageUnit: ['usage.unit', 'usage_unit'],
   costUsd: ['cost'],
   currency: ['currency'],
+  tags: ['labels', 'project.labels', 'system_labels'],
 } as const;
 
 type ProviderExportColumnMap = Record<string, readonly string[]>;
@@ -481,7 +483,17 @@ function missingRecommendedFields(
 ): string[] {
   return Object.entries(columnMap)
     .filter(([field]) => field !== 'fallbackCost')
-    .filter(([, keys]) => !keys.some((key) => hasSourceValue(row, key)))
+    .filter(([field, keys]) => {
+      if (
+        field === 'costUsd' &&
+        'fallbackCost' in columnMap &&
+        columnMap.fallbackCost.some((key) => hasSourceValue(row, key))
+      ) {
+        return false;
+      }
+
+      return !keys.some((key) => hasSourceValue(row, key));
+    })
     .map(([field]) => field);
 }
 
@@ -740,7 +752,25 @@ function assertProviderSourceType(
 }
 
 function rowValue(row: Record<string, unknown>, key: string): unknown {
-  return Object.entries(row).find(([candidate]) => candidate === key)?.[1];
+  const direct = Object.entries(row).find(([candidate]) => candidate === key)?.[1];
+
+  if (direct !== undefined) {
+    return direct;
+  }
+
+  if (!key.includes('.')) {
+    return undefined;
+  }
+
+  return key.split('.').reduce<unknown>((current, segment) => {
+    if (!current || typeof current !== 'object' || Array.isArray(current)) {
+      return undefined;
+    }
+
+    return Object.entries(current as Record<string, unknown>).find(
+      ([candidate]) => candidate === segment,
+    )?.[1];
+  }, row);
 }
 
 function expectedSourceTypeForProvider(
