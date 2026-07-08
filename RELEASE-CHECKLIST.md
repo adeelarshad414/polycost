@@ -54,6 +54,7 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Run `npm run format:check`.
 - Run `npm run overlay:check`.
 - Run `npm run public:readiness:check`.
+- Run `npm run browser:audit`.
 - Run `npm run release:check`.
 - Run `npm run loading:check`.
 - Run `npm run handover:check`.
@@ -72,5 +73,6 @@ Complete this checklist before changing the GitHub repository visibility from pr
 ## Demo Artifacts
 
 - Refresh `docs/demo-artifacts/` with `npm run demo:artifacts`.
+- Refresh `docs/browser-audit/` with `npm run browser:audit`.
 - Validate the executive and engineering screenshots show pricing traceability.
 - Validate a demo comparison can expand evidence from UI number to SKU, source endpoint/record ID, payload hash, transform version, and derivation math.

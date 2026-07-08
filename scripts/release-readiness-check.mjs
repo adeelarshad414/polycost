@@ -25,6 +25,7 @@ const requiredFiles = [
   'HANDOVER-EXCELLENCE-REPORT.md',
   'docs/development/open-source-readiness.md',
   'docs/development/public-demo-hardening.md',
+  'docs/browser-audit/README.md',
   'docs/SECURITY-SUPPRESSIONS.md',
   'docs/verification/full-progress-ledger.md',
   'docs/HOW-TO-USE.md',
@@ -78,6 +79,9 @@ if (!packageJson.scripts?.['handover:check']) {
 if (!packageJson.scripts?.['public:readiness:check']) {
   failures.push('package.json is missing public:readiness:check');
 }
+if (!packageJson.scripts?.['browser:audit']) {
+  failures.push('package.json is missing browser:audit');
+}
 if (!packageJson.scripts?.['theme:hex:check']) {
   failures.push('package.json is missing theme:hex:check');
 }
@@ -126,6 +130,7 @@ await assertFileContains('README.md', [
   ['one-command demo startup', 'npm run demo:up'],
   ['clean-clone timed verifier', 'npm run demo:verify-clean'],
   ['demo artifact capture', 'npm run demo:artifacts'],
+  ['browser audit command', 'npm run browser:audit'],
   [
     'catalog list-price honesty',
     'not a billing, invoicing, or live cloud-account spend management system',
@@ -137,6 +142,7 @@ await assertFileContains('README.md', [
   ['handover excellence report link', 'HANDOVER-EXCELLENCE-REPORT.md'],
   ['open-source launch documentation link', 'docs/development/open-source-readiness.md'],
   ['public demo hardening documentation link', 'docs/development/public-demo-hardening.md'],
+  ['browser audit documentation link', 'docs/browser-audit/README.md'],
 ]);
 
 await assertFileContains('HANDOVER-CENSUS.md', [
@@ -231,6 +237,7 @@ await assertFileContains('RELEASE-CHECKLIST.md', [
   ['clean-clone demo command', 'npm run demo:up'],
   ['clean-clone timed verifier command', 'npm run demo:verify-clean'],
   ['demo artifact command', 'npm run demo:artifacts'],
+  ['browser audit command', 'npm run browser:audit'],
   ['public readiness guard command', 'npm run public:readiness:check'],
   ['public demo hardening documentation', 'docs/development/public-demo-hardening.md'],
   ['unit coverage command', 'npm run ci:unit'],
@@ -264,6 +271,7 @@ await assertFileContains('docs/development/open-source-readiness.md', [
   ['required files list', '.github/PULL_REQUEST_TEMPLATE.md'],
   ['release-readiness command', 'npm run release:check'],
   ['public-readiness command', 'npm run public:readiness:check'],
+  ['browser audit command', 'npm run browser:audit'],
 ]);
 
 await assertFileContains('docs/development/public-demo-hardening.md', [
@@ -271,7 +279,13 @@ await assertFileContains('docs/development/public-demo-hardening.md', [
   ['public demo modes', '## Public Demo Modes'],
   ['repository health checklist', '## Repository Health Checklist'],
   ['verification floor', '## Verification Floor'],
+  ['browser audit command', 'npm run browser:audit'],
   ['blocked or deferred', '## Blocked Or Deferred'],
+]);
+
+await assertFileContains('docs/browser-audit/README.md', [
+  ['browser audit command', 'npm run browser:audit'],
+  ['latest run pointer', 'Latest run:'],
 ]);
 
 await assertFileContains('docs/SECURITY-SUPPRESSIONS.md', [

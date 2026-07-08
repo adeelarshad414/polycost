@@ -1,0 +1,1021 @@
+{
+  "generatedAt": "2026-07-08T08:46:42.893Z",
+  "runDate": "2026-07-08",
+  "baseUrl": "http://127.0.0.1:4176",
+  "status": "passed",
+  "thresholds": {
+    "maxHorizontalOverflowPixels": 1,
+    "unnamedVisibleControls": 0,
+    "missingImageAltAttributes": 0,
+    "pageErrors": 0,
+    "consoleErrors": 0,
+    "keyboardFocusDeadEnds": 0
+  },
+  "toolCoverage": {
+    "lighthouse": {
+      "status": "dependency-unavailable",
+      "note": "The lighthouse package is not installed; Playwright-native navigation and resource metrics were captured instead."
+    },
+    "axe": {
+      "status": "dependency-unavailable",
+      "note": "The axe-core package is not installed; Playwright-native accessibility heuristics were captured instead."
+    }
+  },
+  "scenarios": [
+    {
+      "id": "desktop",
+      "label": "Desktop executive and engineering flow",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "zoomEquivalentPercent": null,
+      "screenshots": {
+        "executive": "desktop-executive.png",
+        "engineering": "desktop-engineering.png"
+      },
+      "status": "passed",
+      "failures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "performance": {
+        "domContentLoadedMs": 81,
+        "loadEventMs": 81,
+        "resourceCount": 14,
+        "transferKb": 332
+      },
+      "audits": {
+        "home": {
+          "label": "desktop:home",
+          "viewportWidth": 1440,
+          "scrollWidth": 1440,
+          "horizontalOverflowPixels": 0,
+          "mainLandmarkCount": 1,
+          "h1Count": 1,
+          "unnamedVisibleControls": [],
+          "imagesMissingAlt": [],
+          "overflowElements": [],
+          "visibleButtonCount": 28,
+          "visibleLinkCount": 2
+        },
+        "executive": {
+          "label": "desktop:executive",
+          "viewportWidth": 1440,
+          "scrollWidth": 1440,
+          "horizontalOverflowPixels": 0,
+          "mainLandmarkCount": 1,
+          "h1Count": 1,
+          "unnamedVisibleControls": [],
+          "imagesMissingAlt": [],
+          "overflowElements": [],
+          "visibleButtonCount": 17,
+          "visibleLinkCount": 2
+        },
+        "engineering": {
+          "label": "desktop:engineering",
+          "viewportWidth": 1440,
+          "scrollWidth": 1440,
+          "horizontalOverflowPixels": 0,
+          "mainLandmarkCount": 1,
+          "h1Count": 1,
+          "unnamedVisibleControls": [],
+          "imagesMissingAlt": [],
+          "overflowElements": [],
+          "visibleButtonCount": 49,
+          "visibleLinkCount": 9
+        },
+        "keyboardTrace": {
+          "visitedCount": 18,
+          "deadEnds": [],
+          "focusWithoutVisibleIndicator": [],
+          "visited": [
+            {
+              "summary": "button Export summary",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 181,
+                "y": 1230,
+                "width": 174,
+                "height": 40
+              }
+            },
+            {
+              "summary": "outside-document",
+              "hasVisibleFocus": false,
+              "ignored": true
+            },
+            {
+              "summary": "outside-document",
+              "hasVisibleFocus": false,
+              "ignored": true
+            },
+            {
+              "summary": "outside-document",
+              "hasVisibleFocus": false,
+              "ignored": true
+            },
+            {
+              "summary": "div RegionAWSAzureGCPLowEvidenceUS EastCurrent comparison region$124.50$0.00us-east-1$138.25$0.00eastus$110.75$0.00us-east1GCPBaseline North America pricing sen",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 173,
+                "y": 4236,
+                "width": 1094,
+                "height": 360
+              }
+            },
+            {
+              "summary": "select All servicesComputeStorageDatabaseNetworkSupportLicensingOperations",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 164,
+                "y": 8757,
+                "width": 220,
+                "height": 44
+              }
+            },
+            {
+              "summary": "select All providersAWSAzureGCP",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 392,
+                "y": 8756,
+                "width": 220,
+                "height": 44
+              }
+            },
+            {
+              "summary": "select All modelsOn-demandReserved 1yrReserved 3yrSavings/CUDSpot estimate",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 620,
+                "y": 8756,
+                "width": 220,
+                "height": 44
+              }
+            },
+            {
+              "summary": "select Service orderAWS On-demandAWS 1yrAWS 3yrAWS SavingsAWS SpotAzure On-demandAzure 1yrAzure 3yrAzure SavingsAzure SpotGCP On-demandGCP 1yrGCP 3yrGCP Savings",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 848,
+                "y": 8756,
+                "width": 220,
+                "height": 44
+              }
+            },
+            {
+              "summary": "select Technical detailCompact cost view",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 164,
+                "y": 8832,
+                "width": 220,
+                "height": 44
+              }
+            },
+            {
+              "summary": "div ServiceCategoryConfidenceAWS On-demandAWS 1yrAWS 3yrAWS SavingsAWS SpotAzure On-demandAzure 1yrAzure 3yrAzure SavingsAzure SpotGCP On-demandGCP 1yrGCP 3yrGC",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 164,
+                "y": 8892,
+                "width": 1112,
+                "height": 285
+              }
+            },
+            {
+              "summary": "button Hourly",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 823,
+                "y": 9665,
+                "width": 72,
+                "height": 44
+              }
+            },
+            {
+              "summary": "button Daily",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 899,
+                "y": 9665,
+                "width": 72,
+                "height": 44
+              }
+            },
+            {
+              "summary": "button Weekly",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 975,
+                "y": 9665,
+                "width": 72,
+                "height": 44
+              }
+            },
+            {
+              "summary": "button Monthly",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 1051,
+                "y": 9665,
+                "width": 72,
+                "height": 44
+              }
+            },
+            {
+              "summary": "button Quarterly",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 1127,
+                "y": 9665,
+                "width": 72,
+                "height": 44
+              }
+            },
+            {
+              "summary": "button Yearly",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 1203,
+                "y": 9665,
+                "width": 72,
+                "height": 44
+              }
+            },
+            {
+              "summary": "button On-demand. On-demand pricing keeps the workload fully flexible with no usage commitment.",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 606,
+                "y": 9793,
+                "width": 134,
+                "height": 40
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "reflow-320",
+      "label": "WCAG 320px reflow",
+      "viewport": {
+        "width": 320,
+        "height": 720
+      },
+      "zoomEquivalentPercent": null,
+      "screenshots": {
+        "executive": "reflow-320-executive.png",
+        "engineering": "reflow-320-engineering.png"
+      },
+      "status": "passed",
+      "failures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "performance": {
+        "domContentLoadedMs": 40,
+        "loadEventMs": 40,
+        "resourceCount": 14,
+        "transferKb": 332
+      },
+      "audits": {
+        "home": {
+          "label": "reflow-320:home",
+          "viewportWidth": 320,
+          "scrollWidth": 320,
+          "horizontalOverflowPixels": 0,
+          "mainLandmarkCount": 1,
+          "h1Count": 1,
+          "unnamedVisibleControls": [],
+          "imagesMissingAlt": [],
+          "overflowElements": [],
+          "visibleButtonCount": 23,
+          "visibleLinkCount": 1
+        },
+        "executive": {
+          "label": "reflow-320:executive",
+          "viewportWidth": 320,
+          "scrollWidth": 320,
+          "horizontalOverflowPixels": 0,
+          "mainLandmarkCount": 1,
+          "h1Count": 1,
+          "unnamedVisibleControls": [],
+          "imagesMissingAlt": [],
+          "overflowElements": [],
+          "visibleButtonCount": 17,
+          "visibleLinkCount": 1
+        },
+        "engineering": {
+          "label": "reflow-320:engineering",
+          "viewportWidth": 320,
+          "scrollWidth": 320,
+          "horizontalOverflowPixels": 0,
+          "mainLandmarkCount": 1,
+          "h1Count": 1,
+          "unnamedVisibleControls": [],
+          "imagesMissingAlt": [],
+          "overflowElements": [
+            {
+              "element": "div Engineering cost controlsCost periods, commitment scenarios, compute/storage/egress mix, budget alerts, currency, and share workflow.",
+              "left": 49,
+              "right": 829,
+              "width": 780
+            },
+            {
+              "element": "h3 Engineering cost controls",
+              "left": 49,
+              "right": 829,
+              "width": 780
+            },
+            {
+              "element": "p Cost periods, commitment scenarios, compute/storage/egress mix, budget alerts, currency, and share workflow.",
+              "left": 49,
+              "right": 829,
+              "width": 780
+            },
+            {
+              "element": "section Engineering service dashboard",
+              "left": 49,
+              "right": 998.14,
+              "width": 949.14
+            },
+            {
+              "element": "div Service driver splitProvider cost by mapped service familyBars are calculated from the current comparison line items. SKU, exact region, and tag metadata stay with the resource",
+              "left": 66,
+              "right": 981.14,
+              "width": 915.14
+            },
+            {
+              "element": "div Service driver splitProvider cost by mapped service family",
+              "left": 66,
+              "right": 614.47,
+              "width": 548.47
+            },
+            {
+              "element": "h3 Provider cost by mapped service family",
+              "left": 66,
+              "right": 614.47,
+              "width": 548.47
+            },
+            {
+              "element": "p Bars are calculated from the current comparison line items. SKU, exact region, and tag metadata stay with the resource table until the API exposes those per row.",
+              "left": 66,
+              "right": 614.47,
+              "width": 548.47
+            },
+            {
+              "element": "div Provider service cost charts",
+              "left": 66,
+              "right": 981.14,
+              "width": 915.14
+            },
+            {
+              "element": "article AWS$124.50EC2EBS / S3RDSData transferSupport planOS licensingResilience opsEC2$84.50 · 68%EBS / S3$40.00 · 32%RDS$0.00 · 0%Data transfer$0.00 · 0%Support plan$0.00 · 0%OS l",
+              "left": 66,
+              "right": 981.14,
+              "width": 915.14
+            },
+            {
+              "element": "div AWS$124.50",
+              "left": 83,
+              "right": 964.14,
+              "width": 881.14
+            },
+            {
+              "element": "div EC2EBS / S3RDSData transferSupport planOS licensingResilience ops",
+              "left": 83,
+              "right": 964.14,
+              "width": 881.14
+            },
+            {
+              "element": "div EC2EBS / S3RDSData transferSupport planOS licensingResilience ops",
+              "left": 425.56,
+              "right": 621.56,
+              "width": 196
+            },
+            {
+              "element": "svg[role=\"application\"] EC2EBS / S3RDSData transferSupport planOS licensingResilience ops",
+              "left": 425.56,
+              "right": 621.56,
+              "width": 196
+            },
+            {
+              "element": "g ",
+              "left": 405.56,
+              "right": 617.56,
+              "width": 212
+            },
+            {
+              "element": "g ",
+              "left": 405.56,
+              "right": 617.56,
+              "width": 212
+            },
+            {
+              "element": "g ",
+              "left": 405.56,
+              "right": 617.56,
+              "width": 212
+            },
+            {
+              "element": "g ",
+              "left": 408.59,
+              "right": 462.88,
+              "width": 54.29
+            },
+            {
+              "element": "g#recharts-bar-_r_1_ ",
+              "left": 408.59,
+              "right": 462.88,
+              "width": 54.29
+            },
+            {
+              "element": "g ",
+              "left": 408.59,
+              "right": 462.88,
+              "width": 54.29
+            }
+          ],
+          "visibleButtonCount": 49,
+          "visibleLinkCount": 8
+        },
+        "keyboardTrace": {
+          "visitedCount": 18,
+          "deadEnds": [],
+          "focusWithoutVisibleIndicator": [],
+          "visited": [
+            {
+              "summary": "button Export summary",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 83,
+                "y": 1272,
+                "width": 154,
+                "height": 40
+              }
+            },
+            {
+              "summary": "outside-document",
+              "hasVisibleFocus": false,
+              "ignored": true
+            },
+            {
+              "summary": "outside-document",
+              "hasVisibleFocus": false,
+              "ignored": true
+            },
+            {
+              "summary": "outside-document",
+              "hasVisibleFocus": false,
+              "ignored": true
+            },
+            {
+              "summary": "div RegionAWSAzureGCPLowEvidenceUS EastCurrent comparison region$124.50$0.00us-east-1$138.25$0.00eastus$110.75$0.00us-east1GCPBaseline North America pricing sen",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": -289,
+                "y": 7805,
+                "width": 897,
+                "height": 360
+              }
+            },
+            {
+              "summary": "select All servicesComputeStorageDatabaseNetworkSupportLicensingOperations",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 50,
+                "y": 13187,
+                "width": 220,
+                "height": 44
+              }
+            },
+            {
+              "summary": "select All providersAWSAzureGCP",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 278,
+                "y": 13184,
+                "width": 220,
+                "height": 44
+              }
+            },
+            {
+              "summary": "select All modelsOn-demandReserved 1yrReserved 3yrSavings/CUDSpot estimate",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 50,
+                "y": 13165,
+                "width": 220,
+                "height": 44
+              }
+            },
+            {
+              "summary": "select Service orderAWS On-demandAWS 1yrAWS 3yrAWS SavingsAWS SpotAzure On-demandAzure 1yrAzure 3yrAzure SavingsAzure SpotGCP On-demandGCP 1yrGCP 3yrGCP Savings",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 278,
+                "y": 13127,
+                "width": 220,
+                "height": 44
+              }
+            },
+            {
+              "summary": "select Technical detailCompact cost view",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 50,
+                "y": 13185,
+                "width": 220,
+                "height": 44
+              }
+            },
+            {
+              "summary": "div ServiceCategoryConfidenceAWS On-demandAWS 1yrAWS 3yrAWS SavingsAWS SpotAzure On-demandAzure 1yrAzure 3yrAzure SavingsAzure SpotGCP On-demandGCP 1yrGCP 3yrGC",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 50,
+                "y": 13242,
+                "width": 915,
+                "height": 285
+              }
+            },
+            {
+              "summary": "button Hourly",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 51,
+                "y": 14597,
+                "width": 149,
+                "height": 44
+              }
+            },
+            {
+              "summary": "button Daily",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 204,
+                "y": 14597,
+                "width": 149,
+                "height": 44
+              }
+            },
+            {
+              "summary": "button Weekly",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 86,
+                "y": 14597,
+                "width": 149,
+                "height": 44
+              }
+            },
+            {
+              "summary": "button Monthly",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 239,
+                "y": 14597,
+                "width": 149,
+                "height": 44
+              }
+            },
+            {
+              "summary": "button Quarterly",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 85,
+                "y": 14597,
+                "width": 149,
+                "height": 44
+              }
+            },
+            {
+              "summary": "button Yearly",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 238,
+                "y": 14597,
+                "width": 149,
+                "height": 44
+              }
+            },
+            {
+              "summary": "button On-demand. On-demand pricing keeps the workload fully flexible with no usage commitment.",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": -526,
+                "y": 14785,
+                "width": 913,
+                "height": 40
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "zoom-200-equivalent",
+      "label": "200% zoom equivalent reflow",
+      "viewport": {
+        "width": 640,
+        "height": 900
+      },
+      "zoomEquivalentPercent": 200,
+      "screenshots": {
+        "executive": "zoom-200-executive.png",
+        "engineering": "zoom-200-engineering.png"
+      },
+      "status": "passed",
+      "failures": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "performance": {
+        "domContentLoadedMs": 35,
+        "loadEventMs": 35,
+        "resourceCount": 14,
+        "transferKb": 332
+      },
+      "audits": {
+        "home": {
+          "label": "zoom-200-equivalent:home",
+          "viewportWidth": 640,
+          "scrollWidth": 640,
+          "horizontalOverflowPixels": 0,
+          "mainLandmarkCount": 1,
+          "h1Count": 1,
+          "unnamedVisibleControls": [],
+          "imagesMissingAlt": [],
+          "overflowElements": [],
+          "visibleButtonCount": 28,
+          "visibleLinkCount": 2
+        },
+        "executive": {
+          "label": "zoom-200-equivalent:executive",
+          "viewportWidth": 640,
+          "scrollWidth": 640,
+          "horizontalOverflowPixels": 0,
+          "mainLandmarkCount": 1,
+          "h1Count": 1,
+          "unnamedVisibleControls": [],
+          "imagesMissingAlt": [],
+          "overflowElements": [],
+          "visibleButtonCount": 17,
+          "visibleLinkCount": 2
+        },
+        "engineering": {
+          "label": "zoom-200-equivalent:engineering",
+          "viewportWidth": 640,
+          "scrollWidth": 640,
+          "horizontalOverflowPixels": 0,
+          "mainLandmarkCount": 1,
+          "h1Count": 1,
+          "unnamedVisibleControls": [],
+          "imagesMissingAlt": [],
+          "overflowElements": [
+            {
+              "element": "div Engineering cost controlsCost periods, commitment scenarios, compute/storage/egress mix, budget alerts, currency, and share workflow.",
+              "left": 49,
+              "right": 829,
+              "width": 780
+            },
+            {
+              "element": "h3 Engineering cost controls",
+              "left": 49,
+              "right": 829,
+              "width": 780
+            },
+            {
+              "element": "p Cost periods, commitment scenarios, compute/storage/egress mix, budget alerts, currency, and share workflow.",
+              "left": 49,
+              "right": 829,
+              "width": 780
+            },
+            {
+              "element": "section Engineering service dashboard",
+              "left": 49,
+              "right": 998.14,
+              "width": 949.14
+            },
+            {
+              "element": "div Service driver splitProvider cost by mapped service familyBars are calculated from the current comparison line items. SKU, exact region, and tag metadata stay with the resource",
+              "left": 66,
+              "right": 981.14,
+              "width": 915.14
+            },
+            {
+              "element": "div Provider service cost charts",
+              "left": 66,
+              "right": 981.14,
+              "width": 915.14
+            },
+            {
+              "element": "article AWS$124.50EC2EBS / S3RDSData transferSupport planOS licensingResilience opsEC2$84.50 · 68%EBS / S3$40.00 · 32%RDS$0.00 · 0%Data transfer$0.00 · 0%Support plan$0.00 · 0%OS l",
+              "left": 66,
+              "right": 981.14,
+              "width": 915.14
+            },
+            {
+              "element": "div AWS$124.50",
+              "left": 83,
+              "right": 964.14,
+              "width": 881.14
+            },
+            {
+              "element": "div EC2EBS / S3RDSData transferSupport planOS licensingResilience ops",
+              "left": 83,
+              "right": 964.14,
+              "width": 881.14
+            },
+            {
+              "element": "div EC2EBS / S3RDSData transferSupport planOS licensingResilience ops",
+              "left": 404.56,
+              "right": 642.56,
+              "width": 238
+            },
+            {
+              "element": "svg[role=\"application\"] EC2EBS / S3RDSData transferSupport planOS licensingResilience ops",
+              "left": 404.56,
+              "right": 642.56,
+              "width": 238
+            },
+            {
+              "element": "g EC2EBS / S3RDSData transferSupport planOS licensingResilience ops",
+              "left": 392.95,
+              "right": 655.11,
+              "width": 262.16
+            },
+            {
+              "element": "g EC2EBS / S3RDSData transferSupport planOS licensingResilience ops",
+              "left": 392.95,
+              "right": 655.11,
+              "width": 262.16
+            },
+            {
+              "element": "g Resilience ops",
+              "left": 585.73,
+              "right": 655.11,
+              "width": 69.38
+            },
+            {
+              "element": "text Resilience ops",
+              "left": 585.73,
+              "right": 655.11,
+              "width": 69.38
+            },
+            {
+              "element": "tspan Resilience ops",
+              "left": 585.73,
+              "right": 655.11,
+              "width": 69.38
+            },
+            {
+              "element": "div EC2$84.50 · 68%EBS / S3$40.00 · 32%RDS$0.00 · 0%Data transfer$0.00 · 0%Support plan$0.00 · 0%OS licensing$0.00 · 0%Resilience ops$0.00 · 0%",
+              "left": 83,
+              "right": 964.14,
+              "width": 881.14
+            },
+            {
+              "element": "span EC2$84.50 · 68%",
+              "left": 83,
+              "right": 964.14,
+              "width": 881.14
+            },
+            {
+              "element": "strong EC2",
+              "left": 103,
+              "right": 964.14,
+              "width": 861.14
+            },
+            {
+              "element": "small $84.50 · 68%",
+              "left": 103,
+              "right": 964.14,
+              "width": 861.14
+            }
+          ],
+          "visibleButtonCount": 49,
+          "visibleLinkCount": 9
+        },
+        "keyboardTrace": {
+          "visitedCount": 18,
+          "deadEnds": [],
+          "focusWithoutVisibleIndicator": [],
+          "visited": [
+            {
+              "summary": "button Export summary",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 83,
+                "y": 1159,
+                "width": 174,
+                "height": 40
+              }
+            },
+            {
+              "summary": "outside-document",
+              "hasVisibleFocus": false,
+              "ignored": true
+            },
+            {
+              "summary": "outside-document",
+              "hasVisibleFocus": false,
+              "ignored": true
+            },
+            {
+              "summary": "outside-document",
+              "hasVisibleFocus": false,
+              "ignored": true
+            },
+            {
+              "summary": "div RegionAWSAzureGCPLowEvidenceUS EastCurrent comparison region$124.50$0.00us-east-1$138.25$0.00eastus$110.75$0.00us-east1GCPBaseline North America pricing sen",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 75,
+                "y": 6890,
+                "width": 897,
+                "height": 360
+              }
+            },
+            {
+              "summary": "select All servicesComputeStorageDatabaseNetworkSupportLicensingOperations",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 66,
+                "y": 12272,
+                "width": 220,
+                "height": 44
+              }
+            },
+            {
+              "summary": "select All providersAWSAzureGCP",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 294,
+                "y": 12265,
+                "width": 220,
+                "height": 44
+              }
+            },
+            {
+              "summary": "select All modelsOn-demandReserved 1yrReserved 3yrSavings/CUDSpot estimate",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 522,
+                "y": 12242,
+                "width": 220,
+                "height": 44
+              }
+            },
+            {
+              "summary": "select Service orderAWS On-demandAWS 1yrAWS 3yrAWS SavingsAWS SpotAzure On-demandAzure 1yrAzure 3yrAzure SavingsAzure SpotGCP On-demandGCP 1yrGCP 3yrGCP Savings",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 359,
+                "y": 12182,
+                "width": 220,
+                "height": 44
+              }
+            },
+            {
+              "summary": "select Technical detailCompact cost view",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 66,
+                "y": 12213,
+                "width": 220,
+                "height": 44
+              }
+            },
+            {
+              "summary": "div ServiceCategoryConfidenceAWS On-demandAWS 1yrAWS 3yrAWS SavingsAWS SpotAzure On-demandAzure 1yrAzure 3yrAzure SavingsAzure SpotGCP On-demandGCP 1yrGCP 3yrGC",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 66,
+                "y": 12273,
+                "width": 915,
+                "height": 285
+              }
+            },
+            {
+              "summary": "button Hourly",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 67,
+                "y": 13249,
+                "width": 149,
+                "height": 44
+              }
+            },
+            {
+              "summary": "button Daily",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 220,
+                "y": 13249,
+                "width": 149,
+                "height": 44
+              }
+            },
+            {
+              "summary": "button Weekly",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 373,
+                "y": 13247,
+                "width": 149,
+                "height": 44
+              }
+            },
+            {
+              "summary": "button Monthly",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 526,
+                "y": 13247,
+                "width": 149,
+                "height": 44
+              }
+            },
+            {
+              "summary": "button Quarterly",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 287,
+                "y": 13247,
+                "width": 149,
+                "height": 44
+              }
+            },
+            {
+              "summary": "button Yearly",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": 440,
+                "y": 13247,
+                "width": 149,
+                "height": 44
+              }
+            },
+            {
+              "summary": "button On-demand. On-demand pricing keeps the workload fully flexible with no usage commitment.",
+              "hasVisibleFocus": true,
+              "ignored": false,
+              "rect": {
+                "x": -324,
+                "y": 13434,
+                "width": 457,
+                "height": 40
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

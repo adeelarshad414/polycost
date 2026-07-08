@@ -20,6 +20,7 @@ production enterprise identity management, or complete landing-zone Terraform.
 | One-command demo  | `npm run demo:up`                | Clean local startup for reviewers                                                    | Health checks and seeded demo data |
 | Clean-clone proof | `npm run demo:verify-clean`      | Confirms a new clone can reach a running demo within the startup budget              | Timed verifier output              |
 | Demo artifacts    | `npm run demo:artifacts`         | Captures executive, engineering, mobile, and walkthrough artifacts                   | `docs/demo-artifacts/`             |
+| Browser audit     | `npm run browser:audit`          | Captures screenshots, reflow/zoom evidence, accessibility heuristics, and metrics    | `docs/browser-audit/`              |
 | Release guard     | `npm run public:readiness:check` | Verifies public-readiness docs, templates, security posture, and demo evidence hooks | Terminal pass/fail output          |
 
 ## Repository Health Checklist
@@ -61,6 +62,7 @@ npm run ci:lint
 npm run public:readiness:check
 npm run release:check
 npm run handover:check
+npm run browser:audit
 npm run test:production-readiness
 npm run ci:build
 ```
@@ -71,6 +73,7 @@ For a full local release rehearsal, run:
 npm run check
 npm run demo:verify-clean
 npm run demo:artifacts
+npm run browser:audit
 ```
 
 `demo:artifacts` requires the web app to be reachable. Set `DEMO_WEB_URL` when the
@@ -78,9 +81,9 @@ demo is running on a non-default host or port.
 
 ## Blocked Or Deferred
 
-- Fresh Lighthouse and axe matrices still need a dedicated browser audit run before
-  a public launch claim.
-- 320px reflow and 200% zoom evidence still need a dedicated browser harness.
+- Fresh Lighthouse and axe matrices still need those exact packages before a public
+  launch claim with those tool names. `npm run browser:audit` records Playwright-native
+  browser evidence and marks Lighthouse/axe package availability honestly.
 - Real provider, production SSO, production LLM, and Terraform provider validation
   require external credentials or a staging environment.
 - Hosted GitHub Actions must be able to allocate runners before remote CI is used as

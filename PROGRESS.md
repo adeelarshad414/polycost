@@ -109,6 +109,44 @@ say so explicitly rather than marking it done.
 | UI Appendix O - Overlay/dialog/button audit             | Complete with known gaps (see notes) | 2026-07-08   |
 | Customer handover excellence orchestrator               | Complete with known gaps (see notes) | 2026-07-08   |
 | Public OSS readiness and demo hardening                 | Complete with known gaps (see notes) | 2026-07-08   |
+| Browser audit artifact hardening                        | Complete with known gaps (see notes) | 2026-07-08   |
+
+## Browser audit artifact hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-08
+
+What changed:
+
+- Added `npm run browser:audit`.
+- Added `scripts/browser-audit.mjs`, a Playwright-native production-build audit
+  runner that starts Vite preview, mocks backend endpoints, captures desktop,
+  320px reflow, and 200% zoom-equivalent evidence, and writes JSON/Markdown
+  artifacts.
+- Added `docs/browser-audit/README.md` plus the dated
+  `docs/browser-audit/2026-07-08/` artifact bundle with executive and engineering
+  screenshots.
+- Added a semantic result-mode `h1` for comparison pages while preserving the
+  existing visual layout.
+- Wired the browser audit command into README, public demo hardening docs,
+  open-source readiness, release checklist, and release/public readiness guards.
+
+Verification performed:
+
+- `npm run browser:audit` passed.
+  - Scenarios: desktop executive/engineering, 320px reflow, 200% zoom-equivalent
+    reflow.
+  - Checks: horizontal overflow, visible control names, image alt attributes, main
+    landmark/h1, keyboard focus trace, console errors, page errors.
+  - Artifact: `docs/browser-audit/2026-07-08/browser-audit.json`.
+
+Known remaining gaps:
+
+- Lighthouse and axe packages are not installed; the audit records this honestly as
+  dependency-unavailable and captures Playwright-native performance/accessibility
+  heuristics instead.
+- The 200% evidence is a 640px CSS viewport equivalent, not Chrome's formal browser
+  zoom control.
 
 ## Public OSS readiness and demo hardening
 

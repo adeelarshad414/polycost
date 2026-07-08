@@ -37,6 +37,12 @@ gate. The gate verifies community files, public-launch honesty language, demo ev
 hooks, tracked environment-file safety, and provider-logo safeguards. It is wired into
 the local `npm run check` floor and release-readiness validation.
 
+The browser audit artifact pass added `npm run browser:audit` and
+`docs/browser-audit/2026-07-08/`. The audit captures desktop, 320px reflow, and 200%
+zoom-equivalent screenshots for executive and engineering states, plus machine-readable
+checks for overflow, visible control names, image alt attributes, landmarks/headings,
+keyboard focus, console errors, page errors, and local navigation/resource metrics.
+
 ## Findings And Disposition
 
 | ID             | Disposition   | Evidence                                                                                                                                                                            |
@@ -63,6 +69,7 @@ the local `npm run check` floor and release-readiness validation.
 | HND-001        | Added         | Customer handover package added under `docs/`, with usage, deployment, runbook, competitive comparison, architecture, and evidence ledger                                           |
 | HND-002        | Added         | `npm run handover:check` validates the handover package and runs inside the full local `npm run check` floor                                                                        |
 | OSS-001        | Added         | `npm run public:readiness:check` validates public-readiness docs, community health files, demo evidence hooks, tracked env-file safety, and provider-logo safeguards                |
+| AUD-001        | Added         | `npm run browser:audit` produces Playwright-native browser audit artifacts for desktop, 320px reflow, and 200% zoom-equivalent scenarios                                            |
 
 ## Verification
 
@@ -127,6 +134,8 @@ Local static/regression gates:
     and chunk-size warnings.
 - Customer handover package gate passed with `npm run handover:check`.
 - Public OSS readiness gate passed with `npm run public:readiness:check`.
+- Browser audit artifact gate passed with `npm run browser:audit`: desktop,
+  320px reflow, and 200% zoom-equivalent scenarios passed.
 - Customer handover full local regression floor passed with `npm run check`:
   - API unit: `51` suites / `400` tests.
   - Web unit: `9` suites / `132` tests.
@@ -213,6 +222,9 @@ Machine-readable token evidence:
 - Hosted GitHub Actions still cannot prove branch CI while jobs fail before runner
   allocation. A maintainer must fix Actions runner/account/billing/quota state or
   rerun once the account can allocate runners.
+- Formal Lighthouse and axe matrices remain future scope until `lighthouse` and
+  `axe-core` are added to the toolchain. The current browser audit records
+  Playwright-native evidence and marks those dependencies unavailable.
 - Full invoice-grade pricing remains future scope: negotiated discounts, credits,
   taxes, enterprise agreements, marketplace charges, and actual provider invoice-of-record
   reconciliation are not complete. Phase 2.9 improves source-row traceability and
