@@ -13,6 +13,10 @@ once tagged releases begin.
   skeleton presets, progress bars, task queue, job toast, and live-tail components.
 - Loading inventory and audit report with `npm run loading:check` wired into the
   full local regression floor and release-readiness validation.
+- Customer handover documentation package: usage guide, deployment guide, runbook,
+  competitive comparison, architecture overview, and handover evidence ledger.
+- `npm run handover:check` gate, wired into the full `npm run check` regression
+  floor and release-readiness validation.
 - Open-source readiness files: license, contribution guide, support policy,
   governance notes, issue templates, pull request template, CODEOWNERS, and
   dependency update configuration.
@@ -31,6 +35,9 @@ once tagged releases begin.
 - Loading UX now follows delay-mounted indicators, real step/phase labels, token-only
   styling, reduced-motion overrides, and explicit blocked notes for API progress that
   is not yet measurable.
+- Customer handover is now documented as private-demo ready with explicit caveats for
+  invoice-grade pricing, full Visio rendering, production enterprise auth, and full
+  landing-zone Terraform.
 - Production-readiness hardening now includes pricing catalog lineage, SKU evidence
   derivation checks, UI-priced service coverage guards, VSDX partial-parse evidence,
   Tier 3 diagram classifier fallback diagnostics, RBAC UI controls aligned to API

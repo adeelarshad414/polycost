@@ -24,6 +24,12 @@ const requiredFiles = [
   'docs/development/open-source-readiness.md',
   'docs/SECURITY-SUPPRESSIONS.md',
   'docs/verification/full-progress-ledger.md',
+  'docs/HOW-TO-USE.md',
+  'docs/DEPLOYMENT.md',
+  'docs/RUNBOOK.md',
+  'docs/COMPARISON.md',
+  'docs/ARCHITECTURE.md',
+  'docs/CUSTOMER-HANDOVER-LEDGER.md',
   '.github/CODEOWNERS',
   '.github/dependabot.yml',
   '.github/PULL_REQUEST_TEMPLATE.md',
@@ -57,6 +63,9 @@ if (!packageJson.scripts?.['demo:verify-clean']) {
 if (!packageJson.scripts?.['pricing:logic:coverage']) {
   failures.push('package.json is missing pricing:logic:coverage');
 }
+if (!packageJson.scripts?.['handover:check']) {
+  failures.push('package.json is missing handover:check');
+}
 if (!packageJson.scripts?.['theme:hex:check']) {
   failures.push('package.json is missing theme:hex:check');
 }
@@ -80,6 +89,9 @@ if (!packageJson.scripts?.check?.includes('npm run progress:verify')) {
 }
 if (!packageJson.scripts?.check?.includes('npm run loading:check')) {
   failures.push('package.json check script must include npm run loading:check');
+}
+if (!packageJson.scripts?.check?.includes('npm run handover:check')) {
+  failures.push('package.json check script must include npm run handover:check');
 }
 
 assertScriptIncludes('test:production-readiness', [
@@ -105,7 +117,46 @@ await assertFileContains('README.md', [
   ],
   ['anonymous usage remains available', 'Anonymous users can still'],
   ['provider credential documentation link', 'docs/PROVIDER-CREDENTIALS.md'],
+  ['handover documentation link', 'docs/CUSTOMER-HANDOVER-LEDGER.md'],
   ['open-source launch documentation link', 'docs/development/open-source-readiness.md'],
+]);
+
+await assertFileContains('docs/CUSTOMER-HANDOVER-LEDGER.md', [
+  ['customer handover verdict', 'private customer/demo handover'],
+  ['phase classification table', '## Phase Classification'],
+  ['eleven-lens audit table', '## Eleven-Lens Audit'],
+  ['mock and dummy inventory', '## Mock And Dummy Inventory'],
+  ['blocked or deferred section', '## Blocked Or Deferred'],
+]);
+
+await assertFileContains('docs/HOW-TO-USE.md', [
+  ['customer demo command', 'npm run demo:up'],
+  ['diagram input paths', 'Diagram mode'],
+  ['Terraform starter bundle workflow', 'Terraform Starter Bundles'],
+]);
+
+await assertFileContains('docs/DEPLOYMENT.md', [
+  ['deployment health checks', '/health/ready'],
+  ['real provider rehearsal', 'Real Provider Pricing Rehearsal'],
+  ['backup and restore guidance', 'Backups And Restore'],
+]);
+
+await assertFileContains('docs/RUNBOOK.md', [
+  ['service objectives', '## Service Objectives'],
+  ['pricing stale incident', 'Incident: Pricing Data Is Stale Or Missing'],
+  ['GitHub Actions runner blocker', 'runner_id'],
+]);
+
+await assertFileContains('docs/COMPARISON.md', [
+  ['Infracost comparison', 'Infracost'],
+  ['Cloudability comparison', 'IBM Cloudability'],
+  ['source limitation', 'Source limitation'],
+]);
+
+await assertFileContains('docs/ARCHITECTURE.md', [
+  ['architecture extension points', '## Extending A Provider Adapter'],
+  ['Terraform extension points', '## Extending Terraform Generation'],
+  ['known boundaries', '## Known Architecture Boundaries'],
 ]);
 
 await assertFileContains('docs/PROVIDER-CREDENTIALS.md', [

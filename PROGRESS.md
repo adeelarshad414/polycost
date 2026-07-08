@@ -104,8 +104,63 @@ say so explicitly rather than marking it done.
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.3 - Terraform bundle export                    | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.4 - Terraform module library                   | Complete with known gaps (see notes) | 2026-07-07   |
+| Customer handover and production excellence package     | Complete with known gaps (see notes) | 2026-07-07   |
 | Loading and progress experience audit/build             | Complete with known gaps (see notes) | 2026-07-08   |
 | UI Appendix O - Overlay/dialog/button audit             | Complete with known gaps (see notes) | 2026-07-08   |
+
+## Customer handover and production excellence package
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added the canonical customer handover documentation package under `docs/`:
+  user guide, deployment guide, operations runbook, competitive comparison,
+  architecture overview, and customer handover ledger.
+- Added `npm run handover:check` to validate the handover docs and wired it into
+  the full `npm run check` regression floor.
+- Extended release-readiness automation so the handover package is required before
+  public/open-source release review.
+- Updated README, changelog, dummy-value notes, and release checklist so customer
+  handover boundaries are discoverable from the repo entry points.
+
+Verification:
+
+- `npm run handover:check`
+- `npm run release:check`
+- `npm run format:check`
+- `npm run ci:lint`
+- `npm run test:production-readiness`
+  - API focused: `10` suites / `135` tests.
+  - Web focused: `2` suites / `84` tests.
+- `npm run ci:build`
+  - API TypeScript build passed.
+  - Web production build passed with the existing Vite environment-placeholder and
+    chunk-size warnings.
+- `npm run check`
+  - API unit: `51` suites / `400` tests.
+  - Web unit: `9` suites / `132` tests.
+  - Graph validation: `304` nodes / `304` edges.
+  - Pricing coverage guard: `36` frontend priced families covered.
+  - Progress verification: `153` phase evidence anchors.
+  - Security suppression check: `22` reviewed suppressions.
+  - Database validation, DevOps check, cloud readiness, release readiness,
+    handover, and provider credential gates passed.
+  - `db:validate` skipped the live `schema_migrations` check because the Postgres
+    container was not running.
+  - `cloud:check` remains documentation/config only because deployable IaC is not
+    present.
+  - `impeccable` skipped by documented Node 20 vs Node 24 constraint.
+
+Known remaining gaps:
+
+- The handover package documents the current honest product boundary; it does not
+  close future phases for invoice-grade billing, full Visio rendering, production
+  LLM corpus quality, enterprise auth/team product depth, or full landing-zone
+  Terraform.
+- Hosted GitHub Actions runner allocation remains an external blocker until the
+  repository account can allocate runners and execute workflow steps.
 
 ## Loading and progress experience audit/build
 
