@@ -25,6 +25,7 @@ npm run provider:credentials:check:strict
 | AWS public catalog        | No                                       | Outbound HTTPS to `pricing.us-east-1.amazonaws.com`                                                 | None read by current adapter    | Public Price List bulk files only; no AWS access keys should be stored for the current adapter.      |
 | Azure public catalog      | No                                       | Outbound HTTPS to `prices.azure.com`                                                                | None read by current adapter    | Public Retail Prices API only; no Entra app registration scope or client secret is required.         |
 | GCP public catalog        | Yes                                      | `VAULT_ADDR`, `VAULT_TOKEN_FILE`, optional `VAULT_NAMESPACE`                                        | `secret/polycost/providers/gcp` | Store either `access_token` or `service_account_json`; dummy values are rejected outside local mode. |
+| Invoice artifact storage  | Yes, when external storage is enabled    | `INVOICE_ARTIFACT_STORAGE_BACKEND`, object store name/region/prefix, KMS, scanner, retention modes  | See artifact storage section    | Store least-privilege object-store credentials in Vault; strict checks reject missing/dummy secrets. |
 | Diagram/NL LLM classifier | Only when endpoint/model are configured  | `DIAGRAM_LLM_CLASSIFIER_ENDPOINT`, `DIAGRAM_LLM_CLASSIFIER_MODEL`, `VAULT_ADDR`, `VAULT_TOKEN_FILE` | `secret/polycost/llm`           | Store `api_key`; parser falls back to deterministic classification if endpoint/model are absent.     |
 
 The API/web `.env` surface stays intentionally small:
@@ -38,8 +39,9 @@ VAULT_TOKEN_FILE=/run/polycost-vault-auth/token
 ```
 
 Do not put provider access tokens, service account JSON, OIDC client secrets, or LLM
-API keys directly in `.env`. Put them in Vault and let the startup credential check
-prove the runtime can read them.
+API keys directly in `.env`. Artifact object-store keys and SAS tokens also stay
+out of `.env`. Put secrets in Vault and let the startup credential check prove the
+runtime can read them.
 
 ## AWS Price List
 
@@ -138,6 +140,103 @@ USE_MOCK_PROVIDERS=false npm run provider:credentials:check:strict
 
 The strict check fails if Vault is missing, the token file is unreadable, the GCP
 secret path is absent, or the stored token/JSON is still a dummy placeholder.
+
+## Invoice Artifact Object Storage
+
+Local/demo mode keeps invoice artifact bytes in Postgres with governance metadata.
+Staging and production must use provider-native object storage and a customer-managed
+key reference:
+
+```bash
+INVOICE_ARTIFACT_STORAGE_BACKEND=aws-s3 # or azure-blob / gcp-gcs
+INVOICE_ARTIFACT_OBJECT_STORE_NAME=polycost-invoice-artifacts
+INVOICE_ARTIFACT_OBJECT_STORE_REGION=us-east-1
+INVOICE_ARTIFACT_OBJECT_STORE_PREFIX=invoice-artifacts
+INVOICE_ARTIFACT_KMS_KEY_REFERENCE="<provider-kms-key-or-key-uri>"
+INVOICE_ARTIFACT_MALWARE_SCANNER_MODE=http-webhook
+INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE=delete-expired
+```
+
+PolyCost writes immutable-ish object keys under the configured prefix using the team,
+reconciliation, artifact id, checksum prefix, and sanitized file name. The database
+stores only the object pointer, checksum, size, KMS/readiness metadata, scan result,
+retention policy, and audit trail. Downloads read the object back through the matching
+provider adapter and re-check the stored SHA-256 before returning bytes.
+
+### AWS S3
+
+Vault path: `secret/polycost/artifacts/aws`
+
+Required keys:
+
+- `access_key_id`
+- `secret_access_key`
+- optional `session_token`
+
+Minimum permission shape:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject"],
+      "Resource": "arn:aws:s3:::polycost-invoice-artifacts/invoice-artifacts/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey"],
+      "Resource": "<artifact-kms-key-arn>"
+    }
+  ]
+}
+```
+
+PolyCost signs S3 REST `PUT`/`GET` requests with SigV4 and sends KMS headers when
+`INVOICE_ARTIFACT_KMS_KEY_REFERENCE` is configured.
+
+### Azure Blob Storage
+
+Vault path: `secret/polycost/artifacts/azure`
+
+Required keys:
+
+- `sas_token`
+- `account_name`, unless `INVOICE_ARTIFACT_OBJECT_STORE_NAME` is formatted as
+  `account/container`
+
+The SAS token should be scoped to the artifact container with create/write/read
+permissions and an expiry/rotation process owned by the operator. PolyCost writes
+Block Blob objects through the Blob REST API and records the returned ETag/version
+when Azure returns them.
+
+### GCP Cloud Storage
+
+Vault path: `secret/polycost/artifacts/gcp`
+
+Required key:
+
+- `access_token`
+
+If this artifact-specific path is absent, PolyCost falls back to
+`secret/polycost/providers/gcp access_token`. The token needs Cloud Storage object
+create/read permission for the configured bucket/prefix, plus the operator-managed
+KMS permission for the referenced key when CMEK is enforced by bucket policy.
+
+Validation command:
+
+```bash
+INVOICE_ARTIFACT_STORAGE_BACKEND=aws-s3 \
+INVOICE_ARTIFACT_OBJECT_STORE_NAME=polycost-invoice-artifacts \
+INVOICE_ARTIFACT_OBJECT_STORE_REGION=us-east-1 \
+INVOICE_ARTIFACT_KMS_KEY_REFERENCE="<kms-key>" \
+INVOICE_ARTIFACT_MALWARE_SCANNER_MODE=http-webhook \
+INVOICE_ARTIFACT_MALWARE_SCANNER_URL=https://scanner.example.com/polycost/artifacts \
+INVOICE_ARTIFACT_MALWARE_SCANNER_SECRET="<scanner-secret>" \
+INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE=delete-expired \
+npm run provider:credentials:check:strict
+```
 
 ## Flip From Mock To Real Mode
 

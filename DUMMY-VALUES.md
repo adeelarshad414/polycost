@@ -45,6 +45,14 @@ The explicit placeholder token is `CHANGE_ME_DEV_ONLY`. Production and staging c
 - `INVOICE_ARTIFACT_STORAGE_BACKEND=database-bytea`
 - Missing `INVOICE_ARTIFACT_OBJECT_STORE_NAME` or
   `INVOICE_ARTIFACT_OBJECT_STORE_REGION` when external artifact storage is enabled
+- Missing or dummy Vault object-store credentials for the selected invoice artifact
+  backend:
+  - AWS S3: `secret/polycost/artifacts/aws` keys `access_key_id` and
+    `secret_access_key`
+  - Azure Blob: `secret/polycost/artifacts/azure` key `sas_token`, plus
+    `account_name` unless the object store name is formatted as `account/container`
+  - GCP GCS: `secret/polycost/artifacts/gcp` key `access_token`, with
+    `secret/polycost/providers/gcp access_token` accepted as a fallback
 - Missing `INVOICE_ARTIFACT_KMS_KEY_REFERENCE`
 - `INVOICE_ARTIFACT_MALWARE_SCANNER_MODE=eicar-signature-only`
 - Missing `INVOICE_ARTIFACT_MALWARE_SCANNER_URL` or non-dummy scanner secret when
@@ -78,8 +86,16 @@ docker compose exec vault vault kv put secret/polycost/llm api_key="<llm-api-key
    `INVOICE_ARTIFACT_KMS_KEY_REFERENCE`, switch
    `INVOICE_ARTIFACT_MALWARE_SCANNER_MODE=http-webhook` with a non-dummy scanner
    secret, and set `INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE=delete-expired`.
-7. Run `npm run provider:credentials:check:strict`.
-8. Run a comparison and confirm each catalog-backed line item has source endpoint,
+7. Store selected artifact object-store credentials in Vault:
+
+```bash
+docker compose exec vault vault kv put secret/polycost/artifacts/aws access_key_id="<access-key-id>" secret_access_key="<secret-access-key>"
+docker compose exec vault vault kv put secret/polycost/artifacts/azure account_name="<storage-account>" sas_token="<sas-token>"
+docker compose exec vault vault kv put secret/polycost/artifacts/gcp access_token="<oauth-access-token>"
+```
+
+8. Run `npm run provider:credentials:check:strict`.
+9. Run a comparison and confirm each catalog-backed line item has source endpoint,
    source record ID, payload hash, transform version, and fetched timestamp.
 
 For SSO readiness, configure provider metadata through the workspace UI only after

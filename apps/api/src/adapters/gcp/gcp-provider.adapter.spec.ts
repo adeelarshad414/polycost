@@ -213,9 +213,13 @@ describe('GcpProviderAdapter', () => {
 
     const fetchMock = fetchClient as jest.MockedFunction<FetchLike>;
     const tokenRequest = fetchMock.mock.calls[0]?.[1];
+    const tokenRequestBody = tokenRequest?.body;
 
-    expect(typeof tokenRequest?.body).toBe('string');
-    expect(new URLSearchParams(tokenRequest?.body).get('assertion')?.split('.')).toHaveLength(3);
+    expect(typeof tokenRequestBody).toBe('string');
+    if (typeof tokenRequestBody !== 'string') {
+      throw new Error('Expected GCP token exchange request body to be URL-encoded text.');
+    }
+    expect(new URLSearchParams(tokenRequestBody).get('assertion')?.split('.')).toHaveLength(3);
   });
 
   it('follows GCP service and SKU pagination while applying region filters', async () => {

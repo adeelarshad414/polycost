@@ -85,6 +85,9 @@ Pricing evidence is intentionally first-class:
   provider-credential checks; staging/production config validation now requires an
   external object-store target, KMS reference, webhook scanner, and delete-expired
   retention mode before startup is accepted
+- external invoice artifact bytes can be written to and read from provider-native
+  AWS S3, Azure Blob Storage, or GCP Cloud Storage adapters; database records keep
+  the object pointer, checksum, size, governance metadata, and audit evidence
 - retention enforcement can report or delete expired non-legal-held database-backed
   artifact blobs through an explicit admin operation
 - invoice-grade readiness is represented as a matrix of evidence checks, blockers,
@@ -174,11 +177,11 @@ Health and operations:
 
 ## Known Architecture Boundaries
 
-- Full invoice-grade pricing, provider invoice-of-record reconciliation, and
-  enterprise artifact handling such as provider-native S3/Azure Blob/GCS byte-write
-  adapters, reviewer workflow UX, and invoice-of-record validation remain future
-  work. The current hardening layer proves configuration readiness, webhook scanner
-  integration, and retention enforcement over the existing database-backed store.
+- Full invoice-grade pricing, provider invoice-of-record reconciliation, external
+  artifact lifecycle deletion against provider buckets, reviewer workflow UX, and
+  invoice-of-record validation remain future work. The current hardening layer proves
+  provider-native artifact write/read adapters, configuration readiness, webhook
+  scanner integration, and retention enforcement over the database-backed store.
 - VSDX parsing is layout-aware extraction, not full Visio rendering.
 - Production LLM quality depends on a real endpoint/model, Vault secret, and corpus
   evaluation.

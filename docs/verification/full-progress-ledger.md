@@ -68,6 +68,10 @@ Evidence:
   operations, production-bound config guards, strict provider-check coverage,
   signed scanner webhook integration, and delete-expired enforcement for
   database-backed blobs that are not under legal hold.
+- Provider-native invoice artifact storage now writes and reads external artifact
+  bytes through AWS S3, Azure Blob Storage, and GCP Cloud Storage adapters, stores
+  object pointers instead of inline bytes for external rows, and checksum-verifies
+  provider reads before returning downloaded content.
 - `docs/PROVIDER-CREDENTIALS.md` states the current production swap procedure and
   explicitly limits real provider mode to catalog list prices, not invoices.
 
@@ -81,11 +85,12 @@ Deferred:
   rows are separated from usage-comparable variance, but provider-account-specific
   amortization, allocation proof, private pricing, and invoice controls remain
   future work. The invoice-grade readiness matrix, artifact register, stored-blob
-  metadata, governance status, and verification status expose those blockers; they
-  do not remove unrelated or unverified evidence requirements. Current artifact
-  storage is database-backed for the OSS/self-hosted baseline with a deterministic
-  scan hook, not enterprise object storage with customer-managed KMS, real AV
-  scanning, legal-hold enforcement, or reviewer workflow automation.
+  metadata, governance status, object-storage pointers, and verification status
+  expose those blockers; they do not remove unrelated or unverified evidence
+  requirements. Current artifact storage supports database-backed local mode plus
+  provider-native object writes/reads, but full external lifecycle deletion, real AV
+  operations, legal-hold enforcement, and reviewer workflow automation remain future
+  production work.
 
 ## Phase B - Input Modes And Requirement Pipeline
 

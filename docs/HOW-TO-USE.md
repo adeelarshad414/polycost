@@ -172,6 +172,6 @@ For finance/FinOps:
    and `POST /api/v1/billing/artifact-storage/retention/enforce` with
    `{ "dryRun": true }` from an admin session to show storage/scanner/KMS/retention
    gaps without deleting demo data.
-10. Call out that invoice-grade actual spend, private discounts, provider-native
-    object-store byte adapters, and provider invoice-of-record validation are still
-    future work.
+10. Call out that invoice-grade actual spend, private discounts, external
+    object-store lifecycle deletion, and provider invoice-of-record validation are
+    still future work.
