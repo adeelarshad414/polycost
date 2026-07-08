@@ -41,6 +41,9 @@ Evidence:
   rows as usage or non-usage adjustments, and reconciliation evidence separates
   usage-comparable variance from taxes, credits, support, marketplace/private-offer,
   and other adjustment rows.
+- `apps/api/src/api/auth-billing.spec.ts` also proves provider commitment semantics
+  are classified separately for covered usage, commitment discounts/negations,
+  recurring or upfront commitment fees, and amortization or unused commitment rows.
 - `docs/PROVIDER-CREDENTIALS.md` states the current production swap procedure and
   explicitly limits real provider mode to catalog list prices, not invoices.
 
@@ -50,8 +53,9 @@ Deferred:
   agreements, amortization semantics, actual billed usage, and provider
   invoice-of-record reconciliation are not complete. Native AWS CUR, Azure Cost
   Management CSV, and nested GCP Billing Export JSON mapper coverage now exists for
-  estimate-vs-actual reconciliation evidence, and classified adjustment rows are
-  separated from usage-comparable variance.
+  estimate-vs-actual reconciliation evidence. Classified adjustment and commitment
+  rows are separated from usage-comparable variance, but provider-account-specific
+  amortization and invoice controls remain future work.
 
 ## Phase B - Input Modes And Requirement Pipeline
 

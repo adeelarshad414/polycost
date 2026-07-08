@@ -578,6 +578,87 @@ function classifyInvoiceAdjustment(input: {
 
   if (
     matchesAny(text, [
+      'savingsplancoveredusage',
+      'discountedusage',
+      'covered usage',
+      'reservation usage',
+      'reserved instance usage',
+      'benefit usage',
+      'reservation applied',
+      'savings plan applied',
+    ])
+  ) {
+    return {
+      category: 'commitment-covered-usage',
+      isAdjustment: false,
+      reason: 'row appears to be usage covered by a provider commitment',
+      sourceSignals: signals.slice(0, 12),
+    };
+  }
+
+  if (
+    matchesAny(text, [
+      'savingsplannegation',
+      'reservation discount',
+      'reserved instance discount',
+      'ri volume discount',
+      'committed use discount',
+      'sustained use discount',
+      'cud credit',
+      'commitment credit',
+      'benefit discount',
+    ])
+  ) {
+    return adjustment(
+      'commitment-discount',
+      'row is marked as a commitment discount or usage negation',
+      signals,
+    );
+  }
+
+  if (
+    matchesAny(text, [
+      'savingsplanrecurringfee',
+      'savingsplanupfrontfee',
+      'rifee',
+      'reservation fee',
+      'reserved instance fee',
+      'reservation purchase',
+      'savings plan purchase',
+      'commitment fee',
+      'committed use fee',
+      'recurring commitment',
+    ])
+  ) {
+    return adjustment(
+      'commitment-fee',
+      'row is marked as a recurring or upfront commitment fee',
+      signals,
+    );
+  }
+
+  if (
+    matchesAny(text, [
+      'amortized',
+      'amortization',
+      'unusedreservation',
+      'unused reservation',
+      'unusedsavingsplan',
+      'unused savings plan',
+      'unused commitment',
+      'reservation amortization',
+      'savings plan amortization',
+    ])
+  ) {
+    return adjustment(
+      'commitment-amortization',
+      'row is marked as commitment amortization or unused commitment cost',
+      signals,
+    );
+  }
+
+  if (
+    matchesAny(text, [
       'discount',
       'savingsplannegation',
       'edp discount',
@@ -1284,6 +1365,7 @@ function reconciliationEvidence(
         traceCoverage,
         missingRecommendedFields,
         adjustmentSummary.adjustmentLineItemCount,
+        adjustmentSummary.commitmentLineItemCount,
       ),
     },
     comparisonTraceKeys: traceKeys,
@@ -1304,6 +1386,8 @@ function invoiceAdjustmentSummary(
   adjustmentCostUsd: number;
   usageLineItemCount: number;
   adjustmentLineItemCount: number;
+  commitmentLineItemCount: number;
+  commitmentNetCostUsd: number;
   estimateComparableVarianceUsd: number;
   estimateComparableVariancePercent: number;
   categories: Array<{
@@ -1327,6 +1411,8 @@ function invoiceAdjustmentSummary(
   let adjustmentSubtotal = 0;
   let usageLineItemCount = 0;
   let adjustmentLineItemCount = 0;
+  let commitmentLineItemCount = 0;
+  let commitmentNetCostUsd = 0;
 
   for (const lineItem of lineItems) {
     const classification = lineItemAdjustmentClassification(lineItem);
@@ -1343,7 +1429,12 @@ function invoiceAdjustmentSummary(
     existing.reasons.add(classification.reason);
     categories.set(classification.category, existing);
 
-    if (classification.category === 'usage') {
+    if (isCommitmentInvoiceCategory(classification.category)) {
+      commitmentLineItemCount += 1;
+      commitmentNetCostUsd = roundCurrency(commitmentNetCostUsd + lineItem.costUsd);
+    }
+
+    if (!classification.isAdjustment) {
       usageLineItemCount += 1;
       usageSubtotal = roundCurrency(usageSubtotal + lineItem.costUsd);
     } else {
@@ -1360,6 +1451,8 @@ function invoiceAdjustmentSummary(
     adjustmentCostUsd: adjustmentSubtotal,
     usageLineItemCount,
     adjustmentLineItemCount,
+    commitmentLineItemCount,
+    commitmentNetCostUsd,
     estimateComparableVarianceUsd,
     estimateComparableVariancePercent:
       estimatedTotalUsd === 0
@@ -1407,9 +1500,12 @@ function lineItemAdjustmentClassification(lineItem: {
       const sourceSignals = record.sourceSignals;
 
       if (isInvoiceAdjustmentCategory(category) && typeof reason === 'string') {
+        const explicitIsAdjustment =
+          typeof record.isAdjustment === 'boolean' ? record.isAdjustment : undefined;
+
         return {
           category,
-          isAdjustment: category !== 'usage',
+          isAdjustment: explicitIsAdjustment ?? !isEstimateComparableInvoiceCategory(category),
           reason,
           sourceSignals: Array.isArray(sourceSignals)
             ? sourceSignals.filter((signal): signal is string => typeof signal === 'string')
@@ -1437,8 +1533,25 @@ function isInvoiceAdjustmentCategory(value: unknown): value is InvoiceAdjustment
     value === 'marketplace' ||
     value === 'refund' ||
     value === 'enterprise-adjustment' ||
+    value === 'commitment-covered-usage' ||
+    value === 'commitment-discount' ||
+    value === 'commitment-fee' ||
+    value === 'commitment-amortization' ||
     value === 'fee' ||
     value === 'unknown'
+  );
+}
+
+function isEstimateComparableInvoiceCategory(category: InvoiceAdjustmentCategory): boolean {
+  return category === 'usage' || category === 'commitment-covered-usage';
+}
+
+function isCommitmentInvoiceCategory(category: InvoiceAdjustmentCategory): boolean {
+  return (
+    category === 'commitment-covered-usage' ||
+    category === 'commitment-discount' ||
+    category === 'commitment-fee' ||
+    category === 'commitment-amortization'
   );
 }
 
@@ -1500,10 +1613,17 @@ function invoiceEvidenceCaveats(
   },
   missingRecommendedFields: string[],
   adjustmentLineItemCount: number,
+  commitmentLineItemCount: number,
 ): string[] {
   const caveats: string[] = [
     'Reconciliation compares provider-export actuals with PolyCost estimate evidence; it is not an invoice-of-record.',
   ];
+
+  if (commitmentLineItemCount > 0) {
+    caveats.push(
+      `${commitmentLineItemCount} commitment, reservation, or savings-plan row(s) were classified separately; amortization remains provider-specific evidence.`,
+    );
+  }
 
   if (adjustmentLineItemCount > 0) {
     caveats.push(
