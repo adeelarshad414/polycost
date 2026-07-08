@@ -1,5 +1,11 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- Reviewed 2026-07-08: this spec materializes generated Terraform files into an isolated mkdtemp directory to execute the generated manifest verifier and tamper check; see docs/SECURITY-SUPPRESSIONS.md. */
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { NormalizedWorkloadSpec } from '../nws/nws.types';
 import { TerraformGenerationService } from './terraform-generation.service';
+import { TerraformGenerationResult } from './terraform.types';
 
 const validNws: NormalizedWorkloadSpec = {
   schemaVersion: '1.0',
@@ -119,6 +125,10 @@ describe('TerraformGenerationService', () => {
     expect(file(result, 'scripts/validate-bundle.mjs')).toContain(
       'terraform-validation-result.json',
     );
+    expect(file(result, 'scripts/verify-manifest.mjs')).toContain(
+      'terraform-manifest-integrity-result.json',
+    );
+    expect(file(result, 'BUNDLE-MANIFEST.json')).toContain('node scripts/verify-manifest.mjs');
     expect(file(result, '.tflint.hcl')).toContain('plugin "terraform"');
     expect(file(result, 'policies/terraform-plan.rego')).toContain('publicly accessible');
     expect(file(result, 'tests/static_validation.tftest.hcl')).toContain(
@@ -160,10 +170,59 @@ describe('TerraformGenerationService', () => {
         expect.objectContaining({ id: 'topology-aware-ingress', status: 'passed' }),
         expect.objectContaining({ id: 'bundle-manifest-generated', status: 'passed' }),
         expect.objectContaining({ id: 'validation-runner-generated', status: 'passed' }),
+        expect.objectContaining({
+          id: 'manifest-integrity-runner-generated',
+          status: 'passed',
+        }),
         expect.objectContaining({ id: 'zip-archive-generated', status: 'passed' }),
         expect.objectContaining({ id: 'module-library-generated', status: 'passed' }),
       ]),
     );
+  });
+
+  it('generates a credential-free manifest verifier that detects bundle tampering', () => {
+    const result = service.generate({
+      targetCloud: 'aws',
+      nws: validNws,
+      workspaceName: 'Revenue Portal',
+    });
+    const workspace = mkdtempSync(join(tmpdir(), 'polycost-terraform-'));
+
+    try {
+      writeGeneratedFiles(workspace, result);
+
+      const passingRun = spawnSync(process.execPath, ['scripts/verify-manifest.mjs'], {
+        cwd: workspace,
+        encoding: 'utf8',
+      });
+
+      expect(passingRun.status).toBe(0);
+      const passingResult = JSON.parse(
+        readFileSync(join(workspace, 'terraform-manifest-integrity-result.json'), 'utf8'),
+      ) as { status: string; checkedFiles: number; failures: string[] };
+      expect(passingResult.status).toBe('passed');
+      expect(passingResult.checkedFiles).toBeGreaterThan(10);
+      expect(passingResult.failures).toEqual([]);
+
+      writeFileSync(
+        join(workspace, 'main.tf'),
+        `${readFileSync(join(workspace, 'main.tf'), 'utf8')}\n# tampered after generation\n`,
+      );
+
+      const failingRun = spawnSync(process.execPath, ['scripts/verify-manifest.mjs'], {
+        cwd: workspace,
+        encoding: 'utf8',
+      });
+      const failingResult = JSON.parse(
+        readFileSync(join(workspace, 'terraform-manifest-integrity-result.json'), 'utf8'),
+      ) as { status: string; failures: string[] };
+
+      expect(failingRun.status).toBe(1);
+      expect(failingResult.status).toBe('failed');
+      expect(failingResult.failures.join('\n')).toContain('main.tf hash mismatch');
+    } finally {
+      rmSync(workspace, { force: true, recursive: true });
+    }
   });
 
   it('generates an Azure bundle with identity-based provider config and region override', () => {
@@ -304,4 +363,12 @@ function file(result: ReturnType<TerraformGenerationService['generate']>, path: 
   }
 
   return match.content;
+}
+
+function writeGeneratedFiles(root: string, result: TerraformGenerationResult): void {
+  for (const generatedFile of result.files) {
+    const targetPath = join(root, generatedFile.path);
+    mkdirSync(dirname(targetPath), { recursive: true });
+    writeFileSync(targetPath, generatedFile.content, 'utf8');
+  }
 }

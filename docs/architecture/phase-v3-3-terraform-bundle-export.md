@@ -14,10 +14,13 @@ bundle is saved into a controlled workstation or CI runner.
   - archive SHA-256
   - archive size in bytes
 - `BUNDLE-MANIFEST.json` generated inside every bundle.
+- `scripts/verify-manifest.mjs` generated inside every bundle for credential-free
+  hash and size verification.
 - `scripts/validate-bundle.mjs` generated inside every bundle.
 - API validation checks for:
   - `bundle-manifest-generated`
   - `validation-runner-generated`
+  - `manifest-integrity-runner-generated`
   - `zip-archive-generated`
 - Frontend download actions:
   - `Download Terraform ZIP`
@@ -35,10 +38,18 @@ The manifest uses `polycost.terraform.bundle.v1` and records:
 
 The manifest intentionally excludes its own recursive hash.
 
+## Manifest Integrity Verification
+
+The generated `scripts/verify-manifest.mjs` runs without Terraform or cloud
+credentials. It reads `BUNDLE-MANIFEST.json`, verifies every listed file hash and
+size, writes `terraform-manifest-integrity-result.json`, and exits non-zero when
+the extracted ZIP has been tampered with or is incomplete.
+
 ## Validation Runner
 
 The generated `scripts/validate-bundle.mjs` runs:
 
+- `node scripts/verify-manifest.mjs`
 - `terraform fmt -check -recursive`
 - `terraform init -backend=false`
 - `terraform validate`

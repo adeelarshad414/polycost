@@ -345,6 +345,7 @@ function hardeningFiles(
   const files: TerraformBundleDraft['files'] = [
     file('Makefile', validationMakefile()),
     file('FRAMEWORK-ALIGNMENT.md', frameworkAlignmentReadme(targetCloud, facts)),
+    file('scripts/verify-manifest.mjs', manifestVerifierScript()),
     file('scripts/validate-bundle.mjs', validationRunnerScript()),
   ];
 
@@ -396,12 +397,109 @@ clean:
 `;
 }
 
+function manifestVerifierScript(): string {
+  return `#!/usr/bin/env node
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+
+const manifestPath = 'BUNDLE-MANIFEST.json';
+const resultPath = 'terraform-manifest-integrity-result.json';
+
+function sha256(content) {
+  return createHash('sha256').update(content, 'utf8').digest('hex');
+}
+
+function writeResult(result) {
+  writeFileSync(resultPath, JSON.stringify(result, null, 2) + '\\n');
+  console.log(JSON.stringify(result, null, 2));
+}
+
+if (!existsSync(manifestPath)) {
+  const result = {
+    generatedAt: new Date().toISOString(),
+    status: 'failed',
+    checkedFiles: 0,
+    failures: ['BUNDLE-MANIFEST.json was not found.'],
+  };
+  writeResult(result);
+  process.exit(1);
+}
+
+let manifest;
+
+try {
+  manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+} catch (error) {
+  const result = {
+    generatedAt: new Date().toISOString(),
+    status: 'failed',
+    checkedFiles: 0,
+    failures: ['BUNDLE-MANIFEST.json is not valid JSON: ' + error.message],
+  };
+  writeResult(result);
+  process.exit(1);
+}
+
+const failures = [];
+const warnings = [];
+const files = Array.isArray(manifest.files) ? manifest.files : [];
+
+if (manifest.schemaVersion !== 'polycost.terraform.bundle.v1') {
+  failures.push('Unexpected manifest schemaVersion: ' + String(manifest.schemaVersion));
+}
+
+for (const file of files) {
+  if (!file || typeof file.path !== 'string' || typeof file.sha256 !== 'string') {
+    failures.push('Manifest contains a malformed file entry.');
+    continue;
+  }
+
+  if (!existsSync(file.path)) {
+    failures.push(file.path + ' is listed in the manifest but missing from disk.');
+    continue;
+  }
+
+  const content = readFileSync(file.path, 'utf8');
+  const actualSha = sha256(content);
+  const actualSize = Buffer.byteLength(content, 'utf8');
+
+  if (actualSha !== file.sha256) {
+    failures.push(file.path + ' hash mismatch: expected ' + file.sha256 + ', got ' + actualSha);
+  }
+
+  if (typeof file.sizeBytes === 'number' && actualSize !== file.sizeBytes) {
+    failures.push(file.path + ' size mismatch: expected ' + file.sizeBytes + ', got ' + actualSize);
+  }
+}
+
+if (files.length === 0) {
+  failures.push('Manifest does not list any generated files.');
+}
+
+if (!files.some((file) => file.path === 'scripts/validate-bundle.mjs')) {
+  warnings.push('Manifest does not list scripts/validate-bundle.mjs.');
+}
+
+const result = {
+  generatedAt: new Date().toISOString(),
+  status: failures.length > 0 ? 'failed' : warnings.length > 0 ? 'warning' : 'passed',
+  checkedFiles: files.length,
+  failures,
+  warnings,
+};
+
+writeResult(result);
+process.exit(result.status === 'failed' ? 1 : 0);
+`;
+}
+
 function validationRunnerScript(): string {
   return `#!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
 import { existsSync, writeFileSync } from 'node:fs';
 
 const commands = [
+  { id: 'manifest-integrity', command: 'node', args: ['scripts/verify-manifest.mjs'], required: true },
   { id: 'terraform-fmt', command: 'terraform', args: ['fmt', '-check', '-recursive'], required: true },
   { id: 'terraform-init', command: 'terraform', args: ['init', '-backend=false'], required: true },
   { id: 'terraform-validate', command: 'terraform', args: ['validate'], required: true },
@@ -495,6 +593,7 @@ provider architecture framework plus Terraform platform standards before any pro
 | Remote state | \`backend.tf.example\` uses provider-native encrypted remote state | Create state backend and locking before team use |
 | Input validation | \`variables.tf\` uses typed variables and validation blocks | Add organization-specific policy and naming validation |
 | Secrets handling | Sensitive variables have no committed runtime defaults | Source secrets from CI/Vault/cloud secret manager |
+| Bundle integrity | \`BUNDLE-MANIFEST.json\` plus \`scripts/verify-manifest.mjs\` verify generated file hashes | Run before editing or promoting the ZIP handoff |
 | Policy as code | \`policies/terraform-plan.rego\`, \`.tflint.hcl\`, and \`Makefile\` are generated | Run plan JSON through policy gates in CI |
 | Module lifecycle | \`modules/\` documents extraction boundaries | Promote into versioned internal modules after review |
 
@@ -518,7 +617,7 @@ ${providerFrameworkNotes(targetCloud)}
 Production promotion requires:
 
 1. Platform owner approval of naming, identity, network, state, and module boundaries.
-2. \`make validate\`, \`terraform test\`, \`terraform plan\`, and policy checks passing in CI.
+2. \`node scripts/verify-manifest.mjs\`, \`make validate\`, \`terraform test\`, \`terraform plan\`, and policy checks passing in CI.
 3. Security review for public ingress, secrets, encryption, logging, WAF/CDN, and least privilege.
 4. Reliability review for backup, restore, failover, RTO/RPO, and region/zone placement.
 5. FinOps review for tags/labels, budgets, commitment model, and lifecycle policies.
@@ -704,8 +803,9 @@ are approved.
 
 ## Promotion Gate
 
-Do not promote this bundle to production until \`make validate\`, \`make plan\`, policy checks, and
-a human architecture review have all passed in the destination account/subscription/project.
+Do not promote this bundle to production until \`node scripts/verify-manifest.mjs\`,
+\`make validate\`, \`make plan\`, policy checks, and a human architecture review have all
+passed in the destination account/subscription/project.
 `;
 }
 
@@ -3309,6 +3409,7 @@ Generated from a PolyCost Normalized Workload Specification for \`${facts.projec
 ## Verification
 
 \`\`\`bash
+node scripts/verify-manifest.mjs
 make validate
 terraform test
 terraform plan -var-file=terraform.tfvars -out=tfplan
@@ -3375,6 +3476,7 @@ function commonSecurityNotes(providerName: string): string[] {
 function commonNextSteps(providerName: string): string[] {
   return [
     `Save the ${providerName} bundle to a new branch or infrastructure repository.`,
+    'Run node scripts/verify-manifest.mjs before editing the ZIP handoff so file hashes match BUNDLE-MANIFEST.json.',
     'Run make validate, terraform test, terraform plan, and policy checks before adding environment-specific tfvars.',
     'Attach policy-as-code checks for required tags, encryption, public exposure, and deletion protection.',
   ];
@@ -3524,6 +3626,16 @@ function validateGeneratedFiles(
       message: 'Generated bundle includes an operator-side validation runner script.',
     },
     {
+      id: 'manifest-integrity-runner-generated',
+      status:
+        files.some((file) => file.path === 'scripts/verify-manifest.mjs') &&
+        joined.includes('terraform-manifest-integrity-result.json')
+          ? 'passed'
+          : 'warning',
+      message:
+        'Generated bundle includes a credential-free manifest integrity verifier for ZIP handoff review.',
+    },
+    {
       id: 'zip-archive-generated',
       status:
         archive.format === 'zip' &&
@@ -3569,6 +3681,12 @@ function validateGeneratedFiles(
     executionMode: 'static-plus-policy',
     checks,
     commands: [
+      {
+        command: 'node scripts/verify-manifest.mjs',
+        status: 'not-run',
+        message:
+          'Verifies generated file hashes and sizes against BUNDLE-MANIFEST.json without Terraform or cloud credentials.',
+      },
       {
         command: 'node scripts/validate-bundle.mjs',
         status: 'not-run',
@@ -3716,6 +3834,7 @@ function bundleManifest(input: {
       resourceSummary: input.facts.resourceSummary,
       validationRunner: 'scripts/validate-bundle.mjs',
       validationCommands: [
+        'node scripts/verify-manifest.mjs',
         'node scripts/validate-bundle.mjs',
         'make validate',
         'terraform test',
