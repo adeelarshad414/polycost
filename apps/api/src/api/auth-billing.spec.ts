@@ -8,6 +8,7 @@ import { AuthService } from './auth.service';
 import { AuthIdentity, TeamRole } from './auth.types';
 import { BillingService } from './billing.service';
 import { InvoiceArtifactGovernanceService } from './invoice-artifact-governance.service';
+import { InvoiceArtifactStorageService } from './invoice-artifact-storage.service';
 import { hashPassword } from './password-hash';
 
 const account: LocalAccountWithPassword = {
@@ -2197,6 +2198,8 @@ describe('BillingService', () => {
         fileName: 'aws-invoice-control.txt',
         mimeType: 'text/plain',
         contentSha256,
+        contentSizeBytes: Buffer.byteLength(artifactContent),
+        storageBackend: 'database-bytea',
         content: Buffer.from(artifactContent, 'utf8'),
         uploadedByAccountId: identity.accountId,
         kmsKeyReference: 'arn:aws:kms:us-east-1:111122223333:key/demo',
@@ -2219,6 +2222,132 @@ describe('BillingService', () => {
         }),
       }),
     );
+  });
+
+  it('stores invoice artifact blobs through external object storage without persisting DB bytes', async () => {
+    const repository = repositoryMock();
+    const artifactContent = 'PolyCost external artifact packet';
+    const contentSha256 = sha256Hex(artifactContent);
+    const reconciliationRecord = {
+      id: '66666666-6666-4666-8666-666666666666',
+      importRunId: '55555555-5555-4555-8555-555555555555',
+      comparisonId: comparisonResult.comparisonId,
+      provider: 'aws' as const,
+      estimatedTotalUsd: 100,
+      invoicedTotalUsd: 107,
+      varianceUsd: 7,
+      variancePercent: 7,
+      status: 'variance-warning' as const,
+      evidence: {
+        invoiceGradeArtifactRegister: {
+          artifacts: [
+            {
+              id: 'artifact-1',
+              provider: 'aws',
+              type: 'provider-invoice',
+              displayName: 'June AWS invoice control packet',
+              reference: 'demo://invoice-control',
+              verificationStatus: 'registered',
+              registeredAt: '2026-07-06T00:00:03.000Z',
+            },
+          ],
+        },
+      },
+      createdAt: '2026-07-06T00:00:02.000Z',
+    };
+    repository.getInvoiceReconciliation.mockResolvedValue(reconciliationRecord);
+    repository.getBillingImport.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      teamId: identity.teamId,
+      provider: 'aws',
+      sourceType: 'aws-cur',
+      status: 'completed',
+      billingPeriodStart: '2026-06-01',
+      billingPeriodEnd: '2026-06-30',
+      originalFileSha256: 'a'.repeat(64),
+      rowsReceived: 1,
+      rowsAccepted: 1,
+      rowsRejected: 0,
+      totalCostUsd: 107,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    });
+    repository.saveInvoiceArtifactBlobAndUpdateEvidence.mockImplementation(async (input) => ({
+      ...reconciliationRecord,
+      evidence: input.evidence,
+    }));
+    const storageService = {
+      store: jest.fn(async () => ({
+        storageBackend: 'aws-s3' as const,
+        objectStoreBucket: 'polycost-invoice-artifacts',
+        objectStoreRegion: 'us-east-1',
+        objectStoreKey: 'invoice-artifacts/team/reconciliation/artifact.txt',
+        objectStoreUri:
+          's3://polycost-invoice-artifacts/invoice-artifacts/team/reconciliation/artifact.txt',
+        objectStoreETag: '"etag"',
+        objectStoreVersion: 'v1',
+      })),
+      read: jest.fn(),
+    } as unknown as InvoiceArtifactStorageService;
+    const service = new BillingService(
+      repository as never,
+      new InvoiceArtifactGovernanceService(
+        configService({
+          INVOICE_ARTIFACT_STORAGE_BACKEND: 'aws-s3',
+          INVOICE_ARTIFACT_OBJECT_STORE_NAME: 'polycost-invoice-artifacts',
+          INVOICE_ARTIFACT_OBJECT_STORE_REGION: 'us-east-1',
+          INVOICE_ARTIFACT_OBJECT_STORE_PREFIX: 'invoice-artifacts',
+          INVOICE_ARTIFACT_KMS_KEY_REFERENCE: 'arn:aws:kms:us-east-1:111122223333:key/demo',
+        }),
+      ),
+      storageService,
+    );
+
+    const result = await service.uploadInvoiceArtifactBlob(
+      '66666666-6666-4666-8666-666666666666',
+      'artifact-1',
+      {
+        fileName: 'aws-invoice-control.txt',
+        mimeType: 'text/plain',
+        content: artifactContent,
+        encoding: 'text',
+        sha256: contentSha256,
+      },
+      identity,
+    );
+    const savedInput = repository.saveInvoiceArtifactBlobAndUpdateEvidence.mock.calls[0]?.[0];
+    const artifacts = (
+      result.evidence.invoiceGradeArtifactRegister as { artifacts: Array<Record<string, unknown>> }
+    ).artifacts;
+    const storedBlob = artifacts[0]?.storedBlob as Record<string, unknown>;
+
+    expect(storageService.store).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: Buffer.from(artifactContent),
+        contentSha256,
+      }),
+    );
+    expect(savedInput).toEqual(
+      expect.objectContaining({
+        storageBackend: 'aws-s3',
+        contentSizeBytes: Buffer.byteLength(artifactContent),
+        objectStoreBucket: 'polycost-invoice-artifacts',
+        objectStoreKey: 'invoice-artifacts/team/reconciliation/artifact.txt',
+        objectStoreUri:
+          's3://polycost-invoice-artifacts/invoice-artifacts/team/reconciliation/artifact.txt',
+      }),
+    );
+    expect(savedInput).not.toHaveProperty('content');
+    expect(storedBlob).toMatchObject({
+      storageMode: 'aws-s3',
+      governance: expect.objectContaining({
+        storageProfile: expect.objectContaining({
+          storageBackend: 'aws-s3',
+          objectStore: expect.objectContaining({
+            uri: 's3://polycost-invoice-artifacts/invoice-artifacts/team/reconciliation/artifact.txt',
+          }),
+        }),
+      }),
+    });
   });
 
   it('downloads stored invoice artifact blobs after team access is checked', async () => {
@@ -2312,6 +2441,118 @@ describe('BillingService', () => {
     expect(repository.getInvoiceArtifactBlob).toHaveBeenCalledWith(
       '66666666-6666-4666-8666-666666666666',
       'artifact-1',
+    );
+  });
+
+  it('downloads external invoice artifact blobs through provider storage and validates checksum', async () => {
+    const repository = repositoryMock();
+    repository.getInvoiceReconciliation.mockResolvedValue({
+      id: '66666666-6666-4666-8666-666666666666',
+      importRunId: '55555555-5555-4555-8555-555555555555',
+      comparisonId: comparisonResult.comparisonId,
+      provider: 'aws',
+      estimatedTotalUsd: 100,
+      invoicedTotalUsd: 107,
+      varianceUsd: 7,
+      variancePercent: 7,
+      status: 'variance-warning',
+      evidence: {
+        invoiceGradeArtifactRegister: {
+          artifacts: [
+            {
+              id: 'artifact-1',
+              provider: 'aws',
+              type: 'provider-invoice',
+              displayName: 'June AWS invoice control packet',
+              reference: 'demo://invoice-control',
+              verificationStatus: 'registered',
+              registeredAt: '2026-07-06T00:00:03.000Z',
+            },
+          ],
+        },
+      },
+      createdAt: '2026-07-06T00:00:02.000Z',
+    });
+    repository.getBillingImport.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      teamId: identity.teamId,
+      provider: 'aws',
+      sourceType: 'aws-cur',
+      status: 'completed',
+      billingPeriodStart: '2026-06-01',
+      billingPeriodEnd: '2026-06-30',
+      originalFileSha256: 'a'.repeat(64),
+      rowsReceived: 1,
+      rowsAccepted: 1,
+      rowsRejected: 0,
+      totalCostUsd: 107,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    });
+    repository.getInvoiceArtifactBlob.mockResolvedValue({
+      id: '99999999-9999-4999-8999-999999999999',
+      reconciliationId: '66666666-6666-4666-8666-666666666666',
+      artifactId: 'artifact-1',
+      teamId: identity.teamId,
+      fileName: 'aws-invoice-control.txt',
+      mimeType: 'text/plain',
+      contentSha256: sha256Hex('invoice'),
+      contentSizeBytes: 7,
+      uploadedByAccountId: identity.accountId,
+      uploadedAt: '2026-07-06T00:00:05.000Z',
+      storageProfile: {
+        storageBackend: 'aws-s3',
+        encryptionStatus: 'customer-managed-kms',
+        objectStore: {
+          bucketOrContainer: 'polycost-invoice-artifacts',
+          prefix: 'invoice-artifacts',
+          region: 'us-east-1',
+          key: 'invoice-artifacts/team/reconciliation/artifact.txt',
+          uri: 's3://polycost-invoice-artifacts/invoice-artifacts/team/reconciliation/artifact.txt',
+        },
+        kmsKeyReference: 'arn:aws:kms:us-east-1:111122223333:key/demo',
+        kmsKeyRequiredForProduction: false,
+      },
+      retentionPolicy: {
+        retentionUntil: '2027-07-06T00:00:05.000Z',
+        retentionDays: 365,
+        legalHold: false,
+      },
+      malwareScan: {
+        status: 'passed',
+        scanner: 'polycost-eicar-signature-v1',
+        checkedAt: '2026-07-06T00:00:05.000Z',
+        findings: [],
+      },
+    });
+    const storageService = {
+      store: jest.fn(),
+      read: jest.fn(async () => Buffer.from('invoice')),
+    } as unknown as InvoiceArtifactStorageService;
+    const service = new BillingService(
+      repository as never,
+      new InvoiceArtifactGovernanceService(),
+      storageService,
+    );
+
+    await expect(
+      service.downloadInvoiceArtifactBlob(
+        '66666666-6666-4666-8666-666666666666',
+        'artifact-1',
+        identity,
+      ),
+    ).resolves.toMatchObject({
+      fileName: 'aws-invoice-control.txt',
+      contentBase64: Buffer.from('invoice').toString('base64'),
+      storageProfile: expect.objectContaining({
+        storageBackend: 'aws-s3',
+      }),
+    });
+    expect(storageService.read).toHaveBeenCalledWith(
+      expect.objectContaining({
+        storageBackend: 'aws-s3',
+        objectStoreBucket: 'polycost-invoice-artifacts',
+        objectStoreKey: 'invoice-artifacts/team/reconciliation/artifact.txt',
+      }),
     );
   });
 

@@ -24,6 +24,11 @@ import {
   InvoiceReconciliationStatus,
 } from './billing.types';
 import { InvoiceArtifactGovernanceService } from './invoice-artifact-governance.service';
+import {
+  InvoiceArtifactObjectPointer,
+  InvoiceArtifactStorageService,
+  StoredInvoiceArtifactObject,
+} from './invoice-artifact-storage.service';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
@@ -152,6 +157,7 @@ export class BillingService {
   constructor(
     private readonly repository: ApiDatabaseRepository,
     private readonly artifactGovernanceService: InvoiceArtifactGovernanceService = new InvoiceArtifactGovernanceService(),
+    private readonly artifactStorageService: InvoiceArtifactStorageService = new InvoiceArtifactStorageService(),
   ) {}
 
   async importActuals(body: unknown, identity: AuthIdentity): Promise<BillingImportResponse> {
@@ -496,9 +502,21 @@ export class BillingService {
       decoded.sha256,
       uploadedAt,
     );
+    const storedObject = await this.artifactStorageService.store({
+      reconciliationId,
+      artifactId,
+      ...(importRun.teamId ? { teamId: importRun.teamId } : {}),
+      fileName: decoded.fileName,
+      mimeType: decoded.mimeType,
+      contentSha256: decoded.sha256,
+      content: decoded.content,
+      uploadedAt,
+      governance,
+    });
+    const storedGovernance = governanceWithStoredObject(governance, storedObject);
     const evidence = replaceInvoiceGradeArtifactEvidence(
       reconciliation,
-      storedInvoiceGradeArtifact(artifact, decoded, uploadedAt, identity, governance),
+      storedInvoiceGradeArtifact(artifact, decoded, uploadedAt, identity, storedGovernance),
     );
 
     return this.repository.saveInvoiceArtifactBlobAndUpdateEvidence({
@@ -508,15 +526,29 @@ export class BillingService {
       fileName: decoded.fileName,
       mimeType: decoded.mimeType,
       contentSha256: decoded.sha256,
-      content: decoded.content,
+      contentSizeBytes: decoded.content.length,
+      storageBackend: storedObject.storageBackend,
+      ...(storedObject.inlineContent ? { content: storedObject.inlineContent } : {}),
+      ...(storedObject.objectStoreBucket
+        ? { objectStoreBucket: storedObject.objectStoreBucket }
+        : {}),
+      ...(storedObject.objectStoreRegion
+        ? { objectStoreRegion: storedObject.objectStoreRegion }
+        : {}),
+      ...(storedObject.objectStoreKey ? { objectStoreKey: storedObject.objectStoreKey } : {}),
+      ...(storedObject.objectStoreUri ? { objectStoreUri: storedObject.objectStoreUri } : {}),
+      ...(storedObject.objectStoreETag ? { objectStoreETag: storedObject.objectStoreETag } : {}),
+      ...(storedObject.objectStoreVersion
+        ? { objectStoreVersion: storedObject.objectStoreVersion }
+        : {}),
       uploadedByAccountId: identity.accountId,
       uploadedAt,
-      ...(governance.storageProfile.kmsKeyReference
-        ? { kmsKeyReference: governance.storageProfile.kmsKeyReference }
+      ...(storedGovernance.storageProfile.kmsKeyReference
+        ? { kmsKeyReference: storedGovernance.storageProfile.kmsKeyReference }
         : {}),
-      retentionUntil: governance.retentionPolicy.retentionUntil,
-      legalHold: governance.retentionPolicy.legalHold,
-      malwareScanCheckedAt: governance.malwareScan.checkedAt,
+      retentionUntil: storedGovernance.retentionPolicy.retentionUntil,
+      legalHold: storedGovernance.retentionPolicy.legalHold,
+      malwareScanCheckedAt: storedGovernance.malwareScan.checkedAt,
       evidence,
       ...(importRun.teamId
         ? {
@@ -535,12 +567,13 @@ export class BillingService {
                 mimeType: decoded.mimeType,
                 contentSha256: decoded.sha256,
                 contentSizeBytes: decoded.content.length,
-                storageBackend: governance.storageProfile.storageBackend,
-                kmsKeyConfigured: !governance.storageProfile.kmsKeyRequiredForProduction,
-                retentionUntil: governance.retentionPolicy.retentionUntil,
-                legalHold: governance.retentionPolicy.legalHold,
-                malwareScanStatus: governance.malwareScan.status,
-                malwareScanScanner: governance.malwareScan.scanner,
+                storageBackend: storedGovernance.storageProfile.storageBackend,
+                objectStoreUri: storedObject.objectStoreUri,
+                kmsKeyConfigured: !storedGovernance.storageProfile.kmsKeyRequiredForProduction,
+                retentionUntil: storedGovernance.retentionPolicy.retentionUntil,
+                legalHold: storedGovernance.retentionPolicy.legalHold,
+                malwareScanStatus: storedGovernance.malwareScan.status,
+                malwareScanScanner: storedGovernance.malwareScan.scanner,
               },
             },
           }
@@ -586,7 +619,31 @@ export class BillingService {
       );
     }
 
-    return blob;
+    if (blob.contentBase64) {
+      return blob;
+    }
+
+    const content = await this.artifactStorageService.read(blobObjectPointer(blob));
+
+    if (!content) {
+      return blob;
+    }
+
+    const fetchedSha256 = sha256Buffer(content);
+
+    if (fetchedSha256 !== blob.contentSha256) {
+      throw new ApiValidationError('invoice artifact object checksum mismatch', [
+        {
+          field: 'artifactId',
+          issue: 'external object bytes no longer match the stored SHA-256 digest',
+        },
+      ]);
+    }
+
+    return {
+      ...blob,
+      contentBase64: content.toString('base64'),
+    };
   }
 
   getInvoiceArtifactStorageReadiness(identity: AuthIdentity): InvoiceArtifactStorageReadiness {
@@ -2715,7 +2772,7 @@ function storedInvoiceGradeArtifact(
     sha256: artifact.sha256 ?? blob.sha256,
     storedBlob: {
       storageStatus: 'stored',
-      storageMode: 'database-bytea',
+      storageMode: governance.storageProfile.storageBackend,
       fileName: blob.fileName,
       mimeType: blob.mimeType,
       contentSha256: blob.sha256,
@@ -2724,6 +2781,49 @@ function storedInvoiceGradeArtifact(
       uploadedByAccountId: identity.accountId,
       governance,
     },
+  };
+}
+
+function governanceWithStoredObject(
+  governance: InvoiceArtifactBlobGovernance,
+  storedObject: StoredInvoiceArtifactObject,
+): InvoiceArtifactBlobGovernance {
+  if (storedObject.storageBackend === 'database-bytea') {
+    return governance;
+  }
+
+  const existingObjectStore = governance.storageProfile.objectStore;
+
+  return {
+    ...governance,
+    storageProfile: {
+      ...governance.storageProfile,
+      storageBackend: storedObject.storageBackend,
+      objectStore: {
+        bucketOrContainer:
+          storedObject.objectStoreBucket ?? existingObjectStore?.bucketOrContainer ?? 'unknown',
+        prefix: existingObjectStore?.prefix ?? 'invoice-artifacts',
+        ...(storedObject.objectStoreRegion
+          ? { region: storedObject.objectStoreRegion }
+          : existingObjectStore?.region
+            ? { region: existingObjectStore.region }
+            : {}),
+        ...(storedObject.objectStoreKey ? { key: storedObject.objectStoreKey } : {}),
+        ...(storedObject.objectStoreUri ? { uri: storedObject.objectStoreUri } : {}),
+        ...(storedObject.objectStoreETag ? { eTag: storedObject.objectStoreETag } : {}),
+        ...(storedObject.objectStoreVersion ? { version: storedObject.objectStoreVersion } : {}),
+      },
+    },
+  };
+}
+
+function blobObjectPointer(blob: InvoiceArtifactBlobRecord): InvoiceArtifactObjectPointer {
+  return {
+    storageBackend: blob.storageProfile.storageBackend,
+    objectStoreBucket: blob.storageProfile.objectStore?.bucketOrContainer,
+    objectStoreRegion: blob.storageProfile.objectStore?.region,
+    objectStoreKey: blob.storageProfile.objectStore?.key,
+    objectStoreUri: blob.storageProfile.objectStore?.uri,
   };
 }
 

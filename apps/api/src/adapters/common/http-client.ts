@@ -5,7 +5,11 @@ export interface HttpResponseLike {
   ok: boolean;
   status: number;
   statusText: string;
+  headers?: {
+    get(name: string): string | null;
+  };
   text(): Promise<string>;
+  arrayBuffer?(): Promise<ArrayBuffer>;
 }
 
 export type FetchLike = (
@@ -13,11 +17,12 @@ export type FetchLike = (
   init?: {
     method?: string;
     headers?: Record<string, string>;
-    body?: string;
+    body?: string | Uint8Array;
   },
 ) => Promise<HttpResponseLike>;
 
-export const defaultFetch: FetchLike = async (input, init) => fetch(input, init);
+export const defaultFetch: FetchLike = async (input, init) =>
+  fetch(input, init as RequestInit | undefined);
 
 export async function parseJsonResponse<T>(
   providerId: ProviderId,

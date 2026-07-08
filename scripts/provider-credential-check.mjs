@@ -46,7 +46,7 @@ if (diagramClassifierConfigured) {
   });
 }
 
-results.push(checkInvoiceArtifactControls());
+results.push(await checkInvoiceArtifactControls());
 
 for (const result of results) {
   const marker = result.status === 'pass' ? 'PASS' : result.status === 'warn' ? 'WARN' : 'FAIL';
@@ -204,20 +204,31 @@ function envBoolean(name, defaultValue) {
   return value.trim().toLowerCase() === 'true';
 }
 
-function checkInvoiceArtifactControls() {
+async function checkInvoiceArtifactControls() {
   const backend = process.env.INVOICE_ARTIFACT_STORAGE_BACKEND ?? 'database-bytea';
   const scannerMode = process.env.INVOICE_ARTIFACT_MALWARE_SCANNER_MODE ?? 'eicar-signature-only';
   const retentionMode = process.env.INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE ?? 'report-only';
+  const objectStoreName = process.env.INVOICE_ARTIFACT_OBJECT_STORE_NAME;
   const gaps = [];
 
   if (backend === 'database-bytea') {
     gaps.push('artifact bytes are stored in Postgres instead of object storage');
   } else {
-    if (!hasValue(process.env.INVOICE_ARTIFACT_OBJECT_STORE_NAME)) {
+    if (!hasValue(objectStoreName)) {
       gaps.push('object store bucket/container is missing');
     }
     if (!hasValue(process.env.INVOICE_ARTIFACT_OBJECT_STORE_REGION)) {
       gaps.push('object store region is missing');
+    }
+    if (hasValue(objectStoreName)) {
+      const storageCredentialCheck = await checkArtifactStorageVaultCredential(
+        backend,
+        objectStoreName,
+      );
+
+      if (storageCredentialCheck.status !== 'pass') {
+        gaps.push(storageCredentialCheck.message);
+      }
     }
   }
 
@@ -245,7 +256,7 @@ function checkInvoiceArtifactControls() {
       provider: 'invoice-artifacts',
       status: 'pass',
       message:
-        'External object storage, KMS reference, webhook scanner, and retention enforcement are configured.',
+        'External object storage, Vault credentials, KMS reference, webhook scanner, and retention enforcement are configured.',
     };
   }
 
@@ -254,6 +265,120 @@ function checkInvoiceArtifactControls() {
     status: strict ? 'fail' : 'warn',
     message: `Artifact governance is demo/local only: ${gaps.join('; ')}.`,
   };
+}
+
+async function checkArtifactStorageVaultCredential(backend, objectStoreName) {
+  if (!vaultAddr || !vaultTokenFile) {
+    return {
+      status: strict ? 'fail' : 'warn',
+      message:
+        'external artifact storage requires VAULT_ADDR and VAULT_TOKEN_FILE for provider object-store credentials',
+    };
+  }
+
+  if (!existsSync(vaultTokenFile)) {
+    return {
+      status: strict ? 'fail' : 'warn',
+      message: `artifact storage Vault token file is not readable at ${vaultTokenFile}`,
+    };
+  }
+
+  try {
+    if (backend === 'aws-s3') {
+      const secretData = await readVaultKv('polycost/artifacts/aws');
+      const accessKeyId = secretData?.access_key_id;
+      const secretAccessKey = secretData?.secret_access_key;
+
+      if (hasValue(accessKeyId) && hasValue(secretAccessKey)) {
+        return {
+          status: 'pass',
+          message: 'Vault contains AWS S3 artifact credentials at secret/polycost/artifacts/aws.',
+        };
+      }
+
+      return {
+        status: strict ? 'fail' : 'warn',
+        message:
+          'Vault path secret/polycost/artifacts/aws must contain production-safe access_key_id and secret_access_key',
+      };
+    }
+
+    if (backend === 'azure-blob') {
+      const secretData = await readVaultKv('polycost/artifacts/azure');
+      const accountName = secretData?.account_name;
+      const sasToken = secretData?.sas_token;
+      const configIncludesAccount = objectStoreName.includes('/');
+
+      if ((configIncludesAccount || hasValue(accountName)) && hasValue(sasToken)) {
+        return {
+          status: 'pass',
+          message:
+            'Vault contains Azure Blob artifact credentials at secret/polycost/artifacts/azure.',
+        };
+      }
+
+      return {
+        status: strict ? 'fail' : 'warn',
+        message:
+          'Vault path secret/polycost/artifacts/azure must contain a production-safe sas_token and account_name unless INVOICE_ARTIFACT_OBJECT_STORE_NAME uses account/container',
+      };
+    }
+
+    if (backend === 'gcp-gcs') {
+      const artifactSecret = await readOptionalVaultKv('polycost/artifacts/gcp');
+      const providerSecret = await readOptionalVaultKv('polycost/providers/gcp');
+      const accessToken = artifactSecret?.access_token ?? providerSecret?.access_token;
+
+      if (hasValue(accessToken)) {
+        return {
+          status: 'pass',
+          message:
+            'Vault contains a GCP GCS artifact access token at secret/polycost/artifacts/gcp or secret/polycost/providers/gcp.',
+        };
+      }
+
+      return {
+        status: strict ? 'fail' : 'warn',
+        message:
+          'Vault path secret/polycost/artifacts/gcp or secret/polycost/providers/gcp must contain a production-safe access_token for GCS artifact storage',
+      };
+    }
+
+    return {
+      status: strict ? 'fail' : 'warn',
+      message: `unsupported artifact storage backend ${backend}`,
+    };
+  } catch (error) {
+    return {
+      status: strict ? 'fail' : 'warn',
+      message: `Could not verify artifact storage Vault credentials: ${error instanceof Error ? error.message : 'unknown error'}`,
+    };
+  }
+}
+
+async function readOptionalVaultKv(path) {
+  try {
+    return await readVaultKv(path);
+  } catch {
+    return undefined;
+  }
+}
+
+async function readVaultKv(path) {
+  const token = (await readFile(vaultTokenFile, 'utf8')).trim();
+  const endpoint = `${vaultAddr.replace(/\/$/, '')}/v1/secret/data/${path}`;
+  const response = await fetch(endpoint, {
+    headers: {
+      'X-Vault-Token': token,
+    },
+  });
+  const parsed = await response.json();
+
+  if (!response.ok) {
+    throw new Error(`Vault path secret/${path} is not readable`);
+  }
+
+  return parsed?.data?.data;
 }
 
 function hasValue(value) {

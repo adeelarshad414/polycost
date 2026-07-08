@@ -37,6 +37,7 @@ import {
   BillingImportRowInput,
   BillingSourceType,
   InvoiceArtifactBlobRecord,
+  InvoiceArtifactStorageBackend,
   InvoiceLineItemRecord,
   InvoiceReconciliationRecord,
   InvoiceReconciliationStatus,
@@ -501,17 +502,23 @@ interface InvoiceArtifactBlobRow {
   mime_type: string;
   content_sha256: string;
   content_size_bytes: number;
-  content: Buffer;
+  content: Buffer | null;
   uploaded_by_account_id: string | null;
   uploaded_at: Date;
-  storage_backend: 'database-bytea';
+  storage_backend: InvoiceArtifactStorageBackend;
   kms_key_reference: string | null;
   retention_until: Date;
   legal_hold: boolean;
   malware_scan_status: 'passed' | 'failed';
-  malware_scan_engine: 'polycost-eicar-signature-v1';
+  malware_scan_engine: string;
   malware_scan_checked_at: Date;
   malware_scan_finding: string | null;
+  object_store_bucket: string | null;
+  object_store_region: string | null;
+  object_store_key: string | null;
+  object_store_uri: string | null;
+  object_store_etag: string | null;
+  object_store_version: string | null;
 }
 
 interface InvoiceArtifactRetentionSummaryRow {
@@ -3880,7 +3887,15 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     fileName: string;
     mimeType: string;
     contentSha256: string;
-    content: Buffer;
+    contentSizeBytes: number;
+    storageBackend: InvoiceArtifactStorageBackend;
+    content?: Buffer;
+    objectStoreBucket?: string;
+    objectStoreRegion?: string;
+    objectStoreKey?: string;
+    objectStoreUri?: string;
+    objectStoreETag?: string;
+    objectStoreVersion?: string;
     uploadedByAccountId?: string;
     uploadedAt: string;
     kmsKeyReference?: string;
@@ -3912,9 +3927,15 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
             malware_scan_status,
             malware_scan_engine,
             malware_scan_checked_at,
-            malware_scan_finding
+            malware_scan_finding,
+            object_store_bucket,
+            object_store_region,
+            object_store_key,
+            object_store_uri,
+            object_store_etag,
+            object_store_version
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'database-bytea', $11, $12, $13, 'passed', 'polycost-eicar-signature-v1', $14, $15)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'passed', 'polycost-eicar-signature-v1', $15, $16, $17, $18, $19, $20, $21, $22)
           ON CONFLICT (reconciliation_id, artifact_id)
           DO UPDATE SET
             team_id = EXCLUDED.team_id,
@@ -3932,7 +3953,13 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
             malware_scan_status = EXCLUDED.malware_scan_status,
             malware_scan_engine = EXCLUDED.malware_scan_engine,
             malware_scan_checked_at = EXCLUDED.malware_scan_checked_at,
-            malware_scan_finding = EXCLUDED.malware_scan_finding
+            malware_scan_finding = EXCLUDED.malware_scan_finding,
+            object_store_bucket = EXCLUDED.object_store_bucket,
+            object_store_region = EXCLUDED.object_store_region,
+            object_store_key = EXCLUDED.object_store_key,
+            object_store_uri = EXCLUDED.object_store_uri,
+            object_store_etag = EXCLUDED.object_store_etag,
+            object_store_version = EXCLUDED.object_store_version
         `,
         [
           input.reconciliationId,
@@ -3941,15 +3968,22 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
           input.fileName,
           input.mimeType,
           input.contentSha256,
-          input.content.length,
-          input.content,
+          input.contentSizeBytes,
+          input.content ?? null,
           input.uploadedByAccountId ?? null,
           input.uploadedAt,
+          input.storageBackend,
           input.kmsKeyReference ?? null,
           input.retentionUntil,
           input.legalHold,
           input.malwareScanCheckedAt,
           input.malwareScanFinding ?? null,
+          input.objectStoreBucket ?? null,
+          input.objectStoreRegion ?? null,
+          input.objectStoreKey ?? null,
+          input.objectStoreUri ?? null,
+          input.objectStoreETag ?? null,
+          input.objectStoreVersion ?? null,
         ],
       );
       const result = await pool.query<InvoiceReconciliationRow>(
@@ -4025,7 +4059,13 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
                malware_scan_status,
                malware_scan_engine,
                malware_scan_checked_at,
-               malware_scan_finding
+               malware_scan_finding,
+               object_store_bucket,
+               object_store_region,
+               object_store_key,
+               object_store_uri,
+               object_store_etag,
+               object_store_version
         FROM invoice_artifact_blobs
         WHERE reconciliation_id = $1
           AND artifact_id = $2
@@ -4559,12 +4599,26 @@ function toInvoiceArtifactBlobRecord(row: InvoiceArtifactBlobRow): InvoiceArtifa
     mimeType: row.mime_type,
     contentSha256: row.content_sha256,
     contentSizeBytes: row.content_size_bytes,
-    contentBase64: row.content.toString('base64'),
+    ...(row.content ? { contentBase64: row.content.toString('base64') } : {}),
     ...(row.uploaded_by_account_id ? { uploadedByAccountId: row.uploaded_by_account_id } : {}),
     uploadedAt: row.uploaded_at.toISOString(),
     storageProfile: {
       storageBackend: row.storage_backend,
-      encryptionStatus: 'database-managed',
+      encryptionStatus:
+        row.storage_backend === 'database-bytea' ? 'database-managed' : 'customer-managed-kms',
+      ...(row.object_store_bucket
+        ? {
+            objectStore: {
+              bucketOrContainer: row.object_store_bucket,
+              prefix: objectPrefixFromKey(row.object_store_key),
+              ...(row.object_store_region ? { region: row.object_store_region } : {}),
+              ...(row.object_store_key ? { key: row.object_store_key } : {}),
+              ...(row.object_store_uri ? { uri: row.object_store_uri } : {}),
+              ...(row.object_store_etag ? { eTag: row.object_store_etag } : {}),
+              ...(row.object_store_version ? { version: row.object_store_version } : {}),
+            },
+          }
+        : {}),
       ...(row.kms_key_reference ? { kmsKeyReference: row.kms_key_reference } : {}),
       kmsKeyRequiredForProduction: !row.kms_key_reference,
     },
@@ -4587,6 +4641,14 @@ function retentionDaysBetween(uploadedAt: Date, retentionUntil: Date): number {
   const diff = retentionUntil.getTime() - uploadedAt.getTime();
 
   return Math.max(0, Math.round(diff / millisecondsPerDay));
+}
+
+function objectPrefixFromKey(key: string | null): string {
+  if (!key || !key.includes('/')) {
+    return 'invoice-artifacts';
+  }
+
+  return key.slice(0, key.lastIndexOf('/'));
 }
 
 function dateOnly(value: Date | string): string {

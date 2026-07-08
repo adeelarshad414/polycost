@@ -109,6 +109,10 @@ export interface InvoiceArtifactBlobGovernance {
       bucketOrContainer: string;
       prefix: string;
       region?: string;
+      key?: string;
+      uri?: string;
+      eTag?: string;
+      version?: string;
     };
     kmsKeyReference?: string;
     kmsKeyRequiredForProduction: boolean;
@@ -160,7 +164,7 @@ export interface InvoiceArtifactBlobRecord extends InvoiceArtifactBlobGovernance
   mimeType: string;
   contentSha256: string;
   contentSizeBytes: number;
-  contentBase64: string;
+  contentBase64?: string;
   uploadedByAccountId?: string;
   uploadedAt: string;
 }

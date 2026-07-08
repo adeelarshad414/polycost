@@ -100,6 +100,7 @@ export class InvoiceArtifactGovernanceService {
     contentSha256: string,
     uploadedAt: string,
   ): Promise<InvoiceArtifactBlobGovernance> {
+    const readiness = this.storageReadiness();
     const scan = await this.scanArtifact({
       fileName: input.fileName,
       mimeType: input.mimeType,
@@ -114,8 +115,12 @@ export class InvoiceArtifactGovernanceService {
 
     return {
       storageProfile: {
-        storageBackend: 'database-bytea',
-        encryptionStatus: 'database-managed',
+        storageBackend: readiness.storageBackend,
+        encryptionStatus:
+          readiness.storageBackend === 'database-bytea'
+            ? 'database-managed'
+            : 'customer-managed-kms',
+        ...(readiness.objectStore ? { objectStore: readiness.objectStore } : {}),
         ...(kmsKeyReference ? { kmsKeyReference } : {}),
         kmsKeyRequiredForProduction: !kmsKeyReference,
       },

@@ -1628,6 +1628,12 @@ describe('ApiDatabaseRepository', () => {
       malware_scan_engine: 'polycost-eicar-signature-v1',
       malware_scan_checked_at: completedAt,
       malware_scan_finding: null,
+      object_store_bucket: null,
+      object_store_region: null,
+      object_store_key: null,
+      object_store_uri: null,
+      object_store_etag: null,
+      object_store_version: null,
     };
     const query = jest.fn(async (text: string, values?: unknown[]) => {
       if (text === 'BEGIN' || text === 'COMMIT' || text === 'ROLLBACK') {
@@ -1865,6 +1871,8 @@ describe('ApiDatabaseRepository', () => {
         fileName: 'aws-invoice-control.txt',
         mimeType: 'text/plain',
         contentSha256: 'd'.repeat(64),
+        contentSizeBytes: 7,
+        storageBackend: 'database-bytea',
         content: Buffer.from('invoice'),
         uploadedByAccountId: '11111111-1111-4111-8111-111111111111',
         uploadedAt: completedAt.toISOString(),
@@ -1976,10 +1984,17 @@ describe('ApiDatabaseRepository', () => {
         Buffer.from('invoice'),
         '11111111-1111-4111-8111-111111111111',
         completedAt.toISOString(),
+        'database-bytea',
         null,
         '2027-07-06T00:00:02.000Z',
         false,
         completedAt.toISOString(),
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
         null,
       ],
     );
@@ -2018,6 +2033,65 @@ describe('ApiDatabaseRepository', () => {
     expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining('legal_hold = false'), [
       evaluatedAt,
     ]);
+  });
+
+  it('maps externally stored invoice artifact blob pointers without inline bytes', async () => {
+    const uploadedAt = new Date('2026-07-08T00:00:00.000Z');
+    const query = jest.fn(async () => ({
+      rows: [
+        {
+          id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          reconciliation_id: '66666666-6666-4666-8666-666666666666',
+          artifact_id: 'artifact-1',
+          team_id: '22222222-2222-4222-8222-222222222222',
+          file_name: 'aws-invoice-control.txt',
+          mime_type: 'text/plain',
+          content_sha256: 'd'.repeat(64),
+          content_size_bytes: 7,
+          content: null,
+          uploaded_by_account_id: '11111111-1111-4111-8111-111111111111',
+          uploaded_at: uploadedAt,
+          storage_backend: 'aws-s3',
+          kms_key_reference: 'arn:aws:kms:us-east-1:111122223333:key/demo',
+          retention_until: new Date('2027-07-08T00:00:00.000Z'),
+          legal_hold: false,
+          malware_scan_status: 'passed',
+          malware_scan_engine: 'polycost-http-webhook-scanner',
+          malware_scan_checked_at: uploadedAt,
+          malware_scan_finding: null,
+          object_store_bucket: 'polycost-invoice-artifacts',
+          object_store_region: 'us-east-1',
+          object_store_key: 'invoice-artifacts/team/reconciliation/artifact.txt',
+          object_store_uri:
+            's3://polycost-invoice-artifacts/invoice-artifacts/team/reconciliation/artifact.txt',
+          object_store_etag: '"etag"',
+          object_store_version: 'v1',
+        },
+      ],
+    }));
+    const repository = createRepository(query);
+
+    const blob = await repository.getInvoiceArtifactBlob(
+      '66666666-6666-4666-8666-666666666666',
+      'artifact-1',
+    );
+
+    expect(blob?.contentBase64).toBeUndefined();
+    expect(blob).toMatchObject({
+      storageProfile: {
+        storageBackend: 'aws-s3',
+        encryptionStatus: 'customer-managed-kms',
+        kmsKeyRequiredForProduction: false,
+        objectStore: {
+          bucketOrContainer: 'polycost-invoice-artifacts',
+          region: 'us-east-1',
+          key: 'invoice-artifacts/team/reconciliation/artifact.txt',
+          uri: 's3://polycost-invoice-artifacts/invoice-artifacts/team/reconciliation/artifact.txt',
+          eTag: '"etag"',
+          version: 'v1',
+        },
+      },
+    });
   });
 
   it('records and lists team audit events with actor display context', async () => {

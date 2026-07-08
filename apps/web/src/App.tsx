@@ -2957,6 +2957,9 @@ function WorkspaceControlCenter({
         reconciliationSummary.artifactId,
         token,
       );
+      if (!artifactBlob.contentBase64) {
+        throw new Error('Stored artifact bytes were not returned by the API.');
+      }
       downloadBlob(
         base64ToBlob(artifactBlob.contentBase64, artifactBlob.mimeType),
         artifactBlob.fileName,

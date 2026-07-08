@@ -117,6 +117,7 @@ say so explicitly rather than marking it done.
 | Phase 2.25 - Invoice artifact blob storage seam         | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.26 - Invoice artifact governance metadata       | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.27 - Artifact storage readiness and retention   | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.28 - Provider artifact storage adapters         | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4356,6 +4357,41 @@ Status: implemented and verified locally on 2026-07-08.
 - Remaining caveat: external S3/Azure Blob/GCS byte-write adapters are still future
   work; this phase adds the production readiness contract, webhook scanner path, and
   retention enforcement foundation over the existing database-backed artifact store.
+
+## Phase 2.28 — Provider artifact storage adapters
+
+Status: implemented and verified locally on 2026-07-08.
+
+- Added migration `034_invoice_artifact_external_storage.sql` so stored invoice
+  artifact rows can hold either database bytes or an external object-store pointer
+  with bucket/container, region, key, URI, ETag, and version metadata.
+- Added `InvoiceArtifactStorageService` with provider-native write/read adapters:
+  AWS S3 SigV4 REST with optional KMS headers, Azure Blob SAS-backed Block Blob
+  writes, and GCP Cloud Storage JSON API uploads/downloads with Vault-backed access
+  tokens.
+- Upload now stores inline bytes only for `database-bytea`; external storage rows
+  persist object pointers and metadata while reconciliation evidence remains
+  metadata-only. Download reads external provider bytes and verifies the stored
+  SHA-256 before returning content to the caller.
+- Extended billing/repository/API/web types so external artifacts can be represented
+  without inline `contentBase64` until the guarded download path rehydrates bytes.
+- Extended strict provider credential checks and operator docs with exact artifact
+  Vault paths for AWS, Azure, and GCP object-store credentials.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/invoice-artifact-storage.service.spec.ts src/api/auth-billing.spec.ts src/api/api-database.repository.spec.ts src/api/invoice-artifact-governance.service.spec.ts`
+  passed 72/72 across 4 suites. `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx src/api-client.spec.ts`
+  passed 86/86 across 2 suites. `npm run ci:lint` passed with zero ESLint/typecheck
+  errors. `npm run provider:credentials:check` passed with the expected local/demo
+  invoice-artifacts warning. `npm run test:production-readiness` passed with API 14
+  suites / 182 tests and web 2 suites / 86 tests. Full `npm run check` passed with
+  API 55 suites / 448 tests, web 11 suites / 143 tests, graph validation 320 nodes /
+  320 edges, pricing coverage, progress verification, QA/security suppression
+  hygiene, DB, DevOps, cloud, release, handover, and provider-credential gates green.
+- Remaining caveat: external artifact writes/reads are now implemented, but full
+  invoice-grade operation still needs provider invoice-of-record reconciliation,
+  reviewer workflow automation, real malware-scanner operation, legal-hold
+  administration, and external object lifecycle deletion during retention
+  enforcement.
 
 ## Deviations from spec log
 
