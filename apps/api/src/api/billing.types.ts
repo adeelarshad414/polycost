@@ -79,12 +79,29 @@ export interface InvoiceGradeArtifactRegistrationInput {
   notes?: string;
 }
 
+export interface InvoiceGradeArtifactVerificationInput {
+  verificationStatus: Exclude<InvoiceGradeArtifactVerificationStatus, 'registered'>;
+  evidenceReference: string;
+  sha256?: string;
+  controlTotalUsd?: number;
+  notes?: string;
+}
+
 export interface InvoiceGradeArtifactRecord extends InvoiceGradeArtifactRegistrationInput {
   id: string;
   provider: ProviderId;
   verificationStatus: InvoiceGradeArtifactVerificationStatus;
   registeredAt: string;
   registeredByAccountId?: string;
+  verifiedAt?: string;
+  verifiedByAccountId?: string;
+  rejectedAt?: string;
+  rejectedByAccountId?: string;
+  verificationEvidenceReference?: string;
+  verificationNotes?: string;
+  verifiedSha256?: string;
+  verificationControlTotalUsd?: number;
+  verificationControlTotalDeltaUsd?: number;
 }
 
 export interface BillingImportRecord {

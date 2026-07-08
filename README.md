@@ -180,6 +180,10 @@ Accounts add workspace controls on top of that core flow:
   signing secret; PolyCost stores an outbox row in the same database transaction as
   the audit event and scheduled workers retry signed delivery without blocking the
   user-facing mutation.
+- Billing reconciliation evidence can register invoice artifact metadata and mark
+  artifacts verified/rejected with review references, checksum/control-total checks,
+  and audit events. This improves proof discipline but is not a provider invoice
+  system of record.
 
 The current self-hosted product does not yet include enterprise IdP login round-trips,
 full email-template management, org billing plans, or a hosted account marketplace.

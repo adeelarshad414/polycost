@@ -581,6 +581,23 @@ describe('App', () => {
     );
     expect(text(container)).toContain('Artifact metadata is registered for traceability only');
 
+    await click(buttonByText(container, 'Verify artifact evidence'));
+    await settleAsyncEffects();
+
+    expect(client.verifyInvoiceGradeArtifact).toHaveBeenCalledWith(
+      '66666666-6666-4666-8666-666666666666',
+      'artifact-1',
+      expect.objectContaining({
+        verificationStatus: 'verified',
+        evidenceReference: 'review://invoice-artifacts/artifact-1',
+        controlTotalUsd: 107,
+      }),
+      'session-token',
+    );
+    expect(text(container)).toContain(
+      'Artifact metadata: 1 registered · 1 verified · registered with verified artifacts',
+    );
+
     unmount();
   });
 
@@ -4757,6 +4774,92 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
           status: 'metadata-registered-not-verified',
           registeredCount: 1,
           verifiedCount: 0,
+          artifacts: [
+            {
+              id: 'artifact-1',
+              provider: 'aws',
+              type: 'provider-invoice',
+              displayName: 'AWS invoice control packet',
+              reference: 'demo://invoice-artifacts/66666666-6666-4666-8666-666666666666',
+              controlTotalUsd: 107,
+              verificationStatus: 'registered',
+              registeredAt: '2026-07-06T00:00:03.000Z',
+            },
+          ],
+          caveats: [
+            'Artifact metadata is registered for traceability only; files, contracts, and invoice controls are not verified by PolyCost yet.',
+          ],
+        },
+        invoiceMatchSummary: {
+          readiness: 'reconciled-evidence-ready',
+          caveats: [
+            'Reconciliation compares provider-export actuals with PolyCost estimate evidence; it is not an invoice-of-record.',
+          ],
+        },
+      },
+      createdAt: '2026-07-06T00:00:02.000Z',
+    })),
+    verifyInvoiceGradeArtifact: jest.fn(async () => ({
+      id: '66666666-6666-4666-8666-666666666666',
+      importRunId: '55555555-5555-4555-8555-555555555555',
+      comparisonId: comparisonResult.comparisonId,
+      provider: 'aws' as const,
+      estimatedTotalUsd: 100,
+      invoicedTotalUsd: 107,
+      varianceUsd: 7,
+      variancePercent: 7,
+      status: 'variance-warning' as const,
+      evidence: {
+        invoiceCoverage: {
+          sourceFingerprintPercent: 100,
+          skuMatchPercent: 100,
+        },
+        invoiceAdjustmentSummary: {
+          adjustmentCostUsd: 6,
+          adjustmentLineItemCount: 4,
+          commitmentLineItemCount: 4,
+          commitmentNetCostUsd: -2,
+          commitmentEvidence: {
+            rowsRequiringProviderInventory: 4,
+            rowsRequiringAmortizationPeriod: 2,
+            rowsRequiringAllocationEvidence: 4,
+          },
+          estimateComparableVarianceUsd: 0,
+          categories: [
+            {
+              category: 'usage',
+              rowCount: 1,
+              totalCostUsd: 100,
+            },
+          ],
+        },
+        invoiceGradeReadiness: {
+          status: 'invoice-grade-blocked',
+          missingCount: 2,
+          partialCount: 3,
+          blockers: ['Private pricing and discount proof'],
+          artifactRegisterStatus: 'registered-with-verified-artifacts',
+          registeredArtifactCount: 1,
+          verifiedArtifactCount: 1,
+        },
+        invoiceGradeArtifactRegister: {
+          status: 'registered-with-verified-artifacts',
+          registeredCount: 1,
+          verifiedCount: 1,
+          artifacts: [
+            {
+              id: 'artifact-1',
+              provider: 'aws',
+              type: 'provider-invoice',
+              displayName: 'AWS invoice control packet',
+              reference: 'demo://invoice-artifacts/66666666-6666-4666-8666-666666666666',
+              controlTotalUsd: 107,
+              verificationStatus: 'verified',
+              registeredAt: '2026-07-06T00:00:03.000Z',
+              verifiedAt: '2026-07-06T00:00:04.000Z',
+              verificationEvidenceReference: 'review://invoice-artifacts/artifact-1',
+            },
+          ],
           caveats: [
             'Artifact metadata is registered for traceability only; files, contracts, and invoice controls are not verified by PolyCost yet.',
           ],

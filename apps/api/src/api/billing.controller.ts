@@ -40,4 +40,19 @@ export class BillingController {
   ) {
     return this.billingService.registerInvoiceGradeArtifact(reconciliationId, body, request.auth!);
   }
+
+  @Post('reconciliations/:id/artifacts/:artifactId/verification')
+  verifyInvoiceGradeArtifact(
+    @Param('id') reconciliationId: string,
+    @Param('artifactId') artifactId: string,
+    @Body() body: unknown,
+    @Req() request: RequestWithAuth,
+  ) {
+    return this.billingService.verifyInvoiceGradeArtifact(
+      reconciliationId,
+      artifactId,
+      body,
+      request.auth!,
+    );
+  }
 }

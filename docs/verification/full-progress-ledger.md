@@ -54,6 +54,10 @@ Evidence:
   under `invoiceGradeArtifactRegister`, with check coverage, registered/verified
   counts, control-total deltas, and audit trail evidence. This is metadata
   registration only, not invoice verification.
+- Registered artifact metadata can now be marked `verified` or `rejected` with review
+  evidence, checksum/control-total mismatch rejection, verified counts, and readiness
+  updates limited to covered checks. This is still metadata/control verification, not
+  durable artifact storage.
 - `docs/PROVIDER-CREDENTIALS.md` states the current production swap procedure and
   explicitly limits real provider mode to catalog list prices, not invoices.
 
@@ -66,8 +70,9 @@ Deferred:
   estimate-vs-actual reconciliation evidence. Classified adjustment and commitment
   rows are separated from usage-comparable variance, but provider-account-specific
   amortization, allocation proof, private pricing, and invoice controls remain
-  future work. The invoice-grade readiness matrix and artifact register expose
-  those blockers; they do not remove them.
+  future work. The invoice-grade readiness matrix, artifact register, and
+  verification status expose those blockers; they do not remove unrelated or
+  unverified evidence requirements.
 
 ## Phase B - Input Modes And Requirement Pipeline
 
