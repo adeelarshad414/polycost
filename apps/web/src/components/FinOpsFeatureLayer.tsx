@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { formatApiError, polyCostClient, PolyCostClient } from '../api-client';
 import { Button } from './Button';
+import { LoadingStatus, Skeleton } from './LoadingExperience';
 import { HOURS_PER_MONTH, hourlyFromMonthly, intervalMultiplierFromMonthly } from '../cost-time';
 import {
   AlertRecord,
@@ -870,14 +871,16 @@ export function FinOpsFeatureLayer({
                 </strong>
                 {shareAnalyticsError ? ` · analytics unavailable: ${shareAnalyticsError}` : ''}
               </span>
-              <button
+              <Button
                 type="button"
-                className="self-start text-action-primary underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:text-text-muted sm:self-auto"
+                variant="link"
+                size="compact"
+                className="self-start sm:self-auto"
                 disabled={isLoadingShareAnalytics}
                 onClick={() => void refreshShareAnalytics(shareLink.token)}
               >
                 Refresh views
-              </button>
+              </Button>
             </div>
           ) : null}
           {shareError ? (
@@ -907,7 +910,7 @@ export function FinOpsFeatureLayer({
             </Button>
             <Button
               type="button"
-              variant="destructive"
+              variant="destructiveQuiet"
               disabled={!shareLink || shareStatus === 'creating'}
               loading={shareStatus === 'creating' && Boolean(shareLink)}
               loadingLabel="Revoking..."
@@ -2027,13 +2030,17 @@ export function SharedReportPlaceholder({
         ) : null}
 
         {!report && !error ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Shared report loading">
-            {[0, 1, 2].map((item) => (
-              <div
-                key={item}
-                className="h-24 animate-pulse rounded-lg border border-border bg-surface-0 motion-reduce:animate-none"
-              />
-            ))}
+          <div
+            className="grid gap-3"
+            aria-busy="true"
+            aria-label="Shared report loading"
+            role="status"
+          >
+            <LoadingStatus
+              title="Opening shared report"
+              detail="Verifying the share token and loading the read-only comparison snapshot."
+            />
+            <Skeleton.Grid cards={3} />
           </div>
         ) : null}
 

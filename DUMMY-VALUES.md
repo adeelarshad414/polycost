@@ -49,3 +49,11 @@ For SSO readiness, configure provider metadata through the workspace UI only aft
 setting `AUTH_PUBLIC_BASE_URL` to the externally reachable API origin. The development
 "test connection" path validates OIDC/SAML issuer shape through the same API surface
 without performing a real enterprise login handshake.
+
+## Customer Handover Note
+
+The handover docs intentionally keep `verified (mock)` distinct from production
+credentials. A customer demo may use the local fixture-backed catalog, mock SSO, and
+missing LLM/provider secrets, but production readiness requires the strict provider
+credential check and replacement of every `CHANGE_ME_DEV_ONLY` value before staging
+or production traffic.

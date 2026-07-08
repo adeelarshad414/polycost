@@ -17,6 +17,12 @@ describe('TopLoadingBar', () => {
   it('renders loading and completion states with accessible progress semantics', () => {
     const { container, rerender, unmount } = render(<TopLoadingBar isLoading label="Refreshing" />);
 
+    expect(progress(container)).toBeNull();
+
+    act(() => {
+      jest.advanceTimersByTime(150);
+    });
+
     expect(progress(container)?.getAttribute('aria-label')).toBe('Refreshing');
     expect(progress(container)?.getAttribute('aria-valuenow')).toBe('80');
     expect(container.querySelector('.top-loading-bar-fill.is-sweeping')).toBeInstanceOf(
@@ -31,7 +37,13 @@ describe('TopLoadingBar', () => {
     );
 
     act(() => {
-      jest.advanceTimersByTime(220);
+      jest.advanceTimersByTime(319);
+    });
+
+    expect(progress(container)).toBeInstanceOf(HTMLElement);
+
+    act(() => {
+      jest.advanceTimersByTime(1);
     });
 
     expect(progress(container)).toBeNull();
@@ -40,6 +52,23 @@ describe('TopLoadingBar', () => {
 
   it('does not render while idle', () => {
     const { container, unmount } = render(<TopLoadingBar isLoading={false} />);
+
+    expect(progress(container)).toBeNull();
+    unmount();
+  });
+
+  it('does not flash for sub-150ms waits', () => {
+    const { container, rerender, unmount } = render(<TopLoadingBar isLoading />);
+
+    act(() => {
+      jest.advanceTimersByTime(149);
+    });
+
+    rerender(<TopLoadingBar isLoading={false} />);
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
 
     expect(progress(container)).toBeNull();
     unmount();

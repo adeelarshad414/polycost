@@ -26,6 +26,13 @@ Complete this checklist before changing the GitHub repository visibility from pr
 
 - Confirm `LICENSE` is the intended project license.
 - Review `README.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `SUPPORT.md`, and `GOVERNANCE.md`.
+- Review the customer handover package:
+  `docs/HOW-TO-USE.md`, `docs/DEPLOYMENT.md`, `docs/RUNBOOK.md`,
+  `docs/COMPARISON.md`, `docs/ARCHITECTURE.md`, and
+  `docs/CUSTOMER-HANDOVER-LEDGER.md`.
+- Review the final handover excellence artifacts:
+  `HANDOVER-CENSUS.md`, `HANDOVER-EXCELLENCE-REPORT.md`, and
+  `handover/HANDOVER-README.md`.
 - Confirm trademark-sensitive cloud logos are not present in the UI.
 - Confirm docs describe AWS/Azure/GCP as provider integrations, not endorsements.
 
@@ -43,7 +50,10 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Run `npm run demo:verify-clean` to prove the clean-clone demo path stays under
   the 10-minute startup budget.
 - Run `npm run format:check`.
+- Run `npm run overlay:check`.
 - Run `npm run release:check`.
+- Run `npm run loading:check`.
+- Run `npm run handover:check`.
 - Run `npm run lint`.
 - Run `npm run typecheck`.
 - Run `npm run ci:unit` to execute coverage and the pricing-logic coverage gate.

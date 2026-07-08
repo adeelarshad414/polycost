@@ -104,6 +104,203 @@ say so explicitly rather than marking it done.
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.3 - Terraform bundle export                    | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.4 - Terraform module library                   | Complete with known gaps (see notes) | 2026-07-07   |
+| Customer handover and production excellence package     | Complete with known gaps (see notes) | 2026-07-07   |
+| Loading and progress experience audit/build             | Complete with known gaps (see notes) | 2026-07-08   |
+| UI Appendix O - Overlay/dialog/button audit             | Complete with known gaps (see notes) | 2026-07-08   |
+| Customer handover excellence orchestrator               | Complete with known gaps (see notes) | 2026-07-08   |
+
+## Customer handover excellence orchestrator
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-08
+
+What changed:
+
+- Combined the customer handover docs branch with the Appendix L loading/progress
+  and Appendix O overlay/button systems on one final handover branch.
+- Added `HANDOVER-CENSUS.md` and `HANDOVER-EXCELLENCE-REPORT.md`.
+- Added the explicit `handover/` package: handover README, design-system handoff,
+  core journeys, known limits, demo script, and screenshot gallery index.
+- Added a keyboard skip link to the SPA shell and expanded web metadata for
+  customer-facing previews.
+- Extended `npm run handover:check` and `npm run release:check` so the final
+  census/report/package cannot drift silently.
+
+Verification planned/performed in this branch:
+
+- `npm run handover:check` passed: 14 handover docs verified.
+- `npm run loading:check`, `npm run overlay:check`, and `npm run theme:hex:check`
+  passed.
+- `npm run ci:lint` passed.
+- Focused web component tests passed: 4 suites / 12 tests.
+- `npm run test:production-readiness` passed: API 10 suites / 135 tests; web 2
+  suites / 84 tests.
+- `npm run check` passed: API 51 suites / 400 tests; web 11 suites / 141 tests;
+  graph validation 308 nodes / 308 edges; release/handover/provider gates passed.
+- `npm run ci:build` passed with the existing Vite placeholder/chunk-size warnings.
+
+Known remaining gaps:
+
+- Fresh Lighthouse and axe sweeps were not produced in this branch; the report
+  blocks those honestly instead of claiming them.
+- 200% zoom and 320px WCAG reflow still need a dedicated browser harness.
+- Real provider/SSO/LLM/Terraform proof requires external credentials and customer
+  environment access.
+- The SPA still has no dedicated product 404 route; Vite/app fallback handles
+  unknown paths.
+
+## Customer handover and production excellence package
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-07
+
+What changed:
+
+- Added the canonical customer handover documentation package under `docs/`:
+  user guide, deployment guide, operations runbook, competitive comparison,
+  architecture overview, and customer handover ledger.
+- Added `npm run handover:check` to validate the handover docs and wired it into
+  the full `npm run check` regression floor.
+- Extended release-readiness automation so the handover package is required before
+  public/open-source release review.
+- Updated README, changelog, dummy-value notes, and release checklist so customer
+  handover boundaries are discoverable from the repo entry points.
+
+Verification:
+
+- `npm run handover:check`
+- `npm run release:check`
+- `npm run format:check`
+- `npm run ci:lint`
+- `npm run test:production-readiness`
+  - API focused: `10` suites / `135` tests.
+  - Web focused: `2` suites / `84` tests.
+- `npm run ci:build`
+  - API TypeScript build passed.
+  - Web production build passed with the existing Vite environment-placeholder and
+    chunk-size warnings.
+- `npm run check`
+  - API unit: `51` suites / `400` tests.
+  - Web unit: `9` suites / `132` tests.
+  - Graph validation: `304` nodes / `304` edges.
+  - Pricing coverage guard: `36` frontend priced families covered.
+  - Progress verification: `153` phase evidence anchors.
+  - Security suppression check: `22` reviewed suppressions.
+  - Database validation, DevOps check, cloud readiness, release readiness,
+    handover, and provider credential gates passed.
+  - `db:validate` skipped the live `schema_migrations` check because the Postgres
+    container was not running.
+  - `cloud:check` remains documentation/config only because deployable IaC is not
+    present.
+  - `impeccable` skipped by documented Node 20 vs Node 24 constraint.
+
+Known remaining gaps:
+
+- The handover package documents the current honest product boundary; it does not
+  close future phases for invoice-grade billing, full Visio rendering, production
+  LLM corpus quality, enterprise auth/team product depth, or full landing-zone
+  Terraform.
+- Hosted GitHub Actions runner allocation remains an external blocker until the
+  repository account can allocate runners and execute workflow steps.
+
+## Loading and progress experience audit/build
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-08
+
+What changed:
+
+- Added the canonical loading component set in
+  `apps/web/src/components/LoadingExperience.tsx`: boot splash, staged session
+  loader, skeleton presets, progress bar, loading status, task queue, job toast, and
+  live-tail indicator.
+- Updated `TopLoadingBar` to delay-mount after `150ms` and hold completion for
+  `320ms`, preventing flash-of-loader behavior on instant waits.
+- Wired the new components into app boot, workspace session hydration, team/SSO
+  sync, pricing evidence loading, comparison workspace loading, shared report
+  loading, and export/refresh activity.
+- Added `LOADING-INVENTORY.md`, `LOADING-AUDIT-REPORT.md`, and
+  `npm run loading:check`; wired the gate into `npm run check` and
+  `npm run release:check`.
+
+Verification:
+
+- `npm run test:unit --workspace @polycost/web -- --runInBand src/components/LoadingExperience.spec.tsx src/components/TopLoadingBar.spec.tsx`
+  - Web focused: `2` suites / `7` tests.
+- `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx src/api-client.spec.ts`
+  - Web focused: `2` suites / `84` tests.
+- `npm run format:check`
+- `npm run ci:lint`
+- `npm run loading:check`
+- `npm run theme:hex:check`
+- `npm run test:production-readiness`
+  - API focused: `10` suites / `135` tests.
+  - Web focused: `2` suites / `84` tests.
+- `npm run ci:build`
+  - API TypeScript build passed.
+  - Web production build passed with the existing Vite environment-placeholder and
+    chunk-size warnings.
+- `npm run check`
+  - API unit: `51` suites / `400` tests.
+  - Web unit: `10` suites / `137` tests.
+  - Graph validation: `300` nodes / `300` edges.
+  - Pricing coverage guard: `36` frontend priced families covered.
+  - Progress verification: `153` phase evidence anchors.
+  - Security suppression check: `22` reviewed suppressions.
+  - Database validation, DevOps check, cloud readiness, release readiness,
+    loading, and provider credential gates passed.
+  - `db:validate` skipped the live `schema_migrations` check because the Postgres
+    container was not running.
+  - `cloud:check` remains documentation/config only because deployable IaC is not
+    present.
+  - `impeccable` skipped by documented Node 20 vs Node 24 constraint.
+
+Known remaining gaps:
+
+- Exact export-job percentages remain blocked by the current API contract; the UI
+  shows report job phase/state without inventing progress.
+- Dedicated dual-mode loading-state screenshots were not captured in this pass
+  because mid/failure loading states need either route-level fixture hooks or a
+  loading-state showcase route.
+- Real auth redirect timing is not measurable in the current anonymous-first SPA
+  without an auth callback route or instrumentation hook.
+
+## UI Appendix O - Overlay/dialog/button audit
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-08
+
+What changed:
+
+- Added canonical shared overlay primitives for dialogs, destructive confirms,
+  drawers, popovers, toast stacks, and banners.
+- Expanded the shared button system with `destructiveQuiet`, `link`, `icon`, and
+  size variants so filled destructive buttons stay reserved for destructive
+  confirmations.
+- Migrated row-level clear/remove/revoke/reload/refresh utility actions to the
+  shared button contract.
+- Added `OVERLAY-INVENTORY.md`, `BUTTON-INVENTORY.md`, and
+  `OVERLAY-AUDIT-REPORT.md`.
+- Added `npm run overlay:check` and wired it into `npm run check` and
+  `npm run release:check`.
+
+Verification:
+
+- `npm run overlay:check`
+- `npm run test:unit --workspace @polycost/web -- --runInBand src/components/Button.spec.tsx src/components/OverlayPrimitives.spec.tsx`
+- `npm run theme:hex:check`
+- `npm run ci:lint`
+- `npm run release:check`
+
+Known remaining gaps:
+
+- No production flow currently opens every new overlay primitive, so full
+  end-user screenshot evidence needs either a dedicated showcase route or the
+  first real product flow using each primitive.
+- Announcement frequency persistence is documented but not runtime-wired because
+  the app has no promotional announcement overlay today.
+- Existing account deletion remains an inline typed-confirmation form pending a
+  broader account/team UX pass.
 
 ## Phase V3.4 - Terraform module library
 

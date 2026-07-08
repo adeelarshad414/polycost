@@ -15,10 +15,29 @@ const requiredFiles = [
   'GOVERNANCE.md',
   'CHANGELOG.md',
   'DUMMY-VALUES.md',
+  'OVERLAY-INVENTORY.md',
+  'BUTTON-INVENTORY.md',
+  'OVERLAY-AUDIT-REPORT.md',
   'RELEASE-CHECKLIST.md',
+  'LOADING-INVENTORY.md',
+  'LOADING-AUDIT-REPORT.md',
+  'HANDOVER-CENSUS.md',
+  'HANDOVER-EXCELLENCE-REPORT.md',
   'docs/development/open-source-readiness.md',
   'docs/SECURITY-SUPPRESSIONS.md',
   'docs/verification/full-progress-ledger.md',
+  'docs/HOW-TO-USE.md',
+  'docs/DEPLOYMENT.md',
+  'docs/RUNBOOK.md',
+  'docs/COMPARISON.md',
+  'docs/ARCHITECTURE.md',
+  'docs/CUSTOMER-HANDOVER-LEDGER.md',
+  'handover/HANDOVER-README.md',
+  'handover/DESIGN-SYSTEM.md',
+  'handover/JOURNEYS.md',
+  'handover/KNOWN-LIMITS.md',
+  'handover/DEMO-SCRIPT.md',
+  'handover/screenshots/README.md',
   '.github/CODEOWNERS',
   '.github/dependabot.yml',
   '.github/PULL_REQUEST_TEMPLATE.md',
@@ -40,6 +59,9 @@ if (!packageJson.scripts?.['provider:credentials:check']) {
 if (!packageJson.scripts?.['progress:verify']) {
   failures.push('package.json is missing progress:verify');
 }
+if (!packageJson.scripts?.['loading:check']) {
+  failures.push('package.json is missing loading:check');
+}
 if (!packageJson.scripts?.['live:verify']) {
   failures.push('package.json is missing live:verify');
 }
@@ -49,8 +71,14 @@ if (!packageJson.scripts?.['demo:verify-clean']) {
 if (!packageJson.scripts?.['pricing:logic:coverage']) {
   failures.push('package.json is missing pricing:logic:coverage');
 }
+if (!packageJson.scripts?.['handover:check']) {
+  failures.push('package.json is missing handover:check');
+}
 if (!packageJson.scripts?.['theme:hex:check']) {
   failures.push('package.json is missing theme:hex:check');
+}
+if (!packageJson.scripts?.['overlay:check']) {
+  failures.push('package.json is missing overlay:check');
 }
 if (!packageJson.scripts?.['ci:unit']?.includes('npm run pricing:logic:coverage')) {
   failures.push('package.json ci:unit script must include npm run pricing:logic:coverage');
@@ -58,11 +86,20 @@ if (!packageJson.scripts?.['ci:unit']?.includes('npm run pricing:logic:coverage'
 if (!packageJson.scripts?.check?.includes('npm run theme:hex:check')) {
   failures.push('package.json check script must include npm run theme:hex:check');
 }
+if (!packageJson.scripts?.check?.includes('npm run overlay:check')) {
+  failures.push('package.json check script must include npm run overlay:check');
+}
 if (!packageJson.scripts?.check?.includes('npm run provider:credentials:check')) {
   failures.push('package.json check script must include npm run provider:credentials:check');
 }
 if (!packageJson.scripts?.check?.includes('npm run progress:verify')) {
   failures.push('package.json check script must include npm run progress:verify');
+}
+if (!packageJson.scripts?.check?.includes('npm run loading:check')) {
+  failures.push('package.json check script must include npm run loading:check');
+}
+if (!packageJson.scripts?.check?.includes('npm run handover:check')) {
+  failures.push('package.json check script must include npm run handover:check');
 }
 
 assertScriptIncludes('test:production-readiness', [
@@ -88,7 +125,68 @@ await assertFileContains('README.md', [
   ],
   ['anonymous usage remains available', 'Anonymous users can still'],
   ['provider credential documentation link', 'docs/PROVIDER-CREDENTIALS.md'],
+  ['handover documentation link', 'docs/CUSTOMER-HANDOVER-LEDGER.md'],
+  ['handover package link', 'handover/HANDOVER-README.md'],
+  ['handover excellence report link', 'HANDOVER-EXCELLENCE-REPORT.md'],
   ['open-source launch documentation link', 'docs/development/open-source-readiness.md'],
+]);
+
+await assertFileContains('HANDOVER-CENSUS.md', [
+  ['route and screen census', '## Route And Screen Census'],
+  ['shared component census', '## Shared Component Census'],
+  ['wiring census', '## Wiring Census'],
+]);
+
+await assertFileContains('HANDOVER-EXCELLENCE-REPORT.md', [
+  ['census summary', '## Census Summary'],
+  ['pass findings', '## Pass Findings'],
+  ['competitor teardown', '## Competitor Teardown'],
+  ['blocked section', '## Blocked'],
+  ['human decision gate register', '## HUMAN_DECISION_GATE Register'],
+]);
+
+await assertFileContains('handover/HANDOVER-README.md', [
+  ['run modes', '## Run Modes'],
+  ['environment matrix', '## Environment Matrix'],
+  ['repository map', '## Repository Map'],
+]);
+
+await assertFileContains('docs/CUSTOMER-HANDOVER-LEDGER.md', [
+  ['customer handover verdict', 'private customer/demo handover'],
+  ['phase classification table', '## Phase Classification'],
+  ['eleven-lens audit table', '## Eleven-Lens Audit'],
+  ['mock and dummy inventory', '## Mock And Dummy Inventory'],
+  ['blocked or deferred section', '## Blocked Or Deferred'],
+]);
+
+await assertFileContains('docs/HOW-TO-USE.md', [
+  ['customer demo command', 'npm run demo:up'],
+  ['diagram input paths', 'Diagram mode'],
+  ['Terraform starter bundle workflow', 'Terraform Starter Bundles'],
+]);
+
+await assertFileContains('docs/DEPLOYMENT.md', [
+  ['deployment health checks', '/health/ready'],
+  ['real provider rehearsal', 'Real Provider Pricing Rehearsal'],
+  ['backup and restore guidance', 'Backups And Restore'],
+]);
+
+await assertFileContains('docs/RUNBOOK.md', [
+  ['service objectives', '## Service Objectives'],
+  ['pricing stale incident', 'Incident: Pricing Data Is Stale Or Missing'],
+  ['GitHub Actions runner blocker', 'runner_id'],
+]);
+
+await assertFileContains('docs/COMPARISON.md', [
+  ['Infracost comparison', 'Infracost'],
+  ['Cloudability comparison', 'IBM Cloudability'],
+  ['source limitation', 'Source limitation'],
+]);
+
+await assertFileContains('docs/ARCHITECTURE.md', [
+  ['architecture extension points', '## Extending A Provider Adapter'],
+  ['Terraform extension points', '## Extending Terraform Generation'],
+  ['known boundaries', '## Known Architecture Boundaries'],
 ]);
 
 await assertFileContains('docs/PROVIDER-CREDENTIALS.md', [
@@ -128,6 +226,24 @@ await assertFileContains('RELEASE-CHECKLIST.md', [
   ['unit coverage command', 'npm run ci:unit'],
   ['pricing logic coverage command', 'npm run pricing:logic:coverage'],
   ['Node 24 impeccable decision', 'On Node 24, run `npm run impeccable`'],
+  ['overlay/button guard command', 'npm run overlay:check'],
+]);
+
+await assertFileContains('OVERLAY-AUDIT-REPORT.md', [
+  ['finding register', '## Findings'],
+  ['blocked section', '## Blocked'],
+  ['human decision gate', '## HUMAN_DECISION_GATE Register'],
+  ['keyboard evidence', 'Keyboard/focus verification'],
+]);
+
+await assertFileContains('OVERLAY-INVENTORY.md', [
+  ['canonical overlay primitive', 'OverlayPrimitives'],
+  ['window confirm status', 'window.confirm/window.alert'],
+]);
+
+await assertFileContains('BUTTON-INVENTORY.md', [
+  ['shared button component', 'Button.tsx'],
+  ['primary convention', 'Primary-button convention'],
 ]);
 
 await assertFileContains('docs/development/open-source-readiness.md', [
@@ -157,6 +273,18 @@ await assertFileContains('docs/verification/full-progress-ledger.md', [
   ['mock verification distinction', 'verified (mock)'],
   ['blocked CI runner evidence', 'runner_id: 0'],
   ['honest release verdict', 'not yet a full invoice-grade billing platform'],
+]);
+
+await assertFileContains('LOADING-INVENTORY.md', [
+  ['loading inventory table', 'Cold SPA boot'],
+  ['loading export inventory', 'Export PDF/CSV/Excel'],
+  ['loading honesty note', 'No time-based fake progress was added'],
+]);
+
+await assertFileContains('LOADING-AUDIT-REPORT.md', [
+  ['loading findings table', '## Findings And Disposition'],
+  ['loading blocked section', '## Blocked'],
+  ['loading human gate register', '## HUMAN_DECISION_GATE'],
 ]);
 
 await assertFileContains('.github/workflows/ci.yml', [

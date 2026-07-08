@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { configuredApiBaseUrl } from '../api-client';
 import { Button } from './Button';
+import { LoadingStatus, Skeleton } from './LoadingExperience';
 import { hourlyFromMonthly } from '../cost-time';
 import {
   ComparisonLineItem,
@@ -522,15 +523,16 @@ function EngineeringPersonaView({
               {sortKeyLabel(sortKey)} ({sortDirection === 'asc' ? 'ascending' : 'descending'}).
             </span>
             {rows.length > ENGINEERING_TABLE_PAGE_SIZE ? (
-              <button
+              <Button
                 type="button"
-                className="inline-flex min-h-9 items-center justify-center rounded-md border border-border-strong bg-surface-1 px-3 text-xs font-semibold text-text-primary transition hover:bg-surface-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
+                variant="secondary"
+                size="compact"
                 onClick={() => setShowAllRows((current) => !current)}
               >
                 {showAllRows
                   ? `Collapse to top ${ENGINEERING_TABLE_PAGE_SIZE}`
                   : `Show all rows${hiddenRowCount > 0 ? ` (${hiddenRowCount} more)` : ''}`}
-              </button>
+              </Button>
             ) : null}
           </div>
         ) : null}
@@ -614,15 +616,10 @@ function EngineeringRowsEmptyState({
         aria-busy="true"
         role="status"
       >
-        <span
-          className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-action-primary motion-reduce:animate-none"
-          aria-hidden="true"
+        <LoadingStatus
+          title="Building engineering rows"
+          detail="Mapping AWS, Azure, and GCP line items into provider, region, SKU, and monthly cost evidence."
         />
-        <strong className="text-text-primary">Building engineering rows</strong>
-        <span>
-          Mapping AWS, Azure, and GCP line items into provider, region, SKU, and monthly cost
-          evidence.
-        </span>
       </div>
     );
   }
@@ -635,13 +632,9 @@ function EngineeringRowsEmptyState({
           No services match your filters
         </strong>
         <span>Clear the tag filter to restore every mapped service row in this comparison.</span>
-        <button
-          type="button"
-          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border-strong bg-surface-1 px-4 py-2 text-sm font-semibold text-text-primary transition hover:bg-surface-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
-          onClick={onClearFilters}
-        >
+        <Button type="button" variant="secondary" onClick={onClearFilters}>
           Clear filters
-        </button>
+        </Button>
       </div>
     );
   }
@@ -746,27 +739,14 @@ function SharedComparisonState({
         role="status"
       >
         <div className="flex items-start gap-3 rounded-lg border border-border bg-surface-1 p-4 sm:col-span-3">
-          <span
-            className="mt-0.5 h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-border border-t-action-primary motion-reduce:animate-none"
-            aria-hidden="true"
+          <LoadingStatus
+            title="Refreshing pricing evidence"
+            detail="Mapping provider SKUs, totals, export links, and engineering rows from the backend response."
           />
-          <div>
-            <strong className="block text-sm text-text-primary">
-              Pricing evidence is being refreshed.
-            </strong>
-            <span className="mt-1 block text-sm text-text-secondary">
-              Mapping provider SKUs, totals, export links, and engineering rows from the backend
-              response.
-            </span>
-          </div>
         </div>
-        {[0, 1, 2].map((item) => (
-          <div
-            key={item}
-            className="h-24 animate-pulse rounded-lg border border-border bg-surface-1 motion-reduce:animate-none"
-            aria-hidden="true"
-          />
-        ))}
+        <div className="sm:col-span-3">
+          <Skeleton.Grid cards={3} />
+        </div>
       </div>
     );
   }
@@ -897,21 +877,20 @@ function SortableHeader({
         .filter(Boolean)
         .join(' ')}
     >
-      <button
+      <Button
         type="button"
         onClick={() => onSort(sortKey)}
         aria-label={description ? `${label}: ${description}` : label}
         title={description}
-        className={[
-          'inline-flex min-h-11 items-center gap-1 rounded-md px-2 text-xs font-semibold uppercase tracking-wide text-text-muted transition hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary',
-          alignRight ? 'ml-auto justify-end' : undefined,
-        ]
+        variant="ghost"
+        size="compact"
+        className={['uppercase text-text-muted', alignRight ? 'ml-auto justify-end' : undefined]
           .filter(Boolean)
           .join(' ')}
       >
         {label}
         <span aria-hidden="true">{isActive ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}</span>
-      </button>
+      </Button>
     </th>
   );
 }

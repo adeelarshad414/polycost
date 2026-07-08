@@ -2116,7 +2116,7 @@ describe('ComparisonView', () => {
     );
     await act(async () => undefined);
 
-    expect(text(container)).toContain('Pricing evidence is being refreshed.');
+    expect(text(container)).toContain('Refreshing pricing evidence');
     expect(text(container)).toContain(
       'Mapping provider SKUs, totals, export links, and engineering rows from the backend response.',
     );

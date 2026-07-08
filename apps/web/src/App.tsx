@@ -5,6 +5,14 @@ import { formatApiError, PolyCostClient, PolyCostApiError, polyCostClient } from
 import { POLYCOST_TAGLINE } from './brand';
 import { Button, ProviderBadge } from './components/Button';
 import { FinOpsFeatureLayer, SharedReportPlaceholder } from './components/FinOpsFeatureLayer';
+import {
+  BootSplash,
+  LoadingStatus,
+  SessionLoader,
+  TaskQueue,
+  type LoadingStep,
+  type TaskQueueItem,
+} from './components/LoadingExperience';
 import { PersonaComparisonWorkspace } from './components/PersonaComparisonWorkspace';
 import { ThemeSwitcher } from './components/ThemeSwitcher';
 import { TopLoadingBar } from './components/TopLoadingBar';
@@ -739,6 +747,7 @@ interface AppProps {
 export function App({ client = polyCostClient }: AppProps) {
   const shareToken = shareTokenFromLocation();
   const isPageLoading = usePageLoadingState();
+  const isBooting = useInitialBootState();
   const activeAsyncActionId = useRef(0);
   const initialRequirementSession = useRef(readStoredRequirementSession()).current;
   const [themeChoice, setThemeChoice] = useState<ThemeChoice>(() => storedTheme());
@@ -1679,6 +1688,10 @@ export function App({ client = polyCostClient }: AppProps) {
       className={hasComparison ? 'app-shell' : 'app-shell app-shell-minimal'}
       aria-labelledby="page-title"
     >
+      <a className="skip-link" href="#requirements">
+        Skip to comparison workspace
+      </a>
+      <BootSplash active={isBooting} />
       <TopLoadingBar isLoading={isPageLoading} />
       {hasComparison ? <ScrollProgressBar /> : null}
       <AppHeader
@@ -1862,6 +1875,17 @@ function usePageLoadingState(): boolean {
   return isPageLoading;
 }
 
+function useInitialBootState(): boolean {
+  const [isBooting, setIsBooting] = useState(true);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setIsBooting(false));
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  return isBooting;
+}
+
 function ScrollProgressBar() {
   const [progress, setProgress] = useState(0);
   const percent = Math.round(progress * 100);
@@ -1930,7 +1954,10 @@ function WorkspaceControlCenter({
   const [newTeamName, setNewTeamName] = useState('Platform cost office');
   const [teamSettingsName, setTeamSettingsName] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
+  const [isSessionHydrating, setIsSessionHydrating] = useState(Boolean(initialStoredAuth.token));
   const [workspaceBusy, setWorkspaceBusy] = useState<string | null>(null);
+  const [isWorkspaceDirectoryLoading, setIsWorkspaceDirectoryLoading] = useState(false);
+  const [workspaceDirectoryError, setWorkspaceDirectoryError] = useState<string | null>(null);
   const [members, setMembers] = useState<TeamMemberRecord[]>([]);
   const [invitations, setInvitations] = useState<TeamInvitationRecord[]>([]);
   const [accountSessions, setAccountSessions] = useState<AccountSessionRecord[]>([]);
@@ -1970,6 +1997,25 @@ function WorkspaceControlCenter({
   const reconciliationSummary = reconciliation
     ? reconciliationEvidenceSummary(reconciliation)
     : null;
+  const sessionHydrationSteps: LoadingStep[] = [
+    { id: 'stored-token', label: 'Reading stored session', state: 'done' },
+    { id: 'verify-session', label: 'Verifying workspace access', state: 'active' },
+    { id: 'prepare-workspace', label: 'Preparing account controls', state: 'pending' },
+  ];
+  const workspaceDirectorySteps: LoadingStep[] = [
+    { id: 'session', label: 'Workspace session verified', state: 'done' },
+    {
+      id: 'team-directory',
+      label: 'Syncing team directory',
+      state: workspaceDirectoryError ? 'failed' : isWorkspaceDirectoryLoading ? 'active' : 'done',
+      detail: workspaceDirectoryError ?? undefined,
+    },
+    {
+      id: 'sso-readiness',
+      label: 'Checking SSO readiness',
+      state: workspaceDirectoryError ? 'pending' : isWorkspaceDirectoryLoading ? 'pending' : 'done',
+    },
+  ];
 
   useEffect(() => {
     if (!landingInviteToken) {
@@ -2002,6 +2048,7 @@ function WorkspaceControlCenter({
   useEffect(() => {
     if (!token) {
       setSession(null);
+      setIsSessionHydrating(false);
       setMembers([]);
       setInvitations([]);
       setAccountSessions([]);
@@ -2011,6 +2058,7 @@ function WorkspaceControlCenter({
 
     let isMounted = true;
 
+    setIsSessionHydrating(true);
     void client
       .getCurrentSession(token)
       .then((currentSession) => {
@@ -2037,6 +2085,11 @@ function WorkspaceControlCenter({
         setAccountSessions([]);
         setSessionExpiredNotice(isSessionExpiredError(sessionError));
         onError(formatApiError(sessionError));
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsSessionHydrating(false);
+        }
       });
 
     return () => {
@@ -2076,6 +2129,8 @@ function WorkspaceControlCenter({
 
   useEffect(() => {
     if (!token || !activeTeam || !canManageTeam) {
+      setIsWorkspaceDirectoryLoading(false);
+      setWorkspaceDirectoryError(null);
       setMembers([]);
       setInvitations([]);
       setSsoStatus(null);
@@ -2084,6 +2139,8 @@ function WorkspaceControlCenter({
 
     let isMounted = true;
 
+    setIsWorkspaceDirectoryLoading(true);
+    setWorkspaceDirectoryError(null);
     void Promise.all([
       client.listTeamMembers(activeTeam.id, token),
       client.listTeamInvitations(activeTeam.id, token),
@@ -2097,10 +2154,18 @@ function WorkspaceControlCenter({
         setMembers(nextMembers);
         setInvitations(nextInvitations);
         setSsoStatus(nextSsoStatus);
+        setWorkspaceDirectoryError(null);
       })
       .catch((workspaceError) => {
         if (isMounted) {
-          onError(formatApiError(workspaceError));
+          const message = formatApiError(workspaceError);
+          setWorkspaceDirectoryError(message);
+          onError(message);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsWorkspaceDirectoryLoading(false);
         }
       });
 
@@ -2719,7 +2784,13 @@ function WorkspaceControlCenter({
               </span>
             </div>
           ) : null}
-          {session ? (
+          {isSessionHydrating && token && !session ? (
+            <SessionLoader
+              compact
+              phase="Verifying workspace access"
+              steps={sessionHydrationSteps}
+            />
+          ) : session ? (
             <div className="workspace-session-summary">
               <span>{session.account.displayName ?? session.account.email}</span>
               <strong>
@@ -2917,6 +2988,23 @@ function WorkspaceControlCenter({
           </div>
           {canManageTeam && activeTeam && session && token ? (
             <>
+              {isWorkspaceDirectoryLoading || workspaceDirectoryError ? (
+                <SessionLoader
+                  compact
+                  identity={{
+                    name: session.account.displayName ?? session.account.email,
+                    detail: `${activeTeam.name} · ${activeTeam.role}`,
+                  }}
+                  phase={
+                    workspaceDirectoryError
+                      ? 'Workspace sync needs attention'
+                      : 'Syncing team access'
+                  }
+                  steps={workspaceDirectorySteps}
+                  trustCue={Boolean(token && session)}
+                  error={workspaceDirectoryError}
+                />
+              ) : null}
               <form className="workspace-inline-form" onSubmit={handleCreateTeam}>
                 <label className="workspace-field">
                   <span>New team</span>
@@ -3034,8 +3122,10 @@ function WorkspaceControlCenter({
                         <option value="admin">Admin</option>
                         <option value="member">Member</option>
                       </select>
-                      <button
+                      <Button
                         type="button"
+                        variant="destructiveQuiet"
+                        size="compact"
                         className="workspace-link-button"
                         aria-label={`Remove ${member.email}`}
                         disabled={removeControl.disabled}
@@ -3043,7 +3133,7 @@ function WorkspaceControlCenter({
                         onClick={() => void handleRemoveMember(member.accountId)}
                       >
                         Remove
-                      </button>
+                      </Button>
                     </div>
                   );
                 })}
@@ -3060,14 +3150,16 @@ function WorkspaceControlCenter({
                           {invitation.role} invite · expires {formatDateTime(invitation.expiresAt)}
                         </small>
                       </span>
-                      <button
+                      <Button
                         type="button"
+                        variant="destructiveQuiet"
+                        size="compact"
                         className="workspace-link-button"
                         disabled={workspaceBusy === `revoke-invite-${invitation.id}`}
                         onClick={() => void handleRevokeInvitation(invitation.id)}
                       >
                         Revoke
-                      </button>
+                      </Button>
                     </div>
                   ))}
               </div>
@@ -4425,7 +4517,7 @@ function RequirementSummaryStrip({
         <Button type="button" variant="secondary" onClick={onEdit}>
           Edit
         </Button>
-        <Button type="button" variant="destructive" onClick={onClear}>
+        <Button type="button" variant="destructiveQuiet" onClick={onClear}>
           Clear
         </Button>
       </div>
@@ -4460,6 +4552,7 @@ function ResultQuickActions({
   ).length;
   const scenarioLabel = pricingModelSummaryLabel(pricingModel);
   const intervalLabel = capitalize(interval);
+  const taskItems = quickActionTaskItems(busyAction, exportingFormat, completedExportFormat);
 
   return (
     <section className="result-quick-actions" aria-label="Comparison quick actions">
@@ -4496,8 +4589,50 @@ function ResultQuickActions({
           Refresh live catalog
         </Button>
       </div>
+      <TaskQueue items={taskItems} />
     </section>
   );
+}
+
+function quickActionTaskItems(
+  busyAction: BusyAction,
+  exportingFormat: ReportFormat | null,
+  completedExportFormat: ReportFormat | null,
+): TaskQueueItem[] {
+  if (busyAction === 'refresh') {
+    return [
+      {
+        id: 'refresh-live-catalog',
+        label: 'Refresh live catalog',
+        status: 'running',
+        phase: 'Refreshing traceable catalog rows and recomputing the saved workload',
+      },
+    ];
+  }
+
+  if (busyAction === 'export' && exportingFormat) {
+    return [
+      {
+        id: `export-${exportingFormat}`,
+        label: `Generate ${exportingFormat.toUpperCase()} report`,
+        status: 'running',
+        phase: 'Waiting for the report export job to complete',
+      },
+    ];
+  }
+
+  if (completedExportFormat) {
+    return [
+      {
+        id: `export-${completedExportFormat}-completed`,
+        label: `${completedExportFormat.toUpperCase()} report`,
+        status: 'completed',
+        phase: 'Downloaded to this browser session',
+      },
+    ];
+  }
+
+  return [];
 }
 
 function StateDetailContent({
@@ -5209,7 +5344,7 @@ function DiagramImportPanel({
         </Button>
         <Button
           type="button"
-          variant="destructive"
+          variant="destructiveQuiet"
           onClick={onClear}
           disabled={isParsing || value.length === 0}
         >
@@ -5304,13 +5439,15 @@ function DiagramReviewPanel({
               <em>{component.assumedDefaults.slice(0, 2).join(', ')}</em>
             ) : null}
             <em>{component.evidence}</em>
-            <button
+            <Button
               type="button"
+              variant="destructiveQuiet"
+              size="compact"
               className="diagram-review-link-button"
               onClick={() => onRemoveComponent(component.nodeId)}
             >
               Remove
-            </button>
+            </Button>
           </article>
         ))}
       </div>
@@ -5561,7 +5698,7 @@ function DescribePanel({
         </Button>
         <Button
           type="button"
-          variant="destructive"
+          variant="destructiveQuiet"
           onClick={onClear}
           disabled={isParsing || value.length === 0}
         >
@@ -7035,9 +7172,15 @@ function ComparisonHistoryPanel({
           <span>Recent comparisons</span>
           <strong>Resume a saved workload shape</strong>
         </div>
-        <button type="button" className="comparison-history-clear" onClick={onClear}>
+        <Button
+          type="button"
+          variant="destructiveQuiet"
+          size="compact"
+          className="comparison-history-clear"
+          onClick={onClear}
+        >
           Clear history
-        </button>
+        </Button>
       </div>
       <div className="comparison-history-list">
         {entries.map((entry) => (
@@ -7641,14 +7784,16 @@ function BulkServiceImporter({
               </tbody>
             </table>
           </div>
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="compact"
             className="bulk-service-add"
             disabled={matchedRows.length === 0}
             onClick={addMatchedRows}
           >
             Add matched services
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -7707,9 +7852,14 @@ function BulkServiceImporter({
                         />
                       </td>
                       <td>
-                        <button type="button" onClick={() => removeRow(row.id)}>
+                        <Button
+                          type="button"
+                          variant="destructiveQuiet"
+                          size="compact"
+                          onClick={() => removeRow(row.id)}
+                        >
                           Remove
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                   );
@@ -11660,9 +11810,10 @@ function PricingEvidencePanel({
 
       {isLoading ? (
         <div className="pricing-evidence-loading" role="status">
-          <span className="pricing-evidence-spinner" aria-hidden="true" />
-          <strong>Syncing pricing evidence</strong>
-          <small>Reading stored lineage from the comparison API.</small>
+          <LoadingStatus
+            title="Syncing pricing evidence"
+            detail="Reading stored lineage from the comparison API."
+          />
         </div>
       ) : null}
 
