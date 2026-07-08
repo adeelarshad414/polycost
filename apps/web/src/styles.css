@@ -2410,6 +2410,7 @@ summary:focus-visible,
 .workspace-member-row small,
 .workspace-empty-state,
 .workspace-token-output,
+.workspace-delivery-output,
 .workspace-sso-status small,
 .workspace-reconciliation-result small {
   margin: 0;
@@ -2453,6 +2454,19 @@ summary:focus-visible,
   border-left: 3px solid var(--brand-green);
   background: color-mix(in srgb, var(--brand-green) 8%, transparent);
   padding: 8px 10px;
+}
+
+.workspace-delivery-output {
+  overflow-wrap: anywhere;
+  border-left: 3px solid var(--brand-blue);
+  background: color-mix(in srgb, var(--brand-blue) 8%, transparent);
+  font-weight: 700;
+  padding: 8px 10px;
+}
+
+.workspace-delivery-output.is-failed {
+  border-left-color: var(--pc-danger);
+  background: color-mix(in srgb, var(--pc-danger) 8%, transparent);
 }
 
 .workspace-sso-status,

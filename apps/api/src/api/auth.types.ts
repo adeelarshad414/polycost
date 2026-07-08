@@ -29,6 +29,15 @@ export interface TeamInvitationRecord {
   revokedAt?: string;
   inviteToken?: string;
   inviteUrl?: string;
+  delivery?: TeamInvitationDeliveryReceipt;
+}
+
+export interface TeamInvitationDeliveryReceipt {
+  mode: 'panel' | 'webhook';
+  status: 'not_configured' | 'accepted' | 'failed';
+  message: string;
+  tokenExposedInResponse: boolean;
+  deliveredAt?: string;
 }
 
 export interface TeamInvitationPreview {

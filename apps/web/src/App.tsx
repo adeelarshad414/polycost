@@ -1972,6 +1972,9 @@ function WorkspaceControlCenter({
   const [inviteRole, setInviteRole] = useState<Exclude<TeamRole, 'owner'>>('member');
   const [lastInviteToken, setLastInviteToken] = useState<string | null>(null);
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null);
+  const [lastInviteDelivery, setLastInviteDelivery] = useState<
+    TeamInvitationRecord['delivery'] | null
+  >(null);
   const [landingInviteToken] = useState(() => readInviteTokenFromUrl());
   const [acceptToken, setAcceptToken] = useState(landingInviteToken);
   const [invitePreview, setInvitePreview] = useState<TeamInvitationPreview | null>(null);
@@ -2495,9 +2498,8 @@ function WorkspaceControlCenter({
       ]);
       setLastInviteToken(invitation.inviteToken ?? null);
       setLastInviteUrl(invitation.inviteUrl ?? null);
-      onNotice(
-        'Invitation created. The one-time token is shown in the workspace panel for this demo.',
-      );
+      setLastInviteDelivery(invitation.delivery ?? null);
+      onNotice(inviteDeliveryNotice(invitation, 'created'));
     } catch (inviteError) {
       onError(formatApiError(inviteError));
     } finally {
@@ -2575,9 +2577,8 @@ function WorkspaceControlCenter({
       ]);
       setLastInviteToken(invitation.inviteToken ?? null);
       setLastInviteUrl(invitation.inviteUrl ?? null);
-      onNotice(
-        'Invitation token refreshed. Share the new one-time link from this workspace panel.',
-      );
+      setLastInviteDelivery(invitation.delivery ?? null);
+      onNotice(inviteDeliveryNotice(invitation, 'refreshed'));
     } catch (inviteError) {
       onError(formatApiError(inviteError));
     } finally {
@@ -3166,6 +3167,14 @@ function WorkspaceControlCenter({
                   {lastInviteUrl ? ` · URL: ${lastInviteUrl}` : ''}
                 </p>
               ) : null}
+              {lastInviteDelivery ? (
+                <p className={`workspace-delivery-output is-${lastInviteDelivery.status}`}>
+                  Delivery: {lastInviteDelivery.message}
+                  {lastInviteDelivery.deliveredAt
+                    ? ` · ${formatDateTime(lastInviteDelivery.deliveredAt)}`
+                    : ''}
+                </p>
+              ) : null}
               <div className="workspace-member-list">
                 {members.map((member) => {
                   const roleControl = memberRoleControlState({
@@ -3627,6 +3636,25 @@ function teamRoleLabel(role: TeamRole): string {
     case 'member':
       return 'Member';
   }
+}
+
+function inviteDeliveryNotice(
+  invitation: TeamInvitationRecord,
+  action: 'created' | 'refreshed',
+): string {
+  if (invitation.delivery?.status === 'accepted') {
+    return `Invitation ${action}; delivery provider accepted the invite.`;
+  }
+
+  if (invitation.delivery?.status === 'failed') {
+    return `Invitation ${action}, but delivery failed. Fix delivery settings and resend the invite.`;
+  }
+
+  if (invitation.inviteToken) {
+    return `Invitation ${action}. The one-time token is shown in the workspace panel for this demo.`;
+  }
+
+  return `Invitation ${action}.`;
 }
 
 function AppHeader({

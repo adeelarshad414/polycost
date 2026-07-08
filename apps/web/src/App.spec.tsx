@@ -303,6 +303,41 @@ describe('App', () => {
     unmount();
   });
 
+  it('shows invite delivery status when webhook delivery hides raw tokens', async () => {
+    window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
+    const client = clientMock({
+      inviteTeamMember: jest.fn(async (_teamId, input) => ({
+        id: '99999999-9999-4999-8999-999999999999',
+        teamId: '22222222-2222-4222-8222-222222222222',
+        email: input.email,
+        role: input.role,
+        status: 'pending' as const,
+        invitedByAccountId: '11111111-1111-4111-8111-111111111111',
+        expiresAt: '2026-07-13T00:00:00.000Z',
+        createdAt: '2026-07-06T00:00:00.000Z',
+        delivery: {
+          mode: 'webhook' as const,
+          status: 'accepted' as const,
+          message: 'Invite delivery webhook accepted the invitation.',
+          tokenExposedInResponse: false,
+          deliveredAt: '2026-07-06T00:00:01.000Z',
+        },
+      })),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await settleAsyncEffects();
+    await settleAsyncEffects();
+
+    await changeInput(inputByWorkspaceLabel(container, 'Invite email'), 'delivered@example.com');
+    await submitForm(formContainingText(container, 'Invite email'));
+
+    expect(text(container)).toContain('Delivery: Invite delivery webhook accepted the invitation.');
+    expect(text(container)).not.toContain('Invite token:');
+
+    unmount();
+  });
+
   it('executes account lifecycle, team settings, invite revoke, and SSO actions', async () => {
     window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
     const client = clientMock({

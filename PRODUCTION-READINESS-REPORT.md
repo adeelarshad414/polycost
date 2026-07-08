@@ -65,6 +65,7 @@ performance/accessibility/best-practices/SEO metrics.
 | UI-AUTH-002    | Improved      | Workspace billing panel now surfaces reconciliation readiness, source-fingerprint coverage, SKU match coverage, and the invoice-of-record caveat                                          |
 | UI-AUTH-003    | Improved      | Active workspace switching is now backend-backed, membership-checked, and exposed in the signed-in account panel                                                                          |
 | UI-AUTH-004    | Improved      | Pending/expired workspace invites can now be resent through a guarded backend route that rotates the stored token hash and exposes the refreshed one-time token only in the response      |
+| UI-AUTH-005    | Improved      | Invite delivery now has local panel mode plus production HTTPS webhook mode with HMAC signatures, production config guards, and browser-safe delivery receipts                            |
 | TF-GEN-001     | Added         | V3 Terraform generation endpoint and UI panel now generate AWS/Azure/GCP starter bundles from NWS with provider pinning, remote-state examples, static checks, and explicit caveats       |
 | TF-GEN-002     | Improved      | V3.1 hardening adds generation profiles, private database networking checks, runtime identity baselines, policy/test/Makefile artifacts, and module-boundary documentation                |
 | TF-GEN-003     | Improved      | V3.2 assurance adds generated CAF/WAF/Terraform framework-alignment evidence and topology-aware public/private ingress/load-balancer controls                                             |
@@ -128,6 +129,21 @@ Local static/regression gates:
     2 suites / 84 tests.
   - `npm run check` passed: API 51 suites / 405 tests; web 11 suites / 141 tests;
     graph validation 312 nodes / 312 edges; pricing coverage, progress
+    verification, QA/security suppression, database, DevOps, cloud, release,
+    handover, and provider credential gates passed.
+  - `npm run ci:build` passed; `npm audit --audit-level=high` passed with the
+    known low Graphify transitive advisory still present.
+- Phase 2.13 invite delivery webhook foundation passed:
+  - API focused: `src/api/invitation-delivery.service.spec.ts`,
+    `src/config/config.schema.spec.ts`, and `src/api/auth-billing.spec.ts`: 3
+    suites / 37 tests.
+  - Web focused: `src/App.spec.tsx` and `src/api-client.spec.ts`: 2 suites / 85
+    tests.
+  - `npm run ci:lint` passed with zero warnings/typecheck errors.
+  - `npm run test:production-readiness` passed: API 12 suites / 155 tests; web
+    2 suites / 85 tests.
+  - `npm run check` passed: API 52 suites / 411 tests; web 11 suites / 142 tests;
+    graph validation 314 nodes / 314 edges; pricing coverage, progress
     verification, QA/security suppression, database, DevOps, cloud, release,
     handover, and provider credential gates passed.
   - `npm run ci:build` passed; `npm audit --audit-level=high` passed with the

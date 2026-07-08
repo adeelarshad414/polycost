@@ -98,6 +98,8 @@ Health and operations:
 - Secrets are read through Vault-backed services.
 - Production/staging config rejects `CHANGE_ME_DEV_ONLY`, `dummy`, and `example`
   placeholder values.
+- Production/staging invite delivery must use a signed HTTPS webhook; local panel
+  token exposure is development/demo-only.
 - Anonymous comparison remains available, while team administration, billing import,
   SSO configuration, and protected account operations require sessions and RBAC.
 - Diagram input has size, entity, decompression, spoofed-file, and temp-file safety

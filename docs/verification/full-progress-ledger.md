@@ -273,6 +273,16 @@ Evidence:
 - Phase 2.12 command gates passed: lint/typecheck, production-readiness, build, and
   high-severity audit; npm still reports the known low Graphify transitive advisory
   with no available fix.
+- Phase 2.13 focused invite-delivery regressions passed: API `3` suites / `37`
+  tests (`invitation-delivery.service`, `config.schema`, `auth-billing`) and web
+  `2` suites / `85` tests (`App`, `api-client`).
+- Phase 2.13 full `npm run check` passed with API `52` suites / `411` tests, web
+  `11` suites / `142` tests, graph validation `314` nodes / `314` edges, pricing
+  coverage, progress verification, QA/security suppression, database, DevOps, cloud,
+  release, handover, and provider credential gates.
+- Phase 2.13 command gates passed: lint/typecheck, production-readiness, build, and
+  high-severity audit; npm still reports the known low Graphify transitive advisory
+  with no available fix.
 - Phase 2.10 full `npm run check` passed with API `51` suites / `403` tests, web
   `11` suites / `141` tests, graph validation `312` nodes / `312` edges, pricing
   coverage, progress verification, QA/security suppression, database, DevOps, cloud,

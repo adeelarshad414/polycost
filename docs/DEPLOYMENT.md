@@ -54,7 +54,7 @@ Start from `.env.example`. The most important runtime variables are:
 | Vault         | `VAULT_ADDR`, `VAULT_TOKEN_FILE`, optional `VAULT_NAMESPACE`              |
 | Pricing       | `USE_MOCK_PROVIDERS`, `PRICING_ETL_RUN_ON_BOOT`, provider default regions |
 | Jobs          | pricing, currency, alert, and share-link cleanup cron variables           |
-| Auth          | session TTL, registration toggle, lockout, SSO state secret               |
+| Auth          | session TTL, registration, lockout, SSO, invite delivery mode/webhook     |
 | Rate limits   | auth, parse, diagram, compare, export, share, live-refresh limits         |
 | LLM hooks     | natural-language and diagram classifier endpoint/model variables          |
 

@@ -102,6 +102,7 @@ say so explicitly rather than marking it done.
 | Phase 2.10 - Billing export mapper hardening            | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.11 - Workspace active team switching            | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.12 - Workspace invitation resend lifecycle      | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.13 - Invite delivery webhook foundation         | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -115,6 +116,51 @@ say so explicitly rather than marking it done.
 | Browser audit artifact hardening                        | Complete with known gaps (see notes) | 2026-07-08   |
 | Formal browser audit tooling                            | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3.5 - Terraform bundle integrity validation      | Complete with known gaps (see notes) | 2026-07-08   |
+
+## Phase 2.13 - Invite delivery webhook foundation
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-08
+
+What changed:
+
+- Added `InvitationDeliveryService` with local/demo panel mode and production
+  webhook mode for team invite delivery.
+- Added HMAC-SHA256 signed webhook payloads carrying the invite URL to an external
+  delivery provider without logging or storing raw invite tokens.
+- Added staging/production config guards requiring `AUTH_INVITE_DELIVERY_MODE=webhook`,
+  an HTTPS webhook URL, and a non-dummy signing secret before workspace invites are
+  production-ready.
+- Updated invite create/resend responses so webhook mode reports delivery status
+  while withholding raw invite tokens from the browser.
+- Added workspace UI delivery-status messaging for accepted/failed delivery provider
+  responses.
+- Updated `.env.example`, README, deployment/runbook, architecture, and dummy-value
+  docs for invite delivery operations.
+
+Verification performed:
+
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/api/invitation-delivery.service.spec.ts src/config/config.schema.spec.ts src/api/auth-billing.spec.ts`
+  passed: 3 suites / 37 tests.
+- `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx src/api-client.spec.ts`
+  passed: 2 suites / 85 tests.
+- `npm run ci:lint` passed with zero ESLint/typecheck errors.
+- `npm run test:production-readiness` passed: API 12 suites / 155 tests and web
+  2 suites / 85 tests.
+- `npm run check` passed: API 52 suites / 411 tests, web 11 suites / 142 tests,
+  graph validation 314 nodes / 314 edges, pricing coverage, progress
+  verification, QA/security suppressions, database, DevOps, cloud, release,
+  handover, and provider credential gates.
+- `npm run ci:build` passed for API and web.
+- `npm audit --audit-level=high` passed; it still reports the documented low
+  transitive Graphify advisory with no available fix.
+
+Known remaining gaps:
+
+- PolyCost now has a production-safe invite delivery integration boundary, but not
+  built-in SMTP/provider-specific email templates, bounce handling, delivery
+  analytics, invite audit-log UI, SCIM provisioning, or full enterprise account
+  administration.
 
 ## Phase 2.12 - Workspace invitation resend lifecycle
 

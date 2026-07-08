@@ -170,10 +170,14 @@ Accounts add workspace controls on top of that core flow:
 - OIDC/SAML configuration readiness with redirect URI display, stored provider
   metadata, mock connection testing, and a signed mock OIDC start/callback flow in
   the workspace UI for development verification.
+- Invite delivery defaults to local/demo panel tokens. Staging and production require
+  `AUTH_INVITE_DELIVERY_MODE=webhook`, an HTTPS delivery URL, and an HMAC signing
+  secret; webhook mode sends the invite link to the delivery provider and does not
+  expose the raw token back to the browser.
 
 The current self-hosted product does not yet include enterprise IdP login round-trips,
-email delivery infrastructure, org billing plans, or a hosted account marketplace. Those
-remain release-track items rather than blockers for anonymous cost comparison.
+full email-template management, org billing plans, or a hosted account marketplace.
+Those remain release-track items rather than blockers for anonymous cost comparison.
 
 ## Session And Account Security
 
@@ -284,6 +288,10 @@ Start from `.env.example`. Important local settings include:
 - `AUTH_LOCAL_REGISTRATION_ENABLED`
 - `AUTH_PUBLIC_BASE_URL`
 - `AUTH_SSO_STATE_SECRET`
+- `AUTH_INVITE_DELIVERY_MODE`
+- `AUTH_INVITE_DELIVERY_WEBHOOK_URL`
+- `AUTH_INVITE_DELIVERY_WEBHOOK_SECRET`
+- `AUTH_INVITE_EMAIL_FROM`
 - `RATE_LIMIT_AUTH_PER_MINUTE`
 - `RATE_LIMIT_NL_PARSE_PER_MINUTE`
 - `RATE_LIMIT_LIVE_REFRESH_PER_MINUTE`
