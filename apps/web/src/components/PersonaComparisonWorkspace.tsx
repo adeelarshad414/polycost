@@ -138,7 +138,7 @@ export function PersonaComparisonWorkspace({
       {showViewSwitcher ? (
         <div className="flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-surface-1 p-3 shadow-sm md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
               View mode
             </p>
             <h2 className="mt-1 text-lg font-semibold text-text-primary">
@@ -344,7 +344,7 @@ function ExecutivePersonaView({
       <section className="rounded-lg border border-border bg-surface-1 p-4 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
               Recommendation
             </p>
             <h3 className="mt-2 text-xl font-semibold text-text-primary">
@@ -424,7 +424,7 @@ function EngineeringPersonaView({
       <div className="min-w-0 max-w-full overflow-hidden rounded-lg border border-border bg-surface-1 shadow-sm">
         <div className="w-full max-w-full overflow-x-auto">
           <table className="min-w-[860px] w-full border-collapse text-left text-sm">
-            <thead className="bg-surface-0 text-xs uppercase tracking-wide text-text-muted">
+            <thead className="bg-surface-0 text-xs uppercase tracking-wide text-text-secondary">
               <tr>
                 <SortableHeader
                   label="Resource name"
@@ -477,7 +477,7 @@ function EngineeringPersonaView({
                       className="sticky left-0 z-10 bg-surface-1 px-3 py-3 font-mono text-xs font-semibold text-text-primary shadow-[1px_0_0_var(--border)]"
                     >
                       <div>{row.resourceName}</div>
-                      <div className="mt-1 font-sans text-xs font-normal text-text-muted">
+                      <div className="mt-1 font-sans text-xs font-normal text-text-secondary">
                         {row.description}
                       </div>
                     </th>
@@ -491,7 +491,7 @@ function EngineeringPersonaView({
                     <td className="px-3 py-3 text-right font-semibold text-text-primary">
                       {formatCurrency(row.monthlyCost)}
                       {row.isApproximate ? (
-                        <span className="ml-2 rounded-full border border-border px-2 py-0.5 text-xs font-medium text-text-muted">
+                        <span className="ml-2 rounded-full border border-border px-2 py-0.5 text-xs font-medium text-text-secondary">
                           approx
                         </span>
                       ) : null}
@@ -554,7 +554,7 @@ function EngineeringPersonaView({
             ))}
           </select>
           {tagOptions.length === 0 ? (
-            <span className="text-xs font-normal text-text-muted">
+            <span className="text-xs font-normal text-text-secondary">
               Tag filtering is ready in the UI; the current API does not return tags yet.
             </span>
           ) : null}
@@ -588,7 +588,7 @@ function EngineeringPersonaView({
               API JSON
             </a>
           ) : (
-            <span className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-muted">
+            <span className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-secondary">
               {apiJsonPendingMessage}
             </span>
           )}
@@ -666,7 +666,7 @@ function EmptyServicesIllustration() {
     <svg
       viewBox="0 0 80 80"
       aria-hidden="true"
-      className="engineering-empty-illustration h-20 w-20 text-text-muted"
+      className="engineering-empty-illustration h-20 w-20 text-text-secondary"
       fill="none"
     >
       <rect x="17" y="18" width="46" height="42" rx="8" stroke="currentColor" strokeWidth="3" />
@@ -686,7 +686,7 @@ function NoResultsIllustration() {
     <svg
       viewBox="0 0 80 80"
       aria-hidden="true"
-      className="engineering-filter-empty-illustration h-20 w-20 text-text-muted"
+      className="engineering-filter-empty-illustration h-20 w-20 text-text-secondary"
       fill="none"
     >
       <path
@@ -808,7 +808,7 @@ function EmptyComparisonIllustration() {
     <svg
       viewBox="0 0 80 80"
       aria-hidden="true"
-      className="comparison-empty-illustration h-20 w-20 text-text-muted"
+      className="comparison-empty-illustration h-20 w-20 text-text-secondary"
       fill="none"
     >
       <path
@@ -837,7 +837,7 @@ function ExecutiveMetricCard({
 }) {
   return (
     <article className="rounded-lg border border-border bg-surface-1 p-4 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">{label}</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{label}</p>
       <strong className="mt-2 block text-2xl font-semibold text-text-primary">{value}</strong>
       <span className="mt-2 block text-sm text-text-secondary">{detail}</span>
     </article>
@@ -884,7 +884,7 @@ function SortableHeader({
         title={description}
         variant="ghost"
         size="compact"
-        className={['uppercase text-text-muted', alignRight ? 'ml-auto justify-end' : undefined]
+        className={['uppercase text-text-secondary', alignRight ? 'ml-auto justify-end' : undefined]
           .filter(Boolean)
           .join(' ')}
       >

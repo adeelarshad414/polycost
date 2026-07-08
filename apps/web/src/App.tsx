@@ -2923,14 +2923,11 @@ function WorkspaceControlCenter({
             </div>
           ) : (
             <form className="workspace-auth-form" onSubmit={handleAuthSubmit}>
-              <div
-                className="workspace-auth-toggle"
-                role="tablist"
-                aria-label="Authentication mode"
-              >
+              <div className="workspace-auth-toggle" role="group" aria-label="Authentication mode">
                 <button
                   type="button"
                   className={authMode === 'login' ? 'is-active' : ''}
+                  aria-pressed={authMode === 'login'}
                   onClick={() => setAuthMode('login')}
                 >
                   Sign in
@@ -2938,6 +2935,7 @@ function WorkspaceControlCenter({
                 <button
                   type="button"
                   className={authMode === 'register' ? 'is-active' : ''}
+                  aria-pressed={authMode === 'register'}
                   onClick={() => setAuthMode('register')}
                 >
                   Register
@@ -9525,7 +9523,7 @@ function ProviderMixDonut({ data }: { data: ProviderMixDatum[] }) {
 
   return (
     <div className="provider-mix-layout">
-      <div className="provider-mix-chart-shell" aria-hidden="true">
+      <div className="provider-mix-chart-shell" role="img" aria-label="Provider cost mix chart">
         <PieChart width={220} height={220}>
           <Pie
             data={data}
@@ -10092,7 +10090,11 @@ function RegionVariancePanel({ rows }: { rows: RegionVarianceRow[] }) {
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap region-variance-wrap">
+        <div
+          className="table-wrap region-variance-wrap"
+          tabIndex={0}
+          aria-label="Region variance monthly sensitivity table"
+        >
           <table className="ranking-table region-variance-table">
             <thead>
               <tr>
@@ -11429,7 +11431,11 @@ function FullCostMatrixTable({ comparison }: { comparison: ComparisonResult | nu
         </label>
       </div>
 
-      <div className="table-wrap cost-matrix-wrap">
+      <div
+        className="table-wrap cost-matrix-wrap"
+        tabIndex={0}
+        aria-label="Provider service cost matrix table"
+      >
         <table className="ranking-table cost-matrix-table">
           <thead>
             <tr>
@@ -16710,7 +16716,11 @@ function EngineeringProviderServiceChart({
 
       {hasData ? (
         <>
-          <div className="engineering-bar-chart-shell" aria-hidden="true">
+          <div
+            className="engineering-bar-chart-shell"
+            role="img"
+            aria-label={`${providerLabel(provider.providerId)} service cost breakdown chart`}
+          >
             <BarChart
               width={chartWidth}
               height={chartHeight}
@@ -17770,7 +17780,7 @@ function CategoryHeatmap({ summaries }: { summaries: ProviderCostSummary[] }) {
         <h3>Category Heatmap</h3>
         <span>Current view</span>
       </div>
-      <div className="heatmap-grid" role="table" aria-label="Provider category costs">
+      <div className="heatmap-grid" role="table" tabIndex={0} aria-label="Provider category costs">
         <div className="heatmap-row heatmap-head" role="row">
           <span role="columnheader">Category</span>
           {PROVIDER_ORDER.map((providerId) => (

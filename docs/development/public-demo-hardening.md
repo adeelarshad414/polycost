@@ -15,13 +15,13 @@ production enterprise identity management, or complete landing-zone Terraform.
 
 ## Public Demo Modes
 
-| Mode              | Command                          | Purpose                                                                              | Evidence                           |
-| ----------------- | -------------------------------- | ------------------------------------------------------------------------------------ | ---------------------------------- |
-| One-command demo  | `npm run demo:up`                | Clean local startup for reviewers                                                    | Health checks and seeded demo data |
-| Clean-clone proof | `npm run demo:verify-clean`      | Confirms a new clone can reach a running demo within the startup budget              | Timed verifier output              |
-| Demo artifacts    | `npm run demo:artifacts`         | Captures executive, engineering, mobile, and walkthrough artifacts                   | `docs/demo-artifacts/`             |
-| Browser audit     | `npm run browser:audit`          | Captures screenshots, reflow/zoom evidence, accessibility heuristics, and metrics    | `docs/browser-audit/`              |
-| Release guard     | `npm run public:readiness:check` | Verifies public-readiness docs, templates, security posture, and demo evidence hooks | Terminal pass/fail output          |
+| Mode              | Command                          | Purpose                                                                               | Evidence                           |
+| ----------------- | -------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------- |
+| One-command demo  | `npm run demo:up`                | Clean local startup for reviewers                                                     | Health checks and seeded demo data |
+| Clean-clone proof | `npm run demo:verify-clean`      | Confirms a new clone can reach a running demo within the startup budget               | Timed verifier output              |
+| Demo artifacts    | `npm run demo:artifacts`         | Captures executive, engineering, mobile, and walkthrough artifacts                    | `docs/demo-artifacts/`             |
+| Browser audit     | `npm run browser:audit`          | Captures screenshots, reflow/zoom evidence, axe accessibility, and Lighthouse metrics | `docs/browser-audit/`              |
+| Release guard     | `npm run public:readiness:check` | Verifies public-readiness docs, templates, security posture, and demo evidence hooks  | Terminal pass/fail output          |
 
 ## Repository Health Checklist
 
@@ -81,9 +81,9 @@ demo is running on a non-default host or port.
 
 ## Blocked Or Deferred
 
-- Fresh Lighthouse and axe matrices still need those exact packages before a public
-  launch claim with those tool names. `npm run browser:audit` records Playwright-native
-  browser evidence and marks Lighthouse/axe package availability honestly.
+- `npm run browser:audit` now runs formal axe-core and Lighthouse checks locally on
+  Node 20 using the deterministic browser-audit server. Keep refreshing
+  `docs/browser-audit/` before public demos so the dated evidence remains current.
 - Real provider, production SSO, production LLM, and Terraform provider validation
   require external credentials or a staging environment.
 - Hosted GitHub Actions must be able to allocate runners before remote CI is used as

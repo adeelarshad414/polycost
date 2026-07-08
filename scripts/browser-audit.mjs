@@ -1,6 +1,6 @@
 import { chromium } from 'playwright';
-import { execFile, spawn } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +9,7 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const webRoot = path.join(root, 'apps/web');
+const distRoot = path.join(webRoot, 'dist');
 const runDate = process.env.POLYCOST_BROWSER_AUDIT_DATE ?? new Date().toISOString().slice(0, 10);
 const artifactRoot = path.join(root, 'docs/browser-audit');
 const artifactDir = path.join(artifactRoot, runDate);
@@ -39,12 +40,20 @@ const audit = {
     pageErrors: 0,
     consoleErrors: 0,
     keyboardFocusDeadEnds: 0,
+    axeViolations: 0,
+    lighthouseCategoryScores: {
+      performance: 0.8,
+      accessibility: 0.9,
+      'best-practices': 0.9,
+      seo: 0.9,
+    },
   },
   toolCoverage: await resolveToolCoverage(),
   scenarios: [],
 };
 
 try {
+  audit.lighthouse = await runLighthouseAudit();
   audit.scenarios.push(
     await runScenario(browser, {
       id: 'desktop',
@@ -81,7 +90,10 @@ try {
     }),
   );
 
-  const failures = audit.scenarios.flatMap((scenario) => scenario.failures);
+  const failures = [
+    ...audit.scenarios.flatMap((scenario) => scenario.failures),
+    ...(audit.lighthouse?.failures ?? []),
+  ];
   if (failures.length > 0) {
     audit.status = 'failed';
     audit.failures = failures;
@@ -115,52 +127,93 @@ async function runCommand(command, args, cwd) {
 }
 
 async function startPreviewServer() {
-  const viteBin = path.join(
-    root,
-    'node_modules',
-    '.bin',
-    process.platform === 'win32' ? 'vite.cmd' : 'vite',
-  );
-  const child = spawn(
-    viteBin,
-    ['preview', '--host', '127.0.0.1', '--port', String(port), '--strictPort'],
-    {
-      cwd: webRoot,
-      env: {
-        ...process.env,
-        VITE_API_BASE_URL: '/api/v1',
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    },
-  );
+  const serverInstance = http.createServer((request, response) => {
+    try {
+      const url = new URL(request.url ?? '/', baseUrl);
 
-  let startupOutput = '';
-  child.stdout.on('data', (chunk) => {
-    startupOutput += chunk.toString();
-  });
-  child.stderr.on('data', (chunk) => {
-    startupOutput += chunk.toString();
-  });
+      if (url.pathname.startsWith('/api/v1/')) {
+        sendJson(response, mockApiResponse(url, request.method ?? 'GET'));
+        return;
+      }
 
-  await waitForServer(baseUrl, 20_000, () => {
-    if (child.exitCode !== null) {
-      throw new Error(`Vite preview exited before becoming ready:\n${startupOutput}`);
+      sendStaticAsset(response, url.pathname);
+    } catch (error) {
+      response.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
+      response.end(error instanceof Error ? error.message : 'Unknown browser audit server error');
     }
   });
 
-  return child;
+  await new Promise((resolve, reject) => {
+    serverInstance.once('error', reject);
+    serverInstance.listen(port, '127.0.0.1', resolve);
+  });
+
+  await waitForServer(baseUrl, 20_000);
+
+  return serverInstance;
 }
 
-async function stopPreviewServer(child) {
-  if (!child || child.exitCode !== null) {
+async function stopPreviewServer(serverInstance) {
+  if (!serverInstance.listening) {
     return;
   }
 
-  child.kill('SIGTERM');
-  await new Promise((resolve) => {
-    child.once('exit', resolve);
-    setTimeout(resolve, 2_000);
+  await new Promise((resolve, reject) => {
+    serverInstance.close((error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
   });
+}
+
+function sendStaticAsset(response, rawPathname) {
+  const pathname = rawPathname === '/' ? '/index.html' : rawPathname;
+  const normalizedPath = path.normalize(decodeURIComponent(pathname)).replace(/^(\.\.[/\\])+/, '');
+  let filePath = path.join(distRoot, normalizedPath);
+
+  if (!filePath.startsWith(distRoot) || !existsSync(filePath) || !statSync(filePath).isFile()) {
+    filePath = path.join(distRoot, 'index.html');
+  }
+
+  response.writeHead(200, {
+    'content-type': contentTypeForPath(filePath),
+    'cache-control': 'no-store',
+  });
+  response.end(readFileSync(filePath));
+}
+
+function sendJson(response, body) {
+  response.writeHead(200, {
+    'content-type': 'application/json; charset=utf-8',
+    'cache-control': 'no-store',
+  });
+  response.end(JSON.stringify(body));
+}
+
+function contentTypeForPath(filePath) {
+  const extension = path.extname(filePath);
+
+  switch (extension) {
+    case '.html':
+      return 'text/html; charset=utf-8';
+    case '.js':
+      return 'text/javascript; charset=utf-8';
+    case '.css':
+      return 'text/css; charset=utf-8';
+    case '.json':
+      return 'application/json; charset=utf-8';
+    case '.svg':
+      return 'image/svg+xml';
+    case '.png':
+      return 'image/png';
+    case '.ico':
+      return 'image/x-icon';
+    default:
+      return 'application/octet-stream';
+  }
 }
 
 async function waitForServer(url, timeoutMs, onAttempt) {
@@ -221,6 +274,7 @@ async function runScenario(browserInstance, scenario) {
   await page.goto(baseUrl, { waitUntil: 'networkidle' });
   await waitForAppReady(page);
   const homeMetrics = await collectPageAudit(page, `${scenario.id}:home`);
+  const homeAxe = await collectAxeAudit(page, `${scenario.id}:home`);
 
   await page.getByRole('button', { name: /compare costs/i }).click();
   await page.getByLabel('Provider cost summary').waitFor({ state: 'visible', timeout: 30_000 });
@@ -229,6 +283,7 @@ async function runScenario(browserInstance, scenario) {
     fullPage: true,
   });
   const executiveMetrics = await collectPageAudit(page, `${scenario.id}:executive`);
+  const executiveAxe = await collectAxeAudit(page, `${scenario.id}:executive`);
 
   const disclosure = page.getByRole('button', { name: /show full breakdown/i });
   await disclosure.waitFor({ state: 'visible' });
@@ -323,6 +378,7 @@ async function runScenario(browserInstance, scenario) {
     fullPage: true,
   });
   const engineeringMetrics = await collectPageAudit(page, `${scenario.id}:engineering`);
+  const engineeringAxe = await collectAxeAudit(page, `${scenario.id}:engineering`);
   const keyboardTrace = await collectKeyboardTrace(page);
   const performance = await collectPerformanceMetrics(page);
 
@@ -331,6 +387,7 @@ async function runScenario(browserInstance, scenario) {
   const failures = scenarioFailures({
     scenario,
     metrics: [homeMetrics, executiveMetrics, engineeringMetrics],
+    axeAudits: [homeAxe, executiveAxe, engineeringAxe],
     keyboardTrace,
     consoleErrors,
     pageErrors,
@@ -351,64 +408,21 @@ async function runScenario(browserInstance, scenario) {
       home: homeMetrics,
       executive: executiveMetrics,
       engineering: engineeringMetrics,
+      axe: {
+        home: homeAxe,
+        executive: executiveAxe,
+        engineering: engineeringAxe,
+      },
       keyboardTrace,
     },
   };
 }
 
 async function installMockApi(page) {
-  const comparison = browserComparison();
-
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
-    const pathname = url.pathname;
-
-    if (pathname === '/api/v1/regions') {
-      await fulfillJson(route, regionCatalog());
-      return;
-    }
-    if (pathname === '/api/v1/data-health') {
-      await fulfillJson(route, dataHealth());
-      return;
-    }
-    if (pathname === '/api/v1/exchange-rates') {
-      await fulfillJson(route, {
-        base: 'USD',
-        lastUpdated: '2026-07-01T00:00:00.000Z',
-        rates: {
-          EUR: 0.92,
-          GBP: 0.78,
-          PKR: 278.5,
-        },
-      });
-      return;
-    }
-    if (pathname === '/api/v1/pricing/aws/compute/models') {
-      await fulfillJson(
-        route,
-        pricingModelsForService(url.searchParams.get('region') ?? 'us-east-1'),
-      );
-      return;
-    }
-    if (pathname === '/api/v1/workload/validate') {
-      await fulfillJson(route, { valid: true });
-      return;
-    }
-    if (pathname === '/api/v1/comparisons' && request.method() === 'POST') {
-      await fulfillJson(route, comparison);
-      return;
-    }
-    if (pathname === `/api/v1/comparisons/${comparison.comparisonId}/analytics`) {
-      await fulfillJson(route, comparisonAnalytics(comparison));
-      return;
-    }
-    if (pathname === `/api/v1/comparisons/${comparison.comparisonId}/evidence`) {
-      await fulfillJson(route, comparisonPricingEvidence(comparison));
-      return;
-    }
-
-    await fulfillJson(route, {});
+    await fulfillJson(route, mockApiResponse(url, request.method()));
   });
 }
 
@@ -418,6 +432,49 @@ async function fulfillJson(route, body) {
     contentType: 'application/json',
     body: JSON.stringify(body),
   });
+}
+
+function mockApiResponse(url, method) {
+  const comparison = browserComparison();
+  const pathname = url.pathname;
+
+  if (pathname === '/api/v1/regions') {
+    return regionCatalog();
+  }
+  if (pathname === '/api/v1/data-health') {
+    return dataHealth();
+  }
+  if (pathname === '/api/v1/exchange-rates') {
+    return {
+      base: 'USD',
+      lastUpdated: '2026-07-01T00:00:00.000Z',
+      rates: {
+        EUR: 0.92,
+        GBP: 0.78,
+        PKR: 278.5,
+      },
+    };
+  }
+  if (pathname === '/api/v1/pricing/aws/compute/models') {
+    return pricingModelsForService(url.searchParams.get('region') ?? 'us-east-1');
+  }
+  if (pathname === '/api/v1/workload/validate') {
+    return { valid: true };
+  }
+  if (pathname === '/api/v1/comparisons' && method === 'POST') {
+    return comparison;
+  }
+  if (pathname === `/api/v1/comparisons/${comparison.comparisonId}/analytics`) {
+    return comparisonAnalytics(comparison);
+  }
+  if (pathname === `/api/v1/comparisons/${comparison.comparisonId}/evidence`) {
+    return comparisonPricingEvidence(comparison);
+  }
+  if (pathname === '/api/v1/health/live' || pathname === '/api/v1/health/ready') {
+    return { status: 'ok', service: 'polycost-api-browser-audit' };
+  }
+
+  return {};
 }
 
 async function waitForAppReady(page) {
@@ -547,6 +604,40 @@ async function collectPageAudit(page, label) {
   }, label);
 }
 
+async function collectAxeAudit(page, label) {
+  const axeCore = await import('axe-core');
+  await page.addScriptTag({ content: axeCore.default.source });
+
+  return await page.evaluate(async (auditLabel) => {
+    const result = await window.axe.run(document, {
+      runOnly: {
+        type: 'tag',
+        values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'],
+      },
+    });
+
+    return {
+      label: auditLabel,
+      status: result.violations.length === 0 ? 'passed' : 'failed',
+      violationCount: result.violations.length,
+      passCount: result.passes.length,
+      incompleteCount: result.incomplete.length,
+      violations: result.violations.map((violation) => ({
+        id: violation.id,
+        impact: violation.impact,
+        description: violation.description,
+        help: violation.help,
+        helpUrl: violation.helpUrl,
+        nodes: violation.nodes.slice(0, 10).map((node) => ({
+          target: node.target,
+          failureSummary: node.failureSummary,
+          html: node.html.slice(0, 240),
+        })),
+      })),
+    };
+  }, label);
+}
+
 async function collectKeyboardTrace(page) {
   await page.keyboard.press('Home');
   const visited = [];
@@ -614,7 +705,14 @@ async function collectPerformanceMetrics(page) {
   });
 }
 
-function scenarioFailures({ scenario, metrics, keyboardTrace, consoleErrors, pageErrors }) {
+function scenarioFailures({
+  scenario,
+  metrics,
+  axeAudits,
+  keyboardTrace,
+  consoleErrors,
+  pageErrors,
+}) {
   const failures = [];
 
   for (const metric of metrics) {
@@ -653,6 +751,16 @@ function scenarioFailures({ scenario, metrics, keyboardTrace, consoleErrors, pag
     }
   }
 
+  for (const axeAudit of axeAudits) {
+    if (axeAudit.violationCount > audit.thresholds.axeViolations) {
+      failures.push({
+        scenario: scenario.id,
+        message: `${axeAudit.label} has ${axeAudit.violationCount} axe violation(s)`,
+        details: axeAudit.violations,
+      });
+    }
+  }
+
   if (keyboardTrace.deadEnds.length > audit.thresholds.keyboardFocusDeadEnds) {
     failures.push({
       scenario: scenario.id,
@@ -685,18 +793,99 @@ function scenarioFailures({ scenario, metrics, keyboardTrace, consoleErrors, pag
   return failures;
 }
 
+async function runLighthouseAudit() {
+  const [{ default: lighthouse }, chromeLauncher] = await Promise.all([
+    import('lighthouse'),
+    import('chrome-launcher'),
+  ]);
+  let chrome;
+
+  try {
+    chrome = await chromeLauncher.launch({
+      chromeFlags: ['--headless=new', '--no-sandbox', '--disable-gpu'],
+    });
+
+    const result = await lighthouse(baseUrl, {
+      port: chrome.port,
+      output: 'json',
+      logLevel: 'error',
+      onlyCategories: ['performance', 'accessibility', 'best-practices', 'seo'],
+      formFactor: 'desktop',
+      screenEmulation: {
+        mobile: false,
+        width: 1440,
+        height: 1000,
+        deviceScaleFactor: 1,
+        disabled: false,
+      },
+      throttlingMethod: 'provided',
+    });
+    const lhr = result?.lhr;
+    const categories = Object.fromEntries(
+      Object.entries(lhr.categories).map(([id, category]) => [
+        id,
+        {
+          title: category.title,
+          score: category.score,
+          threshold: audit.thresholds.lighthouseCategoryScores[id],
+        },
+      ]),
+    );
+    const failures = Object.entries(categories)
+      .filter(([, category]) => {
+        return (
+          typeof category.score === 'number' &&
+          typeof category.threshold === 'number' &&
+          category.score < category.threshold
+        );
+      })
+      .map(([id, category]) => ({
+        scenario: 'lighthouse',
+        message: `${id} score ${category.score} is below ${category.threshold}`,
+      }));
+
+    return {
+      status: failures.length === 0 ? 'passed' : 'failed',
+      lighthouseVersion: lhr.lighthouseVersion,
+      fetchTime: lhr.fetchTime,
+      requestedUrl: lhr.requestedUrl,
+      finalDisplayedUrl: lhr.finalDisplayedUrl,
+      categories,
+      failures,
+    };
+  } catch (error) {
+    return {
+      status: 'failed',
+      error: error instanceof Error ? error.message : String(error),
+      failures: [
+        {
+          scenario: 'lighthouse',
+          message: error instanceof Error ? error.message : String(error),
+        },
+      ],
+    };
+  } finally {
+    if (chrome) {
+      await chrome.kill();
+    }
+  }
+}
+
 async function resolveToolCoverage() {
+  const lighthouseAvailable = optionalResolve('lighthouse');
+  const axeAvailable = optionalResolve('axe-core');
+
   return {
     lighthouse: {
-      status: optionalResolve('lighthouse') ? 'available-not-run' : 'dependency-unavailable',
-      note: optionalResolve('lighthouse')
-        ? 'The lighthouse package is installed, but this script currently records Playwright-native metrics only.'
+      status: lighthouseAvailable ? 'available-and-run' : 'dependency-unavailable',
+      note: lighthouseAvailable
+        ? 'Lighthouse runs against the deterministic browser-audit server.'
         : 'The lighthouse package is not installed; Playwright-native navigation and resource metrics were captured instead.',
     },
     axe: {
-      status: optionalResolve('axe-core') ? 'available' : 'dependency-unavailable',
-      note: optionalResolve('axe-core')
-        ? 'The axe-core package is installed; add injection here before treating this as a formal axe result.'
+      status: axeAvailable ? 'available-and-run' : 'dependency-unavailable',
+      note: axeAvailable
+        ? 'axe-core runs against home, executive, and engineering states for every browser-audit scenario.'
         : 'The axe-core package is not installed; Playwright-native accessibility heuristics were captured instead.',
     },
   };

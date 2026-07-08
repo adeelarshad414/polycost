@@ -503,7 +503,7 @@ export function FinOpsFeatureLayer({
       <div className="grid gap-3 rounded-lg border border-border bg-surface-1 p-3 shadow-sm">
         <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
               Pricing model
             </p>
             <h2 className="mt-1 text-lg font-semibold text-text-primary">
@@ -557,7 +557,7 @@ export function FinOpsFeatureLayer({
           >
             <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <strong className="text-sm font-semibold text-text-primary">Payment option</strong>
-              <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+              <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
                 {isLoadingPricingModels
                   ? 'Loading model metadata'
                   : pricingModelsError
@@ -592,7 +592,7 @@ export function FinOpsFeatureLayer({
               ))}
             </div>
             {pricingModelsError ? (
-              <p className="text-xs font-semibold text-text-muted">
+              <p className="text-xs font-semibold text-text-secondary">
                 Backend model metadata unavailable: {pricingModelsError}
               </p>
             ) : null}
@@ -686,7 +686,7 @@ export function FinOpsFeatureLayer({
         <section className="grid gap-3 rounded-lg border border-border bg-surface-1 p-4 shadow-sm">
           <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
                 Budget alerts
               </p>
               <h3 className="mt-1 text-lg font-semibold text-text-primary">
@@ -704,7 +704,7 @@ export function FinOpsFeatureLayer({
                   placeholder="USD amount"
                   className="min-h-11 rounded-lg border border-border bg-surface-0 px-3 pr-12 text-sm text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
                 />
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold uppercase text-text-muted">
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold uppercase text-text-secondary">
                   USD
                 </span>
               </span>
@@ -727,7 +727,7 @@ export function FinOpsFeatureLayer({
               <BudgetIcon />
               Save backend budget
             </Button>
-            <span className="inline-flex min-h-11 items-center rounded-lg border border-border bg-surface-0 px-3 text-xs font-semibold uppercase tracking-wide text-text-muted">
+            <span className="inline-flex min-h-11 items-center rounded-lg border border-border bg-surface-0 px-3 text-xs font-semibold uppercase tracking-wide text-text-secondary">
               20% anomaly threshold
             </span>
           </div>
@@ -808,7 +808,7 @@ export function FinOpsFeatureLayer({
 
         <section className="grid gap-3 rounded-lg border border-border bg-surface-1 p-4 shadow-sm">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
               Share report
             </p>
             <h3 className="mt-1 text-lg font-semibold text-text-primary">
@@ -859,7 +859,7 @@ export function FinOpsFeatureLayer({
             )}
           </div>
           {shareLink ? (
-            <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface-0 p-3 text-xs font-semibold text-text-muted sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface-0 p-3 text-xs font-semibold text-text-secondary sm:flex-row sm:items-center sm:justify-between">
               <span>
                 Recipient activity:{' '}
                 <strong className="text-text-primary">
@@ -920,7 +920,7 @@ export function FinOpsFeatureLayer({
               Revoke
             </Button>
           </div>
-          <p className="text-xs font-semibold text-text-muted">
+          <p className="text-xs font-semibold text-text-secondary">
             Current mode: {watermarkEnabled ? 'branded report' : 'white-label ready'} ·{' '}
             {shareStatus === 'copied' ? 'link copied' : 'ready for secure sharing'} ·{' '}
             {sharePassword.trim() ? 'password will be required' : 'no password set'}
@@ -931,7 +931,7 @@ export function FinOpsFeatureLayer({
       <section className="grid gap-3 rounded-lg border border-border bg-surface-1 p-4 shadow-sm">
         <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
               Currency display
             </p>
             <h3 className="mt-1 text-lg font-semibold text-text-primary">
@@ -1084,21 +1084,25 @@ function CommitmentTcoPanel({
     >
       <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+          <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
             Payment and TCO detail
           </p>
           <h3 className="mt-1 text-base font-semibold text-text-primary">
             Commitment scenario monthly, hourly, and term view
           </h3>
         </div>
-        <span className="rounded-full border border-border bg-surface-1 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
+        <span className="rounded-full border border-border bg-surface-1 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-secondary">
           Payment lens: {selectedPaymentOption?.label ?? 'Provider default'}
         </span>
       </div>
-      <div className="overflow-x-auto rounded-lg border border-border">
+      <div
+        className="overflow-x-auto rounded-lg border border-border"
+        tabIndex={0}
+        aria-label="Commitment scenario payment comparison table"
+      >
         <table className="min-w-[1080px] w-full border-separate border-spacing-0 text-sm">
           <thead>
-            <tr className="bg-surface-1 text-left text-xs font-bold uppercase tracking-wide text-text-muted">
+            <tr className="bg-surface-1 text-left text-xs font-bold uppercase tracking-wide text-text-secondary">
               <th className="border-b border-border px-3 py-2">Provider</th>
               <th className="border-b border-border px-3 py-2">Model</th>
               <th
@@ -1177,7 +1181,7 @@ function CommitmentTcoPanel({
           </tbody>
         </table>
       </div>
-      <p className="text-xs leading-5 text-text-muted">
+      <p className="text-xs leading-5 text-text-secondary">
         Upfront cash amounts are shown only when provider catalog evidence exposes them. Otherwise
         PolyCost reports the selected payment option and effective recurring run-rate without
         inventing an upfront charge.
@@ -1226,14 +1230,14 @@ function WhatIfScenarioPanel({
     >
       <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+          <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
             Region and scale what-if
           </p>
           <h3 className="mt-1 text-base font-semibold text-text-primary">
             Cache-backed rerun without natural-language reparse
           </h3>
         </div>
-        <span className="rounded-full border border-border bg-surface-1 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
+        <span className="rounded-full border border-border bg-surface-1 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-secondary">
           {pricingModelLabel(pricingModel)} scenario
         </span>
       </div>
@@ -1329,12 +1333,12 @@ function WhatIfScenarioPanel({
       </div>
 
       {result ? (
-        <p className="text-xs leading-5 text-text-muted">
+        <p className="text-xs leading-5 text-text-secondary">
           Scenario comparison {result.comparisonId} was generated from the existing reviewed form
           via the cached comparison API. Natural-language parsing was not invoked.
         </p>
       ) : (
-        <p className="text-xs leading-5 text-text-muted">
+        <p className="text-xs leading-5 text-text-secondary">
           This clones the reviewed requirement model, adjusts region and scale fields, and calls the
           same cache-backed comparison endpoint used by the main result.
         </p>
@@ -1364,14 +1368,14 @@ function WorkloadBreakdown({
     <section className="grid gap-3 rounded-lg border border-border bg-surface-1 p-4 shadow-sm">
       <div className="flex min-w-0 flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+          <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
             Workload cost breakdown
           </p>
           <h3 className="mt-1 text-lg font-semibold text-text-primary">
             Compute, storage, and data-transfer mix
           </h3>
         </div>
-        <span className="rounded-full border border-border bg-surface-0 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
+        <span className="rounded-full border border-border bg-surface-0 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-secondary">
           {isLoading ? 'Refreshing' : 'Real line items'}
         </span>
       </div>
@@ -1434,7 +1438,7 @@ function WorkloadBreakdown({
                     ))}
                   </div>
                   {databaseMonthly > 0 ? (
-                    <p className="text-xs leading-5 text-text-muted">
+                    <p className="text-xs leading-5 text-text-secondary">
                       Database adds{' '}
                       {formatMoney(databaseMonthly * intervalCostMultiplier(interval), currency)}{' '}
                       outside this scoped compute/storage/egress bar.
@@ -1459,7 +1463,7 @@ function WorkloadBreakdown({
 
       <EgressTierAudit comparison={comparison} currency={currency} form={form} />
 
-      <p className="text-xs leading-5 text-text-muted">
+      <p className="text-xs leading-5 text-text-secondary">
         Egress covers direct public-internet transfer only. Inter-region transfer, cross-service
         transfer, CDN edge pricing, and archive retrieval fees stay outside this v1 scoped model.
       </p>
@@ -1484,17 +1488,21 @@ function EgressTierAudit({
       aria-label="Egress tiered breakdown"
     >
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+        <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
           Egress tiered breakdown
         </p>
         <h4 className="mt-1 text-base font-semibold text-text-primary">
           Provider transfer tiers and effective blended rate
         </h4>
       </div>
-      <div className="overflow-x-auto rounded-lg border border-border">
+      <div
+        className="overflow-x-auto rounded-lg border border-border"
+        tabIndex={0}
+        aria-label="Egress tiered breakdown table"
+      >
         <table className="min-w-[860px] w-full border-separate border-spacing-0 text-sm">
           <thead>
-            <tr className="bg-surface-1 text-left text-xs font-bold uppercase tracking-wide text-text-muted">
+            <tr className="bg-surface-1 text-left text-xs font-bold uppercase tracking-wide text-text-secondary">
               <th className="border-b border-border px-3 py-2">Provider</th>
               <th className="border-b border-border px-3 py-2">Region</th>
               <th className="border-b border-border px-3 py-2">Tier band</th>
@@ -1990,14 +1998,14 @@ export function SharedReportPlaceholder({
       <section className="mx-auto grid max-w-4xl gap-4 rounded-lg border border-border bg-surface-1 p-6 shadow-sm">
         <div className="flex min-w-0 flex-col gap-3 border-b border-border pb-4 md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
               PolyCost shared report
             </p>
             <h1 className="mt-2 text-2xl font-semibold text-text-primary">
               Read-only cloud cost report
             </h1>
           </div>
-          <span className="rounded-full border border-border bg-surface-0 px-3 py-1 text-xs font-semibold text-text-muted">
+          <span className="rounded-full border border-border bg-surface-0 px-3 py-1 text-xs font-semibold text-text-secondary">
             /share/{token}
           </span>
         </div>
@@ -2070,7 +2078,7 @@ export function SharedReportPlaceholder({
             </div>
 
             <section className="rounded-lg border border-border bg-surface-0 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
                 Workload scope
               </p>
               <div className="mt-3 grid gap-3 md:grid-cols-4">
@@ -2098,7 +2106,7 @@ export function SharedReportPlaceholder({
             </section>
 
             <section className="rounded-lg border border-border bg-surface-0 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
                 Provider breakdown
               </p>
               <div className="mt-3 grid gap-3 md:grid-cols-3">
@@ -2125,7 +2133,7 @@ export function SharedReportPlaceholder({
                         <dd>{formatMoney(provider.egress, USD_CURRENCY)}</dd>
                       </div>
                     </dl>
-                    <p className="mt-3 text-xs text-text-muted">Region: {provider.region}</p>
+                    <p className="mt-3 text-xs text-text-secondary">Region: {provider.region}</p>
                   </article>
                 ))}
               </div>
@@ -2416,7 +2424,7 @@ function pricingModelSummary(
 function InfoTile({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
     <article className="min-w-0 rounded-lg border border-border bg-surface-0 p-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">{label}</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{label}</p>
       <strong className="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap font-mono text-base text-text-primary">
         {value}
       </strong>

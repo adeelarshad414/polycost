@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-08T08:46:42.893Z",
+  "generatedAt": "2026-07-08T09:21:32.635Z",
   "runDate": "2026-07-08",
   "baseUrl": "http://127.0.0.1:4176",
   "status": "passed",
@@ -9,16 +9,23 @@
     "missingImageAltAttributes": 0,
     "pageErrors": 0,
     "consoleErrors": 0,
-    "keyboardFocusDeadEnds": 0
+    "keyboardFocusDeadEnds": 0,
+    "axeViolations": 0,
+    "lighthouseCategoryScores": {
+      "performance": 0.8,
+      "accessibility": 0.9,
+      "best-practices": 0.9,
+      "seo": 0.9
+    }
   },
   "toolCoverage": {
     "lighthouse": {
-      "status": "dependency-unavailable",
-      "note": "The lighthouse package is not installed; Playwright-native navigation and resource metrics were captured instead."
+      "status": "available-and-run",
+      "note": "Lighthouse runs against the deterministic browser-audit server."
     },
     "axe": {
-      "status": "dependency-unavailable",
-      "note": "The axe-core package is not installed; Playwright-native accessibility heuristics were captured instead."
+      "status": "available-and-run",
+      "note": "axe-core runs against home, executive, and engineering states for every browser-audit scenario."
     }
   },
   "scenarios": [
@@ -39,10 +46,10 @@
       "consoleErrors": [],
       "pageErrors": [],
       "performance": {
-        "domContentLoadedMs": 81,
-        "loadEventMs": 81,
+        "domContentLoadedMs": 75,
+        "loadEventMs": 75,
         "resourceCount": 14,
-        "transferKb": 332
+        "transferKb": 1271
       },
       "audits": {
         "home": {
@@ -84,6 +91,32 @@
           "visibleButtonCount": 49,
           "visibleLinkCount": 9
         },
+        "axe": {
+          "home": {
+            "label": "desktop:home",
+            "status": "passed",
+            "violationCount": 0,
+            "passCount": 28,
+            "incompleteCount": 2,
+            "violations": []
+          },
+          "executive": {
+            "label": "desktop:executive",
+            "status": "passed",
+            "violationCount": 0,
+            "passCount": 28,
+            "incompleteCount": 2,
+            "violations": []
+          },
+          "engineering": {
+            "label": "desktop:engineering",
+            "status": "passed",
+            "violationCount": 0,
+            "passCount": 35,
+            "incompleteCount": 2,
+            "violations": []
+          }
+        },
         "keyboardTrace": {
           "visitedCount": 18,
           "deadEnds": [],
@@ -116,12 +149,12 @@
               "ignored": true
             },
             {
-              "summary": "div RegionAWSAzureGCPLowEvidenceUS EastCurrent comparison region$124.50$0.00us-east-1$138.25$0.00eastus$110.75$0.00us-east1GCPBaseline North America pricing sen",
+              "summary": "div Region variance monthly sensitivity table",
               "hasVisibleFocus": true,
               "ignored": false,
               "rect": {
                 "x": 173,
-                "y": 4236,
+                "y": 4247,
                 "width": 1094,
                 "height": 360
               }
@@ -132,7 +165,7 @@
               "ignored": false,
               "rect": {
                 "x": 164,
-                "y": 8757,
+                "y": 8768,
                 "width": 220,
                 "height": 44
               }
@@ -143,7 +176,7 @@
               "ignored": false,
               "rect": {
                 "x": 392,
-                "y": 8756,
+                "y": 8768,
                 "width": 220,
                 "height": 44
               }
@@ -154,7 +187,7 @@
               "ignored": false,
               "rect": {
                 "x": 620,
-                "y": 8756,
+                "y": 8768,
                 "width": 220,
                 "height": 44
               }
@@ -165,7 +198,7 @@
               "ignored": false,
               "rect": {
                 "x": 848,
-                "y": 8756,
+                "y": 8768,
                 "width": 220,
                 "height": 44
               }
@@ -176,18 +209,18 @@
               "ignored": false,
               "rect": {
                 "x": 164,
-                "y": 8832,
+                "y": 8844,
                 "width": 220,
                 "height": 44
               }
             },
             {
-              "summary": "div ServiceCategoryConfidenceAWS On-demandAWS 1yrAWS 3yrAWS SavingsAWS SpotAzure On-demandAzure 1yrAzure 3yrAzure SavingsAzure SpotGCP On-demandGCP 1yrGCP 3yrGC",
+              "summary": "div Provider service cost matrix table",
               "hasVisibleFocus": true,
               "ignored": false,
               "rect": {
                 "x": 164,
-                "y": 8892,
+                "y": 8904,
                 "width": 1112,
                 "height": 285
               }
@@ -198,7 +231,7 @@
               "ignored": false,
               "rect": {
                 "x": 823,
-                "y": 9665,
+                "y": 9677,
                 "width": 72,
                 "height": 44
               }
@@ -209,7 +242,7 @@
               "ignored": false,
               "rect": {
                 "x": 899,
-                "y": 9665,
+                "y": 9677,
                 "width": 72,
                 "height": 44
               }
@@ -220,7 +253,7 @@
               "ignored": false,
               "rect": {
                 "x": 975,
-                "y": 9665,
+                "y": 9677,
                 "width": 72,
                 "height": 44
               }
@@ -231,7 +264,7 @@
               "ignored": false,
               "rect": {
                 "x": 1051,
-                "y": 9665,
+                "y": 9677,
                 "width": 72,
                 "height": 44
               }
@@ -242,7 +275,7 @@
               "ignored": false,
               "rect": {
                 "x": 1127,
-                "y": 9665,
+                "y": 9677,
                 "width": 72,
                 "height": 44
               }
@@ -253,7 +286,7 @@
               "ignored": false,
               "rect": {
                 "x": 1203,
-                "y": 9665,
+                "y": 9677,
                 "width": 72,
                 "height": 44
               }
@@ -264,7 +297,7 @@
               "ignored": false,
               "rect": {
                 "x": 606,
-                "y": 9793,
+                "y": 9805,
                 "width": 134,
                 "height": 40
               }
@@ -290,10 +323,10 @@
       "consoleErrors": [],
       "pageErrors": [],
       "performance": {
-        "domContentLoadedMs": 40,
-        "loadEventMs": 40,
+        "domContentLoadedMs": 26,
+        "loadEventMs": 26,
         "resourceCount": 14,
-        "transferKb": 332
+        "transferKb": 1271
       },
       "audits": {
         "home": {
@@ -399,7 +432,7 @@
               "width": 881.14
             },
             {
-              "element": "div EC2EBS / S3RDSData transferSupport planOS licensingResilience ops",
+              "element": "div[role=\"img\"] AWS service cost breakdown chart",
               "left": 83,
               "right": 964.14,
               "width": 881.14
@@ -456,6 +489,32 @@
           "visibleButtonCount": 49,
           "visibleLinkCount": 8
         },
+        "axe": {
+          "home": {
+            "label": "reflow-320:home",
+            "status": "passed",
+            "violationCount": 0,
+            "passCount": 28,
+            "incompleteCount": 2,
+            "violations": []
+          },
+          "executive": {
+            "label": "reflow-320:executive",
+            "status": "passed",
+            "violationCount": 0,
+            "passCount": 28,
+            "incompleteCount": 2,
+            "violations": []
+          },
+          "engineering": {
+            "label": "reflow-320:engineering",
+            "status": "passed",
+            "violationCount": 0,
+            "passCount": 34,
+            "incompleteCount": 2,
+            "violations": []
+          }
+        },
         "keyboardTrace": {
           "visitedCount": 18,
           "deadEnds": [],
@@ -488,12 +547,12 @@
               "ignored": true
             },
             {
-              "summary": "div RegionAWSAzureGCPLowEvidenceUS EastCurrent comparison region$124.50$0.00us-east-1$138.25$0.00eastus$110.75$0.00us-east1GCPBaseline North America pricing sen",
+              "summary": "div Region variance monthly sensitivity table",
               "hasVisibleFocus": true,
               "ignored": false,
               "rect": {
                 "x": -289,
-                "y": 7805,
+                "y": 7809,
                 "width": 897,
                 "height": 360
               }
@@ -504,7 +563,7 @@
               "ignored": false,
               "rect": {
                 "x": 50,
-                "y": 13187,
+                "y": 13191,
                 "width": 220,
                 "height": 44
               }
@@ -515,7 +574,7 @@
               "ignored": false,
               "rect": {
                 "x": 278,
-                "y": 13184,
+                "y": 13188,
                 "width": 220,
                 "height": 44
               }
@@ -526,7 +585,7 @@
               "ignored": false,
               "rect": {
                 "x": 50,
-                "y": 13165,
+                "y": 13170,
                 "width": 220,
                 "height": 44
               }
@@ -537,7 +596,7 @@
               "ignored": false,
               "rect": {
                 "x": 278,
-                "y": 13127,
+                "y": 13130,
                 "width": 220,
                 "height": 44
               }
@@ -548,18 +607,18 @@
               "ignored": false,
               "rect": {
                 "x": 50,
-                "y": 13185,
+                "y": 13173,
                 "width": 220,
                 "height": 44
               }
             },
             {
-              "summary": "div ServiceCategoryConfidenceAWS On-demandAWS 1yrAWS 3yrAWS SavingsAWS SpotAzure On-demandAzure 1yrAzure 3yrAzure SavingsAzure SpotGCP On-demandGCP 1yrGCP 3yrGC",
+              "summary": "div Provider service cost matrix table",
               "hasVisibleFocus": true,
               "ignored": false,
               "rect": {
                 "x": 50,
-                "y": 13242,
+                "y": 13230,
                 "width": 915,
                 "height": 285
               }
@@ -570,7 +629,7 @@
               "ignored": false,
               "rect": {
                 "x": 51,
-                "y": 14597,
+                "y": 14584,
                 "width": 149,
                 "height": 44
               }
@@ -581,7 +640,7 @@
               "ignored": false,
               "rect": {
                 "x": 204,
-                "y": 14597,
+                "y": 14582,
                 "width": 149,
                 "height": 44
               }
@@ -592,7 +651,7 @@
               "ignored": false,
               "rect": {
                 "x": 86,
-                "y": 14597,
+                "y": 14582,
                 "width": 149,
                 "height": 44
               }
@@ -603,7 +662,7 @@
               "ignored": false,
               "rect": {
                 "x": 239,
-                "y": 14597,
+                "y": 14582,
                 "width": 149,
                 "height": 44
               }
@@ -614,7 +673,7 @@
               "ignored": false,
               "rect": {
                 "x": 85,
-                "y": 14597,
+                "y": 14582,
                 "width": 149,
                 "height": 44
               }
@@ -625,7 +684,7 @@
               "ignored": false,
               "rect": {
                 "x": 238,
-                "y": 14597,
+                "y": 14582,
                 "width": 149,
                 "height": 44
               }
@@ -636,7 +695,7 @@
               "ignored": false,
               "rect": {
                 "x": -526,
-                "y": 14785,
+                "y": 14770,
                 "width": 913,
                 "height": 40
               }
@@ -662,10 +721,10 @@
       "consoleErrors": [],
       "pageErrors": [],
       "performance": {
-        "domContentLoadedMs": 35,
-        "loadEventMs": 35,
+        "domContentLoadedMs": 28,
+        "loadEventMs": 28,
         "resourceCount": 14,
-        "transferKb": 332
+        "transferKb": 1271
       },
       "audits": {
         "home": {
@@ -753,7 +812,7 @@
               "width": 881.14
             },
             {
-              "element": "div EC2EBS / S3RDSData transferSupport planOS licensingResilience ops",
+              "element": "div[role=\"img\"] AWS service cost breakdown chart",
               "left": 83,
               "right": 964.14,
               "width": 881.14
@@ -828,6 +887,32 @@
           "visibleButtonCount": 49,
           "visibleLinkCount": 9
         },
+        "axe": {
+          "home": {
+            "label": "zoom-200-equivalent:home",
+            "status": "passed",
+            "violationCount": 0,
+            "passCount": 28,
+            "incompleteCount": 2,
+            "violations": []
+          },
+          "executive": {
+            "label": "zoom-200-equivalent:executive",
+            "status": "passed",
+            "violationCount": 0,
+            "passCount": 28,
+            "incompleteCount": 2,
+            "violations": []
+          },
+          "engineering": {
+            "label": "zoom-200-equivalent:engineering",
+            "status": "passed",
+            "violationCount": 0,
+            "passCount": 35,
+            "incompleteCount": 2,
+            "violations": []
+          }
+        },
         "keyboardTrace": {
           "visitedCount": 18,
           "deadEnds": [],
@@ -860,12 +945,12 @@
               "ignored": true
             },
             {
-              "summary": "div RegionAWSAzureGCPLowEvidenceUS EastCurrent comparison region$124.50$0.00us-east-1$138.25$0.00eastus$110.75$0.00us-east1GCPBaseline North America pricing sen",
+              "summary": "div Region variance monthly sensitivity table",
               "hasVisibleFocus": true,
               "ignored": false,
               "rect": {
                 "x": 75,
-                "y": 6890,
+                "y": 6940,
                 "width": 897,
                 "height": 360
               }
@@ -876,7 +961,7 @@
               "ignored": false,
               "rect": {
                 "x": 66,
-                "y": 12272,
+                "y": 12323,
                 "width": 220,
                 "height": 44
               }
@@ -887,7 +972,7 @@
               "ignored": false,
               "rect": {
                 "x": 294,
-                "y": 12265,
+                "y": 12322,
                 "width": 220,
                 "height": 44
               }
@@ -898,7 +983,7 @@
               "ignored": false,
               "rect": {
                 "x": 522,
-                "y": 12242,
+                "y": 12316,
                 "width": 220,
                 "height": 44
               }
@@ -909,7 +994,7 @@
               "ignored": false,
               "rect": {
                 "x": 359,
-                "y": 12182,
+                "y": 12284,
                 "width": 220,
                 "height": 44
               }
@@ -920,18 +1005,18 @@
               "ignored": false,
               "rect": {
                 "x": 66,
-                "y": 12213,
+                "y": 12343,
                 "width": 220,
                 "height": 44
               }
             },
             {
-              "summary": "div ServiceCategoryConfidenceAWS On-demandAWS 1yrAWS 3yrAWS SavingsAWS SpotAzure On-demandAzure 1yrAzure 3yrAzure SavingsAzure SpotGCP On-demandGCP 1yrGCP 3yrGC",
+              "summary": "div Provider service cost matrix table",
               "hasVisibleFocus": true,
               "ignored": false,
               "rect": {
                 "x": 66,
-                "y": 12273,
+                "y": 12403,
                 "width": 915,
                 "height": 285
               }
@@ -942,7 +1027,7 @@
               "ignored": false,
               "rect": {
                 "x": 67,
-                "y": 13249,
+                "y": 13379,
                 "width": 149,
                 "height": 44
               }
@@ -953,7 +1038,7 @@
               "ignored": false,
               "rect": {
                 "x": 220,
-                "y": 13249,
+                "y": 13379,
                 "width": 149,
                 "height": 44
               }
@@ -964,7 +1049,7 @@
               "ignored": false,
               "rect": {
                 "x": 373,
-                "y": 13247,
+                "y": 13379,
                 "width": 149,
                 "height": 44
               }
@@ -975,7 +1060,7 @@
               "ignored": false,
               "rect": {
                 "x": 526,
-                "y": 13247,
+                "y": 13379,
                 "width": 149,
                 "height": 44
               }
@@ -986,7 +1071,7 @@
               "ignored": false,
               "rect": {
                 "x": 287,
-                "y": 13247,
+                "y": 13379,
                 "width": 149,
                 "height": 44
               }
@@ -997,7 +1082,7 @@
               "ignored": false,
               "rect": {
                 "x": 440,
-                "y": 13247,
+                "y": 13379,
                 "width": 149,
                 "height": 44
               }
@@ -1008,7 +1093,7 @@
               "ignored": false,
               "rect": {
                 "x": -324,
-                "y": 13434,
+                "y": 13567,
                 "width": 457,
                 "height": 40
               }
@@ -1017,5 +1102,35 @@
         }
       }
     }
-  ]
+  ],
+  "lighthouse": {
+    "status": "passed",
+    "lighthouseVersion": "12.8.2",
+    "fetchTime": "2026-07-08T09:21:36.653Z",
+    "requestedUrl": "http://127.0.0.1:4176/",
+    "finalDisplayedUrl": "http://127.0.0.1:4176/",
+    "categories": {
+      "performance": {
+        "title": "Performance",
+        "score": 1,
+        "threshold": 0.8
+      },
+      "accessibility": {
+        "title": "Accessibility",
+        "score": 1,
+        "threshold": 0.9
+      },
+      "best-practices": {
+        "title": "Best Practices",
+        "score": 1,
+        "threshold": 0.9
+      },
+      "seo": {
+        "title": "SEO",
+        "score": 0.92,
+        "threshold": 0.9
+      }
+    },
+    "failures": []
+  }
 }

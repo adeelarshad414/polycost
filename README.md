@@ -77,7 +77,7 @@ npm run demo:artifacts
 ```
 
 Capture browser audit screenshots, 320px reflow evidence, 200% zoom-equivalent
-evidence, accessibility heuristics, and local performance metrics:
+evidence, axe accessibility checks, and Lighthouse metrics:
 
 ```bash
 npm run browser:audit
@@ -317,8 +317,8 @@ before switching `USE_MOCK_PROVIDERS=false`.
   traceability expectations.
 - `docs/development/public-demo-hardening.md` captures the public demo readiness
   floor, repository health checklist, and blocked launch evidence.
-- `docs/browser-audit/README.md` indexes the latest Playwright-native browser audit
-  evidence.
+- `docs/browser-audit/README.md` indexes the latest browser audit evidence,
+  including axe-core and Lighthouse results.
 - `LOADING-INVENTORY.md` and `LOADING-AUDIT-REPORT.md` document the loading/progress
   UX audit and evidence.
 - `DUMMY-VALUES.md` lists development-only placeholders and production guardrails.

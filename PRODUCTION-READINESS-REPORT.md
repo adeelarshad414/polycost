@@ -41,35 +41,37 @@ The browser audit artifact pass added `npm run browser:audit` and
 `docs/browser-audit/2026-07-08/`. The audit captures desktop, 320px reflow, and 200%
 zoom-equivalent screenshots for executive and engineering states, plus machine-readable
 checks for overflow, visible control names, image alt attributes, landmarks/headings,
-keyboard focus, console errors, page errors, and local navigation/resource metrics.
+keyboard focus, console errors, page errors, axe accessibility, and Lighthouse
+performance/accessibility/best-practices/SEO metrics.
 
 ## Findings And Disposition
 
-| ID             | Disposition   | Evidence                                                                                                                                                                            |
-| -------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P0-FMT-001     | Fixed         | `npm run check` initially failed on unformatted orchestrator docs; after formatting, `npm run format:check` and `npm run check` passed                                              |
-| P0-DOC-001     | Fixed         | Orchestrator docs moved from `docs/orchestrators/*` to requested `docs/design/*`                                                                                                    |
-| P0-SYNC-001    | Fixed         | `STATE-SYNC.md` created with product detection, CI state, phase classification, and gate register                                                                                   |
-| P0-INV-001     | Fixed         | `THEME-INVENTORY.md` created with route/component inventory and P0 findings                                                                                                         |
-| TKN-001        | Fixed         | Token hex values isolated to `apps/web/src/styles/tokens.css`; `npm run theme:hex:check` passed                                                                                     |
-| TKN-002        | Fixed         | Added persisted `data-accent="default                                                                                                                                               | terracotta"` axis, pre-hydration application, and Appearance control |
-| TKN-003        | Fixed         | Added `theme:hex:check` script and CI workflow gate                                                                                                                                 |
-| API-HEALTH-001 | Fixed         | Added additive `/health/live`, `/api/v1/health/live`, `/health/ready`, and `/api/v1/health/ready` endpoints                                                                         |
-| UI-ARCHIVE-001 | Fixed (smoke) | `docs/theme-audit/2026-07-07/` contains dark/light default screenshots and dark/light terracotta screenshots with token evidence                                                    |
-| CI-REMOTE-001  | Blocked       | GitHub Actions job `85608851518` for prior head showed `runner_id: 0`, empty runner name/group, `steps: []`; remote runner/account infra is not executing repo steps                |
-| INV-TRACE-002  | Improved      | Provider-export rows now persist `_polycost` source fingerprints/column coverage; reconciliation evidence reports coverage, match summary, readiness, and caveats                   |
-| VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                         |
-| LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                    |
-| UI-AUTH-002    | Improved      | Workspace billing panel now surfaces reconciliation readiness, source-fingerprint coverage, SKU match coverage, and the invoice-of-record caveat                                    |
-| TF-GEN-001     | Added         | V3 Terraform generation endpoint and UI panel now generate AWS/Azure/GCP starter bundles from NWS with provider pinning, remote-state examples, static checks, and explicit caveats |
-| TF-GEN-002     | Improved      | V3.1 hardening adds generation profiles, private database networking checks, runtime identity baselines, policy/test/Makefile artifacts, and module-boundary documentation          |
-| TF-GEN-003     | Improved      | V3.2 assurance adds generated CAF/WAF/Terraform framework-alignment evidence and topology-aware public/private ingress/load-balancer controls                                       |
-| TF-GEN-004     | Improved      | V3.3 adds downloadable Terraform ZIP export, bundle manifest hash evidence, generated validation runner, and frontend ZIP/evidence download actions                                 |
-| TF-GEN-005     | Improved      | V3.4 replaces Terraform module placeholders with AWS/Azure/GCP network, compute, and data starter modules plus static module-library validation                                     |
-| HND-001        | Added         | Customer handover package added under `docs/`, with usage, deployment, runbook, competitive comparison, architecture, and evidence ledger                                           |
-| HND-002        | Added         | `npm run handover:check` validates the handover package and runs inside the full local `npm run check` floor                                                                        |
-| OSS-001        | Added         | `npm run public:readiness:check` validates public-readiness docs, community health files, demo evidence hooks, tracked env-file safety, and provider-logo safeguards                |
-| AUD-001        | Added         | `npm run browser:audit` produces Playwright-native browser audit artifacts for desktop, 320px reflow, and 200% zoom-equivalent scenarios                                            |
+| ID             | Disposition   | Evidence                                                                                                                                                                                  |
+| -------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0-FMT-001     | Fixed         | `npm run check` initially failed on unformatted orchestrator docs; after formatting, `npm run format:check` and `npm run check` passed                                                    |
+| P0-DOC-001     | Fixed         | Orchestrator docs moved from `docs/orchestrators/*` to requested `docs/design/*`                                                                                                          |
+| P0-SYNC-001    | Fixed         | `STATE-SYNC.md` created with product detection, CI state, phase classification, and gate register                                                                                         |
+| P0-INV-001     | Fixed         | `THEME-INVENTORY.md` created with route/component inventory and P0 findings                                                                                                               |
+| TKN-001        | Fixed         | Token hex values isolated to `apps/web/src/styles/tokens.css`; `npm run theme:hex:check` passed                                                                                           |
+| TKN-002        | Fixed         | Added persisted `data-accent="default                                                                                                                                                     | terracotta"` axis, pre-hydration application, and Appearance control |
+| TKN-003        | Fixed         | Added `theme:hex:check` script and CI workflow gate                                                                                                                                       |
+| API-HEALTH-001 | Fixed         | Added additive `/health/live`, `/api/v1/health/live`, `/health/ready`, and `/api/v1/health/ready` endpoints                                                                               |
+| UI-ARCHIVE-001 | Fixed (smoke) | `docs/theme-audit/2026-07-07/` contains dark/light default screenshots and dark/light terracotta screenshots with token evidence                                                          |
+| CI-REMOTE-001  | Blocked       | GitHub Actions job `85608851518` for prior head showed `runner_id: 0`, empty runner name/group, `steps: []`; remote runner/account infra is not executing repo steps                      |
+| INV-TRACE-002  | Improved      | Provider-export rows now persist `_polycost` source fingerprints/column coverage; reconciliation evidence reports coverage, match summary, readiness, and caveats                         |
+| VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                               |
+| LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                          |
+| UI-AUTH-002    | Improved      | Workspace billing panel now surfaces reconciliation readiness, source-fingerprint coverage, SKU match coverage, and the invoice-of-record caveat                                          |
+| TF-GEN-001     | Added         | V3 Terraform generation endpoint and UI panel now generate AWS/Azure/GCP starter bundles from NWS with provider pinning, remote-state examples, static checks, and explicit caveats       |
+| TF-GEN-002     | Improved      | V3.1 hardening adds generation profiles, private database networking checks, runtime identity baselines, policy/test/Makefile artifacts, and module-boundary documentation                |
+| TF-GEN-003     | Improved      | V3.2 assurance adds generated CAF/WAF/Terraform framework-alignment evidence and topology-aware public/private ingress/load-balancer controls                                             |
+| TF-GEN-004     | Improved      | V3.3 adds downloadable Terraform ZIP export, bundle manifest hash evidence, generated validation runner, and frontend ZIP/evidence download actions                                       |
+| TF-GEN-005     | Improved      | V3.4 replaces Terraform module placeholders with AWS/Azure/GCP network, compute, and data starter modules plus static module-library validation                                           |
+| HND-001        | Added         | Customer handover package added under `docs/`, with usage, deployment, runbook, competitive comparison, architecture, and evidence ledger                                                 |
+| HND-002        | Added         | `npm run handover:check` validates the handover package and runs inside the full local `npm run check` floor                                                                              |
+| OSS-001        | Added         | `npm run public:readiness:check` validates public-readiness docs, community health files, demo evidence hooks, tracked env-file safety, and provider-logo safeguards                      |
+| AUD-001        | Added         | `npm run browser:audit` produces browser audit artifacts for desktop, 320px reflow, and 200% zoom-equivalent scenarios                                                                    |
+| AUD-002        | Fixed         | `npm run browser:audit` now runs formal `axe-core` and Node-20-compatible Lighthouse 12 checks; latest artifact passed with zero axe violations and Lighthouse scores 1.00/1.00/1.00/0.92 |
 
 ## Verification
 
@@ -135,7 +137,23 @@ Local static/regression gates:
 - Customer handover package gate passed with `npm run handover:check`.
 - Public OSS readiness gate passed with `npm run public:readiness:check`.
 - Browser audit artifact gate passed with `npm run browser:audit`: desktop,
-  320px reflow, and 200% zoom-equivalent scenarios passed.
+  320px reflow, and 200% zoom-equivalent scenarios passed. Formal axe-core
+  scans found zero violations across home, executive, and engineering states;
+  Lighthouse scores were Performance 1.00, Accessibility 1.00, Best Practices
+  1.00, and SEO 0.92.
+- Formal browser audit tooling regression passed on 2026-07-08:
+  - `npm run format:check`, `npm run public:readiness:check`,
+    `npm run release:check`, and `npm run ci:lint` passed.
+  - `npm run test:production-readiness` passed: API 10 suites / 135 tests; web
+    2 suites / 84 tests.
+  - `npm run check` passed: API 51 suites / 400 tests; web 11 suites / 141
+    tests; graph validation 312 nodes / 312 edges; pricing coverage, progress
+    verification, QA/security suppression, database, DevOps, cloud, release,
+    handover, and provider credential gates passed.
+  - `npm run ci:build` passed with the existing Vite environment-placeholder
+    and chunk-size warnings.
+  - `npm audit --audit-level=high` passed; the known Graphify/Ollama transitive
+    npm advisories remain low severity with no available fix.
 - Customer handover full local regression floor passed with `npm run check`:
   - API unit: `51` suites / `400` tests.
   - Web unit: `9` suites / `132` tests.
@@ -222,9 +240,6 @@ Machine-readable token evidence:
 - Hosted GitHub Actions still cannot prove branch CI while jobs fail before runner
   allocation. A maintainer must fix Actions runner/account/billing/quota state or
   rerun once the account can allocate runners.
-- Formal Lighthouse and axe matrices remain future scope until `lighthouse` and
-  `axe-core` are added to the toolchain. The current browser audit records
-  Playwright-native evidence and marks those dependencies unavailable.
 - Full invoice-grade pricing remains future scope: negotiated discounts, credits,
   taxes, enterprise agreements, marketplace charges, and actual provider invoice-of-record
   reconciliation are not complete. Phase 2.9 improves source-row traceability and
