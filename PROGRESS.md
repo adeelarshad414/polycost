@@ -107,6 +107,47 @@ say so explicitly rather than marking it done.
 | Customer handover and production excellence package     | Complete with known gaps (see notes) | 2026-07-07   |
 | Loading and progress experience audit/build             | Complete with known gaps (see notes) | 2026-07-08   |
 | UI Appendix O - Overlay/dialog/button audit             | Complete with known gaps (see notes) | 2026-07-08   |
+| Customer handover excellence orchestrator               | Complete with known gaps (see notes) | 2026-07-08   |
+
+## Customer handover excellence orchestrator
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-08
+
+What changed:
+
+- Combined the customer handover docs branch with the Appendix L loading/progress
+  and Appendix O overlay/button systems on one final handover branch.
+- Added `HANDOVER-CENSUS.md` and `HANDOVER-EXCELLENCE-REPORT.md`.
+- Added the explicit `handover/` package: handover README, design-system handoff,
+  core journeys, known limits, demo script, and screenshot gallery index.
+- Added a keyboard skip link to the SPA shell and expanded web metadata for
+  customer-facing previews.
+- Extended `npm run handover:check` and `npm run release:check` so the final
+  census/report/package cannot drift silently.
+
+Verification planned/performed in this branch:
+
+- `npm run handover:check` passed: 14 handover docs verified.
+- `npm run loading:check`, `npm run overlay:check`, and `npm run theme:hex:check`
+  passed.
+- `npm run ci:lint` passed.
+- Focused web component tests passed: 4 suites / 12 tests.
+- `npm run test:production-readiness` passed: API 10 suites / 135 tests; web 2
+  suites / 84 tests.
+- `npm run check` passed: API 51 suites / 400 tests; web 11 suites / 141 tests;
+  graph validation 308 nodes / 308 edges; release/handover/provider gates passed.
+- `npm run ci:build` passed with the existing Vite placeholder/chunk-size warnings.
+
+Known remaining gaps:
+
+- Fresh Lighthouse and axe sweeps were not produced in this branch; the report
+  blocks those honestly instead of claiming them.
+- 200% zoom and 320px WCAG reflow still need a dedicated browser harness.
+- Real provider/SSO/LLM/Terraform proof requires external credentials and customer
+  environment access.
+- The SPA still has no dedicated product 404 route; Vite/app fallback handles
+  unknown paths.
 
 ## Customer handover and production excellence package
 

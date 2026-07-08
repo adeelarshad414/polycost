@@ -30,6 +30,9 @@ Complete this checklist before changing the GitHub repository visibility from pr
   `docs/HOW-TO-USE.md`, `docs/DEPLOYMENT.md`, `docs/RUNBOOK.md`,
   `docs/COMPARISON.md`, `docs/ARCHITECTURE.md`, and
   `docs/CUSTOMER-HANDOVER-LEDGER.md`.
+- Review the final handover excellence artifacts:
+  `HANDOVER-CENSUS.md`, `HANDOVER-EXCELLENCE-REPORT.md`, and
+  `handover/HANDOVER-README.md`.
 - Confirm trademark-sensitive cloud logos are not present in the UI.
 - Confirm docs describe AWS/Azure/GCP as provider integrations, not endorsements.
 

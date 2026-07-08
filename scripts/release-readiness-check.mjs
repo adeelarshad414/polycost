@@ -21,6 +21,8 @@ const requiredFiles = [
   'RELEASE-CHECKLIST.md',
   'LOADING-INVENTORY.md',
   'LOADING-AUDIT-REPORT.md',
+  'HANDOVER-CENSUS.md',
+  'HANDOVER-EXCELLENCE-REPORT.md',
   'docs/development/open-source-readiness.md',
   'docs/SECURITY-SUPPRESSIONS.md',
   'docs/verification/full-progress-ledger.md',
@@ -30,6 +32,12 @@ const requiredFiles = [
   'docs/COMPARISON.md',
   'docs/ARCHITECTURE.md',
   'docs/CUSTOMER-HANDOVER-LEDGER.md',
+  'handover/HANDOVER-README.md',
+  'handover/DESIGN-SYSTEM.md',
+  'handover/JOURNEYS.md',
+  'handover/KNOWN-LIMITS.md',
+  'handover/DEMO-SCRIPT.md',
+  'handover/screenshots/README.md',
   '.github/CODEOWNERS',
   '.github/dependabot.yml',
   '.github/PULL_REQUEST_TEMPLATE.md',
@@ -118,7 +126,29 @@ await assertFileContains('README.md', [
   ['anonymous usage remains available', 'Anonymous users can still'],
   ['provider credential documentation link', 'docs/PROVIDER-CREDENTIALS.md'],
   ['handover documentation link', 'docs/CUSTOMER-HANDOVER-LEDGER.md'],
+  ['handover package link', 'handover/HANDOVER-README.md'],
+  ['handover excellence report link', 'HANDOVER-EXCELLENCE-REPORT.md'],
   ['open-source launch documentation link', 'docs/development/open-source-readiness.md'],
+]);
+
+await assertFileContains('HANDOVER-CENSUS.md', [
+  ['route and screen census', '## Route And Screen Census'],
+  ['shared component census', '## Shared Component Census'],
+  ['wiring census', '## Wiring Census'],
+]);
+
+await assertFileContains('HANDOVER-EXCELLENCE-REPORT.md', [
+  ['census summary', '## Census Summary'],
+  ['pass findings', '## Pass Findings'],
+  ['competitor teardown', '## Competitor Teardown'],
+  ['blocked section', '## Blocked'],
+  ['human decision gate register', '## HUMAN_DECISION_GATE Register'],
+]);
+
+await assertFileContains('handover/HANDOVER-README.md', [
+  ['run modes', '## Run Modes'],
+  ['environment matrix', '## Environment Matrix'],
+  ['repository map', '## Repository Map'],
 ]);
 
 await assertFileContains('docs/CUSTOMER-HANDOVER-LEDGER.md', [

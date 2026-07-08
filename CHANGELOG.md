@@ -15,6 +15,8 @@ once tagged releases begin.
   full local regression floor and release-readiness validation.
 - Customer handover documentation package: usage guide, deployment guide, runbook,
   competitive comparison, architecture overview, and handover evidence ledger.
+- Final handover excellence package with census, design-system handoff, journey
+  evidence, known-limits register, demo script, and screenshot gallery index.
 - `npm run handover:check` gate, wired into the full `npm run check` regression
   floor and release-readiness validation.
 - Open-source readiness files: license, contribution guide, support policy,

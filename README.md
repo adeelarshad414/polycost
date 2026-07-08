@@ -300,6 +300,9 @@ before switching `USE_MOCK_PROVIDERS=false`.
   points.
 - `docs/CUSTOMER-HANDOVER-LEDGER.md` records the handover verdict, evidence map,
   phase classification, and known gaps.
+- `HANDOVER-CENSUS.md` and `HANDOVER-EXCELLENCE-REPORT.md` summarize the final
+  customer-handover census, findings, evidence, and blocked items.
+- `handover/HANDOVER-README.md` is the final customer handover package entry point.
 - `HOW-TO-USE.md` and `DEPLOY.md` are older root-level compatibility guides.
 - `docs/PROVIDER-CREDENTIALS.md` covers AWS/Azure/GCP pricing-source setup and
   traceability expectations.

@@ -1688,6 +1688,9 @@ export function App({ client = polyCostClient }: AppProps) {
       className={hasComparison ? 'app-shell' : 'app-shell app-shell-minimal'}
       aria-labelledby="page-title"
     >
+      <a className="skip-link" href="#requirements">
+        Skip to comparison workspace
+      </a>
       <BootSplash active={isBooting} />
       <TopLoadingBar isLoading={isPageLoading} />
       {hasComparison ? <ScrollProgressBar /> : null}

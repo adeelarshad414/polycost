@@ -6,12 +6,20 @@ const root = process.cwd();
 const failures = [];
 
 const requiredFiles = [
+  'HANDOVER-CENSUS.md',
+  'HANDOVER-EXCELLENCE-REPORT.md',
   'docs/HOW-TO-USE.md',
   'docs/DEPLOYMENT.md',
   'docs/RUNBOOK.md',
   'docs/COMPARISON.md',
   'docs/ARCHITECTURE.md',
   'docs/CUSTOMER-HANDOVER-LEDGER.md',
+  'handover/HANDOVER-README.md',
+  'handover/DESIGN-SYSTEM.md',
+  'handover/JOURNEYS.md',
+  'handover/KNOWN-LIMITS.md',
+  'handover/DEMO-SCRIPT.md',
+  'handover/screenshots/README.md',
 ];
 
 for (const filePath of requiredFiles) {
@@ -88,12 +96,62 @@ await assertFileContains('docs/CUSTOMER-HANDOVER-LEDGER.md', [
   ['handover acceptance', 'Handover Acceptance'],
 ]);
 
+await assertFileContains('HANDOVER-CENSUS.md', [
+  ['route and screen census', '## Route And Screen Census'],
+  ['shared component census', '## Shared Component Census'],
+  ['wiring census', '## Wiring Census'],
+  ['dead UI disposition', 'Dead UI'],
+]);
+
+await assertFileContains('HANDOVER-EXCELLENCE-REPORT.md', [
+  ['census summary', '## Census Summary'],
+  ['pass findings', '## Pass Findings'],
+  ['competitor teardown', '## Competitor Teardown'],
+  ['blocked section', '## Blocked'],
+  ['human decision gates', '## HUMAN_DECISION_GATE Register'],
+]);
+
+await assertFileContains('handover/HANDOVER-README.md', [
+  ['run modes', '## Run Modes'],
+  ['environment matrix', '## Environment Matrix'],
+  ['repository map', '## Repository Map'],
+]);
+
+await assertFileContains('handover/DESIGN-SYSTEM.md', [
+  ['brand', '## Brand'],
+  ['tokens', '## Tokens'],
+  ['shared UI components', '## Shared UI Components'],
+]);
+
+await assertFileContains('handover/JOURNEYS.md', [
+  ['requirements journey', '## Journey 1: Requirements To Recommendation'],
+  ['diagram journey', '## Journey 2: Diagram To Cost'],
+  ['terraform journey', '## Journey 5: Terraform Starter Bundle'],
+]);
+
+await assertFileContains('handover/KNOWN-LIMITS.md', [
+  ['verified mock boundaries', '## Verified(mock) Boundaries'],
+  ['future product phases', '## Future Product Phases'],
+  ['verification gaps', '## Verification Gaps For Handover'],
+]);
+
+await assertFileContains('handover/DEMO-SCRIPT.md', [
+  ['10 minute demo', '# 10-Minute Demo Script'],
+  ['honest close', '## 9:00-10:00 Honest Close'],
+]);
+
+await assertFileContains('handover/screenshots/README.md', [
+  ['screenshot gallery', '# Screenshot Gallery'],
+  ['demo artifacts', 'docs/demo-artifacts/executive-overview-desktop.png'],
+]);
+
 await assertFileContains('README.md', [
   ['handover guide link', 'docs/HOW-TO-USE.md'],
   ['deployment guide link', 'docs/DEPLOYMENT.md'],
   ['runbook link', 'docs/RUNBOOK.md'],
   ['comparison guide link', 'docs/COMPARISON.md'],
   ['architecture guide link', 'docs/ARCHITECTURE.md'],
+  ['handover package link', 'handover/HANDOVER-README.md'],
 ]);
 
 if (failures.length > 0) {

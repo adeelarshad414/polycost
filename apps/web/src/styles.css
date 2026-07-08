@@ -71,6 +71,36 @@ summary:focus-visible,
   outline: 2px solid var(--pc-action-primary);
 }
 
+.skip-link {
+  position: fixed;
+  z-index: 120;
+  top: var(--pc-space-1);
+  left: var(--pc-space-1);
+  min-height: 40px;
+  align-items: center;
+  border: 1px solid var(--pc-border-strong);
+  border-radius: 8px;
+  background: var(--pc-bg-surface);
+  box-shadow: var(--pc-shadow-soft);
+  color: var(--pc-text-primary);
+  display: inline-flex;
+  font-size: var(--pc-text-sm);
+  font-weight: 800;
+  opacity: 0;
+  padding: 0 var(--pc-space-2);
+  pointer-events: none;
+  transform: translateY(calc(-1 * var(--pc-space-2)));
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.skip-link:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
 .app-shell {
   position: relative;
   isolation: isolate;
