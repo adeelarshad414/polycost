@@ -55,6 +55,7 @@ Start from `.env.example`. The most important runtime variables are:
 | Pricing       | `USE_MOCK_PROVIDERS`, `PRICING_ETL_RUN_ON_BOOT`, provider default regions |
 | Jobs          | pricing, currency, alert, and share-link cleanup cron variables           |
 | Auth          | session TTL, registration, lockout, SSO, invite delivery mode/webhook     |
+| Audit export  | audit export mode, SIEM/WORM webhook URL, signing secret, retry schedule  |
 | Rate limits   | auth, parse, diagram, compare, export, share, live-refresh limits         |
 | LLM hooks     | natural-language and diagram classifier endpoint/model variables          |
 
@@ -72,6 +73,8 @@ Use the same app topology across AWS, Azure, or GCP:
 - managed Redis or Redis-compatible queue/cache service
 - Vault or an equivalent secret manager with workload identity integration
 - scheduled workers for pricing ETL, exchange rates, alerts, and cleanup
+- scheduled audit export workers pointed at a SIEM, immutable log archive, or WORM
+  retention webhook
 - centralized logs, metrics, alerts, and audit retention
 
 Cloud equivalents:

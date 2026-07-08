@@ -1942,6 +1942,10 @@ describe('ApiDatabaseRepository', () => {
         };
       }
 
+      if (text.includes('INSERT INTO team_audit_event_exports')) {
+        return { rows: [], rowCount: 1 };
+      }
+
       throw new Error(`Unexpected transactional query: ${text}`);
     });
     const client = {
@@ -1958,7 +1962,11 @@ describe('ApiDatabaseRepository', () => {
       connect,
       end: jest.fn(async () => undefined),
     } as unknown as PgPoolLike;
-    const repository = new ApiDatabaseRepository(configService, secretsReader, () => pool);
+    const repository = new ApiDatabaseRepository(
+      configServiceWith({ AUTH_AUDIT_EXPORT_MODE: 'webhook' }),
+      secretsReader,
+      () => pool,
+    );
 
     await expect(
       repository.createTeamInvitation({
@@ -2008,6 +2016,10 @@ describe('ApiDatabaseRepository', () => {
         }),
       ],
     );
+    expect(clientQuery).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO team_audit_event_exports'),
+      ['99999999-9999-4999-8999-999999999999'],
+    );
     expect(clientQuery).toHaveBeenLastCalledWith('COMMIT');
     expect(client.release).toHaveBeenCalledTimes(1);
   });
@@ -2048,6 +2060,105 @@ describe('ApiDatabaseRepository', () => {
     expect(clientQuery).toHaveBeenCalledTimes(1);
     expect(clientQuery).not.toHaveBeenCalledWith('ROLLBACK');
     expect(client.release).toHaveBeenCalledTimes(1);
+  });
+
+  it('claims and updates team audit export outbox rows', async () => {
+    const createdAt = new Date('2026-07-06T00:00:00.000Z');
+    const attemptedAt = new Date('2026-07-06T00:05:00.000Z');
+    const query = jest.fn(async (text: string) => {
+      if (text.includes('WITH selected_exports')) {
+        return {
+          rows: [
+            {
+              export_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              audit_event_id: '99999999-9999-4999-8999-999999999999',
+              destination: 'webhook',
+              export_status: 'processing',
+              attempts: 1,
+              next_attempt_at: attemptedAt,
+              last_attempt_at: attemptedAt,
+              delivered_at: null,
+              last_error: null,
+              export_created_at: createdAt,
+              export_updated_at: attemptedAt,
+              id: '99999999-9999-4999-8999-999999999999',
+              team_id: '22222222-2222-4222-8222-222222222222',
+              actor_account_id: '11111111-1111-4111-8111-111111111111',
+              actor_email: 'architect@example.com',
+              action: 'team.invitation.created',
+              target_type: 'invitation',
+              target_id: '88888888-8888-4888-8888-888888888888',
+              metadata: {
+                email: 'finops@example.com',
+                role: 'member',
+              },
+              created_at: createdAt,
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+
+      if (text.includes("SET status = 'delivered'")) {
+        return { rows: [], rowCount: 1 };
+      }
+
+      if (text.includes('RETURNING status')) {
+        return { rows: [{ status: 'pending' }], rowCount: 1 };
+      }
+
+      throw new Error(`Unhandled export outbox query: ${text}`);
+    });
+    const repository = createRepository(query);
+
+    await expect(
+      repository.claimPendingTeamAuditExports({
+        now: attemptedAt.toISOString(),
+        limit: 1000,
+        maxAttempts: 5,
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        exportId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        auditEventId: '99999999-9999-4999-8999-999999999999',
+        destination: 'webhook',
+        status: 'processing',
+        attempts: 1,
+        auditEvent: expect.objectContaining({
+          id: '99999999-9999-4999-8999-999999999999',
+          actorEmail: 'architect@example.com',
+          action: 'team.invitation.created',
+        }),
+      }),
+    ]);
+    await repository.markTeamAuditExportDelivered({
+      exportId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      deliveredAt: attemptedAt.toISOString(),
+    });
+    await expect(
+      repository.markTeamAuditExportFailed({
+        exportId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        error: 'webhook unavailable',
+        nextAttemptAt: '2026-07-06T00:10:00.000Z',
+        maxAttempts: 5,
+      }),
+    ).resolves.toBe('pending');
+
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('WITH selected_exports'), [
+      attemptedAt.toISOString(),
+      5,
+      500,
+    ]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("SET status = 'delivered'"), [
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      attemptedAt.toISOString(),
+    ]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('last_error = left($2, 500)'), [
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'webhook unavailable',
+      '2026-07-06T00:10:00.000Z',
+      5,
+    ]);
   });
 
   it('rolls back transactional auth and billing writes and closes the pool', async () => {
@@ -2143,4 +2254,16 @@ function createRepository(query: jest.Mock): ApiDatabaseRepository {
   };
 
   return new ApiDatabaseRepository(configService, secretsReader, () => pool);
+}
+
+function configServiceWith(overrides: Partial<AppConfig>): ConfigService<AppConfig, true> {
+  return {
+    get: jest.fn((key: keyof AppConfig) => {
+      if (key === 'AUTH_AUDIT_EXPORT_MODE' && overrides.AUTH_AUDIT_EXPORT_MODE !== undefined) {
+        return overrides.AUTH_AUDIT_EXPORT_MODE;
+      }
+
+      return (configService.get as jest.Mock)(key);
+    }),
+  } as unknown as ConfigService<AppConfig, true>;
 }

@@ -10,6 +10,7 @@ import {
   CostManagementJobSummary,
   CURRENCY_SYNC_JOB_NAME,
   SHARE_LINK_CLEANUP_JOB_NAME,
+  TEAM_AUDIT_EXPORT_JOB_NAME,
 } from './cost-management-jobs.types';
 import { CostManagementJobsService } from './cost-management-jobs.service';
 
@@ -70,6 +71,10 @@ export class CostManagementJobsScheduler implements OnModuleInit, OnModuleDestro
         SHARE_LINK_CLEANUP_JOB_NAME,
         this.configService.get('SHARE_LINK_CLEANUP_SCHEDULE_CRON', { infer: true }),
       ),
+      this.scheduleJob(
+        TEAM_AUDIT_EXPORT_JOB_NAME,
+        this.configService.get('AUTH_AUDIT_EXPORT_SCHEDULE_CRON', { infer: true }),
+      ),
     ]);
   }
 
@@ -97,6 +102,8 @@ export class CostManagementJobsScheduler implements OnModuleInit, OnModuleDestro
           return await this.jobsService.evaluateBudgetAlerts();
         case SHARE_LINK_CLEANUP_JOB_NAME:
           return await this.jobsService.cleanupExpiredShareLinks();
+        case TEAM_AUDIT_EXPORT_JOB_NAME:
+          return await this.jobsService.flushPendingAuditExports();
         default:
           throw new Error(`Unsupported cost-management job: ${job.name}`);
       }

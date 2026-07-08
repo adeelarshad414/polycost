@@ -310,9 +310,10 @@ Machine-readable token evidence:
   rerun once the account can allocate runners.
 - Phase 2.14 adds an append-only team audit trail for privileged team, invite, SSO,
   billing import, and reconciliation actions, with admin-only API/UI visibility. Phase 2.15
-  transaction-couples privileged mutation writes with their audit rows. It is still not a
-  fully immutable compliance journal because events are not exported to an external
-  SIEM/WORM retention service.
+  transaction-couples privileged mutation writes with their audit rows. Phase 2.16 adds a
+  same-transaction audit export outbox plus signed SIEM/WORM webhook delivery workers. Full
+  immutability still depends on the deployed external receiver's retention policy and
+  acceptance evidence.
 - Full invoice-grade pricing remains future scope: negotiated discounts, credits,
   taxes, enterprise agreements, marketplace charges, amortization semantics, and
   actual provider invoice-of-record reconciliation are not complete. Phase 2.9 and

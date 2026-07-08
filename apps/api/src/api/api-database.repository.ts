@@ -393,6 +393,20 @@ interface TeamAuditEventRow {
   created_at: Date;
 }
 
+interface TeamAuditExportClaimRow extends TeamAuditEventRow {
+  export_id: string;
+  audit_event_id: string;
+  destination: 'webhook';
+  export_status: TeamAuditExportStatus;
+  attempts: number;
+  next_attempt_at: Date | null;
+  last_attempt_at: Date | null;
+  delivered_at: Date | null;
+  last_error: string | null;
+  export_created_at: Date;
+  export_updated_at: Date;
+}
+
 interface TeamInvitationWithTokenRow extends TeamInvitationRow {
   token_hash: string;
 }
@@ -489,6 +503,21 @@ type TeamAuditEventInput = {
   metadata?: Record<string, unknown>;
 };
 type TeamAuditMutationInput = Omit<TeamAuditEventInput, 'teamId'>;
+export type TeamAuditExportStatus = 'pending' | 'processing' | 'delivered' | 'failed';
+export interface TeamAuditExportClaimRecord {
+  exportId: string;
+  auditEventId: string;
+  destination: 'webhook';
+  status: TeamAuditExportStatus;
+  attempts: number;
+  auditEvent: TeamAuditEventRecord;
+  nextAttemptAt?: string;
+  lastAttemptAt?: string;
+  deliveredAt?: string;
+  lastError?: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 const defaultPgPoolFactory: PgPoolFactory = (config) => new Pool(config);
 
@@ -2732,7 +2761,32 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
       ],
     );
 
-    return toTeamAuditEventRecord(result.rows[0]);
+    const record = toTeamAuditEventRecord(result.rows[0]);
+
+    if (this.configService.get('AUTH_AUDIT_EXPORT_MODE', { infer: true }) === 'webhook') {
+      await this.enqueueTeamAuditExport(queryRunner, record.id);
+    }
+
+    return record;
+  }
+
+  private async enqueueTeamAuditExport(
+    queryRunner: PgQueryRunner,
+    auditEventId: string,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+        INSERT INTO team_audit_event_exports (
+          audit_event_id,
+          destination,
+          status
+        )
+        VALUES ($1, 'webhook', 'pending')
+        ON CONFLICT (audit_event_id, destination)
+        DO NOTHING
+      `,
+      [auditEventId],
+    );
   }
 
   async listTeamAuditEvents(teamId: string, limit = 25): Promise<TeamAuditEventRecord[]> {
@@ -2763,6 +2817,137 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     );
 
     return result.rows.map(toTeamAuditEventRecord);
+  }
+
+  async claimPendingTeamAuditExports(input: {
+    now: string;
+    limit: number;
+    maxAttempts: number;
+  }): Promise<TeamAuditExportClaimRecord[]> {
+    const result = await (
+      await this.getPool()
+    ).query<TeamAuditExportClaimRow>(
+      `
+        WITH selected_exports AS (
+          SELECT id
+          FROM team_audit_event_exports
+          WHERE destination = 'webhook'
+            AND (
+              status = 'pending'
+              OR (
+                status = 'processing'
+                AND last_attempt_at <= ($1::timestamptz - interval '15 minutes')
+              )
+            )
+            AND next_attempt_at <= $1
+            AND attempts < $2
+          ORDER BY created_at ASC,
+                   id ASC
+          LIMIT $3
+          FOR UPDATE SKIP LOCKED
+        ),
+        claimed_exports AS (
+          UPDATE team_audit_event_exports
+          SET status = 'processing',
+              attempts = attempts + 1,
+              last_attempt_at = $1,
+              last_error = NULL,
+              updated_at = now()
+          FROM selected_exports
+          WHERE team_audit_event_exports.id = selected_exports.id
+          RETURNING team_audit_event_exports.id AS export_id,
+                    team_audit_event_exports.audit_event_id,
+                    team_audit_event_exports.destination,
+                    team_audit_event_exports.status AS export_status,
+                    team_audit_event_exports.attempts,
+                    team_audit_event_exports.next_attempt_at,
+                    team_audit_event_exports.last_attempt_at,
+                    team_audit_event_exports.delivered_at,
+                    team_audit_event_exports.last_error,
+                    team_audit_event_exports.created_at AS export_created_at,
+                    team_audit_event_exports.updated_at AS export_updated_at
+        )
+        SELECT claimed_exports.export_id,
+               claimed_exports.audit_event_id,
+               claimed_exports.destination,
+               claimed_exports.export_status,
+               claimed_exports.attempts,
+               claimed_exports.next_attempt_at,
+               claimed_exports.last_attempt_at,
+               claimed_exports.delivered_at,
+               claimed_exports.last_error,
+               claimed_exports.export_created_at,
+               claimed_exports.export_updated_at,
+               team_audit_events.id,
+               team_audit_events.team_id,
+               team_audit_events.actor_account_id,
+               accounts.email AS actor_email,
+               team_audit_events.action,
+               team_audit_events.target_type,
+               team_audit_events.target_id,
+               team_audit_events.metadata,
+               team_audit_events.created_at
+        FROM claimed_exports
+        JOIN team_audit_events
+          ON team_audit_events.id = claimed_exports.audit_event_id
+        LEFT JOIN accounts
+          ON accounts.id = team_audit_events.actor_account_id
+        ORDER BY claimed_exports.export_created_at ASC,
+                 claimed_exports.export_id ASC
+      `,
+      [input.now, input.maxAttempts, Math.max(1, Math.min(input.limit, 500))],
+    );
+
+    return result.rows.map(toTeamAuditExportClaimRecord);
+  }
+
+  async markTeamAuditExportDelivered(input: {
+    exportId: string;
+    deliveredAt: string;
+  }): Promise<void> {
+    await (
+      await this.getPool()
+    ).query(
+      `
+        UPDATE team_audit_event_exports
+        SET status = 'delivered',
+            delivered_at = $2,
+            last_error = NULL,
+            updated_at = now()
+        WHERE id = $1
+      `,
+      [input.exportId, input.deliveredAt],
+    );
+  }
+
+  async markTeamAuditExportFailed(input: {
+    exportId: string;
+    error: string;
+    nextAttemptAt: string;
+    maxAttempts: number;
+  }): Promise<TeamAuditExportStatus | undefined> {
+    const result = await (
+      await this.getPool()
+    ).query<{ status: TeamAuditExportStatus }>(
+      `
+        UPDATE team_audit_event_exports
+        SET status = CASE
+              WHEN attempts >= $4 THEN 'failed'
+              ELSE 'pending'
+            END,
+            next_attempt_at = CASE
+              WHEN attempts >= $4 THEN next_attempt_at
+              ELSE $3
+            END,
+            last_error = left($2, 500),
+            updated_at = now()
+        WHERE id = $1
+        RETURNING status
+      `,
+      [input.exportId, input.error, input.nextAttemptAt, input.maxAttempts],
+    );
+
+    return result.rows[0]?.status;
   }
 
   async revokeTeamInvitation(input: {
@@ -3932,6 +4117,23 @@ function toTeamAuditEventRecord(row: TeamAuditEventRow): TeamAuditEventRecord {
     ...(row.target_id ? { targetId: row.target_id } : {}),
     metadata: row.metadata ?? {},
     createdAt: row.created_at.toISOString(),
+  };
+}
+
+function toTeamAuditExportClaimRecord(row: TeamAuditExportClaimRow): TeamAuditExportClaimRecord {
+  return {
+    exportId: row.export_id,
+    auditEventId: row.audit_event_id,
+    destination: row.destination,
+    status: row.export_status,
+    attempts: row.attempts,
+    auditEvent: toTeamAuditEventRecord(row),
+    ...(row.next_attempt_at ? { nextAttemptAt: row.next_attempt_at.toISOString() } : {}),
+    ...(row.last_attempt_at ? { lastAttemptAt: row.last_attempt_at.toISOString() } : {}),
+    ...(row.delivered_at ? { deliveredAt: row.delivered_at.toISOString() } : {}),
+    ...(row.last_error ? { lastError: row.last_error } : {}),
+    createdAt: row.export_created_at.toISOString(),
+    updatedAt: row.export_updated_at.toISOString(),
   };
 }
 

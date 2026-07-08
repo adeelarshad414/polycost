@@ -42,6 +42,12 @@ describe('config schema', () => {
     expect(config.AUTH_INVITE_DELIVERY_MODE).toBe('panel');
     expect(config.AUTH_INVITE_DELIVERY_WEBHOOK_URL).toBeUndefined();
     expect(config.AUTH_INVITE_DELIVERY_WEBHOOK_SECRET).toBeUndefined();
+    expect(config.AUTH_AUDIT_EXPORT_MODE).toBe('disabled');
+    expect(config.AUTH_AUDIT_EXPORT_WEBHOOK_URL).toBeUndefined();
+    expect(config.AUTH_AUDIT_EXPORT_WEBHOOK_SECRET).toBeUndefined();
+    expect(config.AUTH_AUDIT_EXPORT_SCHEDULE_CRON).toBe('*/5 * * * *');
+    expect(config.AUTH_AUDIT_EXPORT_BATCH_SIZE).toBe(50);
+    expect(config.AUTH_AUDIT_EXPORT_MAX_ATTEMPTS).toBe(5);
   });
 
   it('fails fast for invalid config', () => {
@@ -98,14 +104,18 @@ describe('config schema', () => {
       PRICING_SYNC_ALERT_WEBHOOK_URL: '',
       AUTH_INVITE_DELIVERY_WEBHOOK_URL: '',
       AUTH_INVITE_DELIVERY_WEBHOOK_SECRET: '',
+      AUTH_AUDIT_EXPORT_WEBHOOK_URL: '',
+      AUTH_AUDIT_EXPORT_WEBHOOK_SECRET: '',
     });
 
     expect(config.PRICING_SYNC_ALERT_WEBHOOK_URL).toBeUndefined();
     expect(config.AUTH_INVITE_DELIVERY_WEBHOOK_URL).toBeUndefined();
     expect(config.AUTH_INVITE_DELIVERY_WEBHOOK_SECRET).toBeUndefined();
+    expect(config.AUTH_AUDIT_EXPORT_WEBHOOK_URL).toBeUndefined();
+    expect(config.AUTH_AUDIT_EXPORT_WEBHOOK_SECRET).toBeUndefined();
   });
 
-  it('accepts signed invite delivery webhooks for production-bound environments', () => {
+  it('accepts signed invite delivery and audit export webhooks for production-bound environments', () => {
     const config = validateConfig({
       ...baseConfig,
       NODE_ENV: 'production',
@@ -114,11 +124,18 @@ describe('config schema', () => {
       AUTH_INVITE_DELIVERY_MODE: 'webhook',
       AUTH_INVITE_DELIVERY_WEBHOOK_URL: 'https://mail.example.com/polycost/invites',
       AUTH_INVITE_DELIVERY_WEBHOOK_SECRET: 'production-invite-webhook-secret',
+      AUTH_AUDIT_EXPORT_MODE: 'webhook',
+      AUTH_AUDIT_EXPORT_WEBHOOK_URL: 'https://siem.example.com/polycost/audit-events',
+      AUTH_AUDIT_EXPORT_WEBHOOK_SECRET: 'production-audit-export-secret',
     });
 
     expect(config.AUTH_INVITE_DELIVERY_MODE).toBe('webhook');
     expect(config.AUTH_INVITE_DELIVERY_WEBHOOK_URL).toBe(
       'https://mail.example.com/polycost/invites',
+    );
+    expect(config.AUTH_AUDIT_EXPORT_MODE).toBe('webhook');
+    expect(config.AUTH_AUDIT_EXPORT_WEBHOOK_URL).toBe(
+      'https://siem.example.com/polycost/audit-events',
     );
   });
 
@@ -129,6 +146,9 @@ describe('config schema', () => {
         NODE_ENV: 'staging',
         CORS_ALLOWED_ORIGINS: 'https://polycost.example.com',
         AUTH_SSO_STATE_SECRET: 'production-sso-state-secret-value',
+        AUTH_AUDIT_EXPORT_MODE: 'webhook',
+        AUTH_AUDIT_EXPORT_WEBHOOK_URL: 'https://siem.example.com/polycost/audit-events',
+        AUTH_AUDIT_EXPORT_WEBHOOK_SECRET: 'production-audit-export-secret',
       }),
     ).toThrow('Staging and production invite delivery must use the webhook provider.');
 
@@ -141,6 +161,9 @@ describe('config schema', () => {
         AUTH_INVITE_DELIVERY_MODE: 'webhook',
         AUTH_INVITE_DELIVERY_WEBHOOK_URL: 'http://mail.example.com/polycost/invites',
         AUTH_INVITE_DELIVERY_WEBHOOK_SECRET: 'production-invite-webhook-secret',
+        AUTH_AUDIT_EXPORT_MODE: 'webhook',
+        AUTH_AUDIT_EXPORT_WEBHOOK_URL: 'https://siem.example.com/polycost/audit-events',
+        AUTH_AUDIT_EXPORT_WEBHOOK_SECRET: 'production-audit-export-secret',
       }),
     ).toThrow('Invite delivery webhook URL must use HTTPS outside development.');
 
@@ -150,6 +173,42 @@ describe('config schema', () => {
         AUTH_INVITE_DELIVERY_MODE: 'webhook',
       }),
     ).toThrow('AUTH_INVITE_DELIVERY_WEBHOOK_URL is required for webhook invite delivery.');
+  });
+
+  it('requires production-bound audit export to use signed HTTPS webhooks', () => {
+    expect(() =>
+      validateConfig({
+        ...baseConfig,
+        NODE_ENV: 'staging',
+        CORS_ALLOWED_ORIGINS: 'https://polycost.example.com',
+        AUTH_SSO_STATE_SECRET: 'production-sso-state-secret-value',
+        AUTH_INVITE_DELIVERY_MODE: 'webhook',
+        AUTH_INVITE_DELIVERY_WEBHOOK_URL: 'https://mail.example.com/polycost/invites',
+        AUTH_INVITE_DELIVERY_WEBHOOK_SECRET: 'production-invite-webhook-secret',
+      }),
+    ).toThrow('Staging and production audit export must use the webhook provider.');
+
+    expect(() =>
+      validateConfig({
+        ...baseConfig,
+        NODE_ENV: 'production',
+        CORS_ALLOWED_ORIGINS: 'https://polycost.example.com',
+        AUTH_SSO_STATE_SECRET: 'production-sso-state-secret-value',
+        AUTH_INVITE_DELIVERY_MODE: 'webhook',
+        AUTH_INVITE_DELIVERY_WEBHOOK_URL: 'https://mail.example.com/polycost/invites',
+        AUTH_INVITE_DELIVERY_WEBHOOK_SECRET: 'production-invite-webhook-secret',
+        AUTH_AUDIT_EXPORT_MODE: 'webhook',
+        AUTH_AUDIT_EXPORT_WEBHOOK_URL: 'http://siem.example.com/polycost/audit-events',
+        AUTH_AUDIT_EXPORT_WEBHOOK_SECRET: 'production-audit-export-secret',
+      }),
+    ).toThrow('Audit export webhook URL must use HTTPS outside development.');
+
+    expect(() =>
+      validateConfig({
+        ...baseConfig,
+        AUTH_AUDIT_EXPORT_MODE: 'webhook',
+      }),
+    ).toThrow('AUTH_AUDIT_EXPORT_WEBHOOK_URL is required for audit export webhooks.');
   });
 
   it('allows production deployments to opt into live provider adapters and scheduled-only sync', () => {
@@ -164,6 +223,9 @@ describe('config schema', () => {
       AUTH_INVITE_DELIVERY_MODE: 'webhook',
       AUTH_INVITE_DELIVERY_WEBHOOK_URL: 'https://mail.example.com/polycost/invites',
       AUTH_INVITE_DELIVERY_WEBHOOK_SECRET: 'production-invite-webhook-secret',
+      AUTH_AUDIT_EXPORT_MODE: 'webhook',
+      AUTH_AUDIT_EXPORT_WEBHOOK_URL: 'https://siem.example.com/polycost/audit-events',
+      AUTH_AUDIT_EXPORT_WEBHOOK_SECRET: 'production-audit-export-secret',
     });
 
     expect(config.USE_MOCK_PROVIDERS).toBe(false);
@@ -181,6 +243,9 @@ describe('config schema', () => {
         AUTH_INVITE_DELIVERY_MODE: 'webhook',
         AUTH_INVITE_DELIVERY_WEBHOOK_URL: 'https://mail.example.com/polycost/invites',
         AUTH_INVITE_DELIVERY_WEBHOOK_SECRET: 'production-invite-webhook-secret',
+        AUTH_AUDIT_EXPORT_MODE: 'webhook',
+        AUTH_AUDIT_EXPORT_WEBHOOK_URL: 'https://siem.example.com/polycost/audit-events',
+        AUTH_AUDIT_EXPORT_WEBHOOK_SECRET: 'production-audit-export-secret',
       }),
     ).toThrow(
       'VAULT_TOKEN_FILE is required when real provider pricing is enabled outside development.',
@@ -198,6 +263,9 @@ describe('config schema', () => {
         AUTH_INVITE_DELIVERY_MODE: 'webhook',
         AUTH_INVITE_DELIVERY_WEBHOOK_URL: 'https://mail.example.com/polycost/invites',
         AUTH_INVITE_DELIVERY_WEBHOOK_SECRET: 'production-invite-webhook-secret',
+        AUTH_AUDIT_EXPORT_MODE: 'webhook',
+        AUTH_AUDIT_EXPORT_WEBHOOK_URL: 'https://siem.example.com/polycost/audit-events',
+        AUTH_AUDIT_EXPORT_WEBHOOK_SECRET: 'production-audit-export-secret',
       }),
     ).toThrow('CHANGE_ME_DEV_ONLY and dummy values are not allowed outside development.');
   });

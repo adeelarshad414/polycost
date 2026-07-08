@@ -196,6 +196,34 @@ describe('CostManagementJobsService', () => {
     });
     expect(repository.insertCostObservation).not.toHaveBeenCalled();
   });
+
+  it('flushes pending team audit exports through the audit export service', async () => {
+    const auditExportService = {
+      flushPendingExports: jest.fn(async () => ({
+        status: 'success' as const,
+        claimed: 2,
+        delivered: 2,
+        failed: 0,
+        deadLettered: 0,
+        ranAt: '2026-07-08T00:00:00.000Z',
+      })),
+    };
+    const service = new CostManagementJobsService(
+      repositoryMock() as unknown as ApiDatabaseRepository,
+      exchangeRateClientMock(),
+      auditExportService as never,
+    );
+
+    await expect(service.flushPendingAuditExports()).resolves.toEqual({
+      status: 'success',
+      claimed: 2,
+      delivered: 2,
+      failed: 0,
+      deadLettered: 0,
+      ranAt: '2026-07-08T00:00:00.000Z',
+    });
+    expect(auditExportService.flushPendingExports).toHaveBeenCalledTimes(1);
+  });
 });
 
 function repositoryMock(overrides: Record<string, unknown> = {}) {

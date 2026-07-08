@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ProviderId } from '../adapters/common/cloud-provider-adapter';
 import { ApiDatabaseRepository } from '../api/api-database.repository';
 import { BudgetEvaluationRecord, WorkloadCostBreakdown } from '../api/cost-management.types';
+import { TeamAuditExportService, TeamAuditExportSummary } from '../api/team-audit-export.service';
 import { ExchangeRateClient } from './exchange-rate.client';
 import {
   AlertEvaluationSummary,
@@ -18,6 +19,7 @@ export class CostManagementJobsService {
   constructor(
     private readonly repository: ApiDatabaseRepository,
     private readonly exchangeRateClient: ExchangeRateClient,
+    private readonly auditExportService?: TeamAuditExportService,
   ) {}
 
   async syncCurrencyRates(baseCurrency = 'USD'): Promise<CurrencySyncSummary> {
@@ -81,6 +83,22 @@ export class CostManagementJobsService {
       revokedLinks,
       ranAt,
     };
+  }
+
+  async flushPendingAuditExports(): Promise<TeamAuditExportSummary> {
+    if (!this.auditExportService) {
+      return {
+        status: 'skipped',
+        claimed: 0,
+        delivered: 0,
+        failed: 0,
+        deadLettered: 0,
+        ranAt: new Date().toISOString(),
+        reason: 'audit export service is not configured',
+      };
+    }
+
+    return this.auditExportService.flushPendingExports();
   }
 
   private async evaluateBudget(record: BudgetEvaluationRecord): Promise<{

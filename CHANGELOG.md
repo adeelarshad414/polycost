@@ -49,6 +49,8 @@ once tagged releases begin.
   and reconciliation actions, with guarded admin API reads and workspace UI visibility.
 - Transaction-coupled audit writes for privileged team, invite, SSO, billing import,
   and reconciliation mutations.
+- Team audit export outbox with signed webhook delivery, retry/dead-letter status, and
+  staging/production config guards.
 
 ### Notes
 

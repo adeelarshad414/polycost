@@ -3982,6 +3982,33 @@ Status: implemented locally on 2026-07-08.
 - Remaining caveat: audit rows are stored in PolyCost's database only; external SIEM/WORM
   export remains future compliance hardening.
 
+## Phase 2.16 — Team audit export outbox
+
+Status: implemented locally on 2026-07-08.
+
+- Added `031_team_audit_export_outbox.sql`, an outbox table for durable audit export
+  delivery state, retry attempts, and dead-letter status.
+- Added staging/production config guards requiring `AUTH_AUDIT_EXPORT_MODE=webhook`,
+  an HTTPS `AUTH_AUDIT_EXPORT_WEBHOOK_URL`, and a non-dummy
+  `AUTH_AUDIT_EXPORT_WEBHOOK_SECRET`.
+- When audit export is enabled, every team audit event insert also enqueues a
+  same-transaction outbox row for signed webhook delivery.
+- Added `TeamAuditExportService`, which claims pending outbox rows, signs payloads with
+  HMAC-SHA256, posts them to the configured SIEM/WORM receiver, marks delivered rows,
+  and schedules retry/dead-letter state for failures.
+- Wired recurring `team-audit-export` worker scheduling through the existing job
+  infrastructure using `AUTH_AUDIT_EXPORT_SCHEDULE_CRON`.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/config/config.schema.spec.ts src/api/api-database.repository.spec.ts src/api/team-audit-export.service.spec.ts src/cost-management-jobs/cost-management-jobs.scheduler.spec.ts src/cost-management-jobs/cost-management-jobs.service.spec.ts`
+  passed 47/47, `npm run ci:lint`, `npm run test:production-readiness` passed with
+  156/156 API tests and 85/85 web tests, `npm run build`, and `npm run security:audit`
+  passed. Full `npm run check` passed with 420/420 API tests, 142/142 web tests,
+  graph validation at 316 nodes/316 edges, progress verification, QA, DB validation,
+  release, handover, and provider-credential checks green.
+- Remaining caveat: PolyCost can now emit signed audit events to an external receiver,
+  but production-grade immutability still depends on the deployed SIEM/WORM system's
+  retention policy and acceptance evidence.
+
 ## Deviations from spec log
 
 Every implementation divergence from `00` through `11` should be logged here with

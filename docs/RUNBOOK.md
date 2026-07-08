@@ -185,8 +185,11 @@ Actions:
 2. Confirm `AUTH_SSO_STATE_SECRET` is not a dummy value outside development.
 3. For staging/production, confirm `AUTH_INVITE_DELIVERY_MODE=webhook`, the webhook
    URL uses HTTPS, and `AUTH_INVITE_DELIVERY_WEBHOOK_SECRET` is non-dummy.
-4. Check rate-limit and lockout settings.
-5. Re-run focused auth tests:
+4. Confirm `AUTH_AUDIT_EXPORT_MODE=webhook`, the audit export URL uses HTTPS, and
+   `AUTH_AUDIT_EXPORT_WEBHOOK_SECRET` is non-dummy so team audit events leave the
+   app database for SIEM/WORM retention.
+5. Check rate-limit and lockout settings.
+6. Re-run focused auth tests:
 
 ```bash
 npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/api/auth.controller.spec.ts src/api/invitation-delivery.service.spec.ts
