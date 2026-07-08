@@ -87,6 +87,28 @@ export interface InvoiceGradeArtifactVerificationInput {
   notes?: string;
 }
 
+export interface InvoiceArtifactBlobUploadInput {
+  fileName: string;
+  mimeType: string;
+  content: string;
+  encoding?: 'text' | 'base64';
+  sha256?: string;
+}
+
+export interface InvoiceArtifactBlobRecord {
+  id: string;
+  reconciliationId: string;
+  artifactId: string;
+  teamId?: string;
+  fileName: string;
+  mimeType: string;
+  contentSha256: string;
+  contentSizeBytes: number;
+  contentBase64: string;
+  uploadedByAccountId?: string;
+  uploadedAt: string;
+}
+
 export interface InvoiceGradeArtifactRecord extends InvoiceGradeArtifactRegistrationInput {
   id: string;
   provider: ProviderId;
@@ -102,6 +124,16 @@ export interface InvoiceGradeArtifactRecord extends InvoiceGradeArtifactRegistra
   verifiedSha256?: string;
   verificationControlTotalUsd?: number;
   verificationControlTotalDeltaUsd?: number;
+  storedBlob?: {
+    storageStatus: 'stored';
+    storageMode: 'database-bytea';
+    fileName: string;
+    mimeType: string;
+    contentSha256: string;
+    contentSizeBytes: number;
+    uploadedAt: string;
+    uploadedByAccountId?: string;
+  };
 }
 
 export interface BillingImportRecord {

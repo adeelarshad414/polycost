@@ -579,7 +579,36 @@ describe('App', () => {
     expect(text(container)).toContain(
       'Artifact metadata: 1 registered · 0 verified · metadata registered not verified',
     );
+    expect(text(container)).toContain('Artifact file not stored yet');
     expect(text(container)).toContain('Artifact metadata is registered for traceability only');
+
+    await click(buttonByText(container, 'Store artifact file'));
+    await settleAsyncEffects();
+
+    expect(client.uploadInvoiceArtifactBlob).toHaveBeenCalledWith(
+      '66666666-6666-4666-8666-666666666666',
+      'artifact-1',
+      expect.objectContaining({
+        fileName: 'aws-invoice-control-66666666.txt',
+        mimeType: 'text/plain',
+        encoding: 'text',
+        content: expect.stringContaining('artifact_id=artifact-1'),
+      }),
+      'session-token',
+    );
+    expect(text(container)).toContain('Stored file: aws-invoice-control-66666666.txt');
+    expect(text(container)).toContain('sha256 dddddddddddd');
+
+    await click(buttonByText(container, 'Download stored file'));
+    await settleAsyncEffects();
+
+    expect(client.downloadInvoiceArtifactBlob).toHaveBeenCalledWith(
+      '66666666-6666-4666-8666-666666666666',
+      'artifact-1',
+      'session-token',
+    );
+    expect(window.URL.createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+    expect(HTMLAnchorElement.prototype.click).toHaveBeenCalled();
 
     await click(buttonByText(container, 'Verify artifact evidence'));
     await settleAsyncEffects();
@@ -591,6 +620,7 @@ describe('App', () => {
         verificationStatus: 'verified',
         evidenceReference: 'review://invoice-artifacts/artifact-1',
         controlTotalUsd: 107,
+        sha256: 'd'.repeat(64),
       }),
       'session-token',
     );
@@ -4799,6 +4829,102 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       },
       createdAt: '2026-07-06T00:00:02.000Z',
     })),
+    uploadInvoiceArtifactBlob: jest.fn(async () => ({
+      id: '66666666-6666-4666-8666-666666666666',
+      importRunId: '55555555-5555-4555-8555-555555555555',
+      comparisonId: comparisonResult.comparisonId,
+      provider: 'aws' as const,
+      estimatedTotalUsd: 100,
+      invoicedTotalUsd: 107,
+      varianceUsd: 7,
+      variancePercent: 7,
+      status: 'variance-warning' as const,
+      evidence: {
+        invoiceCoverage: {
+          sourceFingerprintPercent: 100,
+          skuMatchPercent: 100,
+        },
+        invoiceAdjustmentSummary: {
+          adjustmentCostUsd: 6,
+          adjustmentLineItemCount: 4,
+          commitmentLineItemCount: 4,
+          commitmentNetCostUsd: -2,
+          commitmentEvidence: {
+            rowsRequiringProviderInventory: 4,
+            rowsRequiringAmortizationPeriod: 2,
+            rowsRequiringAllocationEvidence: 4,
+          },
+          estimateComparableVarianceUsd: 0,
+          categories: [
+            {
+              category: 'usage',
+              rowCount: 1,
+              totalCostUsd: 100,
+            },
+          ],
+        },
+        invoiceGradeReadiness: {
+          status: 'invoice-grade-blocked',
+          missingCount: 3,
+          partialCount: 2,
+          blockers: ['Provider invoice control total'],
+          artifactRegisterStatus: 'metadata-registered-not-verified',
+          registeredArtifactCount: 1,
+          verifiedArtifactCount: 0,
+        },
+        invoiceGradeArtifactRegister: {
+          status: 'metadata-registered-not-verified',
+          registeredCount: 1,
+          verifiedCount: 0,
+          artifacts: [
+            {
+              id: 'artifact-1',
+              provider: 'aws',
+              type: 'provider-invoice',
+              displayName: 'AWS invoice control packet',
+              reference: 'demo://invoice-artifacts/66666666-6666-4666-8666-666666666666',
+              sha256: 'd'.repeat(64),
+              controlTotalUsd: 107,
+              verificationStatus: 'registered',
+              registeredAt: '2026-07-06T00:00:03.000Z',
+              storedBlob: {
+                storageStatus: 'stored',
+                storageMode: 'database-bytea',
+                fileName: 'aws-invoice-control-66666666.txt',
+                mimeType: 'text/plain',
+                contentSha256: 'd'.repeat(64),
+                contentSizeBytes: 210,
+                uploadedAt: '2026-07-06T00:00:05.000Z',
+                uploadedByAccountId: '11111111-1111-4111-8111-111111111111',
+              },
+            },
+          ],
+          caveats: [
+            'Artifact metadata is registered for traceability only; files, contracts, and invoice controls are not verified by PolyCost yet.',
+          ],
+        },
+        invoiceMatchSummary: {
+          readiness: 'reconciled-evidence-ready',
+          caveats: [
+            'Reconciliation compares provider-export actuals with PolyCost estimate evidence; it is not an invoice-of-record.',
+          ],
+        },
+      },
+      createdAt: '2026-07-06T00:00:02.000Z',
+    })),
+    downloadInvoiceArtifactBlob: jest.fn(async () => ({
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      reconciliationId: '66666666-6666-4666-8666-666666666666',
+      artifactId: 'artifact-1',
+      teamId: '22222222-2222-4222-8222-222222222222',
+      fileName: 'aws-invoice-control-66666666.txt',
+      mimeType: 'text/plain',
+      contentSha256: 'd'.repeat(64),
+      contentSizeBytes: 7,
+      contentBase64: 'aW52b2ljZQ==',
+      uploadedByAccountId: '11111111-1111-4111-8111-111111111111',
+      uploadedAt: '2026-07-06T00:00:05.000Z',
+    })),
     verifyInvoiceGradeArtifact: jest.fn(async () => ({
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
@@ -4853,11 +4979,23 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
               type: 'provider-invoice',
               displayName: 'AWS invoice control packet',
               reference: 'demo://invoice-artifacts/66666666-6666-4666-8666-666666666666',
+              sha256: 'd'.repeat(64),
               controlTotalUsd: 107,
               verificationStatus: 'verified',
               registeredAt: '2026-07-06T00:00:03.000Z',
               verifiedAt: '2026-07-06T00:00:04.000Z',
               verificationEvidenceReference: 'review://invoice-artifacts/artifact-1',
+              verifiedSha256: 'd'.repeat(64),
+              storedBlob: {
+                storageStatus: 'stored',
+                storageMode: 'database-bytea',
+                fileName: 'aws-invoice-control-66666666.txt',
+                mimeType: 'text/plain',
+                contentSha256: 'd'.repeat(64),
+                contentSizeBytes: 210,
+                uploadedAt: '2026-07-06T00:00:05.000Z',
+                uploadedByAccountId: '11111111-1111-4111-8111-111111111111',
+              },
             },
           ],
           caveats: [

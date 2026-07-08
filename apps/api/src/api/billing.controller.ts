@@ -55,4 +55,32 @@ export class BillingController {
       request.auth!,
     );
   }
+
+  @Post('reconciliations/:id/artifacts/:artifactId/blob')
+  uploadInvoiceArtifactBlob(
+    @Param('id') reconciliationId: string,
+    @Param('artifactId') artifactId: string,
+    @Body() body: unknown,
+    @Req() request: RequestWithAuth,
+  ) {
+    return this.billingService.uploadInvoiceArtifactBlob(
+      reconciliationId,
+      artifactId,
+      body,
+      request.auth!,
+    );
+  }
+
+  @Get('reconciliations/:id/artifacts/:artifactId/blob')
+  downloadInvoiceArtifactBlob(
+    @Param('id') reconciliationId: string,
+    @Param('artifactId') artifactId: string,
+    @Req() request: RequestWithAuth,
+  ) {
+    return this.billingService.downloadInvoiceArtifactBlob(
+      reconciliationId,
+      artifactId,
+      request.auth!,
+    );
+  }
 }

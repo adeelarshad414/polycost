@@ -64,6 +64,7 @@ import {
   DiagramParseResult,
   INTERVALS,
   IntervalKey,
+  InvoiceArtifactBlobUploadInput,
   InvoiceGradeArtifactRegistrationInput,
   InvoiceGradeArtifactVerificationInput,
   InvoiceReconciliationRecord,
@@ -2892,6 +2893,84 @@ function WorkspaceControlCenter({
     }
   }
 
+  async function handleStoreInvoiceArtifactBlob() {
+    if (!token || billingAccessMessage || !reconciliation || !reconciliationSummary?.artifactId) {
+      onError(
+        billingAccessMessage ??
+          'Register invoice artifact metadata before storing the invoice evidence file.',
+      );
+      return;
+    }
+
+    setWorkspaceBusy('billing-artifact-upload');
+    onError(null);
+
+    try {
+      const artifactInput: InvoiceArtifactBlobUploadInput = {
+        fileName: `${reconciliation.provider}-invoice-control-${reconciliation.id.slice(0, 8)}.txt`,
+        mimeType: 'text/plain',
+        encoding: 'text',
+        content: [
+          'PolyCost invoice artifact control packet',
+          `reconciliation_id=${reconciliation.id}`,
+          `artifact_id=${reconciliationSummary.artifactId}`,
+          `provider=${reconciliation.provider}`,
+          `billing_period=${billingPeriodStart}/${billingPeriodEnd}`,
+          `invoiced_total_usd=${reconciliation.invoicedTotalUsd}`,
+          `variance_usd=${reconciliation.varianceUsd}`,
+        ].join('\n'),
+      };
+      const updated = await client.uploadInvoiceArtifactBlob(
+        reconciliation.id,
+        reconciliationSummary.artifactId,
+        artifactInput,
+        token,
+      );
+
+      setReconciliation(updated);
+      await refreshTeamAuditEvents();
+      onNotice('Invoice artifact file stored with checksum and audit metadata.');
+    } catch (artifactError) {
+      onError(formatApiError(artifactError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handleDownloadInvoiceArtifactBlob() {
+    if (!token || billingAccessMessage || !reconciliation || !reconciliationSummary?.artifactId) {
+      onError(
+        billingAccessMessage ??
+          'Store an invoice artifact file before downloading the evidence attachment.',
+      );
+      return;
+    }
+
+    setWorkspaceBusy('billing-artifact-download');
+    onError(null);
+
+    try {
+      const artifactBlob = await client.downloadInvoiceArtifactBlob(
+        reconciliation.id,
+        reconciliationSummary.artifactId,
+        token,
+      );
+      downloadBlob(
+        base64ToBlob(artifactBlob.contentBase64, artifactBlob.mimeType),
+        artifactBlob.fileName,
+      );
+      onNotice(
+        `Downloaded stored artifact ${artifactBlob.fileName} (${formatFileSize(
+          artifactBlob.contentSizeBytes,
+        )}).`,
+      );
+    } catch (artifactError) {
+      onError(formatApiError(artifactError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
   async function handleVerifyInvoiceArtifact() {
     if (!token || billingAccessMessage || !reconciliation || !reconciliationSummary?.artifactId) {
       onError(
@@ -2909,8 +2988,11 @@ function WorkspaceControlCenter({
         verificationStatus: 'verified',
         evidenceReference: `review://invoice-artifacts/${reconciliationSummary.artifactId}`,
         controlTotalUsd: reconciliation.invoicedTotalUsd,
+        ...(reconciliationSummary.artifactBlobSha256
+          ? { sha256: reconciliationSummary.artifactBlobSha256 }
+          : {}),
         notes:
-          'Demo verification based on registered metadata and matching invoice control total. Full file/contract verification remains future scope.',
+          'Demo verification based on stored artifact checksum and matching invoice control total. Full provider contract verification remains future scope.',
       };
       const updated = await client.verifyInvoiceGradeArtifact(
         reconciliation.id,
@@ -3646,6 +3728,18 @@ function WorkspaceControlCenter({
                     {reconciliationSummary.artifactVerifiedCount} verified ·{' '}
                     {reconciliationSummary.artifactRegisterStatus}
                   </small>
+                  {reconciliationSummary.artifactBlobStored ? (
+                    <small>
+                      Stored file: {reconciliationSummary.artifactBlobFileName} ·{' '}
+                      {formatFileSize(reconciliationSummary.artifactBlobSizeBytes)} · sha256{' '}
+                      {reconciliationSummary.artifactBlobSha256?.slice(0, 12)}
+                    </small>
+                  ) : reconciliationSummary.artifactId ? (
+                    <small>
+                      Artifact file not stored yet. Metadata is registered, but no evidence blob is
+                      attached.
+                    </small>
+                  ) : null}
                   <small>{reconciliationSummary.artifactPrimaryCaveat}</small>
                   <Button
                     type="button"
@@ -3659,6 +3753,34 @@ function WorkspaceControlCenter({
                     <CompareIcon />
                     Register invoice artifact
                   </Button>
+                  {reconciliationSummary.artifactId && !reconciliationSummary.artifactBlobStored ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="compact"
+                      loading={workspaceBusy === 'billing-artifact-upload'}
+                      loadingLabel="Storing artifact..."
+                      disabled={Boolean(billingAccessMessage)}
+                      onClick={handleStoreInvoiceArtifactBlob}
+                    >
+                      <CompareIcon />
+                      Store artifact file
+                    </Button>
+                  ) : null}
+                  {reconciliationSummary.artifactId && reconciliationSummary.artifactBlobStored ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="compact"
+                      loading={workspaceBusy === 'billing-artifact-download'}
+                      loadingLabel="Opening artifact..."
+                      disabled={Boolean(billingAccessMessage)}
+                      onClick={handleDownloadInvoiceArtifactBlob}
+                    >
+                      <CompareIcon />
+                      Download stored file
+                    </Button>
+                  ) : null}
                   {reconciliationSummary.artifactId &&
                   reconciliationSummary.artifactVerifiedCount <
                     reconciliationSummary.artifactRegisteredCount ? (
@@ -3764,6 +3886,8 @@ function teamAuditActionLabel(action: TeamAuditEventRecord['action']): string {
       return 'Billing artifact registered';
     case 'billing.reconciliation.artifact_verified':
       return 'Billing artifact verified';
+    case 'billing.reconciliation.artifact_blob_uploaded':
+      return 'Billing artifact file stored';
   }
 }
 
@@ -19614,6 +19738,10 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
   artifactRegisterStatus: string;
   artifactRegisteredCount: number;
   artifactVerifiedCount: number;
+  artifactBlobStored: boolean;
+  artifactBlobFileName?: string;
+  artifactBlobSha256?: string;
+  artifactBlobSizeBytes: number;
   artifactPrimaryCaveat: string;
   estimateComparableVarianceUsd: number;
   adjustmentCategories: string[];
@@ -19629,10 +19757,15 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
   const artifactRegister = objectValue(evidence.invoiceGradeArtifactRegister);
   const caveats = stringArrayValue(matchSummary.caveats);
   const artifactCaveats = stringArrayValue(artifactRegister.caveats);
-  const artifactId = arrayValue(artifactRegister.artifacts)
-    .map((artifact) => objectValue(artifact))
-    .map((artifact) => stringValue(artifact.id))
-    .find(Boolean);
+  const artifactRecords = arrayValue(artifactRegister.artifacts).map((artifact) =>
+    objectValue(artifact),
+  );
+  const primaryArtifact = artifactRecords.find((artifact) => stringValue(artifact.id));
+  const artifactId = primaryArtifact ? stringValue(primaryArtifact.id) : undefined;
+  const storedBlob = objectValue(primaryArtifact?.storedBlob);
+  const artifactBlobFileName = stringValue(storedBlob.fileName);
+  const artifactBlobSha256 = stringValue(storedBlob.contentSha256);
+  const artifactBlobSizeBytes = numberValue(storedBlob.contentSizeBytes);
   const readiness =
     stringValue(matchSummary.readiness) ??
     (record.status === 'matched' ? 'reconciled-evidence-ready' : 'reconciliation-foundation');
@@ -19682,6 +19815,10 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
     ).replace(/-/g, ' '),
     artifactRegisteredCount: numberValue(artifactRegister.registeredCount),
     artifactVerifiedCount: numberValue(artifactRegister.verifiedCount),
+    artifactBlobStored: stringValue(storedBlob.storageStatus) === 'stored',
+    ...(artifactBlobFileName ? { artifactBlobFileName } : {}),
+    ...(artifactBlobSha256 ? { artifactBlobSha256 } : {}),
+    artifactBlobSizeBytes,
     artifactPrimaryCaveat:
       artifactCaveats[0] ??
       'No invoice artifact metadata has been registered for this reconciliation yet.',

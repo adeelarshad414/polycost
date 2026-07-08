@@ -1608,7 +1608,20 @@ describe('ApiDatabaseRepository', () => {
       },
       created_at: completedAt,
     };
-    const query = jest.fn(async (text: string) => {
+    const blobRow = {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      reconciliation_id: '66666666-6666-4666-8666-666666666666',
+      artifact_id: 'artifact-1',
+      team_id: '22222222-2222-4222-8222-222222222222',
+      file_name: 'aws-invoice-control.txt',
+      mime_type: 'text/plain',
+      content_sha256: 'd'.repeat(64),
+      content_size_bytes: 7,
+      content: Buffer.from('invoice'),
+      uploaded_by_account_id: '11111111-1111-4111-8111-111111111111',
+      uploaded_at: completedAt,
+    };
+    const query = jest.fn(async (text: string, values?: unknown[]) => {
       if (text === 'BEGIN' || text === 'COMMIT' || text === 'ROLLBACK') {
         return { rows: [], rowCount: 0 };
       }
@@ -1668,18 +1681,30 @@ describe('ApiDatabaseRepository', () => {
         return { rows: [reconciliationRow], rowCount: 1 };
       }
 
+      if (text.includes('INSERT INTO invoice_artifact_blobs')) {
+        return { rows: [blobRow], rowCount: 1 };
+      }
+
+      if (text.includes('FROM invoice_artifact_blobs')) {
+        return { rows: [blobRow], rowCount: 1 };
+      }
+
       if (text.includes('UPDATE invoice_reconciliation_results')) {
-        return {
-          rows: [
-            {
-              ...reconciliationRow,
-              evidence: {
+        const evidence =
+          typeof values?.[1] === 'string'
+            ? (JSON.parse(values[1]) as Record<string, unknown>)
+            : {
                 invoiceLineItemHashes: ['b'.repeat(64)],
                 invoiceGradeArtifactRegister: {
                   registeredCount: 1,
                   status: 'metadata-registered-not-verified',
                 },
-              },
+              };
+        return {
+          rows: [
+            {
+              ...reconciliationRow,
+              evidence,
             },
           ],
           rowCount: 1,
@@ -1824,6 +1849,62 @@ describe('ApiDatabaseRepository', () => {
         }),
       }),
     );
+    await expect(
+      repository.saveInvoiceArtifactBlobAndUpdateEvidence({
+        reconciliationId: '66666666-6666-4666-8666-666666666666',
+        artifactId: 'artifact-1',
+        teamId: '22222222-2222-4222-8222-222222222222',
+        fileName: 'aws-invoice-control.txt',
+        mimeType: 'text/plain',
+        contentSha256: 'd'.repeat(64),
+        content: Buffer.from('invoice'),
+        uploadedByAccountId: '11111111-1111-4111-8111-111111111111',
+        uploadedAt: completedAt.toISOString(),
+        evidence: {
+          invoiceLineItemHashes: ['b'.repeat(64)],
+          invoiceGradeArtifactRegister: {
+            registeredCount: 1,
+            artifacts: [
+              {
+                id: 'artifact-1',
+                storedBlob: {
+                  storageStatus: 'stored',
+                  contentSha256: 'd'.repeat(64),
+                  contentSizeBytes: 7,
+                },
+              },
+            ],
+          },
+        },
+        audit: {
+          teamId: '22222222-2222-4222-8222-222222222222',
+          actorAccountId: '11111111-1111-4111-8111-111111111111',
+          action: 'billing.reconciliation.artifact_blob_uploaded',
+          targetType: 'billing_reconciliation',
+        },
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        evidence: expect.objectContaining({
+          invoiceGradeArtifactRegister: expect.objectContaining({
+            artifacts: [
+              expect.objectContaining({
+                id: 'artifact-1',
+              }),
+            ],
+          }),
+        }),
+      }),
+    );
+    await expect(
+      repository.getInvoiceArtifactBlob('66666666-6666-4666-8666-666666666666', 'artifact-1'),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        fileName: 'aws-invoice-control.txt',
+        contentSha256: 'd'.repeat(64),
+        contentBase64: Buffer.from('invoice').toString('base64'),
+      }),
+    );
 
     expect(query).toHaveBeenCalledWith('BEGIN');
     expect(query).toHaveBeenCalledWith('COMMIT');
@@ -1855,6 +1936,21 @@ describe('ApiDatabaseRepository', () => {
         totalCostUsd: 107,
       }),
     ]);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO invoice_artifact_blobs'),
+      [
+        '66666666-6666-4666-8666-666666666666',
+        'artifact-1',
+        '22222222-2222-4222-8222-222222222222',
+        'aws-invoice-control.txt',
+        'text/plain',
+        'd'.repeat(64),
+        7,
+        Buffer.from('invoice'),
+        '11111111-1111-4111-8111-111111111111',
+        completedAt.toISOString(),
+      ],
+    );
   });
 
   it('records and lists team audit events with actor display context', async () => {

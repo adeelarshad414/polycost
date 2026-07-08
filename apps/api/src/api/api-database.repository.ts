@@ -36,6 +36,7 @@ import {
   BillingImportRecord,
   BillingImportRowInput,
   BillingSourceType,
+  InvoiceArtifactBlobRecord,
   InvoiceLineItemRecord,
   InvoiceReconciliationRecord,
   InvoiceReconciliationStatus,
@@ -489,6 +490,20 @@ interface InvoiceReconciliationRow {
   status: InvoiceReconciliationStatus;
   evidence: Record<string, unknown>;
   created_at: Date;
+}
+
+interface InvoiceArtifactBlobRow {
+  id: string;
+  reconciliation_id: string;
+  artifact_id: string;
+  team_id: string | null;
+  file_name: string;
+  mime_type: string;
+  content_sha256: string;
+  content_size_bytes: number;
+  content: Buffer;
+  uploaded_by_account_id: string | null;
+  uploaded_at: Date;
 }
 
 const PROVIDERS: ProviderId[] = ['aws', 'azure', 'gcp'];
@@ -3845,6 +3860,136 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     });
   }
 
+  async saveInvoiceArtifactBlobAndUpdateEvidence(input: {
+    reconciliationId: string;
+    artifactId: string;
+    teamId?: string;
+    fileName: string;
+    mimeType: string;
+    contentSha256: string;
+    content: Buffer;
+    uploadedByAccountId?: string;
+    uploadedAt: string;
+    evidence: Record<string, unknown>;
+    audit?: TeamAuditEventInput;
+  }): Promise<InvoiceReconciliationRecord> {
+    return this.withTransaction(async (pool) => {
+      await pool.query<InvoiceArtifactBlobRow>(
+        `
+          INSERT INTO invoice_artifact_blobs (
+            reconciliation_id,
+            artifact_id,
+            team_id,
+            file_name,
+            mime_type,
+            content_sha256,
+            content_size_bytes,
+            content,
+            uploaded_by_account_id,
+            uploaded_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          ON CONFLICT (reconciliation_id, artifact_id)
+          DO UPDATE SET
+            team_id = EXCLUDED.team_id,
+            file_name = EXCLUDED.file_name,
+            mime_type = EXCLUDED.mime_type,
+            content_sha256 = EXCLUDED.content_sha256,
+            content_size_bytes = EXCLUDED.content_size_bytes,
+            content = EXCLUDED.content,
+            uploaded_by_account_id = EXCLUDED.uploaded_by_account_id,
+            uploaded_at = EXCLUDED.uploaded_at
+        `,
+        [
+          input.reconciliationId,
+          input.artifactId,
+          input.teamId ?? null,
+          input.fileName,
+          input.mimeType,
+          input.contentSha256,
+          input.content.length,
+          input.content,
+          input.uploadedByAccountId ?? null,
+          input.uploadedAt,
+        ],
+      );
+      const result = await pool.query<InvoiceReconciliationRow>(
+        `
+          UPDATE invoice_reconciliation_results
+          SET evidence = $2::jsonb
+          WHERE id = $1
+          RETURNING id,
+                    import_run_id,
+                    comparison_id,
+                    provider,
+                    estimated_total_usd,
+                    invoiced_total_usd,
+                    variance_usd,
+                    variance_percent,
+                    status,
+                    evidence,
+                    created_at
+        `,
+        [input.reconciliationId, JSON.stringify(input.evidence)],
+      );
+      const row = result.rows[0];
+
+      if (!row) {
+        throw new ApiNotFoundError(
+          `Invoice reconciliation ${input.reconciliationId} was not found`,
+        );
+      }
+
+      if (input.audit) {
+        await this.insertTeamAuditEvent(pool, {
+          ...input.audit,
+          targetId: input.audit.targetId ?? row.id,
+          metadata: {
+            importRunId: row.import_run_id,
+            comparisonId: row.comparison_id,
+            provider: row.provider,
+            status: row.status,
+            varianceUsd: Number.parseFloat(row.variance_usd),
+            variancePercent: Number.parseFloat(row.variance_percent),
+            ...(input.audit.metadata ?? {}),
+          },
+        });
+      }
+
+      return toInvoiceReconciliationRecord(row);
+    });
+  }
+
+  async getInvoiceArtifactBlob(
+    reconciliationId: string,
+    artifactId: string,
+  ): Promise<InvoiceArtifactBlobRecord | undefined> {
+    const result = await (
+      await this.getPool()
+    ).query<InvoiceArtifactBlobRow>(
+      `
+        SELECT id,
+               reconciliation_id,
+               artifact_id,
+               team_id,
+               file_name,
+               mime_type,
+               content_sha256,
+               content_size_bytes,
+               content,
+               uploaded_by_account_id,
+               uploaded_at
+        FROM invoice_artifact_blobs
+        WHERE reconciliation_id = $1
+          AND artifact_id = $2
+        LIMIT 1
+      `,
+      [reconciliationId, artifactId],
+    );
+
+    return result.rows[0] ? toInvoiceArtifactBlobRecord(result.rows[0]) : undefined;
+  }
+
   async onModuleDestroy(): Promise<void> {
     if (this.pool) {
       await this.pool.end();
@@ -4310,6 +4455,22 @@ function toInvoiceReconciliationRecord(row: InvoiceReconciliationRow): InvoiceRe
     status: row.status,
     evidence: row.evidence,
     createdAt: row.created_at.toISOString(),
+  };
+}
+
+function toInvoiceArtifactBlobRecord(row: InvoiceArtifactBlobRow): InvoiceArtifactBlobRecord {
+  return {
+    id: row.id,
+    reconciliationId: row.reconciliation_id,
+    artifactId: row.artifact_id,
+    ...(row.team_id ? { teamId: row.team_id } : {}),
+    fileName: row.file_name,
+    mimeType: row.mime_type,
+    contentSha256: row.content_sha256,
+    contentSizeBytes: row.content_size_bytes,
+    contentBase64: row.content.toString('base64'),
+    ...(row.uploaded_by_account_id ? { uploadedByAccountId: row.uploaded_by_account_id } : {}),
+    uploadedAt: row.uploaded_at.toISOString(),
   };
 }
 

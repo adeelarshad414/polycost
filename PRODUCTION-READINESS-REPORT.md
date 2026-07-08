@@ -1,7 +1,7 @@
 # PolyCost Production Readiness Report
 
 Date: 2026-07-08
-Branch: cumulative production-readiness branches through `codex/invoice-artifact-verification`
+Branch: cumulative production-readiness branches through `codex/invoice-artifact-blob-storage`
 PR: local phase gate, PR created after verification
 Run spec: `docs/design/master-production-readiness-orchestrator-v2.md`
 
@@ -66,6 +66,7 @@ performance/accessibility/best-practices/SEO metrics.
 | INV-TRACE-007  | Improved      | Reconciliation evidence now includes an invoice-grade readiness matrix with present, partial, missing, and not-applicable checks, blockers, and required provider artifacts                                                                             |
 | INV-TRACE-008  | Improved      | Reconciliation evidence can now register invoice-grade artifact metadata, including provider invoice/control-total packets, private pricing, tax, commitment, allocation, currency, and SKU-map evidence without falsely marking it verified            |
 | INV-TRACE-009  | Improved      | Registered invoice artifacts can now be marked verified/rejected with review evidence, checksum/control-total mismatch rejection, verified counts, and readiness updates limited to the covered check                                                   |
+| INV-TRACE-010  | Improved      | Registered invoice artifact files can now be stored in `invoice_artifact_blobs` with raw-byte SHA-256, size/MIME/file-name validation, metadata-only reconciliation evidence, and transaction-coupled audit events                                      |
 | VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                                                                                             |
 | VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                                                                                             |
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                                                                                        |
@@ -76,6 +77,7 @@ performance/accessibility/best-practices/SEO metrics.
 | UI-AUTH-009    | Improved      | Workspace billing panel now surfaces invoice-grade readiness status, missing/partial counts, and top blockers for finance review                                                                                                                        |
 | UI-AUTH-010    | Improved      | Workspace billing panel now exposes an Owner/Admin artifact-registration action and shows registered/verified counts plus the "metadata registered, not verified" caveat                                                                                |
 | UI-AUTH-011    | Improved      | Workspace billing panel now exposes artifact verification after registration and refreshes verified counts without removing unrelated invoice-grade blockers                                                                                            |
+| UI-AUTH-012    | Improved      | Workspace billing panel now exposes store/download actions for registered invoice artifact files and verifies against the stored checksum when present                                                                                                  |
 | UI-AUTH-003    | Improved      | Active workspace switching is now backend-backed, membership-checked, and exposed in the signed-in account panel                                                                                                                                        |
 | UI-AUTH-004    | Improved      | Pending/expired workspace invites can now be resent through a guarded backend route that rotates the stored token hash and exposes the refreshed one-time token only in the response                                                                    |
 | UI-AUTH-005    | Improved      | Invite delivery now has local panel mode plus production HTTPS webhook mode with HMAC signatures, production config guards, and browser-safe delivery receipts                                                                                          |
@@ -122,6 +124,20 @@ Local static/regression gates:
     `src/api/api-database.repository.spec.ts`: 2 suites / 51 tests.
   - Web focused: `src/App.spec.tsx` and `src/api-client.spec.ts`: 2 suites /
     86 tests.
+- Phase 2.25 invoice artifact blob storage focused gates passed:
+  - API focused: `src/api/auth-billing.spec.ts` and
+    `src/api/api-database.repository.spec.ts`: 2 suites / 54 tests.
+  - Web focused: `src/App.spec.tsx` and `src/api-client.spec.ts`: 2 suites /
+    86 tests.
+  - `npm run format:check`: passed.
+  - `npm run ci:lint`: passed with zero ESLint/typecheck errors.
+- Phase 2.25 final local floor passed:
+  - `npm run test:production-readiness`: API 12 suites / 165 tests; web 2 suites /
+    86 tests.
+  - `npm run check`: API 53 suites / 429 tests; web 11 suites / 143 tests; graph
+    validation 316 nodes / 316 edges; pricing coverage, progress verification,
+    QA/security suppression hygiene, DB, DevOps, cloud, release, handover, and
+    provider-credential gates passed.
 - Phase 2.24 final local floor passed:
   - `npm run format:check`: passed.
   - `npm run ci:lint`: passed with zero ESLint/typecheck errors.
@@ -402,12 +418,13 @@ Machine-readable token evidence:
   separates provider commitment semantics from generic adjustments. Phase 2.21
   exposes provider-inventory, amortization-period, and allocation proof requirements,
   and Phase 2.22 lists invoice-grade blockers and required provider artifacts, but
-  Phase 2.23 only registers artifact metadata and check coverage; it does not
-  verify artifact bytes, contracts, taxes, commitments, allocations, or invoice
-  controls. Phase 2.24 adds checksum/control-total verification status for
-  registered artifact metadata, but still does not provide durable file storage,
-  provider invoice rendering, private contract validation, or external reviewer
-  workflow. Full invoice-grade billing remains future scope.
+  Phase 2.23 registers artifact metadata and check coverage. Phase 2.24 adds
+  checksum/control-total verification status for registered artifact metadata.
+  Phase 2.25 adds durable database-backed artifact file upload/download with
+  metadata-only reconciliation evidence and audit events. PolyCost still does not
+  provide provider invoice rendering, private contract validation, object
+  storage/KMS, malware scanning, legal hold, or an external reviewer workflow.
+  Full invoice-grade billing remains future scope.
   PolyCost is still not the invoice system of record.
 - VSDX support now includes extraction/evidence and approximate SVG previews, not full
   Visio semantic rendering. Phase 2.9 adds page geometry, normalized preview bounds, and

@@ -465,6 +465,46 @@ describe('api client', () => {
             },
           },
         }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ...reconciliation,
+          evidence: {
+            invoiceGradeArtifactRegister: {
+              registeredCount: 1,
+              verifiedCount: 1,
+              status: 'registered-with-verified-artifacts',
+              artifacts: [
+                {
+                  id: 'artifact-1',
+                  storedBlob: {
+                    storageStatus: 'stored',
+                    storageMode: 'database-bytea',
+                    fileName: 'aws-invoice-control.txt',
+                    mimeType: 'text/plain',
+                    contentSha256: 'd'.repeat(64),
+                    contentSizeBytes: 7,
+                    uploadedAt: '2026-07-06T00:00:05.000Z',
+                  },
+                },
+              ],
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: 'blob-1',
+          reconciliationId: 'reconciliation-1',
+          artifactId: 'artifact-1',
+          teamId: 'team-1',
+          fileName: 'aws-invoice-control.txt',
+          mimeType: 'text/plain',
+          contentSha256: 'd'.repeat(64),
+          contentSizeBytes: 7,
+          contentBase64: 'aW52b2ljZQ==',
+          uploadedAt: '2026-07-06T00:00:05.000Z',
+        }),
       );
     global.fetch = fetchMock as typeof fetch;
     const client = createPolyCostClient('http://api.test/api/v1');
@@ -546,6 +586,40 @@ describe('api client', () => {
         }),
       }),
     );
+    await expect(
+      client.uploadInvoiceArtifactBlob(
+        'reconciliation-1',
+        'artifact-1',
+        {
+          fileName: 'aws-invoice-control.txt',
+          mimeType: 'text/plain',
+          content: 'invoice',
+          encoding: 'text',
+          sha256: 'd'.repeat(64),
+        },
+        'session-token',
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        evidence: expect.objectContaining({
+          invoiceGradeArtifactRegister: expect.objectContaining({
+            artifacts: [
+              expect.objectContaining({
+                id: 'artifact-1',
+              }),
+            ],
+          }),
+        }),
+      }),
+    );
+    await expect(
+      client.downloadInvoiceArtifactBlob('reconciliation-1', 'artifact-1', 'session-token'),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        fileName: 'aws-invoice-control.txt',
+        contentBase64: 'aW52b2ljZQ==',
+      }),
+    );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       'http://api.test/api/v1/auth/me',
@@ -622,6 +696,32 @@ describe('api client', () => {
           evidenceReference: 'review://controls/aws-invoice-2026-06',
           sha256: 'b'.repeat(64),
           controlTotalUsd: 107,
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      10,
+      'http://api.test/api/v1/billing/reconciliations/reconciliation-1/artifacts/artifact-1/blob',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer session-token',
+        }),
+        body: JSON.stringify({
+          fileName: 'aws-invoice-control.txt',
+          mimeType: 'text/plain',
+          content: 'invoice',
+          encoding: 'text',
+          sha256: 'd'.repeat(64),
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      11,
+      'http://api.test/api/v1/billing/reconciliations/reconciliation-1/artifacts/artifact-1/blob',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer session-token',
         }),
       }),
     );

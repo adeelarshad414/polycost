@@ -150,6 +150,10 @@ The main API is versioned under `/api/v1`.
 - `GET /share/:token` reads a shared report.
 - `GET /exchange-rates` returns cached exchange-rate data.
 - `GET /regions` returns the cloud region catalog used by the UI.
+- `POST /billing/reconciliations/:id/artifacts/:artifactId/blob` stores an invoice
+  artifact file for a registered reconciliation artifact.
+- `GET /billing/reconciliations/:id/artifacts/:artifactId/blob` returns the stored
+  artifact file as base64 for controlled download.
 
 ## Anonymous And Workspace Features
 
@@ -180,7 +184,8 @@ Accounts add workspace controls on top of that core flow:
   signing secret; PolyCost stores an outbox row in the same database transaction as
   the audit event and scheduled workers retry signed delivery without blocking the
   user-facing mutation.
-- Billing reconciliation evidence can register invoice artifact metadata and mark
+- Billing reconciliation evidence can register invoice artifact metadata, store the
+  associated artifact file in the database, download that stored file, and mark
   artifacts verified/rejected with review references, checksum/control-total checks,
   and audit events. This improves proof discipline but is not a provider invoice
   system of record.

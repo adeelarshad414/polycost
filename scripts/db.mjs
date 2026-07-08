@@ -37,6 +37,7 @@ const expectedMigrations = [
   '029_auth_billing_runtime_privileges.sql',
   '030_team_audit_events.sql',
   '031_team_audit_export_outbox.sql',
+  '032_invoice_artifact_blobs.sql',
 ];
 
 if (!['migrate', 'seed', 'reset', 'validate'].includes(command)) {

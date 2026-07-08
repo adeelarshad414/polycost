@@ -74,6 +74,10 @@ once tagged releases begin.
   including checksum/control-total mismatch rejection, verified/rejected review
   evidence, readiness updates limited to covered checks, and workspace verification
   action.
+- Invoice artifact blob storage for registered reconciliation artifacts, including
+  database-backed upload/download APIs, raw-byte SHA-256 validation, MIME/file-name
+  guards, metadata-only reconciliation evidence, audit events, and workspace
+  store/download actions.
 
 ### Notes
 
@@ -91,9 +95,10 @@ once tagged releases begin.
   authorization, and an explicit security suppression/advisory ledger.
 - Billing reconciliation now has native export mapper evidence for AWS CUR, Azure
   Cost Management CSV, and nested GCP Billing Export JSON, plus adjustment-aware
-  usage-comparable variance, commitment row evidence, and invoice artifact metadata
-  registration/verification status, while invoice-of-record storage and provider
-  verification remain future scope.
+  usage-comparable variance, commitment row evidence, invoice artifact metadata
+  registration/verification status, and database-backed artifact file storage, while
+  provider invoice-of-record validation, object storage/KMS, malware scanning, and
+  legal retention workflows remain future scope.
 - Account/team UX now supports switching the current active workspace without a
   new login, refreshing pending/expired invite tokens, and handing invite links to
   a signed delivery webhook, while provider-specific email templates, SSO/SAML,

@@ -114,6 +114,7 @@ say so explicitly rather than marking it done.
 | Phase 2.22 - Invoice-grade readiness matrix             | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.23 - Invoice artifact registration seam         | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.24 - Invoice artifact verification seam         | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.25 - Invoice artifact blob storage seam         | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4253,6 +4254,42 @@ Status: implemented locally on 2026-07-08.
   byte-level upload/download controls, reviewer workflow UI, private-pricing/tax
   contract validation, commitment inventory reconciliation, and provider-account
   allocation review before claiming invoice-grade billing.
+
+## Phase 2.25 — Invoice artifact blob storage seam
+
+Status: implemented locally on 2026-07-08.
+
+- Added migration `032_invoice_artifact_blobs.sql` with team-scoped artifact blob
+  persistence, SHA-256/content-size constraints, MIME allow-listing, safe file-name
+  constraints, and cascade cleanup when a reconciliation is deleted.
+- Added Owner/Admin API routes:
+  `POST /api/v1/billing/reconciliations/:id/artifacts/:artifactId/blob` and
+  `GET /api/v1/billing/reconciliations/:id/artifacts/:artifactId/blob`.
+- Artifact upload now hashes raw decoded bytes, rejects caller checksum mismatches,
+  rejects mismatch with registered artifact metadata, stores bytes in the database,
+  and updates reconciliation evidence with metadata only. Raw bytes are not embedded
+  in the normal reconciliation evidence payload.
+- Blob storage, reconciliation evidence update, and audit event
+  `billing.reconciliation.artifact_blob_uploaded` are written in one repository
+  transaction.
+- Updated the workspace billing panel so the demo path can register metadata, store a
+  demo invoice artifact file, download the stored file, and verify the artifact using
+  the stored checksum while preserving unrelated invoice-grade blockers.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/api/api-database.repository.spec.ts`
+  passed 54/54. `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx src/api-client.spec.ts`
+  passed 86/86. `npm run format:check`, `npm run ci:lint`, and
+  `npm run test:production-readiness` passed with 165/165 API tests and 86/86 web
+  tests. Full `npm run check` passed with 429/429 API tests, 143/143 web tests,
+  graph validation, pricing coverage, progress verification, QA/security
+  suppression hygiene, DB validation, release, handover, and provider-credential
+  checks green.
+- Remaining caveat: this is durable database-backed artifact storage for the OSS demo
+  and self-hosted baseline, not full provider invoice rendering or enterprise object
+  storage. Production invoice-grade operation still needs object storage/KMS,
+  malware scanning, retention/legal hold, reviewer workflow UI, private-pricing/tax
+  contract validation, commitment inventory reconciliation, and provider-account
+  allocation review.
 
 ## Deviations from spec log
 
