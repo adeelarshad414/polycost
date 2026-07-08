@@ -3265,6 +3265,7 @@ function invoiceEvidencePacket(
   reconciliation: InvoiceReconciliationRecord,
   importRun: BillingImportResponse['importRun'],
 ): InvoiceEvidencePacketResponse {
+  const generatedAt = new Date().toISOString();
   const readiness = recordValue(reconciliation.evidence.invoiceGradeReadiness);
   const matchSummary = recordValue(reconciliation.evidence.invoiceMatchSummary);
   const artifactRegister = recordValue(reconciliation.evidence.invoiceGradeArtifactRegister);
@@ -3285,11 +3286,19 @@ function invoiceEvidencePacket(
     invoiceControlMismatchCount: numberFromUnknown(artifactRegister.invoiceControlMismatchCount),
     invoiceControlNotRunCount: numberFromUnknown(artifactRegister.invoiceControlNotRunCount),
   };
+  const caveats = [
+    ...new Set([...stringArray(matchSummary.caveats), ...stringArray(artifactRegister.caveats)]),
+  ];
+  const disclaimers = [
+    'This packet is metadata-only and intentionally excludes raw invoice artifact bytes.',
+    'Invoice control validation compares stored artifact totals with imported actuals and reconciliation totals; it is not provider-authenticated invoice rendering.',
+    'Full invoice-grade billing still requires provider invoice-of-record review, private contract validation, tax/legal review, and external retention controls.',
+  ];
 
-  return {
+  const packetPayload: Omit<InvoiceEvidencePacketResponse, 'integrity'> = {
     packetVersion: 'invoice-evidence-packet/v1',
     packetStatus: invoiceEvidencePacketStatus(artifacts, readiness, controls),
-    generatedAt: new Date().toISOString(),
+    generatedAt,
     reconciliation: {
       id: reconciliation.id,
       importRunId: reconciliation.importRunId,
@@ -3319,14 +3328,32 @@ function invoiceEvidencePacket(
     artifactRegister,
     artifacts,
     controls,
-    caveats: [
-      ...new Set([...stringArray(matchSummary.caveats), ...stringArray(artifactRegister.caveats)]),
-    ],
-    disclaimers: [
-      'This packet is metadata-only and intentionally excludes raw invoice artifact bytes.',
-      'Invoice control validation compares stored artifact totals with imported actuals and reconciliation totals; it is not provider-authenticated invoice rendering.',
-      'Full invoice-grade billing still requires provider invoice-of-record review, private contract validation, tax/legal review, and external retention controls.',
-    ],
+    caveats,
+    disclaimers,
+  };
+  const canonicalPayload = stableJson(packetPayload);
+
+  return {
+    ...packetPayload,
+    integrity: {
+      schemaVersion: 'invoice-evidence-packet-integrity/v1',
+      canonicalization: 'stable-json:v1',
+      digestAlgorithm: 'sha256',
+      payloadDigestSha256: sha256(canonicalPayload),
+      payloadByteLength: Buffer.byteLength(canonicalPayload, 'utf8'),
+      subject: {
+        reconciliationId: reconciliation.id,
+        importRunId: reconciliation.importRunId,
+        comparisonId: reconciliation.comparisonId,
+        provider: reconciliation.provider,
+      },
+      artifactCount: artifacts.length,
+      storedArtifactCount: controls.storedCount,
+      verifiedArtifactCount: controls.verifiedCount,
+      caveatCount: caveats.length,
+      disclaimerCount: disclaimers.length,
+      generatedAt,
+    },
   };
 }
 

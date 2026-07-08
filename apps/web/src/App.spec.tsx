@@ -745,6 +745,9 @@ describe('App', () => {
       'session-token',
     );
     expect(window.URL.createObjectURL).toHaveBeenLastCalledWith(expect.any(Blob));
+    expect(text(container)).toContain(
+      'Invoice evidence packet downloaded (blocked; sha256 ffffffffffff).',
+    );
 
     unmount();
   });
@@ -4912,6 +4915,25 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       packetVersion: 'invoice-evidence-packet/v1' as const,
       packetStatus: 'blocked' as const,
       generatedAt: '2026-07-08T00:00:00.000Z',
+      integrity: {
+        schemaVersion: 'invoice-evidence-packet-integrity/v1' as const,
+        canonicalization: 'stable-json:v1' as const,
+        digestAlgorithm: 'sha256' as const,
+        payloadDigestSha256: 'f'.repeat(64),
+        payloadByteLength: 2048,
+        subject: {
+          reconciliationId: '66666666-6666-4666-8666-666666666666',
+          importRunId: '55555555-5555-4555-8555-555555555555',
+          comparisonId: comparisonResult.comparisonId,
+          provider: 'aws' as const,
+        },
+        artifactCount: 1,
+        storedArtifactCount: 1,
+        verifiedArtifactCount: 1,
+        caveatCount: 1,
+        disclaimerCount: 1,
+        generatedAt: '2026-07-08T00:00:00.000Z',
+      },
       reconciliation: {
         id: '66666666-6666-4666-8666-666666666666',
         importRunId: '55555555-5555-4555-8555-555555555555',

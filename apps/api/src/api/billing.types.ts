@@ -239,6 +239,26 @@ export interface InvoiceArtifactRetentionEnforcementResult {
 
 export type InvoiceEvidencePacketStatus = 'empty' | 'blocked' | 'review-ready';
 
+export interface InvoiceEvidencePacketIntegrity {
+  schemaVersion: 'invoice-evidence-packet-integrity/v1';
+  canonicalization: 'stable-json:v1';
+  digestAlgorithm: 'sha256';
+  payloadDigestSha256: string;
+  payloadByteLength: number;
+  subject: {
+    reconciliationId: string;
+    importRunId: string;
+    comparisonId: string;
+    provider: ProviderId;
+  };
+  artifactCount: number;
+  storedArtifactCount: number;
+  verifiedArtifactCount: number;
+  caveatCount: number;
+  disclaimerCount: number;
+  generatedAt: string;
+}
+
 export interface InvoiceEvidencePacketArtifact {
   id: string;
   provider: ProviderId;
@@ -266,6 +286,7 @@ export interface InvoiceEvidencePacketResponse {
   packetVersion: 'invoice-evidence-packet/v1';
   packetStatus: InvoiceEvidencePacketStatus;
   generatedAt: string;
+  integrity: InvoiceEvidencePacketIntegrity;
   reconciliation: Pick<
     InvoiceReconciliationRecord,
     | 'id'

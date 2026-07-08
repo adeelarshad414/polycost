@@ -95,6 +95,10 @@ once tagged releases begin.
   reviewer handoff JSON with reconciliation/import metadata, readiness, match
   summary, artifact register, sanitized artifact metadata, control counts, caveats,
   and explicit invoice-grade disclaimers.
+- Invoice evidence packets now include a tamper-evident integrity manifest with
+  stable-JSON canonicalization metadata, SHA-256 payload digest, byte length,
+  subject IDs, artifact counts, caveat/disclaimer counts, and digest-aware workspace
+  download filenames/notices.
 - Invoice artifact storage readiness and retention enforcement foundation, including
   production-bound config guards for external object storage/KMS/webhook scanning,
   strict credential-check coverage, signed scanner webhook integration, and admin

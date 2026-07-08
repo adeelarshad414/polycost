@@ -3261,12 +3261,18 @@ function WorkspaceControlCenter({
 
     try {
       const packet = await client.getInvoiceEvidencePacket(reconciliation.id, token);
+      const digestPrefix = packet.integrity.payloadDigestSha256.slice(0, 12);
 
       downloadBlob(
         new Blob([JSON.stringify(packet, null, 2)], { type: 'application/json' }),
-        `polycost-invoice-evidence-${reconciliation.id.slice(0, 8)}.json`,
+        `polycost-invoice-evidence-${reconciliation.id.slice(0, 8)}-${digestPrefix}.json`,
       );
-      onNotice(`Invoice evidence packet downloaded (${packet.packetStatus.replace('-', ' ')}).`);
+      onNotice(
+        `Invoice evidence packet downloaded (${packet.packetStatus.replace(
+          '-',
+          ' ',
+        )}; sha256 ${digestPrefix}).`,
+      );
     } catch (packetError) {
       onError(formatApiError(packetError));
     } finally {
