@@ -55,7 +55,8 @@ export type TeamAuditAction =
   | 'billing.reconciliation.artifact_registered'
   | 'billing.reconciliation.artifact_verified'
   | 'billing.reconciliation.artifact_blob_uploaded'
-  | 'billing.reconciliation.artifact_legal_hold_updated';
+  | 'billing.reconciliation.artifact_legal_hold_updated'
+  | 'billing.reconciliation.artifact_review_updated';
 
 export type TeamAuditTargetType =
   'team' | 'invitation' | 'member' | 'sso_provider' | 'billing_import' | 'billing_reconciliation';

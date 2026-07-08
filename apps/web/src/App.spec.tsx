@@ -603,6 +603,7 @@ describe('App', () => {
     expect(text(container)).toContain('Governance: scan passed');
     expect(text(container)).toContain('legal hold off');
     expect(text(container)).toContain('KMS required for production');
+    expect(text(container)).toContain('Review queue: not requested');
 
     await click(buttonByText(container, 'Place legal hold'));
     await settleAsyncEffects();
@@ -618,6 +619,39 @@ describe('App', () => {
     );
     expect(text(container)).toContain('legal hold on');
     expect(text(container)).toContain('Release legal hold');
+
+    await click(buttonByText(container, 'Send to review'));
+    await settleAsyncEffects();
+
+    expect(client.updateInvoiceArtifactReview).toHaveBeenCalledWith(
+      '66666666-6666-4666-8666-666666666666',
+      'artifact-1',
+      expect.objectContaining({
+        reviewStatus: 'pending',
+        reviewer: 'finance-review@example.com',
+        notes: 'Submitted from workspace panel for finance/legal artifact review.',
+      }),
+      'session-token',
+    );
+    expect(text(container)).toContain('Review queue: pending');
+    expect(text(container)).toContain('finance-review@example.com');
+    expect(text(container)).toContain('pending 1');
+
+    await click(buttonByText(container, 'Approve review'));
+    await settleAsyncEffects();
+
+    expect(client.updateInvoiceArtifactReview).toHaveBeenLastCalledWith(
+      '66666666-6666-4666-8666-666666666666',
+      'artifact-1',
+      expect.objectContaining({
+        reviewStatus: 'approved',
+        reviewer: 'finance-review@example.com',
+        evidenceReference: 'review://invoice-artifacts/artifact-1/approved',
+      }),
+      'session-token',
+    );
+    expect(text(container)).toContain('Review queue: approved');
+    expect(text(container)).toContain('approved 1');
 
     await click(buttonByText(container, 'Download stored file'));
     await settleAsyncEffects();
@@ -4777,6 +4811,22 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       createdAt: '2026-07-06T00:00:02.000Z',
     })),
     listBillingReconciliations: jest.fn(async () => []),
+    listInvoiceArtifactReviews: jest.fn(async () => [
+      {
+        importRunId: '55555555-5555-4555-8555-555555555555',
+        reconciliationId: '66666666-6666-4666-8666-666666666666',
+        comparisonId: comparisonResult.comparisonId,
+        provider: 'aws' as const,
+        artifactId: 'artifact-1',
+        artifactType: 'provider-invoice' as const,
+        displayName: 'AWS invoice control packet',
+        verificationStatus: 'registered' as const,
+        reviewStatus: 'pending' as const,
+        artifactBlobStored: true,
+        legalHold: false,
+        reviewer: 'finance-review@example.com',
+      },
+    ]),
     registerInvoiceGradeArtifact: jest.fn(async () => ({
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
@@ -5029,6 +5079,123 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
                     retentionUntil: '2027-07-06T00:00:05.000Z',
                     retentionDays: 365,
                     legalHold: input.legalHold,
+                  },
+                  malwareScan: {
+                    status: 'passed',
+                    scanner: 'polycost-eicar-signature-v1',
+                    checkedAt: '2026-07-06T00:00:05.000Z',
+                    findings: [],
+                  },
+                },
+              },
+            },
+          ],
+          caveats: [
+            'Artifact metadata is registered for traceability only; files, contracts, and invoice controls are not verified by PolyCost yet.',
+          ],
+        },
+        invoiceMatchSummary: {
+          readiness: 'reconciled-evidence-ready',
+          caveats: [
+            'Reconciliation compares provider-export actuals with PolyCost estimate evidence; it is not an invoice-of-record.',
+          ],
+        },
+      },
+      createdAt: '2026-07-06T00:00:02.000Z',
+    })),
+    updateInvoiceArtifactReview: jest.fn(async (_reconciliationId, _artifactId, input) => ({
+      id: '66666666-6666-4666-8666-666666666666',
+      importRunId: '55555555-5555-4555-8555-555555555555',
+      comparisonId: comparisonResult.comparisonId,
+      provider: 'aws' as const,
+      estimatedTotalUsd: 100,
+      invoicedTotalUsd: 107,
+      varianceUsd: 7,
+      variancePercent: 7,
+      status: 'variance-warning' as const,
+      evidence: {
+        invoiceCoverage: {
+          sourceFingerprintPercent: 100,
+          skuMatchPercent: 100,
+        },
+        invoiceAdjustmentSummary: {
+          adjustmentCostUsd: 6,
+          adjustmentLineItemCount: 4,
+          commitmentLineItemCount: 4,
+          commitmentNetCostUsd: -2,
+          commitmentEvidence: {
+            rowsRequiringProviderInventory: 4,
+            rowsRequiringAmortizationPeriod: 2,
+            rowsRequiringAllocationEvidence: 4,
+          },
+          estimateComparableVarianceUsd: 0,
+          categories: [
+            {
+              category: 'usage',
+              rowCount: 1,
+              totalCostUsd: 100,
+            },
+          ],
+        },
+        invoiceGradeReadiness: {
+          status: 'invoice-grade-blocked',
+          missingCount: 3,
+          partialCount: 2,
+          blockers: ['Provider invoice control total'],
+          artifactRegisterStatus: 'metadata-registered-not-verified',
+          registeredArtifactCount: 1,
+          verifiedArtifactCount: 0,
+        },
+        invoiceGradeArtifactRegister: {
+          status: 'metadata-registered-not-verified',
+          registeredCount: 1,
+          verifiedCount: 0,
+          reviewPendingCount: input.reviewStatus === 'pending' ? 1 : 0,
+          reviewApprovedCount: input.reviewStatus === 'approved' ? 1 : 0,
+          reviewRejectedCount: input.reviewStatus === 'rejected' ? 1 : 0,
+          artifacts: [
+            {
+              id: 'artifact-1',
+              provider: 'aws',
+              type: 'provider-invoice',
+              displayName: 'AWS invoice control packet',
+              reference: 'demo://invoice-artifacts/66666666-6666-4666-8666-666666666666',
+              sha256: 'd'.repeat(64),
+              controlTotalUsd: 107,
+              verificationStatus: 'registered',
+              registeredAt: '2026-07-06T00:00:03.000Z',
+              reviewStatus: input.reviewStatus,
+              reviewReviewer: input.reviewer,
+              reviewRequestedAt: '2026-07-06T00:00:06.000Z',
+              reviewRequestedByAccountId: '11111111-1111-4111-8111-111111111111',
+              reviewedAt: input.reviewStatus === 'pending' ? undefined : '2026-07-06T00:00:07.000Z',
+              reviewedByAccountId:
+                input.reviewStatus === 'pending'
+                  ? undefined
+                  : '11111111-1111-4111-8111-111111111111',
+              reviewEvidenceReference: input.evidenceReference,
+              reviewNotes: input.notes,
+              storedBlob: {
+                storageStatus: 'stored',
+                storageMode: 'database-bytea',
+                fileName: 'aws-invoice-control-66666666.txt',
+                mimeType: 'text/plain',
+                contentSha256: 'd'.repeat(64),
+                contentSizeBytes: 210,
+                uploadedAt: '2026-07-06T00:00:05.000Z',
+                uploadedByAccountId: '11111111-1111-4111-8111-111111111111',
+                legalHoldUpdatedAt: '2026-07-06T00:00:06.000Z',
+                legalHoldReason: 'Placed from workspace demo panel before retention enforcement.',
+                governance: {
+                  storageProfile: {
+                    storageBackend: 'database-bytea',
+                    encryptionStatus: 'database-managed',
+                    kmsKeyRequiredForProduction: true,
+                  },
+                  retentionPolicy: {
+                    retentionUntil: '2027-07-06T00:00:05.000Z',
+                    retentionDays: 365,
+                    legalHold: true,
                   },
                   malwareScan: {
                     status: 'passed',

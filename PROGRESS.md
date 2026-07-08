@@ -120,6 +120,7 @@ say so explicitly rather than marking it done.
 | Phase 2.28 - Provider artifact storage adapters         | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.29 - External artifact retention deletion       | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.30 - Artifact legal-hold administration         | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.31 - Invoice artifact review workflow           | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4453,6 +4454,41 @@ Status: implemented and verified locally on 2026-07-08.
 - Remaining caveat: PolyCost now has the basic audited hold/release control, but not
   a full legal-review approval workflow, external reviewer queue, policy exception
   lifecycle, or provider invoice-of-record validation.
+
+## Phase 2.31 — Invoice artifact review workflow
+
+Status: implemented and verified locally on 2026-07-08.
+
+- Added an Owner/Admin review queue for stored invoice artifacts:
+  `GET /api/v1/billing/imports/:id/artifact-reviews`.
+- Added an audited review-state operation:
+  `PATCH /api/v1/billing/reconciliations/:id/artifacts/:artifactId/review`.
+  Stored artifacts can now move through `pending`, `approved`, or `rejected`
+  review states without changing invoice-grade verification status.
+- Review metadata now stays in the reconciliation evidence register with reviewer,
+  requested/reviewed timestamps, evidence reference, notes, and aggregate review
+  counts. The flow rejects review changes until artifact bytes have actually been
+  stored.
+- Added the `billing.reconciliation.artifact_review_updated` audit action and
+  schema migration so review changes are visible in the team audit trail.
+- Added workspace actions to send stored artifacts to review and approve/reject
+  pending reviews, with refreshed review counts and audit labels in the UI.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/api/api-database.repository.spec.ts`
+  passed 69/69 across 2 suites. `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx src/api-client.spec.ts`
+  passed 87/87 across 2 suites.
+- `npm run ci:lint` passed with zero ESLint/typecheck errors or warnings.
+- `npm run test:production-readiness` passed with API 14 suites / 192 tests and web
+  2 suites / 87 tests.
+- Full `npm run check` passed with API 55 suites / 459 tests, web 11 suites / 144
+  tests, graph validation 320 nodes / 320 edges, pricing coverage, progress
+  verification, QA/security suppression hygiene, DB, DevOps, cloud, release,
+  handover, and provider-credential gates green. `npm run impeccable` was skipped
+  by design because the repo targets Node 20 and the optional tool requires Node 24.
+- Remaining caveat: this is an internal review-status workflow over stored artifacts,
+  not external legal-review routing, policy exception lifecycle automation, private
+  contract validation, provider invoice rendering, or provider invoice-of-record
+  reconciliation.
 
 ## Deviations from spec log
 

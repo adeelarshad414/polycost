@@ -81,6 +81,9 @@ once tagged releases begin.
 - Invoice artifact legal-hold administration for stored reconciliation artifacts,
   including Owner/Admin PATCH API, persistence/evidence synchronization, audit event,
   and workspace place/release action.
+- Invoice artifact review workflow for stored reconciliation artifacts, including
+  pending/approved/rejected review state, Owner/Admin API routes, audit event,
+  workspace send/approve/reject actions, and register-level review counts.
 - Invoice artifact storage readiness and retention enforcement foundation, including
   production-bound config guards for external object storage/KMS/webhook scanning,
   strict credential-check coverage, signed scanner webhook integration, and admin
@@ -113,7 +116,8 @@ once tagged releases begin.
   usage-comparable variance, commitment row evidence, invoice artifact metadata
   registration/verification status, database-backed artifact file storage, provider
   object-storage adapters, external object retention deletion, and artifact governance
-  metadata. Provider invoice-of-record validation, real malware scanning operation,
+  metadata plus an internal artifact review status workflow. Provider invoice-of-record
+  validation, real malware scanning operation, external reviewer workflow automation,
   and legal retention workflow enforcement remain future scope.
 - Account/team UX now supports switching the current active workspace without a
   new login, refreshing pending/expired invite tokens, and handing invite links to
