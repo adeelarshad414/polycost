@@ -82,6 +82,7 @@ Core groups:
 - share links
 - regions and official calculator links
 - auth, teams, invites, sessions, mock SSO readiness
+- active workspace switching for existing team memberships
 - Terraform generation
 
 Health and operations:
@@ -151,5 +152,5 @@ Health and operations:
 - Production LLM quality depends on a real endpoint/model, Vault secret, and corpus
   evaluation.
 - Enterprise auth/team product depth still needs production email, SSO/SAML,
-  SCIM/invites, account lifecycle, and full RBAC UX polish.
+  SCIM, account recovery, org billing UX, and broader account administration polish.
 - Terraform output is a starter bundle, not a full landing-zone module system.

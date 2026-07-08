@@ -100,6 +100,7 @@ say so explicitly rather than marking it done.
 | Production readiness orchestrator v2 pass               | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.9 - Production gap closure continuation         | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.10 - Billing export mapper hardening            | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.11 - Workspace active team switching            | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -113,6 +114,45 @@ say so explicitly rather than marking it done.
 | Browser audit artifact hardening                        | Complete with known gaps (see notes) | 2026-07-08   |
 | Formal browser audit tooling                            | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3.5 - Terraform bundle integrity validation      | Complete with known gaps (see notes) | 2026-07-08   |
+
+## Phase 2.11 - Workspace active team switching
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-08
+
+What changed:
+
+- Added a guarded `POST /api/v1/auth/sessions/team` endpoint that switches the
+  current session's active team only when the account has a membership in the
+  requested team.
+- Added repository-level membership-proof SQL for updating `account_sessions.team_id`
+  without issuing a new login token.
+- Added a typed web client method and signed-in workspace selector so users can
+  change active teams directly from the account panel.
+- Updated team creation so a new team is immediately selected in the current session
+  instead of telling users to sign in again.
+
+Verification performed:
+
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth.controller.spec.ts src/api/auth-billing.spec.ts src/api/api-database.repository.spec.ts`
+  passed: 3 suites / 45 tests.
+- `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx src/api-client.spec.ts`
+  passed: 2 suites / 84 tests.
+- `npm run test:production-readiness` passed: API 10 suites / 139 tests and web
+  2 suites / 84 tests.
+- `npm run check` passed: API 51 suites / 405 tests, web 11 suites / 141 tests,
+  graph validation 312 nodes / 312 edges, pricing coverage, progress
+  verification, QA/security suppressions, database, DevOps, cloud, release,
+  handover, and provider credential gates.
+- `npm run ci:build` passed for API and web.
+- `npm audit --audit-level=high` passed; it still reports the documented low
+  transitive Graphify advisory with no available fix.
+
+Known remaining gaps:
+
+- This closes one account/team lifecycle rough edge for demos, but production email
+  delivery, external SSO/SAML handshakes, SCIM, org billing plans, account recovery,
+  and a complete hosted account administration UX remain future release-track work.
 
 ## Phase 2.10 - Billing export mapper hardening
 

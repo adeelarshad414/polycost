@@ -187,6 +187,9 @@ describe('App', () => {
     );
     expect(text(container)).toContain('Session active');
     expect(text(container)).toContain('No silent refresh');
+    expect(selectByWorkspaceLabel(container, 'Active team').value).toBe(
+      '22222222-2222-4222-8222-222222222222',
+    );
     expect(text(container)).toContain('OIDC ready · SAML ready');
     expect(text(container)).toContain('Current · last seen');
     expect(text(container)).toContain('expires');
@@ -393,6 +396,14 @@ describe('App', () => {
       },
       'session-token',
     );
+    expect(client.switchActiveTeam).toHaveBeenCalledWith(
+      '55555555-5555-4555-8555-555555555555',
+      'session-token',
+    );
+    expect(selectByWorkspaceLabel(container, 'Active team').value).toBe(
+      '55555555-5555-4555-8555-555555555555',
+    );
+    expect(text(container)).toContain('Team created and selected: Platform Council.');
 
     await changeInput(inputByWorkspaceLabel(container, 'Current team name'), 'Platform Guild');
     await submitForm(formContainingText(container, 'Current team name'));
@@ -3798,6 +3809,24 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       },
     ]),
     revokeOtherSessions: jest.fn(async () => ({ revoked: 1 })),
+    switchActiveTeam: jest.fn(async (teamId) => ({
+      activeTeam:
+        teamId === '55555555-5555-4555-8555-555555555555'
+          ? {
+              id: '55555555-5555-4555-8555-555555555555',
+              name: 'Platform Council',
+              role: 'owner' as const,
+            }
+          : {
+              id: '22222222-2222-4222-8222-222222222222',
+              name: 'Architecture team',
+              role: 'owner' as const,
+            },
+      session: {
+        id: '33333333-3333-4333-8333-333333333333',
+        expiresAt: '2099-07-07T00:00:00.000Z',
+      },
+    })),
     createTeam: jest.fn(async (input) => ({
       teamId: '55555555-5555-4555-8555-555555555555',
       teamName: input.teamName,

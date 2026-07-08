@@ -149,6 +149,17 @@ describe('AuthService', () => {
     const repository = repositoryMock();
     repository.resolveSession.mockResolvedValue(identity);
     repository.listAccountTeams.mockResolvedValue([account.defaultTeam!]);
+    repository.updateSessionTeam.mockResolvedValue({
+      activeTeam: {
+        id: account.defaultTeam!.teamId,
+        name: account.defaultTeam!.teamName,
+        role: 'owner',
+      },
+      session: {
+        id: identity.sessionId,
+        expiresAt: identity.expiresAt,
+      },
+    });
     const service = new AuthService(repository as never, configService());
     const current = await service.authenticateRequest({
       headers: {
@@ -169,6 +180,47 @@ describe('AuthService', () => {
         id: identity.sessionId,
       },
     });
+    await expect(
+      service.switchActiveTeam({ teamId: account.defaultTeam!.teamId }, identity),
+    ).resolves.toMatchObject({
+      activeTeam: {
+        id: account.defaultTeam!.teamId,
+        role: 'owner',
+      },
+      session: {
+        id: identity.sessionId,
+      },
+    });
+    expect(repository.updateSessionTeam).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: identity.sessionId,
+        accountId: identity.accountId,
+        teamId: account.defaultTeam!.teamId,
+        now: expect.any(String),
+      }),
+    );
+  });
+
+  it('rejects switching the active workspace to a team outside the account membership', async () => {
+    const repository = repositoryMock();
+    repository.updateSessionTeam.mockResolvedValue(undefined);
+    const service = new AuthService(repository as never, configService());
+
+    await expect(
+      service.switchActiveTeam(
+        {
+          teamId: '99999999-9999-4999-8999-999999999999',
+        },
+        identity,
+      ),
+    ).rejects.toThrow(ApiForbiddenError);
+    expect(repository.updateSessionTeam).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: identity.sessionId,
+        accountId: identity.accountId,
+        teamId: '99999999-9999-4999-8999-999999999999',
+      }),
+    );
   });
 
   it('creates hashed team invitations without leaking raw token storage', async () => {
@@ -1306,6 +1358,7 @@ function repositoryMock() {
     createSession: jest.fn(),
     listAccountSessions: jest.fn(),
     revokeOtherSessions: jest.fn(),
+    updateSessionTeam: jest.fn(),
     recordFailedLogin: jest.fn(),
     resetFailedLogin: jest.fn(),
     resolveSession: jest.fn(),
