@@ -78,6 +78,9 @@ once tagged releases begin.
   database-backed upload/download APIs, raw-byte SHA-256 validation, MIME/file-name
   guards, metadata-only reconciliation evidence, audit events, and workspace
   store/download actions.
+- Invoice artifact legal-hold administration for stored reconciliation artifacts,
+  including Owner/Admin PATCH API, persistence/evidence synchronization, audit event,
+  and workspace place/release action.
 - Invoice artifact storage readiness and retention enforcement foundation, including
   production-bound config guards for external object storage/KMS/webhook scanning,
   strict credential-check coverage, signed scanner webhook integration, and admin

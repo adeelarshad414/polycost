@@ -335,6 +335,14 @@ Evidence:
   `11` suites / `141` tests, graph validation `312` nodes / `312` edges, pricing
   coverage, progress verification, QA/security suppression, database, DevOps, cloud,
   release, handover, and provider credential gates.
+- Phase 2.30 artifact legal-hold administration focused regressions passed: API `2`
+  suites / `66` tests (`auth-billing`, `api-database.repository`) and web `2`
+  suites / `86` tests (`App`, `api-client`). The phase adds audited Owner/Admin
+  legal-hold place/release operations for stored invoice artifacts while keeping full
+  legal-review workflow and provider invoice-of-record validation as future scope.
+  Full local `npm run check` passed afterward with API `55` suites / `456` tests,
+  web `11` suites / `143` tests, graph validation `320` nodes / `320` edges, and
+  progress verification `153` anchors.
 - Phase 2.9 focused regressions passed: API `3` suites / `52` tests
   (`auth-billing`, `diagram-parser`, `llm-classifier`) and web `1` suite / `57`
   tests (`App.spec.tsx`).

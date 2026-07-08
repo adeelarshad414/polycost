@@ -631,6 +631,11 @@ export interface InvoiceArtifactBlobUploadInput {
   kmsKeyReference?: string;
 }
 
+export interface InvoiceArtifactLegalHoldInput {
+  legalHold: boolean;
+  reason?: string;
+}
+
 export interface InvoiceArtifactBlobGovernance {
   storageProfile: {
     storageBackend: InvoiceArtifactStorageBackend;

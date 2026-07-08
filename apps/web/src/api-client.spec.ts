@@ -495,6 +495,41 @@ describe('api client', () => {
       )
       .mockResolvedValueOnce(
         jsonResponse({
+          ...reconciliation,
+          evidence: {
+            invoiceGradeArtifactRegister: {
+              registeredCount: 1,
+              verifiedCount: 1,
+              status: 'registered-with-verified-artifacts',
+              artifacts: [
+                {
+                  id: 'artifact-1',
+                  storedBlob: {
+                    storageStatus: 'stored',
+                    storageMode: 'database-bytea',
+                    fileName: 'aws-invoice-control.txt',
+                    mimeType: 'text/plain',
+                    contentSha256: 'd'.repeat(64),
+                    contentSizeBytes: 7,
+                    uploadedAt: '2026-07-06T00:00:05.000Z',
+                    legalHoldUpdatedAt: '2026-07-06T00:00:06.000Z',
+                    legalHoldReason: 'retention review',
+                    governance: {
+                      ...artifactGovernance(),
+                      retentionPolicy: {
+                        ...artifactGovernance().retentionPolicy,
+                        legalHold: true,
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
           id: 'blob-1',
           reconciliationId: 'reconciliation-1',
           artifactId: 'artifact-1',
@@ -640,6 +675,29 @@ describe('api client', () => {
       }),
     );
     await expect(
+      client.setInvoiceArtifactLegalHold(
+        'reconciliation-1',
+        'artifact-1',
+        {
+          legalHold: true,
+          reason: 'retention review',
+        },
+        'session-token',
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        evidence: expect.objectContaining({
+          invoiceGradeArtifactRegister: expect.objectContaining({
+            artifacts: [
+              expect.objectContaining({
+                id: 'artifact-1',
+              }),
+            ],
+          }),
+        }),
+      }),
+    );
+    await expect(
       client.downloadInvoiceArtifactBlob('reconciliation-1', 'artifact-1', 'session-token'),
     ).resolves.toEqual(
       expect.objectContaining({
@@ -762,6 +820,20 @@ describe('api client', () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       11,
+      'http://api.test/api/v1/billing/reconciliations/reconciliation-1/artifacts/artifact-1/blob/legal-hold',
+      expect.objectContaining({
+        method: 'PATCH',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer session-token',
+        }),
+        body: JSON.stringify({
+          legalHold: true,
+          reason: 'retention review',
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      12,
       'http://api.test/api/v1/billing/reconciliations/reconciliation-1/artifacts/artifact-1/blob',
       expect.objectContaining({
         headers: expect.objectContaining({
@@ -770,7 +842,7 @@ describe('api client', () => {
       }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      12,
+      13,
       'http://api.test/api/v1/billing/artifact-storage/readiness',
       expect.objectContaining({
         headers: expect.objectContaining({
@@ -779,7 +851,7 @@ describe('api client', () => {
       }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      13,
+      14,
       'http://api.test/api/v1/billing/artifact-storage/retention/enforce',
       expect.objectContaining({
         method: 'POST',
