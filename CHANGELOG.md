@@ -78,6 +78,9 @@ once tagged releases begin.
   database-backed upload/download APIs, raw-byte SHA-256 validation, MIME/file-name
   guards, metadata-only reconciliation evidence, audit events, and workspace
   store/download actions.
+- Invoice artifact governance metadata for stored artifacts, including retention
+  windows, legal-hold state, KMS production-readiness flags, and an EICAR-signature
+  scan hook that blocks known test-malware content before storage.
 
 ### Notes
 
@@ -96,9 +99,10 @@ once tagged releases begin.
 - Billing reconciliation now has native export mapper evidence for AWS CUR, Azure
   Cost Management CSV, and nested GCP Billing Export JSON, plus adjustment-aware
   usage-comparable variance, commitment row evidence, invoice artifact metadata
-  registration/verification status, and database-backed artifact file storage, while
-  provider invoice-of-record validation, object storage/KMS, malware scanning, and
-  legal retention workflows remain future scope.
+  registration/verification status, database-backed artifact file storage, and
+  artifact governance metadata. Provider invoice-of-record validation, external
+  object storage, customer-managed keys, real malware scanning, and legal retention
+  workflow enforcement remain future scope.
 - Account/team UX now supports switching the current active workspace without a
   new login, refreshing pending/expired invite tokens, and handing invite links to
   a signed delivery webhook, while provider-specific email templates, SSO/SAML,

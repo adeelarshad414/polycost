@@ -504,6 +504,14 @@ interface InvoiceArtifactBlobRow {
   content: Buffer;
   uploaded_by_account_id: string | null;
   uploaded_at: Date;
+  storage_backend: 'database-bytea';
+  kms_key_reference: string | null;
+  retention_until: Date;
+  legal_hold: boolean;
+  malware_scan_status: 'passed' | 'failed';
+  malware_scan_engine: 'polycost-eicar-signature-v1';
+  malware_scan_checked_at: Date;
+  malware_scan_finding: string | null;
 }
 
 const PROVIDERS: ProviderId[] = ['aws', 'azure', 'gcp'];
@@ -3870,6 +3878,11 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     content: Buffer;
     uploadedByAccountId?: string;
     uploadedAt: string;
+    kmsKeyReference?: string;
+    retentionUntil: string;
+    legalHold: boolean;
+    malwareScanCheckedAt: string;
+    malwareScanFinding?: string;
     evidence: Record<string, unknown>;
     audit?: TeamAuditEventInput;
   }): Promise<InvoiceReconciliationRecord> {
@@ -3886,9 +3899,17 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
             content_size_bytes,
             content,
             uploaded_by_account_id,
-            uploaded_at
+            uploaded_at,
+            storage_backend,
+            kms_key_reference,
+            retention_until,
+            legal_hold,
+            malware_scan_status,
+            malware_scan_engine,
+            malware_scan_checked_at,
+            malware_scan_finding
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'database-bytea', $11, $12, $13, 'passed', 'polycost-eicar-signature-v1', $14, $15)
           ON CONFLICT (reconciliation_id, artifact_id)
           DO UPDATE SET
             team_id = EXCLUDED.team_id,
@@ -3898,7 +3919,15 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
             content_size_bytes = EXCLUDED.content_size_bytes,
             content = EXCLUDED.content,
             uploaded_by_account_id = EXCLUDED.uploaded_by_account_id,
-            uploaded_at = EXCLUDED.uploaded_at
+            uploaded_at = EXCLUDED.uploaded_at,
+            storage_backend = EXCLUDED.storage_backend,
+            kms_key_reference = EXCLUDED.kms_key_reference,
+            retention_until = EXCLUDED.retention_until,
+            legal_hold = EXCLUDED.legal_hold,
+            malware_scan_status = EXCLUDED.malware_scan_status,
+            malware_scan_engine = EXCLUDED.malware_scan_engine,
+            malware_scan_checked_at = EXCLUDED.malware_scan_checked_at,
+            malware_scan_finding = EXCLUDED.malware_scan_finding
         `,
         [
           input.reconciliationId,
@@ -3911,6 +3940,11 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
           input.content,
           input.uploadedByAccountId ?? null,
           input.uploadedAt,
+          input.kmsKeyReference ?? null,
+          input.retentionUntil,
+          input.legalHold,
+          input.malwareScanCheckedAt,
+          input.malwareScanFinding ?? null,
         ],
       );
       const result = await pool.query<InvoiceReconciliationRow>(
@@ -3978,7 +4012,15 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
                content_size_bytes,
                content,
                uploaded_by_account_id,
-               uploaded_at
+               uploaded_at,
+               storage_backend,
+               kms_key_reference,
+               retention_until,
+               legal_hold,
+               malware_scan_status,
+               malware_scan_engine,
+               malware_scan_checked_at,
+               malware_scan_finding
         FROM invoice_artifact_blobs
         WHERE reconciliation_id = $1
           AND artifact_id = $2
@@ -4471,7 +4513,31 @@ function toInvoiceArtifactBlobRecord(row: InvoiceArtifactBlobRow): InvoiceArtifa
     contentBase64: row.content.toString('base64'),
     ...(row.uploaded_by_account_id ? { uploadedByAccountId: row.uploaded_by_account_id } : {}),
     uploadedAt: row.uploaded_at.toISOString(),
+    storageProfile: {
+      storageBackend: row.storage_backend,
+      encryptionStatus: 'database-managed',
+      ...(row.kms_key_reference ? { kmsKeyReference: row.kms_key_reference } : {}),
+      kmsKeyRequiredForProduction: !row.kms_key_reference,
+    },
+    retentionPolicy: {
+      retentionUntil: row.retention_until.toISOString(),
+      retentionDays: retentionDaysBetween(row.uploaded_at, row.retention_until),
+      legalHold: row.legal_hold,
+    },
+    malwareScan: {
+      status: row.malware_scan_status,
+      scanner: row.malware_scan_engine,
+      checkedAt: row.malware_scan_checked_at.toISOString(),
+      findings: row.malware_scan_finding ? [row.malware_scan_finding] : [],
+    },
   };
+}
+
+function retentionDaysBetween(uploadedAt: Date, retentionUntil: Date): number {
+  const millisecondsPerDay = 24 * 60 * 60 * 1000;
+  const diff = retentionUntil.getTime() - uploadedAt.getTime();
+
+  return Math.max(0, Math.round(diff / millisecondsPerDay));
 }
 
 function dateOnly(value: Date | string): string {

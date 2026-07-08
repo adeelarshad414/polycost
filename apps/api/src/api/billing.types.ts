@@ -93,9 +93,32 @@ export interface InvoiceArtifactBlobUploadInput {
   content: string;
   encoding?: 'text' | 'base64';
   sha256?: string;
+  retentionDays?: number;
+  legalHold?: boolean;
+  kmsKeyReference?: string;
 }
 
-export interface InvoiceArtifactBlobRecord {
+export interface InvoiceArtifactBlobGovernance {
+  storageProfile: {
+    storageBackend: 'database-bytea';
+    encryptionStatus: 'database-managed';
+    kmsKeyReference?: string;
+    kmsKeyRequiredForProduction: boolean;
+  };
+  retentionPolicy: {
+    retentionUntil: string;
+    retentionDays: number;
+    legalHold: boolean;
+  };
+  malwareScan: {
+    status: 'passed' | 'failed';
+    scanner: string;
+    checkedAt: string;
+    findings: string[];
+  };
+}
+
+export interface InvoiceArtifactBlobRecord extends InvoiceArtifactBlobGovernance {
   id: string;
   reconciliationId: string;
   artifactId: string;
@@ -133,6 +156,7 @@ export interface InvoiceGradeArtifactRecord extends InvoiceGradeArtifactRegistra
     contentSizeBytes: number;
     uploadedAt: string;
     uploadedByAccountId?: string;
+    governance?: InvoiceArtifactBlobGovernance;
   };
 }
 

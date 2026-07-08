@@ -592,12 +592,17 @@ describe('App', () => {
         fileName: 'aws-invoice-control-66666666.txt',
         mimeType: 'text/plain',
         encoding: 'text',
+        retentionDays: 365,
+        legalHold: false,
         content: expect.stringContaining('artifact_id=artifact-1'),
       }),
       'session-token',
     );
     expect(text(container)).toContain('Stored file: aws-invoice-control-66666666.txt');
     expect(text(container)).toContain('sha256 dddddddddddd');
+    expect(text(container)).toContain('Governance: scan passed');
+    expect(text(container)).toContain('legal hold off');
+    expect(text(container)).toContain('KMS required for production');
 
     await click(buttonByText(container, 'Download stored file'));
     await settleAsyncEffects();
@@ -4896,6 +4901,24 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
                 contentSizeBytes: 210,
                 uploadedAt: '2026-07-06T00:00:05.000Z',
                 uploadedByAccountId: '11111111-1111-4111-8111-111111111111',
+                governance: {
+                  storageProfile: {
+                    storageBackend: 'database-bytea',
+                    encryptionStatus: 'database-managed',
+                    kmsKeyRequiredForProduction: true,
+                  },
+                  retentionPolicy: {
+                    retentionUntil: '2027-07-06T00:00:05.000Z',
+                    retentionDays: 365,
+                    legalHold: false,
+                  },
+                  malwareScan: {
+                    status: 'passed',
+                    scanner: 'polycost-eicar-signature-v1',
+                    checkedAt: '2026-07-06T00:00:05.000Z',
+                    findings: [],
+                  },
+                },
               },
             },
           ],
@@ -4924,6 +4947,22 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       contentBase64: 'aW52b2ljZQ==',
       uploadedByAccountId: '11111111-1111-4111-8111-111111111111',
       uploadedAt: '2026-07-06T00:00:05.000Z',
+      storageProfile: {
+        storageBackend: 'database-bytea' as const,
+        encryptionStatus: 'database-managed' as const,
+        kmsKeyRequiredForProduction: true,
+      },
+      retentionPolicy: {
+        retentionUntil: '2027-07-06T00:00:05.000Z',
+        retentionDays: 365,
+        legalHold: false,
+      },
+      malwareScan: {
+        status: 'passed' as const,
+        scanner: 'polycost-eicar-signature-v1',
+        checkedAt: '2026-07-06T00:00:05.000Z',
+        findings: [],
+      },
     })),
     verifyInvoiceGradeArtifact: jest.fn(async () => ({
       id: '66666666-6666-4666-8666-666666666666',
@@ -4995,6 +5034,24 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
                 contentSizeBytes: 210,
                 uploadedAt: '2026-07-06T00:00:05.000Z',
                 uploadedByAccountId: '11111111-1111-4111-8111-111111111111',
+                governance: {
+                  storageProfile: {
+                    storageBackend: 'database-bytea',
+                    encryptionStatus: 'database-managed',
+                    kmsKeyRequiredForProduction: true,
+                  },
+                  retentionPolicy: {
+                    retentionUntil: '2027-07-06T00:00:05.000Z',
+                    retentionDays: 365,
+                    legalHold: false,
+                  },
+                  malwareScan: {
+                    status: 'passed',
+                    scanner: 'polycost-eicar-signature-v1',
+                    checkedAt: '2026-07-06T00:00:05.000Z',
+                    findings: [],
+                  },
+                },
               },
             },
           ],

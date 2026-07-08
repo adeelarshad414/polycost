@@ -115,6 +115,7 @@ say so explicitly rather than marking it done.
 | Phase 2.23 - Invoice artifact registration seam         | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.24 - Invoice artifact verification seam         | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.25 - Invoice artifact blob storage seam         | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.26 - Invoice artifact governance metadata       | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -3947,7 +3948,7 @@ when it is actually resolved in a later phase, with a note on which phase resolv
 
 ## Phase 2.14 — Team audit trail foundation
 
-Status: implemented locally on 2026-07-08.
+Status: implemented and verified locally on 2026-07-08.
 
 - Added migration `030_team_audit_events.sql` with append-only team audit event storage,
   actor linkage, metadata JSON validation, indexed team/actor timelines, and least-privilege
@@ -4290,6 +4291,36 @@ Status: implemented locally on 2026-07-08.
   malware scanning, retention/legal hold, reviewer workflow UI, private-pricing/tax
   contract validation, commitment inventory reconciliation, and provider-account
   allocation review.
+
+## Phase 2.26 — Invoice artifact governance metadata
+
+Status: implemented locally on 2026-07-08.
+
+- Added migration `033_invoice_artifact_blob_governance.sql` with storage-backend,
+  KMS-reference, retention-until, legal-hold, malware-scan status, scan engine, scan
+  timestamp, and scan-finding columns for invoice artifact blobs.
+- Backfilled existing artifact blobs with a 365-day retention window and scan
+  timestamp before enforcing non-null governance timestamps.
+- Upload now records governance metadata in the blob row and in metadata-only
+  reconciliation evidence: database-backed storage profile, KMS production-readiness
+  flag, retention/legal-hold policy, and malware scan status.
+- Added a deterministic EICAR-signature scan hook that blocks known test-malware
+  content before bytes are stored. This is a local safety hook, not a full AV engine.
+- Updated the workspace billing panel to show artifact governance: scan status,
+  retention date, legal-hold state, and whether KMS remains required for production.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/api/api-database.repository.spec.ts`
+  passed 55/55. `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx src/api-client.spec.ts`
+  passed 86/86. `npm run test:production-readiness` passed with API 12 suites /
+  166 tests and web 2 suites / 86 tests. Full `npm run check` passed with API 53
+  suites / 431 tests, web 11 suites / 143 tests, graph validation 316 nodes / 316
+  edges, pricing coverage, progress verification, QA/security suppression hygiene,
+  DB, DevOps, cloud, release, handover, and provider-credential gates green.
+- Remaining caveat: PolyCost now records governance metadata and blocks EICAR test
+  content, but this is not a production object-storage/KMS/AV/retention platform.
+  Full production invoice handling still needs external object storage, customer
+  managed keys, real malware scanning, legal-hold enforcement, reviewer workflow UX,
+  and provider invoice-of-record validation.
 
 ## Deviations from spec log
 

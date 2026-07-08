@@ -5,6 +5,7 @@ import { ApiForbiddenError, ApiNotFoundError, ApiValidationError } from './api-e
 import { ApiDatabaseRepository } from './api-database.repository';
 import { AuthIdentity } from './auth.types';
 import {
+  InvoiceArtifactBlobGovernance,
   InvoiceArtifactBlobRecord,
   InvoiceArtifactBlobUploadInput,
   BillingImportInput,
@@ -26,6 +27,9 @@ const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const MAX_IMPORT_ROWS = 10_000;
 const MAX_PROVIDER_EXPORT_BYTES = 4 * 1024 * 1024;
 const MAX_INVOICE_ARTIFACT_BLOB_BYTES = 1024 * 1024;
+const DEFAULT_INVOICE_ARTIFACT_RETENTION_DAYS = 365;
+const MAX_INVOICE_ARTIFACT_RETENTION_DAYS = 3650;
+const EICAR_TEST_SIGNATURE = 'EICAR-STANDARD-ANTIVIRUS-TEST-FILE';
 const INVOICE_ARTIFACT_MIME_TYPES = [
   'application/pdf',
   'application/json',
@@ -482,9 +486,10 @@ export class BillingService {
     }
 
     const uploadedAt = new Date().toISOString();
+    const governance = invoiceArtifactBlobGovernance(input, decoded.content, uploadedAt);
     const evidence = replaceInvoiceGradeArtifactEvidence(
       reconciliation,
-      storedInvoiceGradeArtifact(artifact, decoded, uploadedAt, identity),
+      storedInvoiceGradeArtifact(artifact, decoded, uploadedAt, identity, governance),
     );
 
     return this.repository.saveInvoiceArtifactBlobAndUpdateEvidence({
@@ -497,6 +502,12 @@ export class BillingService {
       content: decoded.content,
       uploadedByAccountId: identity.accountId,
       uploadedAt,
+      ...(governance.storageProfile.kmsKeyReference
+        ? { kmsKeyReference: governance.storageProfile.kmsKeyReference }
+        : {}),
+      retentionUntil: governance.retentionPolicy.retentionUntil,
+      legalHold: governance.retentionPolicy.legalHold,
+      malwareScanCheckedAt: governance.malwareScan.checkedAt,
       evidence,
       ...(importRun.teamId
         ? {
@@ -515,6 +526,12 @@ export class BillingService {
                 mimeType: decoded.mimeType,
                 contentSha256: decoded.sha256,
                 contentSizeBytes: decoded.content.length,
+                storageBackend: governance.storageProfile.storageBackend,
+                kmsKeyConfigured: !governance.storageProfile.kmsKeyRequiredForProduction,
+                retentionUntil: governance.retentionPolicy.retentionUntil,
+                legalHold: governance.retentionPolicy.legalHold,
+                malwareScanStatus: governance.malwareScan.status,
+                malwareScanScanner: governance.malwareScan.scanner,
               },
             },
           }
@@ -1618,6 +1635,12 @@ function parseInvoiceArtifactBlobUploadInput(body: unknown): InvoiceArtifactBlob
     MAX_INVOICE_ARTIFACT_BLOB_BYTES * 2,
   );
   const encoding = record.encoding === 'base64' ? 'base64' : 'text';
+  const retentionDays = parseOptionalRetentionDays(record.retentionDays);
+  const legalHold = parseOptionalBoolean(record.legalHold, 'legalHold');
+  const kmsKeyReference = parseArtifactGovernanceReference(
+    record.kmsKeyReference,
+    'kmsKeyReference',
+  );
 
   return {
     fileName,
@@ -1625,6 +1648,9 @@ function parseInvoiceArtifactBlobUploadInput(body: unknown): InvoiceArtifactBlob
     content,
     encoding,
     ...(record.sha256 !== undefined ? { sha256: parseSha256(record.sha256, 'sha256') } : {}),
+    ...(retentionDays !== undefined ? { retentionDays } : {}),
+    ...(legalHold !== undefined ? { legalHold } : {}),
+    ...(kmsKeyReference ? { kmsKeyReference } : {}),
   };
 }
 
@@ -1664,6 +1690,61 @@ function parseArtifactMimeType(value: unknown): (typeof INVOICE_ARTIFACT_MIME_TY
       issue: `must be one of ${INVOICE_ARTIFACT_MIME_TYPES.join(', ')}`,
     },
   ]);
+}
+
+function parseOptionalRetentionDays(value: unknown): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const parsed = typeof value === 'number' ? value : Number.parseFloat(String(value));
+
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > MAX_INVOICE_ARTIFACT_RETENTION_DAYS) {
+    throw new ApiValidationError('retentionDays is invalid', [
+      {
+        field: 'retentionDays',
+        issue: `must be an integer between 1 and ${MAX_INVOICE_ARTIFACT_RETENTION_DAYS}`,
+      },
+    ]);
+  }
+
+  return parsed;
+}
+
+function parseOptionalBoolean(value: unknown, field: string): boolean | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  throw new ApiValidationError(`${field} must be boolean`, [
+    {
+      field,
+      issue: 'must be true or false',
+    },
+  ]);
+}
+
+function parseArtifactGovernanceReference(value: unknown, field: string): string | undefined {
+  const parsed = parseOptionalString(value, 240);
+
+  if (!parsed) {
+    return undefined;
+  }
+
+  if (hasControlCharacter(parsed)) {
+    throw new ApiValidationError(`${field} is invalid`, [
+      {
+        field,
+        issue: 'must not contain control characters',
+      },
+    ]);
+  }
+
+  return parsed;
 }
 
 function hasControlCharacter(value: string): boolean {
@@ -1726,6 +1807,56 @@ function decodeBase64ArtifactContent(content: string): Buffer {
   }
 
   return Buffer.from(normalized, 'base64');
+}
+
+function invoiceArtifactBlobGovernance(
+  input: InvoiceArtifactBlobUploadInput,
+  content: Buffer,
+  uploadedAt: string,
+): InvoiceArtifactBlobGovernance {
+  assertInvoiceArtifactScanPassed(content);
+  const retentionDays = input.retentionDays ?? DEFAULT_INVOICE_ARTIFACT_RETENTION_DAYS;
+  const retentionUntil = addDays(uploadedAt, retentionDays);
+
+  return {
+    storageProfile: {
+      storageBackend: 'database-bytea',
+      encryptionStatus: 'database-managed',
+      ...(input.kmsKeyReference ? { kmsKeyReference: input.kmsKeyReference } : {}),
+      kmsKeyRequiredForProduction: !input.kmsKeyReference,
+    },
+    retentionPolicy: {
+      retentionUntil,
+      retentionDays,
+      legalHold: input.legalHold ?? false,
+    },
+    malwareScan: {
+      status: 'passed',
+      scanner: 'polycost-eicar-signature-v1',
+      checkedAt: uploadedAt,
+      findings: [],
+    },
+  };
+}
+
+function assertInvoiceArtifactScanPassed(content: Buffer): void {
+  if (!content.toString('utf8').includes(EICAR_TEST_SIGNATURE)) {
+    return;
+  }
+
+  throw new ApiValidationError('invoice artifact malware scan failed', [
+    {
+      field: 'content',
+      issue: 'blocked by PolyCost artifact scan hook using the EICAR test signature',
+    },
+  ]);
+}
+
+function addDays(isoTimestamp: string, days: number): string {
+  const date = new Date(isoTimestamp);
+  date.setUTCDate(date.getUTCDate() + days);
+
+  return date.toISOString();
 }
 
 function parseProvider(value: unknown): BillingImportInput['provider'] {
@@ -2573,6 +2704,7 @@ function storedInvoiceGradeArtifact(
   },
   uploadedAt: string,
   identity: AuthIdentity,
+  governance: InvoiceArtifactBlobGovernance,
 ): InvoiceGradeArtifactRecord {
   return {
     ...artifact,
@@ -2586,6 +2718,7 @@ function storedInvoiceGradeArtifact(
       contentSizeBytes: blob.content.length,
       uploadedAt,
       uploadedByAccountId: identity.accountId,
+      governance,
     },
   };
 }

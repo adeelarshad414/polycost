@@ -61,6 +61,9 @@ Evidence:
   routes. The app hashes raw decoded bytes, stores the blob in
   `invoice_artifact_blobs`, writes only metadata into reconciliation evidence, and
   records a transaction-coupled audit event.
+- Stored artifact metadata now includes storage backend, KMS production-readiness,
+  retention/legal-hold policy, and scan-hook status. The local EICAR-signature hook
+  blocks known test-malware content before storage.
 - `docs/PROVIDER-CREDENTIALS.md` states the current production swap procedure and
   explicitly limits real provider mode to catalog list prices, not invoices.
 
@@ -74,10 +77,11 @@ Deferred:
   rows are separated from usage-comparable variance, but provider-account-specific
   amortization, allocation proof, private pricing, and invoice controls remain
   future work. The invoice-grade readiness matrix, artifact register, stored-blob
-  metadata, and verification status expose those blockers; they do not remove
-  unrelated or unverified evidence requirements. Current artifact storage is
-  database-backed for the OSS/self-hosted baseline, not enterprise object storage
-  with KMS, malware scanning, legal hold, or reviewer workflow automation.
+  metadata, governance status, and verification status expose those blockers; they
+  do not remove unrelated or unverified evidence requirements. Current artifact
+  storage is database-backed for the OSS/self-hosted baseline with a deterministic
+  scan hook, not enterprise object storage with customer-managed KMS, real AV
+  scanning, legal-hold enforcement, or reviewer workflow automation.
 
 ## Phase B - Input Modes And Requirement Pipeline
 
