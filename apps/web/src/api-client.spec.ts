@@ -453,6 +453,18 @@ describe('api client', () => {
             },
           },
         }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ...reconciliation,
+          evidence: {
+            invoiceGradeArtifactRegister: {
+              registeredCount: 1,
+              verifiedCount: 1,
+              status: 'registered-with-verified-artifacts',
+            },
+          },
+        }),
       );
     global.fetch = fetchMock as typeof fetch;
     const client = createPolyCostClient('http://api.test/api/v1');
@@ -509,6 +521,27 @@ describe('api client', () => {
         evidence: expect.objectContaining({
           invoiceGradeArtifactRegister: expect.objectContaining({
             registeredCount: 1,
+          }),
+        }),
+      }),
+    );
+    await expect(
+      client.verifyInvoiceGradeArtifact(
+        'reconciliation-1',
+        'artifact-1',
+        {
+          verificationStatus: 'verified',
+          evidenceReference: 'review://controls/aws-invoice-2026-06',
+          sha256: 'b'.repeat(64),
+          controlTotalUsd: 107,
+        },
+        'session-token',
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        evidence: expect.objectContaining({
+          invoiceGradeArtifactRegister: expect.objectContaining({
+            verifiedCount: 1,
           }),
         }),
       }),
@@ -573,6 +606,22 @@ describe('api client', () => {
           controlTotalUsd: 107,
           billingPeriodStart: '2026-06-01',
           billingPeriodEnd: '2026-06-30',
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      9,
+      'http://api.test/api/v1/billing/reconciliations/reconciliation-1/artifacts/artifact-1/verification',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer session-token',
+        }),
+        body: JSON.stringify({
+          verificationStatus: 'verified',
+          evidenceReference: 'review://controls/aws-invoice-2026-06',
+          sha256: 'b'.repeat(64),
+          controlTotalUsd: 107,
         }),
       }),
     );

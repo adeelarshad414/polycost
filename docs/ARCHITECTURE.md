@@ -73,6 +73,9 @@ Pricing evidence is intentionally first-class:
 - commitment evidence requirements are reported separately, including whether rows
   still need provider commitment inventory, amortization-period proof, or allocation
   evidence before invoice-grade use
+- invoice artifacts can be registered and marked verified/rejected with review
+  evidence, checksum/control-total controls, and readiness updates limited to the
+  covered evidence check
 - invoice-grade readiness is represented as a matrix of evidence checks, blockers,
   and required provider artifacts rather than a yes/no claim
 - exports carry methodology and data-freshness context
@@ -160,8 +163,8 @@ Health and operations:
 
 ## Known Architecture Boundaries
 
-- Full invoice-grade pricing and provider invoice-of-record reconciliation remain
-  future work.
+- Full invoice-grade pricing, durable artifact storage, and provider invoice-of-record
+  reconciliation remain future work.
 - VSDX parsing is layout-aware extraction, not full Visio rendering.
 - Production LLM quality depends on a real endpoint/model, Vault secret, and corpus
   evaluation.

@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { ComparisonResult } from '../comparison/comparison.types';
 import { AppConfig } from '../config/config.schema';
-import { ApiForbiddenError, ApiUnauthorizedError } from './api-errors';
+import { ApiForbiddenError, ApiUnauthorizedError, ApiValidationError } from './api-errors';
 import { ApiDatabaseRepository, LocalAccountWithPassword } from './api-database.repository';
 import { AuthService } from './auth.service';
 import { AuthIdentity, TeamRole } from './auth.types';
@@ -1914,6 +1914,225 @@ describe('BillingService', () => {
     );
   });
 
+  it('verifies registered invoice-grade artifact evidence with checksum controls', async () => {
+    const repository = repositoryMock();
+    const reconciliationRecord = {
+      id: '66666666-6666-4666-8666-666666666666',
+      importRunId: '55555555-5555-4555-8555-555555555555',
+      comparisonId: comparisonResult.comparisonId,
+      provider: 'aws' as const,
+      estimatedTotalUsd: 100,
+      invoicedTotalUsd: 107,
+      varianceUsd: 7,
+      variancePercent: 7,
+      status: 'variance-warning' as const,
+      evidence: {
+        invoiceGradeReadiness: {
+          status: 'invoice-grade-blocked',
+          missingCount: 2,
+          blockers: ['Provider invoice control total', 'Private pricing and discount proof'],
+          requiredArtifacts: [
+            'AWS invoice PDF/tax invoice, CUR manifest, payer-account billing period, and Cost Explorer control total.',
+            'Private rate card, enterprise agreement, EDP/EA terms, discount schedule, or provider contract extract.',
+          ],
+          checks: [
+            {
+              id: 'provider-invoice-control',
+              label: 'Provider invoice control total',
+              status: 'missing',
+              evidence:
+                'PolyCost has normalized provider export rows, not the provider invoice of record.',
+              requiredArtifact:
+                'AWS invoice PDF/tax invoice, CUR manifest, payer-account billing period, and Cost Explorer control total.',
+            },
+            {
+              id: 'private-pricing',
+              label: 'Private pricing and discount proof',
+              status: 'missing',
+              evidence: '1 private-pricing, discount, or enterprise-adjustment row(s) detected.',
+              requiredArtifact:
+                'Private rate card, enterprise agreement, EDP/EA terms, discount schedule, or provider contract extract.',
+            },
+          ],
+        },
+        invoiceGradeArtifactRegister: {
+          status: 'metadata-registered-not-verified',
+          provider: 'aws',
+          registeredCount: 1,
+          verifiedCount: 0,
+          artifacts: [
+            {
+              id: 'artifact-1',
+              provider: 'aws',
+              type: 'provider-invoice',
+              displayName: 'June AWS invoice control packet',
+              reference: 's3://billing-audit/2026-06/aws-invoice.pdf',
+              sha256: 'b'.repeat(64),
+              controlTotalUsd: 107,
+              verificationStatus: 'registered',
+              registeredAt: '2026-07-06T00:00:03.000Z',
+              registeredByAccountId: identity.accountId,
+            },
+          ],
+        },
+      },
+      createdAt: '2026-07-06T00:00:02.000Z',
+    };
+    repository.getInvoiceReconciliation.mockResolvedValue(reconciliationRecord);
+    repository.getBillingImport.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      teamId: identity.teamId,
+      provider: 'aws',
+      sourceType: 'aws-cur',
+      status: 'completed',
+      billingPeriodStart: '2026-06-01',
+      billingPeriodEnd: '2026-06-30',
+      originalFileSha256: 'a'.repeat(64),
+      rowsReceived: 1,
+      rowsAccepted: 1,
+      rowsRejected: 0,
+      totalCostUsd: 107,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    });
+    repository.updateInvoiceReconciliationEvidence.mockImplementation(async (input) => ({
+      ...reconciliationRecord,
+      evidence: input.evidence,
+    }));
+    const service = new BillingService(repository as never);
+
+    const result = await service.verifyInvoiceGradeArtifact(
+      '66666666-6666-4666-8666-666666666666',
+      'artifact-1',
+      {
+        verificationStatus: 'verified',
+        evidenceReference: 'review://controls/aws-invoice-2026-06',
+        sha256: 'b'.repeat(64),
+        controlTotalUsd: 107,
+        notes: 'Reviewed invoice checksum and control total.',
+      },
+      identity,
+    );
+
+    expect(result.evidence).toEqual(
+      expect.objectContaining({
+        invoiceGradeReadiness: expect.objectContaining({
+          status: 'invoice-grade-blocked',
+          missingCount: 1,
+          presentCount: 1,
+          blockers: ['Private pricing and discount proof'],
+          checks: [
+            expect.objectContaining({
+              id: 'provider-invoice-control',
+              status: 'present',
+              artifactRegisterStatus: 'verified-artifact-present',
+              verifiedArtifactCount: 1,
+              verifiedArtifactTypes: ['provider-invoice', 'control-total'],
+              missingAcceptedArtifactTypes: [],
+            }),
+            expect.objectContaining({
+              id: 'private-pricing',
+              status: 'missing',
+            }),
+          ],
+        }),
+        invoiceGradeArtifactRegister: expect.objectContaining({
+          status: 'registered-with-verified-artifacts',
+          registeredCount: 1,
+          verifiedCount: 1,
+          artifacts: [
+            expect.objectContaining({
+              id: 'artifact-1',
+              verificationStatus: 'verified',
+              verificationEvidenceReference: 'review://controls/aws-invoice-2026-06',
+              verifiedByAccountId: identity.accountId,
+              verifiedSha256: 'b'.repeat(64),
+              verificationControlTotalUsd: 107,
+              verificationControlTotalDeltaUsd: 0,
+            }),
+          ],
+        }),
+      }),
+    );
+    expect(repository.updateInvoiceReconciliationEvidence).toHaveBeenCalledWith(
+      expect.objectContaining({
+        audit: expect.objectContaining({
+          action: 'billing.reconciliation.artifact_verified',
+          targetType: 'billing_reconciliation',
+          metadata: expect.objectContaining({
+            artifactId: 'artifact-1',
+            artifactType: 'provider-invoice',
+            verificationStatus: 'verified',
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('rejects artifact verification when checksum evidence does not match metadata', async () => {
+    const repository = repositoryMock();
+    repository.getInvoiceReconciliation.mockResolvedValue({
+      id: '66666666-6666-4666-8666-666666666666',
+      importRunId: '55555555-5555-4555-8555-555555555555',
+      comparisonId: comparisonResult.comparisonId,
+      provider: 'aws',
+      estimatedTotalUsd: 100,
+      invoicedTotalUsd: 107,
+      varianceUsd: 7,
+      variancePercent: 7,
+      status: 'variance-warning',
+      evidence: {
+        invoiceGradeReadiness: {
+          checks: [],
+        },
+        invoiceGradeArtifactRegister: {
+          artifacts: [
+            {
+              id: 'artifact-1',
+              provider: 'aws',
+              type: 'provider-invoice',
+              displayName: 'June AWS invoice control packet',
+              reference: 's3://billing-audit/2026-06/aws-invoice.pdf',
+              sha256: 'b'.repeat(64),
+              verificationStatus: 'registered',
+              registeredAt: '2026-07-06T00:00:03.000Z',
+            },
+          ],
+        },
+      },
+      createdAt: '2026-07-06T00:00:02.000Z',
+    });
+    repository.getBillingImport.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      teamId: identity.teamId,
+      provider: 'aws',
+      sourceType: 'aws-cur',
+      status: 'completed',
+      billingPeriodStart: '2026-06-01',
+      billingPeriodEnd: '2026-06-30',
+      originalFileSha256: 'a'.repeat(64),
+      rowsReceived: 1,
+      rowsAccepted: 1,
+      rowsRejected: 0,
+      totalCostUsd: 107,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    });
+    const service = new BillingService(repository as never);
+
+    await expect(
+      service.verifyInvoiceGradeArtifact(
+        '66666666-6666-4666-8666-666666666666',
+        'artifact-1',
+        {
+          verificationStatus: 'verified',
+          evidenceReference: 'review://controls/aws-invoice-2026-06',
+          sha256: 'c'.repeat(64),
+        },
+        identity,
+      ),
+    ).rejects.toThrow(ApiValidationError);
+    expect(repository.updateInvoiceReconciliationEvidence).not.toHaveBeenCalled();
+  });
+
   it('requires owner or admin access for billing imports and reconciliation reads', async () => {
     const repository = repositoryMock();
     const service = new BillingService(repository as never);
@@ -1971,6 +2190,19 @@ describe('BillingService', () => {
           type: 'provider-invoice',
           displayName: 'Invoice control packet',
           reference: 'demo://invoice-control',
+        },
+        memberIdentity,
+      ),
+      'Team admin access is required for billing reconciliation',
+    );
+    await expectForbidden(
+      service.verifyInvoiceGradeArtifact(
+        '66666666-6666-4666-8666-666666666666',
+        'artifact-1',
+        {
+          verificationStatus: 'verified',
+          evidenceReference: 'review://controls/aws-invoice-2026-06',
+          sha256: 'b'.repeat(64),
         },
         memberIdentity,
       ),

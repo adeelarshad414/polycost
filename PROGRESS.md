@@ -113,6 +113,7 @@ say so explicitly rather than marking it done.
 | Phase 2.21 - Commitment amortization evidence needs     | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.22 - Invoice-grade readiness matrix             | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.23 - Invoice artifact registration seam         | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.24 - Invoice artifact verification seam         | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4221,6 +4222,37 @@ Status: implemented locally on 2026-07-08.
   verification, private contract validation, tax/legal entity proof, commitment
   inventory reconciliation, and provider-account allocation review before claiming
   invoice-grade results.
+
+## Phase 2.24 — Invoice artifact verification seam
+
+Status: implemented locally on 2026-07-08.
+
+- Added `POST /api/v1/billing/reconciliations/:id/artifacts/:artifactId/verification`
+  for Owner/Admin users to mark registered artifact metadata as `verified` or
+  `rejected`.
+- Verification requires a review evidence reference and rejects checksum or
+  control-total mismatches against the registered artifact metadata.
+- Verified artifacts now update `invoiceGradeArtifactRegister` with verified counts,
+  review references, checksum/control-total proof, and control-total deltas.
+- `invoiceGradeReadiness` checks now move only where verified artifact types cover
+  the specific check. Registered or rejected metadata does not remove blockers.
+- Updated the workspace billing panel and API client so demos can register an
+  artifact packet and then record verification evidence without claiming full
+  invoice-of-record parity.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/api/api-database.repository.spec.ts`
+  passed 51/51. `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx src/api-client.spec.ts`
+  passed 86/86. `npm run format:check`, `npm run ci:lint`, and
+  `npm run test:production-readiness` passed with 162/162 API tests and 86/86 web
+  tests. Full `npm run check` passed with 426/426 API tests, 143/143 web tests,
+  graph validation, pricing coverage, progress verification, QA/security
+  suppression hygiene, DB validation, release, handover, and provider-credential
+  checks green.
+- Remaining caveat: this is still metadata/control verification, not full artifact
+  storage or provider invoice rendering. PolyCost still needs durable object storage,
+  byte-level upload/download controls, reviewer workflow UI, private-pricing/tax
+  contract validation, commitment inventory reconciliation, and provider-account
+  allocation review before claiming invoice-grade billing.
 
 ## Deviations from spec log
 

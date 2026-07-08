@@ -13,6 +13,7 @@ import {
   InvoiceGradeArtifactRecord,
   InvoiceGradeArtifactRegistrationInput,
   InvoiceGradeArtifactType,
+  InvoiceGradeArtifactVerificationInput,
   InvoiceAdjustmentCategory,
   InvoiceReconciliationRecord,
   InvoiceReconciliationStatus,
@@ -343,6 +344,72 @@ export class BillingService {
               teamId: importRun.teamId,
               actorAccountId: identity.accountId,
               action: 'billing.reconciliation.artifact_registered',
+              targetType: 'billing_reconciliation',
+              targetId: reconciliationId,
+              metadata: {
+                importRunId: importRun.id,
+                comparisonId: reconciliation.comparisonId,
+                provider: reconciliation.provider,
+                artifactId: artifact.id,
+                artifactType: artifact.type,
+                verificationStatus: artifact.verificationStatus,
+              },
+            },
+          }
+        : {}),
+    });
+  }
+
+  async verifyInvoiceGradeArtifact(
+    reconciliationId: string,
+    artifactId: string,
+    body: unknown,
+    identity: AuthIdentity,
+  ): Promise<InvoiceReconciliationRecord> {
+    assertBillingAdmin(identity);
+    const input = parseInvoiceGradeArtifactVerificationInput(body);
+    const reconciliation = await this.repository.getInvoiceReconciliation(reconciliationId);
+
+    if (!reconciliation) {
+      throw new ApiNotFoundError(`Invoice reconciliation ${reconciliationId} was not found`);
+    }
+
+    const importRun = await this.repository.getBillingImport(reconciliation.importRunId);
+
+    if (!importRun) {
+      throw new ApiNotFoundError(
+        `Billing import ${reconciliation.importRunId} was not found for reconciliation ${reconciliationId}`,
+      );
+    }
+
+    assertTeamAccess(importRun.teamId, identity);
+
+    const artifacts = invoiceGradeArtifactsFromEvidence(reconciliation.evidence);
+    const existingArtifact = artifacts.find((artifact) => artifact.id === artifactId);
+
+    if (!existingArtifact) {
+      throw new ApiNotFoundError(
+        `Invoice artifact ${artifactId} was not found for reconciliation ${reconciliationId}`,
+      );
+    }
+
+    const artifact = verifiedInvoiceGradeArtifact(
+      existingArtifact,
+      input,
+      reconciliation,
+      identity,
+    );
+    const evidence = replaceInvoiceGradeArtifactEvidence(reconciliation, artifact);
+
+    return this.repository.updateInvoiceReconciliationEvidence({
+      reconciliationId,
+      evidence,
+      ...(importRun.teamId
+        ? {
+            audit: {
+              teamId: importRun.teamId,
+              actorAccountId: identity.accountId,
+              action: 'billing.reconciliation.artifact_verified',
               targetType: 'billing_reconciliation',
               targetId: reconciliationId,
               metadata: {
@@ -1368,6 +1435,42 @@ function parseArtifactType(value: unknown): InvoiceGradeArtifactType {
   ]);
 }
 
+function parseInvoiceGradeArtifactVerificationInput(
+  body: unknown,
+): InvoiceGradeArtifactVerificationInput {
+  const record = requireRecord(
+    body,
+    'Invoice-grade artifact verification request body must be an object',
+  );
+
+  return {
+    verificationStatus: parseArtifactVerificationStatus(record.verificationStatus),
+    evidenceReference: parseRequiredString(record.evidenceReference, 'evidenceReference', 500),
+    ...(record.sha256 !== undefined ? { sha256: parseSha256(record.sha256, 'sha256') } : {}),
+    ...(record.controlTotalUsd !== undefined
+      ? { controlTotalUsd: parseFiniteNumber(record.controlTotalUsd, 'controlTotalUsd') }
+      : {}),
+    ...(parseOptionalString(record.notes, 600)
+      ? { notes: parseOptionalString(record.notes, 600) }
+      : {}),
+  };
+}
+
+function parseArtifactVerificationStatus(
+  value: unknown,
+): InvoiceGradeArtifactVerificationInput['verificationStatus'] {
+  if (value === 'verified' || value === 'rejected') {
+    return value;
+  }
+
+  throw new ApiValidationError('artifact verification status is unsupported', [
+    {
+      field: 'verificationStatus',
+      issue: 'must be verified or rejected',
+    },
+  ]);
+}
+
 function parseProvider(value: unknown): BillingImportInput['provider'] {
   if (value === 'aws' || value === 'azure' || value === 'gcp') {
     return value;
@@ -2102,6 +2205,107 @@ function appendInvoiceGradeArtifactEvidence(
   };
 }
 
+function replaceInvoiceGradeArtifactEvidence(
+  reconciliation: InvoiceReconciliationRecord,
+  artifact: InvoiceGradeArtifactRecord,
+): Record<string, unknown> {
+  const artifacts = invoiceGradeArtifactsFromEvidence(reconciliation.evidence).map((candidate) =>
+    candidate.id === artifact.id ? artifact : candidate,
+  );
+  const register = invoiceGradeArtifactRegister(artifacts, reconciliation);
+
+  return {
+    ...reconciliation.evidence,
+    invoiceGradeReadiness: annotateInvoiceGradeReadinessWithArtifacts(
+      reconciliation.evidence.invoiceGradeReadiness,
+      register,
+    ),
+    invoiceGradeArtifactRegister: register,
+  };
+}
+
+function verifiedInvoiceGradeArtifact(
+  artifact: InvoiceGradeArtifactRecord,
+  input: InvoiceGradeArtifactVerificationInput,
+  reconciliation: InvoiceReconciliationRecord,
+  identity: AuthIdentity,
+): InvoiceGradeArtifactRecord {
+  if (artifact.sha256 && input.sha256 && artifact.sha256 !== input.sha256) {
+    throw new ApiValidationError('artifact checksum does not match registered checksum', [
+      {
+        field: 'sha256',
+        issue: 'must match the SHA-256 digest registered for this artifact',
+      },
+    ]);
+  }
+
+  if (
+    artifact.controlTotalUsd !== undefined &&
+    input.controlTotalUsd !== undefined &&
+    roundCurrency(artifact.controlTotalUsd - input.controlTotalUsd) !== 0
+  ) {
+    throw new ApiValidationError('artifact control total does not match registered metadata', [
+      {
+        field: 'controlTotalUsd',
+        issue: 'must match the registered control total for this artifact',
+      },
+    ]);
+  }
+
+  const timestamp = new Date().toISOString();
+  const verifiedSha256 = input.sha256 ?? artifact.sha256;
+  const verificationControlTotalUsd = input.controlTotalUsd ?? artifact.controlTotalUsd;
+
+  if (
+    input.verificationStatus === 'verified' &&
+    !verifiedSha256 &&
+    verificationControlTotalUsd === undefined
+  ) {
+    throw new ApiValidationError('verified artifact requires checksum or control total evidence', [
+      {
+        field: 'sha256',
+        issue: 'supply a verified SHA-256 digest or controlTotalUsd before marking verified',
+      },
+    ]);
+  }
+
+  if (input.verificationStatus === 'rejected') {
+    return {
+      ...artifact,
+      verificationStatus: 'rejected',
+      verificationEvidenceReference: input.evidenceReference,
+      ...(input.notes ? { verificationNotes: input.notes } : {}),
+      rejectedAt: timestamp,
+      rejectedByAccountId: identity.accountId,
+      verifiedAt: undefined,
+      verifiedByAccountId: undefined,
+      verifiedSha256: undefined,
+      verificationControlTotalUsd: undefined,
+      verificationControlTotalDeltaUsd: undefined,
+    };
+  }
+
+  return {
+    ...artifact,
+    verificationStatus: 'verified',
+    verificationEvidenceReference: input.evidenceReference,
+    ...(input.notes ? { verificationNotes: input.notes } : {}),
+    ...(verifiedSha256 ? { verifiedSha256 } : {}),
+    ...(verificationControlTotalUsd !== undefined
+      ? {
+          verificationControlTotalUsd,
+          verificationControlTotalDeltaUsd: roundCurrency(
+            verificationControlTotalUsd - reconciliation.invoicedTotalUsd,
+          ),
+        }
+      : {}),
+    verifiedAt: timestamp,
+    verifiedByAccountId: identity.accountId,
+    rejectedAt: undefined,
+    rejectedByAccountId: undefined,
+  };
+}
+
 function invoiceGradeArtifactsFromEvidence(
   evidence: Record<string, unknown>,
 ): InvoiceGradeArtifactRecord[] {
@@ -2133,15 +2337,28 @@ function invoiceGradeArtifactRegister(
   const coverage = Object.entries(INVOICE_GRADE_ARTIFACT_CHECK_COVERAGE).map(
     ([readinessCheckId, acceptedTypes]) => {
       const matchingArtifacts = artifacts.filter((artifact) =>
-        acceptedTypes.includes(artifact.type),
+        acceptedTypes.some((acceptedType) => artifactCoversAcceptedType(artifact, acceptedType)),
       );
       const matchingVerifiedArtifacts = matchingArtifacts.filter(
         (artifact) => artifact.verificationStatus === 'verified',
       );
+      const verifiedArtifactTypes = [
+        ...new Set(
+          matchingVerifiedArtifacts.flatMap((artifact) =>
+            acceptedTypes.filter((acceptedType) =>
+              artifactVerifiesAcceptedType(artifact, acceptedType),
+            ),
+          ),
+        ),
+      ];
 
       return {
         readinessCheckId,
         acceptedArtifactTypes: acceptedTypes,
+        verifiedArtifactTypes,
+        missingAcceptedArtifactTypes: acceptedTypes.filter(
+          (type) => !verifiedArtifactTypes.includes(type),
+        ),
         registeredCount: matchingArtifacts.length,
         verifiedCount: matchingVerifiedArtifacts.length,
         status:
@@ -2160,13 +2377,21 @@ function invoiceGradeArtifactRegister(
     },
   );
   const controlTotalDeltas = artifacts
-    .filter((artifact) => typeof artifact.controlTotalUsd === 'number')
+    .filter(
+      (artifact) =>
+        typeof artifact.controlTotalUsd === 'number' ||
+        typeof artifact.verificationControlTotalUsd === 'number',
+    )
     .map((artifact) => ({
       artifactId: artifact.id,
       artifactType: artifact.type,
       controlTotalUsd: artifact.controlTotalUsd,
+      verificationControlTotalUsd: artifact.verificationControlTotalUsd,
       reconciliationInvoicedTotalUsd: reconciliation.invoicedTotalUsd,
-      deltaUsd: roundCurrency((artifact.controlTotalUsd ?? 0) - reconciliation.invoicedTotalUsd),
+      deltaUsd: roundCurrency(
+        (artifact.verificationControlTotalUsd ?? artifact.controlTotalUsd ?? 0) -
+          reconciliation.invoicedTotalUsd,
+      ),
     }));
 
   return {
@@ -2190,6 +2415,34 @@ function invoiceGradeArtifactRegister(
   };
 }
 
+function artifactCoversAcceptedType(
+  artifact: InvoiceGradeArtifactRecord,
+  acceptedType: InvoiceGradeArtifactType,
+): boolean {
+  if (artifact.type === acceptedType) {
+    return true;
+  }
+
+  return acceptedType === 'control-total' && typeof artifact.controlTotalUsd === 'number';
+}
+
+function artifactVerifiesAcceptedType(
+  artifact: InvoiceGradeArtifactRecord,
+  acceptedType: InvoiceGradeArtifactType,
+): boolean {
+  if (artifact.verificationStatus !== 'verified') {
+    return false;
+  }
+
+  if (artifact.type === acceptedType) {
+    return true;
+  }
+
+  return (
+    acceptedType === 'control-total' && typeof artifact.verificationControlTotalUsd === 'number'
+  );
+}
+
 function annotateInvoiceGradeReadinessWithArtifacts(
   readinessValue: unknown,
   register: Record<string, unknown>,
@@ -2199,6 +2452,7 @@ function annotateInvoiceGradeReadinessWithArtifacts(
   const checks = arrayValue(readiness.checks).map((checkValue) => {
     const check = recordValue(checkValue);
     const checkId = typeof check.id === 'string' ? check.id : '';
+    const currentStatus = invoiceGradeReadinessStatus(check.status);
     const matchingCoverage = coverage.find(
       (coverageItem) => coverageItem.readinessCheckId === checkId,
     );
@@ -2207,22 +2461,83 @@ function annotateInvoiceGradeReadinessWithArtifacts(
       return check;
     }
 
+    const nextStatus = invoiceGradeReadinessStatusWithArtifacts(currentStatus, matchingCoverage);
+
     return {
       ...check,
+      status: nextStatus,
       artifactRegisterStatus: matchingCoverage.status,
       registeredArtifactCount: matchingCoverage.registeredCount,
       verifiedArtifactCount: matchingCoverage.verifiedCount,
+      verifiedArtifactTypes: matchingCoverage.verifiedArtifactTypes,
+      missingAcceptedArtifactTypes: matchingCoverage.missingAcceptedArtifactTypes,
       registeredArtifacts: matchingCoverage.registeredArtifacts,
     };
   });
+  const presentCount = checks.filter((check) => check.status === 'present').length;
+  const partialCount = checks.filter((check) => check.status === 'partial').length;
+  const missingCount = checks.filter((check) => check.status === 'missing').length;
+  const notApplicableCount = checks.filter((check) => check.status === 'not-applicable').length;
+  const blockingChecks = checks.filter((check) => check.status === 'missing');
 
   return {
     ...readiness,
+    status: blockingChecks.length > 0 ? 'invoice-grade-blocked' : 'invoice-grade-review-ready',
+    presentCount,
+    partialCount,
+    missingCount,
+    notApplicableCount,
+    blockers: blockingChecks
+      .map((check) => (typeof check.label === 'string' ? check.label : undefined))
+      .filter((label): label is string => Boolean(label)),
+    requiredArtifacts: [
+      ...new Set(
+        blockingChecks
+          .map((check) =>
+            typeof check.requiredArtifact === 'string' ? check.requiredArtifact : undefined,
+          )
+          .filter((artifact): artifact is string => Boolean(artifact)),
+      ),
+    ],
     artifactRegisterStatus: register.status,
     registeredArtifactCount: register.registeredCount,
     verifiedArtifactCount: register.verifiedCount,
     checks,
   };
+}
+
+function invoiceGradeReadinessStatus(value: unknown): InvoiceGradeReadinessCheckStatus {
+  if (
+    value === 'present' ||
+    value === 'partial' ||
+    value === 'missing' ||
+    value === 'not-applicable'
+  ) {
+    return value;
+  }
+
+  return 'missing';
+}
+
+function invoiceGradeReadinessStatusWithArtifacts(
+  currentStatus: InvoiceGradeReadinessCheckStatus,
+  coverage: Record<string, unknown>,
+): InvoiceGradeReadinessCheckStatus {
+  if (currentStatus === 'present' || currentStatus === 'not-applicable') {
+    return currentStatus;
+  }
+
+  if (numberFromUnknown(coverage.verifiedCount) === 0) {
+    return currentStatus;
+  }
+
+  const missingAcceptedArtifactTypes = stringArray(coverage.missingAcceptedArtifactTypes);
+
+  if (missingAcceptedArtifactTypes.length === 0) {
+    return 'present';
+  }
+
+  return 'partial';
 }
 
 function recordValue(value: unknown): Record<string, unknown> {
@@ -2233,6 +2548,10 @@ function recordValue(value: unknown): Record<string, unknown> {
 
 function arrayValue(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
+}
+
+function numberFromUnknown(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
 function lineItemAdjustmentClassification(lineItem: {

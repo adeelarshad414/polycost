@@ -70,6 +70,10 @@ once tagged releases begin.
 - Invoice artifact metadata registration for reconciliations, including an
   Owner/Admin API route, audit event, workspace action, registered/verified counts,
   control-total deltas, and explicit "metadata registered, not verified" caveats.
+- Invoice artifact verification status for registered reconciliation artifacts,
+  including checksum/control-total mismatch rejection, verified/rejected review
+  evidence, readiness updates limited to covered checks, and workspace verification
+  action.
 
 ### Notes
 
@@ -88,7 +92,8 @@ once tagged releases begin.
 - Billing reconciliation now has native export mapper evidence for AWS CUR, Azure
   Cost Management CSV, and nested GCP Billing Export JSON, plus adjustment-aware
   usage-comparable variance, commitment row evidence, and invoice artifact metadata
-  registration, while invoice-of-record verification remains future scope.
+  registration/verification status, while invoice-of-record storage and provider
+  verification remain future scope.
 - Account/team UX now supports switching the current active workspace without a
   new login, refreshing pending/expired invite tokens, and handing invite links to
   a signed delivery webhook, while provider-specific email templates, SSO/SAML,

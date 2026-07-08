@@ -12,6 +12,7 @@ import {
   BillingImportResponse,
   BillingProviderExportInput,
   InvoiceGradeArtifactRegistrationInput,
+  InvoiceGradeArtifactVerificationInput,
   ComparisonAnalyticsResponse,
   ComparisonPricingEvidenceResponse,
   ComparisonResult,
@@ -239,6 +240,12 @@ export interface PolyCostClient {
   registerInvoiceGradeArtifact(
     reconciliationId: string,
     input: InvoiceGradeArtifactRegistrationInput,
+    token: string,
+  ): Promise<InvoiceReconciliationRecord>;
+  verifyInvoiceGradeArtifact(
+    reconciliationId: string,
+    artifactId: string,
+    input: InvoiceGradeArtifactVerificationInput,
     token: string,
   ): Promise<InvoiceReconciliationRecord>;
 }
@@ -663,6 +670,19 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
       return requestJson<InvoiceReconciliationRecord>(
         baseUrl,
         `/billing/reconciliations/${encodeURIComponent(reconciliationId)}/artifacts`,
+        {
+          method: 'POST',
+          headers: authorizationHeaders(token),
+          body: JSON.stringify(input),
+        },
+      );
+    },
+    verifyInvoiceGradeArtifact(reconciliationId, artifactId, input, token) {
+      return requestJson<InvoiceReconciliationRecord>(
+        baseUrl,
+        `/billing/reconciliations/${encodeURIComponent(
+          reconciliationId,
+        )}/artifacts/${encodeURIComponent(artifactId)}/verification`,
         {
           method: 'POST',
           headers: authorizationHeaders(token),

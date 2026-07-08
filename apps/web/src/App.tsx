@@ -65,6 +65,7 @@ import {
   INTERVALS,
   IntervalKey,
   InvoiceGradeArtifactRegistrationInput,
+  InvoiceGradeArtifactVerificationInput,
   InvoiceReconciliationRecord,
   NormalizedWorkloadSpec,
   PROVIDER_ORDER,
@@ -2891,6 +2892,42 @@ function WorkspaceControlCenter({
     }
   }
 
+  async function handleVerifyInvoiceArtifact() {
+    if (!token || billingAccessMessage || !reconciliation || !reconciliationSummary?.artifactId) {
+      onError(
+        billingAccessMessage ??
+          'Register invoice artifact metadata before marking an artifact verified.',
+      );
+      return;
+    }
+
+    setWorkspaceBusy('billing-artifact-verify');
+    onError(null);
+
+    try {
+      const verificationInput: InvoiceGradeArtifactVerificationInput = {
+        verificationStatus: 'verified',
+        evidenceReference: `review://invoice-artifacts/${reconciliationSummary.artifactId}`,
+        controlTotalUsd: reconciliation.invoicedTotalUsd,
+        notes:
+          'Demo verification based on registered metadata and matching invoice control total. Full file/contract verification remains future scope.',
+      };
+      const updated = await client.verifyInvoiceGradeArtifact(
+        reconciliation.id,
+        reconciliationSummary.artifactId,
+        verificationInput,
+        token,
+      );
+      setReconciliation(updated);
+      await refreshTeamAuditEvents();
+      onNotice('Invoice artifact verification evidence recorded.');
+    } catch (artifactError) {
+      onError(formatApiError(artifactError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
   return (
     <section className="workspace-control-center" id="workspace" aria-label="Workspace controls">
       <div className="workspace-control-heading">
@@ -3622,6 +3659,22 @@ function WorkspaceControlCenter({
                     <CompareIcon />
                     Register invoice artifact
                   </Button>
+                  {reconciliationSummary.artifactId &&
+                  reconciliationSummary.artifactVerifiedCount <
+                    reconciliationSummary.artifactRegisteredCount ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="compact"
+                      loading={workspaceBusy === 'billing-artifact-verify'}
+                      loadingLabel="Verifying artifact..."
+                      disabled={Boolean(billingAccessMessage)}
+                      onClick={handleVerifyInvoiceArtifact}
+                    >
+                      <CompareIcon />
+                      Verify artifact evidence
+                    </Button>
+                  ) : null}
                   {reconciliationSummary.commitmentLineItemCount > 0 ? (
                     <>
                       <small>
@@ -3709,6 +3762,8 @@ function teamAuditActionLabel(action: TeamAuditEventRecord['action']): string {
       return 'Billing reconciliation created';
     case 'billing.reconciliation.artifact_registered':
       return 'Billing artifact registered';
+    case 'billing.reconciliation.artifact_verified':
+      return 'Billing artifact verified';
   }
 }
 
@@ -19555,6 +19610,7 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
   invoiceGradeMissingCount: number;
   invoiceGradePartialCount: number;
   invoiceGradeBlockers: string[];
+  artifactId?: string;
   artifactRegisterStatus: string;
   artifactRegisteredCount: number;
   artifactVerifiedCount: number;
@@ -19573,6 +19629,10 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
   const artifactRegister = objectValue(evidence.invoiceGradeArtifactRegister);
   const caveats = stringArrayValue(matchSummary.caveats);
   const artifactCaveats = stringArrayValue(artifactRegister.caveats);
+  const artifactId = arrayValue(artifactRegister.artifacts)
+    .map((artifact) => objectValue(artifact))
+    .map((artifact) => stringValue(artifact.id))
+    .find(Boolean);
   const readiness =
     stringValue(matchSummary.readiness) ??
     (record.status === 'matched' ? 'reconciled-evidence-ready' : 'reconciliation-foundation');
@@ -19616,6 +19676,7 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
     invoiceGradeMissingCount: numberValue(invoiceGradeReadiness.missingCount),
     invoiceGradePartialCount: numberValue(invoiceGradeReadiness.partialCount),
     invoiceGradeBlockers: stringArrayValue(invoiceGradeReadiness.blockers).slice(0, 3),
+    ...(artifactId ? { artifactId } : {}),
     artifactRegisterStatus: (
       stringValue(artifactRegister.status) ?? 'no-artifacts-registered'
     ).replace(/-/g, ' '),
