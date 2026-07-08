@@ -3555,6 +3555,16 @@ function WorkspaceControlCenter({
                     {reconciliationSummary.adjustmentLineItemCount} adjustment rows (
                     {formatCurrency(reconciliationSummary.adjustmentCostUsd)})
                   </small>
+                  <small>
+                    Invoice-grade readiness: {reconciliationSummary.invoiceGradeStatus} ·{' '}
+                    {reconciliationSummary.invoiceGradeMissingCount} missing ·{' '}
+                    {reconciliationSummary.invoiceGradePartialCount} partial
+                  </small>
+                  {reconciliationSummary.invoiceGradeBlockers.length > 0 ? (
+                    <small>
+                      Invoice blockers: {reconciliationSummary.invoiceGradeBlockers.join(', ')}
+                    </small>
+                  ) : null}
                   {reconciliationSummary.commitmentLineItemCount > 0 ? (
                     <>
                       <small>
@@ -19482,6 +19492,10 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
   commitmentRowsRequiringProviderInventory: number;
   commitmentRowsRequiringAmortizationPeriod: number;
   commitmentRowsRequiringAllocationEvidence: number;
+  invoiceGradeStatus: string;
+  invoiceGradeMissingCount: number;
+  invoiceGradePartialCount: number;
+  invoiceGradeBlockers: string[];
   estimateComparableVarianceUsd: number;
   adjustmentCategories: string[];
   commitmentCategories: string[];
@@ -19492,6 +19506,7 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
   const matchSummary = objectValue(evidence.invoiceMatchSummary);
   const adjustmentSummary = objectValue(evidence.invoiceAdjustmentSummary);
   const commitmentEvidence = objectValue(adjustmentSummary.commitmentEvidence);
+  const invoiceGradeReadiness = objectValue(evidence.invoiceGradeReadiness);
   const caveats = stringArrayValue(matchSummary.caveats);
   const readiness =
     stringValue(matchSummary.readiness) ??
@@ -19530,6 +19545,12 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
     commitmentRowsRequiringAllocationEvidence: numberValue(
       commitmentEvidence.rowsRequiringAllocationEvidence,
     ),
+    invoiceGradeStatus: (
+      stringValue(invoiceGradeReadiness.status) ?? 'invoice-grade-blocked'
+    ).replace(/-/g, ' '),
+    invoiceGradeMissingCount: numberValue(invoiceGradeReadiness.missingCount),
+    invoiceGradePartialCount: numberValue(invoiceGradeReadiness.partialCount),
+    invoiceGradeBlockers: stringArrayValue(invoiceGradeReadiness.blockers).slice(0, 3),
     estimateComparableVarianceUsd: numberValue(
       adjustmentSummary.estimateComparableVarianceUsd ?? record.varianceUsd,
     ),

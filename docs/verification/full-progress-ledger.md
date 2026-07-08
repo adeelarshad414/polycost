@@ -47,6 +47,9 @@ Evidence:
 - Commitment reconciliation evidence now reports which commitment rows still need
   provider inventory, amortization-period proof, and allocation evidence before
   invoice-grade use.
+- Reconciliation evidence now includes an invoice-grade readiness matrix with present,
+  partial, missing, and not-applicable checks, top blockers, and required provider
+  artifacts.
 - `docs/PROVIDER-CREDENTIALS.md` states the current production swap procedure and
   explicitly limits real provider mode to catalog list prices, not invoices.
 
@@ -59,7 +62,8 @@ Deferred:
   estimate-vs-actual reconciliation evidence. Classified adjustment and commitment
   rows are separated from usage-comparable variance, but provider-account-specific
   amortization, allocation proof, private pricing, and invoice controls remain
-  future work.
+  future work. The invoice-grade readiness matrix exposes those blockers; it does
+  not remove them.
 
 ## Phase B - Input Modes And Requirement Pipeline
 

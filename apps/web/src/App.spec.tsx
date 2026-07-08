@@ -546,6 +546,12 @@ describe('App', () => {
     expect(text(container)).toContain('100% source fingerprinted');
     expect(text(container)).toContain('100% SKU matched');
     expect(text(container)).toContain('Usage-comparable variance $0.00');
+    expect(text(container)).toContain('Invoice-grade readiness: invoice grade blocked');
+    expect(text(container)).toContain('3 missing');
+    expect(text(container)).toContain('2 partial');
+    expect(text(container)).toContain(
+      'Invoice blockers: Provider invoice control total, Commitment amortization evidence, Private pricing and discount proof',
+    );
     expect(text(container)).toContain('Commitments: 4 rows');
     expect(text(container)).toContain('net -$2.00');
     expect(text(container)).toContain('discount -$25.00');
@@ -4644,6 +4650,32 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
               category: 'tax',
               rowCount: 1,
               totalCostUsd: 8,
+            },
+          ],
+        },
+        invoiceGradeReadiness: {
+          status: 'invoice-grade-blocked',
+          presentCount: 3,
+          partialCount: 2,
+          missingCount: 3,
+          notApplicableCount: 1,
+          blockers: [
+            'Provider invoice control total',
+            'Commitment amortization evidence',
+            'Private pricing and discount proof',
+          ],
+          requiredArtifacts: [
+            'AWS invoice PDF/tax invoice, CUR manifest, payer-account billing period, and Cost Explorer control total.',
+          ],
+          checks: [
+            {
+              id: 'provider-invoice-control',
+              label: 'Provider invoice control total',
+              status: 'missing',
+              evidence:
+                'PolyCost has normalized provider export rows, not the provider invoice of record.',
+              requiredArtifact:
+                'AWS invoice PDF/tax invoice, CUR manifest, payer-account billing period, and Cost Explorer control total.',
             },
           ],
         },

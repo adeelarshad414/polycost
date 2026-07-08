@@ -73,6 +73,8 @@ Pricing evidence is intentionally first-class:
 - commitment evidence requirements are reported separately, including whether rows
   still need provider commitment inventory, amortization-period proof, or allocation
   evidence before invoice-grade use
+- invoice-grade readiness is represented as a matrix of evidence checks, blockers,
+  and required provider artifacts rather than a yes/no claim
 - exports carry methodology and data-freshness context
 
 This supports decision-grade traceability. It is not yet invoice-grade billing.

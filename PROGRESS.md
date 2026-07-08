@@ -111,6 +111,7 @@ say so explicitly rather than marking it done.
 | Phase 2.19 - Invoice adjustment reconciliation evidence | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.20 - Commitment billing semantics evidence      | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.21 - Commitment amortization evidence needs     | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.22 - Invoice-grade readiness matrix             | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4158,6 +4159,33 @@ test:production-readiness` passed with 159/159 API tests and 86/86 web tests.
   amortization, but invoice-grade treatment still requires provider-account
   commitment inventory, amortization windows, unused commitment allocation, private
   pricing agreements, and invoice-of-record controls.
+
+## Phase 2.22 — Invoice-grade readiness matrix
+
+Status: implemented locally on 2026-07-08.
+
+- Added `invoiceGradeReadiness` to reconciliation evidence. The matrix records
+  present, partial, missing, and not-applicable evidence checks, blockers, and
+  required provider artifacts.
+- The matrix covers provider invoice control totals, source-row traceability,
+  SKU/service matching, allocation evidence, billing period/currency completeness,
+  invoice adjustments, commitment amortization, private pricing, tax jurisdiction,
+  and provider column completeness where fields are missing.
+- Updated the workspace billing panel to show invoice-grade readiness status,
+  missing/partial counts, and the top blockers directly beside reconciliation
+  readiness.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts`
+  passed 24/24. `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx`
+  passed 60/60. `npm run format:check` and `npm run ci:lint` passed. `npm run
+test:production-readiness` passed with 159/159 API tests and 86/86 web tests.
+  Full `npm run check` passed with 423/423 API tests, 143/143 web tests, graph
+  validation, pricing coverage, progress verification, QA/security suppression
+  hygiene, DB validation, release, handover, and provider-credential checks green.
+- Remaining caveat: the readiness matrix improves proof discipline, but it still
+  reports PolyCost as decision-grade until provider invoice PDFs/control totals,
+  tax/legal-entity evidence, private-pricing contracts, commitment inventory, and
+  provider-account allocation artifacts are supplied and verified.
 
 ## Deviations from spec log
 

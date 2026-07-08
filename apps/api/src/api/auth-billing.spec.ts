@@ -1711,6 +1711,36 @@ describe('BillingService', () => {
               }),
             ]),
           }),
+          invoiceGradeReadiness: expect.objectContaining({
+            status: 'invoice-grade-blocked',
+            missingCount: expect.any(Number),
+            blockers: expect.arrayContaining([
+              'Provider invoice control total',
+              'Commitment amortization evidence',
+              'Private pricing and discount proof',
+            ]),
+            checks: expect.arrayContaining([
+              expect.objectContaining({
+                id: 'provider-invoice-control',
+                status: 'missing',
+                requiredArtifact: expect.stringContaining('AWS invoice PDF'),
+              }),
+              expect.objectContaining({
+                id: 'commitment-amortization',
+                status: 'missing',
+                evidence: '4 commitment row(s); 2 require amortization-period proof.',
+              }),
+              expect.objectContaining({
+                id: 'private-pricing',
+                status: 'missing',
+                evidence: '1 private-pricing, discount, or enterprise-adjustment row(s) detected.',
+              }),
+              expect.objectContaining({
+                id: 'allocation-evidence',
+                status: 'present',
+              }),
+            ]),
+          }),
           invoiceMatchSummary: expect.objectContaining({
             caveats: expect.arrayContaining([
               '4 commitment, reservation, or savings-plan row(s) were classified separately; amortization remains provider-specific evidence.',
