@@ -416,6 +416,16 @@ Evidence:
   smoke is wired into `npm run check`. Full local `npm run check` passed afterward
   with API `55` suites / `465` tests, web `11` suites / `147` tests, graph validation
   `320` nodes / `320` edges, and progress verification `153` anchors.
+- Phase 2.37 invoice artifact governance audit manifest focused regressions passed:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts`
+  passed `48/48`, `npm run typecheck --workspaces --if-present` passed for API,
+  web, and shared types, and
+  `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx src/api-client.spec.ts`
+  passed `90/90`. The phase added digest-covered packet governance metadata plus
+  team audit events for packet export and artifact download. Full local
+  `npm run check` passed afterward with API `55` suites / `465` tests, web `11`
+  suites / `147` tests, graph validation `320` nodes / `320` edges, and progress
+  verification `153` anchors.
 - Phase 2.9 focused regressions passed: API `3` suites / `52` tests
   (`auth-billing`, `diagram-parser`, `llm-classifier`) and web `1` suite / `57`
   tests (`App.spec.tsx`).
@@ -465,6 +475,8 @@ These commands have been used as evidence gates in this run:
 - `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx`
 - `npm run test:unit --workspace @polycost/api -- --runInBand src/terraform/terraform-generation.service.spec.ts src/api/api-contract.spec.ts`
 - `npm run test:unit --workspace @polycost/web -- --runInBand src/api-client.spec.ts src/App.spec.tsx`
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts`
+- `npm run typecheck --workspaces --if-present`
 
 `npm run live:verify` writes its latest smoke/timing transcript to
 `.tmp/live-verification/latest.json` by default. Set

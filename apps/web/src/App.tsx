@@ -4360,12 +4360,16 @@ function teamAuditActionLabel(action: TeamAuditEventRecord['action']): string {
       return 'Billing artifact verified';
     case 'billing.reconciliation.artifact_blob_uploaded':
       return 'Billing artifact file stored';
+    case 'billing.reconciliation.artifact_blob_downloaded':
+      return 'Billing artifact file downloaded';
     case 'billing.reconciliation.artifact_legal_hold_updated':
       return 'Billing artifact legal hold updated';
     case 'billing.reconciliation.artifact_review_updated':
       return 'Billing artifact review updated';
     case 'billing.reconciliation.artifact_exception_updated':
       return 'Billing artifact policy exception updated';
+    case 'billing.reconciliation.evidence_packet_exported':
+      return 'Billing evidence packet exported';
     case 'billing.reconciliation.invoice_control_validated':
       return 'Billing invoice control validated';
   }

@@ -165,9 +165,11 @@ The main API is versioned under `/api/v1`.
 - `POST /billing/reconciliations/:id/artifacts/:artifactId/blob` stores an invoice
   artifact file for a registered reconciliation artifact.
 - `GET /billing/reconciliations/:id/artifacts/:artifactId/blob` returns the stored
-  artifact file as base64 for controlled download.
+  artifact file as base64 for controlled download and records a team audit event
+  with checksum, scanner, retention, and storage backend metadata.
 - `GET /billing/reconciliations/:id/evidence-packet` returns a metadata-only
-  evidence packet with a recomputable SHA-256 integrity manifest for reviewer
+  evidence packet with a recomputable SHA-256 integrity manifest, storage/KMS/
+  scanner/retention governance summary, and packet-export audit event for reviewer
   handoff.
 
 ## Anonymous And Workspace Features

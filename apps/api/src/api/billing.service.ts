@@ -23,6 +23,7 @@ import {
   InvoiceControlValidationInput,
   InvoiceControlValidationStatus,
   InvoiceEvidencePacketArtifact,
+  InvoiceEvidencePacketGovernance,
   InvoiceEvidencePacketResponse,
   InvoiceEvidencePacketStatus,
   BillingImportInput,
@@ -400,7 +401,35 @@ export class BillingService {
 
     assertTeamAccess(importRun.teamId, identity);
 
-    return invoiceEvidencePacket(reconciliation, importRun);
+    const packet = invoiceEvidencePacket(
+      reconciliation,
+      importRun,
+      this.artifactGovernanceService.storageReadiness(),
+    );
+
+    if (importRun.teamId) {
+      await this.repository.recordTeamAuditEvent({
+        teamId: importRun.teamId,
+        actorAccountId: identity.accountId,
+        action: 'billing.reconciliation.evidence_packet_exported',
+        targetType: 'billing_reconciliation',
+        targetId: reconciliationId,
+        metadata: {
+          importRunId: importRun.id,
+          comparisonId: reconciliation.comparisonId,
+          provider: reconciliation.provider,
+          packetStatus: packet.packetStatus,
+          payloadDigestSha256: packet.integrity.payloadDigestSha256,
+          artifactCount: packet.integrity.artifactCount,
+          storedArtifactCount: packet.integrity.storedArtifactCount,
+          verifiedArtifactCount: packet.integrity.verifiedArtifactCount,
+          governanceGapCount: packet.artifactGovernance.gaps.length,
+          storageBackends: packet.artifactGovernance.storagePosture.storageBackends,
+        },
+      });
+    }
+
+    return packet;
   }
 
   async registerInvoiceGradeArtifact(
@@ -1025,12 +1054,34 @@ export class BillingService {
     }
 
     if (blob.contentBase64) {
+      await this.recordInvoiceArtifactBlobDownloadAudit({
+        importRun,
+        reconciliation,
+        artifactId,
+        blob,
+        identity,
+        externalObjectFetched: false,
+        checksumVerified: true,
+        contentReturned: true,
+      });
+
       return blob;
     }
 
     const content = await this.artifactStorageService.read(blobObjectPointer(blob));
 
     if (!content) {
+      await this.recordInvoiceArtifactBlobDownloadAudit({
+        importRun,
+        reconciliation,
+        artifactId,
+        blob,
+        identity,
+        externalObjectFetched: false,
+        checksumVerified: false,
+        contentReturned: false,
+      });
+
       return blob;
     }
 
@@ -1045,10 +1096,23 @@ export class BillingService {
       ]);
     }
 
-    return {
+    const hydratedBlob = {
       ...blob,
       contentBase64: content.toString('base64'),
     };
+
+    await this.recordInvoiceArtifactBlobDownloadAudit({
+      importRun,
+      reconciliation,
+      artifactId,
+      blob,
+      identity,
+      externalObjectFetched: true,
+      checksumVerified: true,
+      contentReturned: true,
+    });
+
+    return hydratedBlob;
   }
 
   getInvoiceArtifactStorageReadiness(identity: AuthIdentity): InvoiceArtifactStorageReadiness {
@@ -1095,6 +1159,47 @@ export class BillingService {
       legalHoldSkipped: summary.legalHoldSkipped,
       deleted,
     };
+  }
+
+  private async recordInvoiceArtifactBlobDownloadAudit(input: {
+    importRun: BillingImportResponse['importRun'];
+    reconciliation: InvoiceReconciliationRecord;
+    artifactId: string;
+    blob: InvoiceArtifactBlobRecord;
+    identity: AuthIdentity;
+    externalObjectFetched: boolean;
+    checksumVerified: boolean;
+    contentReturned: boolean;
+  }): Promise<void> {
+    if (!input.importRun.teamId) {
+      return;
+    }
+
+    await this.repository.recordTeamAuditEvent({
+      teamId: input.importRun.teamId,
+      actorAccountId: input.identity.accountId,
+      action: 'billing.reconciliation.artifact_blob_downloaded',
+      targetType: 'billing_reconciliation',
+      targetId: input.reconciliation.id,
+      metadata: {
+        importRunId: input.importRun.id,
+        comparisonId: input.reconciliation.comparisonId,
+        provider: input.reconciliation.provider,
+        artifactId: input.artifactId,
+        fileName: input.blob.fileName,
+        mimeType: input.blob.mimeType,
+        contentSha256: input.blob.contentSha256,
+        contentSizeBytes: input.blob.contentSizeBytes,
+        storageBackend: input.blob.storageProfile.storageBackend,
+        externalObjectFetched: input.externalObjectFetched,
+        checksumVerified: input.checksumVerified,
+        contentReturned: input.contentReturned,
+        malwareScanStatus: input.blob.malwareScan.status,
+        malwareScanScanner: input.blob.malwareScan.scanner,
+        retentionUntil: input.blob.retentionPolicy.retentionUntil,
+        legalHold: input.blob.retentionPolicy.legalHold,
+      },
+    });
   }
 }
 
@@ -3264,6 +3369,7 @@ function replaceInvoiceGradeArtifactEvidence(
 function invoiceEvidencePacket(
   reconciliation: InvoiceReconciliationRecord,
   importRun: BillingImportResponse['importRun'],
+  storageReadiness: InvoiceArtifactStorageReadiness,
 ): InvoiceEvidencePacketResponse {
   const generatedAt = new Date().toISOString();
   const readiness = recordValue(reconciliation.evidence.invoiceGradeReadiness);
@@ -3294,6 +3400,12 @@ function invoiceEvidencePacket(
     'Invoice control validation compares stored artifact totals with imported actuals and reconciliation totals; it is not provider-authenticated invoice rendering.',
     'Full invoice-grade billing still requires provider invoice-of-record review, private contract validation, tax/legal review, and external retention controls.',
   ];
+  const artifactGovernance = invoiceEvidencePacketGovernance(
+    artifacts,
+    storageReadiness,
+    generatedAt,
+    Boolean(importRun.teamId),
+  );
 
   const packetPayload: Omit<InvoiceEvidencePacketResponse, 'integrity'> = {
     packetVersion: 'invoice-evidence-packet/v1',
@@ -3326,6 +3438,7 @@ function invoiceEvidencePacket(
     readiness,
     matchSummary,
     artifactRegister,
+    artifactGovernance,
     artifacts,
     controls,
     caveats,
@@ -3354,6 +3467,154 @@ function invoiceEvidencePacket(
       disclaimerCount: disclaimers.length,
       generatedAt,
     },
+  };
+}
+
+function invoiceEvidencePacketGovernance(
+  artifacts: InvoiceEvidencePacketArtifact[],
+  storageReadiness: InvoiceArtifactStorageReadiness,
+  generatedAt: string,
+  teamScoped: boolean,
+): InvoiceEvidencePacketGovernance {
+  const storedArtifacts = artifacts.filter((artifact) => artifact.storedBlob);
+  const storedBlobs = storedArtifacts
+    .map((artifact) => artifact.storedBlob)
+    .filter((storedBlob): storedBlob is NonNullable<InvoiceEvidencePacketArtifact['storedBlob']> =>
+      Boolean(storedBlob),
+    );
+  const governanceRecords = storedBlobs
+    .map((storedBlob) => storedBlob.governance)
+    .filter((governance): governance is InvoiceArtifactBlobGovernance => Boolean(governance));
+  const storageBackends = [
+    ...new Set(
+      storedBlobs.map(
+        (storedBlob) =>
+          storedBlob.governance?.storageProfile.storageBackend ?? storedBlob.storageMode,
+      ),
+    ),
+  ].sort();
+  const retentionUntilValues = governanceRecords
+    .map((governance) => governance.retentionPolicy.retentionUntil)
+    .filter((retentionUntil) => Number.isFinite(Date.parse(retentionUntil)))
+    .sort();
+  const generatedAtTime = Date.parse(generatedAt);
+  const databaseStoredCount = storedBlobs.filter(
+    (storedBlob) =>
+      (storedBlob.governance?.storageProfile.storageBackend ?? storedBlob.storageMode) ===
+      'database-bytea',
+  ).length;
+  const externalObjectStoreCount = storedBlobs.filter(
+    (storedBlob) =>
+      (storedBlob.governance?.storageProfile.storageBackend ?? storedBlob.storageMode) !==
+      'database-bytea',
+  ).length;
+  const customerManagedKmsCount = governanceRecords.filter(
+    (governance) =>
+      governance.storageProfile.encryptionStatus === 'customer-managed-kms' &&
+      Boolean(governance.storageProfile.kmsKeyReference) &&
+      !governance.storageProfile.kmsKeyRequiredForProduction,
+  ).length;
+  const missingKmsCount = storedBlobs.filter(
+    (storedBlob) =>
+      !storedBlob.governance || storedBlob.governance.storageProfile.kmsKeyRequiredForProduction,
+  ).length;
+  const expiredRetentionCount = governanceRecords.filter((governance) => {
+    const retentionUntilTime = Date.parse(governance.retentionPolicy.retentionUntil);
+
+    return (
+      Number.isFinite(retentionUntilTime) &&
+      Number.isFinite(generatedAtTime) &&
+      retentionUntilTime <= generatedAtTime &&
+      !governance.retentionPolicy.legalHold
+    );
+  }).length;
+  const legalHoldCount = governanceRecords.filter(
+    (governance) => governance.retentionPolicy.legalHold,
+  ).length;
+  const malwareScanPassedCount = governanceRecords.filter(
+    (governance) => governance.malwareScan.status === 'passed',
+  ).length;
+  const malwareScanFailedCount = governanceRecords.filter(
+    (governance) => governance.malwareScan.status === 'failed',
+  ).length;
+  const malwareScannerEngines = [
+    ...new Set(governanceRecords.map((governance) => governance.malwareScan.scanner)),
+  ].sort();
+  const gaps = [
+    ...storageReadiness.gaps,
+    ...(storedArtifacts.length === 0
+      ? ['no stored invoice artifact files are attached to this evidence packet']
+      : []),
+    ...(governanceRecords.length < storedArtifacts.length
+      ? ['one or more stored artifacts are missing governance manifests']
+      : []),
+    ...(databaseStoredCount > 0
+      ? [`${databaseStoredCount} stored artifact(s) remain in database-bytea storage`]
+      : []),
+    ...(missingKmsCount > 0
+      ? [`${missingKmsCount} stored artifact(s) are missing customer-managed KMS metadata`]
+      : []),
+    ...(expiredRetentionCount > 0
+      ? [`${expiredRetentionCount} stored artifact(s) are past retention without legal hold`]
+      : []),
+    ...(malwareScanFailedCount > 0
+      ? [`${malwareScanFailedCount} stored artifact(s) have failed malware scan status`]
+      : []),
+    ...(!teamScoped ? ['team audit trail is unavailable for non-team invoice imports'] : []),
+  ];
+
+  return {
+    schemaVersion: 'invoice-evidence-governance/v1',
+    generatedAt,
+    storageReadiness,
+    accessControls: {
+      requiresBillingAdmin: true,
+      teamScoped,
+      rawArtifactBytesExcluded: true,
+      packetExportAuditAction: 'billing.reconciliation.evidence_packet_exported',
+      artifactDownloadAuditAction: 'billing.reconciliation.artifact_blob_downloaded',
+      verifierCommand: 'npm run invoice:evidence:verify -- <packet.json>',
+    },
+    storagePosture: {
+      storageBackends,
+      storedArtifactCount: storedArtifacts.length,
+      governanceManifestCount: governanceRecords.length,
+      databaseStoredCount,
+      externalObjectStoreCount,
+      customerManagedKmsCount,
+      missingKmsCount,
+      retentionPolicyCount: governanceRecords.filter((governance) =>
+        Boolean(governance.retentionPolicy.retentionUntil),
+      ).length,
+      expiredRetentionCount,
+      legalHoldCount,
+      malwareScanPassedCount,
+      malwareScanFailedCount,
+      malwareScannerEngines,
+      ...(retentionUntilValues[0] ? { earliestRetentionUntil: retentionUntilValues[0] } : {}),
+      ...(retentionUntilValues.at(-1) ? { latestRetentionUntil: retentionUntilValues.at(-1) } : {}),
+    },
+    productionGates: {
+      externalObjectStorageReady:
+        storageReadiness.storageBackend !== 'database-bytea' &&
+        Boolean(
+          storageReadiness.objectStore?.bucketOrContainer && storageReadiness.objectStore.region,
+        ),
+      customerManagedKmsReady:
+        Boolean(storageReadiness.kmsKeyReference) &&
+        missingKmsCount === 0 &&
+        governanceRecords.length === storedArtifacts.length,
+      malwareScanningReady:
+        storageReadiness.scannerMode === 'http-webhook' &&
+        malwareScanFailedCount === 0 &&
+        governanceRecords.length === storedArtifacts.length,
+      retentionPolicyReady:
+        storedArtifacts.length > 0 && governanceRecords.length === storedArtifacts.length,
+      retentionDeletionReady: storageReadiness.retentionEnforcementMode === 'delete-expired',
+      packetIntegrityReady: true,
+      auditTrailReady: teamScoped,
+    },
+    gaps: [...new Set(gaps)],
   };
 }
 

@@ -282,6 +282,47 @@ export interface InvoiceEvidencePacketArtifact {
   policyExceptionStatus?: InvoiceArtifactPolicyExceptionStatus;
 }
 
+export interface InvoiceEvidencePacketGovernance {
+  schemaVersion: 'invoice-evidence-governance/v1';
+  generatedAt: string;
+  storageReadiness: InvoiceArtifactStorageReadiness;
+  accessControls: {
+    requiresBillingAdmin: true;
+    teamScoped: boolean;
+    rawArtifactBytesExcluded: true;
+    packetExportAuditAction: 'billing.reconciliation.evidence_packet_exported';
+    artifactDownloadAuditAction: 'billing.reconciliation.artifact_blob_downloaded';
+    verifierCommand: 'npm run invoice:evidence:verify -- <packet.json>';
+  };
+  storagePosture: {
+    storageBackends: InvoiceArtifactStorageBackend[];
+    storedArtifactCount: number;
+    governanceManifestCount: number;
+    databaseStoredCount: number;
+    externalObjectStoreCount: number;
+    customerManagedKmsCount: number;
+    missingKmsCount: number;
+    retentionPolicyCount: number;
+    expiredRetentionCount: number;
+    legalHoldCount: number;
+    malwareScanPassedCount: number;
+    malwareScanFailedCount: number;
+    malwareScannerEngines: string[];
+    earliestRetentionUntil?: string;
+    latestRetentionUntil?: string;
+  };
+  productionGates: {
+    externalObjectStorageReady: boolean;
+    customerManagedKmsReady: boolean;
+    malwareScanningReady: boolean;
+    retentionPolicyReady: boolean;
+    retentionDeletionReady: boolean;
+    packetIntegrityReady: true;
+    auditTrailReady: boolean;
+  };
+  gaps: string[];
+}
+
 export interface InvoiceEvidencePacketResponse {
   packetVersion: 'invoice-evidence-packet/v1';
   packetStatus: InvoiceEvidencePacketStatus;
@@ -316,6 +357,7 @@ export interface InvoiceEvidencePacketResponse {
   readiness: Record<string, unknown>;
   matchSummary: Record<string, unknown>;
   artifactRegister: Record<string, unknown>;
+  artifactGovernance: InvoiceEvidencePacketGovernance;
   artifacts: InvoiceEvidencePacketArtifact[];
   controls: {
     registeredCount: number;

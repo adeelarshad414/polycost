@@ -4663,6 +4663,42 @@ Status: implemented and verified locally on 2026-07-08.
   but it is not external notarization, provider invoice rendering, private
   contract/legal validation, or provider-authenticated invoice-of-record validation.
 
+## Phase 2.37 — Invoice artifact governance audit manifest
+
+Status: implemented and verified locally on 2026-07-08.
+
+- Added a digest-covered `artifactGovernance` section to invoice evidence packets.
+  The section summarizes current storage readiness, required access controls,
+  storage backends, governance-manifest coverage, database-vs-object-store counts,
+  customer-managed KMS coverage, retention/legal-hold posture, malware scanner
+  posture, production gates, and explicit governance gaps.
+- `GET /api/v1/billing/reconciliations/:id/evidence-packet` now records a
+  `billing.reconciliation.evidence_packet_exported` team audit event containing the
+  packet digest, status, artifact counts, governance gap count, and storage backends.
+- `GET /api/v1/billing/reconciliations/:id/artifacts/:artifactId/blob` now records a
+  `billing.reconciliation.artifact_blob_downloaded` team audit event after successful
+  inline or checksum-verified external object retrieval, including checksum, size,
+  storage backend, scanner status, retention date, legal-hold state, and whether
+  external bytes were fetched.
+- Frontend/shared API types and activity-feed labels now include the two read-side
+  billing audit actions.
+- Verification so far:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts`
+  passed 48/48. `npm run typecheck --workspaces --if-present` passed for API, web,
+  and shared types. `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx src/api-client.spec.ts`
+  passed 90/90. `npm run test:production-readiness` passed with API 14 suites / 198
+  tests and web 2 suites / 90 tests. Full `npm run check` passed with API 55 suites /
+  465 tests, web 11 suites / 147 tests, graph validation 320 nodes / 320 edges,
+  pricing coverage, progress verification, QA/security suppression hygiene, DB,
+  DevOps, cloud, release, handover, and provider-credential gates green. `npm run
+impeccable` was skipped by design because the repo targets Node 20 and the optional
+  tool requires Node 24; DB validation skipped live `schema_migrations` inspection
+  because the local Postgres container was not running.
+- Remaining caveat: this improves packet governance evidence and access auditability,
+  but still does not provide provider invoice rendering, external notarization,
+  private contract/legal validation, WORM storage proof, or full invoice-grade
+  billing coverage.
+
 ## Deviations from spec log
 
 Every implementation divergence from `00` through `11` should be logged here with
