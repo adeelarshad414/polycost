@@ -51,6 +51,8 @@ once tagged releases begin.
   and reconciliation mutations.
 - Team audit export outbox with signed webhook delivery, retry/dead-letter status, and
   staging/production config guards.
+- Audit export receiver smoke scripts for local HMAC contract proof and staging
+  SIEM/WORM canary acceptance evidence.
 
 ### Notes
 

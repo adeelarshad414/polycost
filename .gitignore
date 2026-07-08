@@ -20,3 +20,5 @@ yarn-error.log*
 
 playwright-report/
 test-results/
+
+artifacts/audit-export-smoke/

@@ -103,6 +103,10 @@ say so explicitly rather than marking it done.
 | Phase 2.11 - Workspace active team switching            | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.12 - Workspace invitation resend lifecycle      | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.13 - Invite delivery webhook foundation         | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.14 - Team audit trail foundation                | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.15 - Transaction-coupled audit writes           | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.16 - Team audit export outbox                   | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.17 - Audit export receiver verification         | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4008,6 +4012,35 @@ Status: implemented locally on 2026-07-08.
 - Remaining caveat: PolyCost can now emit signed audit events to an external receiver,
   but production-grade immutability still depends on the deployed SIEM/WORM system's
   retention policy and acceptance evidence.
+
+## Phase 2.17 — Audit export receiver verification
+
+Status: implemented locally on 2026-07-08.
+
+- Added `npm run audit:export:smoke`, a signed canary sender for configured
+  `AUTH_AUDIT_EXPORT_WEBHOOK_URL` and `AUTH_AUDIT_EXPORT_WEBHOOK_SECRET` values.
+  It rejects dummy secrets and enforces HTTPS unless explicitly targeting localhost
+  for local proof.
+- Added `npm run audit:export:smoke:local`, which starts a temporary localhost
+  receiver, validates the `team_audit_event.recorded` HMAC signature with
+  `timingSafeEqual`, and appends exactly one JSONL evidence record to
+  `artifacts/audit-export-smoke/`.
+- Updated the README, deployment guide, runbook, release checklist, and release
+  readiness guard so audit export proof is part of the documented release/handover
+  workflow.
+- Verification:
+  `npm run audit:export:smoke:local` passed with one accepted event and zero
+  rejected events, writing
+  `artifacts/audit-export-smoke/audit-events-2026-07-08T11-46-02-352Z.jsonl`.
+  `npm run format:check`, `npm run ci:lint`, focused audit-export API tests
+  (47/47), `npm run release:check`, and full `npm run check` passed with 420/420
+  API tests, 142/142 web tests, graph validation, pricing coverage, progress
+  verification, QA/security suppression hygiene, DB validation, release,
+  handover, and provider-credential checks green.
+- Remaining caveat: the local smoke proves PolyCost's signed webhook contract and
+  receiver verification semantics, but production-grade immutability still requires
+  a real staging/production SIEM or WORM receiver to archive the canary and prove
+  retention, access control, and deletion resistance.
 
 ## Deviations from spec log
 

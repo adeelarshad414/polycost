@@ -63,6 +63,33 @@ Do not put provider tokens, LLM API keys, SSO client secrets, or database
 passwords in committed files. Store secrets in Vault as documented in
 `docs/PROVIDER-CREDENTIALS.md` and `DUMMY-VALUES.md`.
 
+## Audit Export Receiver Verification
+
+Before claiming SIEM/WORM retention readiness, prove both the webhook contract and
+the deployed receiver retention path.
+
+Local contract smoke:
+
+```bash
+npm run audit:export:smoke:local
+```
+
+This starts a temporary localhost receiver, sends a signed
+`team_audit_event.recorded` canary payload, verifies the HMAC signature, and appends
+one JSONL evidence row under `artifacts/audit-export-smoke/`.
+
+Staging receiver smoke:
+
+```bash
+AUTH_AUDIT_EXPORT_WEBHOOK_URL=https://siem.example.com/polycost/audit-events \
+AUTH_AUDIT_EXPORT_WEBHOOK_SECRET=replace-with-staging-secret \
+npm run audit:export:smoke
+```
+
+Archive the printed `exportId`, receiver HTTP status, receiver-side stored record,
+retention policy, and access-control evidence. PolyCost proves signed delivery;
+the SIEM/WORM platform must prove immutability and retention.
+
 ## Production Reference Architecture
 
 Use the same app topology across AWS, Azure, or GCP:
@@ -95,11 +122,13 @@ Cloud equivalents:
 3. Run `npm run check`.
 4. Run `npm run test:production-readiness`.
 5. Run `npm run ci:build`.
-6. Build API and web images from the repo Dockerfiles.
-7. Run database migrations before shifting traffic.
-8. Deploy with the previous release still available for rollback.
-9. Verify `/health/live`, `/health/ready`, `/health`, and `/health/deep`.
-10. Run a comparison, export PDF/CSV/Excel, and inspect pricing evidence.
+6. Run `npm run audit:export:smoke:local`; for staging releases, run
+   `npm run audit:export:smoke` against the configured SIEM/WORM receiver.
+7. Build API and web images from the repo Dockerfiles.
+8. Run database migrations before shifting traffic.
+9. Deploy with the previous release still available for rollback.
+10. Verify `/health/live`, `/health/ready`, `/health`, and `/health/deep`.
+11. Run a comparison, export PDF/CSV/Excel, and inspect pricing evidence.
 
 ## Real Provider Pricing Rehearsal
 

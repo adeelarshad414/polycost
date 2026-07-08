@@ -66,6 +66,7 @@ performance/accessibility/best-practices/SEO metrics.
 | UI-AUTH-003    | Improved      | Active workspace switching is now backend-backed, membership-checked, and exposed in the signed-in account panel                                                                          |
 | UI-AUTH-004    | Improved      | Pending/expired workspace invites can now be resent through a guarded backend route that rotates the stored token hash and exposes the refreshed one-time token only in the response      |
 | UI-AUTH-005    | Improved      | Invite delivery now has local panel mode plus production HTTPS webhook mode with HMAC signatures, production config guards, and browser-safe delivery receipts                            |
+| AUD-EXP-001    | Improved      | Audit export now has local HMAC receiver proof and a staging canary sender for SIEM/WORM acceptance evidence                                                                              |
 | TF-GEN-001     | Added         | V3 Terraform generation endpoint and UI panel now generate AWS/Azure/GCP starter bundles from NWS with provider pinning, remote-state examples, static checks, and explicit caveats       |
 | TF-GEN-002     | Improved      | V3.1 hardening adds generation profiles, private database networking checks, runtime identity baselines, policy/test/Makefile artifacts, and module-boundary documentation                |
 | TF-GEN-003     | Improved      | V3.2 assurance adds generated CAF/WAF/Terraform framework-alignment evidence and topology-aware public/private ingress/load-balancer controls                                             |
@@ -311,9 +312,9 @@ Machine-readable token evidence:
 - Phase 2.14 adds an append-only team audit trail for privileged team, invite, SSO,
   billing import, and reconciliation actions, with admin-only API/UI visibility. Phase 2.15
   transaction-couples privileged mutation writes with their audit rows. Phase 2.16 adds a
-  same-transaction audit export outbox plus signed SIEM/WORM webhook delivery workers. Full
-  immutability still depends on the deployed external receiver's retention policy and
-  acceptance evidence.
+  same-transaction audit export outbox plus signed SIEM/WORM webhook delivery workers, and
+  Phase 2.17 adds local/staging audit receiver smoke proof. Full immutability still depends
+  on the deployed external receiver's retention policy and acceptance evidence.
 - Full invoice-grade pricing remains future scope: negotiated discounts, credits,
   taxes, enterprise agreements, marketplace charges, amortization semantics, and
   actual provider invoice-of-record reconciliation are not complete. Phase 2.9 and

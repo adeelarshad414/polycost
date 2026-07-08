@@ -265,6 +265,7 @@ npm run public:readiness:check
 npm run browser:audit
 npm run security:audit
 npm run provider:credentials:check
+npm run audit:export:smoke:local
 npm run overlay:check
 npm run release:check
 npm run qa
@@ -315,6 +316,13 @@ and `PRICING_ETL_RUN_ON_BOOT=true`. The API will seed a deterministic AWS/Azure/
 pricing catalog on startup, while real provider adapters remain available when mock
 providers are disabled. Use `docs/PROVIDER-CREDENTIALS.md` and `DUMMY-VALUES.md`
 before switching `USE_MOCK_PROVIDERS=false`.
+
+For audit-export receiver proof, run `npm run audit:export:smoke:local` to start a
+temporary HMAC-verifying receiver and append the accepted event to
+`artifacts/audit-export-smoke/`. In staging, set
+`AUTH_AUDIT_EXPORT_WEBHOOK_URL` and `AUTH_AUDIT_EXPORT_WEBHOOK_SECRET`, then run
+`npm run audit:export:smoke` against the real SIEM/WORM receiver and archive the
+printed canary `exportId` with the receiver-side retention evidence.
 
 ## Documentation
 
