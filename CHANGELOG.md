@@ -45,6 +45,8 @@ once tagged releases begin.
   pending/expired invite status, and refreshed one-time invite links for demos.
 - Invite delivery webhook foundation with local panel mode, production HTTPS webhook
   mode, HMAC signatures, config guards, and browser-safe delivery receipts.
+- Append-only team audit trail foundation for team, invite, SSO, billing import,
+  and reconciliation actions, with guarded admin API reads and workspace UI visibility.
 
 ### Notes
 

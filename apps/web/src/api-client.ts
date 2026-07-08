@@ -36,6 +36,7 @@ import {
   SsoConfigurationStatus,
   SsoConnectionTestResult,
   SsoStartResponse,
+  TeamAuditEventRecord,
   TeamSwitchResponse,
   TeamSettingsRecord,
   TeamInvitationRecord,
@@ -131,6 +132,7 @@ export interface PolyCostClient {
     invitationId: string,
     token: string,
   ): Promise<TeamInvitationRecord>;
+  listTeamAuditEvents(teamId: string, token: string): Promise<TeamAuditEventRecord[]>;
   previewTeamInvitation(tokenValue: string): Promise<TeamInvitationPreview>;
   acceptTeamInvitation(tokenValue: string, token: string): Promise<TeamInvitationRecord>;
   updateTeamMemberRole(
@@ -380,6 +382,15 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         )}/resend`,
         {
           method: 'POST',
+          headers: authorizationHeaders(token),
+        },
+      );
+    },
+    listTeamAuditEvents(teamId, token) {
+      return requestJson<TeamAuditEventRecord[]>(
+        baseUrl,
+        `/auth/teams/${encodeURIComponent(teamId)}/audit-events?limit=25`,
+        {
           headers: authorizationHeaders(token),
         },
       );

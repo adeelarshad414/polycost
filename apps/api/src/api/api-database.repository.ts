@@ -22,6 +22,9 @@ import {
   AccountProfileResponse,
   AuthIdentity,
   SsoConfigurationStatus,
+  TeamAuditAction,
+  TeamAuditEventRecord,
+  TeamAuditTargetType,
   TeamSwitchResponse,
   TeamSettingsRecord,
   TeamInvitationRecord,
@@ -368,6 +371,18 @@ interface TeamInvitationRow {
   created_at: Date;
   accepted_at: Date | null;
   revoked_at: Date | null;
+}
+
+interface TeamAuditEventRow {
+  id: string;
+  team_id: string;
+  actor_account_id: string | null;
+  actor_email: string | null;
+  action: TeamAuditAction;
+  target_type: TeamAuditTargetType;
+  target_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: Date;
 }
 
 interface TeamInvitationWithTokenRow extends TeamInvitationRow {
@@ -2662,6 +2677,80 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     return result.rows.map(toTeamInvitationRecord);
   }
 
+  async recordTeamAuditEvent(input: {
+    teamId: string;
+    actorAccountId?: string;
+    action: TeamAuditAction;
+    targetType: TeamAuditTargetType;
+    targetId?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<TeamAuditEventRecord> {
+    const result = await (
+      await this.getPool()
+    ).query<TeamAuditEventRow>(
+      `
+        INSERT INTO team_audit_events (
+          team_id,
+          actor_account_id,
+          action,
+          target_type,
+          target_id,
+          metadata
+        )
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+        RETURNING id,
+                  team_id,
+                  actor_account_id,
+                  NULL::text AS actor_email,
+                  action,
+                  target_type,
+                  target_id,
+                  metadata,
+                  created_at
+      `,
+      [
+        input.teamId,
+        input.actorAccountId ?? null,
+        input.action,
+        input.targetType,
+        input.targetId ?? null,
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+
+    return toTeamAuditEventRecord(result.rows[0]);
+  }
+
+  async listTeamAuditEvents(teamId: string, limit = 25): Promise<TeamAuditEventRecord[]> {
+    const normalizedLimit = Number.isFinite(limit) ? Math.trunc(limit) : 25;
+    const boundedLimit = Math.min(Math.max(normalizedLimit, 1), 100);
+    const result = await (
+      await this.getPool()
+    ).query<TeamAuditEventRow>(
+      `
+        SELECT team_audit_events.id,
+               team_audit_events.team_id,
+               team_audit_events.actor_account_id,
+               accounts.email AS actor_email,
+               team_audit_events.action,
+               team_audit_events.target_type,
+               team_audit_events.target_id,
+               team_audit_events.metadata,
+               team_audit_events.created_at
+        FROM team_audit_events
+        LEFT JOIN accounts
+          ON accounts.id = team_audit_events.actor_account_id
+        WHERE team_audit_events.team_id = $1
+        ORDER BY team_audit_events.created_at DESC,
+                 team_audit_events.id DESC
+        LIMIT $2
+      `,
+      [teamId, boundedLimit],
+    );
+
+    return result.rows.map(toTeamAuditEventRecord);
+  }
+
   async revokeTeamInvitation(input: {
     teamId: string;
     invitationId: string;
@@ -3672,6 +3761,20 @@ function toTeamInvitationRecord(row: TeamInvitationRow): TeamInvitationRecord {
     createdAt: row.created_at.toISOString(),
     ...(row.accepted_at ? { acceptedAt: row.accepted_at.toISOString() } : {}),
     ...(row.revoked_at ? { revokedAt: row.revoked_at.toISOString() } : {}),
+  };
+}
+
+function toTeamAuditEventRecord(row: TeamAuditEventRow): TeamAuditEventRecord {
+  return {
+    id: row.id,
+    teamId: row.team_id,
+    ...(row.actor_account_id ? { actorAccountId: row.actor_account_id } : {}),
+    ...(row.actor_email ? { actorEmail: row.actor_email } : {}),
+    action: row.action,
+    targetType: row.target_type,
+    ...(row.target_id ? { targetId: row.target_id } : {}),
+    metadata: row.metadata ?? {},
+    createdAt: row.created_at.toISOString(),
   };
 }
 

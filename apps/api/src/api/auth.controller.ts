@@ -160,6 +160,16 @@ export class AuthController {
     return this.authService.listTeamInvitations(teamId, request.auth!);
   }
 
+  @Get('teams/:teamId/audit-events')
+  @UseGuards(SessionAuthGuard)
+  listTeamAuditEvents(
+    @Param('teamId') teamId: string,
+    @Req() request: RequestWithAuth,
+    @Query('limit') limit?: string,
+  ) {
+    return this.authService.listTeamAuditEvents(teamId, request.auth!, optionalLimit(limit));
+  }
+
   @Post('teams/:teamId/invitations/:invitationId/revoke')
   @UseGuards(SessionAuthGuard)
   revokeTeamInvitation(
@@ -294,4 +304,14 @@ function userAgentHeader(headers: Record<string, unknown> | undefined): string |
   }
 
   return typeof value === 'string' ? value : undefined;
+}
+
+function optionalLimit(value: string | undefined): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+
+  return Number.isFinite(parsed) ? parsed : undefined;
 }

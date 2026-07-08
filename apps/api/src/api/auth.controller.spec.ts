@@ -59,6 +59,7 @@ describe('AuthController', () => {
     expect(controller.removeTeamMember('team-1', 'account-1', request)).toBe('remove-member');
     expect(controller.inviteTeamMember('team-1', body, request)).toBe('invite');
     expect(controller.listTeamInvitations('team-1', request)).toBe('invitations');
+    expect(controller.listTeamAuditEvents('team-1', request, '12')).toBe('audit-events');
     expect(controller.revokeTeamInvitation('team-1', 'invite-1', request)).toBe('revoke-invite');
     expect(controller.resendTeamInvitation('team-1', 'invite-1', request)).toBe('resend-invite');
     expect(controller.acceptInvitation(body, request)).toBe('accept-invite');
@@ -83,6 +84,7 @@ describe('AuthController', () => {
       identity,
     );
     expect(service.revokeTeamInvitation).toHaveBeenCalledWith('team-1', 'invite-1', identity);
+    expect(service.listTeamAuditEvents).toHaveBeenCalledWith('team-1', identity, 12);
     expect(service.resendTeamInvitation).toHaveBeenCalledWith('team-1', 'invite-1', identity);
     expect(service.previewInvitation).toHaveBeenCalledWith('invite-token');
     expect(service.startMockOidcLogin).toHaveBeenCalledWith(body);
@@ -160,6 +162,7 @@ describe('AuthController', () => {
       AuthController.prototype.removeTeamMember,
       AuthController.prototype.inviteTeamMember,
       AuthController.prototype.listTeamInvitations,
+      AuthController.prototype.listTeamAuditEvents,
       AuthController.prototype.revokeTeamInvitation,
       AuthController.prototype.resendTeamInvitation,
       AuthController.prototype.acceptInvitation,
@@ -220,6 +223,7 @@ function createAuthServiceMock(): AuthService {
     listTeamMembers: jest.fn(() => 'members'),
     inviteTeamMember: jest.fn(() => 'invite'),
     listTeamInvitations: jest.fn(() => 'invitations'),
+    listTeamAuditEvents: jest.fn(() => 'audit-events'),
     revokeTeamInvitation: jest.fn(() => 'revoke-invite'),
     resendTeamInvitation: jest.fn(() => 'resend-invite'),
     acceptInvitation: jest.fn(() => 'accept-invite'),

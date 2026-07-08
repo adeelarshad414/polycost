@@ -97,6 +97,23 @@ export class BillingService {
       rows,
     });
 
+    if (saved.importRun.teamId) {
+      await this.repository.recordTeamAuditEvent({
+        teamId: saved.importRun.teamId,
+        actorAccountId: identity.accountId,
+        action: 'billing.import.created',
+        targetType: 'billing_import',
+        targetId: saved.importRun.id,
+        metadata: {
+          provider: saved.importRun.provider,
+          sourceType: saved.importRun.sourceType,
+          rowsAccepted: saved.importRun.rowsAccepted,
+          rowsRejected: saved.importRun.rowsRejected,
+          totalCostUsd: saved.importRun.totalCostUsd,
+        },
+      });
+    }
+
     return {
       importRun: saved.importRun,
       acceptedRows: saved.importRun.rowsAccepted,
@@ -178,7 +195,7 @@ export class BillingService {
     const status = reconciliationStatus(estimatedTotalUsd, variancePercent);
     const evidence = reconciliationEvidence(comparison.resultSnapshot, importRunId, lineItems);
 
-    return this.repository.saveInvoiceReconciliation({
+    const reconciliation = await this.repository.saveInvoiceReconciliation({
       importRunId,
       comparisonId,
       provider: importRun.provider,
@@ -189,6 +206,26 @@ export class BillingService {
       status,
       evidence,
     });
+
+    if (importRun.teamId) {
+      await this.repository.recordTeamAuditEvent({
+        teamId: importRun.teamId,
+        actorAccountId: identity.accountId,
+        action: 'billing.reconciliation.created',
+        targetType: 'billing_reconciliation',
+        targetId: reconciliation.id,
+        metadata: {
+          importRunId,
+          comparisonId,
+          provider: reconciliation.provider,
+          status: reconciliation.status,
+          varianceUsd: reconciliation.varianceUsd,
+          variancePercent: reconciliation.variancePercent,
+        },
+      });
+    }
+
+    return reconciliation;
   }
 
   async listReconciliations(

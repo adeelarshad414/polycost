@@ -19,6 +19,9 @@ import {
   SsoConnectionTestResult,
   SsoConfigurationStatus,
   SsoStartResponse,
+  TeamAuditAction,
+  TeamAuditEventRecord,
+  TeamAuditTargetType,
   TeamSettingsRecord,
   TeamSwitchResponse,
   TeamInvitationRecord,
@@ -277,11 +280,25 @@ export class AuthService {
   async createTeam(body: unknown, identity: AuthIdentity): Promise<TeamSettingsRecord> {
     const input = parseTeamSettingsBody(body);
 
-    return this.repository.createTeamForAccount({
+    const created = await this.repository.createTeamForAccount({
       accountId: identity.accountId,
       teamName: input.teamName,
       teamSlug: teamSlug(input.teamName, `${identity.email}:${Date.now()}`),
     });
+
+    await this.recordTeamAuditEvent({
+      teamId: created.teamId,
+      actorAccountId: identity.accountId,
+      action: 'team.created',
+      targetType: 'team',
+      targetId: created.teamId,
+      metadata: {
+        teamName: created.teamName,
+        role: created.role,
+      },
+    });
+
+    return created;
   }
 
   async updateTeamSettings(
@@ -300,6 +317,17 @@ export class AuthService {
     if (!updated) {
       throw new ApiForbiddenError('Team membership is required to update team settings');
     }
+
+    await this.recordTeamAuditEvent({
+      teamId,
+      actorAccountId: identity.accountId,
+      action: 'team.settings.updated',
+      targetType: 'team',
+      targetId: updated.teamId,
+      metadata: {
+        teamName: updated.teamName,
+      },
+    });
 
     return updated;
   }
@@ -327,7 +355,22 @@ export class AuthService {
       expiresAt: new Date(Date.now() + INVITATION_TTL_DAYS * 86_400_000).toISOString(),
     });
 
-    return this.withInvitationDelivery(invitation, inviteToken, identity, 'created');
+    const delivered = await this.withInvitationDelivery(
+      invitation,
+      inviteToken,
+      identity,
+      'created',
+    );
+    await this.recordTeamAuditEvent({
+      teamId,
+      actorAccountId: identity.accountId,
+      action: 'team.invitation.created',
+      targetType: 'invitation',
+      targetId: invitation.id,
+      metadata: invitationAuditMetadata(delivered),
+    });
+
+    return delivered;
   }
 
   async listTeamInvitations(
@@ -360,6 +403,19 @@ export class AuthService {
       ]);
     }
 
+    await this.recordTeamAuditEvent({
+      teamId,
+      actorAccountId: identity.accountId,
+      action: 'team.invitation.revoked',
+      targetType: 'invitation',
+      targetId: revoked.id,
+      metadata: {
+        email: revoked.email,
+        role: revoked.role,
+        status: revoked.status,
+      },
+    });
+
     return revoked;
   }
 
@@ -387,7 +443,22 @@ export class AuthService {
       ]);
     }
 
-    return this.withInvitationDelivery(invitation, inviteToken, identity, 'resent');
+    const delivered = await this.withInvitationDelivery(
+      invitation,
+      inviteToken,
+      identity,
+      'resent',
+    );
+    await this.recordTeamAuditEvent({
+      teamId,
+      actorAccountId: identity.accountId,
+      action: 'team.invitation.resent',
+      targetType: 'invitation',
+      targetId: invitation.id,
+      metadata: invitationAuditMetadata(delivered),
+    });
+
+    return delivered;
   }
 
   async previewInvitation(token: string): Promise<TeamInvitationPreview> {
@@ -439,11 +510,26 @@ export class AuthService {
       throw new ApiForbiddenError('Invitation belongs to a different account email');
     }
 
-    return this.repository.acceptTeamInvitation({
+    const accepted = await this.repository.acceptTeamInvitation({
       invitationId: invitation.id,
       accountId: identity.accountId,
       acceptedAt: new Date().toISOString(),
     });
+
+    await this.recordTeamAuditEvent({
+      teamId: accepted.teamId,
+      actorAccountId: identity.accountId,
+      action: 'team.invitation.accepted',
+      targetType: 'invitation',
+      targetId: accepted.id,
+      metadata: {
+        email: accepted.email,
+        role: accepted.role,
+        status: accepted.status,
+      },
+    });
+
+    return accepted;
   }
 
   async updateTeamMemberRole(
@@ -491,6 +577,19 @@ export class AuthService {
       ]);
     }
 
+    await this.recordTeamAuditEvent({
+      teamId,
+      actorAccountId: identity.accountId,
+      action: 'team.member.role_updated',
+      targetType: 'member',
+      targetId: updated.accountId,
+      metadata: {
+        email: updated.email,
+        fromRole: target.role,
+        toRole: updated.role,
+      },
+    });
+
     return updated;
   }
 
@@ -520,8 +619,28 @@ export class AuthService {
     }
 
     await this.repository.removeTeamMember({ teamId, accountId });
+    await this.recordTeamAuditEvent({
+      teamId,
+      actorAccountId: identity.accountId,
+      action: 'team.member.removed',
+      targetType: 'member',
+      targetId: accountId,
+      metadata: {
+        role: target.role,
+      },
+    });
 
     return { removed: true };
+  }
+
+  async listTeamAuditEvents(
+    teamId: string,
+    identity: AuthIdentity,
+    limit?: number,
+  ): Promise<TeamAuditEventRecord[]> {
+    await this.requireTeamAdmin(identity, teamId);
+
+    return this.repository.listTeamAuditEvents(teamId, limit ?? 25);
   }
 
   async ssoStatus(identity: AuthIdentity): Promise<SsoConfigurationStatus> {
@@ -648,7 +767,7 @@ export class AuthService {
     await this.requireTeamAdmin(identity, teamId);
     const input = parseSsoProviderBody(body);
 
-    return this.repository.upsertSsoProviderConfig({
+    const configured = await this.repository.upsertSsoProviderConfig({
       teamId,
       providerType: input.providerType,
       displayName: input.displayName,
@@ -656,6 +775,22 @@ export class AuthService {
       ...(input.clientId ? { clientIdHint: clientIdHint(input.clientId) } : {}),
       createdByAccountId: identity.accountId,
     });
+
+    await this.recordTeamAuditEvent({
+      teamId,
+      actorAccountId: identity.accountId,
+      action: 'team.sso.configured',
+      targetType: 'sso_provider',
+      targetId: `${configured.providerType}:${configured.issuerUrl}`,
+      metadata: {
+        providerType: configured.providerType,
+        displayName: configured.displayName,
+        issuerUrl: configured.issuerUrl,
+        status: configured.status,
+      },
+    });
+
+    return configured;
   }
 
   async testSsoConnection(
@@ -833,6 +968,17 @@ export class AuthService {
       throw new ApiUnauthorizedError('Current password is invalid');
     }
   }
+
+  private recordTeamAuditEvent(input: {
+    teamId: string;
+    actorAccountId: string;
+    action: TeamAuditAction;
+    targetType: TeamAuditTargetType;
+    targetId?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<TeamAuditEventRecord> {
+    return this.repository.recordTeamAuditEvent(input);
+  }
 }
 
 export function sha256(value: string): string {
@@ -975,6 +1121,21 @@ function parseInviteBody(body: unknown): { email: string; role: Exclude<TeamRole
   return {
     email: normalizeEmail(record.email),
     role: role as Exclude<TeamRole, 'owner'>,
+  };
+}
+
+function invitationAuditMetadata(invitation: TeamInvitationRecord): Record<string, unknown> {
+  return {
+    email: invitation.email,
+    role: invitation.role,
+    status: invitation.status,
+    ...(invitation.delivery
+      ? {
+          deliveryMode: invitation.delivery.mode,
+          deliveryStatus: invitation.delivery.status,
+          tokenExposedInResponse: invitation.delivery.tokenExposedInResponse,
+        }
+      : {}),
   };
 }
 

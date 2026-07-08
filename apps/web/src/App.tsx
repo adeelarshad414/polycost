@@ -81,6 +81,7 @@ import {
   AuthMeResponse,
   SsoConfigurationStatus,
   SsoStartResponse,
+  TeamAuditEventRecord,
   TeamInvitationRecord,
   TeamInvitationPreview,
   TeamMemberRecord,
@@ -1966,6 +1967,7 @@ function WorkspaceControlCenter({
   const [workspaceDirectoryError, setWorkspaceDirectoryError] = useState<string | null>(null);
   const [members, setMembers] = useState<TeamMemberRecord[]>([]);
   const [invitations, setInvitations] = useState<TeamInvitationRecord[]>([]);
+  const [auditEvents, setAuditEvents] = useState<TeamAuditEventRecord[]>([]);
   const [accountSessions, setAccountSessions] = useState<AccountSessionRecord[]>([]);
   const [ssoStatus, setSsoStatus] = useState<SsoConfigurationStatus | null>(null);
   const [inviteEmail, setInviteEmail] = useState('finops@example.com');
@@ -2025,6 +2027,11 @@ function WorkspaceControlCenter({
       label: 'Checking SSO readiness',
       state: workspaceDirectoryError ? 'pending' : isWorkspaceDirectoryLoading ? 'pending' : 'done',
     },
+    {
+      id: 'audit-trail',
+      label: 'Loading audit trail',
+      state: workspaceDirectoryError ? 'pending' : isWorkspaceDirectoryLoading ? 'pending' : 'done',
+    },
   ];
 
   useEffect(() => {
@@ -2061,6 +2068,7 @@ function WorkspaceControlCenter({
       setIsSessionHydrating(false);
       setMembers([]);
       setInvitations([]);
+      setAuditEvents([]);
       setAccountSessions([]);
       setSsoStatus(null);
       return undefined;
@@ -2143,6 +2151,7 @@ function WorkspaceControlCenter({
       setWorkspaceDirectoryError(null);
       setMembers([]);
       setInvitations([]);
+      setAuditEvents([]);
       setSsoStatus(null);
       return undefined;
     }
@@ -2154,15 +2163,17 @@ function WorkspaceControlCenter({
     void Promise.all([
       client.listTeamMembers(activeTeam.id, token),
       client.listTeamInvitations(activeTeam.id, token),
+      client.listTeamAuditEvents(activeTeam.id, token),
       client.getSsoStatus(token),
     ])
-      .then(([nextMembers, nextInvitations, nextSsoStatus]) => {
+      .then(([nextMembers, nextInvitations, nextAuditEvents, nextSsoStatus]) => {
         if (!isMounted) {
           return;
         }
 
         setMembers(nextMembers);
         setInvitations(nextInvitations);
+        setAuditEvents(nextAuditEvents);
         setSsoStatus(nextSsoStatus);
         setWorkspaceDirectoryError(null);
       })
@@ -2257,10 +2268,23 @@ function WorkspaceControlCenter({
   function clearWorkspaceScopedState() {
     setMembers([]);
     setInvitations([]);
+    setAuditEvents([]);
     setSsoStatus(null);
     setSsoStart(null);
     setBillingImport(null);
     setReconciliation(null);
+  }
+
+  async function refreshTeamAuditEvents() {
+    if (!token || !activeTeam || !canManageTeam) {
+      return;
+    }
+
+    try {
+      setAuditEvents(await client.listTeamAuditEvents(activeTeam.id, token));
+    } catch (auditError) {
+      onError(formatApiError(auditError));
+    }
   }
 
   function applyActiveTeamSwitch(
@@ -2466,6 +2490,7 @@ function WorkspaceControlCenter({
             }
           : current,
       );
+      await refreshTeamAuditEvents();
       onNotice('Team settings updated.');
     } catch (settingsError) {
       onError(formatApiError(settingsError));
@@ -2499,6 +2524,7 @@ function WorkspaceControlCenter({
       setLastInviteToken(invitation.inviteToken ?? null);
       setLastInviteUrl(invitation.inviteUrl ?? null);
       setLastInviteDelivery(invitation.delivery ?? null);
+      await refreshTeamAuditEvents();
       onNotice(inviteDeliveryNotice(invitation, 'created'));
     } catch (inviteError) {
       onError(formatApiError(inviteError));
@@ -2553,6 +2579,7 @@ function WorkspaceControlCenter({
       setInvitations((current) =>
         current.map((invitation) => (invitation.id === revoked.id ? revoked : invitation)),
       );
+      await refreshTeamAuditEvents();
       onNotice('Invitation revoked.');
     } catch (inviteError) {
       onError(formatApiError(inviteError));
@@ -2578,6 +2605,7 @@ function WorkspaceControlCenter({
       setLastInviteToken(invitation.inviteToken ?? null);
       setLastInviteUrl(invitation.inviteUrl ?? null);
       setLastInviteDelivery(invitation.delivery ?? null);
+      await refreshTeamAuditEvents();
       onNotice(inviteDeliveryNotice(invitation, 'refreshed'));
     } catch (inviteError) {
       onError(formatApiError(inviteError));
@@ -2622,6 +2650,7 @@ function WorkspaceControlCenter({
             : current,
         );
       }
+      await refreshTeamAuditEvents();
       onNotice('Team role updated.');
     } catch (roleError) {
       onError(formatApiError(roleError));
@@ -2641,6 +2670,7 @@ function WorkspaceControlCenter({
     try {
       await client.removeTeamMember(activeTeam.id, accountId, token);
       setMembers((current) => current.filter((member) => member.accountId !== accountId));
+      await refreshTeamAuditEvents();
       onNotice('Team member removed.');
     } catch (removeError) {
       onError(formatApiError(removeError));
@@ -2685,6 +2715,7 @@ function WorkspaceControlCenter({
             }
           : current,
       );
+      await refreshTeamAuditEvents();
       onNotice('SSO provider configuration saved.');
     } catch (ssoError) {
       onError(formatApiError(ssoError));
@@ -2808,6 +2839,7 @@ function WorkspaceControlCenter({
         setReconciliation(reconciled);
       }
 
+      await refreshTeamAuditEvents();
       onNotice(
         comparisonId
           ? 'Provider export imported and reconciled against the active comparison.'
@@ -3403,6 +3435,28 @@ function WorkspaceControlCenter({
                   Test connection
                 </Button>
               </form>
+              <div className="workspace-audit-list" aria-label="Team audit trail">
+                <div className="workspace-audit-heading">
+                  <span>Recent audit trail</span>
+                  <strong>{auditEvents.length} events</strong>
+                </div>
+                {auditEvents.length > 0 ? (
+                  auditEvents.slice(0, 6).map((event) => (
+                    <div className="workspace-audit-row" key={event.id}>
+                      <span>
+                        <strong>{teamAuditActionLabel(event.action)}</strong>
+                        <small>{teamAuditEventDetail(event)}</small>
+                      </span>
+                      <time dateTime={event.createdAt}>{formatDateTime(event.createdAt)}</time>
+                    </div>
+                  ))
+                ) : (
+                  <p className="workspace-empty-state">
+                    Team, SSO, invite, and billing actions will appear here after the first audited
+                    change.
+                  </p>
+                )}
+              </div>
             </>
           ) : (
             <p className="workspace-empty-state">
@@ -3531,6 +3585,42 @@ function mergeTeamMemberships(
   }
 
   return Array.from(merged.values());
+}
+
+function teamAuditActionLabel(action: TeamAuditEventRecord['action']): string {
+  switch (action) {
+    case 'team.created':
+      return 'Team created';
+    case 'team.settings.updated':
+      return 'Team settings updated';
+    case 'team.invitation.created':
+      return 'Invitation created';
+    case 'team.invitation.resent':
+      return 'Invitation resent';
+    case 'team.invitation.revoked':
+      return 'Invitation revoked';
+    case 'team.invitation.accepted':
+      return 'Invitation accepted';
+    case 'team.member.role_updated':
+      return 'Member role updated';
+    case 'team.member.removed':
+      return 'Member removed';
+    case 'team.sso.configured':
+      return 'SSO configured';
+    case 'billing.import.created':
+      return 'Billing import created';
+    case 'billing.reconciliation.created':
+      return 'Billing reconciliation created';
+  }
+}
+
+function teamAuditEventDetail(event: TeamAuditEventRecord): string {
+  const actor = event.actorEmail ?? event.actorAccountId ?? 'system';
+  const target = event.targetId
+    ? `${event.targetType} ${event.targetId.slice(0, 8)}`
+    : event.targetType;
+
+  return `${actor} · ${target}`;
 }
 
 function memberRoleControlState({
