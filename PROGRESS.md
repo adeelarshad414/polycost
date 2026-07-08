@@ -3933,6 +3933,33 @@ when it is actually resolved in a later phase, with a note on which phase resolv
   scenarios; non-compute commitment cells still render `N/A` where that pricing model
   is not applicable or not available from provider/catalog data.
 
+## Phase 2.14 — Team audit trail foundation
+
+Status: implemented locally on 2026-07-08.
+
+- Added migration `030_team_audit_events.sql` with append-only team audit event storage,
+  actor linkage, metadata JSON validation, indexed team/actor timelines, and least-privilege
+  app-role `SELECT`/`INSERT` grants.
+- Added typed repository methods to append and list bounded recent audit events, plus an
+  admin-guarded `GET /api/v1/auth/teams/:teamId/audit-events` endpoint.
+- Instrumented successful privileged mutations for team creation/settings, invitations,
+  invitation resend/revoke/accept, member role changes/removal, SSO provider configuration,
+  billing import creation, and billing reconciliation creation.
+- Added workspace UI visibility for recent audit events inside the team admin panel and
+  refreshed the stream after audited UI actions.
+- Verification:
+  `npm run format`,
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/api/auth.controller.spec.ts src/api/api-database.repository.spec.ts`
+  passed 47/47,
+  `npm run test --workspace apps/web -- api-client App` passed 142/142,
+  `npm run db:validate` passed with the expected local warning that Postgres was not
+  running, so live schema_migrations inspection was skipped, and full `npm run check`
+  passed with 412/412 API unit tests, 142/142 web unit tests, graph/progress/public
+  readiness checks, QA, release, handover, and provider-credential checks green.
+- Remaining caveat: audit events are append-only and visible to team admins, but mutation
+  writes and audit writes are not yet wrapped in a single cross-operation transaction or
+  exported to an external immutable retention/SIEM sink.
+
 ## Deviations from spec log
 
 Every implementation divergence from `00` through `11` should be logged here with

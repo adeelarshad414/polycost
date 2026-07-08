@@ -1666,6 +1666,99 @@ describe('ApiDatabaseRepository', () => {
     );
   });
 
+  it('records and lists team audit events with actor display context', async () => {
+    const createdAt = new Date('2026-07-06T00:00:00.000Z');
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: '99999999-9999-4999-8999-999999999999',
+            team_id: '22222222-2222-4222-8222-222222222222',
+            actor_account_id: '11111111-1111-4111-8111-111111111111',
+            actor_email: null,
+            action: 'team.invitation.created',
+            target_type: 'invitation',
+            target_id: '88888888-8888-4888-8888-888888888888',
+            metadata: {
+              email: 'finops@example.com',
+              role: 'member',
+            },
+            created_at: createdAt,
+          },
+        ],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: '99999999-9999-4999-8999-999999999999',
+            team_id: '22222222-2222-4222-8222-222222222222',
+            actor_account_id: '11111111-1111-4111-8111-111111111111',
+            actor_email: 'architect@example.com',
+            action: 'team.invitation.created',
+            target_type: 'invitation',
+            target_id: '88888888-8888-4888-8888-888888888888',
+            metadata: {
+              email: 'finops@example.com',
+              role: 'member',
+            },
+            created_at: createdAt,
+          },
+        ],
+        rowCount: 1,
+      });
+    const repository = createRepository(query);
+
+    await expect(
+      repository.recordTeamAuditEvent({
+        teamId: '22222222-2222-4222-8222-222222222222',
+        actorAccountId: '11111111-1111-4111-8111-111111111111',
+        action: 'team.invitation.created',
+        targetType: 'invitation',
+        targetId: '88888888-8888-4888-8888-888888888888',
+        metadata: {
+          email: 'finops@example.com',
+          role: 'member',
+        },
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: '99999999-9999-4999-8999-999999999999',
+        action: 'team.invitation.created',
+        createdAt: createdAt.toISOString(),
+      }),
+    );
+    await expect(
+      repository.listTeamAuditEvents('22222222-2222-4222-8222-222222222222', 500),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        actorEmail: 'architect@example.com',
+        targetType: 'invitation',
+      }),
+    ]);
+
+    expect(query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('INSERT INTO team_audit_events'),
+      [
+        '22222222-2222-4222-8222-222222222222',
+        '11111111-1111-4111-8111-111111111111',
+        'team.invitation.created',
+        'invitation',
+        '88888888-8888-4888-8888-888888888888',
+        JSON.stringify({
+          email: 'finops@example.com',
+          role: 'member',
+        }),
+      ],
+    );
+    expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining('FROM team_audit_events'), [
+      '22222222-2222-4222-8222-222222222222',
+      100,
+    ]);
+  });
+
   it('rolls back transactional auth and billing writes and closes the pool', async () => {
     const authFailureQuery = jest
       .fn()

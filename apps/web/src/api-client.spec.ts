@@ -595,6 +595,19 @@ describe('api client', () => {
       rejectedRows: 0,
       lineItems: [],
     };
+    const auditEvent = {
+      id: 'audit-1',
+      teamId: 'team-1',
+      actorAccountId: 'account-1',
+      actorEmail: 'architect@example.com',
+      action: 'team.invitation.created' as const,
+      targetType: 'invitation' as const,
+      targetId: 'invite-1',
+      metadata: {
+        email: 'finops@example.com',
+      },
+      createdAt: '2026-07-06T00:00:01.000Z',
+    };
     const fetchMock = jest
       .fn()
       .mockResolvedValueOnce(
@@ -669,7 +682,8 @@ describe('api client', () => {
       )
       .mockResolvedValueOnce(jsonResponse(ssoProvider))
       .mockResolvedValueOnce(jsonResponse(ssoTest))
-      .mockResolvedValueOnce(jsonResponse(billingImport));
+      .mockResolvedValueOnce(jsonResponse(billingImport))
+      .mockResolvedValueOnce(jsonResponse([auditEvent]));
     global.fetch = fetchMock as typeof fetch;
     const client = createPolyCostClient('http://api.test/api/v1');
 
@@ -793,6 +807,9 @@ describe('api client', () => {
         'session-token',
       ),
     ).resolves.toEqual(billingImport);
+    await expect(client.listTeamAuditEvents('team-1', 'session-token')).resolves.toEqual([
+      auditEvent,
+    ]);
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       5,
@@ -817,6 +834,12 @@ describe('api client', () => {
       'http://api.test/api/v1/auth/teams/team-1/invitations/invite-1/resend',
       expect.objectContaining({
         method: 'POST',
+        headers: expect.objectContaining({ Authorization: 'Bearer session-token' }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      'http://api.test/api/v1/auth/teams/team-1/audit-events?limit=25',
+      expect.objectContaining({
         headers: expect.objectContaining({ Authorization: 'Bearer session-token' }),
       }),
     );

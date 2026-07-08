@@ -258,6 +258,28 @@ describe('AuthService', () => {
     expect(repository.createTeamInvitation.mock.calls[0][0].tokenHash).not.toBe(
       invitation.inviteToken,
     );
+    expect(repository.recordTeamAuditEvent).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        teamId: account.defaultTeam!.teamId,
+        actorAccountId: identity.accountId,
+        action: 'team.invitation.created',
+        targetType: 'invitation',
+        targetId: '88888888-8888-4888-8888-888888888888',
+        metadata: expect.objectContaining({
+          email: 'finops@example.com',
+          role: 'member',
+          deliveryMode: 'panel',
+          tokenExposedInResponse: true,
+        }),
+      }),
+    );
+    expect(repository.recordTeamAuditEvent.mock.calls[0][0].metadata).toEqual(
+      expect.not.objectContaining({
+        inviteToken: expect.any(String),
+        inviteUrl: expect.any(String),
+      }),
+    );
 
     repository.resendTeamInvitation.mockImplementation(async (input) => ({
       id: '88888888-8888-4888-8888-888888888888',
@@ -286,6 +308,14 @@ describe('AuthService', () => {
       }),
     );
     expect(repository.resendTeamInvitation.mock.calls[0][0].tokenHash).not.toBe(resent.inviteToken);
+    expect(repository.recordTeamAuditEvent).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        action: 'team.invitation.resent',
+        targetType: 'invitation',
+        targetId: '88888888-8888-4888-8888-888888888888',
+      }),
+    );
   });
 
   it('omits raw invitation tokens from API responses when webhook delivery is active', async () => {
@@ -479,6 +509,19 @@ describe('AuthService', () => {
       issuerUrl: 'https://idp.example.com',
       status: 'configured',
     });
+    repository.listTeamAuditEvents.mockResolvedValue([
+      {
+        id: '99999999-9999-4999-8999-999999999999',
+        teamId: account.defaultTeam!.teamId,
+        actorAccountId: identity.accountId,
+        actorEmail: identity.email,
+        action: 'team.sso.configured',
+        targetType: 'sso_provider',
+        targetId: 'oidc:https://idp.example.com',
+        metadata: {},
+        createdAt: '2026-07-06T00:00:01.000Z',
+      },
+    ]);
     const service = new AuthService(repository as never, configService());
 
     await expect(
@@ -535,6 +578,39 @@ describe('AuthService', () => {
       ok: true,
       providerType: 'oidc',
     });
+    await expect(
+      service.listTeamAuditEvents(account.defaultTeam!.teamId, identity, 10),
+    ).resolves.toHaveLength(1);
+
+    expect(repository.recordTeamAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'team.created',
+        targetType: 'team',
+        targetId: '55555555-5555-4555-8555-555555555555',
+      }),
+    );
+    expect(repository.recordTeamAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'team.settings.updated',
+        targetType: 'team',
+        targetId: account.defaultTeam!.teamId,
+      }),
+    );
+    expect(repository.recordTeamAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'team.invitation.revoked',
+        targetType: 'invitation',
+        targetId: '88888888-8888-4888-8888-888888888888',
+      }),
+    );
+    expect(repository.recordTeamAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'team.sso.configured',
+        targetType: 'sso_provider',
+        targetId: 'oidc:https://idp.example.com',
+      }),
+    );
+    expect(repository.listTeamAuditEvents).toHaveBeenCalledWith(account.defaultTeam!.teamId, 10);
   });
 
   it('protects the final team owner from accidental demotion', async () => {
@@ -992,6 +1068,20 @@ describe('BillingService', () => {
         createdByAccountId: identity.accountId,
       }),
     );
+    expect(repository.recordTeamAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        teamId: identity.teamId,
+        actorAccountId: identity.accountId,
+        action: 'billing.import.created',
+        targetType: 'billing_import',
+        targetId: '55555555-5555-4555-8555-555555555555',
+        metadata: expect.objectContaining({
+          provider: 'aws',
+          rowsAccepted: 1,
+          totalCostUsd: 107,
+        }),
+      }),
+    );
   });
 
   it('imports AWS CUR provider exports through the native mapper', async () => {
@@ -1368,6 +1458,22 @@ describe('BillingService', () => {
         comparisonTraceKeys: expect.any(Array),
       }),
     });
+    expect(repository.recordTeamAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        teamId: identity.teamId,
+        actorAccountId: identity.accountId,
+        action: 'billing.reconciliation.created',
+        targetType: 'billing_reconciliation',
+        targetId: '66666666-6666-4666-8666-666666666666',
+        metadata: expect.objectContaining({
+          importRunId: '55555555-5555-4555-8555-555555555555',
+          comparisonId: comparisonResult.comparisonId,
+          provider: 'aws',
+          status: 'variance-warning',
+          varianceUsd: 7,
+        }),
+      }),
+    );
   });
 
   it('blocks reconciliation across active team boundaries', async () => {
@@ -1474,6 +1580,8 @@ function repositoryMock() {
     listAccountTeams: jest.fn(),
     createTeamForAccount: jest.fn(),
     updateTeamSettings: jest.fn(),
+    recordTeamAuditEvent: jest.fn(),
+    listTeamAuditEvents: jest.fn(),
     getTeamMembership: jest.fn(),
     listTeamMembers: jest.fn(),
     createTeamInvitation: jest.fn(),

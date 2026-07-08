@@ -3906,6 +3906,19 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       inviteUrl: 'http://localhost:3001/?invite_token=invite-token',
     })),
     listTeamInvitations: jest.fn(async () => []),
+    listTeamAuditEvents: jest.fn(async () => [
+      {
+        id: 'audit-1',
+        teamId: '22222222-2222-4222-8222-222222222222',
+        actorAccountId: '11111111-1111-4111-8111-111111111111',
+        actorEmail: 'architect@example.com',
+        action: 'team.invitation.created' as const,
+        targetType: 'invitation' as const,
+        targetId: '88888888-8888-4888-8888-888888888888',
+        metadata: {},
+        createdAt: '2026-07-06T00:00:01.000Z',
+      },
+    ]),
     resendTeamInvitation: jest.fn(async () => ({
       id: '88888888-8888-4888-8888-888888888888',
       teamId: '22222222-2222-4222-8222-222222222222',

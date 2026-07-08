@@ -40,6 +40,34 @@ export interface TeamInvitationDeliveryReceipt {
   deliveredAt?: string;
 }
 
+export type TeamAuditAction =
+  | 'team.created'
+  | 'team.settings.updated'
+  | 'team.invitation.created'
+  | 'team.invitation.resent'
+  | 'team.invitation.revoked'
+  | 'team.invitation.accepted'
+  | 'team.member.role_updated'
+  | 'team.member.removed'
+  | 'team.sso.configured'
+  | 'billing.import.created'
+  | 'billing.reconciliation.created';
+
+export type TeamAuditTargetType =
+  'team' | 'invitation' | 'member' | 'sso_provider' | 'billing_import' | 'billing_reconciliation';
+
+export interface TeamAuditEventRecord {
+  id: string;
+  teamId: string;
+  actorAccountId?: string;
+  actorEmail?: string;
+  action: TeamAuditAction;
+  targetType: TeamAuditTargetType;
+  targetId?: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
 export interface TeamInvitationPreview {
   status: 'pending' | 'accepted' | 'revoked' | 'expired' | 'invalid';
   email?: string;

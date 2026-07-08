@@ -308,6 +308,11 @@ Machine-readable token evidence:
 - Hosted GitHub Actions still cannot prove branch CI while jobs fail before runner
   allocation. A maintainer must fix Actions runner/account/billing/quota state or
   rerun once the account can allocate runners.
+- Phase 2.14 adds an append-only team audit trail for privileged team, invite, SSO,
+  billing import, and reconciliation actions, with admin-only API/UI visibility. It is
+  not yet a fully immutable compliance journal: mutation writes and audit writes are not
+  wrapped in one cross-operation transaction, and events are not exported to an external
+  SIEM/WORM retention service.
 - Full invoice-grade pricing remains future scope: negotiated discounts, credits,
   taxes, enterprise agreements, marketplace charges, amortization semantics, and
   actual provider invoice-of-record reconciliation are not complete. Phase 2.9 and
