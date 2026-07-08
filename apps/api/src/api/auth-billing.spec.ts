@@ -1116,8 +1116,9 @@ describe('BillingService', () => {
         billingPeriodStart: '2026-06-01',
         billingPeriodEnd: '2026-06-30',
         content: [
-          'lineItem/ProductCode,product/sku,lineItem/UsageStartDate,lineItem/UsageAmount,pricing/unit,lineItem/NetUnblendedCost,lineItem/CurrencyCode,product/region,lineItem/ResourceId,resourceTags/user:cost_center',
-          'AmazonEC2,sku-compute,2026-06-01T00:00:00Z,730,Hrs,107.00,USD,us-east-1,i-demo,engineering',
+          'lineItem/ProductCode,lineItem/LineItemType,product/sku,lineItem/UsageStartDate,lineItem/UsageAmount,pricing/unit,lineItem/NetUnblendedCost,lineItem/CurrencyCode,product/region,lineItem/ResourceId,resourceTags/user:cost_center',
+          'AmazonEC2,Usage,sku-compute,2026-06-01T00:00:00Z,730,Hrs,107.00,USD,us-east-1,i-demo,engineering',
+          'Tax,Tax,tax-sku,2026-06-01T00:00:00Z,0,USD,8.50,USD,us-east-1,,finance',
         ].join('\n'),
       },
       identity,
@@ -1143,6 +1144,10 @@ describe('BillingService', () => {
               _polycost: expect.objectContaining({
                 provider: 'aws',
                 sourceRowFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+                invoiceAdjustmentClassification: expect.objectContaining({
+                  category: 'usage',
+                  isAdjustment: false,
+                }),
                 recognizedColumns: expect.arrayContaining([
                   'lineItem/NetUnblendedCost',
                   'lineItem/ProductCode',
@@ -1150,6 +1155,18 @@ describe('BillingService', () => {
                 ]),
                 missingRecommendedFields: ['usageEnd'],
                 normalizationStatus: 'partial-provider-export',
+              }),
+            }),
+          }),
+          expect.objectContaining({
+            serviceName: 'Tax',
+            costUsd: 8.5,
+            rawPayload: expect.objectContaining({
+              _polycost: expect.objectContaining({
+                invoiceAdjustmentClassification: expect.objectContaining({
+                  category: 'tax',
+                  isAdjustment: true,
+                }),
               }),
             }),
           }),
@@ -1447,6 +1464,21 @@ describe('BillingService', () => {
             'Reconciliation compares provider-export actuals with PolyCost estimate evidence; it is not an invoice-of-record.',
           ],
         }),
+        invoiceAdjustmentSummary: expect.objectContaining({
+          grossInvoiceTotalUsd: 107,
+          estimateComparableUsageCostUsd: 107,
+          adjustmentCostUsd: 0,
+          usageLineItemCount: 1,
+          adjustmentLineItemCount: 0,
+          estimateComparableVarianceUsd: 7,
+          categories: [
+            expect.objectContaining({
+              category: 'usage',
+              rowCount: 1,
+              totalCostUsd: 107,
+            }),
+          ],
+        }),
         comparisonTraceKeys: expect.any(Array),
       }),
     });
@@ -1461,6 +1493,82 @@ describe('BillingService', () => {
       }),
     );
     expect(repository.recordTeamAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it('separates taxes, credits, support, and marketplace rows from usage variance evidence', async () => {
+    const repository = repositoryMock();
+    repository.getBillingImport.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      teamId: identity.teamId,
+      provider: 'aws',
+      sourceType: 'aws-cur',
+      status: 'completed',
+      billingPeriodStart: '2026-06-01',
+      billingPeriodEnd: '2026-06-30',
+      originalFileSha256: 'a'.repeat(64),
+      rowsReceived: 5,
+      rowsAccepted: 5,
+      rowsRejected: 0,
+      totalCostUsd: 137,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    });
+    repository.listInvoiceLineItems.mockResolvedValue([
+      invoiceLineItem('AmazonEC2', 'sku-compute', 100, 'usage'),
+      invoiceLineItem('Tax', 'tax-sku', 8, 'tax'),
+      invoiceLineItem('Promotional Credit', 'credit-sku', -3, 'credit'),
+      invoiceLineItem('AWS Support Business', 'support-sku', 12, 'support'),
+      invoiceLineItem('AWS Marketplace private offer', 'marketplace-sku', 20, 'marketplace'),
+    ]);
+    repository.getComparison.mockResolvedValue({
+      nwsSnapshot: {} as never,
+      resultSnapshot: comparisonResult,
+    });
+    repository.saveInvoiceReconciliation.mockImplementation(async (input) => ({
+      id: '66666666-6666-4666-8666-666666666666',
+      createdAt: '2026-07-06T00:00:02.000Z',
+      ...input,
+    }));
+    const service = new BillingService(repository as never);
+
+    await service.reconcile(
+      '55555555-5555-4555-8555-555555555555',
+      {
+        comparisonId: comparisonResult.comparisonId,
+      },
+      identity,
+    );
+
+    expect(repository.saveInvoiceReconciliation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        invoicedTotalUsd: 137,
+        varianceUsd: 37,
+        variancePercent: 37,
+        status: 'variance-critical',
+        evidence: expect.objectContaining({
+          invoiceAdjustmentSummary: expect.objectContaining({
+            grossInvoiceTotalUsd: 137,
+            estimateComparableUsageCostUsd: 100,
+            adjustmentCostUsd: 37,
+            usageLineItemCount: 1,
+            adjustmentLineItemCount: 4,
+            estimateComparableVarianceUsd: 0,
+            estimateComparableVariancePercent: 0,
+            categories: expect.arrayContaining([
+              expect.objectContaining({ category: 'usage', rowCount: 1, totalCostUsd: 100 }),
+              expect.objectContaining({ category: 'marketplace', rowCount: 1, totalCostUsd: 20 }),
+              expect.objectContaining({ category: 'support', rowCount: 1, totalCostUsd: 12 }),
+              expect.objectContaining({ category: 'tax', rowCount: 1, totalCostUsd: 8 }),
+              expect.objectContaining({ category: 'credit', rowCount: 1, totalCostUsd: -3 }),
+            ]),
+          }),
+          invoiceMatchSummary: expect.objectContaining({
+            caveats: expect.arrayContaining([
+              '4 non-usage invoice adjustment row(s) were separated from estimate-comparable usage.',
+            ]),
+          }),
+        }),
+      }),
+    );
   });
 
   it('blocks reconciliation across active team boundaries', async () => {
@@ -1549,6 +1657,43 @@ describe('BillingService', () => {
     expect(repository.listInvoiceReconciliations).not.toHaveBeenCalled();
   });
 });
+
+function invoiceLineItem(serviceName: string, skuId: string, costUsd: number, category: string) {
+  return {
+    id: `line-${skuId}`,
+    importRunId: '55555555-5555-4555-8555-555555555555',
+    teamId: identity.teamId,
+    provider: 'aws' as const,
+    billingPeriodStart: '2026-06-01',
+    billingPeriodEnd: '2026-06-30',
+    serviceName,
+    skuId,
+    region: 'us-east-1',
+    resourceId: `resource-${skuId}`,
+    usageStart: '2026-06-01T00:00:00.000Z',
+    usageEnd: '2026-06-30T23:59:59.000Z',
+    costUsd,
+    currency: 'USD',
+    tags: {},
+    rawPayload: {
+      _polycost: {
+        sourceRowFingerprint: 'c'.repeat(64),
+        missingRecommendedFields: [],
+        invoiceAdjustmentClassification: {
+          category,
+          isAdjustment: category !== 'usage',
+          reason:
+            category === 'usage'
+              ? 'row appears to be estimate-comparable usage'
+              : `row is marked as ${category}`,
+          sourceSignals: [serviceName, skuId, category],
+        },
+      },
+    },
+    lineItemHash: `${skuId}`.padEnd(64, 'b').slice(0, 64),
+    createdAt: '2026-07-06T00:00:01.000Z',
+  };
+}
 
 function repositoryMock() {
   return {

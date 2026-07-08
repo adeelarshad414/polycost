@@ -5,6 +5,17 @@ export type BillingSourceType =
 export type BillingImportStatus = 'processing' | 'completed' | 'failed';
 export type InvoiceReconciliationStatus =
   'matched' | 'variance-warning' | 'variance-critical' | 'unmatched';
+export type InvoiceAdjustmentCategory =
+  | 'usage'
+  | 'credit'
+  | 'discount'
+  | 'tax'
+  | 'support'
+  | 'marketplace'
+  | 'refund'
+  | 'enterprise-adjustment'
+  | 'fee'
+  | 'unknown';
 
 export interface BillingImportRowInput {
   serviceName: string;

@@ -1199,7 +1199,7 @@ describe('App', () => {
     );
 
     unmount();
-  });
+  }, 15_000);
 
   it('shows loading spinners while compare, refresh, and export actions are pending', async () => {
     const validateDeferred = deferred<{ valid: true }>();

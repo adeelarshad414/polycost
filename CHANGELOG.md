@@ -55,6 +55,9 @@ once tagged releases begin.
   SIEM/WORM canary acceptance evidence.
 - Approximate VSDX SVG visual previews generated from extracted page geometry, with
   browser rendering and explicit non-pixel-perfect Visio caveats.
+- Invoice adjustment classification for imported actuals, separating usage rows from
+  taxes, credits, discounts, support, marketplace charges, refunds, fees, and other
+  non-usage adjustments in reconciliation evidence and the workspace billing panel.
 
 ### Notes
 
@@ -71,8 +74,9 @@ once tagged releases begin.
   Tier 3 diagram classifier fallback diagnostics, RBAC UI controls aligned to API
   authorization, and an explicit security suppression/advisory ledger.
 - Billing reconciliation now has native export mapper evidence for AWS CUR, Azure
-  Cost Management CSV, and nested GCP Billing Export JSON, while invoice-of-record
-  reconciliation remains future scope.
+  Cost Management CSV, and nested GCP Billing Export JSON, plus adjustment-aware
+  usage-comparable variance evidence, while invoice-of-record reconciliation remains
+  future scope.
 - Account/team UX now supports switching the current active workspace without a
   new login, refreshing pending/expired invite tokens, and handing invite links to
   a signed delivery webhook, while provider-specific email templates, SSO/SAML,

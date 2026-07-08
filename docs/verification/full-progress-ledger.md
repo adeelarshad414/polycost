@@ -37,16 +37,21 @@ Evidence:
   payload hash.
 - `apps/api/src/api/live-pricing-traceability.spec.ts` proves refresh-live catalog
   row changes alter refreshed comparison output while retaining SKU lineage.
+- `apps/api/src/api/auth-billing.spec.ts` proves imported actuals classify invoice
+  rows as usage or non-usage adjustments, and reconciliation evidence separates
+  usage-comparable variance from taxes, credits, support, marketplace/private-offer,
+  and other adjustment rows.
 - `docs/PROVIDER-CREDENTIALS.md` states the current production swap procedure and
   explicitly limits real provider mode to catalog list prices, not invoices.
 
 Deferred:
 
 - Full invoice-grade billing remains future work: private discounts, enterprise
-  agreements, credits, taxes, amortization semantics, actual billed usage, and
-  provider invoice-of-record reconciliation are not complete. Native AWS CUR,
-  Azure Cost Management CSV, and nested GCP Billing Export JSON mapper coverage now
-  exists for estimate-vs-actual reconciliation evidence.
+  agreements, amortization semantics, actual billed usage, and provider
+  invoice-of-record reconciliation are not complete. Native AWS CUR, Azure Cost
+  Management CSV, and nested GCP Billing Export JSON mapper coverage now exists for
+  estimate-vs-actual reconciliation evidence, and classified adjustment rows are
+  separated from usage-comparable variance.
 
 ## Phase B - Input Modes And Requirement Pipeline
 

@@ -158,4 +158,5 @@ For finance/FinOps:
 1. Review commitment-model and break-even sections.
 2. Export CSV/Excel.
 3. Inspect budget/alert and reconciliation readiness sections.
-4. Call out that invoice-grade actual spend and private discounts are future work.
+4. Review usage-comparable variance and the invoice adjustment category summary.
+5. Call out that invoice-grade actual spend and private discounts are future work.

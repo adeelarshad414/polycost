@@ -10,6 +10,7 @@ import {
   BillingProviderExportInput,
   BillingImportRowInput,
   BillingSourceType,
+  InvoiceAdjustmentCategory,
   InvoiceReconciliationRecord,
   InvoiceReconciliationStatus,
 } from './billing.types';
@@ -68,6 +69,13 @@ const GCP_BILLING_COLUMNS = {
 } as const;
 
 type ProviderExportColumnMap = Record<string, readonly string[]>;
+
+interface InvoiceAdjustmentClassification {
+  category: InvoiceAdjustmentCategory;
+  isAdjustment: boolean;
+  reason: string;
+  sourceSignals: string[];
+}
 
 @Injectable()
 export class BillingService {
@@ -185,7 +193,12 @@ export class BillingService {
           : 100
         : roundPercent((varianceUsd / estimatedTotalUsd) * 100);
     const status = reconciliationStatus(estimatedTotalUsd, variancePercent);
-    const evidence = reconciliationEvidence(comparison.resultSnapshot, importRunId, lineItems);
+    const evidence = reconciliationEvidence(
+      comparison.resultSnapshot,
+      importRunId,
+      lineItems,
+      estimatedTotalUsd,
+    );
 
     const reconciliation = await this.repository.saveInvoiceReconciliation({
       importRunId,
@@ -449,6 +462,13 @@ function providerRow(input: {
     ]);
   }
 
+  const adjustmentClassification = classifyInvoiceAdjustment({
+    row: input.row,
+    serviceName: input.serviceName,
+    skuId: input.skuId,
+    costUsd,
+  });
+
   return {
     serviceName: input.serviceName,
     ...(input.skuId ? { skuId: input.skuId } : {}),
@@ -461,7 +481,12 @@ function providerRow(input: {
     costUsd,
     currency: input.currency ?? 'USD',
     tags: input.tags,
-    rawPayload: withNormalizationAudit(input.row, input.provider, input.columnMap),
+    rawPayload: withNormalizationAudit(
+      input.row,
+      input.provider,
+      input.columnMap,
+      adjustmentClassification,
+    ),
   };
 }
 
@@ -469,6 +494,7 @@ function withNormalizationAudit(
   row: Record<string, unknown>,
   provider: BillingImportInput['provider'],
   columnMap: ProviderExportColumnMap,
+  adjustmentClassification: InvoiceAdjustmentClassification,
 ): Record<string, unknown> {
   const missingFields = missingRecommendedFields(row, columnMap);
 
@@ -483,6 +509,7 @@ function withNormalizationAudit(
       normalizationStatus: missingFields.length
         ? 'partial-provider-export'
         : 'provider-export-audit-ready',
+      invoiceAdjustmentClassification: adjustmentClassification,
     },
   };
 }
@@ -516,6 +543,131 @@ function missingRecommendedFields(
       return !keys.some((key) => hasSourceValue(row, key));
     })
     .map(([field]) => field);
+}
+
+function classifyInvoiceAdjustment(input: {
+  row: Record<string, unknown>;
+  serviceName: string;
+  skuId?: string;
+  costUsd: number;
+}): InvoiceAdjustmentClassification {
+  const signals = invoiceAdjustmentSignals(input.row, input.serviceName, input.skuId);
+  const text = signals.join(' ').toLowerCase();
+
+  if (matchesAny(text, ['refund', 'refunded'])) {
+    return adjustment('refund', 'row is marked as a refund', signals);
+  }
+
+  if (matchesAny(text, ['tax', 'vat', 'gst', 'hst', 'sales tax'])) {
+    return adjustment('tax', 'row is marked as tax', signals);
+  }
+
+  if (
+    matchesAny(text, ['support', 'developer support', 'business support', 'enterprise support'])
+  ) {
+    return adjustment('support', 'row is marked as provider support', signals);
+  }
+
+  if (matchesAny(text, ['marketplace', 'private offer', 'publisher'])) {
+    return adjustment(
+      'marketplace',
+      'row is marked as marketplace or private-offer spend',
+      signals,
+    );
+  }
+
+  if (
+    matchesAny(text, [
+      'discount',
+      'savingsplannegation',
+      'edp discount',
+      'private rate discount',
+      'discounted usage discount',
+    ])
+  ) {
+    return adjustment('discount', 'row is marked as a discount or savings-plan negation', signals);
+  }
+
+  if (matchesAny(text, ['credit', 'promotional credit', 'service credit']) || input.costUsd < 0) {
+    return adjustment('credit', 'row is marked as a credit or negative adjustment', signals);
+  }
+
+  if (matchesAny(text, ['enterprise', 'edp', 'true-up', 'trueup', 'billing adjustment'])) {
+    return adjustment(
+      'enterprise-adjustment',
+      'row is marked as an enterprise adjustment',
+      signals,
+    );
+  }
+
+  if (matchesAny(text, ['fee', 'subscription', 'reservation fee', 'savings plan recurring'])) {
+    return adjustment('fee', 'row is marked as a recurring fee or subscription charge', signals);
+  }
+
+  if (matchesAny(text, ['usage', 'covered usage', 'discountedusage', 'compute', 'storage'])) {
+    return {
+      category: 'usage',
+      isAdjustment: false,
+      reason: 'row appears to be estimate-comparable usage',
+      sourceSignals: signals.slice(0, 12),
+    };
+  }
+
+  return {
+    category: 'unknown',
+    isAdjustment: true,
+    reason: 'row could not be proven estimate-comparable usage',
+    sourceSignals: signals.slice(0, 12),
+  };
+}
+
+function invoiceAdjustmentSignals(
+  row: Record<string, unknown>,
+  serviceName: string,
+  skuId: string | undefined,
+): string[] {
+  const flattened = flattenPrimitiveValues(row);
+  const signals = [serviceName, skuId, ...flattened]
+    .filter((value): value is string => typeof value === 'string' && Boolean(value.trim()))
+    .map((value) => value.trim().slice(0, 180));
+
+  return [...new Set(signals)].slice(0, 40);
+}
+
+function flattenPrimitiveValues(value: unknown): string[] {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return [String(value)];
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap(flattenPrimitiveValues);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>).flatMap(([key, nested]) => [
+      key,
+      ...flattenPrimitiveValues(nested),
+    ]);
+  }
+
+  return [];
+}
+
+function matchesAny(text: string, needles: string[]): boolean {
+  return needles.some((needle) => text.includes(needle));
+}
+
+function adjustment(
+  category: Exclude<InvoiceAdjustmentCategory, 'usage' | 'unknown'>,
+  reason: string,
+  signals: string[],
+): InvoiceAdjustmentClassification {
+  return {
+    category,
+    isAdjustment: true,
+    reason,
+    sourceSignals: signals.slice(0, 12),
+  };
 }
 
 function hasSourceValue(row: Record<string, unknown>, key: string): boolean {
@@ -1045,6 +1197,7 @@ function reconciliationEvidence(
     costUsd: number;
     rawPayload?: Record<string, unknown>;
   }>,
+  estimatedTotalUsd: number,
 ): Record<string, unknown> {
   const traceKeys = comparison.providers.flatMap((provider) =>
     provider.lineItems.map((lineItem) => ({
@@ -1091,6 +1244,7 @@ function reconciliationEvidence(
     (lineItem) => lineItem.usageStart && lineItem.usageEnd,
   ).length;
   const rowCount = lineItems.length;
+  const adjustmentSummary = invoiceAdjustmentSummary(lineItems, estimatedTotalUsd);
   const traceCoverage = {
     rowCount,
     rowsWithSkuId: lineItems.filter((lineItem) => lineItem.skuId).length,
@@ -1119,16 +1273,173 @@ function reconciliationEvidence(
       ),
       ...traceCoverage,
     },
+    invoiceAdjustmentSummary: adjustmentSummary,
     invoiceMatchSummary: {
       comparisonSkuIds,
       comparisonCategories,
       matchedSkuIds: skuMatches,
       matchedServices: serviceMatches,
       readiness: invoiceEvidenceReadiness(traceCoverage, missingRecommendedFields),
-      caveats: invoiceEvidenceCaveats(traceCoverage, missingRecommendedFields),
+      caveats: invoiceEvidenceCaveats(
+        traceCoverage,
+        missingRecommendedFields,
+        adjustmentSummary.adjustmentLineItemCount,
+      ),
     },
     comparisonTraceKeys: traceKeys,
   };
+}
+
+function invoiceAdjustmentSummary(
+  lineItems: Array<{
+    serviceName: string;
+    skuId?: string;
+    costUsd: number;
+    rawPayload?: Record<string, unknown>;
+  }>,
+  estimatedTotalUsd: number,
+): {
+  grossInvoiceTotalUsd: number;
+  estimateComparableUsageCostUsd: number;
+  adjustmentCostUsd: number;
+  usageLineItemCount: number;
+  adjustmentLineItemCount: number;
+  estimateComparableVarianceUsd: number;
+  estimateComparableVariancePercent: number;
+  categories: Array<{
+    category: InvoiceAdjustmentCategory;
+    rowCount: number;
+    totalCostUsd: number;
+    exampleServices: string[];
+    reasons: string[];
+  }>;
+} {
+  const categories = new Map<
+    InvoiceAdjustmentCategory,
+    {
+      rowCount: number;
+      totalCostUsd: number;
+      exampleServices: Set<string>;
+      reasons: Set<string>;
+    }
+  >();
+  let usageSubtotal = 0;
+  let adjustmentSubtotal = 0;
+  let usageLineItemCount = 0;
+  let adjustmentLineItemCount = 0;
+
+  for (const lineItem of lineItems) {
+    const classification = lineItemAdjustmentClassification(lineItem);
+    const existing = categories.get(classification.category) ?? {
+      rowCount: 0,
+      totalCostUsd: 0,
+      exampleServices: new Set<string>(),
+      reasons: new Set<string>(),
+    };
+
+    existing.rowCount += 1;
+    existing.totalCostUsd = roundCurrency(existing.totalCostUsd + lineItem.costUsd);
+    existing.exampleServices.add(lineItem.serviceName);
+    existing.reasons.add(classification.reason);
+    categories.set(classification.category, existing);
+
+    if (classification.category === 'usage') {
+      usageLineItemCount += 1;
+      usageSubtotal = roundCurrency(usageSubtotal + lineItem.costUsd);
+    } else {
+      adjustmentLineItemCount += 1;
+      adjustmentSubtotal = roundCurrency(adjustmentSubtotal + lineItem.costUsd);
+    }
+  }
+
+  const estimateComparableVarianceUsd = roundCurrency(usageSubtotal - estimatedTotalUsd);
+
+  return {
+    grossInvoiceTotalUsd: roundCurrency(usageSubtotal + adjustmentSubtotal),
+    estimateComparableUsageCostUsd: usageSubtotal,
+    adjustmentCostUsd: adjustmentSubtotal,
+    usageLineItemCount,
+    adjustmentLineItemCount,
+    estimateComparableVarianceUsd,
+    estimateComparableVariancePercent:
+      estimatedTotalUsd === 0
+        ? usageSubtotal === 0
+          ? 0
+          : 100
+        : roundPercent((estimateComparableVarianceUsd / estimatedTotalUsd) * 100),
+    categories: [...categories.entries()]
+      .map(([category, summary]) => ({
+        category,
+        rowCount: summary.rowCount,
+        totalCostUsd: roundCurrency(summary.totalCostUsd),
+        exampleServices: [...summary.exampleServices].slice(0, 4),
+        reasons: [...summary.reasons].slice(0, 4),
+      }))
+      .sort((left, right) => {
+        if (left.category === 'usage') {
+          return -1;
+        }
+
+        if (right.category === 'usage') {
+          return 1;
+        }
+
+        return Math.abs(right.totalCostUsd) - Math.abs(left.totalCostUsd);
+      }),
+  };
+}
+
+function lineItemAdjustmentClassification(lineItem: {
+  serviceName: string;
+  skuId?: string;
+  costUsd: number;
+  rawPayload?: Record<string, unknown>;
+}): InvoiceAdjustmentClassification {
+  const metadata = lineItem.rawPayload?._polycost;
+
+  if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
+    const classification = (metadata as Record<string, unknown>).invoiceAdjustmentClassification;
+
+    if (classification && typeof classification === 'object' && !Array.isArray(classification)) {
+      const record = classification as Record<string, unknown>;
+      const category = record.category;
+      const reason = record.reason;
+      const sourceSignals = record.sourceSignals;
+
+      if (isInvoiceAdjustmentCategory(category) && typeof reason === 'string') {
+        return {
+          category,
+          isAdjustment: category !== 'usage',
+          reason,
+          sourceSignals: Array.isArray(sourceSignals)
+            ? sourceSignals.filter((signal): signal is string => typeof signal === 'string')
+            : [],
+        };
+      }
+    }
+  }
+
+  return classifyInvoiceAdjustment({
+    row: lineItem.rawPayload ?? {},
+    serviceName: lineItem.serviceName,
+    skuId: lineItem.skuId,
+    costUsd: lineItem.costUsd,
+  });
+}
+
+function isInvoiceAdjustmentCategory(value: unknown): value is InvoiceAdjustmentCategory {
+  return (
+    value === 'usage' ||
+    value === 'credit' ||
+    value === 'discount' ||
+    value === 'tax' ||
+    value === 'support' ||
+    value === 'marketplace' ||
+    value === 'refund' ||
+    value === 'enterprise-adjustment' ||
+    value === 'fee' ||
+    value === 'unknown'
+  );
 }
 
 function sourceRowFingerprint(rawPayload: Record<string, unknown> | undefined): string | undefined {
@@ -1188,10 +1499,17 @@ function invoiceEvidenceCaveats(
     serviceMatchCount: number;
   },
   missingRecommendedFields: string[],
+  adjustmentLineItemCount: number,
 ): string[] {
   const caveats: string[] = [
     'Reconciliation compares provider-export actuals with PolyCost estimate evidence; it is not an invoice-of-record.',
   ];
+
+  if (adjustmentLineItemCount > 0) {
+    caveats.push(
+      `${adjustmentLineItemCount} non-usage invoice adjustment row(s) were separated from estimate-comparable usage.`,
+    );
+  }
 
   if (coverage.rowsWithSourceFingerprint === 0) {
     caveats.push('No provider source-row fingerprints were available for imported rows.');
