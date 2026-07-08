@@ -1985,6 +1985,41 @@ describe('ApiDatabaseRepository', () => {
     );
   });
 
+  it('summarizes and deletes expired invoice artifact blobs without touching legal holds', async () => {
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            expired_candidates: '2',
+            legal_hold_skipped: '1',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ id: 'artifact-blob-1' }, { id: 'artifact-blob-2' }],
+      });
+    const repository = createRepository(query);
+    const evaluatedAt = '2026-07-08T00:00:00.000Z';
+
+    await expect(repository.summarizeInvoiceArtifactRetention(evaluatedAt)).resolves.toEqual({
+      expiredCandidates: 2,
+      legalHoldSkipped: 1,
+    });
+    await expect(repository.deleteExpiredInvoiceArtifactBlobs(evaluatedAt)).resolves.toBe(2);
+    expect(query).toHaveBeenNthCalledWith(1, expect.stringContaining('COUNT(*) FILTER'), [
+      evaluatedAt,
+    ]);
+    expect(query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('DELETE FROM invoice_artifact_blobs'),
+      [evaluatedAt],
+    );
+    expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining('legal_hold = false'), [
+      evaluatedAt,
+    ]);
+  });
+
   it('records and lists team audit events with actor display context', async () => {
     const createdAt = new Date('2026-07-06T00:00:00.000Z');
     const query = jest

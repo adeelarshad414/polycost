@@ -81,6 +81,12 @@ Pricing evidence is intentionally first-class:
   and transaction-coupled audit events
 - stored invoice artifact metadata includes the current storage backend,
   KMS-readiness flag, retention/legal-hold policy, and deterministic scan-hook status
+- artifact storage readiness is exposed through an admin endpoint and strict
+  provider-credential checks; staging/production config validation now requires an
+  external object-store target, KMS reference, webhook scanner, and delete-expired
+  retention mode before startup is accepted
+- retention enforcement can report or delete expired non-legal-held database-backed
+  artifact blobs through an explicit admin operation
 - invoice-grade readiness is represented as a matrix of evidence checks, blockers,
   and required provider artifacts rather than a yes/no claim
 - exports carry methodology and data-freshness context
@@ -169,9 +175,10 @@ Health and operations:
 ## Known Architecture Boundaries
 
 - Full invoice-grade pricing, provider invoice-of-record reconciliation, and
-  enterprise artifact handling such as external object storage, customer-managed KMS,
-  real malware scanning, legal-hold enforcement, and reviewer workflow UX remain
-  future work.
+  enterprise artifact handling such as provider-native S3/Azure Blob/GCS byte-write
+  adapters, reviewer workflow UX, and invoice-of-record validation remain future
+  work. The current hardening layer proves configuration readiness, webhook scanner
+  integration, and retention enforcement over the existing database-backed store.
 - VSDX parsing is layout-aware extraction, not full Visio rendering.
 - Production LLM quality depends on a real endpoint/model, Vault secret, and corpus
   evaluation.

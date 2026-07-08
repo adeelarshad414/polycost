@@ -116,6 +116,7 @@ say so explicitly rather than marking it done.
 | Phase 2.24 - Invoice artifact verification seam         | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.25 - Invoice artifact blob storage seam         | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.26 - Invoice artifact governance metadata       | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.27 - Artifact storage readiness and retention   | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4321,6 +4322,40 @@ Status: implemented locally on 2026-07-08.
   Full production invoice handling still needs external object storage, customer
   managed keys, real malware scanning, legal-hold enforcement, reviewer workflow UX,
   and provider invoice-of-record validation.
+
+## Phase 2.27 — Artifact storage readiness and retention enforcement
+
+Status: implemented and verified locally on 2026-07-08.
+
+- Added config schema and `.env.example` controls for invoice artifact storage
+  backend selection, object-store target, KMS key reference, scanner mode/webhook,
+  and retention enforcement mode.
+- Staging and production validation now rejects database-only artifact storage,
+  missing object-store target, missing KMS reference, local-only scanner mode, and
+  report-only retention enforcement.
+- Added `InvoiceArtifactGovernanceService` to centralize storage readiness,
+  signed malware-scanner webhook integration, EICAR fallback scanning, KMS metadata,
+  and upload governance construction.
+- Added guarded admin API operations for artifact storage readiness and retention
+  enforcement. Local/demo mode reports only; configured `delete-expired` mode deletes
+  expired non-legal-held database-backed artifact blobs.
+- Extended the provider credential checker so strict mode fails when artifact
+  governance controls are missing.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/invoice-artifact-governance.service.spec.ts src/api/auth-billing.spec.ts src/api/api-database.repository.spec.ts src/config/config.schema.spec.ts`
+  passed 78/78 across 4 suites. `npm run test:unit --workspace @polycost/web -- --runInBand src/api-client.spec.ts src/App.spec.tsx`
+  passed 86/86 across 2 suites. `npm run ci:lint` passed with zero warnings/errors.
+  `npm run provider:credentials:check` passed with the expected local/demo
+  invoice-artifacts warning, and `npm run provider:credentials:check:strict`
+  passed when production artifact storage/KMS/scanner/retention env values were
+  supplied. `npm run test:production-readiness` passed with API 13 suites / 175
+  tests and web 2 suites / 86 tests. Full `npm run check` passed with API 54
+  suites / 440 tests, web 11 suites / 143 tests, graph validation 318 nodes / 318
+  edges, pricing coverage, progress verification, QA/security suppression hygiene,
+  DB, DevOps, cloud, release, handover, and provider-credential gates green.
+- Remaining caveat: external S3/Azure Blob/GCS byte-write adapters are still future
+  work; this phase adds the production readiness contract, webhook scanner path, and
+  retention enforcement foundation over the existing database-backed artifact store.
 
 ## Deviations from spec log
 

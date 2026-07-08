@@ -5,9 +5,11 @@ import { ApiForbiddenError, ApiNotFoundError, ApiValidationError } from './api-e
 import { ApiDatabaseRepository } from './api-database.repository';
 import { AuthIdentity } from './auth.types';
 import {
+  InvoiceArtifactRetentionEnforcementResult,
   InvoiceArtifactBlobGovernance,
   InvoiceArtifactBlobRecord,
   InvoiceArtifactBlobUploadInput,
+  InvoiceArtifactStorageReadiness,
   BillingImportInput,
   BillingImportResponse,
   BillingProviderExportInput,
@@ -21,15 +23,14 @@ import {
   InvoiceReconciliationRecord,
   InvoiceReconciliationStatus,
 } from './billing.types';
+import { InvoiceArtifactGovernanceService } from './invoice-artifact-governance.service';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const MAX_IMPORT_ROWS = 10_000;
 const MAX_PROVIDER_EXPORT_BYTES = 4 * 1024 * 1024;
 const MAX_INVOICE_ARTIFACT_BLOB_BYTES = 1024 * 1024;
-const DEFAULT_INVOICE_ARTIFACT_RETENTION_DAYS = 365;
 const MAX_INVOICE_ARTIFACT_RETENTION_DAYS = 3650;
-const EICAR_TEST_SIGNATURE = 'EICAR-STANDARD-ANTIVIRUS-TEST-FILE';
 const INVOICE_ARTIFACT_MIME_TYPES = [
   'application/pdf',
   'application/json',
@@ -148,7 +149,10 @@ interface InvoiceGradeReadinessCheck {
 
 @Injectable()
 export class BillingService {
-  constructor(private readonly repository: ApiDatabaseRepository) {}
+  constructor(
+    private readonly repository: ApiDatabaseRepository,
+    private readonly artifactGovernanceService: InvoiceArtifactGovernanceService = new InvoiceArtifactGovernanceService(),
+  ) {}
 
   async importActuals(body: unknown, identity: AuthIdentity): Promise<BillingImportResponse> {
     assertBillingAdmin(identity);
@@ -486,7 +490,12 @@ export class BillingService {
     }
 
     const uploadedAt = new Date().toISOString();
-    const governance = invoiceArtifactBlobGovernance(input, decoded.content, uploadedAt);
+    const governance = await this.artifactGovernanceService.buildGovernance(
+      input,
+      decoded.content,
+      decoded.sha256,
+      uploadedAt,
+    );
     const evidence = replaceInvoiceGradeArtifactEvidence(
       reconciliation,
       storedInvoiceGradeArtifact(artifact, decoded, uploadedAt, identity, governance),
@@ -578,6 +587,37 @@ export class BillingService {
     }
 
     return blob;
+  }
+
+  getInvoiceArtifactStorageReadiness(identity: AuthIdentity): InvoiceArtifactStorageReadiness {
+    assertBillingAdmin(identity);
+
+    return this.artifactGovernanceService.storageReadiness();
+  }
+
+  async enforceInvoiceArtifactRetention(
+    body: unknown,
+    identity: AuthIdentity,
+  ): Promise<InvoiceArtifactRetentionEnforcementResult> {
+    assertBillingAdmin(identity);
+    const input = parseInvoiceArtifactRetentionEnforcementInput(body);
+    const evaluatedAt = new Date().toISOString();
+    const summary = await this.repository.summarizeInvoiceArtifactRetention(evaluatedAt);
+    const configuredMode = this.artifactGovernanceService.retentionMode();
+    const dryRun = input.dryRun || configuredMode === 'report-only';
+    const deleted = dryRun
+      ? 0
+      : await this.repository.deleteExpiredInvoiceArtifactBlobs(evaluatedAt);
+
+    return {
+      mode: configuredMode,
+      evaluatedAt,
+      dryRun,
+      storageBackend: this.artifactGovernanceService.storageReadiness().storageBackend,
+      expiredCandidates: summary.expiredCandidates,
+      legalHoldSkipped: summary.legalHoldSkipped,
+      deleted,
+    };
   }
 }
 
@@ -1747,6 +1787,20 @@ function parseArtifactGovernanceReference(value: unknown, field: string): string
   return parsed;
 }
 
+function parseInvoiceArtifactRetentionEnforcementInput(body: unknown): { dryRun: boolean } {
+  const record =
+    body === undefined || body === null
+      ? {}
+      : requireRecord(
+          body,
+          'Invoice artifact retention enforcement request body must be an object',
+        );
+
+  return {
+    dryRun: parseOptionalBoolean(record.dryRun, 'dryRun') ?? false,
+  };
+}
+
 function hasControlCharacter(value: string): boolean {
   return Array.from(value).some((character) => {
     const code = character.charCodeAt(0);
@@ -1807,56 +1861,6 @@ function decodeBase64ArtifactContent(content: string): Buffer {
   }
 
   return Buffer.from(normalized, 'base64');
-}
-
-function invoiceArtifactBlobGovernance(
-  input: InvoiceArtifactBlobUploadInput,
-  content: Buffer,
-  uploadedAt: string,
-): InvoiceArtifactBlobGovernance {
-  assertInvoiceArtifactScanPassed(content);
-  const retentionDays = input.retentionDays ?? DEFAULT_INVOICE_ARTIFACT_RETENTION_DAYS;
-  const retentionUntil = addDays(uploadedAt, retentionDays);
-
-  return {
-    storageProfile: {
-      storageBackend: 'database-bytea',
-      encryptionStatus: 'database-managed',
-      ...(input.kmsKeyReference ? { kmsKeyReference: input.kmsKeyReference } : {}),
-      kmsKeyRequiredForProduction: !input.kmsKeyReference,
-    },
-    retentionPolicy: {
-      retentionUntil,
-      retentionDays,
-      legalHold: input.legalHold ?? false,
-    },
-    malwareScan: {
-      status: 'passed',
-      scanner: 'polycost-eicar-signature-v1',
-      checkedAt: uploadedAt,
-      findings: [],
-    },
-  };
-}
-
-function assertInvoiceArtifactScanPassed(content: Buffer): void {
-  if (!content.toString('utf8').includes(EICAR_TEST_SIGNATURE)) {
-    return;
-  }
-
-  throw new ApiValidationError('invoice artifact malware scan failed', [
-    {
-      field: 'content',
-      issue: 'blocked by PolyCost artifact scan hook using the EICAR test signature',
-    },
-  ]);
-}
-
-function addDays(isoTimestamp: string, days: number): string {
-  const date = new Date(isoTimestamp);
-  date.setUTCDate(date.getUTCDate() + days);
-
-  return date.toISOString();
 }
 
 function parseProvider(value: unknown): BillingImportInput['provider'] {

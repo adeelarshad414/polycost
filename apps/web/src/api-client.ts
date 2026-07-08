@@ -12,7 +12,9 @@ import {
   BillingImportResponse,
   BillingProviderExportInput,
   InvoiceArtifactBlobRecord,
+  InvoiceArtifactRetentionEnforcementResult,
   InvoiceArtifactBlobUploadInput,
+  InvoiceArtifactStorageReadiness,
   InvoiceGradeArtifactRegistrationInput,
   InvoiceGradeArtifactVerificationInput,
   ComparisonAnalyticsResponse,
@@ -261,6 +263,11 @@ export interface PolyCostClient {
     artifactId: string,
     token: string,
   ): Promise<InvoiceArtifactBlobRecord>;
+  getInvoiceArtifactStorageReadiness(token: string): Promise<InvoiceArtifactStorageReadiness>;
+  enforceInvoiceArtifactRetention(
+    input: { dryRun?: boolean },
+    token: string,
+  ): Promise<InvoiceArtifactRetentionEnforcementResult>;
 }
 
 export function configuredApiBaseUrl(documentRef: Document = document): string {
@@ -724,6 +731,26 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         )}/artifacts/${encodeURIComponent(artifactId)}/blob`,
         {
           headers: authorizationHeaders(token),
+        },
+      );
+    },
+    getInvoiceArtifactStorageReadiness(token) {
+      return requestJson<InvoiceArtifactStorageReadiness>(
+        baseUrl,
+        '/billing/artifact-storage/readiness',
+        {
+          headers: authorizationHeaders(token),
+        },
+      );
+    },
+    enforceInvoiceArtifactRetention(input, token) {
+      return requestJson<InvoiceArtifactRetentionEnforcementResult>(
+        baseUrl,
+        '/billing/artifact-storage/retention/enforce',
+        {
+          method: 'POST',
+          headers: authorizationHeaders(token),
+          body: JSON.stringify(input),
         },
       );
     },

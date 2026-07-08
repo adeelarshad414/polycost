@@ -17,6 +17,9 @@ export type InvoiceGradeArtifactType =
   | 'currency-policy'
   | 'provider-sku-map';
 export type InvoiceGradeArtifactVerificationStatus = 'registered' | 'verified' | 'rejected';
+export type InvoiceArtifactStorageBackend = 'database-bytea' | 'aws-s3' | 'azure-blob' | 'gcp-gcs';
+export type InvoiceArtifactMalwareScannerMode = 'eicar-signature-only' | 'http-webhook';
+export type InvoiceArtifactRetentionEnforcementMode = 'report-only' | 'delete-expired';
 export type InvoiceAdjustmentCategory =
   | 'usage'
   | 'credit'
@@ -100,8 +103,13 @@ export interface InvoiceArtifactBlobUploadInput {
 
 export interface InvoiceArtifactBlobGovernance {
   storageProfile: {
-    storageBackend: 'database-bytea';
-    encryptionStatus: 'database-managed';
+    storageBackend: InvoiceArtifactStorageBackend;
+    encryptionStatus: 'database-managed' | 'customer-managed-kms';
+    objectStore?: {
+      bucketOrContainer: string;
+      prefix: string;
+      region?: string;
+    };
     kmsKeyReference?: string;
     kmsKeyRequiredForProduction: boolean;
   };
@@ -116,6 +124,31 @@ export interface InvoiceArtifactBlobGovernance {
     checkedAt: string;
     findings: string[];
   };
+}
+
+export interface InvoiceArtifactStorageReadiness {
+  storageBackend: InvoiceArtifactStorageBackend;
+  scannerMode: InvoiceArtifactMalwareScannerMode;
+  retentionEnforcementMode: InvoiceArtifactRetentionEnforcementMode;
+  productionReady: boolean;
+  credentialSource: 'database-connection' | 'vault-or-workload-identity';
+  objectStore?: {
+    bucketOrContainer: string;
+    prefix: string;
+    region?: string;
+  };
+  kmsKeyReference?: string;
+  gaps: string[];
+}
+
+export interface InvoiceArtifactRetentionEnforcementResult {
+  mode: InvoiceArtifactRetentionEnforcementMode;
+  evaluatedAt: string;
+  dryRun: boolean;
+  storageBackend: InvoiceArtifactStorageBackend;
+  expiredCandidates: number;
+  legalHoldSkipped: number;
+  deleted: number;
 }
 
 export interface InvoiceArtifactBlobRecord extends InvoiceArtifactBlobGovernance {
@@ -149,7 +182,7 @@ export interface InvoiceGradeArtifactRecord extends InvoiceGradeArtifactRegistra
   verificationControlTotalDeltaUsd?: number;
   storedBlob?: {
     storageStatus: 'stored';
-    storageMode: 'database-bytea';
+    storageMode: InvoiceArtifactStorageBackend;
     fileName: string;
     mimeType: string;
     contentSha256: string;

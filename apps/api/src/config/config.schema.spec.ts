@@ -8,6 +8,17 @@ const baseConfig = {
   VAULT_ADDR: 'http://vault:8200',
 };
 
+const productionArtifactConfig = {
+  INVOICE_ARTIFACT_STORAGE_BACKEND: 'aws-s3',
+  INVOICE_ARTIFACT_OBJECT_STORE_NAME: 'polycost-invoice-artifacts',
+  INVOICE_ARTIFACT_OBJECT_STORE_REGION: 'us-east-1',
+  INVOICE_ARTIFACT_KMS_KEY_REFERENCE: 'arn:aws:kms:us-east-1:111122223333:key/demo',
+  INVOICE_ARTIFACT_MALWARE_SCANNER_MODE: 'http-webhook',
+  INVOICE_ARTIFACT_MALWARE_SCANNER_URL: 'https://scanner.example.com/polycost/artifacts',
+  INVOICE_ARTIFACT_MALWARE_SCANNER_SECRET: 'production-scanner-webhook-secret',
+  INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE: 'delete-expired',
+};
+
 describe('config schema', () => {
   it('applies safe defaults for non-sensitive config', () => {
     const config = validateConfig(baseConfig);
@@ -48,6 +59,9 @@ describe('config schema', () => {
     expect(config.AUTH_AUDIT_EXPORT_SCHEDULE_CRON).toBe('*/5 * * * *');
     expect(config.AUTH_AUDIT_EXPORT_BATCH_SIZE).toBe(50);
     expect(config.AUTH_AUDIT_EXPORT_MAX_ATTEMPTS).toBe(5);
+    expect(config.INVOICE_ARTIFACT_STORAGE_BACKEND).toBe('database-bytea');
+    expect(config.INVOICE_ARTIFACT_MALWARE_SCANNER_MODE).toBe('eicar-signature-only');
+    expect(config.INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE).toBe('report-only');
   });
 
   it('fails fast for invalid config', () => {
@@ -64,6 +78,7 @@ describe('config schema', () => {
       validateConfig({
         ...baseConfig,
         NODE_ENV: 'production',
+        ...productionArtifactConfig,
         CORS_ALLOWED_ORIGINS: '*',
       }),
     ).toThrow('Wildcard CORS origins are not allowed in staging or production.');
@@ -72,6 +87,7 @@ describe('config schema', () => {
       validateConfig({
         ...baseConfig,
         NODE_ENV: 'staging',
+        ...productionArtifactConfig,
         CORS_ALLOWED_ORIGINS: 'https://app.example.com,*',
       }),
     ).toThrow('Wildcard CORS origins are not allowed in staging or production.');
@@ -119,6 +135,7 @@ describe('config schema', () => {
     const config = validateConfig({
       ...baseConfig,
       NODE_ENV: 'production',
+      ...productionArtifactConfig,
       CORS_ALLOWED_ORIGINS: 'https://polycost.example.com',
       AUTH_SSO_STATE_SECRET: 'production-sso-state-secret-value',
       AUTH_INVITE_DELIVERY_MODE: 'webhook',
@@ -144,6 +161,7 @@ describe('config schema', () => {
       validateConfig({
         ...baseConfig,
         NODE_ENV: 'staging',
+        ...productionArtifactConfig,
         CORS_ALLOWED_ORIGINS: 'https://polycost.example.com',
         AUTH_SSO_STATE_SECRET: 'production-sso-state-secret-value',
         AUTH_AUDIT_EXPORT_MODE: 'webhook',
@@ -156,6 +174,7 @@ describe('config schema', () => {
       validateConfig({
         ...baseConfig,
         NODE_ENV: 'production',
+        ...productionArtifactConfig,
         CORS_ALLOWED_ORIGINS: 'https://polycost.example.com',
         AUTH_SSO_STATE_SECRET: 'production-sso-state-secret-value',
         AUTH_INVITE_DELIVERY_MODE: 'webhook',
@@ -180,6 +199,7 @@ describe('config schema', () => {
       validateConfig({
         ...baseConfig,
         NODE_ENV: 'staging',
+        ...productionArtifactConfig,
         CORS_ALLOWED_ORIGINS: 'https://polycost.example.com',
         AUTH_SSO_STATE_SECRET: 'production-sso-state-secret-value',
         AUTH_INVITE_DELIVERY_MODE: 'webhook',
@@ -192,6 +212,7 @@ describe('config schema', () => {
       validateConfig({
         ...baseConfig,
         NODE_ENV: 'production',
+        ...productionArtifactConfig,
         CORS_ALLOWED_ORIGINS: 'https://polycost.example.com',
         AUTH_SSO_STATE_SECRET: 'production-sso-state-secret-value',
         AUTH_INVITE_DELIVERY_MODE: 'webhook',
@@ -215,6 +236,7 @@ describe('config schema', () => {
     const config = validateConfig({
       ...baseConfig,
       NODE_ENV: 'production',
+      ...productionArtifactConfig,
       USE_MOCK_PROVIDERS: 'false',
       PRICING_ETL_RUN_ON_BOOT: 'false',
       CORS_ALLOWED_ORIGINS: 'https://polycost.example.com',
@@ -237,6 +259,7 @@ describe('config schema', () => {
       validateConfig({
         ...baseConfig,
         NODE_ENV: 'production',
+        ...productionArtifactConfig,
         USE_MOCK_PROVIDERS: 'false',
         CORS_ALLOWED_ORIGINS: 'https://polycost.example.com',
         AUTH_SSO_STATE_SECRET: 'production-sso-state-secret-value',
@@ -257,6 +280,7 @@ describe('config schema', () => {
       validateConfig({
         ...baseConfig,
         NODE_ENV: 'staging',
+        ...productionArtifactConfig,
         AUTH_OIDC_CLIENT_ID: 'CHANGE_ME_DEV_ONLY',
         CORS_ALLOWED_ORIGINS: 'https://polycost.example.com',
         AUTH_SSO_STATE_SECRET: 'production-sso-state-secret-value',
@@ -268,6 +292,39 @@ describe('config schema', () => {
         AUTH_AUDIT_EXPORT_WEBHOOK_SECRET: 'production-audit-export-secret',
       }),
     ).toThrow('CHANGE_ME_DEV_ONLY and dummy values are not allowed outside development.');
+  });
+
+  it('requires production-bound invoice artifact storage, KMS, scanner, and retention controls', () => {
+    expect(() =>
+      validateConfig({
+        ...baseConfig,
+        NODE_ENV: 'production',
+        CORS_ALLOWED_ORIGINS: 'https://polycost.example.com',
+        AUTH_SSO_STATE_SECRET: 'production-sso-state-secret-value',
+        AUTH_INVITE_DELIVERY_MODE: 'webhook',
+        AUTH_INVITE_DELIVERY_WEBHOOK_URL: 'https://mail.example.com/polycost/invites',
+        AUTH_INVITE_DELIVERY_WEBHOOK_SECRET: 'production-invite-webhook-secret',
+        AUTH_AUDIT_EXPORT_MODE: 'webhook',
+        AUTH_AUDIT_EXPORT_WEBHOOK_URL: 'https://siem.example.com/polycost/audit-events',
+        AUTH_AUDIT_EXPORT_WEBHOOK_SECRET: 'production-audit-export-secret',
+      }),
+    ).toThrow('Staging and production invoice artifact storage must use external object storage.');
+
+    expect(() =>
+      validateConfig({
+        ...baseConfig,
+        INVOICE_ARTIFACT_STORAGE_BACKEND: 'gcp-gcs',
+      }),
+    ).toThrow(
+      'INVOICE_ARTIFACT_OBJECT_STORE_NAME is required for external invoice artifact storage.',
+    );
+
+    expect(() =>
+      validateConfig({
+        ...baseConfig,
+        INVOICE_ARTIFACT_MALWARE_SCANNER_MODE: 'http-webhook',
+      }),
+    ).toThrow('INVOICE_ARTIFACT_MALWARE_SCANNER_URL is required for webhook artifact scanning.');
   });
 
   it('keeps secret-shaped values out of the schema', () => {

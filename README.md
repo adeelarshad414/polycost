@@ -188,8 +188,10 @@ Accounts add workspace controls on top of that core flow:
   associated artifact file in the database, download that stored file, and mark
   artifacts verified/rejected with review references, checksum/control-total checks,
   governance metadata, and audit events. Stored artifacts include retention,
-  legal-hold, KMS-readiness, and scan-hook metadata. This improves proof discipline
-  but is not a provider invoice system of record.
+  legal-hold, KMS-readiness, and scan-hook metadata. Admin readiness and retention
+  endpoints expose object-store/KMS/scanner/retention posture, and strict provider
+  checks warn or fail when those controls are missing. This improves proof
+  discipline but is not a provider invoice system of record.
 
 The current self-hosted product does not yet include enterprise IdP login round-trips,
 full email-template management, org billing plans, or a hosted account marketplace.

@@ -41,6 +41,7 @@ import {
 import { CostManagementService } from './cost-management.service';
 import { LivePricingRefreshService } from './live-pricing-refresh.service';
 import { InvitationDeliveryService } from './invitation-delivery.service';
+import { InvoiceArtifactGovernanceService } from './invoice-artifact-governance.service';
 import { DataHealthController } from './data-health.controller';
 import { PricingStatusController } from './pricing-status.controller';
 import { RegionsController } from './regions.controller';
@@ -91,6 +92,7 @@ import { WorkloadController } from './workload.controller';
     AdminApiKeyGuard,
     InvitationDeliveryService,
     TeamAuditExportService,
+    InvoiceArtifactGovernanceService,
     AuthService,
     SessionAuthGuard,
     BillingService,

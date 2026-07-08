@@ -4964,6 +4964,23 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
         findings: [],
       },
     })),
+    getInvoiceArtifactStorageReadiness: jest.fn(async () => ({
+      storageBackend: 'database-bytea' as const,
+      scannerMode: 'eicar-signature-only' as const,
+      retentionEnforcementMode: 'report-only' as const,
+      productionReady: false,
+      credentialSource: 'database-connection' as const,
+      gaps: ['database-bytea keeps artifact bytes in Postgres and is not invoice-grade storage'],
+    })),
+    enforceInvoiceArtifactRetention: jest.fn(async () => ({
+      mode: 'report-only' as const,
+      evaluatedAt: '2026-07-08T00:00:00.000Z',
+      dryRun: true,
+      storageBackend: 'database-bytea' as const,
+      expiredCandidates: 0,
+      legalHoldSkipped: 0,
+      deleted: 0,
+    })),
     verifyInvoiceGradeArtifact: jest.fn(async () => ({
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',

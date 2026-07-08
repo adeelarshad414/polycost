@@ -71,6 +71,16 @@ export class BillingController {
     );
   }
 
+  @Get('artifact-storage/readiness')
+  getInvoiceArtifactStorageReadiness(@Req() request: RequestWithAuth) {
+    return this.billingService.getInvoiceArtifactStorageReadiness(request.auth!);
+  }
+
+  @Post('artifact-storage/retention/enforce')
+  enforceInvoiceArtifactRetention(@Body() body: unknown, @Req() request: RequestWithAuth) {
+    return this.billingService.enforceInvoiceArtifactRetention(body, request.auth!);
+  }
+
   @Get('reconciliations/:id/artifacts/:artifactId/blob')
   downloadInvoiceArtifactBlob(
     @Param('id') reconciliationId: string,

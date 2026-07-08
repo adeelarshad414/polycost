@@ -514,6 +514,11 @@ interface InvoiceArtifactBlobRow {
   malware_scan_finding: string | null;
 }
 
+interface InvoiceArtifactRetentionSummaryRow {
+  expired_candidates: string;
+  legal_hold_skipped: string;
+}
+
 const PROVIDERS: ProviderId[] = ['aws', 'azure', 'gcp'];
 const DATA_FRESHNESS_POLICY_HOURS = 48;
 type DatabaseTeamRole = TeamRole | 'viewer';
@@ -4030,6 +4035,50 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     );
 
     return result.rows[0] ? toInvoiceArtifactBlobRecord(result.rows[0]) : undefined;
+  }
+
+  async summarizeInvoiceArtifactRetention(evaluatedAt: string): Promise<{
+    expiredCandidates: number;
+    legalHoldSkipped: number;
+  }> {
+    const result = await (
+      await this.getPool()
+    ).query<InvoiceArtifactRetentionSummaryRow>(
+      `
+        SELECT COUNT(*) FILTER (
+                 WHERE retention_until <= $1
+                   AND legal_hold = false
+               )::text AS expired_candidates,
+               COUNT(*) FILTER (
+                 WHERE retention_until <= $1
+                   AND legal_hold = true
+               )::text AS legal_hold_skipped
+        FROM invoice_artifact_blobs
+      `,
+      [evaluatedAt],
+    );
+    const row = result.rows[0];
+
+    return {
+      expiredCandidates: row ? Number.parseInt(row.expired_candidates, 10) : 0,
+      legalHoldSkipped: row ? Number.parseInt(row.legal_hold_skipped, 10) : 0,
+    };
+  }
+
+  async deleteExpiredInvoiceArtifactBlobs(evaluatedAt: string): Promise<number> {
+    const result = await (
+      await this.getPool()
+    ).query<{ id: string }>(
+      `
+        DELETE FROM invoice_artifact_blobs
+        WHERE retention_until <= $1
+          AND legal_hold = false
+        RETURNING id
+      `,
+      [evaluatedAt],
+    );
+
+    return result.rows.length;
   }
 
   async onModuleDestroy(): Promise<void> {
