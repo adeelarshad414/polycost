@@ -9,10 +9,10 @@ desktop executive/engineering views, 320px reflow, and 200% zoom-equivalent refl
 
 ## Tool Coverage
 
-- Lighthouse: dependency-unavailable
-  - The lighthouse package is not installed; Playwright-native navigation and resource metrics were captured instead.
-- axe: dependency-unavailable
-  - The axe-core package is not installed; Playwright-native accessibility heuristics were captured instead.
+- Lighthouse: available-and-run
+  - Lighthouse runs against the deterministic browser-audit server.
+- axe: available-and-run
+  - axe-core runs against home, executive, and engineering states for every browser-audit scenario.
 
 ## Scenarios
 

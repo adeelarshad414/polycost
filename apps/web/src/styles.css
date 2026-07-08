@@ -2576,7 +2576,7 @@ summary:focus-visible,
 }
 
 .theme-toggle-label {
-  color: var(--pc-text-tertiary);
+  color: var(--pc-text-secondary);
   font-size: 0.66rem;
   font-weight: 800;
   line-height: 1;
@@ -3950,7 +3950,7 @@ select:hover {
 }
 
 .compute-sizing-search span {
-  color: var(--pc-text-tertiary);
+  color: var(--pc-text-secondary);
   font-size: var(--pc-text-xs);
   font-weight: 850;
   line-height: 1.2;
@@ -4128,7 +4128,7 @@ select:hover {
   position: absolute;
   top: 50%;
   right: 12px;
-  color: var(--pc-text-tertiary);
+  color: var(--pc-text-secondary);
   font-size: var(--pc-text-xs);
   font-weight: 800;
   pointer-events: none;
@@ -4937,7 +4937,7 @@ select:disabled {
 }
 
 .calculator-links-heading span {
-  color: var(--pc-text-tertiary);
+  color: var(--pc-text-secondary);
   font-size: var(--pc-text-xs);
   font-weight: 900;
   letter-spacing: 0;
@@ -5009,19 +5009,19 @@ select:disabled {
 .calculator-link-aws {
   border-color: color-mix(in srgb, var(--pc-provider-aws) 54%, var(--pc-border));
   background: var(--pc-bg-surface);
-  color: var(--pc-provider-aws);
+  color: var(--aws-label-tint);
 }
 
 .calculator-link-azure {
   border-color: color-mix(in srgb, var(--pc-provider-azure) 54%, var(--pc-border));
   background: var(--pc-bg-surface);
-  color: var(--pc-provider-azure);
+  color: var(--azure-label-tint);
 }
 
 .calculator-link-gcp {
   border-color: color-mix(in srgb, var(--pc-provider-gcp) 54%, var(--pc-border));
   background: var(--pc-bg-surface);
-  color: var(--pc-provider-gcp);
+  color: var(--gcp-label-tint);
 }
 
 .action-row,
@@ -6621,14 +6621,17 @@ select:disabled {
 
 .executive-pricing-aws {
   background: var(--brand-orange);
+  color: var(--pc-provider-aws-on-solid);
 }
 
 .executive-pricing-azure {
   background: var(--brand-blue);
+  color: var(--pc-provider-azure-on-solid);
 }
 
 .executive-pricing-gcp {
   background: var(--brand-green);
+  color: var(--pc-provider-gcp-on-solid);
 }
 
 .executive-pricing-bar i,
@@ -6723,7 +6726,7 @@ select:disabled {
 
 .executive-trend-ready > span,
 .executive-data-gap-chart.is-ready > span {
-  color: var(--brand-green);
+  color: color-mix(in srgb, var(--pc-success) 64%, var(--pc-text-primary));
 }
 
 .executive-trend-pending strong {
@@ -7800,7 +7803,7 @@ select:disabled {
 }
 
 .matrix-unavailable {
-  color: var(--pc-text-tertiary);
+  color: var(--pc-text-secondary);
   font-family: var(--pc-font-body);
   font-weight: 800;
 }
@@ -9016,7 +9019,7 @@ select:disabled {
   align-items: center;
   border-radius: 999px;
   background: var(--pc-success-soft);
-  color: var(--pc-success);
+  color: color-mix(in srgb, var(--pc-success) 64%, var(--pc-text-primary));
   padding: 0 10px;
   font-size: var(--pc-text-xs);
   font-weight: 800;
@@ -9145,15 +9148,15 @@ select:disabled {
 }
 
 .provider-mini-heading-aws {
-  color: var(--pc-provider-aws);
+  color: var(--aws-label-tint);
 }
 
 .provider-mini-heading-azure {
-  color: var(--pc-provider-azure);
+  color: var(--azure-label-tint);
 }
 
 .provider-mini-heading-gcp {
-  color: var(--pc-provider-gcp);
+  color: var(--gcp-label-tint);
 }
 
 .line-item-list {

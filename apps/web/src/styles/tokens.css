@@ -89,6 +89,9 @@
   --pc-provider-aws: var(--brand-orange);
   --pc-provider-azure: var(--brand-blue);
   --pc-provider-gcp: var(--brand-green);
+  --pc-provider-aws-on-solid: #0b0e14;
+  --pc-provider-azure-on-solid: #0b0e14;
+  --pc-provider-gcp-on-solid: #0b0e14;
   --pc-provider-gcp-blue: var(--brand-blue);
   --pc-provider-gcp-red: #ea4335;
   --pc-provider-gcp-yellow: #fbbc04;

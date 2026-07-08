@@ -110,6 +110,57 @@ say so explicitly rather than marking it done.
 | Customer handover excellence orchestrator               | Complete with known gaps (see notes) | 2026-07-08   |
 | Public OSS readiness and demo hardening                 | Complete with known gaps (see notes) | 2026-07-08   |
 | Browser audit artifact hardening                        | Complete with known gaps (see notes) | 2026-07-08   |
+| Formal browser audit tooling                            | Complete with known gaps (see notes) | 2026-07-08   |
+
+## Formal browser audit tooling
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-08
+
+What changed:
+
+- Added formal `axe-core` and Node-20-compatible Lighthouse 12 browser audit
+  coverage to `npm run browser:audit`.
+- Replaced the preview-server dependency with a deterministic static/API audit
+  harness so Lighthouse and Playwright exercise the production web build with
+  stable mocked API responses.
+- Fixed audit-discovered accessibility issues across the workspace auth toggle,
+  chart semantics, focusable scroll regions, provider pricing bars, calculator
+  links, matrix unavailable labels, and FinOps/persona comparison contrast.
+- Regenerated `docs/browser-audit/2026-07-08/` with passing machine-readable
+  evidence and screenshots.
+
+Verification performed:
+
+- `npm run format:check` passed.
+- `npm run public:readiness:check` passed.
+- `npm run release:check` passed.
+- `npm run ci:lint` passed.
+- `npm run test:production-readiness` passed: API 10 suites / 135 tests; web 2
+  suites / 84 tests.
+- `npm run check` passed: API 51 suites / 400 tests; web 11 suites / 141 tests;
+  graph validation 312 nodes / 312 edges; pricing coverage, progress
+  verification, QA/security suppression, database, DevOps, cloud, release,
+  handover, and provider credential gates passed.
+- `npm run ci:build` passed.
+- `npm run browser:audit` passed.
+  - Scenarios: desktop executive/engineering, 320px reflow, 200% zoom-equivalent
+    reflow.
+  - Formal axe: zero violations across home, executive, and engineering states
+    in all scenarios.
+  - Lighthouse: Performance 1.00, Accessibility 1.00, Best Practices 1.00, SEO
+    0.92.
+  - Artifact: `docs/browser-audit/2026-07-08/browser-audit.json`.
+- `npm audit --audit-level=high` passed; it still reports the known three low
+  Graphify/Ollama transitive advisories with no available fix.
+
+Known remaining gaps:
+
+- The browser audit is local deterministic evidence, not hosted GitHub Actions
+  evidence; remote CI runner allocation remains an external account/billing
+  blocker.
+- Real provider, production SSO, production LLM, and Terraform provider validation
+  still require external credentials or a staging environment.
 
 ## Browser audit artifact hardening
 
@@ -142,11 +193,10 @@ Verification performed:
 
 Known remaining gaps:
 
-- Lighthouse and axe packages are not installed; the audit records this honestly as
-  dependency-unavailable and captures Playwright-native performance/accessibility
-  heuristics instead.
-- The 200% evidence is a 640px CSS viewport equivalent, not Chrome's formal browser
-  zoom control.
+- Superseded by the formal browser audit tooling checkpoint on 2026-07-08: axe-core
+  and Lighthouse now run inside `npm run browser:audit`.
+- The 200% evidence remains a 640px CSS viewport equivalent, not Chrome's formal
+  browser zoom control.
 
 ## Public OSS readiness and demo hardening
 
@@ -182,10 +232,11 @@ Verification planned/performed in this branch:
 
 Known remaining gaps:
 
-- Fresh Lighthouse, axe, 320px reflow, and 200% zoom artifacts still need a live
-  browser audit harness before a public launch claim.
-- Real provider/SSO/LLM/Terraform validation still requires external credentials or
-  a staging environment.
+- Superseded by the formal browser audit tooling checkpoint on 2026-07-08: fresh
+  Lighthouse, axe, 320px reflow, and 200% zoom-equivalent artifacts now exist
+  under `docs/browser-audit/2026-07-08/`.
+- Real provider/SSO/LLM/Terraform validation still requires external credentials
+  or a staging environment.
 - Hosted GitHub Actions runner availability remains an external repository/account
   prerequisite before remote CI can be treated as release evidence.
 
@@ -221,9 +272,9 @@ Verification planned/performed in this branch:
 
 Known remaining gaps:
 
-- Fresh Lighthouse and axe sweeps were not produced in this branch; the report
-  blocks those honestly instead of claiming them.
-- 200% zoom and 320px WCAG reflow still need a dedicated browser harness.
+- Superseded by the formal browser audit tooling checkpoint on 2026-07-08:
+  Lighthouse, axe, 320px reflow, and 200% zoom-equivalent artifacts now exist
+  under `docs/browser-audit/2026-07-08/`.
 - Real provider/SSO/LLM/Terraform proof requires external credentials and customer
   environment access.
 - The SPA still has no dedicated product 404 route; Vite/app fallback handles
