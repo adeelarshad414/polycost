@@ -3956,9 +3956,31 @@ Status: implemented locally on 2026-07-08.
   running, so live schema_migrations inspection was skipped, and full `npm run check`
   passed with 412/412 API unit tests, 142/142 web unit tests, graph/progress/public
   readiness checks, QA, release, handover, and provider-credential checks green.
-- Remaining caveat: audit events are append-only and visible to team admins, but mutation
-  writes and audit writes are not yet wrapped in a single cross-operation transaction or
-  exported to an external immutable retention/SIEM sink.
+- Remaining caveat: audit events are append-only and visible to team admins, but they are
+  not yet exported to an external immutable retention/SIEM sink.
+
+## Phase 2.15 — Transaction-coupled audit writes
+
+Status: implemented locally on 2026-07-08.
+
+- Moved privileged service paths from separate mutation-plus-audit calls to repository
+  calls that carry an audit payload into the same write operation.
+- Added a shared repository transaction helper that uses a checked-out `pg` client when
+  available, so `BEGIN` / mutation / audit insert / `COMMIT` run on one connection.
+- Transaction-coupled audit rows now cover team creation/settings, invitations,
+  invitation resend/accept/revoke, member role changes/removal, SSO provider
+  configuration, billing import creation, and billing reconciliation creation.
+- Kept external invite delivery outside the database transaction so production webhook
+  calls do not hold database locks; the mutation itself is still audit-committed before
+  delivery is attempted.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/api/api-database.repository.spec.ts`
+  passed 45/45, `npm run ci:lint`, `npm run test:production-readiness`, `npm run build`,
+  and `npm run security:audit` passed, and full `npm run check` passed with 414/414 API
+  unit tests, 142/142 web unit tests, graph/progress/public readiness, QA, release,
+  handover, and provider-credential checks green.
+- Remaining caveat: audit rows are stored in PolyCost's database only; external SIEM/WORM
+  export remains future compliance hardening.
 
 ## Deviations from spec log
 

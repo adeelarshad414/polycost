@@ -19,9 +19,7 @@ import {
   SsoConnectionTestResult,
   SsoConfigurationStatus,
   SsoStartResponse,
-  TeamAuditAction,
   TeamAuditEventRecord,
-  TeamAuditTargetType,
   TeamSettingsRecord,
   TeamSwitchResponse,
   TeamInvitationRecord,
@@ -284,17 +282,13 @@ export class AuthService {
       accountId: identity.accountId,
       teamName: input.teamName,
       teamSlug: teamSlug(input.teamName, `${identity.email}:${Date.now()}`),
-    });
-
-    await this.recordTeamAuditEvent({
-      teamId: created.teamId,
-      actorAccountId: identity.accountId,
-      action: 'team.created',
-      targetType: 'team',
-      targetId: created.teamId,
-      metadata: {
-        teamName: created.teamName,
-        role: created.role,
+      audit: {
+        actorAccountId: identity.accountId,
+        action: 'team.created',
+        targetType: 'team',
+        metadata: {
+          teamName: input.teamName,
+        },
       },
     });
 
@@ -312,22 +306,19 @@ export class AuthService {
       teamId,
       teamName: input.teamName,
       actorAccountId: identity.accountId,
+      audit: {
+        actorAccountId: identity.accountId,
+        action: 'team.settings.updated',
+        targetType: 'team',
+        metadata: {
+          teamName: input.teamName,
+        },
+      },
     });
 
     if (!updated) {
       throw new ApiForbiddenError('Team membership is required to update team settings');
     }
-
-    await this.recordTeamAuditEvent({
-      teamId,
-      actorAccountId: identity.accountId,
-      action: 'team.settings.updated',
-      targetType: 'team',
-      targetId: updated.teamId,
-      metadata: {
-        teamName: updated.teamName,
-      },
-    });
 
     return updated;
   }
@@ -353,6 +344,15 @@ export class AuthService {
       tokenHash: sha256(inviteToken),
       invitedByAccountId: identity.accountId,
       expiresAt: new Date(Date.now() + INVITATION_TTL_DAYS * 86_400_000).toISOString(),
+      audit: {
+        actorAccountId: identity.accountId,
+        action: 'team.invitation.created',
+        targetType: 'invitation',
+        metadata: {
+          email: input.email,
+          role: input.role,
+        },
+      },
     });
 
     const delivered = await this.withInvitationDelivery(
@@ -361,14 +361,6 @@ export class AuthService {
       identity,
       'created',
     );
-    await this.recordTeamAuditEvent({
-      teamId,
-      actorAccountId: identity.accountId,
-      action: 'team.invitation.created',
-      targetType: 'invitation',
-      targetId: invitation.id,
-      metadata: invitationAuditMetadata(delivered),
-    });
 
     return delivered;
   }
@@ -392,6 +384,11 @@ export class AuthService {
       teamId,
       invitationId,
       revokedAt: new Date().toISOString(),
+      audit: {
+        actorAccountId: identity.accountId,
+        action: 'team.invitation.revoked',
+        targetType: 'invitation',
+      },
     });
 
     if (!revoked) {
@@ -402,19 +399,6 @@ export class AuthService {
         },
       ]);
     }
-
-    await this.recordTeamAuditEvent({
-      teamId,
-      actorAccountId: identity.accountId,
-      action: 'team.invitation.revoked',
-      targetType: 'invitation',
-      targetId: revoked.id,
-      metadata: {
-        email: revoked.email,
-        role: revoked.role,
-        status: revoked.status,
-      },
-    });
 
     return revoked;
   }
@@ -432,6 +416,11 @@ export class AuthService {
       tokenHash: sha256(inviteToken),
       invitedByAccountId: identity.accountId,
       expiresAt: new Date(Date.now() + INVITATION_TTL_DAYS * 86_400_000).toISOString(),
+      audit: {
+        actorAccountId: identity.accountId,
+        action: 'team.invitation.resent',
+        targetType: 'invitation',
+      },
     });
 
     if (!invitation) {
@@ -449,14 +438,6 @@ export class AuthService {
       identity,
       'resent',
     );
-    await this.recordTeamAuditEvent({
-      teamId,
-      actorAccountId: identity.accountId,
-      action: 'team.invitation.resent',
-      targetType: 'invitation',
-      targetId: invitation.id,
-      metadata: invitationAuditMetadata(delivered),
-    });
 
     return delivered;
   }
@@ -514,18 +495,10 @@ export class AuthService {
       invitationId: invitation.id,
       accountId: identity.accountId,
       acceptedAt: new Date().toISOString(),
-    });
-
-    await this.recordTeamAuditEvent({
-      teamId: accepted.teamId,
-      actorAccountId: identity.accountId,
-      action: 'team.invitation.accepted',
-      targetType: 'invitation',
-      targetId: accepted.id,
-      metadata: {
-        email: accepted.email,
-        role: accepted.role,
-        status: accepted.status,
+      audit: {
+        actorAccountId: identity.accountId,
+        action: 'team.invitation.accepted',
+        targetType: 'invitation',
       },
     });
 
@@ -566,6 +539,15 @@ export class AuthService {
       teamId,
       accountId,
       role,
+      audit: {
+        actorAccountId: identity.accountId,
+        action: 'team.member.role_updated',
+        targetType: 'member',
+        targetId: accountId,
+        metadata: {
+          fromRole: target.role,
+        },
+      },
     });
 
     if (!updated) {
@@ -576,19 +558,6 @@ export class AuthService {
         },
       ]);
     }
-
-    await this.recordTeamAuditEvent({
-      teamId,
-      actorAccountId: identity.accountId,
-      action: 'team.member.role_updated',
-      targetType: 'member',
-      targetId: updated.accountId,
-      metadata: {
-        email: updated.email,
-        fromRole: target.role,
-        toRole: updated.role,
-      },
-    });
 
     return updated;
   }
@@ -618,15 +587,17 @@ export class AuthService {
       await this.assertOwnerWillRemain(teamId);
     }
 
-    await this.repository.removeTeamMember({ teamId, accountId });
-    await this.recordTeamAuditEvent({
+    await this.repository.removeTeamMember({
       teamId,
-      actorAccountId: identity.accountId,
-      action: 'team.member.removed',
-      targetType: 'member',
-      targetId: accountId,
-      metadata: {
-        role: target.role,
+      accountId,
+      audit: {
+        actorAccountId: identity.accountId,
+        action: 'team.member.removed',
+        targetType: 'member',
+        targetId: accountId,
+        metadata: {
+          role: target.role,
+        },
       },
     });
 
@@ -774,19 +745,10 @@ export class AuthService {
       issuerUrl: input.issuerUrl,
       ...(input.clientId ? { clientIdHint: clientIdHint(input.clientId) } : {}),
       createdByAccountId: identity.accountId,
-    });
-
-    await this.recordTeamAuditEvent({
-      teamId,
-      actorAccountId: identity.accountId,
-      action: 'team.sso.configured',
-      targetType: 'sso_provider',
-      targetId: `${configured.providerType}:${configured.issuerUrl}`,
-      metadata: {
-        providerType: configured.providerType,
-        displayName: configured.displayName,
-        issuerUrl: configured.issuerUrl,
-        status: configured.status,
+      audit: {
+        actorAccountId: identity.accountId,
+        action: 'team.sso.configured',
+        targetType: 'sso_provider',
       },
     });
 
@@ -968,17 +930,6 @@ export class AuthService {
       throw new ApiUnauthorizedError('Current password is invalid');
     }
   }
-
-  private recordTeamAuditEvent(input: {
-    teamId: string;
-    actorAccountId: string;
-    action: TeamAuditAction;
-    targetType: TeamAuditTargetType;
-    targetId?: string;
-    metadata?: Record<string, unknown>;
-  }): Promise<TeamAuditEventRecord> {
-    return this.repository.recordTeamAuditEvent(input);
-  }
 }
 
 export function sha256(value: string): string {
@@ -1121,21 +1072,6 @@ function parseInviteBody(body: unknown): { email: string; role: Exclude<TeamRole
   return {
     email: normalizeEmail(record.email),
     role: role as Exclude<TeamRole, 'owner'>,
-  };
-}
-
-function invitationAuditMetadata(invitation: TeamInvitationRecord): Record<string, unknown> {
-  return {
-    email: invitation.email,
-    role: invitation.role,
-    status: invitation.status,
-    ...(invitation.delivery
-      ? {
-          deliveryMode: invitation.delivery.mode,
-          deliveryStatus: invitation.delivery.status,
-          tokenExposedInResponse: invitation.delivery.tokenExposedInResponse,
-        }
-      : {}),
   };
 }
 

@@ -309,9 +309,9 @@ Machine-readable token evidence:
   allocation. A maintainer must fix Actions runner/account/billing/quota state or
   rerun once the account can allocate runners.
 - Phase 2.14 adds an append-only team audit trail for privileged team, invite, SSO,
-  billing import, and reconciliation actions, with admin-only API/UI visibility. It is
-  not yet a fully immutable compliance journal: mutation writes and audit writes are not
-  wrapped in one cross-operation transaction, and events are not exported to an external
+  billing import, and reconciliation actions, with admin-only API/UI visibility. Phase 2.15
+  transaction-couples privileged mutation writes with their audit rows. It is still not a
+  fully immutable compliance journal because events are not exported to an external
   SIEM/WORM retention service.
 - Full invoice-grade pricing remains future scope: negotiated discounts, credits,
   taxes, enterprise agreements, marketplace charges, amortization semantics, and

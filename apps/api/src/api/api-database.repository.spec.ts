@@ -1244,100 +1244,154 @@ describe('ApiDatabaseRepository', () => {
       accepted_at: null,
       revoked_at: null,
     };
-    const query = jest
-      .fn()
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            account_id: '11111111-1111-4111-8111-111111111111',
-            email: 'architect@example.com',
-            display_name: 'Architect',
-            role: 'owner',
-            created_at: createdAt,
-            last_active_at: lastActiveAt,
-          },
-        ],
-        rowCount: 1,
-      })
-      .mockResolvedValueOnce({
-        rows: [pendingInvitation],
-        rowCount: 1,
-      })
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            ...pendingInvitation,
-            status: 'expired',
-          },
-        ],
-        rowCount: 1,
-      })
-      .mockResolvedValueOnce({
-        rows: [pendingInvitation],
-        rowCount: 1,
-      })
-      .mockResolvedValueOnce({
-        rows: [pendingInvitation],
-        rowCount: 1,
-      })
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            ...pendingInvitation,
-            token_hash: 'e'.repeat(64),
-          },
-        ],
-        rowCount: 1,
-      })
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            ...pendingInvitation,
-            status: 'accepted',
-            accepted_by_account_id: '11111111-1111-4111-8111-111111111111',
-            accepted_at: acceptedAt,
-          },
-        ],
-        rowCount: 1,
-      })
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
-      .mockResolvedValueOnce({
-        rows: [{ owners: '2' }],
-        rowCount: 1,
-      })
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            account_id: '11111111-1111-4111-8111-111111111111',
-            email: 'architect@example.com',
-            display_name: 'Architect',
-            role: 'admin',
-            created_at: createdAt,
-            last_active_at: null,
-          },
-        ],
-        rowCount: 1,
-      })
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            provider_type: 'oidc',
-            display_name: 'Corporate OIDC',
-            issuer_url: 'https://idp.example.com',
-            status: 'configured',
-          },
-          {
-            provider_type: 'saml',
-            display_name: 'Corporate SAML',
-            issuer_url: 'https://sso.example.com/saml',
-            status: 'draft',
-          },
-        ],
-        rowCount: 2,
-      });
+    const query = jest.fn(async (text: string) => {
+      if (text === 'BEGIN' || text === 'COMMIT' || text === 'ROLLBACK') {
+        return { rows: [], rowCount: 0 };
+      }
+
+      if (text.includes('INSERT INTO team_audit_events')) {
+        return {
+          rows: [
+            {
+              id: '99999999-9999-4999-8999-999999999999',
+              team_id: '22222222-2222-4222-8222-222222222222',
+              actor_account_id: '11111111-1111-4111-8111-111111111111',
+              actor_email: null,
+              action: 'team.invitation.created',
+              target_type: 'invitation',
+              target_id: '88888888-8888-4888-8888-888888888888',
+              metadata: {},
+              created_at: createdAt,
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+
+      if (text.includes('SELECT accounts.id AS account_id')) {
+        return {
+          rows: [
+            {
+              account_id: '11111111-1111-4111-8111-111111111111',
+              email: 'architect@example.com',
+              display_name: 'Architect',
+              role: 'owner',
+              created_at: createdAt,
+              last_active_at: lastActiveAt,
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+
+      if (text.includes('INSERT INTO team_invitations')) {
+        return { rows: [pendingInvitation], rowCount: 1 };
+      }
+
+      if (text.includes('FROM team_invitations') && text.includes('ORDER BY created_at DESC')) {
+        return {
+          rows: [
+            {
+              ...pendingInvitation,
+              status: 'expired',
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+
+      if (text.includes('UPDATE team_invitations') && text.includes('token_hash = $3')) {
+        return { rows: [pendingInvitation], rowCount: 1 };
+      }
+
+      if (text.includes('WHERE token_hash = $1')) {
+        return { rows: [pendingInvitation], rowCount: 1 };
+      }
+
+      if (text.includes('FOR UPDATE')) {
+        return {
+          rows: [
+            {
+              ...pendingInvitation,
+              token_hash: 'e'.repeat(64),
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+
+      if (text.includes('INSERT INTO team_memberships')) {
+        return { rows: [], rowCount: 1 };
+      }
+
+      if (text.includes("SET status = 'accepted'")) {
+        return {
+          rows: [
+            {
+              ...pendingInvitation,
+              status: 'accepted',
+              accepted_by_account_id: '11111111-1111-4111-8111-111111111111',
+              accepted_at: acceptedAt,
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+
+      if (text.includes('COUNT(*) AS owners')) {
+        return { rows: [{ owners: '2' }], rowCount: 1 };
+      }
+
+      if (text.includes('UPDATE team_memberships')) {
+        return {
+          rows: [
+            {
+              account_id: '11111111-1111-4111-8111-111111111111',
+              email: 'architect@example.com',
+              display_name: 'Architect',
+              role: 'admin',
+              created_at: createdAt,
+              last_active_at: null,
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+
+      if (text.includes('DELETE FROM team_memberships')) {
+        return {
+          rows: [
+            {
+              account_id: '11111111-1111-4111-8111-111111111111',
+              role: 'admin',
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+
+      if (text.includes('FROM sso_identity_provider_configs')) {
+        return {
+          rows: [
+            {
+              provider_type: 'oidc',
+              display_name: 'Corporate OIDC',
+              issuer_url: 'https://idp.example.com',
+              status: 'configured',
+            },
+            {
+              provider_type: 'saml',
+              display_name: 'Corporate SAML',
+              issuer_url: 'https://sso.example.com/saml',
+              status: 'draft',
+            },
+          ],
+          rowCount: 2,
+        };
+      }
+
+      throw new Error(`Unhandled query in team repository spec: ${text}`);
+    });
     const repository = createRepository(query);
 
     await expect(
@@ -1360,6 +1414,15 @@ describe('ApiDatabaseRepository', () => {
         tokenHash: 'e'.repeat(64),
         invitedByAccountId: '11111111-1111-4111-8111-111111111111',
         expiresAt: expiresAt.toISOString(),
+        audit: {
+          actorAccountId: '11111111-1111-4111-8111-111111111111',
+          action: 'team.invitation.created',
+          targetType: 'invitation',
+          metadata: {
+            email: 'finops@example.com',
+            role: 'admin',
+          },
+        },
       }),
     ).resolves.toEqual(
       expect.objectContaining({
@@ -1382,6 +1445,11 @@ describe('ApiDatabaseRepository', () => {
         tokenHash: 'f'.repeat(64),
         invitedByAccountId: '11111111-1111-4111-8111-111111111111',
         expiresAt: expiresAt.toISOString(),
+        audit: {
+          actorAccountId: '11111111-1111-4111-8111-111111111111',
+          action: 'team.invitation.resent',
+          targetType: 'invitation',
+        },
       }),
     ).resolves.toEqual(
       expect.objectContaining({
@@ -1416,6 +1484,11 @@ describe('ApiDatabaseRepository', () => {
         teamId: '22222222-2222-4222-8222-222222222222',
         accountId: '11111111-1111-4111-8111-111111111111',
         role: 'admin',
+        audit: {
+          actorAccountId: '11111111-1111-4111-8111-111111111111',
+          action: 'team.member.role_updated',
+          targetType: 'member',
+        },
       }),
     ).resolves.toEqual(
       expect.objectContaining({
@@ -1426,6 +1499,11 @@ describe('ApiDatabaseRepository', () => {
       repository.removeTeamMember({
         teamId: '22222222-2222-4222-8222-222222222222',
         accountId: '11111111-1111-4111-8111-111111111111',
+        audit: {
+          actorAccountId: '11111111-1111-4111-8111-111111111111',
+          action: 'team.member.removed',
+          targetType: 'member',
+        },
       }),
     ).resolves.toBe(true);
     await expect(
@@ -1445,15 +1523,27 @@ describe('ApiDatabaseRepository', () => {
       },
     ]);
 
-    expect(query).toHaveBeenNthCalledWith(4, expect.stringContaining('UPDATE team_invitations'), [
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('UPDATE team_invitations'), [
       '22222222-2222-4222-8222-222222222222',
       '88888888-8888-4888-8888-888888888888',
       'f'.repeat(64),
       '11111111-1111-4111-8111-111111111111',
       expiresAt.toISOString(),
     ]);
-    expect(query).toHaveBeenNthCalledWith(6, 'BEGIN');
-    expect(query).toHaveBeenNthCalledWith(10, 'COMMIT');
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO team_audit_events'), [
+      '22222222-2222-4222-8222-222222222222',
+      '11111111-1111-4111-8111-111111111111',
+      'team.invitation.created',
+      'invitation',
+      '88888888-8888-4888-8888-888888888888',
+      JSON.stringify({
+        email: 'finops@example.com',
+        role: 'admin',
+        status: 'pending',
+      }),
+    ]);
+    expect(query).toHaveBeenCalledWith('BEGIN');
+    expect(query).toHaveBeenCalledWith('COMMIT');
   });
 
   it('persists provider invoice imports and reconciliation evidence rows', async () => {
@@ -1518,47 +1608,72 @@ describe('ApiDatabaseRepository', () => {
       },
       created_at: completedAt,
     };
-    const query = jest
-      .fn()
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            ...importRow,
-            status: 'processing',
-            rows_accepted: 0,
-            rows_rejected: 0,
-            total_cost_usd: '0.00',
-            completed_at: null,
-          },
-        ],
-        rowCount: 1,
-      })
-      .mockResolvedValueOnce({
-        rows: [lineItemRow],
-        rowCount: 1,
-      })
-      .mockResolvedValueOnce({
-        rows: [importRow],
-        rowCount: 1,
-      })
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
-      .mockResolvedValueOnce({
-        rows: [importRow],
-        rowCount: 1,
-      })
-      .mockResolvedValueOnce({
-        rows: [lineItemRow],
-        rowCount: 1,
-      })
-      .mockResolvedValueOnce({
-        rows: [reconciliationRow],
-        rowCount: 1,
-      })
-      .mockResolvedValueOnce({
-        rows: [reconciliationRow],
-        rowCount: 1,
-      });
+    const query = jest.fn(async (text: string) => {
+      if (text === 'BEGIN' || text === 'COMMIT' || text === 'ROLLBACK') {
+        return { rows: [], rowCount: 0 };
+      }
+
+      if (text.includes('INSERT INTO team_audit_events')) {
+        return {
+          rows: [
+            {
+              id: '99999999-9999-4999-8999-999999999999',
+              team_id: '22222222-2222-4222-8222-222222222222',
+              actor_account_id: '11111111-1111-4111-8111-111111111111',
+              actor_email: null,
+              action: 'billing.import.created',
+              target_type: 'billing_import',
+              target_id: '55555555-5555-4555-8555-555555555555',
+              metadata: {},
+              created_at: completedAt,
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+
+      if (text.includes('INSERT INTO billing_import_runs')) {
+        return {
+          rows: [
+            {
+              ...importRow,
+              status: 'processing',
+              rows_accepted: 0,
+              rows_rejected: 0,
+              total_cost_usd: '0.00',
+              completed_at: null,
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+
+      if (text.includes('INSERT INTO invoice_line_items')) {
+        return { rows: [lineItemRow], rowCount: 1 };
+      }
+
+      if (text.includes('UPDATE billing_import_runs')) {
+        return { rows: [importRow], rowCount: 1 };
+      }
+
+      if (text.includes('FROM billing_import_runs')) {
+        return { rows: [importRow], rowCount: 1 };
+      }
+
+      if (text.includes('FROM invoice_line_items')) {
+        return { rows: [lineItemRow], rowCount: 1 };
+      }
+
+      if (text.includes('INSERT INTO invoice_reconciliation_results')) {
+        return { rows: [reconciliationRow], rowCount: 1 };
+      }
+
+      if (text.includes('FROM invoice_reconciliation_results')) {
+        return { rows: [reconciliationRow], rowCount: 1 };
+      }
+
+      throw new Error(`Unhandled query in billing repository spec: ${text}`);
+    });
     const repository = createRepository(query);
 
     await expect(
@@ -1573,6 +1688,11 @@ describe('ApiDatabaseRepository', () => {
         originalFileSha256: 'a'.repeat(64),
         teamId: '22222222-2222-4222-8222-222222222222',
         createdByAccountId: '11111111-1111-4111-8111-111111111111',
+        audit: {
+          actorAccountId: '11111111-1111-4111-8111-111111111111',
+          action: 'billing.import.created',
+          targetType: 'billing_import',
+        },
         rows: [
           {
             serviceName: 'AmazonEC2',
@@ -1632,6 +1752,12 @@ describe('ApiDatabaseRepository', () => {
         variancePercent: 7,
         status: 'variance-warning',
         evidence: { invoiceLineItemHashes: ['b'.repeat(64)] },
+        audit: {
+          teamId: '22222222-2222-4222-8222-222222222222',
+          actorAccountId: '11111111-1111-4111-8111-111111111111',
+          action: 'billing.reconciliation.created',
+          targetType: 'billing_reconciliation',
+        },
       }),
     ).resolves.toEqual(
       expect.objectContaining({
@@ -1647,10 +1773,9 @@ describe('ApiDatabaseRepository', () => {
       }),
     ]);
 
-    expect(query).toHaveBeenNthCalledWith(1, 'BEGIN');
-    expect(query).toHaveBeenNthCalledWith(5, 'COMMIT');
-    expect(query).toHaveBeenNthCalledWith(
-      8,
+    expect(query).toHaveBeenCalledWith('BEGIN');
+    expect(query).toHaveBeenCalledWith('COMMIT');
+    expect(query).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO invoice_reconciliation_results'),
       [
         '55555555-5555-4555-8555-555555555555',
@@ -1664,6 +1789,20 @@ describe('ApiDatabaseRepository', () => {
         JSON.stringify({ invoiceLineItemHashes: ['b'.repeat(64)] }),
       ],
     );
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO team_audit_events'), [
+      '22222222-2222-4222-8222-222222222222',
+      '11111111-1111-4111-8111-111111111111',
+      'billing.import.created',
+      'billing_import',
+      '55555555-5555-4555-8555-555555555555',
+      JSON.stringify({
+        provider: 'aws',
+        sourceType: 'aws-cur',
+        rowsAccepted: 1,
+        rowsRejected: 0,
+        totalCostUsd: 107,
+      }),
+    ]);
   });
 
   it('records and lists team audit events with actor display context', async () => {
@@ -1757,6 +1896,158 @@ describe('ApiDatabaseRepository', () => {
       '22222222-2222-4222-8222-222222222222',
       100,
     ]);
+  });
+
+  it('uses a checked-out database client for transaction-coupled audit writes', async () => {
+    const createdAt = new Date('2026-07-06T00:00:00.000Z');
+    const expiresAt = new Date('2026-07-13T00:00:00.000Z');
+    const invitationRow = {
+      id: '88888888-8888-4888-8888-888888888888',
+      team_id: '22222222-2222-4222-8222-222222222222',
+      email: 'finops@example.com',
+      role: 'member',
+      status: 'pending',
+      invited_by_account_id: '11111111-1111-4111-8111-111111111111',
+      accepted_by_account_id: null,
+      expires_at: expiresAt,
+      created_at: createdAt,
+      accepted_at: null,
+      revoked_at: null,
+    };
+    const clientQuery = jest.fn(async (text: string) => {
+      if (text === 'BEGIN' || text === 'COMMIT' || text === 'ROLLBACK') {
+        return { rows: [], rowCount: 0 };
+      }
+
+      if (text.includes('INSERT INTO team_invitations')) {
+        return { rows: [invitationRow], rowCount: 1 };
+      }
+
+      if (text.includes('INSERT INTO team_audit_events')) {
+        return {
+          rows: [
+            {
+              id: '99999999-9999-4999-8999-999999999999',
+              team_id: '22222222-2222-4222-8222-222222222222',
+              actor_account_id: '11111111-1111-4111-8111-111111111111',
+              actor_email: null,
+              action: 'team.invitation.created',
+              target_type: 'invitation',
+              target_id: '88888888-8888-4888-8888-888888888888',
+              metadata: {},
+              created_at: createdAt,
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+
+      throw new Error(`Unexpected transactional query: ${text}`);
+    });
+    const client = {
+      query: clientQuery,
+      release: jest.fn(),
+    };
+    const poolQuery = jest.fn(async () => ({
+      rows: [],
+      rowCount: 0,
+    }));
+    const connect = jest.fn(async () => client);
+    const pool = {
+      query: poolQuery,
+      connect,
+      end: jest.fn(async () => undefined),
+    } as unknown as PgPoolLike;
+    const repository = new ApiDatabaseRepository(configService, secretsReader, () => pool);
+
+    await expect(
+      repository.createTeamInvitation({
+        teamId: '22222222-2222-4222-8222-222222222222',
+        email: 'finops@example.com',
+        role: 'member',
+        tokenHash: 'e'.repeat(64),
+        invitedByAccountId: '11111111-1111-4111-8111-111111111111',
+        expiresAt: expiresAt.toISOString(),
+        audit: {
+          actorAccountId: '11111111-1111-4111-8111-111111111111',
+          action: 'team.invitation.created',
+          targetType: 'invitation',
+          targetId: '88888888-8888-4888-8888-888888888888',
+          metadata: {
+            email: 'finops@example.com',
+            role: 'member',
+          },
+        },
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: '88888888-8888-4888-8888-888888888888',
+        status: 'pending',
+      }),
+    );
+
+    expect(connect).toHaveBeenCalledTimes(1);
+    expect(poolQuery).not.toHaveBeenCalled();
+    expect(clientQuery).toHaveBeenNthCalledWith(1, 'BEGIN');
+    expect(clientQuery).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO team_invitations'),
+      expect.any(Array),
+    );
+    expect(clientQuery).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO team_audit_events'),
+      [
+        '22222222-2222-4222-8222-222222222222',
+        '11111111-1111-4111-8111-111111111111',
+        'team.invitation.created',
+        'invitation',
+        '88888888-8888-4888-8888-888888888888',
+        JSON.stringify({
+          email: 'finops@example.com',
+          role: 'member',
+          status: 'pending',
+        }),
+      ],
+    );
+    expect(clientQuery).toHaveBeenLastCalledWith('COMMIT');
+    expect(client.release).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases checked-out database clients when transaction start fails', async () => {
+    const clientQuery = jest.fn(async (text: string) => {
+      if (text === 'BEGIN') {
+        throw new Error('begin failed');
+      }
+
+      return { rows: [], rowCount: 0 };
+    });
+    const client = {
+      query: clientQuery,
+      release: jest.fn(),
+    };
+    const pool = {
+      query: jest.fn(async () => ({
+        rows: [],
+        rowCount: 0,
+      })),
+      connect: jest.fn(async () => client),
+      end: jest.fn(async () => undefined),
+    } as unknown as PgPoolLike;
+    const repository = new ApiDatabaseRepository(configService, secretsReader, () => pool);
+
+    await expect(
+      repository.createTeamInvitation({
+        teamId: '22222222-2222-4222-8222-222222222222',
+        email: 'finops@example.com',
+        role: 'member',
+        tokenHash: 'e'.repeat(64),
+        invitedByAccountId: '11111111-1111-4111-8111-111111111111',
+        expiresAt: '2026-07-13T00:00:00.000Z',
+      }),
+    ).rejects.toThrow('begin failed');
+
+    expect(clientQuery).toHaveBeenCalledTimes(1);
+    expect(clientQuery).not.toHaveBeenCalledWith('ROLLBACK');
+    expect(client.release).toHaveBeenCalledTimes(1);
   });
 
   it('rolls back transactional auth and billing writes and closes the pool', async () => {
