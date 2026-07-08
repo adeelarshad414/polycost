@@ -13,6 +13,9 @@ import {
   InvoiceArtifactLegalHoldInput,
   InvoiceArtifactBlobRecord,
   InvoiceArtifactBlobUploadInput,
+  InvoiceArtifactPolicyExceptionInput,
+  InvoiceArtifactPolicyExceptionQueueItem,
+  InvoiceArtifactPolicyExceptionStatus,
   InvoiceArtifactReviewInput,
   InvoiceArtifactReviewQueueItem,
   InvoiceArtifactReviewStatus,
@@ -345,6 +348,28 @@ export class BillingService {
     return reconciliations.flatMap((reconciliation) =>
       invoiceGradeArtifactsFromEvidence(reconciliation.evidence).map((artifact) =>
         invoiceArtifactReviewQueueItem(reconciliation, artifact),
+      ),
+    );
+  }
+
+  async listInvoiceArtifactPolicyExceptions(
+    importRunId: string,
+    identity: AuthIdentity,
+  ): Promise<InvoiceArtifactPolicyExceptionQueueItem[]> {
+    assertBillingAdmin(identity);
+    const importRun = await this.repository.getBillingImport(importRunId);
+
+    if (!importRun) {
+      throw new ApiNotFoundError(`Billing import ${importRunId} was not found`);
+    }
+
+    assertTeamAccess(importRun.teamId, identity);
+
+    const reconciliations = await this.repository.listInvoiceReconciliations(importRunId);
+
+    return reconciliations.flatMap((reconciliation) =>
+      invoiceGradeArtifactsFromEvidence(reconciliation.evidence).map((artifact) =>
+        invoiceArtifactPolicyExceptionQueueItem(reconciliation, artifact),
       ),
     );
   }
@@ -748,6 +773,79 @@ export class BillingService {
                 reviewStatus: input.reviewStatus,
                 ...(input.reviewer ? { reviewer: input.reviewer } : {}),
                 ...(input.dueAt ? { dueAt: input.dueAt } : {}),
+                ...(input.evidenceReference ? { evidenceReference: input.evidenceReference } : {}),
+              },
+            },
+          }
+        : {}),
+    });
+  }
+
+  async updateInvoiceArtifactPolicyException(
+    reconciliationId: string,
+    artifactId: string,
+    body: unknown,
+    identity: AuthIdentity,
+  ): Promise<InvoiceReconciliationRecord> {
+    assertBillingAdmin(identity);
+    const input = parseInvoiceArtifactPolicyExceptionInput(body);
+    const reconciliation = await this.repository.getInvoiceReconciliation(reconciliationId);
+
+    if (!reconciliation) {
+      throw new ApiNotFoundError(`Invoice reconciliation ${reconciliationId} was not found`);
+    }
+
+    const importRun = await this.repository.getBillingImport(reconciliation.importRunId);
+
+    if (!importRun) {
+      throw new ApiNotFoundError(
+        `Billing import ${reconciliation.importRunId} was not found for reconciliation ${reconciliationId}`,
+      );
+    }
+
+    assertTeamAccess(importRun.teamId, identity);
+
+    const artifacts = invoiceGradeArtifactsFromEvidence(reconciliation.evidence);
+    const artifact = artifacts.find((candidate) => candidate.id === artifactId);
+
+    if (!artifact) {
+      throw new ApiNotFoundError(
+        `Invoice artifact ${artifactId} was not found for reconciliation ${reconciliationId}`,
+      );
+    }
+
+    if (!artifact.storedBlob) {
+      throw new ApiValidationError('invoice artifact file is not stored', [
+        {
+          field: 'artifactId',
+          issue: 'store the artifact file before changing policy exception state',
+        },
+      ]);
+    }
+
+    const updatedArtifact = policyExceptionInvoiceGradeArtifact(artifact, input, identity);
+    const evidence = replaceInvoiceGradeArtifactEvidence(reconciliation, updatedArtifact);
+
+    return this.repository.updateInvoiceReconciliationEvidence({
+      reconciliationId,
+      evidence,
+      ...(importRun.teamId
+        ? {
+            audit: {
+              teamId: importRun.teamId,
+              actorAccountId: identity.accountId,
+              action: 'billing.reconciliation.artifact_exception_updated',
+              targetType: 'billing_reconciliation',
+              targetId: reconciliationId,
+              metadata: {
+                importRunId: importRun.id,
+                comparisonId: reconciliation.comparisonId,
+                provider: reconciliation.provider,
+                artifactId,
+                exceptionStatus: input.exceptionStatus,
+                reason: input.reason,
+                ...(input.reviewer ? { reviewer: input.reviewer } : {}),
+                ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
                 ...(input.evidenceReference ? { evidenceReference: input.evidenceReference } : {}),
               },
             },
@@ -1998,6 +2096,81 @@ function parseInvoiceArtifactReviewStatus(
   ]);
 }
 
+function parseInvoiceArtifactPolicyExceptionInput(
+  body: unknown,
+): InvoiceArtifactPolicyExceptionInput {
+  const record = requireRecord(
+    body,
+    'Invoice artifact policy exception request body must be an object',
+  );
+  const input: InvoiceArtifactPolicyExceptionInput = {
+    exceptionStatus: parseInvoiceArtifactPolicyExceptionStatus(record.exceptionStatus),
+    reason: parseRequiredString(record.reason, 'reason', 700),
+    ...(parseOptionalString(record.reviewer, 160)
+      ? { reviewer: parseOptionalString(record.reviewer, 160) }
+      : {}),
+    ...(record.expiresAt !== undefined
+      ? { expiresAt: parseIsoDateTime(record.expiresAt, 'expiresAt') }
+      : {}),
+    ...(parseOptionalString(record.evidenceReference, 500)
+      ? { evidenceReference: parseOptionalString(record.evidenceReference, 500) }
+      : {}),
+    ...(parseOptionalString(record.notes, 1000)
+      ? { notes: parseOptionalString(record.notes, 1000) }
+      : {}),
+  };
+
+  if (
+    (input.exceptionStatus === 'approved' || input.exceptionStatus === 'rejected') &&
+    !input.evidenceReference &&
+    !input.notes
+  ) {
+    throw new ApiValidationError('artifact policy exception decision requires evidence', [
+      {
+        field: 'evidenceReference',
+        issue: 'supply evidenceReference or notes before approving or rejecting an exception',
+      },
+    ]);
+  }
+
+  if (input.exceptionStatus === 'approved') {
+    if (!input.expiresAt) {
+      throw new ApiValidationError('artifact policy exception approval requires expiry', [
+        {
+          field: 'expiresAt',
+          issue: 'supply a future expiry timestamp before approving an exception',
+        },
+      ]);
+    }
+
+    if (Date.parse(input.expiresAt) <= Date.now()) {
+      throw new ApiValidationError('artifact policy exception expiry must be in the future', [
+        {
+          field: 'expiresAt',
+          issue: 'approved exceptions must expire in the future',
+        },
+      ]);
+    }
+  }
+
+  return input;
+}
+
+function parseInvoiceArtifactPolicyExceptionStatus(
+  value: unknown,
+): InvoiceArtifactPolicyExceptionInput['exceptionStatus'] {
+  if (value === 'requested' || value === 'approved' || value === 'rejected') {
+    return value;
+  }
+
+  throw new ApiValidationError('artifact policy exception status is unsupported', [
+    {
+      field: 'exceptionStatus',
+      issue: 'must be requested, approved, or rejected',
+    },
+  ]);
+}
+
 function parseArtifactFileName(value: unknown): string {
   const fileName = parseRequiredString(value, 'fileName', 180);
 
@@ -3114,6 +3287,50 @@ function reviewedInvoiceGradeArtifact(
   };
 }
 
+function policyExceptionInvoiceGradeArtifact(
+  artifact: InvoiceGradeArtifactRecord,
+  input: InvoiceArtifactPolicyExceptionInput,
+  identity: AuthIdentity,
+): InvoiceGradeArtifactRecord {
+  const timestamp = new Date().toISOString();
+  const requestedAt = artifact.policyExceptionRequestedAt ?? timestamp;
+  const requestedByAccountId = artifact.policyExceptionRequestedByAccountId ?? identity.accountId;
+
+  if (input.exceptionStatus === 'requested') {
+    return {
+      ...artifact,
+      policyExceptionStatus: 'requested',
+      policyExceptionRequestedAt: timestamp,
+      policyExceptionRequestedByAccountId: identity.accountId,
+      policyExceptionReason: input.reason,
+      policyExceptionDecidedAt: undefined,
+      policyExceptionDecidedByAccountId: undefined,
+      ...(input.reviewer ? { policyExceptionReviewer: input.reviewer } : {}),
+      ...(input.expiresAt ? { policyExceptionExpiresAt: input.expiresAt } : {}),
+      ...(input.evidenceReference
+        ? { policyExceptionEvidenceReference: input.evidenceReference }
+        : {}),
+      ...(input.notes ? { policyExceptionNotes: input.notes } : {}),
+    };
+  }
+
+  return {
+    ...artifact,
+    policyExceptionStatus: input.exceptionStatus,
+    policyExceptionRequestedAt: requestedAt,
+    policyExceptionRequestedByAccountId: requestedByAccountId,
+    policyExceptionReason: input.reason,
+    policyExceptionDecidedAt: timestamp,
+    policyExceptionDecidedByAccountId: identity.accountId,
+    ...(input.reviewer ? { policyExceptionReviewer: input.reviewer } : {}),
+    ...(input.expiresAt ? { policyExceptionExpiresAt: input.expiresAt } : {}),
+    ...(input.evidenceReference
+      ? { policyExceptionEvidenceReference: input.evidenceReference }
+      : {}),
+    ...(input.notes ? { policyExceptionNotes: input.notes } : {}),
+  };
+}
+
 function governanceWithStoredObject(
   governance: InvoiceArtifactBlobGovernance,
   storedObject: StoredInvoiceArtifactObject,
@@ -3219,6 +3436,59 @@ function invoiceArtifactReviewQueueItem(
   };
 }
 
+function invoiceArtifactPolicyExceptionQueueItem(
+  reconciliation: InvoiceReconciliationRecord,
+  artifact: InvoiceGradeArtifactRecord,
+): InvoiceArtifactPolicyExceptionQueueItem {
+  const legalHold = Boolean(artifact.storedBlob?.governance?.retentionPolicy.legalHold);
+
+  return {
+    importRunId: reconciliation.importRunId,
+    reconciliationId: reconciliation.id,
+    comparisonId: reconciliation.comparisonId,
+    provider: reconciliation.provider,
+    artifactId: artifact.id,
+    artifactType: artifact.type,
+    displayName: artifact.displayName,
+    verificationStatus: artifact.verificationStatus,
+    reviewStatus: artifact.reviewStatus ?? 'not-requested',
+    exceptionStatus: artifactPolicyExceptionStatus(artifact),
+    artifactBlobStored: Boolean(artifact.storedBlob),
+    legalHold,
+    ...(artifact.policyExceptionReason ? { reason: artifact.policyExceptionReason } : {}),
+    ...(artifact.policyExceptionReviewer ? { reviewer: artifact.policyExceptionReviewer } : {}),
+    ...(artifact.policyExceptionExpiresAt ? { expiresAt: artifact.policyExceptionExpiresAt } : {}),
+    ...(artifact.policyExceptionRequestedAt
+      ? { requestedAt: artifact.policyExceptionRequestedAt }
+      : {}),
+    ...(artifact.policyExceptionRequestedByAccountId
+      ? { requestedByAccountId: artifact.policyExceptionRequestedByAccountId }
+      : {}),
+    ...(artifact.policyExceptionDecidedAt ? { decidedAt: artifact.policyExceptionDecidedAt } : {}),
+    ...(artifact.policyExceptionDecidedByAccountId
+      ? { decidedByAccountId: artifact.policyExceptionDecidedByAccountId }
+      : {}),
+    ...(artifact.policyExceptionEvidenceReference
+      ? { evidenceReference: artifact.policyExceptionEvidenceReference }
+      : {}),
+    ...(artifact.policyExceptionNotes ? { notes: artifact.policyExceptionNotes } : {}),
+  };
+}
+
+function artifactPolicyExceptionStatus(
+  artifact: InvoiceGradeArtifactRecord,
+): InvoiceArtifactPolicyExceptionStatus {
+  if (
+    artifact.policyExceptionStatus === 'approved' &&
+    artifact.policyExceptionExpiresAt &&
+    Date.parse(artifact.policyExceptionExpiresAt) <= Date.now()
+  ) {
+    return 'expired';
+  }
+
+  return artifact.policyExceptionStatus ?? 'not-requested';
+}
+
 function invoiceGradeArtifactRegister(
   artifacts: InvoiceGradeArtifactRecord[],
   reconciliation: InvoiceReconciliationRecord,
@@ -3256,6 +3526,35 @@ function invoiceGradeArtifactRegister(
     pending: reviewPendingCount,
     approved: reviewApprovedCount,
     rejected: reviewRejectedCount,
+  };
+  let exceptionNotRequestedCount = 0;
+  let exceptionRequestedCount = 0;
+  let exceptionApprovedCount = 0;
+  let exceptionRejectedCount = 0;
+  let exceptionExpiredCount = 0;
+
+  for (const artifact of artifacts) {
+    const status = artifactPolicyExceptionStatus(artifact);
+
+    if (status === 'requested') {
+      exceptionRequestedCount += 1;
+    } else if (status === 'approved') {
+      exceptionApprovedCount += 1;
+    } else if (status === 'rejected') {
+      exceptionRejectedCount += 1;
+    } else if (status === 'expired') {
+      exceptionExpiredCount += 1;
+    } else {
+      exceptionNotRequestedCount += 1;
+    }
+  }
+
+  const policyExceptionCountsByStatus: Record<InvoiceArtifactPolicyExceptionStatus, number> = {
+    'not-requested': exceptionNotRequestedCount,
+    requested: exceptionRequestedCount,
+    approved: exceptionApprovedCount,
+    rejected: exceptionRejectedCount,
+    expired: exceptionExpiredCount,
   };
   const coverage = Object.entries(INVOICE_GRADE_ARTIFACT_CHECK_COVERAGE).map(
     ([readinessCheckId, acceptedTypes]) => {
@@ -3332,6 +3631,11 @@ function invoiceGradeArtifactRegister(
     reviewPendingCount: reviewCountsByStatus.pending,
     reviewApprovedCount: reviewCountsByStatus.approved,
     reviewRejectedCount: reviewCountsByStatus.rejected,
+    policyExceptionCountsByStatus,
+    policyExceptionRequestedCount: policyExceptionCountsByStatus.requested,
+    policyExceptionApprovedCount: policyExceptionCountsByStatus.approved,
+    policyExceptionRejectedCount: policyExceptionCountsByStatus.rejected,
+    policyExceptionExpiredCount: policyExceptionCountsByStatus.expired,
     coverage,
     artifacts,
     controlTotalDeltas,

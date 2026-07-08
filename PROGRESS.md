@@ -121,6 +121,7 @@ say so explicitly rather than marking it done.
 | Phase 2.29 - External artifact retention deletion       | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.30 - Artifact legal-hold administration         | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.31 - Invoice artifact review workflow           | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.32 - Artifact policy exception lifecycle        | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4489,6 +4490,41 @@ Status: implemented and verified locally on 2026-07-08.
   not external legal-review routing, policy exception lifecycle automation, private
   contract validation, provider invoice rendering, or provider invoice-of-record
   reconciliation.
+
+## Phase 2.32 — Artifact policy exception lifecycle
+
+Status: implemented and verified locally on 2026-07-08.
+
+- Added an Owner/Admin policy exception queue for stored invoice artifacts:
+  `GET /api/v1/billing/imports/:id/artifact-policy-exceptions`.
+- Added an audited policy exception state operation:
+  `PATCH /api/v1/billing/reconciliations/:id/artifacts/:artifactId/policy-exception`.
+  Stored artifacts can now move through `requested`, `approved`, or `rejected`
+  exception states without changing invoice-grade verification status.
+- Approved exceptions require a future expiry timestamp plus evidence or notes.
+  Expired approved exceptions are surfaced as computed `expired` status in queue and
+  workspace summaries.
+- Reconciliation evidence now stores exception requester/decision metadata, reviewer,
+  reason, expiry, evidence reference, notes, and aggregate requested/approved/rejected/
+  expired counts.
+- Added the `billing.reconciliation.artifact_exception_updated` audit action and
+  schema migration so exception lifecycle changes are visible in the team audit trail.
+- Added workspace actions to request, approve, and reject time-boxed policy exceptions
+  beside artifact review/governance controls.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/api/api-database.repository.spec.ts`
+  passed 72/72 across 2 suites. `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx src/api-client.spec.ts`
+  passed 88/88 across 2 suites.
+- `npm run ci:lint` passed with zero ESLint/typecheck errors or warnings.
+- Full `npm run check` passed with API 55 suites / 462 tests, web 11 suites / 145
+  tests, graph validation 320 nodes / 320 edges, pricing coverage, progress
+  verification, QA/security suppression hygiene, DB, DevOps, cloud, release,
+  handover, and provider-credential gates green. `npm run impeccable` was skipped
+  by design because the repo targets Node 20 and the optional tool requires Node 24.
+- Remaining caveat: this is an internal policy exception lifecycle over stored
+  artifacts, not external legal-review routing, contract/legal approval integration,
+  full policy exception automation, private contract validation, provider invoice
+  rendering, or provider invoice-of-record reconciliation.
 
 ## Deviations from spec log
 

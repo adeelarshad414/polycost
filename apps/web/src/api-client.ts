@@ -15,6 +15,8 @@ import {
   InvoiceArtifactRetentionEnforcementResult,
   InvoiceArtifactBlobUploadInput,
   InvoiceArtifactLegalHoldInput,
+  InvoiceArtifactPolicyExceptionInput,
+  InvoiceArtifactPolicyExceptionQueueItem,
   InvoiceArtifactReviewInput,
   InvoiceArtifactReviewQueueItem,
   InvoiceArtifactStorageReadiness,
@@ -248,6 +250,10 @@ export interface PolyCostClient {
     importRunId: string,
     token: string,
   ): Promise<InvoiceArtifactReviewQueueItem[]>;
+  listInvoiceArtifactPolicyExceptions(
+    importRunId: string,
+    token: string,
+  ): Promise<InvoiceArtifactPolicyExceptionQueueItem[]>;
   registerInvoiceGradeArtifact(
     reconciliationId: string,
     input: InvoiceGradeArtifactRegistrationInput,
@@ -275,6 +281,12 @@ export interface PolyCostClient {
     reconciliationId: string,
     artifactId: string,
     input: InvoiceArtifactReviewInput,
+    token: string,
+  ): Promise<InvoiceReconciliationRecord>;
+  updateInvoiceArtifactPolicyException(
+    reconciliationId: string,
+    artifactId: string,
+    input: InvoiceArtifactPolicyExceptionInput,
     token: string,
   ): Promise<InvoiceReconciliationRecord>;
   downloadInvoiceArtifactBlob(
@@ -714,6 +726,15 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         },
       );
     },
+    listInvoiceArtifactPolicyExceptions(importRunId, token) {
+      return requestJson<InvoiceArtifactPolicyExceptionQueueItem[]>(
+        baseUrl,
+        `/billing/imports/${encodeURIComponent(importRunId)}/artifact-policy-exceptions`,
+        {
+          headers: authorizationHeaders(token),
+        },
+      );
+    },
     registerInvoiceGradeArtifact(reconciliationId, input, token) {
       return requestJson<InvoiceReconciliationRecord>(
         baseUrl,
@@ -770,6 +791,19 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         `/billing/reconciliations/${encodeURIComponent(
           reconciliationId,
         )}/artifacts/${encodeURIComponent(artifactId)}/review`,
+        {
+          method: 'PATCH',
+          headers: authorizationHeaders(token),
+          body: JSON.stringify(input),
+        },
+      );
+    },
+    updateInvoiceArtifactPolicyException(reconciliationId, artifactId, input, token) {
+      return requestJson<InvoiceReconciliationRecord>(
+        baseUrl,
+        `/billing/reconciliations/${encodeURIComponent(
+          reconciliationId,
+        )}/artifacts/${encodeURIComponent(artifactId)}/policy-exception`,
         {
           method: 'PATCH',
           headers: authorizationHeaders(token),

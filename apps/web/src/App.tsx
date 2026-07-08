@@ -66,6 +66,8 @@ import {
   IntervalKey,
   InvoiceArtifactLegalHoldInput,
   InvoiceArtifactBlobUploadInput,
+  InvoiceArtifactPolicyExceptionInput,
+  InvoiceArtifactPolicyExceptionStatus,
   InvoiceArtifactReviewInput,
   InvoiceArtifactReviewStatus,
   InvoiceGradeArtifactRegistrationInput,
@@ -3082,6 +3084,79 @@ function WorkspaceControlCenter({
     }
   }
 
+  async function handleUpdateInvoiceArtifactPolicyException(
+    exceptionStatus: InvoiceArtifactPolicyExceptionStatus,
+  ) {
+    if (
+      !token ||
+      billingAccessMessage ||
+      !reconciliation ||
+      !reconciliationSummary?.artifactId ||
+      !reconciliationSummary.artifactBlobStored ||
+      exceptionStatus === 'not-requested' ||
+      exceptionStatus === 'expired'
+    ) {
+      onError(
+        billingAccessMessage ??
+          'Store an invoice artifact file before changing policy exception state.',
+      );
+      return;
+    }
+
+    setWorkspaceBusy(`billing-artifact-exception-${exceptionStatus}`);
+    onError(null);
+
+    try {
+      const artifactId = reconciliationSummary.artifactId;
+      const exceptionInput: InvoiceArtifactPolicyExceptionInput = {
+        exceptionStatus,
+        reviewer: 'risk-review@example.com',
+        reason:
+          exceptionStatus === 'requested'
+            ? 'Requesting a time-boxed policy exception while provider invoice-of-record evidence is still incomplete.'
+            : exceptionStatus === 'approved'
+              ? 'Approving a time-boxed exception for demo governance review; invoice-grade validation remains blocked.'
+              : 'Rejecting the exception because provider invoice-of-record evidence remains insufficient.',
+        ...(exceptionStatus === 'approved'
+          ? {
+              expiresAt: futureIsoTimestamp(30),
+              evidenceReference: `exception://invoice-artifacts/${artifactId}/approved`,
+              notes:
+                'Approved as a temporary risk acceptance only. This does not mark the artifact invoice-grade verified.',
+            }
+          : exceptionStatus === 'rejected'
+            ? {
+                evidenceReference: `exception://invoice-artifacts/${artifactId}/rejected`,
+                notes:
+                  'Exception rejected; collect provider invoice controls before relying on invoice-grade evidence.',
+              }
+            : {
+                expiresAt: futureIsoTimestamp(14),
+                notes:
+                  'Queued for policy owner review with explicit expiry target and invoice-grade caveat.',
+              }),
+      };
+      const updated = await client.updateInvoiceArtifactPolicyException(
+        reconciliation.id,
+        artifactId,
+        exceptionInput,
+        token,
+      );
+
+      setReconciliation(updated);
+      await refreshTeamAuditEvents();
+      onNotice(
+        exceptionStatus === 'requested'
+          ? 'Policy exception requested for this artifact.'
+          : `Policy exception ${exceptionStatus}.`,
+      );
+    } catch (artifactError) {
+      onError(formatApiError(artifactError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
   async function handleVerifyInvoiceArtifact() {
     if (!token || billingAccessMessage || !reconciliation || !reconciliationSummary?.artifactId) {
       onError(
@@ -3863,6 +3938,22 @@ function WorkspaceControlCenter({
                         {reconciliationSummary.artifactReviewApprovedCount} · rejected{' '}
                         {reconciliationSummary.artifactReviewRejectedCount}
                       </small>
+                      <small>
+                        Policy exception:{' '}
+                        {reconciliationSummary.artifactPolicyExceptionStatus.replace('-', ' ')}
+                        {reconciliationSummary.artifactPolicyExceptionReviewer
+                          ? ` · ${reconciliationSummary.artifactPolicyExceptionReviewer}`
+                          : ''}
+                        {reconciliationSummary.artifactPolicyExceptionExpiresAt
+                          ? ` · expires ${formatDateTime(
+                              reconciliationSummary.artifactPolicyExceptionExpiresAt,
+                            )}`
+                          : ''}{' '}
+                        · requested {reconciliationSummary.artifactPolicyExceptionRequestedCount} ·
+                        approved {reconciliationSummary.artifactPolicyExceptionApprovedCount} ·
+                        rejected {reconciliationSummary.artifactPolicyExceptionRejectedCount} ·
+                        expired {reconciliationSummary.artifactPolicyExceptionExpiredCount}
+                      </small>
                     </>
                   ) : reconciliationSummary.artifactId ? (
                     <small>
@@ -3978,6 +4069,53 @@ function WorkspaceControlCenter({
                     </>
                   ) : null}
                   {reconciliationSummary.artifactId &&
+                  reconciliationSummary.artifactBlobStored &&
+                  (reconciliationSummary.artifactPolicyExceptionStatus === 'not-requested' ||
+                    reconciliationSummary.artifactPolicyExceptionStatus === 'expired') ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="compact"
+                      loading={workspaceBusy === 'billing-artifact-exception-requested'}
+                      loadingLabel="Requesting exception..."
+                      disabled={Boolean(billingAccessMessage)}
+                      onClick={() => void handleUpdateInvoiceArtifactPolicyException('requested')}
+                    >
+                      <CompareIcon />
+                      Request exception
+                    </Button>
+                  ) : null}
+                  {reconciliationSummary.artifactId &&
+                  reconciliationSummary.artifactBlobStored &&
+                  reconciliationSummary.artifactPolicyExceptionStatus === 'requested' ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="compact"
+                        loading={workspaceBusy === 'billing-artifact-exception-approved'}
+                        loadingLabel="Approving exception..."
+                        disabled={Boolean(billingAccessMessage)}
+                        onClick={() => void handleUpdateInvoiceArtifactPolicyException('approved')}
+                      >
+                        <CompareIcon />
+                        Approve exception
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="compact"
+                        loading={workspaceBusy === 'billing-artifact-exception-rejected'}
+                        loadingLabel="Rejecting exception..."
+                        disabled={Boolean(billingAccessMessage)}
+                        onClick={() => void handleUpdateInvoiceArtifactPolicyException('rejected')}
+                      >
+                        <CompareIcon />
+                        Reject exception
+                      </Button>
+                    </>
+                  ) : null}
+                  {reconciliationSummary.artifactId &&
                   reconciliationSummary.artifactVerifiedCount <
                     reconciliationSummary.artifactRegisteredCount ? (
                     <Button
@@ -4088,6 +4226,8 @@ function teamAuditActionLabel(action: TeamAuditEventRecord['action']): string {
       return 'Billing artifact legal hold updated';
     case 'billing.reconciliation.artifact_review_updated':
       return 'Billing artifact review updated';
+    case 'billing.reconciliation.artifact_exception_updated':
+      return 'Billing artifact policy exception updated';
   }
 }
 
@@ -19952,6 +20092,14 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
   artifactReviewPendingCount: number;
   artifactReviewApprovedCount: number;
   artifactReviewRejectedCount: number;
+  artifactPolicyExceptionStatus: InvoiceArtifactPolicyExceptionStatus;
+  artifactPolicyExceptionReviewer?: string;
+  artifactPolicyExceptionExpiresAt?: string;
+  artifactPolicyExceptionReason?: string;
+  artifactPolicyExceptionRequestedCount: number;
+  artifactPolicyExceptionApprovedCount: number;
+  artifactPolicyExceptionRejectedCount: number;
+  artifactPolicyExceptionExpiredCount: number;
   artifactKmsRequiredForProduction: boolean;
   artifactPrimaryCaveat: string;
   estimateComparableVarianceUsd: number;
@@ -20052,6 +20200,29 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
     artifactReviewPendingCount: numberValue(artifactRegister.reviewPendingCount),
     artifactReviewApprovedCount: numberValue(artifactRegister.reviewApprovedCount),
     artifactReviewRejectedCount: numberValue(artifactRegister.reviewRejectedCount),
+    artifactPolicyExceptionStatus: invoiceArtifactPolicyExceptionStatus(
+      primaryArtifact?.policyExceptionStatus,
+      stringValue(primaryArtifact?.policyExceptionExpiresAt),
+    ),
+    ...(stringValue(primaryArtifact?.policyExceptionReviewer)
+      ? { artifactPolicyExceptionReviewer: stringValue(primaryArtifact?.policyExceptionReviewer) }
+      : {}),
+    ...(stringValue(primaryArtifact?.policyExceptionExpiresAt)
+      ? { artifactPolicyExceptionExpiresAt: stringValue(primaryArtifact?.policyExceptionExpiresAt) }
+      : {}),
+    ...(stringValue(primaryArtifact?.policyExceptionReason)
+      ? { artifactPolicyExceptionReason: stringValue(primaryArtifact?.policyExceptionReason) }
+      : {}),
+    artifactPolicyExceptionRequestedCount: numberValue(
+      artifactRegister.policyExceptionRequestedCount,
+    ),
+    artifactPolicyExceptionApprovedCount: numberValue(
+      artifactRegister.policyExceptionApprovedCount,
+    ),
+    artifactPolicyExceptionRejectedCount: numberValue(
+      artifactRegister.policyExceptionRejectedCount,
+    ),
+    artifactPolicyExceptionExpiredCount: numberValue(artifactRegister.policyExceptionExpiredCount),
     artifactKmsRequiredForProduction: booleanValue(storageProfile.kmsKeyRequiredForProduction),
     artifactPrimaryCaveat:
       artifactCaveats[0] ??
@@ -20078,6 +20249,27 @@ function invoiceArtifactReviewStatus(value: unknown): InvoiceArtifactReviewStatu
     value === 'pending' ||
     value === 'approved' ||
     value === 'rejected' ||
+    value === 'not-requested'
+  ) {
+    return value;
+  }
+
+  return 'not-requested';
+}
+
+function invoiceArtifactPolicyExceptionStatus(
+  value: unknown,
+  expiresAt: string | undefined,
+): InvoiceArtifactPolicyExceptionStatus {
+  if (value === 'approved' && expiresAt && Date.parse(expiresAt) <= Date.now()) {
+    return 'expired';
+  }
+
+  if (
+    value === 'requested' ||
+    value === 'approved' ||
+    value === 'rejected' ||
+    value === 'expired' ||
     value === 'not-requested'
   ) {
     return value;
@@ -20531,6 +20723,10 @@ function formatDateTime(value: string | undefined): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   });
+}
+
+function futureIsoTimestamp(daysFromNow: number): string {
+  return new Date(Date.now() + daysFromNow * 24 * 60 * 60 * 1000).toISOString();
 }
 
 function formatHistoryTimestamp(value: string): string {
