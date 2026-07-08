@@ -1,8 +1,8 @@
 # PolyCost Production Readiness Report
 
-Date: 2026-07-07
-Branch: `codex/reconciliation-coverage-hardening`
-PR: #24, `Production readiness verification hardening`
+Date: 2026-07-08
+Branch: cumulative production-readiness branches through `codex/invoice-adjustment-evidence`
+PR: local phase gate, PR created after verification
 Run spec: `docs/design/master-production-readiness-orchestrator-v2.md`
 
 ## Verdict
@@ -46,39 +46,41 @@ performance/accessibility/best-practices/SEO metrics.
 
 ## Findings And Disposition
 
-| ID             | Disposition   | Evidence                                                                                                                                                                                  |
-| -------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P0-FMT-001     | Fixed         | `npm run check` initially failed on unformatted orchestrator docs; after formatting, `npm run format:check` and `npm run check` passed                                                    |
-| P0-DOC-001     | Fixed         | Orchestrator docs moved from `docs/orchestrators/*` to requested `docs/design/*`                                                                                                          |
-| P0-SYNC-001    | Fixed         | `STATE-SYNC.md` created with product detection, CI state, phase classification, and gate register                                                                                         |
-| P0-INV-001     | Fixed         | `THEME-INVENTORY.md` created with route/component inventory and P0 findings                                                                                                               |
-| TKN-001        | Fixed         | Token hex values isolated to `apps/web/src/styles/tokens.css`; `npm run theme:hex:check` passed                                                                                           |
-| TKN-002        | Fixed         | Added persisted `data-accent="default                                                                                                                                                     | terracotta"` axis, pre-hydration application, and Appearance control |
-| TKN-003        | Fixed         | Added `theme:hex:check` script and CI workflow gate                                                                                                                                       |
-| API-HEALTH-001 | Fixed         | Added additive `/health/live`, `/api/v1/health/live`, `/health/ready`, and `/api/v1/health/ready` endpoints                                                                               |
-| UI-ARCHIVE-001 | Fixed (smoke) | `docs/theme-audit/2026-07-07/` contains dark/light default screenshots and dark/light terracotta screenshots with token evidence                                                          |
-| CI-REMOTE-001  | Blocked       | GitHub Actions job `85608851518` for prior head showed `runner_id: 0`, empty runner name/group, `steps: []`; remote runner/account infra is not executing repo steps                      |
-| INV-TRACE-002  | Improved      | Provider-export rows now persist `_polycost` source fingerprints/column coverage; reconciliation evidence reports coverage, match summary, readiness, and caveats                         |
-| INV-TRACE-003  | Improved      | Azure Cost Management CSV and nested GCP Billing Export JSON now have focused mapper coverage, allocation tag/label recognition, and fallback-cost readiness evidence                     |
-| VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                               |
-| VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                               |
-| LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                          |
-| UI-AUTH-002    | Improved      | Workspace billing panel now surfaces reconciliation readiness, source-fingerprint coverage, SKU match coverage, and the invoice-of-record caveat                                          |
-| UI-AUTH-003    | Improved      | Active workspace switching is now backend-backed, membership-checked, and exposed in the signed-in account panel                                                                          |
-| UI-AUTH-004    | Improved      | Pending/expired workspace invites can now be resent through a guarded backend route that rotates the stored token hash and exposes the refreshed one-time token only in the response      |
-| UI-AUTH-005    | Improved      | Invite delivery now has local panel mode plus production HTTPS webhook mode with HMAC signatures, production config guards, and browser-safe delivery receipts                            |
-| AUD-EXP-001    | Improved      | Audit export now has local HMAC receiver proof and a staging canary sender for SIEM/WORM acceptance evidence                                                                              |
-| TF-GEN-001     | Added         | V3 Terraform generation endpoint and UI panel now generate AWS/Azure/GCP starter bundles from NWS with provider pinning, remote-state examples, static checks, and explicit caveats       |
-| TF-GEN-002     | Improved      | V3.1 hardening adds generation profiles, private database networking checks, runtime identity baselines, policy/test/Makefile artifacts, and module-boundary documentation                |
-| TF-GEN-003     | Improved      | V3.2 assurance adds generated CAF/WAF/Terraform framework-alignment evidence and topology-aware public/private ingress/load-balancer controls                                             |
-| TF-GEN-004     | Improved      | V3.3 adds downloadable Terraform ZIP export, bundle manifest hash evidence, generated validation runner, and frontend ZIP/evidence download actions                                       |
-| TF-GEN-005     | Improved      | V3.4 replaces Terraform module placeholders with AWS/Azure/GCP network, compute, and data starter modules plus static module-library validation                                           |
-| TF-GEN-006     | Improved      | V3.5 adds credential-free Terraform bundle manifest verification and tamper-detection evidence before provider-authenticated validation                                                   |
-| HND-001        | Added         | Customer handover package added under `docs/`, with usage, deployment, runbook, competitive comparison, architecture, and evidence ledger                                                 |
-| HND-002        | Added         | `npm run handover:check` validates the handover package and runs inside the full local `npm run check` floor                                                                              |
-| OSS-001        | Added         | `npm run public:readiness:check` validates public-readiness docs, community health files, demo evidence hooks, tracked env-file safety, and provider-logo safeguards                      |
-| AUD-001        | Added         | `npm run browser:audit` produces browser audit artifacts for desktop, 320px reflow, and 200% zoom-equivalent scenarios                                                                    |
-| AUD-002        | Fixed         | `npm run browser:audit` now runs formal `axe-core` and Node-20-compatible Lighthouse 12 checks; latest artifact passed with zero axe violations and Lighthouse scores 1.00/1.00/1.00/0.92 |
+| ID             | Disposition   | Evidence                                                                                                                                                                                                                                                |
+| -------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0-FMT-001     | Fixed         | `npm run check` initially failed on unformatted orchestrator docs; after formatting, `npm run format:check` and `npm run check` passed                                                                                                                  |
+| P0-DOC-001     | Fixed         | Orchestrator docs moved from `docs/orchestrators/*` to requested `docs/design/*`                                                                                                                                                                        |
+| P0-SYNC-001    | Fixed         | `STATE-SYNC.md` created with product detection, CI state, phase classification, and gate register                                                                                                                                                       |
+| P0-INV-001     | Fixed         | `THEME-INVENTORY.md` created with route/component inventory and P0 findings                                                                                                                                                                             |
+| TKN-001        | Fixed         | Token hex values isolated to `apps/web/src/styles/tokens.css`; `npm run theme:hex:check` passed                                                                                                                                                         |
+| TKN-002        | Fixed         | Added persisted `data-accent="default                                                                                                                                                                                                                   | terracotta"` axis, pre-hydration application, and Appearance control |
+| TKN-003        | Fixed         | Added `theme:hex:check` script and CI workflow gate                                                                                                                                                                                                     |
+| API-HEALTH-001 | Fixed         | Added additive `/health/live`, `/api/v1/health/live`, `/health/ready`, and `/api/v1/health/ready` endpoints                                                                                                                                             |
+| UI-ARCHIVE-001 | Fixed (smoke) | `docs/theme-audit/2026-07-07/` contains dark/light default screenshots and dark/light terracotta screenshots with token evidence                                                                                                                        |
+| CI-REMOTE-001  | Blocked       | GitHub Actions job `85608851518` for prior head showed `runner_id: 0`, empty runner name/group, `steps: []`; remote runner/account infra is not executing repo steps                                                                                    |
+| INV-TRACE-002  | Improved      | Provider-export rows now persist `_polycost` source fingerprints/column coverage; reconciliation evidence reports coverage, match summary, readiness, and caveats                                                                                       |
+| INV-TRACE-003  | Improved      | Azure Cost Management CSV and nested GCP Billing Export JSON now have focused mapper coverage, allocation tag/label recognition, and fallback-cost readiness evidence                                                                                   |
+| INV-TRACE-004  | Improved      | Imported actuals now classify usage versus tax, credit, discount, support, marketplace, refund, fee, enterprise adjustment, and unknown adjustment rows; reconciliation evidence separates usage-comparable variance from non-usage invoice adjustments |
+| VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                                                                                             |
+| VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                                                                                             |
+| LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                                                                                        |
+| UI-AUTH-002    | Improved      | Workspace billing panel now surfaces reconciliation readiness, source-fingerprint coverage, SKU match coverage, and the invoice-of-record caveat                                                                                                        |
+| UI-AUTH-006    | Improved      | Workspace billing panel now surfaces usage-comparable variance plus invoice adjustment count, subtotal, and category summary for finance review                                                                                                         |
+| UI-AUTH-003    | Improved      | Active workspace switching is now backend-backed, membership-checked, and exposed in the signed-in account panel                                                                                                                                        |
+| UI-AUTH-004    | Improved      | Pending/expired workspace invites can now be resent through a guarded backend route that rotates the stored token hash and exposes the refreshed one-time token only in the response                                                                    |
+| UI-AUTH-005    | Improved      | Invite delivery now has local panel mode plus production HTTPS webhook mode with HMAC signatures, production config guards, and browser-safe delivery receipts                                                                                          |
+| AUD-EXP-001    | Improved      | Audit export now has local HMAC receiver proof and a staging canary sender for SIEM/WORM acceptance evidence                                                                                                                                            |
+| TF-GEN-001     | Added         | V3 Terraform generation endpoint and UI panel now generate AWS/Azure/GCP starter bundles from NWS with provider pinning, remote-state examples, static checks, and explicit caveats                                                                     |
+| TF-GEN-002     | Improved      | V3.1 hardening adds generation profiles, private database networking checks, runtime identity baselines, policy/test/Makefile artifacts, and module-boundary documentation                                                                              |
+| TF-GEN-003     | Improved      | V3.2 assurance adds generated CAF/WAF/Terraform framework-alignment evidence and topology-aware public/private ingress/load-balancer controls                                                                                                           |
+| TF-GEN-004     | Improved      | V3.3 adds downloadable Terraform ZIP export, bundle manifest hash evidence, generated validation runner, and frontend ZIP/evidence download actions                                                                                                     |
+| TF-GEN-005     | Improved      | V3.4 replaces Terraform module placeholders with AWS/Azure/GCP network, compute, and data starter modules plus static module-library validation                                                                                                         |
+| TF-GEN-006     | Improved      | V3.5 adds credential-free Terraform bundle manifest verification and tamper-detection evidence before provider-authenticated validation                                                                                                                 |
+| HND-001        | Added         | Customer handover package added under `docs/`, with usage, deployment, runbook, competitive comparison, architecture, and evidence ledger                                                                                                               |
+| HND-002        | Added         | `npm run handover:check` validates the handover package and runs inside the full local `npm run check` floor                                                                                                                                            |
+| OSS-001        | Added         | `npm run public:readiness:check` validates public-readiness docs, community health files, demo evidence hooks, tracked env-file safety, and provider-logo safeguards                                                                                    |
+| AUD-001        | Added         | `npm run browser:audit` produces browser audit artifacts for desktop, 320px reflow, and 200% zoom-equivalent scenarios                                                                                                                                  |
+| AUD-002        | Fixed         | `npm run browser:audit` now runs formal `axe-core` and Node-20-compatible Lighthouse 12 checks; latest artifact passed with zero axe violations and Lighthouse scores 1.00/1.00/1.00/0.92                                                               |
 
 ## Verification
 
@@ -88,6 +90,15 @@ Local static/regression gates:
 - `npm run ci:lint` passed with zero ESLint warnings.
 - `npm run theme:hex:check` passed.
 - `npm run check` passed.
+- Phase 2.19 invoice adjustment evidence focused gates passed:
+  - API focused: `src/api/auth-billing.spec.ts`: 1 suite / 23 tests.
+  - Web focused: `src/App.spec.tsx`: 1 suite / 60 tests.
+- Phase 2.19 final local floor passed:
+  - `npm run test:production-readiness`: API 12 suites / 158 tests; web 2 suites /
+    86 tests.
+  - `npm run check`: API 53 suites / 422 tests; web 11 suites / 143 tests; graph,
+    pricing coverage, progress verification, QA/security suppression hygiene, DB,
+    DevOps, cloud, release, handover, and provider-credential gates passed.
   - API unit: 50 suites / 390 tests.
   - Web unit: 9 suites / 130 tests.
   - Graph validation: 290 nodes / 290 edges.
@@ -316,11 +327,14 @@ Machine-readable token evidence:
   same-transaction audit export outbox plus signed SIEM/WORM webhook delivery workers, and
   Phase 2.17 adds local/staging audit receiver smoke proof. Full immutability still depends
   on the deployed external receiver's retention policy and acceptance evidence.
-- Full invoice-grade pricing remains future scope: negotiated discounts, credits,
-  taxes, enterprise agreements, marketplace charges, amortization semantics, and
-  actual provider invoice-of-record reconciliation are not complete. Phase 2.9 and
-  Phase 2.10 improve source-row traceability, native AWS/Azure/GCP export mapping,
-  allocation evidence, and estimate-vs-actual reconciliation evidence.
+- Full invoice-grade pricing remains future scope: negotiated discounts, jurisdictional
+  tax treatment, enterprise agreements, marketplace private offers, amortization
+  semantics, refunds, support contracts, and actual provider invoice-of-record
+  reconciliation are not complete. Phase 2.9 and Phase 2.10 improve source-row
+  traceability, native AWS/Azure/GCP export mapping, allocation evidence, and
+  estimate-vs-actual reconciliation evidence. Phase 2.19 separates classified
+  non-usage invoice adjustments from usage-comparable variance, but does not make
+  PolyCost the invoice system of record.
 - VSDX support now includes extraction/evidence and approximate SVG previews, not full
   Visio semantic rendering. Phase 2.9 adds page geometry, normalized preview bounds, and
   explicit layout-extraction caveats; Phase 2.18 adds sanitized SVG preview artifacts.

@@ -3549,6 +3549,17 @@ function WorkspaceControlCenter({
                     {reconciliationSummary.sourceFingerprintPercent}% source fingerprinted ·{' '}
                     {reconciliationSummary.skuMatchPercent}% SKU matched
                   </small>
+                  <small>
+                    Usage-comparable variance{' '}
+                    {formatCurrency(reconciliationSummary.estimateComparableVarianceUsd)} ·{' '}
+                    {reconciliationSummary.adjustmentLineItemCount} adjustment rows (
+                    {formatCurrency(reconciliationSummary.adjustmentCostUsd)})
+                  </small>
+                  {reconciliationSummary.adjustmentCategories.length > 0 ? (
+                    <small>
+                      Adjustments: {reconciliationSummary.adjustmentCategories.join(', ')}
+                    </small>
+                  ) : null}
                   <small>{reconciliationSummary.primaryCaveat}</small>
                 </div>
               ) : null}
@@ -19446,20 +19457,40 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
   readiness: string;
   sourceFingerprintPercent: number;
   skuMatchPercent: number;
+  adjustmentCostUsd: number;
+  adjustmentLineItemCount: number;
+  estimateComparableVarianceUsd: number;
+  adjustmentCategories: string[];
   primaryCaveat: string;
 } {
   const evidence = record.evidence;
   const coverage = objectValue(evidence.invoiceCoverage);
   const matchSummary = objectValue(evidence.invoiceMatchSummary);
+  const adjustmentSummary = objectValue(evidence.invoiceAdjustmentSummary);
   const caveats = stringArrayValue(matchSummary.caveats);
   const readiness =
     stringValue(matchSummary.readiness) ??
     (record.status === 'matched' ? 'reconciled-evidence-ready' : 'reconciliation-foundation');
+  const adjustmentCategories = arrayValue(adjustmentSummary.categories)
+    .map((categorySummary) => objectValue(categorySummary))
+    .filter((categorySummary) => stringValue(categorySummary.category) !== 'usage')
+    .map((categorySummary) => {
+      const category = stringValue(categorySummary.category) ?? 'adjustment';
+      const totalCostUsd = numberValue(categorySummary.totalCostUsd);
+
+      return `${category} ${formatCurrency(totalCostUsd)}`;
+    });
 
   return {
     readiness: readiness.replace(/-/g, ' '),
     sourceFingerprintPercent: numberValue(coverage.sourceFingerprintPercent),
     skuMatchPercent: numberValue(coverage.skuMatchPercent),
+    adjustmentCostUsd: numberValue(adjustmentSummary.adjustmentCostUsd),
+    adjustmentLineItemCount: numberValue(adjustmentSummary.adjustmentLineItemCount),
+    estimateComparableVarianceUsd: numberValue(
+      adjustmentSummary.estimateComparableVarianceUsd ?? record.varianceUsd,
+    ),
+    adjustmentCategories,
     primaryCaveat:
       caveats[0] ??
       'Estimate-vs-actual evidence is available, but invoice-grade billing remains a separate provider-led control.',
@@ -19480,6 +19511,10 @@ function stringArrayValue(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === 'string' && Boolean(item.trim()))
     : [];
+}
+
+function arrayValue(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
 }
 
 function numberValue(value: unknown): number {

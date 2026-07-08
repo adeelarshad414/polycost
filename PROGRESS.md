@@ -108,6 +108,7 @@ say so explicitly rather than marking it done.
 | Phase 2.16 - Team audit export outbox                   | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.17 - Audit export receiver verification         | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.18 - VSDX approximate SVG previews              | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.19 - Invoice adjustment reconciliation evidence | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4067,6 +4068,37 @@ Status: implemented locally on 2026-07-08.
 - Remaining caveat: this is still not full Visio rendering. It does not evaluate
   Visio themes, icon glyph libraries, formulas, embedded media, exact text wrapping,
   or pixel-level visual equivalence.
+
+## Phase 2.19 — Invoice adjustment reconciliation evidence
+
+Status: implemented locally on 2026-07-08.
+
+- Added import-time invoice adjustment classification metadata to normalized actuals
+  rows. AWS CUR, Azure Cost Management, GCP Billing Export, and normalized rows now
+  preserve `_polycost.invoiceAdjustmentClassification` beside source-row fingerprints
+  and column coverage evidence.
+- Reconciliation evidence now separates estimate-comparable usage from non-usage
+  invoice adjustments such as tax, credit, discount, support, marketplace/private
+  offer, refund, enterprise adjustment, and recurring fee rows.
+- Added `invoiceAdjustmentSummary` to reconciliation evidence with gross invoice
+  total, usage-comparable subtotal, adjustment subtotal, line-item counts, category
+  totals, example services, reasons, and usage-comparable variance.
+- Updated the workspace billing panel to show usage-comparable variance and
+  adjustment totals/categories alongside readiness, source-fingerprint coverage,
+  SKU-match coverage, and caveats.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts`
+  passed 23/23. `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx`
+  passed 60/60. `npm run format:check` and `npm run ci:lint` passed. `npm run
+test:production-readiness` passed with 158/158 API tests and 86/86 web tests.
+  Full `npm run check` passed with 422/422 API tests, 143/143 web tests, graph
+  validation, pricing coverage, progress verification, QA/security suppression
+  hygiene, DB validation, release, handover, and provider-credential checks green.
+- Remaining caveat: PolyCost now gives finance reviewers cleaner actual-vs-estimate
+  evidence, but full invoice-grade billing remains future work. Provider-specific
+  amortization, private agreements, tax jurisdiction treatment, prepaid commitments,
+  refunds, support contracts, and invoice-of-record controls still need a dedicated
+  production billing phase.
 
 ## Deviations from spec log
 

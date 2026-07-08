@@ -532,6 +532,17 @@ export interface SsoCallbackResponse extends AuthSessionResponse {
 
 export type BillingSourceType =
   'aws-cur' | 'azure-cost-management' | 'gcp-billing-export' | 'normalized-csv';
+export type InvoiceAdjustmentCategory =
+  | 'usage'
+  | 'credit'
+  | 'discount'
+  | 'tax'
+  | 'support'
+  | 'marketplace'
+  | 'refund'
+  | 'enterprise-adjustment'
+  | 'fee'
+  | 'unknown';
 
 export interface BillingImportRowInput {
   serviceName: string;
