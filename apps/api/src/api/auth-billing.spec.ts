@@ -2347,6 +2347,284 @@ describe('BillingService', () => {
     );
   });
 
+  it('lists invoice artifact review queue rows for an imported billing run', async () => {
+    const repository = repositoryMock();
+    repository.getBillingImport.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      teamId: identity.teamId,
+      provider: 'aws',
+      sourceType: 'aws-cur',
+      status: 'completed',
+      billingPeriodStart: '2026-06-01',
+      billingPeriodEnd: '2026-06-30',
+      originalFileSha256: 'a'.repeat(64),
+      rowsReceived: 1,
+      rowsAccepted: 1,
+      rowsRejected: 0,
+      totalCostUsd: 107,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    });
+    repository.listInvoiceReconciliations.mockResolvedValue([
+      {
+        id: '66666666-6666-4666-8666-666666666666',
+        importRunId: '55555555-5555-4555-8555-555555555555',
+        comparisonId: comparisonResult.comparisonId,
+        provider: 'aws',
+        estimatedTotalUsd: 100,
+        invoicedTotalUsd: 107,
+        varianceUsd: 7,
+        variancePercent: 7,
+        status: 'variance-warning',
+        evidence: {
+          invoiceGradeArtifactRegister: {
+            registeredCount: 1,
+            verifiedCount: 0,
+            artifacts: [
+              {
+                id: 'artifact-1',
+                provider: 'aws',
+                type: 'provider-invoice',
+                displayName: 'June AWS invoice control packet',
+                reference: 'demo://invoice-control',
+                verificationStatus: 'registered',
+                registeredAt: '2026-07-06T00:00:03.000Z',
+                reviewStatus: 'pending',
+                reviewReviewer: 'finance-review@example.com',
+                reviewDueAt: '2026-07-10T00:00:00.000Z',
+                reviewRequestedAt: '2026-07-06T00:00:06.000Z',
+                storedBlob: {
+                  storageStatus: 'stored',
+                  storageMode: 'database-bytea',
+                  fileName: 'aws-invoice-control.txt',
+                  mimeType: 'text/plain',
+                  contentSha256: 'd'.repeat(64),
+                  contentSizeBytes: 7,
+                  uploadedAt: '2026-07-06T00:00:05.000Z',
+                  governance: {
+                    storageProfile: {
+                      storageBackend: 'database-bytea',
+                      encryptionStatus: 'database-managed',
+                      kmsKeyRequiredForProduction: true,
+                    },
+                    retentionPolicy: {
+                      retentionUntil: '2027-07-06T00:00:05.000Z',
+                      retentionDays: 365,
+                      legalHold: true,
+                    },
+                    malwareScan: {
+                      status: 'passed',
+                      scanner: 'polycost-eicar-signature-v1',
+                      checkedAt: '2026-07-06T00:00:05.000Z',
+                      findings: [],
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+        createdAt: '2026-07-06T00:00:02.000Z',
+      },
+    ]);
+    const service = new BillingService(repository as never);
+
+    await expect(
+      service.listInvoiceArtifactReviews('55555555-5555-4555-8555-555555555555', identity),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        reconciliationId: '66666666-6666-4666-8666-666666666666',
+        artifactId: 'artifact-1',
+        reviewStatus: 'pending',
+        reviewer: 'finance-review@example.com',
+        artifactBlobStored: true,
+        legalHold: true,
+      }),
+    ]);
+  });
+
+  it('updates invoice artifact review workflow state without marking the artifact verified', async () => {
+    const repository = repositoryMock();
+    const reconciliationRecord = {
+      id: '66666666-6666-4666-8666-666666666666',
+      importRunId: '55555555-5555-4555-8555-555555555555',
+      comparisonId: comparisonResult.comparisonId,
+      provider: 'aws' as const,
+      estimatedTotalUsd: 100,
+      invoicedTotalUsd: 107,
+      varianceUsd: 7,
+      variancePercent: 7,
+      status: 'variance-warning' as const,
+      evidence: {
+        invoiceGradeArtifactRegister: {
+          registeredCount: 1,
+          verifiedCount: 0,
+          artifacts: [
+            {
+              id: 'artifact-1',
+              provider: 'aws',
+              type: 'provider-invoice',
+              displayName: 'June AWS invoice control packet',
+              reference: 'demo://invoice-control',
+              verificationStatus: 'registered',
+              registeredAt: '2026-07-06T00:00:03.000Z',
+              storedBlob: {
+                storageStatus: 'stored',
+                storageMode: 'database-bytea',
+                fileName: 'aws-invoice-control.txt',
+                mimeType: 'text/plain',
+                contentSha256: 'd'.repeat(64),
+                contentSizeBytes: 7,
+                uploadedAt: '2026-07-06T00:00:05.000Z',
+                uploadedByAccountId: identity.accountId,
+                governance: {
+                  storageProfile: {
+                    storageBackend: 'database-bytea',
+                    encryptionStatus: 'database-managed',
+                    kmsKeyRequiredForProduction: true,
+                  },
+                  retentionPolicy: {
+                    retentionUntil: '2027-07-06T00:00:05.000Z',
+                    retentionDays: 365,
+                    legalHold: false,
+                  },
+                  malwareScan: {
+                    status: 'passed',
+                    scanner: 'polycost-eicar-signature-v1',
+                    checkedAt: '2026-07-06T00:00:05.000Z',
+                    findings: [],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+      createdAt: '2026-07-06T00:00:02.000Z',
+    };
+    repository.getInvoiceReconciliation.mockResolvedValue(reconciliationRecord);
+    repository.getBillingImport.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      teamId: identity.teamId,
+      provider: 'aws',
+      sourceType: 'aws-cur',
+      status: 'completed',
+      billingPeriodStart: '2026-06-01',
+      billingPeriodEnd: '2026-06-30',
+      originalFileSha256: 'a'.repeat(64),
+      rowsReceived: 1,
+      rowsAccepted: 1,
+      rowsRejected: 0,
+      totalCostUsd: 107,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    });
+    repository.updateInvoiceReconciliationEvidence.mockImplementation(async (input) => ({
+      ...reconciliationRecord,
+      evidence: input.evidence,
+    }));
+    const service = new BillingService(repository as never);
+
+    const result = await service.updateInvoiceArtifactReview(
+      '66666666-6666-4666-8666-666666666666',
+      'artifact-1',
+      {
+        reviewStatus: 'approved',
+        reviewer: 'finance-review@example.com',
+        evidenceReference: 'review://controls/artifact-1/approved',
+        notes: 'Finance review approved stored artifact packet.',
+      },
+      identity,
+    );
+    const evidenceRegister = result.evidence.invoiceGradeArtifactRegister as {
+      reviewApprovedCount: number;
+      artifacts: Array<Record<string, unknown>>;
+    };
+
+    expect(evidenceRegister.reviewApprovedCount).toBe(1);
+    expect(evidenceRegister.artifacts[0]).toMatchObject({
+      id: 'artifact-1',
+      verificationStatus: 'registered',
+      reviewStatus: 'approved',
+      reviewReviewer: 'finance-review@example.com',
+      reviewEvidenceReference: 'review://controls/artifact-1/approved',
+      reviewedByAccountId: identity.accountId,
+    });
+    expect(repository.updateInvoiceReconciliationEvidence).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reconciliationId: '66666666-6666-4666-8666-666666666666',
+        audit: expect.objectContaining({
+          action: 'billing.reconciliation.artifact_review_updated',
+          metadata: expect.objectContaining({
+            artifactId: 'artifact-1',
+            reviewStatus: 'approved',
+            reviewer: 'finance-review@example.com',
+            evidenceReference: 'review://controls/artifact-1/approved',
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('rejects artifact review workflow changes before a file is stored', async () => {
+    const repository = repositoryMock();
+    repository.getInvoiceReconciliation.mockResolvedValue({
+      id: '66666666-6666-4666-8666-666666666666',
+      importRunId: '55555555-5555-4555-8555-555555555555',
+      comparisonId: comparisonResult.comparisonId,
+      provider: 'aws',
+      estimatedTotalUsd: 100,
+      invoicedTotalUsd: 107,
+      varianceUsd: 7,
+      variancePercent: 7,
+      status: 'variance-warning',
+      evidence: {
+        invoiceGradeArtifactRegister: {
+          registeredCount: 1,
+          verifiedCount: 0,
+          artifacts: [
+            {
+              id: 'artifact-1',
+              provider: 'aws',
+              type: 'provider-invoice',
+              displayName: 'June AWS invoice control packet',
+              reference: 'demo://invoice-control',
+              verificationStatus: 'registered',
+              registeredAt: '2026-07-06T00:00:03.000Z',
+            },
+          ],
+        },
+      },
+      createdAt: '2026-07-06T00:00:02.000Z',
+    });
+    repository.getBillingImport.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      teamId: identity.teamId,
+      provider: 'aws',
+      sourceType: 'aws-cur',
+      status: 'completed',
+      billingPeriodStart: '2026-06-01',
+      billingPeriodEnd: '2026-06-30',
+      originalFileSha256: 'a'.repeat(64),
+      rowsReceived: 1,
+      rowsAccepted: 1,
+      rowsRejected: 0,
+      totalCostUsd: 107,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    });
+    const service = new BillingService(repository as never);
+
+    await expect(
+      service.updateInvoiceArtifactReview(
+        '66666666-6666-4666-8666-666666666666',
+        'artifact-1',
+        {
+          reviewStatus: 'pending',
+        },
+        identity,
+      ),
+    ).rejects.toThrow(ApiValidationError);
+    expect(repository.updateInvoiceReconciliationEvidence).not.toHaveBeenCalled();
+  });
+
   it('rejects legal hold changes before an invoice artifact file is stored', async () => {
     const repository = repositoryMock();
     repository.getInvoiceReconciliation.mockResolvedValue({
@@ -3132,6 +3410,10 @@ describe('BillingService', () => {
       'Team admin access is required for billing reconciliation',
     );
     await expectForbidden(
+      service.listInvoiceArtifactReviews('55555555-5555-4555-8555-555555555555', memberIdentity),
+      'Team admin access is required for billing reconciliation',
+    );
+    await expectForbidden(
       service.registerInvoiceGradeArtifact(
         '66666666-6666-4666-8666-666666666666',
         {
@@ -3175,6 +3457,17 @@ describe('BillingService', () => {
         'artifact-1',
         {
           legalHold: true,
+        },
+        memberIdentity,
+      ),
+      'Team admin access is required for billing reconciliation',
+    );
+    await expectForbidden(
+      service.updateInvoiceArtifactReview(
+        '66666666-6666-4666-8666-666666666666',
+        'artifact-1',
+        {
+          reviewStatus: 'pending',
         },
         memberIdentity,
       ),

@@ -863,6 +863,110 @@ describe('api client', () => {
     );
   });
 
+  it('wires invoice artifact review queue and status routes', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse([
+          {
+            importRunId: 'import-1',
+            reconciliationId: 'reconciliation-1',
+            comparisonId: 'comparison-1',
+            provider: 'aws',
+            artifactId: 'artifact-1',
+            artifactType: 'provider-invoice',
+            displayName: 'Provider invoice packet',
+            verificationStatus: 'registered',
+            reviewStatus: 'pending',
+            artifactBlobStored: true,
+            legalHold: false,
+            reviewer: 'finance-review@example.com',
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: 'reconciliation-1',
+          importRunId: 'import-1',
+          comparisonId: 'comparison-1',
+          provider: 'aws',
+          estimatedTotalUsd: 100,
+          invoicedTotalUsd: 107,
+          varianceUsd: 7,
+          variancePercent: 7,
+          status: 'variance-warning',
+          evidence: {
+            invoiceGradeArtifactRegister: {
+              reviewApprovedCount: 1,
+              artifacts: [
+                {
+                  id: 'artifact-1',
+                  reviewStatus: 'approved',
+                },
+              ],
+            },
+          },
+          createdAt: '2026-07-06T00:00:02.000Z',
+        }),
+      );
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(client.listInvoiceArtifactReviews('import-1', 'session-token')).resolves.toEqual([
+      expect.objectContaining({
+        artifactId: 'artifact-1',
+        reviewStatus: 'pending',
+      }),
+    ]);
+    await expect(
+      client.updateInvoiceArtifactReview(
+        'reconciliation-1',
+        'artifact-1',
+        {
+          reviewStatus: 'approved',
+          reviewer: 'finance-review@example.com',
+          evidenceReference: 'review://controls/artifact-1/approved',
+          notes: 'Approved for demo handoff.',
+        },
+        'session-token',
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        evidence: expect.objectContaining({
+          invoiceGradeArtifactRegister: expect.objectContaining({
+            reviewApprovedCount: 1,
+          }),
+        }),
+      }),
+    );
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'http://api.test/api/v1/billing/imports/import-1/artifact-reviews',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer session-token',
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://api.test/api/v1/billing/reconciliations/reconciliation-1/artifacts/artifact-1/review',
+      expect.objectContaining({
+        method: 'PATCH',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer session-token',
+        }),
+        body: JSON.stringify({
+          reviewStatus: 'approved',
+          reviewer: 'finance-review@example.com',
+          evidenceReference: 'review://controls/artifact-1/approved',
+          notes: 'Approved for demo handoff.',
+        }),
+      }),
+    );
+  });
+
   it('wires account lifecycle, team administration, SSO, and provider export routes', async () => {
     const member = {
       accountId: 'account-1',

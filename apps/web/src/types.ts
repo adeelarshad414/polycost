@@ -437,7 +437,9 @@ export type TeamAuditAction =
   | 'billing.reconciliation.created'
   | 'billing.reconciliation.artifact_registered'
   | 'billing.reconciliation.artifact_verified'
-  | 'billing.reconciliation.artifact_blob_uploaded';
+  | 'billing.reconciliation.artifact_blob_uploaded'
+  | 'billing.reconciliation.artifact_legal_hold_updated'
+  | 'billing.reconciliation.artifact_review_updated';
 
 export type TeamAuditTargetType =
   'team' | 'invitation' | 'member' | 'sso_provider' | 'billing_import' | 'billing_reconciliation';
@@ -634,6 +636,38 @@ export interface InvoiceArtifactBlobUploadInput {
 export interface InvoiceArtifactLegalHoldInput {
   legalHold: boolean;
   reason?: string;
+}
+
+export type InvoiceArtifactReviewStatus = 'not-requested' | 'pending' | 'approved' | 'rejected';
+
+export interface InvoiceArtifactReviewInput {
+  reviewStatus: Exclude<InvoiceArtifactReviewStatus, 'not-requested'>;
+  reviewer?: string;
+  dueAt?: string;
+  evidenceReference?: string;
+  notes?: string;
+}
+
+export interface InvoiceArtifactReviewQueueItem {
+  importRunId: string;
+  reconciliationId: string;
+  comparisonId: string;
+  provider: ProviderId;
+  artifactId: string;
+  artifactType: InvoiceGradeArtifactType;
+  displayName: string;
+  verificationStatus: 'registered' | 'verified' | 'rejected';
+  reviewStatus: InvoiceArtifactReviewStatus;
+  artifactBlobStored: boolean;
+  legalHold: boolean;
+  reviewer?: string;
+  dueAt?: string;
+  reviewRequestedAt?: string;
+  reviewRequestedByAccountId?: string;
+  reviewedAt?: string;
+  reviewedByAccountId?: string;
+  evidenceReference?: string;
+  notes?: string;
 }
 
 export interface InvoiceArtifactBlobGovernance {

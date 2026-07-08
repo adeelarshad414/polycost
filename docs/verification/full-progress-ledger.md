@@ -343,6 +343,18 @@ Evidence:
   Full local `npm run check` passed afterward with API `55` suites / `456` tests,
   web `11` suites / `143` tests, graph validation `320` nodes / `320` edges, and
   progress verification `153` anchors.
+- Phase 2.31 invoice artifact review workflow focused regressions passed: API `2`
+  suites / `69` tests (`auth-billing`, `api-database.repository`) and web `2`
+  suites / `87` tests (`App`, `api-client`). The phase adds audited Owner/Admin
+  review-state operations for stored invoice artifacts, including pending/approved/
+  rejected states, evidence metadata, aggregate review counts, and workspace
+  send/approve/reject controls while keeping external legal-review routing and
+  provider invoice-of-record validation as future scope. `npm run ci:lint` passed
+  with zero ESLint/typecheck warnings, and `npm run test:production-readiness` passed
+  with API `14` suites / `192` tests plus web `2` suites / `87` tests. Full local
+  `npm run check` passed afterward with API `55` suites / `459` tests, web `11`
+  suites / `144` tests, graph validation `320` nodes / `320` edges, and progress
+  verification `153` anchors.
 - Phase 2.9 focused regressions passed: API `3` suites / `52` tests
   (`auth-billing`, `diagram-parser`, `llm-classifier`) and web `1` suite / `57`
   tests (`App.spec.tsx`).

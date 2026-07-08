@@ -66,6 +66,8 @@ import {
   IntervalKey,
   InvoiceArtifactLegalHoldInput,
   InvoiceArtifactBlobUploadInput,
+  InvoiceArtifactReviewInput,
+  InvoiceArtifactReviewStatus,
   InvoiceGradeArtifactRegistrationInput,
   InvoiceGradeArtifactVerificationInput,
   InvoiceReconciliationRecord,
@@ -3024,6 +3026,62 @@ function WorkspaceControlCenter({
     }
   }
 
+  async function handleUpdateInvoiceArtifactReview(reviewStatus: InvoiceArtifactReviewStatus) {
+    if (
+      !token ||
+      billingAccessMessage ||
+      !reconciliation ||
+      !reconciliationSummary?.artifactId ||
+      !reconciliationSummary.artifactBlobStored ||
+      reviewStatus === 'not-requested'
+    ) {
+      onError(
+        billingAccessMessage ??
+          'Store an invoice artifact file before changing review workflow state.',
+      );
+      return;
+    }
+
+    setWorkspaceBusy(`billing-artifact-review-${reviewStatus}`);
+    onError(null);
+
+    try {
+      const reviewInput: InvoiceArtifactReviewInput = {
+        reviewStatus,
+        reviewer: 'finance-review@example.com',
+        ...(reviewStatus === 'pending'
+          ? {
+              notes: 'Submitted from workspace panel for finance/legal artifact review.',
+            }
+          : {
+              evidenceReference: `review://invoice-artifacts/${reconciliationSummary.artifactId}/${reviewStatus}`,
+              notes:
+                reviewStatus === 'approved'
+                  ? 'Demo reviewer approved artifact governance packet after checksum and retention review.'
+                  : 'Demo reviewer rejected artifact packet; provider invoice-of-record evidence is still incomplete.',
+            }),
+      };
+      const updated = await client.updateInvoiceArtifactReview(
+        reconciliation.id,
+        reconciliationSummary.artifactId,
+        reviewInput,
+        token,
+      );
+
+      setReconciliation(updated);
+      await refreshTeamAuditEvents();
+      onNotice(
+        reviewStatus === 'pending'
+          ? 'Invoice artifact sent to the review queue.'
+          : `Invoice artifact review ${reviewStatus}.`,
+      );
+    } catch (artifactError) {
+      onError(formatApiError(artifactError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
   async function handleVerifyInvoiceArtifact() {
     if (!token || billingAccessMessage || !reconciliation || !reconciliationSummary?.artifactId) {
       onError(
@@ -3796,6 +3854,15 @@ function WorkspaceControlCenter({
                           ? 'KMS required for production'
                           : 'KMS reference recorded'}
                       </small>
+                      <small>
+                        Review queue: {reconciliationSummary.artifactReviewStatus.replace('-', ' ')}
+                        {reconciliationSummary.artifactReviewReviewer
+                          ? ` · ${reconciliationSummary.artifactReviewReviewer}`
+                          : ''}{' '}
+                        · pending {reconciliationSummary.artifactReviewPendingCount} · approved{' '}
+                        {reconciliationSummary.artifactReviewApprovedCount} · rejected{' '}
+                        {reconciliationSummary.artifactReviewRejectedCount}
+                      </small>
                     </>
                   ) : reconciliationSummary.artifactId ? (
                     <small>
@@ -3863,6 +3930,52 @@ function WorkspaceControlCenter({
                         ? 'Release legal hold'
                         : 'Place legal hold'}
                     </Button>
+                  ) : null}
+                  {reconciliationSummary.artifactId &&
+                  reconciliationSummary.artifactBlobStored &&
+                  reconciliationSummary.artifactReviewStatus === 'not-requested' ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="compact"
+                      loading={workspaceBusy === 'billing-artifact-review-pending'}
+                      loadingLabel="Sending to review..."
+                      disabled={Boolean(billingAccessMessage)}
+                      onClick={() => void handleUpdateInvoiceArtifactReview('pending')}
+                    >
+                      <CompareIcon />
+                      Send to review
+                    </Button>
+                  ) : null}
+                  {reconciliationSummary.artifactId &&
+                  reconciliationSummary.artifactBlobStored &&
+                  reconciliationSummary.artifactReviewStatus === 'pending' ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="compact"
+                        loading={workspaceBusy === 'billing-artifact-review-approved'}
+                        loadingLabel="Approving review..."
+                        disabled={Boolean(billingAccessMessage)}
+                        onClick={() => void handleUpdateInvoiceArtifactReview('approved')}
+                      >
+                        <CompareIcon />
+                        Approve review
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="compact"
+                        loading={workspaceBusy === 'billing-artifact-review-rejected'}
+                        loadingLabel="Rejecting review..."
+                        disabled={Boolean(billingAccessMessage)}
+                        onClick={() => void handleUpdateInvoiceArtifactReview('rejected')}
+                      >
+                        <CompareIcon />
+                        Reject review
+                      </Button>
+                    </>
                   ) : null}
                   {reconciliationSummary.artifactId &&
                   reconciliationSummary.artifactVerifiedCount <
@@ -3971,6 +4084,10 @@ function teamAuditActionLabel(action: TeamAuditEventRecord['action']): string {
       return 'Billing artifact verified';
     case 'billing.reconciliation.artifact_blob_uploaded':
       return 'Billing artifact file stored';
+    case 'billing.reconciliation.artifact_legal_hold_updated':
+      return 'Billing artifact legal hold updated';
+    case 'billing.reconciliation.artifact_review_updated':
+      return 'Billing artifact review updated';
   }
 }
 
@@ -19828,6 +19945,13 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
   artifactMalwareScanStatus: string;
   artifactRetentionUntil?: string;
   artifactLegalHold: boolean;
+  artifactReviewStatus: InvoiceArtifactReviewStatus;
+  artifactReviewReviewer?: string;
+  artifactReviewRequestedAt?: string;
+  artifactReviewedAt?: string;
+  artifactReviewPendingCount: number;
+  artifactReviewApprovedCount: number;
+  artifactReviewRejectedCount: number;
   artifactKmsRequiredForProduction: boolean;
   artifactPrimaryCaveat: string;
   estimateComparableVarianceUsd: number;
@@ -19915,6 +20039,19 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
       ? { artifactRetentionUntil: stringValue(retentionPolicy.retentionUntil) }
       : {}),
     artifactLegalHold: booleanValue(retentionPolicy.legalHold),
+    artifactReviewStatus: invoiceArtifactReviewStatus(primaryArtifact?.reviewStatus),
+    ...(stringValue(primaryArtifact?.reviewReviewer)
+      ? { artifactReviewReviewer: stringValue(primaryArtifact?.reviewReviewer) }
+      : {}),
+    ...(stringValue(primaryArtifact?.reviewRequestedAt)
+      ? { artifactReviewRequestedAt: stringValue(primaryArtifact?.reviewRequestedAt) }
+      : {}),
+    ...(stringValue(primaryArtifact?.reviewedAt)
+      ? { artifactReviewedAt: stringValue(primaryArtifact?.reviewedAt) }
+      : {}),
+    artifactReviewPendingCount: numberValue(artifactRegister.reviewPendingCount),
+    artifactReviewApprovedCount: numberValue(artifactRegister.reviewApprovedCount),
+    artifactReviewRejectedCount: numberValue(artifactRegister.reviewRejectedCount),
     artifactKmsRequiredForProduction: booleanValue(storageProfile.kmsKeyRequiredForProduction),
     artifactPrimaryCaveat:
       artifactCaveats[0] ??
@@ -19934,6 +20071,19 @@ function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+}
+
+function invoiceArtifactReviewStatus(value: unknown): InvoiceArtifactReviewStatus {
+  if (
+    value === 'pending' ||
+    value === 'approved' ||
+    value === 'rejected' ||
+    value === 'not-requested'
+  ) {
+    return value;
+  }
+
+  return 'not-requested';
 }
 
 function stringValue(value: unknown): string | undefined {

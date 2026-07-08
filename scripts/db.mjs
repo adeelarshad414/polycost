@@ -41,6 +41,7 @@ const expectedMigrations = [
   '033_invoice_artifact_blob_governance.sql',
   '034_invoice_artifact_external_storage.sql',
   '035_team_audit_artifact_legal_hold_action.sql',
+  '036_team_audit_artifact_review_action.sql',
 ];
 
 if (!['migrate', 'seed', 'reset', 'validate'].includes(command)) {

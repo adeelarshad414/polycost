@@ -106,6 +106,38 @@ export interface InvoiceArtifactLegalHoldInput {
   reason?: string;
 }
 
+export type InvoiceArtifactReviewStatus = 'not-requested' | 'pending' | 'approved' | 'rejected';
+
+export interface InvoiceArtifactReviewInput {
+  reviewStatus: Exclude<InvoiceArtifactReviewStatus, 'not-requested'>;
+  reviewer?: string;
+  dueAt?: string;
+  evidenceReference?: string;
+  notes?: string;
+}
+
+export interface InvoiceArtifactReviewQueueItem {
+  importRunId: string;
+  reconciliationId: string;
+  comparisonId: string;
+  provider: ProviderId;
+  artifactId: string;
+  artifactType: InvoiceGradeArtifactType;
+  displayName: string;
+  verificationStatus: InvoiceGradeArtifactVerificationStatus;
+  reviewStatus: InvoiceArtifactReviewStatus;
+  artifactBlobStored: boolean;
+  legalHold: boolean;
+  reviewer?: string;
+  dueAt?: string;
+  reviewRequestedAt?: string;
+  reviewRequestedByAccountId?: string;
+  reviewedAt?: string;
+  reviewedByAccountId?: string;
+  evidenceReference?: string;
+  notes?: string;
+}
+
 export interface InvoiceArtifactBlobGovernance {
   storageProfile: {
     storageBackend: InvoiceArtifactStorageBackend;
@@ -189,6 +221,15 @@ export interface InvoiceGradeArtifactRecord extends InvoiceGradeArtifactRegistra
   verifiedSha256?: string;
   verificationControlTotalUsd?: number;
   verificationControlTotalDeltaUsd?: number;
+  reviewStatus?: InvoiceArtifactReviewStatus;
+  reviewRequestedAt?: string;
+  reviewRequestedByAccountId?: string;
+  reviewReviewer?: string;
+  reviewDueAt?: string;
+  reviewEvidenceReference?: string;
+  reviewNotes?: string;
+  reviewedAt?: string;
+  reviewedByAccountId?: string;
   storedBlob?: {
     storageStatus: 'stored';
     storageMode: InvoiceArtifactStorageBackend;

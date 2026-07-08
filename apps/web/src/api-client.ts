@@ -15,6 +15,8 @@ import {
   InvoiceArtifactRetentionEnforcementResult,
   InvoiceArtifactBlobUploadInput,
   InvoiceArtifactLegalHoldInput,
+  InvoiceArtifactReviewInput,
+  InvoiceArtifactReviewQueueItem,
   InvoiceArtifactStorageReadiness,
   InvoiceGradeArtifactRegistrationInput,
   InvoiceGradeArtifactVerificationInput,
@@ -242,6 +244,10 @@ export interface PolyCostClient {
     importRunId: string,
     token: string,
   ): Promise<InvoiceReconciliationRecord[]>;
+  listInvoiceArtifactReviews(
+    importRunId: string,
+    token: string,
+  ): Promise<InvoiceArtifactReviewQueueItem[]>;
   registerInvoiceGradeArtifact(
     reconciliationId: string,
     input: InvoiceGradeArtifactRegistrationInput,
@@ -263,6 +269,12 @@ export interface PolyCostClient {
     reconciliationId: string,
     artifactId: string,
     input: InvoiceArtifactLegalHoldInput,
+    token: string,
+  ): Promise<InvoiceReconciliationRecord>;
+  updateInvoiceArtifactReview(
+    reconciliationId: string,
+    artifactId: string,
+    input: InvoiceArtifactReviewInput,
     token: string,
   ): Promise<InvoiceReconciliationRecord>;
   downloadInvoiceArtifactBlob(
@@ -693,6 +705,15 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         },
       );
     },
+    listInvoiceArtifactReviews(importRunId, token) {
+      return requestJson<InvoiceArtifactReviewQueueItem[]>(
+        baseUrl,
+        `/billing/imports/${encodeURIComponent(importRunId)}/artifact-reviews`,
+        {
+          headers: authorizationHeaders(token),
+        },
+      );
+    },
     registerInvoiceGradeArtifact(reconciliationId, input, token) {
       return requestJson<InvoiceReconciliationRecord>(
         baseUrl,
@@ -736,6 +757,19 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         `/billing/reconciliations/${encodeURIComponent(
           reconciliationId,
         )}/artifacts/${encodeURIComponent(artifactId)}/blob/legal-hold`,
+        {
+          method: 'PATCH',
+          headers: authorizationHeaders(token),
+          body: JSON.stringify(input),
+        },
+      );
+    },
+    updateInvoiceArtifactReview(reconciliationId, artifactId, input, token) {
+      return requestJson<InvoiceReconciliationRecord>(
+        baseUrl,
+        `/billing/reconciliations/${encodeURIComponent(
+          reconciliationId,
+        )}/artifacts/${encodeURIComponent(artifactId)}/review`,
         {
           method: 'PATCH',
           headers: authorizationHeaders(token),

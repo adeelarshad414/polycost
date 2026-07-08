@@ -13,6 +13,9 @@ import {
   InvoiceArtifactLegalHoldInput,
   InvoiceArtifactBlobRecord,
   InvoiceArtifactBlobUploadInput,
+  InvoiceArtifactReviewInput,
+  InvoiceArtifactReviewQueueItem,
+  InvoiceArtifactReviewStatus,
   InvoiceArtifactStorageReadiness,
   BillingImportInput,
   BillingImportResponse,
@@ -322,6 +325,28 @@ export class BillingService {
     assertTeamAccess(importRun.teamId, identity);
 
     return this.repository.listInvoiceReconciliations(importRunId);
+  }
+
+  async listInvoiceArtifactReviews(
+    importRunId: string,
+    identity: AuthIdentity,
+  ): Promise<InvoiceArtifactReviewQueueItem[]> {
+    assertBillingAdmin(identity);
+    const importRun = await this.repository.getBillingImport(importRunId);
+
+    if (!importRun) {
+      throw new ApiNotFoundError(`Billing import ${importRunId} was not found`);
+    }
+
+    assertTeamAccess(importRun.teamId, identity);
+
+    const reconciliations = await this.repository.listInvoiceReconciliations(importRunId);
+
+    return reconciliations.flatMap((reconciliation) =>
+      invoiceGradeArtifactsFromEvidence(reconciliation.evidence).map((artifact) =>
+        invoiceArtifactReviewQueueItem(reconciliation, artifact),
+      ),
+    );
   }
 
   async registerInvoiceGradeArtifact(
@@ -652,6 +677,78 @@ export class BillingService {
                 artifactId,
                 legalHold: input.legalHold,
                 ...(input.reason ? { reason: input.reason } : {}),
+              },
+            },
+          }
+        : {}),
+    });
+  }
+
+  async updateInvoiceArtifactReview(
+    reconciliationId: string,
+    artifactId: string,
+    body: unknown,
+    identity: AuthIdentity,
+  ): Promise<InvoiceReconciliationRecord> {
+    assertBillingAdmin(identity);
+    const input = parseInvoiceArtifactReviewInput(body);
+    const reconciliation = await this.repository.getInvoiceReconciliation(reconciliationId);
+
+    if (!reconciliation) {
+      throw new ApiNotFoundError(`Invoice reconciliation ${reconciliationId} was not found`);
+    }
+
+    const importRun = await this.repository.getBillingImport(reconciliation.importRunId);
+
+    if (!importRun) {
+      throw new ApiNotFoundError(
+        `Billing import ${reconciliation.importRunId} was not found for reconciliation ${reconciliationId}`,
+      );
+    }
+
+    assertTeamAccess(importRun.teamId, identity);
+
+    const artifacts = invoiceGradeArtifactsFromEvidence(reconciliation.evidence);
+    const artifact = artifacts.find((candidate) => candidate.id === artifactId);
+
+    if (!artifact) {
+      throw new ApiNotFoundError(
+        `Invoice artifact ${artifactId} was not found for reconciliation ${reconciliationId}`,
+      );
+    }
+
+    if (!artifact.storedBlob) {
+      throw new ApiValidationError('invoice artifact file is not stored', [
+        {
+          field: 'artifactId',
+          issue: 'store the artifact file before changing review workflow state',
+        },
+      ]);
+    }
+
+    const updatedArtifact = reviewedInvoiceGradeArtifact(artifact, input, identity);
+    const evidence = replaceInvoiceGradeArtifactEvidence(reconciliation, updatedArtifact);
+
+    return this.repository.updateInvoiceReconciliationEvidence({
+      reconciliationId,
+      evidence,
+      ...(importRun.teamId
+        ? {
+            audit: {
+              teamId: importRun.teamId,
+              actorAccountId: identity.accountId,
+              action: 'billing.reconciliation.artifact_review_updated',
+              targetType: 'billing_reconciliation',
+              targetId: reconciliationId,
+              metadata: {
+                importRunId: importRun.id,
+                comparisonId: reconciliation.comparisonId,
+                provider: reconciliation.provider,
+                artifactId,
+                reviewStatus: input.reviewStatus,
+                ...(input.reviewer ? { reviewer: input.reviewer } : {}),
+                ...(input.dueAt ? { dueAt: input.dueAt } : {}),
+                ...(input.evidenceReference ? { evidenceReference: input.evidenceReference } : {}),
               },
             },
           }
@@ -1854,6 +1951,53 @@ function parseInvoiceArtifactLegalHoldInput(body: unknown): InvoiceArtifactLegal
   };
 }
 
+function parseInvoiceArtifactReviewInput(body: unknown): InvoiceArtifactReviewInput {
+  const record = requireRecord(body, 'Invoice artifact review request body must be an object');
+  const input: InvoiceArtifactReviewInput = {
+    reviewStatus: parseInvoiceArtifactReviewStatus(record.reviewStatus),
+    ...(parseOptionalString(record.reviewer, 160)
+      ? { reviewer: parseOptionalString(record.reviewer, 160) }
+      : {}),
+    ...(record.dueAt !== undefined ? { dueAt: parseIsoDateTime(record.dueAt, 'dueAt') } : {}),
+    ...(parseOptionalString(record.evidenceReference, 500)
+      ? { evidenceReference: parseOptionalString(record.evidenceReference, 500) }
+      : {}),
+    ...(parseOptionalString(record.notes, 800)
+      ? { notes: parseOptionalString(record.notes, 800) }
+      : {}),
+  };
+
+  if (
+    (input.reviewStatus === 'approved' || input.reviewStatus === 'rejected') &&
+    !input.evidenceReference &&
+    !input.notes
+  ) {
+    throw new ApiValidationError('artifact review decision requires evidence', [
+      {
+        field: 'evidenceReference',
+        issue: 'supply evidenceReference or notes before approving or rejecting review',
+      },
+    ]);
+  }
+
+  return input;
+}
+
+function parseInvoiceArtifactReviewStatus(
+  value: unknown,
+): InvoiceArtifactReviewInput['reviewStatus'] {
+  if (value === 'pending' || value === 'approved' || value === 'rejected') {
+    return value;
+  }
+
+  throw new ApiValidationError('artifact review status is unsupported', [
+    {
+      field: 'reviewStatus',
+      issue: 'must be pending, approved, or rejected',
+    },
+  ]);
+}
+
 function parseArtifactFileName(value: unknown): string {
   const fileName = parseRequiredString(value, 'fileName', 180);
 
@@ -2932,6 +3076,44 @@ function legalHoldInvoiceGradeArtifact(
   };
 }
 
+function reviewedInvoiceGradeArtifact(
+  artifact: InvoiceGradeArtifactRecord,
+  input: InvoiceArtifactReviewInput,
+  identity: AuthIdentity,
+): InvoiceGradeArtifactRecord {
+  const timestamp = new Date().toISOString();
+  const requestedAt = artifact.reviewRequestedAt ?? timestamp;
+  const requestedByAccountId = artifact.reviewRequestedByAccountId ?? identity.accountId;
+
+  if (input.reviewStatus === 'pending') {
+    return {
+      ...artifact,
+      reviewStatus: 'pending',
+      reviewRequestedAt: requestedAt,
+      reviewRequestedByAccountId: requestedByAccountId,
+      reviewedAt: undefined,
+      reviewedByAccountId: undefined,
+      ...(input.reviewer ? { reviewReviewer: input.reviewer } : {}),
+      ...(input.dueAt ? { reviewDueAt: input.dueAt } : {}),
+      ...(input.evidenceReference ? { reviewEvidenceReference: input.evidenceReference } : {}),
+      ...(input.notes ? { reviewNotes: input.notes } : {}),
+    };
+  }
+
+  return {
+    ...artifact,
+    reviewStatus: input.reviewStatus,
+    reviewRequestedAt: requestedAt,
+    reviewRequestedByAccountId: requestedByAccountId,
+    reviewedAt: timestamp,
+    reviewedByAccountId: identity.accountId,
+    ...(input.reviewer ? { reviewReviewer: input.reviewer } : {}),
+    ...(input.dueAt ? { reviewDueAt: input.dueAt } : {}),
+    ...(input.evidenceReference ? { reviewEvidenceReference: input.evidenceReference } : {}),
+    ...(input.notes ? { reviewNotes: input.notes } : {}),
+  };
+}
+
 function governanceWithStoredObject(
   governance: InvoiceArtifactBlobGovernance,
   storedObject: StoredInvoiceArtifactObject,
@@ -3004,6 +3186,39 @@ function invoiceGradeArtifactsFromEvidence(
     .map((artifact) => artifact as unknown as InvoiceGradeArtifactRecord);
 }
 
+function invoiceArtifactReviewQueueItem(
+  reconciliation: InvoiceReconciliationRecord,
+  artifact: InvoiceGradeArtifactRecord,
+): InvoiceArtifactReviewQueueItem {
+  const legalHold = Boolean(artifact.storedBlob?.governance?.retentionPolicy.legalHold);
+
+  return {
+    importRunId: reconciliation.importRunId,
+    reconciliationId: reconciliation.id,
+    comparisonId: reconciliation.comparisonId,
+    provider: reconciliation.provider,
+    artifactId: artifact.id,
+    artifactType: artifact.type,
+    displayName: artifact.displayName,
+    verificationStatus: artifact.verificationStatus,
+    reviewStatus: artifact.reviewStatus ?? 'not-requested',
+    artifactBlobStored: Boolean(artifact.storedBlob),
+    legalHold,
+    ...(artifact.reviewReviewer ? { reviewer: artifact.reviewReviewer } : {}),
+    ...(artifact.reviewDueAt ? { dueAt: artifact.reviewDueAt } : {}),
+    ...(artifact.reviewRequestedAt ? { reviewRequestedAt: artifact.reviewRequestedAt } : {}),
+    ...(artifact.reviewRequestedByAccountId
+      ? { reviewRequestedByAccountId: artifact.reviewRequestedByAccountId }
+      : {}),
+    ...(artifact.reviewedAt ? { reviewedAt: artifact.reviewedAt } : {}),
+    ...(artifact.reviewedByAccountId ? { reviewedByAccountId: artifact.reviewedByAccountId } : {}),
+    ...(artifact.reviewEvidenceReference
+      ? { evidenceReference: artifact.reviewEvidenceReference }
+      : {}),
+    ...(artifact.reviewNotes ? { notes: artifact.reviewNotes } : {}),
+  };
+}
+
 function invoiceGradeArtifactRegister(
   artifacts: InvoiceGradeArtifactRecord[],
   reconciliation: InvoiceReconciliationRecord,
@@ -3017,6 +3232,31 @@ function invoiceGradeArtifactRegister(
 
     return counts;
   }, {});
+  let reviewNotRequestedCount = 0;
+  let reviewPendingCount = 0;
+  let reviewApprovedCount = 0;
+  let reviewRejectedCount = 0;
+
+  for (const artifact of artifacts) {
+    const status = artifact.reviewStatus ?? 'not-requested';
+
+    if (status === 'pending') {
+      reviewPendingCount += 1;
+    } else if (status === 'approved') {
+      reviewApprovedCount += 1;
+    } else if (status === 'rejected') {
+      reviewRejectedCount += 1;
+    } else {
+      reviewNotRequestedCount += 1;
+    }
+  }
+
+  const reviewCountsByStatus: Record<InvoiceArtifactReviewStatus, number> = {
+    'not-requested': reviewNotRequestedCount,
+    pending: reviewPendingCount,
+    approved: reviewApprovedCount,
+    rejected: reviewRejectedCount,
+  };
   const coverage = Object.entries(INVOICE_GRADE_ARTIFACT_CHECK_COVERAGE).map(
     ([readinessCheckId, acceptedTypes]) => {
       const matchingArtifacts = artifacts.filter((artifact) =>
@@ -3088,6 +3328,10 @@ function invoiceGradeArtifactRegister(
     registeredCount,
     verifiedCount,
     artifactCountsByType,
+    reviewCountsByStatus,
+    reviewPendingCount: reviewCountsByStatus.pending,
+    reviewApprovedCount: reviewCountsByStatus.approved,
+    reviewRejectedCount: reviewCountsByStatus.rejected,
     coverage,
     artifacts,
     controlTotalDeltas,
