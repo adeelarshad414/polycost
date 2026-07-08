@@ -20,6 +20,8 @@ import {
   InvoiceArtifactReviewQueueItem,
   InvoiceArtifactReviewStatus,
   InvoiceArtifactStorageReadiness,
+  InvoiceControlValidationInput,
+  InvoiceControlValidationStatus,
   BillingImportInput,
   BillingImportResponse,
   BillingProviderExportInput,
@@ -498,6 +500,109 @@ export class BillingService {
                 artifactId: artifact.id,
                 artifactType: artifact.type,
                 verificationStatus: artifact.verificationStatus,
+              },
+            },
+          }
+        : {}),
+    });
+  }
+
+  async validateInvoiceControlPacket(
+    reconciliationId: string,
+    artifactId: string,
+    body: unknown,
+    identity: AuthIdentity,
+  ): Promise<InvoiceReconciliationRecord> {
+    assertBillingAdmin(identity);
+    const input = parseInvoiceControlValidationInput(body);
+    const reconciliation = await this.repository.getInvoiceReconciliation(reconciliationId);
+
+    if (!reconciliation) {
+      throw new ApiNotFoundError(`Invoice reconciliation ${reconciliationId} was not found`);
+    }
+
+    const importRun = await this.repository.getBillingImport(reconciliation.importRunId);
+
+    if (!importRun) {
+      throw new ApiNotFoundError(
+        `Billing import ${reconciliation.importRunId} was not found for reconciliation ${reconciliationId}`,
+      );
+    }
+
+    assertTeamAccess(importRun.teamId, identity);
+
+    const artifacts = invoiceGradeArtifactsFromEvidence(reconciliation.evidence);
+    const artifact = artifacts.find((candidate) => candidate.id === artifactId);
+
+    if (!artifact) {
+      throw new ApiNotFoundError(
+        `Invoice artifact ${artifactId} was not found for reconciliation ${reconciliationId}`,
+      );
+    }
+
+    if (!artifact.storedBlob) {
+      throw new ApiValidationError('invoice artifact file is not stored', [
+        {
+          field: 'artifactId',
+          issue: 'store the artifact file before validating invoice control totals',
+        },
+      ]);
+    }
+
+    if (artifact.verificationStatus !== 'verified') {
+      throw new ApiValidationError('invoice artifact is not verified', [
+        {
+          field: 'artifactId',
+          issue: 'verify the invoice artifact before validating invoice control totals',
+        },
+      ]);
+    }
+
+    const controlTotalUsd = artifact.verificationControlTotalUsd ?? artifact.controlTotalUsd;
+
+    if (controlTotalUsd === undefined) {
+      throw new ApiValidationError('invoice artifact control total is missing', [
+        {
+          field: 'controlTotalUsd',
+          issue:
+            'supply a registered or verified controlTotalUsd before validating invoice control totals',
+        },
+      ]);
+    }
+
+    const validatedArtifact = invoiceControlValidatedArtifact(
+      artifact,
+      input,
+      reconciliation,
+      importRun,
+      identity,
+    );
+    const evidence = replaceInvoiceGradeArtifactEvidence(reconciliation, validatedArtifact);
+
+    return this.repository.updateInvoiceReconciliationEvidence({
+      reconciliationId,
+      evidence,
+      ...(importRun.teamId
+        ? {
+            audit: {
+              teamId: importRun.teamId,
+              actorAccountId: identity.accountId,
+              action: 'billing.reconciliation.invoice_control_validated',
+              targetType: 'billing_reconciliation',
+              targetId: reconciliationId,
+              metadata: {
+                importRunId: importRun.id,
+                comparisonId: reconciliation.comparisonId,
+                provider: reconciliation.provider,
+                artifactId,
+                artifactType: artifact.type,
+                validationStatus: validatedArtifact.invoiceControlValidationStatus,
+                controlTotalUsd,
+                controlTotalDeltaUsd: validatedArtifact.invoiceControlTotalDeltaUsd,
+                importTotalDeltaUsd: validatedArtifact.invoiceControlImportDeltaUsd,
+                acceptedVarianceUsd: validatedArtifact.invoiceControlAcceptedVarianceUsd,
+                periodMatched: validatedArtifact.invoiceControlPeriodMatched,
+                ...(input.evidenceReference ? { evidenceReference: input.evidenceReference } : {}),
               },
             },
           }
@@ -2171,6 +2276,38 @@ function parseInvoiceArtifactPolicyExceptionStatus(
   ]);
 }
 
+function parseInvoiceControlValidationInput(body: unknown): InvoiceControlValidationInput {
+  const record =
+    body === undefined || body === null
+      ? {}
+      : requireRecord(body, 'Invoice control validation request body must be an object');
+  const acceptedVarianceUsd =
+    record.acceptedVarianceUsd !== undefined
+      ? parseFiniteNumber(record.acceptedVarianceUsd, 'acceptedVarianceUsd')
+      : undefined;
+
+  if (
+    acceptedVarianceUsd !== undefined &&
+    (acceptedVarianceUsd < 0 || acceptedVarianceUsd > 100_000)
+  ) {
+    throw new ApiValidationError('acceptedVarianceUsd is invalid', [
+      {
+        field: 'acceptedVarianceUsd',
+        issue: 'must be between 0 and 100000',
+      },
+    ]);
+  }
+
+  const evidenceReference = parseOptionalString(record.evidenceReference, 500);
+  const notes = parseOptionalString(record.notes, 1000);
+
+  return {
+    ...(acceptedVarianceUsd !== undefined ? { acceptedVarianceUsd } : {}),
+    ...(evidenceReference ? { evidenceReference } : {}),
+    ...(notes ? { notes } : {}),
+  };
+}
+
 function parseArtifactFileName(value: unknown): string {
   const fileName = parseRequiredString(value, 'fileName', 180);
 
@@ -3331,6 +3468,79 @@ function policyExceptionInvoiceGradeArtifact(
   };
 }
 
+function invoiceControlValidatedArtifact(
+  artifact: InvoiceGradeArtifactRecord,
+  input: InvoiceControlValidationInput,
+  reconciliation: InvoiceReconciliationRecord,
+  importRun: BillingImportResponse['importRun'],
+  identity: AuthIdentity,
+): InvoiceGradeArtifactRecord {
+  const controlTotalUsd = artifact.verificationControlTotalUsd ?? artifact.controlTotalUsd;
+
+  if (controlTotalUsd === undefined) {
+    throw new ApiValidationError('invoice artifact control total is missing', [
+      {
+        field: 'controlTotalUsd',
+        issue:
+          'supply a registered or verified controlTotalUsd before validating invoice control totals',
+      },
+    ]);
+  }
+
+  const acceptedVarianceUsd = input.acceptedVarianceUsd ?? 0.01;
+  const totalDeltaUsd = roundCurrency(controlTotalUsd - reconciliation.invoicedTotalUsd);
+  const importDeltaUsd = roundCurrency(controlTotalUsd - importRun.totalCostUsd);
+  const periodMatched =
+    (!artifact.billingPeriodStart ||
+      artifact.billingPeriodStart === importRun.billingPeriodStart) &&
+    (!artifact.billingPeriodEnd || artifact.billingPeriodEnd === importRun.billingPeriodEnd);
+  const validationStatus = invoiceControlValidationStatusForDeltas(
+    totalDeltaUsd,
+    importDeltaUsd,
+    acceptedVarianceUsd,
+    periodMatched,
+  );
+
+  return {
+    ...artifact,
+    invoiceControlValidationStatus: validationStatus,
+    invoiceControlValidatedAt: new Date().toISOString(),
+    invoiceControlValidatedByAccountId: identity.accountId,
+    invoiceControlAcceptedVarianceUsd: acceptedVarianceUsd,
+    invoiceControlTotalDeltaUsd: totalDeltaUsd,
+    invoiceControlImportDeltaUsd: importDeltaUsd,
+    invoiceControlPeriodMatched: periodMatched,
+    ...(input.evidenceReference
+      ? { invoiceControlEvidenceReference: input.evidenceReference }
+      : {}),
+    ...(input.notes ? { invoiceControlNotes: input.notes } : {}),
+  };
+}
+
+function invoiceControlValidationStatusForDeltas(
+  totalDeltaUsd: number,
+  importDeltaUsd: number,
+  acceptedVarianceUsd: number,
+  periodMatched: boolean,
+): InvoiceControlValidationStatus {
+  if (!periodMatched) {
+    return 'mismatch';
+  }
+
+  const absoluteTotalDelta = Math.abs(totalDeltaUsd);
+  const absoluteImportDelta = Math.abs(importDeltaUsd);
+
+  if (absoluteTotalDelta <= 0.01 && absoluteImportDelta <= 0.01) {
+    return 'matched';
+  }
+
+  if (absoluteTotalDelta <= acceptedVarianceUsd && absoluteImportDelta <= acceptedVarianceUsd) {
+    return 'variance-warning';
+  }
+
+  return 'mismatch';
+}
+
 function governanceWithStoredObject(
   governance: InvoiceArtifactBlobGovernance,
   storedObject: StoredInvoiceArtifactObject,
@@ -3556,6 +3766,31 @@ function invoiceGradeArtifactRegister(
     rejected: exceptionRejectedCount,
     expired: exceptionExpiredCount,
   };
+  let invoiceControlNotRunCount = 0;
+  let invoiceControlMatchedCount = 0;
+  let invoiceControlVarianceWarningCount = 0;
+  let invoiceControlMismatchCount = 0;
+
+  for (const artifact of artifacts) {
+    const status = artifactInvoiceControlValidationStatus(artifact);
+
+    if (status === 'matched') {
+      invoiceControlMatchedCount += 1;
+    } else if (status === 'variance-warning') {
+      invoiceControlVarianceWarningCount += 1;
+    } else if (status === 'mismatch') {
+      invoiceControlMismatchCount += 1;
+    } else {
+      invoiceControlNotRunCount += 1;
+    }
+  }
+
+  const invoiceControlValidationCountsByStatus: Record<InvoiceControlValidationStatus, number> = {
+    'not-run': invoiceControlNotRunCount,
+    matched: invoiceControlMatchedCount,
+    'variance-warning': invoiceControlVarianceWarningCount,
+    mismatch: invoiceControlMismatchCount,
+  };
   const coverage = Object.entries(INVOICE_GRADE_ARTIFACT_CHECK_COVERAGE).map(
     ([readinessCheckId, acceptedTypes]) => {
       const matchingArtifacts = artifacts.filter((artifact) =>
@@ -3594,6 +3829,7 @@ function invoiceGradeArtifactRegister(
           type: artifact.type,
           displayName: artifact.displayName,
           verificationStatus: artifact.verificationStatus,
+          invoiceControlValidationStatus: artifactInvoiceControlValidationStatus(artifact),
         })),
       };
     },
@@ -3636,14 +3872,25 @@ function invoiceGradeArtifactRegister(
     policyExceptionApprovedCount: policyExceptionCountsByStatus.approved,
     policyExceptionRejectedCount: policyExceptionCountsByStatus.rejected,
     policyExceptionExpiredCount: policyExceptionCountsByStatus.expired,
+    invoiceControlValidationCountsByStatus,
+    invoiceControlMatchedCount: invoiceControlValidationCountsByStatus.matched,
+    invoiceControlVarianceWarningCount,
+    invoiceControlMismatchCount: invoiceControlValidationCountsByStatus.mismatch,
+    invoiceControlNotRunCount,
     coverage,
     artifacts,
     controlTotalDeltas,
     caveats: [
-      'Artifact metadata is registered for traceability only; files, contracts, and invoice controls are not verified by PolyCost yet.',
+      'Artifact metadata is registered for traceability; stored and verified control packets can be matched against imported and reconciled totals but are not provider-authenticated invoice rendering.',
       'Invoice-grade status remains blocked until provider invoice controls, private pricing, tax, commitment, and allocation evidence are independently verified.',
     ],
   };
+}
+
+function artifactInvoiceControlValidationStatus(
+  artifact: InvoiceGradeArtifactRecord,
+): InvoiceControlValidationStatus {
+  return artifact.invoiceControlValidationStatus ?? 'not-run';
 }
 
 function artifactCoversAcceptedType(

@@ -70,6 +70,8 @@ import {
   InvoiceArtifactPolicyExceptionStatus,
   InvoiceArtifactReviewInput,
   InvoiceArtifactReviewStatus,
+  InvoiceControlValidationInput,
+  InvoiceControlValidationStatus,
   InvoiceGradeArtifactRegistrationInput,
   InvoiceGradeArtifactVerificationInput,
   InvoiceReconciliationRecord,
@@ -3196,6 +3198,55 @@ function WorkspaceControlCenter({
     }
   }
 
+  async function handleValidateInvoiceControlPacket() {
+    if (
+      !token ||
+      billingAccessMessage ||
+      !reconciliation ||
+      !reconciliationSummary?.artifactId ||
+      !reconciliationSummary.artifactBlobStored ||
+      reconciliationSummary.artifactVerifiedCount < 1
+    ) {
+      onError(
+        billingAccessMessage ??
+          'Store and verify an invoice artifact before validating invoice control totals.',
+      );
+      return;
+    }
+
+    setWorkspaceBusy('billing-invoice-control-validate');
+    onError(null);
+
+    try {
+      const validationInput: InvoiceControlValidationInput = {
+        acceptedVarianceUsd: 0.01,
+        evidenceReference: `invoice-control://invoice-artifacts/${reconciliationSummary.artifactId}`,
+        notes:
+          'Control packet validation compares stored artifact total against imported actuals and reconciliation totals.',
+      };
+      const updated = await client.validateInvoiceControlPacket(
+        reconciliation.id,
+        reconciliationSummary.artifactId,
+        validationInput,
+        token,
+      );
+      const updatedSummary = reconciliationEvidenceSummary(updated);
+
+      setReconciliation(updated);
+      await refreshTeamAuditEvents();
+      onNotice(
+        `Invoice control validation ${updatedSummary.artifactInvoiceControlValidationStatus.replace(
+          '-',
+          ' ',
+        )}.`,
+      );
+    } catch (artifactError) {
+      onError(formatApiError(artifactError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
   return (
     <section className="workspace-control-center" id="workspace" aria-label="Workspace controls">
       <div className="workspace-control-heading">
@@ -3954,6 +4005,32 @@ function WorkspaceControlCenter({
                         rejected {reconciliationSummary.artifactPolicyExceptionRejectedCount} ·
                         expired {reconciliationSummary.artifactPolicyExceptionExpiredCount}
                       </small>
+                      <small>
+                        Invoice control:{' '}
+                        {reconciliationSummary.artifactInvoiceControlValidationStatus.replace(
+                          '-',
+                          ' ',
+                        )}{' '}
+                        · reconciliation delta{' '}
+                        {formatSignedCurrency(
+                          reconciliationSummary.artifactInvoiceControlTotalDeltaUsd,
+                        )}{' '}
+                        · import delta{' '}
+                        {formatSignedCurrency(
+                          reconciliationSummary.artifactInvoiceControlImportDeltaUsd,
+                        )}{' '}
+                        · period{' '}
+                        {reconciliationSummary.artifactInvoiceControlValidationStatus === 'not-run'
+                          ? 'pending'
+                          : reconciliationSummary.artifactInvoiceControlPeriodMatched
+                            ? 'matched'
+                            : 'not matched'}{' '}
+                        {reconciliationSummary.artifactInvoiceControlValidatedAt
+                          ? `· ${formatDateTime(
+                              reconciliationSummary.artifactInvoiceControlValidatedAt,
+                            )}`
+                          : ''}
+                      </small>
                     </>
                   ) : reconciliationSummary.artifactId ? (
                     <small>
@@ -4131,6 +4208,22 @@ function WorkspaceControlCenter({
                       Verify artifact evidence
                     </Button>
                   ) : null}
+                  {reconciliationSummary.artifactId &&
+                  reconciliationSummary.artifactBlobStored &&
+                  reconciliationSummary.artifactVerifiedCount > 0 ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="compact"
+                      loading={workspaceBusy === 'billing-invoice-control-validate'}
+                      loadingLabel="Validating controls..."
+                      disabled={Boolean(billingAccessMessage)}
+                      onClick={handleValidateInvoiceControlPacket}
+                    >
+                      <CompareIcon />
+                      Validate invoice control
+                    </Button>
+                  ) : null}
                   {reconciliationSummary.commitmentLineItemCount > 0 ? (
                     <>
                       <small>
@@ -4228,6 +4321,8 @@ function teamAuditActionLabel(action: TeamAuditEventRecord['action']): string {
       return 'Billing artifact review updated';
     case 'billing.reconciliation.artifact_exception_updated':
       return 'Billing artifact policy exception updated';
+    case 'billing.reconciliation.invoice_control_validated':
+      return 'Billing invoice control validated';
   }
 }
 
@@ -20100,6 +20195,15 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
   artifactPolicyExceptionApprovedCount: number;
   artifactPolicyExceptionRejectedCount: number;
   artifactPolicyExceptionExpiredCount: number;
+  artifactInvoiceControlValidationStatus: InvoiceControlValidationStatus;
+  artifactInvoiceControlValidatedAt?: string;
+  artifactInvoiceControlTotalDeltaUsd: number;
+  artifactInvoiceControlImportDeltaUsd: number;
+  artifactInvoiceControlPeriodMatched: boolean;
+  artifactInvoiceControlMatchedCount: number;
+  artifactInvoiceControlVarianceWarningCount: number;
+  artifactInvoiceControlMismatchCount: number;
+  artifactInvoiceControlNotRunCount: number;
   artifactKmsRequiredForProduction: boolean;
   artifactPrimaryCaveat: string;
   estimateComparableVarianceUsd: number;
@@ -20223,6 +20327,27 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
       artifactRegister.policyExceptionRejectedCount,
     ),
     artifactPolicyExceptionExpiredCount: numberValue(artifactRegister.policyExceptionExpiredCount),
+    artifactInvoiceControlValidationStatus: invoiceControlValidationStatus(
+      primaryArtifact?.invoiceControlValidationStatus,
+    ),
+    ...(stringValue(primaryArtifact?.invoiceControlValidatedAt)
+      ? {
+          artifactInvoiceControlValidatedAt: stringValue(
+            primaryArtifact?.invoiceControlValidatedAt,
+          ),
+        }
+      : {}),
+    artifactInvoiceControlTotalDeltaUsd: numberValue(primaryArtifact?.invoiceControlTotalDeltaUsd),
+    artifactInvoiceControlImportDeltaUsd: numberValue(
+      primaryArtifact?.invoiceControlImportDeltaUsd,
+    ),
+    artifactInvoiceControlPeriodMatched: booleanValue(primaryArtifact?.invoiceControlPeriodMatched),
+    artifactInvoiceControlMatchedCount: numberValue(artifactRegister.invoiceControlMatchedCount),
+    artifactInvoiceControlVarianceWarningCount: numberValue(
+      artifactRegister.invoiceControlVarianceWarningCount,
+    ),
+    artifactInvoiceControlMismatchCount: numberValue(artifactRegister.invoiceControlMismatchCount),
+    artifactInvoiceControlNotRunCount: numberValue(artifactRegister.invoiceControlNotRunCount),
     artifactKmsRequiredForProduction: booleanValue(storageProfile.kmsKeyRequiredForProduction),
     artifactPrimaryCaveat:
       artifactCaveats[0] ??
@@ -20276,6 +20401,19 @@ function invoiceArtifactPolicyExceptionStatus(
   }
 
   return 'not-requested';
+}
+
+function invoiceControlValidationStatus(value: unknown): InvoiceControlValidationStatus {
+  if (
+    value === 'matched' ||
+    value === 'variance-warning' ||
+    value === 'mismatch' ||
+    value === 'not-run'
+  ) {
+    return value;
+  }
+
+  return 'not-run';
 }
 
 function stringValue(value: unknown): string | undefined {

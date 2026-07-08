@@ -20,6 +20,7 @@ import {
   InvoiceArtifactReviewInput,
   InvoiceArtifactReviewQueueItem,
   InvoiceArtifactStorageReadiness,
+  InvoiceControlValidationInput,
   InvoiceGradeArtifactRegistrationInput,
   InvoiceGradeArtifactVerificationInput,
   ComparisonAnalyticsResponse,
@@ -263,6 +264,12 @@ export interface PolyCostClient {
     reconciliationId: string,
     artifactId: string,
     input: InvoiceGradeArtifactVerificationInput,
+    token: string,
+  ): Promise<InvoiceReconciliationRecord>;
+  validateInvoiceControlPacket(
+    reconciliationId: string,
+    artifactId: string,
+    input: InvoiceControlValidationInput,
     token: string,
   ): Promise<InvoiceReconciliationRecord>;
   uploadInvoiceArtifactBlob(
@@ -752,6 +759,19 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         `/billing/reconciliations/${encodeURIComponent(
           reconciliationId,
         )}/artifacts/${encodeURIComponent(artifactId)}/verification`,
+        {
+          method: 'POST',
+          headers: authorizationHeaders(token),
+          body: JSON.stringify(input),
+        },
+      );
+    },
+    validateInvoiceControlPacket(reconciliationId, artifactId, input, token) {
+      return requestJson<InvoiceReconciliationRecord>(
+        baseUrl,
+        `/billing/reconciliations/${encodeURIComponent(
+          reconciliationId,
+        )}/artifacts/${encodeURIComponent(artifactId)}/invoice-control-validation`,
         {
           method: 'POST',
           headers: authorizationHeaders(token),

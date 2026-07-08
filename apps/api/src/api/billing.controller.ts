@@ -69,6 +69,21 @@ export class BillingController {
     );
   }
 
+  @Post('reconciliations/:id/artifacts/:artifactId/invoice-control-validation')
+  validateInvoiceControlPacket(
+    @Param('id') reconciliationId: string,
+    @Param('artifactId') artifactId: string,
+    @Body() body: unknown,
+    @Req() request: RequestWithAuth,
+  ) {
+    return this.billingService.validateInvoiceControlPacket(
+      reconciliationId,
+      artifactId,
+      body,
+      request.auth!,
+    );
+  }
+
   @Post('reconciliations/:id/artifacts/:artifactId/blob')
   uploadInvoiceArtifactBlob(
     @Param('id') reconciliationId: string,

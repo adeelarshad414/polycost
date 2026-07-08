@@ -440,7 +440,8 @@ export type TeamAuditAction =
   | 'billing.reconciliation.artifact_blob_uploaded'
   | 'billing.reconciliation.artifact_legal_hold_updated'
   | 'billing.reconciliation.artifact_review_updated'
-  | 'billing.reconciliation.artifact_exception_updated';
+  | 'billing.reconciliation.artifact_exception_updated'
+  | 'billing.reconciliation.invoice_control_validated';
 
 export type TeamAuditTargetType =
   'team' | 'invitation' | 'member' | 'sso_provider' | 'billing_import' | 'billing_reconciliation';
@@ -703,6 +704,15 @@ export interface InvoiceArtifactPolicyExceptionQueueItem {
   requestedByAccountId?: string;
   decidedAt?: string;
   decidedByAccountId?: string;
+  evidenceReference?: string;
+  notes?: string;
+}
+
+export type InvoiceControlValidationStatus =
+  'not-run' | 'matched' | 'variance-warning' | 'mismatch';
+
+export interface InvoiceControlValidationInput {
+  acceptedVarianceUsd?: number;
   evidenceReference?: string;
   notes?: string;
 }

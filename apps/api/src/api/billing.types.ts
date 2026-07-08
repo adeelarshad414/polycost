@@ -174,6 +174,15 @@ export interface InvoiceArtifactPolicyExceptionQueueItem {
   notes?: string;
 }
 
+export type InvoiceControlValidationStatus =
+  'not-run' | 'matched' | 'variance-warning' | 'mismatch';
+
+export interface InvoiceControlValidationInput {
+  acceptedVarianceUsd?: number;
+  evidenceReference?: string;
+  notes?: string;
+}
+
 export interface InvoiceArtifactBlobGovernance {
   storageProfile: {
     storageBackend: InvoiceArtifactStorageBackend;
@@ -276,6 +285,15 @@ export interface InvoiceGradeArtifactRecord extends InvoiceGradeArtifactRegistra
   policyExceptionNotes?: string;
   policyExceptionDecidedAt?: string;
   policyExceptionDecidedByAccountId?: string;
+  invoiceControlValidationStatus?: InvoiceControlValidationStatus;
+  invoiceControlValidatedAt?: string;
+  invoiceControlValidatedByAccountId?: string;
+  invoiceControlEvidenceReference?: string;
+  invoiceControlNotes?: string;
+  invoiceControlAcceptedVarianceUsd?: number;
+  invoiceControlTotalDeltaUsd?: number;
+  invoiceControlImportDeltaUsd?: number;
+  invoiceControlPeriodMatched?: boolean;
   storedBlob?: {
     storageStatus: 'stored';
     storageMode: InvoiceArtifactStorageBackend;

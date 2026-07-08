@@ -368,6 +368,19 @@ Evidence:
   `npm run check` passed afterward with API `55` suites / `462` tests, web `11`
   suites / `145` tests, graph validation `320` nodes / `320` edges, and progress
   verification `153` anchors.
+- Phase 2.33 invoice control packet validation focused regressions passed: API `2`
+  suites / `74` tests (`auth-billing`, `api-database.repository`) and web `2`
+  suites / `89` tests (`App`, `api-client`). The phase adds audited Owner/Admin
+  invoice-control validation for stored and verified invoice artifacts, including
+  artifact control-total comparison against imported actuals and reconciliation
+  totals, period match state, validation evidence metadata, aggregate matched/
+  warning/mismatch counts, and workspace validation controls while keeping provider
+  invoice rendering and invoice-of-record validation as future scope. The focused
+  `npm run ci:lint` gate passed with zero ESLint/typecheck warnings, and
+  `npm run test:production-readiness` passed with API `14` suites / `197` tests
+  plus web `2` suites / `89` tests. Full local `npm run check` passed afterward
+  with API `55` suites / `464` tests, web `11` suites / `146` tests, graph
+  validation `320` nodes / `320` edges, and progress verification `153` anchors.
 - Phase 2.9 focused regressions passed: API `3` suites / `52` tests
   (`auth-billing`, `diagram-parser`, `llm-classifier`) and web `1` suite / `57`
   tests (`App.spec.tsx`).

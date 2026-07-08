@@ -1,7 +1,7 @@
 # PolyCost Production Readiness Report
 
 Date: 2026-07-08
-Branch: cumulative production-readiness branches through `codex/invoice-artifact-policy-exceptions`
+Branch: cumulative production-readiness branches through `codex/invoice-control-packet-validation`
 PR: local phase gate, PR created after verification
 Run spec: `docs/design/master-production-readiness-orchestrator-v2.md`
 
@@ -74,6 +74,7 @@ performance/accessibility/best-practices/SEO metrics.
 | INV-TRACE-015  | Improved      | Stored invoice artifacts now have an Owner/Admin legal-hold PATCH operation that updates blob rows and reconciliation evidence together, emits audit events, and exposes place/release controls in the workspace panel                                  |
 | INV-TRACE-016  | Improved      | Stored invoice artifacts now have an Owner/Admin review workflow with pending/approved/rejected states, review evidence metadata, aggregate review counts, audit events, and workspace send/approve/reject controls                                     |
 | INV-TRACE-017  | Improved      | Stored invoice artifacts now have an Owner/Admin policy exception lifecycle with request/approve/reject states, future-expiry enforcement, computed expired status, aggregate counts, audit events, and workspace controls                              |
+| INV-TRACE-018  | Improved      | Stored and verified invoice artifacts can now run an audited control-packet validation comparing artifact control totals against both reconciliation totals and imported actuals, with matched/warning/mismatch counts                                  |
 | VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                                                                                             |
 | VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                                                                                             |
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                                                                                        |
@@ -88,6 +89,7 @@ performance/accessibility/best-practices/SEO metrics.
 | UI-AUTH-013    | Improved      | Workspace billing panel now surfaces stored-artifact governance status: scan result, retention date, legal-hold state, and KMS production-readiness                                                                                                     |
 | UI-AUTH-014    | Improved      | Workspace billing panel now surfaces artifact review status, reviewer evidence, and pending/approved/rejected review counts with guarded review actions for stored files                                                                                |
 | UI-AUTH-015    | Improved      | Workspace billing panel now surfaces policy exception status, reviewer, expiry, and requested/approved/rejected/expired counts with guarded exception actions for stored files                                                                          |
+| UI-AUTH-016    | Improved      | Workspace billing panel now surfaces invoice control validation status, reconciliation/import deltas, period match state, validation timestamp, and a guarded validation action for stored verified artifacts                                           |
 | UI-AUTH-003    | Improved      | Active workspace switching is now backend-backed, membership-checked, and exposed in the signed-in account panel                                                                                                                                        |
 | UI-AUTH-004    | Improved      | Pending/expired workspace invites can now be resent through a guarded backend route that rotates the stored token hash and exposes the refreshed one-time token only in the response                                                                    |
 | UI-AUTH-005    | Improved      | Invite delivery now has local panel mode plus production HTTPS webhook mode with HMAC signatures, production config guards, and browser-safe delivery receipts                                                                                          |
@@ -237,6 +239,21 @@ Local static/regression gates:
     QA/security suppression hygiene, DB, DevOps, cloud, release, handover, and
     provider-credential gates passed. `npm run impeccable` remained the expected
     Node 24 skip under the repo's Node 20 target.
+- Phase 2.33 invoice control packet validation focused gate passed:
+  - API focused: `src/api/auth-billing.spec.ts` and
+    `src/api/api-database.repository.spec.ts`: 2 suites / 74 tests.
+  - Web focused: `src/App.spec.tsx` and `src/api-client.spec.ts`: 2 suites /
+    89 tests.
+  - `npm run ci:lint`: passed with zero ESLint/typecheck errors or warnings.
+  - `npm run test:production-readiness`: API 14 suites / 197 tests; web 2 suites /
+    89 tests.
+  - `npm run check`: API 55 suites / 464 tests; web 11 suites / 146 tests; graph
+    validation 320 nodes / 320 edges; pricing coverage, progress verification,
+    QA/security suppression hygiene, DB, DevOps, cloud, release, handover, and
+    provider-credential gates passed. `npm run impeccable` remained the expected
+    Node 24 skip under the repo's Node 20 target; DB validation skipped live
+    `schema_migrations` inspection because the local Postgres container was not
+    running.
 - Phase 2.25 final local floor passed:
   - `npm run test:production-readiness`: API 12 suites / 165 tests; web 2 suites /
     86 tests.
@@ -537,10 +554,11 @@ Machine-readable token evidence:
   deleting expired non-held database pointers. Phase 2.30 adds audited Owner/Admin
   legal-hold place/release operations for stored artifacts. Phase 2.31 adds an
   audited internal review-status workflow for stored artifacts. Phase 2.32 adds an
-  audited internal policy exception lifecycle with future-expiry enforcement. PolyCost
-  still does not provide provider invoice rendering, private contract validation,
-  external legal-review routing, contract/legal approval integration, or a full
-  external reviewer queue.
+  audited internal policy exception lifecycle with future-expiry enforcement. Phase
+  2.33 adds audited stored-artifact control-total validation against imported actuals
+  and reconciliation totals. PolyCost still does not provide provider invoice
+  rendering, private contract validation, external legal-review routing,
+  contract/legal approval integration, or a full external reviewer queue.
   Full invoice-grade billing remains future scope.
   PolyCost is still not the invoice system of record.
 - VSDX support now includes extraction/evidence and approximate SVG previews, not full

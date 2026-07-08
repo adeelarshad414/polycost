@@ -87,6 +87,10 @@ once tagged releases begin.
 - Invoice artifact policy exception lifecycle for stored reconciliation artifacts,
   including request/approve/reject state, future-expiry enforcement for approvals,
   aggregate exception counts, audit event, and workspace exception controls.
+- Invoice control packet validation for stored and verified reconciliation
+  artifacts, comparing artifact control totals with both imported actuals and
+  reconciliation totals, with match/warning/mismatch counts, audit events, and
+  workspace validation controls.
 - Invoice artifact storage readiness and retention enforcement foundation, including
   production-bound config guards for external object storage/KMS/webhook scanning,
   strict credential-check coverage, signed scanner webhook integration, and admin
@@ -119,9 +123,10 @@ once tagged releases begin.
   usage-comparable variance, commitment row evidence, invoice artifact metadata
   registration/verification status, database-backed artifact file storage, provider
   object-storage adapters, external object retention deletion, and artifact governance
-  metadata plus internal artifact review and policy-exception workflows. Provider
-  invoice-of-record validation, real malware scanning operation, external reviewer
-  workflow automation, and legal retention workflow enforcement remain future scope.
+  metadata plus internal artifact review, policy-exception, and invoice control
+  validation workflows. Provider invoice rendering, private contract validation, real
+  malware scanning operation, external reviewer workflow automation, and legal
+  retention workflow enforcement remain future scope.
 - Account/team UX now supports switching the current active workspace without a
   new login, refreshing pending/expired invite tokens, and handing invite links to
   a signed delivery webhook, while provider-specific email templates, SSO/SAML,
