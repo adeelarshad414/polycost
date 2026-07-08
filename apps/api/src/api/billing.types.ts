@@ -138,6 +138,42 @@ export interface InvoiceArtifactReviewQueueItem {
   notes?: string;
 }
 
+export type InvoiceArtifactPolicyExceptionStatus =
+  'not-requested' | 'requested' | 'approved' | 'rejected' | 'expired';
+
+export interface InvoiceArtifactPolicyExceptionInput {
+  exceptionStatus: Exclude<InvoiceArtifactPolicyExceptionStatus, 'not-requested' | 'expired'>;
+  reason: string;
+  reviewer?: string;
+  expiresAt?: string;
+  evidenceReference?: string;
+  notes?: string;
+}
+
+export interface InvoiceArtifactPolicyExceptionQueueItem {
+  importRunId: string;
+  reconciliationId: string;
+  comparisonId: string;
+  provider: ProviderId;
+  artifactId: string;
+  artifactType: InvoiceGradeArtifactType;
+  displayName: string;
+  verificationStatus: InvoiceGradeArtifactVerificationStatus;
+  reviewStatus: InvoiceArtifactReviewStatus;
+  exceptionStatus: InvoiceArtifactPolicyExceptionStatus;
+  artifactBlobStored: boolean;
+  legalHold: boolean;
+  reason?: string;
+  reviewer?: string;
+  expiresAt?: string;
+  requestedAt?: string;
+  requestedByAccountId?: string;
+  decidedAt?: string;
+  decidedByAccountId?: string;
+  evidenceReference?: string;
+  notes?: string;
+}
+
 export interface InvoiceArtifactBlobGovernance {
   storageProfile: {
     storageBackend: InvoiceArtifactStorageBackend;
@@ -230,6 +266,16 @@ export interface InvoiceGradeArtifactRecord extends InvoiceGradeArtifactRegistra
   reviewNotes?: string;
   reviewedAt?: string;
   reviewedByAccountId?: string;
+  policyExceptionStatus?: InvoiceArtifactPolicyExceptionStatus;
+  policyExceptionRequestedAt?: string;
+  policyExceptionRequestedByAccountId?: string;
+  policyExceptionReviewer?: string;
+  policyExceptionExpiresAt?: string;
+  policyExceptionReason?: string;
+  policyExceptionEvidenceReference?: string;
+  policyExceptionNotes?: string;
+  policyExceptionDecidedAt?: string;
+  policyExceptionDecidedByAccountId?: string;
   storedBlob?: {
     storageStatus: 'stored';
     storageMode: InvoiceArtifactStorageBackend;

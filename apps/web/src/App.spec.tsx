@@ -652,6 +652,45 @@ describe('App', () => {
     );
     expect(text(container)).toContain('Review queue: approved');
     expect(text(container)).toContain('approved 1');
+    expect(text(container)).toContain('Policy exception: not requested');
+
+    await click(buttonByText(container, 'Request exception'));
+    await settleAsyncEffects();
+
+    expect(client.updateInvoiceArtifactPolicyException).toHaveBeenCalledWith(
+      '66666666-6666-4666-8666-666666666666',
+      'artifact-1',
+      expect.objectContaining({
+        exceptionStatus: 'requested',
+        reviewer: 'risk-review@example.com',
+        reason:
+          'Requesting a time-boxed policy exception while provider invoice-of-record evidence is still incomplete.',
+        notes:
+          'Queued for policy owner review with explicit expiry target and invoice-grade caveat.',
+      }),
+      'session-token',
+    );
+    expect(text(container)).toContain('Policy exception: requested');
+    expect(text(container)).toContain('risk-review@example.com');
+    expect(text(container)).toContain('requested 1');
+
+    await click(buttonByText(container, 'Approve exception'));
+    await settleAsyncEffects();
+
+    expect(client.updateInvoiceArtifactPolicyException).toHaveBeenLastCalledWith(
+      '66666666-6666-4666-8666-666666666666',
+      'artifact-1',
+      expect.objectContaining({
+        exceptionStatus: 'approved',
+        reviewer: 'risk-review@example.com',
+        reason:
+          'Approving a time-boxed exception for demo governance review; invoice-grade validation remains blocked.',
+        evidenceReference: 'exception://invoice-artifacts/artifact-1/approved',
+      }),
+      'session-token',
+    );
+    expect(text(container)).toContain('Policy exception: approved');
+    expect(text(container)).toContain('approved 1');
 
     await click(buttonByText(container, 'Download stored file'));
     await settleAsyncEffects();
@@ -4827,6 +4866,23 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
         reviewer: 'finance-review@example.com',
       },
     ]),
+    listInvoiceArtifactPolicyExceptions: jest.fn(async () => [
+      {
+        importRunId: '55555555-5555-4555-8555-555555555555',
+        reconciliationId: '66666666-6666-4666-8666-666666666666',
+        comparisonId: comparisonResult.comparisonId,
+        provider: 'aws' as const,
+        artifactId: 'artifact-1',
+        artifactType: 'provider-invoice' as const,
+        displayName: 'AWS invoice control packet',
+        verificationStatus: 'registered' as const,
+        reviewStatus: 'approved' as const,
+        exceptionStatus: 'requested' as const,
+        artifactBlobStored: true,
+        legalHold: false,
+        reviewer: 'risk-review@example.com',
+      },
+    ]),
     registerInvoiceGradeArtifact: jest.fn(async () => ({
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
@@ -5220,6 +5276,136 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       },
       createdAt: '2026-07-06T00:00:02.000Z',
     })),
+    updateInvoiceArtifactPolicyException: jest.fn(
+      async (_reconciliationId, _artifactId, input) => ({
+        id: '66666666-6666-4666-8666-666666666666',
+        importRunId: '55555555-5555-4555-8555-555555555555',
+        comparisonId: comparisonResult.comparisonId,
+        provider: 'aws' as const,
+        estimatedTotalUsd: 100,
+        invoicedTotalUsd: 107,
+        varianceUsd: 7,
+        variancePercent: 7,
+        status: 'variance-warning' as const,
+        evidence: {
+          invoiceCoverage: {
+            sourceFingerprintPercent: 100,
+            skuMatchPercent: 100,
+          },
+          invoiceAdjustmentSummary: {
+            adjustmentCostUsd: 6,
+            adjustmentLineItemCount: 4,
+            commitmentLineItemCount: 4,
+            commitmentNetCostUsd: -2,
+            commitmentEvidence: {
+              rowsRequiringProviderInventory: 4,
+              rowsRequiringAmortizationPeriod: 2,
+              rowsRequiringAllocationEvidence: 4,
+            },
+            estimateComparableVarianceUsd: 0,
+            categories: [
+              {
+                category: 'usage',
+                rowCount: 1,
+                totalCostUsd: 100,
+              },
+            ],
+          },
+          invoiceGradeReadiness: {
+            status: 'invoice-grade-blocked',
+            missingCount: 3,
+            partialCount: 2,
+            blockers: ['Provider invoice control total'],
+            artifactRegisterStatus: 'metadata-registered-not-verified',
+            registeredArtifactCount: 1,
+            verifiedArtifactCount: 0,
+          },
+          invoiceGradeArtifactRegister: {
+            status: 'metadata-registered-not-verified',
+            registeredCount: 1,
+            verifiedCount: 0,
+            reviewApprovedCount: 1,
+            policyExceptionRequestedCount: input.exceptionStatus === 'requested' ? 1 : 0,
+            policyExceptionApprovedCount: input.exceptionStatus === 'approved' ? 1 : 0,
+            policyExceptionRejectedCount: input.exceptionStatus === 'rejected' ? 1 : 0,
+            policyExceptionExpiredCount: 0,
+            artifacts: [
+              {
+                id: 'artifact-1',
+                provider: 'aws',
+                type: 'provider-invoice',
+                displayName: 'AWS invoice control packet',
+                reference: 'demo://invoice-artifacts/66666666-6666-4666-8666-666666666666',
+                sha256: 'd'.repeat(64),
+                controlTotalUsd: 107,
+                verificationStatus: 'registered',
+                registeredAt: '2026-07-06T00:00:03.000Z',
+                reviewStatus: 'approved',
+                reviewReviewer: 'finance-review@example.com',
+                reviewRequestedAt: '2026-07-06T00:00:06.000Z',
+                reviewRequestedByAccountId: '11111111-1111-4111-8111-111111111111',
+                reviewedAt: '2026-07-06T00:00:07.000Z',
+                reviewedByAccountId: '11111111-1111-4111-8111-111111111111',
+                policyExceptionStatus: input.exceptionStatus,
+                policyExceptionReviewer: input.reviewer,
+                policyExceptionReason: input.reason,
+                policyExceptionRequestedAt: '2026-07-06T00:00:08.000Z',
+                policyExceptionRequestedByAccountId: '11111111-1111-4111-8111-111111111111',
+                policyExceptionExpiresAt: input.expiresAt,
+                policyExceptionDecidedAt:
+                  input.exceptionStatus === 'requested' ? undefined : '2026-07-06T00:00:09.000Z',
+                policyExceptionDecidedByAccountId:
+                  input.exceptionStatus === 'requested'
+                    ? undefined
+                    : '11111111-1111-4111-8111-111111111111',
+                policyExceptionEvidenceReference: input.evidenceReference,
+                policyExceptionNotes: input.notes,
+                storedBlob: {
+                  storageStatus: 'stored',
+                  storageMode: 'database-bytea',
+                  fileName: 'aws-invoice-control-66666666.txt',
+                  mimeType: 'text/plain',
+                  contentSha256: 'd'.repeat(64),
+                  contentSizeBytes: 210,
+                  uploadedAt: '2026-07-06T00:00:05.000Z',
+                  uploadedByAccountId: '11111111-1111-4111-8111-111111111111',
+                  legalHoldUpdatedAt: '2026-07-06T00:00:06.000Z',
+                  legalHoldReason: 'Placed from workspace demo panel before retention enforcement.',
+                  governance: {
+                    storageProfile: {
+                      storageBackend: 'database-bytea',
+                      encryptionStatus: 'database-managed',
+                      kmsKeyRequiredForProduction: true,
+                    },
+                    retentionPolicy: {
+                      retentionUntil: '2027-07-06T00:00:05.000Z',
+                      retentionDays: 365,
+                      legalHold: true,
+                    },
+                    malwareScan: {
+                      status: 'passed',
+                      scanner: 'polycost-eicar-signature-v1',
+                      checkedAt: '2026-07-06T00:00:05.000Z',
+                      findings: [],
+                    },
+                  },
+                },
+              },
+            ],
+            caveats: [
+              'Artifact metadata is registered for traceability only; files, contracts, and invoice controls are not verified by PolyCost yet.',
+            ],
+          },
+          invoiceMatchSummary: {
+            readiness: 'reconciled-evidence-ready',
+            caveats: [
+              'Reconciliation compares provider-export actuals with PolyCost estimate evidence; it is not an invoice-of-record.',
+            ],
+          },
+        },
+        createdAt: '2026-07-06T00:00:02.000Z',
+      }),
+    ),
     downloadInvoiceArtifactBlob: jest.fn(async () => ({
       id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       reconciliationId: '66666666-6666-4666-8666-666666666666',

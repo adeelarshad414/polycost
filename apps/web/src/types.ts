@@ -439,7 +439,8 @@ export type TeamAuditAction =
   | 'billing.reconciliation.artifact_verified'
   | 'billing.reconciliation.artifact_blob_uploaded'
   | 'billing.reconciliation.artifact_legal_hold_updated'
-  | 'billing.reconciliation.artifact_review_updated';
+  | 'billing.reconciliation.artifact_review_updated'
+  | 'billing.reconciliation.artifact_exception_updated';
 
 export type TeamAuditTargetType =
   'team' | 'invitation' | 'member' | 'sso_provider' | 'billing_import' | 'billing_reconciliation';
@@ -666,6 +667,42 @@ export interface InvoiceArtifactReviewQueueItem {
   reviewRequestedByAccountId?: string;
   reviewedAt?: string;
   reviewedByAccountId?: string;
+  evidenceReference?: string;
+  notes?: string;
+}
+
+export type InvoiceArtifactPolicyExceptionStatus =
+  'not-requested' | 'requested' | 'approved' | 'rejected' | 'expired';
+
+export interface InvoiceArtifactPolicyExceptionInput {
+  exceptionStatus: Exclude<InvoiceArtifactPolicyExceptionStatus, 'not-requested' | 'expired'>;
+  reason: string;
+  reviewer?: string;
+  expiresAt?: string;
+  evidenceReference?: string;
+  notes?: string;
+}
+
+export interface InvoiceArtifactPolicyExceptionQueueItem {
+  importRunId: string;
+  reconciliationId: string;
+  comparisonId: string;
+  provider: ProviderId;
+  artifactId: string;
+  artifactType: InvoiceGradeArtifactType;
+  displayName: string;
+  verificationStatus: 'registered' | 'verified' | 'rejected';
+  reviewStatus: InvoiceArtifactReviewStatus;
+  exceptionStatus: InvoiceArtifactPolicyExceptionStatus;
+  artifactBlobStored: boolean;
+  legalHold: boolean;
+  reason?: string;
+  reviewer?: string;
+  expiresAt?: string;
+  requestedAt?: string;
+  requestedByAccountId?: string;
+  decidedAt?: string;
+  decidedByAccountId?: string;
   evidenceReference?: string;
   notes?: string;
 }

@@ -37,6 +37,14 @@ export class BillingController {
     return this.billingService.listInvoiceArtifactReviews(importRunId, request.auth!);
   }
 
+  @Get('imports/:id/artifact-policy-exceptions')
+  listInvoiceArtifactPolicyExceptions(
+    @Param('id') importRunId: string,
+    @Req() request: RequestWithAuth,
+  ) {
+    return this.billingService.listInvoiceArtifactPolicyExceptions(importRunId, request.auth!);
+  }
+
   @Post('reconciliations/:id/artifacts')
   registerInvoiceGradeArtifact(
     @Param('id') reconciliationId: string,
@@ -104,6 +112,21 @@ export class BillingController {
     @Req() request: RequestWithAuth,
   ) {
     return this.billingService.updateInvoiceArtifactReview(
+      reconciliationId,
+      artifactId,
+      body,
+      request.auth!,
+    );
+  }
+
+  @Patch('reconciliations/:id/artifacts/:artifactId/policy-exception')
+  updateInvoiceArtifactPolicyException(
+    @Param('id') reconciliationId: string,
+    @Param('artifactId') artifactId: string,
+    @Body() body: unknown,
+    @Req() request: RequestWithAuth,
+  ) {
+    return this.billingService.updateInvoiceArtifactPolicyException(
       reconciliationId,
       artifactId,
       body,

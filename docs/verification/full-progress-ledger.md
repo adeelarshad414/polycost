@@ -355,6 +355,19 @@ Evidence:
   `npm run check` passed afterward with API `55` suites / `459` tests, web `11`
   suites / `144` tests, graph validation `320` nodes / `320` edges, and progress
   verification `153` anchors.
+- Phase 2.32 artifact policy exception lifecycle focused regressions passed: API `2`
+  suites / `72` tests (`auth-billing`, `api-database.repository`) and web `2`
+  suites / `88` tests (`App`, `api-client`). The phase adds audited Owner/Admin
+  policy exception operations for stored invoice artifacts, including
+  request/approve/reject states, required future expiry for approvals, computed
+  expired status, evidence metadata, aggregate exception counts, and workspace
+  exception controls while keeping external legal-review routing and provider
+  invoice-of-record validation as future scope. `npm run ci:lint` passed with zero
+  ESLint/typecheck warnings, and `npm run test:production-readiness` passed with API
+  `14` suites / `195` tests plus web `2` suites / `88` tests. Full local
+  `npm run check` passed afterward with API `55` suites / `462` tests, web `11`
+  suites / `145` tests, graph validation `320` nodes / `320` edges, and progress
+  verification `153` anchors.
 - Phase 2.9 focused regressions passed: API `3` suites / `52` tests
   (`auth-billing`, `diagram-parser`, `llm-classifier`) and web `1` suite / `57`
   tests (`App.spec.tsx`).
