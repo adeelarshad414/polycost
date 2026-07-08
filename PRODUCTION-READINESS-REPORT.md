@@ -62,12 +62,14 @@ performance/accessibility/best-practices/SEO metrics.
 | INV-TRACE-003  | Improved      | Azure Cost Management CSV and nested GCP Billing Export JSON now have focused mapper coverage, allocation tag/label recognition, and fallback-cost readiness evidence                                                                                   |
 | INV-TRACE-004  | Improved      | Imported actuals now classify usage versus tax, credit, discount, support, marketplace, refund, fee, enterprise adjustment, and unknown adjustment rows; reconciliation evidence separates usage-comparable variance from non-usage invoice adjustments |
 | INV-TRACE-005  | Improved      | Commitment, reservation, and savings-plan rows now classify as covered usage, commitment discounts/negations, commitment fees, or amortization/unused commitment cost, with net commitment evidence in reconciliation summaries                         |
+| INV-TRACE-006  | Improved      | Commitment rows now report whether provider inventory, amortization-period proof, and allocation evidence are still required before invoice-grade interpretation                                                                                        |
 | VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                                                                                             |
 | VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                                                                                             |
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                                                                                        |
 | UI-AUTH-002    | Improved      | Workspace billing panel now surfaces reconciliation readiness, source-fingerprint coverage, SKU match coverage, and the invoice-of-record caveat                                                                                                        |
 | UI-AUTH-006    | Improved      | Workspace billing panel now surfaces usage-comparable variance plus invoice adjustment count, subtotal, and category summary for finance review                                                                                                         |
 | UI-AUTH-007    | Improved      | Workspace billing panel now surfaces commitment row count, net commitment cost, and commitment category totals separately from generic invoice adjustments                                                                                              |
+| UI-AUTH-008    | Improved      | Workspace billing panel now surfaces commitment evidence requirements for provider inventory, amortization periods, and allocation proof                                                                                                                |
 | UI-AUTH-003    | Improved      | Active workspace switching is now backend-backed, membership-checked, and exposed in the signed-in account panel                                                                                                                                        |
 | UI-AUTH-004    | Improved      | Pending/expired workspace invites can now be resent through a guarded backend route that rotates the stored token hash and exposes the refreshed one-time token only in the response                                                                    |
 | UI-AUTH-005    | Improved      | Invite delivery now has local panel mode plus production HTTPS webhook mode with HMAC signatures, production config guards, and browser-safe delivery receipts                                                                                          |
@@ -98,6 +100,15 @@ Local static/regression gates:
 - Phase 2.20 commitment billing semantics focused gates passed:
   - API focused: `src/api/auth-billing.spec.ts`: 1 suite / 24 tests.
   - Web focused: `src/App.spec.tsx`: 1 suite / 60 tests.
+- Phase 2.21 commitment amortization evidence focused gates passed:
+  - API focused: `src/api/auth-billing.spec.ts`: 1 suite / 24 tests.
+  - Web focused: `src/App.spec.tsx`: 1 suite / 60 tests.
+- Phase 2.21 final local floor passed:
+  - `npm run test:production-readiness`: API 12 suites / 159 tests; web 2 suites /
+    86 tests.
+  - `npm run check`: API 53 suites / 423 tests; web 11 suites / 143 tests; graph,
+    pricing coverage, progress verification, QA/security suppression hygiene, DB,
+    DevOps, cloud, release, handover, and provider-credential gates passed.
 - Phase 2.20 final local floor passed:
   - `npm run test:production-readiness`: API 12 suites / 159 tests; web 2 suites /
     86 tests.
@@ -345,8 +356,9 @@ Machine-readable token evidence:
   traceability, native AWS/Azure/GCP export mapping, allocation evidence, and
   estimate-vs-actual reconciliation evidence. Phase 2.19 separates classified
   non-usage invoice adjustments from usage-comparable variance, and Phase 2.20
-  separates provider commitment semantics from generic adjustments, but PolyCost is
-  still not the invoice system of record.
+  separates provider commitment semantics from generic adjustments. Phase 2.21
+  exposes provider-inventory, amortization-period, and allocation proof requirements,
+  but PolyCost is still not the invoice system of record.
 - VSDX support now includes extraction/evidence and approximate SVG previews, not full
   Visio semantic rendering. Phase 2.9 adds page geometry, normalized preview bounds, and
   explicit layout-extraction caveats; Phase 2.18 adds sanitized SVG preview artifacts.

@@ -3556,13 +3556,22 @@ function WorkspaceControlCenter({
                     {formatCurrency(reconciliationSummary.adjustmentCostUsd)})
                   </small>
                   {reconciliationSummary.commitmentLineItemCount > 0 ? (
-                    <small>
-                      Commitments: {reconciliationSummary.commitmentLineItemCount} rows · net{' '}
-                      {formatCurrency(reconciliationSummary.commitmentNetCostUsd)}
-                      {reconciliationSummary.commitmentCategories.length > 0
-                        ? ` (${reconciliationSummary.commitmentCategories.join(', ')})`
-                        : ''}
-                    </small>
+                    <>
+                      <small>
+                        Commitments: {reconciliationSummary.commitmentLineItemCount} rows · net{' '}
+                        {formatCurrency(reconciliationSummary.commitmentNetCostUsd)}
+                        {reconciliationSummary.commitmentCategories.length > 0
+                          ? ` (${reconciliationSummary.commitmentCategories.join(', ')})`
+                          : ''}
+                      </small>
+                      <small>
+                        Commitment evidence needed:{' '}
+                        {reconciliationSummary.commitmentRowsRequiringProviderInventory} inventory ·{' '}
+                        {reconciliationSummary.commitmentRowsRequiringAmortizationPeriod}{' '}
+                        amortization ·{' '}
+                        {reconciliationSummary.commitmentRowsRequiringAllocationEvidence} allocation
+                      </small>
+                    </>
                   ) : null}
                   {reconciliationSummary.adjustmentCategories.length > 0 ? (
                     <small>
@@ -19470,6 +19479,9 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
   adjustmentLineItemCount: number;
   commitmentLineItemCount: number;
   commitmentNetCostUsd: number;
+  commitmentRowsRequiringProviderInventory: number;
+  commitmentRowsRequiringAmortizationPeriod: number;
+  commitmentRowsRequiringAllocationEvidence: number;
   estimateComparableVarianceUsd: number;
   adjustmentCategories: string[];
   commitmentCategories: string[];
@@ -19479,6 +19491,7 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
   const coverage = objectValue(evidence.invoiceCoverage);
   const matchSummary = objectValue(evidence.invoiceMatchSummary);
   const adjustmentSummary = objectValue(evidence.invoiceAdjustmentSummary);
+  const commitmentEvidence = objectValue(adjustmentSummary.commitmentEvidence);
   const caveats = stringArrayValue(matchSummary.caveats);
   const readiness =
     stringValue(matchSummary.readiness) ??
@@ -19508,6 +19521,15 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
     adjustmentLineItemCount: numberValue(adjustmentSummary.adjustmentLineItemCount),
     commitmentLineItemCount: numberValue(adjustmentSummary.commitmentLineItemCount),
     commitmentNetCostUsd: numberValue(adjustmentSummary.commitmentNetCostUsd),
+    commitmentRowsRequiringProviderInventory: numberValue(
+      commitmentEvidence.rowsRequiringProviderInventory,
+    ),
+    commitmentRowsRequiringAmortizationPeriod: numberValue(
+      commitmentEvidence.rowsRequiringAmortizationPeriod,
+    ),
+    commitmentRowsRequiringAllocationEvidence: numberValue(
+      commitmentEvidence.rowsRequiringAllocationEvidence,
+    ),
     estimateComparableVarianceUsd: numberValue(
       adjustmentSummary.estimateComparableVarianceUsd ?? record.varianceUsd,
     ),

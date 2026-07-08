@@ -110,6 +110,7 @@ say so explicitly rather than marking it done.
 | Phase 2.18 - VSDX approximate SVG previews              | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.19 - Invoice adjustment reconciliation evidence | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.20 - Commitment billing semantics evidence      | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.21 - Commitment amortization evidence needs     | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4129,6 +4130,34 @@ test:production-readiness` passed with 159/159 API tests and 86/86 web tests.
   invoice-grade amortization still requires provider-account-specific inventory,
   benefit coverage, amortization period, unused-commitment, private pricing, and
   invoice-of-record controls.
+
+## Phase 2.21 — Commitment amortization evidence needs
+
+Status: implemented locally on 2026-07-08.
+
+- Added machine-readable commitment evidence requirements to imported/reconciled
+  actuals. Commitment rows now carry kind/treatment metadata and flags for provider
+  inventory, amortization-period proof, and allocation evidence requirements.
+- Reconciliation evidence now includes `commitmentEvidence` with status,
+  rows requiring provider inventory, rows requiring amortization-period proof, rows
+  requiring allocation evidence, commitment kind/treatment totals, and caveats.
+- Historical rows that only have a commitment category now derive conservative
+  fallback evidence from stored source signals, so old imports still surface the
+  missing proof requirements.
+- Updated the workspace billing panel to display commitment evidence requirements
+  alongside commitment row count and net cost.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts`
+  passed 24/24. `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx`
+  passed 60/60. `npm run format:check` and `npm run ci:lint` passed. `npm run
+test:production-readiness` passed with 159/159 API tests and 86/86 web tests.
+  Full `npm run check` passed with 423/423 API tests, 143/143 web tests, graph
+  validation, pricing coverage, progress verification, QA/security suppression
+  hygiene, DB validation, release, handover, and provider-credential checks green.
+- Remaining caveat: PolyCost now exposes the exact evidence gap for commitment
+  amortization, but invoice-grade treatment still requires provider-account
+  commitment inventory, amortization windows, unused commitment allocation, private
+  pricing agreements, and invoice-of-record controls.
 
 ## Deviations from spec log
 

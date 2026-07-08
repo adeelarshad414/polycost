@@ -549,6 +549,9 @@ describe('App', () => {
     expect(text(container)).toContain('Commitments: 4 rows');
     expect(text(container)).toContain('net -$2.00');
     expect(text(container)).toContain('discount -$25.00');
+    expect(text(container)).toContain(
+      'Commitment evidence needed: 4 inventory · 2 amortization · 4 allocation',
+    );
     expect(text(container)).toContain('Adjustments: tax $8.00');
 
     unmount();
@@ -4575,6 +4578,41 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
           adjustmentLineItemCount: 4,
           commitmentLineItemCount: 4,
           commitmentNetCostUsd: -2,
+          commitmentEvidence: {
+            status: 'provider-inventory-required',
+            rowsRequiringProviderInventory: 4,
+            rowsRequiringAmortizationPeriod: 2,
+            rowsRequiringAllocationEvidence: 4,
+            categories: [
+              {
+                kind: 'savings-plan',
+                treatment: 'covered-usage',
+                rowCount: 1,
+                totalCostUsd: 0,
+              },
+              {
+                kind: 'savings-plan',
+                treatment: 'discount',
+                rowCount: 1,
+                totalCostUsd: -25,
+              },
+              {
+                kind: 'reserved-capacity',
+                treatment: 'fee',
+                rowCount: 1,
+                totalCostUsd: 20,
+              },
+              {
+                kind: 'reserved-capacity',
+                treatment: 'unused',
+                rowCount: 1,
+                totalCostUsd: 3,
+              },
+            ],
+            caveats: [
+              'Provider commitment inventory is required before treating this as invoice-grade amortization evidence.',
+            ],
+          },
           estimateComparableVarianceUsd: 0,
           categories: [
             {
