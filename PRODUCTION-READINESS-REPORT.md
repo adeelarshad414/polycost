@@ -29,6 +29,14 @@ check`. The handover verdict is private-demo ready with explicit caveats for
 invoice-grade billing, full Visio rendering, production LLM quality, enterprise
 auth/team product depth, and full production landing-zone Terraform.
 
+## Public OSS Readiness Addendum
+
+The public OSS readiness and demo hardening pass added
+`docs/development/public-demo-hardening.md` and the `npm run public:readiness:check`
+gate. The gate verifies community files, public-launch honesty language, demo evidence
+hooks, tracked environment-file safety, and provider-logo safeguards. It is wired into
+the local `npm run check` floor and release-readiness validation.
+
 ## Findings And Disposition
 
 | ID             | Disposition   | Evidence                                                                                                                                                                            |
@@ -54,6 +62,7 @@ auth/team product depth, and full production landing-zone Terraform.
 | TF-GEN-005     | Improved      | V3.4 replaces Terraform module placeholders with AWS/Azure/GCP network, compute, and data starter modules plus static module-library validation                                     |
 | HND-001        | Added         | Customer handover package added under `docs/`, with usage, deployment, runbook, competitive comparison, architecture, and evidence ledger                                           |
 | HND-002        | Added         | `npm run handover:check` validates the handover package and runs inside the full local `npm run check` floor                                                                        |
+| OSS-001        | Added         | `npm run public:readiness:check` validates public-readiness docs, community health files, demo evidence hooks, tracked env-file safety, and provider-logo safeguards                |
 
 ## Verification
 
@@ -117,6 +126,7 @@ Local static/regression gates:
   - Web production build passed with the existing Vite environment-placeholder
     and chunk-size warnings.
 - Customer handover package gate passed with `npm run handover:check`.
+- Public OSS readiness gate passed with `npm run public:readiness:check`.
 - Customer handover full local regression floor passed with `npm run check`:
   - API unit: `51` suites / `400` tests.
   - Web unit: `9` suites / `132` tests.

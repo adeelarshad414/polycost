@@ -15,6 +15,7 @@
 
 - [ ] `npm run format:check`
 - [ ] `npm run ci:lint`
+- [ ] `npm run public:readiness:check`
 - [ ] `npm run test:coverage`
 - [ ] `npm run ci:build`
 - [ ] `npm run security:audit`

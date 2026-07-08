@@ -33,6 +33,8 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Review the final handover excellence artifacts:
   `HANDOVER-CENSUS.md`, `HANDOVER-EXCELLENCE-REPORT.md`, and
   `handover/HANDOVER-README.md`.
+- Review the public demo hardening checklist:
+  `docs/development/public-demo-hardening.md`.
 - Confirm trademark-sensitive cloud logos are not present in the UI.
 - Confirm docs describe AWS/Azure/GCP as provider integrations, not endorsements.
 
@@ -51,6 +53,7 @@ Complete this checklist before changing the GitHub repository visibility from pr
   the 10-minute startup budget.
 - Run `npm run format:check`.
 - Run `npm run overlay:check`.
+- Run `npm run public:readiness:check`.
 - Run `npm run release:check`.
 - Run `npm run loading:check`.
 - Run `npm run handover:check`.

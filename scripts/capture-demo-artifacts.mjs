@@ -33,18 +33,19 @@ async function captureDesktopArtifacts(browserInstance) {
   const page = await context.newPage();
 
   await page.goto(webUrl, { waitUntil: 'networkidle' });
+  await waitForHomeReady(page);
   await page.screenshot({
     path: path.join(artifactDir, 'executive-overview-desktop.png'),
     fullPage: true,
   });
   await page.mouse.wheel(0, 900);
-  await page.waitForTimeout(600);
+  await page.waitForFunction(() => window.scrollY > 0);
   await page.screenshot({
     path: path.join(artifactDir, 'engineering-evidence-desktop.png'),
     fullPage: true,
   });
   await page.mouse.wheel(0, -900);
-  await page.waitForTimeout(600);
+  await page.waitForFunction(() => window.scrollY <= 20);
   await context.close();
 }
 
@@ -56,11 +57,19 @@ async function captureMobileArtifact(browserInstance) {
   const page = await context.newPage();
 
   await page.goto(webUrl, { waitUntil: 'networkidle' });
+  await waitForHomeReady(page);
   await page.screenshot({
     path: path.join(artifactDir, 'mobile-workflow.png'),
     fullPage: true,
   });
   await context.close();
+}
+
+async function waitForHomeReady(page) {
+  await page
+    .getByRole('heading', { name: 'Multi-cloud cost clarity, in one place.' })
+    .waitFor({ state: 'visible' });
+  await page.getByRole('button', { name: /compare costs/i }).waitFor({ state: 'visible' });
 }
 
 function renameLatestVideo() {

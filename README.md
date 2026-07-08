@@ -244,6 +244,7 @@ Security and quality checks:
 ```bash
 npm run loading:check
 npm run handover:check
+npm run public:readiness:check
 npm run security:audit
 npm run provider:credentials:check
 npm run overlay:check
@@ -306,6 +307,8 @@ before switching `USE_MOCK_PROVIDERS=false`.
 - `HOW-TO-USE.md` and `DEPLOY.md` are older root-level compatibility guides.
 - `docs/PROVIDER-CREDENTIALS.md` covers AWS/Azure/GCP pricing-source setup and
   traceability expectations.
+- `docs/development/public-demo-hardening.md` captures the public demo readiness
+  floor, repository health checklist, and blocked launch evidence.
 - `LOADING-INVENTORY.md` and `LOADING-AUDIT-REPORT.md` document the loading/progress
   UX audit and evidence.
 - `DUMMY-VALUES.md` lists development-only placeholders and production guardrails.

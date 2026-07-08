@@ -35,12 +35,14 @@ PolyCost includes:
 - `.github/ISSUE_TEMPLATE/*`
 - `.github/CODEOWNERS`
 - `.github/dependabot.yml`
+- `docs/development/public-demo-hardening.md`
 
 ## Pre-Public Checklist
 
 Run:
 
 ```bash
+npm run public:readiness:check
 npm run release:check
 npm run demo:verify-clean
 npm run format:check
@@ -50,10 +52,11 @@ npm run ci:build
 npm run security:audit
 ```
 
-`npm run release:check` is the machine-readable guard for this page and
-`RELEASE-CHECKLIST.md`. It verifies the required community health files, issue
-templates, PR template, README demo path, security ledger, and private-to-public
-human checklist language are still present before a release candidate is cut.
+`npm run public:readiness:check` is the fast guard for this page and
+`docs/development/public-demo-hardening.md`. `npm run release:check` is the broader
+release guard for `RELEASE-CHECKLIST.md`, the handover package, security ledger,
+issue templates, PR template, README demo path, and private-to-public human checklist
+language.
 
 Recommended local scans before changing repo visibility:
 

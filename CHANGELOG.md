@@ -27,6 +27,9 @@ once tagged releases begin.
   surfaces on top of the anonymous comparison workflow.
 - Machine-readable release readiness check covering community files, README demo
   path, public-release checklist language, issue templates, and the security ledger.
+- Public demo hardening guide and `npm run public:readiness:check` gate covering
+  community files, demo evidence hooks, tracked environment files, provider-logo
+  safeguards, and public-launch honesty language.
 - Canonical overlay/dialog/drawer/popover/toast/banner primitives, expanded shared
   button variants, and the `npm run overlay:check` guard.
 

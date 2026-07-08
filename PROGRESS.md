@@ -108,6 +108,48 @@ say so explicitly rather than marking it done.
 | Loading and progress experience audit/build             | Complete with known gaps (see notes) | 2026-07-08   |
 | UI Appendix O - Overlay/dialog/button audit             | Complete with known gaps (see notes) | 2026-07-08   |
 | Customer handover excellence orchestrator               | Complete with known gaps (see notes) | 2026-07-08   |
+| Public OSS readiness and demo hardening                 | Complete with known gaps (see notes) | 2026-07-08   |
+
+## Public OSS readiness and demo hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-08
+
+What changed:
+
+- Added `docs/development/public-demo-hardening.md` as the public demo readiness
+  checklist for private-to-public launch review.
+- Added `npm run public:readiness:check` to validate community files, demo evidence
+  hooks, release honesty language, tracked environment-file safety, and provider-logo
+  safeguards.
+- Wired `public:readiness:check` into the full `npm run check` regression floor and
+  into `npm run release:check` drift validation.
+- Updated README, release checklist, contribution guide, PR template, and changelog
+  with the new public readiness command.
+- Hardened demo artifact capture to wait on visible app readiness and scroll state
+  instead of fixed sleeps.
+
+Verification planned/performed in this branch:
+
+- `npm run public:readiness:check`
+- `npm run release:check`
+- `npm run handover:check`
+- `npm run format:check`
+- `npm run ci:lint`
+- `npm run check`: API unit `51` suites / `400` tests; web unit `11` suites /
+  `141` tests; graph validation `309` nodes / `309` edges; public readiness,
+  release, handover, provider credential, and QA gates passed.
+- `npm run ci:build`: API TypeScript build and web Vite build passed with the
+  existing environment-placeholder and chunk-size warnings.
+
+Known remaining gaps:
+
+- Fresh Lighthouse, axe, 320px reflow, and 200% zoom artifacts still need a live
+  browser audit harness before a public launch claim.
+- Real provider/SSO/LLM/Terraform validation still requires external credentials or
+  a staging environment.
+- Hosted GitHub Actions runner availability remains an external repository/account
+  prerequisite before remote CI can be treated as release evidence.
 
 ## Customer handover excellence orchestrator
 
