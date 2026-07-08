@@ -83,6 +83,18 @@ evidence, axe accessibility checks, and Lighthouse metrics:
 npm run browser:audit
 ```
 
+Verify a downloaded invoice evidence packet after export:
+
+```bash
+npm run invoice:evidence:verify -- ./polycost-invoice-evidence.json
+```
+
+Run the built-in verifier smoke, including tamper detection:
+
+```bash
+npm run invoice:evidence:verify:smoke
+```
+
 Verify the clean-clone demo path with an isolated temporary clone and a
 10-minute startup budget:
 
@@ -154,6 +166,9 @@ The main API is versioned under `/api/v1`.
   artifact file for a registered reconciliation artifact.
 - `GET /billing/reconciliations/:id/artifacts/:artifactId/blob` returns the stored
   artifact file as base64 for controlled download.
+- `GET /billing/reconciliations/:id/evidence-packet` returns a metadata-only
+  evidence packet with a recomputable SHA-256 integrity manifest for reviewer
+  handoff.
 
 ## Anonymous And Workspace Features
 
@@ -190,7 +205,9 @@ Accounts add workspace controls on top of that core flow:
   governance metadata, and audit events. Stored artifacts include retention,
   legal-hold, KMS-readiness, and scan-hook metadata. Admin readiness and retention
   endpoints expose object-store/KMS/scanner/retention posture, and strict provider
-  checks warn or fail when those controls are missing. This improves proof
+  checks warn or fail when those controls are missing. Evidence packets can be
+  downloaded with a tamper-evident manifest and verified locally with
+  `npm run invoice:evidence:verify -- <packet.json>`. This improves proof
   discipline but is not a provider invoice system of record.
 
 The current self-hosted product does not yet include enterprise IdP login round-trips,

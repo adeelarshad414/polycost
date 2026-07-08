@@ -406,6 +406,16 @@ Evidence:
   plus web `2` suites / `90` tests. Full local `npm run check` passed afterward
   with API `55` suites / `465` tests, web `11` suites / `147` tests, graph
   validation `320` nodes / `320` edges, and progress verification `153` anchors.
+- Phase 2.36 invoice evidence packet verifier CLI smoke passed:
+  `npm run invoice:evidence:verify -- --help`, `npm run invoice:evidence:verify -- --version`,
+  and `npm run invoice:evidence:verify:fixture -- --json` all passed. A tampered
+  temp packet smoke changed `reconciliation.invoicedTotalUsd` and confirmed the
+  verifier exits non-zero with a digest mismatch. `npm run invoice:evidence:verify:smoke`
+  also passed. The committed fixture digest is
+  `951039068994605be9582aaf06465cd09c92b3fa692a61d1da55e1a8cf6a845b`, and the
+  smoke is wired into `npm run check`. Full local `npm run check` passed afterward
+  with API `55` suites / `465` tests, web `11` suites / `147` tests, graph validation
+  `320` nodes / `320` edges, and progress verification `153` anchors.
 - Phase 2.9 focused regressions passed: API `3` suites / `52` tests
   (`auth-billing`, `diagram-parser`, `llm-classifier`) and web `1` suite / `57`
   tests (`App.spec.tsx`).

@@ -1,7 +1,7 @@
 # PolyCost Production Readiness Report
 
 Date: 2026-07-08
-Branch: cumulative production-readiness branches through `codex/invoice-evidence-packet-integrity`
+Branch: cumulative production-readiness branches through `codex/invoice-evidence-packet-verifier`
 PR: local phase gate, PR created after verification
 Run spec: `docs/design/master-production-readiness-orchestrator-v2.md`
 
@@ -77,6 +77,7 @@ performance/accessibility/best-practices/SEO metrics.
 | INV-TRACE-018  | Improved      | Stored and verified invoice artifacts can now run an audited control-packet validation comparing artifact control totals against both reconciliation totals and imported actuals, with matched/warning/mismatch counts                                  |
 | INV-TRACE-019  | Improved      | Reconciliations can now emit metadata-only invoice evidence packets with sanitized artifact metadata, readiness, match summary, control counts, caveats, and invoice-grade disclaimers without exposing raw artifact bytes                              |
 | INV-TRACE-020  | Improved      | Invoice evidence packets now carry a stable-JSON SHA-256 integrity manifest with payload byte length, subject IDs, artifact counts, caveat/disclaimer counts, and digest metadata for reviewer recomputation                                            |
+| INV-TRACE-021  | Improved      | Downloaded invoice evidence packets can now be verified offline with a local CLI that recomputes the stable-JSON digest, validates subject/count metadata, and rejects tampered payloads                                                                |
 | VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                                                                                             |
 | VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                                                                                             |
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                                                                                        |
@@ -289,6 +290,19 @@ Local static/regression gates:
     Node 24 skip under the repo's Node 20 target; DB validation skipped live
     `schema_migrations` inspection because the local Postgres container was not
     running.
+- Phase 2.36 invoice evidence packet verifier CLI smoke passed:
+  - `npm run invoice:evidence:verify -- --help`: passed.
+  - `npm run invoice:evidence:verify -- --version`: passed.
+  - `npm run invoice:evidence:verify:fixture -- --json`: passed with digest
+    `951039068994605be9582aaf06465cd09c92b3fa692a61d1da55e1a8cf6a845b`.
+  - Tampered temp packet smoke changed `reconciliation.invoicedTotalUsd` and the
+    verifier rejected it with a digest mismatch.
+  - `npm run invoice:evidence:verify:smoke`: passed.
+  - `npm run check`: API 55 suites / 465 tests; web 11 suites / 147 tests; graph
+    validation 320 nodes / 320 edges; pricing coverage, progress verification,
+    QA/security suppression hygiene, DB, DevOps, cloud, release, handover, and
+    provider-credential gates passed with the verifier smoke included in the
+    regression floor.
 - Phase 2.25 final local floor passed:
   - `npm run test:production-readiness`: API 12 suites / 165 tests; web 2 suites /
     86 tests.
@@ -580,8 +594,9 @@ Machine-readable token evidence:
   checksum/control-total verification status for registered artifact metadata.
   Phase 2.34 adds a metadata-only invoice evidence packet export for reviewer
   handoff, and Phase 2.35 makes that packet tamper-evident with a stable-JSON
-  SHA-256 integrity manifest, but neither phase replaces provider invoice rendering,
-  private contract/legal validation, or provider-authenticated invoice-of-record
+  SHA-256 integrity manifest. Phase 2.36 adds an offline verifier CLI for exported
+  packets, but these phases do not replace provider invoice rendering, private
+  contract/legal validation, or provider-authenticated invoice-of-record
   reconciliation.
   Phase 2.25 adds durable database-backed artifact file upload/download with
   metadata-only reconciliation evidence and audit events. Phase 2.26 adds storage,
