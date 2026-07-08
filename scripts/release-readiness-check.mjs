@@ -16,6 +16,8 @@ const requiredFiles = [
   'CHANGELOG.md',
   'DUMMY-VALUES.md',
   'RELEASE-CHECKLIST.md',
+  'LOADING-INVENTORY.md',
+  'LOADING-AUDIT-REPORT.md',
   'docs/development/open-source-readiness.md',
   'docs/SECURITY-SUPPRESSIONS.md',
   'docs/verification/full-progress-ledger.md',
@@ -40,6 +42,9 @@ if (!packageJson.scripts?.['provider:credentials:check']) {
 if (!packageJson.scripts?.['progress:verify']) {
   failures.push('package.json is missing progress:verify');
 }
+if (!packageJson.scripts?.['loading:check']) {
+  failures.push('package.json is missing loading:check');
+}
 if (!packageJson.scripts?.['live:verify']) {
   failures.push('package.json is missing live:verify');
 }
@@ -63,6 +68,9 @@ if (!packageJson.scripts?.check?.includes('npm run provider:credentials:check'))
 }
 if (!packageJson.scripts?.check?.includes('npm run progress:verify')) {
   failures.push('package.json check script must include npm run progress:verify');
+}
+if (!packageJson.scripts?.check?.includes('npm run loading:check')) {
+  failures.push('package.json check script must include npm run loading:check');
 }
 
 assertScriptIncludes('test:production-readiness', [
@@ -157,6 +165,18 @@ await assertFileContains('docs/verification/full-progress-ledger.md', [
   ['mock verification distinction', 'verified (mock)'],
   ['blocked CI runner evidence', 'runner_id: 0'],
   ['honest release verdict', 'not yet a full invoice-grade billing platform'],
+]);
+
+await assertFileContains('LOADING-INVENTORY.md', [
+  ['loading inventory table', 'Cold SPA boot'],
+  ['loading export inventory', 'Export PDF/CSV/Excel'],
+  ['loading honesty note', 'No time-based fake progress was added'],
+]);
+
+await assertFileContains('LOADING-AUDIT-REPORT.md', [
+  ['loading findings table', '## Findings And Disposition'],
+  ['loading blocked section', '## Blocked'],
+  ['loading human gate register', '## HUMAN_DECISION_GATE'],
 ]);
 
 await assertFileContains('.github/workflows/ci.yml', [

@@ -104,6 +104,69 @@ say so explicitly rather than marking it done.
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.3 - Terraform bundle export                    | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.4 - Terraform module library                   | Complete with known gaps (see notes) | 2026-07-07   |
+| Loading and progress experience audit/build             | Complete with known gaps (see notes) | 2026-07-08   |
+
+## Loading and progress experience audit/build
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-08
+
+What changed:
+
+- Added the canonical loading component set in
+  `apps/web/src/components/LoadingExperience.tsx`: boot splash, staged session
+  loader, skeleton presets, progress bar, loading status, task queue, job toast, and
+  live-tail indicator.
+- Updated `TopLoadingBar` to delay-mount after `150ms` and hold completion for
+  `320ms`, preventing flash-of-loader behavior on instant waits.
+- Wired the new components into app boot, workspace session hydration, team/SSO
+  sync, pricing evidence loading, comparison workspace loading, shared report
+  loading, and export/refresh activity.
+- Added `LOADING-INVENTORY.md`, `LOADING-AUDIT-REPORT.md`, and
+  `npm run loading:check`; wired the gate into `npm run check` and
+  `npm run release:check`.
+
+Verification:
+
+- `npm run test:unit --workspace @polycost/web -- --runInBand src/components/LoadingExperience.spec.tsx src/components/TopLoadingBar.spec.tsx`
+  - Web focused: `2` suites / `7` tests.
+- `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx src/api-client.spec.ts`
+  - Web focused: `2` suites / `84` tests.
+- `npm run format:check`
+- `npm run ci:lint`
+- `npm run loading:check`
+- `npm run theme:hex:check`
+- `npm run test:production-readiness`
+  - API focused: `10` suites / `135` tests.
+  - Web focused: `2` suites / `84` tests.
+- `npm run ci:build`
+  - API TypeScript build passed.
+  - Web production build passed with the existing Vite environment-placeholder and
+    chunk-size warnings.
+- `npm run check`
+  - API unit: `51` suites / `400` tests.
+  - Web unit: `10` suites / `137` tests.
+  - Graph validation: `300` nodes / `300` edges.
+  - Pricing coverage guard: `36` frontend priced families covered.
+  - Progress verification: `153` phase evidence anchors.
+  - Security suppression check: `22` reviewed suppressions.
+  - Database validation, DevOps check, cloud readiness, release readiness,
+    loading, and provider credential gates passed.
+  - `db:validate` skipped the live `schema_migrations` check because the Postgres
+    container was not running.
+  - `cloud:check` remains documentation/config only because deployable IaC is not
+    present.
+  - `impeccable` skipped by documented Node 20 vs Node 24 constraint.
+
+Known remaining gaps:
+
+- Exact export-job percentages remain blocked by the current API contract; the UI
+  shows report job phase/state without inventing progress.
+- Dedicated dual-mode loading-state screenshots were not captured in this pass
+  because mid/failure loading states need either route-level fixture hooks or a
+  loading-state showcase route.
+- Real auth redirect timing is not measurable in the current anonymous-first SPA
+  without an auth callback route or instrumentation hook.
 
 ## Phase V3.4 - Terraform module library
 

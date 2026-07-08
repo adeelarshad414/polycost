@@ -44,6 +44,7 @@ Complete this checklist before changing the GitHub repository visibility from pr
   the 10-minute startup budget.
 - Run `npm run format:check`.
 - Run `npm run release:check`.
+- Run `npm run loading:check`.
 - Run `npm run lint`.
 - Run `npm run typecheck`.
 - Run `npm run ci:unit` to execute coverage and the pricing-logic coverage gate.

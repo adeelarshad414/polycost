@@ -9,6 +9,10 @@ once tagged releases begin.
 
 ### Added
 
+- Loading/progress experience system with shared `BootSplash`, `SessionLoader`,
+  skeleton presets, progress bars, task queue, job toast, and live-tail components.
+- Loading inventory and audit report with `npm run loading:check` wired into the
+  full local regression floor and release-readiness validation.
 - Open-source readiness files: license, contribution guide, support policy,
   governance notes, issue templates, pull request template, CODEOWNERS, and
   dependency update configuration.
@@ -22,6 +26,9 @@ once tagged releases begin.
 
 - The repository is prepared for an eventual public open-source launch while the
   GitHub repository remains private.
+- Loading UX now follows delay-mounted indicators, real step/phase labels, token-only
+  styling, reduced-motion overrides, and explicit blocked notes for API progress that
+  is not yet measurable.
 - Production-readiness hardening now includes pricing catalog lineage, SKU evidence
   derivation checks, UI-priced service coverage guards, VSDX partial-parse evidence,
   Tier 3 diagram classifier fallback diagnostics, RBAC UI controls aligned to API

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { configuredApiBaseUrl } from '../api-client';
 import { Button } from './Button';
+import { LoadingStatus, Skeleton } from './LoadingExperience';
 import { hourlyFromMonthly } from '../cost-time';
 import {
   ComparisonLineItem,
@@ -614,15 +615,10 @@ function EngineeringRowsEmptyState({
         aria-busy="true"
         role="status"
       >
-        <span
-          className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-action-primary motion-reduce:animate-none"
-          aria-hidden="true"
+        <LoadingStatus
+          title="Building engineering rows"
+          detail="Mapping AWS, Azure, and GCP line items into provider, region, SKU, and monthly cost evidence."
         />
-        <strong className="text-text-primary">Building engineering rows</strong>
-        <span>
-          Mapping AWS, Azure, and GCP line items into provider, region, SKU, and monthly cost
-          evidence.
-        </span>
       </div>
     );
   }
@@ -746,27 +742,14 @@ function SharedComparisonState({
         role="status"
       >
         <div className="flex items-start gap-3 rounded-lg border border-border bg-surface-1 p-4 sm:col-span-3">
-          <span
-            className="mt-0.5 h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-border border-t-action-primary motion-reduce:animate-none"
-            aria-hidden="true"
+          <LoadingStatus
+            title="Refreshing pricing evidence"
+            detail="Mapping provider SKUs, totals, export links, and engineering rows from the backend response."
           />
-          <div>
-            <strong className="block text-sm text-text-primary">
-              Pricing evidence is being refreshed.
-            </strong>
-            <span className="mt-1 block text-sm text-text-secondary">
-              Mapping provider SKUs, totals, export links, and engineering rows from the backend
-              response.
-            </span>
-          </div>
         </div>
-        {[0, 1, 2].map((item) => (
-          <div
-            key={item}
-            className="h-24 animate-pulse rounded-lg border border-border bg-surface-1 motion-reduce:animate-none"
-            aria-hidden="true"
-          />
-        ))}
+        <div className="sm:col-span-3">
+          <Skeleton.Grid cards={3} />
+        </div>
       </div>
     );
   }

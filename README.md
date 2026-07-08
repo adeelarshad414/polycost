@@ -242,6 +242,7 @@ all expected migration files exist and that the running database has recorded th
 Security and quality checks:
 
 ```bash
+npm run loading:check
 npm run security:audit
 npm run provider:credentials:check
 npm run release:check
@@ -290,6 +291,8 @@ before switching `USE_MOCK_PROVIDERS=false`.
 - `DEPLOY.md` covers deployment guidance.
 - `docs/PROVIDER-CREDENTIALS.md` covers AWS/Azure/GCP pricing-source setup and
   traceability expectations.
+- `LOADING-INVENTORY.md` and `LOADING-AUDIT-REPORT.md` document the loading/progress
+  UX audit and evidence.
 - `DUMMY-VALUES.md` lists development-only placeholders and production guardrails.
 - `PROGRESS.md` tracks project progress.
 - `CONTRIBUTING.md` explains how to contribute safely.

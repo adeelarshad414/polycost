@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 
 type LoadingPhase = 'idle' | 'loading' | 'complete';
+const LOADING_DELAY_MS = 150;
+const COMPLETE_MIN_VISIBLE_MS = 320;
 
 interface TopLoadingBarProps {
   isLoading: boolean;
@@ -8,12 +10,16 @@ interface TopLoadingBarProps {
 }
 
 export function TopLoadingBar({ isLoading, label = 'Page loading' }: TopLoadingBarProps) {
-  const [phase, setPhase] = useState<LoadingPhase>(() => (isLoading ? 'loading' : 'idle'));
+  const [phase, setPhase] = useState<LoadingPhase>('idle');
 
   useEffect(() => {
     if (isLoading) {
-      setPhase('loading');
-      return undefined;
+      if (phase === 'loading') {
+        return undefined;
+      }
+
+      const timeout = window.setTimeout(() => setPhase('loading'), LOADING_DELAY_MS);
+      return () => window.clearTimeout(timeout);
     }
 
     if (phase !== 'loading') {
@@ -29,7 +35,7 @@ export function TopLoadingBar({ isLoading, label = 'Page loading' }: TopLoadingB
       return undefined;
     }
 
-    const timeout = window.setTimeout(() => setPhase('idle'), 220);
+    const timeout = window.setTimeout(() => setPhase('idle'), COMPLETE_MIN_VISIBLE_MS);
 
     return () => window.clearTimeout(timeout);
   }, [phase]);
