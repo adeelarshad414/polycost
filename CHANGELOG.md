@@ -41,6 +41,8 @@ once tagged releases begin.
   allocation tag/label evidence for estimate-vs-actual reconciliation.
 - Backend-backed active workspace/team switching with membership-checked session
   updates and a signed-in account-panel selector.
+- Workspace invitation resend lifecycle with guarded token-hash rotation, visible
+  pending/expired invite status, and refreshed one-time invite links for demos.
 
 ### Notes
 
@@ -60,8 +62,8 @@ once tagged releases begin.
   Cost Management CSV, and nested GCP Billing Export JSON, while invoice-of-record
   reconciliation remains future scope.
 - Account/team UX now supports switching the current active workspace without a
-  new login, while production email, SSO/SAML, SCIM, recovery, and org-billing
-  administration remain future scope.
+  new login and refreshing pending/expired invite tokens, while production email,
+  SSO/SAML, SCIM, recovery, and org-billing administration remain future scope.
 - Remaining future work is intentionally documented: full invoice-grade live cloud
   billing coverage, full Visio visual rendering, hosted/team account product depth,
   production email/SSO/SCIM workflows, and provider-authenticated Terraform plan

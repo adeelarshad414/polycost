@@ -170,6 +170,16 @@ export class AuthController {
     return this.authService.revokeTeamInvitation(teamId, invitationId, request.auth!);
   }
 
+  @Post('teams/:teamId/invitations/:invitationId/resend')
+  @UseGuards(SessionAuthGuard)
+  resendTeamInvitation(
+    @Param('teamId') teamId: string,
+    @Param('invitationId') invitationId: string,
+    @Req() request: RequestWithAuth,
+  ) {
+    return this.authService.resendTeamInvitation(teamId, invitationId, request.auth!);
+  }
+
   @Post('invitations/accept')
   @UseGuards(SessionAuthGuard)
   acceptInvitation(@Body() body: unknown, @Req() request: RequestWithAuth) {

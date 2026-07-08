@@ -101,6 +101,7 @@ say so explicitly rather than marking it done.
 | Phase 2.9 - Production gap closure continuation         | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase 2.10 - Billing export mapper hardening            | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.11 - Workspace active team switching            | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.12 - Workspace invitation resend lifecycle      | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -114,6 +115,47 @@ say so explicitly rather than marking it done.
 | Browser audit artifact hardening                        | Complete with known gaps (see notes) | 2026-07-08   |
 | Formal browser audit tooling                            | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3.5 - Terraform bundle integrity validation      | Complete with known gaps (see notes) | 2026-07-08   |
+
+## Phase 2.12 - Workspace invitation resend lifecycle
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-08
+
+What changed:
+
+- Added a guarded `POST /api/v1/auth/teams/:teamId/invitations/:invitationId/resend`
+  endpoint that lets team owners/admins rotate a pending or expired invite token.
+- Added repository-level token-hash replacement that refreshes expiry, clears
+  revoked metadata, and never stores or returns the raw token outside the response.
+- Added a typed web client method and workspace-panel `Resend` action that keeps
+  pending/expired invitations visible, shows their status, and surfaces the refreshed
+  one-time invite token/link for demos.
+- Extended API/web unit coverage for controller guards, service RBAC, repository SQL,
+  typed client routing, and the signed-in workspace invite flow.
+
+Verification performed:
+
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth.controller.spec.ts src/api/auth-billing.spec.ts src/api/api-database.repository.spec.ts`
+  passed: 3 suites / 45 tests.
+- `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx src/api-client.spec.ts`
+  passed: 2 suites / 84 tests.
+- `npm run ci:lint` passed with zero ESLint/typecheck errors.
+- `npm run test:production-readiness` passed: API 10 suites / 139 tests and web
+  2 suites / 84 tests.
+- `npm run check` passed: API 51 suites / 405 tests, web 11 suites / 141 tests,
+  graph validation 312 nodes / 312 edges, pricing coverage, progress
+  verification, QA/security suppressions, database, DevOps, cloud, release,
+  handover, and provider credential gates.
+- `npm run ci:build` passed for API and web.
+- `npm audit --audit-level=high` passed; it still reports the documented low
+  transitive Graphify advisory with no available fix.
+
+Known remaining gaps:
+
+- The resend flow still exposes the one-time token in the demo workspace panel
+  because production email delivery is not yet implemented.
+- Enterprise account UX remains incomplete: no invitation emails/templates, SAML/SCIM
+  admin workflows, recovery flows, or full org/account administration console yet.
 
 ## Phase 2.11 - Workspace active team switching
 

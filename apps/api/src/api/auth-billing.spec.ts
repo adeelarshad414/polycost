@@ -258,6 +258,34 @@ describe('AuthService', () => {
     expect(repository.createTeamInvitation.mock.calls[0][0].tokenHash).not.toBe(
       invitation.inviteToken,
     );
+
+    repository.resendTeamInvitation.mockImplementation(async (input) => ({
+      id: '88888888-8888-4888-8888-888888888888',
+      teamId: input.teamId,
+      email: 'finops@example.com',
+      role: 'member',
+      status: 'pending',
+      invitedByAccountId: input.invitedByAccountId,
+      expiresAt: input.expiresAt,
+      createdAt: '2026-07-06T00:05:00.000Z',
+    }));
+
+    const resent = await service.resendTeamInvitation(
+      account.defaultTeam!.teamId,
+      '88888888-8888-4888-8888-888888888888',
+      identity,
+    );
+
+    expect(resent.inviteToken).toEqual(expect.any(String));
+    expect(resent.inviteUrl).toContain('/?invite_token=');
+    expect(repository.resendTeamInvitation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        invitationId: '88888888-8888-4888-8888-888888888888',
+        tokenHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+        invitedByAccountId: identity.accountId,
+      }),
+    );
+    expect(repository.resendTeamInvitation.mock.calls[0][0].tokenHash).not.toBe(resent.inviteToken);
   });
 
   it('previews invalid and expired invitation landing states without accepting them', async () => {
@@ -710,6 +738,16 @@ describe('AuthService', () => {
       role: input.role,
       createdAt: '2026-07-06T00:00:00.000Z',
     }));
+    repository.resendTeamInvitation.mockResolvedValue({
+      id: '88888888-8888-4888-8888-888888888888',
+      teamId: account.defaultTeam!.teamId,
+      email: 'new@example.com',
+      role: 'member',
+      status: 'pending',
+      invitedByAccountId: account.accountId,
+      expiresAt: '2026-07-13T00:00:00.000Z',
+      createdAt: '2026-07-06T00:05:00.000Z',
+    });
     repository.removeTeamMember.mockResolvedValue(true);
     repository.countTeamOwners.mockResolvedValue(2);
     const service = new AuthService(repository as never, configService());
@@ -733,6 +771,14 @@ describe('AuthService', () => {
       service.inviteTeamMember(
         account.defaultTeam!.teamId,
         { email: 'new@example.com', role: 'member' },
+        memberIdentity,
+      ),
+      'Team admin access is required',
+    );
+    await expectForbidden(
+      service.resendTeamInvitation(
+        account.defaultTeam!.teamId,
+        '88888888-8888-4888-8888-888888888888',
         memberIdentity,
       ),
       'Team admin access is required',
@@ -774,6 +820,13 @@ describe('AuthService', () => {
         adminIdentity,
       ),
     ).resolves.toMatchObject({ status: 'revoked' });
+    await expect(
+      service.resendTeamInvitation(
+        account.defaultTeam!.teamId,
+        '88888888-8888-4888-8888-888888888888',
+        adminIdentity,
+      ),
+    ).resolves.toMatchObject({ status: 'pending', inviteToken: expect.any(String) });
     await expect(
       service.testSsoConnection(
         account.defaultTeam!.teamId,
@@ -1370,6 +1423,7 @@ function repositoryMock() {
     createTeamInvitation: jest.fn(),
     listTeamInvitations: jest.fn(),
     revokeTeamInvitation: jest.fn(),
+    resendTeamInvitation: jest.fn(),
     findInvitationByTokenHash: jest.fn(),
     findPendingInvitationByTokenHash: jest.fn(),
     acceptTeamInvitation: jest.fn(),

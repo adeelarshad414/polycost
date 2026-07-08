@@ -625,6 +625,7 @@ describe('api client', () => {
       .mockResolvedValueOnce(jsonResponse([member]))
       .mockResolvedValueOnce(jsonResponse(invitation))
       .mockResolvedValueOnce(jsonResponse([invitation]))
+      .mockResolvedValueOnce(jsonResponse({ ...invitation, inviteToken: 'refreshed-token' }))
       .mockResolvedValueOnce(jsonResponse({ ...invitation, status: 'revoked' }))
       .mockResolvedValueOnce(
         jsonResponse({
@@ -726,6 +727,9 @@ describe('api client', () => {
       invitation,
     ]);
     await expect(
+      client.resendTeamInvitation('team-1', 'invite-1', 'session-token'),
+    ).resolves.toEqual(expect.objectContaining({ inviteToken: 'refreshed-token' }));
+    await expect(
       client.revokeTeamInvitation('team-1', 'invite-1', 'session-token'),
     ).resolves.toEqual(expect.objectContaining({ status: 'revoked' }));
     await expect(client.previewTeamInvitation('invite-token')).resolves.toEqual(
@@ -809,7 +813,15 @@ describe('api client', () => {
       }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      13,
+      10,
+      'http://api.test/api/v1/auth/teams/team-1/invitations/invite-1/resend',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ Authorization: 'Bearer session-token' }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      14,
       'http://api.test/api/v1/auth/teams/team-1/members/account-1',
       expect.objectContaining({
         method: 'PATCH',
@@ -817,7 +829,7 @@ describe('api client', () => {
       }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      20,
+      21,
       'http://api.test/api/v1/billing/imports/provider-export',
       expect.objectContaining({
         method: 'POST',

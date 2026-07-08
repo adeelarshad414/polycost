@@ -2430,6 +2430,14 @@ summary:focus-visible,
   padding: 7px;
 }
 
+.workspace-row-actions {
+  display: flex;
+  min-width: max-content;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .workspace-link-button {
   color: var(--pc-danger);
   padding-inline: 0;
@@ -9419,6 +9427,11 @@ select:disabled {
   .workspace-member-row {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .workspace-row-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .workspace-control-heading > strong {
