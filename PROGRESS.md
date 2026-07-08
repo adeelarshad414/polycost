@@ -107,6 +107,7 @@ say so explicitly rather than marking it done.
 | Phase 2.15 - Transaction-coupled audit writes           | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.16 - Team audit export outbox                   | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.17 - Audit export receiver verification         | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.18 - VSDX approximate SVG previews              | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4041,6 +4042,31 @@ Status: implemented locally on 2026-07-08.
   receiver verification semantics, but production-grade immutability still requires
   a real staging/production SIEM or WORM receiver to archive the canary and prove
   retention, access control, and deletion resistance.
+
+## Phase 2.18 — VSDX approximate SVG previews
+
+Status: implemented locally on 2026-07-08.
+
+- Added optional `graph.visualPreviews[]` to diagram parse results. VSDX parses now
+  emit bounded, sanitized SVG previews generated from page geometry, positioned
+  shape bounds, safe color metadata, labels, and same-page connector edges.
+- Updated the web diagram review panel to render the server SVG preview as an image
+  data URL when available, with the existing client-side layout preview retained as
+  a fallback.
+- Updated VSDX docs/runbooks from "no visual rendering" to the more precise current
+  state: approximate SVG preview is available, but full Visio semantic rendering
+  remains future work.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/diagram-parser/diagram-parser.service.spec.ts`
+  passed 26/26. `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx`
+  passed 60/60. `npm run ci:lint` passed. `npm run test:production-readiness`
+  passed with 157/157 API tests and 86/86 web tests. Full `npm run check` passed
+  with 421/421 API tests, 143/143 web tests, graph validation, pricing coverage,
+  progress verification, QA/security suppression hygiene, DB validation, release,
+  handover, and provider-credential checks green.
+- Remaining caveat: this is still not full Visio rendering. It does not evaluate
+  Visio themes, icon glyph libraries, formulas, embedded media, exact text wrapping,
+  or pixel-level visual equivalence.
 
 ## Deviations from spec log
 

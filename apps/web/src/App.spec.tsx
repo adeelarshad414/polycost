@@ -1766,6 +1766,50 @@ describe('App', () => {
     unmount();
   });
 
+  it('renders API-provided VSDX SVG visual previews in the diagram review', async () => {
+    const parsedNws = buildNwsFromForm(defaultWorkloadForm, 'drawio_diagram');
+    const parsedDiagram = diagramParseResult(parsedNws, {
+      displayLabel: 'EC2 web',
+      assumedDefaults: [],
+    });
+    parsedDiagram.source.format = 'vsdx';
+    parsedDiagram.source.fileName = 'architecture.vsdx';
+    parsedDiagram.graph.format = 'vsdx';
+    parsedDiagram.graph.visualPreviews = [
+      {
+        format: 'svg',
+        renderingMode: 'approximate-vsdx-svg',
+        pageRef: 'visio/pages/page1.xml',
+        pageName: 'Page 1',
+        width: 10,
+        height: 8,
+        nodeCount: 2,
+        edgeCount: 1,
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 8"><text>EC2 web</text></svg>',
+        warnings: ['approximate SVG preview from VSDX geometry, not full Visio visual rendering'],
+      },
+    ];
+    const client = clientMock({
+      parseDiagram: jest.fn(async () => parsedDiagram),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Upload diagram'));
+    await changeTextarea(textareaById(container, 'diagram-source'), 'VSDX fixture');
+    await click(buttonByText(container, 'Parse diagram'));
+
+    expect(text(container)).toContain('SVG preview · 2 nodes · 1 links');
+    expect(text(container)).toContain(
+      'approximate SVG preview from VSDX geometry, not full Visio visual rendering',
+    );
+    const image = container.querySelector('.diagram-preview-svg') as HTMLImageElement | null;
+    expect(image).not.toBeNull();
+    expect(image?.alt).toBe('Approximate diagram preview for Page 1');
+    expect(image?.src).toContain('data:image/svg+xml');
+
+    unmount();
+  });
+
   it('supports manual diagram review defaults for storage, database, and network services', async () => {
     const parsedNws = buildNwsFromForm(
       {

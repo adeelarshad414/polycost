@@ -644,6 +644,18 @@ export interface DiagramParseResult {
   };
   graph: {
     format: DiagramInputFormat;
+    visualPreviews?: Array<{
+      format: 'svg';
+      renderingMode: 'approximate-vsdx-svg';
+      pageRef?: string;
+      pageName?: string;
+      width: number;
+      height: number;
+      nodeCount: number;
+      edgeCount: number;
+      svg: string;
+      warnings: string[];
+    }>;
     nodes: Array<{
       id: string;
       displayLabel: string;

@@ -57,10 +57,11 @@ foundations above:
 - The frontend now includes a workspace control center wired to the auth/team,
   provider-export import, and reconciliation APIs.
 - VSDX connector records are aggregated into direct topology edges where possible,
-  and the browser preview renders layout-aware nodes plus connector lines.
+  the API emits approximate SVG previews from positioned page geometry, and the
+  browser preview renders those previews with a layout-aware fallback.
 
 Remaining future scope is explicit: full provider billing/export coverage across all
-invoice edge cases, full Visio visual rendering, SSO handshakes, email invite
+invoice edge cases, full Visio semantic rendering, SSO handshakes, email invite
 delivery, and complete enterprise account/RBAC product UX.
 
 ## Security Advisory State

@@ -39,6 +39,7 @@ export interface DiagramGraph {
   nodes: DiagramGraphNode[];
   edges: DiagramGraphEdge[];
   ignoredNodes: DiagramIgnoredNode[];
+  visualPreviews?: DiagramVisualPreview[];
 }
 
 export interface DiagramGraphNode {
@@ -105,6 +106,19 @@ export interface DiagramNodeVisualMetadata {
   geometryHint?: 'rectangle' | 'connector' | 'group' | 'unknown';
   renderingMode?: 'layout-extraction';
   renderingWarnings?: string[];
+}
+
+export interface DiagramVisualPreview {
+  format: 'svg';
+  renderingMode: 'approximate-vsdx-svg';
+  pageRef?: string;
+  pageName?: string;
+  width: number;
+  height: number;
+  nodeCount: number;
+  edgeCount: number;
+  svg: string;
+  warnings: string[];
 }
 
 export interface DiagramExtractor {

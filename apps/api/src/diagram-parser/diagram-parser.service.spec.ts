@@ -317,6 +317,72 @@ describe('DiagramParserService', () => {
     );
   });
 
+  it('emits sanitized approximate SVG visual previews for VSDX pages', async () => {
+    const parsed = await service().parse({
+      content: zipWithStoredEntries([
+        {
+          path: 'visio/pages/page1.xml',
+          content: `
+            <PageContents>
+              <PageSheet>
+                <Cell N="PageWidth" V="12"/>
+                <Cell N="PageHeight" V="8"/>
+              </PageSheet>
+              <Shapes>
+                <Shape ID="10" NameU="AWS19.EC2">
+                  <Text>EC2 &lt;web&gt;</Text>
+                  <Cell N="PinX" V="3"/>
+                  <Cell N="PinY" V="5"/>
+                  <Cell N="Width" V="2"/>
+                  <Cell N="Height" V="1"/>
+                  <Cell N="FillForegnd" V="#D85A30"/>
+                </Shape>
+                <Shape ID="20" NameU="AWS19.RDS">
+                  <Text>database</Text>
+                  <Cell N="PinX" V="8"/>
+                  <Cell N="PinY" V="3"/>
+                  <Cell N="Width" V="2"/>
+                  <Cell N="Height" V="1"/>
+                  <Cell N="LineColor" V="RGB(29,158,117)"/>
+                </Shape>
+                <Shape ID="30" NameU="Connector"><Text>route</Text></Shape>
+              </Shapes>
+              <Connects>
+                <Connect FromSheet="30" ToSheet="10"/>
+                <Connect FromSheet="30" ToSheet="20"/>
+              </Connects>
+            </PageContents>
+          `,
+        },
+      ]).toString('base64'),
+      encoding: 'base64',
+      fileName: 'preview.vsdx',
+    });
+
+    expect(parsed.graph.visualPreviews).toHaveLength(1);
+    expect(parsed.graph.visualPreviews?.[0]).toEqual(
+      expect.objectContaining({
+        format: 'svg',
+        renderingMode: 'approximate-vsdx-svg',
+        pageRef: 'visio/pages/page1.xml',
+        pageName: 'Page 1',
+        nodeCount: 2,
+        edgeCount: 1,
+        warnings: expect.arrayContaining([
+          'approximate SVG preview from VSDX geometry, not full Visio visual rendering',
+        ]),
+      }),
+    );
+    const svg = parsed.graph.visualPreviews?.[0]?.svg ?? '';
+    expect(svg).toContain('<svg');
+    expect(svg).toContain('data-node-id="10"');
+    expect(svg).toContain('data-node-id="20"');
+    expect(svg).toContain('data-edge-id=');
+    expect(svg).toContain('>EC2<');
+    expect(svg).not.toContain('<web>');
+    expect(svg).not.toContain('<script');
+  });
+
   it('uses VSDX page names and container labels as review and region evidence', async () => {
     const parsed = await service().parse({
       content: zipWithStoredEntries([
