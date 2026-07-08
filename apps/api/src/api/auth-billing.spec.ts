@@ -288,6 +288,62 @@ describe('AuthService', () => {
     expect(repository.resendTeamInvitation.mock.calls[0][0].tokenHash).not.toBe(resent.inviteToken);
   });
 
+  it('omits raw invitation tokens from API responses when webhook delivery is active', async () => {
+    const repository = repositoryMock();
+    repository.createTeamInvitation.mockImplementation(async (input) => ({
+      id: '88888888-8888-4888-8888-888888888888',
+      teamId: input.teamId,
+      email: input.email,
+      role: input.role,
+      status: 'pending',
+      invitedByAccountId: input.invitedByAccountId,
+      expiresAt: input.expiresAt,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    }));
+    const deliveryService = {
+      deliverTeamInvitation: jest.fn(async () => ({
+        mode: 'webhook' as const,
+        status: 'accepted' as const,
+        message: 'Invite delivery webhook accepted the invitation.',
+        tokenExposedInResponse: false,
+        deliveredAt: '2026-07-06T00:00:01.000Z',
+      })),
+    };
+    const service = new AuthService(repository as never, configService(), deliveryService as never);
+
+    const invitation = await service.inviteTeamMember(
+      account.defaultTeam!.teamId,
+      {
+        email: 'FinOps@Example.com',
+        role: 'admin',
+      },
+      identity,
+    );
+
+    expect(invitation.inviteToken).toBeUndefined();
+    expect(invitation.inviteUrl).toBeUndefined();
+    expect(invitation.delivery).toMatchObject({
+      mode: 'webhook',
+      status: 'accepted',
+      tokenExposedInResponse: false,
+    });
+    expect(repository.createTeamInvitation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tokenHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }),
+    );
+    expect(deliveryService.deliverTeamInvitation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        inviteUrl: expect.stringContaining('/?invite_token='),
+        action: 'created',
+        invitedBy: {
+          accountId: identity.accountId,
+          email: identity.email,
+        },
+      }),
+    );
+  });
+
   it('previews invalid and expired invitation landing states without accepting them', async () => {
     const repository = repositoryMock();
     const service = new AuthService(repository as never, configService());

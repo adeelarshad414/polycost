@@ -183,11 +183,13 @@ Actions:
 
 1. Confirm `AUTH_PUBLIC_BASE_URL` matches the reachable API origin.
 2. Confirm `AUTH_SSO_STATE_SECRET` is not a dummy value outside development.
-3. Check rate-limit and lockout settings.
-4. Re-run focused auth tests:
+3. For staging/production, confirm `AUTH_INVITE_DELIVERY_MODE=webhook`, the webhook
+   URL uses HTTPS, and `AUTH_INVITE_DELIVERY_WEBHOOK_SECRET` is non-dummy.
+4. Check rate-limit and lockout settings.
+5. Re-run focused auth tests:
 
 ```bash
-npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/api/auth.controller.spec.ts
+npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/api/auth.controller.spec.ts src/api/invitation-delivery.service.spec.ts
 ```
 
 ## Incident: GitHub Actions Do Not Run

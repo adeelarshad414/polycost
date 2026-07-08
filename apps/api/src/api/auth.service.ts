@@ -26,6 +26,7 @@ import {
   TeamMemberRecord,
   TeamRole,
 } from './auth.types';
+import { InvitationDeliveryService } from './invitation-delivery.service';
 import { hashPassword, verifyPassword } from './password-hash';
 
 interface AuthRequestMetadata {
@@ -55,6 +56,7 @@ export class AuthService {
   constructor(
     private readonly repository: ApiDatabaseRepository,
     private readonly configService: ConfigService<AppConfig, true>,
+    private readonly invitationDeliveryService = new InvitationDeliveryService(configService),
   ) {}
 
   async register(body: unknown, metadata: AuthRequestMetadata = {}): Promise<AuthSessionResponse> {
@@ -325,11 +327,7 @@ export class AuthService {
       expiresAt: new Date(Date.now() + INVITATION_TTL_DAYS * 86_400_000).toISOString(),
     });
 
-    return {
-      ...invitation,
-      inviteToken,
-      inviteUrl: `${this.publicBaseUrl()}/?invite_token=${encodeURIComponent(inviteToken)}`,
-    };
+    return this.withInvitationDelivery(invitation, inviteToken, identity, 'created');
   }
 
   async listTeamInvitations(
@@ -389,11 +387,7 @@ export class AuthService {
       ]);
     }
 
-    return {
-      ...invitation,
-      inviteToken,
-      inviteUrl: `${this.publicBaseUrl()}/?invite_token=${encodeURIComponent(inviteToken)}`,
-    };
+    return this.withInvitationDelivery(invitation, inviteToken, identity, 'resent');
   }
 
   async previewInvitation(token: string): Promise<TeamInvitationPreview> {
@@ -715,6 +709,30 @@ export class AuthService {
 
   private publicBaseUrl(): string {
     return this.configService.get('AUTH_PUBLIC_BASE_URL', { infer: true }).replace(/\/$/, '');
+  }
+
+  private async withInvitationDelivery(
+    invitation: TeamInvitationRecord,
+    inviteToken: string,
+    identity: AuthIdentity,
+    action: 'created' | 'resent',
+  ): Promise<TeamInvitationRecord> {
+    const inviteUrl = `${this.publicBaseUrl()}/?invite_token=${encodeURIComponent(inviteToken)}`;
+    const delivery = await this.invitationDeliveryService.deliverTeamInvitation({
+      invitation,
+      inviteUrl,
+      invitedBy: {
+        accountId: identity.accountId,
+        email: identity.email,
+      },
+      action,
+    });
+
+    return {
+      ...invitation,
+      delivery,
+      ...(delivery.tokenExposedInResponse ? { inviteToken, inviteUrl } : {}),
+    };
   }
 
   private ssoStateSecret(): string {

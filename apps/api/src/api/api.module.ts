@@ -40,6 +40,7 @@ import {
 } from './cost-management.controller';
 import { CostManagementService } from './cost-management.service';
 import { LivePricingRefreshService } from './live-pricing-refresh.service';
+import { InvitationDeliveryService } from './invitation-delivery.service';
 import { DataHealthController } from './data-health.controller';
 import { PricingStatusController } from './pricing-status.controller';
 import { RegionsController } from './regions.controller';
@@ -87,6 +88,7 @@ import { WorkloadController } from './workload.controller';
       useFactory: () => new ApiRateLimitService(),
     },
     AdminApiKeyGuard,
+    InvitationDeliveryService,
     AuthService,
     SessionAuthGuard,
     BillingService,

@@ -60,6 +60,19 @@ export const configSchema = z
     AUTH_LOCAL_REGISTRATION_ENABLED: envBoolean(true),
     AUTH_PUBLIC_BASE_URL: z.string().url().default('http://localhost:3001'),
     AUTH_SSO_STATE_SECRET: z.string().min(16).default('CHANGE_ME_DEV_ONLY_SSO_STATE_SECRET'),
+    AUTH_INVITE_DELIVERY_MODE: z.enum(['panel', 'webhook']).default('panel'),
+    AUTH_INVITE_DELIVERY_WEBHOOK_URL: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.string().url().optional(),
+    ),
+    AUTH_INVITE_DELIVERY_WEBHOOK_SECRET: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.string().min(16).optional(),
+    ),
+    AUTH_INVITE_EMAIL_FROM: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.string().min(3).optional(),
+    ),
     AUTH_OIDC_ISSUER_URL: z.string().url().optional(),
     AUTH_OIDC_CLIENT_ID: z.string().min(1).optional(),
     AUTH_SAML_ENTITY_ID: z.string().min(1).optional(),
@@ -96,6 +109,14 @@ export const configSchema = z
     }
 
     if (config.NODE_ENV === 'production' || config.NODE_ENV === 'staging') {
+      if (config.AUTH_INVITE_DELIVERY_MODE !== 'webhook') {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['AUTH_INVITE_DELIVERY_MODE'],
+          message: 'Staging and production invite delivery must use the webhook provider.',
+        });
+      }
+
       for (const [key, value] of Object.entries(config)) {
         if (typeof value === 'string' && isDummyValue(value)) {
           context.addIssue({
@@ -104,6 +125,36 @@ export const configSchema = z
             message: 'CHANGE_ME_DEV_ONLY and dummy values are not allowed outside development.',
           });
         }
+      }
+    }
+
+    if (config.AUTH_INVITE_DELIVERY_MODE === 'webhook') {
+      if (!config.AUTH_INVITE_DELIVERY_WEBHOOK_URL) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['AUTH_INVITE_DELIVERY_WEBHOOK_URL'],
+          message: 'AUTH_INVITE_DELIVERY_WEBHOOK_URL is required for webhook invite delivery.',
+        });
+      }
+
+      if (!config.AUTH_INVITE_DELIVERY_WEBHOOK_SECRET) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['AUTH_INVITE_DELIVERY_WEBHOOK_SECRET'],
+          message: 'AUTH_INVITE_DELIVERY_WEBHOOK_SECRET is required for webhook invite delivery.',
+        });
+      }
+
+      if (
+        (config.NODE_ENV === 'production' || config.NODE_ENV === 'staging') &&
+        config.AUTH_INVITE_DELIVERY_WEBHOOK_URL &&
+        !config.AUTH_INVITE_DELIVERY_WEBHOOK_URL.startsWith('https://')
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['AUTH_INVITE_DELIVERY_WEBHOOK_URL'],
+          message: 'Invite delivery webhook URL must use HTTPS outside development.',
+        });
       }
     }
 

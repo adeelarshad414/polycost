@@ -20,6 +20,8 @@ The explicit placeholder token is `CHANGE_ME_DEV_ONLY`. Production and staging c
   development documentation
 - `AUTH_SSO_STATE_SECRET=CHANGE_ME_DEV_ONLY_SSO_STATE_SECRET` for local mock OIDC
   callback signing
+- `AUTH_INVITE_DELIVERY_MODE=panel` for local/demo token sharing in the workspace
+  panel
 - Local-only Docker Vault seed credentials
 
 ## Not Allowed In Staging Or Production
@@ -28,6 +30,8 @@ The explicit placeholder token is `CHANGE_ME_DEV_ONLY`. Production and staging c
 - `dummy`
 - `example`
 - Dummy `AUTH_SSO_STATE_SECRET` values
+- `AUTH_INVITE_DELIVERY_MODE=panel`
+- Dummy `AUTH_INVITE_DELIVERY_WEBHOOK_SECRET` values
 - Any real provider mode without `VAULT_TOKEN_FILE`
 - Any strict provider credential check where Vault returns a dummy GCP access token or dummy LLM API key
 
@@ -42,8 +46,13 @@ docker compose exec vault vault kv put secret/polycost/llm api_key="<llm-api-key
 ```
 
 3. Set `USE_MOCK_PROVIDERS=false`.
-4. Run `npm run provider:credentials:check:strict`.
-5. Run a comparison and confirm each catalog-backed line item has source endpoint, source record ID, payload hash, transform version, and fetched timestamp.
+4. Set `AUTH_INVITE_DELIVERY_MODE=webhook`,
+   `AUTH_INVITE_DELIVERY_WEBHOOK_URL`, and a non-dummy
+   `AUTH_INVITE_DELIVERY_WEBHOOK_SECRET` before enabling staging or production
+   workspace invites.
+5. Run `npm run provider:credentials:check:strict`.
+6. Run a comparison and confirm each catalog-backed line item has source endpoint,
+   source record ID, payload hash, transform version, and fetched timestamp.
 
 For SSO readiness, configure provider metadata through the workspace UI only after
 setting `AUTH_PUBLIC_BASE_URL` to the externally reachable API origin. The development
