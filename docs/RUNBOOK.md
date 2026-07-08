@@ -188,8 +188,12 @@ Actions:
 4. Confirm `AUTH_AUDIT_EXPORT_MODE=webhook`, the audit export URL uses HTTPS, and
    `AUTH_AUDIT_EXPORT_WEBHOOK_SECRET` is non-dummy so team audit events leave the
    app database for SIEM/WORM retention.
-5. Check rate-limit and lockout settings.
-6. Re-run focused auth tests:
+5. Run `npm run audit:export:smoke:local` for local contract proof, or
+   `npm run audit:export:smoke` with staging `AUTH_AUDIT_EXPORT_WEBHOOK_URL` and
+   `AUTH_AUDIT_EXPORT_WEBHOOK_SECRET` to prove the real receiver accepts signed
+   canary events.
+6. Check rate-limit and lockout settings.
+7. Re-run focused auth tests:
 
 ```bash
 npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/api/auth.controller.spec.ts src/api/invitation-delivery.service.spec.ts
@@ -216,6 +220,7 @@ Actions:
 ```bash
 npm run handover:check
 npm run release:check
+npm run audit:export:smoke:local
 npm run test:production-readiness
 npm run ci:build
 npm run demo:up

@@ -44,6 +44,9 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Confirm known future gaps remain plainly stated: invoice-grade billing, full visual VSDX rendering, production SSO/RBAC polish, and Terraform/V3.
 - Confirm `docs/SECURITY-SUPPRESSIONS.md` is current.
 - Confirm `npm run security:audit` passes the high/critical gate.
+- Confirm audit export receiver evidence is archived before claiming SIEM/WORM
+  readiness: local proof from `npm run audit:export:smoke:local`, and staging
+  proof from `npm run audit:export:smoke` when a real receiver is configured.
 
 ## Verification
 
@@ -55,6 +58,7 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Run `npm run overlay:check`.
 - Run `npm run public:readiness:check`.
 - Run `npm run browser:audit`.
+- Run `npm run audit:export:smoke:local`.
 - Run `npm run release:check`.
 - Run `npm run loading:check`.
 - Run `npm run handover:check`.

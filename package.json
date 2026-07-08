@@ -75,6 +75,8 @@
     "demo:up": "node scripts/demo-ready.mjs",
     "demo:artifacts": "node scripts/capture-demo-artifacts.mjs",
     "demo:verify-clean": "node scripts/clean-clone-demo-check.mjs",
+    "audit:export:smoke": "node scripts/audit-export-webhook-smoke.mjs",
+    "audit:export:smoke:local": "node scripts/audit-export-local-smoke.mjs",
     "browser:audit": "node scripts/browser-audit.mjs",
     "live:verify": "node scripts/live-verification.mjs",
     "hooks:install": "node scripts/install-hooks.mjs",

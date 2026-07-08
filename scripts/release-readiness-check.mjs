@@ -70,6 +70,12 @@ if (!packageJson.scripts?.['live:verify']) {
 if (!packageJson.scripts?.['demo:verify-clean']) {
   failures.push('package.json is missing demo:verify-clean');
 }
+if (!packageJson.scripts?.['audit:export:smoke']) {
+  failures.push('package.json is missing audit:export:smoke');
+}
+if (!packageJson.scripts?.['audit:export:smoke:local']) {
+  failures.push('package.json is missing audit:export:smoke:local');
+}
 if (!packageJson.scripts?.['pricing:logic:coverage']) {
   failures.push('package.json is missing pricing:logic:coverage');
 }
@@ -131,6 +137,8 @@ await assertFileContains('README.md', [
   ['clean-clone timed verifier', 'npm run demo:verify-clean'],
   ['demo artifact capture', 'npm run demo:artifacts'],
   ['browser audit command', 'npm run browser:audit'],
+  ['audit export local smoke command', 'npm run audit:export:smoke:local'],
+  ['audit export staging smoke command', 'npm run audit:export:smoke'],
   [
     'catalog list-price honesty',
     'not a billing, invoicing, or live cloud-account spend management system',
@@ -182,6 +190,9 @@ await assertFileContains('docs/HOW-TO-USE.md', [
 await assertFileContains('docs/DEPLOYMENT.md', [
   ['deployment health checks', '/health/ready'],
   ['real provider rehearsal', 'Real Provider Pricing Rehearsal'],
+  ['audit export receiver verification', '## Audit Export Receiver Verification'],
+  ['audit export local smoke command', 'npm run audit:export:smoke:local'],
+  ['audit export staging smoke command', 'npm run audit:export:smoke'],
   ['backup and restore guidance', 'Backups And Restore'],
 ]);
 
@@ -238,6 +249,8 @@ await assertFileContains('RELEASE-CHECKLIST.md', [
   ['clean-clone timed verifier command', 'npm run demo:verify-clean'],
   ['demo artifact command', 'npm run demo:artifacts'],
   ['browser audit command', 'npm run browser:audit'],
+  ['audit export local smoke command', 'npm run audit:export:smoke:local'],
+  ['audit export staging smoke command', 'npm run audit:export:smoke'],
   ['public readiness guard command', 'npm run public:readiness:check'],
   ['public demo hardening documentation', 'docs/development/public-demo-hardening.md'],
   ['unit coverage command', 'npm run ci:unit'],
@@ -383,6 +396,18 @@ await assertFileContains('scripts/clean-clone-demo-check.mjs', [
   ['isolated compose project', 'COMPOSE_PROJECT_NAME'],
   ['host API port isolation', 'API_HOST_PORT'],
   ['clean clone timing assertion', 'clean-clone-to-running'],
+]);
+
+await assertFileContains('scripts/audit-export-webhook-smoke.mjs', [
+  ['signed audit export event', 'team_audit_event.recorded'],
+  ['HMAC signature header', 'x-polycost-signature-sha256'],
+  ['HTTPS default guard', 'HTTPS unless --allow-http-local'],
+]);
+
+await assertFileContains('scripts/audit-export-local-smoke.mjs', [
+  ['local JSONL artifact path', 'artifacts'],
+  ['constant-time signature verification', 'timingSafeEqual'],
+  ['append-only local evidence', "flag: 'a'"],
 ]);
 
 await assertFileContains('apps/api/src/pricing-normalization/pricing-reconciliation.spec.ts', [
