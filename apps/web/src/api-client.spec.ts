@@ -863,6 +863,76 @@ describe('api client', () => {
     );
   });
 
+  it('wires invoice control validation route', async () => {
+    const fetchMock = jest.fn().mockResolvedValueOnce(
+      jsonResponse({
+        id: 'reconciliation-1',
+        importRunId: 'import-1',
+        comparisonId: 'comparison-1',
+        provider: 'aws',
+        estimatedTotalUsd: 100,
+        invoicedTotalUsd: 107,
+        varianceUsd: 7,
+        variancePercent: 7,
+        status: 'variance-warning',
+        evidence: {
+          invoiceGradeArtifactRegister: {
+            registeredCount: 1,
+            verifiedCount: 1,
+            invoiceControlMatchedCount: 1,
+            artifacts: [
+              {
+                id: 'artifact-1',
+                invoiceControlValidationStatus: 'matched',
+                invoiceControlTotalDeltaUsd: 0,
+                invoiceControlImportDeltaUsd: 0,
+                invoiceControlPeriodMatched: true,
+              },
+            ],
+          },
+        },
+        createdAt: '2026-07-06T00:00:02.000Z',
+      }),
+    );
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(
+      client.validateInvoiceControlPacket(
+        'reconciliation-1',
+        'artifact-1',
+        {
+          acceptedVarianceUsd: 0.01,
+          evidenceReference: 'invoice-control://controls/artifact-1',
+          notes: 'Matched stored artifact control packet.',
+        },
+        'session-token',
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        evidence: expect.objectContaining({
+          invoiceGradeArtifactRegister: expect.objectContaining({
+            invoiceControlMatchedCount: 1,
+          }),
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/billing/reconciliations/reconciliation-1/artifacts/artifact-1/invoice-control-validation',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer session-token',
+        }),
+        body: JSON.stringify({
+          acceptedVarianceUsd: 0.01,
+          evidenceReference: 'invoice-control://controls/artifact-1',
+          notes: 'Matched stored artifact control packet.',
+        }),
+      }),
+    );
+  });
+
   it('wires invoice artifact review queue and status routes', async () => {
     const fetchMock = jest
       .fn()

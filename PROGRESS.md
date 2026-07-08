@@ -122,6 +122,7 @@ say so explicitly rather than marking it done.
 | Phase 2.30 - Artifact legal-hold administration         | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.31 - Invoice artifact review workflow           | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.32 - Artifact policy exception lifecycle        | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.33 - Invoice control packet validation          | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4525,6 +4526,42 @@ Status: implemented and verified locally on 2026-07-08.
   artifacts, not external legal-review routing, contract/legal approval integration,
   full policy exception automation, private contract validation, provider invoice
   rendering, or provider invoice-of-record reconciliation.
+
+## Phase 2.33 — Invoice control packet validation
+
+Status: implemented and verified locally on 2026-07-08.
+
+- Added an Owner/Admin invoice control validation operation:
+  `POST /api/v1/billing/reconciliations/:id/artifacts/:artifactId/invoice-control-validation`.
+- Validation requires the artifact file to be stored and the artifact metadata to be
+  verified before it can run. It rejects missing control totals rather than implying
+  invoice-grade evidence exists.
+- Reconciliation evidence now records `matched`, `variance-warning`, `mismatch`, or
+  `not-run` invoice control status, accepted variance, reconciliation-total delta,
+  imported-actuals delta, billing-period match state, validation evidence reference,
+  notes, validated timestamp, and aggregate control-validation counts.
+- Added the `billing.reconciliation.invoice_control_validated` audit action and
+  schema migration so control validations are visible in the team audit trail.
+- Added workspace UI controls and readouts for invoice control status, deltas, period
+  matching, and validation timestamp after a stored artifact has been verified.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/api/api-database.repository.spec.ts`
+  passed 74/74 across 2 suites. `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx src/api-client.spec.ts`
+  passed 89/89 across 2 suites.
+- `npm run ci:lint` passed with zero ESLint/typecheck errors or warnings.
+- `npm run test:production-readiness` passed with API 14 suites / 197 tests and web
+  2 suites / 89 tests.
+- Full `npm run check` passed with API 55 suites / 464 tests, web 11 suites / 146
+  tests, graph validation 320 nodes / 320 edges, pricing coverage, progress
+  verification, QA/security suppression hygiene, DB, DevOps, cloud, release,
+  handover, and provider-credential gates green. `npm run impeccable` was skipped
+  by design because the repo targets Node 20 and the optional tool requires Node 24;
+  DB validation skipped live `schema_migrations` inspection because the local
+  Postgres container was not running.
+- Remaining caveat: this validates stored control-packet totals against imported
+  actuals and reconciliation totals. It is not provider invoice rendering, private
+  contract/legal validation, provider-authenticated invoice-of-record validation, or
+  full invoice-grade billing coverage.
 
 ## Deviations from spec log
 

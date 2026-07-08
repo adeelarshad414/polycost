@@ -43,6 +43,7 @@ const expectedMigrations = [
   '035_team_audit_artifact_legal_hold_action.sql',
   '036_team_audit_artifact_review_action.sql',
   '037_team_audit_artifact_exception_action.sql',
+  '038_team_audit_invoice_control_validation_action.sql',
 ];
 
 if (!['migrate', 'seed', 'reset', 'validate'].includes(command)) {

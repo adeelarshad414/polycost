@@ -721,6 +721,22 @@ describe('App', () => {
       'Artifact metadata: 1 registered · 1 verified · registered with verified artifacts',
     );
 
+    await click(buttonByText(container, 'Validate invoice control'));
+    await settleAsyncEffects();
+
+    expect(client.validateInvoiceControlPacket).toHaveBeenCalledWith(
+      '66666666-6666-4666-8666-666666666666',
+      'artifact-1',
+      expect.objectContaining({
+        acceptedVarianceUsd: 0.01,
+        evidenceReference: 'invoice-control://invoice-artifacts/artifact-1',
+      }),
+      'session-token',
+    );
+    expect(text(container)).toContain(
+      'Invoice control: matched · reconciliation delta $0.00 · import delta $0.00 · period matched',
+    );
+
     unmount();
   });
 
@@ -5545,6 +5561,121 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
           ],
           caveats: [
             'Artifact metadata is registered for traceability only; files, contracts, and invoice controls are not verified by PolyCost yet.',
+          ],
+        },
+        invoiceMatchSummary: {
+          readiness: 'reconciled-evidence-ready',
+          caveats: [
+            'Reconciliation compares provider-export actuals with PolyCost estimate evidence; it is not an invoice-of-record.',
+          ],
+        },
+      },
+      createdAt: '2026-07-06T00:00:02.000Z',
+    })),
+    validateInvoiceControlPacket: jest.fn(async (_reconciliationId, _artifactId, input) => ({
+      id: '66666666-6666-4666-8666-666666666666',
+      importRunId: '55555555-5555-4555-8555-555555555555',
+      comparisonId: comparisonResult.comparisonId,
+      provider: 'aws' as const,
+      estimatedTotalUsd: 100,
+      invoicedTotalUsd: 107,
+      varianceUsd: 7,
+      variancePercent: 7,
+      status: 'variance-warning' as const,
+      evidence: {
+        invoiceCoverage: {
+          sourceFingerprintPercent: 100,
+          skuMatchPercent: 100,
+        },
+        invoiceAdjustmentSummary: {
+          adjustmentCostUsd: 6,
+          adjustmentLineItemCount: 4,
+          commitmentLineItemCount: 4,
+          commitmentNetCostUsd: -2,
+          commitmentEvidence: {
+            rowsRequiringProviderInventory: 4,
+            rowsRequiringAmortizationPeriod: 2,
+            rowsRequiringAllocationEvidence: 4,
+          },
+          estimateComparableVarianceUsd: 0,
+          categories: [
+            {
+              category: 'usage',
+              rowCount: 1,
+              totalCostUsd: 100,
+            },
+          ],
+        },
+        invoiceGradeReadiness: {
+          status: 'invoice-grade-blocked',
+          missingCount: 2,
+          partialCount: 3,
+          blockers: ['Private pricing and discount proof'],
+          artifactRegisterStatus: 'registered-with-verified-artifacts',
+          registeredArtifactCount: 1,
+          verifiedArtifactCount: 1,
+        },
+        invoiceGradeArtifactRegister: {
+          status: 'registered-with-verified-artifacts',
+          registeredCount: 1,
+          verifiedCount: 1,
+          invoiceControlMatchedCount: 1,
+          invoiceControlVarianceWarningCount: 0,
+          invoiceControlMismatchCount: 0,
+          invoiceControlNotRunCount: 0,
+          artifacts: [
+            {
+              id: 'artifact-1',
+              provider: 'aws',
+              type: 'provider-invoice',
+              displayName: 'AWS invoice control packet',
+              reference: 'demo://invoice-artifacts/66666666-6666-4666-8666-666666666666',
+              sha256: 'd'.repeat(64),
+              controlTotalUsd: 107,
+              verificationControlTotalUsd: 107,
+              verificationStatus: 'verified',
+              invoiceControlValidationStatus: 'matched',
+              invoiceControlAcceptedVarianceUsd: input.acceptedVarianceUsd,
+              invoiceControlEvidenceReference: input.evidenceReference,
+              invoiceControlTotalDeltaUsd: 0,
+              invoiceControlImportDeltaUsd: 0,
+              invoiceControlPeriodMatched: true,
+              invoiceControlValidatedAt: '2026-07-06T00:00:10.000Z',
+              invoiceControlValidatedByAccountId: '11111111-1111-4111-8111-111111111111',
+              registeredAt: '2026-07-06T00:00:03.000Z',
+              verifiedAt: '2026-07-06T00:00:04.000Z',
+              storedBlob: {
+                storageStatus: 'stored',
+                storageMode: 'database-bytea',
+                fileName: 'aws-invoice-control-66666666.txt',
+                mimeType: 'text/plain',
+                contentSha256: 'd'.repeat(64),
+                contentSizeBytes: 210,
+                uploadedAt: '2026-07-06T00:00:05.000Z',
+                uploadedByAccountId: '11111111-1111-4111-8111-111111111111',
+                governance: {
+                  storageProfile: {
+                    storageBackend: 'database-bytea',
+                    encryptionStatus: 'database-managed',
+                    kmsKeyRequiredForProduction: true,
+                  },
+                  retentionPolicy: {
+                    retentionUntil: '2027-07-06T00:00:05.000Z',
+                    retentionDays: 365,
+                    legalHold: false,
+                  },
+                  malwareScan: {
+                    status: 'passed',
+                    scanner: 'polycost-eicar-signature-v1',
+                    checkedAt: '2026-07-06T00:00:05.000Z',
+                    findings: [],
+                  },
+                },
+              },
+            },
+          ],
+          caveats: [
+            'Artifact metadata is registered for traceability; stored and verified control packets can be matched against imported and reconciled totals but are not provider-authenticated invoice rendering.',
           ],
         },
         invoiceMatchSummary: {
