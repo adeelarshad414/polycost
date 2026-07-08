@@ -1179,6 +1179,13 @@ describe('BillingService', () => {
                 invoiceAdjustmentClassification: expect.objectContaining({
                   category: 'commitment-discount',
                   isAdjustment: true,
+                  commitmentEvidence: expect.objectContaining({
+                    kind: 'savings-plan',
+                    treatment: 'discount',
+                    requiresProviderInventory: true,
+                    requiresAmortizationPeriod: false,
+                    requiresAllocationEvidence: true,
+                  }),
                 }),
               }),
             }),
@@ -1642,6 +1649,42 @@ describe('BillingService', () => {
             adjustmentLineItemCount: 3,
             commitmentLineItemCount: 4,
             commitmentNetCostUsd: -2,
+            commitmentEvidence: expect.objectContaining({
+              status: 'provider-inventory-required',
+              rowsRequiringProviderInventory: 4,
+              rowsRequiringAmortizationPeriod: 2,
+              rowsRequiringAllocationEvidence: 4,
+              categories: expect.arrayContaining([
+                expect.objectContaining({
+                  kind: 'savings-plan',
+                  treatment: 'covered-usage',
+                  rowCount: 1,
+                  totalCostUsd: 0,
+                }),
+                expect.objectContaining({
+                  kind: 'savings-plan',
+                  treatment: 'discount',
+                  rowCount: 1,
+                  totalCostUsd: -25,
+                }),
+                expect.objectContaining({
+                  kind: 'reserved-capacity',
+                  treatment: 'fee',
+                  rowCount: 1,
+                  totalCostUsd: 20,
+                }),
+                expect.objectContaining({
+                  kind: 'reserved-capacity',
+                  treatment: 'unused',
+                  rowCount: 1,
+                  totalCostUsd: 3,
+                }),
+              ]),
+              caveats: expect.arrayContaining([
+                'Provider commitment inventory is required before treating this as invoice-grade amortization evidence.',
+                'Amortization period and unused commitment allocation must be proven by provider/account data.',
+              ]),
+            }),
             estimateComparableVarianceUsd: 0,
             estimateComparableVariancePercent: 0,
             categories: expect.arrayContaining([
@@ -1671,6 +1714,7 @@ describe('BillingService', () => {
           invoiceMatchSummary: expect.objectContaining({
             caveats: expect.arrayContaining([
               '4 commitment, reservation, or savings-plan row(s) were classified separately; amortization remains provider-specific evidence.',
+              '2 commitment row(s) require amortization-period and unused-commitment allocation proof from provider/account inventory.',
               '3 non-usage invoice adjustment row(s) were separated from estimate-comparable usage.',
             ]),
           }),

@@ -61,6 +61,9 @@ once tagged releases begin.
 - Provider commitment billing semantics for reconciliation evidence, including
   covered usage, commitment discounts/negations, recurring or upfront commitment
   fees, and amortization or unused commitment rows.
+- Commitment evidence requirements in reconciliation summaries, showing rows that
+  still need provider inventory, amortization-period proof, or allocation evidence
+  before invoice-grade interpretation.
 
 ### Notes
 

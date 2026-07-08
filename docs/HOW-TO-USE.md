@@ -161,4 +161,6 @@ For finance/FinOps:
 4. Review usage-comparable variance and the invoice adjustment category summary.
 5. Review commitment row count/net cost for reservations, savings plans, and
    committed-use discounts.
-6. Call out that invoice-grade actual spend and private discounts are future work.
+6. Review commitment evidence requirements for provider inventory, amortization
+   periods, and allocation proof.
+7. Call out that invoice-grade actual spend and private discounts are future work.

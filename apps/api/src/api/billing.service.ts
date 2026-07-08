@@ -75,6 +75,22 @@ interface InvoiceAdjustmentClassification {
   isAdjustment: boolean;
   reason: string;
   sourceSignals: string[];
+  commitmentEvidence?: InvoiceCommitmentEvidence;
+}
+
+type InvoiceCommitmentKind =
+  'savings-plan' | 'reserved-capacity' | 'committed-use' | 'sustained-use' | 'benefit' | 'unknown';
+
+type InvoiceCommitmentTreatment = 'covered-usage' | 'discount' | 'fee' | 'amortization' | 'unused';
+
+interface InvoiceCommitmentEvidence {
+  kind: InvoiceCommitmentKind;
+  treatment: InvoiceCommitmentTreatment;
+  requiresProviderInventory: boolean;
+  requiresAmortizationPeriod: boolean;
+  requiresAllocationEvidence: boolean;
+  evidenceSignals: string[];
+  caveats: string[];
 }
 
 @Injectable()
@@ -588,12 +604,12 @@ function classifyInvoiceAdjustment(input: {
       'savings plan applied',
     ])
   ) {
-    return {
-      category: 'commitment-covered-usage',
-      isAdjustment: false,
-      reason: 'row appears to be usage covered by a provider commitment',
-      sourceSignals: signals.slice(0, 12),
-    };
+    return commitmentClassification(
+      'commitment-covered-usage',
+      'row appears to be usage covered by a provider commitment',
+      signals,
+      text,
+    );
   }
 
   if (
@@ -609,10 +625,11 @@ function classifyInvoiceAdjustment(input: {
       'benefit discount',
     ])
   ) {
-    return adjustment(
+    return commitmentClassification(
       'commitment-discount',
       'row is marked as a commitment discount or usage negation',
       signals,
+      text,
     );
   }
 
@@ -630,10 +647,11 @@ function classifyInvoiceAdjustment(input: {
       'recurring commitment',
     ])
   ) {
-    return adjustment(
+    return commitmentClassification(
       'commitment-fee',
       'row is marked as a recurring or upfront commitment fee',
       signals,
+      text,
     );
   }
 
@@ -650,10 +668,11 @@ function classifyInvoiceAdjustment(input: {
       'savings plan amortization',
     ])
   ) {
-    return adjustment(
+    return commitmentClassification(
       'commitment-amortization',
       'row is marked as commitment amortization or unused commitment cost',
       signals,
+      text,
     );
   }
 
@@ -749,6 +768,110 @@ function adjustment(
     reason,
     sourceSignals: signals.slice(0, 12),
   };
+}
+
+function commitmentClassification(
+  category:
+    | 'commitment-covered-usage'
+    | 'commitment-discount'
+    | 'commitment-fee'
+    | 'commitment-amortization',
+  reason: string,
+  signals: string[],
+  text: string,
+): InvoiceAdjustmentClassification {
+  return {
+    category,
+    isAdjustment: !isEstimateComparableInvoiceCategory(category),
+    reason,
+    sourceSignals: signals.slice(0, 12),
+    commitmentEvidence: commitmentEvidenceForCategory(category, signals, text),
+  };
+}
+
+function commitmentEvidenceForCategory(
+  category:
+    | 'commitment-covered-usage'
+    | 'commitment-discount'
+    | 'commitment-fee'
+    | 'commitment-amortization',
+  signals: string[],
+  text: string,
+): InvoiceCommitmentEvidence {
+  const treatment = commitmentTreatmentForCategory(category, text);
+
+  return {
+    kind: commitmentKindFromSignals(text),
+    treatment,
+    requiresProviderInventory: true,
+    requiresAmortizationPeriod:
+      treatment === 'fee' || treatment === 'amortization' || treatment === 'unused',
+    requiresAllocationEvidence: true,
+    evidenceSignals: signals.slice(0, 12),
+    caveats: commitmentEvidenceCaveats(treatment),
+  };
+}
+
+function commitmentKindFromSignals(text: string): InvoiceCommitmentKind {
+  if (matchesAny(text, ['savingsplan', 'savings plan'])) {
+    return 'savings-plan';
+  }
+
+  if (matchesAny(text, ['rifee', 'reserved instance', 'reservation'])) {
+    return 'reserved-capacity';
+  }
+
+  if (matchesAny(text, ['committed use', 'committed-use', 'cud', 'commitment'])) {
+    return 'committed-use';
+  }
+
+  if (matchesAny(text, ['sustained use', 'sustained-use'])) {
+    return 'sustained-use';
+  }
+
+  if (matchesAny(text, ['benefit'])) {
+    return 'benefit';
+  }
+
+  return 'unknown';
+}
+
+function commitmentTreatmentForCategory(
+  category:
+    | 'commitment-covered-usage'
+    | 'commitment-discount'
+    | 'commitment-fee'
+    | 'commitment-amortization',
+  text: string,
+): InvoiceCommitmentTreatment {
+  if (category === 'commitment-covered-usage') {
+    return 'covered-usage';
+  }
+
+  if (category === 'commitment-discount') {
+    return 'discount';
+  }
+
+  if (category === 'commitment-fee') {
+    return 'fee';
+  }
+
+  return matchesAny(text, ['unused']) ? 'unused' : 'amortization';
+}
+
+function commitmentEvidenceCaveats(treatment: InvoiceCommitmentTreatment): string[] {
+  const caveats = [
+    'Provider commitment inventory is required before treating this as invoice-grade amortization evidence.',
+    'Allocation requires account, subscription, or project ownership context from the provider export.',
+  ];
+
+  if (treatment === 'fee' || treatment === 'amortization' || treatment === 'unused') {
+    caveats.push(
+      'Amortization period and unused commitment allocation must be proven by provider/account data.',
+    );
+  }
+
+  return caveats;
 }
 
 function hasSourceValue(row: Record<string, unknown>, key: string): boolean {
@@ -1366,6 +1489,7 @@ function reconciliationEvidence(
         missingRecommendedFields,
         adjustmentSummary.adjustmentLineItemCount,
         adjustmentSummary.commitmentLineItemCount,
+        adjustmentSummary.commitmentEvidence.rowsRequiringAmortizationPeriod,
       ),
     },
     comparisonTraceKeys: traceKeys,
@@ -1388,6 +1512,19 @@ function invoiceAdjustmentSummary(
   adjustmentLineItemCount: number;
   commitmentLineItemCount: number;
   commitmentNetCostUsd: number;
+  commitmentEvidence: {
+    status: 'not-applicable' | 'provider-inventory-required';
+    rowsRequiringProviderInventory: number;
+    rowsRequiringAmortizationPeriod: number;
+    rowsRequiringAllocationEvidence: number;
+    categories: Array<{
+      kind: InvoiceCommitmentKind;
+      treatment: InvoiceCommitmentTreatment;
+      rowCount: number;
+      totalCostUsd: number;
+    }>;
+    caveats: string[];
+  };
   estimateComparableVarianceUsd: number;
   estimateComparableVariancePercent: number;
   categories: Array<{
@@ -1413,6 +1550,19 @@ function invoiceAdjustmentSummary(
   let adjustmentLineItemCount = 0;
   let commitmentLineItemCount = 0;
   let commitmentNetCostUsd = 0;
+  let rowsRequiringProviderInventory = 0;
+  let rowsRequiringAmortizationPeriod = 0;
+  let rowsRequiringAllocationEvidence = 0;
+  const commitmentEvidenceCategories = new Map<
+    string,
+    {
+      kind: InvoiceCommitmentKind;
+      treatment: InvoiceCommitmentTreatment;
+      rowCount: number;
+      totalCostUsd: number;
+    }
+  >();
+  const commitmentEvidenceCaveatSet = new Set<string>();
 
   for (const lineItem of lineItems) {
     const classification = lineItemAdjustmentClassification(lineItem);
@@ -1434,6 +1584,40 @@ function invoiceAdjustmentSummary(
       commitmentNetCostUsd = roundCurrency(commitmentNetCostUsd + lineItem.costUsd);
     }
 
+    if (classification.commitmentEvidence) {
+      if (classification.commitmentEvidence.requiresProviderInventory) {
+        rowsRequiringProviderInventory += 1;
+      }
+
+      if (classification.commitmentEvidence.requiresAmortizationPeriod) {
+        rowsRequiringAmortizationPeriod += 1;
+      }
+
+      if (classification.commitmentEvidence.requiresAllocationEvidence) {
+        rowsRequiringAllocationEvidence += 1;
+      }
+
+      const commitmentKey = [
+        classification.commitmentEvidence.kind,
+        classification.commitmentEvidence.treatment,
+      ].join(':');
+      const existingCommitment = commitmentEvidenceCategories.get(commitmentKey) ?? {
+        kind: classification.commitmentEvidence.kind,
+        treatment: classification.commitmentEvidence.treatment,
+        rowCount: 0,
+        totalCostUsd: 0,
+      };
+      existingCommitment.rowCount += 1;
+      existingCommitment.totalCostUsd = roundCurrency(
+        existingCommitment.totalCostUsd + lineItem.costUsd,
+      );
+      commitmentEvidenceCategories.set(commitmentKey, existingCommitment);
+
+      for (const caveat of classification.commitmentEvidence.caveats) {
+        commitmentEvidenceCaveatSet.add(caveat);
+      }
+    }
+
     if (!classification.isAdjustment) {
       usageLineItemCount += 1;
       usageSubtotal = roundCurrency(usageSubtotal + lineItem.costUsd);
@@ -1453,6 +1637,20 @@ function invoiceAdjustmentSummary(
     adjustmentLineItemCount,
     commitmentLineItemCount,
     commitmentNetCostUsd,
+    commitmentEvidence: {
+      status: commitmentLineItemCount > 0 ? 'provider-inventory-required' : 'not-applicable',
+      rowsRequiringProviderInventory,
+      rowsRequiringAmortizationPeriod,
+      rowsRequiringAllocationEvidence,
+      categories: [...commitmentEvidenceCategories.values()].sort((left, right) => {
+        if (left.kind !== right.kind) {
+          return left.kind.localeCompare(right.kind);
+        }
+
+        return left.treatment.localeCompare(right.treatment);
+      }),
+      caveats: [...commitmentEvidenceCaveatSet],
+    },
     estimateComparableVarianceUsd,
     estimateComparableVariancePercent:
       estimatedTotalUsd === 0
@@ -1497,19 +1695,29 @@ function lineItemAdjustmentClassification(lineItem: {
       const record = classification as Record<string, unknown>;
       const category = record.category;
       const reason = record.reason;
-      const sourceSignals = record.sourceSignals;
 
       if (isInvoiceAdjustmentCategory(category) && typeof reason === 'string') {
         const explicitIsAdjustment =
           typeof record.isAdjustment === 'boolean' ? record.isAdjustment : undefined;
+        const sourceSignals = Array.isArray(record.sourceSignals)
+          ? record.sourceSignals.filter((signal): signal is string => typeof signal === 'string')
+          : [];
+        const commitmentEvidence =
+          commitmentEvidenceFromUnknown(record.commitmentEvidence) ??
+          (isCommitmentInvoiceCategory(category)
+            ? commitmentEvidenceForCategory(
+                category,
+                sourceSignals,
+                sourceSignals.join(' ').toLowerCase(),
+              )
+            : undefined);
 
         return {
           category,
           isAdjustment: explicitIsAdjustment ?? !isEstimateComparableInvoiceCategory(category),
           reason,
-          sourceSignals: Array.isArray(sourceSignals)
-            ? sourceSignals.filter((signal): signal is string => typeof signal === 'string')
-            : [],
+          sourceSignals,
+          ...(commitmentEvidence ? { commitmentEvidence } : {}),
         };
       }
     }
@@ -1546,13 +1754,70 @@ function isEstimateComparableInvoiceCategory(category: InvoiceAdjustmentCategory
   return category === 'usage' || category === 'commitment-covered-usage';
 }
 
-function isCommitmentInvoiceCategory(category: InvoiceAdjustmentCategory): boolean {
+function isCommitmentInvoiceCategory(
+  category: InvoiceAdjustmentCategory,
+): category is
+  | 'commitment-covered-usage'
+  | 'commitment-discount'
+  | 'commitment-fee'
+  | 'commitment-amortization' {
   return (
     category === 'commitment-covered-usage' ||
     category === 'commitment-discount' ||
     category === 'commitment-fee' ||
     category === 'commitment-amortization'
   );
+}
+
+function commitmentEvidenceFromUnknown(value: unknown): InvoiceCommitmentEvidence | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  const kind = record.kind;
+  const treatment = record.treatment;
+
+  if (!isInvoiceCommitmentKind(kind) || !isInvoiceCommitmentTreatment(treatment)) {
+    return undefined;
+  }
+
+  return {
+    kind,
+    treatment,
+    requiresProviderInventory: record.requiresProviderInventory === true,
+    requiresAmortizationPeriod: record.requiresAmortizationPeriod === true,
+    requiresAllocationEvidence: record.requiresAllocationEvidence === true,
+    evidenceSignals: stringArray(record.evidenceSignals),
+    caveats: stringArray(record.caveats),
+  };
+}
+
+function isInvoiceCommitmentKind(value: unknown): value is InvoiceCommitmentKind {
+  return (
+    value === 'savings-plan' ||
+    value === 'reserved-capacity' ||
+    value === 'committed-use' ||
+    value === 'sustained-use' ||
+    value === 'benefit' ||
+    value === 'unknown'
+  );
+}
+
+function isInvoiceCommitmentTreatment(value: unknown): value is InvoiceCommitmentTreatment {
+  return (
+    value === 'covered-usage' ||
+    value === 'discount' ||
+    value === 'fee' ||
+    value === 'amortization' ||
+    value === 'unused'
+  );
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string' && Boolean(item.trim()))
+    : [];
 }
 
 function sourceRowFingerprint(rawPayload: Record<string, unknown> | undefined): string | undefined {
@@ -1614,6 +1879,7 @@ function invoiceEvidenceCaveats(
   missingRecommendedFields: string[],
   adjustmentLineItemCount: number,
   commitmentLineItemCount: number,
+  commitmentRowsRequiringAmortizationPeriod: number,
 ): string[] {
   const caveats: string[] = [
     'Reconciliation compares provider-export actuals with PolyCost estimate evidence; it is not an invoice-of-record.',
@@ -1622,6 +1888,12 @@ function invoiceEvidenceCaveats(
   if (commitmentLineItemCount > 0) {
     caveats.push(
       `${commitmentLineItemCount} commitment, reservation, or savings-plan row(s) were classified separately; amortization remains provider-specific evidence.`,
+    );
+  }
+
+  if (commitmentRowsRequiringAmortizationPeriod > 0) {
+    caveats.push(
+      `${commitmentRowsRequiringAmortizationPeriod} commitment row(s) require amortization-period and unused-commitment allocation proof from provider/account inventory.`,
     );
   }
 

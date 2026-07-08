@@ -44,6 +44,9 @@ Evidence:
 - `apps/api/src/api/auth-billing.spec.ts` also proves provider commitment semantics
   are classified separately for covered usage, commitment discounts/negations,
   recurring or upfront commitment fees, and amortization or unused commitment rows.
+- Commitment reconciliation evidence now reports which commitment rows still need
+  provider inventory, amortization-period proof, and allocation evidence before
+  invoice-grade use.
 - `docs/PROVIDER-CREDENTIALS.md` states the current production swap procedure and
   explicitly limits real provider mode to catalog list prices, not invoices.
 
@@ -55,7 +58,8 @@ Deferred:
   Management CSV, and nested GCP Billing Export JSON mapper coverage now exists for
   estimate-vs-actual reconciliation evidence. Classified adjustment and commitment
   rows are separated from usage-comparable variance, but provider-account-specific
-  amortization and invoice controls remain future work.
+  amortization, allocation proof, private pricing, and invoice controls remain
+  future work.
 
 ## Phase B - Input Modes And Requirement Pipeline
 

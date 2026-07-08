@@ -70,6 +70,9 @@ Pricing evidence is intentionally first-class:
 - provider commitment rows such as Savings Plans, reservations, committed-use
   discounts, sustained-use discounts, commitment fees, and unused/amortized
   commitment costs are classified separately from generic invoice adjustments
+- commitment evidence requirements are reported separately, including whether rows
+  still need provider commitment inventory, amortization-period proof, or allocation
+  evidence before invoice-grade use
 - exports carry methodology and data-freshness context
 
 This supports decision-grade traceability. It is not yet invoice-grade billing.
