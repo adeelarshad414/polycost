@@ -22,6 +22,7 @@ import {
   AccountProfileResponse,
   AuthIdentity,
   SsoConfigurationStatus,
+  TeamSwitchResponse,
   TeamSettingsRecord,
   TeamInvitationRecord,
   TeamMemberRecord,
@@ -330,6 +331,14 @@ interface AccountSessionListRow {
   revoked_at: Date | null;
   has_user_agent: boolean;
   has_ip: boolean;
+}
+
+interface TeamSwitchRow {
+  session_id: string;
+  team_id: string;
+  team_name: string;
+  role: DatabaseTeamRole;
+  expires_at: Date;
 }
 
 interface TeamMembershipRow {
@@ -2330,6 +2339,71 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     );
 
     return result.rowCount ?? 0;
+  }
+
+  async updateSessionTeam(input: {
+    sessionId: string;
+    accountId: string;
+    teamId: string;
+    now: string;
+  }): Promise<TeamSwitchResponse | undefined> {
+    const result = await (
+      await this.getPool()
+    ).query<TeamSwitchRow>(
+      `
+        WITH membership AS (
+          SELECT team_memberships.team_id,
+                 teams.name AS team_name,
+                 team_memberships.role
+          FROM team_memberships
+          JOIN teams
+            ON teams.id = team_memberships.team_id
+          WHERE team_memberships.account_id = $2
+            AND team_memberships.team_id = $3
+          LIMIT 1
+        ),
+        updated_session AS (
+          UPDATE account_sessions
+          SET team_id = membership.team_id,
+              last_seen_at = $4
+          FROM membership
+          WHERE account_sessions.id = $1
+            AND account_sessions.account_id = $2
+            AND account_sessions.revoked_at IS NULL
+            AND account_sessions.expires_at > $4
+          RETURNING account_sessions.id AS session_id,
+                    account_sessions.account_id,
+                    account_sessions.team_id,
+                    account_sessions.expires_at,
+                    membership.team_name,
+                    membership.role
+        )
+        SELECT session_id,
+               team_id,
+               team_name,
+               role,
+               expires_at
+        FROM updated_session
+      `,
+      [input.sessionId, input.accountId, input.teamId, input.now],
+    );
+    const row = result.rows[0];
+
+    if (!row || !row.team_id || !row.team_name || !row.role) {
+      return undefined;
+    }
+
+    return {
+      activeTeam: {
+        id: row.team_id,
+        name: row.team_name,
+        role: normalizeDatabaseTeamRole(row.role),
+      },
+      session: {
+        id: row.session_id,
+        expiresAt: row.expires_at.toISOString(),
+      },
+    };
   }
 
   async listAccountTeams(accountId: string): Promise<AccountTeamMembership[]> {

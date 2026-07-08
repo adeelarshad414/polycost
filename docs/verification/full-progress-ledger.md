@@ -253,6 +253,16 @@ Evidence:
   stub/unconfigured mode distinct from production-connected mode.
 - Phase 2.10 adds focused Azure Cost Management CSV and nested GCP Billing Export JSON
   mapper proof, including fallback-cost recognition and allocation tag/label evidence.
+- Phase 2.11 adds backend-backed active workspace switching with session guard,
+  membership proof, typed web-client wiring, and a signed-in account-panel team
+  selector.
+- Phase 2.11 focused regressions passed: API `3` suites / `45` tests
+  (`auth.controller`, `auth-billing`, `api-database.repository`) and web `2` suites /
+  `84` tests (`App.spec.tsx`, `api-client.spec.ts`).
+- Phase 2.11 full `npm run check` passed with API `51` suites / `405` tests, web
+  `11` suites / `141` tests, graph validation `312` nodes / `312` edges, pricing
+  coverage, progress verification, QA/security suppression, database, DevOps, cloud,
+  release, handover, and provider credential gates.
 - Phase 2.10 full `npm run check` passed with API `51` suites / `403` tests, web
   `11` suites / `141` tests, graph validation `312` nodes / `312` edges, pricing
   coverage, progress verification, QA/security suppression, database, DevOps, cloud,

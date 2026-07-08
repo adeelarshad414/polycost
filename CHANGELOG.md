@@ -39,6 +39,8 @@ once tagged releases begin.
   manifest hash/size checks and tamper-detection regression coverage.
 - Azure Cost Management and nested GCP Billing Export mapper hardening with
   allocation tag/label evidence for estimate-vs-actual reconciliation.
+- Backend-backed active workspace/team switching with membership-checked session
+  updates and a signed-in account-panel selector.
 
 ### Notes
 
@@ -57,6 +59,9 @@ once tagged releases begin.
 - Billing reconciliation now has native export mapper evidence for AWS CUR, Azure
   Cost Management CSV, and nested GCP Billing Export JSON, while invoice-of-record
   reconciliation remains future scope.
+- Account/team UX now supports switching the current active workspace without a
+  new login, while production email, SSO/SAML, SCIM, recovery, and org-billing
+  administration remain future scope.
 - Remaining future work is intentionally documented: full invoice-grade live cloud
   billing coverage, full Visio visual rendering, hosted/team account product depth,
   production email/SSO/SCIM workflows, and provider-authenticated Terraform plan

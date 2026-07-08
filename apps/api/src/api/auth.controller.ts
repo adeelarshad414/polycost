@@ -95,6 +95,12 @@ export class AuthController {
     return this.authService.revokeOtherSessions(request.auth!);
   }
 
+  @Post('sessions/team')
+  @UseGuards(SessionAuthGuard)
+  switchActiveTeam(@Body() body: unknown, @Req() request: RequestWithAuth) {
+    return this.authService.switchActiveTeam(body, request.auth!);
+  }
+
   @Post('teams')
   @UseGuards(SessionAuthGuard)
   createTeam(@Body() body: unknown, @Req() request: RequestWithAuth) {

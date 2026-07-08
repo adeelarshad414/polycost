@@ -377,6 +377,18 @@ export interface AuthMeResponse {
   };
 }
 
+export interface TeamSwitchResponse {
+  activeTeam: {
+    id: string;
+    name: string;
+    role: TeamRole;
+  };
+  session: {
+    id: string;
+    expiresAt: string;
+  };
+}
+
 export interface TeamMemberRecord {
   accountId: string;
   email: string;

@@ -608,6 +608,19 @@ describe('api client', () => {
       .mockResolvedValueOnce(jsonResponse({ changed: true }))
       .mockResolvedValueOnce(jsonResponse({ deleted: true }))
       .mockResolvedValueOnce(jsonResponse(teamSettings))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          activeTeam: {
+            id: 'team-1',
+            name: 'Architecture platform',
+            role: 'owner',
+          },
+          session: {
+            id: 'session-1',
+            expiresAt: '2026-07-07T00:00:00.000Z',
+          },
+        }),
+      )
       .mockResolvedValueOnce(jsonResponse(teamSettings))
       .mockResolvedValueOnce(jsonResponse([member]))
       .mockResolvedValueOnce(jsonResponse(invitation))
@@ -690,6 +703,14 @@ describe('api client', () => {
     await expect(
       client.createTeam({ teamName: 'Architecture platform' }, 'session-token'),
     ).resolves.toEqual(teamSettings);
+    await expect(client.switchActiveTeam('team-1', 'session-token')).resolves.toEqual(
+      expect.objectContaining({
+        activeTeam: expect.objectContaining({
+          id: 'team-1',
+          role: 'owner',
+        }),
+      }),
+    );
     await expect(
       client.updateTeamSettings('team-1', { teamName: 'Architecture platform' }, 'session-token'),
     ).resolves.toEqual(teamSettings);
@@ -770,7 +791,16 @@ describe('api client', () => {
     ).resolves.toEqual(billingImport);
 
     expect(fetchMock).toHaveBeenNthCalledWith(
-      7,
+      5,
+      'http://api.test/api/v1/auth/sessions/team',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ teamId: 'team-1' }),
+        headers: expect.objectContaining({ Authorization: 'Bearer session-token' }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      8,
       'http://api.test/api/v1/auth/teams/team-1/invitations',
       expect.objectContaining({
         method: 'POST',
@@ -779,7 +809,7 @@ describe('api client', () => {
       }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      12,
+      13,
       'http://api.test/api/v1/auth/teams/team-1/members/account-1',
       expect.objectContaining({
         method: 'PATCH',
@@ -787,7 +817,7 @@ describe('api client', () => {
       }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      19,
+      20,
       'http://api.test/api/v1/billing/imports/provider-export',
       expect.objectContaining({
         method: 'POST',

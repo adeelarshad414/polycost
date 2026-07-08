@@ -153,6 +153,18 @@ export interface AuthMeResponse {
   };
 }
 
+export interface TeamSwitchResponse {
+  activeTeam: {
+    id: string;
+    name: string;
+    role: TeamRole;
+  };
+  session: {
+    id: string;
+    expiresAt: string;
+  };
+}
+
 export interface RequestWithAuth {
   headers?: Record<string, unknown>;
   ip?: string;

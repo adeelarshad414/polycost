@@ -1166,6 +1166,66 @@ describe('ApiDatabaseRepository', () => {
     expect(query).toHaveBeenNthCalledWith(6, 'COMMIT');
   });
 
+  it('switches the current session to another account team through membership proof', async () => {
+    const expiresAt = new Date('2026-07-07T00:00:00.000Z');
+    const query = jest.fn().mockResolvedValueOnce({
+      rows: [
+        {
+          session_id: '33333333-3333-4333-8333-333333333333',
+          account_id: '11111111-1111-4111-8111-111111111111',
+          email: '',
+          display_name: null,
+          team_id: '55555555-5555-4555-8555-555555555555',
+          team_name: 'Platform team',
+          role: 'admin',
+          expires_at: expiresAt,
+        },
+      ],
+      rowCount: 1,
+    });
+    const repository = createRepository(query);
+
+    await expect(
+      repository.updateSessionTeam({
+        sessionId: '33333333-3333-4333-8333-333333333333',
+        accountId: '11111111-1111-4111-8111-111111111111',
+        teamId: '55555555-5555-4555-8555-555555555555',
+        now: '2026-07-06T00:00:00.000Z',
+      }),
+    ).resolves.toEqual({
+      activeTeam: {
+        id: '55555555-5555-4555-8555-555555555555',
+        name: 'Platform team',
+        role: 'admin',
+      },
+      session: {
+        id: '33333333-3333-4333-8333-333333333333',
+        expiresAt: expiresAt.toISOString(),
+      },
+    });
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('UPDATE account_sessions'), [
+      '33333333-3333-4333-8333-333333333333',
+      '11111111-1111-4111-8111-111111111111',
+      '55555555-5555-4555-8555-555555555555',
+      '2026-07-06T00:00:00.000Z',
+    ]);
+
+    const missingRepository = createRepository(
+      jest.fn(async () => ({
+        rows: [],
+        rowCount: 0,
+      })),
+    );
+    await expect(
+      missingRepository.updateSessionTeam({
+        sessionId: '33333333-3333-4333-8333-333333333333',
+        accountId: '11111111-1111-4111-8111-111111111111',
+        teamId: '99999999-9999-4999-8999-999999999999',
+        now: '2026-07-06T00:00:00.000Z',
+      }),
+    ).resolves.toBeUndefined();
+  });
+
   it('manages team invitations, members, and SSO provider config rows', async () => {
     const createdAt = new Date('2026-07-06T00:00:00.000Z');
     const lastActiveAt = new Date('2026-07-06T00:05:00.000Z');

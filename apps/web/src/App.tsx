@@ -85,6 +85,7 @@ import {
   TeamInvitationPreview,
   TeamMemberRecord,
   TeamRole,
+  TeamSwitchResponse,
 } from './types';
 import {
   ARCHITECTURE_TEMPLATES,
@@ -1988,6 +1989,7 @@ function WorkspaceControlCenter({
   const [billingImport, setBillingImport] = useState<BillingImportResponse | null>(null);
   const [reconciliation, setReconciliation] = useState<InvoiceReconciliationRecord | null>(null);
   const activeTeam = session?.activeTeam;
+  const activeTeamOptions = session?.teams ?? [];
   const canManageTeam = activeTeam?.role === 'owner' || activeTeam?.role === 'admin';
   const billingAccessMessage = !token
     ? 'Sign in before importing provider billing exports.'
@@ -2249,6 +2251,58 @@ function WorkspaceControlCenter({
     }
   }
 
+  function clearWorkspaceScopedState() {
+    setMembers([]);
+    setInvitations([]);
+    setSsoStatus(null);
+    setSsoStart(null);
+    setBillingImport(null);
+    setReconciliation(null);
+  }
+
+  function applyActiveTeamSwitch(
+    switched: TeamSwitchResponse,
+    extraMembership?: AuthMeResponse['teams'][number],
+  ) {
+    setSession((current) =>
+      current
+        ? {
+            ...current,
+            activeTeam: switched.activeTeam,
+            teams: mergeTeamMemberships(current.teams, [
+              activeTeamToMembership(switched.activeTeam),
+              ...(extraMembership ? [extraMembership] : []),
+            ]),
+            session: {
+              ...current.session,
+              ...switched.session,
+            },
+          }
+        : current,
+    );
+    setTeamSettingsName(switched.activeTeam.name);
+    clearWorkspaceScopedState();
+  }
+
+  async function handleActiveTeamSwitch(teamId: string) {
+    if (!token || !session || !teamId || teamId === activeTeam?.id) {
+      return;
+    }
+
+    setWorkspaceBusy('switch-team');
+    onError(null);
+
+    try {
+      const switched = await client.switchActiveTeam(teamId, token);
+      applyActiveTeamSwitch(switched);
+      onNotice(`Active workspace switched to ${switched.activeTeam.name}.`);
+    } catch (switchError) {
+      onError(formatApiError(switchError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
   async function handleProfileUpdate(event: FormEvent) {
     event.preventDefault();
     if (!token) {
@@ -2359,27 +2413,13 @@ function WorkspaceControlCenter({
 
     try {
       const created = await client.createTeam({ teamName: newTeamName }, token);
-      setSession((current) =>
-        current
-          ? {
-              ...current,
-              activeTeam: {
-                id: created.teamId,
-                name: created.teamName,
-                role: created.role,
-              },
-              teams: [
-                ...current.teams,
-                {
-                  teamId: created.teamId,
-                  teamName: created.teamName,
-                  role: created.role,
-                },
-              ],
-            }
-          : current,
-      );
-      onNotice('Team created. Sign in again to make it your default active team.');
+      const switched = await client.switchActiveTeam(created.teamId, token);
+      applyActiveTeamSwitch(switched, {
+        teamId: created.teamId,
+        teamName: created.teamName,
+        role: created.role,
+      });
+      onNotice(`Team created and selected: ${created.teamName}.`);
     } catch (teamError) {
       onError(formatApiError(teamError));
     } finally {
@@ -2806,6 +2846,23 @@ function WorkspaceControlCenter({
                   <strong>{sessionStatus.label}</strong>
                   <span>{sessionStatus.detail}</span>
                 </div>
+              ) : null}
+              {activeTeamOptions.length > 0 ? (
+                <label className="workspace-field">
+                  <span>Active team</span>
+                  <select
+                    aria-label="Active team"
+                    value={activeTeam?.id ?? ''}
+                    disabled={workspaceBusy === 'switch-team'}
+                    onChange={(event) => void handleActiveTeamSwitch(event.currentTarget.value)}
+                  >
+                    {activeTeamOptions.map((team) => (
+                      <option key={team.teamId} value={team.teamId}>
+                        {team.teamName} · {teamRoleLabel(team.role)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               ) : null}
               <form className="workspace-inline-form" onSubmit={handleProfileUpdate}>
                 <label className="workspace-field">
@@ -3392,6 +3449,33 @@ function WorkspaceControlCenter({
       </div>
     </section>
   );
+}
+
+function activeTeamToMembership(
+  activeTeam: TeamSwitchResponse['activeTeam'],
+): AuthMeResponse['teams'][number] {
+  return {
+    teamId: activeTeam.id,
+    teamName: activeTeam.name,
+    role: activeTeam.role,
+  };
+}
+
+function mergeTeamMemberships(
+  current: AuthMeResponse['teams'],
+  nextMemberships: Array<AuthMeResponse['teams'][number]>,
+): AuthMeResponse['teams'] {
+  const merged = new Map<string, AuthMeResponse['teams'][number]>();
+
+  for (const team of current) {
+    merged.set(team.teamId, team);
+  }
+
+  for (const team of nextMemberships) {
+    merged.set(team.teamId, team);
+  }
+
+  return Array.from(merged.values());
 }
 
 function memberRoleControlState({

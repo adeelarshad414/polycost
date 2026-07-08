@@ -36,6 +36,7 @@ import {
   SsoConfigurationStatus,
   SsoConnectionTestResult,
   SsoStartResponse,
+  TeamSwitchResponse,
   TeamSettingsRecord,
   TeamInvitationRecord,
   TeamInvitationPreview,
@@ -106,6 +107,7 @@ export interface PolyCostClient {
   ): Promise<{ deleted: true }>;
   listAccountSessions(token: string): Promise<AccountSessionRecord[]>;
   revokeOtherSessions(token: string): Promise<{ revoked: number }>;
+  switchActiveTeam(teamId: string, token: string): Promise<TeamSwitchResponse>;
   createTeam(input: { teamName: string }, token: string): Promise<TeamSettingsRecord>;
   updateTeamSettings(
     teamId: string,
@@ -301,6 +303,13 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
       return requestJson<{ revoked: number }>(baseUrl, '/auth/sessions/revoke-other', {
         method: 'POST',
         headers: authorizationHeaders(token),
+      });
+    },
+    switchActiveTeam(teamId, token) {
+      return requestJson<TeamSwitchResponse>(baseUrl, '/auth/sessions/team', {
+        method: 'POST',
+        headers: authorizationHeaders(token),
+        body: JSON.stringify({ teamId }),
       });
     },
     createTeam(input, token) {

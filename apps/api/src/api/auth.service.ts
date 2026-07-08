@@ -20,6 +20,7 @@ import {
   SsoConfigurationStatus,
   SsoStartResponse,
   TeamSettingsRecord,
+  TeamSwitchResponse,
   TeamInvitationRecord,
   TeamInvitationPreview,
   TeamMemberRecord,
@@ -194,6 +195,22 @@ export class AuthService {
     });
 
     return { revoked };
+  }
+
+  async switchActiveTeam(body: unknown, identity: AuthIdentity): Promise<TeamSwitchResponse> {
+    const input = parseTeamSwitchBody(body);
+    const switched = await this.repository.updateSessionTeam({
+      sessionId: identity.sessionId,
+      accountId: identity.accountId,
+      teamId: input.teamId,
+      now: new Date().toISOString(),
+    });
+
+    if (!switched) {
+      throw new ApiForbiddenError('Team membership is required to switch active workspace');
+    }
+
+    return switched;
   }
 
   async updateProfile(body: unknown, identity: AuthIdentity): Promise<AccountProfileResponse> {
@@ -883,6 +900,14 @@ function parseTeamSettingsBody(body: unknown): { teamName: string } {
   }
 
   return { teamName };
+}
+
+function parseTeamSwitchBody(body: unknown): { teamId: string } {
+  const record = requireRecord(body, 'Team switch request body must be an object');
+
+  return {
+    teamId: requiredString(record.teamId, 'teamId'),
+  };
 }
 
 function parseInviteBody(body: unknown): { email: string; role: Exclude<TeamRole, 'owner'> } {

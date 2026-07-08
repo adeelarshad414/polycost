@@ -49,6 +49,7 @@ describe('AuthController', () => {
     expect(controller.deleteAccount(body, request)).toBe('account');
     expect(controller.listSessions(request)).toBe('sessions');
     expect(controller.revokeOtherSessions(request)).toBe('revoke-other');
+    expect(controller.switchActiveTeam(body, request)).toBe('switch-team');
     expect(controller.createTeam(body, request)).toBe('create-team');
     expect(controller.updateTeamSettings('team-1', body, request)).toBe('team-settings');
     expect(controller.listTeamMembers('team-1', request)).toBe('members');
@@ -71,6 +72,7 @@ describe('AuthController', () => {
     expect(service.updateProfile).toHaveBeenCalledWith(body, identity);
     expect(service.changePassword).toHaveBeenCalledWith(body, identity);
     expect(service.deleteAccount).toHaveBeenCalledWith(body, identity);
+    expect(service.switchActiveTeam).toHaveBeenCalledWith(body, identity);
     expect(service.createTeam).toHaveBeenCalledWith(body, identity);
     expect(service.updateTeamSettings).toHaveBeenCalledWith('team-1', body, identity);
     expect(service.updateTeamMemberRole).toHaveBeenCalledWith(
@@ -148,6 +150,7 @@ describe('AuthController', () => {
       AuthController.prototype.deleteAccount,
       AuthController.prototype.listSessions,
       AuthController.prototype.revokeOtherSessions,
+      AuthController.prototype.switchActiveTeam,
       AuthController.prototype.createTeam,
       AuthController.prototype.updateTeamSettings,
       AuthController.prototype.listTeamMembers,
@@ -208,6 +211,7 @@ function createAuthServiceMock(): AuthService {
     deleteAccount: jest.fn(() => 'account'),
     listSessions: jest.fn(() => 'sessions'),
     revokeOtherSessions: jest.fn(() => 'revoke-other'),
+    switchActiveTeam: jest.fn(() => 'switch-team'),
     createTeam: jest.fn(() => 'create-team'),
     updateTeamSettings: jest.fn(() => 'team-settings'),
     listTeamMembers: jest.fn(() => 'members'),
