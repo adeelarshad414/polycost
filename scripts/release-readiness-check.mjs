@@ -24,6 +24,7 @@ const requiredFiles = [
   'HANDOVER-CENSUS.md',
   'HANDOVER-EXCELLENCE-REPORT.md',
   'docs/development/open-source-readiness.md',
+  'docs/development/public-demo-hardening.md',
   'docs/SECURITY-SUPPRESSIONS.md',
   'docs/verification/full-progress-ledger.md',
   'docs/HOW-TO-USE.md',
@@ -74,6 +75,9 @@ if (!packageJson.scripts?.['pricing:logic:coverage']) {
 if (!packageJson.scripts?.['handover:check']) {
   failures.push('package.json is missing handover:check');
 }
+if (!packageJson.scripts?.['public:readiness:check']) {
+  failures.push('package.json is missing public:readiness:check');
+}
 if (!packageJson.scripts?.['theme:hex:check']) {
   failures.push('package.json is missing theme:hex:check');
 }
@@ -100,6 +104,9 @@ if (!packageJson.scripts?.check?.includes('npm run loading:check')) {
 }
 if (!packageJson.scripts?.check?.includes('npm run handover:check')) {
   failures.push('package.json check script must include npm run handover:check');
+}
+if (!packageJson.scripts?.check?.includes('npm run public:readiness:check')) {
+  failures.push('package.json check script must include npm run public:readiness:check');
 }
 
 assertScriptIncludes('test:production-readiness', [
@@ -129,6 +136,7 @@ await assertFileContains('README.md', [
   ['handover package link', 'handover/HANDOVER-README.md'],
   ['handover excellence report link', 'HANDOVER-EXCELLENCE-REPORT.md'],
   ['open-source launch documentation link', 'docs/development/open-source-readiness.md'],
+  ['public demo hardening documentation link', 'docs/development/public-demo-hardening.md'],
 ]);
 
 await assertFileContains('HANDOVER-CENSUS.md', [
@@ -223,6 +231,8 @@ await assertFileContains('RELEASE-CHECKLIST.md', [
   ['clean-clone demo command', 'npm run demo:up'],
   ['clean-clone timed verifier command', 'npm run demo:verify-clean'],
   ['demo artifact command', 'npm run demo:artifacts'],
+  ['public readiness guard command', 'npm run public:readiness:check'],
+  ['public demo hardening documentation', 'docs/development/public-demo-hardening.md'],
   ['unit coverage command', 'npm run ci:unit'],
   ['pricing logic coverage command', 'npm run pricing:logic:coverage'],
   ['Node 24 impeccable decision', 'On Node 24, run `npm run impeccable`'],
@@ -253,6 +263,15 @@ await assertFileContains('docs/development/open-source-readiness.md', [
   ['no private data committed', 'No private credentials, customer data, invoices, diagrams'],
   ['required files list', '.github/PULL_REQUEST_TEMPLATE.md'],
   ['release-readiness command', 'npm run release:check'],
+  ['public-readiness command', 'npm run public:readiness:check'],
+]);
+
+await assertFileContains('docs/development/public-demo-hardening.md', [
+  ['current verdict', '## Current Verdict'],
+  ['public demo modes', '## Public Demo Modes'],
+  ['repository health checklist', '## Repository Health Checklist'],
+  ['verification floor', '## Verification Floor'],
+  ['blocked or deferred', '## Blocked Or Deferred'],
 ]);
 
 await assertFileContains('docs/SECURITY-SUPPRESSIONS.md', [
@@ -380,6 +399,7 @@ await assertFileContains('apps/api/src/diagram-parser/diagram-parser.service.spe
 await assertFileContains('.github/PULL_REQUEST_TEMPLATE.md', [
   ['format validation checkbox', 'npm run format:check'],
   ['lint validation checkbox', 'npm run ci:lint'],
+  ['public readiness validation checkbox', 'npm run public:readiness:check'],
   ['security validation checkbox', 'npm run security:audit'],
   ['risk notes section', 'Security/privacy considerations'],
 ]);
