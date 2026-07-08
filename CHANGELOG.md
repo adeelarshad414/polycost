@@ -47,6 +47,8 @@ once tagged releases begin.
   mode, HMAC signatures, config guards, and browser-safe delivery receipts.
 - Append-only team audit trail foundation for team, invite, SSO, billing import,
   and reconciliation actions, with guarded admin API reads and workspace UI visibility.
+- Transaction-coupled audit writes for privileged team, invite, SSO, billing import,
+  and reconciliation mutations.
 
 ### Notes
 

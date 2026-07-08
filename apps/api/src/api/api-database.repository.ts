@@ -66,8 +66,16 @@ interface QueryResultLike<T> {
   rowCount: number | null;
 }
 
-export interface PgPoolLike {
+interface PgQueryRunner {
   query<T = unknown>(text: string, values?: unknown[]): Promise<QueryResultLike<T>>;
+}
+
+interface PgClientLike extends PgQueryRunner {
+  release(): void;
+}
+
+export interface PgPoolLike extends PgQueryRunner {
+  connect?(): Promise<PgClientLike>;
   end(): Promise<void>;
 }
 
@@ -472,6 +480,15 @@ interface InvoiceReconciliationRow {
 const PROVIDERS: ProviderId[] = ['aws', 'azure', 'gcp'];
 const DATA_FRESHNESS_POLICY_HOURS = 48;
 type DatabaseTeamRole = TeamRole | 'viewer';
+type TeamAuditEventInput = {
+  teamId: string;
+  actorAccountId?: string;
+  action: TeamAuditAction;
+  targetType: TeamAuditTargetType;
+  targetId?: string;
+  metadata?: Record<string, unknown>;
+};
+type TeamAuditMutationInput = Omit<TeamAuditEventInput, 'teamId'>;
 
 const defaultPgPoolFactory: PgPoolFactory = (config) => new Pool(config);
 
@@ -1808,11 +1825,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     teamName: string;
     teamSlug: string;
   }): Promise<LocalAccountWithPassword> {
-    const pool = await this.getPool();
-
-    await pool.query('BEGIN');
-
-    try {
+    return this.withTransaction(async (pool) => {
       const accountResult = await pool.query<{
         id: string;
         email: string;
@@ -1877,8 +1890,6 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         [team.id, account.id],
       );
 
-      await pool.query('COMMIT');
-
       return {
         accountId: account.id,
         email: account.email,
@@ -1892,10 +1903,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
           role: 'owner',
         },
       };
-    } catch (error) {
-      await pool.query('ROLLBACK');
-      throw error;
-    }
+    });
   }
 
   async findLocalAccountByEmail(email: string): Promise<LocalAccountWithPassword | undefined> {
@@ -1951,11 +1959,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     teamId: string;
     defaultRole: Exclude<TeamRole, 'owner'>;
   }): Promise<AccountSessionPrincipal | undefined> {
-    const pool = await this.getPool();
-
-    await pool.query('BEGIN');
-
-    try {
+    return this.withTransaction(async (pool) => {
       const existing = await pool.query<AccountProfileRow>(
         `
           SELECT id,
@@ -1971,7 +1975,6 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
       let account = existing.rows[0];
 
       if (account?.status === 'disabled') {
-        await pool.query('ROLLBACK');
         return undefined;
       }
 
@@ -2047,13 +2050,8 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         [account.id, input.teamId],
       );
 
-      await pool.query('COMMIT');
-
       return principal.rows[0] ? toAccountSessionPrincipal(principal.rows[0]) : undefined;
-    } catch (error) {
-      await pool.query('ROLLBACK');
-      throw error;
-    }
+    });
   }
 
   async recordFailedLogin(input: {
@@ -2148,11 +2146,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     accountId: string;
     deactivatedAt: string;
   }): Promise<AccountProfileResponse | undefined> {
-    const pool = await this.getPool();
-
-    await pool.query('BEGIN');
-
-    try {
+    return this.withTransaction(async (pool) => {
       await pool.query(
         `
           UPDATE account_sessions
@@ -2178,13 +2172,8 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         [input.accountId],
       );
 
-      await pool.query('COMMIT');
-
       return result.rows[0] ? toAccountProfileResponse(result.rows[0]) : undefined;
-    } catch (error) {
-      await pool.query('ROLLBACK');
-      throw error;
-    }
+    });
   }
 
   async createSession(input: {
@@ -2451,12 +2440,9 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     accountId: string;
     teamName: string;
     teamSlug: string;
+    audit?: TeamAuditMutationInput;
   }): Promise<TeamSettingsRecord> {
-    const pool = await this.getPool();
-
-    await pool.query('BEGIN');
-
-    try {
+    return this.withTransaction(async (pool) => {
       const teamResult = await pool.query<TeamSettingsRow>(
         `
           WITH created_team AS (
@@ -2495,49 +2481,63 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         `,
         [input.accountId, input.teamSlug, input.teamName],
       );
+      const row = teamResult.rows[0];
 
-      await pool.query('COMMIT');
+      if (input.audit) {
+        await this.insertTeamAuditEvent(pool, {
+          teamId: row.team_id,
+          ...input.audit,
+          targetId: input.audit.targetId ?? row.team_id,
+        });
+      }
 
-      return toTeamSettingsRecord(teamResult.rows[0]);
-    } catch (error) {
-      await pool.query('ROLLBACK');
-      throw error;
-    }
+      return toTeamSettingsRecord(row);
+    });
   }
 
   async updateTeamSettings(input: {
     teamId: string;
     teamName: string;
     actorAccountId: string;
+    audit?: TeamAuditMutationInput;
   }): Promise<TeamSettingsRecord | undefined> {
-    const result = await (
-      await this.getPool()
-    ).query<TeamSettingsRow>(
-      `
-        WITH updated_team AS (
-          UPDATE teams
-          SET name = $2,
-              updated_at = now()
-          WHERE id = $1
-          RETURNING id,
-                    name,
-                    plan,
-                    updated_at
-        )
-        SELECT updated_team.id AS team_id,
-               updated_team.name AS team_name,
-               updated_team.plan,
-               team_memberships.role,
-               updated_team.updated_at
-        FROM updated_team
-        JOIN team_memberships
-          ON team_memberships.team_id = updated_team.id
-         AND team_memberships.account_id = $3
-      `,
-      [input.teamId, input.teamName, input.actorAccountId],
-    );
+    return this.withTransaction(async (pool) => {
+      const result = await pool.query<TeamSettingsRow>(
+        `
+          WITH updated_team AS (
+            UPDATE teams
+            SET name = $2,
+                updated_at = now()
+            WHERE id = $1
+            RETURNING id,
+                      name,
+                      plan,
+                      updated_at
+          )
+          SELECT updated_team.id AS team_id,
+                 updated_team.name AS team_name,
+                 updated_team.plan,
+                 team_memberships.role,
+                 updated_team.updated_at
+          FROM updated_team
+          JOIN team_memberships
+            ON team_memberships.team_id = updated_team.id
+           AND team_memberships.account_id = $3
+        `,
+        [input.teamId, input.teamName, input.actorAccountId],
+      );
+      const row = result.rows[0];
 
-    return result.rows[0] ? toTeamSettingsRecord(result.rows[0]) : undefined;
+      if (row && input.audit) {
+        await this.insertTeamAuditEvent(pool, {
+          teamId: input.teamId,
+          ...input.audit,
+          targetId: input.audit.targetId ?? row.team_id,
+        });
+      }
+
+      return row ? toTeamSettingsRecord(row) : undefined;
+    });
   }
 
   async getTeamMembership(input: {
@@ -2600,52 +2600,68 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     tokenHash: string;
     invitedByAccountId: string;
     expiresAt: string;
+    audit?: TeamAuditMutationInput;
   }): Promise<TeamInvitationRecord> {
-    const result = await (
-      await this.getPool()
-    ).query<TeamInvitationRow>(
-      `
-        INSERT INTO team_invitations (
-          team_id,
-          email,
-          role,
-          token_hash,
-          invited_by_account_id,
-          expires_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (team_id, email)
-          WHERE status = 'pending'
-        DO UPDATE SET
-          role = EXCLUDED.role,
-          token_hash = EXCLUDED.token_hash,
-          invited_by_account_id = EXCLUDED.invited_by_account_id,
-          expires_at = EXCLUDED.expires_at,
-          created_at = now(),
-          revoked_at = NULL
-        RETURNING id,
-                  team_id,
-                  email,
-                  role,
-                  status,
-                  invited_by_account_id,
-                  accepted_by_account_id,
-                  expires_at,
-                  created_at,
-                  accepted_at,
-                  revoked_at
-      `,
-      [
-        input.teamId,
-        input.email,
-        input.role,
-        input.tokenHash,
-        input.invitedByAccountId,
-        input.expiresAt,
-      ],
-    );
+    return this.withTransaction(async (pool) => {
+      const result = await pool.query<TeamInvitationRow>(
+        `
+          INSERT INTO team_invitations (
+            team_id,
+            email,
+            role,
+            token_hash,
+            invited_by_account_id,
+            expires_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6)
+          ON CONFLICT (team_id, email)
+            WHERE status = 'pending'
+          DO UPDATE SET
+            role = EXCLUDED.role,
+            token_hash = EXCLUDED.token_hash,
+            invited_by_account_id = EXCLUDED.invited_by_account_id,
+            expires_at = EXCLUDED.expires_at,
+            created_at = now(),
+            revoked_at = NULL
+          RETURNING id,
+                    team_id,
+                    email,
+                    role,
+                    status,
+                    invited_by_account_id,
+                    accepted_by_account_id,
+                    expires_at,
+                    created_at,
+                    accepted_at,
+                    revoked_at
+        `,
+        [
+          input.teamId,
+          input.email,
+          input.role,
+          input.tokenHash,
+          input.invitedByAccountId,
+          input.expiresAt,
+        ],
+      );
+      const row = result.rows[0];
 
-    return toTeamInvitationRecord(result.rows[0]);
+      if (input.audit) {
+        await this.insertTeamAuditEvent(pool, {
+          teamId: input.teamId,
+          ...input.audit,
+          targetId: input.audit.targetId ?? row.id,
+          metadata: {
+            email: row.email,
+            role: normalizeInvitableDatabaseRole(row.role),
+            status: row.status,
+            ...(input.audit.metadata ?? {}),
+          },
+        });
+      }
+
+      return toTeamInvitationRecord(row);
+    });
   }
 
   async listTeamInvitations(teamId: string): Promise<TeamInvitationRecord[]> {
@@ -2677,17 +2693,15 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     return result.rows.map(toTeamInvitationRecord);
   }
 
-  async recordTeamAuditEvent(input: {
-    teamId: string;
-    actorAccountId?: string;
-    action: TeamAuditAction;
-    targetType: TeamAuditTargetType;
-    targetId?: string;
-    metadata?: Record<string, unknown>;
-  }): Promise<TeamAuditEventRecord> {
-    const result = await (
-      await this.getPool()
-    ).query<TeamAuditEventRow>(
+  async recordTeamAuditEvent(input: TeamAuditEventInput): Promise<TeamAuditEventRecord> {
+    return this.insertTeamAuditEvent(await this.getPool(), input);
+  }
+
+  private async insertTeamAuditEvent(
+    queryRunner: PgQueryRunner,
+    input: TeamAuditEventInput,
+  ): Promise<TeamAuditEventRecord> {
+    const result = await queryRunner.query<TeamAuditEventRow>(
       `
         INSERT INTO team_audit_events (
           team_id,
@@ -2755,33 +2769,49 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     teamId: string;
     invitationId: string;
     revokedAt: string;
+    audit?: TeamAuditMutationInput;
   }): Promise<TeamInvitationRecord | undefined> {
-    const result = await (
-      await this.getPool()
-    ).query<TeamInvitationRow>(
-      `
-        UPDATE team_invitations
-        SET status = 'revoked',
-            revoked_at = $3
-        WHERE team_id = $1
-          AND id = $2
-          AND status = 'pending'
-        RETURNING id,
-                  team_id,
-                  email,
-                  role,
-                  status,
-                  invited_by_account_id,
-                  accepted_by_account_id,
-                  expires_at,
-                  created_at,
-                  accepted_at,
-                  revoked_at
-      `,
-      [input.teamId, input.invitationId, input.revokedAt],
-    );
+    return this.withTransaction(async (pool) => {
+      const result = await pool.query<TeamInvitationRow>(
+        `
+          UPDATE team_invitations
+          SET status = 'revoked',
+              revoked_at = $3
+          WHERE team_id = $1
+            AND id = $2
+            AND status = 'pending'
+          RETURNING id,
+                    team_id,
+                    email,
+                    role,
+                    status,
+                    invited_by_account_id,
+                    accepted_by_account_id,
+                    expires_at,
+                    created_at,
+                    accepted_at,
+                    revoked_at
+        `,
+        [input.teamId, input.invitationId, input.revokedAt],
+      );
+      const row = result.rows[0];
 
-    return result.rows[0] ? toTeamInvitationRecord(result.rows[0]) : undefined;
+      if (row && input.audit) {
+        await this.insertTeamAuditEvent(pool, {
+          teamId: input.teamId,
+          ...input.audit,
+          targetId: input.audit.targetId ?? row.id,
+          metadata: {
+            email: row.email,
+            role: normalizeInvitableDatabaseRole(row.role),
+            status: row.status,
+            ...(input.audit.metadata ?? {}),
+          },
+        });
+      }
+
+      return row ? toTeamInvitationRecord(row) : undefined;
+    });
   }
 
   async resendTeamInvitation(input: {
@@ -2790,45 +2820,61 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     tokenHash: string;
     invitedByAccountId: string;
     expiresAt: string;
+    audit?: TeamAuditMutationInput;
   }): Promise<TeamInvitationRecord | undefined> {
-    const result = await (
-      await this.getPool()
-    ).query<TeamInvitationRow>(
-      `
-        UPDATE team_invitations
-        SET token_hash = $3,
-            invited_by_account_id = $4,
-            expires_at = $5,
-            created_at = now(),
-            revoked_at = NULL
-        WHERE team_id = $1
-          AND id = $2
-          AND status = 'pending'
-        RETURNING id,
-                  team_id,
-                  email,
-                  role,
-                  CASE
-                    WHEN status = 'pending' AND expires_at <= now() THEN 'expired'
-                    ELSE status
-                  END AS status,
-                  invited_by_account_id,
-                  accepted_by_account_id,
-                  expires_at,
-                  created_at,
-                  accepted_at,
-                  revoked_at
-      `,
-      [
-        input.teamId,
-        input.invitationId,
-        input.tokenHash,
-        input.invitedByAccountId,
-        input.expiresAt,
-      ],
-    );
+    return this.withTransaction(async (pool) => {
+      const result = await pool.query<TeamInvitationRow>(
+        `
+          UPDATE team_invitations
+          SET token_hash = $3,
+              invited_by_account_id = $4,
+              expires_at = $5,
+              created_at = now(),
+              revoked_at = NULL
+          WHERE team_id = $1
+            AND id = $2
+            AND status = 'pending'
+          RETURNING id,
+                    team_id,
+                    email,
+                    role,
+                    CASE
+                      WHEN status = 'pending' AND expires_at <= now() THEN 'expired'
+                      ELSE status
+                    END AS status,
+                    invited_by_account_id,
+                    accepted_by_account_id,
+                    expires_at,
+                    created_at,
+                    accepted_at,
+                    revoked_at
+        `,
+        [
+          input.teamId,
+          input.invitationId,
+          input.tokenHash,
+          input.invitedByAccountId,
+          input.expiresAt,
+        ],
+      );
+      const row = result.rows[0];
 
-    return result.rows[0] ? toTeamInvitationRecord(result.rows[0]) : undefined;
+      if (row && input.audit) {
+        await this.insertTeamAuditEvent(pool, {
+          teamId: input.teamId,
+          ...input.audit,
+          targetId: input.audit.targetId ?? row.id,
+          metadata: {
+            email: row.email,
+            role: normalizeInvitableDatabaseRole(row.role),
+            status: row.status,
+            ...(input.audit.metadata ?? {}),
+          },
+        });
+      }
+
+      return row ? toTeamInvitationRecord(row) : undefined;
+    });
   }
 
   async findPendingInvitationByTokenHash(
@@ -2892,12 +2938,9 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     invitationId: string;
     accountId: string;
     acceptedAt: string;
+    audit?: TeamAuditMutationInput;
   }): Promise<TeamInvitationRecord> {
-    const pool = await this.getPool();
-
-    await pool.query('BEGIN');
-
-    try {
+    return this.withTransaction(async (pool) => {
       const invitation = await pool.query<TeamInvitationWithTokenRow>(
         `
           SELECT id,
@@ -2963,14 +3006,24 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         `,
         [input.invitationId, input.accountId, input.acceptedAt],
       );
+      const acceptedRow = accepted.rows[0];
 
-      await pool.query('COMMIT');
+      if (input.audit) {
+        await this.insertTeamAuditEvent(pool, {
+          teamId: acceptedRow.team_id,
+          ...input.audit,
+          targetId: input.audit.targetId ?? acceptedRow.id,
+          metadata: {
+            email: acceptedRow.email,
+            role: normalizeInvitableDatabaseRole(acceptedRow.role),
+            status: acceptedRow.status,
+            ...(input.audit.metadata ?? {}),
+          },
+        });
+      }
 
-      return toTeamInvitationRecord(accepted.rows[0]);
-    } catch (error) {
-      await pool.query('ROLLBACK');
-      throw error;
-    }
+      return toTeamInvitationRecord(acceptedRow);
+    });
   }
 
   async countTeamOwners(teamId: string): Promise<number> {
@@ -2993,50 +3046,84 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     teamId: string;
     accountId: string;
     role: TeamRole;
+    audit?: TeamAuditMutationInput;
   }): Promise<TeamMemberRecord | undefined> {
-    const result = await (
-      await this.getPool()
-    ).query<TeamMemberRow>(
-      `
-        WITH updated_membership AS (
-          UPDATE team_memberships
-          SET role = $3
+    return this.withTransaction(async (pool) => {
+      const result = await pool.query<TeamMemberRow>(
+        `
+          WITH updated_membership AS (
+            UPDATE team_memberships
+            SET role = $3
+            WHERE team_id = $1
+              AND account_id = $2
+            RETURNING account_id,
+                      role,
+                      created_at,
+                      last_active_at
+          )
+          SELECT updated_membership.account_id,
+                 accounts.email,
+                 accounts.display_name,
+                 updated_membership.role,
+                 updated_membership.created_at,
+                 updated_membership.last_active_at
+          FROM updated_membership
+          JOIN accounts
+            ON accounts.id = updated_membership.account_id
+        `,
+        [input.teamId, input.accountId, input.role],
+      );
+      const row = result.rows[0];
+
+      if (row && input.audit) {
+        await this.insertTeamAuditEvent(pool, {
+          teamId: input.teamId,
+          ...input.audit,
+          targetId: input.audit.targetId ?? row.account_id,
+          metadata: {
+            email: row.email,
+            toRole: normalizeDatabaseTeamRole(row.role),
+            ...(input.audit.metadata ?? {}),
+          },
+        });
+      }
+
+      return row ? toTeamMemberRecord(row) : undefined;
+    });
+  }
+
+  async removeTeamMember(input: {
+    teamId: string;
+    accountId: string;
+    audit?: TeamAuditMutationInput;
+  }): Promise<boolean> {
+    return this.withTransaction(async (pool) => {
+      const result = await pool.query<{ account_id: string; role: DatabaseTeamRole }>(
+        `
+          DELETE FROM team_memberships
           WHERE team_id = $1
             AND account_id = $2
           RETURNING account_id,
-                    role,
-                    created_at,
-                    last_active_at
-        )
-        SELECT updated_membership.account_id,
-               accounts.email,
-               accounts.display_name,
-               updated_membership.role,
-               updated_membership.created_at,
-               updated_membership.last_active_at
-        FROM updated_membership
-        JOIN accounts
-          ON accounts.id = updated_membership.account_id
-      `,
-      [input.teamId, input.accountId, input.role],
-    );
+                    role
+        `,
+        [input.teamId, input.accountId],
+      );
+      const row = result.rows[0];
 
-    return result.rows[0] ? toTeamMemberRecord(result.rows[0]) : undefined;
-  }
+      if (row && input.audit) {
+        await this.insertTeamAuditEvent(pool, {
+          teamId: input.teamId,
+          ...input.audit,
+          targetId: input.audit.targetId ?? row.account_id,
+          metadata: {
+            role: normalizeDatabaseTeamRole(row.role),
+            ...(input.audit.metadata ?? {}),
+          },
+        });
+      }
 
-  async removeTeamMember(input: { teamId: string; accountId: string }): Promise<boolean> {
-    const result = await (
-      await this.getPool()
-    ).query(
-      `
-        DELETE FROM team_memberships
-        WHERE team_id = $1
-          AND account_id = $2
-      `,
-      [input.teamId, input.accountId],
-    );
-
-    return (result.rowCount ?? 0) > 0;
+      return Boolean(row);
+    });
   }
 
   async listSsoProviderConfigs(
@@ -3073,48 +3160,64 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     issuerUrl: string;
     clientIdHint?: string;
     createdByAccountId: string;
+    audit?: TeamAuditMutationInput;
   }): Promise<SsoConfigurationStatus['configuredProviders'][number]> {
-    const result = await (
-      await this.getPool()
-    ).query<SsoProviderConfigRow>(
-      `
-        INSERT INTO sso_identity_provider_configs (
-          team_id,
-          provider_type,
-          display_name,
-          issuer_url,
-          client_id_hint,
-          created_by_account_id
-        )
-        VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (team_id, provider_type, issuer_url)
-        DO UPDATE SET
-          display_name = EXCLUDED.display_name,
-          client_id_hint = EXCLUDED.client_id_hint,
-          status = 'configured',
-          updated_at = now()
-        RETURNING provider_type,
-                  display_name,
-                  issuer_url,
-                  status
-      `,
-      [
-        input.teamId,
-        input.providerType,
-        input.displayName,
-        input.issuerUrl,
-        input.clientIdHint ?? null,
-        input.createdByAccountId,
-      ],
-    );
-    const row = result.rows[0];
+    return this.withTransaction(async (pool) => {
+      const result = await pool.query<SsoProviderConfigRow>(
+        `
+          INSERT INTO sso_identity_provider_configs (
+            team_id,
+            provider_type,
+            display_name,
+            issuer_url,
+            client_id_hint,
+            created_by_account_id
+          )
+          VALUES ($1, $2, $3, $4, $5, $6)
+          ON CONFLICT (team_id, provider_type, issuer_url)
+          DO UPDATE SET
+            display_name = EXCLUDED.display_name,
+            client_id_hint = EXCLUDED.client_id_hint,
+            status = 'configured',
+            updated_at = now()
+          RETURNING provider_type,
+                    display_name,
+                    issuer_url,
+                    status
+        `,
+        [
+          input.teamId,
+          input.providerType,
+          input.displayName,
+          input.issuerUrl,
+          input.clientIdHint ?? null,
+          input.createdByAccountId,
+        ],
+      );
+      const row = result.rows[0];
 
-    return {
-      providerType: row.provider_type,
-      displayName: row.display_name,
-      issuerUrl: row.issuer_url,
-      status: row.status,
-    };
+      if (input.audit) {
+        await this.insertTeamAuditEvent(pool, {
+          teamId: input.teamId,
+          ...input.audit,
+          targetId: input.audit.targetId ?? `${row.provider_type}:${row.issuer_url}`,
+          metadata: {
+            providerType: row.provider_type,
+            displayName: row.display_name,
+            issuerUrl: row.issuer_url,
+            status: row.status,
+            ...(input.audit.metadata ?? {}),
+          },
+        });
+      }
+
+      return {
+        providerType: row.provider_type,
+        displayName: row.display_name,
+        issuerUrl: row.issuer_url,
+        status: row.status,
+      };
+    });
   }
 
   async createBillingImport(input: {
@@ -3123,16 +3226,14 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     teamId?: string;
     createdByAccountId?: string;
     rows: Array<BillingImportRowInput & { lineItemHash: string }>;
+    audit?: TeamAuditMutationInput;
   }): Promise<{
     importRun: BillingImportRecord;
     lineItems: InvoiceLineItemRecord[];
   }> {
-    const pool = await this.getPool();
     const importedLineItems: InvoiceLineItemRecord[] = [];
 
-    await pool.query('BEGIN');
-
-    try {
+    return this.withTransaction(async (pool) => {
       const importResult = await pool.query<BillingImportRow>(
         `
           INSERT INTO billing_import_runs (
@@ -3286,17 +3387,29 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         `,
         [importRunId, acceptedRows, input.rows.length - acceptedRows, totalCostUsd],
       );
+      const finalImportRow = finalImport.rows[0];
 
-      await pool.query('COMMIT');
+      if (input.audit && finalImportRow.team_id) {
+        await this.insertTeamAuditEvent(pool, {
+          teamId: finalImportRow.team_id,
+          ...input.audit,
+          targetId: input.audit.targetId ?? finalImportRow.id,
+          metadata: {
+            provider: finalImportRow.provider,
+            sourceType: finalImportRow.source_type,
+            rowsAccepted: finalImportRow.rows_accepted,
+            rowsRejected: finalImportRow.rows_rejected,
+            totalCostUsd: Number.parseFloat(finalImportRow.total_cost_usd),
+            ...(input.audit.metadata ?? {}),
+          },
+        });
+      }
 
       return {
-        importRun: toBillingImportRecord(finalImport.rows[0]),
+        importRun: toBillingImportRecord(finalImportRow),
         lineItems: importedLineItems,
       };
-    } catch (error) {
-      await pool.query('ROLLBACK');
-      throw error;
-    }
+    });
   }
 
   async getBillingImport(importRunId: string): Promise<BillingImportRecord | undefined> {
@@ -3377,49 +3490,67 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     variancePercent: number;
     status: InvoiceReconciliationStatus;
     evidence: Record<string, unknown>;
+    audit?: TeamAuditEventInput;
   }): Promise<InvoiceReconciliationRecord> {
-    const result = await (
-      await this.getPool()
-    ).query<InvoiceReconciliationRow>(
-      `
-        INSERT INTO invoice_reconciliation_results (
-          import_run_id,
-          comparison_id,
-          provider,
-          estimated_total_usd,
-          invoiced_total_usd,
-          variance_usd,
-          variance_percent,
-          status,
-          evidence
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
-        RETURNING id,
-                  import_run_id,
-                  comparison_id,
-                  provider,
-                  estimated_total_usd,
-                  invoiced_total_usd,
-                  variance_usd,
-                  variance_percent,
-                  status,
-                  evidence,
-                  created_at
-      `,
-      [
-        input.importRunId,
-        input.comparisonId,
-        input.provider,
-        input.estimatedTotalUsd,
-        input.invoicedTotalUsd,
-        input.varianceUsd,
-        input.variancePercent,
-        input.status,
-        JSON.stringify(input.evidence),
-      ],
-    );
+    return this.withTransaction(async (pool) => {
+      const result = await pool.query<InvoiceReconciliationRow>(
+        `
+          INSERT INTO invoice_reconciliation_results (
+            import_run_id,
+            comparison_id,
+            provider,
+            estimated_total_usd,
+            invoiced_total_usd,
+            variance_usd,
+            variance_percent,
+            status,
+            evidence
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+          RETURNING id,
+                    import_run_id,
+                    comparison_id,
+                    provider,
+                    estimated_total_usd,
+                    invoiced_total_usd,
+                    variance_usd,
+                    variance_percent,
+                    status,
+                    evidence,
+                    created_at
+        `,
+        [
+          input.importRunId,
+          input.comparisonId,
+          input.provider,
+          input.estimatedTotalUsd,
+          input.invoicedTotalUsd,
+          input.varianceUsd,
+          input.variancePercent,
+          input.status,
+          JSON.stringify(input.evidence),
+        ],
+      );
+      const row = result.rows[0];
 
-    return toInvoiceReconciliationRecord(result.rows[0]);
+      if (input.audit) {
+        await this.insertTeamAuditEvent(pool, {
+          ...input.audit,
+          targetId: input.audit.targetId ?? row.id,
+          metadata: {
+            importRunId: input.importRunId,
+            comparisonId: input.comparisonId,
+            provider: row.provider,
+            status: row.status,
+            varianceUsd: Number.parseFloat(row.variance_usd),
+            variancePercent: Number.parseFloat(row.variance_percent),
+            ...(input.audit.metadata ?? {}),
+          },
+        });
+      }
+
+      return toInvoiceReconciliationRecord(row);
+    });
   }
 
   async listInvoiceReconciliations(importRunId: string): Promise<InvoiceReconciliationRecord[]> {
@@ -3451,6 +3582,32 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
   async onModuleDestroy(): Promise<void> {
     if (this.pool) {
       await this.pool.end();
+    }
+  }
+
+  private async withTransaction<T>(
+    operation: (queryRunner: PgQueryRunner) => Promise<T>,
+  ): Promise<T> {
+    const pool = await this.getPool();
+    const queryRunner = pool.connect ? await pool.connect() : pool;
+    let transactionStarted = false;
+
+    try {
+      await queryRunner.query('BEGIN');
+      transactionStarted = true;
+
+      const result = await operation(queryRunner);
+      await queryRunner.query('COMMIT');
+
+      return result;
+    } catch (error) {
+      if (transactionStarted) {
+        await queryRunner.query('ROLLBACK');
+      }
+      throw error;
+    } finally {
+      const releasableRunner = queryRunner as PgQueryRunner & { release?: () => void };
+      releasableRunner.release?.();
     }
   }
 
