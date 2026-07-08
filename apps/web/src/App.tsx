@@ -3555,6 +3555,15 @@ function WorkspaceControlCenter({
                     {reconciliationSummary.adjustmentLineItemCount} adjustment rows (
                     {formatCurrency(reconciliationSummary.adjustmentCostUsd)})
                   </small>
+                  {reconciliationSummary.commitmentLineItemCount > 0 ? (
+                    <small>
+                      Commitments: {reconciliationSummary.commitmentLineItemCount} rows · net{' '}
+                      {formatCurrency(reconciliationSummary.commitmentNetCostUsd)}
+                      {reconciliationSummary.commitmentCategories.length > 0
+                        ? ` (${reconciliationSummary.commitmentCategories.join(', ')})`
+                        : ''}
+                    </small>
+                  ) : null}
                   {reconciliationSummary.adjustmentCategories.length > 0 ? (
                     <small>
                       Adjustments: {reconciliationSummary.adjustmentCategories.join(', ')}
@@ -19459,8 +19468,11 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
   skuMatchPercent: number;
   adjustmentCostUsd: number;
   adjustmentLineItemCount: number;
+  commitmentLineItemCount: number;
+  commitmentNetCostUsd: number;
   estimateComparableVarianceUsd: number;
   adjustmentCategories: string[];
+  commitmentCategories: string[];
   primaryCaveat: string;
 } {
   const evidence = record.evidence;
@@ -19471,14 +19483,21 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
   const readiness =
     stringValue(matchSummary.readiness) ??
     (record.status === 'matched' ? 'reconciled-evidence-ready' : 'reconciliation-foundation');
-  const adjustmentCategories = arrayValue(adjustmentSummary.categories)
+  const categorySummaries = arrayValue(adjustmentSummary.categories)
     .map((categorySummary) => objectValue(categorySummary))
-    .filter((categorySummary) => stringValue(categorySummary.category) !== 'usage')
+    .map((categorySummary) => ({
+      category: stringValue(categorySummary.category) ?? 'adjustment',
+      totalCostUsd: numberValue(categorySummary.totalCostUsd),
+    }));
+  const adjustmentCategories = categorySummaries
+    .filter(({ category }) => category !== 'usage' && !category.startsWith('commitment-'))
+    .map(({ category, totalCostUsd }) => `${category} ${formatCurrency(totalCostUsd)}`);
+  const commitmentCategories = categorySummaries
+    .filter(({ category }) => category.startsWith('commitment-'))
     .map((categorySummary) => {
-      const category = stringValue(categorySummary.category) ?? 'adjustment';
-      const totalCostUsd = numberValue(categorySummary.totalCostUsd);
+      const categoryLabel = categorySummary.category.replace(/^commitment-/, '');
 
-      return `${category} ${formatCurrency(totalCostUsd)}`;
+      return `${categoryLabel} ${formatCurrency(categorySummary.totalCostUsd)}`;
     });
 
   return {
@@ -19487,10 +19506,13 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
     skuMatchPercent: numberValue(coverage.skuMatchPercent),
     adjustmentCostUsd: numberValue(adjustmentSummary.adjustmentCostUsd),
     adjustmentLineItemCount: numberValue(adjustmentSummary.adjustmentLineItemCount),
+    commitmentLineItemCount: numberValue(adjustmentSummary.commitmentLineItemCount),
+    commitmentNetCostUsd: numberValue(adjustmentSummary.commitmentNetCostUsd),
     estimateComparableVarianceUsd: numberValue(
       adjustmentSummary.estimateComparableVarianceUsd ?? record.varianceUsd,
     ),
     adjustmentCategories,
+    commitmentCategories,
     primaryCaveat:
       caveats[0] ??
       'Estimate-vs-actual evidence is available, but invoice-grade billing remains a separate provider-led control.',

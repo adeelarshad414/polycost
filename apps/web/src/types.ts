@@ -541,6 +541,10 @@ export type InvoiceAdjustmentCategory =
   | 'marketplace'
   | 'refund'
   | 'enterprise-adjustment'
+  | 'commitment-covered-usage'
+  | 'commitment-discount'
+  | 'commitment-fee'
+  | 'commitment-amortization'
   | 'fee'
   | 'unknown';
 

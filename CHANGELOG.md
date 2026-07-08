@@ -58,6 +58,9 @@ once tagged releases begin.
 - Invoice adjustment classification for imported actuals, separating usage rows from
   taxes, credits, discounts, support, marketplace charges, refunds, fees, and other
   non-usage adjustments in reconciliation evidence and the workspace billing panel.
+- Provider commitment billing semantics for reconciliation evidence, including
+  covered usage, commitment discounts/negations, recurring or upfront commitment
+  fees, and amortization or unused commitment rows.
 
 ### Notes
 
@@ -75,8 +78,8 @@ once tagged releases begin.
   authorization, and an explicit security suppression/advisory ledger.
 - Billing reconciliation now has native export mapper evidence for AWS CUR, Azure
   Cost Management CSV, and nested GCP Billing Export JSON, plus adjustment-aware
-  usage-comparable variance evidence, while invoice-of-record reconciliation remains
-  future scope.
+  usage-comparable variance and commitment row evidence, while invoice-of-record
+  reconciliation remains future scope.
 - Account/team UX now supports switching the current active workspace without a
   new login, refreshing pending/expired invite tokens, and handing invite links to
   a signed delivery webhook, while provider-specific email templates, SSO/SAML,

@@ -545,6 +545,11 @@ describe('App', () => {
     expect(text(container)).toContain('reconciled evidence ready');
     expect(text(container)).toContain('100% source fingerprinted');
     expect(text(container)).toContain('100% SKU matched');
+    expect(text(container)).toContain('Usage-comparable variance $0.00');
+    expect(text(container)).toContain('Commitments: 4 rows');
+    expect(text(container)).toContain('net -$2.00');
+    expect(text(container)).toContain('discount -$25.00');
+    expect(text(container)).toContain('Adjustments: tax $8.00');
 
     unmount();
   });
@@ -4564,6 +4569,45 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
         invoiceCoverage: {
           sourceFingerprintPercent: 100,
           skuMatchPercent: 100,
+        },
+        invoiceAdjustmentSummary: {
+          adjustmentCostUsd: 6,
+          adjustmentLineItemCount: 4,
+          commitmentLineItemCount: 4,
+          commitmentNetCostUsd: -2,
+          estimateComparableVarianceUsd: 0,
+          categories: [
+            {
+              category: 'usage',
+              rowCount: 1,
+              totalCostUsd: 100,
+            },
+            {
+              category: 'commitment-covered-usage',
+              rowCount: 1,
+              totalCostUsd: 0,
+            },
+            {
+              category: 'commitment-discount',
+              rowCount: 1,
+              totalCostUsd: -25,
+            },
+            {
+              category: 'commitment-fee',
+              rowCount: 1,
+              totalCostUsd: 20,
+            },
+            {
+              category: 'commitment-amortization',
+              rowCount: 1,
+              totalCostUsd: 3,
+            },
+            {
+              category: 'tax',
+              rowCount: 1,
+              totalCostUsd: 8,
+            },
+          ],
         },
         invoiceMatchSummary: {
           readiness: 'reconciled-evidence-ready',

@@ -109,6 +109,7 @@ say so explicitly rather than marking it done.
 | Phase 2.17 - Audit export receiver verification         | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.18 - VSDX approximate SVG previews              | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.19 - Invoice adjustment reconciliation evidence | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.20 - Commitment billing semantics evidence      | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4099,6 +4100,35 @@ test:production-readiness` passed with 158/158 API tests and 86/86 web tests.
   amortization, private agreements, tax jurisdiction treatment, prepaid commitments,
   refunds, support contracts, and invoice-of-record controls still need a dedicated
   production billing phase.
+
+## Phase 2.20 — Commitment billing semantics evidence
+
+Status: implemented locally on 2026-07-08.
+
+- Added provider commitment billing categories to invoice reconciliation evidence:
+  `commitment-covered-usage`, `commitment-discount`, `commitment-fee`, and
+  `commitment-amortization`.
+- Hardened native billing export classification for commitment signals commonly found
+  in AWS Savings Plans/Reserved Instance rows, Azure reservations/savings-plan benefit
+  exports, and GCP committed-use or sustained-use discount rows.
+- Reconciliation evidence now reports `commitmentLineItemCount` and
+  `commitmentNetCostUsd`, while keeping covered commitment usage estimate-comparable
+  and separating discounts, fees, and amortization/unused commitment rows from usage
+  variance.
+- Updated the workspace billing panel to show commitment row count, net commitment
+  cost, and commitment category totals separately from generic invoice adjustments.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts`
+  passed 24/24. `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx`
+  passed 60/60. `npm run format:check` and `npm run ci:lint` passed. `npm run
+test:production-readiness` passed with 159/159 API tests and 86/86 web tests.
+  Full `npm run check` passed with 423/423 API tests, 143/143 web tests, graph
+  validation, pricing coverage, progress verification, QA/security suppression
+  hygiene, DB validation, release, handover, and provider-credential checks green.
+- Remaining caveat: commitment rows are now visible and categorized, but full
+  invoice-grade amortization still requires provider-account-specific inventory,
+  benefit coverage, amortization period, unused-commitment, private pricing, and
+  invoice-of-record controls.
 
 ## Deviations from spec log
 

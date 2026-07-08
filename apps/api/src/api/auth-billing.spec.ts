@@ -1119,6 +1119,7 @@ describe('BillingService', () => {
           'lineItem/ProductCode,lineItem/LineItemType,product/sku,lineItem/UsageStartDate,lineItem/UsageAmount,pricing/unit,lineItem/NetUnblendedCost,lineItem/CurrencyCode,product/region,lineItem/ResourceId,resourceTags/user:cost_center',
           'AmazonEC2,Usage,sku-compute,2026-06-01T00:00:00Z,730,Hrs,107.00,USD,us-east-1,i-demo,engineering',
           'Tax,Tax,tax-sku,2026-06-01T00:00:00Z,0,USD,8.50,USD,us-east-1,,finance',
+          'AWSComputeSavingsPlans,SavingsPlanNegation,sp-negation-sku,2026-06-01T00:00:00Z,730,Hrs,-12.50,USD,us-east-1,,finance',
         ].join('\n'),
       },
       identity,
@@ -1165,6 +1166,18 @@ describe('BillingService', () => {
               _polycost: expect.objectContaining({
                 invoiceAdjustmentClassification: expect.objectContaining({
                   category: 'tax',
+                  isAdjustment: true,
+                }),
+              }),
+            }),
+          }),
+          expect.objectContaining({
+            serviceName: 'AWSComputeSavingsPlans',
+            costUsd: -12.5,
+            rawPayload: expect.objectContaining({
+              _polycost: expect.objectContaining({
+                invoiceAdjustmentClassification: expect.objectContaining({
+                  category: 'commitment-discount',
                   isAdjustment: true,
                 }),
               }),
@@ -1571,6 +1584,101 @@ describe('BillingService', () => {
     );
   });
 
+  it('separates commitment discount, fee, and amortization semantics from usage variance', async () => {
+    const repository = repositoryMock();
+    repository.getBillingImport.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      teamId: identity.teamId,
+      provider: 'aws',
+      sourceType: 'aws-cur',
+      status: 'completed',
+      billingPeriodStart: '2026-06-01',
+      billingPeriodEnd: '2026-06-30',
+      originalFileSha256: 'a'.repeat(64),
+      rowsReceived: 5,
+      rowsAccepted: 5,
+      rowsRejected: 0,
+      totalCostUsd: 98,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    });
+    repository.listInvoiceLineItems.mockResolvedValue([
+      invoiceLineItem('AmazonEC2', 'sku-compute', 100, 'usage'),
+      invoiceLineItem('SavingsPlanCoveredUsage', 'sp-covered-sku', 0, 'commitment-covered-usage'),
+      invoiceLineItem('SavingsPlanNegation', 'sp-negation-sku', -25, 'commitment-discount'),
+      invoiceLineItem('RIFee', 'ri-fee-sku', 20, 'commitment-fee'),
+      invoiceLineItem('UnusedReservation', 'ri-unused-sku', 3, 'commitment-amortization'),
+    ]);
+    repository.getComparison.mockResolvedValue({
+      nwsSnapshot: {} as never,
+      resultSnapshot: comparisonResult,
+    });
+    repository.saveInvoiceReconciliation.mockImplementation(async (input) => ({
+      id: '66666666-6666-4666-8666-666666666666',
+      createdAt: '2026-07-06T00:00:02.000Z',
+      ...input,
+    }));
+    const service = new BillingService(repository as never);
+
+    await service.reconcile(
+      '55555555-5555-4555-8555-555555555555',
+      {
+        comparisonId: comparisonResult.comparisonId,
+      },
+      identity,
+    );
+
+    expect(repository.saveInvoiceReconciliation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        invoicedTotalUsd: 98,
+        varianceUsd: -2,
+        variancePercent: -2,
+        status: 'matched',
+        evidence: expect.objectContaining({
+          invoiceAdjustmentSummary: expect.objectContaining({
+            grossInvoiceTotalUsd: 98,
+            estimateComparableUsageCostUsd: 100,
+            adjustmentCostUsd: -2,
+            usageLineItemCount: 2,
+            adjustmentLineItemCount: 3,
+            commitmentLineItemCount: 4,
+            commitmentNetCostUsd: -2,
+            estimateComparableVarianceUsd: 0,
+            estimateComparableVariancePercent: 0,
+            categories: expect.arrayContaining([
+              expect.objectContaining({ category: 'usage', rowCount: 1, totalCostUsd: 100 }),
+              expect.objectContaining({
+                category: 'commitment-covered-usage',
+                rowCount: 1,
+                totalCostUsd: 0,
+              }),
+              expect.objectContaining({
+                category: 'commitment-discount',
+                rowCount: 1,
+                totalCostUsd: -25,
+              }),
+              expect.objectContaining({
+                category: 'commitment-fee',
+                rowCount: 1,
+                totalCostUsd: 20,
+              }),
+              expect.objectContaining({
+                category: 'commitment-amortization',
+                rowCount: 1,
+                totalCostUsd: 3,
+              }),
+            ]),
+          }),
+          invoiceMatchSummary: expect.objectContaining({
+            caveats: expect.arrayContaining([
+              '4 commitment, reservation, or savings-plan row(s) were classified separately; amortization remains provider-specific evidence.',
+              '3 non-usage invoice adjustment row(s) were separated from estimate-comparable usage.',
+            ]),
+          }),
+        }),
+      }),
+    );
+  });
+
   it('blocks reconciliation across active team boundaries', async () => {
     const repository = repositoryMock();
     repository.getBillingImport.mockResolvedValue({
@@ -1681,7 +1789,7 @@ function invoiceLineItem(serviceName: string, skuId: string, costUsd: number, ca
         missingRecommendedFields: [],
         invoiceAdjustmentClassification: {
           category,
-          isAdjustment: category !== 'usage',
+          isAdjustment: category !== 'usage' && category !== 'commitment-covered-usage',
           reason:
             category === 'usage'
               ? 'row appears to be estimate-comparable usage'

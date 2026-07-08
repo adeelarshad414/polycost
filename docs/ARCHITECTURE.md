@@ -67,6 +67,9 @@ Pricing evidence is intentionally first-class:
   support, marketplace/private-offer charges, refunds, fees, and unknown adjustments
   so reconciliation can report usage-comparable variance without burying invoice
   adjustments inside the same number
+- provider commitment rows such as Savings Plans, reservations, committed-use
+  discounts, sustained-use discounts, commitment fees, and unused/amortized
+  commitment costs are classified separately from generic invoice adjustments
 - exports carry methodology and data-freshness context
 
 This supports decision-grade traceability. It is not yet invoice-grade billing.
