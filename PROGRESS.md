@@ -125,6 +125,7 @@ say so explicitly rather than marking it done.
 | Phase 2.33 - Invoice control packet validation          | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.34 - Invoice evidence packet export             | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.35 - Invoice evidence packet integrity          | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.36 - Invoice evidence packet verifier CLI       | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4627,6 +4628,40 @@ Status: implemented and verified locally on 2026-07-08.
   it is not an external notarization service, provider-authenticated invoice
   rendering, private contract/legal validation, or full invoice-grade billing
   coverage.
+
+## Phase 2.36 — Invoice evidence packet verifier CLI
+
+Status: implemented and verified locally on 2026-07-08.
+
+- Added `scripts/invoice-evidence-packet-verifier.mjs` and npm commands:
+  `npm run invoice:evidence:verify -- <packet.json>` and
+  `npm run invoice:evidence:verify:fixture`, plus
+  `npm run invoice:evidence:verify:smoke`.
+- The verifier recomputes the `stable-json:v1` SHA-256 digest over the packet payload
+  excluding the integrity block, validates payload byte length, subject IDs,
+  artifact/control counts, caveat/disclaimer counts, schema version, digest
+  algorithm, and generated timestamp, and exits non-zero for tampered packets.
+- Added a committed valid packet fixture plus
+  `npm run invoice:evidence:verify:smoke`, which verifies the valid fixture and a
+  deliberately tampered temp copy. The smoke is wired into `npm run check` so the
+  handoff verifier cannot silently drift.
+- Verification:
+  `npm run invoice:evidence:verify -- --help`, `npm run invoice:evidence:verify -- --version`,
+  and `npm run invoice:evidence:verify:fixture -- --json` passed. A tampered temp
+  packet smoke test changed `reconciliation.invoicedTotalUsd` and confirmed the
+  verifier rejects it with a digest mismatch. `npm run invoice:evidence:verify:smoke`
+  passed.
+- Full `npm run check` passed with the verifier smoke in the regression floor: API
+  55 suites / 465 tests, web 11 suites / 147 tests, graph validation 320 nodes / 320
+  edges, pricing coverage, progress verification, QA/security suppression hygiene,
+  DB, DevOps, cloud, release, handover, and provider-credential gates green.
+  `npm run impeccable` was skipped by design because the repo targets Node 20 and
+  the optional tool requires Node 24; DB validation skipped live
+  `schema_migrations` inspection because the local Postgres container was not
+  running.
+- Remaining caveat: this verifies exported packet integrity locally after download,
+  but it is not external notarization, provider invoice rendering, private
+  contract/legal validation, or provider-authenticated invoice-of-record validation.
 
 ## Deviations from spec log
 

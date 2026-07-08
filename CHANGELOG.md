@@ -99,6 +99,9 @@ once tagged releases begin.
   stable-JSON canonicalization metadata, SHA-256 payload digest, byte length,
   subject IDs, artifact counts, caveat/disclaimer counts, and digest-aware workspace
   download filenames/notices.
+- Invoice evidence packet verifier CLI with a committed valid fixture, tamper smoke,
+  and full-check gate, so reviewers can recompute exported packet digests and detect
+  tampering with `npm run invoice:evidence:verify -- <packet.json>`.
 - Invoice artifact storage readiness and retention enforcement foundation, including
   production-bound config guards for external object storage/KMS/webhook scanning,
   strict credential-check coverage, signed scanner webhook integration, and admin
