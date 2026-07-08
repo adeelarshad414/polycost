@@ -771,6 +771,94 @@ export interface InvoiceArtifactRetentionEnforcementResult {
   deleted: number;
 }
 
+export type InvoiceEvidencePacketStatus = 'empty' | 'blocked' | 'review-ready';
+
+export interface InvoiceEvidencePacketArtifact {
+  id: string;
+  provider: ProviderId;
+  type: InvoiceGradeArtifactType;
+  displayName: string;
+  reference: string;
+  verificationStatus: 'registered' | 'verified' | 'rejected';
+  registeredAt: string;
+  stored: boolean;
+  reviewed: boolean;
+  invoiceControlValidationStatus: InvoiceControlValidationStatus;
+  sha256?: string;
+  verifiedSha256?: string;
+  controlTotalUsd?: number;
+  verificationControlTotalUsd?: number;
+  invoiceControlTotalDeltaUsd?: number;
+  invoiceControlImportDeltaUsd?: number;
+  invoiceControlPeriodMatched?: boolean;
+  storedBlob?: {
+    storageStatus: 'stored';
+    storageMode: InvoiceArtifactStorageBackend;
+    fileName: string;
+    mimeType: string;
+    contentSha256: string;
+    contentSizeBytes: number;
+    uploadedAt: string;
+    uploadedByAccountId?: string;
+    legalHoldUpdatedAt?: string;
+    legalHoldUpdatedByAccountId?: string;
+    legalHoldReason?: string;
+    governance?: InvoiceArtifactBlobGovernance;
+  };
+  reviewStatus?: InvoiceArtifactReviewStatus;
+  policyExceptionStatus?: InvoiceArtifactPolicyExceptionStatus;
+}
+
+export interface InvoiceEvidencePacketResponse {
+  packetVersion: 'invoice-evidence-packet/v1';
+  packetStatus: InvoiceEvidencePacketStatus;
+  generatedAt: string;
+  reconciliation: Pick<
+    InvoiceReconciliationRecord,
+    | 'id'
+    | 'importRunId'
+    | 'comparisonId'
+    | 'provider'
+    | 'estimatedTotalUsd'
+    | 'invoicedTotalUsd'
+    | 'varianceUsd'
+    | 'variancePercent'
+    | 'status'
+    | 'createdAt'
+  >;
+  importRun: Pick<
+    BillingImportResponse['importRun'],
+    | 'id'
+    | 'provider'
+    | 'sourceType'
+    | 'billingPeriodStart'
+    | 'billingPeriodEnd'
+    | 'originalFileSha256'
+    | 'rowsAccepted'
+    | 'rowsRejected'
+    | 'totalCostUsd'
+    | 'createdAt'
+  >;
+  readiness: Record<string, unknown>;
+  matchSummary: Record<string, unknown>;
+  artifactRegister: Record<string, unknown>;
+  artifacts: InvoiceEvidencePacketArtifact[];
+  controls: {
+    registeredCount: number;
+    verifiedCount: number;
+    storedCount: number;
+    reviewApprovedCount: number;
+    policyExceptionApprovedCount: number;
+    policyExceptionExpiredCount: number;
+    invoiceControlMatchedCount: number;
+    invoiceControlVarianceWarningCount: number;
+    invoiceControlMismatchCount: number;
+    invoiceControlNotRunCount: number;
+  };
+  caveats: string[];
+  disclaimers: string[];
+}
+
 export interface InvoiceArtifactBlobRecord extends InvoiceArtifactBlobGovernance {
   id: string;
   reconciliationId: string;

@@ -3247,6 +3247,33 @@ function WorkspaceControlCenter({
     }
   }
 
+  async function handleDownloadInvoiceEvidencePacket() {
+    if (!token || billingAccessMessage || !reconciliation) {
+      onError(
+        billingAccessMessage ??
+          'Run an estimate-vs-actual reconciliation before downloading an evidence packet.',
+      );
+      return;
+    }
+
+    setWorkspaceBusy('billing-evidence-packet');
+    onError(null);
+
+    try {
+      const packet = await client.getInvoiceEvidencePacket(reconciliation.id, token);
+
+      downloadBlob(
+        new Blob([JSON.stringify(packet, null, 2)], { type: 'application/json' }),
+        `polycost-invoice-evidence-${reconciliation.id.slice(0, 8)}.json`,
+      );
+      onNotice(`Invoice evidence packet downloaded (${packet.packetStatus.replace('-', ' ')}).`);
+    } catch (packetError) {
+      onError(formatApiError(packetError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
   return (
     <section className="workspace-control-center" id="workspace" aria-label="Workspace controls">
       <div className="workspace-control-heading">
@@ -4039,6 +4066,18 @@ function WorkspaceControlCenter({
                     </small>
                   ) : null}
                   <small>{reconciliationSummary.artifactPrimaryCaveat}</small>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="compact"
+                    loading={workspaceBusy === 'billing-evidence-packet'}
+                    loadingLabel="Preparing packet..."
+                    disabled={Boolean(billingAccessMessage)}
+                    onClick={handleDownloadInvoiceEvidencePacket}
+                  >
+                    <CompareIcon />
+                    Download evidence packet
+                  </Button>
                   <Button
                     type="button"
                     variant="secondary"

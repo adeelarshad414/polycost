@@ -933,6 +933,77 @@ describe('api client', () => {
     );
   });
 
+  it('wires invoice evidence packet route', async () => {
+    const fetchMock = jest.fn().mockResolvedValueOnce(
+      jsonResponse({
+        packetVersion: 'invoice-evidence-packet/v1',
+        packetStatus: 'blocked',
+        generatedAt: '2026-07-08T00:00:00.000Z',
+        reconciliation: {
+          id: 'reconciliation-1',
+          importRunId: 'import-1',
+          comparisonId: 'comparison-1',
+          provider: 'aws',
+          estimatedTotalUsd: 100,
+          invoicedTotalUsd: 107,
+          varianceUsd: 7,
+          variancePercent: 7,
+          status: 'variance-warning',
+          createdAt: '2026-07-06T00:00:02.000Z',
+        },
+        importRun: {
+          id: 'import-1',
+          provider: 'aws',
+          sourceType: 'aws-cur',
+          billingPeriodStart: '2026-06-01',
+          billingPeriodEnd: '2026-06-30',
+          originalFileSha256: 'a'.repeat(64),
+          rowsAccepted: 1,
+          rowsRejected: 0,
+          totalCostUsd: 107,
+          createdAt: '2026-07-06T00:00:00.000Z',
+        },
+        readiness: {},
+        matchSummary: {},
+        artifactRegister: {},
+        artifacts: [],
+        controls: {
+          registeredCount: 0,
+          verifiedCount: 0,
+          storedCount: 0,
+          reviewApprovedCount: 0,
+          policyExceptionApprovedCount: 0,
+          policyExceptionExpiredCount: 0,
+          invoiceControlMatchedCount: 0,
+          invoiceControlVarianceWarningCount: 0,
+          invoiceControlMismatchCount: 0,
+          invoiceControlNotRunCount: 0,
+        },
+        caveats: [],
+        disclaimers: ['Metadata-only packet.'],
+      }),
+    );
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(
+      client.getInvoiceEvidencePacket('reconciliation-1', 'session-token'),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        packetVersion: 'invoice-evidence-packet/v1',
+        packetStatus: 'blocked',
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/billing/reconciliations/reconciliation-1/evidence-packet',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer session-token',
+        }),
+      }),
+    );
+  });
+
   it('wires invoice artifact review queue and status routes', async () => {
     const fetchMock = jest
       .fn()

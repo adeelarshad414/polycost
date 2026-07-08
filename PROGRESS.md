@@ -123,6 +123,7 @@ say so explicitly rather than marking it done.
 | Phase 2.31 - Invoice artifact review workflow           | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.32 - Artifact policy exception lifecycle        | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.33 - Invoice control packet validation          | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.34 - Invoice evidence packet export             | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4562,6 +4563,36 @@ Status: implemented and verified locally on 2026-07-08.
   actuals and reconciliation totals. It is not provider invoice rendering, private
   contract/legal validation, provider-authenticated invoice-of-record validation, or
   full invoice-grade billing coverage.
+
+## Phase 2.34 — Invoice evidence packet export
+
+Status: implemented and verified locally on 2026-07-08.
+
+- Added an Owner/Admin evidence-packet API:
+  `GET /api/v1/billing/reconciliations/:id/evidence-packet`.
+- The packet is metadata-only and intentionally excludes raw invoice artifact bytes.
+  It includes reconciliation/import metadata, invoice-grade readiness, match summary,
+  artifact register evidence, sanitized artifact metadata, aggregate control counts,
+  caveats, and explicit invoice-grade disclaimers.
+- Added workspace UI download support for `polycost-invoice-evidence-*.json` from
+  the billing reconciliation panel without exposing stored artifact bytes.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/api/api-database.repository.spec.ts`
+  passed 75/75 across 2 suites. `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx src/api-client.spec.ts`
+  passed 90/90 across 2 suites.
+- `npm run ci:lint` passed with zero ESLint/typecheck errors or warnings.
+- `npm run test:production-readiness` passed with API 14 suites / 198 tests and web
+  2 suites / 90 tests.
+- Full `npm run check` passed with API 55 suites / 465 tests, web 11 suites / 147
+  tests, graph validation 320 nodes / 320 edges, pricing coverage, progress
+  verification, QA/security suppression hygiene, DB, DevOps, cloud, release,
+  handover, and provider-credential gates green. `npm run impeccable` was skipped
+  by design because the repo targets Node 20 and the optional tool requires Node 24;
+  DB validation skipped live `schema_migrations` inspection because the local
+  Postgres container was not running.
+- Remaining caveat: this is an evidence handoff/export layer, not provider invoice
+  rendering, private contract/legal validation, provider-authenticated invoice-of-
+  record validation, or full invoice-grade billing coverage.
 
 ## Deviations from spec log
 

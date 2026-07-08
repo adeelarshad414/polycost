@@ -737,6 +737,15 @@ describe('App', () => {
       'Invoice control: matched · reconciliation delta $0.00 · import delta $0.00 · period matched',
     );
 
+    await click(buttonByText(container, 'Download evidence packet'));
+    await settleAsyncEffects();
+
+    expect(client.getInvoiceEvidencePacket).toHaveBeenCalledWith(
+      '66666666-6666-4666-8666-666666666666',
+      'session-token',
+    );
+    expect(window.URL.createObjectURL).toHaveBeenLastCalledWith(expect.any(Blob));
+
     unmount();
   });
 
@@ -4899,6 +4908,80 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
         reviewer: 'risk-review@example.com',
       },
     ]),
+    getInvoiceEvidencePacket: jest.fn(async () => ({
+      packetVersion: 'invoice-evidence-packet/v1' as const,
+      packetStatus: 'blocked' as const,
+      generatedAt: '2026-07-08T00:00:00.000Z',
+      reconciliation: {
+        id: '66666666-6666-4666-8666-666666666666',
+        importRunId: '55555555-5555-4555-8555-555555555555',
+        comparisonId: comparisonResult.comparisonId,
+        provider: 'aws' as const,
+        estimatedTotalUsd: 100,
+        invoicedTotalUsd: 107,
+        varianceUsd: 7,
+        variancePercent: 7,
+        status: 'variance-warning' as const,
+        createdAt: '2026-07-06T00:00:02.000Z',
+      },
+      importRun: {
+        id: '55555555-5555-4555-8555-555555555555',
+        provider: 'aws' as const,
+        sourceType: 'aws-cur' as const,
+        billingPeriodStart: '2026-06-01',
+        billingPeriodEnd: '2026-06-30',
+        originalFileSha256: 'a'.repeat(64),
+        rowsAccepted: 1,
+        rowsRejected: 0,
+        totalCostUsd: 107,
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+      readiness: {
+        status: 'invoice-grade-blocked',
+      },
+      matchSummary: {
+        readiness: 'reconciled-evidence-ready',
+      },
+      artifactRegister: {
+        registeredCount: 1,
+        verifiedCount: 1,
+      },
+      artifacts: [
+        {
+          id: 'artifact-1',
+          provider: 'aws' as const,
+          type: 'provider-invoice' as const,
+          displayName: 'AWS invoice control packet',
+          reference: 'demo://invoice-artifacts/66666666-6666-4666-8666-666666666666',
+          verificationStatus: 'verified' as const,
+          registeredAt: '2026-07-06T00:00:03.000Z',
+          stored: true,
+          reviewed: true,
+          invoiceControlValidationStatus: 'matched' as const,
+          controlTotalUsd: 107,
+          verificationControlTotalUsd: 107,
+          invoiceControlTotalDeltaUsd: 0,
+          invoiceControlImportDeltaUsd: 0,
+          invoiceControlPeriodMatched: true,
+        },
+      ],
+      controls: {
+        registeredCount: 1,
+        verifiedCount: 1,
+        storedCount: 1,
+        reviewApprovedCount: 1,
+        policyExceptionApprovedCount: 1,
+        policyExceptionExpiredCount: 0,
+        invoiceControlMatchedCount: 1,
+        invoiceControlVarianceWarningCount: 0,
+        invoiceControlMismatchCount: 0,
+        invoiceControlNotRunCount: 0,
+      },
+      caveats: ['Provider invoice rendering remains outside PolyCost.'],
+      disclaimers: [
+        'This packet is metadata-only and intentionally excludes raw invoice artifact bytes.',
+      ],
+    })),
     registerInvoiceGradeArtifact: jest.fn(async () => ({
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',

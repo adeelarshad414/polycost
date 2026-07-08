@@ -22,6 +22,9 @@ import {
   InvoiceArtifactStorageReadiness,
   InvoiceControlValidationInput,
   InvoiceControlValidationStatus,
+  InvoiceEvidencePacketArtifact,
+  InvoiceEvidencePacketResponse,
+  InvoiceEvidencePacketStatus,
   BillingImportInput,
   BillingImportResponse,
   BillingProviderExportInput,
@@ -374,6 +377,30 @@ export class BillingService {
         invoiceArtifactPolicyExceptionQueueItem(reconciliation, artifact),
       ),
     );
+  }
+
+  async getInvoiceEvidencePacket(
+    reconciliationId: string,
+    identity: AuthIdentity,
+  ): Promise<InvoiceEvidencePacketResponse> {
+    assertBillingAdmin(identity);
+    const reconciliation = await this.repository.getInvoiceReconciliation(reconciliationId);
+
+    if (!reconciliation) {
+      throw new ApiNotFoundError(`Invoice reconciliation ${reconciliationId} was not found`);
+    }
+
+    const importRun = await this.repository.getBillingImport(reconciliation.importRunId);
+
+    if (!importRun) {
+      throw new ApiNotFoundError(
+        `Billing import ${reconciliation.importRunId} was not found for reconciliation ${reconciliationId}`,
+      );
+    }
+
+    assertTeamAccess(importRun.teamId, identity);
+
+    return invoiceEvidencePacket(reconciliation, importRun);
   }
 
   async registerInvoiceGradeArtifact(
@@ -3232,6 +3259,137 @@ function replaceInvoiceGradeArtifactEvidence(
     ),
     invoiceGradeArtifactRegister: register,
   };
+}
+
+function invoiceEvidencePacket(
+  reconciliation: InvoiceReconciliationRecord,
+  importRun: BillingImportResponse['importRun'],
+): InvoiceEvidencePacketResponse {
+  const readiness = recordValue(reconciliation.evidence.invoiceGradeReadiness);
+  const matchSummary = recordValue(reconciliation.evidence.invoiceMatchSummary);
+  const artifactRegister = recordValue(reconciliation.evidence.invoiceGradeArtifactRegister);
+  const artifacts = invoiceGradeArtifactsFromEvidence(reconciliation.evidence).map((artifact) =>
+    invoiceEvidencePacketArtifact(artifact),
+  );
+  const controls = {
+    registeredCount: numberFromUnknown(artifactRegister.registeredCount),
+    verifiedCount: numberFromUnknown(artifactRegister.verifiedCount),
+    storedCount: artifacts.filter((artifact) => artifact.stored).length,
+    reviewApprovedCount: numberFromUnknown(artifactRegister.reviewApprovedCount),
+    policyExceptionApprovedCount: numberFromUnknown(artifactRegister.policyExceptionApprovedCount),
+    policyExceptionExpiredCount: numberFromUnknown(artifactRegister.policyExceptionExpiredCount),
+    invoiceControlMatchedCount: numberFromUnknown(artifactRegister.invoiceControlMatchedCount),
+    invoiceControlVarianceWarningCount: numberFromUnknown(
+      artifactRegister.invoiceControlVarianceWarningCount,
+    ),
+    invoiceControlMismatchCount: numberFromUnknown(artifactRegister.invoiceControlMismatchCount),
+    invoiceControlNotRunCount: numberFromUnknown(artifactRegister.invoiceControlNotRunCount),
+  };
+
+  return {
+    packetVersion: 'invoice-evidence-packet/v1',
+    packetStatus: invoiceEvidencePacketStatus(artifacts, readiness, controls),
+    generatedAt: new Date().toISOString(),
+    reconciliation: {
+      id: reconciliation.id,
+      importRunId: reconciliation.importRunId,
+      comparisonId: reconciliation.comparisonId,
+      provider: reconciliation.provider,
+      estimatedTotalUsd: reconciliation.estimatedTotalUsd,
+      invoicedTotalUsd: reconciliation.invoicedTotalUsd,
+      varianceUsd: reconciliation.varianceUsd,
+      variancePercent: reconciliation.variancePercent,
+      status: reconciliation.status,
+      createdAt: reconciliation.createdAt,
+    },
+    importRun: {
+      id: importRun.id,
+      provider: importRun.provider,
+      sourceType: importRun.sourceType,
+      billingPeriodStart: importRun.billingPeriodStart,
+      billingPeriodEnd: importRun.billingPeriodEnd,
+      originalFileSha256: importRun.originalFileSha256,
+      rowsAccepted: importRun.rowsAccepted,
+      rowsRejected: importRun.rowsRejected,
+      totalCostUsd: importRun.totalCostUsd,
+      createdAt: importRun.createdAt,
+    },
+    readiness,
+    matchSummary,
+    artifactRegister,
+    artifacts,
+    controls,
+    caveats: [
+      ...new Set([...stringArray(matchSummary.caveats), ...stringArray(artifactRegister.caveats)]),
+    ],
+    disclaimers: [
+      'This packet is metadata-only and intentionally excludes raw invoice artifact bytes.',
+      'Invoice control validation compares stored artifact totals with imported actuals and reconciliation totals; it is not provider-authenticated invoice rendering.',
+      'Full invoice-grade billing still requires provider invoice-of-record review, private contract validation, tax/legal review, and external retention controls.',
+    ],
+  };
+}
+
+function invoiceEvidencePacketArtifact(
+  artifact: InvoiceGradeArtifactRecord,
+): InvoiceEvidencePacketArtifact {
+  const reviewStatus = artifact.reviewStatus;
+  const policyExceptionStatus = artifactPolicyExceptionStatus(artifact);
+
+  return {
+    id: artifact.id,
+    provider: artifact.provider,
+    type: artifact.type,
+    displayName: artifact.displayName,
+    reference: artifact.reference,
+    verificationStatus: artifact.verificationStatus,
+    registeredAt: artifact.registeredAt,
+    stored: Boolean(artifact.storedBlob),
+    reviewed: reviewStatus === 'approved',
+    invoiceControlValidationStatus: artifactInvoiceControlValidationStatus(artifact),
+    ...(artifact.sha256 ? { sha256: artifact.sha256 } : {}),
+    ...(artifact.verifiedSha256 ? { verifiedSha256: artifact.verifiedSha256 } : {}),
+    ...(artifact.controlTotalUsd !== undefined
+      ? { controlTotalUsd: artifact.controlTotalUsd }
+      : {}),
+    ...(artifact.verificationControlTotalUsd !== undefined
+      ? { verificationControlTotalUsd: artifact.verificationControlTotalUsd }
+      : {}),
+    ...(artifact.invoiceControlTotalDeltaUsd !== undefined
+      ? { invoiceControlTotalDeltaUsd: artifact.invoiceControlTotalDeltaUsd }
+      : {}),
+    ...(artifact.invoiceControlImportDeltaUsd !== undefined
+      ? { invoiceControlImportDeltaUsd: artifact.invoiceControlImportDeltaUsd }
+      : {}),
+    ...(artifact.invoiceControlPeriodMatched !== undefined
+      ? { invoiceControlPeriodMatched: artifact.invoiceControlPeriodMatched }
+      : {}),
+    ...(artifact.storedBlob ? { storedBlob: artifact.storedBlob } : {}),
+    ...(reviewStatus ? { reviewStatus } : {}),
+    ...(policyExceptionStatus !== 'not-requested' ? { policyExceptionStatus } : {}),
+  };
+}
+
+function invoiceEvidencePacketStatus(
+  artifacts: InvoiceEvidencePacketArtifact[],
+  readiness: Record<string, unknown>,
+  controls: InvoiceEvidencePacketResponse['controls'],
+): InvoiceEvidencePacketStatus {
+  if (artifacts.length === 0) {
+    return 'empty';
+  }
+
+  const readinessStatus = typeof readiness.status === 'string' ? readiness.status : '';
+
+  if (
+    readinessStatus === 'invoice-grade-blocked' ||
+    controls.invoiceControlMismatchCount > 0 ||
+    controls.invoiceControlMatchedCount === 0
+  ) {
+    return 'blocked';
+  }
+
+  return 'review-ready';
 }
 
 function verifiedInvoiceGradeArtifact(

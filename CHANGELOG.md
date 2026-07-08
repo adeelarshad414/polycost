@@ -91,6 +91,10 @@ once tagged releases begin.
   artifacts, comparing artifact control totals with both imported actuals and
   reconciliation totals, with match/warning/mismatch counts, audit events, and
   workspace validation controls.
+- Invoice evidence packet export for reconciliations, producing a metadata-only
+  reviewer handoff JSON with reconciliation/import metadata, readiness, match
+  summary, artifact register, sanitized artifact metadata, control counts, caveats,
+  and explicit invoice-grade disclaimers.
 - Invoice artifact storage readiness and retention enforcement foundation, including
   production-bound config guards for external object storage/KMS/webhook scanning,
   strict credential-check coverage, signed scanner webhook integration, and admin

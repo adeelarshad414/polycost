@@ -2194,6 +2194,145 @@ describe('BillingService', () => {
     );
   });
 
+  it('builds metadata-only invoice evidence packets for reconciliation review', async () => {
+    const repository = repositoryMock();
+    const reconciliationRecord = {
+      id: '66666666-6666-4666-8666-666666666666',
+      importRunId: '55555555-5555-4555-8555-555555555555',
+      comparisonId: comparisonResult.comparisonId,
+      provider: 'aws' as const,
+      estimatedTotalUsd: 100,
+      invoicedTotalUsd: 107,
+      varianceUsd: 7,
+      variancePercent: 7,
+      status: 'variance-warning' as const,
+      evidence: {
+        invoiceGradeReadiness: {
+          status: 'invoice-grade-review-ready',
+          presentCount: 9,
+          missingCount: 0,
+          partialCount: 0,
+          blockers: [],
+        },
+        invoiceMatchSummary: {
+          readiness: 'audit-ready-with-caveats',
+          caveats: ['Provider invoice rendering remains outside PolyCost.'],
+        },
+        invoiceGradeArtifactRegister: {
+          status: 'registered-with-verified-artifacts',
+          provider: 'aws',
+          registeredCount: 1,
+          verifiedCount: 1,
+          reviewApprovedCount: 1,
+          policyExceptionApprovedCount: 0,
+          policyExceptionExpiredCount: 0,
+          invoiceControlMatchedCount: 1,
+          invoiceControlVarianceWarningCount: 0,
+          invoiceControlMismatchCount: 0,
+          invoiceControlNotRunCount: 0,
+          caveats: ['Stored artifacts are metadata-only in reconciliation evidence.'],
+          artifacts: [
+            {
+              id: 'artifact-1',
+              provider: 'aws',
+              type: 'provider-invoice',
+              displayName: 'June AWS invoice control packet',
+              reference: 's3://billing-audit/2026-06/aws-invoice.pdf',
+              sha256: 'b'.repeat(64),
+              controlTotalUsd: 107,
+              verificationControlTotalUsd: 107,
+              verificationStatus: 'verified',
+              reviewStatus: 'approved',
+              invoiceControlValidationStatus: 'matched',
+              invoiceControlTotalDeltaUsd: 0,
+              invoiceControlImportDeltaUsd: 0,
+              invoiceControlPeriodMatched: true,
+              registeredAt: '2026-07-06T00:00:03.000Z',
+              registeredByAccountId: identity.accountId,
+              verifiedAt: '2026-07-06T00:00:04.000Z',
+              verifiedByAccountId: identity.accountId,
+              storedBlob: {
+                storageStatus: 'stored',
+                storageMode: 'database-bytea',
+                fileName: 'aws-invoice-control.txt',
+                mimeType: 'text/plain',
+                contentSha256: 'd'.repeat(64),
+                contentSizeBytes: 210,
+                uploadedAt: '2026-07-06T00:00:05.000Z',
+                uploadedByAccountId: identity.accountId,
+              },
+            },
+          ],
+        },
+      },
+      createdAt: '2026-07-06T00:00:02.000Z',
+    };
+    repository.getInvoiceReconciliation.mockResolvedValue(reconciliationRecord);
+    repository.getBillingImport.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      teamId: identity.teamId,
+      provider: 'aws',
+      sourceType: 'aws-cur',
+      status: 'completed',
+      billingPeriodStart: '2026-06-01',
+      billingPeriodEnd: '2026-06-30',
+      originalFileSha256: 'a'.repeat(64),
+      rowsReceived: 1,
+      rowsAccepted: 1,
+      rowsRejected: 0,
+      totalCostUsd: 107,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    });
+    const service = new BillingService(repository as never);
+
+    const packet = await service.getInvoiceEvidencePacket(
+      '66666666-6666-4666-8666-666666666666',
+      identity,
+    );
+
+    expect(packet).toEqual(
+      expect.objectContaining({
+        packetVersion: 'invoice-evidence-packet/v1',
+        packetStatus: 'review-ready',
+        reconciliation: expect.objectContaining({
+          id: '66666666-6666-4666-8666-666666666666',
+          invoicedTotalUsd: 107,
+        }),
+        importRun: expect.objectContaining({
+          totalCostUsd: 107,
+          originalFileSha256: 'a'.repeat(64),
+        }),
+        controls: expect.objectContaining({
+          registeredCount: 1,
+          verifiedCount: 1,
+          storedCount: 1,
+          reviewApprovedCount: 1,
+          invoiceControlMatchedCount: 1,
+          invoiceControlMismatchCount: 0,
+        }),
+        artifacts: [
+          expect.objectContaining({
+            id: 'artifact-1',
+            stored: true,
+            reviewed: true,
+            invoiceControlValidationStatus: 'matched',
+            storedBlob: expect.objectContaining({
+              contentSha256: 'd'.repeat(64),
+              contentSizeBytes: 210,
+            }),
+          }),
+        ],
+      }),
+    );
+    expect(packet.disclaimers).toEqual(
+      expect.arrayContaining([
+        'This packet is metadata-only and intentionally excludes raw invoice artifact bytes.',
+      ]),
+    );
+    expect(JSON.stringify(packet)).not.toContain('contentBase64');
+    expect(JSON.stringify(packet)).not.toContain('aW52b2ljZQ==');
+  });
+
   it('stores invoice artifact blobs with checksum metadata without exposing bytes in evidence', async () => {
     const repository = repositoryMock();
     const artifactContent = [
@@ -3895,6 +4034,10 @@ describe('BillingService', () => {
         '55555555-5555-4555-8555-555555555555',
         memberIdentity,
       ),
+      'Team admin access is required for billing reconciliation',
+    );
+    await expectForbidden(
+      service.getInvoiceEvidencePacket('66666666-6666-4666-8666-666666666666', memberIdentity),
       'Team admin access is required for billing reconciliation',
     );
     await expectForbidden(
