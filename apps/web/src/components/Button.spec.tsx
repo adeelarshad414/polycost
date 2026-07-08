@@ -13,6 +13,9 @@ describe('Button system', () => {
     expect(buttonByText(container, 'Secondary').className).toContain('pc-button-secondary');
     expect(buttonByText(container, 'Ghost').className).toContain('pc-button-ghost');
     expect(buttonByText(container, 'Destructive').className).toContain('pc-button-destructive');
+    expect(buttonByText(container, 'Remove').className).toContain('pc-button-destructive-quiet');
+    expect(buttonByText(container, 'Link action').className).toContain('pc-button-link');
+    expect(buttonByLabel(container, 'Close preview').className).toContain('pc-button-icon');
     expect(buttonByText(container, 'Loading').getAttribute('aria-busy')).toBe('true');
     expect(buttonByText(container, 'Loading').disabled).toBe(false);
     expect(buttonByText(container, 'Loading').querySelector('.animate-spin')).toBeInstanceOf(
@@ -52,6 +55,18 @@ function render(element: React.ReactElement): {
 function buttonByText(container: HTMLElement, label: string): HTMLButtonElement {
   const button = Array.from(container.querySelectorAll('button')).find(
     (candidate) => candidate.textContent === label,
+  );
+
+  if (!(button instanceof HTMLButtonElement)) {
+    throw new Error(`Button not found: ${label}`);
+  }
+
+  return button;
+}
+
+function buttonByLabel(container: HTMLElement, label: string): HTMLButtonElement {
+  const button = Array.from(container.querySelectorAll('button')).find(
+    (candidate) => candidate.getAttribute('aria-label') === label,
   );
 
   if (!(button instanceof HTMLButtonElement)) {

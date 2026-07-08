@@ -15,6 +15,9 @@ const requiredFiles = [
   'GOVERNANCE.md',
   'CHANGELOG.md',
   'DUMMY-VALUES.md',
+  'OVERLAY-INVENTORY.md',
+  'BUTTON-INVENTORY.md',
+  'OVERLAY-AUDIT-REPORT.md',
   'RELEASE-CHECKLIST.md',
   'LOADING-INVENTORY.md',
   'LOADING-AUDIT-REPORT.md',
@@ -57,11 +60,17 @@ if (!packageJson.scripts?.['pricing:logic:coverage']) {
 if (!packageJson.scripts?.['theme:hex:check']) {
   failures.push('package.json is missing theme:hex:check');
 }
+if (!packageJson.scripts?.['overlay:check']) {
+  failures.push('package.json is missing overlay:check');
+}
 if (!packageJson.scripts?.['ci:unit']?.includes('npm run pricing:logic:coverage')) {
   failures.push('package.json ci:unit script must include npm run pricing:logic:coverage');
 }
 if (!packageJson.scripts?.check?.includes('npm run theme:hex:check')) {
   failures.push('package.json check script must include npm run theme:hex:check');
+}
+if (!packageJson.scripts?.check?.includes('npm run overlay:check')) {
+  failures.push('package.json check script must include npm run overlay:check');
 }
 if (!packageJson.scripts?.check?.includes('npm run provider:credentials:check')) {
   failures.push('package.json check script must include npm run provider:credentials:check');
@@ -136,6 +145,24 @@ await assertFileContains('RELEASE-CHECKLIST.md', [
   ['unit coverage command', 'npm run ci:unit'],
   ['pricing logic coverage command', 'npm run pricing:logic:coverage'],
   ['Node 24 impeccable decision', 'On Node 24, run `npm run impeccable`'],
+  ['overlay/button guard command', 'npm run overlay:check'],
+]);
+
+await assertFileContains('OVERLAY-AUDIT-REPORT.md', [
+  ['finding register', '## Findings'],
+  ['blocked section', '## Blocked'],
+  ['human decision gate', '## HUMAN_DECISION_GATE Register'],
+  ['keyboard evidence', 'Keyboard/focus verification'],
+]);
+
+await assertFileContains('OVERLAY-INVENTORY.md', [
+  ['canonical overlay primitive', 'OverlayPrimitives'],
+  ['window confirm status', 'window.confirm/window.alert'],
+]);
+
+await assertFileContains('BUTTON-INVENTORY.md', [
+  ['shared button component', 'Button.tsx'],
+  ['primary convention', 'Primary-button convention'],
 ]);
 
 await assertFileContains('docs/development/open-source-readiness.md', [

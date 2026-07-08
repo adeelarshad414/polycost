@@ -1,4 +1,5 @@
 import { Component, ReactNode } from 'react';
+import { Button } from './Button';
 
 interface AppErrorBoundaryProps {
   children: ReactNode;
@@ -37,9 +38,9 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
             Refresh the page to restore the comparison workspace. If this repeats, restart the web
             app and API service before rerunning the demo.
           </p>
-          <button type="button" onClick={() => window.location.reload()}>
+          <Button type="button" variant="secondary" onClick={() => window.location.reload()}>
             Reload workspace
-          </button>
+          </Button>
         </section>
       </main>
     );

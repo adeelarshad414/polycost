@@ -81,8 +81,10 @@ export function LandingPage({
         </nav>
 
         <div className="landing-actions">
-          <button
+          <Button
             type="button"
+            variant="icon"
+            size="compact"
             className="landing-menu-button"
             aria-label="Toggle navigation menu"
             aria-expanded={isMenuOpen}
@@ -90,7 +92,7 @@ export function LandingPage({
             onClick={() => setIsMenuOpen((open) => !open)}
           >
             <MenuIcon />
-          </button>
+          </Button>
           <Button
             type="button"
             variant="secondary"

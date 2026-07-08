@@ -245,6 +245,7 @@ Security and quality checks:
 npm run loading:check
 npm run security:audit
 npm run provider:credentials:check
+npm run overlay:check
 npm run release:check
 npm run qa
 npm run check
@@ -295,6 +296,8 @@ before switching `USE_MOCK_PROVIDERS=false`.
   UX audit and evidence.
 - `DUMMY-VALUES.md` lists development-only placeholders and production guardrails.
 - `PROGRESS.md` tracks project progress.
+- `OVERLAY-INVENTORY.md`, `BUTTON-INVENTORY.md`, and
+  `OVERLAY-AUDIT-REPORT.md` document the UI interruption and action system audit.
 - `CONTRIBUTING.md` explains how to contribute safely.
 - `SECURITY.md` explains private vulnerability reporting.
 - `SUPPORT.md` explains community support scope.

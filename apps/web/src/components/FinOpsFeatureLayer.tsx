@@ -871,14 +871,16 @@ export function FinOpsFeatureLayer({
                 </strong>
                 {shareAnalyticsError ? ` · analytics unavailable: ${shareAnalyticsError}` : ''}
               </span>
-              <button
+              <Button
                 type="button"
-                className="self-start text-action-primary underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:text-text-muted sm:self-auto"
+                variant="link"
+                size="compact"
+                className="self-start sm:self-auto"
                 disabled={isLoadingShareAnalytics}
                 onClick={() => void refreshShareAnalytics(shareLink.token)}
               >
                 Refresh views
-              </button>
+              </Button>
             </div>
           ) : null}
           {shareError ? (
@@ -908,7 +910,7 @@ export function FinOpsFeatureLayer({
             </Button>
             <Button
               type="button"
-              variant="destructive"
+              variant="destructiveQuiet"
               disabled={!shareLink || shareStatus === 'creating'}
               loading={shareStatus === 'creating' && Boolean(shareLink)}
               loadingLabel="Revoking..."
