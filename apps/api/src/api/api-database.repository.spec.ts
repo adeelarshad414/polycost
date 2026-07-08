@@ -1668,6 +1668,24 @@ describe('ApiDatabaseRepository', () => {
         return { rows: [reconciliationRow], rowCount: 1 };
       }
 
+      if (text.includes('UPDATE invoice_reconciliation_results')) {
+        return {
+          rows: [
+            {
+              ...reconciliationRow,
+              evidence: {
+                invoiceLineItemHashes: ['b'.repeat(64)],
+                invoiceGradeArtifactRegister: {
+                  registeredCount: 1,
+                  status: 'metadata-registered-not-verified',
+                },
+              },
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+
       if (text.includes('FROM invoice_reconciliation_results')) {
         return { rows: [reconciliationRow], rowCount: 1 };
       }
@@ -1772,6 +1790,40 @@ describe('ApiDatabaseRepository', () => {
         varianceUsd: 7,
       }),
     ]);
+    await expect(
+      repository.getInvoiceReconciliation('66666666-6666-4666-8666-666666666666'),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: '66666666-6666-4666-8666-666666666666',
+        provider: 'aws',
+      }),
+    );
+    await expect(
+      repository.updateInvoiceReconciliationEvidence({
+        reconciliationId: '66666666-6666-4666-8666-666666666666',
+        evidence: {
+          invoiceLineItemHashes: ['b'.repeat(64)],
+          invoiceGradeArtifactRegister: {
+            registeredCount: 1,
+            status: 'metadata-registered-not-verified',
+          },
+        },
+        audit: {
+          teamId: '22222222-2222-4222-8222-222222222222',
+          actorAccountId: '11111111-1111-4111-8111-111111111111',
+          action: 'billing.reconciliation.artifact_registered',
+          targetType: 'billing_reconciliation',
+        },
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        evidence: expect.objectContaining({
+          invoiceGradeArtifactRegister: expect.objectContaining({
+            registeredCount: 1,
+          }),
+        }),
+      }),
+    );
 
     expect(query).toHaveBeenCalledWith('BEGIN');
     expect(query).toHaveBeenCalledWith('COMMIT');

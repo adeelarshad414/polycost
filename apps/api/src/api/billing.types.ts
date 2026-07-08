@@ -5,6 +5,18 @@ export type BillingSourceType =
 export type BillingImportStatus = 'processing' | 'completed' | 'failed';
 export type InvoiceReconciliationStatus =
   'matched' | 'variance-warning' | 'variance-critical' | 'unmatched';
+export type InvoiceGradeArtifactType =
+  | 'provider-invoice'
+  | 'provider-export-manifest'
+  | 'control-total'
+  | 'tax-invoice'
+  | 'private-pricing-agreement'
+  | 'commitment-inventory'
+  | 'commitment-amortization-schedule'
+  | 'allocation-map'
+  | 'currency-policy'
+  | 'provider-sku-map';
+export type InvoiceGradeArtifactVerificationStatus = 'registered' | 'verified' | 'rejected';
 export type InvoiceAdjustmentCategory =
   | 'usage'
   | 'credit'
@@ -54,6 +66,25 @@ export interface BillingProviderExportInput {
   encoding?: 'text' | 'base64';
   fileName?: string;
   originalFileSha256?: string;
+}
+
+export interface InvoiceGradeArtifactRegistrationInput {
+  type: InvoiceGradeArtifactType;
+  displayName: string;
+  reference: string;
+  sha256?: string;
+  controlTotalUsd?: number;
+  billingPeriodStart?: string;
+  billingPeriodEnd?: string;
+  notes?: string;
+}
+
+export interface InvoiceGradeArtifactRecord extends InvoiceGradeArtifactRegistrationInput {
+  id: string;
+  provider: ProviderId;
+  verificationStatus: InvoiceGradeArtifactVerificationStatus;
+  registeredAt: string;
+  registeredByAccountId?: string;
 }
 
 export interface BillingImportRecord {

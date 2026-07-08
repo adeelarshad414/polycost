@@ -8,7 +8,7 @@ import { NormalizedWorkloadSpec } from '../nws/nws.types';
 import { calculateEgressCost } from '../pricing-normalization/egress-tier-calculator';
 import { providerRegionForCanonicalRegion } from '../pricing-normalization/region-map';
 import { SecretsReader, SecretsService } from '../secrets/secrets.service';
-import { DataHealthResponse, PricingStatusResponse } from './api-errors';
+import { ApiNotFoundError, DataHealthResponse, PricingStatusResponse } from './api-errors';
 import {
   GeneratedReport,
   ReportExportJobRecord,
@@ -3762,6 +3762,87 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     );
 
     return result.rows.map(toInvoiceReconciliationRecord);
+  }
+
+  async getInvoiceReconciliation(
+    reconciliationId: string,
+  ): Promise<InvoiceReconciliationRecord | undefined> {
+    const result = await (
+      await this.getPool()
+    ).query<InvoiceReconciliationRow>(
+      `
+        SELECT id,
+               import_run_id,
+               comparison_id,
+               provider,
+               estimated_total_usd,
+               invoiced_total_usd,
+               variance_usd,
+               variance_percent,
+               status,
+               evidence,
+               created_at
+        FROM invoice_reconciliation_results
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [reconciliationId],
+    );
+
+    return result.rows[0] ? toInvoiceReconciliationRecord(result.rows[0]) : undefined;
+  }
+
+  async updateInvoiceReconciliationEvidence(input: {
+    reconciliationId: string;
+    evidence: Record<string, unknown>;
+    audit?: TeamAuditEventInput;
+  }): Promise<InvoiceReconciliationRecord> {
+    return this.withTransaction(async (pool) => {
+      const result = await pool.query<InvoiceReconciliationRow>(
+        `
+          UPDATE invoice_reconciliation_results
+          SET evidence = $2::jsonb
+          WHERE id = $1
+          RETURNING id,
+                    import_run_id,
+                    comparison_id,
+                    provider,
+                    estimated_total_usd,
+                    invoiced_total_usd,
+                    variance_usd,
+                    variance_percent,
+                    status,
+                    evidence,
+                    created_at
+        `,
+        [input.reconciliationId, JSON.stringify(input.evidence)],
+      );
+      const row = result.rows[0];
+
+      if (!row) {
+        throw new ApiNotFoundError(
+          `Invoice reconciliation ${input.reconciliationId} was not found`,
+        );
+      }
+
+      if (input.audit) {
+        await this.insertTeamAuditEvent(pool, {
+          ...input.audit,
+          targetId: input.audit.targetId ?? row.id,
+          metadata: {
+            importRunId: row.import_run_id,
+            comparisonId: row.comparison_id,
+            provider: row.provider,
+            status: row.status,
+            varianceUsd: Number.parseFloat(row.variance_usd),
+            variancePercent: Number.parseFloat(row.variance_percent),
+            ...(input.audit.metadata ?? {}),
+          },
+        });
+      }
+
+      return toInvoiceReconciliationRecord(row);
+    });
   }
 
   async onModuleDestroy(): Promise<void> {
