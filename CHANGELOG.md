@@ -30,6 +30,8 @@ once tagged releases begin.
 - Public demo hardening guide and `npm run public:readiness:check` gate covering
   community files, demo evidence hooks, tracked environment files, provider-logo
   safeguards, and public-launch honesty language.
+- Playwright-native browser audit command with desktop, 320px reflow, and 200%
+  zoom-equivalent screenshot artifacts plus accessibility and performance evidence.
 - Canonical overlay/dialog/drawer/popover/toast/banner primitives, expanded shared
   button variants, and the `npm run overlay:check` guard.
 

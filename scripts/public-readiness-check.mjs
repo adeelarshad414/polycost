@@ -21,6 +21,7 @@ const requiredFiles = [
   'RELEASE-CHECKLIST.md',
   'docs/development/open-source-readiness.md',
   'docs/development/public-demo-hardening.md',
+  'docs/browser-audit/README.md',
   'docs/demo-artifacts/README.md',
   'docs/PROVIDER-CREDENTIALS.md',
   'handover/HANDOVER-README.md',
@@ -54,6 +55,9 @@ if (packageJson.license !== 'MIT') {
 }
 if (!packageJson.scripts?.['public:readiness:check']) {
   failures.push('package.json is missing public:readiness:check');
+}
+if (!packageJson.scripts?.['browser:audit']) {
+  failures.push('package.json is missing browser:audit');
 }
 if (!packageJson.scripts?.check?.includes('npm run public:readiness:check')) {
   failures.push('package.json check script must include npm run public:readiness:check');
@@ -92,11 +96,18 @@ await assertFileContains('docs/development/public-demo-hardening.md', [
   ['demo modes', '## Public Demo Modes'],
   ['repository health checklist', '## Repository Health Checklist'],
   ['verification floor', 'npm run public:readiness:check'],
+  ['browser audit command', 'npm run browser:audit'],
   ['blocked section', '## Blocked Or Deferred'],
+]);
+
+await assertFileContains('docs/browser-audit/README.md', [
+  ['browser audit command', 'npm run browser:audit'],
+  ['latest run pointer', 'Latest run:'],
 ]);
 
 await assertFileContains('RELEASE-CHECKLIST.md', [
   ['public readiness command', 'npm run public:readiness:check'],
+  ['browser audit command', 'npm run browser:audit'],
   ['public hardening doc', 'docs/development/public-demo-hardening.md'],
   ['provider logo/trademark review', 'cloud logos are not present'],
 ]);

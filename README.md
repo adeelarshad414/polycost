@@ -76,6 +76,13 @@ Generate reviewer screenshots and a short walkthrough video from the running dem
 npm run demo:artifacts
 ```
 
+Capture browser audit screenshots, 320px reflow evidence, 200% zoom-equivalent
+evidence, accessibility heuristics, and local performance metrics:
+
+```bash
+npm run browser:audit
+```
+
 Verify the clean-clone demo path with an isolated temporary clone and a
 10-minute startup budget:
 
@@ -245,6 +252,7 @@ Security and quality checks:
 npm run loading:check
 npm run handover:check
 npm run public:readiness:check
+npm run browser:audit
 npm run security:audit
 npm run provider:credentials:check
 npm run overlay:check
@@ -309,6 +317,8 @@ before switching `USE_MOCK_PROVIDERS=false`.
   traceability expectations.
 - `docs/development/public-demo-hardening.md` captures the public demo readiness
   floor, repository health checklist, and blocked launch evidence.
+- `docs/browser-audit/README.md` indexes the latest Playwright-native browser audit
+  evidence.
 - `LOADING-INVENTORY.md` and `LOADING-AUDIT-REPORT.md` document the loading/progress
   UX audit and evidence.
 - `DUMMY-VALUES.md` lists development-only placeholders and production guardrails.

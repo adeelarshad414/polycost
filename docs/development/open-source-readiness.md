@@ -45,6 +45,7 @@ Run:
 npm run public:readiness:check
 npm run release:check
 npm run demo:verify-clean
+npm run browser:audit
 npm run format:check
 npm run ci:lint
 npm run test:coverage
