@@ -102,6 +102,10 @@ once tagged releases begin.
 - Invoice evidence packet verifier CLI with a committed valid fixture, tamper smoke,
   and full-check gate, so reviewers can recompute exported packet digests and detect
   tampering with `npm run invoice:evidence:verify -- <packet.json>`.
+- Invoice evidence packets now include a digest-covered governance manifest for
+  artifact storage/KMS/scanner/retention posture, and packet export plus artifact
+  download actions are written to the team audit trail with checksum and storage
+  metadata.
 - Invoice artifact storage readiness and retention enforcement foundation, including
   production-bound config guards for external object storage/KMS/webhook scanning,
   strict credential-check coverage, signed scanner webhook integration, and admin

@@ -2310,6 +2310,31 @@ describe('BillingService', () => {
           invoiceControlMatchedCount: 1,
           invoiceControlMismatchCount: 0,
         }),
+        artifactGovernance: expect.objectContaining({
+          schemaVersion: 'invoice-evidence-governance/v1',
+          accessControls: expect.objectContaining({
+            requiresBillingAdmin: true,
+            teamScoped: true,
+            rawArtifactBytesExcluded: true,
+            packetExportAuditAction: 'billing.reconciliation.evidence_packet_exported',
+            artifactDownloadAuditAction: 'billing.reconciliation.artifact_blob_downloaded',
+          }),
+          storagePosture: expect.objectContaining({
+            storageBackends: ['database-bytea'],
+            storedArtifactCount: 1,
+            governanceManifestCount: 0,
+            databaseStoredCount: 1,
+            missingKmsCount: 1,
+          }),
+          productionGates: expect.objectContaining({
+            packetIntegrityReady: true,
+            auditTrailReady: true,
+            externalObjectStorageReady: false,
+          }),
+          gaps: expect.arrayContaining([
+            'one or more stored artifacts are missing governance manifests',
+          ]),
+        }),
         artifacts: [
           expect.objectContaining({
             id: 'artifact-1',
@@ -2354,6 +2379,27 @@ describe('BillingService', () => {
     );
     expect(JSON.stringify(packet)).not.toContain('contentBase64');
     expect(JSON.stringify(packet)).not.toContain('aW52b2ljZQ==');
+    expect(repository.recordTeamAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        teamId: identity.teamId,
+        actorAccountId: identity.accountId,
+        action: 'billing.reconciliation.evidence_packet_exported',
+        targetType: 'billing_reconciliation',
+        targetId: '66666666-6666-4666-8666-666666666666',
+        metadata: expect.objectContaining({
+          importRunId: '55555555-5555-4555-8555-555555555555',
+          comparisonId: comparisonResult.comparisonId,
+          provider: 'aws',
+          packetStatus: 'review-ready',
+          payloadDigestSha256: packet.integrity.payloadDigestSha256,
+          artifactCount: 1,
+          storedArtifactCount: 1,
+          verifiedArtifactCount: 1,
+          governanceGapCount: packet.artifactGovernance.gaps.length,
+          storageBackends: ['database-bytea'],
+        }),
+      }),
+    );
   });
 
   it('stores invoice artifact blobs with checksum metadata without exposing bytes in evidence', async () => {
@@ -3543,6 +3589,29 @@ describe('BillingService', () => {
       '66666666-6666-4666-8666-666666666666',
       'artifact-1',
     );
+    expect(repository.recordTeamAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        teamId: identity.teamId,
+        actorAccountId: identity.accountId,
+        action: 'billing.reconciliation.artifact_blob_downloaded',
+        targetType: 'billing_reconciliation',
+        targetId: '66666666-6666-4666-8666-666666666666',
+        metadata: expect.objectContaining({
+          importRunId: '55555555-5555-4555-8555-555555555555',
+          comparisonId: comparisonResult.comparisonId,
+          provider: 'aws',
+          artifactId: 'artifact-1',
+          fileName: 'aws-invoice-control.txt',
+          contentSha256: 'd'.repeat(64),
+          contentSizeBytes: 7,
+          storageBackend: 'database-bytea',
+          externalObjectFetched: false,
+          checksumVerified: true,
+          contentReturned: true,
+          malwareScanStatus: 'passed',
+        }),
+      }),
+    );
   });
 
   it('downloads external invoice artifact blobs through provider storage and validates checksum', async () => {
@@ -3653,6 +3722,19 @@ describe('BillingService', () => {
         storageBackend: 'aws-s3',
         objectStoreBucket: 'polycost-invoice-artifacts',
         objectStoreKey: 'invoice-artifacts/team/reconciliation/artifact.txt',
+      }),
+    );
+    expect(repository.recordTeamAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'billing.reconciliation.artifact_blob_downloaded',
+        metadata: expect.objectContaining({
+          artifactId: 'artifact-1',
+          storageBackend: 'aws-s3',
+          externalObjectFetched: true,
+          checksumVerified: true,
+          contentReturned: true,
+          malwareScanScanner: 'polycost-eicar-signature-v1',
+        }),
       }),
     );
   });
