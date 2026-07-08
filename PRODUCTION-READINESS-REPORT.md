@@ -64,6 +64,7 @@ performance/accessibility/best-practices/SEO metrics.
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                          |
 | UI-AUTH-002    | Improved      | Workspace billing panel now surfaces reconciliation readiness, source-fingerprint coverage, SKU match coverage, and the invoice-of-record caveat                                          |
 | UI-AUTH-003    | Improved      | Active workspace switching is now backend-backed, membership-checked, and exposed in the signed-in account panel                                                                          |
+| UI-AUTH-004    | Improved      | Pending/expired workspace invites can now be resent through a guarded backend route that rotates the stored token hash and exposes the refreshed one-time token only in the response      |
 | TF-GEN-001     | Added         | V3 Terraform generation endpoint and UI panel now generate AWS/Azure/GCP starter bundles from NWS with provider pinning, remote-state examples, static checks, and explicit caveats       |
 | TF-GEN-002     | Improved      | V3.1 hardening adds generation profiles, private database networking checks, runtime identity baselines, policy/test/Makefile artifacts, and module-boundary documentation                |
 | TF-GEN-003     | Improved      | V3.2 assurance adds generated CAF/WAF/Terraform framework-alignment evidence and topology-aware public/private ingress/load-balancer controls                                             |
@@ -117,6 +118,20 @@ Local static/regression gates:
   - Pricing coverage, progress verification, QA/security suppressions,
     database, DevOps, cloud, release, handover, and provider credential gates
     passed; security suppression ledger remains at 23 reviewed suppressions.
+- Phase 2.12 workspace invitation resend lifecycle passed:
+  - API focused: `src/api/auth.controller.spec.ts`, `src/api/auth-billing.spec.ts`,
+    and `src/api/api-database.repository.spec.ts`: 3 suites / 45 tests.
+  - Web focused: `src/App.spec.tsx` and `src/api-client.spec.ts`: 2 suites / 84
+    tests.
+  - `npm run ci:lint` passed with zero warnings/typecheck errors.
+  - `npm run test:production-readiness` passed: API 10 suites / 139 tests; web
+    2 suites / 84 tests.
+  - `npm run check` passed: API 51 suites / 405 tests; web 11 suites / 141 tests;
+    graph validation 312 nodes / 312 edges; pricing coverage, progress
+    verification, QA/security suppression, database, DevOps, cloud, release,
+    handover, and provider credential gates passed.
+  - `npm run ci:build` passed; `npm audit --audit-level=high` passed with the
+    known low Graphify transitive advisory still present.
 - Phase 2.10 full regression floor passed with `npm run check`:
   - API unit: 51 suites / 403 tests.
   - Web unit: 11 suites / 141 tests.

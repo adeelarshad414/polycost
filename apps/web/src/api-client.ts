@@ -126,6 +126,11 @@ export interface PolyCostClient {
     invitationId: string,
     token: string,
   ): Promise<TeamInvitationRecord>;
+  resendTeamInvitation(
+    teamId: string,
+    invitationId: string,
+    token: string,
+  ): Promise<TeamInvitationRecord>;
   previewTeamInvitation(tokenValue: string): Promise<TeamInvitationPreview>;
   acceptTeamInvitation(tokenValue: string, token: string): Promise<TeamInvitationRecord>;
   updateTeamMemberRole(
@@ -361,6 +366,18 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         `/auth/teams/${encodeURIComponent(teamId)}/invitations/${encodeURIComponent(
           invitationId,
         )}/revoke`,
+        {
+          method: 'POST',
+          headers: authorizationHeaders(token),
+        },
+      );
+    },
+    resendTeamInvitation(teamId, invitationId, token) {
+      return requestJson<TeamInvitationRecord>(
+        baseUrl,
+        `/auth/teams/${encodeURIComponent(teamId)}/invitations/${encodeURIComponent(
+          invitationId,
+        )}/resend`,
         {
           method: 'POST',
           headers: authorizationHeaders(token),

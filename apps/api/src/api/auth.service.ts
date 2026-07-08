@@ -365,6 +365,37 @@ export class AuthService {
     return revoked;
   }
 
+  async resendTeamInvitation(
+    teamId: string,
+    invitationId: string,
+    identity: AuthIdentity,
+  ): Promise<TeamInvitationRecord> {
+    await this.requireTeamAdmin(identity, teamId);
+    const inviteToken = randomBytes(32).toString('base64url');
+    const invitation = await this.repository.resendTeamInvitation({
+      teamId,
+      invitationId,
+      tokenHash: sha256(inviteToken),
+      invitedByAccountId: identity.accountId,
+      expiresAt: new Date(Date.now() + INVITATION_TTL_DAYS * 86_400_000).toISOString(),
+    });
+
+    if (!invitation) {
+      throw new ApiValidationError('Invitation was not found or cannot be resent', [
+        {
+          field: 'invitationId',
+          issue: 'must reference a pending or expired invitation',
+        },
+      ]);
+    }
+
+    return {
+      ...invitation,
+      inviteToken,
+      inviteUrl: `${this.publicBaseUrl()}/?invite_token=${encodeURIComponent(inviteToken)}`,
+    };
+  }
+
   async previewInvitation(token: string): Promise<TeamInvitationPreview> {
     const invitation = await this.repository.findInvitationByTokenHash(sha256(token));
 

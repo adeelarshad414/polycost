@@ -1276,6 +1276,10 @@ describe('ApiDatabaseRepository', () => {
         rows: [pendingInvitation],
         rowCount: 1,
       })
+      .mockResolvedValueOnce({
+        rows: [pendingInvitation],
+        rowCount: 1,
+      })
       .mockResolvedValueOnce({ rows: [], rowCount: 0 })
       .mockResolvedValueOnce({
         rows: [
@@ -1372,6 +1376,20 @@ describe('ApiDatabaseRepository', () => {
       }),
     ]);
     await expect(
+      repository.resendTeamInvitation({
+        teamId: '22222222-2222-4222-8222-222222222222',
+        invitationId: '88888888-8888-4888-8888-888888888888',
+        tokenHash: 'f'.repeat(64),
+        invitedByAccountId: '11111111-1111-4111-8111-111111111111',
+        expiresAt: expiresAt.toISOString(),
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: '88888888-8888-4888-8888-888888888888',
+        status: 'pending',
+      }),
+    );
+    await expect(
       repository.findPendingInvitationByTokenHash('e'.repeat(64), createdAt.toISOString()),
     ).resolves.toEqual(
       expect.objectContaining({
@@ -1427,8 +1445,15 @@ describe('ApiDatabaseRepository', () => {
       },
     ]);
 
-    expect(query).toHaveBeenNthCalledWith(5, 'BEGIN');
-    expect(query).toHaveBeenNthCalledWith(9, 'COMMIT');
+    expect(query).toHaveBeenNthCalledWith(4, expect.stringContaining('UPDATE team_invitations'), [
+      '22222222-2222-4222-8222-222222222222',
+      '88888888-8888-4888-8888-888888888888',
+      'f'.repeat(64),
+      '11111111-1111-4111-8111-111111111111',
+      expiresAt.toISOString(),
+    ]);
+    expect(query).toHaveBeenNthCalledWith(6, 'BEGIN');
+    expect(query).toHaveBeenNthCalledWith(10, 'COMMIT');
   });
 
   it('persists provider invoice imports and reconciliation evidence rows', async () => {

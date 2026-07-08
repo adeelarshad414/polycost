@@ -163,7 +163,7 @@ Accounts add workspace controls on top of that core flow:
   and server-side "sign out other devices".
 - Team creation, team settings, member list, member removal, pending invitations,
   invite-token landing preview, expired/revoked invite states, invite-token
-  acceptance, and invite revocation.
+  acceptance, invite-token resend/refresh, and invite revocation.
 - Three-role RBAC: Owner, Admin, and Member. Owners manage role changes; owners and
   admins manage members, invitations, SSO provider configuration, and billing import
   workflows; members keep comparison and report access.

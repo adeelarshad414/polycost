@@ -353,6 +353,14 @@ describe('App', () => {
       'session-token',
     );
 
+    await click(buttonByText(container, 'Resend'));
+    expect(client.resendTeamInvitation).toHaveBeenCalledWith(
+      '22222222-2222-4222-8222-222222222222',
+      '88888888-8888-4888-8888-888888888888',
+      'session-token',
+    );
+    expect(text(container)).toContain('Invite token: refreshed-invite-token');
+
     await click(buttonByText(container, 'Revoke'));
     expect(client.revokeTeamInvitation).toHaveBeenCalledWith(
       '22222222-2222-4222-8222-222222222222',
@@ -3863,6 +3871,18 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       inviteUrl: 'http://localhost:3001/?invite_token=invite-token',
     })),
     listTeamInvitations: jest.fn(async () => []),
+    resendTeamInvitation: jest.fn(async () => ({
+      id: '88888888-8888-4888-8888-888888888888',
+      teamId: '22222222-2222-4222-8222-222222222222',
+      email: 'finops@example.com',
+      role: 'member' as const,
+      status: 'pending' as const,
+      invitedByAccountId: '11111111-1111-4111-8111-111111111111',
+      expiresAt: '2026-07-13T00:00:00.000Z',
+      createdAt: '2026-07-06T00:05:00.000Z',
+      inviteToken: 'refreshed-invite-token',
+      inviteUrl: 'http://localhost:3001/?invite_token=refreshed-invite-token',
+    })),
     revokeTeamInvitation: jest.fn(async () => ({
       id: '88888888-8888-4888-8888-888888888888',
       teamId: '22222222-2222-4222-8222-222222222222',

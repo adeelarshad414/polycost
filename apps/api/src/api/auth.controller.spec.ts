@@ -60,6 +60,7 @@ describe('AuthController', () => {
     expect(controller.inviteTeamMember('team-1', body, request)).toBe('invite');
     expect(controller.listTeamInvitations('team-1', request)).toBe('invitations');
     expect(controller.revokeTeamInvitation('team-1', 'invite-1', request)).toBe('revoke-invite');
+    expect(controller.resendTeamInvitation('team-1', 'invite-1', request)).toBe('resend-invite');
     expect(controller.acceptInvitation(body, request)).toBe('accept-invite');
     expect(controller.previewInvitation('invite-token')).toBe('preview-invite');
     expect(controller.ssoStatus(request)).toBe('sso-status');
@@ -82,6 +83,7 @@ describe('AuthController', () => {
       identity,
     );
     expect(service.revokeTeamInvitation).toHaveBeenCalledWith('team-1', 'invite-1', identity);
+    expect(service.resendTeamInvitation).toHaveBeenCalledWith('team-1', 'invite-1', identity);
     expect(service.previewInvitation).toHaveBeenCalledWith('invite-token');
     expect(service.startMockOidcLogin).toHaveBeenCalledWith(body);
     expect(service.mockOidcAuthorize).toHaveBeenCalledWith(body);
@@ -159,6 +161,7 @@ describe('AuthController', () => {
       AuthController.prototype.inviteTeamMember,
       AuthController.prototype.listTeamInvitations,
       AuthController.prototype.revokeTeamInvitation,
+      AuthController.prototype.resendTeamInvitation,
       AuthController.prototype.acceptInvitation,
       AuthController.prototype.ssoStatus,
       AuthController.prototype.configureSsoProvider,
@@ -218,6 +221,7 @@ function createAuthServiceMock(): AuthService {
     inviteTeamMember: jest.fn(() => 'invite'),
     listTeamInvitations: jest.fn(() => 'invitations'),
     revokeTeamInvitation: jest.fn(() => 'revoke-invite'),
+    resendTeamInvitation: jest.fn(() => 'resend-invite'),
     acceptInvitation: jest.fn(() => 'accept-invite'),
     previewInvitation: jest.fn(() => 'preview-invite'),
     updateTeamMemberRole: jest.fn(() => 'member-role'),

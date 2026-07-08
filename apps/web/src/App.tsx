@@ -2559,6 +2559,32 @@ function WorkspaceControlCenter({
     }
   }
 
+  async function handleResendInvitation(invitationId: string) {
+    if (!token || !activeTeam) {
+      return;
+    }
+
+    setWorkspaceBusy(`resend-invite-${invitationId}`);
+    onError(null);
+
+    try {
+      const invitation = await client.resendTeamInvitation(activeTeam.id, invitationId, token);
+      setInvitations((current) => [
+        invitation,
+        ...current.filter((currentInvitation) => currentInvitation.id !== invitation.id),
+      ]);
+      setLastInviteToken(invitation.inviteToken ?? null);
+      setLastInviteUrl(invitation.inviteUrl ?? null);
+      onNotice(
+        'Invitation token refreshed. Share the new one-time link from this workspace panel.',
+      );
+    } catch (inviteError) {
+      onError(formatApiError(inviteError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
   async function handleRoleChange(accountId: string, role: TeamRole) {
     if (!token || !activeTeam) {
       return;
@@ -3198,28 +3224,48 @@ function WorkspaceControlCenter({
                   );
                 })}
               </div>
-              <div className="workspace-member-list" aria-label="Pending invitations">
+              <div className="workspace-member-list" aria-label="Team invitations">
                 {invitations
-                  .filter((invitation) => invitation.status === 'pending')
+                  .filter(
+                    (invitation) =>
+                      invitation.status === 'pending' || invitation.status === 'expired',
+                  )
                   .slice(0, 4)
                   .map((invitation) => (
                     <div className="workspace-member-row" key={invitation.id}>
                       <span>
                         <strong>{invitation.email}</strong>
                         <small>
-                          {invitation.role} invite · expires {formatDateTime(invitation.expiresAt)}
+                          {invitation.role} invite · {invitation.status} · expires{' '}
+                          {formatDateTime(invitation.expiresAt)}
                         </small>
                       </span>
-                      <Button
-                        type="button"
-                        variant="destructiveQuiet"
-                        size="compact"
-                        className="workspace-link-button"
-                        disabled={workspaceBusy === `revoke-invite-${invitation.id}`}
-                        onClick={() => void handleRevokeInvitation(invitation.id)}
-                      >
-                        Revoke
-                      </Button>
+                      <span className="workspace-row-actions">
+                        {invitation.status === 'pending' || invitation.status === 'expired' ? (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="compact"
+                            loading={workspaceBusy === `resend-invite-${invitation.id}`}
+                            loadingLabel="Refreshing..."
+                            onClick={() => void handleResendInvitation(invitation.id)}
+                          >
+                            Resend
+                          </Button>
+                        ) : null}
+                        {invitation.status === 'pending' ? (
+                          <Button
+                            type="button"
+                            variant="destructiveQuiet"
+                            size="compact"
+                            className="workspace-link-button"
+                            disabled={workspaceBusy === `revoke-invite-${invitation.id}`}
+                            onClick={() => void handleRevokeInvitation(invitation.id)}
+                          >
+                            Revoke
+                          </Button>
+                        ) : null}
+                      </span>
                     </div>
                   ))}
               </div>

@@ -263,6 +263,16 @@ Evidence:
   `11` suites / `141` tests, graph validation `312` nodes / `312` edges, pricing
   coverage, progress verification, QA/security suppression, database, DevOps, cloud,
   release, handover, and provider credential gates.
+- Phase 2.12 focused invitation lifecycle regressions passed: API `3` suites /
+  `45` tests (`auth.controller`, `auth-billing`, `api-database.repository`) and
+  web `2` suites / `84` tests (`App`, `api-client`).
+- Phase 2.12 full `npm run check` passed with API `51` suites / `405` tests, web
+  `11` suites / `141` tests, graph validation `312` nodes / `312` edges, pricing
+  coverage, progress verification, QA/security suppression, database, DevOps, cloud,
+  release, handover, and provider credential gates.
+- Phase 2.12 command gates passed: lint/typecheck, production-readiness, build, and
+  high-severity audit; npm still reports the known low Graphify transitive advisory
+  with no available fix.
 - Phase 2.10 full `npm run check` passed with API `51` suites / `403` tests, web
   `11` suites / `141` tests, graph validation `312` nodes / `312` edges, pricing
   coverage, progress verification, QA/security suppression, database, DevOps, cloud,

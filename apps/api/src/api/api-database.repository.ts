@@ -2695,6 +2695,53 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     return result.rows[0] ? toTeamInvitationRecord(result.rows[0]) : undefined;
   }
 
+  async resendTeamInvitation(input: {
+    teamId: string;
+    invitationId: string;
+    tokenHash: string;
+    invitedByAccountId: string;
+    expiresAt: string;
+  }): Promise<TeamInvitationRecord | undefined> {
+    const result = await (
+      await this.getPool()
+    ).query<TeamInvitationRow>(
+      `
+        UPDATE team_invitations
+        SET token_hash = $3,
+            invited_by_account_id = $4,
+            expires_at = $5,
+            created_at = now(),
+            revoked_at = NULL
+        WHERE team_id = $1
+          AND id = $2
+          AND status = 'pending'
+        RETURNING id,
+                  team_id,
+                  email,
+                  role,
+                  CASE
+                    WHEN status = 'pending' AND expires_at <= now() THEN 'expired'
+                    ELSE status
+                  END AS status,
+                  invited_by_account_id,
+                  accepted_by_account_id,
+                  expires_at,
+                  created_at,
+                  accepted_at,
+                  revoked_at
+      `,
+      [
+        input.teamId,
+        input.invitationId,
+        input.tokenHash,
+        input.invitedByAccountId,
+        input.expiresAt,
+      ],
+    );
+
+    return result.rows[0] ? toTeamInvitationRecord(result.rows[0]) : undefined;
+  }
+
   async findPendingInvitationByTokenHash(
     tokenHash: string,
     now: string,

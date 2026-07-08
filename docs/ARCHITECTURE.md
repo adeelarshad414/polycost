@@ -81,7 +81,7 @@ Core groups:
 - budgets, alerts, exchange rates
 - share links
 - regions and official calculator links
-- auth, teams, invites, sessions, mock SSO readiness
+- auth, teams, invites, invite resend, sessions, mock SSO readiness
 - active workspace switching for existing team memberships
 - Terraform generation
 
