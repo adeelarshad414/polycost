@@ -174,6 +174,12 @@ Accounts add workspace controls on top of that core flow:
   `AUTH_INVITE_DELIVERY_MODE=webhook`, an HTTPS delivery URL, and an HMAC signing
   secret; webhook mode sends the invite link to the delivery provider and does not
   expose the raw token back to the browser.
+- Privileged workspace, invitation, SSO, billing import, and reconciliation actions
+  write append-only team audit events. Staging and production require
+  `AUTH_AUDIT_EXPORT_MODE=webhook`, an HTTPS SIEM/WORM receiver URL, and an HMAC
+  signing secret; PolyCost stores an outbox row in the same database transaction as
+  the audit event and scheduled workers retry signed delivery without blocking the
+  user-facing mutation.
 
 The current self-hosted product does not yet include enterprise IdP login round-trips,
 full email-template management, org billing plans, or a hosted account marketplace.
@@ -292,6 +298,12 @@ Start from `.env.example`. Important local settings include:
 - `AUTH_INVITE_DELIVERY_WEBHOOK_URL`
 - `AUTH_INVITE_DELIVERY_WEBHOOK_SECRET`
 - `AUTH_INVITE_EMAIL_FROM`
+- `AUTH_AUDIT_EXPORT_MODE`
+- `AUTH_AUDIT_EXPORT_WEBHOOK_URL`
+- `AUTH_AUDIT_EXPORT_WEBHOOK_SECRET`
+- `AUTH_AUDIT_EXPORT_SCHEDULE_CRON`
+- `AUTH_AUDIT_EXPORT_BATCH_SIZE`
+- `AUTH_AUDIT_EXPORT_MAX_ATTEMPTS`
 - `RATE_LIMIT_AUTH_PER_MINUTE`
 - `RATE_LIMIT_NL_PARSE_PER_MINUTE`
 - `RATE_LIMIT_LIVE_REFRESH_PER_MINUTE`

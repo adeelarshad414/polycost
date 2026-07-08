@@ -73,6 +73,18 @@ export const configSchema = z
       (value) => (value === '' ? undefined : value),
       z.string().min(3).optional(),
     ),
+    AUTH_AUDIT_EXPORT_MODE: z.enum(['disabled', 'webhook']).default('disabled'),
+    AUTH_AUDIT_EXPORT_WEBHOOK_URL: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.string().url().optional(),
+    ),
+    AUTH_AUDIT_EXPORT_WEBHOOK_SECRET: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.string().min(16).optional(),
+    ),
+    AUTH_AUDIT_EXPORT_SCHEDULE_CRON: z.string().default('*/5 * * * *'),
+    AUTH_AUDIT_EXPORT_BATCH_SIZE: z.coerce.number().int().min(1).max(500).default(50),
+    AUTH_AUDIT_EXPORT_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5),
     AUTH_OIDC_ISSUER_URL: z.string().url().optional(),
     AUTH_OIDC_CLIENT_ID: z.string().min(1).optional(),
     AUTH_SAML_ENTITY_ID: z.string().min(1).optional(),
@@ -117,6 +129,14 @@ export const configSchema = z
         });
       }
 
+      if (config.AUTH_AUDIT_EXPORT_MODE !== 'webhook') {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['AUTH_AUDIT_EXPORT_MODE'],
+          message: 'Staging and production audit export must use the webhook provider.',
+        });
+      }
+
       for (const [key, value] of Object.entries(config)) {
         if (typeof value === 'string' && isDummyValue(value)) {
           context.addIssue({
@@ -154,6 +174,36 @@ export const configSchema = z
           code: z.ZodIssueCode.custom,
           path: ['AUTH_INVITE_DELIVERY_WEBHOOK_URL'],
           message: 'Invite delivery webhook URL must use HTTPS outside development.',
+        });
+      }
+    }
+
+    if (config.AUTH_AUDIT_EXPORT_MODE === 'webhook') {
+      if (!config.AUTH_AUDIT_EXPORT_WEBHOOK_URL) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['AUTH_AUDIT_EXPORT_WEBHOOK_URL'],
+          message: 'AUTH_AUDIT_EXPORT_WEBHOOK_URL is required for audit export webhooks.',
+        });
+      }
+
+      if (!config.AUTH_AUDIT_EXPORT_WEBHOOK_SECRET) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['AUTH_AUDIT_EXPORT_WEBHOOK_SECRET'],
+          message: 'AUTH_AUDIT_EXPORT_WEBHOOK_SECRET is required for audit export webhooks.',
+        });
+      }
+
+      if (
+        (config.NODE_ENV === 'production' || config.NODE_ENV === 'staging') &&
+        config.AUTH_AUDIT_EXPORT_WEBHOOK_URL &&
+        !config.AUTH_AUDIT_EXPORT_WEBHOOK_URL.startsWith('https://')
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['AUTH_AUDIT_EXPORT_WEBHOOK_URL'],
+          message: 'Audit export webhook URL must use HTTPS outside development.',
         });
       }
     }

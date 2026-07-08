@@ -36,6 +36,7 @@ const expectedMigrations = [
   '028_pricing_lineage_metadata.sql',
   '029_auth_billing_runtime_privileges.sql',
   '030_team_audit_events.sql',
+  '031_team_audit_export_outbox.sql',
 ];
 
 if (!['migrate', 'seed', 'reset', 'validate'].includes(command)) {

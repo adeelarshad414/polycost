@@ -47,6 +47,7 @@ import { RegionsController } from './regions.controller';
 import { RegionsService } from './regions.service';
 import { ReportExportJobsService } from './report-export-jobs.service';
 import { SessionAuthGuard } from './session-auth.guard';
+import { TeamAuditExportService } from './team-audit-export.service';
 import { WorkloadController } from './workload.controller';
 
 @Module({
@@ -89,6 +90,7 @@ import { WorkloadController } from './workload.controller';
     },
     AdminApiKeyGuard,
     InvitationDeliveryService,
+    TeamAuditExportService,
     AuthService,
     SessionAuthGuard,
     BillingService,
@@ -136,6 +138,6 @@ import { WorkloadController } from './workload.controller';
       useClass: ApiExceptionFilter,
     },
   ],
-  exports: [ApiDatabaseRepository, CostManagementService],
+  exports: [ApiDatabaseRepository, CostManagementService, TeamAuditExportService],
 })
 export class ApiModule {}

@@ -4,6 +4,7 @@ import {
   ALERT_EVALUATOR_JOB_NAME,
   CURRENCY_SYNC_JOB_NAME,
   SHARE_LINK_CLEANUP_JOB_NAME,
+  TEAM_AUDIT_EXPORT_JOB_NAME,
 } from './cost-management-jobs.types';
 import { CostManagementJobsService } from './cost-management-jobs.service';
 import {
@@ -21,6 +22,8 @@ const configService = {
         return '*/15 * * * *';
       case 'SHARE_LINK_CLEANUP_SCHEDULE_CRON':
         return '0 3 * * *';
+      case 'AUTH_AUDIT_EXPORT_SCHEDULE_CRON':
+        return '*/5 * * * *';
       default:
         throw new Error(`Unexpected config key ${String(key)}`);
     }
@@ -28,7 +31,7 @@ const configService = {
 } as unknown as ConfigService<AppConfig, true>;
 
 describe('CostManagementJobsScheduler', () => {
-  it('schedules currency, alert, and share-link cleanup jobs', async () => {
+  it('schedules currency, alert, share-link cleanup, and audit export jobs', async () => {
     const queue = queueMock();
     const scheduler = new CostManagementJobsScheduler(
       configService,
@@ -69,6 +72,16 @@ describe('CostManagementJobsScheduler', () => {
         },
       }),
     );
+    expect(queue.add).toHaveBeenCalledWith(
+      TEAM_AUDIT_EXPORT_JOB_NAME,
+      {},
+      expect.objectContaining({
+        jobId: TEAM_AUDIT_EXPORT_JOB_NAME,
+        repeat: {
+          pattern: '*/5 * * * *',
+        },
+      }),
+    );
   });
 
   it('starts a worker that dispatches to the matching job service method', async () => {
@@ -94,10 +107,12 @@ describe('CostManagementJobsScheduler', () => {
     await capturedProcessor({ name: CURRENCY_SYNC_JOB_NAME });
     await capturedProcessor({ name: ALERT_EVALUATOR_JOB_NAME });
     await capturedProcessor({ name: SHARE_LINK_CLEANUP_JOB_NAME });
+    await capturedProcessor({ name: TEAM_AUDIT_EXPORT_JOB_NAME });
 
     expect(jobsService.syncCurrencyRates).toHaveBeenCalledWith('USD');
     expect(jobsService.evaluateBudgetAlerts).toHaveBeenCalledTimes(1);
     expect(jobsService.cleanupExpiredShareLinks).toHaveBeenCalledTimes(1);
+    expect(jobsService.flushPendingAuditExports).toHaveBeenCalledTimes(1);
   });
 
   it('closes worker and queue on module destroy', async () => {
@@ -140,6 +155,9 @@ function jobsServiceMock() {
       status: 'success',
     })),
     cleanupExpiredShareLinks: jest.fn(async () => ({
+      status: 'success',
+    })),
+    flushPendingAuditExports: jest.fn(async () => ({
       status: 'success',
     })),
   };

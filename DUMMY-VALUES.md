@@ -22,6 +22,8 @@ The explicit placeholder token is `CHANGE_ME_DEV_ONLY`. Production and staging c
   callback signing
 - `AUTH_INVITE_DELIVERY_MODE=panel` for local/demo token sharing in the workspace
   panel
+- `AUTH_AUDIT_EXPORT_MODE=disabled` for local/demo audit trails that stay in the
+  app database only
 - Local-only Docker Vault seed credentials
 
 ## Not Allowed In Staging Or Production
@@ -32,6 +34,8 @@ The explicit placeholder token is `CHANGE_ME_DEV_ONLY`. Production and staging c
 - Dummy `AUTH_SSO_STATE_SECRET` values
 - `AUTH_INVITE_DELIVERY_MODE=panel`
 - Dummy `AUTH_INVITE_DELIVERY_WEBHOOK_SECRET` values
+- `AUTH_AUDIT_EXPORT_MODE=disabled`
+- Dummy `AUTH_AUDIT_EXPORT_WEBHOOK_SECRET` values
 - Any real provider mode without `VAULT_TOKEN_FILE`
 - Any strict provider credential check where Vault returns a dummy GCP access token or dummy LLM API key
 
@@ -50,8 +54,12 @@ docker compose exec vault vault kv put secret/polycost/llm api_key="<llm-api-key
    `AUTH_INVITE_DELIVERY_WEBHOOK_URL`, and a non-dummy
    `AUTH_INVITE_DELIVERY_WEBHOOK_SECRET` before enabling staging or production
    workspace invites.
-5. Run `npm run provider:credentials:check:strict`.
-6. Run a comparison and confirm each catalog-backed line item has source endpoint,
+5. Set `AUTH_AUDIT_EXPORT_MODE=webhook`,
+   `AUTH_AUDIT_EXPORT_WEBHOOK_URL`, and a non-dummy
+   `AUTH_AUDIT_EXPORT_WEBHOOK_SECRET` before enabling staging or production
+   team administration.
+6. Run `npm run provider:credentials:check:strict`.
+7. Run a comparison and confirm each catalog-backed line item has source endpoint,
    source record ID, payload hash, transform version, and fetched timestamp.
 
 For SSO readiness, configure provider metadata through the workspace UI only after

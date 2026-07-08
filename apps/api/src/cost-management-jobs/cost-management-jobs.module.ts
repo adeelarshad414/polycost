@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Queue, Worker } from 'bullmq';
 import { ApiDatabaseRepository } from '../api/api-database.repository';
 import { ApiModule } from '../api/api.module';
+import { TeamAuditExportService } from '../api/team-audit-export.service';
 import { AppConfig } from '../config/config.schema';
 import {
   COST_MANAGEMENT_QUEUE,
@@ -30,9 +31,12 @@ import { ExchangeRateClient, FrankfurterExchangeRateClient } from './exchange-ra
     },
     {
       provide: CostManagementJobsService,
-      inject: [ApiDatabaseRepository, EXCHANGE_RATE_CLIENT],
-      useFactory: (repository: ApiDatabaseRepository, exchangeRateClient: ExchangeRateClient) =>
-        new CostManagementJobsService(repository, exchangeRateClient),
+      inject: [ApiDatabaseRepository, EXCHANGE_RATE_CLIENT, TeamAuditExportService],
+      useFactory: (
+        repository: ApiDatabaseRepository,
+        exchangeRateClient: ExchangeRateClient,
+        auditExportService: TeamAuditExportService,
+      ) => new CostManagementJobsService(repository, exchangeRateClient, auditExportService),
     },
     {
       provide: COST_MANAGEMENT_QUEUE,
