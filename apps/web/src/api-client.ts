@@ -21,6 +21,7 @@ import {
   InvoiceArtifactReviewQueueItem,
   InvoiceArtifactStorageReadiness,
   InvoiceControlValidationInput,
+  InvoiceEvidencePacketResponse,
   InvoiceGradeArtifactRegistrationInput,
   InvoiceGradeArtifactVerificationInput,
   ComparisonAnalyticsResponse,
@@ -255,6 +256,10 @@ export interface PolyCostClient {
     importRunId: string,
     token: string,
   ): Promise<InvoiceArtifactPolicyExceptionQueueItem[]>;
+  getInvoiceEvidencePacket(
+    reconciliationId: string,
+    token: string,
+  ): Promise<InvoiceEvidencePacketResponse>;
   registerInvoiceGradeArtifact(
     reconciliationId: string,
     input: InvoiceGradeArtifactRegistrationInput,
@@ -737,6 +742,15 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
       return requestJson<InvoiceArtifactPolicyExceptionQueueItem[]>(
         baseUrl,
         `/billing/imports/${encodeURIComponent(importRunId)}/artifact-policy-exceptions`,
+        {
+          headers: authorizationHeaders(token),
+        },
+      );
+    },
+    getInvoiceEvidencePacket(reconciliationId, token) {
+      return requestJson<InvoiceEvidencePacketResponse>(
+        baseUrl,
+        `/billing/reconciliations/${encodeURIComponent(reconciliationId)}/evidence-packet`,
         {
           headers: authorizationHeaders(token),
         },

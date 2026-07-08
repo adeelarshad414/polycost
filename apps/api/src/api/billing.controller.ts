@@ -45,6 +45,11 @@ export class BillingController {
     return this.billingService.listInvoiceArtifactPolicyExceptions(importRunId, request.auth!);
   }
 
+  @Get('reconciliations/:id/evidence-packet')
+  getInvoiceEvidencePacket(@Param('id') reconciliationId: string, @Req() request: RequestWithAuth) {
+    return this.billingService.getInvoiceEvidencePacket(reconciliationId, request.auth!);
+  }
+
   @Post('reconciliations/:id/artifacts')
   registerInvoiceGradeArtifact(
     @Param('id') reconciliationId: string,

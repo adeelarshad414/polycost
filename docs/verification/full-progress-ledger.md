@@ -381,6 +381,19 @@ Evidence:
   plus web `2` suites / `89` tests. Full local `npm run check` passed afterward
   with API `55` suites / `464` tests, web `11` suites / `146` tests, graph
   validation `320` nodes / `320` edges, and progress verification `153` anchors.
+- Phase 2.34 invoice evidence packet export focused regressions passed: API `2`
+  suites / `75` tests (`auth-billing`, `api-database.repository`) and web `2`
+  suites / `90` tests (`App`, `api-client`). The phase adds an Owner/Admin
+  metadata-only evidence-packet endpoint and workspace JSON download for
+  reconciliation reviewer handoff, including reconciliation/import metadata,
+  readiness, match summary, artifact register evidence, sanitized artifact metadata,
+  control counts, caveats, and invoice-grade disclaimers while excluding raw artifact
+  bytes. The focused `npm run ci:lint` gate passed with zero ESLint/typecheck
+  warnings, and `npm run test:production-readiness` passed with API `14` suites /
+  `198` tests plus web `2` suites / `90` tests. Full local `npm run check` passed
+  afterward with API `55` suites / `465` tests, web `11` suites / `147` tests,
+  graph validation `320` nodes / `320` edges, and progress verification `153`
+  anchors.
 - Phase 2.9 focused regressions passed: API `3` suites / `52` tests
   (`auth-billing`, `diagram-parser`, `llm-classifier`) and web `1` suite / `57`
   tests (`App.spec.tsx`).
