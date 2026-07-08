@@ -5619,9 +5619,11 @@ function DiagramReviewPanel({
   onAddRequirement: (serviceType: string) => void;
 }) {
   const layoutPreview = diagramLayoutPreview(result.graph.nodes, result.graph.edges);
+  const visualPreview = result.graph.visualPreviews?.[0];
   const renderingCaveat = result.graph.nodes
     .map((node) => node.visual?.renderingWarnings?.[0])
     .find((warning): warning is string => Boolean(warning));
+  const visualPreviewCaveat = visualPreview?.warnings[0];
 
   return (
     <section className="diagram-review-panel" aria-label="Diagram parse review">
@@ -5632,45 +5634,62 @@ function DiagramReviewPanel({
           {result.review.components.length} services · {result.graph.edges.length} links ·{' '}
           {result.review.unresolvedClassifications.length} unresolved
         </small>
-        {renderingCaveat ? <small>{renderingCaveat}</small> : null}
+        {visualPreview ? (
+          <small>
+            SVG preview · {visualPreview.nodeCount} nodes · {visualPreview.edgeCount} links
+          </small>
+        ) : null}
+        {(visualPreviewCaveat ?? renderingCaveat) ? (
+          <small>{visualPreviewCaveat ?? renderingCaveat}</small>
+        ) : null}
       </div>
       <div
-        className={`diagram-preview-pane${layoutPreview ? ' diagram-preview-pane-layout' : ''}`}
+        className={`diagram-preview-pane${
+          visualPreview || layoutPreview ? ' diagram-preview-pane-layout' : ''
+        }`}
         aria-label="Diagram structure preview"
       >
-        {layoutPreview
-          ? [
-              <svg
-                className="diagram-preview-edges"
-                viewBox="0 0 100 100"
-                preserveAspectRatio="none"
-                key="edges"
-                aria-hidden="true"
-              >
-                {layoutPreview.edges.map((edge) => (
-                  <line key={edge.id} x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} />
-                ))}
-              </svg>,
-              ...layoutPreview.nodes.map((node) => (
-                <span
-                  className={`diagram-preview-node diagram-preview-node-${node.kind}`}
-                  key={node.id}
-                  style={node.style}
-                  title={node.visual?.pageName ?? node.sourceRef}
-                >
-                  {node.displayLabel}
-                </span>
-              )),
-            ]
-          : result.graph.nodes.slice(0, 12).map((node) => (
+        {visualPreview ? (
+          <img
+            className="diagram-preview-svg"
+            src={svgDataUrl(visualPreview.svg)}
+            alt={`Approximate diagram preview for ${visualPreview.pageName ?? 'VSDX page'}`}
+          />
+        ) : layoutPreview ? (
+          [
+            <svg
+              className="diagram-preview-edges"
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+              key="edges"
+              aria-hidden="true"
+            >
+              {layoutPreview.edges.map((edge) => (
+                <line key={edge.id} x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} />
+              ))}
+            </svg>,
+            ...layoutPreview.nodes.map((node) => (
               <span
                 className={`diagram-preview-node diagram-preview-node-${node.kind}`}
                 key={node.id}
+                style={node.style}
+                title={node.visual?.pageName ?? node.sourceRef}
               >
                 {node.displayLabel}
               </span>
-            ))}
-        {!layoutPreview && result.graph.nodes.length > 12 ? (
+            )),
+          ]
+        ) : (
+          result.graph.nodes.slice(0, 12).map((node) => (
+            <span
+              className={`diagram-preview-node diagram-preview-node-${node.kind}`}
+              key={node.id}
+            >
+              {node.displayLabel}
+            </span>
+          ))
+        )}
+        {!visualPreview && !layoutPreview && result.graph.nodes.length > 12 ? (
           <span className="diagram-preview-node diagram-preview-node-more">
             +{result.graph.nodes.length - 12} more
           </span>
@@ -5765,6 +5784,10 @@ function DiagramReviewPanel({
       </label>
     </section>
   );
+}
+
+function svgDataUrl(svg: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
 function diagramLayoutPreview(

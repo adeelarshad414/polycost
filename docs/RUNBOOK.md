@@ -166,7 +166,9 @@ Actions:
 
 1. Confirm the file is editable source, not an image/PDF.
 2. Check the review panel for unresolved nodes.
-3. For VSDX, use the page/container/bounds evidence as extraction hints only.
+3. For VSDX, compare the approximate SVG preview plus page/container/bounds evidence
+   against the source diagram. Treat theme/icon/text-wrap differences as expected
+   unless the topology, labels, or service classification are wrong.
 4. If using Tier 3 LLM classification, verify endpoint/model and Vault key.
 5. Add a sanitized fixture before claiming a parser fix.
 

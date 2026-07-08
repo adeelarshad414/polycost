@@ -44,8 +44,9 @@ Diagram mode:
 - Mermaid: paste `.mmd` source or flowchart text.
 - diagrams.net/draw.io: export `.drawio` or XML source, not a screenshot.
 - Lucidchart: export CSV shape data.
-- Visio: export VSDX. PolyCost performs layout-aware extraction; it does not render
-  the full visual diagram.
+- Visio: export VSDX. PolyCost performs layout-aware extraction and emits an
+  approximate SVG preview for positioned shapes; it does not perform pixel-perfect
+  Visio rendering.
 
 After a diagram upload, review classified services, unresolved nodes, assumptions,
 and ignored decoration before running the comparison.
@@ -158,4 +159,3 @@ For finance/FinOps:
 2. Export CSV/Excel.
 3. Inspect budget/alert and reconciliation readiness sections.
 4. Call out that invoice-grade actual spend and private discounts are future work.
-

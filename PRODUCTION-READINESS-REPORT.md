@@ -61,6 +61,7 @@ performance/accessibility/best-practices/SEO metrics.
 | INV-TRACE-002  | Improved      | Provider-export rows now persist `_polycost` source fingerprints/column coverage; reconciliation evidence reports coverage, match summary, readiness, and caveats                         |
 | INV-TRACE-003  | Improved      | Azure Cost Management CSV and nested GCP Billing Export JSON now have focused mapper coverage, allocation tag/label recognition, and fallback-cost readiness evidence                     |
 | VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                               |
+| VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                               |
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                          |
 | UI-AUTH-002    | Improved      | Workspace billing panel now surfaces reconciliation readiness, source-fingerprint coverage, SKU match coverage, and the invoice-of-record caveat                                          |
 | UI-AUTH-003    | Improved      | Active workspace switching is now backend-backed, membership-checked, and exposed in the signed-in account panel                                                                          |
@@ -320,9 +321,9 @@ Machine-readable token evidence:
   actual provider invoice-of-record reconciliation are not complete. Phase 2.9 and
   Phase 2.10 improve source-row traceability, native AWS/Azure/GCP export mapping,
   allocation evidence, and estimate-vs-actual reconciliation evidence.
-- VSDX support remains extraction/evidence oriented, not full Visio visual rendering.
-  Phase 2.9 adds page geometry, normalized preview bounds, and explicit layout-extraction
-  caveats.
+- VSDX support now includes extraction/evidence and approximate SVG previews, not full
+  Visio semantic rendering. Phase 2.9 adds page geometry, normalized preview bounds, and
+  explicit layout-extraction caveats; Phase 2.18 adds sanitized SVG preview artifacts.
 - Production LLM classifier quality requires a real endpoint/model, Vault secret, monitored
   corpus evaluation, and false-positive tracking. Phase 2.9 adds an explicit readiness
   surface so stub/unconfigured mode is not reported as production-connected.

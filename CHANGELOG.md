@@ -53,6 +53,8 @@ once tagged releases begin.
   staging/production config guards.
 - Audit export receiver smoke scripts for local HMAC contract proof and staging
   SIEM/WORM canary acceptance evidence.
+- Approximate VSDX SVG visual previews generated from extracted page geometry, with
+  browser rendering and explicit non-pixel-perfect Visio caveats.
 
 ### Notes
 

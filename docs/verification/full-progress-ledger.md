@@ -142,7 +142,9 @@ Evidence:
 
 Deferred:
 
-- VSDX support is layout-aware extraction and evidence, not full Visio visual rendering.
+- VSDX support now includes layout-aware extraction, evidence, and approximate SVG
+  previews, but it is still not full Visio visual rendering; themes, icons, formulas,
+  embedded media, and exact text wrapping remain future scope.
 - Production LLM accuracy depends on the operator configuring a real endpoint/model
   and Vault API key, then evaluating the chosen model against a production corpus.
 

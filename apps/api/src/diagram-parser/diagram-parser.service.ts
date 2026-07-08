@@ -18,6 +18,7 @@ import {
   DiagramParseRequest,
   DiagramParseResult,
   DiagramReviewComponent,
+  DiagramVisualPreview,
   ExtractedDiagram,
   ExtractedDiagramNode,
 } from './diagram-parser.types';
@@ -207,6 +208,7 @@ export class DiagramParserService {
         nodes: graphNodes,
         edges: extracted.edges.slice(0, DIAGRAM_MAX_EDGES),
         ignoredNodes,
+        ...visualPreviewsForGraph(extracted.format, graphNodes, extracted.edges),
       },
       classifiedNodes,
       review: {
@@ -218,6 +220,209 @@ export class DiagramParserService {
       fieldsRequiringReview,
     };
   }
+}
+
+const MAX_VISUAL_PREVIEW_PAGES = 3;
+const MAX_VISUAL_PREVIEW_NODES_PER_PAGE = 60;
+const SVG_PREVIEW_PADDING = 0.35;
+
+function visualPreviewsForGraph(
+  format: ExtractedDiagram['format'],
+  nodes: DiagramGraphNode[],
+  edges: ExtractedDiagram['edges'],
+): { visualPreviews: DiagramVisualPreview[] } | Record<string, never> {
+  if (format !== 'vsdx') {
+    return {};
+  }
+
+  const nodesByPage = new Map<string, DiagramGraphNode[]>();
+
+  for (const node of nodes) {
+    if (!node.bounds || !node.visual?.pageRef) {
+      continue;
+    }
+
+    const pageNodes = nodesByPage.get(node.visual.pageRef) ?? [];
+    pageNodes.push(node);
+    nodesByPage.set(node.visual.pageRef, pageNodes);
+  }
+
+  const visualPreviews = [...nodesByPage.entries()]
+    .slice(0, MAX_VISUAL_PREVIEW_PAGES)
+    .map(([pageRef, pageNodes]) => visualPreviewForPage(pageRef, pageNodes, edges))
+    .filter((preview): preview is DiagramVisualPreview => Boolean(preview));
+
+  return visualPreviews.length > 0 ? { visualPreviews } : {};
+}
+
+function visualPreviewForPage(
+  pageRef: string,
+  pageNodes: DiagramGraphNode[],
+  edges: ExtractedDiagram['edges'],
+): DiagramVisualPreview | undefined {
+  const boundedNodes = pageNodes
+    .filter((node) => node.bounds)
+    .slice(0, MAX_VISUAL_PREVIEW_NODES_PER_PAGE);
+
+  if (boundedNodes.length === 0) {
+    return undefined;
+  }
+
+  const pageWidth =
+    firstFiniteNumber(boundedNodes.map((node) => node.visual?.pageWidth)) ??
+    Math.max(...boundedNodes.map((node) => node.bounds!.x + node.bounds!.width));
+  const pageHeight =
+    firstFiniteNumber(boundedNodes.map((node) => node.visual?.pageHeight)) ??
+    Math.max(...boundedNodes.map((node) => node.bounds!.y + node.bounds!.height));
+  const viewBoxWidth = roundPreview(pageWidth + SVG_PREVIEW_PADDING * 2);
+  const viewBoxHeight = roundPreview(pageHeight + SVG_PREVIEW_PADDING * 2);
+  const nodeCenters = new Map(
+    boundedNodes.map((node) => [
+      node.id,
+      {
+        x: roundPreview(node.bounds!.x + node.bounds!.width / 2 + SVG_PREVIEW_PADDING),
+        y: roundPreview(
+          pageHeight - node.bounds!.y - node.bounds!.height / 2 + SVG_PREVIEW_PADDING,
+        ),
+      },
+    ]),
+  );
+  const samePageEdges = edges
+    .map((edge) => {
+      const source = nodeCenters.get(edge.sourceId);
+      const target = nodeCenters.get(edge.targetId);
+
+      return source && target
+        ? {
+            edge,
+            source,
+            target,
+          }
+        : undefined;
+    })
+    .filter(
+      (
+        edge,
+      ): edge is {
+        edge: ExtractedDiagram['edges'][number];
+        source: { x: number; y: number };
+        target: { x: number; y: number };
+      } => Boolean(edge),
+    );
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${escapeSvgAttribute(
+      `Approximate VSDX preview for ${pageNodes[0]?.visual?.pageName ?? pageRef}`,
+    )}" viewBox="0 0 ${viewBoxWidth} ${viewBoxHeight}">`,
+    '<rect x="0" y="0" width="100%" height="100%" rx="0.16" fill="white"/>',
+    `<g stroke="gainsboro" stroke-width="0.015">${gridLines(viewBoxWidth, viewBoxHeight).join('')}</g>`,
+    ...samePageEdges.map(
+      ({ edge, source, target }) =>
+        `<line data-edge-id="${escapeSvgAttribute(edge.id)}" x1="${source.x}" y1="${source.y}" x2="${target.x}" y2="${target.y}" stroke="steelblue" stroke-width="0.04" stroke-linecap="round"/>`,
+    ),
+    ...boundedNodes.map((node) => svgNode(node, pageHeight)),
+    '</svg>',
+  ].join('');
+  const warnings = [
+    'approximate SVG preview from VSDX geometry, not full Visio visual rendering',
+    'does not evaluate Visio themes, formulas, icons, embedded media, or text wrapping',
+  ];
+
+  if (pageNodes.length > boundedNodes.length) {
+    warnings.push(
+      `preview capped at ${MAX_VISUAL_PREVIEW_NODES_PER_PAGE} positioned nodes on this page`,
+    );
+  }
+
+  return {
+    format: 'svg',
+    renderingMode: 'approximate-vsdx-svg',
+    pageRef,
+    pageName: pageNodes[0]?.visual?.pageName ?? pageRef,
+    width: viewBoxWidth,
+    height: viewBoxHeight,
+    nodeCount: boundedNodes.length,
+    edgeCount: samePageEdges.length,
+    svg,
+    warnings,
+  };
+}
+
+function svgNode(node: DiagramGraphNode, pageHeight: number): string {
+  const bounds = node.bounds!;
+  const x = roundPreview(bounds.x + SVG_PREVIEW_PADDING);
+  const y = roundPreview(pageHeight - bounds.y - bounds.height + SVG_PREVIEW_PADDING);
+  const width = roundPreview(bounds.width);
+  const height = roundPreview(bounds.height);
+  const fill = safeSvgColor(node.visual?.fillColor) ?? 'white';
+  const stroke = safeSvgColor(node.visual?.lineColor) ?? strokeForNodeKind(node.kind);
+  const label = ellipsizeSvgText(node.displayLabel, 44);
+  const fontSize = Math.max(0.12, Math.min(0.24, height / 5));
+  const textY = roundPreview(y + height / 2 + fontSize / 3);
+
+  return [
+    `<g data-node-id="${escapeSvgAttribute(node.id)}">`,
+    `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="0.08" fill="${fill}" fill-opacity="0.16" stroke="${stroke}" stroke-width="0.035"/>`,
+    `<text x="${roundPreview(x + width / 2)}" y="${textY}" text-anchor="middle" font-family="Arial, sans-serif" font-size="${roundPreview(
+      fontSize,
+    )}" font-weight="700" fill="black">${escapeSvgText(label)}</text>`,
+    '</g>',
+  ].join('');
+}
+
+function gridLines(width: number, height: number): string[] {
+  const lines: string[] = [];
+  const step = Math.max(1, Math.round(Math.min(width, height) / 8));
+
+  for (let x = step; x < width; x += step) {
+    lines.push(`<line x1="${x}" y1="0" x2="${x}" y2="${height}"/>`);
+  }
+
+  for (let y = step; y < height; y += step) {
+    lines.push(`<line x1="0" y1="${y}" x2="${width}" y2="${y}"/>`);
+  }
+
+  return lines;
+}
+
+function firstFiniteNumber(values: Array<number | undefined>): number | undefined {
+  return values.find(
+    (value): value is number => typeof value === 'number' && Number.isFinite(value),
+  );
+}
+
+function safeSvgColor(value: string | undefined): string | undefined {
+  return value && /^#[0-9A-F]{6}$/i.test(value) ? value : undefined;
+}
+
+function strokeForNodeKind(kind: DiagramGraphNode['kind']): string {
+  switch (kind) {
+    case 'resource':
+      return 'seagreen';
+    case 'unknown':
+      return 'darkorange';
+    case 'decorative':
+      return 'slategray';
+    case 'connector':
+      return 'steelblue';
+    default:
+      return 'slategray';
+  }
+}
+
+function ellipsizeSvgText(value: string, maxLength: number): string {
+  return value.length > maxLength ? `${value.slice(0, maxLength - 1)}...` : value;
+}
+
+function escapeSvgText(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function escapeSvgAttribute(value: string): string {
+  return escapeSvgText(value).replace(/"/g, '&quot;');
+}
+
+function roundPreview(value: number): number {
+  return Math.round(value * 1000) / 1000;
 }
 
 function buildDraftNws({
