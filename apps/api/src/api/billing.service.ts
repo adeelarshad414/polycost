@@ -5,6 +5,8 @@ import { ApiForbiddenError, ApiNotFoundError, ApiValidationError } from './api-e
 import { ApiDatabaseRepository } from './api-database.repository';
 import { AuthIdentity } from './auth.types';
 import {
+  InvoiceArtifactBlobRecord,
+  InvoiceArtifactBlobUploadInput,
   BillingImportInput,
   BillingImportResponse,
   BillingProviderExportInput,
@@ -23,6 +25,15 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const MAX_IMPORT_ROWS = 10_000;
 const MAX_PROVIDER_EXPORT_BYTES = 4 * 1024 * 1024;
+const MAX_INVOICE_ARTIFACT_BLOB_BYTES = 1024 * 1024;
+const INVOICE_ARTIFACT_MIME_TYPES = [
+  'application/pdf',
+  'application/json',
+  'text/csv',
+  'text/plain',
+  'image/png',
+  'image/jpeg',
+] as const;
 const SOURCE_TYPES: BillingSourceType[] = [
   'aws-cur',
   'azure-cost-management',
@@ -424,6 +435,132 @@ export class BillingService {
           }
         : {}),
     });
+  }
+
+  async uploadInvoiceArtifactBlob(
+    reconciliationId: string,
+    artifactId: string,
+    body: unknown,
+    identity: AuthIdentity,
+  ): Promise<InvoiceReconciliationRecord> {
+    assertBillingAdmin(identity);
+    const input = parseInvoiceArtifactBlobUploadInput(body);
+    const decoded = decodeInvoiceArtifactBlob(input);
+    const reconciliation = await this.repository.getInvoiceReconciliation(reconciliationId);
+
+    if (!reconciliation) {
+      throw new ApiNotFoundError(`Invoice reconciliation ${reconciliationId} was not found`);
+    }
+
+    const importRun = await this.repository.getBillingImport(reconciliation.importRunId);
+
+    if (!importRun) {
+      throw new ApiNotFoundError(
+        `Billing import ${reconciliation.importRunId} was not found for reconciliation ${reconciliationId}`,
+      );
+    }
+
+    assertTeamAccess(importRun.teamId, identity);
+
+    const artifacts = invoiceGradeArtifactsFromEvidence(reconciliation.evidence);
+    const artifact = artifacts.find((candidate) => candidate.id === artifactId);
+
+    if (!artifact) {
+      throw new ApiNotFoundError(
+        `Invoice artifact ${artifactId} was not found for reconciliation ${reconciliationId}`,
+      );
+    }
+
+    if (artifact.sha256 && artifact.sha256 !== decoded.sha256) {
+      throw new ApiValidationError('artifact upload checksum does not match registered metadata', [
+        {
+          field: 'content',
+          issue:
+            'decoded artifact bytes must match the SHA-256 digest registered for this artifact',
+        },
+      ]);
+    }
+
+    const uploadedAt = new Date().toISOString();
+    const evidence = replaceInvoiceGradeArtifactEvidence(
+      reconciliation,
+      storedInvoiceGradeArtifact(artifact, decoded, uploadedAt, identity),
+    );
+
+    return this.repository.saveInvoiceArtifactBlobAndUpdateEvidence({
+      reconciliationId,
+      artifactId,
+      ...(importRun.teamId ? { teamId: importRun.teamId } : {}),
+      fileName: decoded.fileName,
+      mimeType: decoded.mimeType,
+      contentSha256: decoded.sha256,
+      content: decoded.content,
+      uploadedByAccountId: identity.accountId,
+      uploadedAt,
+      evidence,
+      ...(importRun.teamId
+        ? {
+            audit: {
+              teamId: importRun.teamId,
+              actorAccountId: identity.accountId,
+              action: 'billing.reconciliation.artifact_blob_uploaded',
+              targetType: 'billing_reconciliation',
+              targetId: reconciliationId,
+              metadata: {
+                importRunId: importRun.id,
+                comparisonId: reconciliation.comparisonId,
+                provider: reconciliation.provider,
+                artifactId,
+                fileName: decoded.fileName,
+                mimeType: decoded.mimeType,
+                contentSha256: decoded.sha256,
+                contentSizeBytes: decoded.content.length,
+              },
+            },
+          }
+        : {}),
+    });
+  }
+
+  async downloadInvoiceArtifactBlob(
+    reconciliationId: string,
+    artifactId: string,
+    identity: AuthIdentity,
+  ): Promise<InvoiceArtifactBlobRecord> {
+    assertBillingAdmin(identity);
+    const reconciliation = await this.repository.getInvoiceReconciliation(reconciliationId);
+
+    if (!reconciliation) {
+      throw new ApiNotFoundError(`Invoice reconciliation ${reconciliationId} was not found`);
+    }
+
+    const importRun = await this.repository.getBillingImport(reconciliation.importRunId);
+
+    if (!importRun) {
+      throw new ApiNotFoundError(
+        `Billing import ${reconciliation.importRunId} was not found for reconciliation ${reconciliationId}`,
+      );
+    }
+
+    assertTeamAccess(importRun.teamId, identity);
+
+    const artifacts = invoiceGradeArtifactsFromEvidence(reconciliation.evidence);
+
+    if (!artifacts.some((artifact) => artifact.id === artifactId)) {
+      throw new ApiNotFoundError(
+        `Invoice artifact ${artifactId} was not found for reconciliation ${reconciliationId}`,
+      );
+    }
+
+    const blob = await this.repository.getInvoiceArtifactBlob(reconciliationId, artifactId);
+
+    if (!blob) {
+      throw new ApiNotFoundError(
+        `Invoice artifact blob ${artifactId} was not found for reconciliation ${reconciliationId}`,
+      );
+    }
+
+    return blob;
   }
 }
 
@@ -1471,6 +1608,126 @@ function parseArtifactVerificationStatus(
   ]);
 }
 
+function parseInvoiceArtifactBlobUploadInput(body: unknown): InvoiceArtifactBlobUploadInput {
+  const record = requireRecord(body, 'Invoice artifact blob upload request body must be an object');
+  const fileName = parseArtifactFileName(record.fileName);
+  const mimeType = parseArtifactMimeType(record.mimeType);
+  const content = parseRequiredString(
+    record.content,
+    'content',
+    MAX_INVOICE_ARTIFACT_BLOB_BYTES * 2,
+  );
+  const encoding = record.encoding === 'base64' ? 'base64' : 'text';
+
+  return {
+    fileName,
+    mimeType,
+    content,
+    encoding,
+    ...(record.sha256 !== undefined ? { sha256: parseSha256(record.sha256, 'sha256') } : {}),
+  };
+}
+
+function parseArtifactFileName(value: unknown): string {
+  const fileName = parseRequiredString(value, 'fileName', 180);
+
+  if (
+    fileName.includes('/') ||
+    fileName.includes('\\') ||
+    hasControlCharacter(fileName) ||
+    fileName === '.' ||
+    fileName === '..'
+  ) {
+    throw new ApiValidationError('fileName is invalid', [
+      {
+        field: 'fileName',
+        issue: 'must be a plain file name without path separators',
+      },
+    ]);
+  }
+
+  return fileName;
+}
+
+function parseArtifactMimeType(value: unknown): (typeof INVOICE_ARTIFACT_MIME_TYPES)[number] {
+  const mimeType = parseRequiredString(value, 'mimeType', 80).toLowerCase();
+
+  if (
+    INVOICE_ARTIFACT_MIME_TYPES.includes(mimeType as (typeof INVOICE_ARTIFACT_MIME_TYPES)[number])
+  ) {
+    return mimeType as (typeof INVOICE_ARTIFACT_MIME_TYPES)[number];
+  }
+
+  throw new ApiValidationError('mimeType is unsupported', [
+    {
+      field: 'mimeType',
+      issue: `must be one of ${INVOICE_ARTIFACT_MIME_TYPES.join(', ')}`,
+    },
+  ]);
+}
+
+function hasControlCharacter(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const code = character.charCodeAt(0);
+
+    return code < 32 || code === 127;
+  });
+}
+
+function decodeInvoiceArtifactBlob(input: InvoiceArtifactBlobUploadInput): {
+  fileName: string;
+  mimeType: string;
+  content: Buffer;
+  sha256: string;
+} {
+  const content =
+    input.encoding === 'base64'
+      ? decodeBase64ArtifactContent(input.content)
+      : Buffer.from(input.content, 'utf8');
+
+  if (content.length === 0 || content.length > MAX_INVOICE_ARTIFACT_BLOB_BYTES) {
+    throw new ApiValidationError('invoice artifact blob size is invalid', [
+      {
+        field: 'content',
+        issue: `must decode to between 1 byte and ${MAX_INVOICE_ARTIFACT_BLOB_BYTES} bytes`,
+      },
+    ]);
+  }
+
+  const contentSha256 = sha256Buffer(content);
+
+  if (input.sha256 && input.sha256 !== contentSha256) {
+    throw new ApiValidationError('invoice artifact blob checksum is invalid', [
+      {
+        field: 'sha256',
+        issue: 'must match the decoded content SHA-256 digest',
+      },
+    ]);
+  }
+
+  return {
+    fileName: input.fileName,
+    mimeType: input.mimeType,
+    content,
+    sha256: contentSha256,
+  };
+}
+
+function decodeBase64ArtifactContent(content: string): Buffer {
+  const normalized = content.replace(/\s+/g, '');
+
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(normalized) || normalized.length % 4 !== 0) {
+    throw new ApiValidationError('content must be base64 encoded', [
+      {
+        field: 'content',
+        issue: 'must be valid base64 when encoding is base64',
+      },
+    ]);
+  }
+
+  return Buffer.from(normalized, 'base64');
+}
+
 function parseProvider(value: unknown): BillingImportInput['provider'] {
   if (value === 'aws' || value === 'azure' || value === 'gcp') {
     return value;
@@ -2306,6 +2563,33 @@ function verifiedInvoiceGradeArtifact(
   };
 }
 
+function storedInvoiceGradeArtifact(
+  artifact: InvoiceGradeArtifactRecord,
+  blob: {
+    fileName: string;
+    mimeType: string;
+    content: Buffer;
+    sha256: string;
+  },
+  uploadedAt: string,
+  identity: AuthIdentity,
+): InvoiceGradeArtifactRecord {
+  return {
+    ...artifact,
+    sha256: artifact.sha256 ?? blob.sha256,
+    storedBlob: {
+      storageStatus: 'stored',
+      storageMode: 'database-bytea',
+      fileName: blob.fileName,
+      mimeType: blob.mimeType,
+      contentSha256: blob.sha256,
+      contentSizeBytes: blob.content.length,
+      uploadedAt,
+      uploadedByAccountId: identity.accountId,
+    },
+  };
+}
+
 function invoiceGradeArtifactsFromEvidence(
   evidence: Record<string, unknown>,
 ): InvoiceGradeArtifactRecord[] {
@@ -2814,6 +3098,10 @@ function stableJson(value: unknown): string {
 }
 
 function sha256(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function sha256Buffer(value: Buffer): string {
   return createHash('sha256').update(value).digest('hex');
 }
 

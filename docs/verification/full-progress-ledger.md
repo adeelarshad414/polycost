@@ -56,8 +56,11 @@ Evidence:
   registration only, not invoice verification.
 - Registered artifact metadata can now be marked `verified` or `rejected` with review
   evidence, checksum/control-total mismatch rejection, verified counts, and readiness
-  updates limited to covered checks. This is still metadata/control verification, not
-  durable artifact storage.
+  updates limited to covered checks.
+- Registered artifact files can now be stored and downloaded through guarded billing
+  routes. The app hashes raw decoded bytes, stores the blob in
+  `invoice_artifact_blobs`, writes only metadata into reconciliation evidence, and
+  records a transaction-coupled audit event.
 - `docs/PROVIDER-CREDENTIALS.md` states the current production swap procedure and
   explicitly limits real provider mode to catalog list prices, not invoices.
 
@@ -70,9 +73,11 @@ Deferred:
   estimate-vs-actual reconciliation evidence. Classified adjustment and commitment
   rows are separated from usage-comparable variance, but provider-account-specific
   amortization, allocation proof, private pricing, and invoice controls remain
-  future work. The invoice-grade readiness matrix, artifact register, and
-  verification status expose those blockers; they do not remove unrelated or
-  unverified evidence requirements.
+  future work. The invoice-grade readiness matrix, artifact register, stored-blob
+  metadata, and verification status expose those blockers; they do not remove
+  unrelated or unverified evidence requirements. Current artifact storage is
+  database-backed for the OSS/self-hosted baseline, not enterprise object storage
+  with KMS, malware scanning, legal hold, or reviewer workflow automation.
 
 ## Phase B - Input Modes And Requirement Pipeline
 

@@ -11,6 +11,8 @@ import {
   BillingImportInput,
   BillingImportResponse,
   BillingProviderExportInput,
+  InvoiceArtifactBlobRecord,
+  InvoiceArtifactBlobUploadInput,
   InvoiceGradeArtifactRegistrationInput,
   InvoiceGradeArtifactVerificationInput,
   ComparisonAnalyticsResponse,
@@ -248,6 +250,17 @@ export interface PolyCostClient {
     input: InvoiceGradeArtifactVerificationInput,
     token: string,
   ): Promise<InvoiceReconciliationRecord>;
+  uploadInvoiceArtifactBlob(
+    reconciliationId: string,
+    artifactId: string,
+    input: InvoiceArtifactBlobUploadInput,
+    token: string,
+  ): Promise<InvoiceReconciliationRecord>;
+  downloadInvoiceArtifactBlob(
+    reconciliationId: string,
+    artifactId: string,
+    token: string,
+  ): Promise<InvoiceArtifactBlobRecord>;
 }
 
 export function configuredApiBaseUrl(documentRef: Document = document): string {
@@ -687,6 +700,30 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
           method: 'POST',
           headers: authorizationHeaders(token),
           body: JSON.stringify(input),
+        },
+      );
+    },
+    uploadInvoiceArtifactBlob(reconciliationId, artifactId, input, token) {
+      return requestJson<InvoiceReconciliationRecord>(
+        baseUrl,
+        `/billing/reconciliations/${encodeURIComponent(
+          reconciliationId,
+        )}/artifacts/${encodeURIComponent(artifactId)}/blob`,
+        {
+          method: 'POST',
+          headers: authorizationHeaders(token),
+          body: JSON.stringify(input),
+        },
+      );
+    },
+    downloadInvoiceArtifactBlob(reconciliationId, artifactId, token) {
+      return requestJson<InvoiceArtifactBlobRecord>(
+        baseUrl,
+        `/billing/reconciliations/${encodeURIComponent(
+          reconciliationId,
+        )}/artifacts/${encodeURIComponent(artifactId)}/blob`,
+        {
+          headers: authorizationHeaders(token),
         },
       );
     },

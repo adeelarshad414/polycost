@@ -436,7 +436,8 @@ export type TeamAuditAction =
   | 'billing.import.created'
   | 'billing.reconciliation.created'
   | 'billing.reconciliation.artifact_registered'
-  | 'billing.reconciliation.artifact_verified';
+  | 'billing.reconciliation.artifact_verified'
+  | 'billing.reconciliation.artifact_blob_uploaded';
 
 export type TeamAuditTargetType =
   'team' | 'invitation' | 'member' | 'sso_provider' | 'billing_import' | 'billing_reconciliation';
@@ -614,6 +615,28 @@ export interface InvoiceGradeArtifactVerificationInput {
   sha256?: string;
   controlTotalUsd?: number;
   notes?: string;
+}
+
+export interface InvoiceArtifactBlobUploadInput {
+  fileName: string;
+  mimeType: string;
+  content: string;
+  encoding?: 'text' | 'base64';
+  sha256?: string;
+}
+
+export interface InvoiceArtifactBlobRecord {
+  id: string;
+  reconciliationId: string;
+  artifactId: string;
+  teamId?: string;
+  fileName: string;
+  mimeType: string;
+  contentSha256: string;
+  contentSizeBytes: number;
+  contentBase64: string;
+  uploadedByAccountId?: string;
+  uploadedAt: string;
 }
 
 export interface BillingImportResponse {

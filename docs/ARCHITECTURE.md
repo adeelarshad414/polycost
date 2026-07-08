@@ -76,6 +76,9 @@ Pricing evidence is intentionally first-class:
 - invoice artifacts can be registered and marked verified/rejected with review
   evidence, checksum/control-total controls, and readiness updates limited to the
   covered evidence check
+- invoice artifact files can be stored in the application database with raw-byte
+  SHA-256, size/MIME/file-name validation, metadata-only reconciliation evidence,
+  and transaction-coupled audit events
 - invoice-grade readiness is represented as a matrix of evidence checks, blockers,
   and required provider artifacts rather than a yes/no claim
 - exports carry methodology and data-freshness context
@@ -163,8 +166,9 @@ Health and operations:
 
 ## Known Architecture Boundaries
 
-- Full invoice-grade pricing, durable artifact storage, and provider invoice-of-record
-  reconciliation remain future work.
+- Full invoice-grade pricing, provider invoice-of-record reconciliation, and
+  enterprise artifact handling such as object storage/KMS, malware scanning, legal
+  hold, and reviewer workflow UX remain future work.
 - VSDX parsing is layout-aware extraction, not full Visio rendering.
 - Production LLM quality depends on a real endpoint/model, Vault secret, and corpus
   evaluation.

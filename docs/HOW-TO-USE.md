@@ -164,7 +164,10 @@ For finance/FinOps:
 6. Review commitment evidence requirements for provider inventory, amortization
    periods, and allocation proof.
 7. Review the invoice-grade readiness blockers and required provider artifacts.
-8. Register and verify a demo invoice artifact packet. Show that PolyCost records
-   checksum/control-total evidence for the artifact while keeping unrelated
-   invoice-grade blockers visible.
-9. Call out that invoice-grade actual spend and private discounts are future work.
+8. Register a demo invoice artifact packet, store its evidence file, download the
+   stored file, and then verify the artifact. Show that PolyCost records stored-file
+   checksum/control-total evidence while keeping unrelated invoice-grade blockers
+   visible.
+9. Call out that invoice-grade actual spend, private discounts, object storage/KMS,
+   malware scanning, retention policy, and provider invoice-of-record validation are
+   future work.
