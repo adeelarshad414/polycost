@@ -559,6 +559,27 @@ describe('App', () => {
       'Commitment evidence needed: 4 inventory · 2 amortization · 4 allocation',
     );
     expect(text(container)).toContain('Adjustments: tax $8.00');
+    expect(text(container)).toContain('Artifact metadata: 0 registered · 0 verified');
+
+    await click(buttonByText(container, 'Register invoice artifact'));
+    await settleAsyncEffects();
+
+    expect(client.registerInvoiceGradeArtifact).toHaveBeenCalledWith(
+      '66666666-6666-4666-8666-666666666666',
+      expect.objectContaining({
+        type: 'provider-invoice',
+        displayName: 'AWS invoice control packet',
+        reference: 'demo://invoice-artifacts/66666666-6666-4666-8666-666666666666',
+        controlTotalUsd: 107,
+        billingPeriodStart: '2026-06-01',
+        billingPeriodEnd: '2026-06-30',
+      }),
+      'session-token',
+    );
+    expect(text(container)).toContain(
+      'Artifact metadata: 1 registered · 0 verified · metadata registered not verified',
+    );
+    expect(text(container)).toContain('Artifact metadata is registered for traceability only');
 
     unmount();
   });
@@ -4689,6 +4710,66 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       createdAt: '2026-07-06T00:00:02.000Z',
     })),
     listBillingReconciliations: jest.fn(async () => []),
+    registerInvoiceGradeArtifact: jest.fn(async () => ({
+      id: '66666666-6666-4666-8666-666666666666',
+      importRunId: '55555555-5555-4555-8555-555555555555',
+      comparisonId: comparisonResult.comparisonId,
+      provider: 'aws' as const,
+      estimatedTotalUsd: 100,
+      invoicedTotalUsd: 107,
+      varianceUsd: 7,
+      variancePercent: 7,
+      status: 'variance-warning' as const,
+      evidence: {
+        invoiceCoverage: {
+          sourceFingerprintPercent: 100,
+          skuMatchPercent: 100,
+        },
+        invoiceAdjustmentSummary: {
+          adjustmentCostUsd: 6,
+          adjustmentLineItemCount: 4,
+          commitmentLineItemCount: 4,
+          commitmentNetCostUsd: -2,
+          commitmentEvidence: {
+            rowsRequiringProviderInventory: 4,
+            rowsRequiringAmortizationPeriod: 2,
+            rowsRequiringAllocationEvidence: 4,
+          },
+          estimateComparableVarianceUsd: 0,
+          categories: [
+            {
+              category: 'usage',
+              rowCount: 1,
+              totalCostUsd: 100,
+            },
+          ],
+        },
+        invoiceGradeReadiness: {
+          status: 'invoice-grade-blocked',
+          missingCount: 3,
+          partialCount: 2,
+          blockers: ['Provider invoice control total'],
+          artifactRegisterStatus: 'metadata-registered-not-verified',
+          registeredArtifactCount: 1,
+          verifiedArtifactCount: 0,
+        },
+        invoiceGradeArtifactRegister: {
+          status: 'metadata-registered-not-verified',
+          registeredCount: 1,
+          verifiedCount: 0,
+          caveats: [
+            'Artifact metadata is registered for traceability only; files, contracts, and invoice controls are not verified by PolyCost yet.',
+          ],
+        },
+        invoiceMatchSummary: {
+          readiness: 'reconciled-evidence-ready',
+          caveats: [
+            'Reconciliation compares provider-export actuals with PolyCost estimate evidence; it is not an invoice-of-record.',
+          ],
+        },
+      },
+      createdAt: '2026-07-06T00:00:02.000Z',
+    })),
     ...overrides,
   };
 }

@@ -31,4 +31,13 @@ export class BillingController {
   listReconciliations(@Param('id') importRunId: string, @Req() request: RequestWithAuth) {
     return this.billingService.listReconciliations(importRunId, request.auth!);
   }
+
+  @Post('reconciliations/:id/artifacts')
+  registerInvoiceGradeArtifact(
+    @Param('id') reconciliationId: string,
+    @Body() body: unknown,
+    @Req() request: RequestWithAuth,
+  ) {
+    return this.billingService.registerInvoiceGradeArtifact(reconciliationId, body, request.auth!);
+  }
 }

@@ -64,6 +64,7 @@ import {
   DiagramParseResult,
   INTERVALS,
   IntervalKey,
+  InvoiceGradeArtifactRegistrationInput,
   InvoiceReconciliationRecord,
   NormalizedWorkloadSpec,
   PROVIDER_ORDER,
@@ -2852,6 +2853,44 @@ function WorkspaceControlCenter({
     }
   }
 
+  async function handleRegisterInvoiceArtifact() {
+    if (!token || billingAccessMessage || !reconciliation) {
+      onError(
+        billingAccessMessage ??
+          'Run an estimate-vs-actual reconciliation before registering invoice artifacts.',
+      );
+      return;
+    }
+
+    setWorkspaceBusy('billing-artifact');
+    onError(null);
+
+    try {
+      const artifactInput: InvoiceGradeArtifactRegistrationInput = {
+        type: 'provider-invoice',
+        displayName: `${providerLabel(reconciliation.provider)} invoice control packet`,
+        reference: `demo://invoice-artifacts/${reconciliation.id}`,
+        controlTotalUsd: reconciliation.invoicedTotalUsd,
+        billingPeriodStart,
+        billingPeriodEnd,
+        notes:
+          'Metadata registration only. Invoice files, contracts, tax, commitment, and allocation evidence still require independent verification.',
+      };
+      const updated = await client.registerInvoiceGradeArtifact(
+        reconciliation.id,
+        artifactInput,
+        token,
+      );
+      setReconciliation(updated);
+      await refreshTeamAuditEvents();
+      onNotice('Invoice artifact metadata registered. Verification is still required.');
+    } catch (artifactError) {
+      onError(formatApiError(artifactError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
   return (
     <section className="workspace-control-center" id="workspace" aria-label="Workspace controls">
       <div className="workspace-control-heading">
@@ -3565,6 +3604,24 @@ function WorkspaceControlCenter({
                       Invoice blockers: {reconciliationSummary.invoiceGradeBlockers.join(', ')}
                     </small>
                   ) : null}
+                  <small>
+                    Artifact metadata: {reconciliationSummary.artifactRegisteredCount} registered ·{' '}
+                    {reconciliationSummary.artifactVerifiedCount} verified ·{' '}
+                    {reconciliationSummary.artifactRegisterStatus}
+                  </small>
+                  <small>{reconciliationSummary.artifactPrimaryCaveat}</small>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="compact"
+                    loading={workspaceBusy === 'billing-artifact'}
+                    loadingLabel="Registering artifact..."
+                    disabled={Boolean(billingAccessMessage)}
+                    onClick={handleRegisterInvoiceArtifact}
+                  >
+                    <CompareIcon />
+                    Register invoice artifact
+                  </Button>
                   {reconciliationSummary.commitmentLineItemCount > 0 ? (
                     <>
                       <small>
@@ -3650,6 +3707,8 @@ function teamAuditActionLabel(action: TeamAuditEventRecord['action']): string {
       return 'Billing import created';
     case 'billing.reconciliation.created':
       return 'Billing reconciliation created';
+    case 'billing.reconciliation.artifact_registered':
+      return 'Billing artifact registered';
   }
 }
 
@@ -19496,6 +19555,10 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
   invoiceGradeMissingCount: number;
   invoiceGradePartialCount: number;
   invoiceGradeBlockers: string[];
+  artifactRegisterStatus: string;
+  artifactRegisteredCount: number;
+  artifactVerifiedCount: number;
+  artifactPrimaryCaveat: string;
   estimateComparableVarianceUsd: number;
   adjustmentCategories: string[];
   commitmentCategories: string[];
@@ -19507,7 +19570,9 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
   const adjustmentSummary = objectValue(evidence.invoiceAdjustmentSummary);
   const commitmentEvidence = objectValue(adjustmentSummary.commitmentEvidence);
   const invoiceGradeReadiness = objectValue(evidence.invoiceGradeReadiness);
+  const artifactRegister = objectValue(evidence.invoiceGradeArtifactRegister);
   const caveats = stringArrayValue(matchSummary.caveats);
+  const artifactCaveats = stringArrayValue(artifactRegister.caveats);
   const readiness =
     stringValue(matchSummary.readiness) ??
     (record.status === 'matched' ? 'reconciled-evidence-ready' : 'reconciliation-foundation');
@@ -19551,6 +19616,14 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
     invoiceGradeMissingCount: numberValue(invoiceGradeReadiness.missingCount),
     invoiceGradePartialCount: numberValue(invoiceGradeReadiness.partialCount),
     invoiceGradeBlockers: stringArrayValue(invoiceGradeReadiness.blockers).slice(0, 3),
+    artifactRegisterStatus: (
+      stringValue(artifactRegister.status) ?? 'no-artifacts-registered'
+    ).replace(/-/g, ' '),
+    artifactRegisteredCount: numberValue(artifactRegister.registeredCount),
+    artifactVerifiedCount: numberValue(artifactRegister.verifiedCount),
+    artifactPrimaryCaveat:
+      artifactCaveats[0] ??
+      'No invoice artifact metadata has been registered for this reconciliation yet.',
     estimateComparableVarianceUsd: numberValue(
       adjustmentSummary.estimateComparableVarianceUsd ?? record.varianceUsd,
     ),

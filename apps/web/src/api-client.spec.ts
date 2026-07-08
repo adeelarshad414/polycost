@@ -442,7 +442,18 @@ describe('api client', () => {
       .mockResolvedValueOnce(jsonResponse({ revoked: 1 }))
       .mockResolvedValueOnce(jsonResponse(billingImport))
       .mockResolvedValueOnce(jsonResponse(reconciliation))
-      .mockResolvedValueOnce(jsonResponse([reconciliation]));
+      .mockResolvedValueOnce(jsonResponse([reconciliation]))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ...reconciliation,
+          evidence: {
+            invoiceGradeArtifactRegister: {
+              registeredCount: 1,
+              status: 'metadata-registered-not-verified',
+            },
+          },
+        }),
+      );
     global.fetch = fetchMock as typeof fetch;
     const client = createPolyCostClient('http://api.test/api/v1');
 
@@ -480,6 +491,28 @@ describe('api client', () => {
     await expect(client.listBillingReconciliations('import-1', 'session-token')).resolves.toEqual([
       reconciliation,
     ]);
+    await expect(
+      client.registerInvoiceGradeArtifact(
+        'reconciliation-1',
+        {
+          type: 'provider-invoice',
+          displayName: 'Provider invoice control packet',
+          reference: 'demo://invoice-artifacts/reconciliation-1',
+          controlTotalUsd: 107,
+          billingPeriodStart: '2026-06-01',
+          billingPeriodEnd: '2026-06-30',
+        },
+        'session-token',
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        evidence: expect.objectContaining({
+          invoiceGradeArtifactRegister: expect.objectContaining({
+            registeredCount: 1,
+          }),
+        }),
+      }),
+    );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       'http://api.test/api/v1/auth/me',
@@ -523,6 +556,24 @@ describe('api client', () => {
       'http://api.test/api/v1/billing/imports/import-1/reconcile',
       expect.objectContaining({
         body: JSON.stringify({ comparisonId: 'comparison-1' }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      8,
+      'http://api.test/api/v1/billing/reconciliations/reconciliation-1/artifacts',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer session-token',
+        }),
+        body: JSON.stringify({
+          type: 'provider-invoice',
+          displayName: 'Provider invoice control packet',
+          reference: 'demo://invoice-artifacts/reconciliation-1',
+          controlTotalUsd: 107,
+          billingPeriodStart: '2026-06-01',
+          billingPeriodEnd: '2026-06-30',
+        }),
       }),
     );
   });

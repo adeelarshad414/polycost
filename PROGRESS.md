@@ -112,6 +112,7 @@ say so explicitly rather than marking it done.
 | Phase 2.20 - Commitment billing semantics evidence      | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.21 - Commitment amortization evidence needs     | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.22 - Invoice-grade readiness matrix             | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.23 - Invoice artifact registration seam         | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4186,6 +4187,40 @@ test:production-readiness` passed with 159/159 API tests and 86/86 web tests.
   reports PolyCost as decision-grade until provider invoice PDFs/control totals,
   tax/legal-entity evidence, private-pricing contracts, commitment inventory, and
   provider-account allocation artifacts are supplied and verified.
+
+## Phase 2.23 — Invoice artifact registration seam
+
+Status: implemented locally on 2026-07-08.
+
+- Added `POST /api/v1/billing/reconciliations/:id/artifacts` for Owner/Admin users
+  to attach invoice-grade artifact metadata to an existing reconciliation.
+- Artifact metadata covers provider invoices, export manifests, control totals, tax
+  invoices, private-pricing agreements, commitment inventory/amortization schedules,
+  allocation maps, currency policy, and SKU maps.
+- Reconciliation evidence now stores `invoiceGradeArtifactRegister` with registered
+  artifact counts, check coverage, control-total deltas, and caveats. Existing
+  `invoiceGradeReadiness` checks are annotated with registered metadata, but missing
+  invoice-grade checks remain missing until a future verification worker validates
+  actual files/contracts.
+- Added transaction-coupled audit logging for
+  `billing.reconciliation.artifact_registered`.
+- Updated the workspace billing panel and API client so demos can register an
+  invoice control packet from a reconciled actuals import and immediately see
+  "metadata registered, not verified" status.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/api/api-database.repository.spec.ts`
+  passed 49/49. `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx src/api-client.spec.ts`
+  passed 86/86. `npm run format:check`, `npm run ci:lint`, and
+  `npm run test:production-readiness` passed with 160/160 API tests and 86/86 web
+  tests. Full `npm run check` passed with 424/424 API tests, 143/143 web tests,
+  graph validation, pricing coverage, progress verification, QA/security
+  suppression hygiene, DB validation, release, handover, and provider-credential
+  checks green.
+- Remaining caveat: this is a provider-artifact registration seam, not invoice-grade
+  billing verification. PolyCost still needs real artifact storage, checksum/file
+  verification, private contract validation, tax/legal entity proof, commitment
+  inventory reconciliation, and provider-account allocation review before claiming
+  invoice-grade results.
 
 ## Deviations from spec log
 

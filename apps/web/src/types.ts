@@ -434,7 +434,8 @@ export type TeamAuditAction =
   | 'team.member.removed'
   | 'team.sso.configured'
   | 'billing.import.created'
-  | 'billing.reconciliation.created';
+  | 'billing.reconciliation.created'
+  | 'billing.reconciliation.artifact_registered';
 
 export type TeamAuditTargetType =
   'team' | 'invitation' | 'member' | 'sso_provider' | 'billing_import' | 'billing_reconciliation';
@@ -581,6 +582,29 @@ export interface BillingProviderExportInput {
   encoding?: 'text' | 'base64';
   fileName?: string;
   originalFileSha256?: string;
+}
+
+export type InvoiceGradeArtifactType =
+  | 'provider-invoice'
+  | 'provider-export-manifest'
+  | 'control-total'
+  | 'tax-invoice'
+  | 'private-pricing-agreement'
+  | 'commitment-inventory'
+  | 'commitment-amortization-schedule'
+  | 'allocation-map'
+  | 'currency-policy'
+  | 'provider-sku-map';
+
+export interface InvoiceGradeArtifactRegistrationInput {
+  type: InvoiceGradeArtifactType;
+  displayName: string;
+  reference: string;
+  sha256?: string;
+  controlTotalUsd?: number;
+  billingPeriodStart?: string;
+  billingPeriodEnd?: string;
+  notes?: string;
 }
 
 export interface BillingImportResponse {

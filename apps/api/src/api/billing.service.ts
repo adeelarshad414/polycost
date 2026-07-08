@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ComparisonResult } from '../comparison/comparison.types';
 import { ApiForbiddenError, ApiNotFoundError, ApiValidationError } from './api-errors';
@@ -10,6 +10,9 @@ import {
   BillingProviderExportInput,
   BillingImportRowInput,
   BillingSourceType,
+  InvoiceGradeArtifactRecord,
+  InvoiceGradeArtifactRegistrationInput,
+  InvoiceGradeArtifactType,
   InvoiceAdjustmentCategory,
   InvoiceReconciliationRecord,
   InvoiceReconciliationStatus,
@@ -25,6 +28,30 @@ const SOURCE_TYPES: BillingSourceType[] = [
   'gcp-billing-export',
   'normalized-csv',
 ];
+const INVOICE_GRADE_ARTIFACT_TYPES: InvoiceGradeArtifactType[] = [
+  'provider-invoice',
+  'provider-export-manifest',
+  'control-total',
+  'tax-invoice',
+  'private-pricing-agreement',
+  'commitment-inventory',
+  'commitment-amortization-schedule',
+  'allocation-map',
+  'currency-policy',
+  'provider-sku-map',
+];
+const INVOICE_GRADE_ARTIFACT_CHECK_COVERAGE: Record<string, InvoiceGradeArtifactType[]> = {
+  'provider-invoice-control': ['provider-invoice', 'control-total'],
+  'source-row-traceability': ['provider-export-manifest'],
+  'sku-service-match': ['provider-sku-map'],
+  'allocation-evidence': ['allocation-map'],
+  'billing-period-currency': ['currency-policy', 'provider-invoice'],
+  'adjustment-support': ['provider-invoice', 'tax-invoice'],
+  'commitment-amortization': ['commitment-inventory', 'commitment-amortization-schedule'],
+  'private-pricing': ['private-pricing-agreement'],
+  'tax-jurisdiction': ['tax-invoice'],
+  'provider-column-completeness': ['provider-export-manifest'],
+};
 
 const AWS_CUR_COLUMNS = {
   serviceName: ['lineItem/ProductCode', 'product/ProductName', 'product/productName'],
@@ -265,6 +292,71 @@ export class BillingService {
     assertTeamAccess(importRun.teamId, identity);
 
     return this.repository.listInvoiceReconciliations(importRunId);
+  }
+
+  async registerInvoiceGradeArtifact(
+    reconciliationId: string,
+    body: unknown,
+    identity: AuthIdentity,
+  ): Promise<InvoiceReconciliationRecord> {
+    assertBillingAdmin(identity);
+    const input = parseInvoiceGradeArtifactRegistrationInput(body);
+    const reconciliation = await this.repository.getInvoiceReconciliation(reconciliationId);
+
+    if (!reconciliation) {
+      throw new ApiNotFoundError(`Invoice reconciliation ${reconciliationId} was not found`);
+    }
+
+    const importRun = await this.repository.getBillingImport(reconciliation.importRunId);
+
+    if (!importRun) {
+      throw new ApiNotFoundError(
+        `Billing import ${reconciliation.importRunId} was not found for reconciliation ${reconciliationId}`,
+      );
+    }
+
+    assertTeamAccess(importRun.teamId, identity);
+
+    const artifact: InvoiceGradeArtifactRecord = {
+      id: randomUUID(),
+      provider: reconciliation.provider,
+      type: input.type,
+      displayName: input.displayName,
+      reference: input.reference,
+      verificationStatus: 'registered',
+      registeredAt: new Date().toISOString(),
+      registeredByAccountId: identity.accountId,
+      ...(input.sha256 ? { sha256: input.sha256 } : {}),
+      ...(input.controlTotalUsd !== undefined ? { controlTotalUsd: input.controlTotalUsd } : {}),
+      ...(input.billingPeriodStart ? { billingPeriodStart: input.billingPeriodStart } : {}),
+      ...(input.billingPeriodEnd ? { billingPeriodEnd: input.billingPeriodEnd } : {}),
+      ...(input.notes ? { notes: input.notes } : {}),
+    };
+    const evidence = appendInvoiceGradeArtifactEvidence(reconciliation, artifact);
+
+    return this.repository.updateInvoiceReconciliationEvidence({
+      reconciliationId,
+      evidence,
+      ...(importRun.teamId
+        ? {
+            audit: {
+              teamId: importRun.teamId,
+              actorAccountId: identity.accountId,
+              action: 'billing.reconciliation.artifact_registered',
+              targetType: 'billing_reconciliation',
+              targetId: reconciliationId,
+              metadata: {
+                importRunId: importRun.id,
+                comparisonId: reconciliation.comparisonId,
+                provider: reconciliation.provider,
+                artifactId: artifact.id,
+                artifactType: artifact.type,
+                verificationStatus: artifact.verificationStatus,
+              },
+            },
+          }
+        : {}),
+    });
   }
 }
 
@@ -1219,6 +1311,63 @@ function parseComparisonId(body: unknown): string {
   return parseRequiredString(record.comparisonId, 'comparisonId', 80);
 }
 
+function parseInvoiceGradeArtifactRegistrationInput(
+  body: unknown,
+): InvoiceGradeArtifactRegistrationInput {
+  const record = requireRecord(
+    body,
+    'Invoice-grade artifact registration request body must be an object',
+  );
+  const billingPeriodStart =
+    record.billingPeriodStart !== undefined
+      ? parseDate(record.billingPeriodStart, 'billingPeriodStart')
+      : undefined;
+  const billingPeriodEnd =
+    record.billingPeriodEnd !== undefined
+      ? parseDate(record.billingPeriodEnd, 'billingPeriodEnd')
+      : undefined;
+
+  if (billingPeriodStart && billingPeriodEnd && billingPeriodEnd < billingPeriodStart) {
+    throw new ApiValidationError('artifact billing period is invalid', [
+      {
+        field: 'billingPeriodEnd',
+        issue: 'must be on or after billingPeriodStart',
+      },
+    ]);
+  }
+
+  return {
+    type: parseArtifactType(record.type),
+    displayName: parseRequiredString(record.displayName, 'displayName', 160),
+    reference: parseRequiredString(record.reference, 'reference', 500),
+    ...(record.sha256 !== undefined ? { sha256: parseSha256(record.sha256, 'sha256') } : {}),
+    ...(record.controlTotalUsd !== undefined
+      ? { controlTotalUsd: parseFiniteNumber(record.controlTotalUsd, 'controlTotalUsd') }
+      : {}),
+    ...(billingPeriodStart ? { billingPeriodStart } : {}),
+    ...(billingPeriodEnd ? { billingPeriodEnd } : {}),
+    ...(parseOptionalString(record.notes, 600)
+      ? { notes: parseOptionalString(record.notes, 600) }
+      : {}),
+  };
+}
+
+function parseArtifactType(value: unknown): InvoiceGradeArtifactType {
+  if (
+    typeof value === 'string' &&
+    INVOICE_GRADE_ARTIFACT_TYPES.includes(value as InvoiceGradeArtifactType)
+  ) {
+    return value as InvoiceGradeArtifactType;
+  }
+
+  throw new ApiValidationError('artifact type is unsupported', [
+    {
+      field: 'type',
+      issue: `must be one of ${INVOICE_GRADE_ARTIFACT_TYPES.join(', ')}`,
+    },
+  ]);
+}
+
 function parseProvider(value: unknown): BillingImportInput['provider'] {
   if (value === 'aws' || value === 'azure' || value === 'gcp') {
     return value;
@@ -1303,10 +1452,16 @@ function parseOptionalSha256(value: unknown): string | undefined {
     return undefined;
   }
 
+  return parseSha256(parsed, 'originalFileSha256');
+}
+
+function parseSha256(value: unknown, field: string): string {
+  const parsed = parseRequiredString(value, field, 64);
+
   if (!SHA256_PATTERN.test(parsed)) {
-    throw new ApiValidationError('originalFileSha256 must be a SHA-256 hex digest', [
+    throw new ApiValidationError(`${field} must be a SHA-256 hex digest`, [
       {
-        field: 'originalFileSha256',
+        field,
         issue: 'must be a 64-character lowercase SHA-256 hex digest',
       },
     ]);
@@ -1927,6 +2082,157 @@ function providerInvoiceArtifact(provider: BillingImportInput['provider'] | unde
     default:
       return 'Provider invoice of record, billing export manifest, account scope, and invoice control total.';
   }
+}
+
+function appendInvoiceGradeArtifactEvidence(
+  reconciliation: InvoiceReconciliationRecord,
+  artifact: InvoiceGradeArtifactRecord,
+): Record<string, unknown> {
+  const existingArtifacts = invoiceGradeArtifactsFromEvidence(reconciliation.evidence);
+  const artifacts = [...existingArtifacts, artifact];
+  const register = invoiceGradeArtifactRegister(artifacts, reconciliation);
+
+  return {
+    ...reconciliation.evidence,
+    invoiceGradeReadiness: annotateInvoiceGradeReadinessWithArtifacts(
+      reconciliation.evidence.invoiceGradeReadiness,
+      register,
+    ),
+    invoiceGradeArtifactRegister: register,
+  };
+}
+
+function invoiceGradeArtifactsFromEvidence(
+  evidence: Record<string, unknown>,
+): InvoiceGradeArtifactRecord[] {
+  const register = recordValue(evidence.invoiceGradeArtifactRegister);
+
+  return arrayValue(register.artifacts)
+    .map((artifact) => recordValue(artifact))
+    .filter((artifact) => typeof artifact.id === 'string')
+    .filter((artifact) => typeof artifact.type === 'string')
+    .filter((artifact) => typeof artifact.displayName === 'string')
+    .filter((artifact) => typeof artifact.reference === 'string')
+    .filter((artifact) => typeof artifact.provider === 'string')
+    .map((artifact) => artifact as unknown as InvoiceGradeArtifactRecord);
+}
+
+function invoiceGradeArtifactRegister(
+  artifacts: InvoiceGradeArtifactRecord[],
+  reconciliation: InvoiceReconciliationRecord,
+): Record<string, unknown> {
+  const registeredCount = artifacts.length;
+  const verifiedCount = artifacts.filter(
+    (artifact) => artifact.verificationStatus === 'verified',
+  ).length;
+  const artifactCountsByType = artifacts.reduce<Record<string, number>>((counts, artifact) => {
+    counts[artifact.type] = (counts[artifact.type] ?? 0) + 1;
+
+    return counts;
+  }, {});
+  const coverage = Object.entries(INVOICE_GRADE_ARTIFACT_CHECK_COVERAGE).map(
+    ([readinessCheckId, acceptedTypes]) => {
+      const matchingArtifacts = artifacts.filter((artifact) =>
+        acceptedTypes.includes(artifact.type),
+      );
+      const matchingVerifiedArtifacts = matchingArtifacts.filter(
+        (artifact) => artifact.verificationStatus === 'verified',
+      );
+
+      return {
+        readinessCheckId,
+        acceptedArtifactTypes: acceptedTypes,
+        registeredCount: matchingArtifacts.length,
+        verifiedCount: matchingVerifiedArtifacts.length,
+        status:
+          matchingVerifiedArtifacts.length > 0
+            ? 'verified-artifact-present'
+            : matchingArtifacts.length > 0
+              ? 'metadata-registered-not-verified'
+              : 'missing',
+        registeredArtifacts: matchingArtifacts.map((artifact) => ({
+          id: artifact.id,
+          type: artifact.type,
+          displayName: artifact.displayName,
+          verificationStatus: artifact.verificationStatus,
+        })),
+      };
+    },
+  );
+  const controlTotalDeltas = artifacts
+    .filter((artifact) => typeof artifact.controlTotalUsd === 'number')
+    .map((artifact) => ({
+      artifactId: artifact.id,
+      artifactType: artifact.type,
+      controlTotalUsd: artifact.controlTotalUsd,
+      reconciliationInvoicedTotalUsd: reconciliation.invoicedTotalUsd,
+      deltaUsd: roundCurrency((artifact.controlTotalUsd ?? 0) - reconciliation.invoicedTotalUsd),
+    }));
+
+  return {
+    status:
+      registeredCount === 0
+        ? 'no-artifacts-registered'
+        : verifiedCount > 0
+          ? 'registered-with-verified-artifacts'
+          : 'metadata-registered-not-verified',
+    provider: reconciliation.provider,
+    registeredCount,
+    verifiedCount,
+    artifactCountsByType,
+    coverage,
+    artifacts,
+    controlTotalDeltas,
+    caveats: [
+      'Artifact metadata is registered for traceability only; files, contracts, and invoice controls are not verified by PolyCost yet.',
+      'Invoice-grade status remains blocked until provider invoice controls, private pricing, tax, commitment, and allocation evidence are independently verified.',
+    ],
+  };
+}
+
+function annotateInvoiceGradeReadinessWithArtifacts(
+  readinessValue: unknown,
+  register: Record<string, unknown>,
+): Record<string, unknown> {
+  const readiness = recordValue(readinessValue);
+  const coverage = arrayValue(register.coverage).map((item) => recordValue(item));
+  const checks = arrayValue(readiness.checks).map((checkValue) => {
+    const check = recordValue(checkValue);
+    const checkId = typeof check.id === 'string' ? check.id : '';
+    const matchingCoverage = coverage.find(
+      (coverageItem) => coverageItem.readinessCheckId === checkId,
+    );
+
+    if (!matchingCoverage) {
+      return check;
+    }
+
+    return {
+      ...check,
+      artifactRegisterStatus: matchingCoverage.status,
+      registeredArtifactCount: matchingCoverage.registeredCount,
+      verifiedArtifactCount: matchingCoverage.verifiedCount,
+      registeredArtifacts: matchingCoverage.registeredArtifacts,
+    };
+  });
+
+  return {
+    ...readiness,
+    artifactRegisterStatus: register.status,
+    registeredArtifactCount: register.registeredCount,
+    verifiedArtifactCount: register.verifiedCount,
+    checks,
+  };
+}
+
+function recordValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function arrayValue(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
 }
 
 function lineItemAdjustmentClassification(lineItem: {

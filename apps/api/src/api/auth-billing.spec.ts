@@ -1783,6 +1783,137 @@ describe('BillingService', () => {
     ).rejects.toThrow(ApiForbiddenError);
   });
 
+  it('registers invoice-grade artifact metadata without marking evidence verified', async () => {
+    const repository = repositoryMock();
+    const reconciliationRecord = {
+      id: '66666666-6666-4666-8666-666666666666',
+      importRunId: '55555555-5555-4555-8555-555555555555',
+      comparisonId: comparisonResult.comparisonId,
+      provider: 'aws' as const,
+      estimatedTotalUsd: 100,
+      invoicedTotalUsd: 107,
+      varianceUsd: 7,
+      variancePercent: 7,
+      status: 'variance-warning' as const,
+      evidence: {
+        invoiceGradeReadiness: {
+          status: 'invoice-grade-blocked',
+          missingCount: 3,
+          blockers: ['Provider invoice control total'],
+          checks: [
+            {
+              id: 'provider-invoice-control',
+              label: 'Provider invoice control total',
+              status: 'missing',
+              evidence:
+                'PolyCost has normalized provider export rows, not the provider invoice of record.',
+              requiredArtifact:
+                'AWS invoice PDF/tax invoice, CUR manifest, payer-account billing period, and Cost Explorer control total.',
+            },
+          ],
+        },
+      },
+      createdAt: '2026-07-06T00:00:02.000Z',
+    };
+    repository.getInvoiceReconciliation.mockResolvedValue(reconciliationRecord);
+    repository.getBillingImport.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      teamId: identity.teamId,
+      provider: 'aws',
+      sourceType: 'aws-cur',
+      status: 'completed',
+      billingPeriodStart: '2026-06-01',
+      billingPeriodEnd: '2026-06-30',
+      originalFileSha256: 'a'.repeat(64),
+      rowsReceived: 1,
+      rowsAccepted: 1,
+      rowsRejected: 0,
+      totalCostUsd: 107,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    });
+    repository.updateInvoiceReconciliationEvidence.mockImplementation(async (input) => ({
+      ...reconciliationRecord,
+      evidence: input.evidence,
+    }));
+    const service = new BillingService(repository as never);
+
+    const result = await service.registerInvoiceGradeArtifact(
+      '66666666-6666-4666-8666-666666666666',
+      {
+        type: 'provider-invoice',
+        displayName: 'June AWS invoice control packet',
+        reference: 's3://billing-audit/2026-06/aws-invoice.pdf',
+        sha256: 'b'.repeat(64),
+        controlTotalUsd: 107,
+        billingPeriodStart: '2026-06-01',
+        billingPeriodEnd: '2026-06-30',
+        notes: 'Metadata registered during demo readiness hardening.',
+      },
+      identity,
+    );
+
+    expect(result.evidence).toEqual(
+      expect.objectContaining({
+        invoiceGradeReadiness: expect.objectContaining({
+          status: 'invoice-grade-blocked',
+          artifactRegisterStatus: 'metadata-registered-not-verified',
+          registeredArtifactCount: 1,
+          checks: [
+            expect.objectContaining({
+              id: 'provider-invoice-control',
+              status: 'missing',
+              artifactRegisterStatus: 'metadata-registered-not-verified',
+              registeredArtifactCount: 1,
+              verifiedArtifactCount: 0,
+            }),
+          ],
+        }),
+        invoiceGradeArtifactRegister: expect.objectContaining({
+          status: 'metadata-registered-not-verified',
+          provider: 'aws',
+          registeredCount: 1,
+          verifiedCount: 0,
+          artifactCountsByType: {
+            'provider-invoice': 1,
+          },
+          artifacts: [
+            expect.objectContaining({
+              provider: 'aws',
+              type: 'provider-invoice',
+              displayName: 'June AWS invoice control packet',
+              reference: 's3://billing-audit/2026-06/aws-invoice.pdf',
+              verificationStatus: 'registered',
+              registeredByAccountId: identity.accountId,
+            }),
+          ],
+          controlTotalDeltas: [
+            expect.objectContaining({
+              controlTotalUsd: 107,
+              reconciliationInvoicedTotalUsd: 107,
+              deltaUsd: 0,
+            }),
+          ],
+        }),
+      }),
+    );
+    expect(repository.updateInvoiceReconciliationEvidence).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reconciliationId: '66666666-6666-4666-8666-666666666666',
+        audit: expect.objectContaining({
+          teamId: identity.teamId,
+          actorAccountId: identity.accountId,
+          action: 'billing.reconciliation.artifact_registered',
+          targetType: 'billing_reconciliation',
+          targetId: '66666666-6666-4666-8666-666666666666',
+          metadata: expect.objectContaining({
+            artifactType: 'provider-invoice',
+            verificationStatus: 'registered',
+          }),
+        }),
+      }),
+    );
+  });
+
   it('requires owner or admin access for billing imports and reconciliation reads', async () => {
     const repository = repositoryMock();
     const service = new BillingService(repository as never);
@@ -1831,6 +1962,18 @@ describe('BillingService', () => {
     );
     await expectForbidden(
       service.listReconciliations('55555555-5555-4555-8555-555555555555', memberIdentity),
+      'Team admin access is required for billing reconciliation',
+    );
+    await expectForbidden(
+      service.registerInvoiceGradeArtifact(
+        '66666666-6666-4666-8666-666666666666',
+        {
+          type: 'provider-invoice',
+          displayName: 'Invoice control packet',
+          reference: 'demo://invoice-control',
+        },
+        memberIdentity,
+      ),
       'Team admin access is required for billing reconciliation',
     );
 
@@ -1917,6 +2060,8 @@ function repositoryMock() {
     getComparison: jest.fn(),
     saveInvoiceReconciliation: jest.fn(),
     listInvoiceReconciliations: jest.fn(),
+    getInvoiceReconciliation: jest.fn(),
+    updateInvoiceReconciliationEvidence: jest.fn(),
   } as unknown as jest.Mocked<ApiDatabaseRepository>;
 }
 
