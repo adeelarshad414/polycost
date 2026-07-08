@@ -36,6 +36,7 @@ Suppression locations reviewed on 2026-07-06:
 - `apps/api/src/reports/report-evidence.ts`
 - `apps/api/src/secrets/secrets.service.spec.ts`
 - `apps/api/src/secrets/secrets.service.ts`
+- `apps/api/src/terraform/terraform-generation.service.spec.ts`
 - `apps/api/src/terraform/terraform-generation.service.ts`
 - `apps/web/src/App.tsx`
 - `apps/web/src/workload.ts`

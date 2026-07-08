@@ -35,6 +35,8 @@ once tagged releases begin.
   performance/accessibility/best-practices/SEO evidence.
 - Canonical overlay/dialog/drawer/popover/toast/banner primitives, expanded shared
   button variants, and the `npm run overlay:check` guard.
+- Terraform bundle integrity verifier generated in every ZIP handoff, with
+  manifest hash/size checks and tamper-detection regression coverage.
 
 ### Notes
 
@@ -52,7 +54,8 @@ once tagged releases begin.
   authorization, and an explicit security suppression/advisory ledger.
 - Remaining future work is intentionally documented: full invoice-grade live cloud
   billing coverage, full Visio visual rendering, hosted/team account product depth,
-  production email/SSO/SCIM workflows, and Terraform generation.
+  production email/SSO/SCIM workflows, and provider-authenticated Terraform plan
+  execution.
 
 ## 0.1.0
 

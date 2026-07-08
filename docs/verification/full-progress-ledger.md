@@ -156,7 +156,8 @@ Evidence:
   examples, README guidance, assumptions, security notes, and SHA-256 file hashes.
 - `apps/api/src/terraform/terraform-generation.service.spec.ts` verifies provider
   pinning, static safety checks, region override handling, secure defaults, service
-  mappings, and unsupported-resource caveats across AWS, Azure, and GCP.
+  mappings, unsupported-resource caveats, and generated manifest-integrity
+  verification across AWS, Azure, and GCP.
 - `apps/api/src/api/api-contract.spec.ts` covers `POST /api/v1/terraform/generate`.
 - `apps/web/src/api-client.spec.ts` verifies the frontend client request to
   `/terraform/generate`.
@@ -166,6 +167,9 @@ Evidence:
   baselines, validation model, and known gaps.
 - Phase V3 focused checks passed: API `2` suites / `40` tests and web `2` suites /
   `84` tests.
+- V3.5 Terraform bundle integrity hardening added
+  `scripts/verify-manifest.mjs` to generated bundles and proved it passes on a
+  materialized bundle and fails after `main.tf` tampering.
 - Phase V3 full `npm run check` passed with API `51` suites / `398` tests, web
   `9` suites / `132` tests, graph validation, pricing coverage, progress
   verification, QA/security suppression, database, DevOps, cloud, release, and

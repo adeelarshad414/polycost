@@ -67,6 +67,7 @@ performance/accessibility/best-practices/SEO metrics.
 | TF-GEN-003     | Improved      | V3.2 assurance adds generated CAF/WAF/Terraform framework-alignment evidence and topology-aware public/private ingress/load-balancer controls                                             |
 | TF-GEN-004     | Improved      | V3.3 adds downloadable Terraform ZIP export, bundle manifest hash evidence, generated validation runner, and frontend ZIP/evidence download actions                                       |
 | TF-GEN-005     | Improved      | V3.4 replaces Terraform module placeholders with AWS/Azure/GCP network, compute, and data starter modules plus static module-library validation                                           |
+| TF-GEN-006     | Improved      | V3.5 adds credential-free Terraform bundle manifest verification and tamper-detection evidence before provider-authenticated validation                                                   |
 | HND-001        | Added         | Customer handover package added under `docs/`, with usage, deployment, runbook, competitive comparison, architecture, and evidence ledger                                                 |
 | HND-002        | Added         | `npm run handover:check` validates the handover package and runs inside the full local `npm run check` floor                                                                              |
 | OSS-001        | Added         | `npm run public:readiness:check` validates public-readiness docs, community health files, demo evidence hooks, tracked env-file safety, and provider-logo safeguards                      |
@@ -121,6 +122,16 @@ Local static/regression gates:
     `src/api/api-contract.spec.ts`: 2 suites / 42 tests.
   - Web focused: `src/api-client.spec.ts` and `src/App.spec.tsx`: 2 suites /
     84 tests.
+- Phase V3.5 Terraform bundle integrity checks passed:
+  - API focused: `src/terraform/terraform-generation.service.spec.ts`: 1 suite /
+    6 tests.
+  - The focused test materializes a generated bundle, runs
+    `node scripts/verify-manifest.mjs`, then tampers with `main.tf` and proves the
+    verifier fails with a manifest hash mismatch.
+  - `npm run ci:lint` passed with zero warnings.
+  - `npm run security:suppressions` passed: 23 reviewed suppressions.
+  - `npm run test:production-readiness` passed: API 10 suites / 136 tests; web
+    2 suites / 84 tests.
 - Phase V3.3/V3.4 full local regression floor passed with `npm run check`:
   - API unit: 51 suites / 400 tests.
   - Web unit: 9 suites / 132 tests.
@@ -253,11 +264,12 @@ Machine-readable token evidence:
 - Full enterprise auth product polish remains future scope: production email, SSO/SAML,
   org billing UX, and complete team/account lifecycle polish.
 - Terraform generation now has a hardened root bundle, ZIP export, bundle
-  manifest, validation runner, generation profile, private database networking,
-  runtime identity baselines, policy/test scaffolding, and AWS/Azure/GCP starter
-  modules for network, compute, and data. Full production IaC remains future
-  scope: landing-zone integration, edge/observability/DR modules,
-  container/serverless/Kubernetes module generation, active-active DR, and real
+  manifest, credential-free manifest integrity verifier, validation runner,
+  generation profile, private database networking, runtime identity baselines,
+  policy/test scaffolding, and AWS/Azure/GCP starter modules for network, compute,
+  and data. Full production IaC remains future scope: landing-zone integration,
+  edge/observability/DR modules, container/serverless/Kubernetes module generation,
+  active-active DR, destination-account policy gates, and real
   `terraform init/validate/test/plan` execution with provider credentials are not
   run by PolyCost request handling.
 

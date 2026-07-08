@@ -111,6 +111,46 @@ say so explicitly rather than marking it done.
 | Public OSS readiness and demo hardening                 | Complete with known gaps (see notes) | 2026-07-08   |
 | Browser audit artifact hardening                        | Complete with known gaps (see notes) | 2026-07-08   |
 | Formal browser audit tooling                            | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase V3.5 - Terraform bundle integrity validation      | Complete with known gaps (see notes) | 2026-07-08   |
+
+## Phase V3.5 - Terraform bundle integrity validation
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-08
+
+What changed:
+
+- Added `scripts/verify-manifest.mjs` to every generated Terraform bundle.
+- The generated verifier reads `BUNDLE-MANIFEST.json`, verifies every listed file
+  hash and size, writes `terraform-manifest-integrity-result.json`, and exits
+  non-zero when the saved ZIP handoff is incomplete or tampered with.
+- `scripts/validate-bundle.mjs`, `BUNDLE-MANIFEST.json`, generated README guidance,
+  and API validation checks now include the manifest-integrity gate before
+  Terraform/provider-authenticated validation.
+- Added a materialized-bundle regression test that writes generated files to an
+  isolated temp directory, proves the verifier passes, tampers with `main.tf`, and
+  proves the verifier fails with a hash mismatch.
+- Updated `docs/architecture/phase-v3-3-terraform-bundle-export.md` and
+  `docs/verification/full-progress-ledger.md` with the new evidence.
+
+Verification performed:
+
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/terraform/terraform-generation.service.spec.ts`
+  passed: 1 suite / 6 tests.
+- `npm run ci:lint` passed with zero warnings after the reviewed test-only
+  filesystem suppression was added to `docs/SECURITY-SUPPRESSIONS.md`.
+- `npm run security:suppressions` passed: 23 reviewed suppressions.
+- `npm run test:production-readiness` passed: API 10 suites / 136 tests; web 2
+  suites / 84 tests.
+
+Known remaining gaps:
+
+- This closes the credential-free ZIP handoff integrity gap, but it is not a
+  provider-authenticated `terraform init/validate/test/plan` execution in a real
+  AWS account, Azure subscription, or GCP project.
+- Landing-zone integration, edge/observability/DR modules, container/serverless/
+  Kubernetes module generation, active-active DR, and real policy gates against
+  destination-account plan JSON remain future IaC phases.
 
 ## Formal browser audit tooling
 

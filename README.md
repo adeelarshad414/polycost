@@ -27,8 +27,8 @@ This repository currently includes the V1 MVP plus the Phase 2 diagram-ingestion
 4. Reports out: on-screen analytics plus PDF, CSV, and Excel export.
 
 Terraform generation is now available as a reviewed starter-bundle workflow for AWS, Azure, and GCP,
-including ZIP export, validation evidence, and starter module libraries. Reverse
-Terraform-to-diagram/cost workflows remain future roadmap scope.
+including ZIP export, manifest integrity verification, validation evidence, and starter module
+libraries. Reverse Terraform-to-diagram/cost workflows remain future roadmap scope.
 
 ## Monorepo Layout
 
