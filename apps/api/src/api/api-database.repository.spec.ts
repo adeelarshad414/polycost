@@ -2035,6 +2035,82 @@ describe('ApiDatabaseRepository', () => {
     ]);
   });
 
+  it('lists expired invoice artifact deletion candidates and deletes eligible ids only', async () => {
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            storage_backend: 'aws-s3',
+            object_store_bucket: 'polycost-invoice-artifacts',
+            object_store_region: 'us-east-1',
+            object_store_key: 'invoice-artifacts/team/reconciliation/artifact.txt',
+            object_store_uri:
+              's3://polycost-invoice-artifacts/invoice-artifacts/team/reconciliation/artifact.txt',
+            object_store_version: 'v1',
+          },
+          {
+            id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            storage_backend: 'database-bytea',
+            object_store_bucket: null,
+            object_store_region: null,
+            object_store_key: null,
+            object_store_uri: null,
+            object_store_version: null,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+          { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' },
+        ],
+      });
+    const repository = createRepository(query);
+    const evaluatedAt = '2026-07-08T00:00:00.000Z';
+    const ids = ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'];
+
+    await expect(
+      repository.listExpiredInvoiceArtifactBlobDeletionCandidates(evaluatedAt),
+    ).resolves.toEqual([
+      {
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        storageBackend: 'aws-s3',
+        objectStoreBucket: 'polycost-invoice-artifacts',
+        objectStoreRegion: 'us-east-1',
+        objectStoreKey: 'invoice-artifacts/team/reconciliation/artifact.txt',
+        objectStoreUri:
+          's3://polycost-invoice-artifacts/invoice-artifacts/team/reconciliation/artifact.txt',
+        objectStoreVersion: 'v1',
+      },
+      {
+        id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        storageBackend: 'database-bytea',
+      },
+    ]);
+    await expect(repository.deleteInvoiceArtifactBlobsByIds(ids, evaluatedAt)).resolves.toBe(2);
+    expect(query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('FROM invoice_artifact_blobs'),
+      [evaluatedAt],
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('ORDER BY retention_until ASC'),
+      [evaluatedAt],
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('WHERE id = ANY($1::uuid[])'),
+      [ids, evaluatedAt],
+    );
+    expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining('legal_hold = false'), [
+      ids,
+      evaluatedAt,
+    ]);
+  });
+
   it('maps externally stored invoice artifact blob pointers without inline bytes', async () => {
     const uploadedAt = new Date('2026-07-08T00:00:00.000Z');
     const query = jest.fn(async () => ({

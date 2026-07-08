@@ -161,7 +161,10 @@ PolyCost writes immutable-ish object keys under the configured prefix using the 
 reconciliation, artifact id, checksum prefix, and sanitized file name. The database
 stores only the object pointer, checksum, size, KMS/readiness metadata, scan result,
 retention policy, and audit trail. Downloads read the object back through the matching
-provider adapter and re-check the stored SHA-256 before returning bytes.
+provider adapter and re-check the stored SHA-256 before returning bytes. Retention
+enforcement deletes external provider objects first, treating provider `404` as
+already deleted for retry safety, and only then removes still-expired non-held
+database pointer rows.
 
 ### AWS S3
 
@@ -181,7 +184,7 @@ Minimum permission shape:
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": ["s3:GetObject", "s3:PutObject"],
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
       "Resource": "arn:aws:s3:::polycost-invoice-artifacts/invoice-artifacts/*"
     },
     {
@@ -206,10 +209,10 @@ Required keys:
 - `account_name`, unless `INVOICE_ARTIFACT_OBJECT_STORE_NAME` is formatted as
   `account/container`
 
-The SAS token should be scoped to the artifact container with create/write/read
+The SAS token should be scoped to the artifact container with create/write/read/delete
 permissions and an expiry/rotation process owned by the operator. PolyCost writes
-Block Blob objects through the Blob REST API and records the returned ETag/version
-when Azure returns them.
+Block Blob objects through the Blob REST API, deletes expired external objects during
+retention enforcement, and records the returned ETag/version when Azure returns them.
 
 ### GCP Cloud Storage
 
@@ -221,8 +224,9 @@ Required key:
 
 If this artifact-specific path is absent, PolyCost falls back to
 `secret/polycost/providers/gcp access_token`. The token needs Cloud Storage object
-create/read permission for the configured bucket/prefix, plus the operator-managed
-KMS permission for the referenced key when CMEK is enforced by bucket policy.
+create/read/delete permission for the configured bucket/prefix, plus the
+operator-managed KMS permission for the referenced key when CMEK is enforced by
+bucket policy.
 
 Validation command:
 

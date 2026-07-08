@@ -526,6 +526,26 @@ interface InvoiceArtifactRetentionSummaryRow {
   legal_hold_skipped: string;
 }
 
+interface InvoiceArtifactBlobDeletionCandidateRow {
+  id: string;
+  storage_backend: InvoiceArtifactStorageBackend;
+  object_store_bucket: string | null;
+  object_store_region: string | null;
+  object_store_key: string | null;
+  object_store_uri: string | null;
+  object_store_version: string | null;
+}
+
+export interface InvoiceArtifactBlobDeletionCandidate {
+  id: string;
+  storageBackend: InvoiceArtifactStorageBackend;
+  objectStoreBucket?: string;
+  objectStoreRegion?: string;
+  objectStoreKey?: string;
+  objectStoreUri?: string;
+  objectStoreVersion?: string;
+}
+
 const PROVIDERS: ProviderId[] = ['aws', 'azure', 'gcp'];
 const DATA_FRESHNESS_POLICY_HOURS = 48;
 type DatabaseTeamRole = TeamRole | 'viewer';
@@ -4103,6 +4123,60 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
       expiredCandidates: row ? Number.parseInt(row.expired_candidates, 10) : 0,
       legalHoldSkipped: row ? Number.parseInt(row.legal_hold_skipped, 10) : 0,
     };
+  }
+
+  async listExpiredInvoiceArtifactBlobDeletionCandidates(
+    evaluatedAt: string,
+  ): Promise<InvoiceArtifactBlobDeletionCandidate[]> {
+    const result = await (
+      await this.getPool()
+    ).query<InvoiceArtifactBlobDeletionCandidateRow>(
+      `
+        SELECT id,
+               storage_backend,
+               object_store_bucket,
+               object_store_region,
+               object_store_key,
+               object_store_uri,
+               object_store_version
+        FROM invoice_artifact_blobs
+        WHERE retention_until <= $1
+          AND legal_hold = false
+        ORDER BY retention_until ASC, uploaded_at ASC
+      `,
+      [evaluatedAt],
+    );
+
+    return result.rows.map((row) => ({
+      id: row.id,
+      storageBackend: row.storage_backend,
+      ...(row.object_store_bucket ? { objectStoreBucket: row.object_store_bucket } : {}),
+      ...(row.object_store_region ? { objectStoreRegion: row.object_store_region } : {}),
+      ...(row.object_store_key ? { objectStoreKey: row.object_store_key } : {}),
+      ...(row.object_store_uri ? { objectStoreUri: row.object_store_uri } : {}),
+      ...(row.object_store_version ? { objectStoreVersion: row.object_store_version } : {}),
+    }));
+  }
+
+  async deleteInvoiceArtifactBlobsByIds(ids: string[], evaluatedAt: string): Promise<number> {
+    if (ids.length === 0) {
+      return 0;
+    }
+
+    const result = await (
+      await this.getPool()
+    ).query<{ id: string }>(
+      `
+        DELETE FROM invoice_artifact_blobs
+        WHERE id = ANY($1::uuid[])
+          AND retention_until <= $2
+          AND legal_hold = false
+        RETURNING id
+      `,
+      [ids, evaluatedAt],
+    );
+
+    return result.rows.length;
   }
 
   async deleteExpiredInvoiceArtifactBlobs(evaluatedAt: string): Promise<number> {

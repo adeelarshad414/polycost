@@ -29,6 +29,7 @@ export interface InvoiceArtifactObjectPointer {
   objectStoreRegion?: string;
   objectStoreKey?: string;
   objectStoreUri?: string;
+  objectStoreVersion?: string;
 }
 
 interface StoreInput {
@@ -95,14 +96,7 @@ export class InvoiceArtifactStorageService {
       return undefined;
     }
 
-    if (!pointer.objectStoreBucket || !pointer.objectStoreKey || !pointer.objectStoreUri) {
-      throw new ApiValidationError('invoice artifact object pointer is incomplete', [
-        {
-          field: 'artifactId',
-          issue: 'external artifact rows must include bucket/container, key, and URI',
-        },
-      ]);
-    }
+    validateExternalPointer(pointer);
 
     switch (pointer.storageBackend) {
       case 'aws-s3':
@@ -111,6 +105,25 @@ export class InvoiceArtifactStorageService {
         return this.readAzureBlob(pointer);
       case 'gcp-gcs':
         return this.readGcpGcs(pointer);
+      default:
+        return assertNeverStorageBackend(pointer.storageBackend);
+    }
+  }
+
+  async delete(pointer: InvoiceArtifactObjectPointer): Promise<void> {
+    if (pointer.storageBackend === 'database-bytea') {
+      return;
+    }
+
+    validateExternalPointer(pointer);
+
+    switch (pointer.storageBackend) {
+      case 'aws-s3':
+        return this.deleteAwsS3(pointer);
+      case 'azure-blob':
+        return this.deleteAzureBlob(pointer);
+      case 'gcp-gcs':
+        return this.deleteGcpGcs(pointer);
       default:
         return assertNeverStorageBackend(pointer.storageBackend);
     }
@@ -206,6 +219,41 @@ export class InvoiceArtifactStorageService {
     return responseBuffer(response);
   }
 
+  private async deleteAwsS3(pointer: InvoiceArtifactObjectPointer): Promise<void> {
+    const region =
+      pointer.objectStoreRegion ?? this.optionalConfig('INVOICE_ARTIFACT_OBJECT_STORE_REGION');
+
+    if (!region) {
+      throw storageConfigError('INVOICE_ARTIFACT_OBJECT_STORE_REGION is required for AWS S3');
+    }
+
+    const bucket = pointer.objectStoreBucket!;
+    const key = pointer.objectStoreKey!;
+    const host = `${bucket}.s3.${region}.amazonaws.com`;
+    const path = objectPath(key);
+    const query = pointer.objectStoreVersion
+      ? `versionId=${awsQueryEncode(pointer.objectStoreVersion)}`
+      : '';
+    const credentials = await this.awsCredentials();
+    const response = await this.fetcher(`https://${host}${path}${query ? `?${query}` : ''}`, {
+      method: 'DELETE',
+      headers: awsSignedHeaders({
+        credentials,
+        method: 'DELETE',
+        host,
+        path,
+        query,
+        region,
+        content: Buffer.alloc(0),
+        now: this.now(),
+      }),
+    });
+
+    if (!response.ok && response.status !== 404) {
+      throw storageProviderError('AWS S3', response.status, response.statusText);
+    }
+  }
+
   private async storeAzureBlob(
     input: StoreInput,
     configuredContainer: string,
@@ -252,6 +300,7 @@ export class InvoiceArtifactStorageService {
         azureTarget.containerName,
         pointer.objectStoreKey!,
         azureTarget.sasToken,
+        { versionId: pointer.objectStoreVersion },
       ),
     );
 
@@ -260,6 +309,29 @@ export class InvoiceArtifactStorageService {
     }
 
     return responseBuffer(response);
+  }
+
+  private async deleteAzureBlob(pointer: InvoiceArtifactObjectPointer): Promise<void> {
+    const azureTarget = await this.azureTarget(pointer.objectStoreBucket!);
+    const response = await this.fetcher(
+      azureBlobUrl(
+        azureTarget.accountName,
+        azureTarget.containerName,
+        pointer.objectStoreKey!,
+        azureTarget.sasToken,
+        { versionId: pointer.objectStoreVersion },
+      ),
+      {
+        method: 'DELETE',
+        headers: {
+          'x-ms-version': '2023-11-03',
+        },
+      },
+    );
+
+    if (!response.ok && response.status !== 404) {
+      throw storageProviderError('Azure Blob Storage', response.status, response.statusText);
+    }
   }
 
   private async storeGcpGcs(
@@ -320,6 +392,28 @@ export class InvoiceArtifactStorageService {
     }
 
     return responseBuffer(response);
+  }
+
+  private async deleteGcpGcs(pointer: InvoiceArtifactObjectPointer): Promise<void> {
+    const token = await this.gcpAccessToken();
+    const generationQuery = pointer.objectStoreVersion
+      ? `?generation=${encodeURIComponent(pointer.objectStoreVersion)}`
+      : '';
+    const response = await this.fetcher(
+      `https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(
+        pointer.objectStoreBucket!,
+      )}/o/${encodeURIComponent(pointer.objectStoreKey!)}${generationQuery}`,
+      {
+        method: 'DELETE',
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    if (!response.ok && response.status !== 404) {
+      throw storageProviderError('GCP Cloud Storage', response.status, response.statusText);
+    }
   }
 
   private storageBackend(): InvoiceArtifactStorageBackend {
@@ -397,9 +491,10 @@ export class InvoiceArtifactStorageService {
 
 function awsSignedHeaders(input: {
   credentials: AwsCredentials;
-  method: 'GET' | 'PUT';
+  method: 'DELETE' | 'GET' | 'PUT';
   host: string;
   path: string;
+  query?: string;
   region: string;
   content: Buffer;
   contentType?: string;
@@ -435,7 +530,7 @@ function awsSignedHeaders(input: {
   const canonicalRequest = [
     input.method,
     input.path,
-    '',
+    input.query ?? '',
     `${canonicalHeaders}\n`,
     signedHeaders,
     contentHash,
@@ -518,16 +613,48 @@ function objectPath(key: string): string {
   return `/${key.split('/').map(encodeURIComponent).join('/')}`;
 }
 
+function awsQueryEncode(value: string): string {
+  return encodeURIComponent(value).replace(
+    /[!'()*]/g,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+}
+
 function azureBlobUrl(
   accountName: string,
   containerName: string,
   key: string,
   sasToken: string,
+  options: { versionId?: string } = {},
 ): string {
   const normalizedSasToken = sasToken.startsWith('?') ? sasToken.slice(1) : sasToken;
+  const query = [
+    options.versionId ? `versionid=${encodeURIComponent(options.versionId)}` : undefined,
+    normalizedSasToken,
+  ]
+    .filter(Boolean)
+    .join('&');
+
   return `https://${accountName}.blob.core.windows.net/${encodeURIComponent(
     containerName,
-  )}/${key.split('/').map(encodeURIComponent).join('/')}?${normalizedSasToken}`;
+  )}/${key.split('/').map(encodeURIComponent).join('/')}?${query}`;
+}
+
+function validateExternalPointer(
+  pointer: InvoiceArtifactObjectPointer,
+): asserts pointer is InvoiceArtifactObjectPointer & {
+  objectStoreBucket: string;
+  objectStoreKey: string;
+  objectStoreUri: string;
+} {
+  if (!pointer.objectStoreBucket || !pointer.objectStoreKey || !pointer.objectStoreUri) {
+    throw new ApiValidationError('invoice artifact object pointer is incomplete', [
+      {
+        field: 'artifactId',
+        issue: 'external artifact rows must include bucket/container, key, and URI',
+      },
+    ]);
+  }
 }
 
 async function responseBuffer(response: {

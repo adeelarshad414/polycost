@@ -88,6 +88,8 @@ once tagged releases begin.
 - Provider-native invoice artifact object storage adapters for AWS S3, Azure Blob
   Storage, and GCP Cloud Storage, including Vault-backed credentials, object pointer
   persistence, checksum-verified reads, and production credential-check coverage.
+- External invoice artifact retention deletion now purges AWS S3, Azure Blob Storage,
+  and GCP Cloud Storage objects before deleting expired non-held database pointers.
 
 ### Notes
 
@@ -107,8 +109,8 @@ once tagged releases begin.
   Cost Management CSV, and nested GCP Billing Export JSON, plus adjustment-aware
   usage-comparable variance, commitment row evidence, invoice artifact metadata
   registration/verification status, database-backed artifact file storage, provider
-  object-storage adapters, and artifact governance metadata. Provider invoice-of-record
-  validation, external object lifecycle deletion, real malware scanning operation,
+  object-storage adapters, external object retention deletion, and artifact governance
+  metadata. Provider invoice-of-record validation, real malware scanning operation,
   and legal retention workflow enforcement remain future scope.
 - Account/team UX now supports switching the current active workspace without a
   new login, refreshing pending/expired invite tokens, and handing invite links to

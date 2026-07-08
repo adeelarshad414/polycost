@@ -2590,6 +2590,8 @@ describe('BillingService', () => {
       storageBackend: 'database-bytea',
     });
     expect(repository.deleteExpiredInvoiceArtifactBlobs).not.toHaveBeenCalled();
+    expect(repository.listExpiredInvoiceArtifactBlobDeletionCandidates).not.toHaveBeenCalled();
+    expect(repository.deleteInvoiceArtifactBlobsByIds).not.toHaveBeenCalled();
   });
 
   it('deletes expired non-held invoice artifacts when retention enforcement is enabled', async () => {
@@ -2598,7 +2600,21 @@ describe('BillingService', () => {
       expiredCandidates: 3,
       legalHoldSkipped: 2,
     });
-    repository.deleteExpiredInvoiceArtifactBlobs.mockResolvedValue(3);
+    repository.listExpiredInvoiceArtifactBlobDeletionCandidates.mockResolvedValue([
+      {
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        storageBackend: 'database-bytea',
+      },
+      {
+        id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        storageBackend: 'database-bytea',
+      },
+      {
+        id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        storageBackend: 'database-bytea',
+      },
+    ]);
+    repository.deleteInvoiceArtifactBlobsByIds.mockResolvedValue(3);
     const service = new BillingService(
       repository as never,
       new InvoiceArtifactGovernanceService(
@@ -2617,7 +2633,78 @@ describe('BillingService', () => {
       legalHoldSkipped: 2,
       deleted: 3,
     });
-    expect(repository.deleteExpiredInvoiceArtifactBlobs).toHaveBeenCalledWith(expect.any(String));
+    expect(repository.listExpiredInvoiceArtifactBlobDeletionCandidates).toHaveBeenCalledWith(
+      expect.any(String),
+    );
+    expect(repository.deleteInvoiceArtifactBlobsByIds).toHaveBeenCalledWith(
+      [
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      ],
+      expect.any(String),
+    );
+    expect(repository.deleteExpiredInvoiceArtifactBlobs).not.toHaveBeenCalled();
+  });
+
+  it('purges external artifact objects before deleting expired retention rows', async () => {
+    const repository = repositoryMock();
+    repository.summarizeInvoiceArtifactRetention.mockResolvedValue({
+      expiredCandidates: 2,
+      legalHoldSkipped: 0,
+    });
+    repository.listExpiredInvoiceArtifactBlobDeletionCandidates.mockResolvedValue([
+      {
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        storageBackend: 'aws-s3',
+        objectStoreBucket: 'polycost-invoice-artifacts',
+        objectStoreRegion: 'us-east-1',
+        objectStoreKey: 'invoice-artifacts/team/reconciliation/artifact.txt',
+        objectStoreUri:
+          's3://polycost-invoice-artifacts/invoice-artifacts/team/reconciliation/artifact.txt',
+        objectStoreVersion: 'v1',
+      },
+      {
+        id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        storageBackend: 'database-bytea',
+      },
+    ]);
+    repository.deleteInvoiceArtifactBlobsByIds.mockResolvedValue(2);
+    const storageService = {
+      delete: jest.fn().mockResolvedValue(undefined),
+    } as unknown as InvoiceArtifactStorageService;
+    const service = new BillingService(
+      repository as never,
+      new InvoiceArtifactGovernanceService(
+        configService({
+          INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE: 'delete-expired',
+        }),
+      ),
+      storageService,
+    );
+
+    await expect(
+      service.enforceInvoiceArtifactRetention({ dryRun: false }, identity),
+    ).resolves.toMatchObject({
+      mode: 'delete-expired',
+      dryRun: false,
+      expiredCandidates: 2,
+      legalHoldSkipped: 0,
+      deleted: 2,
+    });
+    expect(storageService.delete).toHaveBeenCalledTimes(1);
+    expect(storageService.delete).toHaveBeenCalledWith(
+      expect.objectContaining({
+        storageBackend: 'aws-s3',
+        objectStoreBucket: 'polycost-invoice-artifacts',
+        objectStoreKey: 'invoice-artifacts/team/reconciliation/artifact.txt',
+        objectStoreVersion: 'v1',
+      }),
+    );
+    expect(repository.deleteInvoiceArtifactBlobsByIds).toHaveBeenCalledWith(
+      ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'],
+      expect.any(String),
+    );
   });
 
   it('rejects artifact blob uploads when bytes do not match registered checksum metadata', async () => {
@@ -2995,6 +3082,8 @@ function repositoryMock() {
     saveInvoiceArtifactBlobAndUpdateEvidence: jest.fn(),
     getInvoiceArtifactBlob: jest.fn(),
     summarizeInvoiceArtifactRetention: jest.fn(),
+    listExpiredInvoiceArtifactBlobDeletionCandidates: jest.fn(),
+    deleteInvoiceArtifactBlobsByIds: jest.fn(),
     deleteExpiredInvoiceArtifactBlobs: jest.fn(),
   } as unknown as jest.Mocked<ApiDatabaseRepository>;
 }

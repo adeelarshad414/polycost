@@ -155,6 +155,127 @@ describe('InvoiceArtifactStorageService', () => {
       }),
     ).resolves.toEqual(content);
   });
+
+  it('deletes AWS S3 artifact objects with SigV4 and version id support', async () => {
+    const fetcher = jest.fn(async () => okResponse(''));
+    const service = new InvoiceArtifactStorageService(
+      configService({
+        INVOICE_ARTIFACT_OBJECT_STORE_REGION: 'us-east-1',
+      }),
+      secretsReader({
+        'polycost/artifacts/aws:access_key_id': 'AKIATEST',
+        'polycost/artifacts/aws:secret_access_key': 'aws-secret-key',
+      }),
+      fetcher,
+      () => new Date('2026-07-08T00:00:00.000Z'),
+    );
+
+    await expect(
+      service.delete({
+        storageBackend: 'aws-s3',
+        objectStoreBucket: 'polycost-invoice-artifacts',
+        objectStoreRegion: 'us-east-1',
+        objectStoreKey: 'invoice-artifacts/demo.txt',
+        objectStoreUri: 's3://polycost-invoice-artifacts/invoice-artifacts/demo.txt',
+        objectStoreVersion: 'v1',
+      }),
+    ).resolves.toBeUndefined();
+    expect(fetcher).toHaveBeenCalledWith(
+      'https://polycost-invoice-artifacts.s3.us-east-1.amazonaws.com/invoice-artifacts/demo.txt?versionId=v1',
+      expect.objectContaining({
+        method: 'DELETE',
+        headers: expect.objectContaining({
+          authorization: expect.stringContaining('AWS4-HMAC-SHA256'),
+        }),
+      }),
+    );
+  });
+
+  it('deletes Azure Blob artifact objects through SAS-backed REST calls', async () => {
+    const fetcher = jest.fn(async () => okResponse(''));
+    const service = new InvoiceArtifactStorageService(
+      configService(),
+      secretsReader({
+        'polycost/artifacts/azure:account_name': 'polycostartifacts',
+        'polycost/artifacts/azure:sas_token': 'sv=2026&sig=signature',
+      }),
+      fetcher,
+    );
+
+    await expect(
+      service.delete({
+        storageBackend: 'azure-blob',
+        objectStoreBucket: 'polycost-invoice-artifacts',
+        objectStoreKey: 'invoice-artifacts/demo.txt',
+        objectStoreUri: 'azure-blob://polycostartifacts/polycost-invoice-artifacts/demo.txt',
+        objectStoreVersion: '2',
+      }),
+    ).resolves.toBeUndefined();
+    expect(fetcher).toHaveBeenCalledWith(
+      'https://polycostartifacts.blob.core.windows.net/polycost-invoice-artifacts/invoice-artifacts/demo.txt?versionid=2&sv=2026&sig=signature',
+      expect.objectContaining({
+        method: 'DELETE',
+        headers: expect.objectContaining({
+          'x-ms-version': '2023-11-03',
+        }),
+      }),
+    );
+  });
+
+  it('deletes GCP Cloud Storage artifact objects by generation', async () => {
+    const fetcher = jest.fn(async () => okResponse(''));
+    const service = new InvoiceArtifactStorageService(
+      configService(),
+      secretsReader({
+        'polycost/artifacts/gcp:access_token': 'gcp-storage-token',
+      }),
+      fetcher,
+    );
+
+    await expect(
+      service.delete({
+        storageBackend: 'gcp-gcs',
+        objectStoreBucket: 'polycost-invoice-artifacts',
+        objectStoreKey: 'invoice-artifacts/demo.txt',
+        objectStoreUri: 'gs://polycost-invoice-artifacts/invoice-artifacts/demo.txt',
+        objectStoreVersion: '3',
+      }),
+    ).resolves.toBeUndefined();
+    expect(fetcher).toHaveBeenCalledWith(
+      'https://storage.googleapis.com/storage/v1/b/polycost-invoice-artifacts/o/invoice-artifacts%2Fdemo.txt?generation=3',
+      expect.objectContaining({
+        method: 'DELETE',
+        headers: expect.objectContaining({
+          authorization: 'Bearer gcp-storage-token',
+        }),
+      }),
+    );
+  });
+
+  it('treats missing provider objects as already deleted for retention retries', async () => {
+    const fetcher = jest.fn(async () => ({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      text: async () => '',
+    }));
+    const service = new InvoiceArtifactStorageService(
+      configService(),
+      secretsReader({
+        'polycost/artifacts/gcp:access_token': 'gcp-storage-token',
+      }),
+      fetcher,
+    );
+
+    await expect(
+      service.delete({
+        storageBackend: 'gcp-gcs',
+        objectStoreBucket: 'polycost-invoice-artifacts',
+        objectStoreKey: 'invoice-artifacts/missing.txt',
+        objectStoreUri: 'gs://polycost-invoice-artifacts/invoice-artifacts/missing.txt',
+      }),
+    ).resolves.toBeUndefined();
+  });
 });
 
 function storeInput(storageBackend: InvoiceArtifactStorageBackend) {
