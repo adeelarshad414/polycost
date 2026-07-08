@@ -163,4 +163,5 @@ For finance/FinOps:
    committed-use discounts.
 6. Review commitment evidence requirements for provider inventory, amortization
    periods, and allocation proof.
-7. Call out that invoice-grade actual spend and private discounts are future work.
+7. Review the invoice-grade readiness blockers and required provider artifacts.
+8. Call out that invoice-grade actual spend and private discounts are future work.

@@ -93,6 +93,16 @@ interface InvoiceCommitmentEvidence {
   caveats: string[];
 }
 
+type InvoiceGradeReadinessCheckStatus = 'present' | 'partial' | 'missing' | 'not-applicable';
+
+interface InvoiceGradeReadinessCheck {
+  id: string;
+  label: string;
+  status: InvoiceGradeReadinessCheckStatus;
+  evidence: string;
+  requiredArtifact: string;
+}
+
 @Injectable()
 export class BillingService {
   constructor(private readonly repository: ApiDatabaseRepository) {}
@@ -1102,6 +1112,10 @@ function tagsFromJsonish(row: Record<string, unknown>, keys: string[]): Record<s
   return {};
 }
 
+function hasAllocationTags(tags: Record<string, string> | undefined): boolean {
+  return Boolean(tags && Object.entries(tags).some(([key, value]) => key.trim() && value.trim()));
+}
+
 function stringifyTagValues(tags: Record<string, unknown>): Record<string, string> {
   return Object.fromEntries(
     Object.entries(tags).flatMap(([key, value]) =>
@@ -1394,11 +1408,14 @@ function reconciliationEvidence(
     lineItemHash: string;
     skuId?: string;
     serviceName: string;
+    provider?: BillingImportInput['provider'];
     region?: string;
     resourceId?: string;
     usageStart?: string;
     usageEnd?: string;
     costUsd: number;
+    currency?: string;
+    tags?: Record<string, string>;
     rawPayload?: Record<string, unknown>;
   }>,
   estimatedTotalUsd: number,
@@ -1455,12 +1472,28 @@ function reconciliationEvidence(
     rowsWithRegion: lineItems.filter((lineItem) => lineItem.region).length,
     rowsWithResourceId: lineItems.filter((lineItem) => lineItem.resourceId).length,
     rowsWithUsageWindow,
+    rowsWithCurrency: lineItems.filter((lineItem) => lineItem.currency).length,
+    rowsWithAllocationTags: lineItems.filter((lineItem) => hasAllocationTags(lineItem.tags)).length,
     rowsWithSourceFingerprint: sourceFingerprints.length,
     skuMatchCount: skuMatches.length,
     serviceMatchCount: serviceMatches.length,
     skuMatchPercent: percentOf(skuMatches.length, Math.max(invoiceSkuIds.length, 1)),
     sourceFingerprintPercent: percentOf(sourceFingerprints.length, Math.max(rowCount, 1)),
+    currencyCoveragePercent: percentOf(
+      lineItems.filter((lineItem) => lineItem.currency).length,
+      Math.max(rowCount, 1),
+    ),
+    allocationTagCoveragePercent: percentOf(
+      lineItems.filter((lineItem) => hasAllocationTags(lineItem.tags)).length,
+      Math.max(rowCount, 1),
+    ),
   };
+  const invoiceGradeReadiness = invoiceGradeReadinessMatrix(
+    lineItems,
+    traceCoverage,
+    adjustmentSummary,
+    missingRecommendedFields,
+  );
 
   return {
     importRunId,
@@ -1478,6 +1511,7 @@ function reconciliationEvidence(
       ...traceCoverage,
     },
     invoiceAdjustmentSummary: adjustmentSummary,
+    invoiceGradeReadiness,
     invoiceMatchSummary: {
       comparisonSkuIds,
       comparisonCategories,
@@ -1678,6 +1712,221 @@ function invoiceAdjustmentSummary(
         return Math.abs(right.totalCostUsd) - Math.abs(left.totalCostUsd);
       }),
   };
+}
+
+function invoiceGradeReadinessMatrix(
+  lineItems: Array<{
+    provider?: BillingImportInput['provider'];
+    serviceName: string;
+    skuId?: string;
+    resourceId?: string;
+    usageStart?: string;
+    usageEnd?: string;
+    currency?: string;
+    tags?: Record<string, string>;
+  }>,
+  coverage: {
+    rowCount: number;
+    rowsWithSourceFingerprint: number;
+    rowsWithSkuId: number;
+    rowsWithResourceId: number;
+    rowsWithUsageWindow: number;
+    rowsWithCurrency: number;
+    rowsWithAllocationTags: number;
+    skuMatchCount: number;
+    serviceMatchCount: number;
+    sourceFingerprintPercent: number;
+    skuMatchPercent: number;
+    currencyCoveragePercent: number;
+    allocationTagCoveragePercent: number;
+  },
+  adjustmentSummary: {
+    adjustmentLineItemCount: number;
+    commitmentLineItemCount: number;
+    commitmentEvidence: {
+      rowsRequiringProviderInventory: number;
+      rowsRequiringAmortizationPeriod: number;
+      rowsRequiringAllocationEvidence: number;
+    };
+    categories: Array<{
+      category: InvoiceAdjustmentCategory;
+      rowCount: number;
+      totalCostUsd: number;
+    }>;
+  },
+  missingRecommendedFields: string[],
+): {
+  status: 'invoice-grade-blocked' | 'invoice-grade-review-ready';
+  presentCount: number;
+  partialCount: number;
+  missingCount: number;
+  notApplicableCount: number;
+  blockers: string[];
+  requiredArtifacts: string[];
+  checks: InvoiceGradeReadinessCheck[];
+} {
+  const provider = lineItems.find((lineItem) => lineItem.provider)?.provider;
+  const rowCount = Math.max(coverage.rowCount, 1);
+  const hasPrivatePricingRows = invoiceCategoryTotal(adjustmentSummary, [
+    'discount',
+    'enterprise-adjustment',
+    'commitment-discount',
+  ]);
+  const hasTaxRows = invoiceCategoryTotal(adjustmentSummary, ['tax']);
+  const checks: InvoiceGradeReadinessCheck[] = [
+    {
+      id: 'provider-invoice-control',
+      label: 'Provider invoice control total',
+      status: 'missing',
+      evidence: 'PolyCost has normalized provider export rows, not the provider invoice of record.',
+      requiredArtifact: providerInvoiceArtifact(provider),
+    },
+    {
+      id: 'source-row-traceability',
+      label: 'Source-row traceability',
+      status:
+        coverage.rowsWithSourceFingerprint === coverage.rowCount
+          ? 'present'
+          : coverage.rowsWithSourceFingerprint > 0
+            ? 'partial'
+            : 'missing',
+      evidence: `${coverage.sourceFingerprintPercent}% of imported rows have PolyCost source-row fingerprints.`,
+      requiredArtifact:
+        'Provider export with stable row IDs, source file hash, and import manifest.',
+    },
+    {
+      id: 'sku-service-match',
+      label: 'SKU/service match to estimate',
+      status:
+        coverage.skuMatchPercent === 100
+          ? 'present'
+          : coverage.skuMatchCount > 0 || coverage.serviceMatchCount > 0
+            ? 'partial'
+            : 'missing',
+      evidence: `${coverage.skuMatchCount} SKU match(es), ${coverage.serviceMatchCount} service-name match(es).`,
+      requiredArtifact: 'Provider SKU/meter-to-estimate mapping reviewed for the billing period.',
+    },
+    {
+      id: 'allocation-evidence',
+      label: 'Cost allocation evidence',
+      status:
+        coverage.rowsWithAllocationTags === coverage.rowCount ||
+        coverage.rowsWithResourceId === rowCount
+          ? 'present'
+          : coverage.rowsWithAllocationTags > 0 || coverage.rowsWithResourceId > 0
+            ? 'partial'
+            : 'missing',
+      evidence: `${coverage.allocationTagCoveragePercent}% rows have allocation tags; ${coverage.rowsWithResourceId}/${coverage.rowCount} rows have resource IDs.`,
+      requiredArtifact:
+        'Cost allocation tag policy, account/subscription/project ownership map, and resource-owner evidence.',
+    },
+    {
+      id: 'billing-period-currency',
+      label: 'Billing period and currency completeness',
+      status:
+        coverage.rowsWithUsageWindow === coverage.rowCount &&
+        coverage.rowsWithCurrency === coverage.rowCount
+          ? 'present'
+          : coverage.rowsWithUsageWindow > 0 || coverage.rowsWithCurrency > 0
+            ? 'partial'
+            : 'missing',
+      evidence: `${coverage.rowsWithUsageWindow}/${coverage.rowCount} rows have usage windows; ${coverage.currencyCoveragePercent}% rows have currency.`,
+      requiredArtifact:
+        'Provider billing-period boundaries, currency/exchange-rate policy, and invoice issue date.',
+    },
+    {
+      id: 'adjustment-support',
+      label: 'Invoice adjustment support',
+      status: adjustmentSummary.adjustmentLineItemCount > 0 ? 'partial' : 'not-applicable',
+      evidence: `${adjustmentSummary.adjustmentLineItemCount} non-usage adjustment row(s) classified.`,
+      requiredArtifact:
+        'Provider support, marketplace, credit, refund, fee, and adjustment documents for each non-usage row.',
+    },
+    {
+      id: 'commitment-amortization',
+      label: 'Commitment amortization evidence',
+      status:
+        adjustmentSummary.commitmentLineItemCount === 0
+          ? 'not-applicable'
+          : adjustmentSummary.commitmentEvidence.rowsRequiringAmortizationPeriod > 0
+            ? 'missing'
+            : 'partial',
+      evidence: `${adjustmentSummary.commitmentLineItemCount} commitment row(s); ${adjustmentSummary.commitmentEvidence.rowsRequiringAmortizationPeriod} require amortization-period proof.`,
+      requiredArtifact:
+        'Provider commitment inventory, benefit coverage report, amortization schedule, and unused commitment allocation.',
+    },
+    {
+      id: 'private-pricing',
+      label: 'Private pricing and discount proof',
+      status: hasPrivatePricingRows > 0 ? 'missing' : 'not-applicable',
+      evidence: `${hasPrivatePricingRows} private-pricing, discount, or enterprise-adjustment row(s) detected.`,
+      requiredArtifact:
+        'Private rate card, enterprise agreement, EDP/EA terms, discount schedule, or provider contract extract.',
+    },
+    {
+      id: 'tax-jurisdiction',
+      label: 'Tax jurisdiction evidence',
+      status: hasTaxRows > 0 ? 'missing' : 'not-applicable',
+      evidence: `${hasTaxRows} tax row(s) detected.`,
+      requiredArtifact:
+        'Provider tax invoice, jurisdiction mapping, VAT/GST/sales-tax treatment, and legal-entity mapping.',
+    },
+  ];
+
+  if (missingRecommendedFields.length > 0) {
+    checks.push({
+      id: 'provider-column-completeness',
+      label: 'Provider export column completeness',
+      status: 'partial',
+      evidence: `Missing recommended normalized fields: ${missingRecommendedFields.join(', ')}.`,
+      requiredArtifact:
+        'Native provider export with recommended SKU, region, usage, cost, currency, and resource columns.',
+    });
+  }
+
+  const presentCount = checks.filter((check) => check.status === 'present').length;
+  const partialCount = checks.filter((check) => check.status === 'partial').length;
+  const missingCount = checks.filter((check) => check.status === 'missing').length;
+  const notApplicableCount = checks.filter((check) => check.status === 'not-applicable').length;
+  const blockingChecks = checks.filter((check) => check.status === 'missing');
+
+  return {
+    status: blockingChecks.length > 0 ? 'invoice-grade-blocked' : 'invoice-grade-review-ready',
+    presentCount,
+    partialCount,
+    missingCount,
+    notApplicableCount,
+    blockers: blockingChecks.map((check) => check.label),
+    requiredArtifacts: [...new Set(blockingChecks.map((check) => check.requiredArtifact))],
+    checks,
+  };
+}
+
+function invoiceCategoryTotal(
+  adjustmentSummary: {
+    categories: Array<{
+      category: InvoiceAdjustmentCategory;
+      rowCount: number;
+    }>;
+  },
+  categories: InvoiceAdjustmentCategory[],
+): number {
+  return adjustmentSummary.categories
+    .filter((summary) => categories.includes(summary.category))
+    .reduce((total, summary) => total + summary.rowCount, 0);
+}
+
+function providerInvoiceArtifact(provider: BillingImportInput['provider'] | undefined): string {
+  switch (provider) {
+    case 'aws':
+      return 'AWS invoice PDF/tax invoice, CUR manifest, payer-account billing period, and Cost Explorer control total.';
+    case 'azure':
+      return 'Azure invoice PDF, Cost Management export manifest, billing profile/invoice section, and cost control total.';
+    case 'gcp':
+      return 'GCP Cloud Billing invoice, billing account export manifest, project/legal-entity mapping, and invoice control total.';
+    default:
+      return 'Provider invoice of record, billing export manifest, account scope, and invoice control total.';
+  }
 }
 
 function lineItemAdjustmentClassification(lineItem: {

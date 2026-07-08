@@ -64,6 +64,9 @@ once tagged releases begin.
 - Commitment evidence requirements in reconciliation summaries, showing rows that
   still need provider inventory, amortization-period proof, or allocation evidence
   before invoice-grade interpretation.
+- Invoice-grade readiness matrix for actuals reconciliation, listing present,
+  partial, missing, and not-applicable billing evidence with required provider
+  artifacts and blockers.
 
 ### Notes
 
