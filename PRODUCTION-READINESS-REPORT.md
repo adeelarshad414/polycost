@@ -12,6 +12,23 @@ production-ready in the strict v2 sense until the blocked items below are cleare
 The core OSS demo path remains `verified (mock)` where it depends on fixture-backed
 cloud, LLM, SSO, or billing inputs.
 
+## Customer Handover Addendum
+
+The customer handover and production excellence pass added the canonical handover
+package:
+
+- `docs/HOW-TO-USE.md`
+- `docs/DEPLOYMENT.md`
+- `docs/RUNBOOK.md`
+- `docs/COMPARISON.md`
+- `docs/ARCHITECTURE.md`
+- `docs/CUSTOMER-HANDOVER-LEDGER.md`
+
+`npm run handover:check` now validates this package and is wired into `npm run
+check`. The handover verdict is private-demo ready with explicit caveats for
+invoice-grade billing, full Visio rendering, production LLM quality, enterprise
+auth/team product depth, and full production landing-zone Terraform.
+
 ## Findings And Disposition
 
 | ID             | Disposition   | Evidence                                                                                                                                                                            |
@@ -35,6 +52,8 @@ cloud, LLM, SSO, or billing inputs.
 | TF-GEN-003     | Improved      | V3.2 assurance adds generated CAF/WAF/Terraform framework-alignment evidence and topology-aware public/private ingress/load-balancer controls                                       |
 | TF-GEN-004     | Improved      | V3.3 adds downloadable Terraform ZIP export, bundle manifest hash evidence, generated validation runner, and frontend ZIP/evidence download actions                                 |
 | TF-GEN-005     | Improved      | V3.4 replaces Terraform module placeholders with AWS/Azure/GCP network, compute, and data starter modules plus static module-library validation                                     |
+| HND-001        | Added         | Customer handover package added under `docs/`, with usage, deployment, runbook, competitive comparison, architecture, and evidence ledger                                           |
+| HND-002        | Added         | `npm run handover:check` validates the handover package and runs inside the full local `npm run check` floor                                                                        |
 
 ## Verification
 
@@ -97,6 +116,21 @@ Local static/regression gates:
   - API TypeScript build passed.
   - Web production build passed with the existing Vite environment-placeholder
     and chunk-size warnings.
+- Customer handover package gate passed with `npm run handover:check`.
+- Customer handover full local regression floor passed with `npm run check`:
+  - API unit: `51` suites / `400` tests.
+  - Web unit: `9` suites / `132` tests.
+  - Graph validation: `304` nodes / `304` edges.
+  - Pricing coverage guard: `36` frontend priced families covered.
+  - Progress verification: `153` phase evidence anchors.
+  - Security suppression check: `22` reviewed suppressions.
+  - Database validation, DevOps check, cloud readiness, release readiness,
+    handover, and provider credential gates passed.
+  - `db:validate` skipped the live `schema_migrations` check because the Postgres
+    container was not running.
+  - `cloud:check` remains documentation/config only because deployable IaC is not
+    present.
+  - `impeccable` skipped by documented Node 20 vs Node 24 constraint.
 - Phase V3 full regression floor passed with `npm run check`:
   - API unit: 51 suites / 398 tests.
   - Web unit: 9 suites / 132 tests.

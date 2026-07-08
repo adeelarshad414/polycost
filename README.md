@@ -242,6 +242,7 @@ all expected migration files exist and that the running database has recorded th
 Security and quality checks:
 
 ```bash
+npm run handover:check
 npm run security:audit
 npm run provider:credentials:check
 npm run release:check
@@ -286,8 +287,18 @@ before switching `USE_MOCK_PROVIDERS=false`.
 
 ## Documentation
 
-- `HOW-TO-USE.md` explains the product workflow.
-- `DEPLOY.md` covers deployment guidance.
+- `docs/HOW-TO-USE.md` explains the customer-facing product workflow and demo
+  talk track.
+- `docs/DEPLOYMENT.md` covers self-hosted demo and production deployment guidance.
+- `docs/RUNBOOK.md` covers operating procedures, health checks, incidents, and
+  pre-demo checks.
+- `docs/COMPARISON.md` compares PolyCost honestly with Infracost, Vantage,
+  CloudZero, IBM Cloudability, and native calculators.
+- `docs/ARCHITECTURE.md` documents the current system architecture and extension
+  points.
+- `docs/CUSTOMER-HANDOVER-LEDGER.md` records the handover verdict, evidence map,
+  phase classification, and known gaps.
+- `HOW-TO-USE.md` and `DEPLOY.md` are older root-level compatibility guides.
 - `docs/PROVIDER-CREDENTIALS.md` covers AWS/Azure/GCP pricing-source setup and
   traceability expectations.
 - `DUMMY-VALUES.md` lists development-only placeholders and production guardrails.

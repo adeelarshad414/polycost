@@ -9,6 +9,10 @@ once tagged releases begin.
 
 ### Added
 
+- Customer handover documentation package: usage guide, deployment guide, runbook,
+  competitive comparison, architecture overview, and handover evidence ledger.
+- `npm run handover:check` gate, wired into the full `npm run check` regression
+  floor and release-readiness validation.
 - Open-source readiness files: license, contribution guide, support policy,
   governance notes, issue templates, pull request template, CODEOWNERS, and
   dependency update configuration.
@@ -22,6 +26,9 @@ once tagged releases begin.
 
 - The repository is prepared for an eventual public open-source launch while the
   GitHub repository remains private.
+- Customer handover is now documented as private-demo ready with explicit caveats for
+  invoice-grade pricing, full Visio rendering, production enterprise auth, and full
+  landing-zone Terraform.
 - Production-readiness hardening now includes pricing catalog lineage, SKU evidence
   derivation checks, UI-priced service coverage guards, VSDX partial-parse evidence,
   Tier 3 diagram classifier fallback diagnostics, RBAC UI controls aligned to API
