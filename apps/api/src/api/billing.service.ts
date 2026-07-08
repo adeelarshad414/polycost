@@ -2,7 +2,10 @@ import { createHash, randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ComparisonResult } from '../comparison/comparison.types';
 import { ApiForbiddenError, ApiNotFoundError, ApiValidationError } from './api-errors';
-import { ApiDatabaseRepository } from './api-database.repository';
+import {
+  ApiDatabaseRepository,
+  InvoiceArtifactBlobDeletionCandidate,
+} from './api-database.repository';
 import { AuthIdentity } from './auth.types';
 import {
   InvoiceArtifactRetentionEnforcementResult,
@@ -662,9 +665,24 @@ export class BillingService {
     const summary = await this.repository.summarizeInvoiceArtifactRetention(evaluatedAt);
     const configuredMode = this.artifactGovernanceService.retentionMode();
     const dryRun = input.dryRun || configuredMode === 'report-only';
+    const deletionCandidates = dryRun
+      ? []
+      : await this.repository.listExpiredInvoiceArtifactBlobDeletionCandidates(evaluatedAt);
+
+    if (!dryRun) {
+      for (const candidate of deletionCandidates) {
+        if (candidate.storageBackend !== 'database-bytea') {
+          await this.artifactStorageService.delete(deletionCandidateObjectPointer(candidate));
+        }
+      }
+    }
+
     const deleted = dryRun
       ? 0
-      : await this.repository.deleteExpiredInvoiceArtifactBlobs(evaluatedAt);
+      : await this.repository.deleteInvoiceArtifactBlobsByIds(
+          deletionCandidates.map((candidate) => candidate.id),
+          evaluatedAt,
+        );
 
     return {
       mode: configuredMode,
@@ -2824,6 +2842,20 @@ function blobObjectPointer(blob: InvoiceArtifactBlobRecord): InvoiceArtifactObje
     objectStoreRegion: blob.storageProfile.objectStore?.region,
     objectStoreKey: blob.storageProfile.objectStore?.key,
     objectStoreUri: blob.storageProfile.objectStore?.uri,
+    objectStoreVersion: blob.storageProfile.objectStore?.version,
+  };
+}
+
+function deletionCandidateObjectPointer(
+  candidate: InvoiceArtifactBlobDeletionCandidate,
+): InvoiceArtifactObjectPointer {
+  return {
+    storageBackend: candidate.storageBackend,
+    objectStoreBucket: candidate.objectStoreBucket,
+    objectStoreRegion: candidate.objectStoreRegion,
+    objectStoreKey: candidate.objectStoreKey,
+    objectStoreUri: candidate.objectStoreUri,
+    objectStoreVersion: candidate.objectStoreVersion,
   };
 }
 

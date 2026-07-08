@@ -72,6 +72,9 @@ Evidence:
   bytes through AWS S3, Azure Blob Storage, and GCP Cloud Storage adapters, stores
   object pointers instead of inline bytes for external rows, and checksum-verifies
   provider reads before returning downloaded content.
+- External artifact retention now deletes S3, Azure Blob, or GCP Cloud Storage objects
+  before removing expired non-held database pointers, with provider `404` treated as
+  idempotent success for retry safety.
 - `docs/PROVIDER-CREDENTIALS.md` states the current production swap procedure and
   explicitly limits real provider mode to catalog list prices, not invoices.
 
@@ -88,9 +91,8 @@ Deferred:
   metadata, governance status, object-storage pointers, and verification status
   expose those blockers; they do not remove unrelated or unverified evidence
   requirements. Current artifact storage supports database-backed local mode plus
-  provider-native object writes/reads, but full external lifecycle deletion, real AV
-  operations, legal-hold enforcement, and reviewer workflow automation remain future
-  production work.
+  provider-native object writes/reads/deletes, but real AV operations, legal-hold
+  enforcement, and reviewer workflow automation remain future production work.
 
 ## Phase B - Input Modes And Requirement Pipeline
 

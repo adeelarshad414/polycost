@@ -118,6 +118,7 @@ say so explicitly rather than marking it done.
 | Phase 2.26 - Invoice artifact governance metadata       | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.27 - Artifact storage readiness and retention   | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.28 - Provider artifact storage adapters         | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.29 - External artifact retention deletion       | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4392,6 +4393,36 @@ Status: implemented and verified locally on 2026-07-08.
   reviewer workflow automation, real malware-scanner operation, legal-hold
   administration, and external object lifecycle deletion during retention
   enforcement.
+
+## Phase 2.29 — External artifact retention deletion
+
+Status: implemented and verified locally on 2026-07-08.
+
+- Added provider object deletion to `InvoiceArtifactStorageService` for AWS S3,
+  Azure Blob Storage, and GCP Cloud Storage. Provider `404` responses are treated as
+  idempotent success so retention retries can safely continue after a partially
+  completed purge.
+- Retention enforcement now lists expired, non-held artifact candidates, deletes
+  external provider objects first for S3/Blob/GCS rows, and then deletes only those
+  candidate database rows that are still expired and not under legal hold.
+- Added repository methods to list lightweight retention deletion candidates and
+  delete by explicit IDs with retention/legal-hold predicates rechecked at deletion
+  time.
+- Updated operator docs with delete permissions for object-store credentials and
+  clarified that external provider objects are purged before database pointers.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/invoice-artifact-storage.service.spec.ts src/api/auth-billing.spec.ts src/api/api-database.repository.spec.ts src/api/invoice-artifact-governance.service.spec.ts`
+  passed 78/78 across 4 suites. `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx src/api-client.spec.ts`
+  passed 86/86 across 2 suites. `npm run ci:lint` passed with zero ESLint/typecheck
+  errors. `npm run test:production-readiness` passed with API 14 suites / 187 tests
+  and web 2 suites / 86 tests. Full `npm run check` passed with API 55 suites / 454
+  tests, web 11 suites / 143 tests, graph validation 320 nodes / 320 edges, pricing
+  coverage, progress verification, QA/security suppression hygiene, DB, DevOps,
+  cloud, release, handover, and provider-credential gates green.
+- Remaining caveat: lifecycle deletion is now wired for object storage, but full
+  invoice-grade operation still needs provider invoice-of-record reconciliation,
+  reviewer workflow automation, production malware-scanner operation, and richer
+  legal-hold administration.
 
 ## Deviations from spec log
 
