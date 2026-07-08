@@ -915,6 +915,208 @@ describe('BillingService', () => {
     );
   });
 
+  it('imports Azure Cost Management exports through the native mapper', async () => {
+    const repository = repositoryMock();
+    repository.createBillingImport.mockImplementation(async (input) => ({
+      importRun: {
+        id: '55555555-5555-4555-8555-555555555555',
+        teamId: identity.teamId,
+        provider: input.importInput.provider,
+        sourceType: input.importInput.sourceType,
+        status: 'completed',
+        billingPeriodStart: input.importInput.billingPeriodStart,
+        billingPeriodEnd: input.importInput.billingPeriodEnd,
+        originalFileSha256: input.originalFileSha256,
+        rowsReceived: input.rows.length,
+        rowsAccepted: input.rows.length,
+        rowsRejected: 0,
+        totalCostUsd: 42.25,
+        createdByAccountId: identity.accountId,
+        createdAt: '2026-07-06T00:00:00.000Z',
+        completedAt: '2026-07-06T00:00:01.000Z',
+      },
+      lineItems: input.rows.map((row, index) => ({
+        id: `line-${index}`,
+        importRunId: '55555555-5555-4555-8555-555555555555',
+        teamId: identity.teamId,
+        provider: input.importInput.provider,
+        billingPeriodStart: input.importInput.billingPeriodStart,
+        billingPeriodEnd: input.importInput.billingPeriodEnd,
+        ...row,
+        createdAt: '2026-07-06T00:00:01.000Z',
+      })),
+    }));
+    const service = new BillingService(repository as never);
+
+    await service.importProviderExport(
+      {
+        provider: 'azure',
+        sourceType: 'azure-cost-management',
+        billingPeriodStart: '2026-06-01',
+        billingPeriodEnd: '2026-06-30',
+        content: [
+          'ServiceName,MeterId,ResourceLocation,ResourceId,UsageDateTime,UsageEndDate,Quantity,UnitOfMeasure,CostInBillingCurrency,BillingCurrencyCode,Tags',
+          'Virtual Machines,meter-compute,eastus,/subscriptions/demo/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/app,2026-06-01T00:00:00Z,2026-06-01T01:00:00Z,1,Hours,42.25,USD,"{""cost_center"":""platform"",""env"":""prod""}"',
+        ].join('\n'),
+      },
+      identity,
+    );
+
+    expect(repository.createBillingImport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        importInput: expect.objectContaining({
+          provider: 'azure',
+          sourceType: 'azure-cost-management',
+        }),
+        rows: [
+          expect.objectContaining({
+            serviceName: 'Virtual Machines',
+            skuId: 'meter-compute',
+            region: 'eastus',
+            resourceId:
+              '/subscriptions/demo/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/app',
+            costUsd: 42.25,
+            currency: 'USD',
+            tags: {
+              cost_center: 'platform',
+              env: 'prod',
+            },
+            rawPayload: expect.objectContaining({
+              _polycost: expect.objectContaining({
+                provider: 'azure',
+                recognizedColumns: expect.arrayContaining([
+                  'BillingCurrencyCode',
+                  'CostInBillingCurrency',
+                  'MeterId',
+                  'ServiceName',
+                  'Tags',
+                ]),
+                normalizationStatus: 'provider-export-audit-ready',
+              }),
+            }),
+          }),
+        ],
+      }),
+    );
+  });
+
+  it('imports nested GCP Billing Export JSON through the native mapper', async () => {
+    const repository = repositoryMock();
+    repository.createBillingImport.mockImplementation(async (input) => ({
+      importRun: {
+        id: '55555555-5555-4555-8555-555555555555',
+        teamId: identity.teamId,
+        provider: input.importInput.provider,
+        sourceType: input.importInput.sourceType,
+        status: 'completed',
+        billingPeriodStart: input.importInput.billingPeriodStart,
+        billingPeriodEnd: input.importInput.billingPeriodEnd,
+        originalFileSha256: input.originalFileSha256,
+        rowsReceived: input.rows.length,
+        rowsAccepted: input.rows.length,
+        rowsRejected: 0,
+        totalCostUsd: 19.84,
+        createdByAccountId: identity.accountId,
+        createdAt: '2026-07-06T00:00:00.000Z',
+        completedAt: '2026-07-06T00:00:01.000Z',
+      },
+      lineItems: input.rows.map((row, index) => ({
+        id: `line-${index}`,
+        importRunId: '55555555-5555-4555-8555-555555555555',
+        teamId: identity.teamId,
+        provider: input.importInput.provider,
+        billingPeriodStart: input.importInput.billingPeriodStart,
+        billingPeriodEnd: input.importInput.billingPeriodEnd,
+        ...row,
+        createdAt: '2026-07-06T00:00:01.000Z',
+      })),
+    }));
+    const service = new BillingService(repository as never);
+
+    await service.importProviderExport(
+      {
+        provider: 'gcp',
+        sourceType: 'gcp-billing-export',
+        billingPeriodStart: '2026-06-01',
+        billingPeriodEnd: '2026-06-30',
+        content: JSON.stringify([
+          {
+            service: {
+              description: 'Compute Engine',
+              id: '6F81-5844-456A',
+            },
+            sku: {
+              id: 'gcp-n2-standard-4',
+              description: 'N2 Instance Core running in Americas',
+            },
+            location: {
+              region: 'us-east1',
+            },
+            project: {
+              id: 'demo-project',
+              labels: {
+                cost_center: 'platform',
+                env: 'prod',
+              },
+            },
+            usage_start_time: '2026-06-01T00:00:00Z',
+            usage_end_time: '2026-06-01T01:00:00Z',
+            usage: {
+              amount: 4,
+              unit: 'h',
+            },
+            cost: 19.84,
+            currency: 'USD',
+          },
+        ]),
+      },
+      identity,
+    );
+
+    expect(repository.createBillingImport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        importInput: expect.objectContaining({
+          provider: 'gcp',
+          sourceType: 'gcp-billing-export',
+        }),
+        rows: [
+          expect.objectContaining({
+            serviceName: 'Compute Engine',
+            skuId: 'gcp-n2-standard-4',
+            region: 'us-east1',
+            resourceId: 'demo-project',
+            usageQuantity: 4,
+            usageUnit: 'h',
+            costUsd: 19.84,
+            tags: {
+              cost_center: 'platform',
+              env: 'prod',
+            },
+            rawPayload: expect.objectContaining({
+              _polycost: expect.objectContaining({
+                provider: 'gcp',
+                recognizedColumns: expect.arrayContaining([
+                  'cost',
+                  'currency',
+                  'location.region',
+                  'project.id',
+                  'project.labels',
+                  'service.description',
+                  'sku.id',
+                  'usage.amount',
+                  'usage.unit',
+                  'usage_end_time',
+                  'usage_start_time',
+                ]),
+                normalizationStatus: 'provider-export-audit-ready',
+              }),
+            }),
+          }),
+        ],
+      }),
+    );
+  });
+
   it('reconciles imported actuals against comparison totals with trace evidence', async () => {
     const repository = repositoryMock();
     repository.getBillingImport.mockResolvedValue({

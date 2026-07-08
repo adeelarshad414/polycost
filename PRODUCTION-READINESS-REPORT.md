@@ -59,6 +59,7 @@ performance/accessibility/best-practices/SEO metrics.
 | UI-ARCHIVE-001 | Fixed (smoke) | `docs/theme-audit/2026-07-07/` contains dark/light default screenshots and dark/light terracotta screenshots with token evidence                                                          |
 | CI-REMOTE-001  | Blocked       | GitHub Actions job `85608851518` for prior head showed `runner_id: 0`, empty runner name/group, `steps: []`; remote runner/account infra is not executing repo steps                      |
 | INV-TRACE-002  | Improved      | Provider-export rows now persist `_polycost` source fingerprints/column coverage; reconciliation evidence reports coverage, match summary, readiness, and caveats                         |
+| INV-TRACE-003  | Improved      | Azure Cost Management CSV and nested GCP Billing Export JSON now have focused mapper coverage, allocation tag/label recognition, and fallback-cost readiness evidence                     |
 | VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                               |
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                          |
 | UI-AUTH-002    | Improved      | Workspace billing panel now surfaces reconciliation readiness, source-fingerprint coverage, SKU match coverage, and the invoice-of-record caveat                                          |
@@ -90,7 +91,7 @@ Local static/regression gates:
   - Security suppression check: 21 reviewed suppressions.
   - `impeccable` skipped by documented Node 20 vs Node 24 constraint.
 - `npm run test:production-readiness` passed.
-  - API focused: 10 suites / 133 tests.
+  - API focused: 10 suites / 138 tests.
   - Web focused: 2 suites / 84 tests.
 - `npm run ci:build` passed for API and web.
 - Phase 2.9 focused continuation passed:
@@ -98,6 +99,18 @@ Local static/regression gates:
     `src/diagram-parser/diagram-parser.service.spec.ts`, and
     `src/diagram-parser/llm-classifier.client.spec.ts`: 3 suites / 52 tests.
   - Web focused: `src/App.spec.tsx`: 1 suite / 57 tests.
+- Phase 2.10 billing export mapper hardening passed:
+  - API focused: `src/api/auth-billing.spec.ts`: 1 suite / 20 tests.
+  - The focused tests cover AWS CUR, Azure Cost Management CSV with
+    `CostInBillingCurrency` fallback, and nested GCP Billing Export JSON with
+    labels under `project.labels`.
+- Phase 2.10 full regression floor passed with `npm run check`:
+  - API unit: 51 suites / 403 tests.
+  - Web unit: 11 suites / 141 tests.
+  - Graph validation: 312 nodes / 312 edges.
+  - Pricing coverage, progress verification, QA/security suppressions,
+    database, DevOps, cloud, release, handover, and provider credential gates
+    passed; security suppression ledger now covers 23 reviewed suppressions.
 - Phase 2.9 full regression floor passed with `npm run check`:
   - API unit: 50 suites / 392 tests.
   - Web unit: 9 suites / 130 tests.
@@ -252,9 +265,10 @@ Machine-readable token evidence:
   allocation. A maintainer must fix Actions runner/account/billing/quota state or
   rerun once the account can allocate runners.
 - Full invoice-grade pricing remains future scope: negotiated discounts, credits,
-  taxes, enterprise agreements, marketplace charges, and actual provider invoice-of-record
-  reconciliation are not complete. Phase 2.9 improves source-row traceability and
-  estimate-vs-actual reconciliation evidence.
+  taxes, enterprise agreements, marketplace charges, amortization semantics, and
+  actual provider invoice-of-record reconciliation are not complete. Phase 2.9 and
+  Phase 2.10 improve source-row traceability, native AWS/Azure/GCP export mapping,
+  allocation evidence, and estimate-vs-actual reconciliation evidence.
 - VSDX support remains extraction/evidence oriented, not full Visio visual rendering.
   Phase 2.9 adds page geometry, normalized preview bounds, and explicit layout-extraction
   caveats.
