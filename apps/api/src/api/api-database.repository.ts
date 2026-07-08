@@ -4053,6 +4053,78 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     });
   }
 
+  async updateInvoiceArtifactLegalHoldAndEvidence(input: {
+    reconciliationId: string;
+    artifactId: string;
+    legalHold: boolean;
+    evidence: Record<string, unknown>;
+    audit?: TeamAuditEventInput;
+  }): Promise<InvoiceReconciliationRecord> {
+    return this.withTransaction(async (pool) => {
+      const artifactResult = await pool.query<{ id: string }>(
+        `
+          UPDATE invoice_artifact_blobs
+          SET legal_hold = $3
+          WHERE reconciliation_id = $1
+            AND artifact_id = $2
+          RETURNING id
+        `,
+        [input.reconciliationId, input.artifactId, input.legalHold],
+      );
+
+      if (!artifactResult.rows[0]) {
+        throw new ApiNotFoundError(
+          `Invoice artifact blob ${input.artifactId} was not found for reconciliation ${input.reconciliationId}`,
+        );
+      }
+
+      const result = await pool.query<InvoiceReconciliationRow>(
+        `
+          UPDATE invoice_reconciliation_results
+          SET evidence = $2::jsonb
+          WHERE id = $1
+          RETURNING id,
+                    import_run_id,
+                    comparison_id,
+                    provider,
+                    estimated_total_usd,
+                    invoiced_total_usd,
+                    variance_usd,
+                    variance_percent,
+                    status,
+                    evidence,
+                    created_at
+        `,
+        [input.reconciliationId, JSON.stringify(input.evidence)],
+      );
+      const row = result.rows[0];
+
+      if (!row) {
+        throw new ApiNotFoundError(
+          `Invoice reconciliation ${input.reconciliationId} was not found`,
+        );
+      }
+
+      if (input.audit) {
+        await this.insertTeamAuditEvent(pool, {
+          ...input.audit,
+          targetId: input.audit.targetId ?? row.id,
+          metadata: {
+            importRunId: row.import_run_id,
+            comparisonId: row.comparison_id,
+            provider: row.provider,
+            status: row.status,
+            varianceUsd: Number.parseFloat(row.variance_usd),
+            variancePercent: Number.parseFloat(row.variance_percent),
+            ...(input.audit.metadata ?? {}),
+          },
+        });
+      }
+
+      return toInvoiceReconciliationRecord(row);
+    });
+  }
+
   async getInvoiceArtifactBlob(
     reconciliationId: string,
     artifactId: string,

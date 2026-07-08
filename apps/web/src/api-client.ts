@@ -14,6 +14,7 @@ import {
   InvoiceArtifactBlobRecord,
   InvoiceArtifactRetentionEnforcementResult,
   InvoiceArtifactBlobUploadInput,
+  InvoiceArtifactLegalHoldInput,
   InvoiceArtifactStorageReadiness,
   InvoiceGradeArtifactRegistrationInput,
   InvoiceGradeArtifactVerificationInput,
@@ -256,6 +257,12 @@ export interface PolyCostClient {
     reconciliationId: string,
     artifactId: string,
     input: InvoiceArtifactBlobUploadInput,
+    token: string,
+  ): Promise<InvoiceReconciliationRecord>;
+  setInvoiceArtifactLegalHold(
+    reconciliationId: string,
+    artifactId: string,
+    input: InvoiceArtifactLegalHoldInput,
     token: string,
   ): Promise<InvoiceReconciliationRecord>;
   downloadInvoiceArtifactBlob(
@@ -718,6 +725,19 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         )}/artifacts/${encodeURIComponent(artifactId)}/blob`,
         {
           method: 'POST',
+          headers: authorizationHeaders(token),
+          body: JSON.stringify(input),
+        },
+      );
+    },
+    setInvoiceArtifactLegalHold(reconciliationId, artifactId, input, token) {
+      return requestJson<InvoiceReconciliationRecord>(
+        baseUrl,
+        `/billing/reconciliations/${encodeURIComponent(
+          reconciliationId,
+        )}/artifacts/${encodeURIComponent(artifactId)}/blob/legal-hold`,
+        {
+          method: 'PATCH',
           headers: authorizationHeaders(token),
           body: JSON.stringify(input),
         },

@@ -1608,6 +1608,7 @@ describe('ApiDatabaseRepository', () => {
       },
       created_at: completedAt,
     };
+    let legalHoldState = false;
     const blobRow = {
       id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       reconciliation_id: '66666666-6666-4666-8666-666666666666',
@@ -1696,11 +1697,19 @@ describe('ApiDatabaseRepository', () => {
       }
 
       if (text.includes('INSERT INTO invoice_artifact_blobs')) {
+        legalHoldState = Boolean(values?.[13]);
+
         return { rows: [blobRow], rowCount: 1 };
       }
 
+      if (text.includes('UPDATE invoice_artifact_blobs')) {
+        legalHoldState = Boolean(values?.[2]);
+
+        return { rows: [{ id: blobRow.id }], rowCount: 1 };
+      }
+
       if (text.includes('FROM invoice_artifact_blobs')) {
-        return { rows: [blobRow], rowCount: 1 };
+        return { rows: [{ ...blobRow, legal_hold: legalHoldState }], rowCount: 1 };
       }
 
       if (text.includes('UPDATE invoice_reconciliation_results')) {
@@ -1940,6 +1949,75 @@ describe('ApiDatabaseRepository', () => {
         }),
       }),
     );
+    await expect(
+      repository.updateInvoiceArtifactLegalHoldAndEvidence({
+        reconciliationId: '66666666-6666-4666-8666-666666666666',
+        artifactId: 'artifact-1',
+        legalHold: true,
+        evidence: {
+          invoiceLineItemHashes: ['b'.repeat(64)],
+          invoiceGradeArtifactRegister: {
+            registeredCount: 1,
+            artifacts: [
+              {
+                id: 'artifact-1',
+                storedBlob: {
+                  storageStatus: 'stored',
+                  contentSha256: 'd'.repeat(64),
+                  contentSizeBytes: 7,
+                  governance: {
+                    retentionPolicy: {
+                      retentionUntil: '2027-07-06T00:00:02.000Z',
+                      retentionDays: 365,
+                      legalHold: true,
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+        audit: {
+          teamId: '22222222-2222-4222-8222-222222222222',
+          actorAccountId: '11111111-1111-4111-8111-111111111111',
+          action: 'billing.reconciliation.artifact_legal_hold_updated',
+          targetType: 'billing_reconciliation',
+          metadata: {
+            artifactId: 'artifact-1',
+            legalHold: true,
+            reason: 'retention review',
+          },
+        },
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        evidence: expect.objectContaining({
+          invoiceGradeArtifactRegister: expect.objectContaining({
+            artifacts: [
+              expect.objectContaining({
+                id: 'artifact-1',
+                storedBlob: expect.objectContaining({
+                  governance: expect.objectContaining({
+                    retentionPolicy: expect.objectContaining({
+                      legalHold: true,
+                    }),
+                  }),
+                }),
+              }),
+            ],
+          }),
+        }),
+      }),
+    );
+    await expect(
+      repository.getInvoiceArtifactBlob('66666666-6666-4666-8666-666666666666', 'artifact-1'),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        retentionPolicy: expect.objectContaining({
+          legalHold: true,
+        }),
+      }),
+    );
 
     expect(query).toHaveBeenCalledWith('BEGIN');
     expect(query).toHaveBeenCalledWith('COMMIT');
@@ -1997,6 +2075,19 @@ describe('ApiDatabaseRepository', () => {
         null,
         null,
       ],
+    );
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('UPDATE invoice_artifact_blobs'), [
+      '66666666-6666-4666-8666-666666666666',
+      'artifact-1',
+      true,
+    ]);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO team_audit_events'),
+      expect.arrayContaining([
+        'billing.reconciliation.artifact_legal_hold_updated',
+        'billing_reconciliation',
+        '66666666-6666-4666-8666-666666666666',
+      ]),
     );
   });
 

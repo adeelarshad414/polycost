@@ -64,6 +64,7 @@ import {
   DiagramParseResult,
   INTERVALS,
   IntervalKey,
+  InvoiceArtifactLegalHoldInput,
   InvoiceArtifactBlobUploadInput,
   InvoiceGradeArtifactRegistrationInput,
   InvoiceGradeArtifactVerificationInput,
@@ -2976,6 +2977,53 @@ function WorkspaceControlCenter({
     }
   }
 
+  async function handleToggleInvoiceArtifactLegalHold() {
+    if (
+      !token ||
+      billingAccessMessage ||
+      !reconciliation ||
+      !reconciliationSummary?.artifactId ||
+      !reconciliationSummary.artifactBlobStored
+    ) {
+      onError(
+        billingAccessMessage ?? 'Store an invoice artifact file before changing legal hold state.',
+      );
+      return;
+    }
+
+    const nextLegalHold = !reconciliationSummary.artifactLegalHold;
+
+    setWorkspaceBusy('billing-artifact-legal-hold');
+    onError(null);
+
+    try {
+      const legalHoldInput: InvoiceArtifactLegalHoldInput = {
+        legalHold: nextLegalHold,
+        reason: nextLegalHold
+          ? 'Placed from workspace demo panel before retention enforcement.'
+          : 'Released from workspace demo panel after review evidence was checked.',
+      };
+      const updated = await client.setInvoiceArtifactLegalHold(
+        reconciliation.id,
+        reconciliationSummary.artifactId,
+        legalHoldInput,
+        token,
+      );
+
+      setReconciliation(updated);
+      await refreshTeamAuditEvents();
+      onNotice(
+        nextLegalHold
+          ? 'Legal hold placed. Retention purge will skip this artifact until released.'
+          : 'Legal hold released. Retention policy can apply again after review.',
+      );
+    } catch (artifactError) {
+      onError(formatApiError(artifactError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
   async function handleVerifyInvoiceArtifact() {
     if (!token || billingAccessMessage || !reconciliation || !reconciliationSummary?.artifactId) {
       onError(
@@ -3794,6 +3842,26 @@ function WorkspaceControlCenter({
                     >
                       <CompareIcon />
                       Download stored file
+                    </Button>
+                  ) : null}
+                  {reconciliationSummary.artifactId && reconciliationSummary.artifactBlobStored ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="compact"
+                      loading={workspaceBusy === 'billing-artifact-legal-hold'}
+                      loadingLabel={
+                        reconciliationSummary.artifactLegalHold
+                          ? 'Releasing legal hold...'
+                          : 'Placing legal hold...'
+                      }
+                      disabled={Boolean(billingAccessMessage)}
+                      onClick={handleToggleInvoiceArtifactLegalHold}
+                    >
+                      <CompareIcon />
+                      {reconciliationSummary.artifactLegalHold
+                        ? 'Release legal hold'
+                        : 'Place legal hold'}
                     </Button>
                   ) : null}
                   {reconciliationSummary.artifactId &&

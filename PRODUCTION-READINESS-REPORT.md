@@ -1,7 +1,7 @@
 # PolyCost Production Readiness Report
 
 Date: 2026-07-08
-Branch: cumulative production-readiness branches through `codex/external-artifact-retention-delete`
+Branch: cumulative production-readiness branches through `codex/invoice-artifact-legal-hold-admin`
 PR: local phase gate, PR created after verification
 Run spec: `docs/design/master-production-readiness-orchestrator-v2.md`
 
@@ -71,6 +71,7 @@ performance/accessibility/best-practices/SEO metrics.
 | INV-TRACE-012  | Improved      | Artifact storage readiness now has production-bound config guards, strict credential-check coverage, signed scanner webhook integration, and retention enforcement for expired non-held database-backed blobs                                           |
 | INV-TRACE-013  | Improved      | Provider-native artifact storage adapters now write/read invoice artifact bytes through AWS S3, Azure Blob Storage, and GCP Cloud Storage, persist object pointers, and checksum-verify external downloads                                              |
 | INV-TRACE-014  | Improved      | External artifact retention enforcement now purges S3, Azure Blob, and GCP Cloud Storage objects before deleting still-expired, non-held database pointers, with 404 treated as idempotent success                                                      |
+| INV-TRACE-015  | Improved      | Stored invoice artifacts now have an Owner/Admin legal-hold PATCH operation that updates blob rows and reconciliation evidence together, emits audit events, and exposes place/release controls in the workspace panel                                  |
 | VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                                                                                             |
 | VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                                                                                             |
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                                                                                        |
@@ -193,6 +194,19 @@ Local static/regression gates:
     validation 320 nodes / 320 edges; pricing coverage, progress verification,
     QA/security suppression hygiene, DB, DevOps, cloud, release, handover, and
     provider-credential gates passed.
+- Phase 2.30 artifact legal-hold administration focused gate passed:
+  - API focused: `src/api/auth-billing.spec.ts` and
+    `src/api/api-database.repository.spec.ts`: 2 suites / 66 tests.
+  - Web focused: `src/App.spec.tsx` and `src/api-client.spec.ts`: 2 suites /
+    86 tests.
+  - `npm run ci:lint`: passed with zero ESLint/typecheck errors.
+  - `npm run test:production-readiness`: API 14 suites / 189 tests; web 2 suites /
+    86 tests.
+  - `npm run check`: API 55 suites / 456 tests; web 11 suites / 143 tests; graph
+    validation 320 nodes / 320 edges; pricing coverage, progress verification,
+    QA/security suppression hygiene, DB, DevOps, cloud, release, handover, and
+    provider-credential gates passed. `npm run impeccable` remained the expected
+    Node 24 skip under the repo's Node 20 target.
 - Phase 2.25 final local floor passed:
   - `npm run test:production-readiness`: API 12 suites / 165 tests; web 2 suites /
     86 tests.
@@ -490,9 +504,10 @@ Machine-readable token evidence:
   enforcement for non-held database-backed blobs. Phase 2.28 adds provider-native
   S3/Azure Blob/GCS byte-write/read adapters with object-pointer persistence and
   checksum-verified downloads. Phase 2.29 adds provider object deletion before
-  deleting expired non-held database pointers. PolyCost still does not provide
-  provider invoice rendering, private contract validation, production legal-hold
-  administration, or an external reviewer workflow.
+  deleting expired non-held database pointers. Phase 2.30 adds audited Owner/Admin
+  legal-hold place/release operations for stored artifacts. PolyCost still does not
+  provide provider invoice rendering, private contract validation, a legal-review
+  approval workflow, or an external reviewer queue.
   Full invoice-grade billing remains future scope.
   PolyCost is still not the invoice system of record.
 - VSDX support now includes extraction/evidence and approximate SVG previews, not full

@@ -10,6 +10,7 @@ import { AuthIdentity } from './auth.types';
 import {
   InvoiceArtifactRetentionEnforcementResult,
   InvoiceArtifactBlobGovernance,
+  InvoiceArtifactLegalHoldInput,
   InvoiceArtifactBlobRecord,
   InvoiceArtifactBlobUploadInput,
   InvoiceArtifactStorageReadiness,
@@ -577,6 +578,80 @@ export class BillingService {
                 legalHold: storedGovernance.retentionPolicy.legalHold,
                 malwareScanStatus: storedGovernance.malwareScan.status,
                 malwareScanScanner: storedGovernance.malwareScan.scanner,
+              },
+            },
+          }
+        : {}),
+    });
+  }
+
+  async setInvoiceArtifactLegalHold(
+    reconciliationId: string,
+    artifactId: string,
+    body: unknown,
+    identity: AuthIdentity,
+  ): Promise<InvoiceReconciliationRecord> {
+    assertBillingAdmin(identity);
+    const input = parseInvoiceArtifactLegalHoldInput(body);
+    const reconciliation = await this.repository.getInvoiceReconciliation(reconciliationId);
+
+    if (!reconciliation) {
+      throw new ApiNotFoundError(`Invoice reconciliation ${reconciliationId} was not found`);
+    }
+
+    const importRun = await this.repository.getBillingImport(reconciliation.importRunId);
+
+    if (!importRun) {
+      throw new ApiNotFoundError(
+        `Billing import ${reconciliation.importRunId} was not found for reconciliation ${reconciliationId}`,
+      );
+    }
+
+    assertTeamAccess(importRun.teamId, identity);
+
+    const artifacts = invoiceGradeArtifactsFromEvidence(reconciliation.evidence);
+    const artifact = artifacts.find((candidate) => candidate.id === artifactId);
+
+    if (!artifact) {
+      throw new ApiNotFoundError(
+        `Invoice artifact ${artifactId} was not found for reconciliation ${reconciliationId}`,
+      );
+    }
+
+    if (!artifact.storedBlob) {
+      throw new ApiValidationError('invoice artifact file is not stored', [
+        {
+          field: 'artifactId',
+          issue: 'store the artifact file before changing legal hold state',
+        },
+      ]);
+    }
+
+    const evidence = replaceInvoiceGradeArtifactEvidence(
+      reconciliation,
+      legalHoldInvoiceGradeArtifact(artifact, input, identity),
+    );
+
+    return this.repository.updateInvoiceArtifactLegalHoldAndEvidence({
+      reconciliationId,
+      artifactId,
+      legalHold: input.legalHold,
+      evidence,
+      ...(importRun.teamId
+        ? {
+            audit: {
+              teamId: importRun.teamId,
+              actorAccountId: identity.accountId,
+              action: 'billing.reconciliation.artifact_legal_hold_updated',
+              targetType: 'billing_reconciliation',
+              targetId: reconciliationId,
+              metadata: {
+                importRunId: importRun.id,
+                comparisonId: reconciliation.comparisonId,
+                provider: reconciliation.provider,
+                artifactId,
+                legalHold: input.legalHold,
+                ...(input.reason ? { reason: input.reason } : {}),
               },
             },
           }
@@ -1769,6 +1844,16 @@ function parseInvoiceArtifactBlobUploadInput(body: unknown): InvoiceArtifactBlob
   };
 }
 
+function parseInvoiceArtifactLegalHoldInput(body: unknown): InvoiceArtifactLegalHoldInput {
+  const record = requireRecord(body, 'Invoice artifact legal-hold request body must be an object');
+  const reason = parseOptionalString(record.reason, 400);
+
+  return {
+    legalHold: parseRequiredBoolean(record.legalHold, 'legalHold'),
+    ...(reason ? { reason } : {}),
+  };
+}
+
 function parseArtifactFileName(value: unknown): string {
   const fileName = parseRequiredString(value, 'fileName', 180);
 
@@ -1831,6 +1916,10 @@ function parseOptionalBoolean(value: unknown, field: string): boolean | undefine
     return undefined;
   }
 
+  return parseRequiredBoolean(value, field);
+}
+
+function parseRequiredBoolean(value: unknown, field: string): boolean {
   if (typeof value === 'boolean') {
     return value;
   }
@@ -2798,6 +2887,47 @@ function storedInvoiceGradeArtifact(
       uploadedAt,
       uploadedByAccountId: identity.accountId,
       governance,
+    },
+  };
+}
+
+function legalHoldInvoiceGradeArtifact(
+  artifact: InvoiceGradeArtifactRecord,
+  input: InvoiceArtifactLegalHoldInput,
+  identity: AuthIdentity,
+): InvoiceGradeArtifactRecord {
+  const storedBlob = artifact.storedBlob;
+
+  if (!storedBlob) {
+    throw new ApiValidationError('invoice artifact file is not stored', [
+      {
+        field: 'artifactId',
+        issue: 'store the artifact file before changing legal hold state',
+      },
+    ]);
+  }
+
+  const timestamp = new Date().toISOString();
+  const governance = storedBlob.governance;
+
+  return {
+    ...artifact,
+    storedBlob: {
+      ...storedBlob,
+      legalHoldUpdatedAt: timestamp,
+      legalHoldUpdatedByAccountId: identity.accountId,
+      ...(input.reason ? { legalHoldReason: input.reason } : {}),
+      ...(governance
+        ? {
+            governance: {
+              ...governance,
+              retentionPolicy: {
+                ...governance.retentionPolicy,
+                legalHold: input.legalHold,
+              },
+            },
+          }
+        : {}),
     },
   };
 }

@@ -119,6 +119,7 @@ say so explicitly rather than marking it done.
 | Phase 2.27 - Artifact storage readiness and retention   | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.28 - Provider artifact storage adapters         | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.29 - External artifact retention deletion       | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.30 - Artifact legal-hold administration         | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4423,6 +4424,35 @@ Status: implemented and verified locally on 2026-07-08.
   invoice-grade operation still needs provider invoice-of-record reconciliation,
   reviewer workflow automation, production malware-scanner operation, and richer
   legal-hold administration.
+
+## Phase 2.30 — Artifact legal-hold administration
+
+Status: implemented and verified locally on 2026-07-08.
+
+- Added an Owner/Admin legal-hold operation for stored invoice artifacts:
+  `PATCH /api/v1/billing/reconciliations/:id/artifacts/:artifactId/blob/legal-hold`.
+- Legal-hold changes now update both `invoice_artifact_blobs.legal_hold` and the
+  reconciliation evidence register in one transaction, so retention enforcement and
+  workspace summaries read the same governance state.
+- Added the `billing.reconciliation.artifact_legal_hold_updated` audit action and
+  schema migration so hold/release actions are visible in the team audit trail.
+- Added a workspace action that appears after artifact file storage and lets admins
+  place or release a legal hold with an audit reason.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/api/api-database.repository.spec.ts`
+  passed 66/66 across 2 suites. `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx src/api-client.spec.ts`
+  passed 86/86 across 2 suites.
+- `npm run ci:lint` passed with zero ESLint/typecheck errors.
+- `npm run test:production-readiness` passed with API 14 suites / 189 tests and web
+  2 suites / 86 tests.
+- Full `npm run check` passed with API 55 suites / 456 tests, web 11 suites / 143
+  tests, graph validation 320 nodes / 320 edges, pricing coverage, progress
+  verification, QA/security suppression hygiene, DB, DevOps, cloud, release,
+  handover, and provider-credential gates green. `npm run impeccable` was skipped
+  by design because the repo targets Node 20 and the optional tool requires Node 24.
+- Remaining caveat: PolyCost now has the basic audited hold/release control, but not
+  a full legal-review approval workflow, external reviewer queue, policy exception
+  lifecycle, or provider invoice-of-record validation.
 
 ## Deviations from spec log
 

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { RequestWithAuth } from './auth.types';
 import { BillingService } from './billing.service';
 import { SessionAuthGuard } from './session-auth.guard';
@@ -74,6 +74,21 @@ export class BillingController {
   @Get('artifact-storage/readiness')
   getInvoiceArtifactStorageReadiness(@Req() request: RequestWithAuth) {
     return this.billingService.getInvoiceArtifactStorageReadiness(request.auth!);
+  }
+
+  @Patch('reconciliations/:id/artifacts/:artifactId/blob/legal-hold')
+  setInvoiceArtifactLegalHold(
+    @Param('id') reconciliationId: string,
+    @Param('artifactId') artifactId: string,
+    @Body() body: unknown,
+    @Req() request: RequestWithAuth,
+  ) {
+    return this.billingService.setInvoiceArtifactLegalHold(
+      reconciliationId,
+      artifactId,
+      body,
+      request.auth!,
+    );
   }
 
   @Post('artifact-storage/retention/enforce')

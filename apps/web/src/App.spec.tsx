@@ -604,6 +604,21 @@ describe('App', () => {
     expect(text(container)).toContain('legal hold off');
     expect(text(container)).toContain('KMS required for production');
 
+    await click(buttonByText(container, 'Place legal hold'));
+    await settleAsyncEffects();
+
+    expect(client.setInvoiceArtifactLegalHold).toHaveBeenCalledWith(
+      '66666666-6666-4666-8666-666666666666',
+      'artifact-1',
+      expect.objectContaining({
+        legalHold: true,
+        reason: 'Placed from workspace demo panel before retention enforcement.',
+      }),
+      'session-token',
+    );
+    expect(text(container)).toContain('legal hold on');
+    expect(text(container)).toContain('Release legal hold');
+
     await click(buttonByText(container, 'Download stored file'));
     await settleAsyncEffects();
 
@@ -4911,6 +4926,109 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
                     retentionUntil: '2027-07-06T00:00:05.000Z',
                     retentionDays: 365,
                     legalHold: false,
+                  },
+                  malwareScan: {
+                    status: 'passed',
+                    scanner: 'polycost-eicar-signature-v1',
+                    checkedAt: '2026-07-06T00:00:05.000Z',
+                    findings: [],
+                  },
+                },
+              },
+            },
+          ],
+          caveats: [
+            'Artifact metadata is registered for traceability only; files, contracts, and invoice controls are not verified by PolyCost yet.',
+          ],
+        },
+        invoiceMatchSummary: {
+          readiness: 'reconciled-evidence-ready',
+          caveats: [
+            'Reconciliation compares provider-export actuals with PolyCost estimate evidence; it is not an invoice-of-record.',
+          ],
+        },
+      },
+      createdAt: '2026-07-06T00:00:02.000Z',
+    })),
+    setInvoiceArtifactLegalHold: jest.fn(async (_reconciliationId, _artifactId, input) => ({
+      id: '66666666-6666-4666-8666-666666666666',
+      importRunId: '55555555-5555-4555-8555-555555555555',
+      comparisonId: comparisonResult.comparisonId,
+      provider: 'aws' as const,
+      estimatedTotalUsd: 100,
+      invoicedTotalUsd: 107,
+      varianceUsd: 7,
+      variancePercent: 7,
+      status: 'variance-warning' as const,
+      evidence: {
+        invoiceCoverage: {
+          sourceFingerprintPercent: 100,
+          skuMatchPercent: 100,
+        },
+        invoiceAdjustmentSummary: {
+          adjustmentCostUsd: 6,
+          adjustmentLineItemCount: 4,
+          commitmentLineItemCount: 4,
+          commitmentNetCostUsd: -2,
+          commitmentEvidence: {
+            rowsRequiringProviderInventory: 4,
+            rowsRequiringAmortizationPeriod: 2,
+            rowsRequiringAllocationEvidence: 4,
+          },
+          estimateComparableVarianceUsd: 0,
+          categories: [
+            {
+              category: 'usage',
+              rowCount: 1,
+              totalCostUsd: 100,
+            },
+          ],
+        },
+        invoiceGradeReadiness: {
+          status: 'invoice-grade-blocked',
+          missingCount: 3,
+          partialCount: 2,
+          blockers: ['Provider invoice control total'],
+          artifactRegisterStatus: 'metadata-registered-not-verified',
+          registeredArtifactCount: 1,
+          verifiedArtifactCount: 0,
+        },
+        invoiceGradeArtifactRegister: {
+          status: 'metadata-registered-not-verified',
+          registeredCount: 1,
+          verifiedCount: 0,
+          artifacts: [
+            {
+              id: 'artifact-1',
+              provider: 'aws',
+              type: 'provider-invoice',
+              displayName: 'AWS invoice control packet',
+              reference: 'demo://invoice-artifacts/66666666-6666-4666-8666-666666666666',
+              sha256: 'd'.repeat(64),
+              controlTotalUsd: 107,
+              verificationStatus: 'registered',
+              registeredAt: '2026-07-06T00:00:03.000Z',
+              storedBlob: {
+                storageStatus: 'stored',
+                storageMode: 'database-bytea',
+                fileName: 'aws-invoice-control-66666666.txt',
+                mimeType: 'text/plain',
+                contentSha256: 'd'.repeat(64),
+                contentSizeBytes: 210,
+                uploadedAt: '2026-07-06T00:00:05.000Z',
+                uploadedByAccountId: '11111111-1111-4111-8111-111111111111',
+                legalHoldUpdatedAt: '2026-07-06T00:00:06.000Z',
+                legalHoldReason: input.reason,
+                governance: {
+                  storageProfile: {
+                    storageBackend: 'database-bytea',
+                    encryptionStatus: 'database-managed',
+                    kmsKeyRequiredForProduction: true,
+                  },
+                  retentionPolicy: {
+                    retentionUntil: '2027-07-06T00:00:05.000Z',
+                    retentionDays: 365,
+                    legalHold: input.legalHold,
                   },
                   malwareScan: {
                     status: 'passed',
