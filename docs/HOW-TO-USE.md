@@ -166,8 +166,8 @@ For finance/FinOps:
 7. Review the invoice-grade readiness blockers and required provider artifacts.
 8. Register a demo invoice artifact packet, store its evidence file, download the
    stored file, and then verify the artifact. Show that PolyCost records stored-file
-   checksum/control-total evidence while keeping unrelated invoice-grade blockers
-   visible.
-9. Call out that invoice-grade actual spend, private discounts, object storage/KMS,
-   malware scanning, retention policy, and provider invoice-of-record validation are
-   future work.
+   checksum/control-total evidence, scan status, retention date, legal-hold state,
+   and KMS-readiness metadata while keeping unrelated invoice-grade blockers visible.
+9. Call out that invoice-grade actual spend, private discounts, external object
+   storage, customer-managed KMS, real malware scanning, legal-hold enforcement, and
+   provider invoice-of-record validation are future work.

@@ -1620,6 +1620,14 @@ describe('ApiDatabaseRepository', () => {
       content: Buffer.from('invoice'),
       uploaded_by_account_id: '11111111-1111-4111-8111-111111111111',
       uploaded_at: completedAt,
+      storage_backend: 'database-bytea',
+      kms_key_reference: null,
+      retention_until: new Date('2027-07-06T00:00:02.000Z'),
+      legal_hold: false,
+      malware_scan_status: 'passed',
+      malware_scan_engine: 'polycost-eicar-signature-v1',
+      malware_scan_checked_at: completedAt,
+      malware_scan_finding: null,
     };
     const query = jest.fn(async (text: string, values?: unknown[]) => {
       if (text === 'BEGIN' || text === 'COMMIT' || text === 'ROLLBACK') {
@@ -1860,6 +1868,9 @@ describe('ApiDatabaseRepository', () => {
         content: Buffer.from('invoice'),
         uploadedByAccountId: '11111111-1111-4111-8111-111111111111',
         uploadedAt: completedAt.toISOString(),
+        retentionUntil: '2027-07-06T00:00:02.000Z',
+        legalHold: false,
+        malwareScanCheckedAt: completedAt.toISOString(),
         evidence: {
           invoiceLineItemHashes: ['b'.repeat(64)],
           invoiceGradeArtifactRegister: {
@@ -1903,6 +1914,22 @@ describe('ApiDatabaseRepository', () => {
         fileName: 'aws-invoice-control.txt',
         contentSha256: 'd'.repeat(64),
         contentBase64: Buffer.from('invoice').toString('base64'),
+        storageProfile: expect.objectContaining({
+          storageBackend: 'database-bytea',
+          encryptionStatus: 'database-managed',
+          kmsKeyRequiredForProduction: true,
+        }),
+        retentionPolicy: expect.objectContaining({
+          retentionUntil: '2027-07-06T00:00:02.000Z',
+          retentionDays: 365,
+          legalHold: false,
+        }),
+        malwareScan: expect.objectContaining({
+          status: 'passed',
+          scanner: 'polycost-eicar-signature-v1',
+          checkedAt: completedAt.toISOString(),
+          findings: [],
+        }),
       }),
     );
 
@@ -1949,6 +1976,11 @@ describe('ApiDatabaseRepository', () => {
         Buffer.from('invoice'),
         '11111111-1111-4111-8111-111111111111',
         completedAt.toISOString(),
+        null,
+        '2027-07-06T00:00:02.000Z',
+        false,
+        completedAt.toISOString(),
+        null,
       ],
     );
   });

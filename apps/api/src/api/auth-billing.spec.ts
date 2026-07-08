@@ -2144,6 +2144,9 @@ describe('BillingService', () => {
         content: artifactContent,
         encoding: 'text',
         sha256: contentSha256,
+        retentionDays: 730,
+        legalHold: true,
+        kmsKeyReference: 'arn:aws:kms:us-east-1:111122223333:key/demo',
       },
       identity,
     );
@@ -2167,6 +2170,23 @@ describe('BillingService', () => {
       contentSha256,
       contentSizeBytes: Buffer.byteLength(artifactContent),
       uploadedByAccountId: identity.accountId,
+      governance: expect.objectContaining({
+        storageProfile: expect.objectContaining({
+          storageBackend: 'database-bytea',
+          encryptionStatus: 'database-managed',
+          kmsKeyReference: 'arn:aws:kms:us-east-1:111122223333:key/demo',
+          kmsKeyRequiredForProduction: false,
+        }),
+        retentionPolicy: expect.objectContaining({
+          retentionDays: 730,
+          legalHold: true,
+        }),
+        malwareScan: expect.objectContaining({
+          status: 'passed',
+          scanner: 'polycost-eicar-signature-v1',
+          findings: [],
+        }),
+      }),
     });
     expect(repository.saveInvoiceArtifactBlobAndUpdateEvidence).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -2178,12 +2198,22 @@ describe('BillingService', () => {
         contentSha256,
         content: Buffer.from(artifactContent, 'utf8'),
         uploadedByAccountId: identity.accountId,
+        kmsKeyReference: 'arn:aws:kms:us-east-1:111122223333:key/demo',
+        retentionUntil: expect.any(String),
+        legalHold: true,
+        malwareScanCheckedAt: expect.any(String),
         audit: expect.objectContaining({
           action: 'billing.reconciliation.artifact_blob_uploaded',
           metadata: expect.objectContaining({
             artifactId: 'artifact-1',
             contentSha256,
             contentSizeBytes: Buffer.byteLength(artifactContent),
+            storageBackend: 'database-bytea',
+            kmsKeyConfigured: true,
+            retentionUntil: expect.any(String),
+            legalHold: true,
+            malwareScanStatus: 'passed',
+            malwareScanScanner: 'polycost-eicar-signature-v1',
           }),
         }),
       }),
@@ -2246,6 +2276,22 @@ describe('BillingService', () => {
       contentBase64: Buffer.from('invoice').toString('base64'),
       uploadedByAccountId: identity.accountId,
       uploadedAt: '2026-07-06T00:00:05.000Z',
+      storageProfile: {
+        storageBackend: 'database-bytea',
+        encryptionStatus: 'database-managed',
+        kmsKeyRequiredForProduction: true,
+      },
+      retentionPolicy: {
+        retentionUntil: '2027-07-06T00:00:05.000Z',
+        retentionDays: 365,
+        legalHold: false,
+      },
+      malwareScan: {
+        status: 'passed',
+        scanner: 'polycost-eicar-signature-v1',
+        checkedAt: '2026-07-06T00:00:05.000Z',
+        findings: [],
+      },
     });
     const service = new BillingService(repository as never);
 
@@ -2258,6 +2304,9 @@ describe('BillingService', () => {
     ).resolves.toMatchObject({
       fileName: 'aws-invoice-control.txt',
       contentBase64: Buffer.from('invoice').toString('base64'),
+      malwareScan: expect.objectContaining({
+        status: 'passed',
+      }),
     });
     expect(repository.getInvoiceArtifactBlob).toHaveBeenCalledWith(
       '66666666-6666-4666-8666-666666666666',
@@ -2320,6 +2369,68 @@ describe('BillingService', () => {
           fileName: 'aws-invoice-control.txt',
           mimeType: 'text/plain',
           content: 'different-bytes',
+          encoding: 'text',
+        },
+        identity,
+      ),
+    ).rejects.toThrow(ApiValidationError);
+    expect(repository.saveInvoiceArtifactBlobAndUpdateEvidence).not.toHaveBeenCalled();
+  });
+
+  it('rejects artifact blob uploads that trip the malware scan hook', async () => {
+    const repository = repositoryMock();
+    repository.getInvoiceReconciliation.mockResolvedValue({
+      id: '66666666-6666-4666-8666-666666666666',
+      importRunId: '55555555-5555-4555-8555-555555555555',
+      comparisonId: comparisonResult.comparisonId,
+      provider: 'aws',
+      estimatedTotalUsd: 100,
+      invoicedTotalUsd: 107,
+      varianceUsd: 7,
+      variancePercent: 7,
+      status: 'variance-warning',
+      evidence: {
+        invoiceGradeArtifactRegister: {
+          artifacts: [
+            {
+              id: 'artifact-1',
+              provider: 'aws',
+              type: 'provider-invoice',
+              displayName: 'June AWS invoice control packet',
+              reference: 'demo://invoice-control',
+              verificationStatus: 'registered',
+              registeredAt: '2026-07-06T00:00:03.000Z',
+            },
+          ],
+        },
+      },
+      createdAt: '2026-07-06T00:00:02.000Z',
+    });
+    repository.getBillingImport.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      teamId: identity.teamId,
+      provider: 'aws',
+      sourceType: 'aws-cur',
+      status: 'completed',
+      billingPeriodStart: '2026-06-01',
+      billingPeriodEnd: '2026-06-30',
+      originalFileSha256: 'a'.repeat(64),
+      rowsReceived: 1,
+      rowsAccepted: 1,
+      rowsRejected: 0,
+      totalCostUsd: 107,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    });
+    const service = new BillingService(repository as never);
+
+    await expect(
+      service.uploadInvoiceArtifactBlob(
+        '66666666-6666-4666-8666-666666666666',
+        'artifact-1',
+        {
+          fileName: 'eicar.txt',
+          mimeType: 'text/plain',
+          content: 'X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*',
           encoding: 'text',
         },
         identity,

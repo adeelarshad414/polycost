@@ -2910,6 +2910,8 @@ function WorkspaceControlCenter({
         fileName: `${reconciliation.provider}-invoice-control-${reconciliation.id.slice(0, 8)}.txt`,
         mimeType: 'text/plain',
         encoding: 'text',
+        retentionDays: 365,
+        legalHold: false,
         content: [
           'PolyCost invoice artifact control packet',
           `reconciliation_id=${reconciliation.id}`,
@@ -3729,11 +3731,21 @@ function WorkspaceControlCenter({
                     {reconciliationSummary.artifactRegisterStatus}
                   </small>
                   {reconciliationSummary.artifactBlobStored ? (
-                    <small>
-                      Stored file: {reconciliationSummary.artifactBlobFileName} ·{' '}
-                      {formatFileSize(reconciliationSummary.artifactBlobSizeBytes)} · sha256{' '}
-                      {reconciliationSummary.artifactBlobSha256?.slice(0, 12)}
-                    </small>
+                    <>
+                      <small>
+                        Stored file: {reconciliationSummary.artifactBlobFileName} ·{' '}
+                        {formatFileSize(reconciliationSummary.artifactBlobSizeBytes)} · sha256{' '}
+                        {reconciliationSummary.artifactBlobSha256?.slice(0, 12)}
+                      </small>
+                      <small>
+                        Governance: scan {reconciliationSummary.artifactMalwareScanStatus} · retain
+                        until {formatDateTime(reconciliationSummary.artifactRetentionUntil)} · legal
+                        hold {reconciliationSummary.artifactLegalHold ? 'on' : 'off'} ·{' '}
+                        {reconciliationSummary.artifactKmsRequiredForProduction
+                          ? 'KMS required for production'
+                          : 'KMS reference recorded'}
+                      </small>
+                    </>
                   ) : reconciliationSummary.artifactId ? (
                     <small>
                       Artifact file not stored yet. Metadata is registered, but no evidence blob is
@@ -19742,6 +19754,10 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
   artifactBlobFileName?: string;
   artifactBlobSha256?: string;
   artifactBlobSizeBytes: number;
+  artifactMalwareScanStatus: string;
+  artifactRetentionUntil?: string;
+  artifactLegalHold: boolean;
+  artifactKmsRequiredForProduction: boolean;
   artifactPrimaryCaveat: string;
   estimateComparableVarianceUsd: number;
   adjustmentCategories: string[];
@@ -19766,6 +19782,10 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
   const artifactBlobFileName = stringValue(storedBlob.fileName);
   const artifactBlobSha256 = stringValue(storedBlob.contentSha256);
   const artifactBlobSizeBytes = numberValue(storedBlob.contentSizeBytes);
+  const governance = objectValue(storedBlob.governance);
+  const storageProfile = objectValue(governance.storageProfile);
+  const retentionPolicy = objectValue(governance.retentionPolicy);
+  const malwareScan = objectValue(governance.malwareScan);
   const readiness =
     stringValue(matchSummary.readiness) ??
     (record.status === 'matched' ? 'reconciled-evidence-ready' : 'reconciliation-foundation');
@@ -19819,6 +19839,12 @@ function reconciliationEvidenceSummary(record: InvoiceReconciliationRecord): {
     ...(artifactBlobFileName ? { artifactBlobFileName } : {}),
     ...(artifactBlobSha256 ? { artifactBlobSha256 } : {}),
     artifactBlobSizeBytes,
+    artifactMalwareScanStatus: stringValue(malwareScan.status) ?? 'pending',
+    ...(stringValue(retentionPolicy.retentionUntil)
+      ? { artifactRetentionUntil: stringValue(retentionPolicy.retentionUntil) }
+      : {}),
+    artifactLegalHold: booleanValue(retentionPolicy.legalHold),
+    artifactKmsRequiredForProduction: booleanValue(storageProfile.kmsKeyRequiredForProduction),
     artifactPrimaryCaveat:
       artifactCaveats[0] ??
       'No invoice artifact metadata has been registered for this reconciliation yet.',
@@ -19855,6 +19881,10 @@ function arrayValue(value: unknown): unknown[] {
 
 function numberValue(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+function booleanValue(value: unknown): boolean {
+  return value === true;
 }
 
 function providerExportSample(provider: ProviderId): string {

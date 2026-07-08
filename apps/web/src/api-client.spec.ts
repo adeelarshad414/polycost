@@ -485,6 +485,7 @@ describe('api client', () => {
                     contentSha256: 'd'.repeat(64),
                     contentSizeBytes: 7,
                     uploadedAt: '2026-07-06T00:00:05.000Z',
+                    governance: artifactGovernance(),
                   },
                 },
               ],
@@ -504,6 +505,7 @@ describe('api client', () => {
           contentSizeBytes: 7,
           contentBase64: 'aW52b2ljZQ==',
           uploadedAt: '2026-07-06T00:00:05.000Z',
+          ...artifactGovernance(),
         }),
       );
     global.fetch = fetchMock as typeof fetch;
@@ -596,6 +598,8 @@ describe('api client', () => {
           content: 'invoice',
           encoding: 'text',
           sha256: 'd'.repeat(64),
+          retentionDays: 365,
+          legalHold: false,
         },
         'session-token',
       ),
@@ -713,6 +717,8 @@ describe('api client', () => {
           content: 'invoice',
           encoding: 'text',
           sha256: 'd'.repeat(64),
+          retentionDays: 365,
+          legalHold: false,
         }),
       }),
     );
@@ -1929,4 +1935,25 @@ function jsonResponse(body: unknown, status = 200): Response {
     json: jest.fn(async () => JSON.parse(bodyText) as unknown),
     blob: jest.fn(async () => new Blob([bodyText])),
   } as unknown as Response;
+}
+
+function artifactGovernance() {
+  return {
+    storageProfile: {
+      storageBackend: 'database-bytea',
+      encryptionStatus: 'database-managed',
+      kmsKeyRequiredForProduction: true,
+    },
+    retentionPolicy: {
+      retentionUntil: '2027-07-06T00:00:05.000Z',
+      retentionDays: 365,
+      legalHold: false,
+    },
+    malwareScan: {
+      status: 'passed',
+      scanner: 'polycost-eicar-signature-v1',
+      checkedAt: '2026-07-06T00:00:05.000Z',
+      findings: [],
+    },
+  };
 }

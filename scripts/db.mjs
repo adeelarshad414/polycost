@@ -38,6 +38,7 @@ const expectedMigrations = [
   '030_team_audit_events.sql',
   '031_team_audit_export_outbox.sql',
   '032_invoice_artifact_blobs.sql',
+  '033_invoice_artifact_blob_governance.sql',
 ];
 
 if (!['migrate', 'seed', 'reset', 'validate'].includes(command)) {
