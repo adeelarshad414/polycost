@@ -4404,7 +4404,7 @@ select:disabled {
 
 .pc-button {
   display: inline-flex;
-  min-height: 44px;
+  min-height: 40px;
   align-items: center;
   justify-content: center;
   gap: var(--pc-space-1);
@@ -4422,6 +4422,22 @@ select:disabled {
     border-color 120ms ease,
     box-shadow 120ms ease,
     color 120ms ease;
+}
+
+.pc-button-default {
+  min-height: 40px;
+}
+
+.pc-button-compact {
+  min-height: 36px;
+  padding-inline: var(--pc-space-1);
+  font-size: var(--pc-text-xs);
+}
+
+.pc-button-hero {
+  min-height: 44px;
+  padding-inline: var(--pc-space-3);
+  font-size: var(--pc-text-base);
 }
 
 .pc-button:focus-visible {
@@ -4458,7 +4474,7 @@ select:disabled {
 
 .pc-button-secondary {
   border-color: var(--pc-border-strong);
-  background: transparent;
+  background: var(--pc-bg-surface);
   color: var(--pc-text-primary);
 }
 
@@ -4486,23 +4502,77 @@ select:disabled {
 }
 
 .pc-button-destructive {
-  border-color: color-mix(in srgb, var(--pc-landing-destructive) 34%, var(--pc-border));
-  background: color-mix(in srgb, var(--pc-error-soft) 72%, transparent);
+  border-color: var(--pc-error);
+  background: var(--pc-error);
   box-shadow: none;
-  color: var(--pc-landing-destructive);
+  color: var(--on-primary-action);
 }
 
 .pc-button-destructive:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--destructive-hover) 56%, var(--pc-border));
-  background: color-mix(in srgb, var(--pc-error-soft) 92%, var(--pc-bg-surface));
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--pc-landing-destructive) 10%, transparent);
-  color: var(--destructive-hover);
+  border-color: var(--destructive-hover);
+  background: var(--destructive-hover);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--pc-error) 16%, transparent);
+  color: var(--on-primary-action);
 }
 
 .pc-button-destructive:active:not(:disabled) {
   border-color: var(--destructive-active);
-  background: color-mix(in srgb, var(--pc-error-soft) 86%, var(--pc-bg-surface-2));
-  color: var(--destructive-active);
+  background: var(--destructive-active);
+  color: var(--on-primary-action);
+}
+
+.pc-button-destructive-quiet {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--pc-error);
+}
+
+.pc-button-destructive-quiet:hover:not(:disabled),
+.pc-button-destructive-quiet:active:not(:disabled) {
+  border-color: color-mix(in srgb, var(--pc-error) 18%, transparent);
+  background: var(--pc-error-soft);
+  color: var(--destructive-hover);
+}
+
+.pc-button-link {
+  min-height: auto;
+  border-color: transparent;
+  background: transparent;
+  color: var(--brand-text);
+  font-weight: 800;
+  padding-inline: 0;
+  text-decoration: none;
+}
+
+.pc-button-link:hover:not(:disabled),
+.pc-button-link:active:not(:disabled) {
+  background: transparent;
+  color: var(--primary-action-hover);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.pc-button-icon {
+  width: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--pc-text-secondary);
+  padding: 0;
+}
+
+.pc-button-icon.pc-button-compact {
+  width: 36px;
+  min-width: 36px;
+  min-height: 36px;
+}
+
+.pc-button-icon:hover:not(:disabled),
+.pc-button-icon:active:not(:disabled) {
+  background: var(--pc-bg-surface-2);
+  color: var(--pc-text-primary);
 }
 
 .button-system-preview {
@@ -4546,6 +4616,277 @@ select:disabled {
 
 .button-loading-arc-gcp {
   stroke: var(--pc-provider-gcp);
+}
+
+.pc-overlay-root {
+  position: fixed;
+  z-index: 90;
+  inset: 0;
+  display: grid;
+  align-items: center;
+  justify-items: center;
+  background: color-mix(in srgb, var(--pc-ink-900) 42%, transparent);
+  padding: var(--pc-space-2);
+  animation: pc-overlay-fade 150ms ease both;
+}
+
+:root[data-theme='dark'] .pc-overlay-root {
+  background: color-mix(in srgb, var(--pc-ink-900) 58%, transparent);
+}
+
+.pc-dialog,
+.pc-drawer,
+.pc-popover,
+.pc-toast,
+.pc-banner {
+  border: 1px solid var(--pc-border);
+  background: var(--pc-bg-surface);
+  color: var(--pc-text-primary);
+}
+
+.pc-dialog {
+  position: relative;
+  display: grid;
+  width: min(100%, 560px);
+  max-height: min(90vh, 760px);
+  gap: var(--pc-space-2);
+  overflow: auto;
+  border-radius: 10px;
+  box-shadow: var(--pc-shadow-strong);
+  padding: var(--pc-space-3);
+  animation: pc-dialog-enter 150ms ease both;
+}
+
+.pc-dialog-confirm {
+  width: min(100%, 400px);
+}
+
+.pc-dialog-rich {
+  width: min(100%, 640px);
+}
+
+.pc-dialog-close {
+  position: absolute;
+  top: var(--pc-space-1);
+  right: var(--pc-space-1);
+}
+
+.pc-dialog-header {
+  display: grid;
+  gap: 6px;
+  padding-right: var(--pc-space-3);
+}
+
+.pc-dialog-header h2,
+.pc-drawer-header h2,
+.pc-popover h3 {
+  margin: 0;
+  color: var(--pc-text-primary);
+  font-size: var(--pc-text-lg);
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.pc-dialog-header p,
+.pc-dialog-body,
+.pc-drawer-body,
+.pc-popover-body {
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-sm);
+  line-height: 1.6;
+}
+
+.pc-dialog-header p,
+.pc-dialog-body p,
+.pc-drawer-body p,
+.pc-popover-body p {
+  margin: 0;
+}
+
+.pc-dialog-footer,
+.pc-drawer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--pc-space-1);
+  padding-top: var(--pc-space-1);
+}
+
+.pc-dialog-confirmation {
+  display: grid;
+  gap: 6px;
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-sm);
+  font-weight: 760;
+}
+
+.pc-dialog-confirmation input {
+  min-height: 40px;
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: var(--pc-bg-surface);
+  color: var(--pc-text-primary);
+  font: inherit;
+  padding: 0 var(--pc-space-1);
+}
+
+.pc-drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  display: grid;
+  width: min(100%, 420px);
+  grid-template-rows: auto 1fr auto;
+  box-shadow: var(--pc-shadow-strong);
+  animation: pc-drawer-enter 150ms ease both;
+}
+
+.pc-drawer-right {
+  right: 0;
+}
+
+.pc-drawer-left {
+  left: 0;
+}
+
+.pc-drawer-header,
+.pc-drawer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pc-space-1);
+  border-bottom: 1px solid var(--pc-border);
+  padding: var(--pc-space-2);
+}
+
+.pc-drawer-footer {
+  border-top: 1px solid var(--pc-border);
+  border-bottom: 0;
+  justify-content: flex-end;
+}
+
+.pc-drawer-body {
+  overflow: auto;
+  padding: var(--pc-space-2);
+}
+
+.pc-popover {
+  position: absolute;
+  z-index: 70;
+  display: grid;
+  width: min(360px, calc(100vw - var(--pc-space-4)));
+  gap: var(--pc-space-1);
+  border-radius: 8px;
+  box-shadow: var(--pc-shadow-soft);
+  padding: var(--pc-space-2);
+}
+
+.pc-toast-viewport {
+  position: fixed;
+  z-index: 95;
+  right: var(--pc-space-2);
+  bottom: var(--pc-space-2);
+  display: grid;
+  width: min(380px, calc(100vw - var(--pc-space-4)));
+  gap: var(--pc-space-1);
+}
+
+.pc-toast {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: var(--pc-space-1);
+  align-items: start;
+  border-left-width: 4px;
+  border-radius: 8px;
+  box-shadow: var(--pc-shadow-soft);
+  padding: var(--pc-space-1);
+}
+
+.pc-toast strong,
+.pc-banner strong {
+  display: block;
+  color: var(--pc-text-primary);
+  font-size: var(--pc-text-sm);
+  font-weight: 800;
+}
+
+.pc-toast p,
+.pc-banner span {
+  margin: 3px 0 0;
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-sm);
+  line-height: 1.45;
+}
+
+.pc-toast-info,
+.pc-banner-info {
+  border-left-color: var(--brand-text);
+}
+
+.pc-toast-success,
+.pc-banner-success {
+  border-left-color: var(--pc-success);
+}
+
+.pc-toast-warning,
+.pc-banner-warning {
+  border-left-color: var(--pc-warning);
+}
+
+.pc-toast-critical,
+.pc-banner-critical {
+  border-left-color: var(--pc-error);
+}
+
+.pc-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pc-space-2);
+  border-radius: 8px;
+  border-left-width: 4px;
+  padding: var(--pc-space-1) var(--pc-space-2);
+}
+
+.pc-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--pc-space-1);
+  flex-shrink: 0;
+}
+
+@keyframes pc-overlay-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pc-dialog-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pc-drawer-enter {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .segment-icon {

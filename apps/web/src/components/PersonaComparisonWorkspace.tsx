@@ -522,15 +522,16 @@ function EngineeringPersonaView({
               {sortKeyLabel(sortKey)} ({sortDirection === 'asc' ? 'ascending' : 'descending'}).
             </span>
             {rows.length > ENGINEERING_TABLE_PAGE_SIZE ? (
-              <button
+              <Button
                 type="button"
-                className="inline-flex min-h-9 items-center justify-center rounded-md border border-border-strong bg-surface-1 px-3 text-xs font-semibold text-text-primary transition hover:bg-surface-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
+                variant="secondary"
+                size="compact"
                 onClick={() => setShowAllRows((current) => !current)}
               >
                 {showAllRows
                   ? `Collapse to top ${ENGINEERING_TABLE_PAGE_SIZE}`
                   : `Show all rows${hiddenRowCount > 0 ? ` (${hiddenRowCount} more)` : ''}`}
-              </button>
+              </Button>
             ) : null}
           </div>
         ) : null}
@@ -635,13 +636,9 @@ function EngineeringRowsEmptyState({
           No services match your filters
         </strong>
         <span>Clear the tag filter to restore every mapped service row in this comparison.</span>
-        <button
-          type="button"
-          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border-strong bg-surface-1 px-4 py-2 text-sm font-semibold text-text-primary transition hover:bg-surface-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
-          onClick={onClearFilters}
-        >
+        <Button type="button" variant="secondary" onClick={onClearFilters}>
           Clear filters
-        </button>
+        </Button>
       </div>
     );
   }
@@ -897,21 +894,20 @@ function SortableHeader({
         .filter(Boolean)
         .join(' ')}
     >
-      <button
+      <Button
         type="button"
         onClick={() => onSort(sortKey)}
         aria-label={description ? `${label}: ${description}` : label}
         title={description}
-        className={[
-          'inline-flex min-h-11 items-center gap-1 rounded-md px-2 text-xs font-semibold uppercase tracking-wide text-text-muted transition hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary',
-          alignRight ? 'ml-auto justify-end' : undefined,
-        ]
+        variant="ghost"
+        size="compact"
+        className={['uppercase text-text-muted', alignRight ? 'ml-auto justify-end' : undefined]
           .filter(Boolean)
           .join(' ')}
       >
         {label}
         <span aria-hidden="true">{isActive ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}</span>
-      </button>
+      </Button>
     </th>
   );
 }

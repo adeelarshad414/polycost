@@ -1,10 +1,13 @@
 import { forwardRef, type ButtonHTMLAttributes, type MouseEvent, type ReactNode } from 'react';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'destructive';
+export type ButtonVariant =
+  'primary' | 'secondary' | 'ghost' | 'destructive' | 'destructiveQuiet' | 'link' | 'icon';
+export type ButtonSize = 'default' | 'compact' | 'hero';
 export type ProviderBadgeProvider = 'aws' | 'azure' | 'gcp';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
+  size?: ButtonSize;
   loading?: boolean;
   loadingLabel?: ReactNode;
 }
@@ -22,10 +25,22 @@ export interface ProviderBadgeProps {
  * - primary: one main action per view or section.
  * - secondary: outlined supporting action.
  * - ghost: low-emphasis transparent action.
- * - destructive: irreversible or clearing/deleting action.
+ * - destructive: destructive confirm primary only.
+ * - destructiveQuiet: row-level remove/revoke/clear trigger that opens or performs a safe action.
+ * - link: tertiary inline action.
+ * - icon: chrome action; caller must provide an aria-label.
  */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = 'secondary', className, children, loading = false, loadingLabel, onClick, ...props },
+  {
+    variant = 'secondary',
+    size = 'default',
+    className,
+    children,
+    loading = false,
+    loadingLabel,
+    onClick,
+    ...props
+  },
   ref,
 ) {
   function handleClick(event: MouseEvent<HTMLButtonElement>) {
@@ -49,6 +64,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
         loadingLabel ? 'min-w-[9rem]' : undefined,
         'data-[loading=true]:pointer-events-none data-[loading=true]:cursor-progress data-[loading=true]:opacity-[0.85]',
         buttonVariantClassName(variant),
+        buttonSizeClassName(size),
         className,
       )}
       onClick={handleClick}
@@ -92,6 +108,15 @@ export function ButtonSystemPreview() {
       </Button>
       <Button variant="destructive" type="button">
         Destructive
+      </Button>
+      <Button variant="destructiveQuiet" type="button">
+        Remove
+      </Button>
+      <Button variant="link" type="button">
+        Link action
+      </Button>
+      <Button variant="icon" type="button" aria-label="Close preview">
+        <span aria-hidden="true">x</span>
       </Button>
       <Button variant="primary" type="button" loading loadingLabel="Loading">
         Loading
@@ -137,6 +162,23 @@ function buttonVariantClassName(variant: ButtonVariant): string {
       return 'pc-button-ghost';
     case 'destructive':
       return 'pc-button-destructive';
+    case 'destructiveQuiet':
+      return 'pc-button-destructive-quiet';
+    case 'link':
+      return 'pc-button-link';
+    case 'icon':
+      return 'pc-button-icon';
+  }
+}
+
+function buttonSizeClassName(size: ButtonSize): string {
+  switch (size) {
+    case 'default':
+      return 'pc-button-default';
+    case 'compact':
+      return 'pc-button-compact';
+    case 'hero':
+      return 'pc-button-hero';
   }
 }
 

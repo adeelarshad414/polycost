@@ -104,6 +104,44 @@ say so explicitly rather than marking it done.
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.3 - Terraform bundle export                    | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.4 - Terraform module library                   | Complete with known gaps (see notes) | 2026-07-07   |
+| UI Appendix O - Overlay/dialog/button audit             | Complete with known gaps (see notes) | 2026-07-08   |
+
+## UI Appendix O - Overlay/dialog/button audit
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-08
+
+What changed:
+
+- Added canonical shared overlay primitives for dialogs, destructive confirms,
+  drawers, popovers, toast stacks, and banners.
+- Expanded the shared button system with `destructiveQuiet`, `link`, `icon`, and
+  size variants so filled destructive buttons stay reserved for destructive
+  confirmations.
+- Migrated row-level clear/remove/revoke/reload/refresh utility actions to the
+  shared button contract.
+- Added `OVERLAY-INVENTORY.md`, `BUTTON-INVENTORY.md`, and
+  `OVERLAY-AUDIT-REPORT.md`.
+- Added `npm run overlay:check` and wired it into `npm run check` and
+  `npm run release:check`.
+
+Verification:
+
+- `npm run overlay:check`
+- `npm run test:unit --workspace @polycost/web -- --runInBand src/components/Button.spec.tsx src/components/OverlayPrimitives.spec.tsx`
+- `npm run theme:hex:check`
+- `npm run ci:lint`
+- `npm run release:check`
+
+Known remaining gaps:
+
+- No production flow currently opens every new overlay primitive, so full
+  end-user screenshot evidence needs either a dedicated showcase route or the
+  first real product flow using each primitive.
+- Announcement frequency persistence is documented but not runtime-wired because
+  the app has no promotional announcement overlay today.
+- Existing account deletion remains an inline typed-confirmation form pending a
+  broader account/team UX pass.
 
 ## Phase V3.4 - Terraform module library
 

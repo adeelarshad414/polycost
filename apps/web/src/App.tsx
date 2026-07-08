@@ -3034,8 +3034,10 @@ function WorkspaceControlCenter({
                         <option value="admin">Admin</option>
                         <option value="member">Member</option>
                       </select>
-                      <button
+                      <Button
                         type="button"
+                        variant="destructiveQuiet"
+                        size="compact"
                         className="workspace-link-button"
                         aria-label={`Remove ${member.email}`}
                         disabled={removeControl.disabled}
@@ -3043,7 +3045,7 @@ function WorkspaceControlCenter({
                         onClick={() => void handleRemoveMember(member.accountId)}
                       >
                         Remove
-                      </button>
+                      </Button>
                     </div>
                   );
                 })}
@@ -3060,14 +3062,16 @@ function WorkspaceControlCenter({
                           {invitation.role} invite · expires {formatDateTime(invitation.expiresAt)}
                         </small>
                       </span>
-                      <button
+                      <Button
                         type="button"
+                        variant="destructiveQuiet"
+                        size="compact"
                         className="workspace-link-button"
                         disabled={workspaceBusy === `revoke-invite-${invitation.id}`}
                         onClick={() => void handleRevokeInvitation(invitation.id)}
                       >
                         Revoke
-                      </button>
+                      </Button>
                     </div>
                   ))}
               </div>
@@ -4425,7 +4429,7 @@ function RequirementSummaryStrip({
         <Button type="button" variant="secondary" onClick={onEdit}>
           Edit
         </Button>
-        <Button type="button" variant="destructive" onClick={onClear}>
+        <Button type="button" variant="destructiveQuiet" onClick={onClear}>
           Clear
         </Button>
       </div>
@@ -5209,7 +5213,7 @@ function DiagramImportPanel({
         </Button>
         <Button
           type="button"
-          variant="destructive"
+          variant="destructiveQuiet"
           onClick={onClear}
           disabled={isParsing || value.length === 0}
         >
@@ -5304,13 +5308,15 @@ function DiagramReviewPanel({
               <em>{component.assumedDefaults.slice(0, 2).join(', ')}</em>
             ) : null}
             <em>{component.evidence}</em>
-            <button
+            <Button
               type="button"
+              variant="destructiveQuiet"
+              size="compact"
               className="diagram-review-link-button"
               onClick={() => onRemoveComponent(component.nodeId)}
             >
               Remove
-            </button>
+            </Button>
           </article>
         ))}
       </div>
@@ -5561,7 +5567,7 @@ function DescribePanel({
         </Button>
         <Button
           type="button"
-          variant="destructive"
+          variant="destructiveQuiet"
           onClick={onClear}
           disabled={isParsing || value.length === 0}
         >
@@ -7035,9 +7041,15 @@ function ComparisonHistoryPanel({
           <span>Recent comparisons</span>
           <strong>Resume a saved workload shape</strong>
         </div>
-        <button type="button" className="comparison-history-clear" onClick={onClear}>
+        <Button
+          type="button"
+          variant="destructiveQuiet"
+          size="compact"
+          className="comparison-history-clear"
+          onClick={onClear}
+        >
           Clear history
-        </button>
+        </Button>
       </div>
       <div className="comparison-history-list">
         {entries.map((entry) => (
@@ -7641,14 +7653,16 @@ function BulkServiceImporter({
               </tbody>
             </table>
           </div>
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="compact"
             className="bulk-service-add"
             disabled={matchedRows.length === 0}
             onClick={addMatchedRows}
           >
             Add matched services
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -7707,9 +7721,14 @@ function BulkServiceImporter({
                         />
                       </td>
                       <td>
-                        <button type="button" onClick={() => removeRow(row.id)}>
+                        <Button
+                          type="button"
+                          variant="destructiveQuiet"
+                          size="compact"
+                          onClick={() => removeRow(row.id)}
+                        >
                           Remove
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                   );
