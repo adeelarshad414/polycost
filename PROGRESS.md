@@ -124,6 +124,7 @@ say so explicitly rather than marking it done.
 | Phase 2.32 - Artifact policy exception lifecycle        | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.33 - Invoice control packet validation          | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.34 - Invoice evidence packet export             | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.35 - Invoice evidence packet integrity          | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4593,6 +4594,39 @@ Status: implemented and verified locally on 2026-07-08.
 - Remaining caveat: this is an evidence handoff/export layer, not provider invoice
   rendering, private contract/legal validation, provider-authenticated invoice-of-
   record validation, or full invoice-grade billing coverage.
+
+## Phase 2.35 — Invoice evidence packet integrity
+
+Status: implemented and verified locally on 2026-07-08.
+
+- Added a tamper-evident `integrity` manifest to invoice evidence packets. The
+  manifest records schema version, canonicalization method, SHA-256 digest algorithm,
+  payload digest, canonical payload byte length, reconciliation/import/comparison
+  subject IDs, provider, artifact counts, caveat/disclaimer counts, and generated
+  timestamp.
+- The payload digest is computed over the canonical stable-JSON packet body excluding
+  the integrity block itself, avoiding self-reference while letting reviewers
+  recompute the exact delivered packet payload hash.
+- Workspace evidence-packet downloads now include the digest prefix in the JSON file
+  name and success notice so reviewers can cross-check the handoff artifact quickly.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/api/api-database.repository.spec.ts`
+  passed 75/75 across 2 suites. `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx src/api-client.spec.ts`
+  passed 90/90 across 2 suites.
+- `npm run ci:lint` passed with zero ESLint/typecheck errors or warnings.
+- `npm run test:production-readiness` passed with API 14 suites / 198 tests and web
+  2 suites / 90 tests.
+- Full `npm run check` passed with API 55 suites / 465 tests, web 11 suites / 147
+  tests, graph validation 320 nodes / 320 edges, pricing coverage, progress
+  verification, QA/security suppression hygiene, DB, DevOps, cloud, release,
+  handover, and provider-credential gates green. `npm run impeccable` was skipped
+  by design because the repo targets Node 20 and the optional tool requires Node 24;
+  DB validation skipped live `schema_migrations` inspection because the local
+  Postgres container was not running.
+- Remaining caveat: this makes the evidence packet tamper-evident after export, but
+  it is not an external notarization service, provider-authenticated invoice
+  rendering, private contract/legal validation, or full invoice-grade billing
+  coverage.
 
 ## Deviations from spec log
 

@@ -2329,6 +2329,29 @@ describe('BillingService', () => {
         'This packet is metadata-only and intentionally excludes raw invoice artifact bytes.',
       ]),
     );
+    const { integrity, ...packetPayload } = packet;
+    const canonicalPayload = stableJson(packetPayload);
+
+    expect(integrity).toEqual(
+      expect.objectContaining({
+        schemaVersion: 'invoice-evidence-packet-integrity/v1',
+        canonicalization: 'stable-json:v1',
+        digestAlgorithm: 'sha256',
+        payloadDigestSha256: sha256Hex(canonicalPayload),
+        payloadByteLength: Buffer.byteLength(canonicalPayload, 'utf8'),
+        subject: {
+          reconciliationId: '66666666-6666-4666-8666-666666666666',
+          importRunId: '55555555-5555-4555-8555-555555555555',
+          comparisonId: comparisonResult.comparisonId,
+          provider: 'aws',
+        },
+        artifactCount: 1,
+        storedArtifactCount: 1,
+        verifiedArtifactCount: 1,
+        disclaimerCount: packet.disclaimers.length,
+        generatedAt: packet.generatedAt,
+      }),
+    );
     expect(JSON.stringify(packet)).not.toContain('contentBase64');
     expect(JSON.stringify(packet)).not.toContain('aW52b2ljZQ==');
   });
@@ -4276,4 +4299,19 @@ function configService(overrides: Partial<AppConfig> = {}): ConfigService<AppCon
 
 function sha256Hex(value: string): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableJson).join(',')}]`;
+  }
+
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, nested]) => `${JSON.stringify(key)}:${stableJson(nested)}`)
+      .join(',')}}`;
+  }
+
+  return JSON.stringify(value);
 }

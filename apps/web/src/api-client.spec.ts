@@ -939,6 +939,25 @@ describe('api client', () => {
         packetVersion: 'invoice-evidence-packet/v1',
         packetStatus: 'blocked',
         generatedAt: '2026-07-08T00:00:00.000Z',
+        integrity: {
+          schemaVersion: 'invoice-evidence-packet-integrity/v1',
+          canonicalization: 'stable-json:v1',
+          digestAlgorithm: 'sha256',
+          payloadDigestSha256: 'f'.repeat(64),
+          payloadByteLength: 2048,
+          subject: {
+            reconciliationId: 'reconciliation-1',
+            importRunId: 'import-1',
+            comparisonId: 'comparison-1',
+            provider: 'aws',
+          },
+          artifactCount: 0,
+          storedArtifactCount: 0,
+          verifiedArtifactCount: 0,
+          caveatCount: 0,
+          disclaimerCount: 1,
+          generatedAt: '2026-07-08T00:00:00.000Z',
+        },
         reconciliation: {
           id: 'reconciliation-1',
           importRunId: 'import-1',
@@ -992,6 +1011,9 @@ describe('api client', () => {
       expect.objectContaining({
         packetVersion: 'invoice-evidence-packet/v1',
         packetStatus: 'blocked',
+        integrity: expect.objectContaining({
+          payloadDigestSha256: 'f'.repeat(64),
+        }),
       }),
     );
     expect(fetchMock).toHaveBeenCalledWith(
