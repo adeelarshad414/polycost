@@ -102,6 +102,8 @@ async function assertPhaseEvidenceAnchors() {
     'npm run pricing:coverage:check',
     'npm run provider:credentials:check',
     'npm run invoice:artifact-profile:check',
+    'npm run invoice:artifact-scanner:smoke:local',
+    'npm run invoice:artifact-rehearsal:plan',
   ]);
   assertScriptIncludes(packageJson, 'ci:unit', [
     'npm run test:coverage',
@@ -320,6 +322,27 @@ async function assertPhaseEvidenceAnchors() {
     ['secret-free runtime profile guard', 'forbiddenRuntimeSecretKeys'],
     ['provider proof verifier reuse', 'invoice-artifact-provider-retention-proof-verifier.mjs'],
     ['target environment caveat', 'Run provider:credentials:check:strict'],
+  ]);
+
+  await assertFileContains('scripts/invoice-artifact-scanner-webhook-smoke.mjs', [
+    ['scanner signature header', 'x-polycost-artifact-signature'],
+    ['scanner clean verdict', "parsedResponse.verdict === 'clean'"],
+    ['scanner dummy secret guard', 'isDummyCredential'],
+  ]);
+
+  await assertFileContains('scripts/invoice-artifact-scanner-local-smoke.mjs', [
+    ['local scanner receiver schema', 'invoice-artifact-scanner-local-smoke/v1'],
+    ['constant-time scanner signature check', 'timingSafeEqual'],
+    ['strict bind env', 'POLYCOST_INVOICE_ARTIFACT_SCANNER_LOCAL_SMOKE_STRICT=1'],
+  ]);
+
+  await assertFileContains('scripts/invoice-artifact-staging-rehearsal.mjs', [
+    ['staging rehearsal schema', 'polycost-invoice-artifact-staging-rehearsal/v1'],
+    ['strict credential live step', 'provider-credentials-strict'],
+    ['scanner live step', 'scanner-webhook-smoke'],
+    ['notary live step', 'notary-webhook-smoke'],
+    ['audit live step', 'audit-export-smoke'],
+    ['secret handling statement', 'raw secrets must stay in Vault/runtime env'],
   ]);
 
   await assertFileContains('docs/operations/invoice-artifact-production-profile.example.json', [
