@@ -111,6 +111,10 @@ Evidence:
   `npm run pricing:catalog:snapshot:capture:run:live`, with CI-safe plan and
   smoke modes through `npm run pricing:catalog:snapshot:capture:run:plan` and
   `npm run pricing:catalog:snapshot:capture:run:smoke`.
+- Completed live capture runs can now be verified as one artifact set through
+  `npm run pricing:catalog:snapshot:capture:run:evidence:check -- --run-dir <run-output-dir> --require-live-run`,
+  with a credential-free smoke through
+  `npm run pricing:catalog:snapshot:capture:run:evidence:smoke`.
 - `docs/PROVIDER-CREDENTIALS.md` states the current production swap procedure and
   explicitly limits real provider mode to catalog list prices, not invoices.
 
