@@ -47,6 +47,11 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Confirm audit export receiver evidence is archived before claiming SIEM/WORM
   readiness: local proof from `npm run audit:export:smoke:local`, and staging
   proof from `npm run audit:export:smoke` when a real receiver is configured.
+- Confirm invoice evidence notary receiver evidence is archived before claiming
+  external notary/WORM handoff readiness: local proof from
+  `npm run invoice:evidence:notary:smoke:local`, and staging proof from
+  `npm run invoice:evidence:notary:smoke` when a real HTTPS receiver is
+  configured.
 
 ## Verification
 
@@ -59,6 +64,7 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Run `npm run public:readiness:check`.
 - Run `npm run browser:audit`.
 - Run `npm run audit:export:smoke:local`.
+- Run `npm run invoice:evidence:notary:smoke:local`.
 - Run `npm run release:check`.
 - Run `npm run loading:check`.
 - Run `npm run handover:check`.

@@ -448,6 +448,16 @@ Evidence:
   `npm run check` passed afterward with API `56` suites / `470` tests, web `11`
   suites / `147` tests, graph validation `322` nodes / `322` edges, and progress
   verification `153` anchors.
+- Phase 2.40 invoice evidence notary receiver smoke proof passed:
+  `npm run invoice:evidence:notary:smoke:local` accepted one signed
+  `invoice_evidence_packet.exported` canary handoff, rejected zero events, verified
+  the `x-polycost-signature-sha256` HMAC receiver contract, and appended a JSONL
+  artifact under `artifacts/invoice-evidence-notary-smoke/`. The staging command
+  `npm run invoice:evidence:notary:smoke` is documented and release-gated for HTTPS
+  receivers with non-dummy signing secrets; live staging execution remains
+  operator-environment evidence. Full local `npm run check` passed afterward with
+  API `56` suites / `470` tests, web `11` suites / `147` tests, graph validation
+  `322` nodes / `322` edges, and progress verification `153` anchors.
 - Phase 2.9 focused regressions passed: API `3` suites / `52` tests
   (`auth-billing`, `diagram-parser`, `llm-classifier`) and web `1` suite / `57`
   tests (`App.spec.tsx`).

@@ -277,6 +277,32 @@ the signing secret or receiver response body. Receiver-side immutable retention 
 still external proof owned by the operator; retain the receiver's WORM/object-lock
 acceptance record with the exported packet.
 
+Before promoting a notary/WORM receiver, run the local contract smoke:
+
+```bash
+npm run invoice:evidence:notary:smoke:local
+```
+
+It starts a temporary localhost receiver, posts a signed
+`invoice_evidence_packet.exported` canary, verifies the `x-polycost-signature-sha256`
+header, and appends a JSONL proof artifact under
+`artifacts/invoice-evidence-notary-smoke/`. This proves the PolyCost receiver
+contract only; it is not immutable retention evidence.
+
+For staging or production-like receivers, use a real HTTPS endpoint and non-dummy
+signing secret:
+
+```bash
+INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL=https://worm.example.com/polycost/evidence-receipts \
+INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET="<runtime-secret-from-secret-manager>" \
+INVOICE_EVIDENCE_RECEIPT_SIGNING_KEY_REFERENCE="<kms-or-secret-manager-key-ref>" \
+npm run invoice:evidence:notary:smoke
+```
+
+Archive the printed run ID, reconciliation ID, packet digests, receiver-side
+acceptance object, retention policy, and access-control evidence with the release
+or customer handover packet.
+
 ## Flip From Mock To Real Mode
 
 1. Start dependencies:

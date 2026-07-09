@@ -77,6 +77,8 @@
     "demo:verify-clean": "node scripts/clean-clone-demo-check.mjs",
     "audit:export:smoke": "node scripts/audit-export-webhook-smoke.mjs",
     "audit:export:smoke:local": "node scripts/audit-export-local-smoke.mjs",
+    "invoice:evidence:notary:smoke": "node scripts/invoice-evidence-notary-webhook-smoke.mjs",
+    "invoice:evidence:notary:smoke:local": "node scripts/invoice-evidence-notary-local-smoke.mjs",
     "browser:audit": "node scripts/browser-audit.mjs",
     "invoice:evidence:verify": "node scripts/invoice-evidence-packet-verifier.mjs",
     "invoice:evidence:verify:fixture": "node scripts/invoice-evidence-packet-verifier.mjs test/fixtures/billing/invoice-evidence-packet.valid.json",

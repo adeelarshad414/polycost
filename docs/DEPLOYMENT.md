@@ -90,6 +90,35 @@ Archive the printed `exportId`, receiver HTTP status, receiver-side stored recor
 retention policy, and access-control evidence. PolyCost proves signed delivery;
 the SIEM/WORM platform must prove immutability and retention.
 
+## Invoice Evidence Notary Receiver Verification
+
+Before claiming external invoice evidence WORM handoff readiness, prove both the
+notary webhook contract and the deployed receiver retention path.
+
+Local contract smoke:
+
+```bash
+npm run invoice:evidence:notary:smoke:local
+```
+
+This starts a temporary localhost receiver, sends a signed
+`invoice_evidence_packet.exported` canary payload, verifies the HMAC signature, and
+appends one compact JSONL evidence row under
+`artifacts/invoice-evidence-notary-smoke/`.
+
+Staging receiver smoke:
+
+```bash
+INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL=https://worm.example.com/polycost/evidence-receipts \
+INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET=replace-with-staging-secret \
+npm run invoice:evidence:notary:smoke
+```
+
+Archive the printed reconciliation ID, packet digest, base payload digest, receiver
+HTTP status, receiver-side stored record, retention policy, and access-control
+evidence. PolyCost proves signed handoff delivery; the WORM/notary platform must
+prove immutability and retention.
+
 ## Production Reference Architecture
 
 Use the same app topology across AWS, Azure, or GCP:
