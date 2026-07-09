@@ -72,6 +72,9 @@ as exact row-change proof.
 Use `npm run pricing:catalog:snapshot:capture:smoke` to replay provider-native
 AWS/Azure/GCP fixture payloads through the capture normalizers without network
 calls or cloud credentials.
+Use `npm run pricing:catalog:snapshot:capture:preflight` for CI-safe readiness
+posture, and `npm run pricing:catalog:snapshot:capture:preflight:strict` in a
+target environment before claiming live provider capture readiness.
 The checked-in example validates the contract only; PolyCost still is not the
 provider invoice system of record. See
 `docs/architecture/phase-2-invoice-of-record-pilot-evidence.md`.

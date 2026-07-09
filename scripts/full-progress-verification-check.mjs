@@ -111,6 +111,7 @@ async function assertPhaseEvidenceAnchors() {
     'npm run pricing:catalog:snapshot:smoke',
     'npm run pricing:catalog:snapshot:capture:plan',
     'npm run pricing:catalog:snapshot:capture:smoke',
+    'npm run pricing:catalog:snapshot:capture:preflight',
     'npm run terraform:evidence:check',
     'npm run terraform:evidence:capture:smoke',
     'npm run vsdx:visual-evidence:check',
@@ -425,6 +426,18 @@ async function assertPhaseEvidenceAnchors() {
     ['fixture capture handoff', '--fixture-smoke'],
     ['strict live rejection', '--require-live-provider'],
     ['no credential env smoke', 'scrubbedEnv'],
+  ]);
+
+  await assertFileContains('scripts/pricing-catalog-live-snapshot-capture-preflight.mjs', [
+    [
+      'pricing catalog live capture preflight schema',
+      'polycost-pricing-catalog-live-snapshot-capture-preflight/v1',
+    ],
+    ['strict live option', '--strict-live'],
+    ['live guard env', 'POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE'],
+    ['previous evidence env', 'PRICING_CATALOG_PREVIOUS_LIVE_EVIDENCE'],
+    ['strict checker handoff', '--require-live-provider'],
+    ['no raw credential output', 'no_raw_credential_output'],
   ]);
 
   await assertFileContains(

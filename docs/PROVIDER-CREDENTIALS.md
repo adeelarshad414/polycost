@@ -424,8 +424,13 @@ Use `npm run pricing:catalog:snapshot:capture:plan` to inspect the live capture
 requirements without provider calls. Use
 `npm run pricing:catalog:snapshot:capture:smoke` to replay provider-native
 AWS/Azure/GCP fixture payloads through the capture normalizers without cloud
-credentials. To generate sanitized live provider evidence, run the guarded
-operator-side capture command:
+credentials. Use `npm run pricing:catalog:snapshot:capture:preflight` for
+CI-safe readiness posture, and
+`npm run pricing:catalog:snapshot:capture:preflight:strict` in the target
+environment after setting `POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true`,
+`POLYCOST_OPERATOR`, a GCP credential source, and
+`PRICING_CATALOG_PREVIOUS_LIVE_EVIDENCE`. To generate sanitized live provider
+evidence, run the guarded operator-side capture command:
 
 ```bash
 POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true \

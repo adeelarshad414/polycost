@@ -91,6 +91,10 @@ Evidence:
   `POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true`, a reviewer operator, previous
   live evidence, and GCP Cloud Billing read credentials before
   `--require-live-provider` can pass.
+- Live provider catalog snapshot capture readiness now has a machine-readable
+  preflight through `npm run pricing:catalog:snapshot:capture:preflight`, plus
+  strict target-environment mode through
+  `npm run pricing:catalog:snapshot:capture:preflight:strict`.
 - The capture path now has credential-free provider-native fixture replay through
   `npm run pricing:catalog:snapshot:capture:smoke`, proving the AWS/Azure/GCP
   capture normalizers, exact price row-change math, and strict live-proof

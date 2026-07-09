@@ -31,6 +31,12 @@ Review the live capture plan without network calls:
 npm run pricing:catalog:snapshot:capture:plan
 ```
 
+Review live-capture readiness without provider network calls:
+
+```bash
+npm run pricing:catalog:snapshot:capture:preflight
+```
+
 Replay provider-native fixture payloads through the live capture normalizers
 without provider credentials:
 
@@ -42,6 +48,20 @@ The smoke generates AWS Price List, Azure Retail Prices, and GCP Cloud Billing
 fixture payloads, changes one price-bearing row per provider, validates
 `provider-snapshot-smoke` evidence, and confirms `--require-live-provider`
 rejects the fixture output.
+
+Strict preflight is for target environments:
+
+```bash
+POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true \
+  POLYCOST_OPERATOR="<reviewer-name>" \
+  PRICING_CATALOG_PREVIOUS_LIVE_EVIDENCE=<prior-live-provider-bundle.json> \
+  npm run pricing:catalog:snapshot:capture:preflight:strict
+```
+
+Strict preflight validates the live guard, reviewer identity, previous live
+evidence, GCP credential source, endpoint configuration, and no-secret output
+posture before live capture is attempted. It does not call provider catalog APIs
+and does not replace the actual `--live` capture run.
 
 For live provider proof, run the guarded operator-side capture command from a
 read-only provider environment:
