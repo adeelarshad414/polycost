@@ -194,6 +194,9 @@ Evidence:
   `npm run diagram:llm-corpus:capture`, with
   `npm run diagram:llm-corpus:capture:smoke` proving the checked-in capture
   contract and downstream checker handoff.
+- Drift and false-positive monitoring now has a runnable contract through
+  `npm run diagram:llm-corpus:drift:check`, backed by a sanitized baseline profile
+  and unreviewed-mismatch thresholds.
 - `apps/api/src/reports/report-generators.spec.ts` proves classification evidence
   strings travel into exported report sections.
 - `PROGRESS.md` records the current fixture corpus tier table, including VSDX
@@ -214,7 +217,9 @@ Deferred:
   The checked-in corpus evidence and capture profile are `example-schema` only;
   live quality proof must use `evidenceLevel=live-model`,
   `npm run diagram:llm-corpus:capture -- --require-live-model`, and
-  `npm run diagram:llm-corpus:check -- --require-live-model`.
+  `npm run diagram:llm-corpus:check -- --require-live-model`. Ongoing monitoring
+  must also use `npm run diagram:llm-corpus:drift:check -- --require-live-model`
+  with a reviewed false-positive register.
 
 ## Phase V3 - Terraform Generation
 

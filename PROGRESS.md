@@ -150,6 +150,7 @@ say so explicitly rather than marking it done.
 | Phase 2.58 - Enterprise IdP pilot evidence gate         | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.59 - Invoice-of-record pilot evidence gate      | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.60 - Diagram LLM evidence capture helper        | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.61 - Diagram LLM drift monitoring gate          | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -477,6 +478,71 @@ Known gaps carried forward:
   strict `npm run diagram:llm-corpus:capture -- --require-live-model`, strict
   `npm run diagram:llm-corpus:check -- --require-live-model`, operator review,
   ongoing corpus refresh, false-positive tracking, and drift monitoring.
+
+## Phase 2.61 - Diagram LLM drift monitoring gate
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added `scripts/diagram-llm-corpus-drift-check.mjs`, a machine-readable drift
+  monitor that compares sanitized classifier evidence against a baseline, detects
+  category/service-type accuracy drops, enforces high-confidence coverage, and
+  fails unreviewed mismatches.
+- Added `docs/operations/evidence/diagram-llm-corpus-drift/diagram-llm-corpus-drift.example.json`,
+  a sanitized `example-schema` drift profile with baseline metrics, thresholds,
+  an empty false-positive register, and raw prompt/secret exclusion attestations.
+- Added `docs/architecture/phase-2-diagram-llm-corpus-drift-monitoring.md` to
+  document the capture/validate/monitor workflow and the boundary that drift
+  monitoring validates archived sanitized evidence rather than calling the model.
+- Added `npm run diagram:llm-corpus:drift:check` and wired it into the aggregate
+  `npm run check` floor.
+- Updated README, `docs/HOW-TO-USE.md`, `docs/PROVIDER-CREDENTIALS.md`,
+  `docs/ARCHITECTURE.md`, release checklist, release-readiness guards,
+  progress-verification guards, and the full-progress ledger.
+
+Verification performed:
+
+- `node --check scripts/diagram-llm-corpus-drift-check.mjs` passed.
+- `npm run diagram:llm-corpus:drift:check -- --json` passed against the checked-in
+  sample with `12` cases, `12` predictions, `categoryAccuracy=1`,
+  `serviceTypeAccuracy=1`, `highConfidenceCoverage=1`, `mismatchCount=0`,
+  `unreviewedMismatchCount=0`, and `verifiedExampleDriftCheck=true`.
+- `npm run diagram:llm-corpus:drift:check -- --require-live-model --json` failed
+  as intended against the checked-in sample because it is `example-schema`
+  monitoring without live endpoint/model/Vault evidence or named drift reviewer.
+- `npm run diagram:llm-corpus:drift:check -- --require-live-model --profile .tmp/diagram-llm-live-drift-profile.json --json`
+  passed against a generated temporary live-model-shaped bundle with
+  `verifiedLiveModelDrift=true`.
+- `npm run diagram:llm-corpus:drift:check -- --evidence .tmp/diagram-llm-drift-mismatch-evidence.json --json`
+  failed as intended with one unreviewed service-type mismatch.
+- `npm run diagram:llm-corpus:drift:check -- --profile .tmp/diagram-llm-drift-reviewed-profile.json --json`
+  passed with the same mismatch only after it was tracked in the sanitized
+  false-positive register.
+- `npm run format:check`, `npm run release:check`, and `npm run progress:verify`
+  passed; progress verification now reports `331` phase evidence anchors.
+- Full `npm run check` passed with the diagram LLM drift monitor in the aggregate
+  floor. The run included API unit `59` suites / `494` tests, web unit `11` suites /
+  `149` tests, graph validation `354` nodes / `354` edges, pricing coverage `36`
+  frontend families, progress verification `331` anchors, release readiness,
+  handover, DevOps/cloud/provider-credential gates, and invoice/Terraform/VSDX/LLM/
+  enterprise-IdP/provider-invoice evidence smokes. Expected caveats remained:
+  `impeccable` is skipped on the repo's Node 20 target, live Postgres migrations
+  were skipped because the local Postgres container was not running, the diagram
+  LLM provider check reports the endpoint/model are not configured in local mode,
+  and the default local env still warns that invoice-artifacts are demo/local
+  without live object-storage/KMS/scanner/WORM settings.
+
+Known gaps carried forward:
+
+- This closes the local drift-monitoring and false-positive register foundation,
+  but it does not operate a production model, scheduler, alerting pipeline, or
+  reviewer queue in the default OSS/CI path.
+- Real proof still requires live endpoint/model evidence, Vault-backed
+  `secret/polycost/llm` `api_key`, scheduled live corpus runs, sanitized live
+  evidence capture, strict drift monitoring, reviewer workflow, threshold tuning,
+  and alert routing for regressions.
 
 ## Phase V3.6 - Terraform validation evidence
 

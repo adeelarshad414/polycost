@@ -192,8 +192,10 @@ Health and operations:
 - VSDX parsing is layout-aware extraction, not full Visio rendering.
 - Production LLM quality depends on a real endpoint/model, Vault secret, and corpus
   evaluation. The capture helper is `npm run diagram:llm-corpus:capture`; the
-  validation gate is `npm run diagram:llm-corpus:check`. Production claims require
-  `--require-live-model` evidence, not the checked-in sample.
+  validation gate is `npm run diagram:llm-corpus:check`; drift monitoring is
+  `npm run diagram:llm-corpus:drift:check`. Production claims require
+  `--require-live-model` evidence and reviewed mismatch handling, not the checked-in
+  sample.
 - Enterprise auth/team product depth still needs production email, SSO/SAML,
   SCIM, account recovery, org billing UX, and broader account administration polish.
 - Terraform output is a starter bundle, not a full landing-zone module system.

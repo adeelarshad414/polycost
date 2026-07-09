@@ -1,7 +1,7 @@
 # PolyCost Production Readiness Report
 
 Date: 2026-07-09
-Branch: cumulative production-readiness branches through `codex/diagram-llm-capture`
+Branch: cumulative production-readiness branches through `codex/diagram-llm-drift-monitor`
 PR: local phase gate, PR created after verification
 Run spec: `docs/design/master-production-readiness-orchestrator-v2.md`
 
@@ -95,6 +95,7 @@ performance/accessibility/best-practices/SEO metrics.
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                                                                                                 |
 | LLM-READY-003  | Improved      | Phase 2.57 adds a labeled Tier 3 diagram-classifier corpus, sanitized prediction evidence bundle, accuracy metrics, raw prompt/response exclusion checks, and a strict `--require-live-model` production evidence gate                                           |
 | LLM-READY-004  | Improved      | Phase 2.60 adds `npm run diagram:llm-corpus:capture`, an operator-side sanitized evidence capture helper with sample smoke coverage, strict live-model mode, downstream checker handoff, and raw prompt/response/secret guards                                   |
+| LLM-READY-005  | Improved      | Phase 2.61 adds `npm run diagram:llm-corpus:drift:check`, a monitored-baseline drift gate with accuracy-drop thresholds, high-confidence coverage checks, unreviewed mismatch failure, and sanitized false-positive register handling                            |
 | UI-AUTH-002    | Improved      | Workspace billing panel now surfaces reconciliation readiness, source-fingerprint coverage, SKU match coverage, and the invoice-of-record caveat                                                                                                                 |
 | UI-AUTH-006    | Improved      | Workspace billing panel now surfaces usage-comparable variance plus invoice adjustment count, subtotal, and category summary for finance review                                                                                                                  |
 | UI-AUTH-007    | Improved      | Workspace billing panel now surfaces commitment row count, net commitment cost, and commitment category totals separately from generic invoice adjustments                                                                                                       |
@@ -217,6 +218,27 @@ Local static/regression gates:
     suites / `149` tests, graph validation `352` nodes / `352` edges, pricing
     coverage `36` frontend families, progress verification `315` anchors, and the
     new diagram LLM capture smoke in the aggregate floor.
+- Phase 2.61 diagram LLM drift monitoring gates passed:
+  - `node --check scripts/diagram-llm-corpus-drift-check.mjs` passed.
+  - `npm run diagram:llm-corpus:drift:check -- --json` passed against the
+    sanitized `example-schema` drift profile with `mismatchCount=0`,
+    `unreviewedMismatchCount=0`, and `verifiedExampleDriftCheck=true`.
+  - `npm run diagram:llm-corpus:drift:check -- --require-live-model --json`
+    failed as intended for the sample profile because it is not production
+    endpoint/model/Vault/drift-review evidence.
+  - `npm run diagram:llm-corpus:drift:check -- --require-live-model --profile .tmp/diagram-llm-live-drift-profile.json --json`
+    passed against a generated temporary live-model-shaped bundle with
+    `verifiedLiveModelDrift=true`.
+  - `npm run diagram:llm-corpus:drift:check -- --evidence .tmp/diagram-llm-drift-mismatch-evidence.json --json`
+    failed as intended with one unreviewed mismatch.
+  - `npm run diagram:llm-corpus:drift:check -- --profile .tmp/diagram-llm-drift-reviewed-profile.json --json`
+    passed once that mismatch was tracked in the sanitized false-positive register.
+  - `npm run format:check`, `npm run release:check`, and `npm run progress:verify`
+    passed; progress verification reports `331` anchors.
+  - Full `npm run check` passed with API `59` suites / `494` tests, web `11`
+    suites / `149` tests, graph validation `354` nodes / `354` edges, pricing
+    coverage `36` frontend families, progress verification `331` anchors, and the
+    new diagram LLM drift monitor in the aggregate floor.
 - Phase 2.58 enterprise IdP pilot evidence gates passed:
   - `node --check scripts/enterprise-idp-pilot-evidence-check.mjs` passed.
   - `npm run enterprise:idp:evidence:check -- --json` passed against the sanitized
@@ -926,8 +948,9 @@ Machine-readable token evidence:
   surface so stub/unconfigured mode is not reported as production-connected. Phase 2.57
   adds the baseline labeled corpus, sanitized evidence bundle, metric gate, and
   `--require-live-model` strict mode. Phase 2.60 adds a repeatable sanitized
-  capture helper and smoke gate, but the checked-in sample remains `example-schema`
-  evidence rather than production model proof.
+  capture helper and smoke gate. Phase 2.61 adds monitored drift thresholds and a
+  false-positive register contract, but the checked-in sample remains
+  `example-schema` evidence rather than production model proof.
 - Full enterprise auth product polish remains future scope: production email,
   production SSO/SAML certification, formal SCIM certification, account recovery,
   org billing UX, and broader team/account administration. Phase 2.11 closes active
