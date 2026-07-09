@@ -94,6 +94,12 @@ if (!packageJson.scripts?.['invoice:retention-proof:verify']) {
 if (!packageJson.scripts?.['invoice:retention-proof:verify:smoke']) {
   failures.push('package.json is missing invoice:retention-proof:verify:smoke');
 }
+if (!packageJson.scripts?.['invoice:retention-proof:capture-plan']) {
+  failures.push('package.json is missing invoice:retention-proof:capture-plan');
+}
+if (!packageJson.scripts?.['invoice:retention-proof:capture-plan:smoke']) {
+  failures.push('package.json is missing invoice:retention-proof:capture-plan:smoke');
+}
 if (!packageJson.scripts?.['pricing:logic:coverage']) {
   failures.push('package.json is missing pricing:logic:coverage');
 }
@@ -139,6 +145,11 @@ if (!packageJson.scripts?.check?.includes('npm run public:readiness:check')) {
 if (!packageJson.scripts?.check?.includes('npm run invoice:retention-proof:verify:smoke')) {
   failures.push(
     'package.json check script must include npm run invoice:retention-proof:verify:smoke',
+  );
+}
+if (!packageJson.scripts?.check?.includes('npm run invoice:retention-proof:capture-plan:smoke')) {
+  failures.push(
+    'package.json check script must include npm run invoice:retention-proof:capture-plan:smoke',
   );
 }
 
@@ -271,6 +282,10 @@ await assertFileContains('docs/PROVIDER-CREDENTIALS.md', [
   ['provider retention proof manifest', '## Provider Retention Proof Manifest'],
   ['provider retention proof mode', 'INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE'],
   ['provider retention proof verifier command', 'npm run invoice:retention-proof:verify'],
+  [
+    'provider retention proof capture planner command',
+    'npm run invoice:retention-proof:capture-plan',
+  ],
   ['provider retention proof ready gate', 'providerRetentionProofReady'],
   [
     'no env secret storage',
@@ -514,6 +529,27 @@ await assertFileContains('scripts/invoice-artifact-provider-retention-proof-veri
   ['GCP proof smoke fixture', 'provider-retention-proof-gcp.json'],
   ['digest mismatch smoke', 'proof digest mismatch'],
 ]);
+
+await assertFileContains('scripts/invoice-artifact-provider-retention-proof-capture-plan.mjs', [
+  [
+    'provider retention proof capture plan schema',
+    'invoice-artifact-provider-retention-proof-capture-plan/v1',
+  ],
+  ['AWS retention capture command', 'aws s3api get-object-retention'],
+  ['Azure immutability capture command', 'az storage blob immutability-policy show'],
+  ['GCP retention capture command', 'gcloud storage objects describe'],
+  ['no cloud CLI execution by PolyCost', 'cloudCliExecutionByPolyCost: false'],
+]);
+
+await assertFileContains(
+  'scripts/invoice-artifact-provider-retention-proof-capture-plan-smoke.mjs',
+  [
+    ['AWS capture plan smoke', 'aws s3api get-object-retention'],
+    ['Azure capture plan smoke', 'az storage blob immutability-policy show'],
+    ['GCP capture plan smoke', 'gcloud storage objects describe'],
+    ['provider URI mismatch smoke', 'provider/URI mismatch'],
+  ],
+);
 
 await assertFileContains('scripts/provider-credential-check.mjs', [
   [

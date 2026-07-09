@@ -712,7 +712,10 @@ Machine-readable token evidence:
   external artifact has provider-control-plane proof reference and SHA-256 digest.
   Phase 2.43 adds an offline AWS/Azure/GCP provider retention proof artifact
   verifier and smoke harness so operators can validate the captured proof JSON and
-  digest before copying it into runtime configuration.
+  digest before copying it into runtime configuration. Phase 2.44 adds an offline
+  AWS/Azure/GCP capture-plan helper that turns a stored object URI into provider
+  CLI capture commands, verifier command, durable reference, and runtime config
+  handoff template without executing cloud CLIs or handling cloud credentials.
   PolyCost still does not provide provider invoice rendering, private contract
   validation, automated cloud-control-plane WORM object-store proof capture,
   receiver-side immutability proof, external legal-review routing, contract/legal

@@ -131,6 +131,9 @@ say so explicitly rather than marking it done.
 | Phase 2.39 - Invoice evidence notary API handoff        | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.40 - Invoice evidence notary receiver smoke     | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.41 - Notary reference receiver staging path     | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.42 - Provider retention proof manifest          | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.43 - Provider retention proof artifact verifier | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.44 - Provider retention proof capture planner   | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4941,6 +4944,38 @@ Status: implemented and verified locally on 2026-07-09.
 - Remaining caveat: this verifier validates captured proof files and digests; it
   does not call provider APIs itself, prove chain of custody, or replace legal
   retention review.
+
+## Phase 2.44 — Provider retention proof capture planner
+
+Status: implemented and verified locally on 2026-07-09.
+
+- Added `npm run invoice:retention-proof:capture-plan`, an offline AWS/Azure/GCP
+  planner that accepts a provider object URI and emits provider CLI capture
+  commands, proof file path, verifier command, durable proof reference, runtime
+  config template, and operator control checklist.
+- Added `npm run invoice:retention-proof:capture-plan:smoke` covering AWS S3
+  versioned object URIs, Azure Blob object URIs, GCP GCS object URIs, runtime
+  config placeholders, provider/URI mismatch failures, and no-overclaim fields
+  (`cloudCliExecutionByPolyCost: false`,
+  `immutableRetentionProvedByPolyCost: false`).
+- Updated provider-credential docs and release-readiness guards so operators can
+  generate the capture runbook before using the proof verifier.
+- Verification: `npm run invoice:retention-proof:capture-plan:smoke`,
+  `npm run format:check`, `npm run ci:lint`, `npm run release:check`,
+  `npm run progress:verify`, and full `npm run check` passed with the planner
+  smoke in the regression floor. The full run included API unit tests (56 suites,
+  471 tests), web unit tests (11 suites, 147 tests), graph validation (322 nodes,
+  322 edges), pricing coverage, progress verification (153 anchors), QA/security
+  suppression hygiene, DB, DevOps, cloud, release, handover, and
+  provider-credential gates. Expected caveats remained: `npm run impeccable`
+  skipped because the repo targets Node 20 and the optional tool requires Node
+  24; DB validation skipped live `schema_migrations` inspection because local
+  Postgres was not running; provider credentials warned that invoice artifact
+  governance is still demo/local by default.
+- Remaining caveat: the planner still does not execute cloud CLIs, handle
+  credentials, prove chain of custody, or replace legal retention review. It
+  creates the auditable command plan that operators run in their controlled cloud
+  environment.
 
 ## Deviations from spec log
 
