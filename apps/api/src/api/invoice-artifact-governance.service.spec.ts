@@ -34,6 +34,11 @@ describe('InvoiceArtifactGovernanceService', () => {
         INVOICE_ARTIFACT_MALWARE_SCANNER_URL: 'https://scanner.example.com/polycost/artifacts',
         INVOICE_ARTIFACT_MALWARE_SCANNER_SECRET: 'production-scanner-webhook-secret',
         INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE: 'delete-expired',
+        INVOICE_EVIDENCE_WORM_RETENTION_MODE: 'provider-object-lock',
+        INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE: 'provider-control-plane',
+        INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_REFERENCE:
+          's3://polycost-invoice-artifacts/object-lock-proof.json',
+        INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_SHA256: 'b'.repeat(64),
       }),
     );
 
@@ -49,7 +54,61 @@ describe('InvoiceArtifactGovernanceService', () => {
         region: 'us-east-1',
       },
       kmsKeyReference: 'arn:aws:kms:us-east-1:111122223333:key/demo',
+      providerRetentionProofMode: 'provider-control-plane',
+      providerRetentionProofReference: 's3://polycost-invoice-artifacts/object-lock-proof.json',
+      providerRetentionProofSha256: 'b'.repeat(64),
       gaps: [],
+    });
+  });
+
+  it('records provider control-plane retention proof when digest and reference are configured', async () => {
+    const content = Buffer.from('invoice artifact bytes');
+    const sha256 = createHash('sha256').update(content).digest('hex');
+    const service = new InvoiceArtifactGovernanceService(
+      configService({
+        INVOICE_ARTIFACT_STORAGE_BACKEND: 'aws-s3',
+        INVOICE_ARTIFACT_OBJECT_STORE_NAME: 'polycost-invoice-artifacts',
+        INVOICE_ARTIFACT_OBJECT_STORE_REGION: 'us-east-1',
+        INVOICE_ARTIFACT_OBJECT_STORE_PREFIX: 'invoice-artifacts',
+        INVOICE_ARTIFACT_KMS_KEY_REFERENCE: 'arn:aws:kms:us-east-1:111122223333:key/demo',
+        INVOICE_EVIDENCE_WORM_RETENTION_MODE: 'provider-object-lock',
+        INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE: 'provider-control-plane',
+        INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_REFERENCE:
+          's3://polycost-invoice-artifacts/object-lock-proof.json',
+        INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_SHA256: 'c'.repeat(64),
+      }),
+    );
+
+    await expect(
+      service.buildGovernance(
+        {
+          fileName: 'invoice.txt',
+          mimeType: 'text/plain',
+          content: 'ignored',
+          encoding: 'text',
+          retentionDays: 400,
+        },
+        content,
+        sha256,
+        '2026-07-08T00:00:00.000Z',
+      ),
+    ).resolves.toMatchObject({
+      providerRetentionProof: {
+        schemaVersion: 'invoice-artifact-provider-retention-proof/v1',
+        status: 'provider-verified',
+        evidenceSource: 'provider-control-plane',
+        storageBackend: 'aws-s3',
+        retentionMode: 'provider-object-lock',
+        retentionUntil: '2027-08-12T00:00:00.000Z',
+        proofReference: 's3://polycost-invoice-artifacts/object-lock-proof.json',
+        proofDigestSha256: 'c'.repeat(64),
+        objectStore: {
+          bucketOrContainer: 'polycost-invoice-artifacts',
+          prefix: 'invoice-artifacts',
+          region: 'us-east-1',
+        },
+        caveats: [],
+      },
     });
   });
 

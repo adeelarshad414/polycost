@@ -20,6 +20,10 @@ export type InvoiceGradeArtifactVerificationStatus = 'registered' | 'verified' |
 export type InvoiceArtifactStorageBackend = 'database-bytea' | 'aws-s3' | 'azure-blob' | 'gcp-gcs';
 export type InvoiceArtifactMalwareScannerMode = 'eicar-signature-only' | 'http-webhook';
 export type InvoiceArtifactRetentionEnforcementMode = 'report-only' | 'delete-expired';
+export type InvoiceArtifactProviderRetentionProofMode =
+  'not-configured' | 'declared-config' | 'provider-control-plane';
+export type InvoiceArtifactProviderRetentionProofStatus =
+  'not-applicable' | 'missing' | 'declared' | 'provider-verified';
 export type InvoiceEvidenceReceiptMode = 'metadata-only' | 'local-hmac' | 'external-webhook';
 export type InvoiceEvidenceWormRetentionMode =
   'not-configured' | 'provider-object-lock' | 'external-worm-receiver';
@@ -186,6 +190,29 @@ export interface InvoiceControlValidationInput {
   notes?: string;
 }
 
+export interface InvoiceArtifactProviderRetentionProof {
+  schemaVersion: 'invoice-artifact-provider-retention-proof/v1';
+  status: InvoiceArtifactProviderRetentionProofStatus;
+  evidenceSource: 'not-required' | 'local-config' | 'provider-control-plane';
+  storageBackend: InvoiceArtifactStorageBackend;
+  checkedAt: string;
+  retentionMode: InvoiceEvidenceWormRetentionMode;
+  retentionUntil: string;
+  legalHold: boolean;
+  objectStore?: {
+    bucketOrContainer: string;
+    prefix?: string;
+    region?: string;
+    key?: string;
+    uri?: string;
+    eTag?: string;
+    version?: string;
+  };
+  proofReference?: string;
+  proofDigestSha256?: string;
+  caveats: string[];
+}
+
 export interface InvoiceArtifactBlobGovernance {
   storageProfile: {
     storageBackend: InvoiceArtifactStorageBackend;
@@ -207,6 +234,7 @@ export interface InvoiceArtifactBlobGovernance {
     retentionDays: number;
     legalHold: boolean;
   };
+  providerRetentionProof: InvoiceArtifactProviderRetentionProof;
   malwareScan: {
     status: 'passed' | 'failed';
     scanner: string;
@@ -227,6 +255,9 @@ export interface InvoiceArtifactStorageReadiness {
     region?: string;
   };
   kmsKeyReference?: string;
+  providerRetentionProofMode: InvoiceArtifactProviderRetentionProofMode;
+  providerRetentionProofReference?: string;
+  providerRetentionProofSha256?: string;
   gaps: string[];
 }
 
@@ -308,6 +339,10 @@ export interface InvoiceEvidencePacketGovernance {
     retentionPolicyCount: number;
     expiredRetentionCount: number;
     legalHoldCount: number;
+    providerRetentionProofMissingCount: number;
+    providerRetentionProofDeclaredCount: number;
+    providerRetentionProofVerifiedCount: number;
+    providerRetentionProofNotApplicableCount: number;
     malwareScanPassedCount: number;
     malwareScanFailedCount: number;
     malwareScannerEngines: string[];
@@ -320,6 +355,7 @@ export interface InvoiceEvidencePacketGovernance {
     malwareScanningReady: boolean;
     retentionPolicyReady: boolean;
     retentionDeletionReady: boolean;
+    providerRetentionProofReady: boolean;
     packetIntegrityReady: true;
     auditTrailReady: boolean;
   };

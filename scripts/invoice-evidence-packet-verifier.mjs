@@ -152,6 +152,7 @@ async function verifyPacketFile(filePath) {
   assertEqual(failures, 'integrity.generatedAt', integrity.generatedAt, packet.generatedAt);
   assertSubject(failures, packet, integrity);
   assertCounts(failures, packet, integrity);
+  assertArtifactGovernance(failures, packet);
   assertReceipt(failures, packet);
 
   return {
@@ -233,6 +234,135 @@ function assertCounts(failures, packet, integrity) {
   assertEqual(failures, 'controls.verifiedCount', controls.verifiedCount, verifiedArtifactCount);
   assertEqual(failures, 'integrity.caveatCount', integrity.caveatCount, caveats.length);
   assertEqual(failures, 'integrity.disclaimerCount', integrity.disclaimerCount, disclaimers.length);
+}
+
+function assertArtifactGovernance(failures, packet) {
+  if (packet.artifactGovernance === undefined) {
+    return;
+  }
+
+  const artifactGovernance = isPlainObject(packet.artifactGovernance)
+    ? packet.artifactGovernance
+    : {};
+  const storagePosture = isPlainObject(artifactGovernance.storagePosture)
+    ? artifactGovernance.storagePosture
+    : {};
+  const productionGates = isPlainObject(artifactGovernance.productionGates)
+    ? artifactGovernance.productionGates
+    : {};
+  const artifacts = Array.isArray(packet.artifacts) ? packet.artifacts : [];
+  const governanceRecords = artifacts
+    .map((artifact) => (isPlainObject(artifact) ? artifact.storedBlob : undefined))
+    .filter(isPlainObject)
+    .map((storedBlob) => storedBlob.governance)
+    .filter(isPlainObject);
+  const proofs = governanceRecords.map((governance) => governance.providerRetentionProof);
+  const missingCount = governanceRecords.filter(
+    (governance) =>
+      !isPlainObject(governance.providerRetentionProof) ||
+      governance.providerRetentionProof.status === 'missing',
+  ).length;
+  const declaredCount = proofs.filter(
+    (proof) => isPlainObject(proof) && proof.status === 'declared',
+  ).length;
+  const verifiedCount = proofs.filter(
+    (proof) => isPlainObject(proof) && proof.status === 'provider-verified',
+  ).length;
+  const notApplicableCount = proofs.filter(
+    (proof) => isPlainObject(proof) && proof.status === 'not-applicable',
+  ).length;
+
+  assertEqual(
+    failures,
+    'artifactGovernance.storagePosture.providerRetentionProofMissingCount',
+    storagePosture.providerRetentionProofMissingCount,
+    missingCount,
+  );
+  assertEqual(
+    failures,
+    'artifactGovernance.storagePosture.providerRetentionProofDeclaredCount',
+    storagePosture.providerRetentionProofDeclaredCount,
+    declaredCount,
+  );
+  assertEqual(
+    failures,
+    'artifactGovernance.storagePosture.providerRetentionProofVerifiedCount',
+    storagePosture.providerRetentionProofVerifiedCount,
+    verifiedCount,
+  );
+  assertEqual(
+    failures,
+    'artifactGovernance.storagePosture.providerRetentionProofNotApplicableCount',
+    storagePosture.providerRetentionProofNotApplicableCount,
+    notApplicableCount,
+  );
+
+  for (const [index, proof] of proofs.entries()) {
+    if (!isPlainObject(proof)) {
+      failures.push(`artifact providerRetentionProof at index ${index} must be an object.`);
+      continue;
+    }
+
+    assertEqual(
+      failures,
+      `artifact providerRetentionProof[${index}].schemaVersion`,
+      proof.schemaVersion,
+      'invoice-artifact-provider-retention-proof/v1',
+    );
+
+    if (
+      proof.status !== 'not-applicable' &&
+      proof.status !== 'missing' &&
+      proof.status !== 'declared' &&
+      proof.status !== 'provider-verified'
+    ) {
+      failures.push(
+        `artifact providerRetentionProof[${index}].status must be not-applicable, missing, declared, or provider-verified.`,
+      );
+    }
+
+    if (proof.status === 'provider-verified') {
+      assertEqual(
+        failures,
+        `artifact providerRetentionProof[${index}].evidenceSource`,
+        proof.evidenceSource,
+        'provider-control-plane',
+      );
+      if (typeof proof.proofReference !== 'string' || proof.proofReference.trim() === '') {
+        failures.push(
+          `artifact providerRetentionProof[${index}].proofReference is required for provider-verified proof.`,
+        );
+      }
+      if (
+        typeof proof.proofDigestSha256 !== 'string' ||
+        !SHA256_PATTERN.test(proof.proofDigestSha256)
+      ) {
+        failures.push(
+          `artifact providerRetentionProof[${index}].proofDigestSha256 must be a lowercase 64-character SHA-256 hex for provider-verified proof.`,
+        );
+      }
+    } else if (proof.evidenceSource === 'provider-control-plane') {
+      failures.push(
+        `artifact providerRetentionProof[${index}] cannot use provider-control-plane evidenceSource unless status is provider-verified.`,
+      );
+    }
+  }
+
+  if (productionGates.providerRetentionProofReady === true) {
+    const externalObjectStoreCount = Number(storagePosture.externalObjectStoreCount);
+
+    if (!Number.isFinite(externalObjectStoreCount) || externalObjectStoreCount <= 0) {
+      failures.push(
+        'artifactGovernance.productionGates.providerRetentionProofReady requires at least one external object-store artifact.',
+      );
+    }
+
+    if (verifiedCount !== externalObjectStoreCount || missingCount !== 0 || declaredCount !== 0) {
+      failures.push(
+        'artifactGovernance.productionGates.providerRetentionProofReady can only be true when every external object-store artifact has provider-verified retention proof.',
+      );
+    }
+  }
 }
 
 function assertReceipt(failures, packet) {

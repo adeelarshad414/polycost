@@ -8,14 +8,18 @@ import {
   InvoiceArtifactBlobGovernance,
   InvoiceArtifactBlobUploadInput,
   InvoiceArtifactMalwareScannerMode,
+  InvoiceArtifactProviderRetentionProof,
+  InvoiceArtifactProviderRetentionProofMode,
   InvoiceArtifactRetentionEnforcementMode,
   InvoiceArtifactStorageBackend,
   InvoiceArtifactStorageReadiness,
+  InvoiceEvidenceWormRetentionMode,
 } from './billing.types';
 
 const EICAR_TEST_SIGNATURE = 'EICAR-STANDARD-ANTIVIRUS-TEST-FILE';
 const DEFAULT_INVOICE_ARTIFACT_RETENTION_DAYS = 365;
 const MAX_SCANNER_FINDING_LENGTH = 400;
+const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 
 interface ArtifactScanInput {
   fileName: string;
@@ -45,6 +49,14 @@ export class InvoiceArtifactGovernanceService {
     const retentionEnforcementMode = this.retentionEnforcementMode();
     const objectStore = this.objectStore();
     const kmsKeyReference = this.optionalConfig('INVOICE_ARTIFACT_KMS_KEY_REFERENCE');
+    const providerRetentionProofMode = this.providerRetentionProofMode();
+    const providerRetentionProofReference = this.optionalConfig(
+      'INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_REFERENCE',
+    );
+    const providerRetentionProofSha256 = validSha256(
+      this.optionalConfig('INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_SHA256'),
+    );
+    const wormRetentionMode = this.wormRetentionMode();
     const gaps: string[] = [];
 
     if (storageBackend === 'database-bytea') {
@@ -77,6 +89,23 @@ export class InvoiceArtifactGovernanceService {
       gaps.push('retention enforcement is report-only and will not purge expired artifacts');
     }
 
+    if (storageBackend !== 'database-bytea') {
+      if (wormRetentionMode !== 'provider-object-lock') {
+        gaps.push('provider object-lock WORM retention mode is not configured');
+      }
+
+      if (providerRetentionProofMode !== 'provider-control-plane') {
+        gaps.push('provider retention proof is not captured from the provider control plane');
+      } else {
+        if (!providerRetentionProofReference) {
+          gaps.push('provider retention proof reference is not configured');
+        }
+        if (!providerRetentionProofSha256) {
+          gaps.push('provider retention proof SHA-256 digest is not configured');
+        }
+      }
+    }
+
     return {
       storageBackend,
       scannerMode,
@@ -86,6 +115,9 @@ export class InvoiceArtifactGovernanceService {
         storageBackend === 'database-bytea' ? 'database-connection' : 'vault-or-workload-identity',
       ...(objectStore ? { objectStore } : {}),
       ...(kmsKeyReference ? { kmsKeyReference } : {}),
+      providerRetentionProofMode,
+      ...(providerRetentionProofReference ? { providerRetentionProofReference } : {}),
+      ...(providerRetentionProofSha256 ? { providerRetentionProofSha256 } : {}),
       gaps,
     };
   }
@@ -112,6 +144,7 @@ export class InvoiceArtifactGovernanceService {
     const retentionUntil = addDays(uploadedAt, retentionDays);
     const kmsKeyReference =
       input.kmsKeyReference ?? this.optionalConfig('INVOICE_ARTIFACT_KMS_KEY_REFERENCE');
+    const legalHold = input.legalHold ?? false;
 
     return {
       storageProfile: {
@@ -127,8 +160,14 @@ export class InvoiceArtifactGovernanceService {
       retentionPolicy: {
         retentionUntil,
         retentionDays,
-        legalHold: input.legalHold ?? false,
+        legalHold,
       },
+      providerRetentionProof: this.providerRetentionProof({
+        readiness,
+        retentionUntil,
+        legalHold,
+        checkedAt: uploadedAt,
+      }),
       malwareScan: scan,
     };
   }
@@ -231,6 +270,75 @@ export class InvoiceArtifactGovernanceService {
     };
   }
 
+  private providerRetentionProof(input: {
+    readiness: InvoiceArtifactStorageReadiness;
+    retentionUntil: string;
+    legalHold: boolean;
+    checkedAt: string;
+  }): InvoiceArtifactProviderRetentionProof {
+    const retentionMode = this.wormRetentionMode();
+    const proofMode = input.readiness.providerRetentionProofMode;
+    const proofReference = input.readiness.providerRetentionProofReference;
+    const proofDigestSha256 = input.readiness.providerRetentionProofSha256;
+
+    if (input.readiness.storageBackend === 'database-bytea') {
+      return {
+        schemaVersion: 'invoice-artifact-provider-retention-proof/v1',
+        status: 'not-applicable',
+        evidenceSource: 'not-required',
+        storageBackend: input.readiness.storageBackend,
+        checkedAt: input.checkedAt,
+        retentionMode,
+        retentionUntil: input.retentionUntil,
+        legalHold: input.legalHold,
+        caveats: [
+          'database-bytea storage has no provider object-lock control plane; use external object storage for invoice-grade retention proof.',
+        ],
+      };
+    }
+
+    const providerVerified =
+      proofMode === 'provider-control-plane' &&
+      retentionMode === 'provider-object-lock' &&
+      Boolean(proofReference && proofDigestSha256);
+    const declared =
+      !providerVerified &&
+      (proofMode === 'declared-config' ||
+        proofMode === 'provider-control-plane' ||
+        retentionMode === 'provider-object-lock');
+    const caveats = [
+      ...(retentionMode !== 'provider-object-lock'
+        ? ['provider object-lock WORM retention mode is not configured']
+        : []),
+      ...(proofMode !== 'provider-control-plane'
+        ? [
+            'provider retention proof is based on local configuration, not provider control-plane evidence',
+          ]
+        : []),
+      ...(proofMode === 'provider-control-plane' && !proofReference
+        ? ['provider control-plane proof reference is missing']
+        : []),
+      ...(proofMode === 'provider-control-plane' && !proofDigestSha256
+        ? ['provider control-plane proof SHA-256 digest is missing or invalid']
+        : []),
+    ];
+
+    return {
+      schemaVersion: 'invoice-artifact-provider-retention-proof/v1',
+      status: providerVerified ? 'provider-verified' : declared ? 'declared' : 'missing',
+      evidenceSource: providerVerified ? 'provider-control-plane' : 'local-config',
+      storageBackend: input.readiness.storageBackend,
+      checkedAt: input.checkedAt,
+      retentionMode,
+      retentionUntil: input.retentionUntil,
+      legalHold: input.legalHold,
+      ...(input.readiness.objectStore ? { objectStore: input.readiness.objectStore } : {}),
+      ...(proofReference ? { proofReference } : {}),
+      ...(proofDigestSha256 ? { proofDigestSha256 } : {}),
+      caveats: [...new Set(caveats)],
+    };
+  }
+
   private storageBackend(): InvoiceArtifactStorageBackend {
     return (
       this.configService?.get('INVOICE_ARTIFACT_STORAGE_BACKEND', { infer: true }) ??
@@ -249,6 +357,21 @@ export class InvoiceArtifactGovernanceService {
     return (
       this.configService?.get('INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE', { infer: true }) ??
       'report-only'
+    );
+  }
+
+  private providerRetentionProofMode(): InvoiceArtifactProviderRetentionProofMode {
+    return (
+      this.configService?.get('INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE', {
+        infer: true,
+      }) ?? 'not-configured'
+    );
+  }
+
+  private wormRetentionMode(): InvoiceEvidenceWormRetentionMode {
+    return (
+      this.configService?.get('INVOICE_EVIDENCE_WORM_RETENTION_MODE', { infer: true }) ??
+      'not-configured'
     );
   }
 
@@ -320,6 +443,10 @@ function parseScannerFindings(value: unknown): string[] {
     .filter((finding) => finding.length > 0 && !hasControlCharacter(finding))
     .map((finding) => finding.slice(0, MAX_SCANNER_FINDING_LENGTH))
     .slice(0, 10);
+}
+
+function validSha256(value: string | undefined): string | undefined {
+  return value && SHA256_PATTERN.test(value) ? value : undefined;
 }
 
 function hasControlCharacter(value: string): boolean {

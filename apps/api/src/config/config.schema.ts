@@ -26,6 +26,13 @@ const optionalUrl = z.preprocess(
 
 const optionalNonEmptyString = (minLength = 1) =>
   z.preprocess((value) => (value === '' ? undefined : value), z.string().min(minLength).optional());
+const optionalSha256 = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
+);
 
 export const configSchema = z
   .object({
@@ -108,6 +115,11 @@ export const configSchema = z
     INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE: z
       .enum(['report-only', 'delete-expired'])
       .default('report-only'),
+    INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE: z
+      .enum(['not-configured', 'declared-config', 'provider-control-plane'])
+      .default('not-configured'),
+    INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_REFERENCE: optionalNonEmptyString(3),
+    INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_SHA256: optionalSha256,
     INVOICE_EVIDENCE_RECEIPT_MODE: z
       .enum(['metadata-only', 'local-hmac', 'external-webhook'])
       .default('metadata-only'),
@@ -385,6 +397,37 @@ export const configSchema = z
           path: ['INVOICE_EVIDENCE_WORM_RETENTION_MODE'],
           message:
             'Staging and production invoice evidence packets must declare provider object-lock or external WORM retention.',
+        });
+      }
+
+      if (
+        config.INVOICE_EVIDENCE_WORM_RETENTION_MODE === 'provider-object-lock' &&
+        config.INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE !== 'provider-control-plane'
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE'],
+          message:
+            'Provider object-lock mode requires provider-control-plane retention proof outside development.',
+        });
+      }
+    }
+
+    if (config.INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE === 'provider-control-plane') {
+      if (!config.INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_REFERENCE) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_REFERENCE'],
+          message: 'Provider control-plane retention proof requires a durable evidence reference.',
+        });
+      }
+
+      if (!config.INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_SHA256) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_SHA256'],
+          message:
+            'Provider control-plane retention proof requires the SHA-256 digest of the captured provider evidence.',
         });
       }
     }

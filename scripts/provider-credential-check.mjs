@@ -210,6 +210,8 @@ async function checkInvoiceArtifactControls() {
   const retentionMode = process.env.INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE ?? 'report-only';
   const receiptMode = process.env.INVOICE_EVIDENCE_RECEIPT_MODE ?? 'metadata-only';
   const wormRetentionMode = process.env.INVOICE_EVIDENCE_WORM_RETENTION_MODE ?? 'not-configured';
+  const providerRetentionProofMode =
+    process.env.INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE ?? 'not-configured';
   const objectStoreName = process.env.INVOICE_ARTIFACT_OBJECT_STORE_NAME;
   const gaps = [];
 
@@ -275,6 +277,19 @@ async function checkInvoiceArtifactControls() {
     gaps.push('WORM retention mode is not configured');
   }
 
+  if (backend !== 'database-bytea') {
+    if (providerRetentionProofMode !== 'provider-control-plane') {
+      gaps.push('provider retention proof is not captured from the provider control plane');
+    } else {
+      if (!hasValue(process.env.INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_REFERENCE)) {
+        gaps.push('provider retention proof reference is missing');
+      }
+      if (!hasSha256(process.env.INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_SHA256)) {
+        gaps.push('provider retention proof SHA-256 digest is missing or invalid');
+      }
+    }
+  }
+
   if (
     wormRetentionMode === 'external-worm-receiver' &&
     (process.env.AUTH_AUDIT_EXPORT_MODE ?? 'disabled') !== 'webhook'
@@ -287,7 +302,7 @@ async function checkInvoiceArtifactControls() {
       provider: 'invoice-artifacts',
       status: 'pass',
       message:
-        'External object storage, Vault credentials, KMS reference, webhook scanner, retention enforcement, signed receipts, and WORM posture are configured.',
+        'External object storage, Vault credentials, KMS reference, webhook scanner, retention enforcement, signed receipts, provider retention proof, and WORM posture are configured.',
     };
   }
 
@@ -414,6 +429,10 @@ async function readVaultKv(path) {
 
 function hasValue(value) {
   return typeof value === 'string' && value.trim().length > 0 && !isDummyCredential(value);
+}
+
+function hasSha256(value) {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value.trim());
 }
 
 function isDummyCredential(value) {

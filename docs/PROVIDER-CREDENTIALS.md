@@ -155,16 +155,55 @@ INVOICE_ARTIFACT_OBJECT_STORE_PREFIX=invoice-artifacts
 INVOICE_ARTIFACT_KMS_KEY_REFERENCE="<provider-kms-key-or-key-uri>"
 INVOICE_ARTIFACT_MALWARE_SCANNER_MODE=http-webhook
 INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE=delete-expired
+INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE=provider-control-plane
+INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_REFERENCE="<durable-provider-proof-uri>"
+INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_SHA256="<sha256-of-provider-proof-json>"
 ```
 
 PolyCost writes immutable-ish object keys under the configured prefix using the team,
 reconciliation, artifact id, checksum prefix, and sanitized file name. The database
 stores only the object pointer, checksum, size, KMS/readiness metadata, scan result,
-retention policy, and audit trail. Downloads read the object back through the matching
-provider adapter and re-check the stored SHA-256 before returning bytes. Retention
-enforcement deletes external provider objects first, treating provider `404` as
-already deleted for retry safety, and only then removes still-expired non-held
-database pointer rows.
+retention policy, provider retention proof manifest, and audit trail. Downloads
+read the object back through the matching provider adapter and re-check the stored
+SHA-256 before returning bytes. Retention enforcement deletes external provider
+objects first, treating provider `404` as already deleted for retry safety, and
+only then removes still-expired non-held database pointer rows.
+
+### Provider Retention Proof Manifest
+
+Every uploaded invoice artifact now carries a typed provider retention proof
+manifest in its governance block. The manifest is intentionally conservative:
+
+- `not-applicable` means local/database storage has no provider object-lock proof.
+- `missing` means external storage exists but no retention proof mode/reference was
+  configured.
+- `declared` means local configuration declares retention posture, but PolyCost has
+  not been given captured provider control-plane evidence.
+- `provider-verified` requires `INVOICE_EVIDENCE_WORM_RETENTION_MODE=provider-object-lock`,
+  `INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE=provider-control-plane`, a durable
+  proof reference, and a SHA-256 digest of that proof artifact.
+
+Use the provider CLI or governance system outside PolyCost to capture the control
+plane proof, store that JSON in WORM/object-lock backed evidence storage, and point
+PolyCost at the reference plus digest. Suggested capture commands:
+
+```bash
+aws s3api get-object-retention --bucket polycost-invoice-artifacts --key invoice-artifacts/... > aws-object-retention.json
+aws s3api get-object-legal-hold --bucket polycost-invoice-artifacts --key invoice-artifacts/... > aws-object-legal-hold.json
+
+az storage blob immutability-policy show --account-name "<account>" --container-name "<container>" --name "invoice-artifacts/..." > azure-immutability-policy.json
+az storage blob legal-hold show --account-name "<account>" --container-name "<container>" --name "invoice-artifacts/..." > azure-legal-hold.json
+
+gcloud storage objects describe gs://polycost-invoice-artifacts/invoice-artifacts/... --format=json > gcp-object-retention.json
+```
+
+The evidence packet aggregates these manifests as
+`providerRetentionProofMissingCount`, `providerRetentionProofDeclaredCount`, and
+`providerRetentionProofVerifiedCount`. The `providerRetentionProofReady` production
+gate is true only when every external object-store artifact has provider-verified
+proof. This is still not invoice-grade billing by itself; it proves artifact
+retention posture, not provider invoice correctness, private discounts, tax review,
+or legal sufficiency.
 
 ### AWS S3
 
@@ -239,6 +278,9 @@ INVOICE_ARTIFACT_MALWARE_SCANNER_MODE=http-webhook \
 INVOICE_ARTIFACT_MALWARE_SCANNER_URL=https://scanner.example.com/polycost/artifacts \
 INVOICE_ARTIFACT_MALWARE_SCANNER_SECRET="<scanner-secret>" \
 INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE=delete-expired \
+INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE=provider-control-plane \
+INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_REFERENCE="<durable-provider-proof-uri>" \
+INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_SHA256="<provider-proof-sha256>" \
 INVOICE_EVIDENCE_RECEIPT_MODE=external-webhook \
 INVOICE_EVIDENCE_RECEIPT_SIGNING_KEY_REFERENCE="<receipt-signing-key-ref>" \
 INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET="<receipt-signing-secret>" \

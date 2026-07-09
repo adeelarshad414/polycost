@@ -311,6 +311,34 @@ function governance(storageBackend: InvoiceArtifactStorageBackend): InvoiceArtif
       retentionDays: 365,
       legalHold: false,
     },
+    providerRetentionProof: {
+      schemaVersion: 'invoice-artifact-provider-retention-proof/v1',
+      status: storageBackend === 'database-bytea' ? 'not-applicable' : 'declared',
+      evidenceSource: storageBackend === 'database-bytea' ? 'not-required' : 'local-config',
+      storageBackend,
+      checkedAt: '2026-07-08T00:00:00.000Z',
+      retentionMode:
+        storageBackend === 'database-bytea' ? 'not-configured' : 'provider-object-lock',
+      retentionUntil: '2027-07-08T00:00:00.000Z',
+      legalHold: false,
+      ...(storageBackend === 'database-bytea'
+        ? {}
+        : {
+            objectStore: {
+              bucketOrContainer: 'polycost-invoice-artifacts',
+              prefix: 'invoice-artifacts',
+              ...(storageBackend === 'aws-s3' ? { region: 'us-east-1' } : {}),
+            },
+          }),
+      caveats:
+        storageBackend === 'database-bytea'
+          ? [
+              'database-bytea storage has no provider object-lock control plane; use external object storage for invoice-grade retention proof.',
+            ]
+          : [
+              'provider retention proof is based on local configuration, not provider control-plane evidence',
+            ],
+    },
     malwareScan: {
       status: 'passed',
       scanner: 'polycost-eicar-signature-v1',

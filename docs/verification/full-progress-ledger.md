@@ -550,3 +550,34 @@ docs are heavily tested.
 
 It is not yet a full invoice-grade billing platform, not a full Visio renderer, and
 not a complete enterprise IAM/SSO product.
+
+## Phase 2.42 - Provider Retention Proof Manifest
+
+Status: implemented and verified locally on 2026-07-09.
+
+Evidence added:
+
+- `InvoiceArtifactBlobGovernance` now includes
+  `invoice-artifact-provider-retention-proof/v1` with explicit
+  `not-applicable`, `missing`, `declared`, and `provider-verified` status values.
+- Evidence packet governance now records provider retention proof missing,
+  declared, verified, and not-applicable counts, plus the
+  `providerRetentionProofReady` production gate.
+- The offline invoice evidence packet verifier checks proof-count consistency and
+  rejects provider-control-plane evidence claims unless provider-verified proof
+  includes a durable reference and SHA-256 digest.
+- `provider:credentials:check`, `.env.example`, `DUMMY-VALUES.md`, and
+  `docs/PROVIDER-CREDENTIALS.md` now document strict provider proof settings and
+  operator-owned AWS/Azure/GCP control-plane capture examples.
+- Focused API regression passed with 3 suites / 70 tests. Full `npm run check`
+  passed with API 56 suites / 471 tests, web 11 suites / 147 tests, graph
+  validation 322 nodes / 322 edges, pricing coverage, progress verification 153
+  anchors, QA/security suppression hygiene, DB, DevOps, cloud, release,
+  handover, and provider-credential gates green.
+
+Honest boundary:
+
+- This phase proves PolyCost can carry, aggregate, and verify provider retention
+  proof manifests. It does not yet perform live provider control-plane proof
+  capture for every cloud automatically, and it does not convert PolyCost into an
+  invoice system of record.
