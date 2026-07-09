@@ -426,6 +426,18 @@ Evidence:
   `npm run check` passed afterward with API `55` suites / `465` tests, web `11`
   suites / `147` tests, graph validation `320` nodes / `320` edges, and progress
   verification `153` anchors.
+- Phase 2.38 invoice evidence receipt and WORM posture focused regressions passed:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/config/config.schema.spec.ts`
+  passed `64/64`, `npm run typecheck --workspaces --if-present` passed for API,
+  web, and shared types, `npm run invoice:evidence:verify:smoke` passed with
+  receipt-aware validation, and
+  `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx src/api-client.spec.ts`
+  passed `90/90`. `npm run provider:credentials:check` passed with the expected
+  local/demo invoice-artifacts warning expanded to include metadata-only evidence
+  receipts and missing WORM retention mode. Full local `npm run check` passed
+  afterward with API `55` suites / `467` tests, web `11` suites / `147` tests,
+  graph validation `320` nodes / `320` edges, and progress verification `153`
+  anchors.
 - Phase 2.9 focused regressions passed: API `3` suites / `52` tests
   (`auth-billing`, `diagram-parser`, `llm-classifier`) and web `1` suite / `57`
   tests (`App.spec.tsx`).
@@ -477,6 +489,8 @@ These commands have been used as evidence gates in this run:
 - `npm run test:unit --workspace @polycost/web -- --runInBand src/api-client.spec.ts src/App.spec.tsx`
 - `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts`
 - `npm run typecheck --workspaces --if-present`
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/config/config.schema.spec.ts`
+- `npm run invoice:evidence:verify:smoke`
 
 `npm run live:verify` writes its latest smoke/timing transcript to
 `.tmp/live-verification/latest.json` by default. Set

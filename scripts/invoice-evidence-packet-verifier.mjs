@@ -152,6 +152,7 @@ async function verifyPacketFile(filePath) {
   assertEqual(failures, 'integrity.generatedAt', integrity.generatedAt, packet.generatedAt);
   assertSubject(failures, packet, integrity);
   assertCounts(failures, packet, integrity);
+  assertReceipt(failures, packet);
 
   return {
     ok: failures.length === 0,
@@ -163,6 +164,14 @@ async function verifyPacketFile(filePath) {
     payloadDigestSha256,
     payloadByteLength,
     subject: isPlainObject(integrity.subject) ? integrity.subject : undefined,
+    receipt:
+      isPlainObject(packet.receipt) && typeof packet.receipt.status === 'string'
+        ? {
+            status: packet.receipt.status,
+            mode: packet.receipt.mode,
+            signed: isPlainObject(packet.receipt.signature),
+          }
+        : undefined,
     failures,
   };
 }
@@ -224,6 +233,112 @@ function assertCounts(failures, packet, integrity) {
   assertEqual(failures, 'controls.verifiedCount', controls.verifiedCount, verifiedArtifactCount);
   assertEqual(failures, 'integrity.caveatCount', integrity.caveatCount, caveats.length);
   assertEqual(failures, 'integrity.disclaimerCount', integrity.disclaimerCount, disclaimers.length);
+}
+
+function assertReceipt(failures, packet) {
+  if (packet.receipt === undefined) {
+    return;
+  }
+
+  const receipt = parseJsonObject(packet.receipt, 'receipt');
+  const subject = isPlainObject(receipt.subject) ? receipt.subject : {};
+  const basePayload = { ...packet };
+  delete basePayload.integrity;
+  delete basePayload.receipt;
+  const canonicalBasePayload = stableJson(basePayload);
+  const basePayloadDigestSha256 = sha256(canonicalBasePayload);
+  const basePayloadByteLength = Buffer.byteLength(canonicalBasePayload, 'utf8');
+
+  assertEqual(
+    failures,
+    'receipt.schemaVersion',
+    receipt.schemaVersion,
+    'invoice-evidence-receipt/v1',
+  );
+  assertEqual(failures, 'receipt.issuedAt', receipt.issuedAt, packet.generatedAt);
+  assertEqual(
+    failures,
+    'receipt.subject.reconciliationId',
+    subject.reconciliationId,
+    packet.reconciliation?.id,
+  );
+  assertEqual(
+    failures,
+    'receipt.subject.importRunId',
+    subject.importRunId,
+    packet.reconciliation?.importRunId,
+  );
+  assertEqual(
+    failures,
+    'receipt.subject.comparisonId',
+    subject.comparisonId,
+    packet.reconciliation?.comparisonId,
+  );
+  assertEqual(
+    failures,
+    'receipt.subject.provider',
+    subject.provider,
+    packet.reconciliation?.provider,
+  );
+  assertEqual(
+    failures,
+    'receipt.basePayloadDigestSha256',
+    receipt.basePayloadDigestSha256,
+    basePayloadDigestSha256,
+  );
+  assertEqual(
+    failures,
+    'receipt.basePayloadByteLength',
+    receipt.basePayloadByteLength,
+    basePayloadByteLength,
+  );
+
+  if (
+    receipt.mode !== 'metadata-only' &&
+    receipt.mode !== 'local-hmac' &&
+    receipt.mode !== 'external-webhook'
+  ) {
+    failures.push('receipt.mode must be metadata-only, local-hmac, or external-webhook.');
+  }
+
+  const wormReadiness = isPlainObject(receipt.wormReadiness) ? receipt.wormReadiness : {};
+  const signature = isPlainObject(receipt.signature) ? receipt.signature : undefined;
+
+  if (signature) {
+    assertEqual(failures, 'receipt.signature.algorithm', signature.algorithm, 'hmac-sha256');
+
+    if (typeof signature.signature !== 'string' || !SHA256_PATTERN.test(signature.signature)) {
+      failures.push(
+        'receipt.signature.signature must be a lowercase 64-character HMAC-SHA256 hex.',
+      );
+    }
+
+    const signedPayload = stableJson({
+      schemaVersion: 'invoice-evidence-receipt-signature/v1',
+      issuedAt: receipt.issuedAt,
+      subject: receipt.subject,
+      basePayloadDigestSha256: receipt.basePayloadDigestSha256,
+      basePayloadByteLength: receipt.basePayloadByteLength,
+      mode: receipt.mode,
+      wormRetentionMode: wormReadiness.retentionMode,
+    });
+
+    assertEqual(
+      failures,
+      'receipt.signature.signedPayloadDigestSha256',
+      signature.signedPayloadDigestSha256,
+      sha256(signedPayload),
+    );
+  } else if (receipt.status !== 'metadata-only') {
+    failures.push('receipt.signature is required unless receipt.status is metadata-only.');
+  }
+
+  if (receipt.mode === 'external-webhook') {
+    if (!isPlainObject(receipt.notary)) {
+      failures.push('receipt.notary is required for external-webhook receipt mode.');
+    }
+    assertEqual(failures, 'receipt.status', receipt.status, 'external-notary-ready');
+  }
 }
 
 function assertEqual(failures, field, actual, expected) {
@@ -304,5 +419,7 @@ Options:
 
 The verifier recomputes the stable-json:v1 SHA-256 digest over the packet payload
 excluding the integrity block, then validates subject IDs and artifact/control
-counts so reviewers can detect tampering after export.`);
+counts. When a receipt block is present, it also recomputes the base evidence payload
+digest bound by the receipt and validates signed-payload metadata so reviewers can
+detect tampering after export.`);
 }

@@ -208,6 +208,8 @@ async function checkInvoiceArtifactControls() {
   const backend = process.env.INVOICE_ARTIFACT_STORAGE_BACKEND ?? 'database-bytea';
   const scannerMode = process.env.INVOICE_ARTIFACT_MALWARE_SCANNER_MODE ?? 'eicar-signature-only';
   const retentionMode = process.env.INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE ?? 'report-only';
+  const receiptMode = process.env.INVOICE_EVIDENCE_RECEIPT_MODE ?? 'metadata-only';
+  const wormRetentionMode = process.env.INVOICE_EVIDENCE_WORM_RETENTION_MODE ?? 'not-configured';
   const objectStoreName = process.env.INVOICE_ARTIFACT_OBJECT_STORE_NAME;
   const gaps = [];
 
@@ -251,12 +253,41 @@ async function checkInvoiceArtifactControls() {
     gaps.push('retention mode is not delete-expired');
   }
 
+  if (receiptMode === 'metadata-only') {
+    gaps.push('evidence receipt mode is metadata-only');
+  } else {
+    if (!hasValue(process.env.INVOICE_EVIDENCE_RECEIPT_SIGNING_KEY_REFERENCE)) {
+      gaps.push('evidence receipt signing key reference is missing');
+    }
+    if (!hasValue(process.env.INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET)) {
+      gaps.push('evidence receipt signing secret is missing');
+    }
+  }
+
+  if (
+    receiptMode === 'external-webhook' &&
+    !hasValue(process.env.INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL)
+  ) {
+    gaps.push('evidence notary webhook URL is missing');
+  }
+
+  if (wormRetentionMode === 'not-configured') {
+    gaps.push('WORM retention mode is not configured');
+  }
+
+  if (
+    wormRetentionMode === 'external-worm-receiver' &&
+    (process.env.AUTH_AUDIT_EXPORT_MODE ?? 'disabled') !== 'webhook'
+  ) {
+    gaps.push('external WORM receiver mode requires AUTH_AUDIT_EXPORT_MODE=webhook');
+  }
+
   if (gaps.length === 0) {
     return {
       provider: 'invoice-artifacts',
       status: 'pass',
       message:
-        'External object storage, Vault credentials, KMS reference, webhook scanner, and retention enforcement are configured.',
+        'External object storage, Vault credentials, KMS reference, webhook scanner, retention enforcement, signed receipts, and WORM posture are configured.',
     };
   }
 

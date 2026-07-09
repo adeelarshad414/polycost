@@ -239,8 +239,38 @@ INVOICE_ARTIFACT_MALWARE_SCANNER_MODE=http-webhook \
 INVOICE_ARTIFACT_MALWARE_SCANNER_URL=https://scanner.example.com/polycost/artifacts \
 INVOICE_ARTIFACT_MALWARE_SCANNER_SECRET="<scanner-secret>" \
 INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE=delete-expired \
+INVOICE_EVIDENCE_RECEIPT_MODE=external-webhook \
+INVOICE_EVIDENCE_RECEIPT_SIGNING_KEY_REFERENCE="<receipt-signing-key-ref>" \
+INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET="<receipt-signing-secret>" \
+INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL=https://worm.example.com/polycost/evidence-receipts \
+INVOICE_EVIDENCE_WORM_RETENTION_MODE=external-worm-receiver \
 npm run provider:credentials:check:strict
 ```
+
+## Invoice Evidence Receipts And WORM Handoff
+
+Evidence packets always include the stable-JSON SHA-256 packet integrity block. For
+staging and production, PolyCost also requires a signed receipt posture:
+
+```bash
+INVOICE_EVIDENCE_RECEIPT_MODE=local-hmac # or external-webhook
+INVOICE_EVIDENCE_RECEIPT_SIGNING_KEY_REFERENCE="<kms-or-secret-manager-key-ref>"
+INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET="<runtime-secret-from-secret-manager>"
+INVOICE_EVIDENCE_WORM_RETENTION_MODE=provider-object-lock # or external-worm-receiver
+```
+
+`external-webhook` additionally requires:
+
+```bash
+INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL=https://worm.example.com/polycost/evidence-receipts
+```
+
+The exported packet includes a receipt that signs the base evidence payload digest
+with HMAC-SHA256 and records the signing key reference, WORM retention mode, and
+notary webhook host/hash. PolyCost does not automatically send packet bytes during
+download; operators must archive the exported packet plus receipt in the configured
+provider object-lock bucket or external WORM/notary system and retain receiver-side
+acceptance evidence.
 
 ## Flip From Mock To Real Mode
 

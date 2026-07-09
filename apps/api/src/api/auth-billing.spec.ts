@@ -2335,6 +2335,25 @@ describe('BillingService', () => {
             'one or more stored artifacts are missing governance manifests',
           ]),
         }),
+        receipt: expect.objectContaining({
+          schemaVersion: 'invoice-evidence-receipt/v1',
+          mode: 'metadata-only',
+          status: 'metadata-only',
+          subject: {
+            reconciliationId: '66666666-6666-4666-8666-666666666666',
+            importRunId: '55555555-5555-4555-8555-555555555555',
+            comparisonId: comparisonResult.comparisonId,
+            provider: 'aws',
+          },
+          basePayloadDigestSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+          basePayloadByteLength: expect.any(Number),
+          wormReadiness: expect.objectContaining({
+            retentionMode: 'not-configured',
+            configured: false,
+            signedReceiptConfigured: false,
+            gaps: expect.arrayContaining(['signed evidence receipt is not configured']),
+          }),
+        }),
         artifacts: [
           expect.objectContaining({
             id: 'artifact-1',
@@ -2392,11 +2411,131 @@ describe('BillingService', () => {
           provider: 'aws',
           packetStatus: 'review-ready',
           payloadDigestSha256: packet.integrity.payloadDigestSha256,
+          receiptStatus: 'metadata-only',
+          receiptMode: 'metadata-only',
+          receiptSigned: false,
+          wormRetentionMode: 'not-configured',
           artifactCount: 1,
           storedArtifactCount: 1,
           verifiedArtifactCount: 1,
           governanceGapCount: packet.artifactGovernance.gaps.length,
           storageBackends: ['database-bytea'],
+        }),
+      }),
+    );
+  });
+
+  it('adds signed external receipt readiness when evidence receipt controls are configured', async () => {
+    const repository = repositoryMock();
+    repository.getInvoiceReconciliation.mockResolvedValue({
+      id: '66666666-6666-4666-8666-666666666666',
+      importRunId: '55555555-5555-4555-8555-555555555555',
+      comparisonId: comparisonResult.comparisonId,
+      provider: 'aws',
+      estimatedTotalUsd: 100,
+      invoicedTotalUsd: 107,
+      varianceUsd: 7,
+      variancePercent: 7,
+      status: 'variance-warning',
+      evidence: {
+        invoiceGradeReadiness: {
+          status: 'invoice-grade-blocked',
+          checks: [],
+        },
+        invoiceMatchSummary: {
+          caveats: [],
+        },
+        invoiceGradeArtifactRegister: {
+          registeredCount: 0,
+          verifiedCount: 0,
+          artifacts: [],
+        },
+      },
+      createdAt: '2026-07-06T00:00:02.000Z',
+    });
+    repository.getBillingImport.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      teamId: identity.teamId,
+      provider: 'aws',
+      sourceType: 'aws-cur',
+      status: 'completed',
+      billingPeriodStart: '2026-06-01',
+      billingPeriodEnd: '2026-06-30',
+      originalFileSha256: 'a'.repeat(64),
+      rowsReceived: 1,
+      rowsAccepted: 1,
+      rowsRejected: 0,
+      totalCostUsd: 107,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    });
+    const receiptConfig = configService({
+      INVOICE_ARTIFACT_STORAGE_BACKEND: 'aws-s3',
+      INVOICE_ARTIFACT_OBJECT_STORE_NAME: 'polycost-invoice-artifacts',
+      INVOICE_ARTIFACT_OBJECT_STORE_REGION: 'us-east-1',
+      INVOICE_ARTIFACT_KMS_KEY_REFERENCE: 'arn:aws:kms:us-east-1:111122223333:key/demo',
+      INVOICE_ARTIFACT_MALWARE_SCANNER_MODE: 'http-webhook',
+      INVOICE_ARTIFACT_MALWARE_SCANNER_URL: 'https://scanner.example.com/polycost/artifacts',
+      INVOICE_ARTIFACT_MALWARE_SCANNER_SECRET: 'production-scanner-webhook-secret',
+      INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE: 'delete-expired',
+      AUTH_AUDIT_EXPORT_MODE: 'webhook',
+      AUTH_AUDIT_EXPORT_WEBHOOK_URL: 'https://siem.example.com/polycost/audit-events',
+      INVOICE_EVIDENCE_RECEIPT_MODE: 'external-webhook',
+      INVOICE_EVIDENCE_RECEIPT_SIGNING_KEY_REFERENCE:
+        'arn:aws:kms:us-east-1:111122223333:alias/polycost-evidence-receipts',
+      INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET: 'production-evidence-receipt-signing-secret',
+      INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL: 'https://worm.example.com/polycost/evidence-receipts',
+      INVOICE_EVIDENCE_WORM_RETENTION_MODE: 'external-worm-receiver',
+    });
+    const service = new BillingService(
+      repository as never,
+      new InvoiceArtifactGovernanceService(receiptConfig),
+      new InvoiceArtifactStorageService(),
+      receiptConfig,
+    );
+
+    const packet = await service.getInvoiceEvidencePacket(
+      '66666666-6666-4666-8666-666666666666',
+      identity,
+    );
+
+    expect(packet.receipt).toMatchObject({
+      schemaVersion: 'invoice-evidence-receipt/v1',
+      mode: 'external-webhook',
+      status: 'external-notary-ready',
+      basePayloadDigestSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+      signature: expect.objectContaining({
+        algorithm: 'hmac-sha256',
+        keyReference: 'arn:aws:kms:us-east-1:111122223333:alias/polycost-evidence-receipts',
+        signedPayloadDigestSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+        signature: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }),
+      notary: expect.objectContaining({
+        deliveryMode: 'operator-forwarded-webhook',
+        urlHost: 'worm.example.com',
+        urlSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+        deliveryEvidence: 'not-sent-by-api',
+      }),
+      wormReadiness: expect.objectContaining({
+        retentionMode: 'external-worm-receiver',
+        configured: true,
+        objectStorageConfigured: true,
+        customerManagedKmsConfigured: true,
+        scannerWebhookConfigured: true,
+        retentionDeleteExpiredConfigured: true,
+        auditExportWebhookConfigured: true,
+        signedReceiptConfigured: true,
+        gaps: [],
+      }),
+    });
+    expect(JSON.stringify(packet)).not.toContain('production-evidence-receipt-signing-secret');
+    expect(repository.recordTeamAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'billing.reconciliation.evidence_packet_exported',
+        metadata: expect.objectContaining({
+          receiptStatus: 'external-notary-ready',
+          receiptMode: 'external-webhook',
+          receiptSigned: true,
+          wormRetentionMode: 'external-worm-receiver',
         }),
       }),
     );

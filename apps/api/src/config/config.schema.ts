@@ -108,6 +108,15 @@ export const configSchema = z
     INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE: z
       .enum(['report-only', 'delete-expired'])
       .default('report-only'),
+    INVOICE_EVIDENCE_RECEIPT_MODE: z
+      .enum(['metadata-only', 'local-hmac', 'external-webhook'])
+      .default('metadata-only'),
+    INVOICE_EVIDENCE_RECEIPT_SIGNING_KEY_REFERENCE: optionalNonEmptyString(3),
+    INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET: optionalNonEmptyString(32),
+    INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL: optionalUrl,
+    INVOICE_EVIDENCE_WORM_RETENTION_MODE: z
+      .enum(['not-configured', 'provider-object-lock', 'external-worm-receiver'])
+      .default('not-configured'),
     AUTH_OIDC_ISSUER_URL: z.string().url().optional(),
     AUTH_OIDC_CLIENT_ID: z.string().min(1).optional(),
     AUTH_SAML_ENTITY_ID: z.string().min(1).optional(),
@@ -283,6 +292,49 @@ export const configSchema = z
       }
     }
 
+    if (config.INVOICE_EVIDENCE_RECEIPT_MODE !== 'metadata-only') {
+      if (!config.INVOICE_EVIDENCE_RECEIPT_SIGNING_KEY_REFERENCE) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['INVOICE_EVIDENCE_RECEIPT_SIGNING_KEY_REFERENCE'],
+          message:
+            'INVOICE_EVIDENCE_RECEIPT_SIGNING_KEY_REFERENCE is required for signed invoice evidence receipts.',
+        });
+      }
+
+      if (!config.INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET'],
+          message:
+            'INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET is required for signed invoice evidence receipts.',
+        });
+      }
+    }
+
+    if (config.INVOICE_EVIDENCE_RECEIPT_MODE === 'external-webhook') {
+      if (!config.INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL'],
+          message:
+            'INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL is required for external invoice evidence receipt handoff.',
+        });
+      }
+
+      if (
+        (config.NODE_ENV === 'production' || config.NODE_ENV === 'staging') &&
+        config.INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL &&
+        !config.INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL.startsWith('https://')
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL'],
+          message: 'Invoice evidence notary webhook URL must use HTTPS outside development.',
+        });
+      }
+    }
+
     if (config.NODE_ENV === 'production' || config.NODE_ENV === 'staging') {
       if (config.INVOICE_ARTIFACT_STORAGE_BACKEND === 'database-bytea') {
         context.addIssue({
@@ -316,6 +368,23 @@ export const configSchema = z
           path: ['INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE'],
           message:
             'Staging and production invoice artifact retention enforcement must delete expired non-held artifacts.',
+        });
+      }
+
+      if (config.INVOICE_EVIDENCE_RECEIPT_MODE === 'metadata-only') {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['INVOICE_EVIDENCE_RECEIPT_MODE'],
+          message: 'Staging and production invoice evidence packets must use signed receipts.',
+        });
+      }
+
+      if (config.INVOICE_EVIDENCE_WORM_RETENTION_MODE === 'not-configured') {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['INVOICE_EVIDENCE_WORM_RETENTION_MODE'],
+          message:
+            'Staging and production invoice evidence packets must declare provider object-lock or external WORM retention.',
         });
       }
     }

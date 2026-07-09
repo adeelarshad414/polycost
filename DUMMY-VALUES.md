@@ -30,6 +30,10 @@ The explicit placeholder token is `CHANGE_ME_DEV_ONLY`. Production and staging c
   scanner safety checks
 - `INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE=report-only` for local/demo
   retention checks that do not delete bytes
+- `INVOICE_EVIDENCE_RECEIPT_MODE=metadata-only` for local/demo evidence packet
+  receipts without a signing secret
+- `INVOICE_EVIDENCE_WORM_RETENTION_MODE=not-configured` for local/demo evidence
+  packets without provider object-lock or external WORM handoff proof
 - Local-only Docker Vault seed credentials
 
 ## Not Allowed In Staging Or Production
@@ -58,6 +62,12 @@ The explicit placeholder token is `CHANGE_ME_DEV_ONLY`. Production and staging c
 - Missing `INVOICE_ARTIFACT_MALWARE_SCANNER_URL` or non-dummy scanner secret when
   scanner webhook mode is enabled
 - `INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE=report-only`
+- `INVOICE_EVIDENCE_RECEIPT_MODE=metadata-only`
+- Missing `INVOICE_EVIDENCE_RECEIPT_SIGNING_KEY_REFERENCE` or non-dummy
+  `INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET` when signed receipts are enabled
+- Missing `INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL` when external receipt handoff is
+  enabled
+- `INVOICE_EVIDENCE_WORM_RETENTION_MODE=not-configured`
 - Any real provider mode without `VAULT_TOKEN_FILE`
 - Any strict provider credential check where Vault returns a dummy GCP access token or dummy LLM API key
 
@@ -86,7 +96,13 @@ docker compose exec vault vault kv put secret/polycost/llm api_key="<llm-api-key
    `INVOICE_ARTIFACT_KMS_KEY_REFERENCE`, switch
    `INVOICE_ARTIFACT_MALWARE_SCANNER_MODE=http-webhook` with a non-dummy scanner
    secret, and set `INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE=delete-expired`.
-7. Store selected artifact object-store credentials in Vault:
+7. Set `INVOICE_EVIDENCE_RECEIPT_MODE` to `local-hmac` or `external-webhook`,
+   configure `INVOICE_EVIDENCE_RECEIPT_SIGNING_KEY_REFERENCE` and a non-dummy
+   `INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET`, and set
+   `INVOICE_EVIDENCE_WORM_RETENTION_MODE` to `provider-object-lock` or
+   `external-worm-receiver`. For external receipt handoff, also configure
+   `INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL`.
+8. Store selected artifact object-store credentials in Vault:
 
 ```bash
 docker compose exec vault vault kv put secret/polycost/artifacts/aws access_key_id="<access-key-id>" secret_access_key="<secret-access-key>"
@@ -94,9 +110,9 @@ docker compose exec vault vault kv put secret/polycost/artifacts/azure account_n
 docker compose exec vault vault kv put secret/polycost/artifacts/gcp access_token="<oauth-access-token>"
 ```
 
-8. Run `npm run provider:credentials:check:strict`.
-9. Run a comparison and confirm each catalog-backed line item has source endpoint,
-   source record ID, payload hash, transform version, and fetched timestamp.
+9. Run `npm run provider:credentials:check:strict`.
+10. Run a comparison and confirm each catalog-backed line item has source endpoint,
+    source record ID, payload hash, transform version, and fetched timestamp.
 
 For SSO readiness, configure provider metadata through the workspace UI only after
 setting `AUTH_PUBLIC_BASE_URL` to the externally reachable API origin. The development

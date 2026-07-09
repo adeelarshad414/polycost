@@ -106,6 +106,10 @@ once tagged releases begin.
   artifact storage/KMS/scanner/retention posture, and packet export plus artifact
   download actions are written to the team audit trail with checksum and storage
   metadata.
+- Invoice evidence packets now include receipt/notary metadata: local/demo packets
+  stay metadata-only, while configured environments can add HMAC-SHA256 signed
+  receipts, external notary webhook host/hash metadata, and WORM posture checks
+  that are validated by config and provider-credential gates.
 - Invoice artifact storage readiness and retention enforcement foundation, including
   production-bound config guards for external object storage/KMS/webhook scanning,
   strict credential-check coverage, signed scanner webhook integration, and admin
