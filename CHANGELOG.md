@@ -118,6 +118,9 @@ once tagged releases begin.
   now send signed `invoice_evidence_packet.exported` canary handoffs, validate the
   HMAC receiver contract, and write a local JSONL artifact that operators can pair
   with external WORM/object-lock receiver evidence.
+- Self-hostable invoice evidence notary reference receiver with `/health/live`,
+  `/health/ready`, HMAC verification, rate limiting, append-only JSONL evidence,
+  Docker packaging, and an end-to-end receiver smoke harness.
 - Invoice artifact storage readiness and retention enforcement foundation, including
   production-bound config guards for external object storage/KMS/webhook scanning,
   strict credential-check coverage, signed scanner webhook integration, and admin

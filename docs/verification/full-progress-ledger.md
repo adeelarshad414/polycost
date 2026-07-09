@@ -458,6 +458,19 @@ Evidence:
   operator-environment evidence. Full local `npm run check` passed afterward with
   API `56` suites / `470` tests, web `11` suites / `147` tests, graph validation
   `322` nodes / `322` edges, and progress verification `153` anchors.
+- Phase 2.41 notary reference receiver staging path proof passed:
+  `npm run invoice:evidence:notary:receiver:smoke` started the self-hostable
+  reference receiver, verified `/health/ready`, sent the existing signed notary
+  webhook smoke through the receiver, and confirmed the JSONL receipt artifact
+  under `artifacts/invoice-evidence-notary-reference-receiver/`. The captured
+  packet digest was
+  `1bb1abec466eda604ebb949acf7e40e8b0385cdcff1445ecac2d691736550ea0`.
+  `docker build -f docker/notary-receiver/Dockerfile -t
+polycost/notary-reference-receiver:local .` passed. The receiver intentionally
+  records `immutableRetentionProved: false`; WORM/object-lock proof remains
+  operator-environment evidence. Full local `npm run check` passed afterward with
+  API `56` suites / `470` tests, web `11` suites / `147` tests, graph validation
+  `322` nodes / `322` edges, and progress verification `153` anchors.
 - Phase 2.9 focused regressions passed: API `3` suites / `52` tests
   (`auth-billing`, `diagram-parser`, `llm-classifier`) and web `1` suite / `57`
   tests (`App.spec.tsx`).

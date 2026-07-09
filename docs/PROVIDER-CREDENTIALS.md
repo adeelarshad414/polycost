@@ -303,6 +303,23 @@ Archive the printed run ID, reconciliation ID, packet digests, receiver-side
 acceptance object, retention policy, and access-control evidence with the release
 or customer handover packet.
 
+PolyCost's optional reference receiver uses the same signing secret as the notary
+handoff smoke and records append-only JSONL receipts:
+
+```bash
+INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET="<runtime-secret-from-secret-manager>"
+POLYCOST_INVOICE_EVIDENCE_NOTARY_RECEIVER_HOST=0.0.0.0
+POLYCOST_INVOICE_EVIDENCE_NOTARY_RECEIVER_PORT=61780
+POLYCOST_INVOICE_EVIDENCE_NOTARY_RECEIVER_PATH=/polycost/evidence-receipts
+POLYCOST_INVOICE_EVIDENCE_NOTARY_RECEIVER_ARTIFACT_DIR=/mnt/worm/notary-receipts
+POLYCOST_INVOICE_EVIDENCE_NOTARY_RECEIVER_RETENTION_MODE=operator-managed-worm
+```
+
+`npm run invoice:evidence:notary:receiver` refuses missing, dummy, `change_me`, or
+`dev_only` signing secrets outside `--dev`. Mount the artifact directory on
+operator-owned immutable storage and archive object-lock policy plus access logs
+before marking receiver-side WORM evidence complete.
+
 ## Flip From Mock To Real Mode
 
 1. Start dependencies:

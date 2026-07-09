@@ -82,6 +82,12 @@ if (!packageJson.scripts?.['invoice:evidence:notary:smoke']) {
 if (!packageJson.scripts?.['invoice:evidence:notary:smoke:local']) {
   failures.push('package.json is missing invoice:evidence:notary:smoke:local');
 }
+if (!packageJson.scripts?.['invoice:evidence:notary:receiver']) {
+  failures.push('package.json is missing invoice:evidence:notary:receiver');
+}
+if (!packageJson.scripts?.['invoice:evidence:notary:receiver:smoke']) {
+  failures.push('package.json is missing invoice:evidence:notary:receiver:smoke');
+}
 if (!packageJson.scripts?.['pricing:logic:coverage']) {
   failures.push('package.json is missing pricing:logic:coverage');
 }
@@ -147,6 +153,11 @@ await assertFileContains('README.md', [
   ['audit export staging smoke command', 'npm run audit:export:smoke'],
   ['invoice evidence notary local smoke command', 'npm run invoice:evidence:notary:smoke:local'],
   ['invoice evidence notary staging smoke command', 'npm run invoice:evidence:notary:smoke'],
+  ['invoice evidence notary receiver command', 'npm run invoice:evidence:notary:receiver'],
+  [
+    'invoice evidence notary receiver smoke command',
+    'npm run invoice:evidence:notary:receiver:smoke',
+  ],
   [
     'catalog list-price honesty',
     'not a billing, invoicing, or live cloud-account spend management system',
@@ -207,6 +218,14 @@ await assertFileContains('docs/DEPLOYMENT.md', [
   ],
   ['invoice evidence notary local smoke command', 'npm run invoice:evidence:notary:smoke:local'],
   ['invoice evidence notary staging smoke command', 'npm run invoice:evidence:notary:smoke'],
+  [
+    'invoice evidence notary reference receiver command',
+    'npm run invoice:evidence:notary:receiver',
+  ],
+  [
+    'invoice evidence notary reference smoke command',
+    'npm run invoice:evidence:notary:receiver:smoke',
+  ],
   ['backup and restore guidance', 'Backups And Restore'],
 ]);
 
@@ -267,6 +286,10 @@ await assertFileContains('RELEASE-CHECKLIST.md', [
   ['audit export staging smoke command', 'npm run audit:export:smoke'],
   ['invoice evidence notary local smoke command', 'npm run invoice:evidence:notary:smoke:local'],
   ['invoice evidence notary staging smoke command', 'npm run invoice:evidence:notary:smoke'],
+  [
+    'invoice evidence notary reference smoke command',
+    'npm run invoice:evidence:notary:receiver:smoke',
+  ],
   ['public readiness guard command', 'npm run public:readiness:check'],
   ['public demo hardening documentation', 'docs/development/public-demo-hardening.md'],
   ['unit coverage command', 'npm run ci:unit'],
@@ -436,6 +459,29 @@ await assertFileContains('scripts/invoice-evidence-notary-local-smoke.mjs', [
   ['local JSONL artifact path', 'artifacts'],
   ['constant-time signature verification', 'timingSafeEqual'],
   ['append-only local evidence', "flag: 'a'"],
+]);
+
+await assertFileContains('scripts/invoice-evidence-notary-reference-receiver.mjs', [
+  ['reference receiver event', 'invoice_evidence_packet.exported'],
+  ['reference receiver health', '/health/ready'],
+  ['constant-time signature verification', 'timingSafeEqual'],
+  ['receiver artifact dir env', 'POLYCOST_INVOICE_EVIDENCE_NOTARY_RECEIVER_ARTIFACT_DIR'],
+  ['append-only receiver evidence', "flag: 'a'"],
+  ['no immutable overclaim', 'immutableRetentionProved: false'],
+]);
+
+await assertFileContains('scripts/invoice-evidence-notary-reference-receiver-smoke.mjs', [
+  ['spawns reference receiver', 'invoice-evidence-notary-reference-receiver.mjs'],
+  ['uses staging webhook smoke sender', 'invoice-evidence-notary-webhook-smoke.mjs'],
+  ['local HTTP exception is explicit', '--allow-http-local'],
+  ['verifies captured receiver artifact', 'Captured receipt packet digest'],
+]);
+
+await assertFileContains('docker/notary-receiver/Dockerfile', [
+  ['Node 20 base image', 'node:20-alpine'],
+  ['non-root runtime user', 'USER node'],
+  ['container healthcheck', 'HEALTHCHECK'],
+  ['receiver command', 'invoice-evidence-notary-reference-receiver.mjs'],
 ]);
 
 await assertFileContains('apps/api/src/pricing-normalization/pricing-reconciliation.spec.ts', [

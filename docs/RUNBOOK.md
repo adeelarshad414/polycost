@@ -199,8 +199,13 @@ Actions:
    `INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL` and
    `INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET` to prove the real WORM/notary receiver
    accepts signed evidence handoff canaries.
-7. Check rate-limit and lockout settings.
-8. Re-run focused auth tests:
+7. If a separate notary platform is not available for staging, run
+   `npm run invoice:evidence:notary:receiver:smoke` to prove PolyCost's reference
+   receiver can verify HMAC handoffs, expose `/health/ready`, and append JSONL
+   evidence. Do not claim immutable retention unless the receiver artifact
+   directory is backed by WORM/object-lock storage and access logs are archived.
+8. Check rate-limit and lockout settings.
+9. Re-run focused auth tests:
 
 ```bash
 npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/api/auth.controller.spec.ts src/api/invitation-delivery.service.spec.ts

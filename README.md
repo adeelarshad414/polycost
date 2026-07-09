@@ -109,6 +109,13 @@ INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET=replace-with-staging-secret \
 npm run invoice:evidence:notary:smoke
 ```
 
+Run the self-hostable reference receiver and its end-to-end smoke:
+
+```bash
+npm run invoice:evidence:notary:receiver:dev
+npm run invoice:evidence:notary:receiver:smoke
+```
+
 Verify the clean-clone demo path with an isolated temporary clone and a
 10-minute startup budget:
 
@@ -383,6 +390,16 @@ HMAC-verifying receiver and append accepted handoff evidence to
 `npm run invoice:evidence:notary:smoke` and archive the printed reconciliation ID,
 packet digest, base payload digest, receiver HTTP status, and receiver-side
 retention evidence.
+
+PolyCost also ships a self-hostable reference receiver for staging rehearsals. Run
+`npm run invoice:evidence:notary:receiver` with a non-dummy
+`INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET` and a
+`POLYCOST_INVOICE_EVIDENCE_NOTARY_RECEIVER_ARTIFACT_DIR` mounted on operator-owned
+WORM/object-lock storage, or build `docker/notary-receiver/Dockerfile` for a small
+Node 20 container with `/health/live` and `/health/ready` endpoints. The reference
+receiver writes append-only JSONL evidence, but still does not itself prove cloud
+immutability unless its artifact directory is backed by WORM storage and access-log
+evidence is archived.
 
 ## Documentation
 
