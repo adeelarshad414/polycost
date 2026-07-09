@@ -106,6 +106,7 @@ async function assertPhaseEvidenceAnchors() {
     'npm run invoice:artifact-rehearsal:plan',
     'npm run invoice:artifact-rehearsal:evidence:check',
     'npm run invoice:record:evidence:check',
+    'npm run invoice:record:pricing-lineage:smoke',
     'npm run terraform:evidence:check',
     'npm run terraform:evidence:capture:smoke',
     'npm run vsdx:visual-evidence:check',
@@ -370,7 +371,18 @@ async function assertPhaseEvidenceAnchors() {
     ['invoice-of-record check schema', 'polycost-invoice-of-record-pilot-evidence-check/v1'],
     ['require provider invoice mode', '--require-provider-invoice'],
     ['provider invoice control total requirement', 'providerInvoiceControlTotals'],
+    ['pricing catalog section', 'pricingCatalog'],
+    ['pricing catalog snapshot digest', 'catalogSnapshotSha256'],
+    ['pricing catalog validator', 'validatePricingCatalog'],
     ['raw invoice payload guard', 'findForbiddenRawPayloads'],
+  ]);
+
+  await assertFileContains('scripts/invoice-of-record-pricing-lineage-smoke.mjs', [
+    ['invoice pricing lineage smoke schema', 'polycost-invoice-of-record-pricing-lineage-smoke/v1'],
+    ['pricing catalog lineage snapshot schema', 'polycost-pricing-catalog-lineage-snapshot/v1'],
+    ['strict invoice checker handoff', 'invoice-of-record-pilot-evidence-check.mjs'],
+    ['catalog snapshot digest', 'catalogSnapshotSha256'],
+    ['matched SKU coverage', 'invoiceSkuMatchCoverage'],
   ]);
 
   await assertFileContains('scripts/provider-credential-check.mjs', [
@@ -643,7 +655,9 @@ async function assertPhaseEvidenceAnchors() {
   await assertFileContains('docs/architecture/phase-2-invoice-of-record-pilot-evidence.md', [
     ['invoice-of-record architecture note', 'Phase 2 Invoice-Of-Record Pilot Evidence'],
     ['invoice-of-record evidence command', 'npm run invoice:record:evidence:check'],
+    ['invoice pricing lineage smoke command', 'npm run invoice:record:pricing-lineage:smoke'],
     ['provider invoice strict mode', '--require-provider-invoice'],
+    ['pricing lineage boundary', 'pricing catalog lineage smoke'],
     ['invoice system boundary', 'provider invoice system of record'],
   ]);
 
@@ -680,6 +694,10 @@ async function assertPhaseEvidenceAnchors() {
     ['diagram LLM drift alert smoke ledger', 'npm run diagram:llm-corpus:drift:alert:smoke'],
     ['enterprise IdP pilot checker ledger', 'npm run enterprise:idp:evidence:check'],
     ['invoice-of-record pilot checker ledger', 'npm run invoice:record:evidence:check'],
+    [
+      'invoice-of-record pricing lineage smoke ledger',
+      'npm run invoice:record:pricing-lineage:smoke',
+    ],
     ['Terraform destination capture checker ledger', 'npm run terraform:evidence:capture:smoke'],
     ['auth enterprise deferred ledger', 'Full enterprise account/team UX'],
     ['auth live transcript ledger', 'workspace-auth-rbac-sso'],

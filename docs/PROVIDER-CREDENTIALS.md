@@ -412,6 +412,10 @@ notary receipt, and audit-export proof, validate the sanitized digest-only bundl
 npm run invoice:record:evidence:check -- --require-provider-invoice <bundle.json>
 ```
 
+Use `npm run invoice:record:pricing-lineage:smoke` for a local sanitized proof
+that invoice SKUs can be linked to exact pricing catalog rows, source record IDs,
+source payload hashes, and catalog snapshot digests.
+
 The checked-in example can be validated with `npm run invoice:record:evidence:check`
 for schema coverage only. It is not provider invoice proof and does not make
 PolyCost the provider invoice system of record. Do not place raw invoices, raw

@@ -44,6 +44,12 @@ const REQUIRED_ARTIFACT_DIGESTS = [
   'notaryReceiptSha256',
   'auditExportSha256',
 ];
+const REQUIRED_PRICING_CATALOG_ATTESTATIONS = [
+  'exactSourceRecordMatched',
+  'refreshedCatalogSnapshotArchived',
+  'invoiceSkuMapReviewed',
+  'rawCatalogPayloadExcluded',
+];
 const REQUIRED_ATTESTATIONS = [
   'providerInvoiceReviewed',
   'financeReviewerApproved',
@@ -201,7 +207,10 @@ async function checkEvidence(options) {
   const taxAndAdjustments = plainObject(evidence.taxAndAdjustments);
   const commitments = plainObject(evidence.commitments);
   const artifacts = plainObject(evidence.artifacts);
+  const pricingCatalog = plainObject(evidence.pricingCatalog);
   const operatorAttestations = plainObject(evidence.operatorAttestations);
+  const requiresProviderInvoice =
+    options.requireProviderInvoice || evidenceLevel === 'provider-invoice-pilot';
 
   if (evidence.schemaVersion !== EVIDENCE_SCHEMA) {
     failures.push(`evidence.schemaVersion must be ${EVIDENCE_SCHEMA}.`);
@@ -233,9 +242,15 @@ async function checkEvidence(options) {
   failures.push(...validateTaxAndAdjustments(taxAndAdjustments));
   failures.push(...validateCommitments(commitments));
   failures.push(...validateArtifacts(artifacts));
+  failures.push(
+    ...validatePricingCatalog(pricingCatalog, {
+      provider: evidence.provider,
+      requireProviderInvoice: requiresProviderInvoice,
+    }),
+  );
   failures.push(...validateOperatorAttestations(operatorAttestations));
 
-  if (options.requireProviderInvoice || evidenceLevel === 'provider-invoice-pilot') {
+  if (requiresProviderInvoice) {
     failures.push(...validateProviderInvoicePilot(evidence, operatorAttestations));
   }
 
@@ -257,6 +272,10 @@ async function checkEvidence(options) {
     verifiedExampleSchema: failures.length === 0 && evidenceLevel === 'example-schema',
     verifiedProviderInvoicePilot,
     providerInvoiceRequired: evidenceLevel !== 'provider-invoice-pilot',
+    pricingCatalogLinked: Boolean(pricingCatalog),
+    pricingCatalogSnapshotSha256: pricingCatalog?.catalogSnapshotSha256,
+    pricingCatalogMatchedSkuCount: pricingCatalog?.matchedSkuCount,
+    pricingCatalogSourceRecordCount: pricingCatalog?.sourceRecordCount,
     requiredControlCount: REQUIRED_RECONCILIATION_CHECKS.size,
     nonUsageCategoryCount: Array.isArray(taxAndAdjustments?.categories)
       ? taxAndAdjustments.categories.length
@@ -466,6 +485,144 @@ function validateArtifacts(artifacts) {
   }
 
   return validateDigestFields(artifacts, REQUIRED_ARTIFACT_DIGESTS);
+}
+
+function validatePricingCatalog(pricingCatalog, options) {
+  if (!pricingCatalog) {
+    return options.requireProviderInvoice
+      ? ['pricingCatalog must be present for provider invoice pilot evidence.']
+      : [];
+  }
+
+  const failures = [];
+  if (!hasValue(pricingCatalog.provider)) {
+    failures.push('pricingCatalog.provider is required.');
+  } else if (
+    pricingCatalog.provider !== options.provider &&
+    options.provider !== 'multi-cloud' &&
+    options.provider !== 'example'
+  ) {
+    failures.push('pricingCatalog.provider must match evidence.provider.');
+  }
+  if (!hasValue(pricingCatalog.sourceSystem)) {
+    failures.push('pricingCatalog.sourceSystem is required.');
+  }
+  if (options.requireProviderInvoice && pricingCatalog.sourceSystem === 'example') {
+    failures.push('pricingCatalog.sourceSystem cannot be example for provider invoice evidence.');
+  }
+  if (!isValidDateString(pricingCatalog.catalogGeneratedAt)) {
+    failures.push('pricingCatalog.catalogGeneratedAt must be a valid ISO-8601 timestamp.');
+  }
+  for (const key of ['catalogSnapshotSha256', 'catalogSnapshotRowsSha256']) {
+    if (!hasSha256(pricingCatalog[key])) {
+      failures.push(`pricingCatalog.${key} must be a SHA-256 digest.`);
+    }
+  }
+  for (const key of [
+    'sourceEndpointCount',
+    'sourceRecordCount',
+    'matchedInvoiceLineCount',
+    'matchedSkuCount',
+    'invoiceSkuCount',
+  ]) {
+    if (!Number.isInteger(pricingCatalog[key]) || pricingCatalog[key] <= 0) {
+      failures.push(`pricingCatalog.${key} must be a positive integer.`);
+    }
+  }
+  for (const key of [
+    'sourcePayloadHashCoverage',
+    'invoiceSkuMatchCoverage',
+    'pricingTraceCoverage',
+  ]) {
+    if (!isRatioAtLeast(pricingCatalog[key], options.requireProviderInvoice ? 1 : 0.95)) {
+      failures.push(
+        `pricingCatalog.${key} must be ${options.requireProviderInvoice ? '1' : 'at least 0.95'}.`,
+      );
+    }
+  }
+  if (pricingCatalog.rawCatalogRowsExcluded !== true) {
+    failures.push('pricingCatalog.rawCatalogRowsExcluded must be true.');
+  }
+
+  const matchedInvoiceSkuIds = Array.isArray(pricingCatalog.matchedInvoiceSkuIds)
+    ? pricingCatalog.matchedInvoiceSkuIds
+    : [];
+  if (matchedInvoiceSkuIds.length !== pricingCatalog.matchedSkuCount) {
+    failures.push('pricingCatalog.matchedInvoiceSkuIds length must equal matchedSkuCount.');
+  }
+  if (pricingCatalog.matchedSkuCount !== pricingCatalog.invoiceSkuCount) {
+    failures.push('pricingCatalog.matchedSkuCount must equal invoiceSkuCount.');
+  }
+
+  const rows = Array.isArray(pricingCatalog.catalogRows) ? pricingCatalog.catalogRows : [];
+  if (rows.length !== pricingCatalog.sourceRecordCount) {
+    failures.push('pricingCatalog.catalogRows length must equal sourceRecordCount.');
+  }
+  for (const [index, row] of rows.entries()) {
+    failures.push(...validateCatalogRow(row, index, options.provider));
+  }
+
+  const lineageAttestations = plainObject(pricingCatalog.lineageAttestations);
+  if (!lineageAttestations) {
+    failures.push('pricingCatalog.lineageAttestations must be an object.');
+  } else {
+    for (const key of REQUIRED_PRICING_CATALOG_ATTESTATIONS) {
+      if (lineageAttestations[key] !== true) {
+        failures.push(`pricingCatalog.lineageAttestations.${key} must be true.`);
+      }
+    }
+  }
+
+  return failures;
+}
+
+function validateCatalogRow(row, index, evidenceProvider) {
+  const failures = [];
+  if (!plainObject(row)) {
+    return [`pricingCatalog.catalogRows[${index}] must be an object.`];
+  }
+  for (const key of [
+    'provider',
+    'serviceCategory',
+    'serviceName',
+    'skuId',
+    'region',
+    'unit',
+    'sourceEndpoint',
+    'sourceRecordId',
+    'sourceRecordKey',
+    'sourcePayloadHash',
+    'transformVersion',
+  ]) {
+    if (!hasValue(row[key])) {
+      failures.push(`pricingCatalog.catalogRows[${index}].${key} is required.`);
+    }
+  }
+  if (
+    evidenceProvider !== 'multi-cloud' &&
+    evidenceProvider !== 'example' &&
+    row.provider !== evidenceProvider
+  ) {
+    failures.push(`pricingCatalog.catalogRows[${index}].provider must match evidence.provider.`);
+  }
+  if (!isFiniteNumber(row.unitPriceUsd) || row.unitPriceUsd < 0) {
+    failures.push(
+      `pricingCatalog.catalogRows[${index}].unitPriceUsd must be a non-negative number.`,
+    );
+  }
+  if (!hasSha256(row.sourcePayloadHash)) {
+    failures.push(
+      `pricingCatalog.catalogRows[${index}].sourcePayloadHash must be a SHA-256 digest.`,
+    );
+  }
+  if (!isValidDateString(row.fetchedAt)) {
+    failures.push(`pricingCatalog.catalogRows[${index}].fetchedAt must be ISO-8601.`);
+  }
+  if (!isValidDateString(row.effectiveDate)) {
+    failures.push(`pricingCatalog.catalogRows[${index}].effectiveDate must be ISO-8601.`);
+  }
+
+  return failures;
 }
 
 function validateOperatorAttestations(operatorAttestations) {

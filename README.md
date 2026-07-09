@@ -58,6 +58,8 @@ For invoice-of-record pilot evidence, archive sanitized provider invoice, billin
 export, normalized actuals, private-pricing, tax/adjustment, commitment,
 retention/notary/audit, and finance/security review digests, then run
 `npm run invoice:record:evidence:check -- --require-provider-invoice <bundle.json>`.
+Use `npm run invoice:record:pricing-lineage:smoke` for the local pricing catalog
+lineage smoke that binds sanitized invoice SKUs to exact catalog source rows.
 The checked-in example validates the contract only; PolyCost still is not the
 provider invoice system of record. See
 `docs/architecture/phase-2-invoice-of-record-pilot-evidence.md`.
@@ -301,8 +303,10 @@ Accounts add workspace controls on top of that core flow:
   This improves proof discipline but is not a provider invoice system of record.
   Provider invoice-of-record pilot evidence can be checked with
   `npm run invoice:record:evidence:check -- --require-provider-invoice <bundle.json>`
-  after finance/security reviewers archive sanitized invoice, export, contract,
-  tax/adjustment, commitment, retention, notary, and audit digests.
+  after finance/security reviewers archive sanitized invoice, export, pricing
+  catalog snapshot, contract, tax/adjustment, commitment, retention, notary, and
+  audit digests. The local pricing lineage smoke is
+  `npm run invoice:record:pricing-lineage:smoke`.
 
 The current self-hosted product does not yet include production IdP certification,
 full email-template management, org billing plans, account recovery UX, complete

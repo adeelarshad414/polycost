@@ -152,6 +152,9 @@ if (!packageJson.scripts?.['invoice:artifact-rehearsal:evidence:check']) {
 if (!packageJson.scripts?.['invoice:record:evidence:check']) {
   failures.push('package.json is missing invoice:record:evidence:check');
 }
+if (!packageJson.scripts?.['invoice:record:pricing-lineage:smoke']) {
+  failures.push('package.json is missing invoice:record:pricing-lineage:smoke');
+}
 if (!packageJson.scripts?.['terraform:evidence:check']) {
   failures.push('package.json is missing terraform:evidence:check');
 }
@@ -260,6 +263,11 @@ if (!packageJson.scripts?.check?.includes('npm run invoice:artifact-rehearsal:ev
 }
 if (!packageJson.scripts?.check?.includes('npm run invoice:record:evidence:check')) {
   failures.push('package.json check script must include npm run invoice:record:evidence:check');
+}
+if (!packageJson.scripts?.check?.includes('npm run invoice:record:pricing-lineage:smoke')) {
+  failures.push(
+    'package.json check script must include npm run invoice:record:pricing-lineage:smoke',
+  );
 }
 if (!packageJson.scripts?.check?.includes('npm run terraform:evidence:check')) {
   failures.push('package.json check script must include npm run terraform:evidence:check');
@@ -894,7 +902,18 @@ await assertFileContains('scripts/invoice-of-record-pilot-evidence-check.mjs', [
   ['invoice-of-record check schema', 'polycost-invoice-of-record-pilot-evidence-check/v1'],
   ['provider invoice required option', '--require-provider-invoice'],
   ['invoice control total requirement', 'providerInvoiceControlTotals'],
+  ['pricing catalog section', 'pricingCatalog'],
+  ['pricing catalog snapshot digest', 'catalogSnapshotSha256'],
+  ['pricing catalog validator', 'validatePricingCatalog'],
   ['raw invoice payload guard', 'findForbiddenRawPayloads'],
+]);
+
+await assertFileContains('scripts/invoice-of-record-pricing-lineage-smoke.mjs', [
+  ['invoice pricing lineage smoke schema', 'polycost-invoice-of-record-pricing-lineage-smoke/v1'],
+  ['pricing catalog lineage snapshot schema', 'polycost-pricing-catalog-lineage-snapshot/v1'],
+  ['strict invoice checker handoff', 'invoice-of-record-pilot-evidence-check.mjs'],
+  ['catalog snapshot digest', 'catalogSnapshotSha256'],
+  ['matched SKU coverage', 'invoiceSkuMatchCoverage'],
 ]);
 
 await assertFileContains(
@@ -1115,7 +1134,9 @@ await assertFileContains('docs/architecture/phase-v3-6-terraform-validation-evid
 await assertFileContains('docs/architecture/phase-2-invoice-of-record-pilot-evidence.md', [
   ['invoice-of-record title', 'Phase 2 Invoice-Of-Record Pilot Evidence'],
   ['invoice-of-record command', 'npm run invoice:record:evidence:check'],
+  ['invoice pricing lineage smoke command', 'npm run invoice:record:pricing-lineage:smoke'],
   ['provider invoice strict mode', '--require-provider-invoice'],
+  ['pricing lineage boundary', 'pricing catalog lineage smoke'],
   ['invoice system boundary', 'provider invoice system of record'],
 ]);
 
