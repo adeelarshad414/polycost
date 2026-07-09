@@ -151,6 +151,7 @@ say so explicitly rather than marking it done.
 | Phase 2.59 - Invoice-of-record pilot evidence gate      | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.60 - Diagram LLM evidence capture helper        | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.61 - Diagram LLM drift monitoring gate          | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.62 - Diagram LLM drift alert evidence           | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -543,6 +544,65 @@ Known gaps carried forward:
   `secret/polycost/llm` `api_key`, scheduled live corpus runs, sanitized live
   evidence capture, strict drift monitoring, reviewer workflow, threshold tuning,
   and alert routing for regressions.
+
+## Phase 2.62 - Diagram LLM drift alert evidence
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added `scripts/diagram-llm-drift-alert-evidence-check.mjs`, a machine-readable
+  verifier for sanitized diagram LLM drift alert handoff evidence.
+- Added `docs/operations/evidence/diagram-llm-drift-alert/diagram-llm-drift-alert.example.json`,
+  a sanitized `example-schema` bundle for alert source, routing, owner/SLO policy,
+  payload hygiene, review metadata, and operator attestations.
+- Added `docs/architecture/phase-2-diagram-llm-drift-alert-evidence.md` to
+  document the staging alert workflow and the boundary that the checker validates
+  archived alert evidence rather than sending alerts or proving receiver retention.
+- Added `npm run diagram:llm-corpus:drift:alert:check` and wired it into the
+  aggregate `npm run check` floor.
+- Updated README, `docs/HOW-TO-USE.md`, `docs/PROVIDER-CREDENTIALS.md`,
+  `docs/ARCHITECTURE.md`, release checklist, release-readiness guards,
+  progress-verification guards, and the full-progress ledger.
+
+Verification performed:
+
+- `node --check scripts/diagram-llm-drift-alert-evidence-check.mjs` passed.
+- `npm run diagram:llm-corpus:drift:alert:check -- --json` passed against the
+  checked-in sample with `verifiedExampleSchema=true`, `verifiedStagingAlert=false`,
+  `routingMode=sample`, and `destinationType=example`.
+- `npm run diagram:llm-corpus:drift:alert:check -- --require-staging-alert --json`
+  failed as intended against the checked-in sample because it is `example-schema`
+  evidence without signed/TLS receiver acceptance or named reviewer evidence.
+- `npm run diagram:llm-corpus:drift:alert:check -- --require-staging-alert .tmp/diagram-llm-drift-alert-staging-evidence.json --json`
+  passed against a generated temporary staging-shaped bundle with
+  `verifiedStagingAlert=true`.
+- `npm run diagram:llm-corpus:drift:alert:check -- .tmp/diagram-llm-drift-alert-raw-url-evidence.json --json`
+  failed as intended when a raw receiver URL was injected into the evidence.
+- `npm run format:check`, `npm run release:check`, and `npm run progress:verify`
+  passed; progress verification now reports `347` phase evidence anchors.
+- Full `npm run check` passed with the diagram LLM drift alert evidence checker in
+  the aggregate floor. The run included API unit `59` suites / `494` tests, web
+  unit `11` suites / `149` tests, graph validation `356` nodes / `356` edges,
+  pricing coverage `36` frontend families, progress verification `347` anchors,
+  release readiness, handover, DevOps/cloud/provider-credential gates, and invoice/
+  Terraform/VSDX/LLM/enterprise-IdP/provider-invoice evidence smokes. Expected
+  caveats remained: `impeccable` is skipped on the repo's Node 20 target, live
+  Postgres migrations were skipped because the local Postgres container was not
+  running, the diagram LLM provider check reports the endpoint/model are not
+  configured in local mode, and the default local env still warns that
+  invoice-artifacts are demo/local without live object-storage/KMS/scanner/WORM
+  settings.
+
+Known gaps carried forward:
+
+- This closes the local alert evidence contract, but it does not send alerts,
+  operate a scheduler, host an incident receiver, or prove receiver-side retention
+  in the default OSS/CI path.
+- Real proof still requires a live drift event/canary, signed TLS receiver or
+  incident-system acceptance, archived receiver-side evidence, owner/on-call
+  workflow, retention proof, scheduler integration, and production alert routing.
 
 ## Phase V3.6 - Terraform validation evidence
 

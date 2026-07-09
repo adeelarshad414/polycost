@@ -42,6 +42,9 @@ Natural-language mode:
   `npm run diagram:llm-corpus:drift:check -- --require-live-model --profile <profile.json>`
   before claiming the classifier is still within its reviewed drift and
   false-positive budget.
+- For alerting proof, archive sanitized receiver/incident evidence and run
+  `npm run diagram:llm-corpus:drift:alert:check -- --require-staging-alert <evidence.json>`
+  before claiming drift regressions route to an owner workflow.
 
 Guided-form mode:
 
