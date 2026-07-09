@@ -154,6 +154,7 @@ say so explicitly rather than marking it done.
 | Phase 2.62 - Diagram LLM drift alert evidence           | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.63 - Diagram LLM drift alert receiver smoke     | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.64 - Invoice pricing lineage evidence smoke     | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.65 - Pricing catalog snapshot evidence          | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -709,6 +710,70 @@ Known gaps carried forward:
   exact pricing catalog rows and source payload hashes, but it is local synthetic
   evidence, not a real provider invoice renderer, private-contract validation, tax/
   legal certification, or provider-authenticated invoice-grade billing system.
+
+## Phase 2.65 - Pricing catalog snapshot evidence
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added `scripts/pricing-catalog-snapshot-evidence-check.mjs`, a machine-readable
+  verifier for provider pricing catalog snapshot evidence across AWS, Azure, and
+  GCP.
+- Added `scripts/pricing-catalog-snapshot-smoke.mjs`, a local fixture-replay smoke
+  that generates previous/current catalog snapshots, changes one SKU row per
+  provider, verifies exact row-change counts, source payload hash coverage,
+  snapshot digests, and freshness SLA evidence, then validates the generated
+  bundle with `--require-provider-snapshot`.
+- Added `docs/operations/evidence/pricing-catalog-snapshot/pricing-catalog-snapshot.example.json`,
+  a sanitized `example-schema` bundle for CI/schema validation.
+- Added `docs/architecture/phase-2-pricing-catalog-snapshot-evidence.md` to
+  document the evidence contract, local smoke, `--require-live-provider` path, and
+  catalog-list-price boundary.
+- Added `npm run pricing:catalog:snapshot:check` and
+  `npm run pricing:catalog:snapshot:smoke` to the aggregate `npm run check` floor
+  and wired them into release/progress verification.
+- Updated README, `docs/HOW-TO-USE.md`, `docs/PROVIDER-CREDENTIALS.md`,
+  `docs/operations/live-pricing-credentials.md`, release checklist, the
+  full-progress ledger, and the production-readiness report.
+
+Verification performed:
+
+- `node --check scripts/pricing-catalog-snapshot-evidence-check.mjs` passed.
+- `node --check scripts/pricing-catalog-snapshot-smoke.mjs` passed.
+- `node scripts/pricing-catalog-snapshot-evidence-check.mjs --json` passed against
+  the checked-in sample with `verifiedExampleSchema=true`.
+- `node scripts/pricing-catalog-snapshot-smoke.mjs --json` passed with
+  `providerCount=3`, `changedRowCount=3`, `priceChangedSkuCount=3`, and
+  `verifiedProviderSnapshot=true`.
+- `npm run format:check`, `npm run release:check`, and `npm run progress:verify`
+  passed; progress verification now reports `394` phase evidence anchors.
+- Full `npm run check` passed with the pricing catalog snapshot checks in the
+  aggregate floor. The run included API unit `59` suites / `494` tests, web unit
+  `11` suites / `149` tests, graph validation `358` nodes / `358` edges, pricing
+  coverage `36` frontend families, progress verification `394` anchors, release
+  readiness, handover, DevOps/cloud/provider-credential gates, and invoice/
+  Terraform/VSDX/LLM/enterprise-IdP/provider-invoice/catalog-snapshot evidence
+  smokes. Expected caveats remained: invoice artifact scanner local smoke skipped
+  live local TCP binding when the sandbox blocked it, `impeccable` is skipped on
+  the repo's Node 20 target, live Postgres migrations were skipped because the
+  local Postgres container was not running, the diagram LLM provider check reports
+  the endpoint/model are not configured in local mode, and the default local env
+  still warns that invoice-artifacts are demo/local without live object-storage/
+  KMS/scanner/WORM settings.
+
+Known gaps carried forward:
+
+- This adds provider catalog snapshot freshness and exact row-change proof, but the
+  checked-in smoke is fixture replay. Real provider proof still requires
+  `evidenceLevel=live-provider-snapshot`,
+  `npm run pricing:catalog:snapshot:check -- --require-live-provider <bundle.json>`,
+  archived live AWS/Azure/GCP catalog snapshots, reviewed endpoints, and sanitized
+  evidence generated from real provider refreshes.
+- Even live catalog snapshot proof remains catalog-list-price evidence, not
+  invoice-grade billing, private discounts, tax/legal validation, credits,
+  marketplace/support charges, or provider invoice-of-record reconciliation.
 
 ## Phase V3.6 - Terraform validation evidence
 
