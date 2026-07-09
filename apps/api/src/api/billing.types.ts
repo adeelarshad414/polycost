@@ -113,6 +113,13 @@ export interface InvoiceArtifactLegalHoldInput {
   reason?: string;
 }
 
+export interface InvoiceArtifactProviderRetentionProofInput {
+  proofReference: string;
+  proofDigestSha256: string;
+  checkedAt?: string;
+  notes?: string;
+}
+
 export type InvoiceArtifactReviewStatus = 'not-requested' | 'pending' | 'approved' | 'rejected';
 
 export interface InvoiceArtifactReviewInput {

@@ -168,10 +168,14 @@ For finance/FinOps:
    stored file, and then verify the artifact. Show that PolyCost records stored-file
    checksum/control-total evidence, scan status, retention date, legal-hold state,
    and KMS-readiness metadata while keeping unrelated invoice-grade blockers visible.
-9. For operator readiness, call `GET /api/v1/billing/artifact-storage/readiness`
+9. For externally stored artifacts, run the provider-retention proof capture plan
+   and verifier, then attach the proof with
+   `PATCH /api/v1/billing/reconciliations/:id/artifacts/:artifactId/blob/provider-retention-proof`.
+   Use durable proof references only; do not paste signed URLs or SAS tokens.
+10. For operator readiness, call `GET /api/v1/billing/artifact-storage/readiness`
    and `POST /api/v1/billing/artifact-storage/retention/enforce` with
    `{ "dryRun": true }` from an admin session to show storage/scanner/KMS/retention
    gaps without deleting demo data.
-10. Call out that invoice-grade actual spend, private discounts, legal-hold
+11. Call out that invoice-grade actual spend, private discounts, legal-hold
     administration, reviewer workflow automation, and provider invoice-of-record
     validation are still future work.

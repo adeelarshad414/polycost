@@ -18,6 +18,7 @@ import {
   InvoiceArtifactPolicyExceptionInput,
   InvoiceArtifactPolicyExceptionQueueItem,
   InvoiceArtifactPolicyExceptionStatus,
+  InvoiceArtifactProviderRetentionProofInput,
   InvoiceArtifactReviewInput,
   InvoiceArtifactReviewQueueItem,
   InvoiceArtifactReviewStatus,
@@ -901,6 +902,82 @@ export class BillingService {
                 artifactId,
                 legalHold: input.legalHold,
                 ...(input.reason ? { reason: input.reason } : {}),
+              },
+            },
+          }
+        : {}),
+    });
+  }
+
+  async attachInvoiceArtifactProviderRetentionProof(
+    reconciliationId: string,
+    artifactId: string,
+    body: unknown,
+    identity: AuthIdentity,
+  ): Promise<InvoiceReconciliationRecord> {
+    assertBillingAdmin(identity);
+    const input = parseInvoiceArtifactProviderRetentionProofInput(body);
+    const reconciliation = await this.repository.getInvoiceReconciliation(reconciliationId);
+
+    if (!reconciliation) {
+      throw new ApiNotFoundError(`Invoice reconciliation ${reconciliationId} was not found`);
+    }
+
+    const importRun = await this.repository.getBillingImport(reconciliation.importRunId);
+
+    if (!importRun) {
+      throw new ApiNotFoundError(
+        `Billing import ${reconciliation.importRunId} was not found for reconciliation ${reconciliationId}`,
+      );
+    }
+
+    assertTeamAccess(importRun.teamId, identity);
+
+    const artifacts = invoiceGradeArtifactsFromEvidence(reconciliation.evidence);
+    const artifact = artifacts.find((candidate) => candidate.id === artifactId);
+
+    if (!artifact) {
+      throw new ApiNotFoundError(
+        `Invoice artifact ${artifactId} was not found for reconciliation ${reconciliationId}`,
+      );
+    }
+
+    if (!artifact.storedBlob) {
+      throw new ApiValidationError('invoice artifact file is not stored', [
+        {
+          field: 'artifactId',
+          issue: 'store the artifact file before attaching provider retention proof',
+        },
+      ]);
+    }
+
+    const updatedArtifact = providerRetentionProofInvoiceGradeArtifact(artifact, input);
+    const evidence = replaceInvoiceGradeArtifactEvidence(reconciliation, updatedArtifact);
+
+    return this.repository.updateInvoiceReconciliationEvidence({
+      reconciliationId,
+      evidence,
+      ...(importRun.teamId
+        ? {
+            audit: {
+              teamId: importRun.teamId,
+              actorAccountId: identity.accountId,
+              action: 'billing.reconciliation.artifact_provider_retention_proof_attached',
+              targetType: 'billing_reconciliation',
+              targetId: reconciliationId,
+              metadata: {
+                importRunId: importRun.id,
+                comparisonId: reconciliation.comparisonId,
+                provider: reconciliation.provider,
+                artifactId,
+                proofReference: input.proofReference,
+                proofDigestSha256: input.proofDigestSha256,
+                checkedAt: input.checkedAt,
+                ...(input.notes ? { notes: input.notes } : {}),
+                storageBackend:
+                  updatedArtifact.storedBlob?.governance?.storageProfile.storageBackend,
+                objectStoreUri:
+                  updatedArtifact.storedBlob?.governance?.storageProfile.objectStore?.uri,
               },
             },
           }
@@ -2347,6 +2424,25 @@ function parseInvoiceArtifactLegalHoldInput(body: unknown): InvoiceArtifactLegal
   };
 }
 
+function parseInvoiceArtifactProviderRetentionProofInput(
+  body: unknown,
+): InvoiceArtifactProviderRetentionProofInput {
+  const record = requireRecord(
+    body,
+    'Invoice artifact provider retention proof request body must be an object',
+  );
+  const checkedAt =
+    record.checkedAt !== undefined ? parseIsoDateTime(record.checkedAt, 'checkedAt') : undefined;
+  const notes = parseOptionalString(record.notes, 800);
+
+  return {
+    proofReference: parseProviderRetentionProofReference(record.proofReference),
+    proofDigestSha256: parseSha256(record.proofDigestSha256, 'proofDigestSha256'),
+    ...(checkedAt ? { checkedAt } : {}),
+    ...(notes ? { notes } : {}),
+  };
+}
+
 function parseInvoiceArtifactReviewInput(body: unknown): InvoiceArtifactReviewInput {
   const record = requireRecord(body, 'Invoice artifact review request body must be an object');
   const input: InvoiceArtifactReviewInput = {
@@ -2591,6 +2687,51 @@ function parseArtifactGovernanceReference(value: unknown, field: string): string
       {
         field,
         issue: 'must not contain control characters',
+      },
+    ]);
+  }
+
+  return parsed;
+}
+
+function parseProviderRetentionProofReference(value: unknown): string {
+  const parsed = parseRequiredString(value, 'proofReference', 500);
+
+  if (hasControlCharacter(parsed)) {
+    throw new ApiValidationError('proofReference is invalid', [
+      {
+        field: 'proofReference',
+        issue: 'must not contain control characters',
+      },
+    ]);
+  }
+
+  let url: URL;
+  try {
+    url = new URL(parsed);
+  } catch {
+    throw new ApiValidationError('proofReference is invalid', [
+      {
+        field: 'proofReference',
+        issue: 'must be a durable URI such as s3://, azure-blob://, gs://, or https://',
+      },
+    ]);
+  }
+
+  if (!['s3:', 'azure-blob:', 'gs:', 'https:'].includes(url.protocol)) {
+    throw new ApiValidationError('proofReference is invalid', [
+      {
+        field: 'proofReference',
+        issue: 'must use s3://, azure-blob://, gs://, or https://',
+      },
+    ]);
+  }
+
+  if (url.search || url.hash) {
+    throw new ApiValidationError('proofReference must not include embedded credentials', [
+      {
+        field: 'proofReference',
+        issue: 'store signed URLs/SAS tokens in the operator vault, not in PolyCost evidence',
       },
     ]);
   }
@@ -3818,8 +3959,16 @@ function invoiceEvidencePacketGovernance(
   const malwareScannerEngines = [
     ...new Set(governanceRecords.map((governance) => governance.malwareScan.scanner)),
   ].sort();
+  const providerRetentionProofReady =
+    externalObjectStoreCount > 0 &&
+    providerRetentionProofVerifiedCount === externalObjectStoreCount &&
+    providerRetentionProofMissingCount === 0 &&
+    providerRetentionProofDeclaredCount === 0;
+  const storageReadinessGaps = providerRetentionProofReady
+    ? storageReadiness.gaps.filter((gap) => !isProviderRetentionProofConfigGap(gap))
+    : storageReadiness.gaps;
   const gaps = [
-    ...storageReadiness.gaps,
+    ...storageReadinessGaps,
     ...(storedArtifacts.length === 0
       ? ['no stored invoice artifact files are attached to this evidence packet']
       : []),
@@ -3903,16 +4052,19 @@ function invoiceEvidencePacketGovernance(
       retentionPolicyReady:
         storedArtifacts.length > 0 && governanceRecords.length === storedArtifacts.length,
       retentionDeletionReady: storageReadiness.retentionEnforcementMode === 'delete-expired',
-      providerRetentionProofReady:
-        externalObjectStoreCount > 0 &&
-        providerRetentionProofVerifiedCount === externalObjectStoreCount &&
-        providerRetentionProofMissingCount === 0 &&
-        providerRetentionProofDeclaredCount === 0,
+      providerRetentionProofReady,
       packetIntegrityReady: true,
       auditTrailReady: teamScoped,
     },
     gaps: [...new Set(gaps)],
   };
+}
+
+function isProviderRetentionProofConfigGap(gap: string): boolean {
+  return (
+    gap.includes('provider object-lock WORM retention mode') ||
+    gap.includes('provider retention proof')
+  );
 }
 
 function invoiceEvidencePacketArtifact(
@@ -4133,6 +4285,79 @@ function legalHoldInvoiceGradeArtifact(
             },
           }
         : {}),
+    },
+  };
+}
+
+function providerRetentionProofInvoiceGradeArtifact(
+  artifact: InvoiceGradeArtifactRecord,
+  input: InvoiceArtifactProviderRetentionProofInput,
+): InvoiceGradeArtifactRecord {
+  const storedBlob = artifact.storedBlob;
+  const governance = storedBlob?.governance;
+
+  if (!storedBlob) {
+    throw new ApiValidationError('invoice artifact file is not stored', [
+      {
+        field: 'artifactId',
+        issue: 'store the artifact file before attaching provider retention proof',
+      },
+    ]);
+  }
+
+  if (!governance) {
+    throw new ApiValidationError('invoice artifact governance manifest is missing', [
+      {
+        field: 'artifactId',
+        issue: 're-store the artifact through the governed artifact storage path first',
+      },
+    ]);
+  }
+
+  if (governance.storageProfile.storageBackend === 'database-bytea') {
+    throw new ApiValidationError('provider retention proof requires external object storage', [
+      {
+        field: 'artifactId',
+        issue: 'database-bytea storage has no provider object-lock control plane',
+      },
+    ]);
+  }
+
+  if (!governance.storageProfile.objectStore?.uri) {
+    throw new ApiValidationError('invoice artifact object-store pointer is missing', [
+      {
+        field: 'artifactId',
+        issue: 'external artifacts must include a durable object-store URI before proof attach',
+      },
+    ]);
+  }
+
+  const checkedAt = input.checkedAt ?? new Date().toISOString();
+
+  return {
+    ...artifact,
+    storedBlob: {
+      ...storedBlob,
+      governance: {
+        ...governance,
+        providerRetentionProof: {
+          schemaVersion: 'invoice-artifact-provider-retention-proof/v1',
+          status: 'provider-verified',
+          evidenceSource: 'provider-control-plane',
+          storageBackend: governance.storageProfile.storageBackend,
+          checkedAt,
+          retentionMode: 'provider-object-lock',
+          retentionUntil: governance.retentionPolicy.retentionUntil,
+          legalHold: governance.retentionPolicy.legalHold,
+          objectStore: governance.storageProfile.objectStore,
+          proofReference: input.proofReference,
+          proofDigestSha256: input.proofDigestSha256,
+          caveats: [
+            'Provider control-plane proof was captured outside PolyCost and attached as immutable evidence metadata; PolyCost did not execute provider APIs or decide legal sufficiency.',
+            ...(input.notes ? [`Operator notes: ${input.notes}`] : []),
+          ],
+        },
+      },
     },
   };
 }

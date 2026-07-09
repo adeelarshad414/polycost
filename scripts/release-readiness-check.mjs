@@ -286,6 +286,8 @@ await assertFileContains('docs/PROVIDER-CREDENTIALS.md', [
     'provider retention proof capture planner command',
     'npm run invoice:retention-proof:capture-plan',
   ],
+  ['provider retention proof attach endpoint', 'blob/provider-retention-proof'],
+  ['provider retention proof signed URL warning', 'Do not paste signed URLs'],
   ['provider retention proof ready gate', 'providerRetentionProofReady'],
   [
     'no env secret storage',
@@ -550,6 +552,40 @@ await assertFileContains(
     ['provider URI mismatch smoke', 'provider/URI mismatch'],
   ],
 );
+
+await assertFileContains('apps/api/src/api/billing.controller.ts', [
+  [
+    'provider retention proof attach route',
+    'reconciliations/:id/artifacts/:artifactId/blob/provider-retention-proof',
+  ],
+]);
+
+await assertFileContains('apps/api/src/api/billing.service.ts', [
+  ['provider retention proof attach method', 'attachInvoiceArtifactProviderRetentionProof'],
+  [
+    'provider retention proof attach audit action',
+    'billing.reconciliation.artifact_provider_retention_proof_attached',
+  ],
+  [
+    'provider retention proof signed URL guard',
+    'proofReference must not include embedded credentials',
+  ],
+]);
+
+await assertFileContains('apps/api/src/api/auth-billing.spec.ts', [
+  [
+    'provider retention proof attach positive test',
+    'attaches provider retention proof to an externally stored invoice artifact',
+  ],
+  [
+    'provider retention proof signed URL rejection test',
+    'rejects provider retention proof references with embedded signed-url credentials',
+  ],
+  [
+    'provider retention proof packet gate test',
+    'lets artifact-level provider retention proof satisfy the evidence packet gate',
+  ],
+]);
 
 await assertFileContains('scripts/provider-credential-check.mjs', [
   [

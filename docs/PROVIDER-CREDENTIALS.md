@@ -235,6 +235,27 @@ For repeatable release evidence, rerun it with `--expected-sha256=<digest>` afte
 archiving the proof artifact. The command validates captured evidence structure
 and digest only; it does not call the provider API or prove legal sufficiency.
 
+After verification, billing Owners/Admins can attach the provider-retention proof
+to the exact stored invoice artifact without giving PolyCost provider credentials:
+
+```bash
+curl -X PATCH \
+  "$POLYCOST_API_BASE_URL/api/v1/billing/reconciliations/$RECONCILIATION_ID/artifacts/$ARTIFACT_ID/blob/provider-retention-proof" \
+  -H "Authorization: Bearer $POLYCOST_SESSION_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "proofReference": "s3://polycost-invoice-artifacts/object-lock-proof.json",
+    "proofDigestSha256": "copy_the_64_character_sha256_from_the_verifier",
+    "checkedAt": "2026-07-09T00:00:00.000Z",
+    "notes": "Captured by release operator from provider control plane"
+  }'
+```
+
+`proofReference` must be a durable reference (`s3://`, `azure-blob://`, `gs://`,
+or `https://`) with no query string or fragment. Do not paste signed URLs, SAS
+tokens, bearer tokens, or temporary credentials into PolyCost evidence or audit
+metadata.
+
 The evidence packet aggregates these manifests as
 `providerRetentionProofMissingCount`, `providerRetentionProofDeclaredCount`, and
 `providerRetentionProofVerifiedCount`. The `providerRetentionProofReady` production
