@@ -183,6 +183,12 @@ The main API is versioned under `/api/v1`.
 - `GET /share/:token` reads a shared report.
 - `GET /exchange-rates` returns cached exchange-rate data.
 - `GET /regions` returns the cloud region catalog used by the UI.
+- `POST /auth/teams/:teamId/scim/tokens` creates a one-time-visible SCIM bearer
+  token for a team owner/admin; `GET` lists token metadata and `DELETE` revokes a
+  token.
+- `GET /scim/v2/Users`, `POST /scim/v2/Users`, `PUT /scim/v2/Users/:id`,
+  `PATCH /scim/v2/Users/:id`, and `DELETE /scim/v2/Users/:id` provide the SCIM
+  provisioning foundation for bearer-token-authenticated IdP clients.
 - `POST /billing/reconciliations/:id/artifacts/:artifactId/blob` stores an invoice
   artifact file for a registered reconciliation artifact.
 - `GET /billing/reconciliations/:id/artifacts/:artifactId/blob` returns the stored
@@ -206,6 +212,14 @@ Accounts add workspace controls on top of that core flow:
 - Team creation, team settings, member list, member removal, pending invitations,
   invite-token landing preview, expired/revoked invite states, invite-token
   acceptance, invite-token resend/refresh, and invite revocation.
+- SCIM provisioning foundation for enterprise IdP-managed users: owners/admins can
+  create and revoke one-time-visible SCIM bearer tokens at
+  `/api/v1/auth/teams/:teamId/scim/tokens`, while SCIM clients can list, create,
+  replace, patch-active, and deactivate users through `/api/v1/scim/v2/Users`.
+  The API stores only token hashes and display prefixes, records provisioning audit
+  events, and attaches active SCIM users as workspace members. This is an
+  integration foundation, not formal SCIM certification or a complete hosted IAM
+  suite.
 - Three-role RBAC: Owner, Admin, and Member. Owners manage role changes; owners and
   admins manage members, invitations, SSO provider configuration, and billing import
   workflows; members keep comparison and report access.
@@ -238,9 +252,10 @@ Accounts add workspace controls on top of that core flow:
   posture before claiming durable evidence handoff.
   This improves proof discipline but is not a provider invoice system of record.
 
-The current self-hosted product does not yet include enterprise IdP login round-trips,
-full email-template management, org billing plans, or a hosted account marketplace.
-Those remain release-track items rather than blockers for anonymous cost comparison.
+The current self-hosted product does not yet include production IdP certification,
+full email-template management, org billing plans, account recovery UX, complete
+team administration UX, or a hosted account marketplace. Those remain release-track
+items rather than blockers for anonymous cost comparison.
 
 ## Session And Account Security
 

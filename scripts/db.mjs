@@ -45,6 +45,7 @@ const expectedMigrations = [
   '037_team_audit_artifact_exception_action.sql',
   '038_team_audit_invoice_control_validation_action.sql',
   '039_invoice_artifact_provider_retention_proof_persistence.sql',
+  '040_team_scim_provisioning.sql',
 ];
 
 if (!['migrate', 'seed', 'reset', 'validate'].includes(command)) {

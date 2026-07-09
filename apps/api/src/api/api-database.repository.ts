@@ -30,6 +30,9 @@ import {
   TeamAuditAction,
   TeamAuditEventRecord,
   TeamAuditTargetType,
+  TeamScimIdentity,
+  TeamScimTokenRecord,
+  TeamScimUserRecord,
   TeamSwitchResponse,
   TeamSettingsRecord,
   TeamInvitationRecord,
@@ -424,6 +427,38 @@ interface SsoProviderConfigRow {
   display_name: string;
   issuer_url: string;
   status: 'configured' | 'disabled';
+}
+
+interface TeamScimTokenRow {
+  id: string;
+  team_id: string;
+  display_name: string;
+  token_prefix: string;
+  created_by_account_id: string | null;
+  created_at: Date;
+  last_used_at: Date | null;
+  revoked_at: Date | null;
+  expires_at: Date | null;
+}
+
+interface TeamScimIdentityRow {
+  token_id: string;
+  team_id: string;
+  token_prefix: string;
+  display_name: string;
+}
+
+interface TeamScimUserRow {
+  id: string;
+  team_id: string;
+  external_id: string;
+  account_id: string;
+  user_name: string;
+  display_name: string | null;
+  active: boolean;
+  created_at: Date;
+  updated_at: Date;
+  deactivated_at: Date | null;
 }
 
 interface AccountProfileRow {
@@ -3480,6 +3515,449 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     });
   }
 
+  async createTeamScimToken(input: {
+    teamId: string;
+    displayName: string;
+    tokenHash: string;
+    tokenPrefix: string;
+    createdByAccountId: string;
+    expiresAt?: string;
+    audit?: TeamAuditMutationInput;
+  }): Promise<TeamScimTokenRecord> {
+    return this.withTransaction(async (pool) => {
+      const result = await pool.query<TeamScimTokenRow>(
+        `
+          INSERT INTO team_scim_tokens (
+            team_id,
+            display_name,
+            token_hash,
+            token_prefix,
+            created_by_account_id,
+            expires_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6)
+          RETURNING id,
+                    team_id,
+                    display_name,
+                    token_prefix,
+                    created_by_account_id,
+                    created_at,
+                    last_used_at,
+                    revoked_at,
+                    expires_at
+        `,
+        [
+          input.teamId,
+          input.displayName,
+          input.tokenHash,
+          input.tokenPrefix,
+          input.createdByAccountId,
+          input.expiresAt ?? null,
+        ],
+      );
+      const row = result.rows[0];
+
+      if (input.audit) {
+        await this.insertTeamAuditEvent(pool, {
+          teamId: input.teamId,
+          ...input.audit,
+          targetId: input.audit.targetId ?? row.id,
+          metadata: {
+            displayName: row.display_name,
+            tokenPrefix: row.token_prefix,
+            ...(row.expires_at ? { expiresAt: row.expires_at.toISOString() } : {}),
+            ...(input.audit.metadata ?? {}),
+          },
+        });
+      }
+
+      return toTeamScimTokenRecord(row);
+    });
+  }
+
+  async listTeamScimTokens(teamId: string): Promise<TeamScimTokenRecord[]> {
+    const result = await (
+      await this.getPool()
+    ).query<TeamScimTokenRow>(
+      `
+        SELECT id,
+               team_id,
+               display_name,
+               token_prefix,
+               created_by_account_id,
+               created_at,
+               last_used_at,
+               revoked_at,
+               expires_at
+        FROM team_scim_tokens
+        WHERE team_id = $1
+        ORDER BY created_at DESC,
+                 id DESC
+      `,
+      [teamId],
+    );
+
+    return result.rows.map(toTeamScimTokenRecord);
+  }
+
+  async revokeTeamScimToken(input: {
+    teamId: string;
+    tokenId: string;
+    revokedAt: string;
+    audit?: TeamAuditMutationInput;
+  }): Promise<TeamScimTokenRecord | undefined> {
+    return this.withTransaction(async (pool) => {
+      const result = await pool.query<TeamScimTokenRow>(
+        `
+          UPDATE team_scim_tokens
+          SET revoked_at = $3
+          WHERE team_id = $1
+            AND id = $2
+            AND revoked_at IS NULL
+          RETURNING id,
+                    team_id,
+                    display_name,
+                    token_prefix,
+                    created_by_account_id,
+                    created_at,
+                    last_used_at,
+                    revoked_at,
+                    expires_at
+        `,
+        [input.teamId, input.tokenId, input.revokedAt],
+      );
+      const row = result.rows[0];
+
+      if (row && input.audit) {
+        await this.insertTeamAuditEvent(pool, {
+          teamId: input.teamId,
+          ...input.audit,
+          targetId: input.audit.targetId ?? row.id,
+          metadata: {
+            displayName: row.display_name,
+            tokenPrefix: row.token_prefix,
+            ...(input.audit.metadata ?? {}),
+          },
+        });
+      }
+
+      return row ? toTeamScimTokenRecord(row) : undefined;
+    });
+  }
+
+  async resolveTeamScimToken(input: {
+    tokenHash: string;
+    now: string;
+  }): Promise<TeamScimIdentity | undefined> {
+    const result = await (
+      await this.getPool()
+    ).query<TeamScimIdentityRow>(
+      `
+        WITH resolved_token AS (
+          UPDATE team_scim_tokens
+          SET last_used_at = $2
+          WHERE token_hash = $1
+            AND revoked_at IS NULL
+            AND (
+              expires_at IS NULL
+              OR expires_at > $2
+            )
+          RETURNING id,
+                    team_id,
+                    token_prefix,
+                    display_name
+        )
+        SELECT id AS token_id,
+               team_id,
+               token_prefix,
+               display_name
+        FROM resolved_token
+      `,
+      [input.tokenHash, input.now],
+    );
+    const row = result.rows[0];
+
+    return row
+      ? {
+          teamId: row.team_id,
+          tokenId: row.token_id,
+          tokenPrefix: row.token_prefix,
+          displayName: row.display_name,
+        }
+      : undefined;
+  }
+
+  async listTeamScimUsers(teamId: string): Promise<TeamScimUserRecord[]> {
+    const result = await (
+      await this.getPool()
+    ).query<TeamScimUserRow>(
+      `
+        SELECT id,
+               team_id,
+               external_id,
+               account_id,
+               user_name,
+               display_name,
+               active,
+               created_at,
+               updated_at,
+               deactivated_at
+        FROM team_scim_external_users
+        WHERE team_id = $1
+        ORDER BY user_name ASC
+      `,
+      [teamId],
+    );
+
+    return result.rows.map(toTeamScimUserRecord);
+  }
+
+  async getTeamScimUser(input: {
+    teamId: string;
+    userId: string;
+  }): Promise<TeamScimUserRecord | undefined> {
+    const result = await (
+      await this.getPool()
+    ).query<TeamScimUserRow>(
+      `
+        SELECT id,
+               team_id,
+               external_id,
+               account_id,
+               user_name,
+               display_name,
+               active,
+               created_at,
+               updated_at,
+               deactivated_at
+        FROM team_scim_external_users
+        WHERE team_id = $1
+          AND id = $2
+        LIMIT 1
+      `,
+      [input.teamId, input.userId],
+    );
+
+    return result.rows[0] ? toTeamScimUserRecord(result.rows[0]) : undefined;
+  }
+
+  async upsertTeamScimUser(input: {
+    teamId: string;
+    externalId: string;
+    externalSubjectHash: string;
+    userName: string;
+    displayName?: string;
+    active: boolean;
+    rawProfile: Record<string, unknown>;
+    audit?: TeamAuditMutationInput;
+  }): Promise<TeamScimUserRecord | undefined> {
+    return this.withTransaction(async (pool) => {
+      const existing = await pool.query<AccountProfileRow>(
+        `
+          SELECT id,
+                 email,
+                 display_name,
+                 status
+          FROM accounts
+          WHERE lower(email) = lower($1)
+          FOR UPDATE
+        `,
+        [input.userName],
+      );
+      let account = existing.rows[0];
+
+      if (account?.status === 'disabled' && input.active) {
+        return undefined;
+      }
+
+      if (!account) {
+        const inserted = await pool.query<AccountProfileRow>(
+          `
+            INSERT INTO accounts (
+              email,
+              display_name,
+              auth_provider,
+              external_subject_hash
+            )
+            VALUES ($1, $2, 'saml', $3)
+            RETURNING id,
+                      email,
+                      display_name,
+                      status
+          `,
+          [input.userName, input.displayName ?? null, input.externalSubjectHash],
+        );
+        account = inserted.rows[0];
+      } else if (input.displayName && input.displayName !== account.display_name) {
+        const updated = await pool.query<AccountProfileRow>(
+          `
+            UPDATE accounts
+            SET display_name = $2,
+                updated_at = now()
+            WHERE id = $1
+            RETURNING id,
+                      email,
+                      display_name,
+                      status
+          `,
+          [account.id, input.displayName],
+        );
+        account = updated.rows[0];
+      }
+
+      if (input.active) {
+        await pool.query(
+          `
+            INSERT INTO team_memberships (
+              team_id,
+              account_id,
+              role,
+              last_active_at
+            )
+            VALUES ($1, $2, 'member', now())
+            ON CONFLICT (team_id, account_id)
+            DO UPDATE SET
+              last_active_at = EXCLUDED.last_active_at
+          `,
+          [input.teamId, account.id],
+        );
+      } else {
+        await pool.query(
+          `
+            DELETE FROM team_memberships
+            WHERE team_id = $1
+              AND account_id = $2
+          `,
+          [input.teamId, account.id],
+        );
+      }
+
+      const result = await pool.query<TeamScimUserRow>(
+        `
+          INSERT INTO team_scim_external_users (
+            team_id,
+            external_id,
+            account_id,
+            user_name,
+            display_name,
+            active,
+            raw_profile,
+            deactivated_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, CASE WHEN $6 THEN NULL ELSE now() END)
+          ON CONFLICT (team_id, external_id)
+          DO UPDATE SET
+            account_id = EXCLUDED.account_id,
+            user_name = EXCLUDED.user_name,
+            display_name = EXCLUDED.display_name,
+            active = EXCLUDED.active,
+            raw_profile = EXCLUDED.raw_profile,
+            updated_at = now(),
+            deactivated_at = CASE
+              WHEN EXCLUDED.active THEN NULL
+              ELSE COALESCE(team_scim_external_users.deactivated_at, now())
+            END
+          RETURNING id,
+                    team_id,
+                    external_id,
+                    account_id,
+                    user_name,
+                    display_name,
+                    active,
+                    created_at,
+                    updated_at,
+                    deactivated_at
+        `,
+        [
+          input.teamId,
+          input.externalId,
+          account.id,
+          input.userName,
+          input.displayName ?? null,
+          input.active,
+          JSON.stringify(input.rawProfile),
+        ],
+      );
+      const row = result.rows[0];
+
+      if (input.audit) {
+        await this.insertTeamAuditEvent(pool, {
+          teamId: input.teamId,
+          ...input.audit,
+          targetId: input.audit.targetId ?? row.id,
+          metadata: {
+            externalId: row.external_id,
+            userName: row.user_name,
+            active: row.active,
+            ...(input.audit.metadata ?? {}),
+          },
+        });
+      }
+
+      return toTeamScimUserRecord(row);
+    });
+  }
+
+  async deactivateTeamScimUser(input: {
+    teamId: string;
+    userId: string;
+    audit?: TeamAuditMutationInput;
+  }): Promise<TeamScimUserRecord | undefined> {
+    return this.withTransaction(async (pool) => {
+      const result = await pool.query<TeamScimUserRow>(
+        `
+          UPDATE team_scim_external_users
+          SET active = false,
+              updated_at = now(),
+              deactivated_at = COALESCE(deactivated_at, now())
+          WHERE team_id = $1
+            AND id = $2
+          RETURNING id,
+                    team_id,
+                    external_id,
+                    account_id,
+                    user_name,
+                    display_name,
+                    active,
+                    created_at,
+                    updated_at,
+                    deactivated_at
+        `,
+        [input.teamId, input.userId],
+      );
+      const row = result.rows[0];
+
+      if (!row) {
+        return undefined;
+      }
+
+      await pool.query(
+        `
+          DELETE FROM team_memberships
+          WHERE team_id = $1
+            AND account_id = $2
+        `,
+        [input.teamId, row.account_id],
+      );
+
+      if (input.audit) {
+        await this.insertTeamAuditEvent(pool, {
+          teamId: input.teamId,
+          ...input.audit,
+          targetId: input.audit.targetId ?? row.id,
+          metadata: {
+            externalId: row.external_id,
+            userName: row.user_name,
+            active: false,
+            ...(input.audit.metadata ?? {}),
+          },
+        });
+      }
+
+      return toTeamScimUserRecord(row);
+    });
+  }
+
   async createBillingImport(input: {
     importInput: BillingImportInput;
     originalFileSha256: string;
@@ -4770,6 +5248,35 @@ function toTeamAuditEventRecord(row: TeamAuditEventRow): TeamAuditEventRecord {
     ...(row.target_id ? { targetId: row.target_id } : {}),
     metadata: row.metadata ?? {},
     createdAt: row.created_at.toISOString(),
+  };
+}
+
+function toTeamScimTokenRecord(row: TeamScimTokenRow): TeamScimTokenRecord {
+  return {
+    id: row.id,
+    teamId: row.team_id,
+    displayName: row.display_name,
+    tokenPrefix: row.token_prefix,
+    ...(row.created_by_account_id ? { createdByAccountId: row.created_by_account_id } : {}),
+    createdAt: row.created_at.toISOString(),
+    ...(row.last_used_at ? { lastUsedAt: row.last_used_at.toISOString() } : {}),
+    ...(row.revoked_at ? { revokedAt: row.revoked_at.toISOString() } : {}),
+    ...(row.expires_at ? { expiresAt: row.expires_at.toISOString() } : {}),
+  };
+}
+
+function toTeamScimUserRecord(row: TeamScimUserRow): TeamScimUserRecord {
+  return {
+    id: row.id,
+    teamId: row.team_id,
+    externalId: row.external_id,
+    accountId: row.account_id,
+    userName: row.user_name,
+    ...(row.display_name ? { displayName: row.display_name } : {}),
+    active: row.active,
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString(),
+    ...(row.deactivated_at ? { deactivatedAt: row.deactivated_at.toISOString() } : {}),
   };
 }
 

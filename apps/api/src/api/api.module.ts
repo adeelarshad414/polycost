@@ -49,6 +49,8 @@ import { PricingStatusController } from './pricing-status.controller';
 import { RegionsController } from './regions.controller';
 import { RegionsService } from './regions.service';
 import { ReportExportJobsService } from './report-export-jobs.service';
+import { ScimProvisioningController } from './scim-provisioning.controller';
+import { ScimProvisioningService } from './scim-provisioning.service';
 import { SessionAuthGuard } from './session-auth.guard';
 import { TeamAuditExportService } from './team-audit-export.service';
 import { WorkloadController } from './workload.controller';
@@ -75,6 +77,7 @@ import { WorkloadController } from './workload.controller';
     SharedReportsController,
     ExchangeRatesController,
     AuthController,
+    ScimProvisioningController,
     BillingController,
     TerraformGenerationController,
   ],
@@ -103,6 +106,7 @@ import { WorkloadController } from './workload.controller';
         new InvoiceArtifactStorageService(configService, secretsService),
     },
     AuthService,
+    ScimProvisioningService,
     SessionAuthGuard,
     BillingService,
     ComparisonAnalyticsService,

@@ -247,6 +247,12 @@ Evidence:
   reconciliation, and Owner/Admin/Member RBAC enforcement.
 - `apps/api/src/api/auth.controller.spec.ts` proves workspace account/team endpoints
   stay behind the session guard.
+- `apps/api/src/api/scim-provisioning.service.spec.ts` and
+  `apps/api/src/api/scim-provisioning.controller.spec.ts` prove the SCIM
+  provisioning foundation: owner/admin token creation stores only hashes and
+  prefixes, SCIM bearer tokens resolve by hash, `/api/v1/scim/v2/Users` emits
+  standard `ListResponse`/`User` shapes, active users attach as members, and
+  deactivation removes team membership with audit events.
 - `apps/web/src/App.spec.tsx` verifies workspace session UX, invitation state,
   member/role UI state, SSO readiness labels, and RBAC visibility/disabled-control
   behavior.
@@ -265,8 +271,9 @@ Evidence:
 
 Deferred:
 
-- Full enterprise account/team UX, production email delivery, production OIDC/SAML
-  provider handshakes, SSO administration depth, and complete RBAC product polish
+- Full enterprise account/team UX, formal SCIM certification, production email
+  delivery, production OIDC/SAML provider handshakes, SSO administration depth,
+  account recovery, invite/approval workflows, and complete RBAC product polish
   remain future phases.
 
 ## Phase G - Operations, Security And Release Readiness

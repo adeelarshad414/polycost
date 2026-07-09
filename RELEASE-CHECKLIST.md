@@ -41,7 +41,7 @@ Complete this checklist before changing the GitHub repository visibility from pr
 ## Product Honesty
 
 - Confirm README and reports describe pricing as catalog list-price estimates, not invoices.
-- Confirm known future gaps remain plainly stated: invoice-grade billing, full visual VSDX rendering, production SSO/RBAC polish, and Terraform/V3.
+- Confirm known future gaps remain plainly stated: invoice-grade billing, full visual VSDX rendering, formal SCIM/SSO certification and production RBAC polish, and Terraform/V3.
 - Confirm `docs/SECURITY-SUPPRESSIONS.md` is current.
 - Confirm `npm run security:audit` passes the high/critical gate.
 - Confirm audit export receiver evidence is archived before claiming SIEM/WORM

@@ -741,9 +741,12 @@ Machine-readable token evidence:
 - Production LLM classifier quality requires a real endpoint/model, Vault secret, monitored
   corpus evaluation, and false-positive tracking. Phase 2.9 adds an explicit readiness
   surface so stub/unconfigured mode is not reported as production-connected.
-- Full enterprise auth product polish remains future scope: production email, SSO/SAML,
-  SCIM, account recovery, org billing UX, and broader team/account administration.
-  Phase 2.11 closes active workspace switching for existing team memberships.
+- Full enterprise auth product polish remains future scope: production email,
+  production SSO/SAML certification, formal SCIM certification, account recovery,
+  org billing UX, and broader team/account administration. Phase 2.11 closes active
+  workspace switching for existing team memberships, and Phase 2.48 adds the SCIM
+  provisioning foundation with hashed tokens, bearer-token user provisioning, team
+  membership deactivation, and audit events.
 - Terraform generation now has a hardened root bundle, ZIP export, bundle
   manifest, credential-free manifest integrity verifier, validation runner,
   generation profile, private database networking, runtime identity baselines,
