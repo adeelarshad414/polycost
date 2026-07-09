@@ -148,6 +148,7 @@ say so explicitly rather than marking it done.
 | Phase 2.56 - VSDX visual evidence verification          | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.57 - Diagram LLM corpus evidence gate           | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.58 - Enterprise IdP pilot evidence gate         | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.59 - Invoice-of-record pilot evidence gate      | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -344,6 +345,74 @@ Known gaps carried forward:
   Vault-backed secrets, registered redirect/ACS URLs, TLS validation, redacted
   screenshot/configuration evidence, audit-review evidence, and named operator plus
   reviewer attestations.
+
+## Phase 2.59 - Invoice-of-record pilot evidence gate
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added `scripts/invoice-of-record-pilot-evidence-check.mjs`, a machine-readable
+  verifier for sanitized provider invoice-of-record pilot evidence across provider
+  invoice control totals, billing export lineage, private pricing, tax/adjustment
+  classification, commitment inventory/amortization/allocation, artifact governance,
+  retention/notary/audit proof, and finance/security attestations.
+- Added `docs/operations/evidence/invoice-of-record-pilot-evidence.example.json`,
+  a sanitized `example-schema` bundle that validates the evidence contract without
+  claiming provider invoice proof.
+- Added `docs/architecture/phase-2-invoice-of-record-pilot-evidence.md` to document
+  the provider-invoice pilot workflow, strict mode, required finance controls, and
+  boundary that PolyCost is not the provider invoice system of record.
+- Added `npm run invoice:record:evidence:check` and wired it into the aggregate
+  `npm run check` floor.
+- Updated README, `docs/HOW-TO-USE.md`, `docs/PROVIDER-CREDENTIALS.md`,
+  `docs/ARCHITECTURE.md`, release checklist, release-readiness guards,
+  progress-verification guards, and the full-progress ledger.
+
+Verification performed:
+
+- `node --check scripts/invoice-of-record-pilot-evidence-check.mjs` passed.
+- `npm run invoice:record:evidence:check -- --json` passed against the checked-in
+  sample with `verifiedExampleSchema=true`, `verifiedProviderInvoicePilot=false`,
+  `requiredControlCount=12`, and `nonUsageCategoryCount=7`.
+- `npm run invoice:record:evidence:check -- --require-provider-invoice --json`
+  failed as intended against the checked-in sample because it is `example-schema`
+  evidence, uses the `example` provider, targets `staging`, and uses example-only
+  operator/reviewer identities.
+- `npm run invoice:record:evidence:check -- --require-provider-invoice .tmp/invoice-of-record-provider-evidence.json --json`
+  passed against a generated temporary production-shaped bundle with
+  `verifiedProviderInvoicePilot=true`, proving strict mode can accept real evidence
+  once required provider/reviewer fields are present.
+- `npm run release:check` passed and `npm run progress:verify` passed with `296`
+  anchors.
+- Full `npm run check` passed with the invoice-of-record evidence checker in the
+  aggregate floor. The run included API unit `59` suites / `494` tests, web unit
+  `11` suites / `149` tests, graph validation `349` nodes / `349` edges, pricing
+  coverage `36` frontend families, progress verification `296` anchors, release
+  readiness, handover, DevOps/cloud/provider-credential gates, and invoice/
+  Terraform/VSDX/LLM/enterprise-IdP/provider-invoice evidence smokes. Expected
+  caveats remained: `impeccable` is skipped on the repo's Node 20 target, live
+  Postgres migrations were skipped because the local Postgres container was not
+  running, the diagram LLM provider check reports the endpoint/model are not
+  configured in local mode, and the default local env still warns that
+  invoice-artifacts are demo/local without live object-storage/KMS/scanner/WORM
+  settings.
+
+Known gaps carried forward:
+
+- This creates a measurable provider invoice-of-record pilot evidence path, but it
+  does not execute a real AWS/Azure/GCP provider-invoice finance pilot in the
+  default OSS/CI path.
+- PolyCost still is not a provider invoice system of record, tax/legal authority,
+  procurement contract system, payment processor, or billing dispute platform.
+- Real pilot proof still requires `evidenceLevel=provider-invoice-pilot`, strict
+  `npm run invoice:record:evidence:check -- --require-provider-invoice <bundle.json>`,
+  production provider invoice/control-total artifacts, billing export lineage,
+  private rate card/contract/discount evidence, tax/support/credit/marketplace/
+  refund/fee classification, commitment inventory/amortization/allocation proof,
+  retained evidence packets, notary/audit proof, and named finance/security
+  reviewers.
 
 ## Phase V3.6 - Terraform validation evidence
 

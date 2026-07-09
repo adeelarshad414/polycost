@@ -54,6 +54,14 @@ The checked-in example validates the evidence contract only; it is not formal
 SCIM/OIDC/SAML certification. See
 `docs/architecture/phase-2-enterprise-idp-pilot-evidence.md`.
 
+For invoice-of-record pilot evidence, archive sanitized provider invoice, billing
+export, normalized actuals, private-pricing, tax/adjustment, commitment,
+retention/notary/audit, and finance/security review digests, then run
+`npm run invoice:record:evidence:check -- --require-provider-invoice <bundle.json>`.
+The checked-in example validates the contract only; PolyCost still is not the
+provider invoice system of record. See
+`docs/architecture/phase-2-invoice-of-record-pilot-evidence.md`.
+
 ## Monorepo Layout
 
 ```text
@@ -291,6 +299,10 @@ Accounts add workspace controls on top of that core flow:
   configure signed receipts plus provider object-lock or external WORM retention
   posture before claiming durable evidence handoff.
   This improves proof discipline but is not a provider invoice system of record.
+  Provider invoice-of-record pilot evidence can be checked with
+  `npm run invoice:record:evidence:check -- --require-provider-invoice <bundle.json>`
+  after finance/security reviewers archive sanitized invoice, export, contract,
+  tax/adjustment, commitment, retention, notary, and audit digests.
 
 The current self-hosted product does not yet include production IdP certification,
 full email-template management, org billing plans, account recovery UX, complete
@@ -528,6 +540,8 @@ block TCP listeners report a structured skip unless strict mode is enabled.
   documents the Terraform destination evidence capture helper.
 - `docs/architecture/phase-2-enterprise-idp-pilot-evidence.md` documents the
   enterprise IdP pilot evidence contract.
+- `docs/architecture/phase-2-invoice-of-record-pilot-evidence.md` documents the
+  provider invoice-of-record pilot evidence contract.
 - `docs/development/open-source-readiness.md` tracks the private-to-public launch
   checklist.
 - `docs/operations/live-pricing-credentials.md` documents live-pricing ETL,

@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "polycost-invoice-of-record-pilot-evidence/v1",
+  "bundleName": "invoice-of-record-pilot-baseline-evidence",
+  "evidenceLevel": "example-schema",
+  "productionClaim": false,
+  "capturedAt": "2026-07-09T00:00:00.000Z",
+  "environment": "staging",
+  "provider": "example",
+  "providerInvoice": {
+    "invoiceIdRef": "example-invoice-2026-06",
+    "billingAccountRef": "example-billing-account",
+    "invoicePeriodStart": "2026-06-01T00:00:00.000Z",
+    "invoicePeriodEnd": "2026-06-30T23:59:59.000Z",
+    "invoiceDigestSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "currency": "USD",
+    "controlTotal": 25000.42,
+    "invoiceOfRecordArchived": true,
+    "controlTotalVerified": true,
+    "accountScopeDocumented": true,
+    "rawInvoiceBytesExcluded": true
+  },
+  "billingExport": {
+    "sourceSystem": "example-provider-billing-export",
+    "exportManifestSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "normalizedActualsSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "rowCount": 1284,
+    "sourceFingerprintCoverage": 0.99,
+    "exportPeriodMatchesInvoice": true,
+    "rawExportRowsExcluded": true
+  },
+  "reconciliation": {
+    "reconciliationId": "11111111-1111-4111-8111-111111111111",
+    "readiness": "review-ready",
+    "usageComparableVariance": 180.22,
+    "usageComparableVariancePercent": 1.21,
+    "checks": {
+      "providerInvoiceControlTotals": "verified",
+      "billingExportLineage": "verified",
+      "privatePricing": "verified",
+      "taxTreatment": "verified",
+      "creditsAndRefunds": "verified",
+      "supportAndFees": "verified",
+      "marketplaceCharges": "verified",
+      "commitmentInventory": "verified",
+      "commitmentAmortization": "verified",
+      "allocationTags": "verified",
+      "currencyConversion": "verified",
+      "skuMapping": "verified"
+    }
+  },
+  "privatePricing": {
+    "rateCardDigestSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "contractDigestSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "discountScheduleDigestSha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "negotiatedDiscountsReviewed": true,
+    "enterpriseAgreementReviewed": true,
+    "privateOffersReviewed": true
+  },
+  "taxAndAdjustments": {
+    "taxTreatmentDigestSha256": "1212121212121212121212121212121212121212121212121212121212121212",
+    "categories": [
+      "tax",
+      "credit",
+      "support",
+      "marketplace",
+      "refund",
+      "fee",
+      "enterprise-adjustment"
+    ],
+    "taxesClassified": true,
+    "creditsClassified": true,
+    "supportFeesClassified": true,
+    "marketplaceChargesClassified": true,
+    "refundsClassified": true
+  },
+  "commitments": {
+    "inventoryDigestSha256": "2323232323232323232323232323232323232323232323232323232323232323",
+    "amortizationDigestSha256": "3434343434343434343434343434343434343434343434343434343434343434",
+    "allocationDigestSha256": "4545454545454545454545454545454545454545454545454545454545454545",
+    "reservedInstancesReviewed": true,
+    "savingsPlansReviewed": true,
+    "committedUseDiscountsReviewed": true,
+    "unusedCommitmentsClassified": true
+  },
+  "artifacts": {
+    "providerInvoiceSha256": "5656565656565656565656565656565656565656565656565656565656565656",
+    "billingExportManifestSha256": "6767676767676767676767676767676767676767676767676767676767676767",
+    "normalizedActualsSha256": "7878787878787878787878787878787878787878787878787878787878787878",
+    "reconciliationEvidencePacketSha256": "8989898989898989898989898989898989898989898989898989898989898989",
+    "artifactGovernanceManifestSha256": "9090909090909090909090909090909090909090909090909090909090909090",
+    "providerRetentionProofSha256": "abababababababababababababababababababababababababababababababab",
+    "notaryReceiptSha256": "bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc",
+    "auditExportSha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+  },
+  "operatorAttestations": {
+    "providerInvoiceReviewed": true,
+    "financeReviewerApproved": true,
+    "securityReviewerApproved": true,
+    "rawSecretsExcluded": true,
+    "rawInvoiceBytesExcluded": true,
+    "customerPiiRedacted": true,
+    "productionClaimedByPolyCost": false,
+    "operator": "example-only",
+    "financeReviewer": "example-only",
+    "securityReviewer": "example-only"
+  },
+  "caveats": [
+    "This is sanitized sample evidence for CI/schema validation only.",
+    "A real bundle must use evidenceLevel=provider-invoice-pilot after finance/security review of provider invoice-of-record artifacts in production.",
+    "PolyCost still does not become the provider invoice system of record."
+  ]
+}

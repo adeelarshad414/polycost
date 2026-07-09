@@ -105,6 +105,7 @@ async function assertPhaseEvidenceAnchors() {
     'npm run invoice:artifact-scanner:smoke:local',
     'npm run invoice:artifact-rehearsal:plan',
     'npm run invoice:artifact-rehearsal:evidence:check',
+    'npm run invoice:record:evidence:check',
     'npm run terraform:evidence:check',
     'npm run terraform:evidence:capture:smoke',
     'npm run vsdx:visual-evidence:check',
@@ -360,6 +361,14 @@ async function assertPhaseEvidenceAnchors() {
     ['profile archive drift guard', 'archiveReference must match profile evidence'],
   ]);
 
+  await assertFileContains('scripts/invoice-of-record-pilot-evidence-check.mjs', [
+    ['invoice-of-record evidence schema', 'polycost-invoice-of-record-pilot-evidence/v1'],
+    ['invoice-of-record check schema', 'polycost-invoice-of-record-pilot-evidence-check/v1'],
+    ['require provider invoice mode', '--require-provider-invoice'],
+    ['provider invoice control total requirement', 'providerInvoiceControlTotals'],
+    ['raw invoice payload guard', 'findForbiddenRawPayloads'],
+  ]);
+
   await assertFileContains('scripts/provider-credential-check.mjs', [
     ['provider credential JSON schema', 'polycost-provider-credential-check/v1'],
     ['provider credential JSON option', '--json'],
@@ -376,6 +385,16 @@ async function assertPhaseEvidenceAnchors() {
         'invoice-artifact-provider-retention-proof-verification/v1',
       ],
       ['sample caveat', 'sanitized sample evidence for CI/schema validation only'],
+    ],
+  );
+
+  await assertFileContains(
+    'docs/operations/evidence/invoice-of-record-pilot-evidence.example.json',
+    [
+      ['invoice-of-record evidence schema', 'polycost-invoice-of-record-pilot-evidence/v1'],
+      ['sample-only evidence level', 'example-schema'],
+      ['provider invoice pilot caveat', 'evidenceLevel=provider-invoice-pilot'],
+      ['provider invoice control total check', 'providerInvoiceControlTotals'],
     ],
   );
 
@@ -511,6 +530,13 @@ async function assertPhaseEvidenceAnchors() {
     ['enterprise IAM boundary', 'complete hosted IAM product'],
   ]);
 
+  await assertFileContains('docs/architecture/phase-2-invoice-of-record-pilot-evidence.md', [
+    ['invoice-of-record architecture note', 'Phase 2 Invoice-Of-Record Pilot Evidence'],
+    ['invoice-of-record evidence command', 'npm run invoice:record:evidence:check'],
+    ['provider invoice strict mode', '--require-provider-invoice'],
+    ['invoice system boundary', 'provider invoice system of record'],
+  ]);
+
   await assertFileContains('docs/operations/invoice-artifact-production-profile.example.json', [
     ['production profile schema', 'polycost-invoice-artifact-production-profile/v1'],
     ['config-evidence verification level', 'verified(config-evidence)'],
@@ -539,6 +565,7 @@ async function assertPhaseEvidenceAnchors() {
     ['VSDX visual evidence checker ledger', 'npm run vsdx:visual-evidence:check'],
     ['diagram LLM corpus checker ledger', 'npm run diagram:llm-corpus:check'],
     ['enterprise IdP pilot checker ledger', 'npm run enterprise:idp:evidence:check'],
+    ['invoice-of-record pilot checker ledger', 'npm run invoice:record:evidence:check'],
     ['Terraform destination capture checker ledger', 'npm run terraform:evidence:capture:smoke'],
     ['auth enterprise deferred ledger', 'Full enterprise account/team UX'],
     ['auth live transcript ledger', 'workspace-auth-rbac-sso'],

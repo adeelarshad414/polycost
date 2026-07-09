@@ -51,6 +51,9 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Confirm managed enterprise IdP pilot evidence is archived with
   `npm run enterprise:idp:evidence:check -- --require-managed-idp <bundle.json>`
   before claiming Okta/Entra/Auth0/Google Workspace SSO plus SCIM pilot readiness.
+- Confirm provider invoice-of-record pilot evidence is archived with
+  `npm run invoice:record:evidence:check -- --require-provider-invoice <bundle.json>`
+  before claiming invoice-grade finance pilot readiness.
 - Confirm destination Terraform evidence can be assembled from runner artifacts with
   `npm run terraform:evidence:capture:smoke` before claiming Terraform destination-plan
   handoff readiness.
@@ -85,6 +88,7 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Run `npm run vsdx:visual-evidence:check`.
 - Run `npm run diagram:llm-corpus:check`.
 - Run `npm run enterprise:idp:evidence:check`.
+- Run `npm run invoice:record:evidence:check`.
 - Run `npm run release:check`.
 - Run `npm run loading:check`.
 - Run `npm run handover:check`.
