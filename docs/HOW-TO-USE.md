@@ -231,5 +231,9 @@ For finance/FinOps:
     manifest from preflight, capture, and snapshot evidence artifacts, and
     `npm run pricing:catalog:snapshot:capture:archive:build:smoke` to validate
     that flow locally without credentials.
+    Use `npm run pricing:catalog:snapshot:capture:run:plan` and
+    `npm run pricing:catalog:snapshot:capture:run:smoke` before the guarded target
+    run:
+    `POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true npm run pricing:catalog:snapshot:capture:run:live -- --operator <name> --previous-evidence <prior-live-bundle.json>`.
     The checked-in sample can be validated with
     `npm run invoice:record:evidence:check`, but it is schema-only evidence.

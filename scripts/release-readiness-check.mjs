@@ -190,6 +190,15 @@ if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:archive:build']) {
 if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:archive:build:smoke']) {
   failures.push('package.json is missing pricing:catalog:snapshot:capture:archive:build:smoke');
 }
+if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:run:plan']) {
+  failures.push('package.json is missing pricing:catalog:snapshot:capture:run:plan');
+}
+if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:run:smoke']) {
+  failures.push('package.json is missing pricing:catalog:snapshot:capture:run:smoke');
+}
+if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:run:live']) {
+  failures.push('package.json is missing pricing:catalog:snapshot:capture:run:live');
+}
 if (!packageJson.scripts?.['terraform:evidence:check']) {
   failures.push('package.json is missing terraform:evidence:check');
 }
@@ -339,6 +348,11 @@ if (
 ) {
   failures.push(
     'package.json check script must include npm run pricing:catalog:snapshot:capture:archive:build:smoke',
+  );
+}
+if (!packageJson.scripts?.check?.includes('npm run pricing:catalog:snapshot:capture:run:smoke')) {
+  failures.push(
+    'package.json check script must include npm run pricing:catalog:snapshot:capture:run:smoke',
   );
 }
 if (!packageJson.scripts?.check?.includes('npm run terraform:evidence:check')) {
@@ -1087,6 +1101,23 @@ await assertFileContains('scripts/pricing-catalog-live-capture-archive-build.mjs
   ['strict archive option', '--require-live-archive'],
   ['fixture capture smoke command', 'scripts/pricing-catalog-live-snapshot-capture-smoke.mjs'],
   ['strict rejection flag', 'strictLiveRejectedFixtureArchive'],
+]);
+
+await assertFileContains('scripts/pricing-catalog-live-capture-run.mjs', [
+  ['pricing catalog live capture run schema', 'polycost-pricing-catalog-live-capture-run/v1'],
+  [
+    'pricing catalog live capture run plan schema',
+    'polycost-pricing-catalog-live-capture-run-plan/v1',
+  ],
+  [
+    'pricing catalog live capture run smoke schema',
+    'polycost-pricing-catalog-live-capture-run-smoke/v1',
+  ],
+  ['live guard env', 'POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE'],
+  ['archive builder handoff', 'scripts/pricing-catalog-live-capture-archive-build.mjs'],
+  ['strict preflight handoff', 'scripts/pricing-catalog-live-snapshot-capture-preflight.mjs'],
+  ['live capture handoff', 'scripts/pricing-catalog-live-snapshot-capture.mjs'],
+  ['strict live rejection', 'Live run requires'],
 ]);
 
 await assertFileContains(
