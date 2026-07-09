@@ -421,8 +421,11 @@ comparison evidence, and
 `npm run pricing:catalog:snapshot:check -- --require-live-provider <bundle.json>`
 after archiving sanitized live AWS/Azure/GCP catalog snapshot evidence.
 Use `npm run pricing:catalog:snapshot:capture:plan` to inspect the live capture
-requirements without provider calls. To generate sanitized live provider evidence,
-run the guarded operator-side capture command:
+requirements without provider calls. Use
+`npm run pricing:catalog:snapshot:capture:smoke` to replay provider-native
+AWS/Azure/GCP fixture payloads through the capture normalizers without cloud
+credentials. To generate sanitized live provider evidence, run the guarded
+operator-side capture command:
 
 ```bash
 POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true \

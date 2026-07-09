@@ -16,6 +16,20 @@ const DEFAULT_GCP_SERVICE_ID = '6F81-5844-456A';
 const DEFAULT_SAMPLE_LIMIT = 25;
 const PROVIDERS = ['aws', 'azure', 'gcp'];
 const LIVE_GUARD_ENV = 'POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE';
+const FIXTURE_FILENAMES = {
+  aws: {
+    previous: 'aws-previous.json',
+    current: 'aws-current.json',
+  },
+  azure: {
+    previous: 'azure-previous.json',
+    current: 'azure-current.json',
+  },
+  gcp: {
+    previous: 'gcp-previous.json',
+    current: 'gcp-current.json',
+  },
+};
 
 let args;
 
@@ -38,7 +52,11 @@ if (args.version) {
 }
 
 try {
-  const result = args.live ? await runLiveCapture(args) : await runPlan(args);
+  const result = args.fixtureSmoke
+    ? await runFixtureSmokeCapture(args)
+    : args.live
+      ? await runLiveCapture(args)
+      : await runPlan(args);
 
   if (args.json) {
     console.log(JSON.stringify(result, null, 2));
@@ -56,7 +74,7 @@ try {
         {
           ok: false,
           schemaVersion: CAPTURE_SCHEMA,
-          mode: args.live ? 'live' : 'plan',
+          mode: args.fixtureSmoke ? 'fixture-smoke' : args.live ? 'live' : 'plan',
           failures: [message],
         },
         null,
@@ -74,6 +92,8 @@ function parseArgs(argv) {
   const options = {
     live: false,
     plan: false,
+    fixtureSmoke: false,
+    fixtureDir: undefined,
     outputDir: DEFAULT_OUTPUT_DIR,
     previousEvidencePath: undefined,
     operator: process.env.POLYCOST_OPERATOR,
@@ -114,6 +134,19 @@ function parseArgs(argv) {
     }
     if (arg === '--live') {
       options.live = true;
+      continue;
+    }
+    if (arg === '--fixture-smoke') {
+      options.fixtureSmoke = true;
+      continue;
+    }
+    if (arg === '--fixture-dir') {
+      options.fixtureDir = readOptionValue(argv, index, '--fixture-dir');
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith('--fixture-dir=')) {
+      options.fixtureDir = arg.slice('--fixture-dir='.length).trim();
       continue;
     }
     if (arg === '--output-dir') {
@@ -204,8 +237,12 @@ function parseArgs(argv) {
   if (!Number.isInteger(options.freshnessSlaHours) || options.freshnessSlaHours <= 0) {
     throw new Error('PRICING_CATALOG_SNAPSHOT_FRESHNESS_HOURS must be a positive integer.');
   }
-  if (options.live && options.plan) {
-    throw new Error('Use either --live or --plan, not both.');
+  const selectedModes = [options.live, options.plan, options.fixtureSmoke].filter(Boolean).length;
+  if (selectedModes > 1) {
+    throw new Error('Use only one of --live, --plan, or --fixture-smoke.');
+  }
+  if (options.fixtureSmoke && !options.fixtureDir) {
+    throw new Error('--fixture-dir is required with --fixture-smoke.');
   }
 
   return options;
@@ -370,6 +407,141 @@ async function runLiveCapture(options) {
   };
 }
 
+async function runFixtureSmokeCapture(options) {
+  const root = process.cwd();
+  const outputDir = path.resolve(root, options.outputDir);
+  const fixtureDir = path.resolve(root, options.fixtureDir);
+  const capturedAt = new Date().toISOString();
+  const previousCapturedAt = new Date(Date.parse(capturedAt) - 60 * 60 * 1000).toISOString();
+  const previousRowsByProvider = new Map();
+  const currentRowsByProvider = new Map();
+
+  previousRowsByProvider.set(
+    'aws',
+    normalizeAwsRows({
+      payload: await readFixturePayload(fixtureDir, 'aws', 'previous'),
+      options,
+      endpoint: awsOfferUrl(options.awsOfferCode),
+      fetchedAt: previousCapturedAt,
+    }),
+  );
+  currentRowsByProvider.set(
+    'aws',
+    normalizeAwsRows({
+      payload: await readFixturePayload(fixtureDir, 'aws', 'current'),
+      options,
+      endpoint: awsOfferUrl(options.awsOfferCode),
+      fetchedAt: capturedAt,
+    }),
+  );
+  previousRowsByProvider.set(
+    'azure',
+    normalizeAzureRows({
+      payload: await readFixturePayload(fixtureDir, 'azure', 'previous'),
+      options,
+      endpoint: azureRetailPricesUrl(options.azureRegion),
+      fetchedAt: previousCapturedAt,
+    }),
+  );
+  currentRowsByProvider.set(
+    'azure',
+    normalizeAzureRows({
+      payload: await readFixturePayload(fixtureDir, 'azure', 'current'),
+      options,
+      endpoint: azureRetailPricesUrl(options.azureRegion),
+      fetchedAt: capturedAt,
+    }),
+  );
+  previousRowsByProvider.set(
+    'gcp',
+    normalizeGcpRows({
+      payload: await readFixturePayload(fixtureDir, 'gcp', 'previous'),
+      options,
+      endpoint: gcpSkusUrl(options.gcpServiceId),
+      fetchedAt: previousCapturedAt,
+    }),
+  );
+  currentRowsByProvider.set(
+    'gcp',
+    normalizeGcpRows({
+      payload: await readFixturePayload(fixtureDir, 'gcp', 'current'),
+      options,
+      endpoint: gcpSkusUrl(options.gcpServiceId),
+      fetchedAt: capturedAt,
+    }),
+  );
+
+  const providerSnapshots = PROVIDERS.map((provider) => {
+    const currentRows = currentRowsByProvider.get(provider);
+    const previousRows = previousRowsByProvider.get(provider);
+
+    return buildProviderSnapshot({
+      provider,
+      sourceSystem: `${sourceSystemForProvider(provider)}-fixture-replay`,
+      sourceMode: 'fixture-replay',
+      publicEndpoints: [...new Set(currentRows.map((row) => row.sourceEndpoint))],
+      previousRows,
+      currentRows,
+    });
+  });
+  const snapshotWindow = summarizeWindow(providerSnapshots);
+  const evidence = {
+    schemaVersion: EVIDENCE_SCHEMA,
+    bundleName: 'pricing-catalog-live-capture-fixture-smoke-evidence',
+    evidenceLevel: 'provider-snapshot-smoke',
+    productionClaim: false,
+    capturedAt,
+    freshnessSlaHours: options.freshnessSlaHours,
+    snapshotWindow,
+    providerSnapshots,
+    operatorAttestations: {
+      rawCatalogPayloadExcluded: true,
+      credentialsExcluded: true,
+      signedUrlsExcluded: true,
+      liveProviderEndpointsReviewed: false,
+      productionClaimedByPolyCost: false,
+      operator: 'pricing-catalog-live-snapshot-capture-smoke',
+    },
+    caveats: [
+      'This fixture smoke replays provider-native AWS/Azure/GCP catalog payloads through the live capture normalizers without provider network calls.',
+      'It proves parser/normalizer coverage, hash coverage, and exact row-change math; it is not live provider API proof.',
+      'Use --live with POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true and --require-live-provider evidence before claiming live provider snapshot proof.',
+    ],
+  };
+  const evidencePath = path.join(outputDir, 'pricing-catalog-live-capture-fixture-evidence.json');
+  const providerSnapshotPaths = {};
+
+  await mkdir(outputDir, { recursive: true });
+  await writeJson(evidencePath, evidence);
+  for (const snapshot of providerSnapshots) {
+    const filePath = path.join(outputDir, `${snapshot.provider}-fixture-row-samples.json`);
+    providerSnapshotPaths[snapshot.provider] = filePath;
+    await writeJson(filePath, snapshot.rowSamples);
+  }
+
+  const check = runSnapshotEvidenceCheck({
+    root,
+    evidencePath,
+    requireLiveProvider: false,
+  });
+
+  return {
+    ok: true,
+    schemaVersion: CAPTURE_SCHEMA,
+    mode: 'fixture-smoke',
+    fixtureDir,
+    outputDir,
+    evidencePath,
+    providerSnapshotPaths,
+    providerCount: providerSnapshots.length,
+    changedRowCount: snapshotWindow.changedRowCount,
+    priceChangedSkuCount: snapshotWindow.priceChangedSkuCount,
+    verifiedProviderSnapshot: check.verifiedProviderSnapshot === true,
+    verifiedLiveProviderSnapshot: false,
+    caveats: evidence.caveats,
+  };
+}
+
 function assertLiveGuard(options) {
   if (process.env[LIVE_GUARD_ENV] !== 'true') {
     throw new Error(`${LIVE_GUARD_ENV}=true is required before live provider capture.`);
@@ -429,6 +601,11 @@ async function readPreviousEvidence(root, evidencePath) {
 async function fetchAwsRows(options, fetchedAt) {
   const endpoint = awsOfferUrl(options.awsOfferCode);
   const payload = await fetchJson(endpoint, {});
+
+  return normalizeAwsRows({ payload, options, endpoint, fetchedAt });
+}
+
+function normalizeAwsRows({ payload, options, endpoint, fetchedAt }) {
   const products = plainObject(payload.products) ? Object.values(payload.products) : [];
   const onDemandTerms = plainObject(payload.terms?.OnDemand) ? payload.terms.OnDemand : {};
   const rows = [];
@@ -498,6 +675,11 @@ async function fetchAwsRows(options, fetchedAt) {
 async function fetchAzureRows(options, fetchedAt) {
   const endpoint = azureRetailPricesUrl(options.azureRegion);
   const payload = await fetchJson(endpoint, {});
+
+  return normalizeAzureRows({ payload, options, endpoint, fetchedAt });
+}
+
+function normalizeAzureRows({ payload, options, endpoint, fetchedAt }) {
   const items = Array.isArray(payload.Items) ? payload.Items : [];
   const rows = [];
 
@@ -549,6 +731,11 @@ async function fetchGcpRows(options, fetchedAt) {
   const payload = await fetchJson(endpoint, {
     Authorization: `Bearer ${token}`,
   });
+
+  return normalizeGcpRows({ payload, options, endpoint, fetchedAt });
+}
+
+function normalizeGcpRows({ payload, options, endpoint, fetchedAt }) {
   const skus = Array.isArray(payload.skus) ? payload.skus : [];
   const rows = [];
 
@@ -595,6 +782,16 @@ async function fetchGcpRows(options, fetchedAt) {
   }
 
   return requireRows('gcp', rows);
+}
+
+async function readFixturePayload(fixtureDir, provider, phase) {
+  const fileName = FIXTURE_FILENAMES[provider]?.[phase];
+  if (!fileName) {
+    throw new Error(`Unsupported fixture payload ${provider}/${phase}.`);
+  }
+
+  const fixturePath = path.join(fixtureDir, fileName);
+  return parseJsonObject(await readFile(fixturePath, 'utf8'), fixturePath);
 }
 
 async function fetchJson(url, headers) {
@@ -727,6 +924,7 @@ function requireRows(provider, rows) {
 function buildProviderSnapshot({
   provider,
   sourceSystem,
+  sourceMode = 'provider-api',
   publicEndpoints,
   previousRows,
   currentRows,
@@ -736,7 +934,7 @@ function buildProviderSnapshot({
   return {
     provider,
     sourceSystem,
-    sourceMode: 'provider-api',
+    sourceMode,
     catalogGeneratedAt: maxIso(currentRows.map((row) => row.fetchedAt)),
     snapshotSha256: sha256(canonicalJson(currentRows)),
     previousSnapshotSha256: sha256(canonicalJson(previousRows)),
@@ -806,12 +1004,12 @@ function summarizeWindow(providerSnapshots) {
   };
 }
 
-function runSnapshotEvidenceCheck({ root, evidencePath }) {
+function runSnapshotEvidenceCheck({ root, evidencePath, requireLiveProvider = true }) {
   const child = spawnSync(
     process.execPath,
     [
       'scripts/pricing-catalog-snapshot-evidence-check.mjs',
-      '--require-live-provider',
+      requireLiveProvider ? '--require-live-provider' : '--require-provider-snapshot',
       evidencePath,
       '--json',
     ],
@@ -997,6 +1195,13 @@ function printResult(result) {
     console.log(`Output directory: ${path.relative(process.cwd(), result.outputDir)}`);
     return;
   }
+  if (result.mode === 'fixture-smoke') {
+    console.log(
+      `Pricing catalog live capture fixture smoke passed (${result.providerCount} providers; ${result.changedRowCount} changed rows).`,
+    );
+    console.log(`Evidence bundle: ${path.relative(process.cwd(), result.evidencePath)}`);
+    return;
+  }
 
   console.log(
     `Pricing catalog live snapshot capture passed (${result.providerCount} providers; ${result.changedRowCount} changed rows).`,
@@ -1009,10 +1214,13 @@ function printHelp() {
 
 Usage:
   node scripts/pricing-catalog-live-snapshot-capture.mjs [--plan]
+  node scripts/pricing-catalog-live-snapshot-capture.mjs --fixture-smoke --fixture-dir <dir>
   ${LIVE_GUARD_ENV}=true node scripts/pricing-catalog-live-snapshot-capture.mjs --live --operator <name> --previous-evidence <bundle.json>
 
 Options:
   --plan                         Print the live capture plan without network calls (default)
+  --fixture-smoke                Replay provider-native fixture payloads through capture normalizers
+  --fixture-dir <path>           Directory containing aws/azure/gcp previous/current fixture JSON
   --live                         Capture sanitized evidence from provider catalog APIs
   --previous-evidence <path>     Prior live-provider evidence bundle for exact row-change proof
   --operator <name>              Human/operator reviewer name for live evidence attestation

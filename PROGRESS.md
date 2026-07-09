@@ -156,6 +156,7 @@ say so explicitly rather than marking it done.
 | Phase 2.64 - Invoice pricing lineage evidence smoke     | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.65 - Pricing catalog snapshot evidence          | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.66 - Live catalog snapshot capture guard        | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.67 - Live catalog capture fixture smoke         | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -834,6 +835,60 @@ Known gaps carried forward:
 - Even verified live catalog snapshots remain catalog list-price evidence, not
   invoice-grade billing, private discounts, taxes, credits, support, marketplace,
   or provider invoice-of-record proof.
+
+## Phase 2.67 - Live catalog capture fixture smoke
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Refactored `scripts/pricing-catalog-live-snapshot-capture.mjs` so AWS Price
+  List, Azure Retail Prices, and GCP Cloud Billing payload normalization can be
+  exercised separately from provider network fetches.
+- Added `--fixture-smoke --fixture-dir <dir>` to the capture runner. This mode
+  replays provider-native previous/current fixture payloads through the same
+  normalizers, emits `provider-snapshot-smoke` evidence, and validates it with
+  `--require-provider-snapshot`.
+- Added `scripts/pricing-catalog-live-snapshot-capture-smoke.mjs`, which
+  generates AWS/Azure/GCP provider-native fixture payloads, changes one
+  price-bearing row per provider, scrubs live guard and credential env vars, runs
+  the fixture capture mode, and confirms `--require-live-provider` rejects the
+  fixture evidence.
+- Added `npm run pricing:catalog:snapshot:capture:smoke` to the aggregate
+  `npm run check` floor and wired it into release/progress verification.
+- Updated README, operator credential docs, release checklist, architecture notes,
+  full-progress ledger, and the production-readiness report.
+
+Verification performed:
+
+- `node --check scripts/pricing-catalog-live-snapshot-capture.mjs` passed.
+- `node --check scripts/pricing-catalog-live-snapshot-capture-smoke.mjs` passed.
+- `node scripts/pricing-catalog-live-snapshot-capture-smoke.mjs --json` passed
+  with `providerCount=3`, `changedRowCount=3`, `priceChangedSkuCount=3`,
+  `verifiedProviderSnapshot=true`, `verifiedLiveProviderSnapshot=false`, and
+  `strictLiveRejectedFixtureEvidence=true`.
+- Full `npm run check` passed with API unit `59` suites / `494` tests, web unit
+  `11` suites / `149` tests, graph validation `358` nodes / `358` edges, pricing
+  coverage `36` frontend families, progress verification `406` anchors, and the
+  live capture fixture smoke in the aggregate floor. Expected caveats remained:
+  invoice artifact scanner local smoke skipped live local TCP binding when the
+  sandbox blocked it, `impeccable` is skipped on the repo's Node 20 target, live
+  Postgres migrations were skipped because the local Postgres container was not
+  running, the diagram LLM provider check reports the endpoint/model are not
+  configured in local mode, and the default local env still warns that
+  invoice-artifacts are demo/local without live object-storage/KMS/scanner/WORM
+  settings.
+
+Known gaps carried forward:
+
+- This proves provider-native fixture replay through the capture normalizers, not
+  real provider network access or GCP Cloud Billing credential validity.
+- A real `verifiedLiveProviderSnapshot=true` bundle still requires the guarded
+  `--live` path, operator network access, GCP Cloud Billing read credentials, a
+  prior live evidence bundle, and archived sanitized output.
+- Even live catalog snapshot proof remains catalog list-price evidence, not
+  invoice-grade billing or provider invoice-of-record reconciliation.
 
 ## Phase V3.6 - Terraform validation evidence
 
