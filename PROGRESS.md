@@ -135,6 +135,7 @@ say so explicitly rather than marking it done.
 | Phase 2.43 - Provider retention proof artifact verifier | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.44 - Provider retention proof capture planner   | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.45 - Provider retention proof API intake        | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.46 - Provider retention proof row persistence   | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -5016,6 +5017,43 @@ Status: implemented and verified locally on 2026-07-09.
 - Remaining caveat: this endpoint ingests and audits captured proof metadata only.
   It still does not execute provider control-plane calls, hold cloud credentials,
   prove full chain of custody, or replace legal retention sufficiency review.
+
+## Phase 2.46 — Provider retention proof row persistence
+
+Status: implemented and verified locally on 2026-07-09.
+
+- Added migration `039_invoice_artifact_provider_retention_proof_persistence.sql`
+  with additive proof columns on `invoice_artifact_blobs`, status/source/mode/
+  digest/reference/caveat constraints, an indexed proof status read path, and a
+  refreshed `team_audit_events` action constraint that includes the current
+  invoice artifact and evidence-packet actions.
+- Updated fresh Docker database bootstrap and `scripts/db.mjs` migration
+  validation so a clean self-hosted stack applies migrations through `039`, not
+  only the older billing/auth migration range.
+- Updated artifact upload and proof attach persistence so provider-retention
+  proof metadata is stored with the exact artifact blob row and reconstructed by
+  `getInvoiceArtifactBlob` for externally stored artifacts, instead of falling
+  back to `missing` when the evidence packet already held a proof.
+- Added focused regression coverage for service wiring, signed URL rejection,
+  proof row update SQL, database-backed insert defaults, and external-object
+  readback as `provider-verified`.
+- Verification: `npm run format`, focused API test
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/api/api-database.repository.spec.ts`
+  passed with 2 suites / 79 tests, `npm run db:validate` passed with live
+  `schema_migrations` inspection skipped because the local Postgres container was
+  not running, and `npm run release:check` passed. Full `npm run check` also
+  passed with API 56 suites / 474 tests, web 11 suites / 147 tests, graph
+  validation 322 nodes / 322 edges, pricing coverage, progress verification 153
+  anchors, QA/security suppression hygiene, DB, DevOps, cloud, release, handover,
+  and provider-credential gates green. Expected caveats remained: optional
+  `npm run impeccable` skipped because the repo targets Node 20 and the tool
+  requires Node 24, DB validation skipped live `schema_migrations` inspection
+  because local Postgres was not running, and provider credentials warned that
+  invoice artifact governance is still demo/local by default.
+- Remaining caveat: PolyCost now persists attached provider-retention proof in
+  the artifact blob read model, but it still does not execute provider
+  control-plane calls, hold cloud credentials, prove chain of custody, or replace
+  legal retention sufficiency review.
 
 ## Deviations from spec log
 

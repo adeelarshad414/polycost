@@ -256,6 +256,13 @@ or `https://`) with no query string or fragment. Do not paste signed URLs, SAS
 tokens, bearer tokens, or temporary credentials into PolyCost evidence or audit
 metadata.
 
+After a successful attach, PolyCost persists the proof status, source, checked
+timestamp, retention mode, durable reference, digest, and bounded caveats on the
+matching `invoice_artifact_blobs` row. Artifact blob readback reconstructs
+external object-store records from those columns, so reviewer downloads and
+evidence packets no longer depend only on the reconciliation evidence JSON for
+provider-retention proof status.
+
 The evidence packet aggregates these manifests as
 `providerRetentionProofMissingCount`, `providerRetentionProofDeclaredCount`, and
 `providerRetentionProofVerifiedCount`. The `providerRetentionProofReady` production

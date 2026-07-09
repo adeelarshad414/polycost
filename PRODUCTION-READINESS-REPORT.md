@@ -84,6 +84,7 @@ performance/accessibility/best-practices/SEO metrics.
 | INV-TRACE-025  | Improved      | Invoice evidence notary receiver smoke commands now prove the HMAC receiver contract locally and against HTTPS staging receivers, with JSONL artifact capture and release-readiness documentation gates                                                 |
 | INV-TRACE-026  | Improved      | A self-hostable notary reference receiver now verifies signed evidence handoffs, exposes health/readiness, writes append-only JSONL receipts, ships with Docker packaging, and has an end-to-end smoke harness                                          |
 | INV-TRACE-027  | Improved      | Provider retention proof verifier output can now be attached to exact externally stored invoice artifacts through an Owner/Admin API handoff with SHA-256 validation, signed URL rejection, evidence-packet gate updates, and audit logging             |
+| INV-TRACE-028  | Improved      | Attached provider retention proof metadata now persists on the exact `invoice_artifact_blobs` row, refreshes the artifact read model, extends clean Docker migrations through `039`, and release-gates the schema/audit action constraints              |
 | VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                                                                                             |
 | VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                                                                                             |
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                                                                                        |
@@ -720,7 +721,10 @@ Machine-readable token evidence:
   Phase 2.45 adds an Owner/Admin API handoff that attaches offline verifier output
   to the exact externally stored invoice artifact, rejects signed URL/SAS-style
   proof references, audits the attach action, and lets artifact-level verified
-  proof satisfy the packet provider-retention proof gate.
+  proof satisfy the packet provider-retention proof gate. Phase 2.46 persists
+  attached proof metadata onto the exact `invoice_artifact_blobs` row, reconstructs
+  externally stored artifact read models from those proof columns, and extends
+  clean Docker/database migration gates through `039`.
   PolyCost still does not provide provider invoice rendering, private contract
   validation, automated cloud-control-plane WORM object-store proof capture,
   receiver-side immutability proof, external legal-review routing, contract/legal

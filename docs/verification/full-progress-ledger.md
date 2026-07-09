@@ -681,3 +681,43 @@ Honest boundary:
 - The intake endpoint persists proof metadata only. PolyCost still does not run
   cloud provider APIs, receive provider credentials for proof capture, prove full
   chain of custody, or replace legal retention sufficiency review.
+
+## Phase 2.46 - Provider Retention Proof Row Persistence
+
+Status: implemented and verified locally on 2026-07-09.
+
+Evidence added:
+
+- Migration `039_invoice_artifact_provider_retention_proof_persistence.sql`
+  adds nullable provider-retention proof columns to `invoice_artifact_blobs`,
+  enforces status/source/mode/reference/digest/caveat constraints, indexes
+  persisted proof status, and refreshes the team audit action allow-list for the
+  current invoice artifact/evidence actions.
+- Fresh Docker database initialization and `scripts/db.mjs` validation now include
+  migration `039`, closing the clean-clone schema drift between local migrations
+  and first-run Postgres bootstrap.
+- Artifact upload and proof attach persistence now write declared or
+  provider-verified proof metadata to the exact artifact blob row, and
+  `getInvoiceArtifactBlob` reconstructs externally stored rows as
+  `provider-verified` when proof columns are present.
+- Focused API/repository regressions prove successful service wiring, signed URL
+  rejection, database-backed insert defaults, proof row update SQL, audit action
+  persistence, and external blob readback.
+- Verification passed with `npm run format`, focused API tests
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/api/api-database.repository.spec.ts`
+  (2 suites / 79 tests), `npm run db:validate`, and
+  `npm run release:check`. Full `npm run check` passed with API 56 suites / 474
+  tests, web 11 suites / 147 tests, graph validation 322 nodes / 322 edges,
+  pricing coverage, progress verification 153 anchors, QA/security suppression
+  hygiene, DB, DevOps, cloud, release, handover, and provider-credential gates.
+  Expected caveats remained: optional impeccable skipped on Node 20, live DB
+  `schema_migrations` inspection was skipped because the local Postgres container
+  was not running, and local invoice artifact governance remains demo/default
+  unless production object storage controls are configured.
+
+Honest boundary:
+
+- This phase closes the artifact-row/read-model persistence gap for attached
+  proof metadata. PolyCost still does not execute provider control-plane proof
+  capture, hold provider credentials, prove chain of custody, or replace legal
+  retention sufficiency review.
