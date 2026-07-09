@@ -453,6 +453,10 @@ before claiming archived live-provider capture proof. The archive verifier check
 the bundle digest, strict preflight posture, capture metadata, provider coverage,
 and the underlying `--require-live-provider` snapshot checker result without
 printing credentials or raw provider payloads.
+Generate the archive manifest with
+`npm run pricing:catalog:snapshot:capture:archive:build -- --preflight <preflight.json> --capture <capture.json> --snapshot-evidence <bundle.json> --operator "<reviewer-name>" --output <archive.json> --require-live-archive`.
+Use `npm run pricing:catalog:snapshot:capture:archive:build:smoke` for the local
+credential-free builder proof.
 
 The checked-in example can be validated with `npm run invoice:record:evidence:check`
 for schema coverage only. It is not provider invoice proof and does not make

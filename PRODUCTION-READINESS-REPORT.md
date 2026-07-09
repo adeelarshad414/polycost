@@ -1,7 +1,7 @@
 # PolyCost Production Readiness Report
 
 Date: 2026-07-09
-Branch: cumulative production-readiness branches through `codex/pricing-live-evidence-archive`
+Branch: cumulative production-readiness branches through `codex/pricing-live-archive-builder`
 PR: local phase gate, PR created after verification
 Run spec: `docs/design/master-production-readiness-orchestrator-v2.md`
 
@@ -96,6 +96,7 @@ performance/accessibility/best-practices/SEO metrics.
 | INV-TRACE-037  | Improved      | Phase 2.67 adds `npm run pricing:catalog:snapshot:capture:smoke`, replaying provider-native AWS/Azure/GCP fixtures through live capture normalizers without credentials while proving strict live-provider rejection for fixture evidence                        |
 | INV-TRACE-038  | Improved      | Phase 2.68 adds `npm run pricing:catalog:snapshot:capture:preflight` and strict target-environment mode, checking live guard, reviewer, prior live evidence, GCP credential source, endpoints, and no-secret output posture before live capture                  |
 | INV-TRACE-039  | Improved      | Phase 2.69 adds `npm run pricing:catalog:snapshot:capture:archive:check` and strict archive mode, binding live capture manifests to exact evidence file digests, preflight posture, capture metadata, provider coverage, and strict snapshot checker output      |
+| INV-TRACE-040  | Improved      | Phase 2.70 adds `npm run pricing:catalog:snapshot:capture:archive:build` plus a credential-free builder smoke, generating archive manifests from preflight/capture/snapshot artifacts and proving strict live archive rejection for fixture evidence             |
 | VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                                                                                                      |
 | VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                                                                                                      |
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                                                                                                 |
@@ -395,6 +396,23 @@ Local static/regression gates:
     suites / `149` tests, graph validation `359` nodes / `359` edges, pricing
     coverage `36` frontend families, progress verification `423` anchors, and
     the archive checker in the aggregate floor. Expected caveats remained:
+    local invoice artifact scanner smoke skipped because TCP bind is blocked in
+    this sandbox, `impeccable` is skipped on the repo's Node 20 target, live
+    Postgres migrations were skipped because the local Postgres container was
+    not running, and provider credential checks still warn that invoice-artifact
+    governance is demo/local without live object-storage/KMS/scanner/WORM
+    settings.
+- Phase 2.70 live catalog archive builder smoke gates passed:
+  - `node --check scripts/pricing-catalog-live-capture-archive-build.mjs`
+    passed.
+  - `node scripts/pricing-catalog-live-capture-archive-build.mjs --smoke --json`
+    passed with `verifiedExampleArchive=true`,
+    `verifiedLiveCaptureArchive=false`, and
+    `strictLiveRejectedFixtureArchive=true`.
+  - Full `npm run check` passed with API `59` suites / `494` tests, web `11`
+    suites / `149` tests, graph validation `359` nodes / `359` edges, pricing
+    coverage `36` frontend families, progress verification `430` anchors, and
+    the archive builder smoke in the aggregate floor. Expected caveats remained:
     local invoice artifact scanner smoke skipped because TCP bind is blocked in
     this sandbox, `impeccable` is skipped on the repo's Node 20 target, live
     Postgres migrations were skipped because the local Postgres container was
@@ -1027,6 +1045,9 @@ Machine-readable token evidence:
   be bound to exact evidence file digests, strict preflight posture, capture
   metadata, provider coverage, and strict snapshot checker output before anyone
   claims archived live-provider proof.
+  Phase 2.70 adds archive-manifest generation from preflight, capture, and
+  snapshot evidence artifacts, with a credential-free smoke that proves fixture
+  archives remain rejected by strict live archive verification.
   These phases do not replace provider invoice rendering, private contract/legal
   validation, or provider-authenticated invoice-of-record reconciliation.
   Phase 2.25 adds durable database-backed artifact file upload/download with

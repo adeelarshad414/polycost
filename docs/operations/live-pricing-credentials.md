@@ -163,6 +163,26 @@ archive must pass strict mode:
 npm run pricing:catalog:snapshot:capture:archive:strict -- <archive.json>
 ```
 
+To generate the archive manifest from the captured artifacts instead of editing
+JSON by hand, write the preflight and capture command outputs with `--json`, then
+run:
+
+```bash
+npm run pricing:catalog:snapshot:capture:archive:build -- \
+  --preflight <preflight.json> \
+  --capture <capture.json> \
+  --snapshot-evidence <bundle.json> \
+  --operator "<reviewer-name>" \
+  --output <archive.json> \
+  --require-live-archive
+```
+
+For local credential-free verification of the builder handoff, run:
+
+```bash
+npm run pricing:catalog:snapshot:capture:archive:build:smoke
+```
+
 The archive verifier checks the manifest schema, operator attestation, strict
 preflight posture, capture metadata, AWS/Azure/GCP provider coverage, referenced
 evidence file SHA-256 digest, and the underlying

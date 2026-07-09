@@ -97,6 +97,24 @@ Use strict archive mode before claiming live-provider archive proof:
 npm run pricing:catalog:snapshot:capture:archive:strict -- <archive.json>
 ```
 
+Generate that archive manifest from captured artifacts:
+
+```bash
+npm run pricing:catalog:snapshot:capture:archive:build -- \
+  --preflight <preflight.json> \
+  --capture <capture.json> \
+  --snapshot-evidence <evidence.json> \
+  --operator "<reviewer-name>" \
+  --output <archive.json> \
+  --require-live-archive
+```
+
+The local builder smoke proves this handoff without provider credentials:
+
+```bash
+npm run pricing:catalog:snapshot:capture:archive:build:smoke
+```
+
 The archive verifier checks the manifest schema, referenced evidence SHA-256,
 operator attestation, strict preflight posture, capture metadata, provider
 coverage, and the underlying `--require-live-provider` result. The checked-in

@@ -227,5 +227,9 @@ For finance/FinOps:
     `npm run pricing:catalog:snapshot:capture:archive:check`. Use
     `npm run pricing:catalog:snapshot:capture:archive:strict -- <archive.json>`
     before claiming archived live-provider capture proof.
+    Use `npm run pricing:catalog:snapshot:capture:archive:build` to generate the
+    manifest from preflight, capture, and snapshot evidence artifacts, and
+    `npm run pricing:catalog:snapshot:capture:archive:build:smoke` to validate
+    that flow locally without credentials.
     The checked-in sample can be validated with
     `npm run invoice:record:evidence:check`, but it is schema-only evidence.

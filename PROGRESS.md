@@ -159,6 +159,7 @@ say so explicitly rather than marking it done.
 | Phase 2.67 - Live catalog capture fixture smoke         | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.68 - Live catalog capture readiness preflight   | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.69 - Live catalog capture archive proof         | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.70 - Live catalog archive builder smoke         | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -1006,6 +1007,61 @@ Known gaps carried forward:
   manifest whose referenced bundle passes `--require-live-provider`.
 - Even archived live catalog capture proof remains catalog list-price evidence,
   not invoice-grade billing or provider invoice-of-record reconciliation.
+
+## Phase 2.70 - Live catalog archive builder smoke
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added `scripts/pricing-catalog-live-capture-archive-build.mjs`, an
+  operator-side manifest builder that generates archive manifests from preflight,
+  capture, and snapshot evidence JSON artifacts.
+- Added `npm run pricing:catalog:snapshot:capture:archive:build` for target
+  artifact assembly and
+  `npm run pricing:catalog:snapshot:capture:archive:build:smoke` for a
+  credential-free local builder proof.
+- The builder computes the referenced evidence SHA-256, derives AWS/Azure/GCP
+  provider coverage from the snapshot evidence, records preflight check IDs and
+  capture metadata, invokes the archive checker, and supports
+  `--require-live-archive` for target environments.
+- The smoke path generates local advisory preflight output, provider-native
+  fixture capture evidence, builds an archive manifest, validates it, and proves
+  strict live archive mode rejects fixture evidence.
+- Wired the builder smoke into `npm run check`, release readiness, progress
+  verification, README, HOW-TO, provider credential docs, live pricing runbook,
+  architecture notes, release checklist, full-progress ledger, and the
+  production-readiness report.
+
+Verification performed:
+
+- `node --check scripts/pricing-catalog-live-capture-archive-build.mjs` passed.
+- `node scripts/pricing-catalog-live-capture-archive-build.mjs --smoke --json`
+  passed with `verifiedExampleArchive=true`,
+  `verifiedLiveCaptureArchive=false`, and
+  `strictLiveRejectedFixtureArchive=true`.
+- Full `npm run check` passed with the archive builder smoke in the aggregate
+  floor: API unit `59` suites / `494` tests, web unit `11` suites / `149` tests,
+  graph validation `359` nodes / `359` edges, pricing coverage `36` frontend
+  families, progress verification `430` anchors, release readiness, handover,
+  DevOps/cloud/provider-credential gates, and invoice/Terraform/VSDX/diagram/IdP
+  evidence smokes. Expected caveats remained: local invoice artifact scanner
+  smoke skipped because TCP bind is blocked in this sandbox, `impeccable` is
+  skipped on the repo's Node 20 target, live Postgres migrations were skipped
+  because the local Postgres container was not running, and the default local env
+  still warns that invoice-artifacts are demo/local without live
+  object-storage/KMS/scanner/WORM settings.
+
+Known gaps carried forward:
+
+- This removes manual archive-manifest assembly, but it still depends on a real
+  target environment to produce live provider artifacts.
+- A real `verifiedLiveCaptureArchive=true` result still requires strict
+  preflight, guarded `--live` capture, prior live evidence, GCP Cloud Billing
+  read credentials, and strict archive verification.
+- Even generated live archive proof remains catalog list-price evidence, not
+  invoice-grade billing or provider invoice-of-record reconciliation.
 
 ## Phase V3.6 - Terraform validation evidence
 
