@@ -463,6 +463,8 @@ environment run. In the target environment, use
 `POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true npm run pricing:catalog:snapshot:capture:run:live -- --operator "<reviewer-name>" --previous-evidence <prior-live-provider-bundle.json>`
 to run strict preflight, live capture, archive build, and strict archive
 verification as one sequence.
+Then verify the generated run folder with
+`npm run pricing:catalog:snapshot:capture:run:evidence:check -- --run-dir <run-output-dir> --require-live-run`.
 
 The checked-in example can be validated with `npm run invoice:record:evidence:check`
 for schema coverage only. It is not provider invoice proof and does not make

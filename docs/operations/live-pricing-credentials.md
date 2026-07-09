@@ -206,6 +206,24 @@ POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true \
   --previous-evidence <prior-live-provider-bundle.json>
 ```
 
+After live mode finishes, verify the generated run folder as one artifact set:
+
+```bash
+npm run pricing:catalog:snapshot:capture:run:evidence:check -- \
+  --run-dir <run-output-dir> \
+  --require-live-run
+```
+
+For local credential-free verification of the run-evidence checker itself, run:
+
+```bash
+npm run pricing:catalog:snapshot:capture:run:evidence:smoke
+```
+
+The smoke validates the run-summary, preflight, capture, snapshot, and archive
+handoff with fixture evidence, then proves `--require-live-run` rejects the same
+fixture artifacts.
+
 The archive verifier checks the manifest schema, operator attestation, strict
 preflight posture, capture metadata, AWS/Azure/GCP provider coverage, referenced
 evidence file SHA-256 digest, and the underlying

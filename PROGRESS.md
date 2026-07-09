@@ -161,6 +161,7 @@ say so explicitly rather than marking it done.
 | Phase 2.69 - Live catalog capture archive proof         | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.70 - Live catalog archive builder smoke         | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.71 - Live catalog capture run orchestrator      | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.72 - Live catalog run evidence verifier         | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -1119,6 +1120,62 @@ Known gaps carried forward:
   read credentials and provider API reachability in the target environment.
 - Even a successful live runner remains catalog list-price evidence, not
   invoice-grade billing or provider invoice-of-record reconciliation.
+
+## Phase 2.72 - Live catalog run evidence verifier
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added `scripts/pricing-catalog-live-capture-run-evidence-check.mjs`, a
+  post-run verifier for live capture runner artifact sets.
+- Added `npm run pricing:catalog:snapshot:capture:run:evidence:check` for target
+  run folders and
+  `npm run pricing:catalog:snapshot:capture:run:evidence:smoke` for local CI-safe
+  proof.
+- The verifier reads `run-summary.json`, strict preflight output, capture output,
+  snapshot evidence, and archive manifest; invokes the archive checker; verifies
+  path/digest handoff; checks summary consistency; scans for raw payload/secret
+  fields; and supports `--require-live-run` for target environments.
+- The smoke path generates fixture run evidence, accepts it only as base artifact
+  wiring, and proves `--require-live-run` rejects fixture evidence.
+- Wired the verifier smoke into `npm run check`, release readiness, progress
+  verification, README, HOW-TO, provider credential docs, live pricing runbook,
+  architecture notes, release checklist, full-progress ledger, and the
+  production-readiness report.
+
+Verification performed:
+
+- `node --check scripts/pricing-catalog-live-capture-run-evidence-check.mjs`
+  passed.
+- `node scripts/pricing-catalog-live-capture-run-evidence-check.mjs --smoke --json`
+  passed with `baseFixtureRunAccepted=true` and
+  `strictLiveRejectedFixtureRun=true`.
+- `node scripts/pricing-catalog-live-capture-run-evidence-check.mjs --run-summary .tmp/not-here/run-summary.json --json`
+  failed as intended for a missing run summary.
+- Full `npm run check` passed with the live run evidence verifier smoke in the
+  aggregate floor: API unit `59` suites / `494` tests, web unit `11` suites /
+  `149` tests, graph validation `359` nodes / `359` edges, pricing coverage `36`
+  frontend families, progress verification `446` anchors, release readiness,
+  handover, DevOps/cloud/provider-credential gates, and
+  invoice/Terraform/VSDX/diagram/IdP evidence smokes. Expected caveats remained:
+  local invoice artifact scanner smoke skipped because TCP bind is blocked in
+  this sandbox, `impeccable` is skipped on the repo's Node 20 target, live
+  Postgres migrations were skipped because the local Postgres container was not
+  running, and the default local env still warns that invoice-artifacts are
+  demo/local without live object-storage/KMS/scanner/WORM settings.
+
+Known gaps carried forward:
+
+- This gives operators an independent post-run proof command, but it still cannot
+  create real provider capture evidence without target-environment credentials
+  and network access.
+- A real `--require-live-run` pass still requires strict live preflight, guarded
+  live capture, prior live evidence, GCP Cloud Billing read credentials, provider
+  API reachability, and a verified live capture archive.
+- Even a verified live run remains catalog list-price evidence, not invoice-grade
+  billing or provider invoice-of-record reconciliation.
 
 ## Phase V3.6 - Terraform validation evidence
 

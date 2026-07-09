@@ -235,5 +235,7 @@ For finance/FinOps:
     `npm run pricing:catalog:snapshot:capture:run:smoke` before the guarded target
     run:
     `POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true npm run pricing:catalog:snapshot:capture:run:live -- --operator <name> --previous-evidence <prior-live-bundle.json>`.
+    Then verify the target run folder with
+    `npm run pricing:catalog:snapshot:capture:run:evidence:check -- --run-dir <run-output-dir> --require-live-run`.
     The checked-in sample can be validated with
     `npm run invoice:record:evidence:check`, but it is schema-only evidence.

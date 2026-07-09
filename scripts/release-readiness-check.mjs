@@ -199,6 +199,12 @@ if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:run:smoke']) {
 if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:run:live']) {
   failures.push('package.json is missing pricing:catalog:snapshot:capture:run:live');
 }
+if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:run:evidence:check']) {
+  failures.push('package.json is missing pricing:catalog:snapshot:capture:run:evidence:check');
+}
+if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:run:evidence:smoke']) {
+  failures.push('package.json is missing pricing:catalog:snapshot:capture:run:evidence:smoke');
+}
 if (!packageJson.scripts?.['terraform:evidence:check']) {
   failures.push('package.json is missing terraform:evidence:check');
 }
@@ -353,6 +359,15 @@ if (
 if (!packageJson.scripts?.check?.includes('npm run pricing:catalog:snapshot:capture:run:smoke')) {
   failures.push(
     'package.json check script must include npm run pricing:catalog:snapshot:capture:run:smoke',
+  );
+}
+if (
+  !packageJson.scripts?.check?.includes(
+    'npm run pricing:catalog:snapshot:capture:run:evidence:smoke',
+  )
+) {
+  failures.push(
+    'package.json check script must include npm run pricing:catalog:snapshot:capture:run:evidence:smoke',
   );
 }
 if (!packageJson.scripts?.check?.includes('npm run terraform:evidence:check')) {
@@ -1118,6 +1133,21 @@ await assertFileContains('scripts/pricing-catalog-live-capture-run.mjs', [
   ['strict preflight handoff', 'scripts/pricing-catalog-live-snapshot-capture-preflight.mjs'],
   ['live capture handoff', 'scripts/pricing-catalog-live-snapshot-capture.mjs'],
   ['strict live rejection', 'Live run requires'],
+]);
+
+await assertFileContains('scripts/pricing-catalog-live-capture-run-evidence-check.mjs', [
+  [
+    'pricing catalog live capture run evidence check schema',
+    'polycost-pricing-catalog-live-capture-run-evidence-check/v1',
+  ],
+  [
+    'pricing catalog live capture run evidence smoke schema',
+    'polycost-pricing-catalog-live-capture-run-evidence-check-smoke/v1',
+  ],
+  ['run summary schema guard', 'polycost-pricing-catalog-live-capture-run/v1'],
+  ['strict live run option', '--require-live-run'],
+  ['archive checker handoff', 'scripts/pricing-catalog-live-capture-archive-check.mjs'],
+  ['fixture run rejection flag', 'strictLiveRejectedFixtureRun'],
 ]);
 
 await assertFileContains(

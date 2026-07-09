@@ -83,7 +83,8 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - For target-environment live pricing proof, prefer
   `POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true npm run pricing:catalog:snapshot:capture:run:live -- --operator "<reviewer-name>" --previous-evidence <prior-live-provider-bundle.json>`
   after `npm run pricing:catalog:snapshot:capture:run:plan` and
-  `npm run pricing:catalog:snapshot:capture:run:smoke`.
+  `npm run pricing:catalog:snapshot:capture:run:smoke`, then run
+  `npm run pricing:catalog:snapshot:capture:run:evidence:check -- --run-dir <run-output-dir> --require-live-run`.
 - Confirm destination Terraform evidence can be assembled from runner artifacts with
   `npm run terraform:evidence:capture:smoke` before claiming Terraform destination-plan
   handoff readiness.
@@ -132,6 +133,7 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Run `npm run pricing:catalog:snapshot:capture:archive:check`.
 - Run `npm run pricing:catalog:snapshot:capture:archive:build:smoke`.
 - Run `npm run pricing:catalog:snapshot:capture:run:smoke`.
+- Run `npm run pricing:catalog:snapshot:capture:run:evidence:smoke`.
 - Run `npm run release:check`.
 - Run `npm run loading:check`.
 - Run `npm run handover:check`.
