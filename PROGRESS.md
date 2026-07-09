@@ -158,6 +158,7 @@ say so explicitly rather than marking it done.
 | Phase 2.66 - Live catalog snapshot capture guard        | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.67 - Live catalog capture fixture smoke         | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.68 - Live catalog capture readiness preflight   | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.69 - Live catalog capture archive proof         | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -944,6 +945,67 @@ Known gaps carried forward:
   `--require-live-provider`.
 - Even strict live capture proof remains catalog list-price evidence, not
   invoice-grade billing or provider invoice-of-record reconciliation.
+
+## Phase 2.69 - Live catalog capture archive proof
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added `scripts/pricing-catalog-live-capture-archive-check.mjs`, a
+  machine-readable verifier for archived live catalog capture manifests.
+- Added
+  `docs/operations/evidence/pricing-catalog-live-capture/pricing-catalog-live-capture-archive.example.json`,
+  a sanitized `example-schema` archive manifest bound to the checked-in snapshot
+  evidence SHA-256 digest.
+- Added `npm run pricing:catalog:snapshot:capture:archive:check` for CI-safe
+  archive contract validation and
+  `npm run pricing:catalog:snapshot:capture:archive:strict` for target
+  environments.
+- The archive verifier checks manifest schema, operator attestation, strict
+  preflight posture, capture metadata, AWS/Azure/GCP provider coverage,
+  referenced evidence file SHA-256 digest, raw-secret exclusion, and the
+  underlying snapshot evidence checker. Strict mode requires the referenced
+  snapshot evidence to pass `--require-live-provider`.
+- Wired the archive check into `npm run check`, release readiness, progress
+  verification, README, HOW-TO, provider credential docs, live pricing runbook,
+  architecture notes, release checklist, full-progress ledger, and the
+  production-readiness report.
+
+Verification performed:
+
+- `node --check scripts/pricing-catalog-live-capture-archive-check.mjs` passed.
+- `node scripts/pricing-catalog-live-capture-archive-check.mjs --json` passed
+  against the checked-in archive sample with `verifiedExampleArchive=true`,
+  `verifiedLiveCaptureArchive=false`, and the expected digest
+  `86aec3dd0cfa0a5f2358b4f98459ef8cf37eeb4c1df37b50d725defcaece668c`.
+- `node scripts/pricing-catalog-live-capture-archive-check.mjs --require-live-archive --json`
+  failed as intended against the checked-in sample because it is
+  `example-schema`, uses sample/provider fixtures, has non-strict preflight
+  posture, and the referenced snapshot evidence is not live-provider proof.
+- Full `npm run check` passed with the archive checker in the aggregate floor:
+  API unit `59` suites / `494` tests, web unit `11` suites / `149` tests, graph
+  validation `359` nodes / `359` edges, pricing coverage `36` frontend families,
+  progress verification `423` anchors, release readiness, handover,
+  DevOps/cloud/provider-credential gates, and invoice/Terraform/VSDX/diagram/IdP
+  evidence smokes. Expected caveats remained: local invoice artifact scanner
+  smoke skipped because TCP bind is blocked in this sandbox, `impeccable` is
+  skipped on the repo's Node 20 target, live Postgres migrations were skipped
+  because the local Postgres container was not running, and the default local env
+  still warns that invoice-artifacts are demo/local without live
+  object-storage/KMS/scanner/WORM settings.
+
+Known gaps carried forward:
+
+- This verifies archive completeness around sanitized evidence, but it does not
+  execute provider APIs or prove provider network reachability.
+- A real `verifiedLiveCaptureArchive=true` result still requires a target
+  environment strict preflight, guarded `--live` capture, a real prior live
+  evidence bundle, GCP Cloud Billing read credentials, and a durable archive
+  manifest whose referenced bundle passes `--require-live-provider`.
+- Even archived live catalog capture proof remains catalog list-price evidence,
+  not invoice-grade billing or provider invoice-of-record reconciliation.
 
 ## Phase V3.6 - Terraform validation evidence
 

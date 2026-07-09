@@ -99,6 +99,10 @@ Evidence:
   `npm run pricing:catalog:snapshot:capture:smoke`, proving the AWS/Azure/GCP
   capture normalizers, exact price row-change math, and strict live-proof
   rejection for fixture evidence.
+- Archived live capture evidence now has a digest-bound manifest verifier through
+  `npm run pricing:catalog:snapshot:capture:archive:check`, plus strict
+  target-environment mode through
+  `npm run pricing:catalog:snapshot:capture:archive:strict`.
 - `docs/PROVIDER-CREDENTIALS.md` states the current production swap procedure and
   explicitly limits real provider mode to catalog list prices, not invoices.
 

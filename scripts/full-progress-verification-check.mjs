@@ -112,6 +112,7 @@ async function assertPhaseEvidenceAnchors() {
     'npm run pricing:catalog:snapshot:capture:plan',
     'npm run pricing:catalog:snapshot:capture:smoke',
     'npm run pricing:catalog:snapshot:capture:preflight',
+    'npm run pricing:catalog:snapshot:capture:archive:check',
     'npm run terraform:evidence:check',
     'npm run terraform:evidence:capture:smoke',
     'npm run vsdx:visual-evidence:check',
@@ -439,6 +440,33 @@ async function assertPhaseEvidenceAnchors() {
     ['strict checker handoff', '--require-live-provider'],
     ['no raw credential output', 'no_raw_credential_output'],
   ]);
+
+  await assertFileContains('scripts/pricing-catalog-live-capture-archive-check.mjs', [
+    [
+      'pricing catalog live capture archive schema',
+      'polycost-pricing-catalog-live-capture-archive/v1',
+    ],
+    ['strict live archive option', '--require-live-archive'],
+    ['snapshot checker handoff', '--require-live-provider'],
+    ['digest verification', 'archiveDigestVerified'],
+    ['strict snapshot attestation', 'strictSnapshotCheckerPassed'],
+  ]);
+
+  await assertFileContains(
+    'docs/operations/evidence/pricing-catalog-live-capture/pricing-catalog-live-capture-archive.example.json',
+    [
+      [
+        'pricing catalog live capture archive example schema',
+        'polycost-pricing-catalog-live-capture-archive/v1',
+      ],
+      ['sample-only evidence level', 'example-schema'],
+      [
+        'snapshot evidence digest',
+        '86aec3dd0cfa0a5f2358b4f98459ef8cf37eeb4c1df37b50d725defcaece668c',
+      ],
+      ['strict archive caveat', '--require-live-archive'],
+    ],
+  );
 
   await assertFileContains(
     'docs/operations/evidence/pricing-catalog-snapshot/pricing-catalog-snapshot.example.json',

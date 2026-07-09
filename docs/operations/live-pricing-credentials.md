@@ -149,6 +149,26 @@ credentials. After archiving the generated bundle, run:
 npm run pricing:catalog:snapshot:check -- --require-live-provider <bundle.json>
 ```
 
+Then record the bundle in a digest-bound archive manifest and validate the
+archive:
+
+```bash
+npm run pricing:catalog:snapshot:capture:archive:check -- <archive.json>
+```
+
+Before claiming archived live-provider capture proof in a target environment, the
+archive must pass strict mode:
+
+```bash
+npm run pricing:catalog:snapshot:capture:archive:strict -- <archive.json>
+```
+
+The archive verifier checks the manifest schema, operator attestation, strict
+preflight posture, capture metadata, AWS/Azure/GCP provider coverage, referenced
+evidence file SHA-256 digest, and the underlying
+`--require-live-provider` snapshot evidence result. The checked-in archive sample
+is `example-schema`; strict mode rejects it by design.
+
 The local smoke proves freshness math, snapshot digests, exact row-change detection,
 and source payload hash coverage. It does not call provider APIs and does not turn
 catalog list prices into invoice-grade billing.

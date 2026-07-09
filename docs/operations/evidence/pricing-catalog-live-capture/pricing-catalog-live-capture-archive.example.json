@@ -1,0 +1,79 @@
+{
+  "schemaVersion": "polycost-pricing-catalog-live-capture-archive/v1",
+  "archiveName": "pricing-catalog-live-capture-archive-example",
+  "evidenceLevel": "example-schema",
+  "productionClaim": false,
+  "archivedAt": "2026-07-09T00:00:00.000Z",
+  "operator": {
+    "name": "example-only",
+    "role": "release-operator",
+    "attestedAt": "2026-07-09T00:00:00.000Z"
+  },
+  "preflight": {
+    "schemaVersion": "polycost-pricing-catalog-live-snapshot-capture-preflight/v1",
+    "checkedAt": "2026-07-09T00:00:00.000Z",
+    "strictLive": false,
+    "readyForLiveCapture": false,
+    "warningCount": 4,
+    "failureCount": 0,
+    "checkIds": [
+      "live_guard",
+      "operator_attestation",
+      "previous_live_evidence",
+      "gcp_cloud_billing_credential",
+      "aws_public_catalog_endpoint",
+      "azure_public_catalog_endpoint",
+      "gcp_cloud_billing_endpoint",
+      "no_raw_credential_output"
+    ]
+  },
+  "capture": {
+    "schemaVersion": "polycost-pricing-catalog-live-snapshot-capture/v1",
+    "mode": "sample-reference",
+    "capturedAt": "2026-07-09T00:00:00.000Z",
+    "command": "npm run pricing:catalog:snapshot:capture:plan",
+    "verifiedLiveProviderSnapshot": false
+  },
+  "snapshotEvidence": {
+    "path": "../pricing-catalog-snapshot/pricing-catalog-snapshot.example.json",
+    "sha256": "86aec3dd0cfa0a5f2358b4f98459ef8cf37eeb4c1df37b50d725defcaece668c",
+    "expectedVerifiedLiveProviderSnapshot": false,
+    "requiredChecker": "npm run pricing:catalog:snapshot:check -- --require-live-provider <bundle.json>"
+  },
+  "providerCoverage": [
+    {
+      "provider": "aws",
+      "sourceSystem": "aws-price-list-example",
+      "sourceMode": "sample",
+      "rowCount": 2,
+      "changedRowCount": 0
+    },
+    {
+      "provider": "azure",
+      "sourceSystem": "azure-retail-prices-example",
+      "sourceMode": "sample",
+      "rowCount": 2,
+      "changedRowCount": 0
+    },
+    {
+      "provider": "gcp",
+      "sourceSystem": "gcp-cloud-billing-example",
+      "sourceMode": "sample",
+      "rowCount": 2,
+      "changedRowCount": 0
+    }
+  ],
+  "attestations": {
+    "rawCatalogPayloadExcluded": true,
+    "credentialsExcluded": true,
+    "signedUrlsExcluded": true,
+    "archiveDigestVerified": true,
+    "strictSnapshotCheckerPassed": false,
+    "productionClaimedByPolyCost": false
+  },
+  "caveats": [
+    "This is sanitized sample archive evidence for CI/schema validation only.",
+    "Use evidenceLevel=live-provider-capture-archive and --require-live-archive before claiming real provider API archive proof.",
+    "PolyCost still does not provide invoice-grade billing, private discounts, taxes, actual invoices, or legal invoice-of-record reconciliation."
+  ]
+}

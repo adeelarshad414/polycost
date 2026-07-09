@@ -75,6 +75,10 @@ calls or cloud credentials.
 Use `npm run pricing:catalog:snapshot:capture:preflight` for CI-safe readiness
 posture, and `npm run pricing:catalog:snapshot:capture:preflight:strict` in a
 target environment before claiming live provider capture readiness.
+After live capture, register the sanitized bundle in an archive manifest and run
+`npm run pricing:catalog:snapshot:capture:archive:check`; use
+`npm run pricing:catalog:snapshot:capture:archive:strict -- <archive.json>` before
+claiming archived live-provider capture proof.
 The checked-in example validates the contract only; PolyCost still is not the
 provider invoice system of record. See
 `docs/architecture/phase-2-invoice-of-record-pilot-evidence.md`.
