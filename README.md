@@ -435,6 +435,14 @@ capture in an operator-authenticated shell. The capture command writes proof JSO
 under `artifacts/`, runs the offline verifier by default, and rejects signed URL
 or SAS-style object URI query strings.
 
+For a reviewer-ready artifact-governance profile, run
+`npm run invoice:artifact-profile:check`. This validates the sanitized production
+profile in `docs/operations/invoice-artifact-production-profile.example.json`,
+checks the captured provider proof digest, and confirms secrets are represented as
+Vault references rather than raw credential material. It is
+`verified(config-evidence)` only; live cloud/Vault proof still requires
+`npm run provider:credentials:check:strict` in the target environment.
+
 ## Documentation
 
 - `docs/HOW-TO-USE.md` explains the customer-facing product workflow and demo

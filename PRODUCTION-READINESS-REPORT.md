@@ -86,6 +86,7 @@ performance/accessibility/best-practices/SEO metrics.
 | INV-TRACE-027  | Improved      | Provider retention proof verifier output can now be attached to exact externally stored invoice artifacts through an Owner/Admin API handoff with SHA-256 validation, signed URL rejection, evidence-packet gate updates, and audit logging             |
 | INV-TRACE-028  | Improved      | Attached provider retention proof metadata now persists on the exact `invoice_artifact_blobs` row, refreshes the artifact read model, extends clean Docker migrations through `039`, and release-gates the schema/audit action constraints              |
 | INV-TRACE-029  | Improved      | Provider retention proof capture can now run optional read-only AWS/Azure/GCP CLI commands from an operator-authenticated shell with dry-run, no-shell argument arrays, signed URI rejection, verifier handoff, and release-gated smoke coverage        |
+| INV-TRACE-030  | Improved      | Invoice artifact production-profile checks now validate sanitized external object-storage/KMS/scanner/WORM/receipt/audit evidence bundles, proof digest consistency, secret-reference-only posture, and offline provider proof verification             |
 | VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                                                                                             |
 | VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                                                                                             |
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                                                                                        |
@@ -652,6 +653,19 @@ Full-stack evidence:
   36 frontend families, progress verification 165 anchors, release readiness,
   handover, DevOps/cloud/provider-credential gates, and invoice
   evidence/retention-proof smokes.
+- Invoice artifact production profile evidence now includes:
+  - `docs/operations/invoice-artifact-production-profile.example.json`
+  - `docs/operations/evidence/aws-s3-retention-proof.example.json`
+  - `npm run invoice:artifact-profile:check`, which passed as
+    `verified(config-evidence)` with provider `aws-s3`, digest
+    `8b7487c43ed9df63249134345b238c0d3db7144e1029d818198ad9c6d3436b84`, and
+    the explicit caveat that live cloud/Vault evidence remains target-environment
+    proof.
+- Latest full `npm run check` with the profile gate passed with API unit 59 suites
+  / 494 tests, web unit 11 suites / 149 tests, graph validation 330 nodes / 330
+  edges, pricing coverage 36 frontend families, progress verification 175
+  anchors, release readiness, handover, DevOps/cloud/provider-credential gates,
+  and invoice evidence/retention-proof/profile smokes.
 
 ## Screenshot Index
 

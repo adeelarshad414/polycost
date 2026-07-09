@@ -1,0 +1,9 @@
+{
+  "Retention": {
+    "Mode": "COMPLIANCE",
+    "RetainUntilDate": "2027-07-09T00:00:00.000Z"
+  },
+  "LegalHold": {
+    "Status": "ON"
+  }
+}

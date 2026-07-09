@@ -16,7 +16,14 @@ Run these checks before a production rehearsal:
 ```bash
 npm run provider:credentials:check
 npm run provider:credentials:check:strict
+npm run invoice:artifact-profile:check
 ```
+
+`provider:credentials:check:strict` proves the target environment can read live
+Vault/provider credentials. `invoice:artifact-profile:check` is intentionally
+different: it validates a sanitized production profile and captured provider proof
+artifact without reading secrets or calling cloud APIs. Treat it as
+`verified(config-evidence)`, not live-cloud evidence.
 
 ## Credential Matrix
 
@@ -256,6 +263,39 @@ The verifier prints the computed
 For repeatable release evidence, rerun it with `--expected-sha256=<digest>` after
 archiving the proof artifact. The command validates captured evidence structure
 and digest only; it does not call the provider API or prove legal sufficiency.
+
+### Production Profile Check
+
+For handover rehearsals, keep a sanitized artifact-governance profile next to the
+operator evidence packet. The profile must contain runtime control values, Vault
+secret references, durable evidence references, and a captured provider retention
+proof digest. It must not contain raw webhook secrets, cloud access keys, SAS
+tokens, service account JSON, or bearer tokens.
+
+The repository includes an AWS S3 Object Lock example profile and proof artifact:
+
+```bash
+npm run invoice:artifact-profile:check
+
+npm run invoice:artifact-profile:check -- \
+  docs/operations/invoice-artifact-production-profile.example.json
+```
+
+The check verifies:
+
+- external object storage, KMS, webhook scanner, delete-expired retention, signed
+  evidence receipts, audit webhook export, and provider object-lock posture are
+  represented in the profile
+- secret material is represented only as Vault paths and key names
+- the captured provider proof artifact exists, its SHA-256 digest matches the
+  runtime config, and the offline proof verifier accepts the provider evidence
+- scanner, notary, and audit-export canary receipts are represented as durable
+  provider-backed archive references
+
+This closes a reviewer-readiness gap but still does not prove live cloud access.
+After replacing the example values with target-environment references, run
+`npm run provider:credentials:check:strict` and the staging scanner/notary/audit
+smokes from the deployed environment.
 
 After verification, billing Owners/Admins can attach the provider-retention proof
 to the exact stored invoice artifact without giving PolyCost provider credentials:

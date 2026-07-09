@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "polycost-invoice-artifact-production-profile/v1",
+  "profileName": "aws-s3-object-lock-staging-rehearsal",
+  "verificationLevel": "verified(config-evidence)",
+  "productionClaim": false,
+  "provider": "aws-s3",
+  "runtimeConfig": {
+    "NODE_ENV": "staging",
+    "INVOICE_ARTIFACT_STORAGE_BACKEND": "aws-s3",
+    "INVOICE_ARTIFACT_OBJECT_STORE_NAME": "polycost-invoice-artifacts-prod",
+    "INVOICE_ARTIFACT_OBJECT_STORE_REGION": "us-east-1",
+    "INVOICE_ARTIFACT_OBJECT_STORE_PREFIX": "invoice-artifacts",
+    "INVOICE_ARTIFACT_KMS_KEY_REFERENCE": "arn:aws:kms:us-east-1:111122223333:key/11111111-2222-3333-4444-555555555555",
+    "INVOICE_ARTIFACT_MALWARE_SCANNER_MODE": "http-webhook",
+    "INVOICE_ARTIFACT_MALWARE_SCANNER_URL": "https://scanner.polycost.invalid/artifacts",
+    "INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE": "delete-expired",
+    "INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE": "provider-control-plane",
+    "INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_REFERENCE": "s3://polycost-invoice-artifacts-prod/evidence/aws-s3-retention-proof.example.json",
+    "INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_SHA256": "8b7487c43ed9df63249134345b238c0d3db7144e1029d818198ad9c6d3436b84",
+    "INVOICE_EVIDENCE_RECEIPT_MODE": "external-webhook",
+    "INVOICE_EVIDENCE_RECEIPT_SIGNING_KEY_REFERENCE": "arn:aws:kms:us-east-1:111122223333:alias/polycost-invoice-evidence-receipts",
+    "INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL": "https://worm.polycost.invalid/evidence-receipts",
+    "INVOICE_EVIDENCE_WORM_RETENTION_MODE": "provider-object-lock",
+    "AUTH_AUDIT_EXPORT_MODE": "webhook",
+    "AUTH_AUDIT_EXPORT_WEBHOOK_URL": "https://siem.polycost.invalid/audit-events",
+    "VAULT_ADDR": "https://vault.polycost.invalid",
+    "VAULT_TOKEN_FILE": "/run/polycost-vault-auth/token"
+  },
+  "secretReferences": {
+    "artifactStorage": {
+      "source": "vault",
+      "path": "secret/polycost/artifacts/aws",
+      "requiredKeys": ["access_key_id", "secret_access_key"],
+      "rotationOwner": "cloud-platform"
+    },
+    "scannerWebhook": {
+      "source": "vault",
+      "path": "secret/polycost/artifacts/scanner",
+      "requiredKeys": ["hmac_secret"],
+      "rotationOwner": "security"
+    },
+    "evidenceReceipt": {
+      "source": "vault",
+      "path": "secret/polycost/invoice-evidence",
+      "requiredKeys": ["receipt_signing_secret"],
+      "rotationOwner": "security"
+    },
+    "auditExport": {
+      "source": "vault",
+      "path": "secret/polycost/audit-export",
+      "requiredKeys": ["webhook_secret"],
+      "rotationOwner": "security"
+    }
+  },
+  "evidence": {
+    "providerRetentionProof": {
+      "provider": "aws-s3",
+      "file": "docs/operations/evidence/aws-s3-retention-proof.example.json",
+      "reference": "s3://polycost-invoice-artifacts-prod/evidence/aws-s3-retention-proof.example.json",
+      "expectedSha256": "8b7487c43ed9df63249134345b238c0d3db7144e1029d818198ad9c6d3436b84"
+    },
+    "scannerCanary": {
+      "required": true,
+      "archiveReference": "s3://polycost-invoice-artifacts-prod/evidence/scanner-canary.jsonl"
+    },
+    "notaryReceiverCanary": {
+      "required": true,
+      "archiveReference": "s3://polycost-invoice-artifacts-prod/evidence/notary-receiver-canary.jsonl"
+    },
+    "auditExportCanary": {
+      "required": true,
+      "archiveReference": "s3://polycost-invoice-artifacts-prod/evidence/audit-export-canary.jsonl"
+    }
+  },
+  "operatorControls": [
+    "Run npm run provider:credentials:check:strict in the target environment after seeding Vault.",
+    "Run npm run invoice:retention-proof:verify with --expected-sha256 against the archived provider proof artifact.",
+    "Archive scanner, notary receiver, and audit-export canary receipts in WORM/object-lock backed storage.",
+    "Keep raw secrets out of this profile; only Vault paths, key names, and durable evidence references belong here."
+  ],
+  "caveats": [
+    "This profile proves configuration and evidence-package completeness only.",
+    "Real invoice-grade operation still requires target-environment Vault access, provider object-lock/KMS controls, scanner availability, and receiver-side retention evidence."
+  ]
+}

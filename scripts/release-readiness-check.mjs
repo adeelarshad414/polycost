@@ -34,6 +34,8 @@ const requiredFiles = [
   'docs/COMPARISON.md',
   'docs/ARCHITECTURE.md',
   'docs/CUSTOMER-HANDOVER-LEDGER.md',
+  'docs/operations/invoice-artifact-production-profile.example.json',
+  'docs/operations/evidence/aws-s3-retention-proof.example.json',
   'handover/HANDOVER-README.md',
   'handover/DESIGN-SYSTEM.md',
   'handover/JOURNEYS.md',
@@ -106,6 +108,9 @@ if (!packageJson.scripts?.['invoice:retention-proof:capture']) {
 if (!packageJson.scripts?.['invoice:retention-proof:capture:smoke']) {
   failures.push('package.json is missing invoice:retention-proof:capture:smoke');
 }
+if (!packageJson.scripts?.['invoice:artifact-profile:check']) {
+  failures.push('package.json is missing invoice:artifact-profile:check');
+}
 if (!packageJson.scripts?.['pricing:logic:coverage']) {
   failures.push('package.json is missing pricing:logic:coverage');
 }
@@ -162,6 +167,9 @@ if (!packageJson.scripts?.check?.includes('npm run invoice:retention-proof:captu
   failures.push(
     'package.json check script must include npm run invoice:retention-proof:capture:smoke',
   );
+}
+if (!packageJson.scripts?.check?.includes('npm run invoice:artifact-profile:check')) {
+  failures.push('package.json check script must include npm run invoice:artifact-profile:check');
 }
 
 assertScriptIncludes('test:production-readiness', [
@@ -649,6 +657,33 @@ await assertFileContains(
     ['provider URI mismatch smoke', 'provider/URI mismatch'],
   ],
 );
+
+await assertFileContains('scripts/invoice-artifact-production-profile-check.mjs', [
+  ['production profile check schema', 'polycost-invoice-artifact-production-profile-check/v1'],
+  ['profile secret exclusion', 'forbiddenRuntimeSecretKeys'],
+  ['profile proof verifier reuse', 'invoice-artifact-provider-retention-proof-verifier.mjs'],
+  ['live cloud caveat', 'Run provider:credentials:check:strict'],
+]);
+
+await assertFileContains('docs/operations/invoice-artifact-production-profile.example.json', [
+  ['production profile schema', 'polycost-invoice-artifact-production-profile/v1'],
+  ['verified config evidence label', 'verified(config-evidence)'],
+  ['external artifact storage backend', '"INVOICE_ARTIFACT_STORAGE_BACKEND": "aws-s3"'],
+  [
+    'provider control-plane proof mode',
+    '"INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE": "provider-control-plane"',
+  ],
+  [
+    'provider object-lock WORM mode',
+    '"INVOICE_EVIDENCE_WORM_RETENTION_MODE": "provider-object-lock"',
+  ],
+  ['secret-reference-only storage credential', '"path": "secret/polycost/artifacts/aws"'],
+]);
+
+await assertFileContains('docs/operations/evidence/aws-s3-retention-proof.example.json', [
+  ['AWS Object Lock retention mode', '"Mode": "COMPLIANCE"'],
+  ['AWS legal hold evidence', '"Status": "ON"'],
+]);
 
 await assertFileContains('apps/api/src/api/billing.controller.ts', [
   [

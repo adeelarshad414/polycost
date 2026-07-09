@@ -73,6 +73,10 @@ The explicit placeholder token is `CHANGE_ME_DEV_ONLY`. Production and staging c
 - Missing `INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_REFERENCE` or valid
   `INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_SHA256` when provider control-plane
   retention proof mode is enabled
+- Missing or stale sanitized production artifact-governance profile proof, as
+  checked by `npm run invoice:artifact-profile:check`. The profile may contain
+  Vault paths, key names, and durable evidence references, but never raw webhook
+  secrets, cloud access keys, SAS tokens, service-account JSON, or bearer tokens.
 - `INVOICE_EVIDENCE_RECEIPT_MODE=metadata-only`
 - Missing `INVOICE_EVIDENCE_RECEIPT_SIGNING_KEY_REFERENCE` or non-dummy
   `INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET` when signed receipts are enabled

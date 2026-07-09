@@ -513,6 +513,21 @@ polycost/notary-reference-receiver:local .` passed. The receiver intentionally
   pricing coverage `36` frontend families, progress verification `165` anchors,
   release readiness, handover, DevOps/cloud/provider-credential gates, and invoice
   evidence/retention-proof smokes.
+- `docs/operations/invoice-artifact-production-profile.example.json` and
+  `docs/operations/evidence/aws-s3-retention-proof.example.json` now provide a
+  sanitized artifact-governance profile plus provider proof fixture. The new
+  `invoice:artifact-profile:check` command validates the external object-storage,
+  KMS, scanner, delete-expired retention, signed receipt, audit webhook, provider
+  object-lock, secret-reference-only, digest, and offline provider proof verifier
+  posture as `verified(config-evidence)` while preserving the caveat that live
+  cloud/Vault proof remains target-environment evidence. The progress verifier
+  passed afterward with `175` anchors.
+- Full `npm run check` passed afterward with the profile gate in the aggregate
+  floor: API unit `59` suites / `494` tests, web unit `11` suites / `149` tests,
+  graph validation `330` nodes / `330` edges, pricing coverage `36` frontend
+  families, progress verification `175` anchors, release readiness, handover,
+  DevOps/cloud/provider-credential gates, and invoice evidence/retention-proof/profile
+  smokes.
 
 Blocked:
 
