@@ -32,6 +32,9 @@ Natural-language mode:
   for correction.
 - If no production LLM endpoint is configured, the local deterministic parser stays
   available for common workload descriptions.
+- If a production diagram classifier is configured, evaluate its labeled-corpus
+  evidence before demo claims with
+  `npm run diagram:llm-corpus:check -- --require-live-model <bundle.json>`.
 
 Guided-form mode:
 

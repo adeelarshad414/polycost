@@ -320,6 +320,10 @@ Limits and safety behavior:
   read from Vault at `secret/polycost/llm` key `api_key`.
 - If the diagram classifier endpoint/model are unset, unresolved nodes stay in the
   review screen for manual classification. This is the default OSS path.
+- To evaluate production classifier quality, run the labeled corpus evidence gate:
+  `npm run diagram:llm-corpus:check -- --require-live-model <bundle.json>`.
+  The checked-in sample validates the contract only and is not production LLM proof.
+  See `docs/architecture/phase-2-diagram-llm-corpus-evidence.md`.
 
 ## Common Commands
 

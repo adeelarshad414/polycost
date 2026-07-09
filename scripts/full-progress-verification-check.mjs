@@ -107,6 +107,7 @@ async function assertPhaseEvidenceAnchors() {
     'npm run invoice:artifact-rehearsal:evidence:check',
     'npm run terraform:evidence:check',
     'npm run vsdx:visual-evidence:check',
+    'npm run diagram:llm-corpus:check',
   ]);
   assertScriptIncludes(packageJson, 'ci:unit', [
     'npm run test:coverage',
@@ -391,6 +392,14 @@ async function assertPhaseEvidenceAnchors() {
     ['raw visual payload guard', 'findForbiddenRawPayloads'],
   ]);
 
+  await assertFileContains('scripts/diagram-llm-corpus-check.mjs', [
+    ['diagram LLM corpus schema', 'polycost-diagram-llm-corpus/v1'],
+    ['diagram LLM evidence schema', 'polycost-diagram-llm-corpus-evidence/v1'],
+    ['diagram LLM check schema', 'polycost-diagram-llm-corpus-check/v1'],
+    ['require live model mode', '--require-live-model'],
+    ['service-type accuracy metric', 'serviceTypeAccuracy'],
+  ]);
+
   await assertFileContains('docs/operations/evidence/terraform-validation-evidence.example.json', [
     ['Terraform evidence example schema', 'polycost-terraform-validation-evidence/v1'],
     ['sample-only evidence level', 'example-schema'],
@@ -406,6 +415,19 @@ async function assertPhaseEvidenceAnchors() {
     ['full Visio caveat', 'not full Visio visual rendering'],
   ]);
 
+  await assertFileContains('fixtures/diagrams/llm-corpus/diagram-llm-corpus.v1.json', [
+    ['diagram LLM corpus schema', 'polycost-diagram-llm-corpus/v1'],
+    ['diagram LLM corpus baseline', 'tier-3-diagram-classifier-baseline'],
+    ['service-type classification corpus', '"serviceType": "container-registry"'],
+  ]);
+
+  await assertFileContains('docs/operations/evidence/diagram-llm-corpus-evidence.example.json', [
+    ['diagram LLM evidence schema', 'polycost-diagram-llm-corpus-evidence/v1'],
+    ['sample-only evidence level', 'example-schema'],
+    ['fixture evidence mode', '"mode": "fixture-evidence"'],
+    ['live model caveat', 'evidenceLevel=live-model'],
+  ]);
+
   await assertFileContains('docs/architecture/phase-v3-6-terraform-validation-evidence.md', [
     ['V3.6 title', 'Phase V3.6 Terraform Validation Evidence'],
     ['destination plan command', 'npm run terraform:evidence:check'],
@@ -418,6 +440,13 @@ async function assertPhaseEvidenceAnchors() {
     ['VSDX visual evidence command', 'npm run vsdx:visual-evidence:check'],
     ['reviewed preview strict mode', '--require-human-review'],
     ['full Visio deferred boundary', 'not full Visio visual rendering'],
+  ]);
+
+  await assertFileContains('docs/architecture/phase-2-diagram-llm-corpus-evidence.md', [
+    ['diagram LLM corpus architecture note', 'Phase 2 Diagram LLM Corpus Evidence'],
+    ['diagram LLM corpus command', 'npm run diagram:llm-corpus:check'],
+    ['live model strict mode', '--require-live-model'],
+    ['sample evidence distinction', 'example-schema'],
   ]);
 
   await assertFileContains('docs/operations/invoice-artifact-production-profile.example.json', [
@@ -446,6 +475,7 @@ async function assertPhaseEvidenceAnchors() {
     ['invoice-grade deferred ledger', 'Full invoice-grade billing remains future work'],
     ['VSDX visual rendering deferred ledger', 'not full Visio visual rendering'],
     ['VSDX visual evidence checker ledger', 'npm run vsdx:visual-evidence:check'],
+    ['diagram LLM corpus checker ledger', 'npm run diagram:llm-corpus:check'],
     ['auth enterprise deferred ledger', 'Full enterprise account/team UX'],
     ['auth live transcript ledger', 'workspace-auth-rbac-sso'],
     ['external CI blocker ledger', 'runner_id: 0'],

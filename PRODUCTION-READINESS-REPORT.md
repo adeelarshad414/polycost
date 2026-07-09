@@ -92,6 +92,7 @@ performance/accessibility/best-practices/SEO metrics.
 | VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                                                                                             |
 | VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                                                                                             |
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                                                                                        |
+| LLM-READY-003  | Improved      | Phase 2.57 adds a labeled Tier 3 diagram-classifier corpus, sanitized prediction evidence bundle, accuracy metrics, raw prompt/response exclusion checks, and a strict `--require-live-model` production evidence gate                                  |
 | UI-AUTH-002    | Improved      | Workspace billing panel now surfaces reconciliation readiness, source-fingerprint coverage, SKU match coverage, and the invoice-of-record caveat                                                                                                        |
 | UI-AUTH-006    | Improved      | Workspace billing panel now surfaces usage-comparable variance plus invoice adjustment count, subtotal, and category summary for finance review                                                                                                         |
 | UI-AUTH-007    | Improved      | Workspace billing panel now surfaces commitment row count, net commitment cost, and commitment category totals separately from generic invoice adjustments                                                                                              |
@@ -180,6 +181,20 @@ Local static/regression gates:
     suites / `149` tests, graph validation `335` nodes / `335` edges, pricing
     coverage `36` frontend families, progress verification `232` anchors, and the
     new VSDX evidence gate in the aggregate floor.
+- Phase 2.57 diagram LLM corpus evidence gates passed:
+  - `node --check scripts/diagram-llm-corpus-check.mjs` passed.
+  - `npm run diagram:llm-corpus:check -- --json` passed against the sanitized
+    `example-schema` bundle with `12` cases, `categoryAccuracy=1`,
+    `serviceTypeAccuracy=1`, and `verifiedExampleSchema=true`.
+  - `npm run diagram:llm-corpus:check -- --require-live-model --json` failed as
+    intended for the sample bundle because it is not production endpoint/model
+    evidence.
+  - `npm run release:check` passed and `npm run progress:verify` passed with `250`
+    anchors.
+  - Full `npm run check` passed with API `59` suites / `494` tests, web `11`
+    suites / `149` tests, graph validation `337` nodes / `337` edges, pricing
+    coverage `36` frontend families, progress verification `250` anchors, and the
+    new diagram LLM corpus gate in the aggregate floor.
 - Phase 2.19 invoice adjustment evidence focused gates passed:
   - API focused: `src/api/auth-billing.spec.ts`: 1 suite / 23 tests.
   - Web focused: `src/App.spec.tsx`: 1 suite / 60 tests.
@@ -835,7 +850,10 @@ Machine-readable token evidence:
   CI schema bundle, but full Visio rendering is still future scope.
 - Production LLM classifier quality requires a real endpoint/model, Vault secret, monitored
   corpus evaluation, and false-positive tracking. Phase 2.9 adds an explicit readiness
-  surface so stub/unconfigured mode is not reported as production-connected.
+  surface so stub/unconfigured mode is not reported as production-connected. Phase 2.57
+  adds the baseline labeled corpus, sanitized evidence bundle, metric gate, and
+  `--require-live-model` strict mode, but the checked-in sample remains
+  `example-schema` evidence rather than production model proof.
 - Full enterprise auth product polish remains future scope: production email,
   production SSO/SAML certification, formal SCIM certification, account recovery,
   org billing UX, and broader team/account administration. Phase 2.11 closes active

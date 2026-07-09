@@ -146,6 +146,7 @@ say so explicitly rather than marking it done.
 | Phase 2.54 - Invoice artifact staging rehearsal harness | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.55 - Rehearsal evidence bundle verification     | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.56 - VSDX visual evidence verification          | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.57 - Diagram LLM corpus evidence gate           | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -214,6 +215,66 @@ Known gaps carried forward:
   `evidenceLevel=reviewed-preview`, `humanPreviewReviewed=true`, a named reviewer,
   and `npm run vsdx:visual-evidence:check -- --require-human-review <bundle.json>`.
 - Full Visio visual rendering remains future scope.
+
+## Phase 2.57 - Diagram LLM corpus evidence gate
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added `fixtures/diagrams/llm-corpus/diagram-llm-corpus.v1.json`, a labeled
+  baseline corpus for Tier 3 diagram-classifier service category and service-type
+  evaluation.
+- Added `scripts/diagram-llm-corpus-check.mjs`, a machine-readable checker that
+  validates the corpus, verifies sanitized prediction evidence, computes category
+  and service-type accuracy, checks corpus SHA-256 linkage, and rejects raw prompts,
+  raw responses, API keys, and authorization material in evidence bundles.
+- Added `docs/operations/evidence/diagram-llm-corpus-evidence.example.json`, a
+  sanitized `example-schema` bundle that validates the evidence contract without
+  claiming production LLM proof.
+- Added `docs/architecture/phase-2-diagram-llm-corpus-evidence.md` to document the
+  baseline corpus, live-model evidence workflow, accuracy thresholds, and boundary
+  that the checked-in sample is not production LLM proof.
+- Added `npm run diagram:llm-corpus:check` and wired it into the aggregate
+  `npm run check` floor.
+- Updated README, `docs/HOW-TO-USE.md`, `docs/ARCHITECTURE.md`,
+  `docs/PROVIDER-CREDENTIALS.md`, release checklist, release-readiness guards,
+  progress-verification guards, and the full-progress ledger.
+
+Verification performed:
+
+- `node --check scripts/diagram-llm-corpus-check.mjs` passed.
+- `npm run diagram:llm-corpus:check -- --json` passed against the checked-in
+  sample with `12` cases, `12` predictions, `categoryAccuracy=1`,
+  `serviceTypeAccuracy=1`, `verifiedExampleSchema=true`, and
+  `verifiedLiveModel=false`.
+- `npm run diagram:llm-corpus:check -- --require-live-model --json` failed as
+  intended against the checked-in sample because it is `example-schema` evidence
+  without a configured endpoint, verified Vault secret, live-endpoint run mode, or
+  named production reviewer.
+- `npm run release:check` passed and `npm run progress:verify` passed with `250`
+  anchors.
+- Full `npm run check` passed with the diagram LLM corpus checker in the aggregate
+  floor. The run included API unit `59` suites / `494` tests, web unit `11` suites /
+  `149` tests, graph validation `337` nodes / `337` edges, pricing coverage `36`
+  frontend families, progress verification `250` anchors, release readiness,
+  handover, DevOps/cloud/provider-credential gates, and invoice/Terraform/VSDX/LLM
+  evidence smokes. Expected caveats remained: `impeccable` is skipped on the
+  repo's Node 20 target, live Postgres migrations were skipped because the local
+  Postgres container was not running, the diagram LLM provider check reports the
+  endpoint/model are not configured in local mode, and the default local env still
+  warns that invoice-artifacts are demo/local without live object-storage/KMS/
+  scanner/WORM settings.
+
+Known gaps carried forward:
+
+- This creates a production-quality measurement path, but it does not configure or
+  call a live model in the default OSS/CI path.
+- Production proof still requires a configured endpoint/model, Vault-backed
+  `secret/polycost/llm` `api_key`, `evidenceLevel=live-model`, strict
+  `npm run diagram:llm-corpus:check -- --require-live-model <bundle.json>`, operator
+  review, ongoing corpus refresh, false-positive tracking, and drift monitoring.
 
 ## Phase V3.6 - Terraform validation evidence
 

@@ -1,0 +1,119 @@
+{
+  "schemaVersion": "polycost-diagram-llm-corpus-evidence/v1",
+  "bundleName": "tier-3-diagram-classifier-baseline-evidence",
+  "evidenceLevel": "example-schema",
+  "productionClaim": false,
+  "evaluatedAt": "2026-07-09T00:00:00.000Z",
+  "corpusSha256": "74205fe6854b302d636d2f505be06ff68faed7d88330fcc388438ca06f0e269f",
+  "modelEvidence": {
+    "providerCompatibility": "fixture",
+    "modelRef": "example-only",
+    "endpointConfigured": false,
+    "vaultSecretVerified": false,
+    "secretPath": "secret/polycost/llm"
+  },
+  "run": {
+    "mode": "fixture-evidence",
+    "schemaValidated": true,
+    "rawPromptsExcluded": true,
+    "rawResponsesExcluded": true,
+    "predictionSource": "sanitized-example"
+  },
+  "predictions": [
+    {
+      "id": "compute-web-tier",
+      "serviceCategory": "compute",
+      "serviceType": "vm-compute",
+      "confidence": "high",
+      "reason": "sample prediction matches compute instance workload language"
+    },
+    {
+      "id": "container-orchestrator",
+      "serviceCategory": "containers",
+      "serviceType": "kubernetes",
+      "confidence": "high",
+      "reason": "sample prediction maps managed Kubernetes cluster to Kubernetes"
+    },
+    {
+      "id": "serverless-worker",
+      "serviceCategory": "application",
+      "serviceType": "serverless-function",
+      "confidence": "high",
+      "reason": "sample prediction maps event triggered functions to serverless function"
+    },
+    {
+      "id": "object-archive",
+      "serviceCategory": "storage",
+      "serviceType": "object-storage",
+      "confidence": "high",
+      "reason": "sample prediction maps archive bucket to object storage"
+    },
+    {
+      "id": "managed-postgres",
+      "serviceCategory": "database",
+      "serviceType": "managed-postgres",
+      "confidence": "high",
+      "reason": "sample prediction maps PostgreSQL primary and standby to managed Postgres"
+    },
+    {
+      "id": "global-cdn",
+      "serviceCategory": "networking",
+      "serviceType": "cdn",
+      "confidence": "high",
+      "reason": "sample prediction maps edge cache to CDN"
+    },
+    {
+      "id": "async-queue",
+      "serviceCategory": "integration",
+      "serviceType": "queue-or-event-bus",
+      "confidence": "high",
+      "reason": "sample prediction maps asynchronous handoff to queue or event bus"
+    },
+    {
+      "id": "stream-analytics",
+      "serviceCategory": "analytics",
+      "serviceType": "streaming",
+      "confidence": "high",
+      "reason": "sample prediction maps clickstream ingestion to streaming analytics"
+    },
+    {
+      "id": "genai-embedding",
+      "serviceCategory": "ai",
+      "serviceType": "generative-ai",
+      "confidence": "high",
+      "reason": "sample prediction maps embeddings and generative answers to generative AI"
+    },
+    {
+      "id": "security-waf",
+      "serviceCategory": "security",
+      "serviceType": "waf",
+      "confidence": "high",
+      "reason": "sample prediction maps web application firewall to WAF"
+    },
+    {
+      "id": "observability",
+      "serviceCategory": "operations",
+      "serviceType": "monitoring",
+      "confidence": "high",
+      "reason": "sample prediction maps logs metrics and alerts to monitoring"
+    },
+    {
+      "id": "container-registry",
+      "serviceCategory": "devops",
+      "serviceType": "container-registry",
+      "confidence": "high",
+      "reason": "sample prediction maps OCI image registry to container registry"
+    }
+  ],
+  "operatorAttestations": {
+    "productionEndpointReviewed": false,
+    "rawSecretsExcluded": true,
+    "productionClaimedByPolyCost": false,
+    "operator": "example-only"
+  },
+  "caveats": [
+    "This is sanitized sample evidence for CI/schema validation only.",
+    "A real production bundle must use evidenceLevel=live-model after running the corpus against a configured endpoint/model and Vault-backed api_key.",
+    "Production LLM quality requires ongoing corpus refresh, false-positive review, and monitored drift tracking."
+  ]
+}
