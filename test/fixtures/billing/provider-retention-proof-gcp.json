@@ -1,0 +1,8 @@
+{
+  "bucket": "polycost-invoice-artifacts",
+  "name": "invoice-artifacts/team/reconciliation/artifact.txt",
+  "generation": "1870000000000000",
+  "retentionExpirationTime": "2031-07-09T00:00:00.000Z",
+  "eventBasedHold": false,
+  "temporaryHold": false
+}

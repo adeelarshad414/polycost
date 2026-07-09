@@ -1,0 +1,6 @@
+{
+  "immutabilityPolicyUntilDate": "2031-07-09T00:00:00.000Z",
+  "policyMode": "Locked",
+  "hasLegalHold": false,
+  "etag": "\"azure-proof-etag\""
+}

@@ -581,3 +581,29 @@ Honest boundary:
   proof manifests. It does not yet perform live provider control-plane proof
   capture for every cloud automatically, and it does not convert PolyCost into an
   invoice system of record.
+
+## Phase 2.43 - Provider Retention Proof Artifact Verifier
+
+Status: implemented and verified locally on 2026-07-09.
+
+Evidence added:
+
+- `npm run invoice:retention-proof:verify` verifies captured AWS S3, Azure Blob,
+  and GCP Cloud Storage retention proof JSON files, computes the SHA-256 digest,
+  checks optional expected digest input, and prints recommended runtime config for
+  provider-control-plane proof mode.
+- `npm run invoice:retention-proof:verify:smoke` covers valid AWS/Azure/GCP
+  fixture proof files, digest mismatch failure, and missing-retention failure.
+- The smoke is part of `npm run check`, and release-readiness anchors now require
+  the verifier, smoke harness, docs command, and provider-specific validation
+  strings.
+- Full `npm run check` passed with API 56 suites / 471 tests, web 11 suites /
+  147 tests, graph validation 322 nodes / 322 edges, pricing coverage, progress
+  verification 153 anchors, QA/security suppression hygiene, DB, DevOps, cloud,
+  release, handover, and provider-credential gates green.
+
+Honest boundary:
+
+- The verifier validates captured evidence structure and digest only. It does not
+  call cloud APIs itself, prove chain of custody, or replace legal retention
+  sufficiency review.

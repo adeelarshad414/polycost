@@ -197,6 +197,27 @@ az storage blob legal-hold show --account-name "<account>" --container-name "<co
 gcloud storage objects describe gs://polycost-invoice-artifacts/invoice-artifacts/... --format=json > gcp-object-retention.json
 ```
 
+Before copying the proof digest into runtime config, verify the captured JSON with
+PolyCost's offline verifier:
+
+```bash
+npm run invoice:retention-proof:verify -- aws-s3 aws-object-retention.json \
+  --reference=s3://polycost-invoice-artifacts/object-lock-proof.json
+
+npm run invoice:retention-proof:verify -- azure-blob azure-immutability-policy.json \
+  --reference=azure-blob://account/container/object-lock-proof.json
+
+npm run invoice:retention-proof:verify -- gcp-gcs gcp-object-retention.json \
+  --reference=gs://polycost-invoice-artifacts/object-lock-proof.json
+```
+
+The verifier prints the computed
+`INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_SHA256` and recommended
+`INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE=provider-control-plane` settings.
+For repeatable release evidence, rerun it with `--expected-sha256=<digest>` after
+archiving the proof artifact. The command validates captured evidence structure
+and digest only; it does not call the provider API or prove legal sufficiency.
+
 The evidence packet aggregates these manifests as
 `providerRetentionProofMissingCount`, `providerRetentionProofDeclaredCount`, and
 `providerRetentionProofVerifiedCount`. The `providerRetentionProofReady` production

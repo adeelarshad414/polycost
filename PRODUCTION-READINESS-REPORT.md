@@ -710,6 +710,9 @@ Machine-readable token evidence:
   retention proof manifest, packet-level proof counters, offline verifier checks,
   and a `providerRetentionProofReady` gate that turns green only when every
   external artifact has provider-control-plane proof reference and SHA-256 digest.
+  Phase 2.43 adds an offline AWS/Azure/GCP provider retention proof artifact
+  verifier and smoke harness so operators can validate the captured proof JSON and
+  digest before copying it into runtime configuration.
   PolyCost still does not provide provider invoice rendering, private contract
   validation, automated cloud-control-plane WORM object-store proof capture,
   receiver-side immutability proof, external legal-review routing, contract/legal

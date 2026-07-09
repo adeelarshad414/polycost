@@ -1,0 +1,12 @@
+{
+  "Retention": {
+    "Mode": "COMPLIANCE",
+    "RetainUntilDate": "2031-07-09T00:00:00.000Z"
+  },
+  "LegalHold": {
+    "Status": "OFF"
+  },
+  "ResponseMetadata": {
+    "RequestId": "aws-proof-request-123"
+  }
+}
