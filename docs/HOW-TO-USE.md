@@ -196,3 +196,10 @@ For finance/FinOps:
 11. Call out that invoice-grade actual spend, private discounts, legal-hold
     administration, reviewer workflow automation, and provider invoice-of-record
     validation are still future work.
+12. For a provider invoice-of-record pilot, archive sanitized provider invoice,
+    billing export, normalized actuals, private-pricing, tax/adjustment,
+    commitment, retention/notary/audit, and finance/security review digests, then
+    run
+    `npm run invoice:record:evidence:check -- --require-provider-invoice <bundle.json>`.
+    The checked-in sample can be validated with
+    `npm run invoice:record:evidence:check`, but it is schema-only evidence.

@@ -37,6 +37,7 @@ const requiredFiles = [
   'docs/operations/invoice-artifact-production-profile.example.json',
   'docs/operations/evidence/aws-s3-retention-proof.example.json',
   'docs/operations/evidence/invoice-artifact-rehearsal-evidence.example.json',
+  'docs/operations/evidence/invoice-of-record-pilot-evidence.example.json',
   'docs/operations/evidence/terraform-validation-evidence.example.json',
   'docs/operations/evidence/terraform-destination-capture/terraform-destination-capture.example.json',
   'docs/operations/evidence/terraform-destination-capture/BUNDLE-MANIFEST.json',
@@ -46,6 +47,7 @@ const requiredFiles = [
   'docs/operations/evidence/enterprise-idp-pilot-evidence.example.json',
   'docs/architecture/phase-v3-6-terraform-validation-evidence.md',
   'docs/architecture/phase-v3-7-terraform-destination-evidence-capture.md',
+  'docs/architecture/phase-2-invoice-of-record-pilot-evidence.md',
   'docs/architecture/phase-2-vsdx-visual-evidence.md',
   'docs/architecture/phase-2-diagram-llm-corpus-evidence.md',
   'docs/architecture/phase-2-enterprise-idp-pilot-evidence.md',
@@ -140,6 +142,9 @@ if (!packageJson.scripts?.['invoice:artifact-rehearsal:live']) {
 if (!packageJson.scripts?.['invoice:artifact-rehearsal:evidence:check']) {
   failures.push('package.json is missing invoice:artifact-rehearsal:evidence:check');
 }
+if (!packageJson.scripts?.['invoice:record:evidence:check']) {
+  failures.push('package.json is missing invoice:record:evidence:check');
+}
 if (!packageJson.scripts?.['terraform:evidence:check']) {
   failures.push('package.json is missing terraform:evidence:check');
 }
@@ -231,6 +236,9 @@ if (!packageJson.scripts?.check?.includes('npm run invoice:artifact-rehearsal:ev
     'package.json check script must include npm run invoice:artifact-rehearsal:evidence:check',
   );
 }
+if (!packageJson.scripts?.check?.includes('npm run invoice:record:evidence:check')) {
+  failures.push('package.json check script must include npm run invoice:record:evidence:check');
+}
 if (!packageJson.scripts?.check?.includes('npm run terraform:evidence:check')) {
   failures.push('package.json check script must include npm run terraform:evidence:check');
 }
@@ -281,6 +289,11 @@ await assertFileContains('README.md', [
   [
     'invoice artifact rehearsal evidence checker command',
     'npm run invoice:artifact-rehearsal:evidence:check',
+  ],
+  ['invoice-of-record pilot evidence checker command', 'npm run invoice:record:evidence:check'],
+  [
+    'invoice-of-record architecture link',
+    'docs/architecture/phase-2-invoice-of-record-pilot-evidence.md',
   ],
   ['terraform validation evidence checker command', 'npm run terraform:evidence:check'],
   ['terraform destination evidence capture command', 'npm run terraform:evidence:capture'],
@@ -352,6 +365,7 @@ await assertFileContains('docs/HOW-TO-USE.md', [
   ['VSDX visual evidence checker', 'npm run vsdx:visual-evidence:check'],
   ['diagram LLM corpus checker', 'npm run diagram:llm-corpus:check'],
   ['enterprise IdP pilot evidence checker', 'npm run enterprise:idp:evidence:check'],
+  ['invoice-of-record evidence checker', 'npm run invoice:record:evidence:check'],
   ['Terraform evidence capture workflow', 'npm run terraform:evidence:capture'],
   ['Terraform starter bundle workflow', 'Terraform Starter Bundles'],
 ]);
@@ -443,6 +457,7 @@ await assertFileContains('RELEASE-CHECKLIST.md', [
   ['VSDX visual evidence checker command', 'npm run vsdx:visual-evidence:check'],
   ['diagram LLM corpus checker command', 'npm run diagram:llm-corpus:check'],
   ['enterprise IdP pilot evidence checker command', 'npm run enterprise:idp:evidence:check'],
+  ['invoice-of-record evidence checker command', 'npm run invoice:record:evidence:check'],
   ['Terraform evidence capture smoke command', 'npm run terraform:evidence:capture:smoke'],
   ['security audit gate', 'npm run security:audit'],
   ['clean-clone demo command', 'npm run demo:up'],
@@ -812,6 +827,14 @@ await assertFileContains('scripts/invoice-artifact-rehearsal-evidence-check.mjs'
   ['profile archive reference drift guard', 'archiveReference must match profile evidence'],
 ]);
 
+await assertFileContains('scripts/invoice-of-record-pilot-evidence-check.mjs', [
+  ['invoice-of-record evidence schema', 'polycost-invoice-of-record-pilot-evidence/v1'],
+  ['invoice-of-record check schema', 'polycost-invoice-of-record-pilot-evidence-check/v1'],
+  ['provider invoice required option', '--require-provider-invoice'],
+  ['invoice control total requirement', 'providerInvoiceControlTotals'],
+  ['raw invoice payload guard', 'findForbiddenRawPayloads'],
+]);
+
 await assertFileContains(
   'docs/operations/evidence/invoice-artifact-rehearsal-evidence.example.json',
   [
@@ -826,6 +849,13 @@ await assertFileContains(
     ['sample caveat', 'sanitized sample evidence for CI/schema validation only'],
   ],
 );
+
+await assertFileContains('docs/operations/evidence/invoice-of-record-pilot-evidence.example.json', [
+  ['invoice-of-record evidence example schema', 'polycost-invoice-of-record-pilot-evidence/v1'],
+  ['sample-only evidence level', 'example-schema'],
+  ['provider invoice pilot caveat', 'evidenceLevel=provider-invoice-pilot'],
+  ['invoice control total check', 'providerInvoiceControlTotals'],
+]);
 
 await assertFileContains('scripts/terraform-validation-evidence-check.mjs', [
   ['Terraform evidence bundle schema', 'polycost-terraform-validation-evidence/v1'],
@@ -934,6 +964,13 @@ await assertFileContains('docs/architecture/phase-v3-6-terraform-validation-evid
   ['destination plan command', 'npm run terraform:evidence:check'],
   ['sample evidence distinction', 'example-schema'],
   ['operator boundary', 'PolyCost still does not run `terraform apply`'],
+]);
+
+await assertFileContains('docs/architecture/phase-2-invoice-of-record-pilot-evidence.md', [
+  ['invoice-of-record title', 'Phase 2 Invoice-Of-Record Pilot Evidence'],
+  ['invoice-of-record command', 'npm run invoice:record:evidence:check'],
+  ['provider invoice strict mode', '--require-provider-invoice'],
+  ['invoice system boundary', 'provider invoice system of record'],
 ]);
 
 await assertFileContains('docs/architecture/phase-v3-7-terraform-destination-evidence-capture.md', [

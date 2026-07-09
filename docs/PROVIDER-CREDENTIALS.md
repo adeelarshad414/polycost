@@ -391,6 +391,24 @@ proof. This is still not invoice-grade billing by itself; it proves artifact
 retention posture, not provider invoice correctness, private discounts, tax review,
 or legal sufficiency.
 
+## Provider Invoice-Of-Record Pilot Evidence
+
+After a finance pilot has archived the provider invoice of record, billing export
+manifest, normalized actuals, private rate card/contract/discount evidence,
+tax/credit/support/marketplace/refund/fee classifications, commitment inventory and
+amortization proof, evidence packet, artifact governance manifest, retention proof,
+notary receipt, and audit-export proof, validate the sanitized digest-only bundle:
+
+```bash
+npm run invoice:record:evidence:check -- --require-provider-invoice <bundle.json>
+```
+
+The checked-in example can be validated with `npm run invoice:record:evidence:check`
+for schema coverage only. It is not provider invoice proof and does not make
+PolyCost the provider invoice system of record. Do not place raw invoices, raw
+billing exports, private contracts, customer PII, credentials, signed URLs, or
+authorization headers in the evidence bundle.
+
 ### AWS S3
 
 Vault path: `secret/polycost/artifacts/aws`

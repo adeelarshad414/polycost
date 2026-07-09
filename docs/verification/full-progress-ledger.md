@@ -75,6 +75,10 @@ Evidence:
 - External artifact retention now deletes S3, Azure Blob, or GCP Cloud Storage objects
   before removing expired non-held database pointers, with provider `404` treated as
   idempotent success for retry safety.
+- Provider invoice-of-record pilot evidence now has a runnable contract through
+  `npm run invoice:record:evidence:check`, backed by
+  `docs/operations/evidence/invoice-of-record-pilot-evidence.example.json` and strict
+  `--require-provider-invoice` mode for production finance/security-reviewed bundles.
 - `docs/PROVIDER-CREDENTIALS.md` states the current production swap procedure and
   explicitly limits real provider mode to catalog list prices, not invoices.
 
@@ -88,10 +92,11 @@ Deferred:
   rows are separated from usage-comparable variance, but provider-account-specific
   amortization, allocation proof, private pricing, and invoice controls remain
   future work. The invoice-grade readiness matrix, artifact register, stored-blob
-  metadata, governance status, object-storage pointers, and verification status
-  expose those blockers; they do not remove unrelated or unverified evidence
-  requirements. Current artifact storage supports database-backed local mode plus
-  provider-native object writes/reads/deletes, but real AV operations, legal-hold
+  metadata, governance status, object-storage pointers, verification status, and
+  invoice-of-record pilot evidence gate expose those blockers; they do not remove
+  unrelated or unverified evidence requirements. Current artifact storage supports
+  database-backed local mode plus provider-native object writes/reads/deletes, but
+  executed production provider-invoice bundles, real AV operations, legal-hold
   enforcement, and reviewer workflow automation remain future production work.
 
 ## Phase B - Input Modes And Requirement Pipeline
