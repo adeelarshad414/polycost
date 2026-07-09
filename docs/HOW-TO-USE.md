@@ -46,7 +46,9 @@ Diagram mode:
 - Lucidchart: export CSV shape data.
 - Visio: export VSDX. PolyCost performs layout-aware extraction and emits an
   approximate SVG preview for positioned shapes; it does not perform pixel-perfect
-  Visio rendering.
+  Visio rendering. For reviewed VSDX preview handoff evidence, archive the
+  sanitized preview bundle and run
+  `npm run vsdx:visual-evidence:check -- --require-human-review <bundle.json>`.
 
 After a diagram upload, review classified services, unresolved nodes, assumptions,
 and ignored decoration before running the comparison.

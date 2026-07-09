@@ -36,6 +36,13 @@ and tag evidence, then run
 `npm run terraform:evidence:check -- --require-destination-plan <bundle.json>`.
 The checked-in example bundle validates the schema only and is not live cloud proof.
 
+For VSDX visual evidence, archive the generated approximate SVG preview digest,
+parser counts, caveats, and reviewer attestation, then run
+`npm run vsdx:visual-evidence:check -- --require-human-review <bundle.json>`.
+The checked-in example bundle validates the schema only; PolyCost still provides
+layout-aware preview evidence, not full Visio visual rendering. See
+`docs/architecture/phase-2-vsdx-visual-evidence.md`.
+
 ## Monorepo Layout
 
 ```text

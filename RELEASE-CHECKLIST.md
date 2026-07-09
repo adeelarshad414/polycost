@@ -42,6 +42,9 @@ Complete this checklist before changing the GitHub repository visibility from pr
 
 - Confirm README and reports describe pricing as catalog list-price estimates, not invoices.
 - Confirm known future gaps remain plainly stated: invoice-grade billing, full visual VSDX rendering, formal SCIM/SSO certification and production RBAC polish, and Terraform/V3.
+- Confirm current VSDX preview evidence is archived with
+  `npm run vsdx:visual-evidence:check -- --require-human-review <bundle.json>`
+  before claiming reviewed VSDX visual proof.
 - Confirm `docs/SECURITY-SUPPRESSIONS.md` is current.
 - Confirm `npm run security:audit` passes the high/critical gate.
 - Confirm audit export receiver evidence is archived before claiming SIEM/WORM
@@ -69,6 +72,7 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Run `npm run audit:export:smoke:local`.
 - Run `npm run invoice:evidence:notary:smoke:local`.
 - Run `npm run invoice:evidence:notary:receiver:smoke`.
+- Run `npm run vsdx:visual-evidence:check`.
 - Run `npm run release:check`.
 - Run `npm run loading:check`.
 - Run `npm run handover:check`.

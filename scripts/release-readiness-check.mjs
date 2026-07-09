@@ -38,7 +38,9 @@ const requiredFiles = [
   'docs/operations/evidence/aws-s3-retention-proof.example.json',
   'docs/operations/evidence/invoice-artifact-rehearsal-evidence.example.json',
   'docs/operations/evidence/terraform-validation-evidence.example.json',
+  'docs/operations/evidence/vsdx-visual-evidence.example.json',
   'docs/architecture/phase-v3-6-terraform-validation-evidence.md',
+  'docs/architecture/phase-2-vsdx-visual-evidence.md',
   'handover/HANDOVER-README.md',
   'handover/DESIGN-SYSTEM.md',
   'handover/JOURNEYS.md',
@@ -132,6 +134,9 @@ if (!packageJson.scripts?.['invoice:artifact-rehearsal:evidence:check']) {
 if (!packageJson.scripts?.['terraform:evidence:check']) {
   failures.push('package.json is missing terraform:evidence:check');
 }
+if (!packageJson.scripts?.['vsdx:visual-evidence:check']) {
+  failures.push('package.json is missing vsdx:visual-evidence:check');
+}
 if (!packageJson.scripts?.['pricing:logic:coverage']) {
   failures.push('package.json is missing pricing:logic:coverage');
 }
@@ -208,6 +213,9 @@ if (!packageJson.scripts?.check?.includes('npm run invoice:artifact-rehearsal:ev
 if (!packageJson.scripts?.check?.includes('npm run terraform:evidence:check')) {
   failures.push('package.json check script must include npm run terraform:evidence:check');
 }
+if (!packageJson.scripts?.check?.includes('npm run vsdx:visual-evidence:check')) {
+  failures.push('package.json check script must include npm run vsdx:visual-evidence:check');
+}
 
 assertScriptIncludes('test:production-readiness', [
   'src/api/finops-proof.spec.ts',
@@ -245,10 +253,12 @@ await assertFileContains('README.md', [
     'npm run invoice:artifact-rehearsal:evidence:check',
   ],
   ['terraform validation evidence checker command', 'npm run terraform:evidence:check'],
+  ['VSDX visual evidence checker command', 'npm run vsdx:visual-evidence:check'],
   [
     'terraform validation evidence architecture link',
     'docs/architecture/phase-v3-6-terraform-validation-evidence.md',
   ],
+  ['VSDX visual evidence architecture link', 'docs/architecture/phase-2-vsdx-visual-evidence.md'],
   [
     'catalog list-price honesty',
     'not a billing, invoicing, or live cloud-account spend management system',
@@ -294,6 +304,7 @@ await assertFileContains('docs/CUSTOMER-HANDOVER-LEDGER.md', [
 await assertFileContains('docs/HOW-TO-USE.md', [
   ['customer demo command', 'npm run demo:up'],
   ['diagram input paths', 'Diagram mode'],
+  ['VSDX visual evidence checker', 'npm run vsdx:visual-evidence:check'],
   ['Terraform starter bundle workflow', 'Terraform Starter Bundles'],
 ]);
 
@@ -378,6 +389,7 @@ await assertFileContains('RELEASE-CHECKLIST.md', [
   ['provider logo/trademark review', 'cloud logos are not present'],
   ['pricing honesty task', 'catalog list-price estimates, not invoices'],
   ['known future gaps task', 'full visual VSDX rendering'],
+  ['VSDX visual evidence checker command', 'npm run vsdx:visual-evidence:check'],
   ['security audit gate', 'npm run security:audit'],
   ['clean-clone demo command', 'npm run demo:up'],
   ['clean-clone timed verifier command', 'npm run demo:verify-clean'],
@@ -768,6 +780,14 @@ await assertFileContains('scripts/terraform-validation-evidence-check.mjs', [
   ['raw secret material guard', 'findSecretMaterial'],
 ]);
 
+await assertFileContains('scripts/vsdx-visual-evidence-check.mjs', [
+  ['VSDX visual evidence bundle schema', 'polycost-vsdx-visual-evidence/v1'],
+  ['VSDX visual evidence check schema', 'polycost-vsdx-visual-evidence-check/v1'],
+  ['human review required option', '--require-human-review'],
+  ['approximate SVG preview type', 'approximate-svg'],
+  ['raw VSDX payload guard', 'findForbiddenRawPayloads'],
+]);
+
 await assertFileContains('docs/operations/evidence/terraform-validation-evidence.example.json', [
   ['Terraform evidence example schema', 'polycost-terraform-validation-evidence/v1'],
   ['sample-only evidence level', 'example-schema'],
@@ -777,11 +797,26 @@ await assertFileContains('docs/operations/evidence/terraform-validation-evidence
   ['tag evidence', '"CostCenter"'],
 ]);
 
+await assertFileContains('docs/operations/evidence/vsdx-visual-evidence.example.json', [
+  ['VSDX visual evidence example schema', 'polycost-vsdx-visual-evidence/v1'],
+  ['sample-only evidence level', 'example-schema'],
+  ['layout extraction rendering mode', '"renderingMode": "layout-extraction"'],
+  ['approximate SVG caveat', 'not full Visio visual rendering'],
+  ['human review not claimed', '"humanPreviewReviewed": false'],
+]);
+
 await assertFileContains('docs/architecture/phase-v3-6-terraform-validation-evidence.md', [
   ['V3.6 title', 'Phase V3.6 Terraform Validation Evidence'],
   ['destination plan command', 'npm run terraform:evidence:check'],
   ['sample evidence distinction', 'example-schema'],
   ['operator boundary', 'PolyCost still does not run `terraform apply`'],
+]);
+
+await assertFileContains('docs/architecture/phase-2-vsdx-visual-evidence.md', [
+  ['VSDX visual evidence title', 'Phase 2 VSDX Visual Evidence'],
+  ['VSDX visual evidence command', 'npm run vsdx:visual-evidence:check'],
+  ['sample evidence distinction', 'example-schema'],
+  ['full Visio boundary', 'not full Visio visual rendering'],
 ]);
 
 await assertFileContains('docs/operations/invoice-artifact-production-profile.example.json', [
