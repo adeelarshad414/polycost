@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "polycost-vsdx-visual-evidence/v1",
+  "bundleName": "revenue-portal-vsdx-preview",
+  "evidenceLevel": "example-schema",
+  "productionClaim": false,
+  "sourceFormat": "vsdx",
+  "capturedAt": "2026-07-09T00:00:00.000Z",
+  "parser": {
+    "graphSchemaVersion": "diagram-parser/v1",
+    "nodeCount": 3,
+    "edgeCount": 2,
+    "pageCount": 1,
+    "visualPreviewCount": 1,
+    "partialParse": false,
+    "securityWarnings": []
+  },
+  "preview": {
+    "renderingMode": "layout-extraction",
+    "previewType": "approximate-svg",
+    "svgSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "pageRef": "visio/pages/page1.xml",
+    "pageName": "Application us-east-1",
+    "pageWidth": 11,
+    "pageHeight": 8.5,
+    "positionedShapeCount": 3,
+    "connectorPathCount": 2,
+    "textLabelCount": 3,
+    "normalizedBoundsPresent": true,
+    "warnings": [
+      "approximate SVG preview from VSDX geometry, not full Visio visual rendering",
+      "does not evaluate Visio themes, formulas, icons, embedded media, or exact text wrapping"
+    ]
+  },
+  "coverage": {
+    "themesRendered": false,
+    "iconsRendered": false,
+    "formulasEvaluated": false,
+    "embeddedMediaRendered": false,
+    "exactTextWrapping": false,
+    "fullVisioRenderingClaim": false
+  },
+  "operatorAttestations": {
+    "humanPreviewReviewed": false,
+    "rawFileExcluded": true,
+    "unsafeXmlRejected": true,
+    "fullVisioRenderingClaimedByPolyCost": false,
+    "operator": "example-only"
+  },
+  "caveats": [
+    "This is sanitized sample evidence for CI/schema validation only.",
+    "PolyCost provides layout-aware VSDX extraction and approximate SVG previews, not full Visio visual rendering.",
+    "A real reviewed bundle must use evidenceLevel=reviewed-preview after an operator reviews the generated preview against the source diagram."
+  ]
+}

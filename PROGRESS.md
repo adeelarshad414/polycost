@@ -145,6 +145,7 @@ say so explicitly rather than marking it done.
 | Phase 2.53 - Invoice artifact production profile check  | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.54 - Invoice artifact staging rehearsal harness | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.55 - Rehearsal evidence bundle verification     | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.56 - VSDX visual evidence verification          | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -159,6 +160,60 @@ say so explicitly rather than marking it done.
 | Formal browser audit tooling                            | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3.5 - Terraform bundle integrity validation      | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3.6 - Terraform validation evidence              | Complete with known gaps (see notes) | 2026-07-09   |
+
+## Phase 2.56 - VSDX visual evidence verification
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added `scripts/vsdx-visual-evidence-check.mjs`, a machine-readable verifier for
+  archived VSDX visual preview evidence.
+- Added `docs/operations/evidence/vsdx-visual-evidence.example.json`, a sanitized
+  `example-schema` bundle that validates the evidence contract without claiming
+  human-reviewed diagram proof.
+- Added `docs/architecture/phase-2-vsdx-visual-evidence.md` to explain the
+  approximate SVG preview workflow, reviewed-preview evidence level, and boundary
+  that PolyCost is not performing full Visio visual rendering.
+- Added `npm run vsdx:visual-evidence:check` and wired it into the aggregate
+  `npm run check` floor.
+- Updated README, `docs/HOW-TO-USE.md`, the public release checklist,
+  release-readiness guards, and progress-verification guards so the VSDX evidence
+  boundary is runnable and auditable.
+
+Verification performed:
+
+- `node --check scripts/vsdx-visual-evidence-check.mjs` passed.
+- `npm run vsdx:visual-evidence:check -- --json` passed against the checked-in
+  sample with `verifiedExampleSchema=true`, `verifiedReviewedPreview=false`, and
+  `humanReviewRequired=true`.
+- `npm run vsdx:visual-evidence:check -- --require-human-review --json` failed as
+  intended against the checked-in sample because it is `example-schema` evidence,
+  `humanPreviewReviewed=false`, and the operator is `example-only`.
+- `npm run release:check` passed and `npm run progress:verify` passed with `232`
+  anchors.
+- Full `npm run check` passed with the VSDX visual evidence checker in the aggregate
+  floor. The run included API unit `59` suites / `494` tests, web unit `11` suites /
+  `149` tests, graph validation `335` nodes / `335` edges, pricing coverage `36`
+  frontend families, progress verification `232` anchors, release readiness,
+  handover, DevOps/cloud/provider-credential gates, and invoice/Terraform/VSDX
+  evidence smokes. Expected caveats remained: `impeccable` is skipped on the
+  repo's Node 20 target, live Postgres migrations were skipped because the local
+  Postgres container was not running, and the default local env still warns that
+  invoice-artifacts are demo/local without live object-storage/KMS/scanner/WORM
+  settings.
+
+Known gaps carried forward:
+
+- This verifies archived evidence for PolyCost's current layout-aware extraction and
+  approximate SVG preview path. It still does not evaluate Visio themes, icon
+  libraries, formulas, embedded media, exact text wrapping, or pixel-level visual
+  equivalence.
+- Real reviewed preview proof requires an operator bundle with
+  `evidenceLevel=reviewed-preview`, `humanPreviewReviewed=true`, a named reviewer,
+  and `npm run vsdx:visual-evidence:check -- --require-human-review <bundle.json>`.
+- Full Visio visual rendering remains future scope.
 
 ## Phase V3.6 - Terraform validation evidence
 

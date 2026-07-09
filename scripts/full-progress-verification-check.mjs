@@ -106,6 +106,7 @@ async function assertPhaseEvidenceAnchors() {
     'npm run invoice:artifact-rehearsal:plan',
     'npm run invoice:artifact-rehearsal:evidence:check',
     'npm run terraform:evidence:check',
+    'npm run vsdx:visual-evidence:check',
   ]);
   assertScriptIncludes(packageJson, 'ci:unit', [
     'npm run test:coverage',
@@ -383,6 +384,13 @@ async function assertPhaseEvidenceAnchors() {
     ['raw secret material guard', 'findSecretMaterial'],
   ]);
 
+  await assertFileContains('scripts/vsdx-visual-evidence-check.mjs', [
+    ['VSDX visual evidence bundle schema', 'polycost-vsdx-visual-evidence/v1'],
+    ['VSDX visual evidence check schema', 'polycost-vsdx-visual-evidence-check/v1'],
+    ['require human review mode', '--require-human-review'],
+    ['raw visual payload guard', 'findForbiddenRawPayloads'],
+  ]);
+
   await assertFileContains('docs/operations/evidence/terraform-validation-evidence.example.json', [
     ['Terraform evidence example schema', 'polycost-terraform-validation-evidence/v1'],
     ['sample-only evidence level', 'example-schema'],
@@ -391,11 +399,25 @@ async function assertPhaseEvidenceAnchors() {
     ['tag evidence', '"CostCenter"'],
   ]);
 
+  await assertFileContains('docs/operations/evidence/vsdx-visual-evidence.example.json', [
+    ['VSDX visual evidence example schema', 'polycost-vsdx-visual-evidence/v1'],
+    ['sample-only evidence level', 'example-schema'],
+    ['approximate SVG evidence type', '"previewType": "approximate-svg"'],
+    ['full Visio caveat', 'not full Visio visual rendering'],
+  ]);
+
   await assertFileContains('docs/architecture/phase-v3-6-terraform-validation-evidence.md', [
     ['V3.6 title', 'Phase V3.6 Terraform Validation Evidence'],
     ['destination plan command', 'npm run terraform:evidence:check'],
     ['sample evidence distinction', 'example-schema'],
     ['operator boundary', 'PolyCost still does not run `terraform apply`'],
+  ]);
+
+  await assertFileContains('docs/architecture/phase-2-vsdx-visual-evidence.md', [
+    ['VSDX visual evidence architecture note', 'Phase 2 VSDX Visual Evidence'],
+    ['VSDX visual evidence command', 'npm run vsdx:visual-evidence:check'],
+    ['reviewed preview strict mode', '--require-human-review'],
+    ['full Visio deferred boundary', 'not full Visio visual rendering'],
   ]);
 
   await assertFileContains('docs/operations/invoice-artifact-production-profile.example.json', [
@@ -423,6 +445,7 @@ async function assertPhaseEvidenceAnchors() {
     ['verified mock distinction', 'verified (mock)'],
     ['invoice-grade deferred ledger', 'Full invoice-grade billing remains future work'],
     ['VSDX visual rendering deferred ledger', 'not full Visio visual rendering'],
+    ['VSDX visual evidence checker ledger', 'npm run vsdx:visual-evidence:check'],
     ['auth enterprise deferred ledger', 'Full enterprise account/team UX'],
     ['auth live transcript ledger', 'workspace-auth-rbac-sso'],
     ['external CI blocker ledger', 'runner_id: 0'],

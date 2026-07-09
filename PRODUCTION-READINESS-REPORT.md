@@ -122,6 +122,7 @@ performance/accessibility/best-practices/SEO metrics.
 | TF-GEN-005     | Improved      | V3.4 replaces Terraform module placeholders with AWS/Azure/GCP network, compute, and data starter modules plus static module-library validation                                                                                                         |
 | TF-GEN-006     | Improved      | V3.5 adds credential-free Terraform bundle manifest verification and tamper-detection evidence before provider-authenticated validation                                                                                                                 |
 | TF-GEN-007     | Improved      | V3.6 adds a machine-verifiable Terraform destination-plan evidence contract for manifest integrity, validation output, plan summary, policy, remote-state posture, tag evidence, and operator attestations                                              |
+| VSDX-VIS-004   | Improved      | Phase 2.56 adds `npm run vsdx:visual-evidence:check`, a machine-verifiable VSDX preview evidence contract that proves approximate SVG/layout-extraction evidence while preserving the no-full-Visio-rendering boundary                                  |
 | HND-001        | Added         | Customer handover package added under `docs/`, with usage, deployment, runbook, competitive comparison, architecture, and evidence ledger                                                                                                               |
 | HND-002        | Added         | `npm run handover:check` validates the handover package and runs inside the full local `npm run check` floor                                                                                                                                            |
 | OSS-001        | Added         | `npm run public:readiness:check` validates public-readiness docs, community health files, demo evidence hooks, tracked env-file safety, and provider-logo safeguards                                                                                    |
@@ -166,6 +167,19 @@ Local static/regression gates:
     / `149` tests, graph validation `331` nodes / `331` edges, pricing coverage
     `36` frontend families, progress verification `203` anchors, and the new
     evidence bundle gate in the aggregate floor.
+- Phase 2.56 VSDX visual evidence verification gates passed:
+  - `node --check scripts/vsdx-visual-evidence-check.mjs` passed.
+  - `npm run vsdx:visual-evidence:check -- --json` passed against the sanitized
+    `example-schema` bundle with `verifiedExampleSchema=true`.
+  - `npm run vsdx:visual-evidence:check -- --require-human-review --json` failed as
+    intended for the sample bundle because it is not human-reviewed preview
+    evidence.
+  - `npm run release:check` passed and `npm run progress:verify` passed with `232`
+    anchors.
+  - Full `npm run check` passed with API `59` suites / `494` tests, web `11`
+    suites / `149` tests, graph validation `335` nodes / `335` edges, pricing
+    coverage `36` frontend families, progress verification `232` anchors, and the
+    new VSDX evidence gate in the aggregate floor.
 - Phase 2.19 invoice adjustment evidence focused gates passed:
   - API focused: `src/api/auth-billing.spec.ts`: 1 suite / 23 tests.
   - Web focused: `src/App.spec.tsx`: 1 suite / 60 tests.
@@ -817,6 +831,8 @@ Machine-readable token evidence:
 - VSDX support now includes extraction/evidence and approximate SVG previews, not full
   Visio semantic rendering. Phase 2.9 adds page geometry, normalized preview bounds, and
   explicit layout-extraction caveats; Phase 2.18 adds sanitized SVG preview artifacts.
+  Phase 2.56 adds a machine-verifiable reviewed-preview evidence contract and sample
+  CI schema bundle, but full Visio rendering is still future scope.
 - Production LLM classifier quality requires a real endpoint/model, Vault secret, monitored
   corpus evaluation, and false-positive tracking. Phase 2.9 adds an explicit readiness
   surface so stub/unconfigured mode is not reported as production-connected.
