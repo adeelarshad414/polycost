@@ -20,6 +20,8 @@ const SCIM_USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User';
 const SCIM_LIST_RESPONSE_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:ListResponse';
 const SCIM_SERVICE_PROVIDER_CONFIG_SCHEMA =
   'urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig';
+const SCIM_SCHEMA_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:Schema';
+const SCIM_RESOURCE_TYPE_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:ResourceType';
 const TOKEN_PREFIX_LENGTH = 18;
 const SCIM_TOKEN_PREFIX = 'pc_scim_';
 
@@ -51,6 +53,61 @@ export interface ScimListUsersResponse {
   startIndex: number;
   itemsPerPage: number;
   Resources: ScimUserResponse[];
+}
+
+interface ScimSchemaAttribute {
+  name: string;
+  type: 'string' | 'boolean' | 'complex';
+  multiValued: boolean;
+  description: string;
+  required: boolean;
+  caseExact: boolean;
+  mutability: 'readWrite' | 'readOnly' | 'immutable';
+  returned: 'always' | 'default' | 'never';
+  uniqueness: 'none' | 'server' | 'global';
+  subAttributes?: ScimSchemaAttribute[];
+}
+
+interface ScimSchemaResponse {
+  schemas: [typeof SCIM_SCHEMA_SCHEMA];
+  id: typeof SCIM_USER_SCHEMA;
+  name: 'User';
+  description: string;
+  attributes: ScimSchemaAttribute[];
+  meta: {
+    resourceType: 'Schema';
+    location: '/api/v1/scim/v2/Schemas/urn:ietf:params:scim:schemas:core:2.0:User';
+  };
+}
+
+interface ScimResourceTypeResponse {
+  schemas: [typeof SCIM_RESOURCE_TYPE_SCHEMA];
+  id: 'User';
+  name: 'User';
+  endpoint: '/Users';
+  description: string;
+  schema: typeof SCIM_USER_SCHEMA;
+  schemaExtensions: [];
+  meta: {
+    resourceType: 'ResourceType';
+    location: '/api/v1/scim/v2/ResourceTypes/User';
+  };
+}
+
+export interface ScimListSchemasResponse {
+  schemas: [typeof SCIM_LIST_RESPONSE_SCHEMA];
+  totalResults: 1;
+  startIndex: 1;
+  itemsPerPage: 1;
+  Resources: [ScimSchemaResponse];
+}
+
+export interface ScimListResourceTypesResponse {
+  schemas: [typeof SCIM_LIST_RESPONSE_SCHEMA];
+  totalResults: 1;
+  startIndex: 1;
+  itemsPerPage: 1;
+  Resources: [ScimResourceTypeResponse];
 }
 
 @Injectable()
@@ -147,6 +204,53 @@ export class ScimProvisioningService {
         },
       ],
     };
+  }
+
+  async listSchemas(request: RequestWithAuth): Promise<ScimListSchemasResponse> {
+    await this.authenticateScimRequest(request);
+
+    return {
+      schemas: [SCIM_LIST_RESPONSE_SCHEMA],
+      totalResults: 1,
+      startIndex: 1,
+      itemsPerPage: 1,
+      Resources: [scimUserSchema()],
+    };
+  }
+
+  async getSchema(schemaId: string, request: RequestWithAuth): Promise<ScimSchemaResponse> {
+    await this.authenticateScimRequest(request);
+
+    if (decodeURIComponent(schemaId) !== SCIM_USER_SCHEMA) {
+      throw new ApiNotFoundError('SCIM schema was not found');
+    }
+
+    return scimUserSchema();
+  }
+
+  async listResourceTypes(request: RequestWithAuth): Promise<ScimListResourceTypesResponse> {
+    await this.authenticateScimRequest(request);
+
+    return {
+      schemas: [SCIM_LIST_RESPONSE_SCHEMA],
+      totalResults: 1,
+      startIndex: 1,
+      itemsPerPage: 1,
+      Resources: [scimUserResourceType()],
+    };
+  }
+
+  async getResourceType(
+    resourceTypeId: string,
+    request: RequestWithAuth,
+  ): Promise<ScimResourceTypeResponse> {
+    await this.authenticateScimRequest(request);
+
+    if (resourceTypeId.toLowerCase() !== 'user') {
+      throw new ApiNotFoundError('SCIM resource type was not found');
+    }
+
+    return scimUserResourceType();
   }
 
   async listUsers(request: RequestWithAuth): Promise<ScimListUsersResponse> {
@@ -446,6 +550,151 @@ function toScimUserResponse(user: TeamScimUserRecord): ScimUserResponse {
       resourceType: 'User',
       created: user.createdAt,
       lastModified: user.updatedAt,
+    },
+  };
+}
+
+function scimUserSchema(): ScimSchemaResponse {
+  return {
+    schemas: [SCIM_SCHEMA_SCHEMA],
+    id: SCIM_USER_SCHEMA,
+    name: 'User',
+    description: 'PolyCost supports the core SCIM User attributes needed for IdP provisioning.',
+    attributes: [
+      {
+        name: 'id',
+        type: 'string',
+        multiValued: false,
+        description: 'PolyCost SCIM user identifier.',
+        required: false,
+        caseExact: true,
+        mutability: 'readOnly',
+        returned: 'always',
+        uniqueness: 'server',
+      },
+      {
+        name: 'externalId',
+        type: 'string',
+        multiValued: false,
+        description: 'Identity provider stable user identifier.',
+        required: false,
+        caseExact: true,
+        mutability: 'readWrite',
+        returned: 'default',
+        uniqueness: 'none',
+      },
+      {
+        name: 'userName',
+        type: 'string',
+        multiValued: false,
+        description: 'Email-style username used to attach the user to a PolyCost account.',
+        required: true,
+        caseExact: false,
+        mutability: 'readWrite',
+        returned: 'default',
+        uniqueness: 'server',
+      },
+      {
+        name: 'name',
+        type: 'complex',
+        multiValued: false,
+        description: 'Optional display-name container accepted from common IdPs.',
+        required: false,
+        caseExact: false,
+        mutability: 'readWrite',
+        returned: 'default',
+        uniqueness: 'none',
+        subAttributes: [
+          {
+            name: 'formatted',
+            type: 'string',
+            multiValued: false,
+            description: 'Human-readable display name.',
+            required: false,
+            caseExact: false,
+            mutability: 'readWrite',
+            returned: 'default',
+            uniqueness: 'none',
+          },
+        ],
+      },
+      {
+        name: 'displayName',
+        type: 'string',
+        multiValued: false,
+        description: 'Optional human-readable display name.',
+        required: false,
+        caseExact: false,
+        mutability: 'readWrite',
+        returned: 'default',
+        uniqueness: 'none',
+      },
+      {
+        name: 'active',
+        type: 'boolean',
+        multiValued: false,
+        description: 'Whether the IdP-managed team membership is active.',
+        required: false,
+        caseExact: false,
+        mutability: 'readWrite',
+        returned: 'default',
+        uniqueness: 'none',
+      },
+      {
+        name: 'emails',
+        type: 'complex',
+        multiValued: true,
+        description: 'Optional email values accepted for profile retention evidence.',
+        required: false,
+        caseExact: false,
+        mutability: 'readWrite',
+        returned: 'default',
+        uniqueness: 'none',
+        subAttributes: [
+          {
+            name: 'value',
+            type: 'string',
+            multiValued: false,
+            description: 'Email address value.',
+            required: false,
+            caseExact: false,
+            mutability: 'readWrite',
+            returned: 'default',
+            uniqueness: 'none',
+          },
+          {
+            name: 'primary',
+            type: 'boolean',
+            multiValued: false,
+            description: 'Whether this email is the primary IdP email.',
+            required: false,
+            caseExact: false,
+            mutability: 'readWrite',
+            returned: 'default',
+            uniqueness: 'none',
+          },
+        ],
+      },
+    ],
+    meta: {
+      resourceType: 'Schema',
+      location: '/api/v1/scim/v2/Schemas/urn:ietf:params:scim:schemas:core:2.0:User',
+    },
+  };
+}
+
+function scimUserResourceType(): ScimResourceTypeResponse {
+  return {
+    schemas: [SCIM_RESOURCE_TYPE_SCHEMA],
+    id: 'User',
+    name: 'User',
+    endpoint: '/Users',
+    description: 'PolyCost team-member provisioning through the SCIM core User resource.',
+    schema: SCIM_USER_SCHEMA,
+    schemaExtensions: [],
+    meta: {
+      resourceType: 'ResourceType',
+      location: '/api/v1/scim/v2/ResourceTypes/User',
     },
   };
 }

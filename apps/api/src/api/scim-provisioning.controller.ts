@@ -55,6 +55,29 @@ export class ScimProvisioningController {
     return this.scimProvisioningService.serviceProviderConfig(request);
   }
 
+  @Get('scim/v2/Schemas')
+  listSchemas(@Req() request: RequestWithAuth) {
+    return this.scimProvisioningService.listSchemas(request);
+  }
+
+  @Get('scim/v2/Schemas/:schemaId')
+  getSchema(@Param('schemaId') schemaId: string, @Req() request: RequestWithAuth) {
+    return this.scimProvisioningService.getSchema(schemaId, request);
+  }
+
+  @Get('scim/v2/ResourceTypes')
+  listResourceTypes(@Req() request: RequestWithAuth) {
+    return this.scimProvisioningService.listResourceTypes(request);
+  }
+
+  @Get('scim/v2/ResourceTypes/:resourceTypeId')
+  getResourceType(
+    @Param('resourceTypeId') resourceTypeId: string,
+    @Req() request: RequestWithAuth,
+  ) {
+    return this.scimProvisioningService.getResourceType(resourceTypeId, request);
+  }
+
   @Get('scim/v2/Users')
   listUsers(@Req() request: RequestWithAuth) {
     return this.scimProvisioningService.listUsers(request);

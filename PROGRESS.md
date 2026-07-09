@@ -139,6 +139,7 @@ say so explicitly rather than marking it done.
 | Phase 2.47 - Provider retention proof CLI capture       | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.48 - SCIM provisioning foundation               | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.49 - SCIM admin workspace UX                    | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.50 - SCIM discovery and IdP onboarding          | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -152,6 +153,50 @@ say so explicitly rather than marking it done.
 | Browser audit artifact hardening                        | Complete with known gaps (see notes) | 2026-07-08   |
 | Formal browser audit tooling                            | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3.5 - Terraform bundle integrity validation      | Complete with known gaps (see notes) | 2026-07-08   |
+
+## Phase 2.50 - SCIM discovery and IdP onboarding
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added SCIM bearer-authenticated discovery endpoints for `/api/v1/scim/v2/Schemas`,
+  `/api/v1/scim/v2/Schemas/:schemaId`, `/api/v1/scim/v2/ResourceTypes`, and
+  `/api/v1/scim/v2/ResourceTypes/:resourceTypeId`.
+- Added typed core User schema and User resource-type responses for IdP discovery
+  without exposing tenant/team data.
+- Added representative Okta-style, Microsoft Entra-style, and deactivate-patch SCIM
+  fixtures under `fixtures/scim/`.
+- Added service tests proving discovery requires a valid SCIM bearer token and that
+  the representative IdP create/deactivate fixture shapes are accepted without
+  storing raw bearer tokens.
+- Added `docs/ENTERPRISE-IDP-ONBOARDING.md` with setup fields, endpoint summary,
+  smoke commands, token-handling checklist, and explicit non-certification boundary.
+- Added README/user-guide links and release-readiness guards for discovery routes,
+  fixtures, docs, and tests.
+
+Verification performed:
+
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/api/scim-provisioning.service.spec.ts src/api/scim-provisioning.controller.spec.ts`
+  passed: 2 suites / 13 tests.
+- `npm run ci:lint` passed with no new warning-only security findings from the
+  SCIM fixture loader.
+- `npm run format:check`, `npm run progress:verify`, and `npm run release:check`
+  passed after adding the SCIM discovery and IdP onboarding guards.
+- Full `npm run check` passed: API unit 58 suites / 487 tests, web unit 11 suites
+  / 149 tests, graph validation 327/327, pricing coverage, progress verification
+  153 anchors, release/handover/provider gates green. Expected caveats remained:
+  live Postgres `schema_migrations` inspection skipped because the container was
+  not running, Node 20 skipped `impeccable`, and invoice-artifact governance warned
+  for demo/local storage posture.
+
+Known gaps carried forward:
+
+- This improves IdP interoperability and operator readiness, but does not claim
+  formal SCIM certification, production SSO/SAML/OIDC certification, group push,
+  IdP-driven role mapping, custom schema extensions, account recovery, org billing
+  UX, or a complete enterprise IAM administration product.
 
 ## Phase 2.49 - SCIM admin workspace UX
 

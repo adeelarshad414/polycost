@@ -104,6 +104,7 @@ performance/accessibility/best-practices/SEO metrics.
 | UI-AUTH-017    | Improved      | Workspace billing panel can now download a reviewer-ready invoice evidence JSON packet for the active reconciliation while keeping stored artifact byte downloads separate                                                                              |
 | UI-AUTH-018    | Improved      | Workspace evidence-packet downloads now include the packet digest prefix in the generated file name and completion notice                                                                                                                               |
 | UI-AUTH-019    | Improved      | Workspace Team access now exposes SCIM provisioning posture, one-time token creation, token revocation, token metadata, and provisioned-user visibility through session-authenticated admin APIs                                                        |
+| IAM-SCIM-001   | Improved      | SCIM now exposes bearer-protected `/Schemas` and `/ResourceTypes` discovery endpoints, representative Okta/Entra fixtures, and an operator onboarding guide while preserving the non-certification boundary                                             |
 | UI-AUTH-003    | Improved      | Active workspace switching is now backend-backed, membership-checked, and exposed in the signed-in account panel                                                                                                                                        |
 | UI-AUTH-004    | Improved      | Pending/expired workspace invites can now be resent through a guarded backend route that rotates the stored token hash and exposes the refreshed one-time token only in the response                                                                    |
 | UI-AUTH-005    | Improved      | Invite delivery now has local panel mode plus production HTTPS webhook mode with HMAC signatures, production config guards, and browser-safe delivery receipts                                                                                          |
@@ -748,7 +749,10 @@ Machine-readable token evidence:
   workspace switching for existing team memberships, Phase 2.48 adds the SCIM
   provisioning foundation with hashed tokens, bearer-token user provisioning, team
   membership deactivation, and audit events, and Phase 2.49 exposes the SCIM
-  token/user posture plus create/revoke controls in the workspace admin UI.
+  token/user posture plus create/revoke controls in the workspace admin UI. Phase
+  2.50 adds SCIM discovery endpoints, representative IdP fixtures, and operator
+  onboarding docs, but group push, IdP-driven role mapping, custom schema
+  extensions, and formal certification remain future scope.
 - Terraform generation now has a hardened root bundle, ZIP export, bundle
   manifest, credential-free manifest integrity verifier, validation runner,
   generation profile, private database networking, runtime identity baselines,

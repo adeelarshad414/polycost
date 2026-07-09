@@ -1,7 +1,18 @@
+import { readFileSync } from 'node:fs';
 import { ApiDatabaseRepository } from './api-database.repository';
 import { ApiForbiddenError, ApiUnauthorizedError, ApiValidationError } from './api-errors';
 import { AuthIdentity, TeamScimUserRecord } from './auth.types';
 import { ScimProvisioningService } from './scim-provisioning.service';
+
+const OKTA_USER_CREATE_FIXTURE = JSON.parse(
+  readFileSync('../../fixtures/scim/okta-user-create.json', 'utf8'),
+) as Record<string, unknown>;
+const ENTRA_USER_CREATE_FIXTURE = JSON.parse(
+  readFileSync('../../fixtures/scim/entra-user-create.json', 'utf8'),
+) as Record<string, unknown>;
+const DEACTIVATE_USER_PATCH_FIXTURE = JSON.parse(
+  readFileSync('../../fixtures/scim/deactivate-user-patch.json', 'utf8'),
+) as Record<string, unknown>;
 
 describe('ScimProvisioningService', () => {
   const teamId = '22222222-2222-4222-8222-222222222222';
@@ -122,6 +133,52 @@ describe('ScimProvisioningService', () => {
     );
   });
 
+  it('exposes SCIM discovery metadata only to valid SCIM bearer tokens', async () => {
+    const repository = repositoryMock();
+    repository.resolveTeamScimToken.mockResolvedValue(scimIdentity);
+    const service = new ScimProvisioningService(repository as never);
+
+    await expect(service.listSchemas({ headers: {} })).rejects.toThrow(ApiUnauthorizedError);
+
+    await expect(service.listSchemas(request)).resolves.toMatchObject({
+      schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
+      totalResults: 1,
+      Resources: [
+        {
+          id: 'urn:ietf:params:scim:schemas:core:2.0:User',
+          name: 'User',
+          attributes: expect.arrayContaining([
+            expect.objectContaining({ name: 'userName', required: true }),
+            expect.objectContaining({ name: 'active', type: 'boolean' }),
+          ]),
+        },
+      ],
+    });
+    await expect(
+      service.getSchema(encodeURIComponent('urn:ietf:params:scim:schemas:core:2.0:User'), request),
+    ).resolves.toMatchObject({
+      id: 'urn:ietf:params:scim:schemas:core:2.0:User',
+      name: 'User',
+    });
+    await expect(service.listResourceTypes(request)).resolves.toMatchObject({
+      totalResults: 1,
+      Resources: [
+        {
+          id: 'User',
+          endpoint: '/Users',
+          schema: 'urn:ietf:params:scim:schemas:core:2.0:User',
+        },
+      ],
+    });
+    await expect(service.getResourceType('User', request)).resolves.toMatchObject({
+      id: 'User',
+      endpoint: '/Users',
+    });
+    await expect(service.getResourceType('Group', request)).rejects.toThrow(
+      'SCIM resource type was not found',
+    );
+  });
+
   it('upserts SCIM users as member-scoped external identities and audits the token actor', async () => {
     const repository = repositoryMock();
     repository.resolveTeamScimToken.mockResolvedValue(scimIdentity);
@@ -162,6 +219,38 @@ describe('ScimProvisioningService', () => {
     );
   });
 
+  it('accepts representative Okta and Entra SCIM user-create fixtures', async () => {
+    const repository = repositoryMock();
+    repository.resolveTeamScimToken.mockResolvedValue(scimIdentity);
+    repository.upsertTeamScimUser.mockImplementation(async (input) =>
+      scimUserRecord({
+        externalId: input.externalId,
+        userName: input.userName,
+        displayName: input.displayName,
+      }),
+    );
+    const service = new ScimProvisioningService(repository as never);
+
+    await expect(service.createUser(OKTA_USER_CREATE_FIXTURE, request)).resolves.toEqual(
+      expect.objectContaining({
+        externalId: 'okta-00u-platform-engineer',
+        userName: 'platform.engineer@example.com',
+        displayName: 'Platform Engineer',
+      }),
+    );
+    await expect(service.createUser(ENTRA_USER_CREATE_FIXTURE, request)).resolves.toEqual(
+      expect.objectContaining({
+        externalId: 'entra-8f77-platform-owner',
+        userName: 'platform.owner@example.com',
+        displayName: 'Platform Owner',
+      }),
+    );
+    expect(repository.upsertTeamScimUser).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(repository.upsertTeamScimUser.mock.calls)).not.toContain(
+      'pc_scim_test-token',
+    );
+  });
+
   it('deactivates SCIM users on active=false patches without disabling unrelated accounts globally', async () => {
     const repository = repositoryMock();
     repository.resolveTeamScimToken.mockResolvedValue(scimIdentity);
@@ -192,6 +281,28 @@ describe('ScimProvisioningService', () => {
           action: 'team.scim.user_deactivated',
           targetType: 'scim_user',
         }),
+      }),
+    );
+  });
+
+  it('accepts representative IdP deactivation patch fixtures', async () => {
+    const repository = repositoryMock();
+    repository.resolveTeamScimToken.mockResolvedValue(scimIdentity);
+    repository.getTeamScimUser.mockResolvedValue(scimUserRecord());
+    repository.deactivateTeamScimUser.mockResolvedValue(scimUserRecord({ active: false }));
+    const service = new ScimProvisioningService(repository as never);
+
+    await expect(
+      service.patchUser(
+        '66666666-6666-4666-8666-666666666666',
+        DEACTIVATE_USER_PATCH_FIXTURE,
+        request,
+      ),
+    ).resolves.toEqual(expect.objectContaining({ active: false }));
+    expect(repository.deactivateTeamScimUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        teamId,
+        userId: '66666666-6666-4666-8666-666666666666',
       }),
     );
   });

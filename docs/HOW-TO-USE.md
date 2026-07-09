@@ -130,10 +130,13 @@ Accounts add:
 - team settings and invitation flows
 - Owner/Admin/Member RBAC checks
 - mock OIDC/SAML readiness and provider metadata screens
+- SCIM token management, provisioning posture, and IdP user sync foundations
 - billing export reconciliation foundations
 
-Production email delivery, enterprise SSO handshakes, SCIM, complete account/team
-administration polish, and hosted billing plans remain future phases.
+For SCIM operator setup, see `docs/ENTERPRISE-IDP-ONBOARDING.md`.
+
+Production email delivery, formal enterprise SSO/SCIM certification, complete
+account/team administration polish, and hosted billing plans remain future phases.
 
 ## 8. Demo Talk Track
 

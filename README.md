@@ -189,6 +189,8 @@ The main API is versioned under `/api/v1`.
 - `GET /scim/v2/Users`, `POST /scim/v2/Users`, `PUT /scim/v2/Users/:id`,
   `PATCH /scim/v2/Users/:id`, and `DELETE /scim/v2/Users/:id` provide the SCIM
   provisioning foundation for bearer-token-authenticated IdP clients.
+- `GET /scim/v2/ServiceProviderConfig`, `GET /scim/v2/Schemas`, and
+  `GET /scim/v2/ResourceTypes` provide bearer-protected SCIM discovery metadata.
 - `POST /billing/reconciliations/:id/artifacts/:artifactId/blob` stores an invoice
   artifact file for a registered reconciliation artifact.
 - `GET /billing/reconciliations/:id/artifacts/:artifactId/blob` returns the stored
@@ -220,7 +222,8 @@ Accounts add workspace controls on top of that core flow:
   events, and attaches active SCIM users as workspace members. The workspace Team
   access panel shows active token/user posture, token metadata, provisioned users,
   one-time token creation, and token revocation. This is an integration foundation,
-  not formal SCIM certification or a complete hosted IAM suite.
+  not formal SCIM certification or a complete hosted IAM suite. Operator setup
+  guidance lives in `docs/ENTERPRISE-IDP-ONBOARDING.md`.
 - Three-role RBAC: Owner, Admin, and Member. Owners manage role changes; owners and
   admins manage members, invitations, SSO provider configuration, and billing import
   workflows; members keep comparison and report access.
