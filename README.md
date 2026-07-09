@@ -210,8 +210,11 @@ Accounts add workspace controls on top of that core flow:
   checks warn or fail when those controls are missing. Evidence packets can be
   downloaded with a tamper-evident manifest, a signed receipt when configured, and
   local verification through `npm run invoice:evidence:verify -- <packet.json>`.
-  Staging and production must configure signed receipts plus provider object-lock
-  or external WORM retention posture before claiming durable evidence handoff.
+  In `external-webhook` receipt mode, PolyCost sends a signed packet-handoff
+  request to the configured notary/WORM receiver during export and records sanitized
+  acceptance or failure evidence in the receipt. Staging and production must
+  configure signed receipts plus provider object-lock or external WORM retention
+  posture before claiming durable evidence handoff.
   This improves proof discipline but is not a provider invoice system of record.
 
 The current self-hosted product does not yet include enterprise IdP login round-trips,

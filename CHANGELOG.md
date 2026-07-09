@@ -110,6 +110,10 @@ once tagged releases begin.
   stay metadata-only, while configured environments can add HMAC-SHA256 signed
   receipts, external notary webhook host/hash metadata, and WORM posture checks
   that are validated by config and provider-credential gates.
+- External invoice evidence notary/WORM handoff for configured environments:
+  evidence packet export now sends a signed `invoice_evidence_packet.exported`
+  webhook request and records sanitized accepted/failed delivery evidence in the
+  returned receipt.
 - Invoice artifact storage readiness and retention enforcement foundation, including
   production-bound config guards for external object storage/KMS/webhook scanning,
   strict credential-check coverage, signed scanner webhook integration, and admin

@@ -9,6 +9,7 @@ import { AuthIdentity, TeamRole } from './auth.types';
 import { BillingService } from './billing.service';
 import { InvoiceArtifactGovernanceService } from './invoice-artifact-governance.service';
 import { InvoiceArtifactStorageService } from './invoice-artifact-storage.service';
+import { InvoiceEvidenceNotaryService } from './invoice-evidence-notary.service';
 import { hashPassword } from './password-hash';
 
 const account: LocalAccountWithPassword = {
@@ -2415,6 +2416,8 @@ describe('BillingService', () => {
           receiptMode: 'metadata-only',
           receiptSigned: false,
           wormRetentionMode: 'not-configured',
+          notaryDeliveryStatus: 'skipped',
+          notaryDeliveryMode: 'disabled',
           artifactCount: 1,
           storedArtifactCount: 1,
           verifiedArtifactCount: 1,
@@ -2486,11 +2489,17 @@ describe('BillingService', () => {
       INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL: 'https://worm.example.com/polycost/evidence-receipts',
       INVOICE_EVIDENCE_WORM_RETENTION_MODE: 'external-worm-receiver',
     });
+    const notaryFetcher = jest.fn(async () => new Response('', { status: 202 }));
     const service = new BillingService(
       repository as never,
       new InvoiceArtifactGovernanceService(receiptConfig),
       new InvoiceArtifactStorageService(),
       receiptConfig,
+      new InvoiceEvidenceNotaryService(
+        receiptConfig,
+        notaryFetcher,
+        () => new Date('2026-07-09T10:00:00.000Z'),
+      ),
     );
 
     const packet = await service.getInvoiceEvidencePacket(
@@ -2510,10 +2519,14 @@ describe('BillingService', () => {
         signature: expect.stringMatching(/^[a-f0-9]{64}$/),
       }),
       notary: expect.objectContaining({
-        deliveryMode: 'operator-forwarded-webhook',
+        deliveryMode: 'api-webhook',
         urlHost: 'worm.example.com',
         urlSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
-        deliveryEvidence: 'not-sent-by-api',
+        deliveryEvidence: 'accepted-by-api',
+        attemptedAt: '2026-07-09T10:00:00.000Z',
+        requestDigestSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+        acceptedSubjectDigestSha256: packet.receipt.basePayloadDigestSha256,
+        responseStatusCode: 202,
       }),
       wormReadiness: expect.objectContaining({
         retentionMode: 'external-worm-receiver',
@@ -2527,6 +2540,7 @@ describe('BillingService', () => {
         gaps: [],
       }),
     });
+    expect(notaryFetcher).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(packet)).not.toContain('production-evidence-receipt-signing-secret');
     expect(repository.recordTeamAuditEvent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -2536,6 +2550,11 @@ describe('BillingService', () => {
           receiptMode: 'external-webhook',
           receiptSigned: true,
           wormRetentionMode: 'external-worm-receiver',
+          notaryDeliveryStatus: 'accepted',
+          notaryDeliveryMode: 'external-webhook',
+          notaryDeliveryEvidence: 'accepted-by-api',
+          notaryRequestDigestSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+          notaryResponseStatusCode: 202,
         }),
       }),
     );

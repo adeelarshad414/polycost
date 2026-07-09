@@ -126,6 +126,9 @@ say so explicitly rather than marking it done.
 | Phase 2.34 - Invoice evidence packet export             | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.35 - Invoice evidence packet integrity          | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.36 - Invoice evidence packet verifier CLI       | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.37 - Invoice artifact governance audit manifest | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase 2.38 - Invoice evidence receipt and WORM posture  | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.39 - Invoice evidence notary API handoff        | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4743,6 +4746,44 @@ Status: implemented and verified locally on 2026-07-09.
   external notary during download, prove provider object-lock retention from the
   cloud control plane, render provider invoices, or become an invoice system of
   record.
+
+## Phase 2.39 — Invoice evidence notary API handoff
+
+Status: implemented and verified locally on 2026-07-09.
+
+- Added `InvoiceEvidenceNotaryService`, which sends a signed
+  `invoice_evidence_packet.exported` webhook request when
+  `INVOICE_EVIDENCE_RECEIPT_MODE=external-webhook` is configured.
+- The handoff payload includes the metadata-only evidence packet, packet digest,
+  base evidence payload digest, receipt mode/status, actor, and team identifiers.
+  The HMAC-SHA256 signature is sent in headers; signing secrets and receiver
+  response bodies are never returned in packet JSON.
+- Evidence packet receipts now update their notary block after export with
+  sanitized API handoff evidence: `accepted-by-api` or `failed-api-webhook`,
+  attempted timestamp, request digest, accepted subject digest, receiver HTTP
+  status, and message. Packet integrity is recomputed after this evidence is added.
+- Team audit metadata for evidence packet export now includes notary delivery status,
+  mode, delivery evidence, request digest, and receiver HTTP status.
+- The offline verifier now validates API notary delivery evidence shape and ensures
+  accepted handoffs reference the receipt's base payload digest.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/invoice-evidence-notary.service.spec.ts src/api/auth-billing.spec.ts`
+  passed 52/52. `npm run typecheck --workspaces --if-present` passed for API,
+  web, and shared types. `npm run invoice:evidence:verify:smoke` passed.
+  `npm run provider:credentials:check` passed with the expected local/demo
+  invoice-artifacts warning. `npm run test:production-readiness` passed with API
+  14 suites / 200 tests and web 2 suites / 90 tests. Full `npm run check` passed
+  with API 56 suites / 470 tests, web 11 suites / 147 tests, graph validation
+  322 nodes / 322 edges, pricing coverage, progress verification 153 anchors,
+  QA/security suppression hygiene, DB, DevOps, cloud, release, handover, and
+  provider-credential gates green. `npm run impeccable` was skipped by design
+  because the repo targets Node 20 and the optional tool requires Node 24; DB
+  validation skipped live `schema_migrations` inspection because the local Postgres
+  container was not running.
+- Remaining caveat: this proves PolyCost can submit a signed packet handoff request
+  and record receiver acceptance, but receiver-side immutability/object-lock proof
+  remains external operator evidence. Full provider invoice rendering and invoice
+  system-of-record behavior remain future scope.
 
 ## Deviations from spec log
 

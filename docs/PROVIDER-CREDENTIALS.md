@@ -267,10 +267,15 @@ INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL=https://worm.example.com/polycost/evidence-r
 
 The exported packet includes a receipt that signs the base evidence payload digest
 with HMAC-SHA256 and records the signing key reference, WORM retention mode, and
-notary webhook host/hash. PolyCost does not automatically send packet bytes during
-download; operators must archive the exported packet plus receipt in the configured
-provider object-lock bucket or external WORM/notary system and retain receiver-side
-acceptance evidence.
+notary webhook host/hash. In `external-webhook` mode, PolyCost sends a signed
+`invoice_evidence_packet.exported` handoff request during evidence packet export.
+The receiver gets the metadata-only packet, packet digest, base payload digest,
+receipt mode/status, and actor/team identifiers. PolyCost records only sanitized
+handoff evidence in the returned receipt: accepted/failed status, request digest,
+subject digest, receiver HTTP status, receiver host, and URL hash. It never emits
+the signing secret or receiver response body. Receiver-side immutable retention is
+still external proof owned by the operator; retain the receiver's WORM/object-lock
+acceptance record with the exported packet.
 
 ## Flip From Mock To Real Mode
 

@@ -891,10 +891,15 @@ export interface InvoiceEvidencePacketReceipt {
     signedFields: string[];
   };
   notary?: {
-    deliveryMode: 'operator-forwarded-webhook';
+    deliveryMode: 'operator-forwarded-webhook' | 'api-webhook';
     urlHost: string;
     urlSha256: string;
-    deliveryEvidence: 'not-sent-by-api';
+    deliveryEvidence: 'not-sent-by-api' | 'accepted-by-api' | 'failed-api-webhook';
+    attemptedAt?: string;
+    requestDigestSha256?: string;
+    acceptedSubjectDigestSha256?: string;
+    responseStatusCode?: number;
+    message?: string;
   };
   wormReadiness: {
     retentionMode: InvoiceEvidenceWormRetentionMode;

@@ -438,6 +438,16 @@ Evidence:
   afterward with API `55` suites / `467` tests, web `11` suites / `147` tests,
   graph validation `320` nodes / `320` edges, and progress verification `153`
   anchors.
+- Phase 2.39 invoice evidence notary API handoff focused regressions passed:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/invoice-evidence-notary.service.spec.ts src/api/auth-billing.spec.ts`
+  passed `52/52`. The phase added signed external-webhook handoff requests during
+  evidence packet export, sanitized accepted/failed receipt evidence, recomputed
+  packet integrity after handoff evidence, and audit metadata for notary delivery
+  status/request digest. `npm run test:production-readiness` passed with API `14`
+  suites / `200` tests and web `2` suites / `90` tests. Full local
+  `npm run check` passed afterward with API `56` suites / `470` tests, web `11`
+  suites / `147` tests, graph validation `322` nodes / `322` edges, and progress
+  verification `153` anchors.
 - Phase 2.9 focused regressions passed: API `3` suites / `52` tests
   (`auth-billing`, `diagram-parser`, `llm-classifier`) and web `1` suite / `57`
   tests (`App.spec.tsx`).
