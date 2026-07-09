@@ -30,6 +30,10 @@ describe('ScimProvisioningController', () => {
     expect(controller.createToken('team-1', body, request)).toBe('create-token');
     expect(controller.revokeToken('team-1', 'token-1', request)).toBe('revoke-token');
     expect(controller.serviceProviderConfig(request)).toBe('service-provider-config');
+    expect(controller.listSchemas(request)).toBe('schemas');
+    expect(controller.getSchema('User', request)).toBe('schema');
+    expect(controller.listResourceTypes(request)).toBe('resource-types');
+    expect(controller.getResourceType('User', request)).toBe('resource-type');
     expect(controller.listUsers(request)).toBe('users');
     expect(controller.createUser(body, request)).toBe('create-user');
     expect(controller.getUser('user-1', request)).toBe('get-user');
@@ -41,6 +45,10 @@ describe('ScimProvisioningController', () => {
     expect(service.listProvisionedUsers).toHaveBeenCalledWith('team-1', identity);
     expect(service.createToken).toHaveBeenCalledWith('team-1', body, identity);
     expect(service.revokeToken).toHaveBeenCalledWith('team-1', 'token-1', identity);
+    expect(service.listSchemas).toHaveBeenCalledWith(request);
+    expect(service.getSchema).toHaveBeenCalledWith('User', request);
+    expect(service.listResourceTypes).toHaveBeenCalledWith(request);
+    expect(service.getResourceType).toHaveBeenCalledWith('User', request);
     expect(service.createUser).toHaveBeenCalledWith(body, request);
     expect(service.replaceUser).toHaveBeenCalledWith('user-1', body, request);
     expect(service.patchUser).toHaveBeenCalledWith('user-1', body, request);
@@ -55,6 +63,10 @@ describe('ScimProvisioningController', () => {
     ];
     const bearerProtectedHandlers = [
       ScimProvisioningController.prototype.serviceProviderConfig,
+      ScimProvisioningController.prototype.listSchemas,
+      ScimProvisioningController.prototype.getSchema,
+      ScimProvisioningController.prototype.listResourceTypes,
+      ScimProvisioningController.prototype.getResourceType,
       ScimProvisioningController.prototype.listUsers,
       ScimProvisioningController.prototype.createUser,
       ScimProvisioningController.prototype.getUser,
@@ -80,6 +92,10 @@ function createServiceMock(): ScimProvisioningService {
     createToken: jest.fn(() => 'create-token'),
     revokeToken: jest.fn(() => 'revoke-token'),
     serviceProviderConfig: jest.fn(() => 'service-provider-config'),
+    listSchemas: jest.fn(() => 'schemas'),
+    getSchema: jest.fn(() => 'schema'),
+    listResourceTypes: jest.fn(() => 'resource-types'),
+    getResourceType: jest.fn(() => 'resource-type'),
     listUsers: jest.fn(() => 'users'),
     createUser: jest.fn(() => 'create-user'),
     getUser: jest.fn(() => 'get-user'),

@@ -1,0 +1,16 @@
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+  "externalId": "okta-00u-platform-engineer",
+  "userName": "platform.engineer@example.com",
+  "name": {
+    "formatted": "Platform Engineer"
+  },
+  "displayName": "Platform Engineer",
+  "emails": [
+    {
+      "value": "platform.engineer@example.com",
+      "primary": true
+    }
+  ],
+  "active": true
+}

@@ -1,0 +1,16 @@
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+  "externalId": "entra-8f77-platform-owner",
+  "userName": "platform.owner@example.com",
+  "name": {
+    "formatted": "Platform Owner"
+  },
+  "displayName": "Platform Owner",
+  "emails": [
+    {
+      "value": "platform.owner@example.com",
+      "primary": true
+    }
+  ],
+  "active": true
+}

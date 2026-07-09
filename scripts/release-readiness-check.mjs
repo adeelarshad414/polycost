@@ -480,6 +480,32 @@ await assertFileContains('README.md', [
   ['SCIM token endpoint', '/api/v1/auth/teams/:teamId/scim/tokens'],
   ['SCIM user endpoint', '/api/v1/scim/v2/Users'],
   ['SCIM admin workspace posture', 'access panel shows active token/user posture'],
+  ['SCIM IdP onboarding guide', 'docs/ENTERPRISE-IDP-ONBOARDING.md'],
+]);
+
+await assertFileContains('docs/ENTERPRISE-IDP-ONBOARDING.md', [
+  ['SCIM onboarding base URL', '/api/v1/scim/v2'],
+  ['SCIM service provider config endpoint', 'GET /ServiceProviderConfig'],
+  ['SCIM schemas endpoint', 'GET /Schemas'],
+  ['SCIM resource types endpoint', 'GET /ResourceTypes'],
+  ['Okta setup section', 'Okta-Style Setup'],
+  ['Entra setup section', 'Microsoft Entra-Style Setup'],
+  ['SCIM certification boundary', 'Formal SCIM certification'],
+]);
+
+await assertFileContains('fixtures/scim/okta-user-create.json', [
+  ['Okta SCIM userName fixture', '"userName": "platform.engineer@example.com"'],
+  ['Okta SCIM externalId fixture', '"externalId": "okta-00u-platform-engineer"'],
+]);
+
+await assertFileContains('fixtures/scim/entra-user-create.json', [
+  ['Entra SCIM userName fixture', '"userName": "platform.owner@example.com"'],
+  ['Entra SCIM externalId fixture', '"externalId": "entra-8f77-platform-owner"'],
+]);
+
+await assertFileContains('fixtures/scim/deactivate-user-patch.json', [
+  ['SCIM deactivate patch path', '"path": "active"'],
+  ['SCIM deactivate patch value', '"value": false'],
 ]);
 
 await assertFileContains('apps/web/src/api-client.ts', [
@@ -494,6 +520,17 @@ await assertFileContains('apps/web/src/App.tsx', [
   ['SCIM token creation label', 'SCIM token name'],
   ['SCIM token one-time copy label', 'Copy now. It will not be shown again.'],
   ['SCIM provisioned users list label', 'SCIM provisioned users'],
+]);
+
+await assertFileContains('apps/api/src/api/scim-provisioning.controller.ts', [
+  ['SCIM Schemas route', 'scim/v2/Schemas'],
+  ['SCIM ResourceTypes route', 'scim/v2/ResourceTypes'],
+]);
+
+await assertFileContains('apps/api/src/api/scim-provisioning.service.spec.ts', [
+  ['SCIM discovery test', 'exposes SCIM discovery metadata only to valid SCIM bearer tokens'],
+  ['SCIM Okta fixture test', 'okta-user-create.json'],
+  ['SCIM Entra fixture test', 'entra-user-create.json'],
 ]);
 
 await assertFileContains('database/migrations/040_team_scim_provisioning.sql', [

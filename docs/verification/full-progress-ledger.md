@@ -252,7 +252,10 @@ Evidence:
   provisioning foundation: owner/admin token creation stores only hashes and
   prefixes, SCIM bearer tokens resolve by hash, `/api/v1/scim/v2/Users` emits
   standard `ListResponse`/`User` shapes, active users attach as members, and
-  deactivation removes team membership with audit events.
+  deactivation removes team membership with audit events. They also prove SCIM
+  discovery metadata for `/Schemas` and `/ResourceTypes` remains bearer-protected
+  and that representative Okta/Entra create and deactivate fixture payloads are
+  accepted by the parser.
 - `apps/web/src/App.spec.tsx` verifies workspace session UX, invitation state,
   member/role UI state, SSO readiness labels, SCIM admin token create/revoke
   controls, SCIM provisioned-user visibility, and RBAC visibility/disabled-control
@@ -260,6 +263,9 @@ Evidence:
 - `apps/web/src/api-client.spec.ts` proves the session-bearer web client wiring
   for listing SCIM token metadata, listing SCIM provisioned users, creating
   one-time-visible SCIM tokens, and revoking SCIM tokens.
+- `docs/ENTERPRISE-IDP-ONBOARDING.md` records the current operator setup path for
+  Okta-style and Microsoft Entra-style SCIM clients while preserving the formal
+  certification boundary.
 - `scripts/live-verification.mjs` records a `workspace-auth-rbac-sso` smoke journey
   against the running stack: owner signup, session hydration, invite preview and
   acceptance, member role change, mock OIDC start/authorize/callback, structured
@@ -276,9 +282,9 @@ Evidence:
 Deferred:
 
 - Full enterprise account/team UX, formal SCIM certification, production email
-  delivery, production OIDC/SAML provider handshakes, production IdP onboarding
-  depth, account recovery, invite/approval workflows, and complete RBAC product
-  polish remain future phases.
+  delivery, production OIDC/SAML provider handshakes, group push, IdP-driven role
+  mapping, custom schema extensions, account recovery, invite/approval workflows,
+  and complete RBAC product polish remain future phases.
 
 ## Phase G - Operations, Security And Release Readiness
 
