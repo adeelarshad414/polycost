@@ -4908,6 +4908,40 @@ progress:verify`, `npm run format:check`, and `npm run ci:lint` passed. Full
   not call every cloud provider control plane itself or replace legal/invoice
   system-of-record review.
 
+## Phase 2.43 — Provider retention proof artifact verifier
+
+Status: implemented and verified locally on 2026-07-09.
+
+- Added `npm run invoice:retention-proof:verify`, an offline verifier for captured
+  AWS S3 object-lock, Azure Blob immutability/legal-hold, and GCP Cloud Storage
+  retention/hold JSON proof artifacts. It computes the proof SHA-256, optionally
+  checks an expected digest, validates provider-specific retention signals, and
+  prints the recommended runtime config values for
+  `INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE`,
+  `INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_REFERENCE`, and
+  `INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_SHA256`.
+- Added `npm run invoice:retention-proof:verify:smoke` with AWS/Azure/GCP proof
+  fixtures, digest mismatch coverage, and missing-retention failure coverage. The
+  smoke is now part of `npm run check`.
+- Updated provider-credential documentation and release-readiness guards to make
+  proof-artifact verification part of the production evidence path.
+- Verification:
+  `npm run invoice:retention-proof:verify:smoke`, `npm run format:check`,
+  `npm run release:check`, `npm run progress:verify`, and `npm run ci:lint`
+  passed. Full `npm run check` passed with API 56 suites / 471 tests, web 11
+  suites / 147 tests, graph validation 322 nodes / 322 edges, pricing coverage,
+  progress verification 153 anchors, QA/security suppression hygiene, DB,
+  DevOps, cloud, release, handover, and provider-credential gates green.
+  `npm run impeccable` was skipped by design because the repo targets Node 20 and
+  the optional tool requires Node 24; DB validation skipped live
+  `schema_migrations` inspection because the local Postgres container was not
+  running. Local provider credential posture remains a warning because
+  `.env.example` defaults to demo Postgres/metadata-only invoice evidence
+  settings.
+- Remaining caveat: this verifier validates captured proof files and digests; it
+  does not call provider APIs itself, prove chain of custody, or replace legal
+  retention review.
+
 ## Deviations from spec log
 
 Every implementation divergence from `00` through `11` should be logged here with

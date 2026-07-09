@@ -88,6 +88,12 @@ if (!packageJson.scripts?.['invoice:evidence:notary:receiver']) {
 if (!packageJson.scripts?.['invoice:evidence:notary:receiver:smoke']) {
   failures.push('package.json is missing invoice:evidence:notary:receiver:smoke');
 }
+if (!packageJson.scripts?.['invoice:retention-proof:verify']) {
+  failures.push('package.json is missing invoice:retention-proof:verify');
+}
+if (!packageJson.scripts?.['invoice:retention-proof:verify:smoke']) {
+  failures.push('package.json is missing invoice:retention-proof:verify:smoke');
+}
 if (!packageJson.scripts?.['pricing:logic:coverage']) {
   failures.push('package.json is missing pricing:logic:coverage');
 }
@@ -129,6 +135,11 @@ if (!packageJson.scripts?.check?.includes('npm run handover:check')) {
 }
 if (!packageJson.scripts?.check?.includes('npm run public:readiness:check')) {
   failures.push('package.json check script must include npm run public:readiness:check');
+}
+if (!packageJson.scripts?.check?.includes('npm run invoice:retention-proof:verify:smoke')) {
+  failures.push(
+    'package.json check script must include npm run invoice:retention-proof:verify:smoke',
+  );
 }
 
 assertScriptIncludes('test:production-readiness', [
@@ -259,6 +270,7 @@ await assertFileContains('docs/PROVIDER-CREDENTIALS.md', [
   ['diagram LLM Vault path', 'secret/polycost/llm'],
   ['provider retention proof manifest', '## Provider Retention Proof Manifest'],
   ['provider retention proof mode', 'INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE'],
+  ['provider retention proof verifier command', 'npm run invoice:retention-proof:verify'],
   ['provider retention proof ready gate', 'providerRetentionProofReady'],
   [
     'no env secret storage',
@@ -483,6 +495,24 @@ await assertFileContains('scripts/invoice-evidence-notary-reference-receiver-smo
 await assertFileContains('scripts/invoice-evidence-packet-verifier.mjs', [
   ['provider retention proof count verification', 'providerRetentionProofVerifiedCount'],
   ['provider retention proof gate verification', 'providerRetentionProofReady'],
+]);
+
+await assertFileContains('scripts/invoice-artifact-provider-retention-proof-verifier.mjs', [
+  [
+    'provider retention proof verifier schema',
+    'invoice-artifact-provider-retention-proof-verification/v1',
+  ],
+  ['AWS proof validation', 'aws-s3-object-lock'],
+  ['Azure proof validation', 'azure-blob-immutability'],
+  ['GCP proof validation', 'gcp-gcs-retention'],
+  ['no legal overclaim', 'immutableRetentionProvedByPolyCost: false'],
+]);
+
+await assertFileContains('scripts/invoice-artifact-provider-retention-proof-verifier-smoke.mjs', [
+  ['AWS proof smoke fixture', 'provider-retention-proof-aws.json'],
+  ['Azure proof smoke fixture', 'provider-retention-proof-azure.json'],
+  ['GCP proof smoke fixture', 'provider-retention-proof-gcp.json'],
+  ['digest mismatch smoke', 'proof digest mismatch'],
 ]);
 
 await assertFileContains('scripts/provider-credential-check.mjs', [
