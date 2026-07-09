@@ -114,6 +114,10 @@ once tagged releases begin.
   evidence packet export now sends a signed `invoice_evidence_packet.exported`
   webhook request and records sanitized accepted/failed delivery evidence in the
   returned receipt.
+- Invoice evidence notary receiver smoke proof: local and staging smoke commands
+  now send signed `invoice_evidence_packet.exported` canary handoffs, validate the
+  HMAC receiver contract, and write a local JSONL artifact that operators can pair
+  with external WORM/object-lock receiver evidence.
 - Invoice artifact storage readiness and retention enforcement foundation, including
   production-bound config guards for external object storage/KMS/webhook scanning,
   strict credential-check coverage, signed scanner webhook integration, and admin

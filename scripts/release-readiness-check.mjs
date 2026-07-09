@@ -76,6 +76,12 @@ if (!packageJson.scripts?.['audit:export:smoke']) {
 if (!packageJson.scripts?.['audit:export:smoke:local']) {
   failures.push('package.json is missing audit:export:smoke:local');
 }
+if (!packageJson.scripts?.['invoice:evidence:notary:smoke']) {
+  failures.push('package.json is missing invoice:evidence:notary:smoke');
+}
+if (!packageJson.scripts?.['invoice:evidence:notary:smoke:local']) {
+  failures.push('package.json is missing invoice:evidence:notary:smoke:local');
+}
 if (!packageJson.scripts?.['pricing:logic:coverage']) {
   failures.push('package.json is missing pricing:logic:coverage');
 }
@@ -139,6 +145,8 @@ await assertFileContains('README.md', [
   ['browser audit command', 'npm run browser:audit'],
   ['audit export local smoke command', 'npm run audit:export:smoke:local'],
   ['audit export staging smoke command', 'npm run audit:export:smoke'],
+  ['invoice evidence notary local smoke command', 'npm run invoice:evidence:notary:smoke:local'],
+  ['invoice evidence notary staging smoke command', 'npm run invoice:evidence:notary:smoke'],
   [
     'catalog list-price honesty',
     'not a billing, invoicing, or live cloud-account spend management system',
@@ -193,6 +201,12 @@ await assertFileContains('docs/DEPLOYMENT.md', [
   ['audit export receiver verification', '## Audit Export Receiver Verification'],
   ['audit export local smoke command', 'npm run audit:export:smoke:local'],
   ['audit export staging smoke command', 'npm run audit:export:smoke'],
+  [
+    'invoice evidence notary receiver verification',
+    '## Invoice Evidence Notary Receiver Verification',
+  ],
+  ['invoice evidence notary local smoke command', 'npm run invoice:evidence:notary:smoke:local'],
+  ['invoice evidence notary staging smoke command', 'npm run invoice:evidence:notary:smoke'],
   ['backup and restore guidance', 'Backups And Restore'],
 ]);
 
@@ -251,6 +265,8 @@ await assertFileContains('RELEASE-CHECKLIST.md', [
   ['browser audit command', 'npm run browser:audit'],
   ['audit export local smoke command', 'npm run audit:export:smoke:local'],
   ['audit export staging smoke command', 'npm run audit:export:smoke'],
+  ['invoice evidence notary local smoke command', 'npm run invoice:evidence:notary:smoke:local'],
+  ['invoice evidence notary staging smoke command', 'npm run invoice:evidence:notary:smoke'],
   ['public readiness guard command', 'npm run public:readiness:check'],
   ['public demo hardening documentation', 'docs/development/public-demo-hardening.md'],
   ['unit coverage command', 'npm run ci:unit'],
@@ -405,6 +421,18 @@ await assertFileContains('scripts/audit-export-webhook-smoke.mjs', [
 ]);
 
 await assertFileContains('scripts/audit-export-local-smoke.mjs', [
+  ['local JSONL artifact path', 'artifacts'],
+  ['constant-time signature verification', 'timingSafeEqual'],
+  ['append-only local evidence', "flag: 'a'"],
+]);
+
+await assertFileContains('scripts/invoice-evidence-notary-webhook-smoke.mjs', [
+  ['signed invoice evidence event', 'invoice_evidence_packet.exported'],
+  ['HMAC signature header', 'x-polycost-signature-sha256'],
+  ['HTTPS default guard', 'HTTPS unless --allow-http-local'],
+]);
+
+await assertFileContains('scripts/invoice-evidence-notary-local-smoke.mjs', [
   ['local JSONL artifact path', 'artifacts'],
   ['constant-time signature verification', 'timingSafeEqual'],
   ['append-only local evidence', "flag: 'a'"],

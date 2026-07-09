@@ -129,6 +129,7 @@ say so explicitly rather than marking it done.
 | Phase 2.37 - Invoice artifact governance audit manifest | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase 2.38 - Invoice evidence receipt and WORM posture  | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.39 - Invoice evidence notary API handoff        | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.40 - Invoice evidence notary receiver smoke     | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4784,6 +4785,41 @@ Status: implemented and verified locally on 2026-07-09.
   and record receiver acceptance, but receiver-side immutability/object-lock proof
   remains external operator evidence. Full provider invoice rendering and invoice
   system-of-record behavior remain future scope.
+
+## Phase 2.40 — Invoice evidence notary receiver smoke
+
+Status: implemented and verified locally on 2026-07-09.
+
+- Added `npm run invoice:evidence:notary:smoke:local`, which starts a temporary
+  localhost notary receiver, sends a signed `invoice_evidence_packet.exported`
+  canary handoff, verifies the `x-polycost-signature-sha256` HMAC header with a
+  constant-time comparison, and appends a JSONL proof artifact under
+  `artifacts/invoice-evidence-notary-smoke/`.
+- Added `npm run invoice:evidence:notary:smoke` for staging/production-like HTTPS
+  receivers. It requires `INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL` plus a non-dummy
+  `INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET`, rejects non-local HTTP targets unless
+  explicitly allowed for localhost, and prints the run ID, reconciliation ID, and
+  packet digests needed for receiver-side archive evidence.
+- README, deployment, runbook, provider-credential guidance, changelog, and
+  release-readiness checks now include the notary receiver smoke workflow so the
+  customer handover can prove the receiver contract without claiming immutable
+  retention.
+- Verification:
+  `npm run invoice:evidence:notary:smoke:local` passed and wrote
+  `artifacts/invoice-evidence-notary-smoke/invoice-evidence-notary-2026-07-09T09-58-16-786Z.jsonl`
+  with one accepted handoff and zero rejected events. `npm run release:check`,
+  `npm run progress:verify`, and `npm run ci:lint` passed. Full `npm run check`
+  passed with API 56 suites / 470 tests, web 11 suites / 147 tests, graph
+  validation 322 nodes / 322 edges, pricing coverage, progress verification 153
+  anchors, QA/security suppression hygiene, DB, DevOps, cloud, release, handover,
+  and provider-credential gates green. `npm run impeccable` was skipped by design
+  because the repo targets Node 20 and the optional tool requires Node 24; DB
+  validation skipped live `schema_migrations` inspection because the local Postgres
+  container was not running.
+- Remaining caveat: this proves HMAC receiver compatibility and local artifact
+  capture only. Operator-owned WORM/object-lock retention, external receiver
+  access controls, provider invoice rendering, and invoice system-of-record
+  behavior remain future scope.
 
 ## Deviations from spec log
 

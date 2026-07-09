@@ -194,8 +194,13 @@ Actions:
    `npm run audit:export:smoke` with staging `AUTH_AUDIT_EXPORT_WEBHOOK_URL` and
    `AUTH_AUDIT_EXPORT_WEBHOOK_SECRET` to prove the real receiver accepts signed
    canary events.
-6. Check rate-limit and lockout settings.
-7. Re-run focused auth tests:
+6. Run `npm run invoice:evidence:notary:smoke:local` for local notary handoff
+   contract proof, or `npm run invoice:evidence:notary:smoke` with staging
+   `INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL` and
+   `INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET` to prove the real WORM/notary receiver
+   accepts signed evidence handoff canaries.
+7. Check rate-limit and lockout settings.
+8. Re-run focused auth tests:
 
 ```bash
 npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/api/auth.controller.spec.ts src/api/invitation-delivery.service.spec.ts

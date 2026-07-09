@@ -95,6 +95,20 @@ Run the built-in verifier smoke, including tamper detection:
 npm run invoice:evidence:verify:smoke
 ```
 
+Prove the invoice evidence notary/WORM receiver contract locally:
+
+```bash
+npm run invoice:evidence:notary:smoke:local
+```
+
+Send the same signed handoff smoke to a staging receiver:
+
+```bash
+INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL=https://worm.example.com/polycost/evidence-receipts \
+INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET=replace-with-staging-secret \
+npm run invoice:evidence:notary:smoke
+```
+
 Verify the clean-clone demo path with an isolated temporary clone and a
 10-minute startup budget:
 
@@ -359,6 +373,16 @@ temporary HMAC-verifying receiver and append the accepted event to
 `AUTH_AUDIT_EXPORT_WEBHOOK_URL` and `AUTH_AUDIT_EXPORT_WEBHOOK_SECRET`, then run
 `npm run audit:export:smoke` against the real SIEM/WORM receiver and archive the
 printed canary `exportId` with the receiver-side retention evidence.
+
+For invoice evidence notary/WORM receiver proof, run
+`npm run invoice:evidence:notary:smoke:local` to start a temporary
+HMAC-verifying receiver and append accepted handoff evidence to
+`artifacts/invoice-evidence-notary-smoke/`. In staging, set
+`INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL` and
+`INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET`, then run
+`npm run invoice:evidence:notary:smoke` and archive the printed reconciliation ID,
+packet digest, base payload digest, receiver HTTP status, and receiver-side
+retention evidence.
 
 ## Documentation
 
