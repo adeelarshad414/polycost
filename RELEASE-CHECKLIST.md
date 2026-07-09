@@ -52,6 +52,9 @@ Complete this checklist before changing the GitHub repository visibility from pr
   `npm run invoice:evidence:notary:smoke:local`, and staging proof from
   `npm run invoice:evidence:notary:smoke` when a real HTTPS receiver is
   configured.
+- If using PolyCost's reference receiver for staging, confirm
+  `npm run invoice:evidence:notary:receiver:smoke` passed and the JSONL artifact
+  directory is backed by WORM/object-lock storage before claiming immutability.
 
 ## Verification
 
@@ -65,6 +68,7 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Run `npm run browser:audit`.
 - Run `npm run audit:export:smoke:local`.
 - Run `npm run invoice:evidence:notary:smoke:local`.
+- Run `npm run invoice:evidence:notary:receiver:smoke`.
 - Run `npm run release:check`.
 - Run `npm run loading:check`.
 - Run `npm run handover:check`.

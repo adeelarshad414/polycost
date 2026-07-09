@@ -34,6 +34,8 @@ The explicit placeholder token is `CHANGE_ME_DEV_ONLY`. Production and staging c
   receipts without a signing secret
 - `INVOICE_EVIDENCE_WORM_RETENTION_MODE=not-configured` for local/demo evidence
   packets without provider object-lock or external WORM handoff proof
+- `npm run invoice:evidence:notary:receiver:dev` with the built-in local-only
+  notary reference receiver secret for smoke testing on `127.0.0.1`
 - Local-only Docker Vault seed credentials
 
 ## Not Allowed In Staging Or Production
@@ -68,6 +70,9 @@ The explicit placeholder token is `CHANGE_ME_DEV_ONLY`. Production and staging c
 - Missing `INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL` when external API notary/WORM
   handoff is enabled
 - `INVOICE_EVIDENCE_WORM_RETENTION_MODE=not-configured`
+- Running `npm run invoice:evidence:notary:receiver` without a non-dummy
+  `INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET` and a WORM/object-lock backed
+  `POLYCOST_INVOICE_EVIDENCE_NOTARY_RECEIVER_ARTIFACT_DIR`
 - Any real provider mode without `VAULT_TOKEN_FILE`
 - Any strict provider credential check where Vault returns a dummy GCP access token or dummy LLM API key
 

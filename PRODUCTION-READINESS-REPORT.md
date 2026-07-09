@@ -82,6 +82,7 @@ performance/accessibility/best-practices/SEO metrics.
 | INV-TRACE-023  | Improved      | Invoice evidence packets now include receipt/notary metadata with optional HMAC-SHA256 signing, WORM posture checks, strict production config guards, provider-credential guard coverage, and receipt-aware offline verification                        |
 | INV-TRACE-024  | Improved      | External-webhook invoice evidence export now sends a signed notary/WORM handoff request, records sanitized accepted/failed delivery evidence in the receipt, recomputes packet integrity, and audits handoff status                                     |
 | INV-TRACE-025  | Improved      | Invoice evidence notary receiver smoke commands now prove the HMAC receiver contract locally and against HTTPS staging receivers, with JSONL artifact capture and release-readiness documentation gates                                                 |
+| INV-TRACE-026  | Improved      | A self-hostable notary reference receiver now verifies signed evidence handoffs, exposes health/readiness, writes append-only JSONL receipts, ships with Docker packaging, and has an end-to-end smoke harness                                          |
 | VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                                                                                             |
 | VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                                                                                             |
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                                                                                        |
@@ -361,6 +362,24 @@ Local static/regression gates:
   - The staging command `npm run invoice:evidence:notary:smoke` is release-gated
     and documented for HTTPS receivers with non-dummy signing secrets; live
     staging execution remains operator-environment evidence.
+  - Full `npm run check`: passed with API 56 suites / 470 tests, web 11 suites /
+    147 tests, graph validation 322 nodes / 322 edges, pricing coverage, progress
+    verification 153 anchors, QA/security suppression hygiene, DB, DevOps, cloud,
+    release, handover, and provider-credential gates. `npm run impeccable` remained
+    the expected Node 24 skip under the repo's Node 20 target; DB validation skipped
+    live `schema_migrations` inspection because the local Postgres container was
+    not running.
+- Phase 2.41 notary reference receiver staging path focused gate passed:
+  - `npm run invoice:evidence:notary:receiver:smoke`: passed. The harness started
+    the self-hostable reference receiver, verified `/health/ready`, sent the
+    existing signed webhook canary through it, and confirmed a JSONL receipt was
+    appended under `artifacts/invoice-evidence-notary-reference-receiver/`.
+  - Captured packet digest:
+    `1bb1abec466eda604ebb949acf7e40e8b0385cdcff1445ecac2d691736550ea0`.
+  - `docker build -f docker/notary-receiver/Dockerfile -t
+polycost/notary-reference-receiver:local .`: passed.
+  - The reference receiver deliberately reports `immutableRetentionProved: false`;
+    real WORM/object-lock proof remains operator-environment evidence.
   - Full `npm run check`: passed with API 56 suites / 470 tests, web 11 suites /
     147 tests, graph validation 322 nodes / 322 edges, pricing coverage, progress
     verification 153 anchors, QA/security suppression hygiene, DB, DevOps, cloud,
@@ -684,7 +703,10 @@ Machine-readable token evidence:
   sanitized accepted/failed delivery evidence in the receipt. Phase 2.40 adds
   local and staging notary receiver smoke commands so operators can prove the HMAC
   receiver contract and archive receiver-side evidence separately from PolyCost's
-  packet export.
+  packet export. Phase 2.41 adds a self-hostable notary reference receiver with
+  health/readiness checks, append-only JSONL receipt capture, Docker packaging, and
+  a smoke harness, while still requiring operator-owned WORM/object-lock storage
+  evidence before claiming immutability.
   PolyCost still does not provide provider invoice rendering, private contract
   validation, cloud-control-plane WORM object-store proof, receiver-side
   immutability proof, external legal-review routing, contract/legal approval

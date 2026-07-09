@@ -130,6 +130,7 @@ say so explicitly rather than marking it done.
 | Phase 2.38 - Invoice evidence receipt and WORM posture  | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.39 - Invoice evidence notary API handoff        | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.40 - Invoice evidence notary receiver smoke     | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.41 - Notary reference receiver staging path     | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4820,6 +4821,48 @@ Status: implemented and verified locally on 2026-07-09.
   capture only. Operator-owned WORM/object-lock retention, external receiver
   access controls, provider invoice rendering, and invoice system-of-record
   behavior remain future scope.
+
+## Phase 2.41 — Notary reference receiver staging path
+
+Status: implemented and verified locally on 2026-07-09.
+
+- Added `npm run invoice:evidence:notary:receiver`, a dependency-free reference
+  notary receiver for staging rehearsals. It verifies signed
+  `invoice_evidence_packet.exported` payloads with HMAC-SHA256, uses
+  `timingSafeEqual`, enforces JSON content type, applies a per-minute rate limit,
+  bounds request size, exposes `/health/live` and `/health/ready`, and appends
+  compact JSONL receipt evidence under
+  `POLYCOST_INVOICE_EVIDENCE_NOTARY_RECEIVER_ARTIFACT_DIR`.
+- Added `npm run invoice:evidence:notary:receiver:dev` for local-only startup and
+  `npm run invoice:evidence:notary:receiver:smoke`, which starts the receiver,
+  checks readiness, runs the existing signed webhook smoke against it, and verifies
+  the captured JSONL receipt digest.
+- Added `docker/notary-receiver/Dockerfile` for a small Node 20 container running
+  as the non-root `node` user with a `/health/ready` healthcheck and
+  `/data/notary-receipts` volume.
+- README, deployment, runbook, provider-credential, dummy-value, release-checklist,
+  changelog, and release-readiness guardrails now document the reference receiver
+  and keep append-only JSONL proof distinct from operator-owned WORM/object-lock
+  immutability proof.
+- Verification:
+  `npm run invoice:evidence:notary:receiver:smoke` passed and wrote
+  `artifacts/invoice-evidence-notary-reference-receiver/smoke-2026-07-09T10-44-00-186Z/invoice-evidence-notary-receipts-2026-07-09.jsonl`
+  after accepting the signed packet digest
+  `1bb1abec466eda604ebb949acf7e40e8b0385cdcff1445ecac2d691736550ea0`.
+  `docker build -f docker/notary-receiver/Dockerfile -t
+polycost/notary-reference-receiver:local .` passed.
+  `npm run release:check`, `npm run progress:verify`, and `npm run ci:lint`
+  passed. Full `npm run check` passed with API 56 suites / 470 tests, web 11
+  suites / 147 tests, graph validation 322 nodes / 322 edges, pricing coverage,
+  progress verification 153 anchors, QA/security suppression hygiene, DB, DevOps,
+  cloud, release, handover, and provider-credential gates green. `npm run
+impeccable` was skipped by design because the repo targets Node 20 and the
+  optional tool requires Node 24; DB validation skipped live `schema_migrations`
+  inspection because the local Postgres container was not running.
+- Remaining caveat: the reference receiver proves deployable HMAC verification,
+  health/readiness, and append-only local receipt capture. Immutable retention,
+  external access logs, TLS termination, and object-lock/WORM guarantees still
+  depend on the operator's storage and deployment environment.
 
 ## Deviations from spec log
 

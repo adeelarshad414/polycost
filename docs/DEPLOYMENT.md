@@ -119,6 +119,51 @@ HTTP status, receiver-side stored record, retention policy, and access-control
 evidence. PolyCost proves signed handoff delivery; the WORM/notary platform must
 prove immutability and retention.
 
+## Reference Invoice Evidence Notary Receiver
+
+For staging rehearsals without a separate SIEM/WORM platform, PolyCost includes a
+small reference receiver that verifies signed `invoice_evidence_packet.exported`
+handoffs and writes append-only JSONL receipts.
+
+Local development receiver:
+
+```bash
+npm run invoice:evidence:notary:receiver:dev
+```
+
+Automated receiver smoke:
+
+```bash
+npm run invoice:evidence:notary:receiver:smoke
+```
+
+Production-like receiver process:
+
+```bash
+INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET="<runtime-secret-from-secret-manager>" \
+POLYCOST_INVOICE_EVIDENCE_NOTARY_RECEIVER_HOST=0.0.0.0 \
+POLYCOST_INVOICE_EVIDENCE_NOTARY_RECEIVER_PORT=61780 \
+POLYCOST_INVOICE_EVIDENCE_NOTARY_RECEIVER_ARTIFACT_DIR=/mnt/worm/notary-receipts \
+npm run invoice:evidence:notary:receiver
+```
+
+Container build:
+
+```bash
+docker build -f docker/notary-receiver/Dockerfile -t polycost/notary-reference-receiver:local .
+docker run --rm -p 61780:61780 \
+  -e INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET="<runtime-secret-from-secret-manager>" \
+  -v /mnt/worm/notary-receipts:/data/notary-receipts \
+  polycost/notary-reference-receiver:local
+```
+
+Expose the receiver only behind TLS. Verify `/health/live` and `/health/ready`,
+then run `npm run invoice:evidence:notary:smoke` against the HTTPS URL. Archive
+the JSONL receipt, packet digest, object-lock/retention policy, access logs, and
+secret/key-reference evidence. The reference receiver proves the HMAC handoff
+contract and local append-only capture; the storage layer must prove immutable
+retention.
+
 ## Production Reference Architecture
 
 Use the same app topology across AWS, Azure, or GCP:
@@ -153,11 +198,14 @@ Cloud equivalents:
 5. Run `npm run ci:build`.
 6. Run `npm run audit:export:smoke:local`; for staging releases, run
    `npm run audit:export:smoke` against the configured SIEM/WORM receiver.
-7. Build API and web images from the repo Dockerfiles.
-8. Run database migrations before shifting traffic.
-9. Deploy with the previous release still available for rollback.
-10. Verify `/health/live`, `/health/ready`, `/health`, and `/health/deep`.
-11. Run a comparison, export PDF/CSV/Excel, and inspect pricing evidence.
+7. Run `npm run invoice:evidence:notary:receiver:smoke`; for staging releases, run
+   `npm run invoice:evidence:notary:smoke` against the configured HTTPS
+   notary/WORM receiver.
+8. Build API and web images from the repo Dockerfiles.
+9. Run database migrations before shifting traffic.
+10. Deploy with the previous release still available for rollback.
+11. Verify `/health/live`, `/health/ready`, `/health`, and `/health/deep`.
+12. Run a comparison, export PDF/CSV/Excel, and inspect pricing evidence.
 
 ## Real Provider Pricing Rehearsal
 
