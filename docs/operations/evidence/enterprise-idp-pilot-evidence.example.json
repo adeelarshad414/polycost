@@ -1,0 +1,115 @@
+{
+  "schemaVersion": "polycost-enterprise-idp-pilot-evidence/v1",
+  "bundleName": "enterprise-idp-pilot-baseline-evidence",
+  "evidenceLevel": "example-schema",
+  "productionClaim": false,
+  "capturedAt": "2026-07-09T00:00:00.000Z",
+  "environment": "staging",
+  "idp": {
+    "provider": "example",
+    "tenantRef": "example-managed-idp-tenant",
+    "protocols": ["oidc", "scim"],
+    "managedTenantVerified": false
+  },
+  "deployment": {
+    "apiBaseUrl": "https://polycost.example.com/api/v1",
+    "webBaseUrl": "https://polycost.example.com",
+    "oidcCallbackUrl": "https://polycost.example.com/api/v1/auth/sso/oidc/callback",
+    "samlAcsUrl": "https://polycost.example.com/api/v1/auth/sso/saml/acs",
+    "scimBaseUrl": "https://polycost.example.com/api/v1/scim/v2"
+  },
+  "configuration": {
+    "oidcConfigured": true,
+    "samlConfigured": false,
+    "scimConfigured": true,
+    "vaultSecretRefs": ["secret/polycost/auth/oidc", "secret/polycost/scim"],
+    "vaultSecretsVerified": false,
+    "tlsVerified": false,
+    "redirectUrisRegistered": false,
+    "issuerAudienceValidated": false
+  },
+  "journeys": [
+    {
+      "name": "workspace-auth-rbac-sso",
+      "status": "passed",
+      "durationMs": 720,
+      "evidenceSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "name": "scim-provisioning-lifecycle",
+      "status": "passed",
+      "durationMs": 680,
+      "evidenceSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "name": "rbac-member-denial",
+      "status": "passed",
+      "durationMs": 90,
+      "evidenceSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "name": "session-revocation",
+      "status": "passed",
+      "durationMs": 120,
+      "evidenceSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "name": "audit-review",
+      "status": "passed",
+      "durationMs": 140,
+      "evidenceSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  ],
+  "scim": {
+    "serviceProviderConfigValidated": true,
+    "schemasValidated": true,
+    "resourceTypesValidated": true,
+    "userCreateValidated": true,
+    "userUpdateValidated": true,
+    "deactivateRemovesMembership": true,
+    "tokenMetadataOnly": true,
+    "tokenHashOnlyStorage": true,
+    "revokedTokenDenied": true
+  },
+  "rbac": {
+    "memberCannotImportBilling": true,
+    "adminCanManageScimTokens": true,
+    "ownerCanConfigureSso": true,
+    "finalOwnerProtected": true,
+    "crossTeamAccessDenied": true
+  },
+  "audit": {
+    "teamAuditEventsReviewed": true,
+    "observedActions": [
+      "team.sso.configured",
+      "team.scim.token.created",
+      "team.scim.user_upserted",
+      "team.scim.user_deactivated",
+      "team.scim.token.revoked"
+    ]
+  },
+  "security": {
+    "rawSecretsExcluded": true,
+    "rawBearerTokensExcluded": true,
+    "screenshotsRedacted": true,
+    "noBearerTokensInLogs": true,
+    "authErrorsGeneric": true,
+    "rateLimitsObserved": true
+  },
+  "artifacts": {
+    "liveTranscriptSha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+    "screenshotIndexSha256": "abababababababababababababababababababababababababababababababab",
+    "idpConfigurationEvidenceSha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+  },
+  "operatorAttestations": {
+    "rawSecretsExcluded": true,
+    "productionClaimedByPolyCost": false,
+    "operator": "example-only",
+    "reviewer": "example-only"
+  },
+  "caveats": [
+    "This is sanitized sample evidence for CI/schema validation only.",
+    "A real bundle must use evidenceLevel=managed-idp-pilot after a customer-specific Okta, Entra, Auth0, Google Workspace, generic OIDC, or generic SAML pilot.",
+    "Do not store raw SSO assertions, SCIM bearer tokens, session cookies, IdP tokens, private keys, client secrets, or authorization headers in evidence."
+  ]
+}

@@ -141,7 +141,13 @@ Accounts add:
 - SCIM token management, provisioning posture, and IdP user sync foundations
 - billing export reconciliation foundations
 
-For SCIM operator setup, see `docs/ENTERPRISE-IDP-ONBOARDING.md`.
+For SCIM operator setup, see `docs/ENTERPRISE-IDP-ONBOARDING.md`. After a real
+Okta, Microsoft Entra, Auth0, Google Workspace, generic OIDC, or generic SAML
+pilot, archive sanitized transcript, screenshot, IdP configuration, RBAC denial,
+and audit-review digests, then run
+`npm run enterprise:idp:evidence:check -- --require-managed-idp <bundle.json>`.
+The checked-in sample can be validated with `npm run enterprise:idp:evidence:check`,
+but it is schema-only evidence.
 
 Production email delivery, formal enterprise SSO/SCIM certification, complete
 account/team administration polish, and hosted billing plans remain future phases.

@@ -147,6 +147,7 @@ say so explicitly rather than marking it done.
 | Phase 2.55 - Rehearsal evidence bundle verification     | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.56 - VSDX visual evidence verification          | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.57 - Diagram LLM corpus evidence gate           | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.58 - Enterprise IdP pilot evidence gate         | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -276,6 +277,73 @@ Known gaps carried forward:
   `secret/polycost/llm` `api_key`, `evidenceLevel=live-model`, strict
   `npm run diagram:llm-corpus:check -- --require-live-model <bundle.json>`, operator
   review, ongoing corpus refresh, false-positive tracking, and drift monitoring.
+
+## Phase 2.58 - Enterprise IdP pilot evidence gate
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added `scripts/enterprise-idp-pilot-evidence-check.mjs`, a machine-readable
+  verifier for sanitized enterprise IdP pilot evidence across workspace auth/RBAC/
+  SSO, SCIM lifecycle, audit review, redaction posture, and operator attestations.
+- Added `docs/operations/evidence/enterprise-idp-pilot-evidence.example.json`, a
+  sanitized `example-schema` bundle that validates the evidence contract without
+  claiming managed IdP proof.
+- Added `docs/architecture/phase-2-enterprise-idp-pilot-evidence.md` to document
+  the managed-pilot workflow, strict mode, required OIDC/SAML plus SCIM proof, and
+  boundary that this is not formal SCIM/OIDC/SAML certification or a complete IAM
+  product.
+- Added `npm run enterprise:idp:evidence:check` and wired it into the aggregate
+  `npm run check` floor.
+- Updated README, `docs/HOW-TO-USE.md`, `docs/PROVIDER-CREDENTIALS.md`,
+  `docs/ENTERPRISE-IDP-ONBOARDING.md`, release checklist, release-readiness guards,
+  progress-verification guards, and the full-progress ledger.
+
+Verification performed:
+
+- `node --check scripts/enterprise-idp-pilot-evidence-check.mjs` passed.
+- `npm run enterprise:idp:evidence:check -- --json` passed against the checked-in
+  sample with `verifiedExampleSchema=true`, `verifiedManagedIdpPilot=false`,
+  `journeyCount=5`, and `requiredAuditActionCount=5`.
+- `npm run enterprise:idp:evidence:check -- --require-managed-idp --json` failed
+  as intended against the checked-in sample because it is `example-schema`
+  evidence, uses the `example` provider, has no verified managed tenant, and does
+  not attest Vault/TLS/redirect/issuer verification with real operator/reviewer
+  identities.
+- `npm run enterprise:idp:evidence:check -- --require-managed-idp .tmp/enterprise-idp-managed-evidence.json --json`
+  passed against a generated temporary managed-pilot-shaped bundle with
+  `verifiedManagedIdpPilot=true`, proving strict mode can accept real evidence once
+  required IdP/operator fields are present.
+- `npm run release:check` passed and `npm run progress:verify` passed with `281`
+  anchors.
+- Full `npm run check` passed with the enterprise IdP evidence checker in the
+  aggregate floor. The run included API unit `59` suites / `494` tests, web unit
+  `11` suites / `149` tests, graph validation `347` nodes / `347` edges, pricing
+  coverage `36` frontend families, progress verification `281` anchors, release
+  readiness, handover, DevOps/cloud/provider-credential gates, and invoice/
+  Terraform/VSDX/LLM/enterprise-IdP evidence smokes. Expected caveats remained:
+  `impeccable` is skipped on the repo's Node 20 target, live Postgres migrations
+  were skipped because the local Postgres container was not running, the diagram
+  LLM provider check reports the endpoint/model are not configured in local mode,
+  and the default local env still warns that invoice-artifacts are demo/local
+  without live object-storage/KMS/scanner/WORM settings.
+
+Known gaps carried forward:
+
+- This creates a measurable managed-IdP evidence path, but it does not execute a
+  real Okta, Microsoft Entra, Auth0, Google Workspace, generic OIDC, or generic
+  SAML pilot in the default OSS/CI path.
+- Formal SCIM/OIDC/SAML certification, production email delivery, group push,
+  IdP-driven role mapping, custom schema extensions, account recovery, invite/
+  approval workflows, org billing UX, and complete enterprise account/team product
+  polish remain future work.
+- Real pilot proof still requires `evidenceLevel=managed-idp-pilot`, strict
+  `npm run enterprise:idp:evidence:check -- --require-managed-idp <bundle.json>`,
+  Vault-backed secrets, registered redirect/ACS URLs, TLS validation, redacted
+  screenshot/configuration evidence, audit-review evidence, and named operator plus
+  reviewer attestations.
 
 ## Phase V3.6 - Terraform validation evidence
 

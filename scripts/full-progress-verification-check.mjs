@@ -109,6 +109,7 @@ async function assertPhaseEvidenceAnchors() {
     'npm run terraform:evidence:capture:smoke',
     'npm run vsdx:visual-evidence:check',
     'npm run diagram:llm-corpus:check',
+    'npm run enterprise:idp:evidence:check',
   ]);
   assertScriptIncludes(packageJson, 'ci:unit', [
     'npm run test:coverage',
@@ -409,6 +410,14 @@ async function assertPhaseEvidenceAnchors() {
     ['service-type accuracy metric', 'serviceTypeAccuracy'],
   ]);
 
+  await assertFileContains('scripts/enterprise-idp-pilot-evidence-check.mjs', [
+    ['enterprise IdP evidence schema', 'polycost-enterprise-idp-pilot-evidence/v1'],
+    ['enterprise IdP check schema', 'polycost-enterprise-idp-pilot-evidence-check/v1'],
+    ['require managed IdP mode', '--require-managed-idp'],
+    ['workspace auth journey requirement', 'workspace-auth-rbac-sso'],
+    ['SCIM lifecycle journey requirement', 'scim-provisioning-lifecycle'],
+  ]);
+
   await assertFileContains('docs/operations/evidence/terraform-validation-evidence.example.json', [
     ['Terraform evidence example schema', 'polycost-terraform-validation-evidence/v1'],
     ['sample-only evidence level', 'example-schema'],
@@ -454,6 +463,13 @@ async function assertPhaseEvidenceAnchors() {
     ['live model caveat', 'evidenceLevel=live-model'],
   ]);
 
+  await assertFileContains('docs/operations/evidence/enterprise-idp-pilot-evidence.example.json', [
+    ['enterprise IdP evidence schema', 'polycost-enterprise-idp-pilot-evidence/v1'],
+    ['sample-only evidence level', 'example-schema'],
+    ['managed IdP caveat', 'evidenceLevel=managed-idp-pilot'],
+    ['SCIM provisioning journey', 'scim-provisioning-lifecycle'],
+  ]);
+
   await assertFileContains('docs/architecture/phase-v3-6-terraform-validation-evidence.md', [
     ['V3.6 title', 'Phase V3.6 Terraform Validation Evidence'],
     ['destination plan command', 'npm run terraform:evidence:check'],
@@ -488,6 +504,13 @@ async function assertPhaseEvidenceAnchors() {
     ['sample evidence distinction', 'example-schema'],
   ]);
 
+  await assertFileContains('docs/architecture/phase-2-enterprise-idp-pilot-evidence.md', [
+    ['enterprise IdP pilot architecture note', 'Phase 2 Enterprise IdP Pilot Evidence'],
+    ['enterprise IdP evidence command', 'npm run enterprise:idp:evidence:check'],
+    ['managed IdP strict mode', '--require-managed-idp'],
+    ['enterprise IAM boundary', 'complete hosted IAM product'],
+  ]);
+
   await assertFileContains('docs/operations/invoice-artifact-production-profile.example.json', [
     ['production profile schema', 'polycost-invoice-artifact-production-profile/v1'],
     ['config-evidence verification level', 'verified(config-evidence)'],
@@ -515,6 +538,7 @@ async function assertPhaseEvidenceAnchors() {
     ['VSDX visual rendering deferred ledger', 'not full Visio visual rendering'],
     ['VSDX visual evidence checker ledger', 'npm run vsdx:visual-evidence:check'],
     ['diagram LLM corpus checker ledger', 'npm run diagram:llm-corpus:check'],
+    ['enterprise IdP pilot checker ledger', 'npm run enterprise:idp:evidence:check'],
     ['Terraform destination capture checker ledger', 'npm run terraform:evidence:capture:smoke'],
     ['auth enterprise deferred ledger', 'Full enterprise account/team UX'],
     ['auth live transcript ledger', 'workspace-auth-rbac-sso'],
