@@ -142,6 +142,7 @@ say so explicitly rather than marking it done.
 | Phase 2.50 - SCIM discovery and IdP onboarding          | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.51 - SCIM live verification transcript          | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.52 - Isolated E2E and runtime DI hardening      | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.53 - Invoice artifact production profile check  | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -155,6 +156,67 @@ say so explicitly rather than marking it done.
 | Browser audit artifact hardening                        | Complete with known gaps (see notes) | 2026-07-08   |
 | Formal browser audit tooling                            | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3.5 - Terraform bundle integrity validation      | Complete with known gaps (see notes) | 2026-07-08   |
+
+## Phase 2.53 - Invoice artifact production profile check
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added `docs/operations/invoice-artifact-production-profile.example.json`, a
+  sanitized AWS S3 Object Lock staging-rehearsal profile for invoice artifact
+  governance.
+- Added `docs/operations/evidence/aws-s3-retention-proof.example.json`, a
+  non-secret captured provider proof fixture with future retention and legal-hold
+  evidence.
+- Added `scripts/invoice-artifact-production-profile-check.mjs`, which validates:
+  - external object storage, KMS, webhook scanner, delete-expired retention,
+    signed evidence receipts, audit webhook export, provider object-lock posture,
+    and provider-control-plane retention proof mode
+  - secret-reference-only profile posture, rejecting raw webhook secrets, cloud
+    access keys, SAS tokens, service-account JSON paths, and bearer-token style
+    runtime fields
+  - proof-file existence, repository-relative path safety, SHA-256 digest match,
+    runtime/evidence reference consistency, and the existing offline provider
+    retention proof verifier result
+  - scanner, notary receiver, and audit-export canary archive references
+- Added `npm run invoice:artifact-profile:check` and wired it into the aggregate
+  `npm run check` floor.
+- Updated provider credentials, README, and dummy-values docs to distinguish this
+  `verified(config-evidence)` profile check from live Vault/provider proof.
+- Added release and progress anchors for the profile checker, example profile, and
+  provider proof fixture.
+
+Verification performed:
+
+- `node --check scripts/invoice-artifact-production-profile-check.mjs` passed.
+- `npm run invoice:artifact-profile:check` passed against the example profile,
+  reporting provider `aws-s3`, verification `verified(config-evidence)`, digest
+  `8b7487c43ed9df63249134345b238c0d3db7144e1029d818198ad9c6d3436b84`, and the
+  explicit caveat that live cloud evidence is still required.
+- `npm run release:check` passed.
+- `npm run progress:verify` passed with `175` phase evidence anchors verified.
+- Full `npm run check` passed with the new `invoice:artifact-profile:check` in
+  the aggregate floor. The run included API unit `59` suites / `494` tests, web
+  unit `11` suites / `149` tests, graph validation `330` nodes / `330` edges,
+  pricing coverage `36` frontend families, progress verification `175` anchors,
+  release readiness, handover, DevOps/cloud/provider-credential gates, and invoice
+  evidence/retention-proof/profile smokes. Expected caveats remained:
+  `impeccable` is skipped on the repo's Node 20 target, live Postgres migrations
+  were skipped because the local Postgres container was not running, and the
+  default local env still warns that invoice-artifacts are demo/local without live
+  object-storage/KMS/scanner/WORM settings.
+
+Known gaps carried forward:
+
+- This closes reviewer-readiness for sanitized production artifact-governance
+  evidence, but it does not read Vault, write provider object storage, call cloud
+  control planes, or prove customer legal immutability.
+- Live invoice-grade operation still requires target-environment
+  `npm run provider:credentials:check:strict`, real object-store credentials,
+  scanner/notary/audit webhook canaries, provider object-lock/KMS controls, and
+  archived receiver-side retention evidence.
 
 ## Phase 2.52 - Isolated E2E and runtime DI hardening
 

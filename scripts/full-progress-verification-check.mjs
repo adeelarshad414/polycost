@@ -101,6 +101,7 @@ async function assertPhaseEvidenceAnchors() {
     'npm run progress:verify',
     'npm run pricing:coverage:check',
     'npm run provider:credentials:check',
+    'npm run invoice:artifact-profile:check',
   ]);
   assertScriptIncludes(packageJson, 'ci:unit', [
     'npm run test:coverage',
@@ -312,6 +313,27 @@ async function assertPhaseEvidenceAnchors() {
     ['pricing engine coverage fragment', 'apps/api/src/comparison/'],
     ['pricing model coverage fragment', 'apps/api/src/pricing-models/'],
     ['pricing normalization coverage fragment', 'apps/api/src/pricing-normalization/'],
+  ]);
+
+  await assertFileContains('scripts/invoice-artifact-production-profile-check.mjs', [
+    ['production profile check schema', 'polycost-invoice-artifact-production-profile-check/v1'],
+    ['secret-free runtime profile guard', 'forbiddenRuntimeSecretKeys'],
+    ['provider proof verifier reuse', 'invoice-artifact-provider-retention-proof-verifier.mjs'],
+    ['target environment caveat', 'Run provider:credentials:check:strict'],
+  ]);
+
+  await assertFileContains('docs/operations/invoice-artifact-production-profile.example.json', [
+    ['production profile schema', 'polycost-invoice-artifact-production-profile/v1'],
+    ['config-evidence verification level', 'verified(config-evidence)'],
+    [
+      'provider control-plane proof mode',
+      '"INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE": "provider-control-plane"',
+    ],
+    [
+      'provider object-lock WORM mode',
+      '"INVOICE_EVIDENCE_WORM_RETENTION_MODE": "provider-object-lock"',
+    ],
+    ['Vault storage credential reference', '"path": "secret/polycost/artifacts/aws"'],
   ]);
 
   await assertFileContains('docs/verification/full-progress-ledger.md', [
