@@ -39,8 +39,11 @@ const requiredFiles = [
   'docs/operations/evidence/invoice-artifact-rehearsal-evidence.example.json',
   'docs/operations/evidence/terraform-validation-evidence.example.json',
   'docs/operations/evidence/vsdx-visual-evidence.example.json',
+  'docs/operations/evidence/diagram-llm-corpus-evidence.example.json',
   'docs/architecture/phase-v3-6-terraform-validation-evidence.md',
   'docs/architecture/phase-2-vsdx-visual-evidence.md',
+  'docs/architecture/phase-2-diagram-llm-corpus-evidence.md',
+  'fixtures/diagrams/llm-corpus/diagram-llm-corpus.v1.json',
   'handover/HANDOVER-README.md',
   'handover/DESIGN-SYSTEM.md',
   'handover/JOURNEYS.md',
@@ -137,6 +140,9 @@ if (!packageJson.scripts?.['terraform:evidence:check']) {
 if (!packageJson.scripts?.['vsdx:visual-evidence:check']) {
   failures.push('package.json is missing vsdx:visual-evidence:check');
 }
+if (!packageJson.scripts?.['diagram:llm-corpus:check']) {
+  failures.push('package.json is missing diagram:llm-corpus:check');
+}
 if (!packageJson.scripts?.['pricing:logic:coverage']) {
   failures.push('package.json is missing pricing:logic:coverage');
 }
@@ -216,6 +222,9 @@ if (!packageJson.scripts?.check?.includes('npm run terraform:evidence:check')) {
 if (!packageJson.scripts?.check?.includes('npm run vsdx:visual-evidence:check')) {
   failures.push('package.json check script must include npm run vsdx:visual-evidence:check');
 }
+if (!packageJson.scripts?.check?.includes('npm run diagram:llm-corpus:check')) {
+  failures.push('package.json check script must include npm run diagram:llm-corpus:check');
+}
 
 assertScriptIncludes('test:production-readiness', [
   'src/api/finops-proof.spec.ts',
@@ -254,11 +263,16 @@ await assertFileContains('README.md', [
   ],
   ['terraform validation evidence checker command', 'npm run terraform:evidence:check'],
   ['VSDX visual evidence checker command', 'npm run vsdx:visual-evidence:check'],
+  ['diagram LLM corpus checker command', 'npm run diagram:llm-corpus:check'],
   [
     'terraform validation evidence architecture link',
     'docs/architecture/phase-v3-6-terraform-validation-evidence.md',
   ],
   ['VSDX visual evidence architecture link', 'docs/architecture/phase-2-vsdx-visual-evidence.md'],
+  [
+    'diagram LLM corpus architecture link',
+    'docs/architecture/phase-2-diagram-llm-corpus-evidence.md',
+  ],
   [
     'catalog list-price honesty',
     'not a billing, invoicing, or live cloud-account spend management system',
@@ -305,6 +319,7 @@ await assertFileContains('docs/HOW-TO-USE.md', [
   ['customer demo command', 'npm run demo:up'],
   ['diagram input paths', 'Diagram mode'],
   ['VSDX visual evidence checker', 'npm run vsdx:visual-evidence:check'],
+  ['diagram LLM corpus checker', 'npm run diagram:llm-corpus:check'],
   ['Terraform starter bundle workflow', 'Terraform Starter Bundles'],
 ]);
 
@@ -359,6 +374,7 @@ await assertFileContains('docs/PROVIDER-CREDENTIALS.md', [
     'USE_MOCK_PROVIDERS=false npm run provider:credentials:check:strict',
   ],
   ['diagram LLM Vault path', 'secret/polycost/llm'],
+  ['diagram LLM corpus checker', 'npm run diagram:llm-corpus:check'],
   ['provider retention proof manifest', '## Provider Retention Proof Manifest'],
   ['provider retention proof mode', 'INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE'],
   ['provider retention proof verifier command', 'npm run invoice:retention-proof:verify'],
@@ -390,6 +406,7 @@ await assertFileContains('RELEASE-CHECKLIST.md', [
   ['pricing honesty task', 'catalog list-price estimates, not invoices'],
   ['known future gaps task', 'full visual VSDX rendering'],
   ['VSDX visual evidence checker command', 'npm run vsdx:visual-evidence:check'],
+  ['diagram LLM corpus checker command', 'npm run diagram:llm-corpus:check'],
   ['security audit gate', 'npm run security:audit'],
   ['clean-clone demo command', 'npm run demo:up'],
   ['clean-clone timed verifier command', 'npm run demo:verify-clean'],
@@ -788,6 +805,15 @@ await assertFileContains('scripts/vsdx-visual-evidence-check.mjs', [
   ['raw VSDX payload guard', 'findForbiddenRawPayloads'],
 ]);
 
+await assertFileContains('scripts/diagram-llm-corpus-check.mjs', [
+  ['diagram LLM corpus schema', 'polycost-diagram-llm-corpus/v1'],
+  ['diagram LLM evidence schema', 'polycost-diagram-llm-corpus-evidence/v1'],
+  ['diagram LLM check schema', 'polycost-diagram-llm-corpus-check/v1'],
+  ['live model required option', '--require-live-model'],
+  ['service-type accuracy threshold', 'minServiceTypeAccuracy'],
+  ['raw prompt payload guard', 'findForbiddenRawPayloads'],
+]);
+
 await assertFileContains('docs/operations/evidence/terraform-validation-evidence.example.json', [
   ['Terraform evidence example schema', 'polycost-terraform-validation-evidence/v1'],
   ['sample-only evidence level', 'example-schema'],
@@ -805,6 +831,21 @@ await assertFileContains('docs/operations/evidence/vsdx-visual-evidence.example.
   ['human review not claimed', '"humanPreviewReviewed": false'],
 ]);
 
+await assertFileContains('fixtures/diagrams/llm-corpus/diagram-llm-corpus.v1.json', [
+  ['diagram LLM corpus schema', 'polycost-diagram-llm-corpus/v1'],
+  ['diagram LLM corpus baseline name', 'tier-3-diagram-classifier-baseline'],
+  ['service type corpus evidence', '"serviceType": "container-registry"'],
+  ['generative AI corpus evidence', '"serviceType": "generative-ai"'],
+]);
+
+await assertFileContains('docs/operations/evidence/diagram-llm-corpus-evidence.example.json', [
+  ['diagram LLM evidence example schema', 'polycost-diagram-llm-corpus-evidence/v1'],
+  ['sample-only evidence level', 'example-schema'],
+  ['fixture evidence mode', '"mode": "fixture-evidence"'],
+  ['live-model caveat', 'evidenceLevel=live-model'],
+  ['raw prompt exclusion', '"rawPromptsExcluded": true'],
+]);
+
 await assertFileContains('docs/architecture/phase-v3-6-terraform-validation-evidence.md', [
   ['V3.6 title', 'Phase V3.6 Terraform Validation Evidence'],
   ['destination plan command', 'npm run terraform:evidence:check'],
@@ -817,6 +858,14 @@ await assertFileContains('docs/architecture/phase-2-vsdx-visual-evidence.md', [
   ['VSDX visual evidence command', 'npm run vsdx:visual-evidence:check'],
   ['sample evidence distinction', 'example-schema'],
   ['full Visio boundary', 'not full Visio visual rendering'],
+]);
+
+await assertFileContains('docs/architecture/phase-2-diagram-llm-corpus-evidence.md', [
+  ['diagram LLM corpus title', 'Phase 2 Diagram LLM Corpus Evidence'],
+  ['diagram LLM corpus command', 'npm run diagram:llm-corpus:check'],
+  ['live model strict mode', '--require-live-model'],
+  ['sample evidence distinction', 'example-schema'],
+  ['production LLM boundary', 'not production LLM proof'],
 ]);
 
 await assertFileContains('docs/operations/invoice-artifact-production-profile.example.json', [

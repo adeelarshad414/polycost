@@ -45,6 +45,9 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Confirm current VSDX preview evidence is archived with
   `npm run vsdx:visual-evidence:check -- --require-human-review <bundle.json>`
   before claiming reviewed VSDX visual proof.
+- Confirm production diagram-classifier evidence is archived with
+  `npm run diagram:llm-corpus:check -- --require-live-model <bundle.json>` before
+  claiming production LLM quality.
 - Confirm `docs/SECURITY-SUPPRESSIONS.md` is current.
 - Confirm `npm run security:audit` passes the high/critical gate.
 - Confirm audit export receiver evidence is archived before claiming SIEM/WORM
@@ -73,6 +76,7 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Run `npm run invoice:evidence:notary:smoke:local`.
 - Run `npm run invoice:evidence:notary:receiver:smoke`.
 - Run `npm run vsdx:visual-evidence:check`.
+- Run `npm run diagram:llm-corpus:check`.
 - Run `npm run release:check`.
 - Run `npm run loading:check`.
 - Run `npm run handover:check`.

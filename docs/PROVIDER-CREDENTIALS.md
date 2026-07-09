@@ -35,6 +35,12 @@ artifact without reading secrets or calling cloud APIs. Treat it as
 | Invoice artifact storage  | Yes, when external storage is enabled    | `INVOICE_ARTIFACT_STORAGE_BACKEND`, object store name/region/prefix, KMS, scanner, retention modes  | See artifact storage section    | Store least-privilege object-store credentials in Vault; strict checks reject missing/dummy secrets. |
 | Diagram/NL LLM classifier | Only when endpoint/model are configured  | `DIAGRAM_LLM_CLASSIFIER_ENDPOINT`, `DIAGRAM_LLM_CLASSIFIER_MODEL`, `VAULT_ADDR`, `VAULT_TOKEN_FILE` | `secret/polycost/llm`           | Store `api_key`; parser falls back to deterministic classification if endpoint/model are absent.     |
 
+Before claiming production diagram-classifier quality, archive a sanitized corpus
+evaluation bundle and run
+`npm run diagram:llm-corpus:check -- --require-live-model <bundle.json>`. The
+checked-in example validates the evidence format only; it does not prove live
+model quality.
+
 The API/web `.env` surface stays intentionally small:
 
 ```bash

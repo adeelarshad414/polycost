@@ -1,0 +1,116 @@
+{
+  "schemaVersion": "polycost-diagram-llm-corpus/v1",
+  "corpusName": "tier-3-diagram-classifier-baseline",
+  "version": "2026-07-09",
+  "description": "Sanitized baseline corpus for evaluating PolyCost diagram Tier 3 LLM classifier outputs without storing raw prompts or provider responses.",
+  "cases": [
+    {
+      "id": "compute-web-tier",
+      "displayLabel": "customer-facing web tier running four Linux instances",
+      "stencilId": "custom.compute.box",
+      "expected": {
+        "serviceCategory": "compute",
+        "serviceType": "vm-compute"
+      }
+    },
+    {
+      "id": "container-orchestrator",
+      "displayLabel": "managed Kubernetes application cluster",
+      "stencilId": "generic.cluster",
+      "expected": {
+        "serviceCategory": "containers",
+        "serviceType": "kubernetes"
+      }
+    },
+    {
+      "id": "serverless-worker",
+      "displayLabel": "event triggered payment enrichment functions",
+      "stencilId": "generic.lambda-like",
+      "expected": {
+        "serviceCategory": "application",
+        "serviceType": "serverless-function"
+      }
+    },
+    {
+      "id": "object-archive",
+      "displayLabel": "durable invoice archive bucket with lifecycle retention",
+      "stencilId": "custom.storage.archive",
+      "expected": {
+        "serviceCategory": "storage",
+        "serviceType": "object-storage"
+      }
+    },
+    {
+      "id": "managed-postgres",
+      "displayLabel": "managed PostgreSQL primary and standby database",
+      "stencilId": "generic.database.cylinder",
+      "expected": {
+        "serviceCategory": "database",
+        "serviceType": "managed-postgres"
+      }
+    },
+    {
+      "id": "global-cdn",
+      "displayLabel": "global static asset edge cache",
+      "stencilId": "generic.edge.network",
+      "expected": {
+        "serviceCategory": "networking",
+        "serviceType": "cdn"
+      }
+    },
+    {
+      "id": "async-queue",
+      "displayLabel": "asynchronous order handoff queue",
+      "stencilId": "generic.messaging.queue",
+      "expected": {
+        "serviceCategory": "integration",
+        "serviceType": "queue-or-event-bus"
+      }
+    },
+    {
+      "id": "stream-analytics",
+      "displayLabel": "clickstream ingestion and streaming analytics",
+      "stencilId": "generic.analytics.stream",
+      "expected": {
+        "serviceCategory": "analytics",
+        "serviceType": "streaming"
+      }
+    },
+    {
+      "id": "genai-embedding",
+      "displayLabel": "document embedding and generative answer service",
+      "stencilId": "generic.ai.model",
+      "expected": {
+        "serviceCategory": "ai",
+        "serviceType": "generative-ai"
+      }
+    },
+    {
+      "id": "security-waf",
+      "displayLabel": "managed web application firewall before ingress",
+      "stencilId": "generic.security.shield",
+      "expected": {
+        "serviceCategory": "security",
+        "serviceType": "waf"
+      }
+    },
+    {
+      "id": "observability",
+      "displayLabel": "central logs metrics and alerting workspace",
+      "stencilId": "generic.operations.monitor",
+      "expected": {
+        "serviceCategory": "operations",
+        "serviceType": "monitoring"
+      }
+    },
+    {
+      "id": "container-registry",
+      "displayLabel": "private OCI image registry for deployment pipeline",
+      "stencilId": "generic.devops.registry",
+      "expected": {
+        "serviceCategory": "devops",
+        "serviceType": "container-registry"
+      }
+    }
+  ]
+}

@@ -185,7 +185,8 @@ Health and operations:
   over database-backed and external object-backed artifact rows.
 - VSDX parsing is layout-aware extraction, not full Visio rendering.
 - Production LLM quality depends on a real endpoint/model, Vault secret, and corpus
-  evaluation.
+  evaluation. The baseline corpus/evidence gate is `npm run diagram:llm-corpus:check`;
+  production claims require `--require-live-model` evidence, not the checked-in sample.
 - Enterprise auth/team product depth still needs production email, SSO/SAML,
   SCIM, account recovery, org billing UX, and broader account administration polish.
 - Terraform output is a starter bundle, not a full landing-zone module system.
