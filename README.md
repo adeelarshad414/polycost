@@ -69,6 +69,9 @@ capture requirements without network calls. To generate sanitized live evidence,
 run `POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true npm run pricing:catalog:snapshot:capture -- --live --operator <name> --previous-evidence <prior-live-bundle.json>`;
 the command requires a prior live bundle so first-run captures cannot be reported
 as exact row-change proof.
+Use `npm run pricing:catalog:snapshot:capture:smoke` to replay provider-native
+AWS/Azure/GCP fixture payloads through the capture normalizers without network
+calls or cloud credentials.
 The checked-in example validates the contract only; PolyCost still is not the
 provider invoice system of record. See
 `docs/architecture/phase-2-invoice-of-record-pilot-evidence.md`.

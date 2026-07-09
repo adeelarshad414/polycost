@@ -91,6 +91,10 @@ Evidence:
   `POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true`, a reviewer operator, previous
   live evidence, and GCP Cloud Billing read credentials before
   `--require-live-provider` can pass.
+- The capture path now has credential-free provider-native fixture replay through
+  `npm run pricing:catalog:snapshot:capture:smoke`, proving the AWS/Azure/GCP
+  capture normalizers, exact price row-change math, and strict live-proof
+  rejection for fixture evidence.
 - `docs/PROVIDER-CREDENTIALS.md` states the current production swap procedure and
   explicitly limits real provider mode to catalog list prices, not invoices.
 

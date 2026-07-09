@@ -169,6 +169,9 @@ if (!packageJson.scripts?.['pricing:catalog:snapshot:capture']) {
 if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:plan']) {
   failures.push('package.json is missing pricing:catalog:snapshot:capture:plan');
 }
+if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:smoke']) {
+  failures.push('package.json is missing pricing:catalog:snapshot:capture:smoke');
+}
 if (!packageJson.scripts?.['terraform:evidence:check']) {
   failures.push('package.json is missing terraform:evidence:check');
 }
@@ -292,6 +295,11 @@ if (!packageJson.scripts?.check?.includes('npm run pricing:catalog:snapshot:smok
 if (!packageJson.scripts?.check?.includes('npm run pricing:catalog:snapshot:capture:plan')) {
   failures.push(
     'package.json check script must include npm run pricing:catalog:snapshot:capture:plan',
+  );
+}
+if (!packageJson.scripts?.check?.includes('npm run pricing:catalog:snapshot:capture:smoke')) {
+  failures.push(
+    'package.json check script must include npm run pricing:catalog:snapshot:capture:smoke',
   );
 }
 if (!packageJson.scripts?.check?.includes('npm run terraform:evidence:check')) {
@@ -965,11 +973,25 @@ await assertFileContains('scripts/pricing-catalog-live-snapshot-capture.mjs', [
   ['pricing catalog live capture schema', 'polycost-pricing-catalog-live-snapshot-capture/v1'],
   ['live snapshot evidence schema', 'polycost-pricing-catalog-snapshot-evidence/v1'],
   ['live guard env', 'POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE'],
+  ['fixture smoke mode', '--fixture-smoke'],
   ['previous evidence requirement', '--previous-evidence'],
   ['AWS public catalog adapter', 'aws-price-list-bulk-offer'],
   ['Azure public catalog adapter', 'azure-retail-prices-api'],
   ['GCP credentialed catalog adapter', 'gcp-cloud-billing-catalog-api'],
   ['strict live checker handoff', '--require-live-provider'],
+]);
+
+await assertFileContains('scripts/pricing-catalog-live-snapshot-capture-smoke.mjs', [
+  [
+    'pricing catalog live capture smoke schema',
+    'polycost-pricing-catalog-live-snapshot-capture-smoke/v1',
+  ],
+  ['fixture capture handoff', '--fixture-smoke'],
+  ['strict live rejection', '--require-live-provider'],
+  ['AWS fixture coverage', 'awsFixture'],
+  ['Azure fixture coverage', 'azureFixture'],
+  ['GCP fixture coverage', 'gcpFixture'],
+  ['no credential env smoke', 'scrubbedEnv'],
 ]);
 
 await assertFileContains(

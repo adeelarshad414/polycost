@@ -31,6 +31,18 @@ Review the live capture plan without network calls:
 npm run pricing:catalog:snapshot:capture:plan
 ```
 
+Replay provider-native fixture payloads through the live capture normalizers
+without provider credentials:
+
+```bash
+npm run pricing:catalog:snapshot:capture:smoke
+```
+
+The smoke generates AWS Price List, Azure Retail Prices, and GCP Cloud Billing
+fixture payloads, changes one price-bearing row per provider, validates
+`provider-snapshot-smoke` evidence, and confirms `--require-live-provider`
+rejects the fixture output.
+
 For live provider proof, run the guarded operator-side capture command from a
 read-only provider environment:
 

@@ -104,6 +104,13 @@ Review the live capture plan without provider network calls:
 npm run pricing:catalog:snapshot:capture:plan
 ```
 
+Replay provider-native AWS/Azure/GCP fixture payloads through the same capture
+normalizers without cloud credentials:
+
+```bash
+npm run pricing:catalog:snapshot:capture:smoke
+```
+
 For live provider proof, use the guarded capture command from an
 operator-authenticated environment. AWS Price List and Azure Retail Prices use
 public read-only catalog endpoints. GCP requires one of:
