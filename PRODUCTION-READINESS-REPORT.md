@@ -99,6 +99,7 @@ performance/accessibility/best-practices/SEO metrics.
 | INV-TRACE-040  | Improved      | Phase 2.70 adds `npm run pricing:catalog:snapshot:capture:archive:build` plus a credential-free builder smoke, generating archive manifests from preflight/capture/snapshot artifacts and proving strict live archive rejection for fixture evidence             |
 | INV-TRACE-041  | Improved      | Phase 2.71 adds `npm run pricing:catalog:snapshot:capture:run:live` plus plan/smoke modes, orchestrating strict preflight, guarded live capture, archive build, and strict archive verification as one target-environment sequence                               |
 | INV-TRACE-042  | Improved      | Phase 2.72 adds `npm run pricing:catalog:snapshot:capture:run:evidence:check`, verifying completed live-run artifact sets across run summary, preflight, capture, snapshot evidence, archive manifest, and strict archive proof                                  |
+| INV-TRACE-043  | Improved      | Phase 2.73 adds `npm run pricing:catalog:snapshot:capture:run:evidence:packet`, building/checking stable-JSON reviewer packets with referenced artifact digests while excluding raw provider payloads and credentials                                            |
 | VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                                                                                                      |
 | VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                                                                                                      |
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                                                                                                 |
@@ -453,6 +454,24 @@ Local static/regression gates:
     suites / `149` tests, graph validation `359` nodes / `359` edges, pricing
     coverage `36` frontend families, progress verification `446` anchors, and
     the live run evidence verifier smoke in the aggregate floor. Expected caveats
+    remained: local invoice artifact scanner smoke skipped because TCP bind is
+    blocked in this sandbox, `impeccable` is skipped on the repo's Node 20 target,
+    live Postgres migrations were skipped because the local Postgres container
+    was not running, and provider credential checks still warn that
+    invoice-artifact governance is demo/local without live object-storage/KMS/
+    scanner/WORM settings.
+- Phase 2.73 live catalog run evidence packet gates passed:
+  - `node --check scripts/pricing-catalog-live-capture-run-evidence-packet.mjs`
+    passed.
+  - `node scripts/pricing-catalog-live-capture-run-evidence-packet.mjs --smoke --json`
+    passed with `baseFixturePacketVerified=true` and
+    `strictLiveRejectedFixturePacket=true`.
+  - `node scripts/pricing-catalog-live-capture-run-evidence-packet.mjs --check .tmp/not-here/packet.json --json`
+    failed as intended for a missing packet file.
+  - Full `npm run check` passed with API `59` suites / `494` tests, web `11`
+    suites / `149` tests, graph validation `359` nodes / `359` edges, pricing
+    coverage `36` frontend families, progress verification `454` anchors, and
+    the live run evidence packet smoke in the aggregate floor. Expected caveats
     remained: local invoice artifact scanner smoke skipped because TCP bind is
     blocked in this sandbox, `impeccable` is skipped on the repo's Node 20 target,
     live Postgres migrations were skipped because the local Postgres container
@@ -1094,6 +1113,9 @@ Machine-readable token evidence:
   Phase 2.72 adds a post-run artifact verifier for the live capture runner,
   binding run summary, preflight, capture, snapshot evidence, archive manifest,
   and archive checker output into one auditable evidence check.
+  Phase 2.73 adds a stable-JSON reviewer packet with referenced artifact digests
+  for the verified live-run folder, while still excluding raw provider payloads,
+  credentials, signed URLs, and private billing artifacts.
   These phases do not replace provider invoice rendering, private contract/legal
   validation, or provider-authenticated invoice-of-record reconciliation.
   Phase 2.25 adds durable database-backed artifact file upload/download with

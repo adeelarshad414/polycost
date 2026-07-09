@@ -116,6 +116,7 @@ async function assertPhaseEvidenceAnchors() {
     'npm run pricing:catalog:snapshot:capture:archive:build:smoke',
     'npm run pricing:catalog:snapshot:capture:run:smoke',
     'npm run pricing:catalog:snapshot:capture:run:evidence:smoke',
+    'npm run pricing:catalog:snapshot:capture:run:evidence:packet:smoke',
     'npm run terraform:evidence:check',
     'npm run terraform:evidence:capture:smoke',
     'npm run vsdx:visual-evidence:check',
@@ -516,6 +517,25 @@ async function assertPhaseEvidenceAnchors() {
     ['strict live run option', '--require-live-run'],
     ['archive checker handoff', 'scripts/pricing-catalog-live-capture-archive-check.mjs'],
     ['fixture run rejection flag', 'strictLiveRejectedFixtureRun'],
+  ]);
+
+  await assertFileContains('scripts/pricing-catalog-live-capture-run-evidence-packet.mjs', [
+    [
+      'pricing catalog live capture run evidence packet schema',
+      'polycost-pricing-catalog-live-capture-run-evidence-packet/v1',
+    ],
+    [
+      'pricing catalog live capture run evidence packet smoke schema',
+      'polycost-pricing-catalog-live-capture-run-evidence-packet-smoke/v1',
+    ],
+    [
+      'pricing catalog live capture run evidence packet check schema',
+      'polycost-pricing-catalog-live-capture-run-evidence-packet-check/v1',
+    ],
+    ['run evidence checker handoff', 'scripts/pricing-catalog-live-capture-run-evidence-check.mjs'],
+    ['strict live packet option', '--require-live-packet'],
+    ['fixture packet rejection flag', 'strictLiveRejectedFixturePacket'],
+    ['stable JSON integrity', 'stable-json:v1'],
   ]);
 
   await assertFileContains(

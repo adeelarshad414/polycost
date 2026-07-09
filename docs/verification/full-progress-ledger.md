@@ -115,6 +115,10 @@ Evidence:
   `npm run pricing:catalog:snapshot:capture:run:evidence:check -- --run-dir <run-output-dir> --require-live-run`,
   with a credential-free smoke through
   `npm run pricing:catalog:snapshot:capture:run:evidence:smoke`.
+- Verified live capture run folders can now be packaged for reviewer handoff
+  through `npm run pricing:catalog:snapshot:capture:run:evidence:packet`, with
+  stable-JSON integrity, referenced artifact digests, and a credential-free smoke
+  through `npm run pricing:catalog:snapshot:capture:run:evidence:packet:smoke`.
 - `docs/PROVIDER-CREDENTIALS.md` states the current production swap procedure and
   explicitly limits real provider mode to catalog list prices, not invoices.
 

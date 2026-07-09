@@ -224,6 +224,30 @@ The smoke validates the run-summary, preflight, capture, snapshot, and archive
 handoff with fixture evidence, then proves `--require-live-run` rejects the same
 fixture artifacts.
 
+For reviewer handoff after a target run, build a metadata-only packet:
+
+```bash
+npm run pricing:catalog:snapshot:capture:run:evidence:packet -- \
+  --run-dir <run-output-dir> \
+  --operator "<reviewer-name>" \
+  --require-live-run \
+  --output <packet.json>
+```
+
+Verify the packet and referenced file digests with:
+
+```bash
+npm run pricing:catalog:snapshot:capture:run:evidence:packet -- \
+  --check <packet.json> \
+  --require-live-packet
+```
+
+For local credential-free verification of packet build/check behavior, run:
+
+```bash
+npm run pricing:catalog:snapshot:capture:run:evidence:packet:smoke
+```
+
 The archive verifier checks the manifest schema, operator attestation, strict
 preflight posture, capture metadata, AWS/Azure/GCP provider coverage, referenced
 evidence file SHA-256 digest, and the underlying
