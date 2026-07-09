@@ -183,6 +183,29 @@ For local credential-free verification of the builder handoff, run:
 npm run pricing:catalog:snapshot:capture:archive:build:smoke
 ```
 
+For the target-environment end-to-end sequence, use the live capture runner. Plan
+mode prints the exact artifact paths and command sequence without provider calls:
+
+```bash
+npm run pricing:catalog:snapshot:capture:run:plan
+```
+
+Smoke mode proves the orchestration locally with fixture evidence:
+
+```bash
+npm run pricing:catalog:snapshot:capture:run:smoke
+```
+
+Live mode runs strict preflight, guarded provider capture, archive build, and
+strict archive verification in sequence:
+
+```bash
+POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true \
+  npm run pricing:catalog:snapshot:capture:run:live -- \
+  --operator "<reviewer-name>" \
+  --previous-evidence <prior-live-provider-bundle.json>
+```
+
 The archive verifier checks the manifest schema, operator attestation, strict
 preflight posture, capture metadata, AWS/Azure/GCP provider coverage, referenced
 evidence file SHA-256 digest, and the underlying

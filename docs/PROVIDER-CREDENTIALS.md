@@ -457,6 +457,12 @@ Generate the archive manifest with
 `npm run pricing:catalog:snapshot:capture:archive:build -- --preflight <preflight.json> --capture <capture.json> --snapshot-evidence <bundle.json> --operator "<reviewer-name>" --output <archive.json> --require-live-archive`.
 Use `npm run pricing:catalog:snapshot:capture:archive:build:smoke` for the local
 credential-free builder proof.
+Use `npm run pricing:catalog:snapshot:capture:run:plan` and
+`npm run pricing:catalog:snapshot:capture:run:smoke` before the target
+environment run. In the target environment, use
+`POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true npm run pricing:catalog:snapshot:capture:run:live -- --operator "<reviewer-name>" --previous-evidence <prior-live-provider-bundle.json>`
+to run strict preflight, live capture, archive build, and strict archive
+verification as one sequence.
 
 The checked-in example can be validated with `npm run invoice:record:evidence:check`
 for schema coverage only. It is not provider invoice proof and does not make

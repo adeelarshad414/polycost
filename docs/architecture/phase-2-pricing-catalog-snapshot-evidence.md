@@ -115,6 +115,17 @@ The local builder smoke proves this handoff without provider credentials:
 npm run pricing:catalog:snapshot:capture:archive:build:smoke
 ```
 
+The live capture runner orchestrates the whole target-environment sequence:
+
+```bash
+npm run pricing:catalog:snapshot:capture:run:plan
+npm run pricing:catalog:snapshot:capture:run:smoke
+POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true \
+  npm run pricing:catalog:snapshot:capture:run:live -- \
+  --operator "<reviewer-name>" \
+  --previous-evidence <prior-live-provider-bundle.json>
+```
+
 The archive verifier checks the manifest schema, referenced evidence SHA-256,
 operator attestation, strict preflight posture, capture metadata, provider
 coverage, and the underlying `--require-live-provider` result. The checked-in

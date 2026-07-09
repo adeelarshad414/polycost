@@ -160,6 +160,7 @@ say so explicitly rather than marking it done.
 | Phase 2.68 - Live catalog capture readiness preflight   | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.69 - Live catalog capture archive proof         | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.70 - Live catalog archive builder smoke         | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.71 - Live catalog capture run orchestrator      | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -1061,6 +1062,62 @@ Known gaps carried forward:
   preflight, guarded `--live` capture, prior live evidence, GCP Cloud Billing
   read credentials, and strict archive verification.
 - Even generated live archive proof remains catalog list-price evidence, not
+  invoice-grade billing or provider invoice-of-record reconciliation.
+
+## Phase 2.71 - Live catalog capture run orchestrator
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added `scripts/pricing-catalog-live-capture-run.mjs`, an operator-side runner
+  that orchestrates the target-environment live pricing evidence sequence.
+- Added `npm run pricing:catalog:snapshot:capture:run:plan`,
+  `npm run pricing:catalog:snapshot:capture:run:smoke`, and
+  `npm run pricing:catalog:snapshot:capture:run:live`.
+- Plan mode prints required inputs, expected artifact paths, and the command
+  sequence without provider calls. Smoke mode runs the local archive-builder
+  smoke and proves strict live archive verification rejects fixture evidence.
+  Live mode requires `POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true`, a real
+  operator, and prior live evidence, then runs strict preflight, guarded live
+  capture, archive build, and strict archive verification.
+- Wired the smoke runner into `npm run check`, release readiness, progress
+  verification, README, HOW-TO, provider credential docs, live pricing runbook,
+  architecture notes, release checklist, full-progress ledger, and the
+  production-readiness report.
+
+Verification performed:
+
+- `node --check scripts/pricing-catalog-live-capture-run.mjs` passed.
+- `node scripts/pricing-catalog-live-capture-run.mjs --plan --json` passed and
+  emitted required live inputs plus artifact paths.
+- `node scripts/pricing-catalog-live-capture-run.mjs --smoke --json` passed with
+  `verifiedExampleArchive=true`, `verifiedLiveCaptureArchive=false`, and
+  `strictLiveRejectedFixtureArchive=true`.
+- `node scripts/pricing-catalog-live-capture-run.mjs --live --json` failed as
+  intended in the local environment because the live guard, real operator, and
+  prior live evidence were not provided.
+- Full `npm run check` passed with the live capture runner smoke in the aggregate
+  floor: API unit `59` suites / `494` tests, web unit `11` suites / `149` tests,
+  graph validation `359` nodes / `359` edges, pricing coverage `36` frontend
+  families, progress verification `439` anchors, release readiness, handover,
+  DevOps/cloud/provider-credential gates, and invoice/Terraform/VSDX/diagram/IdP
+  evidence smokes. Expected caveats remained: local invoice artifact scanner
+  smoke skipped because TCP bind is blocked in this sandbox, `impeccable` is
+  skipped on the repo's Node 20 target, live Postgres migrations were skipped
+  because the local Postgres container was not running, and the default local env
+  still warns that invoice-artifacts are demo/local without live
+  object-storage/KMS/scanner/WORM settings.
+
+Known gaps carried forward:
+
+- This provides the single target-environment command path, but it still cannot
+  execute real provider capture without real network access, credentials, and
+  prior live evidence.
+- A real `verifiedLiveCaptureArchive=true` run still requires GCP Cloud Billing
+  read credentials and provider API reachability in the target environment.
+- Even a successful live runner remains catalog list-price evidence, not
   invoice-grade billing or provider invoice-of-record reconciliation.
 
 ## Phase V3.6 - Terraform validation evidence

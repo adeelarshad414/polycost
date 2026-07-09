@@ -107,6 +107,10 @@ Evidence:
   artifacts through `npm run pricing:catalog:snapshot:capture:archive:build`, with
   a credential-free smoke through
   `npm run pricing:catalog:snapshot:capture:archive:build:smoke`.
+- Target-environment live catalog capture now has a single orchestrator through
+  `npm run pricing:catalog:snapshot:capture:run:live`, with CI-safe plan and
+  smoke modes through `npm run pricing:catalog:snapshot:capture:run:plan` and
+  `npm run pricing:catalog:snapshot:capture:run:smoke`.
 - `docs/PROVIDER-CREDENTIALS.md` states the current production swap procedure and
   explicitly limits real provider mode to catalog list prices, not invoices.
 
