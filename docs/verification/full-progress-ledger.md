@@ -103,6 +103,10 @@ Evidence:
   `npm run pricing:catalog:snapshot:capture:archive:check`, plus strict
   target-environment mode through
   `npm run pricing:catalog:snapshot:capture:archive:strict`.
+- Archive manifests can now be generated from preflight/capture/snapshot evidence
+  artifacts through `npm run pricing:catalog:snapshot:capture:archive:build`, with
+  a credential-free smoke through
+  `npm run pricing:catalog:snapshot:capture:archive:build:smoke`.
 - `docs/PROVIDER-CREDENTIALS.md` states the current production swap procedure and
   explicitly limits real provider mode to catalog list prices, not invoices.
 

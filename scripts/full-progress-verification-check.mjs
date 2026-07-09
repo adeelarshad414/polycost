@@ -113,6 +113,7 @@ async function assertPhaseEvidenceAnchors() {
     'npm run pricing:catalog:snapshot:capture:smoke',
     'npm run pricing:catalog:snapshot:capture:preflight',
     'npm run pricing:catalog:snapshot:capture:archive:check',
+    'npm run pricing:catalog:snapshot:capture:archive:build:smoke',
     'npm run terraform:evidence:check',
     'npm run terraform:evidence:capture:smoke',
     'npm run vsdx:visual-evidence:check',
@@ -467,6 +468,21 @@ async function assertPhaseEvidenceAnchors() {
       ['strict archive caveat', '--require-live-archive'],
     ],
   );
+
+  await assertFileContains('scripts/pricing-catalog-live-capture-archive-build.mjs', [
+    [
+      'pricing catalog live capture archive build schema',
+      'polycost-pricing-catalog-live-capture-archive-build/v1',
+    ],
+    [
+      'pricing catalog live capture archive build smoke schema',
+      'polycost-pricing-catalog-live-capture-archive-build-smoke/v1',
+    ],
+    ['archive checker handoff', 'scripts/pricing-catalog-live-capture-archive-check.mjs'],
+    ['strict archive option', '--require-live-archive'],
+    ['fixture capture smoke command', 'scripts/pricing-catalog-live-snapshot-capture-smoke.mjs'],
+    ['strict rejection flag', 'strictLiveRejectedFixtureArchive'],
+  ]);
 
   await assertFileContains(
     'docs/operations/evidence/pricing-catalog-snapshot/pricing-catalog-snapshot.example.json',

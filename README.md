@@ -79,6 +79,10 @@ After live capture, register the sanitized bundle in an archive manifest and run
 `npm run pricing:catalog:snapshot:capture:archive:check`; use
 `npm run pricing:catalog:snapshot:capture:archive:strict -- <archive.json>` before
 claiming archived live-provider capture proof.
+Use `npm run pricing:catalog:snapshot:capture:archive:build` to generate that
+manifest from preflight, capture, and snapshot evidence artifacts, and
+`npm run pricing:catalog:snapshot:capture:archive:build:smoke` to prove the
+builder flow locally without credentials.
 The checked-in example validates the contract only; PolyCost still is not the
 provider invoice system of record. See
 `docs/architecture/phase-2-invoice-of-record-pilot-evidence.md`.
