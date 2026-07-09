@@ -50,6 +50,10 @@ export type TeamAuditAction =
   | 'team.member.role_updated'
   | 'team.member.removed'
   | 'team.sso.configured'
+  | 'team.scim_token.created'
+  | 'team.scim_token.revoked'
+  | 'team.scim.user_upserted'
+  | 'team.scim.user_deactivated'
   | 'billing.import.created'
   | 'billing.reconciliation.created'
   | 'billing.reconciliation.artifact_registered'
@@ -64,7 +68,14 @@ export type TeamAuditAction =
   | 'billing.reconciliation.invoice_control_validated';
 
 export type TeamAuditTargetType =
-  'team' | 'invitation' | 'member' | 'sso_provider' | 'billing_import' | 'billing_reconciliation';
+  | 'team'
+  | 'invitation'
+  | 'member'
+  | 'sso_provider'
+  | 'scim_token'
+  | 'scim_user'
+  | 'billing_import'
+  | 'billing_reconciliation';
 
 export interface TeamAuditEventRecord {
   id: string;
@@ -155,6 +166,42 @@ export interface SsoCallbackResponse extends AuthSessionResponse {
     subjectHash: string;
     stateVerified: true;
   };
+}
+
+export interface TeamScimTokenRecord {
+  id: string;
+  teamId: string;
+  displayName: string;
+  tokenPrefix: string;
+  createdByAccountId?: string;
+  createdAt: string;
+  lastUsedAt?: string;
+  revokedAt?: string;
+  expiresAt?: string;
+}
+
+export interface CreatedTeamScimTokenRecord extends TeamScimTokenRecord {
+  token: string;
+}
+
+export interface TeamScimIdentity {
+  teamId: string;
+  tokenId: string;
+  tokenPrefix: string;
+  displayName: string;
+}
+
+export interface TeamScimUserRecord {
+  id: string;
+  teamId: string;
+  externalId: string;
+  accountId: string;
+  userName: string;
+  displayName?: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deactivatedAt?: string;
 }
 
 export interface AuthIdentity {

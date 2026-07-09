@@ -170,6 +170,8 @@ assertScriptIncludes('test:production-readiness', [
   'src/api/live-pricing-traceability.spec.ts',
   'src/api/auth-billing.spec.ts',
   'src/api/auth.controller.spec.ts',
+  'src/api/scim-provisioning.service.spec.ts',
+  'src/api/scim-provisioning.controller.spec.ts',
   'src/diagram-parser/diagram-parser.service.spec.ts',
   'src/diagram-parser/llm-classifier.client.spec.ts',
   'src/reports/report-generators.spec.ts',
@@ -471,6 +473,27 @@ await assertFileContains('scripts/live-verification.mjs', [
   ['auth SSO state verification transcript', 'stateVerified'],
   ['redis transcript event', 'redis-degradation'],
   ['live verification transcript writer', 'writeTranscript'],
+]);
+
+await assertFileContains('README.md', [
+  ['SCIM provisioning foundation', 'SCIM provisioning foundation'],
+  ['SCIM token endpoint', '/api/v1/auth/teams/:teamId/scim/tokens'],
+  ['SCIM user endpoint', '/api/v1/scim/v2/Users'],
+]);
+
+await assertFileContains('database/migrations/040_team_scim_provisioning.sql', [
+  ['SCIM token table', 'team_scim_tokens'],
+  ['SCIM user mapping table', 'team_scim_external_users'],
+  ['no plaintext token column', 'token_hash'],
+  ['SCIM audit action', 'team.scim.user_upserted'],
+]);
+
+await assertFileContains('scripts/db.mjs', [
+  ['SCIM migration validation', '040_team_scim_provisioning.sql'],
+]);
+
+await assertFileContains('docker/postgres/initdb.d/001-run-migrations.sh', [
+  ['SCIM migration bootstrap', '040_team_scim_provisioning.sql'],
 ]);
 
 await assertFileContains('scripts/clean-clone-demo-check.mjs', [

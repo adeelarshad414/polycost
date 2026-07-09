@@ -137,6 +137,7 @@ say so explicitly rather than marking it done.
 | Phase 2.45 - Provider retention proof API intake        | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.46 - Provider retention proof row persistence   | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.47 - Provider retention proof CLI capture       | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.48 - SCIM provisioning foundation               | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -150,6 +151,50 @@ say so explicitly rather than marking it done.
 | Browser audit artifact hardening                        | Complete with known gaps (see notes) | 2026-07-08   |
 | Formal browser audit tooling                            | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3.5 - Terraform bundle integrity validation      | Complete with known gaps (see notes) | 2026-07-08   |
+
+## Phase 2.48 - SCIM provisioning foundation
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added migration `040_team_scim_provisioning.sql` with `team_scim_tokens` and
+  `team_scim_external_users` tables, token-hash checks, no plaintext token storage,
+  least-privilege runtime grants, and team audit allow-list entries for SCIM token
+  and user lifecycle events.
+- Added owner/admin guarded SCIM token administration endpoints under
+  `/api/v1/auth/teams/:teamId/scim/tokens`; token values are returned once on
+  creation, while persisted rows keep only hash and display-prefix metadata.
+- Added bearer-token-authenticated `/api/v1/scim/v2/Users` endpoints for listing,
+  creating, replacing, active-state patching, and deactivating IdP-managed users.
+- Added transactional repository support that attaches active SCIM users to the
+  workspace as `member`, removes the team membership on deactivation, and records
+  token/user lifecycle audit events without storing raw bearer tokens.
+- Added focused SCIM service/controller tests and wired them into
+  `npm run test:production-readiness` plus release-readiness checks.
+
+Verification performed:
+
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/api/scim-provisioning.service.spec.ts src/api/scim-provisioning.controller.spec.ts`
+  passed: 2 suites / 9 tests.
+- `npm run typecheck --workspace @polycost/api` passed.
+- `npm run db:validate` passed; live schema check was skipped because the local
+  Postgres container was not running.
+- `npm run test:production-readiness` passed: API 16 suites / 213 tests and web
+  2 suites / 90 tests.
+- `npm run check` passed: API unit 58 suites / 483 tests, web unit 11 suites / 147
+  tests, graph validation 326/326, release/progress/handover/provider gates green.
+  Expected local caveats remained: live Postgres migration check skipped because the
+  container was not running, Node 20 skipped `impeccable`, and invoice-artifacts
+  warned for demo/local storage posture.
+
+Known gaps carried forward:
+
+- This is a SCIM provisioning foundation for self-hosted/demo use, not formal SCIM
+  certification or a complete enterprise IAM product. SSO provider certification,
+  account recovery UX, invite/approval workflows, team administration depth, and
+  full RBAC product UX remain future phases.
 
 ## Phase 2.13 - Invite delivery webhook foundation
 
