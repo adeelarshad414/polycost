@@ -12,6 +12,17 @@ Run the checked-in sample alert contract:
 npm run diagram:llm-corpus:drift:alert:check
 ```
 
+Run the local reference sender/receiver proof:
+
+```bash
+npm run diagram:llm-corpus:drift:alert:smoke
+```
+
+The local reference receiver smoke generates sanitized live-model drift evidence,
+signs an alert envelope, passes it to a local reference receiver, archives a
+receiver receipt, writes a `staging-alert` evidence bundle under `.tmp/`, and
+validates that bundle with the strict alert checker.
+
 For staging alert proof, send a sanitized drift canary to the configured receiver
 or incident system, archive receiver-side acceptance evidence, and run:
 
@@ -25,7 +36,8 @@ only; it is not production alerting proof.
 ## Boundary
 
 The checker does not call the model endpoint, send alerts, read Vault, or verify
-receiver retention. It validates archived sanitized alert evidence, routing
-attestations, owner/SLO policy, and reviewer handoff metadata. Production quality
-still depends on the deployed alert receiver, incident workflow, scheduler, and
-receiver-side retention proof.
+receiver retention. The smoke does send a signed envelope through the local
+reference receiver, but it does not call an external model endpoint, external
+incident system, or production receiver. Production quality still depends on the
+deployed alert receiver, incident workflow, scheduler, and receiver-side retention
+proof from that environment; the local smoke is not receiver-side retention proof.

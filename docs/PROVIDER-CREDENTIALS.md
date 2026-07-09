@@ -47,6 +47,9 @@ capture, drift, alert, and evidence examples validate the format only; they do n
 prove live model quality. Before claiming drift alerting works, archive sanitized
 receiver acceptance evidence and run
 `npm run diagram:llm-corpus:drift:alert:check -- --require-staging-alert <evidence.json>`.
+For a local reference sender/receiver proof, run
+`npm run diagram:llm-corpus:drift:alert:smoke`; it writes generated evidence under
+`.tmp/` and does not call an external incident system.
 
 Before claiming managed enterprise IdP readiness, run a customer-specific pilot
 against Okta, Microsoft Entra, Auth0, Google Workspace, generic OIDC, or generic

@@ -152,6 +152,7 @@ say so explicitly rather than marking it done.
 | Phase 2.60 - Diagram LLM evidence capture helper        | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.61 - Diagram LLM drift monitoring gate          | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.62 - Diagram LLM drift alert evidence           | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.63 - Diagram LLM drift alert receiver smoke     | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -603,6 +604,59 @@ Known gaps carried forward:
 - Real proof still requires a live drift event/canary, signed TLS receiver or
   incident-system acceptance, archived receiver-side evidence, owner/on-call
   workflow, retention proof, scheduler integration, and production alert routing.
+
+## Phase 2.63 - Diagram LLM drift alert receiver smoke
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added `scripts/diagram-llm-drift-alert-reference-receiver-smoke.mjs`, a local
+  executable sender/receiver proof for diagram LLM drift alerts.
+- The smoke generates sanitized `live-model` drift evidence, runs the strict drift
+  monitor, signs an alert envelope with HMAC, verifies it through a local
+  reference receiver, archives a sanitized receiver receipt, writes a generated
+  `staging-alert` evidence bundle under `.tmp/`, and validates it with
+  `scripts/diagram-llm-drift-alert-evidence-check.mjs --require-staging-alert`.
+- Tightened the alert evidence checker so strict staging evidence now requires
+  `signatureSha256`, `deliveryEnvelopeSha256`, and `receiverReceiptSha256`.
+- Added `npm run diagram:llm-corpus:drift:alert:smoke` to the aggregate
+  `npm run check` floor and wired it into release/progress verification.
+- Updated README, `docs/HOW-TO-USE.md`, `docs/PROVIDER-CREDENTIALS.md`,
+  `docs/ARCHITECTURE.md`, release checklist, the full-progress ledger, and the
+  production-readiness report.
+
+Verification performed:
+
+- `node --check scripts/diagram-llm-drift-alert-reference-receiver-smoke.mjs`
+  passed.
+- `node --check scripts/diagram-llm-drift-alert-evidence-check.mjs` passed.
+- `node scripts/diagram-llm-drift-alert-reference-receiver-smoke.mjs --captured-at 2026-07-09T00:00:00.000Z --json`
+  passed with `verifiedLiveModelDrift=true`, `mismatchCount=1`,
+  `receiverAccepted=true`, `receiverStatusCode=202`, and
+  `verifiedStagingAlert=true`.
+- `npm run format:check`, `npm run release:check`, and `npm run progress:verify`
+  passed; progress verification now reports `359` phase evidence anchors.
+- Full `npm run check` passed with the reference receiver smoke in the aggregate
+  floor. The run included API unit `59` suites / `494` tests, web unit `11`
+  suites / `149` tests, graph validation `356` nodes / `356` edges, pricing
+  coverage `36` frontend families, progress verification `359` anchors, release
+  readiness, handover, DevOps/cloud/provider-credential gates, and invoice/
+  Terraform/VSDX/LLM/enterprise-IdP/provider-invoice evidence smokes. Expected
+  caveats remained: invoice artifact scanner local smoke skipped live local TCP
+  binding when the sandbox blocked it, `impeccable` is skipped on the repo's Node
+  20 target, live Postgres migrations were skipped because the local Postgres
+  container was not running, the diagram LLM provider check reports the
+  endpoint/model are not configured in local mode, and the default local env still
+  warns that invoice-artifacts are demo/local without live object-storage/KMS/
+  scanner/WORM settings.
+
+Known gaps carried forward:
+
+- This is a local reference receiver smoke, not a deployed production incident
+  receiver, external incident-system integration, scheduler, or receiver-side
+  retention proof from a managed staging/production environment.
 
 ## Phase V3.6 - Terraform validation evidence
 

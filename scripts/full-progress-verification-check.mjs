@@ -113,6 +113,7 @@ async function assertPhaseEvidenceAnchors() {
     'npm run diagram:llm-corpus:capture:smoke',
     'npm run diagram:llm-corpus:drift:check',
     'npm run diagram:llm-corpus:drift:alert:check',
+    'npm run diagram:llm-corpus:drift:alert:smoke',
     'npm run enterprise:idp:evidence:check',
   ]);
   assertScriptIncludes(packageJson, 'ci:unit', [
@@ -453,7 +454,24 @@ async function assertPhaseEvidenceAnchors() {
     ['diagram LLM drift alert check schema', 'polycost-diagram-llm-drift-alert-evidence-check/v1'],
     ['staging alert strict option', '--require-staging-alert'],
     ['receiver acceptance guard', 'receiverAccepted'],
+    ['signature digest guard', 'signatureSha256'],
+    ['receiver receipt digest guard', 'receiverReceiptSha256'],
     ['raw prompt payload guard', 'findForbiddenRawPayloads'],
+  ]);
+
+  await assertFileContains('scripts/diagram-llm-drift-alert-reference-receiver-smoke.mjs', [
+    [
+      'diagram LLM drift alert reference receiver schema',
+      'polycost-diagram-llm-drift-alert-reference-receiver/v1',
+    ],
+    [
+      'diagram LLM drift alert smoke schema',
+      'polycost-diagram-llm-drift-alert-reference-receiver-smoke/v1',
+    ],
+    ['live drift checker handoff', 'diagram-llm-corpus-drift-check.mjs'],
+    ['strict alert checker handoff', 'diagram-llm-drift-alert-evidence-check.mjs'],
+    ['HMAC signature evidence', 'hmacSha256'],
+    ['receiver receipt evidence', 'receiverReceiptSha256'],
   ]);
 
   await assertFileContains('scripts/enterprise-idp-pilot-evidence-check.mjs', [
@@ -609,7 +627,9 @@ async function assertPhaseEvidenceAnchors() {
   await assertFileContains('docs/architecture/phase-2-diagram-llm-drift-alert-evidence.md', [
     ['diagram LLM drift alert architecture note', 'Phase 2 Diagram LLM Drift Alert Evidence'],
     ['diagram LLM drift alert command', 'npm run diagram:llm-corpus:drift:alert:check'],
+    ['diagram LLM drift alert smoke command', 'npm run diagram:llm-corpus:drift:alert:smoke'],
     ['staging alert strict mode', '--require-staging-alert'],
+    ['reference receiver smoke boundary', 'local reference receiver smoke'],
     ['receiver retention boundary', 'receiver-side retention proof'],
   ]);
 
@@ -657,6 +677,7 @@ async function assertPhaseEvidenceAnchors() {
     ['diagram LLM capture smoke ledger', 'npm run diagram:llm-corpus:capture:smoke'],
     ['diagram LLM drift checker ledger', 'npm run diagram:llm-corpus:drift:check'],
     ['diagram LLM drift alert checker ledger', 'npm run diagram:llm-corpus:drift:alert:check'],
+    ['diagram LLM drift alert smoke ledger', 'npm run diagram:llm-corpus:drift:alert:smoke'],
     ['enterprise IdP pilot checker ledger', 'npm run enterprise:idp:evidence:check'],
     ['invoice-of-record pilot checker ledger', 'npm run invoice:record:evidence:check'],
     ['Terraform destination capture checker ledger', 'npm run terraform:evidence:capture:smoke'],

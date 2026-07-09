@@ -200,6 +200,11 @@ Evidence:
 - Drift alert handoff evidence now has a runnable contract through
   `npm run diagram:llm-corpus:drift:alert:check`, with strict staging mode for
   signed/TLS receiver acceptance and reviewer handoff proof.
+- Drift alert sender/receiver evidence now has a local reference proof through
+  `npm run diagram:llm-corpus:drift:alert:smoke`, which generates sanitized
+  live-model drift evidence, signs an alert envelope, verifies it through a local
+  receiver, archives the receipt, and validates the generated `staging-alert`
+  bundle.
 - `apps/api/src/reports/report-generators.spec.ts` proves classification evidence
   strings travel into exported report sections.
 - `PROGRESS.md` records the current fixture corpus tier table, including VSDX
@@ -224,7 +229,9 @@ Deferred:
   must also use `npm run diagram:llm-corpus:drift:check -- --require-live-model`
   with a reviewed false-positive register, plus
   `npm run diagram:llm-corpus:drift:alert:check -- --require-staging-alert` for
-  owner/reviewer routing evidence.
+  owner/reviewer routing evidence. The local
+  `npm run diagram:llm-corpus:drift:alert:smoke` proof does not replace a real
+  deployed receiver or external incident-system proof.
 
 ## Phase V3 - Terraform Generation
 
