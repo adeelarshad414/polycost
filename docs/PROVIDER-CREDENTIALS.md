@@ -420,6 +420,22 @@ Use `npm run pricing:catalog:snapshot:smoke` for local provider catalog snapshot
 comparison evidence, and
 `npm run pricing:catalog:snapshot:check -- --require-live-provider <bundle.json>`
 after archiving sanitized live AWS/Azure/GCP catalog snapshot evidence.
+Use `npm run pricing:catalog:snapshot:capture:plan` to inspect the live capture
+requirements without provider calls. To generate sanitized live provider evidence,
+run the guarded operator-side capture command:
+
+```bash
+POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true \
+  npm run pricing:catalog:snapshot:capture -- \
+  --live \
+  --operator "<reviewer-name>" \
+  --previous-evidence <prior-live-provider-bundle.json>
+```
+
+AWS and Azure catalog capture use public read-only endpoints. GCP capture requires
+`GCP_CLOUD_BILLING_ACCESS_TOKEN`, `GCP_CLOUD_BILLING_ACCESS_TOKEN_FILE`, or Vault
+`secret/polycost/providers/gcp access_token`. The generated evidence must not
+contain raw provider payloads, bearer tokens, signed URLs, or credentials.
 
 The checked-in example can be validated with `npm run invoice:record:evidence:check`
 for schema coverage only. It is not provider invoice proof and does not make

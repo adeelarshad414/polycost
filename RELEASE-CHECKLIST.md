@@ -68,7 +68,8 @@ Complete this checklist before changing the GitHub repository visibility from pr
   SKU traceability.
 - Confirm provider catalog snapshot comparison proof passes with
   `npm run pricing:catalog:snapshot:smoke` before claiming pricing refresh
-  snapshot traceability, and use
+  snapshot traceability. Run `npm run pricing:catalog:snapshot:capture:plan` to
+  review guarded live capture prerequisites, and use
   `npm run pricing:catalog:snapshot:check -- --require-live-provider <bundle.json>`
   before claiming live provider snapshot proof.
 - Confirm destination Terraform evidence can be assembled from runner artifacts with
@@ -113,6 +114,7 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Run `npm run invoice:record:pricing-lineage:smoke`.
 - Run `npm run pricing:catalog:snapshot:check`.
 - Run `npm run pricing:catalog:snapshot:smoke`.
+- Run `npm run pricing:catalog:snapshot:capture:plan`.
 - Run `npm run release:check`.
 - Run `npm run loading:check`.
 - Run `npm run handover:check`.

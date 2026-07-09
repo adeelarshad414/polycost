@@ -155,6 +155,7 @@ say so explicitly rather than marking it done.
 | Phase 2.63 - Diagram LLM drift alert receiver smoke     | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.64 - Invoice pricing lineage evidence smoke     | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.65 - Pricing catalog snapshot evidence          | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.66 - Live catalog snapshot capture guard        | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -774,6 +775,65 @@ Known gaps carried forward:
 - Even live catalog snapshot proof remains catalog-list-price evidence, not
   invoice-grade billing, private discounts, tax/legal validation, credits,
   marketplace/support charges, or provider invoice-of-record reconciliation.
+
+## Phase 2.66 - Live catalog snapshot capture guard
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added `scripts/pricing-catalog-live-snapshot-capture.mjs`, an operator-side
+  capture command for sanitized live AWS/Azure/GCP pricing catalog snapshot
+  evidence.
+- Added `npm run pricing:catalog:snapshot:capture` for real capture and
+  `npm run pricing:catalog:snapshot:capture:plan` for CI-safe plan verification.
+- Live mode is gated by `POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true`, a real
+  `--operator`, and `--previous-evidence` that already passes
+  `--require-live-provider`; first-run evidence cannot be mislabeled as exact
+  row-change proof.
+- The capture command reads AWS Price List and Azure Retail Prices public
+  catalogs, requires GCP Cloud Billing read credentials through an access-token
+  env var/file or Vault, and writes only sanitized row samples, hashes, source
+  record keys, and public endpoint references.
+- Wired the plan command into `npm run check`, `npm run release:check`, and
+  `npm run progress:verify` so the live capture surface remains discoverable and
+  drift-guarded without making CI depend on provider networks or credentials.
+- Updated README, operator credential docs, release checklist, architecture notes,
+  full-progress ledger, and the production-readiness report.
+
+Verification performed:
+
+- `node --check scripts/pricing-catalog-live-snapshot-capture.mjs` passed.
+- `npm run pricing:catalog:snapshot:capture:plan -- --json` passed and reported
+  AWS, Azure, and GCP read-only provider plans with the live guard and previous
+  evidence requirement.
+- `npm run pricing:catalog:snapshot:check -- --require-live-provider docs/operations/evidence/pricing-catalog-snapshot/pricing-catalog-snapshot.example.json --json`
+  failed as intended because the checked-in sample is not live-provider evidence.
+- `npm run release:check` and `npm run progress:verify` passed with the new plan
+  gate anchored.
+- Full `npm run check` passed with API unit `59` suites / `494` tests, web unit
+  `11` suites / `149` tests, graph validation `358` nodes / `358` edges, pricing
+  coverage `36` frontend families, progress verification `400` anchors, and the
+  live catalog snapshot capture plan in the aggregate floor. Expected caveats
+  remained: invoice artifact scanner local smoke skipped live local TCP binding
+  when the sandbox blocked it, `impeccable` is skipped on the repo's Node 20
+  target, live Postgres migrations were skipped because the local Postgres
+  container was not running, the diagram LLM provider check reports the
+  endpoint/model are not configured in local mode, and the default local env still
+  warns that invoice-artifacts are demo/local without live object-storage/KMS/
+  scanner/WORM settings.
+
+Known gaps carried forward:
+
+- This adds the guarded operator-side live capture path, not managed server-side
+  cloud credential storage or scheduled production ETL execution.
+- A real `verifiedLiveProviderSnapshot=true` bundle still requires operator
+  network access, GCP Cloud Billing read credentials, a prior live evidence
+  bundle, and archived sanitized output from the live capture command.
+- Even verified live catalog snapshots remain catalog list-price evidence, not
+  invoice-grade billing, private discounts, taxes, credits, support, marketplace,
+  or provider invoice-of-record proof.
 
 ## Phase V3.6 - Terraform validation evidence
 

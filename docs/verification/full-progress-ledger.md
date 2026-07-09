@@ -86,6 +86,11 @@ Evidence:
 - Provider catalog snapshot evidence now has a runnable contract through
   `npm run pricing:catalog:snapshot:check`, plus local AWS/Azure/GCP exact
   row-change proof through `npm run pricing:catalog:snapshot:smoke`.
+- Live provider catalog snapshot capture now has a guarded operator-side plan
+  through `npm run pricing:catalog:snapshot:capture:plan`; real capture requires
+  `POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true`, a reviewer operator, previous
+  live evidence, and GCP Cloud Billing read credentials before
+  `--require-live-provider` can pass.
 - `docs/PROVIDER-CREDENTIALS.md` states the current production swap procedure and
   explicitly limits real provider mode to catalog list prices, not invoices.
 

@@ -109,6 +109,7 @@ async function assertPhaseEvidenceAnchors() {
     'npm run invoice:record:pricing-lineage:smoke',
     'npm run pricing:catalog:snapshot:check',
     'npm run pricing:catalog:snapshot:smoke',
+    'npm run pricing:catalog:snapshot:capture:plan',
     'npm run terraform:evidence:check',
     'npm run terraform:evidence:capture:smoke',
     'npm run vsdx:visual-evidence:check',
@@ -404,6 +405,14 @@ async function assertPhaseEvidenceAnchors() {
     ['pricing catalog evidence schema', 'polycost-pricing-catalog-snapshot-evidence/v1'],
     ['strict snapshot checker handoff', 'pricing-catalog-snapshot-evidence-check.mjs'],
     ['changed row proof', 'priceChangedSkuCount'],
+  ]);
+
+  await assertFileContains('scripts/pricing-catalog-live-snapshot-capture.mjs', [
+    ['pricing catalog live capture schema', 'polycost-pricing-catalog-live-snapshot-capture/v1'],
+    ['live snapshot evidence schema', 'polycost-pricing-catalog-snapshot-evidence/v1'],
+    ['live guard env', 'POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE'],
+    ['previous evidence requirement', '--previous-evidence'],
+    ['strict live checker handoff', '--require-live-provider'],
   ]);
 
   await assertFileContains(

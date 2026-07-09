@@ -25,8 +25,29 @@ then validates the generated bundle with:
 npm run pricing:catalog:snapshot:check -- --require-provider-snapshot <evidence.json>
 ```
 
-For live provider proof, archive a sanitized bundle produced from real AWS Price
-List, Azure Retail Prices, and GCP Cloud Billing Catalog refreshes and run:
+Review the live capture plan without network calls:
+
+```bash
+npm run pricing:catalog:snapshot:capture:plan
+```
+
+For live provider proof, run the guarded operator-side capture command from a
+read-only provider environment:
+
+```bash
+POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true \
+  npm run pricing:catalog:snapshot:capture -- \
+  --live \
+  --operator "<reviewer-name>" \
+  --previous-evidence <prior-live-provider-bundle.json>
+```
+
+Live capture requires prior live evidence so first-run captures cannot be
+misrepresented as exact row-change proof. The command reads public AWS Price List
+and Azure Retail Prices endpoints, uses a GCP Cloud Billing read token from env,
+token file, or Vault, and archives only sanitized hashes, source record keys,
+public endpoint references, and representative rows. It then validates the output
+through:
 
 ```bash
 npm run pricing:catalog:snapshot:check -- --require-live-provider <evidence.json>
