@@ -110,6 +110,7 @@ async function assertPhaseEvidenceAnchors() {
     'npm run terraform:evidence:capture:smoke',
     'npm run vsdx:visual-evidence:check',
     'npm run diagram:llm-corpus:check',
+    'npm run diagram:llm-corpus:capture:smoke',
     'npm run enterprise:idp:evidence:check',
   ]);
   assertScriptIncludes(packageJson, 'ci:unit', [
@@ -429,6 +430,14 @@ async function assertPhaseEvidenceAnchors() {
     ['service-type accuracy metric', 'serviceTypeAccuracy'],
   ]);
 
+  await assertFileContains('scripts/diagram-llm-corpus-evidence-capture.mjs', [
+    ['diagram LLM capture schema', 'polycost-diagram-llm-corpus-evidence-capture/v1'],
+    ['diagram LLM evidence schema', 'polycost-diagram-llm-corpus-evidence/v1'],
+    ['require live model mode', '--require-live-model'],
+    ['downstream checker handoff', 'diagram-llm-corpus-check.mjs'],
+    ['raw prompt payload guard', 'findForbiddenRawPayloads'],
+  ]);
+
   await assertFileContains('scripts/enterprise-idp-pilot-evidence-check.mjs', [
     ['enterprise IdP evidence schema', 'polycost-enterprise-idp-pilot-evidence/v1'],
     ['enterprise IdP check schema', 'polycost-enterprise-idp-pilot-evidence-check/v1'],
@@ -482,6 +491,25 @@ async function assertPhaseEvidenceAnchors() {
     ['live model caveat', 'evidenceLevel=live-model'],
   ]);
 
+  await assertFileContains(
+    'docs/operations/evidence/diagram-llm-corpus-capture/diagram-llm-corpus-capture.example.json',
+    [
+      ['diagram LLM capture profile schema', 'polycost-diagram-llm-corpus-evidence-capture/v1'],
+      ['sample-only evidence level', 'example-schema'],
+      ['prediction artifact path', 'predictions.example.json'],
+      ['raw prompt exclusion', '"rawPromptsExcluded": true'],
+    ],
+  );
+
+  await assertFileContains(
+    'docs/operations/evidence/diagram-llm-corpus-capture/predictions.example.json',
+    [
+      ['diagram LLM capture prediction case', '"id": "compute-web-tier"'],
+      ['service-type prediction evidence', '"serviceType": "container-registry"'],
+      ['high confidence prediction evidence', '"confidence": "high"'],
+    ],
+  );
+
   await assertFileContains('docs/operations/evidence/enterprise-idp-pilot-evidence.example.json', [
     ['enterprise IdP evidence schema', 'polycost-enterprise-idp-pilot-evidence/v1'],
     ['sample-only evidence level', 'example-schema'],
@@ -521,6 +549,14 @@ async function assertPhaseEvidenceAnchors() {
     ['diagram LLM corpus command', 'npm run diagram:llm-corpus:check'],
     ['live model strict mode', '--require-live-model'],
     ['sample evidence distinction', 'example-schema'],
+  ]);
+
+  await assertFileContains('docs/architecture/phase-2-diagram-llm-corpus-evidence-capture.md', [
+    ['diagram LLM capture architecture note', 'Phase 2 Diagram LLM Corpus Evidence Capture'],
+    ['diagram LLM capture smoke command', 'npm run diagram:llm-corpus:capture:smoke'],
+    ['diagram LLM capture command', 'npm run diagram:llm-corpus:capture'],
+    ['live model strict mode', '--require-live-model'],
+    ['no endpoint call boundary', 'does not call the model endpoint'],
   ]);
 
   await assertFileContains('docs/architecture/phase-2-enterprise-idp-pilot-evidence.md', [
@@ -564,6 +600,7 @@ async function assertPhaseEvidenceAnchors() {
     ['VSDX visual rendering deferred ledger', 'not full Visio visual rendering'],
     ['VSDX visual evidence checker ledger', 'npm run vsdx:visual-evidence:check'],
     ['diagram LLM corpus checker ledger', 'npm run diagram:llm-corpus:check'],
+    ['diagram LLM capture smoke ledger', 'npm run diagram:llm-corpus:capture:smoke'],
     ['enterprise IdP pilot checker ledger', 'npm run enterprise:idp:evidence:check'],
     ['invoice-of-record pilot checker ledger', 'npm run invoice:record:evidence:check'],
     ['Terraform destination capture checker ledger', 'npm run terraform:evidence:capture:smoke'],

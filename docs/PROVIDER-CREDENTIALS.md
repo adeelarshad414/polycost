@@ -37,10 +37,11 @@ artifact without reading secrets or calling cloud APIs. Treat it as
 | Enterprise IdP pilot      | Only when running managed IdP evidence   | SSO provider metadata, redirect URIs, SCIM base URL, `VAULT_ADDR`, `VAULT_TOKEN_FILE`               | `secret/polycost/auth/oidc` or `secret/polycost/auth/saml` | Store client secrets/private keys in Vault only; evidence bundles contain digests and redacted proof. |
 
 Before claiming production diagram-classifier quality, archive a sanitized corpus
-evaluation bundle and run
-`npm run diagram:llm-corpus:check -- --require-live-model <bundle.json>`. The
-checked-in example validates the evidence format only; it does not prove live
-model quality.
+prediction artifact, assemble a standard evidence bundle with
+`npm run diagram:llm-corpus:capture -- --require-live-model --profile <profile.json> --output <bundle.json>`,
+then run `npm run diagram:llm-corpus:check -- --require-live-model <bundle.json>`.
+The checked-in capture and evidence examples validate the format only; they do not
+prove live model quality.
 
 Before claiming managed enterprise IdP readiness, run a customer-specific pilot
 against Okta, Microsoft Entra, Auth0, Google Workspace, generic OIDC, or generic

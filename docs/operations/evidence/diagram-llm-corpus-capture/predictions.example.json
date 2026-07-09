@@ -1,0 +1,86 @@
+[
+  {
+    "id": "compute-web-tier",
+    "serviceCategory": "compute",
+    "serviceType": "vm-compute",
+    "confidence": "high",
+    "reason": "sample prediction matches compute instance workload language"
+  },
+  {
+    "id": "container-orchestrator",
+    "serviceCategory": "containers",
+    "serviceType": "kubernetes",
+    "confidence": "high",
+    "reason": "sample prediction maps managed Kubernetes cluster to Kubernetes"
+  },
+  {
+    "id": "serverless-worker",
+    "serviceCategory": "application",
+    "serviceType": "serverless-function",
+    "confidence": "high",
+    "reason": "sample prediction maps event triggered functions to serverless function"
+  },
+  {
+    "id": "object-archive",
+    "serviceCategory": "storage",
+    "serviceType": "object-storage",
+    "confidence": "high",
+    "reason": "sample prediction maps archive bucket to object storage"
+  },
+  {
+    "id": "managed-postgres",
+    "serviceCategory": "database",
+    "serviceType": "managed-postgres",
+    "confidence": "high",
+    "reason": "sample prediction maps PostgreSQL primary and standby to managed Postgres"
+  },
+  {
+    "id": "global-cdn",
+    "serviceCategory": "networking",
+    "serviceType": "cdn",
+    "confidence": "high",
+    "reason": "sample prediction maps edge cache to CDN"
+  },
+  {
+    "id": "async-queue",
+    "serviceCategory": "integration",
+    "serviceType": "queue-or-event-bus",
+    "confidence": "high",
+    "reason": "sample prediction maps asynchronous handoff to queue or event bus"
+  },
+  {
+    "id": "stream-analytics",
+    "serviceCategory": "analytics",
+    "serviceType": "streaming",
+    "confidence": "high",
+    "reason": "sample prediction maps clickstream ingestion to streaming analytics"
+  },
+  {
+    "id": "genai-embedding",
+    "serviceCategory": "ai",
+    "serviceType": "generative-ai",
+    "confidence": "high",
+    "reason": "sample prediction maps embeddings and generative answers to generative AI"
+  },
+  {
+    "id": "security-waf",
+    "serviceCategory": "security",
+    "serviceType": "waf",
+    "confidence": "high",
+    "reason": "sample prediction maps web application firewall to WAF"
+  },
+  {
+    "id": "observability",
+    "serviceCategory": "operations",
+    "serviceType": "monitoring",
+    "confidence": "high",
+    "reason": "sample prediction maps logs metrics and alerts to monitoring"
+  },
+  {
+    "id": "container-registry",
+    "serviceCategory": "devops",
+    "serviceType": "container-registry",
+    "confidence": "high",
+    "reason": "sample prediction maps OCI image registry to container registry"
+  }
+]

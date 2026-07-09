@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "polycost-diagram-llm-corpus-evidence-capture/v1",
+  "bundleName": "tier-3-diagram-classifier-capture-example",
+  "evidenceLevel": "example-schema",
+  "productionClaim": false,
+  "evaluatedAt": "2026-07-09T00:00:00.000Z",
+  "paths": {
+    "predictions": "predictions.example.json"
+  },
+  "modelEvidence": {
+    "providerCompatibility": "fixture",
+    "modelRef": "example-only",
+    "endpointConfigured": false,
+    "vaultSecretVerified": false,
+    "secretPath": "secret/polycost/llm"
+  },
+  "run": {
+    "mode": "fixture-evidence",
+    "schemaValidated": true,
+    "rawPromptsExcluded": true,
+    "rawResponsesExcluded": true,
+    "predictionSource": "sanitized-example"
+  },
+  "operatorAttestations": {
+    "productionEndpointReviewed": false,
+    "rawSecretsExcluded": true,
+    "productionClaimedByPolyCost": false,
+    "operator": "example-only"
+  },
+  "caveats": [
+    "This is sanitized sample capture evidence for CI/schema validation only.",
+    "A real production capture must use evidenceLevel=live-model after running the corpus against a configured endpoint/model and Vault-backed api_key.",
+    "Raw prompts, raw provider responses, API keys, and authorization headers must stay out of capture profiles and evidence bundles."
+  ]
+}

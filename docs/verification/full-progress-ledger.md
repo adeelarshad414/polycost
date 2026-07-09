@@ -190,6 +190,10 @@ Evidence:
   `npm run diagram:llm-corpus:check`, backed by
   `fixtures/diagrams/llm-corpus/diagram-llm-corpus.v1.json` and strict
   `--require-live-model` mode for production endpoint/model evidence.
+- Production-model evidence can now be assembled through
+  `npm run diagram:llm-corpus:capture`, with
+  `npm run diagram:llm-corpus:capture:smoke` proving the checked-in capture
+  contract and downstream checker handoff.
 - `apps/api/src/reports/report-generators.spec.ts` proves classification evidence
   strings travel into exported report sections.
 - `PROGRESS.md` records the current fixture corpus tier table, including VSDX
@@ -207,8 +211,10 @@ Deferred:
   future scope.
 - Production LLM accuracy depends on the operator configuring a real endpoint/model
   and Vault API key, then evaluating the chosen model against a production corpus.
-  The checked-in corpus evidence is `example-schema` only; live quality proof must
-  use `evidenceLevel=live-model` and `npm run diagram:llm-corpus:check -- --require-live-model`.
+  The checked-in corpus evidence and capture profile are `example-schema` only;
+  live quality proof must use `evidenceLevel=live-model`,
+  `npm run diagram:llm-corpus:capture -- --require-live-model`, and
+  `npm run diagram:llm-corpus:check -- --require-live-model`.
 
 ## Phase V3 - Terraform Generation
 

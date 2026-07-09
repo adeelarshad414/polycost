@@ -46,8 +46,9 @@ Complete this checklist before changing the GitHub repository visibility from pr
   `npm run vsdx:visual-evidence:check -- --require-human-review <bundle.json>`
   before claiming reviewed VSDX visual proof.
 - Confirm production diagram-classifier evidence is archived with
-  `npm run diagram:llm-corpus:check -- --require-live-model <bundle.json>` before
-  claiming production LLM quality.
+  `npm run diagram:llm-corpus:capture -- --require-live-model --profile <profile.json> --output <bundle.json>`
+  and validated with `npm run diagram:llm-corpus:check -- --require-live-model <bundle.json>`
+  before claiming production LLM quality.
 - Confirm managed enterprise IdP pilot evidence is archived with
   `npm run enterprise:idp:evidence:check -- --require-managed-idp <bundle.json>`
   before claiming Okta/Entra/Auth0/Google Workspace SSO plus SCIM pilot readiness.
@@ -86,6 +87,7 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Run `npm run invoice:evidence:notary:receiver:smoke`.
 - Run `npm run terraform:evidence:capture:smoke`.
 - Run `npm run vsdx:visual-evidence:check`.
+- Run `npm run diagram:llm-corpus:capture:smoke`.
 - Run `npm run diagram:llm-corpus:check`.
 - Run `npm run enterprise:idp:evidence:check`.
 - Run `npm run invoice:record:evidence:check`.
