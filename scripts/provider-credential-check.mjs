@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 
-const strict = process.argv.includes('--strict');
+const args = parseArgs(process.argv.slice(2));
+const strict = args.strict;
 const useMockProviders = envBoolean('USE_MOCK_PROVIDERS', true);
 const vaultAddr = process.env.VAULT_ADDR;
 const vaultTokenFile = process.env.VAULT_TOKEN_FILE;
@@ -48,16 +49,60 @@ if (diagramClassifierConfigured) {
 
 results.push(await checkInvoiceArtifactControls());
 
-for (const result of results) {
-  const marker = result.status === 'pass' ? 'PASS' : result.status === 'warn' ? 'WARN' : 'FAIL';
-  console.log(`[${marker}] ${result.provider}: ${result.message}`);
-}
-
 const failures = results.filter((result) => result.status === 'fail');
 const warnings = results.filter((result) => result.status === 'warn');
+const summary = {
+  ok: failures.length === 0 && (!strict || warnings.length === 0),
+  schemaVersion: 'polycost-provider-credential-check/v1',
+  strict,
+  useMockProviders,
+  checkedAt: new Date().toISOString(),
+  resultCount: results.length,
+  passCount: results.filter((result) => result.status === 'pass').length,
+  warnCount: warnings.length,
+  failCount: failures.length,
+  results,
+};
 
-if (failures.length > 0 || (strict && warnings.length > 0)) {
+if (args.json) {
+  console.log(JSON.stringify(summary, null, 2));
+} else if (!args.quiet) {
+  for (const result of results) {
+    const marker = result.status === 'pass' ? 'PASS' : result.status === 'warn' ? 'WARN' : 'FAIL';
+    console.log(`[${marker}] ${result.provider}: ${result.message}`);
+  }
+}
+
+if (!summary.ok) {
   process.exit(1);
+}
+
+function parseArgs(argv) {
+  const parsed = {
+    strict: false,
+    json: false,
+    quiet: false,
+  };
+
+  for (const arg of argv) {
+    if (arg === '--strict') {
+      parsed.strict = true;
+      continue;
+    }
+    if (arg === '--json') {
+      parsed.json = true;
+      continue;
+    }
+    if (arg === '--quiet') {
+      parsed.quiet = true;
+      continue;
+    }
+
+    console.error(`Unknown provider credential check argument: ${arg}`);
+    process.exit(1);
+  }
+
+  return parsed;
 }
 
 async function checkGcpVaultCredential() {

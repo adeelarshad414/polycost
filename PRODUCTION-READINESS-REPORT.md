@@ -88,6 +88,7 @@ performance/accessibility/best-practices/SEO metrics.
 | INV-TRACE-029  | Improved      | Provider retention proof capture can now run optional read-only AWS/Azure/GCP CLI commands from an operator-authenticated shell with dry-run, no-shell argument arrays, signed URI rejection, verifier handoff, and release-gated smoke coverage        |
 | INV-TRACE-030  | Improved      | Invoice artifact production-profile checks now validate sanitized external object-storage/KMS/scanner/WORM/receipt/audit evidence bundles, proof digest consistency, secret-reference-only posture, and offline provider proof verification             |
 | INV-TRACE-031  | Improved      | Invoice artifact staging rehearsal now packages profile, strict provider credential, scanner webhook, notary webhook, and audit-export checks into plan/live modes, with scanner HMAC canary proof and local strict-bind smoke evidence                 |
+| INV-TRACE-032  | Improved      | Live rehearsal outputs now have a machine-verifiable evidence bundle contract, provider credential JSON output, sample-only schema proof, raw-secret guards, and a `--require-live` gate for target-environment attestation                             |
 | VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                                                                                             |
 | VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                                                                                             |
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                                                                                        |
@@ -148,6 +149,22 @@ Local static/regression gates:
     / `149` tests, graph validation `330` nodes / `330` edges, pricing coverage
     `36` frontend families, progress verification `189` anchors, and the new
     invoice artifact rehearsal gates in the aggregate floor.
+- Phase 2.55 rehearsal evidence bundle verification gates passed:
+  - `node --check` passed for the provider credential checker, evidence bundle
+    checker, and staging rehearsal script.
+  - `npm run provider:credentials:check -- --json` passed with the new
+    `polycost-provider-credential-check/v1` output and the expected non-strict
+    local/demo invoice-artifacts warning.
+  - `npm run invoice:artifact-rehearsal:evidence:check -- --json` passed against
+    the sanitized `example-schema` bundle with live evidence still required.
+  - `npm run invoice:artifact-rehearsal:evidence:check -- --require-live --json`
+    failed as intended for the sample bundle because it is not live target evidence.
+  - `npm run release:check` passed and `npm run progress:verify` passed with `203`
+    anchors.
+  - Full `npm run check` passed with API `59` suites / `494` tests, web `11` suites
+    / `149` tests, graph validation `331` nodes / `331` edges, pricing coverage
+    `36` frontend families, progress verification `203` anchors, and the new
+    evidence bundle gate in the aggregate floor.
 - Phase 2.19 invoice adjustment evidence focused gates passed:
   - API focused: `src/api/auth-billing.spec.ts`: 1 suite / 23 tests.
   - Web focused: `src/App.spec.tsx`: 1 suite / 60 tests.

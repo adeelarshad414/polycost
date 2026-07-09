@@ -1,0 +1,164 @@
+{
+  "schemaVersion": "polycost-invoice-artifact-rehearsal-evidence/v1",
+  "bundleName": "aws-s3-object-lock-staging-rehearsal-example",
+  "evidenceLevel": "example-schema",
+  "productionClaim": false,
+  "environment": "staging",
+  "provider": "aws-s3",
+  "profileName": "aws-s3-object-lock-staging-rehearsal",
+  "profilePath": "docs/operations/invoice-artifact-production-profile.example.json",
+  "capturedAt": "2026-07-09T00:00:00.000Z",
+  "profileCheck": {
+    "ok": true,
+    "schemaVersion": "polycost-invoice-artifact-production-profile-check/v1",
+    "profilePath": "docs/operations/invoice-artifact-production-profile.example.json",
+    "profileName": "aws-s3-object-lock-staging-rehearsal",
+    "provider": "aws-s3",
+    "verificationLevel": "verified(config-evidence)",
+    "productionClaim": false,
+    "runtimeControlCount": 20,
+    "secretReferenceCount": 4,
+    "canaryEvidenceCount": 3,
+    "providerRetentionProofSha256": "8b7487c43ed9df63249134345b238c0d3db7144e1029d818198ad9c6d3436b84",
+    "verifiedConfigEvidence": true,
+    "liveCloudEvidenceRequired": true,
+    "caveats": [
+      "This validates a sanitized production profile and captured proof artifact; it does not read Vault or call cloud provider APIs.",
+      "Run provider:credentials:check:strict in the target environment to prove live Vault/provider access."
+    ],
+    "failures": []
+  },
+  "providerCredentialsStrict": {
+    "ok": true,
+    "schemaVersion": "polycost-provider-credential-check/v1",
+    "strict": true,
+    "useMockProviders": false,
+    "checkedAt": "2026-07-09T00:00:00.000Z",
+    "resultCount": 5,
+    "passCount": 5,
+    "warnCount": 0,
+    "failCount": 0,
+    "results": [
+      {
+        "provider": "aws",
+        "status": "pass",
+        "message": "Current AWS adapter uses public AWS Price List bulk offer files; no account credential is required for default ETL."
+      },
+      {
+        "provider": "azure",
+        "status": "pass",
+        "message": "Azure Retail Prices API is unauthenticated for the current adapter; keep outbound HTTPS enabled."
+      },
+      {
+        "provider": "gcp",
+        "status": "pass",
+        "message": "Vault contains a GCP Cloud Billing access token at secret/polycost/providers/gcp access_token."
+      },
+      {
+        "provider": "diagram-llm",
+        "status": "pass",
+        "message": "Vault contains a diagram/NL parser API key at secret/polycost/llm api_key."
+      },
+      {
+        "provider": "invoice-artifacts",
+        "status": "pass",
+        "message": "External object storage, Vault credentials, KMS reference, webhook scanner, retention enforcement, signed receipts, provider retention proof, and WORM posture are configured."
+      }
+    ]
+  },
+  "providerRetentionProof": {
+    "ok": true,
+    "schemaVersion": "invoice-artifact-provider-retention-proof-verification/v1",
+    "provider": "aws-s3",
+    "file": "docs/operations/evidence/aws-s3-retention-proof.example.json",
+    "byteLength": 142,
+    "proofDigestSha256": "8b7487c43ed9df63249134345b238c0d3db7144e1029d818198ad9c6d3436b84",
+    "proofReference": "s3://polycost-invoice-artifacts-prod/evidence/aws-s3-retention-proof.example.json",
+    "controlPlaneEvidencePresent": true,
+    "immutableRetentionProvedByPolyCost": false,
+    "summary": {
+      "providerEvidenceType": "aws-s3-object-lock",
+      "retentionMode": "COMPLIANCE",
+      "retentionUntil": "2027-07-09T00:00:00.000Z",
+      "legalHold": true
+    },
+    "caveats": [
+      "This verifies a captured provider proof artifact and digest; it does not call the cloud provider control plane itself.",
+      "Legal immutability, retention sufficiency, and chain-of-custody remain operator-owned controls."
+    ],
+    "recommendedRuntimeConfig": {
+      "INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE": "provider-control-plane",
+      "INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_REFERENCE": "s3://polycost-invoice-artifacts-prod/evidence/aws-s3-retention-proof.example.json",
+      "INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_SHA256": "8b7487c43ed9df63249134345b238c0d3db7144e1029d818198ad9c6d3436b84"
+    },
+    "failures": []
+  },
+  "scannerWebhookSmoke": {
+    "status": "pass",
+    "scanner": "example-staging-scanner",
+    "receiver": "https://scanner.polycost.invalid/artifacts",
+    "httpStatus": 202,
+    "runId": "invoice-artifact-scanner-smoke-example",
+    "artifactSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "contentSizeBytes": 82,
+    "findingCount": 0
+  },
+  "notaryWebhookSmoke": {
+    "status": "pass",
+    "receiver": "https://worm.polycost.invalid/evidence-receipts",
+    "httpStatus": 202,
+    "runId": "invoice-evidence-notary-smoke-example",
+    "reconciliationId": "11111111-1111-4111-8111-111111111111",
+    "packetDigestSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "basePayloadDigestSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "responseBytes": 128,
+    "exportedAt": "2026-07-09T00:00:00.000Z"
+  },
+  "auditExportSmoke": {
+    "status": "pass",
+    "receiver": "https://siem.polycost.invalid/audit-events",
+    "httpStatus": 202,
+    "runId": "audit-export-smoke-example",
+    "exportId": "22222222-2222-4222-8222-222222222222",
+    "auditEventId": "33333333-3333-4333-8333-333333333333",
+    "responseBytes": 96,
+    "ranAt": "2026-07-09T00:00:00.000Z"
+  },
+  "canaryArchives": [
+    {
+      "name": "scannerCanary",
+      "archiveReference": "s3://polycost-invoice-artifacts-prod/evidence/scanner-canary.jsonl",
+      "receiptSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "retentionEvidenceReference": "s3://polycost-invoice-artifacts-prod/evidence/scanner-canary-retention-proof.json",
+      "retentionEvidenceSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "archivedAt": "2026-07-09T00:00:00.000Z"
+    },
+    {
+      "name": "notaryReceiverCanary",
+      "archiveReference": "s3://polycost-invoice-artifacts-prod/evidence/notary-receiver-canary.jsonl",
+      "receiptSha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "retentionEvidenceReference": "s3://polycost-invoice-artifacts-prod/evidence/notary-receiver-canary-retention-proof.json",
+      "retentionEvidenceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "archivedAt": "2026-07-09T00:00:00.000Z"
+    },
+    {
+      "name": "auditExportCanary",
+      "archiveReference": "s3://polycost-invoice-artifacts-prod/evidence/audit-export-canary.jsonl",
+      "receiptSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "retentionEvidenceReference": "s3://polycost-invoice-artifacts-prod/evidence/audit-export-canary-retention-proof.json",
+      "retentionEvidenceSha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "archivedAt": "2026-07-09T00:00:00.000Z"
+    }
+  ],
+  "operatorAttestations": {
+    "liveRunExecuted": false,
+    "rawSecretsExcluded": true,
+    "receiverSideRetentionEvidenceArchived": true,
+    "targetEnvironmentAccessControlled": false,
+    "operator": "example-only"
+  },
+  "caveats": [
+    "This is sanitized sample evidence for CI/schema validation only.",
+    "A real bundle must use evidenceLevel=live-target after running the live rehearsal in the target environment."
+  ]
+}

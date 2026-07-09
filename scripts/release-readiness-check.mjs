@@ -36,6 +36,7 @@ const requiredFiles = [
   'docs/CUSTOMER-HANDOVER-LEDGER.md',
   'docs/operations/invoice-artifact-production-profile.example.json',
   'docs/operations/evidence/aws-s3-retention-proof.example.json',
+  'docs/operations/evidence/invoice-artifact-rehearsal-evidence.example.json',
   'handover/HANDOVER-README.md',
   'handover/DESIGN-SYSTEM.md',
   'handover/JOURNEYS.md',
@@ -123,6 +124,9 @@ if (!packageJson.scripts?.['invoice:artifact-rehearsal:plan']) {
 if (!packageJson.scripts?.['invoice:artifact-rehearsal:live']) {
   failures.push('package.json is missing invoice:artifact-rehearsal:live');
 }
+if (!packageJson.scripts?.['invoice:artifact-rehearsal:evidence:check']) {
+  failures.push('package.json is missing invoice:artifact-rehearsal:evidence:check');
+}
 if (!packageJson.scripts?.['pricing:logic:coverage']) {
   failures.push('package.json is missing pricing:logic:coverage');
 }
@@ -191,6 +195,11 @@ if (!packageJson.scripts?.check?.includes('npm run invoice:artifact-profile:chec
 if (!packageJson.scripts?.check?.includes('npm run invoice:artifact-rehearsal:plan')) {
   failures.push('package.json check script must include npm run invoice:artifact-rehearsal:plan');
 }
+if (!packageJson.scripts?.check?.includes('npm run invoice:artifact-rehearsal:evidence:check')) {
+  failures.push(
+    'package.json check script must include npm run invoice:artifact-rehearsal:evidence:check',
+  );
+}
 
 assertScriptIncludes('test:production-readiness', [
   'src/api/finops-proof.spec.ts',
@@ -223,6 +232,10 @@ await assertFileContains('README.md', [
     'npm run invoice:evidence:notary:receiver:smoke',
   ],
   ['provider retention proof capture command', 'npm run invoice:retention-proof:capture'],
+  [
+    'invoice artifact rehearsal evidence checker command',
+    'npm run invoice:artifact-rehearsal:evidence:check',
+  ],
   [
     'catalog list-price honesty',
     'not a billing, invoicing, or live cloud-account spend management system',
@@ -709,6 +722,30 @@ await assertFileContains('scripts/invoice-artifact-staging-rehearsal.mjs', [
   ['secret handling statement', 'raw secrets must stay in Vault/runtime env'],
 ]);
 
+await assertFileContains('scripts/invoice-artifact-rehearsal-evidence-check.mjs', [
+  ['rehearsal evidence bundle schema', 'polycost-invoice-artifact-rehearsal-evidence/v1'],
+  ['rehearsal evidence check schema', 'polycost-invoice-artifact-rehearsal-evidence-check/v1'],
+  ['live evidence required option', '--require-live'],
+  ['sample evidence distinction', 'example-schema'],
+  ['raw secret material guard', 'findSecretMaterial'],
+  ['profile archive reference drift guard', 'archiveReference must match profile evidence'],
+]);
+
+await assertFileContains(
+  'docs/operations/evidence/invoice-artifact-rehearsal-evidence.example.json',
+  [
+    ['rehearsal evidence example schema', 'polycost-invoice-artifact-rehearsal-evidence/v1'],
+    ['sample-only evidence level', 'example-schema'],
+    ['provider credential JSON schema', 'polycost-provider-credential-check/v1'],
+    ['profile check embedded output', 'polycost-invoice-artifact-production-profile-check/v1'],
+    [
+      'provider retention proof embedded output',
+      'invoice-artifact-provider-retention-proof-verification/v1',
+    ],
+    ['sample caveat', 'sanitized sample evidence for CI/schema validation only'],
+  ],
+);
+
 await assertFileContains('docs/operations/invoice-artifact-production-profile.example.json', [
   ['production profile schema', 'polycost-invoice-artifact-production-profile/v1'],
   ['verified config evidence label', 'verified(config-evidence)'],
@@ -764,6 +801,8 @@ await assertFileContains('apps/api/src/api/auth-billing.spec.ts', [
 ]);
 
 await assertFileContains('scripts/provider-credential-check.mjs', [
+  ['provider credential JSON schema', 'polycost-provider-credential-check/v1'],
+  ['provider credential JSON option', '--json'],
   [
     'provider retention proof credential check',
     'provider retention proof is not captured from the provider control plane',
