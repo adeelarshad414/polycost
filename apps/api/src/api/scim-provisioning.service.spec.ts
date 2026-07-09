@@ -78,6 +78,24 @@ describe('ScimProvisioningService', () => {
     expect(repository.createTeamScimToken).not.toHaveBeenCalled();
   });
 
+  it('lists provisioned SCIM users for team owners and admins without exposing bearer tokens', async () => {
+    const repository = repositoryMock();
+    repository.listTeamScimUsers.mockResolvedValue([scimUserRecord()]);
+    const service = new ScimProvisioningService(repository as never);
+
+    await expect(service.listProvisionedUsers(teamId, identity)).resolves.toEqual([
+      expect.objectContaining({
+        userName: 'engineer@example.com',
+        active: true,
+      }),
+    ]);
+    expect(repository.listTeamScimUsers).toHaveBeenCalledWith(teamId);
+
+    await expect(
+      service.listProvisionedUsers(teamId, { ...identity, role: 'member' }),
+    ).rejects.toThrow(ApiForbiddenError);
+  });
+
   it('lists SCIM users through bearer-token authentication with standard list response shape', async () => {
     const repository = repositoryMock();
     repository.resolveTeamScimToken.mockResolvedValue(scimIdentity);

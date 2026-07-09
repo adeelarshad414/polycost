@@ -24,6 +24,12 @@ export class ScimProvisioningController {
     return this.scimProvisioningService.listTokens(teamId, request.auth!);
   }
 
+  @Get('auth/teams/:teamId/scim/users')
+  @UseGuards(SessionAuthGuard)
+  listProvisionedUsers(@Param('teamId') teamId: string, @Req() request: RequestWithAuth) {
+    return this.scimProvisioningService.listProvisionedUsers(teamId, request.auth!);
+  }
+
   @Post('auth/teams/:teamId/scim/tokens')
   @UseGuards(SessionAuthGuard)
   createToken(

@@ -1675,6 +1675,94 @@ describe('api client', () => {
     );
   });
 
+  it('wires SCIM team-admin routes with bearer headers', async () => {
+    const scimToken = {
+      id: 'scim-token-1',
+      teamId: 'team-1',
+      displayName: 'Okta production SCIM',
+      tokenPrefix: 'pc_scim_stage',
+      createdAt: '2026-07-09T00:00:00.000Z',
+      lastUsedAt: '2026-07-09T01:00:00.000Z',
+      expiresAt: '2027-01-01T00:00:00.000Z',
+    };
+    const scimUser = {
+      id: 'scim-user-1',
+      teamId: 'team-1',
+      externalId: 'idp-user-1',
+      accountId: 'account-1',
+      userName: 'engineer@example.com',
+      displayName: 'Platform Engineer',
+      active: true,
+      createdAt: '2026-07-09T00:00:00.000Z',
+      updatedAt: '2026-07-09T01:00:00.000Z',
+    };
+    const createdScimToken = {
+      ...scimToken,
+      id: 'scim-token-2',
+      tokenPrefix: 'pc_scim_created',
+      token: 'pc_scim_created-secret',
+    };
+    const revokedScimToken = {
+      ...scimToken,
+      revokedAt: '2026-07-09T02:00:00.000Z',
+    };
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([scimToken]))
+      .mockResolvedValueOnce(jsonResponse([scimUser]))
+      .mockResolvedValueOnce(jsonResponse(createdScimToken))
+      .mockResolvedValueOnce(jsonResponse(revokedScimToken));
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(client.listTeamScimTokens('team-1', 'session-token')).resolves.toEqual([
+      scimToken,
+    ]);
+    await expect(client.listTeamScimUsers('team-1', 'session-token')).resolves.toEqual([scimUser]);
+    await expect(
+      client.createTeamScimToken(
+        'team-1',
+        { displayName: 'Okta production SCIM' },
+        'session-token',
+      ),
+    ).resolves.toEqual(createdScimToken);
+    await expect(
+      client.revokeTeamScimToken('team-1', 'scim-token-1', 'session-token'),
+    ).resolves.toEqual(revokedScimToken);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'http://api.test/api/v1/auth/teams/team-1/scim/tokens',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer session-token' }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://api.test/api/v1/auth/teams/team-1/scim/users',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer session-token' }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      'http://api.test/api/v1/auth/teams/team-1/scim/tokens',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ displayName: 'Okta production SCIM' }),
+        headers: expect.objectContaining({ Authorization: 'Bearer session-token' }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      'http://api.test/api/v1/auth/teams/team-1/scim/tokens/scim-token-1',
+      expect.objectContaining({
+        method: 'DELETE',
+        headers: expect.objectContaining({ Authorization: 'Bearer session-token' }),
+      }),
+    );
+  });
+
   it('explains plain HTTP failures without exposing raw status copy', async () => {
     global.fetch = jest.fn(async () => jsonResponse({}, 405)) as typeof fetch;
     const client = createPolyCostClient('http://api.test/api/v1');

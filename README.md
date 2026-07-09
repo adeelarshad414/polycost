@@ -217,9 +217,10 @@ Accounts add workspace controls on top of that core flow:
   `/api/v1/auth/teams/:teamId/scim/tokens`, while SCIM clients can list, create,
   replace, patch-active, and deactivate users through `/api/v1/scim/v2/Users`.
   The API stores only token hashes and display prefixes, records provisioning audit
-  events, and attaches active SCIM users as workspace members. This is an
-  integration foundation, not formal SCIM certification or a complete hosted IAM
-  suite.
+  events, and attaches active SCIM users as workspace members. The workspace Team
+  access panel shows active token/user posture, token metadata, provisioned users,
+  one-time token creation, and token revocation. This is an integration foundation,
+  not formal SCIM certification or a complete hosted IAM suite.
 - Three-role RBAC: Owner, Admin, and Member. Owners manage role changes; owners and
   admins manage members, invitations, SSO provider configuration, and billing import
   workflows; members keep comparison and report access.

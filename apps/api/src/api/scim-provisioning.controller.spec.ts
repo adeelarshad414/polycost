@@ -26,6 +26,7 @@ describe('ScimProvisioningController', () => {
     const body = { userName: 'engineer@example.com' };
 
     expect(controller.listTokens('team-1', request)).toBe('tokens');
+    expect(controller.listProvisionedUsers('team-1', request)).toBe('provisioned-users');
     expect(controller.createToken('team-1', body, request)).toBe('create-token');
     expect(controller.revokeToken('team-1', 'token-1', request)).toBe('revoke-token');
     expect(controller.serviceProviderConfig(request)).toBe('service-provider-config');
@@ -37,6 +38,7 @@ describe('ScimProvisioningController', () => {
     expect(controller.deactivateUser('user-1', request)).toBe('deactivate-user');
 
     expect(service.listTokens).toHaveBeenCalledWith('team-1', identity);
+    expect(service.listProvisionedUsers).toHaveBeenCalledWith('team-1', identity);
     expect(service.createToken).toHaveBeenCalledWith('team-1', body, identity);
     expect(service.revokeToken).toHaveBeenCalledWith('team-1', 'token-1', identity);
     expect(service.createUser).toHaveBeenCalledWith(body, request);
@@ -47,6 +49,7 @@ describe('ScimProvisioningController', () => {
   it('keeps SCIM token administration behind session auth while SCIM endpoints use bearer-token auth', () => {
     const sessionProtectedHandlers = [
       ScimProvisioningController.prototype.listTokens,
+      ScimProvisioningController.prototype.listProvisionedUsers,
       ScimProvisioningController.prototype.createToken,
       ScimProvisioningController.prototype.revokeToken,
     ];
@@ -73,6 +76,7 @@ describe('ScimProvisioningController', () => {
 function createServiceMock(): ScimProvisioningService {
   return {
     listTokens: jest.fn(() => 'tokens'),
+    listProvisionedUsers: jest.fn(() => 'provisioned-users'),
     createToken: jest.fn(() => 'create-token'),
     revokeToken: jest.fn(() => 'revoke-token'),
     serviceProviderConfig: jest.fn(() => 'service-provider-config'),

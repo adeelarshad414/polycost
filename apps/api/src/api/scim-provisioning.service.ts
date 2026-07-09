@@ -63,6 +63,15 @@ export class ScimProvisioningService {
     return this.repository.listTeamScimTokens(teamId);
   }
 
+  async listProvisionedUsers(
+    teamId: string,
+    identity: AuthIdentity,
+  ): Promise<TeamScimUserRecord[]> {
+    await this.requireTeamAdmin(identity, teamId);
+
+    return this.repository.listTeamScimUsers(teamId);
+  }
+
   async createToken(
     teamId: string,
     body: unknown,
