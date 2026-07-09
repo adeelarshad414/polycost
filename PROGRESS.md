@@ -141,6 +141,7 @@ say so explicitly rather than marking it done.
 | Phase 2.49 - SCIM admin workspace UX                    | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.50 - SCIM discovery and IdP onboarding          | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.51 - SCIM live verification transcript          | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.52 - Isolated E2E and runtime DI hardening      | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -154,6 +155,84 @@ say so explicitly rather than marking it done.
 | Browser audit artifact hardening                        | Complete with known gaps (see notes) | 2026-07-08   |
 | Formal browser audit tooling                            | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3.5 - Terraform bundle integrity validation      | Complete with known gaps (see notes) | 2026-07-08   |
+
+## Phase 2.52 - Isolated E2E and runtime DI hardening
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Hardened `scripts/ci-e2e.mjs` so Compose E2E uses an isolated project name by
+  default instead of the repository directory name.
+- Added automatic free host-port selection for the E2E web, API, and Vault
+  bindings, with explicit overrides through `POLYCOST_E2E_WEB_PORT`,
+  `POLYCOST_E2E_API_HOST_PORT`, and `POLYCOST_E2E_VAULT_HOST_PORT`.
+- Changed host-port probing to bind-check `0.0.0.0`, which catches wildcard
+  listeners that a localhost-only probe can miss.
+- In owned-Compose mode, the runner now pins `POLYCOST_API_ORIGIN`,
+  `POLYCOST_API_BASE_URL`, `POLYCOST_WEB_BASE_URL`, CORS, and container/host port
+  wiring to the isolated stack it just started.
+- Preserved the existing `POLYCOST_E2E_SKIP_COMPOSE` behavior for attaching to an
+  already-running stack.
+- Added explicit optional Nest injection tokens for function-backed runtime
+  collaborators used by invitation delivery, audit export, invoice artifact
+  governance, invoice evidence notary, and the optional auth invitation sender.
+- Added `apps/api/src/api/runtime-di.spec.ts` and wired it into
+  `test:production-readiness` so emitted constructor metadata cannot silently
+  regress into production container boot failures.
+- Updated README and deployment docs so reviewers know `ci:e2e` can run beside an
+  existing local PolyCost or Vault process.
+- Added progress and release-readiness guards for the isolated Compose project,
+  dynamic port allocator, API origin wiring, Vault host-port override, and runtime
+  DI regression coverage.
+
+Verification performed:
+
+- The first `npm run ci:e2e` attempt failed before tests because the default Vault
+  host port `8200` was already held by a local `ssh` listener. This exposed the
+  port-collision gap fixed in this phase.
+- Follow-up attempts exposed two additional real runtime gaps: wildcard listeners
+  on the web port were missed by localhost-only probing, and the API container
+  failed to boot when Nest treated optional function defaults as DI dependencies.
+- `node --check scripts/ci-e2e.mjs` passed.
+- Focused API regression passed:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/runtime-di.spec.ts src/api/invitation-delivery.service.spec.ts src/api/team-audit-export.service.spec.ts src/api/invoice-evidence-notary.service.spec.ts src/api/invoice-artifact-governance.service.spec.ts`
+  (`5` suites / `21` tests).
+- Expanded API regression passed:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/runtime-di.spec.ts src/api/invitation-delivery.service.spec.ts src/api/auth-billing.spec.ts`
+  (`3` suites / `62` tests).
+- `npm run ci:lint` passed.
+- `npm run progress:verify` passed with `165` phase evidence anchors verified.
+- `npm run release:check` passed.
+- Elevated local `npm run ci:e2e` passed with isolated Compose project
+  `polycoste2e88038`, web `http://localhost:58174`, API
+  `http://localhost:3301`, and Vault host port `18220`:
+  - API E2E: `16/16` passed.
+  - Web Playwright: `7/7` passed.
+  - Live verification passed with template-to-recommendation `6523ms` /
+    `60000ms`, diagram-to-PDF `2698ms` / `180000ms`, workspace auth/RBAC
+    `406ms` / `60000ms`, SCIM provisioning `281ms` / `60000ms`, and Redis-down
+    degradation returning `/health=degraded`, `/health/deep=degraded`, and
+    data-health HTTP `200`.
+- Full `npm run check` passed with API unit `59` suites / `494` tests, web unit
+  `11` suites / `149` tests, graph validation `328` nodes / `328` edges, pricing
+  coverage `36` frontend families, progress verification `165` anchors, release
+  readiness, handover, DevOps/cloud/provider-credential gates, and invoice
+  evidence/retention-proof smokes. Expected caveats remained: `impeccable` is
+  skipped on the repo's Node 20 target, live Postgres migrations were skipped
+  because the local Postgres container was not running, and invoice artifact
+  governance is still demo/local rather than external object-storage/WORM/KMS
+  proof.
+
+Known gaps carried forward:
+
+- Dynamic free-port selection greatly reduces local collision risk, but it is still
+  not a replacement for a dedicated CI runner or hosted preview environment.
+- Local Docker may still emit environment warnings, such as buildx availability or
+  first-time image pulls, before the app-level regression floor starts.
+- The existing Vite large-chunk warning remains a frontend optimization item, not a
+  release blocker for this phase.
 
 ## Phase 2.51 - SCIM live verification transcript
 

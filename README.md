@@ -148,6 +148,13 @@ Default local URLs:
 - Health check: `http://localhost:3001/health`
 - Vault dev UI/API: `http://localhost:8200`
 
+The full-stack E2E runner, `npm run ci:e2e`, uses an isolated Compose project and
+free host ports by default so it can run beside another local PolyCost stack. Set
+`POLYCOST_E2E_WEB_PORT`, `POLYCOST_E2E_API_HOST_PORT`, or
+`POLYCOST_E2E_VAULT_HOST_PORT` only when you need fixed local ports. Set
+`POLYCOST_E2E_COMPOSE_PROJECT_NAME` or `POLYCOST_E2E_API_CONTAINER_PORT` only
+when a runner requires deterministic Compose naming or API container binding.
+
 The health check returns the API status plus downstream dependency probes for Postgres
 and Redis, so a healthy response means the request path can reach the core data and
 cache services.

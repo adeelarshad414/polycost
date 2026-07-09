@@ -1,22 +1,74 @@
 import { spawnSync } from 'node:child_process';
+import net from 'node:net';
 
 const root = process.cwd();
 const skipCompose = process.env.POLYCOST_E2E_SKIP_COMPOSE === '1';
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const commandTimeoutMs = Number(process.env.POLYCOST_E2E_COMMAND_TIMEOUT_MS ?? 900_000);
 const diagnosticsTimeoutMs = Number(process.env.POLYCOST_E2E_DIAGNOSTICS_TIMEOUT_MS ?? 60_000);
-const apiOrigin =
-  process.env.POLYCOST_API_ORIGIN ?? `http://localhost:${process.env.API_PORT ?? '3001'}`;
-const webOrigin =
-  process.env.POLYCOST_WEB_BASE_URL ?? `http://localhost:${process.env.WEB_PORT ?? '3000'}`;
+const allocatedHostPorts = new Set();
+const dockerBindProbeHost = '0.0.0.0';
+
+const composeProjectName =
+  process.env.COMPOSE_PROJECT_NAME ??
+  process.env.POLYCOST_E2E_COMPOSE_PROJECT_NAME ??
+  `polycoste2e${process.pid}`;
+const apiContainerPort =
+  process.env.API_PORT ?? process.env.POLYCOST_E2E_API_CONTAINER_PORT ?? '3001';
+const apiHostPort =
+  process.env.API_HOST_PORT ??
+  process.env.POLYCOST_E2E_API_HOST_PORT ??
+  (skipCompose ? apiContainerPort : await findAvailablePort(3301));
+const webHostPort =
+  process.env.WEB_PORT ??
+  process.env.POLYCOST_E2E_WEB_PORT ??
+  (skipCompose ? '3000' : await findAvailablePort(3300));
+const vaultHostPort =
+  process.env.VAULT_HOST_PORT ??
+  process.env.POLYCOST_E2E_VAULT_HOST_PORT ??
+  (skipCompose ? '8200' : await findAvailablePort(18220));
+const apiOrigin = process.env.POLYCOST_API_ORIGIN ?? `http://localhost:${apiHostPort}`;
+const webOrigin = process.env.POLYCOST_WEB_BASE_URL ?? `http://localhost:${webHostPort}`;
 let runnerFailure;
 let testsFailed = false;
 
 try {
-  process.env.POLYCOST_API_BASE_URL = process.env.POLYCOST_API_BASE_URL ?? `${apiOrigin}/api/v1`;
-  process.env.POLYCOST_WEB_BASE_URL = webOrigin;
+  if (skipCompose) {
+    process.env.POLYCOST_API_ORIGIN = process.env.POLYCOST_API_ORIGIN ?? apiOrigin;
+    process.env.POLYCOST_API_BASE_URL = process.env.POLYCOST_API_BASE_URL ?? `${apiOrigin}/api/v1`;
+    process.env.POLYCOST_WEB_BASE_URL = webOrigin;
+  } else {
+    process.env.POLYCOST_API_ORIGIN = apiOrigin;
+    process.env.POLYCOST_API_BASE_URL = `${apiOrigin}/api/v1`;
+    process.env.POLYCOST_WEB_BASE_URL = webOrigin;
+  }
 
   if (!skipCompose) {
+    process.env.COMPOSE_PROJECT_NAME = composeProjectName;
+    process.env.API_PORT = apiContainerPort;
+    process.env.API_HOST_PORT = apiHostPort;
+    process.env.PORT = process.env.PORT ?? apiContainerPort;
+    process.env.WEB_PORT = webHostPort;
+    process.env.VAULT_HOST_PORT = vaultHostPort;
+    process.env.VITE_API_BASE_URL = process.env.VITE_API_BASE_URL ?? `${apiOrigin}/api/v1`;
+    process.env.CORS_ALLOWED_ORIGINS =
+      process.env.CORS_ALLOWED_ORIGINS ??
+      [
+        `http://localhost:${webHostPort}`,
+        `http://127.0.0.1:${webHostPort}`,
+        `http://localhost:${apiHostPort}`,
+        `http://127.0.0.1:${apiHostPort}`,
+      ].join(',');
+
+    console.log(
+      [
+        `E2E Compose project: ${composeProjectName}`,
+        `web=${webOrigin}`,
+        `api=${apiOrigin}`,
+        `vaultHostPort=${vaultHostPort}`,
+      ].join(' | '),
+    );
+
     run('docker', ['compose', 'up', '--build', '-d', '--remove-orphans'], {
       timeoutMs: commandTimeoutMs,
     });
@@ -168,4 +220,59 @@ function printComposeDiagnostics() {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function findAvailablePort(preferredPort) {
+  const preferred = Number(preferredPort);
+
+  if (
+    Number.isInteger(preferred) &&
+    preferred > 0 &&
+    !allocatedHostPorts.has(String(preferred)) &&
+    (await canBind(preferred))
+  ) {
+    allocatedHostPorts.add(String(preferred));
+    return String(preferred);
+  }
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const port = await allocateEphemeralPort();
+    if (!allocatedHostPorts.has(port)) {
+      allocatedHostPorts.add(port);
+      return port;
+    }
+  }
+
+  throw new Error('Could not allocate a distinct E2E host port.');
+}
+
+async function allocateEphemeralPort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.unref();
+    server.on('error', reject);
+    server.listen(0, dockerBindProbeHost, () => {
+      const address = server.address();
+      server.close(() => {
+        if (address && typeof address === 'object') {
+          resolve(String(address.port));
+        } else {
+          reject(new Error('Could not allocate an E2E host port.'));
+        }
+      });
+    });
+  });
+}
+
+async function canBind(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.unref();
+    server.on('error', () => {
+      resolve(false);
+    });
+    server.listen(port, dockerBindProbeHost, () => {
+      server.close(() => resolve(true));
+    });
+  });
 }

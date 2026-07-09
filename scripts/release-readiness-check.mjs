@@ -172,6 +172,7 @@ assertScriptIncludes('test:production-readiness', [
   'src/api/auth.controller.spec.ts',
   'src/api/scim-provisioning.service.spec.ts',
   'src/api/scim-provisioning.controller.spec.ts',
+  'src/api/runtime-di.spec.ts',
   'src/diagram-parser/diagram-parser.service.spec.ts',
   'src/diagram-parser/llm-classifier.client.spec.ts',
   'src/reports/report-generators.spec.ts',
@@ -452,6 +453,10 @@ await assertFileContains('apps/web/src/styles/tokens.css', [
 
 await assertFileContains('scripts/ci-e2e.mjs', [
   ['live verification inside compose E2E', "npmCommand, ['run', 'live:verify']"],
+  ['isolated E2E compose project', 'POLYCOST_E2E_COMPOSE_PROJECT_NAME'],
+  ['dynamic E2E port allocation', 'findAvailablePort'],
+  ['E2E Vault host port override', 'POLYCOST_E2E_VAULT_HOST_PORT'],
+  ['E2E API origin wiring', 'process.env.POLYCOST_API_ORIGIN = apiOrigin'],
 ]);
 
 await assertFileContains('scripts/live-verification.mjs', [

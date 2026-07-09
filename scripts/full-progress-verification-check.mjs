@@ -116,6 +116,7 @@ async function assertPhaseEvidenceAnchors() {
     'src/pricing-normalization/pricing-reconciliation.spec.ts',
     'src/api/live-pricing-traceability.spec.ts',
     'src/api/auth-billing.spec.ts',
+    'src/api/runtime-di.spec.ts',
     'src/diagram-parser/diagram-parser.service.spec.ts',
     'src/reports/report-generators.spec.ts',
     'src/App.spec.tsx',
@@ -248,6 +249,10 @@ async function assertPhaseEvidenceAnchors() {
 
   await assertFileContains('scripts/ci-e2e.mjs', [
     ['E2E command timeout knob', 'POLYCOST_E2E_COMMAND_TIMEOUT_MS'],
+    ['isolated E2E Compose project', 'POLYCOST_E2E_COMPOSE_PROJECT_NAME'],
+    ['dynamic E2E port allocator', 'findAvailablePort'],
+    ['E2E Vault host port override', 'POLYCOST_E2E_VAULT_HOST_PORT'],
+    ['E2E API origin wiring', 'process.env.POLYCOST_API_ORIGIN = apiOrigin'],
     [
       'live verification runs inside Compose E2E',
       "run(npmCommand, ['run', 'live:verify'], { timeoutMs: commandTimeoutMs })",

@@ -106,6 +106,8 @@ performance/accessibility/best-practices/SEO metrics.
 | UI-AUTH-019    | Improved      | Workspace Team access now exposes SCIM provisioning posture, one-time token creation, token revocation, token metadata, and provisioned-user visibility through session-authenticated admin APIs                                                        |
 | IAM-SCIM-001   | Improved      | SCIM now exposes bearer-protected `/Schemas` and `/ResourceTypes` discovery endpoints, representative Okta/Entra fixtures, and an operator onboarding guide while preserving the non-certification boundary                                             |
 | IAM-SCIM-002   | Improved      | Live verification now records a sanitized `scim-provisioning-lifecycle` journey for token creation, metadata-only token listing, bearer-protected discovery, user create/list/admin readback/deactivate, token revocation, and revoked-token denial     |
+| OPS-E2E-002    | Improved      | Compose E2E now runs with isolated project names, dynamic host-port allocation, wildcard bind probing, owned-stack API/web origin wiring, and latest local proof across API E2E, web Playwright, live verification, SCIM, and Redis degradation         |
+| API-DI-001     | Improved      | Function-backed optional runtime collaborators now use explicit optional injection tokens, with a production-readiness metadata guard preventing Nest container boot regressions                                                                        |
 | UI-AUTH-003    | Improved      | Active workspace switching is now backend-backed, membership-checked, and exposed in the signed-in account panel                                                                                                                                        |
 | UI-AUTH-004    | Improved      | Pending/expired workspace invites can now be resent through a guarded backend route that rotates the stored token hash and exposes the refreshed one-time token only in the response                                                                    |
 | UI-AUTH-005    | Improved      | Invite delivery now has local panel mode plus production HTTPS webhook mode with HMAC signatures, production config guards, and browser-safe delivery receipts                                                                                          |
@@ -633,6 +635,23 @@ Full-stack evidence:
 - Transcript path: `.tmp/live-verification/latest-v2-prod-ready.json`.
 - Transcript secret scan found only benign labels and `stateVerified: true`.
 - Isolated Compose stack was cleaned with `docker compose down --remove-orphans --volumes`.
+- Latest hardening rerun of `npm run ci:e2e` passed on isolated Compose project
+  `polycoste2e88038` with web `http://localhost:58174`, API
+  `http://localhost:3301`, and Vault host port `18220`:
+  - API E2E: 16/16 passed.
+  - Web Playwright: 7/7 passed.
+  - Live verification passed with template-to-recommendation `6523ms` /
+    `60000ms`, diagram-to-PDF `2698ms` / `180000ms`, workspace auth/RBAC
+    `406ms` / `60000ms`, SCIM provisioning `281ms` / `60000ms`, and Redis
+    degradation returning `/health=degraded`, `/health/deep=degraded`, and
+    `/api/v1/data-health HTTP 200`.
+- Runtime DI guard coverage now sits in `test:production-readiness` through
+  `apps/api/src/api/runtime-di.spec.ts`.
+- Latest full `npm run check` passed with API unit 59 suites / 494 tests, web unit
+  11 suites / 149 tests, graph validation 328 nodes / 328 edges, pricing coverage
+  36 frontend families, progress verification 165 anchors, release readiness,
+  handover, DevOps/cloud/provider-credential gates, and invoice
+  evidence/retention-proof smokes.
 
 ## Screenshot Index
 

@@ -276,5 +276,13 @@ npm run ci:e2e
 npm run live:verify
 ```
 
+`npm run ci:e2e` starts an isolated Compose project by default and chooses free
+host ports for the web app, API, and Vault. Override with
+`POLYCOST_E2E_WEB_PORT`, `POLYCOST_E2E_API_HOST_PORT`, or
+`POLYCOST_E2E_VAULT_HOST_PORT` only when a demo environment requires fixed ports.
+Use `POLYCOST_E2E_COMPOSE_PROJECT_NAME` or
+`POLYCOST_E2E_API_CONTAINER_PORT` only for deterministic runner naming or API
+container binding.
+
 Hosted GitHub Actions is not currently treated as release evidence until the runner
 allocation blocker recorded in the readiness report is resolved.

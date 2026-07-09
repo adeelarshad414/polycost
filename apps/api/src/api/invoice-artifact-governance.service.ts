@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FetchLike, defaultFetch } from '../adapters/common/http-client';
 import { AppConfig } from '../config/config.schema';
@@ -20,6 +20,7 @@ const EICAR_TEST_SIGNATURE = 'EICAR-STANDARD-ANTIVIRUS-TEST-FILE';
 const DEFAULT_INVOICE_ARTIFACT_RETENTION_DAYS = 365;
 const MAX_SCANNER_FINDING_LENGTH = 400;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
+export const INVOICE_ARTIFACT_GOVERNANCE_FETCH = Symbol('INVOICE_ARTIFACT_GOVERNANCE_FETCH');
 
 interface ArtifactScanInput {
   fileName: string;
@@ -40,6 +41,8 @@ interface ScannerWebhookResponse {
 export class InvoiceArtifactGovernanceService {
   constructor(
     private readonly configService?: ConfigService<AppConfig, true>,
+    @Optional()
+    @Inject(INVOICE_ARTIFACT_GOVERNANCE_FETCH)
     private readonly fetcher: FetchLike = defaultFetch,
   ) {}
 
