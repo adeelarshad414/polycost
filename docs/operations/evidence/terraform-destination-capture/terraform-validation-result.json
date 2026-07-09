@@ -1,0 +1,48 @@
+{
+  "generatedAt": "2026-07-09T00:02:00.000Z",
+  "status": "passed",
+  "results": [
+    {
+      "id": "manifest-integrity",
+      "status": "passed",
+      "command": "node scripts/verify-manifest.mjs",
+      "exitCode": 0
+    },
+    {
+      "id": "terraform-fmt",
+      "status": "passed",
+      "command": "terraform fmt -check -recursive",
+      "exitCode": 0
+    },
+    {
+      "id": "terraform-init",
+      "status": "passed",
+      "command": "terraform init -backend=false",
+      "exitCode": 0
+    },
+    {
+      "id": "terraform-validate",
+      "status": "passed",
+      "command": "terraform validate",
+      "exitCode": 0
+    },
+    {
+      "id": "terraform-test",
+      "status": "passed",
+      "command": "terraform test",
+      "exitCode": 0
+    },
+    {
+      "id": "tflint",
+      "status": "passed",
+      "command": "tflint --recursive",
+      "exitCode": 0
+    },
+    {
+      "id": "conftest-policy",
+      "status": "passed",
+      "command": "conftest test tfplan.json --policy policies",
+      "exitCode": 0
+    }
+  ]
+}

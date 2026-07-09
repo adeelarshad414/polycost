@@ -106,6 +106,7 @@ async function assertPhaseEvidenceAnchors() {
     'npm run invoice:artifact-rehearsal:plan',
     'npm run invoice:artifact-rehearsal:evidence:check',
     'npm run terraform:evidence:check',
+    'npm run terraform:evidence:capture:smoke',
     'npm run vsdx:visual-evidence:check',
     'npm run diagram:llm-corpus:check',
   ]);
@@ -385,6 +386,14 @@ async function assertPhaseEvidenceAnchors() {
     ['raw secret material guard', 'findSecretMaterial'],
   ]);
 
+  await assertFileContains('scripts/terraform-destination-evidence-capture.mjs', [
+    ['Terraform capture profile schema', 'polycost-terraform-destination-evidence-capture/v1'],
+    ['Terraform output evidence schema', 'polycost-terraform-validation-evidence/v1'],
+    ['capture smoke mode', '--smoke'],
+    ['destination evidence checker handoff', '--require-destination-plan'],
+    ['raw secret material guard', 'findSecretMaterial'],
+  ]);
+
   await assertFileContains('scripts/vsdx-visual-evidence-check.mjs', [
     ['VSDX visual evidence bundle schema', 'polycost-vsdx-visual-evidence/v1'],
     ['VSDX visual evidence check schema', 'polycost-vsdx-visual-evidence-check/v1'],
@@ -406,6 +415,23 @@ async function assertPhaseEvidenceAnchors() {
     ['bundle manifest schema', 'polycost.terraform.bundle.v1'],
     ['remote state evidence', '"lockingConfigured": true'],
     ['tag evidence', '"CostCenter"'],
+  ]);
+
+  await assertFileContains(
+    'docs/operations/evidence/terraform-destination-capture/terraform-destination-capture.example.json',
+    [
+      [
+        'Terraform destination capture profile schema',
+        'polycost-terraform-destination-evidence-capture/v1',
+      ],
+      ['capture profile plan path', '"planJson": "tfplan.json"'],
+      ['capture profile operator', '"operator": "example-only"'],
+    ],
+  );
+
+  await assertFileContains('docs/operations/evidence/terraform-destination-capture/tfplan.json', [
+    ['Terraform destination plan fixture', '"resource_changes"'],
+    ['Terraform destination cost tags', '"ManagedBy": "terraform"'],
   ]);
 
   await assertFileContains('docs/operations/evidence/vsdx-visual-evidence.example.json', [
@@ -434,6 +460,19 @@ async function assertPhaseEvidenceAnchors() {
     ['sample evidence distinction', 'example-schema'],
     ['operator boundary', 'PolyCost still does not run `terraform apply`'],
   ]);
+
+  await assertFileContains(
+    'docs/architecture/phase-v3-7-terraform-destination-evidence-capture.md',
+    [
+      [
+        'Terraform destination capture architecture note',
+        'Phase V3.7 Terraform Destination Evidence Capture',
+      ],
+      ['Terraform destination capture command', 'npm run terraform:evidence:capture'],
+      ['Terraform destination capture smoke command', 'npm run terraform:evidence:capture:smoke'],
+      ['operator boundary', 'PolyCost still does not run Terraform inside request handling'],
+    ],
+  );
 
   await assertFileContains('docs/architecture/phase-2-vsdx-visual-evidence.md', [
     ['VSDX visual evidence architecture note', 'Phase 2 VSDX Visual Evidence'],
@@ -476,6 +515,7 @@ async function assertPhaseEvidenceAnchors() {
     ['VSDX visual rendering deferred ledger', 'not full Visio visual rendering'],
     ['VSDX visual evidence checker ledger', 'npm run vsdx:visual-evidence:check'],
     ['diagram LLM corpus checker ledger', 'npm run diagram:llm-corpus:check'],
+    ['Terraform destination capture checker ledger', 'npm run terraform:evidence:capture:smoke'],
     ['auth enterprise deferred ledger', 'Full enterprise account/team UX'],
     ['auth live transcript ledger', 'workspace-auth-rbac-sso'],
     ['external CI blocker ledger', 'runner_id: 0'],

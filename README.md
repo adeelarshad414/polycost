@@ -35,6 +35,9 @@ result, validation runner output, plan JSON summary, policy result, remote-state
 and tag evidence, then run
 `npm run terraform:evidence:check -- --require-destination-plan <bundle.json>`.
 The checked-in example bundle validates the schema only and is not live cloud proof.
+To assemble that evidence from operator-controlled destination artifacts, use
+`npm run terraform:evidence:capture -- --profile <profile.json> --output <bundle.json>`.
+See `docs/architecture/phase-v3-7-terraform-destination-evidence-capture.md`.
 
 For VSDX visual evidence, archive the generated approximate SVG preview digest,
 parser counts, caveats, and reviewer attestation, then run
@@ -508,6 +511,8 @@ block TCP listeners report a structured skip unless strict mode is enabled.
   cost-intelligence model and future import/Terraform hooks.
 - `docs/architecture/phase-v3-6-terraform-validation-evidence.md` documents the
   Terraform destination-plan evidence contract.
+- `docs/architecture/phase-v3-7-terraform-destination-evidence-capture.md`
+  documents the Terraform destination evidence capture helper.
 - `docs/development/open-source-readiness.md` tracks the private-to-public launch
   checklist.
 - `docs/operations/live-pricing-credentials.md` documents live-pricing ETL,

@@ -38,9 +38,13 @@ const requiredFiles = [
   'docs/operations/evidence/aws-s3-retention-proof.example.json',
   'docs/operations/evidence/invoice-artifact-rehearsal-evidence.example.json',
   'docs/operations/evidence/terraform-validation-evidence.example.json',
+  'docs/operations/evidence/terraform-destination-capture/terraform-destination-capture.example.json',
+  'docs/operations/evidence/terraform-destination-capture/BUNDLE-MANIFEST.json',
+  'docs/operations/evidence/terraform-destination-capture/tfplan.json',
   'docs/operations/evidence/vsdx-visual-evidence.example.json',
   'docs/operations/evidence/diagram-llm-corpus-evidence.example.json',
   'docs/architecture/phase-v3-6-terraform-validation-evidence.md',
+  'docs/architecture/phase-v3-7-terraform-destination-evidence-capture.md',
   'docs/architecture/phase-2-vsdx-visual-evidence.md',
   'docs/architecture/phase-2-diagram-llm-corpus-evidence.md',
   'fixtures/diagrams/llm-corpus/diagram-llm-corpus.v1.json',
@@ -137,6 +141,12 @@ if (!packageJson.scripts?.['invoice:artifact-rehearsal:evidence:check']) {
 if (!packageJson.scripts?.['terraform:evidence:check']) {
   failures.push('package.json is missing terraform:evidence:check');
 }
+if (!packageJson.scripts?.['terraform:evidence:capture']) {
+  failures.push('package.json is missing terraform:evidence:capture');
+}
+if (!packageJson.scripts?.['terraform:evidence:capture:smoke']) {
+  failures.push('package.json is missing terraform:evidence:capture:smoke');
+}
 if (!packageJson.scripts?.['vsdx:visual-evidence:check']) {
   failures.push('package.json is missing vsdx:visual-evidence:check');
 }
@@ -219,6 +229,9 @@ if (!packageJson.scripts?.check?.includes('npm run invoice:artifact-rehearsal:ev
 if (!packageJson.scripts?.check?.includes('npm run terraform:evidence:check')) {
   failures.push('package.json check script must include npm run terraform:evidence:check');
 }
+if (!packageJson.scripts?.check?.includes('npm run terraform:evidence:capture:smoke')) {
+  failures.push('package.json check script must include npm run terraform:evidence:capture:smoke');
+}
 if (!packageJson.scripts?.check?.includes('npm run vsdx:visual-evidence:check')) {
   failures.push('package.json check script must include npm run vsdx:visual-evidence:check');
 }
@@ -262,11 +275,16 @@ await assertFileContains('README.md', [
     'npm run invoice:artifact-rehearsal:evidence:check',
   ],
   ['terraform validation evidence checker command', 'npm run terraform:evidence:check'],
+  ['terraform destination evidence capture command', 'npm run terraform:evidence:capture'],
   ['VSDX visual evidence checker command', 'npm run vsdx:visual-evidence:check'],
   ['diagram LLM corpus checker command', 'npm run diagram:llm-corpus:check'],
   [
     'terraform validation evidence architecture link',
     'docs/architecture/phase-v3-6-terraform-validation-evidence.md',
+  ],
+  [
+    'terraform destination evidence capture architecture link',
+    'docs/architecture/phase-v3-7-terraform-destination-evidence-capture.md',
   ],
   ['VSDX visual evidence architecture link', 'docs/architecture/phase-2-vsdx-visual-evidence.md'],
   [
@@ -320,6 +338,7 @@ await assertFileContains('docs/HOW-TO-USE.md', [
   ['diagram input paths', 'Diagram mode'],
   ['VSDX visual evidence checker', 'npm run vsdx:visual-evidence:check'],
   ['diagram LLM corpus checker', 'npm run diagram:llm-corpus:check'],
+  ['Terraform evidence capture workflow', 'npm run terraform:evidence:capture'],
   ['Terraform starter bundle workflow', 'Terraform Starter Bundles'],
 ]);
 
@@ -407,6 +426,7 @@ await assertFileContains('RELEASE-CHECKLIST.md', [
   ['known future gaps task', 'full visual VSDX rendering'],
   ['VSDX visual evidence checker command', 'npm run vsdx:visual-evidence:check'],
   ['diagram LLM corpus checker command', 'npm run diagram:llm-corpus:check'],
+  ['Terraform evidence capture smoke command', 'npm run terraform:evidence:capture:smoke'],
   ['security audit gate', 'npm run security:audit'],
   ['clean-clone demo command', 'npm run demo:up'],
   ['clean-clone timed verifier command', 'npm run demo:verify-clean'],
@@ -797,6 +817,15 @@ await assertFileContains('scripts/terraform-validation-evidence-check.mjs', [
   ['raw secret material guard', 'findSecretMaterial'],
 ]);
 
+await assertFileContains('scripts/terraform-destination-evidence-capture.mjs', [
+  ['Terraform capture profile schema', 'polycost-terraform-destination-evidence-capture/v1'],
+  ['Terraform validation evidence output schema', 'polycost-terraform-validation-evidence/v1'],
+  ['capture smoke mode', '--smoke'],
+  ['destination plan checker handoff', '--require-destination-plan'],
+  ['no shell Terraform execution', 'shell: false'],
+  ['raw secret material guard', 'findSecretMaterial'],
+]);
+
 await assertFileContains('scripts/vsdx-visual-evidence-check.mjs', [
   ['VSDX visual evidence bundle schema', 'polycost-vsdx-visual-evidence/v1'],
   ['VSDX visual evidence check schema', 'polycost-vsdx-visual-evidence-check/v1'],
@@ -821,6 +850,25 @@ await assertFileContains('docs/operations/evidence/terraform-validation-evidence
   ['destination-plan caveat', 'sanitized sample evidence for CI/schema validation only'],
   ['remote state evidence', '"lockingConfigured": true'],
   ['tag evidence', '"CostCenter"'],
+]);
+
+await assertFileContains(
+  'docs/operations/evidence/terraform-destination-capture/terraform-destination-capture.example.json',
+  [
+    [
+      'Terraform destination capture profile schema',
+      'polycost-terraform-destination-evidence-capture/v1',
+    ],
+    ['destination plan profile cloud', '"targetCloud": "aws"'],
+    ['destination plan profile artifact path', '"planJson": "tfplan.json"'],
+    ['destination plan profile operator', '"operator": "example-only"'],
+  ],
+);
+
+await assertFileContains('docs/operations/evidence/terraform-destination-capture/tfplan.json', [
+  ['Terraform plan format version', '"format_version": "1.2"'],
+  ['Terraform plan resource changes', '"resource_changes"'],
+  ['Terraform plan cost tags', '"CostCenter": "finops"'],
 ]);
 
 await assertFileContains('docs/operations/evidence/vsdx-visual-evidence.example.json', [
@@ -851,6 +899,13 @@ await assertFileContains('docs/architecture/phase-v3-6-terraform-validation-evid
   ['destination plan command', 'npm run terraform:evidence:check'],
   ['sample evidence distinction', 'example-schema'],
   ['operator boundary', 'PolyCost still does not run `terraform apply`'],
+]);
+
+await assertFileContains('docs/architecture/phase-v3-7-terraform-destination-evidence-capture.md', [
+  ['V3.7 title', 'Phase V3.7 Terraform Destination Evidence Capture'],
+  ['destination capture command', 'npm run terraform:evidence:capture'],
+  ['destination capture smoke command', 'npm run terraform:evidence:capture:smoke'],
+  ['operator boundary', 'PolyCost still does not run Terraform inside request handling'],
 ]);
 
 await assertFileContains('docs/architecture/phase-2-vsdx-visual-evidence.md', [

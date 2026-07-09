@@ -174,7 +174,8 @@ Health and operations:
 4. Add or update module files for AWS, Azure, and GCP.
 5. Extend static validation checks, bundle manifest evidence, and API/web tests.
 6. Keep `terraform plan` execution outside request handling until a dedicated
-   sandboxed runner is designed.
+   sandboxed runner is designed; use the destination evidence capture helper for
+   operator-run plan artifacts.
 
 ## Known Architecture Boundaries
 
@@ -190,3 +191,5 @@ Health and operations:
 - Enterprise auth/team product depth still needs production email, SSO/SAML,
   SCIM, account recovery, org billing UX, and broader account administration polish.
 - Terraform output is a starter bundle, not a full landing-zone module system.
+  Destination evidence capture verifies operator-run artifacts; it does not make
+  PolyCost the Terraform runner or state manager.

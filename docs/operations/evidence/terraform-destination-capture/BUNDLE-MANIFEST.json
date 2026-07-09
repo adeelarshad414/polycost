@@ -1,0 +1,102 @@
+{
+  "schemaVersion": "polycost.terraform.bundle.v1",
+  "bundleName": "revenue-portal-aws-terraform",
+  "generatedAt": "2026-07-09T00:00:00.000Z",
+  "targetCloud": "aws",
+  "workspaceName": "revenue-portal",
+  "region": "us-east-1",
+  "generationProfile": {
+    "runtimeTarget": "vm",
+    "networkTopology": "private",
+    "availabilityMode": "multi-az",
+    "policyPackIncluded": true,
+    "moduleScaffoldIncluded": true
+  },
+  "resourceSummary": {
+    "computeInstances": 2,
+    "objectStorageBuckets": 1,
+    "blockStorageVolumes": 1,
+    "fileShares": 0,
+    "relationalDatabases": 1,
+    "loadBalancers": 1,
+    "cdnEnabled": true,
+    "multiAz": true,
+    "multiRegion": false
+  },
+  "validationRunner": "scripts/validate-bundle.mjs",
+  "validationCommands": [
+    "node scripts/verify-manifest.mjs",
+    "node scripts/validate-bundle.mjs",
+    "make validate",
+    "terraform test",
+    "terraform plan -var-file=terraform.tfvars -out=tfplan",
+    "conftest test tfplan.json --policy policies"
+  ],
+  "files": [
+    {
+      "path": "versions.tf",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sizeBytes": 200
+    },
+    {
+      "path": "providers.tf",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sizeBytes": 120
+    },
+    {
+      "path": "backend.tf.example",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "sizeBytes": 180
+    },
+    {
+      "path": "variables.tf",
+      "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "sizeBytes": 1800
+    },
+    {
+      "path": "main.tf",
+      "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "sizeBytes": 6400
+    },
+    {
+      "path": "outputs.tf",
+      "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "sizeBytes": 420
+    },
+    {
+      "path": "terraform.tfvars.example",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "sizeBytes": 520
+    },
+    {
+      "path": "README.md",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "sizeBytes": 3400
+    },
+    {
+      "path": "FRAMEWORK-ALIGNMENT.md",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "sizeBytes": 2100
+    },
+    {
+      "path": ".tflint.hcl",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "sizeBytes": 320
+    },
+    {
+      "path": "policies/terraform-plan.rego",
+      "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "sizeBytes": 1700
+    },
+    {
+      "path": "scripts/validate-bundle.mjs",
+      "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "sizeBytes": 2400
+    },
+    {
+      "path": "scripts/verify-manifest.mjs",
+      "sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "sizeBytes": 3100
+    }
+  ]
+}
