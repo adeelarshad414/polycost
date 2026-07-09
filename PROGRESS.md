@@ -162,6 +162,7 @@ say so explicitly rather than marking it done.
 | Phase 2.70 - Live catalog archive builder smoke         | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.71 - Live catalog capture run orchestrator      | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.72 - Live catalog run evidence verifier         | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.73 - Live catalog run evidence packet           | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -1176,6 +1177,68 @@ Known gaps carried forward:
   API reachability, and a verified live capture archive.
 - Even a verified live run remains catalog list-price evidence, not invoice-grade
   billing or provider invoice-of-record reconciliation.
+
+## Phase 2.73 - Live catalog run evidence packet
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added `scripts/pricing-catalog-live-capture-run-evidence-packet.mjs`, a
+  metadata-only packet builder/checker for live capture runner evidence handoff.
+- Added `npm run pricing:catalog:snapshot:capture:run:evidence:packet` for target
+  packet build/check flows and
+  `npm run pricing:catalog:snapshot:capture:run:evidence:packet:smoke` for local
+  CI-safe proof.
+- The packet builder runs the Phase 2.72 verifier first, writes stable-JSON
+  integrity metadata, records five referenced artifact digests
+  (`run-summary`, `preflight`, `capture`, `snapshot-evidence`,
+  `archive-manifest`), and keeps raw provider payloads and credentials out of the
+  packet.
+- The packet checker recomputes stable-JSON integrity, verifies referenced file
+  digests/byte lengths, validates verifier summary metadata, scans for raw
+  payload/secret fields, and supports `--require-live-packet` for target
+  environments.
+- The smoke path builds/checks a fixture packet and proves `--require-live-packet`
+  rejects it.
+- Wired the packet smoke into `npm run check`, release readiness, progress
+  verification, README, HOW-TO, provider credential docs, live pricing runbook,
+  architecture notes, release checklist, full-progress ledger, and the
+  production-readiness report.
+
+Verification performed:
+
+- `node --check scripts/pricing-catalog-live-capture-run-evidence-packet.mjs`
+  passed.
+- `node scripts/pricing-catalog-live-capture-run-evidence-packet.mjs --smoke --json`
+  passed with `baseFixturePacketVerified=true` and
+  `strictLiveRejectedFixturePacket=true`.
+- `node scripts/pricing-catalog-live-capture-run-evidence-packet.mjs --check .tmp/not-here/packet.json --json`
+  failed as intended for a missing packet file.
+- Full `npm run check` passed with the live run evidence packet smoke in the
+  aggregate floor: API unit `59` suites / `494` tests, web unit `11` suites /
+  `149` tests, graph validation `359` nodes / `359` edges, pricing coverage `36`
+  frontend families, progress verification `454` anchors, release readiness,
+  handover, DevOps/cloud/provider-credential gates, and
+  invoice/Terraform/VSDX/diagram/IdP evidence smokes. Expected caveats remained:
+  local invoice artifact scanner smoke skipped because TCP bind is blocked in
+  this sandbox, `impeccable` is skipped on the repo's Node 20 target, live
+  Postgres migrations were skipped because the local Postgres container was not
+  running, and the default local env still warns that invoice-artifacts are
+  demo/local without live object-storage/KMS/scanner/WORM settings.
+
+Known gaps carried forward:
+
+- This gives reviewers a tamper-evident metadata packet after a target run, but
+  it still cannot create real provider capture evidence without
+  target-environment credentials and network access.
+- A real `--require-live-packet` pass still requires a real
+  `--require-live-run` verifier result, strict live preflight, guarded live
+  capture, prior live evidence, GCP Cloud Billing read credentials, provider API
+  reachability, and a verified live capture archive.
+- Even a verified live packet remains catalog list-price evidence, not
+  invoice-grade billing or provider invoice-of-record reconciliation.
 
 ## Phase V3.6 - Terraform validation evidence
 

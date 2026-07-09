@@ -237,5 +237,7 @@ For finance/FinOps:
     `POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true npm run pricing:catalog:snapshot:capture:run:live -- --operator <name> --previous-evidence <prior-live-bundle.json>`.
     Then verify the target run folder with
     `npm run pricing:catalog:snapshot:capture:run:evidence:check -- --run-dir <run-output-dir> --require-live-run`.
+    Build the sanitized reviewer packet with
+    `npm run pricing:catalog:snapshot:capture:run:evidence:packet -- --run-dir <run-output-dir> --operator <name> --require-live-run --output <packet.json>`.
     The checked-in sample can be validated with
     `npm run invoice:record:evidence:check`, but it is schema-only evidence.

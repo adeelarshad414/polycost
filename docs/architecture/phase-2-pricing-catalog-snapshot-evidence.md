@@ -127,6 +127,14 @@ POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true \
 npm run pricing:catalog:snapshot:capture:run:evidence:check -- \
   --run-dir <run-output-dir> \
   --require-live-run
+npm run pricing:catalog:snapshot:capture:run:evidence:packet -- \
+  --run-dir <run-output-dir> \
+  --operator "<reviewer-name>" \
+  --require-live-run \
+  --output <packet.json>
+npm run pricing:catalog:snapshot:capture:run:evidence:packet -- \
+  --check <packet.json> \
+  --require-live-packet
 ```
 
 The archive verifier checks the manifest schema, referenced evidence SHA-256,
@@ -136,6 +144,8 @@ archive manifest is `example-schema` and is rejected by strict mode.
 The run-evidence verifier checks the run summary, strict preflight output,
 capture output, snapshot evidence, archive manifest, and archive verifier result
 as one artifact set.
+The packet builder then emits metadata, stable-JSON integrity, and referenced
+file digests only; it does not embed raw provider catalog payloads.
 
 ## Boundary
 

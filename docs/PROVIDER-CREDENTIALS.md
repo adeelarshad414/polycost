@@ -465,6 +465,10 @@ to run strict preflight, live capture, archive build, and strict archive
 verification as one sequence.
 Then verify the generated run folder with
 `npm run pricing:catalog:snapshot:capture:run:evidence:check -- --run-dir <run-output-dir> --require-live-run`.
+For reviewer handoff, build and verify the metadata-only packet with
+`npm run pricing:catalog:snapshot:capture:run:evidence:packet -- --run-dir <run-output-dir> --operator "<reviewer-name>" --require-live-run --output <packet.json>`
+and
+`npm run pricing:catalog:snapshot:capture:run:evidence:packet -- --check <packet.json> --require-live-packet`.
 
 The checked-in example can be validated with `npm run invoice:record:evidence:check`
 for schema coverage only. It is not provider invoice proof and does not make

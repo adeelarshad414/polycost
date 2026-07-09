@@ -89,6 +89,8 @@ target-environment sequence through
 `POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true npm run pricing:catalog:snapshot:capture:run:live -- --operator <name> --previous-evidence <prior-live-bundle.json>`.
 After the target run, verify the emitted artifact set with
 `npm run pricing:catalog:snapshot:capture:run:evidence:check -- --run-dir <run-output-dir> --require-live-run`.
+Then build a sanitized reviewer packet with
+`npm run pricing:catalog:snapshot:capture:run:evidence:packet -- --run-dir <run-output-dir> --operator <name> --require-live-run --output <packet.json>`.
 The checked-in example validates the contract only; PolyCost still is not the
 provider invoice system of record. See
 `docs/architecture/phase-2-invoice-of-record-pilot-evidence.md`.

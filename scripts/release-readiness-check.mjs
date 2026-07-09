@@ -205,6 +205,14 @@ if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:run:evidence:check'
 if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:run:evidence:smoke']) {
   failures.push('package.json is missing pricing:catalog:snapshot:capture:run:evidence:smoke');
 }
+if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:run:evidence:packet']) {
+  failures.push('package.json is missing pricing:catalog:snapshot:capture:run:evidence:packet');
+}
+if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:run:evidence:packet:smoke']) {
+  failures.push(
+    'package.json is missing pricing:catalog:snapshot:capture:run:evidence:packet:smoke',
+  );
+}
 if (!packageJson.scripts?.['terraform:evidence:check']) {
   failures.push('package.json is missing terraform:evidence:check');
 }
@@ -368,6 +376,15 @@ if (
 ) {
   failures.push(
     'package.json check script must include npm run pricing:catalog:snapshot:capture:run:evidence:smoke',
+  );
+}
+if (
+  !packageJson.scripts?.check?.includes(
+    'npm run pricing:catalog:snapshot:capture:run:evidence:packet:smoke',
+  )
+) {
+  failures.push(
+    'package.json check script must include npm run pricing:catalog:snapshot:capture:run:evidence:packet:smoke',
   );
 }
 if (!packageJson.scripts?.check?.includes('npm run terraform:evidence:check')) {
@@ -1148,6 +1165,25 @@ await assertFileContains('scripts/pricing-catalog-live-capture-run-evidence-chec
   ['strict live run option', '--require-live-run'],
   ['archive checker handoff', 'scripts/pricing-catalog-live-capture-archive-check.mjs'],
   ['fixture run rejection flag', 'strictLiveRejectedFixtureRun'],
+]);
+
+await assertFileContains('scripts/pricing-catalog-live-capture-run-evidence-packet.mjs', [
+  [
+    'pricing catalog live capture run evidence packet schema',
+    'polycost-pricing-catalog-live-capture-run-evidence-packet/v1',
+  ],
+  [
+    'pricing catalog live capture run evidence packet smoke schema',
+    'polycost-pricing-catalog-live-capture-run-evidence-packet-smoke/v1',
+  ],
+  [
+    'pricing catalog live capture run evidence packet check schema',
+    'polycost-pricing-catalog-live-capture-run-evidence-packet-check/v1',
+  ],
+  ['run evidence checker handoff', 'scripts/pricing-catalog-live-capture-run-evidence-check.mjs'],
+  ['strict live packet option', '--require-live-packet'],
+  ['fixture packet rejection flag', 'strictLiveRejectedFixturePacket'],
+  ['stable JSON integrity', 'stable-json:v1'],
 ]);
 
 await assertFileContains(
