@@ -607,3 +607,37 @@ Honest boundary:
 - The verifier validates captured evidence structure and digest only. It does not
   call cloud APIs itself, prove chain of custody, or replace legal retention
   sufficiency review.
+
+## Phase 2.44 - Provider Retention Proof Capture Planner
+
+Status: implemented and verified locally on 2026-07-09.
+
+Evidence added:
+
+- `npm run invoice:retention-proof:capture-plan` accepts AWS S3, Azure Blob, and
+  GCP Cloud Storage object URIs and emits provider CLI capture commands, proof
+  file path, verifier command, durable proof reference, runtime config template,
+  and an operator control checklist.
+- `npm run invoice:retention-proof:capture-plan:smoke` covers AWS versioned S3
+  object URIs, Azure Blob object URIs, GCP GCS object URIs, provider/URI mismatch
+  failures, runtime config placeholders, and explicit no-overclaim fields.
+- The planner smoke is wired into `npm run check`, and release-readiness anchors
+  now require the planner, smoke harness, docs command, and provider-specific CLI
+  command strings.
+- Verification passed with `npm run invoice:retention-proof:capture-plan:smoke`,
+  `npm run format:check`, `npm run ci:lint`, `npm run release:check`,
+  `npm run progress:verify`, and full `npm run check`. The full run included API
+  unit tests (56 suites, 471 tests), web unit tests (11 suites, 147 tests), graph
+  validation (322 nodes, 322 edges), pricing coverage, progress verification (153
+  anchors), QA/security suppression hygiene, DB, DevOps, cloud, release,
+  handover, and provider-credential gates. Expected caveats remained: optional
+  impeccable skipped on Node 20, live Postgres `schema_migrations` inspection was
+  skipped because the container was not running, and local invoice artifact
+  governance remains demo/default unless production object storage controls are
+  configured.
+
+Honest boundary:
+
+- The planner creates an auditable command plan only. PolyCost still does not run
+  cloud CLIs, receive cloud credentials, prove chain of custody, or replace legal
+  retention sufficiency review.

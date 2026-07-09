@@ -185,7 +185,24 @@ manifest in its governance block. The manifest is intentionally conservative:
 
 Use the provider CLI or governance system outside PolyCost to capture the control
 plane proof, store that JSON in WORM/object-lock backed evidence storage, and point
-PolyCost at the reference plus digest. Suggested capture commands:
+PolyCost at the reference plus digest. To generate a provider-specific capture
+runbook from the stored artifact URI, use:
+
+```bash
+npm run invoice:retention-proof:capture-plan -- aws-s3 \
+  's3://polycost-invoice-artifacts/invoice-artifacts/team/reconciliation/artifact.txt?versionId=v1'
+
+npm run invoice:retention-proof:capture-plan -- azure-blob \
+  'azure-blob://account/container/invoice-artifacts/team/reconciliation/artifact.txt'
+
+npm run invoice:retention-proof:capture-plan -- gcp-gcs \
+  'gs://polycost-invoice-artifacts/invoice-artifacts/team/reconciliation/artifact.txt'
+```
+
+The planner does not execute provider CLIs or handle credentials. It emits the
+capture commands, proof file path, verifier command, and runtime config template
+that operators should run/archive in their controlled shell. The lower-level
+commands it emits are equivalent to:
 
 ```bash
 aws s3api get-object-retention --bucket polycost-invoice-artifacts --key invoice-artifacts/... > aws-object-retention.json
