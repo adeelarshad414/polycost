@@ -157,6 +157,7 @@ say so explicitly rather than marking it done.
 | Phase 2.65 - Pricing catalog snapshot evidence          | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.66 - Live catalog snapshot capture guard        | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.67 - Live catalog capture fixture smoke         | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.68 - Live catalog capture readiness preflight   | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -888,6 +889,60 @@ Known gaps carried forward:
   `--live` path, operator network access, GCP Cloud Billing read credentials, a
   prior live evidence bundle, and archived sanitized output.
 - Even live catalog snapshot proof remains catalog list-price evidence, not
+  invoice-grade billing or provider invoice-of-record reconciliation.
+
+## Phase 2.68 - Live catalog capture readiness preflight
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added `scripts/pricing-catalog-live-snapshot-capture-preflight.mjs`, a
+  machine-readable live catalog capture readiness preflight.
+- Added `npm run pricing:catalog:snapshot:capture:preflight` for CI-safe advisory
+  posture and `npm run pricing:catalog:snapshot:capture:preflight:strict` for
+  target environments.
+- The preflight checks live guard state, operator attestation, prior
+  `--require-live-provider` evidence, GCP Cloud Billing credential source,
+  AWS/Azure/GCP endpoint configuration, and no-raw-credential output posture.
+- Advisory mode passes local/demo environments with warnings. Strict mode fails
+  unless every live-capture prerequisite is present.
+- Wired advisory preflight into `npm run check`, release readiness, progress
+  verification, README, operator credential docs, release checklist, architecture
+  notes, full-progress ledger, and the production-readiness report.
+
+Verification performed:
+
+- `node --check scripts/pricing-catalog-live-snapshot-capture-preflight.mjs`
+  passed.
+- `node scripts/pricing-catalog-live-snapshot-capture-preflight.mjs --json`
+  passed in local advisory mode with `readyForLiveCapture=false`, `warningCount=4`,
+  and no failures.
+- `node scripts/pricing-catalog-live-snapshot-capture-preflight.mjs --strict-live --json`
+  failed as intended in the local environment because live guard, operator, prior
+  live evidence, and GCP credential source are not configured.
+- Full `npm run check` passed with the advisory preflight in the aggregate floor:
+  API unit `59` suites / `494` tests, web unit `11` suites / `149` tests, graph
+  validation `358` nodes / `358` edges, pricing coverage `36` frontend families,
+  progress verification `413` anchors, release readiness, handover,
+  DevOps/cloud/provider-credential gates, and invoice/Terraform/VSDX/diagram/IdP
+  evidence smokes. Expected caveats remained: local invoice artifact scanner
+  smoke skipped because TCP bind is blocked in this sandbox, `impeccable` is
+  skipped on the repo's Node 20 target, live Postgres migrations were skipped
+  because the local Postgres container was not running, and the default local env
+  still warns that invoice-artifacts are demo/local without live
+  object-storage/KMS/scanner/WORM settings.
+
+Known gaps carried forward:
+
+- This preflight does not call provider pricing APIs and does not prove provider
+  network reachability.
+- Strict preflight readiness is necessary before live capture, but a real
+  `verifiedLiveProviderSnapshot=true` bundle still requires executing the guarded
+  `--live` capture path and validating the generated evidence with
+  `--require-live-provider`.
+- Even strict live capture proof remains catalog list-price evidence, not
   invoice-grade billing or provider invoice-of-record reconciliation.
 
 ## Phase V3.6 - Terraform validation evidence

@@ -104,6 +104,12 @@ Review the live capture plan without provider network calls:
 npm run pricing:catalog:snapshot:capture:plan
 ```
 
+Review live-capture readiness without provider network calls:
+
+```bash
+npm run pricing:catalog:snapshot:capture:preflight
+```
+
 Replay provider-native AWS/Azure/GCP fixture payloads through the same capture
 normalizers without cloud credentials:
 
@@ -116,6 +122,15 @@ operator-authenticated environment. AWS Price List and Azure Retail Prices use
 public read-only catalog endpoints. GCP requires one of:
 `GCP_CLOUD_BILLING_ACCESS_TOKEN`, `GCP_CLOUD_BILLING_ACCESS_TOKEN_FILE`, or Vault
 `secret/polycost/providers/gcp access_token`.
+
+Before claiming the target environment is ready for live provider capture, run:
+
+```bash
+POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true \
+  POLYCOST_OPERATOR="<reviewer-name>" \
+  PRICING_CATALOG_PREVIOUS_LIVE_EVIDENCE=<prior-live-provider-bundle.json> \
+  npm run pricing:catalog:snapshot:capture:preflight:strict
+```
 
 ```bash
 POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true \

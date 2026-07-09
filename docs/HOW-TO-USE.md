@@ -217,8 +217,9 @@ For finance/FinOps:
     Use `npm run pricing:catalog:snapshot:smoke` to prove local provider catalog
     snapshot freshness and exact row-change comparison across AWS, Azure, and GCP.
     Use `npm run pricing:catalog:snapshot:capture:plan` to review live capture
-    prerequisites, `npm run pricing:catalog:snapshot:capture:smoke` to replay
-    provider-native fixture payloads through the capture normalizers, then
+    prerequisites, `npm run pricing:catalog:snapshot:capture:preflight` for
+    advisory readiness, `npm run pricing:catalog:snapshot:capture:smoke` to
+    replay provider-native fixture payloads through the capture normalizers, then
     `POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true npm run pricing:catalog:snapshot:capture -- --live --operator <name> --previous-evidence <prior-live-bundle.json>`
     when an operator has provider network access and GCP Cloud Billing read
     credentials.

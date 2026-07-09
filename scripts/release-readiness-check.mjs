@@ -172,6 +172,12 @@ if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:plan']) {
 if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:smoke']) {
   failures.push('package.json is missing pricing:catalog:snapshot:capture:smoke');
 }
+if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:preflight']) {
+  failures.push('package.json is missing pricing:catalog:snapshot:capture:preflight');
+}
+if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:preflight:strict']) {
+  failures.push('package.json is missing pricing:catalog:snapshot:capture:preflight:strict');
+}
 if (!packageJson.scripts?.['terraform:evidence:check']) {
   failures.push('package.json is missing terraform:evidence:check');
 }
@@ -300,6 +306,11 @@ if (!packageJson.scripts?.check?.includes('npm run pricing:catalog:snapshot:capt
 if (!packageJson.scripts?.check?.includes('npm run pricing:catalog:snapshot:capture:smoke')) {
   failures.push(
     'package.json check script must include npm run pricing:catalog:snapshot:capture:smoke',
+  );
+}
+if (!packageJson.scripts?.check?.includes('npm run pricing:catalog:snapshot:capture:preflight')) {
+  failures.push(
+    'package.json check script must include npm run pricing:catalog:snapshot:capture:preflight',
   );
 }
 if (!packageJson.scripts?.check?.includes('npm run terraform:evidence:check')) {
@@ -992,6 +1003,19 @@ await assertFileContains('scripts/pricing-catalog-live-snapshot-capture-smoke.mj
   ['Azure fixture coverage', 'azureFixture'],
   ['GCP fixture coverage', 'gcpFixture'],
   ['no credential env smoke', 'scrubbedEnv'],
+]);
+
+await assertFileContains('scripts/pricing-catalog-live-snapshot-capture-preflight.mjs', [
+  [
+    'pricing catalog live capture preflight schema',
+    'polycost-pricing-catalog-live-snapshot-capture-preflight/v1',
+  ],
+  ['strict live option', '--strict-live'],
+  ['live guard env', 'POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE'],
+  ['previous evidence env', 'PRICING_CATALOG_PREVIOUS_LIVE_EVIDENCE'],
+  ['GCP credential env', 'GCP_CLOUD_BILLING_ACCESS_TOKEN'],
+  ['strict checker handoff', '--require-live-provider'],
+  ['no raw credential output', 'no_raw_credential_output'],
 ]);
 
 await assertFileContains(

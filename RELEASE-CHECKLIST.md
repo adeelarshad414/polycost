@@ -70,8 +70,12 @@ Complete this checklist before changing the GitHub repository visibility from pr
   `npm run pricing:catalog:snapshot:smoke` before claiming pricing refresh
   snapshot traceability. Run `npm run pricing:catalog:snapshot:capture:plan` to
   review guarded live capture prerequisites, run
+  `npm run pricing:catalog:snapshot:capture:preflight` for advisory readiness,
+  run
   `npm run pricing:catalog:snapshot:capture:smoke` to exercise provider-native
-  capture normalizers without credentials, and use
+  capture normalizers without credentials, run
+  `npm run pricing:catalog:snapshot:capture:preflight:strict` in the target
+  environment before claiming capture readiness, and use
   `npm run pricing:catalog:snapshot:check -- --require-live-provider <bundle.json>`
   before claiming live provider snapshot proof.
 - Confirm destination Terraform evidence can be assembled from runner artifacts with
@@ -116,6 +120,7 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Run `npm run invoice:record:pricing-lineage:smoke`.
 - Run `npm run pricing:catalog:snapshot:check`.
 - Run `npm run pricing:catalog:snapshot:smoke`.
+- Run `npm run pricing:catalog:snapshot:capture:preflight`.
 - Run `npm run pricing:catalog:snapshot:capture:plan`.
 - Run `npm run pricing:catalog:snapshot:capture:smoke`.
 - Run `npm run release:check`.
