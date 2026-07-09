@@ -208,9 +208,11 @@ For finance/FinOps:
     administration, reviewer workflow automation, and provider invoice-of-record
     validation are still future work.
 12. For a provider invoice-of-record pilot, archive sanitized provider invoice,
-    billing export, normalized actuals, private-pricing, tax/adjustment,
-    commitment, retention/notary/audit, and finance/security review digests, then
-    run
+    billing export, normalized actuals, pricing catalog snapshot, private-pricing,
+    tax/adjustment, commitment, retention/notary/audit, and finance/security
+    review digests, then run
     `npm run invoice:record:evidence:check -- --require-provider-invoice <bundle.json>`.
+    Use `npm run invoice:record:pricing-lineage:smoke` to prove the local
+    invoice-to-catalog lineage contract with sanitized evidence.
     The checked-in sample can be validated with
     `npm run invoice:record:evidence:check`, but it is schema-only evidence.

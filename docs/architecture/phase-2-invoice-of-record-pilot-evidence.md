@@ -13,6 +13,17 @@ Run the default schema/sample check:
 npm run invoice:record:evidence:check
 ```
 
+Run the local pricing catalog lineage smoke:
+
+```bash
+npm run invoice:record:pricing-lineage:smoke
+```
+
+The pricing catalog lineage smoke generates sanitized provider-invoice-pilot-shaped
+evidence, a pricing catalog snapshot, and normalized actuals under `.tmp/`, then
+validates that exact SKU rows, source record IDs, payload hashes, and invoice SKU
+matches are present in strict provider-invoice evidence.
+
 For a real provider invoice pilot, archive sanitized digests and metadata for the
 provider invoice of record, billing export manifest, normalized actuals,
 reconciliation evidence packet, private-pricing artifacts, tax/credit/support/
@@ -33,6 +44,8 @@ Provider invoice pilot evidence must cover:
 - provider invoice ID/account/period/control total and invoice digest
 - billing export manifest, normalized actuals digest, row count, source-fingerprint
   coverage, and period match to the invoice
+- pricing catalog snapshot digest, exact source record IDs, source payload hashes,
+  source record keys, source endpoint count, and invoice SKU match coverage
 - reconciliation controls for private pricing, tax, credits/refunds, support/fees,
   marketplace charges, commitments, allocation tags, currency conversion, and SKU
   mapping
@@ -45,8 +58,10 @@ Provider invoice pilot evidence must cover:
 
 ## Boundary
 
-This gate makes invoice-grade pilot evidence measurable. It does not make PolyCost
-a provider invoice system of record, tax/legal authority, procurement contract
-system, payment processor, or billing dispute platform. Final invoice-grade
-interpretation remains customer-owned and depends on provider invoices, contracts,
-legal/tax review, retained artifacts, and finance approval.
+This gate makes invoice-grade pilot evidence measurable. The pricing catalog
+lineage smoke proves the evidence contract can bind invoice SKUs to exact catalog
+source rows; it does not make PolyCost a provider invoice system of record,
+tax/legal authority, procurement contract system, payment processor, or billing
+dispute platform. Final invoice-grade interpretation remains customer-owned and
+depends on provider invoices, contracts, legal/tax review, retained artifacts, and
+finance approval.

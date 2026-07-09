@@ -1,7 +1,7 @@
 # PolyCost Production Readiness Report
 
 Date: 2026-07-09
-Branch: cumulative production-readiness branches through `codex/diagram-llm-drift-alert-smoke`
+Branch: cumulative production-readiness branches through `codex/invoice-pricing-lineage-evidence`
 PR: local phase gate, PR created after verification
 Run spec: `docs/design/master-production-readiness-orchestrator-v2.md`
 
@@ -90,6 +90,7 @@ performance/accessibility/best-practices/SEO metrics.
 | INV-TRACE-031  | Improved      | Invoice artifact staging rehearsal now packages profile, strict provider credential, scanner webhook, notary webhook, and audit-export checks into plan/live modes, with scanner HMAC canary proof and local strict-bind smoke evidence                          |
 | INV-TRACE-032  | Improved      | Live rehearsal outputs now have a machine-verifiable evidence bundle contract, provider credential JSON output, sample-only schema proof, raw-secret guards, and a `--require-live` gate for target-environment attestation                                      |
 | INV-TRACE-033  | Improved      | Phase 2.59 adds `npm run invoice:record:evidence:check`, a strict provider invoice-of-record pilot evidence contract for invoice control totals, billing export lineage, private pricing, adjustments, commitments, retention, notary, audit, and reviewer proof |
+| INV-TRACE-034  | Improved      | Phase 2.64 adds `npm run invoice:record:pricing-lineage:smoke`, proving provider-invoice pilot evidence can bind invoice SKUs to pricing catalog snapshot digests, source record IDs, source payload hashes, and exact SKU match coverage                        |
 | VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                                                                                                      |
 | VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                                                                                                      |
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                                                                                                 |
@@ -306,6 +307,16 @@ Local static/regression gates:
     suites / `149` tests, graph validation `349` nodes / `349` edges, pricing
     coverage `36` frontend families, progress verification `296` anchors, and the
     new invoice-of-record evidence gate in the aggregate floor.
+- Phase 2.64 invoice pricing lineage evidence smoke gates passed:
+  - `node --check scripts/invoice-of-record-pricing-lineage-smoke.mjs` passed.
+  - `node --check scripts/invoice-of-record-pilot-evidence-check.mjs` passed.
+  - `node scripts/invoice-of-record-pricing-lineage-smoke.mjs --json` passed with
+    `invoiceSkuCount=3`, `matchedSkuCount=3`, `catalogSourceRecordCount=3`, and
+    `verifiedProviderInvoicePilot=true`.
+  - Full `npm run check` passed with API `59` suites / `494` tests, web `11`
+    suites / `149` tests, graph validation `356` nodes / `356` edges, pricing
+    coverage `36` frontend families, progress verification `371` anchors, and the
+    new invoice pricing-lineage smoke in the aggregate floor.
 - Phase 2.19 invoice adjustment evidence focused gates passed:
   - API focused: `src/api/auth-billing.spec.ts`: 1 suite / 23 tests.
   - Web focused: `src/App.spec.tsx`: 1 suite / 60 tests.
@@ -913,9 +924,10 @@ Machine-readable token evidence:
   Phase 2.34 adds a metadata-only invoice evidence packet export for reviewer
   handoff, and Phase 2.35 makes that packet tamper-evident with a stable-JSON
   SHA-256 integrity manifest. Phase 2.36 adds an offline verifier CLI for exported
-  packets, but these phases do not replace provider invoice rendering, private
-  contract/legal validation, or provider-authenticated invoice-of-record
-  reconciliation.
+  packets. Phase 2.64 adds invoice-to-pricing-catalog lineage evidence for exact
+  SKU rows and catalog snapshot digests, but these phases do not replace provider
+  invoice rendering, private contract/legal validation, or provider-authenticated
+  invoice-of-record reconciliation.
   Phase 2.25 adds durable database-backed artifact file upload/download with
   metadata-only reconciliation evidence and audit events. Phase 2.26 adds storage,
   KMS-readiness, retention/legal-hold, and EICAR scan-hook governance metadata.

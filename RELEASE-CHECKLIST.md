@@ -63,6 +63,9 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Confirm provider invoice-of-record pilot evidence is archived with
   `npm run invoice:record:evidence:check -- --require-provider-invoice <bundle.json>`
   before claiming invoice-grade finance pilot readiness.
+- Confirm invoice-to-pricing-catalog lineage proof passes with
+  `npm run invoice:record:pricing-lineage:smoke` before claiming invoice pilot
+  SKU traceability.
 - Confirm destination Terraform evidence can be assembled from runner artifacts with
   `npm run terraform:evidence:capture:smoke` before claiming Terraform destination-plan
   handoff readiness.
@@ -102,6 +105,7 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Run `npm run diagram:llm-corpus:drift:alert:smoke`.
 - Run `npm run enterprise:idp:evidence:check`.
 - Run `npm run invoice:record:evidence:check`.
+- Run `npm run invoice:record:pricing-lineage:smoke`.
 - Run `npm run release:check`.
 - Run `npm run loading:check`.
 - Run `npm run handover:check`.

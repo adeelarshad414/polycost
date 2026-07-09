@@ -188,7 +188,10 @@ Health and operations:
   hardening layer proves provider-native artifact write/read/delete adapters,
   configuration readiness, webhook scanner integration, retention enforcement, and
   a strict provider-invoice pilot evidence contract over database-backed and
-  external object-backed artifact rows.
+  external object-backed artifact rows. The local
+  `npm run invoice:record:pricing-lineage:smoke` proof binds sanitized invoice
+  SKUs to pricing catalog snapshot digests and exact source rows, but it is still
+  not provider invoice rendering or legal invoice-grade certification.
 - VSDX parsing is layout-aware extraction, not full Visio rendering.
 - Production LLM quality depends on a real endpoint/model, Vault secret, and corpus
   evaluation. The capture helper is `npm run diagram:llm-corpus:capture`; the

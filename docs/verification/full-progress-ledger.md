@@ -79,6 +79,10 @@ Evidence:
   `npm run invoice:record:evidence:check`, backed by
   `docs/operations/evidence/invoice-of-record-pilot-evidence.example.json` and strict
   `--require-provider-invoice` mode for production finance/security-reviewed bundles.
+- Invoice-to-pricing-catalog lineage now has a runnable local smoke through
+  `npm run invoice:record:pricing-lineage:smoke`, proving strict provider-invoice
+  evidence can carry a pricing catalog snapshot digest, exact source record IDs,
+  source payload hashes, source record keys, and full invoice SKU match coverage.
 - `docs/PROVIDER-CREDENTIALS.md` states the current production swap procedure and
   explicitly limits real provider mode to catalog list prices, not invoices.
 
