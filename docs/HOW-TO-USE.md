@@ -214,5 +214,7 @@ For finance/FinOps:
     `npm run invoice:record:evidence:check -- --require-provider-invoice <bundle.json>`.
     Use `npm run invoice:record:pricing-lineage:smoke` to prove the local
     invoice-to-catalog lineage contract with sanitized evidence.
+    Use `npm run pricing:catalog:snapshot:smoke` to prove local provider catalog
+    snapshot freshness and exact row-change comparison across AWS, Azure, and GCP.
     The checked-in sample can be validated with
     `npm run invoice:record:evidence:check`, but it is schema-only evidence.

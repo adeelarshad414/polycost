@@ -84,6 +84,31 @@ npm run provider:credentials:check:strict
 Use strict mode in CI or pre-demo production rehearsals. Non-strict mode is intended for
 local demos where mock providers are intentionally enabled.
 
+## Catalog Snapshot Evidence
+
+Run the checked-in schema sample:
+
+```bash
+npm run pricing:catalog:snapshot:check
+```
+
+Run the local AWS/Azure/GCP snapshot comparison smoke:
+
+```bash
+npm run pricing:catalog:snapshot:smoke
+```
+
+For live provider proof, archive a sanitized snapshot evidence bundle from real AWS
+Price List, Azure Retail Prices, and GCP Cloud Billing Catalog refreshes, then run:
+
+```bash
+npm run pricing:catalog:snapshot:check -- --require-live-provider <bundle.json>
+```
+
+The local smoke proves freshness math, snapshot digests, exact row-change detection,
+and source payload hash coverage. It does not call provider APIs and does not turn
+catalog list prices into invoice-grade billing.
+
 ## Traceability Contract
 
 Every catalog-backed comparison line item now includes:

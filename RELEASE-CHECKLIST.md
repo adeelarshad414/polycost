@@ -66,6 +66,11 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Confirm invoice-to-pricing-catalog lineage proof passes with
   `npm run invoice:record:pricing-lineage:smoke` before claiming invoice pilot
   SKU traceability.
+- Confirm provider catalog snapshot comparison proof passes with
+  `npm run pricing:catalog:snapshot:smoke` before claiming pricing refresh
+  snapshot traceability, and use
+  `npm run pricing:catalog:snapshot:check -- --require-live-provider <bundle.json>`
+  before claiming live provider snapshot proof.
 - Confirm destination Terraform evidence can be assembled from runner artifacts with
   `npm run terraform:evidence:capture:smoke` before claiming Terraform destination-plan
   handoff readiness.
@@ -106,6 +111,8 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Run `npm run enterprise:idp:evidence:check`.
 - Run `npm run invoice:record:evidence:check`.
 - Run `npm run invoice:record:pricing-lineage:smoke`.
+- Run `npm run pricing:catalog:snapshot:check`.
+- Run `npm run pricing:catalog:snapshot:smoke`.
 - Run `npm run release:check`.
 - Run `npm run loading:check`.
 - Run `npm run handover:check`.

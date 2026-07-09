@@ -107,6 +107,8 @@ async function assertPhaseEvidenceAnchors() {
     'npm run invoice:artifact-rehearsal:evidence:check',
     'npm run invoice:record:evidence:check',
     'npm run invoice:record:pricing-lineage:smoke',
+    'npm run pricing:catalog:snapshot:check',
+    'npm run pricing:catalog:snapshot:smoke',
     'npm run terraform:evidence:check',
     'npm run terraform:evidence:capture:smoke',
     'npm run vsdx:visual-evidence:check',
@@ -385,6 +387,35 @@ async function assertPhaseEvidenceAnchors() {
     ['matched SKU coverage', 'invoiceSkuMatchCoverage'],
   ]);
 
+  await assertFileContains('scripts/pricing-catalog-snapshot-evidence-check.mjs', [
+    ['pricing catalog snapshot evidence schema', 'polycost-pricing-catalog-snapshot-evidence/v1'],
+    [
+      'pricing catalog snapshot check schema',
+      'polycost-pricing-catalog-snapshot-evidence-check/v1',
+    ],
+    ['require provider snapshot mode', '--require-provider-snapshot'],
+    ['require live provider mode', '--require-live-provider'],
+    ['exact row-change proof', 'exactRowChangeVerified'],
+    ['source payload hash coverage', 'sourcePayloadHashCoverage'],
+  ]);
+
+  await assertFileContains('scripts/pricing-catalog-snapshot-smoke.mjs', [
+    ['pricing catalog snapshot smoke schema', 'polycost-pricing-catalog-snapshot-smoke/v1'],
+    ['pricing catalog evidence schema', 'polycost-pricing-catalog-snapshot-evidence/v1'],
+    ['strict snapshot checker handoff', 'pricing-catalog-snapshot-evidence-check.mjs'],
+    ['changed row proof', 'priceChangedSkuCount'],
+  ]);
+
+  await assertFileContains(
+    'docs/operations/evidence/pricing-catalog-snapshot/pricing-catalog-snapshot.example.json',
+    [
+      ['pricing catalog snapshot evidence schema', 'polycost-pricing-catalog-snapshot-evidence/v1'],
+      ['sample-only evidence level', 'example-schema'],
+      ['source payload hash coverage', '"sourcePayloadHashCoverage": 1'],
+      ['live provider caveat', 'evidenceLevel=live-provider-snapshot'],
+    ],
+  );
+
   await assertFileContains('scripts/provider-credential-check.mjs', [
     ['provider credential JSON schema', 'polycost-provider-credential-check/v1'],
     ['provider credential JSON option', '--json'],
@@ -661,6 +692,14 @@ async function assertPhaseEvidenceAnchors() {
     ['invoice system boundary', 'provider invoice system of record'],
   ]);
 
+  await assertFileContains('docs/architecture/phase-2-pricing-catalog-snapshot-evidence.md', [
+    ['pricing catalog snapshot architecture note', 'Phase 2 Pricing Catalog Snapshot Evidence'],
+    ['pricing catalog snapshot check command', 'npm run pricing:catalog:snapshot:check'],
+    ['pricing catalog snapshot smoke command', 'npm run pricing:catalog:snapshot:smoke'],
+    ['live provider strict mode', '--require-live-provider'],
+    ['catalog-list-price boundary', 'catalog-list-price evidence'],
+  ]);
+
   await assertFileContains('docs/operations/invoice-artifact-production-profile.example.json', [
     ['production profile schema', 'polycost-invoice-artifact-production-profile/v1'],
     ['config-evidence verification level', 'verified(config-evidence)'],
@@ -698,6 +737,8 @@ async function assertPhaseEvidenceAnchors() {
       'invoice-of-record pricing lineage smoke ledger',
       'npm run invoice:record:pricing-lineage:smoke',
     ],
+    ['pricing catalog snapshot checker ledger', 'npm run pricing:catalog:snapshot:check'],
+    ['pricing catalog snapshot smoke ledger', 'npm run pricing:catalog:snapshot:smoke'],
     ['Terraform destination capture checker ledger', 'npm run terraform:evidence:capture:smoke'],
     ['auth enterprise deferred ledger', 'Full enterprise account/team UX'],
     ['auth live transcript ledger', 'workspace-auth-rbac-sso'],

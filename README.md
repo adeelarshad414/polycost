@@ -60,6 +60,10 @@ retention/notary/audit, and finance/security review digests, then run
 `npm run invoice:record:evidence:check -- --require-provider-invoice <bundle.json>`.
 Use `npm run invoice:record:pricing-lineage:smoke` for the local pricing catalog
 lineage smoke that binds sanitized invoice SKUs to exact catalog source rows.
+Use `npm run pricing:catalog:snapshot:smoke` for the local AWS/Azure/GCP catalog
+snapshot comparison proof, and
+`npm run pricing:catalog:snapshot:check -- --require-live-provider <bundle.json>`
+for archived live provider snapshot evidence.
 The checked-in example validates the contract only; PolyCost still is not the
 provider invoice system of record. See
 `docs/architecture/phase-2-invoice-of-record-pilot-evidence.md`.
@@ -560,6 +564,8 @@ block TCP listeners report a structured skip unless strict mode is enabled.
   enterprise IdP pilot evidence contract.
 - `docs/architecture/phase-2-invoice-of-record-pilot-evidence.md` documents the
   provider invoice-of-record pilot evidence contract.
+- `docs/architecture/phase-2-pricing-catalog-snapshot-evidence.md` documents the
+  provider catalog snapshot freshness and exact row-change evidence contract.
 - `docs/development/open-source-readiness.md` tracks the private-to-public launch
   checklist.
 - `docs/operations/live-pricing-credentials.md` documents live-pricing ETL,

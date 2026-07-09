@@ -83,6 +83,9 @@ Evidence:
   `npm run invoice:record:pricing-lineage:smoke`, proving strict provider-invoice
   evidence can carry a pricing catalog snapshot digest, exact source record IDs,
   source payload hashes, source record keys, and full invoice SKU match coverage.
+- Provider catalog snapshot evidence now has a runnable contract through
+  `npm run pricing:catalog:snapshot:check`, plus local AWS/Azure/GCP exact
+  row-change proof through `npm run pricing:catalog:snapshot:smoke`.
 - `docs/PROVIDER-CREDENTIALS.md` states the current production swap procedure and
   explicitly limits real provider mode to catalog list prices, not invoices.
 

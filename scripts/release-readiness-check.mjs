@@ -38,6 +38,7 @@ const requiredFiles = [
   'docs/operations/evidence/aws-s3-retention-proof.example.json',
   'docs/operations/evidence/invoice-artifact-rehearsal-evidence.example.json',
   'docs/operations/evidence/invoice-of-record-pilot-evidence.example.json',
+  'docs/operations/evidence/pricing-catalog-snapshot/pricing-catalog-snapshot.example.json',
   'docs/operations/evidence/terraform-validation-evidence.example.json',
   'docs/operations/evidence/terraform-destination-capture/terraform-destination-capture.example.json',
   'docs/operations/evidence/terraform-destination-capture/BUNDLE-MANIFEST.json',
@@ -52,6 +53,7 @@ const requiredFiles = [
   'docs/architecture/phase-v3-6-terraform-validation-evidence.md',
   'docs/architecture/phase-v3-7-terraform-destination-evidence-capture.md',
   'docs/architecture/phase-2-invoice-of-record-pilot-evidence.md',
+  'docs/architecture/phase-2-pricing-catalog-snapshot-evidence.md',
   'docs/architecture/phase-2-vsdx-visual-evidence.md',
   'docs/architecture/phase-2-diagram-llm-corpus-evidence.md',
   'docs/architecture/phase-2-diagram-llm-corpus-evidence-capture.md',
@@ -154,6 +156,12 @@ if (!packageJson.scripts?.['invoice:record:evidence:check']) {
 }
 if (!packageJson.scripts?.['invoice:record:pricing-lineage:smoke']) {
   failures.push('package.json is missing invoice:record:pricing-lineage:smoke');
+}
+if (!packageJson.scripts?.['pricing:catalog:snapshot:check']) {
+  failures.push('package.json is missing pricing:catalog:snapshot:check');
+}
+if (!packageJson.scripts?.['pricing:catalog:snapshot:smoke']) {
+  failures.push('package.json is missing pricing:catalog:snapshot:smoke');
 }
 if (!packageJson.scripts?.['terraform:evidence:check']) {
   failures.push('package.json is missing terraform:evidence:check');
@@ -268,6 +276,12 @@ if (!packageJson.scripts?.check?.includes('npm run invoice:record:pricing-lineag
   failures.push(
     'package.json check script must include npm run invoice:record:pricing-lineage:smoke',
   );
+}
+if (!packageJson.scripts?.check?.includes('npm run pricing:catalog:snapshot:check')) {
+  failures.push('package.json check script must include npm run pricing:catalog:snapshot:check');
+}
+if (!packageJson.scripts?.check?.includes('npm run pricing:catalog:snapshot:smoke')) {
+  failures.push('package.json check script must include npm run pricing:catalog:snapshot:smoke');
 }
 if (!packageJson.scripts?.check?.includes('npm run terraform:evidence:check')) {
   failures.push('package.json check script must include npm run terraform:evidence:check');
@@ -916,6 +930,26 @@ await assertFileContains('scripts/invoice-of-record-pricing-lineage-smoke.mjs', 
   ['matched SKU coverage', 'invoiceSkuMatchCoverage'],
 ]);
 
+await assertFileContains('scripts/pricing-catalog-snapshot-evidence-check.mjs', [
+  ['pricing catalog snapshot evidence schema', 'polycost-pricing-catalog-snapshot-evidence/v1'],
+  ['pricing catalog snapshot check schema', 'polycost-pricing-catalog-snapshot-evidence-check/v1'],
+  ['provider snapshot strict option', '--require-provider-snapshot'],
+  ['live provider strict option', '--require-live-provider'],
+  ['exact row-change proof', 'exactRowChangeVerified'],
+  ['source payload hash coverage', 'sourcePayloadHashCoverage'],
+  ['raw catalog payload guard', 'findForbiddenRawPayloads'],
+]);
+
+await assertFileContains('scripts/pricing-catalog-snapshot-smoke.mjs', [
+  ['pricing catalog snapshot smoke schema', 'polycost-pricing-catalog-snapshot-smoke/v1'],
+  ['pricing catalog evidence schema', 'polycost-pricing-catalog-snapshot-evidence/v1'],
+  ['strict snapshot checker handoff', 'pricing-catalog-snapshot-evidence-check.mjs'],
+  ['AWS provider coverage', "'aws'"],
+  ['Azure provider coverage', "'azure'"],
+  ['GCP provider coverage', "'gcp'"],
+  ['changed row proof', 'priceChangedSkuCount'],
+]);
+
 await assertFileContains(
   'docs/operations/evidence/invoice-artifact-rehearsal-evidence.example.json',
   [
@@ -937,6 +971,17 @@ await assertFileContains('docs/operations/evidence/invoice-of-record-pilot-evide
   ['provider invoice pilot caveat', 'evidenceLevel=provider-invoice-pilot'],
   ['invoice control total check', 'providerInvoiceControlTotals'],
 ]);
+
+await assertFileContains(
+  'docs/operations/evidence/pricing-catalog-snapshot/pricing-catalog-snapshot.example.json',
+  [
+    ['pricing catalog snapshot evidence schema', 'polycost-pricing-catalog-snapshot-evidence/v1'],
+    ['sample-only evidence level', 'example-schema'],
+    ['snapshot window evidence', '"snapshotWindow"'],
+    ['source payload hash coverage', '"sourcePayloadHashCoverage": 1'],
+    ['live provider caveat', 'evidenceLevel=live-provider-snapshot'],
+  ],
+);
 
 await assertFileContains('scripts/terraform-validation-evidence-check.mjs', [
   ['Terraform evidence bundle schema', 'polycost-terraform-validation-evidence/v1'],
@@ -1138,6 +1183,14 @@ await assertFileContains('docs/architecture/phase-2-invoice-of-record-pilot-evid
   ['provider invoice strict mode', '--require-provider-invoice'],
   ['pricing lineage boundary', 'pricing catalog lineage smoke'],
   ['invoice system boundary', 'provider invoice system of record'],
+]);
+
+await assertFileContains('docs/architecture/phase-2-pricing-catalog-snapshot-evidence.md', [
+  ['pricing catalog snapshot title', 'Phase 2 Pricing Catalog Snapshot Evidence'],
+  ['pricing catalog snapshot check command', 'npm run pricing:catalog:snapshot:check'],
+  ['pricing catalog snapshot smoke command', 'npm run pricing:catalog:snapshot:smoke'],
+  ['live provider strict mode', '--require-live-provider'],
+  ['catalog-list-price boundary', 'catalog-list-price evidence'],
 ]);
 
 await assertFileContains('docs/architecture/phase-v3-7-terraform-destination-evidence-capture.md', [

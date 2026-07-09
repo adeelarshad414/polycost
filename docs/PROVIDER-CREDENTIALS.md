@@ -416,6 +416,11 @@ Use `npm run invoice:record:pricing-lineage:smoke` for a local sanitized proof
 that invoice SKUs can be linked to exact pricing catalog rows, source record IDs,
 source payload hashes, and catalog snapshot digests.
 
+Use `npm run pricing:catalog:snapshot:smoke` for local provider catalog snapshot
+comparison evidence, and
+`npm run pricing:catalog:snapshot:check -- --require-live-provider <bundle.json>`
+after archiving sanitized live AWS/Azure/GCP catalog snapshot evidence.
+
 The checked-in example can be validated with `npm run invoice:record:evidence:check`
 for schema coverage only. It is not provider invoice proof and does not make
 PolyCost the provider invoice system of record. Do not place raw invoices, raw
