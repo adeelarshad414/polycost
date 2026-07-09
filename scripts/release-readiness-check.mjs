@@ -108,8 +108,20 @@ if (!packageJson.scripts?.['invoice:retention-proof:capture']) {
 if (!packageJson.scripts?.['invoice:retention-proof:capture:smoke']) {
   failures.push('package.json is missing invoice:retention-proof:capture:smoke');
 }
+if (!packageJson.scripts?.['invoice:artifact-scanner:smoke']) {
+  failures.push('package.json is missing invoice:artifact-scanner:smoke');
+}
+if (!packageJson.scripts?.['invoice:artifact-scanner:smoke:local']) {
+  failures.push('package.json is missing invoice:artifact-scanner:smoke:local');
+}
 if (!packageJson.scripts?.['invoice:artifact-profile:check']) {
   failures.push('package.json is missing invoice:artifact-profile:check');
+}
+if (!packageJson.scripts?.['invoice:artifact-rehearsal:plan']) {
+  failures.push('package.json is missing invoice:artifact-rehearsal:plan');
+}
+if (!packageJson.scripts?.['invoice:artifact-rehearsal:live']) {
+  failures.push('package.json is missing invoice:artifact-rehearsal:live');
 }
 if (!packageJson.scripts?.['pricing:logic:coverage']) {
   failures.push('package.json is missing pricing:logic:coverage');
@@ -168,8 +180,16 @@ if (!packageJson.scripts?.check?.includes('npm run invoice:retention-proof:captu
     'package.json check script must include npm run invoice:retention-proof:capture:smoke',
   );
 }
+if (!packageJson.scripts?.check?.includes('npm run invoice:artifact-scanner:smoke:local')) {
+  failures.push(
+    'package.json check script must include npm run invoice:artifact-scanner:smoke:local',
+  );
+}
 if (!packageJson.scripts?.check?.includes('npm run invoice:artifact-profile:check')) {
   failures.push('package.json check script must include npm run invoice:artifact-profile:check');
+}
+if (!packageJson.scripts?.check?.includes('npm run invoice:artifact-rehearsal:plan')) {
+  failures.push('package.json check script must include npm run invoice:artifact-rehearsal:plan');
 }
 
 assertScriptIncludes('test:production-readiness', [
@@ -663,6 +683,30 @@ await assertFileContains('scripts/invoice-artifact-production-profile-check.mjs'
   ['profile secret exclusion', 'forbiddenRuntimeSecretKeys'],
   ['profile proof verifier reuse', 'invoice-artifact-provider-retention-proof-verifier.mjs'],
   ['live cloud caveat', 'Run provider:credentials:check:strict'],
+]);
+
+await assertFileContains('scripts/invoice-artifact-scanner-webhook-smoke.mjs', [
+  ['scanner signature header', 'x-polycost-artifact-signature'],
+  ['scanner HTTPS guard', 'must use HTTPS unless --allow-http-local'],
+  ['scanner clean verdict', "parsedResponse.verdict === 'clean'"],
+  ['scanner secret dummy guard', 'isDummyCredential'],
+]);
+
+await assertFileContains('scripts/invoice-artifact-scanner-local-smoke.mjs', [
+  ['local scanner receiver schema', 'invoice-artifact-scanner-local-smoke/v1'],
+  ['constant-time scanner signature check', 'timingSafeEqual'],
+  ['sandbox bind skip', 'local TCP bind is not permitted in this sandbox'],
+  ['strict bind env', 'POLYCOST_INVOICE_ARTIFACT_SCANNER_LOCAL_SMOKE_STRICT=1'],
+]);
+
+await assertFileContains('scripts/invoice-artifact-staging-rehearsal.mjs', [
+  ['staging rehearsal schema', 'polycost-invoice-artifact-staging-rehearsal/v1'],
+  ['plan-only mode caveat', 'without reading Vault or calling external endpoints'],
+  ['strict credential live step', 'provider-credentials-strict'],
+  ['scanner live step', 'scanner-webhook-smoke'],
+  ['notary live step', 'notary-webhook-smoke'],
+  ['audit live step', 'audit-export-smoke'],
+  ['secret handling statement', 'raw secrets must stay in Vault/runtime env'],
 ]);
 
 await assertFileContains('docs/operations/invoice-artifact-production-profile.example.json', [

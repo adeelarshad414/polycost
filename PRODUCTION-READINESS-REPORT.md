@@ -87,6 +87,7 @@ performance/accessibility/best-practices/SEO metrics.
 | INV-TRACE-028  | Improved      | Attached provider retention proof metadata now persists on the exact `invoice_artifact_blobs` row, refreshes the artifact read model, extends clean Docker migrations through `039`, and release-gates the schema/audit action constraints              |
 | INV-TRACE-029  | Improved      | Provider retention proof capture can now run optional read-only AWS/Azure/GCP CLI commands from an operator-authenticated shell with dry-run, no-shell argument arrays, signed URI rejection, verifier handoff, and release-gated smoke coverage        |
 | INV-TRACE-030  | Improved      | Invoice artifact production-profile checks now validate sanitized external object-storage/KMS/scanner/WORM/receipt/audit evidence bundles, proof digest consistency, secret-reference-only posture, and offline provider proof verification             |
+| INV-TRACE-031  | Improved      | Invoice artifact staging rehearsal now packages profile, strict provider credential, scanner webhook, notary webhook, and audit-export checks into plan/live modes, with scanner HMAC canary proof and local strict-bind smoke evidence                 |
 | VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                                                                                             |
 | VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                                                                                             |
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                                                                                        |
@@ -133,6 +134,20 @@ Local static/regression gates:
 - `npm run ci:lint` passed with zero ESLint warnings.
 - `npm run theme:hex:check` passed.
 - `npm run check` passed.
+- Phase 2.54 invoice artifact staging rehearsal gates passed:
+  - `node --check` passed for the scanner webhook smoke, scanner local smoke, and
+    staging rehearsal scripts.
+  - `npm run invoice:artifact-scanner:smoke:local` passed with a structured
+    `invoice-artifact-scanner-local-smoke/v1` skip in this sandbox because local TCP
+    bind is blocked; strict mode turns that into a failure where local listeners are
+    expected.
+  - `npm run invoice:artifact-rehearsal:plan -- --json` passed and emitted the live
+    target-environment checklist for profile, strict provider credentials, scanner
+    webhook, notary webhook, and audit-export smokes.
+  - Full `npm run check` passed with API `59` suites / `494` tests, web `11` suites
+    / `149` tests, graph validation `330` nodes / `330` edges, pricing coverage
+    `36` frontend families, progress verification `189` anchors, and the new
+    invoice artifact rehearsal gates in the aggregate floor.
 - Phase 2.19 invoice adjustment evidence focused gates passed:
   - API focused: `src/api/auth-billing.spec.ts`: 1 suite / 23 tests.
   - Web focused: `src/App.spec.tsx`: 1 suite / 60 tests.

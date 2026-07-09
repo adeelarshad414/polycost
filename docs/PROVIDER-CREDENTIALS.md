@@ -297,6 +297,33 @@ After replacing the example values with target-environment references, run
 `npm run provider:credentials:check:strict` and the staging scanner/notary/audit
 smokes from the deployed environment.
 
+### Staging Rehearsal Harness
+
+Use the rehearsal harness to package those checks into one operator workflow. Plan
+mode is safe for local CI and documentation reviews because it validates the
+profile and prints the exact live checklist without reading Vault or calling
+external endpoints:
+
+```bash
+npm run invoice:artifact-rehearsal:plan
+```
+
+Live mode is for staging or production-like environments only. It overlays the
+profile runtime config onto the current shell, then runs the profile check, strict
+provider credential check, scanner webhook canary, invoice evidence notary canary,
+and audit-export canary:
+
+```bash
+npm run invoice:artifact-rehearsal:live
+```
+
+Archive the JSON output from live mode together with receiver-side WORM/object-lock
+retention evidence for the scanner, notary, and audit-export canary references.
+If your local environment permits TCP listeners, `npm run
+invoice:artifact-scanner:smoke:local` also proves the scanner webhook HMAC
+contract. Sandboxes that block local TCP binding report a structured skipped
+status unless `POLYCOST_INVOICE_ARTIFACT_SCANNER_LOCAL_SMOKE_STRICT=1` is set.
+
 After verification, billing Owners/Admins can attach the provider-retention proof
 to the exact stored invoice artifact without giving PolyCost provider credentials:
 

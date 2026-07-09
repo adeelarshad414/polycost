@@ -143,6 +143,7 @@ say so explicitly rather than marking it done.
 | Phase 2.51 - SCIM live verification transcript          | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.52 - Isolated E2E and runtime DI hardening      | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.53 - Invoice artifact production profile check  | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.54 - Invoice artifact staging rehearsal harness | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -156,6 +157,77 @@ say so explicitly rather than marking it done.
 | Browser audit artifact hardening                        | Complete with known gaps (see notes) | 2026-07-08   |
 | Formal browser audit tooling                            | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3.5 - Terraform bundle integrity validation      | Complete with known gaps (see notes) | 2026-07-08   |
+
+## Phase 2.54 - Invoice artifact staging rehearsal harness
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added `scripts/invoice-artifact-scanner-webhook-smoke.mjs`, a staging canary
+  sender for the artifact scanner webhook contract. It sends digest-covered test
+  content, signs the request with `x-polycost-artifact-signature`, requires HTTPS
+  except for explicit local smoke mode, rejects dummy secrets, and requires a clean
+  scanner verdict before passing.
+- Added `scripts/invoice-artifact-scanner-local-smoke.mjs`, a local HMAC receiver
+  smoke that verifies the scanner payload, signature, checksum, and sender response.
+  Sandboxes that disallow local TCP listeners return a structured skip unless
+  `POLYCOST_INVOICE_ARTIFACT_SCANNER_LOCAL_SMOKE_STRICT=1` is set.
+- Added `scripts/invoice-artifact-staging-rehearsal.mjs` with `--plan` and `--live`
+  modes. Plan mode validates the sanitized production profile and prints the exact
+  target-environment checklist without reading Vault or calling external services;
+  live mode overlays profile runtime config and runs strict provider credentials,
+  scanner webhook, notary webhook, and audit-export smokes.
+- Added `npm run invoice:artifact-scanner:smoke`,
+  `npm run invoice:artifact-scanner:smoke:local`,
+  `npm run invoice:artifact-rehearsal:plan`, and
+  `npm run invoice:artifact-rehearsal:live`. The aggregate `npm run check` floor now
+  includes the local scanner smoke and rehearsal plan gate.
+- Updated provider-credential and README guidance so operators can distinguish local
+  rehearsal planning from live target-environment proof and archive receiver-side
+  WORM/object-lock evidence after live runs.
+- Extended release-readiness and progress-verification guards so the scanner sender,
+  local receiver smoke, staging rehearsal plan/live modes, and secret-handling
+  caveats cannot silently disappear.
+
+Verification performed:
+
+- `node --check scripts/invoice-artifact-scanner-webhook-smoke.mjs` passed.
+- `node --check scripts/invoice-artifact-scanner-local-smoke.mjs` passed.
+- `node --check scripts/invoice-artifact-staging-rehearsal.mjs` passed.
+- `npm run invoice:artifact-scanner:smoke:local` passed in this sandbox with a
+  structured `invoice-artifact-scanner-local-smoke/v1` skip because local TCP bind is
+  not permitted; strict mode makes that condition fail in runners where local
+  listeners are expected.
+- `npm run invoice:artifact-rehearsal:plan -- --json` passed and emitted the
+  profile check result plus live commands for profile, strict provider credentials,
+  scanner webhook, notary webhook, and audit-export smokes.
+- `npm run release:check` passed.
+- `npm run progress:verify` passed with `189` phase evidence anchors verified.
+- Full `npm run check` passed with the scanner local smoke and rehearsal plan in the
+  aggregate floor. The run included API unit `59` suites / `494` tests, web unit
+  `11` suites / `149` tests, graph validation `330` nodes / `330` edges, pricing
+  coverage `36` frontend families, progress verification `189` anchors, release
+  readiness, handover, DevOps/cloud/provider-credential gates, and invoice
+  evidence/retention-proof/profile/rehearsal smokes. Expected caveats remained:
+  `impeccable` is skipped on the repo's Node 20 target, live Postgres migrations
+  were skipped because the local Postgres container was not running, the local cloud
+  check is documentation/config only, and the default local env still warns that
+  invoice-artifacts are demo/local without live object-storage/KMS/scanner/WORM
+  settings.
+
+Known gaps carried forward:
+
+- This adds a repeatable staging rehearsal harness, but live mode was not run in the
+  local sandbox because it requires real Vault/provider/scanner/notary/audit
+  endpoints and archived target-environment evidence.
+- Local scanner smoke is contract proof only when a runner permits local TCP bind; in
+  restricted sandboxes it reports a structured skip unless strict mode is enabled.
+- PolyCost is still not invoice-grade billing software until a customer environment
+  runs the live rehearsal, writes provider object-storage evidence, captures
+  receiver-side WORM retention proof, and reconciles against provider invoices of
+  record.
 
 ## Phase 2.53 - Invoice artifact production profile check
 

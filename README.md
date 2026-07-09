@@ -443,6 +443,13 @@ Vault references rather than raw credential material. It is
 `verified(config-evidence)` only; live cloud/Vault proof still requires
 `npm run provider:credentials:check:strict` in the target environment.
 
+To rehearse the full artifact-governance handoff, run
+`npm run invoice:artifact-rehearsal:plan` locally, then run
+`npm run invoice:artifact-rehearsal:live` from the staging environment after Vault,
+scanner, notary, audit-export, and provider object-lock evidence are configured.
+The local check also runs `npm run invoice:artifact-scanner:smoke:local`; sandboxes
+that block TCP listeners report a structured skip unless strict mode is enabled.
+
 ## Documentation
 
 - `docs/HOW-TO-USE.md` explains the customer-facing product workflow and demo

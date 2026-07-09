@@ -528,6 +528,19 @@ polycost/notary-reference-receiver:local .` passed. The receiver intentionally
   families, progress verification `175` anchors, release readiness, handover,
   DevOps/cloud/provider-credential gates, and invoice evidence/retention-proof/profile
   smokes.
+- Invoice artifact staging rehearsal now adds a scanner webhook HMAC canary sender,
+  a local receiver smoke with strict-bind mode, and a plan/live rehearsal
+  orchestrator. The local plan validates the sanitized production profile and emits
+  the exact live target-environment checklist for profile, strict provider
+  credential, scanner webhook, notary webhook, and audit-export checks without
+  reading Vault or calling external services. The progress verifier passed afterward
+  with `189` anchors.
+- Full `npm run check` passed afterward with the rehearsal gates in the aggregate
+  floor: API unit `59` suites / `494` tests, web unit `11` suites / `149` tests,
+  graph validation `330` nodes / `330` edges, pricing coverage `36` frontend
+  families, progress verification `189` anchors, release readiness, handover,
+  DevOps/cloud/provider-credential gates, and invoice
+  evidence/retention-proof/profile/rehearsal smokes.
 
 Blocked:
 
