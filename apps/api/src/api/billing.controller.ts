@@ -124,6 +124,21 @@ export class BillingController {
     );
   }
 
+  @Patch('reconciliations/:id/artifacts/:artifactId/blob/provider-retention-proof')
+  attachInvoiceArtifactProviderRetentionProof(
+    @Param('id') reconciliationId: string,
+    @Param('artifactId') artifactId: string,
+    @Body() body: unknown,
+    @Req() request: RequestWithAuth,
+  ) {
+    return this.billingService.attachInvoiceArtifactProviderRetentionProof(
+      reconciliationId,
+      artifactId,
+      body,
+      request.auth!,
+    );
+  }
+
   @Patch('reconciliations/:id/artifacts/:artifactId/review')
   updateInvoiceArtifactReview(
     @Param('id') reconciliationId: string,

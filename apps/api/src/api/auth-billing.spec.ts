@@ -2428,6 +2428,149 @@ describe('BillingService', () => {
     );
   });
 
+  it('lets artifact-level provider retention proof satisfy the evidence packet gate', async () => {
+    const repository = repositoryMock();
+    const objectStore = {
+      bucketOrContainer: 'polycost-invoice-artifacts',
+      prefix: 'invoice-artifacts',
+      region: 'us-east-1',
+      key: 'invoice-artifacts/team/reconciliation/artifact.txt',
+      uri: 's3://polycost-invoice-artifacts/invoice-artifacts/team/reconciliation/artifact.txt',
+      version: 'v1',
+    };
+    repository.getInvoiceReconciliation.mockResolvedValue({
+      id: '66666666-6666-4666-8666-666666666666',
+      importRunId: '55555555-5555-4555-8555-555555555555',
+      comparisonId: comparisonResult.comparisonId,
+      provider: 'aws',
+      estimatedTotalUsd: 100,
+      invoicedTotalUsd: 107,
+      varianceUsd: 7,
+      variancePercent: 7,
+      status: 'variance-warning',
+      evidence: {
+        invoiceGradeReadiness: {
+          checks: [],
+        },
+        invoiceMatchSummary: {
+          caveats: [],
+        },
+        invoiceGradeArtifactRegister: {
+          registeredCount: 1,
+          verifiedCount: 1,
+          artifacts: [
+            {
+              id: 'artifact-1',
+              provider: 'aws',
+              type: 'provider-invoice',
+              displayName: 'June AWS invoice control packet',
+              reference: 'demo://invoice-control',
+              verificationStatus: 'verified',
+              registeredAt: '2026-07-06T00:00:03.000Z',
+              verifiedAt: '2026-07-06T00:00:04.000Z',
+              storedBlob: {
+                storageStatus: 'stored',
+                storageMode: 'aws-s3',
+                fileName: 'aws-invoice-control.txt',
+                mimeType: 'text/plain',
+                contentSha256: 'd'.repeat(64),
+                contentSizeBytes: 7,
+                uploadedAt: '2026-07-06T00:00:05.000Z',
+                governance: {
+                  storageProfile: {
+                    storageBackend: 'aws-s3',
+                    encryptionStatus: 'customer-managed-kms',
+                    objectStore,
+                    kmsKeyReference: 'arn:aws:kms:us-east-1:111122223333:key/demo',
+                    kmsKeyRequiredForProduction: false,
+                  },
+                  retentionPolicy: {
+                    retentionUntil: '2027-07-06T00:00:05.000Z',
+                    retentionDays: 365,
+                    legalHold: false,
+                  },
+                  providerRetentionProof: {
+                    schemaVersion: 'invoice-artifact-provider-retention-proof/v1',
+                    status: 'provider-verified',
+                    evidenceSource: 'provider-control-plane',
+                    storageBackend: 'aws-s3',
+                    checkedAt: '2026-07-06T01:00:00.000Z',
+                    retentionMode: 'provider-object-lock',
+                    retentionUntil: '2027-07-06T00:00:05.000Z',
+                    legalHold: false,
+                    objectStore,
+                    proofReference: 's3://polycost-invoice-artifacts/object-lock-proof.json',
+                    proofDigestSha256: 'f'.repeat(64),
+                    caveats: [],
+                  },
+                  malwareScan: {
+                    status: 'passed',
+                    scanner: 'polycost-eicar-signature-v1',
+                    checkedAt: '2026-07-06T00:00:05.000Z',
+                    findings: [],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+      createdAt: '2026-07-06T00:00:02.000Z',
+    });
+    repository.getBillingImport.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      teamId: identity.teamId,
+      provider: 'aws',
+      sourceType: 'aws-cur',
+      status: 'completed',
+      billingPeriodStart: '2026-06-01',
+      billingPeriodEnd: '2026-06-30',
+      originalFileSha256: 'a'.repeat(64),
+      rowsReceived: 1,
+      rowsAccepted: 1,
+      rowsRejected: 0,
+      totalCostUsd: 107,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    });
+    const service = new BillingService(
+      repository as never,
+      new InvoiceArtifactGovernanceService(
+        configService({
+          INVOICE_ARTIFACT_STORAGE_BACKEND: 'aws-s3',
+          INVOICE_ARTIFACT_OBJECT_STORE_NAME: 'polycost-invoice-artifacts',
+          INVOICE_ARTIFACT_OBJECT_STORE_REGION: 'us-east-1',
+          INVOICE_ARTIFACT_OBJECT_STORE_PREFIX: 'invoice-artifacts',
+          INVOICE_ARTIFACT_KMS_KEY_REFERENCE: 'arn:aws:kms:us-east-1:111122223333:key/demo',
+        }),
+      ),
+    );
+
+    const packet = await service.getInvoiceEvidencePacket(
+      '66666666-6666-4666-8666-666666666666',
+      identity,
+    );
+
+    expect(packet.artifactGovernance.productionGates.providerRetentionProofReady).toBe(true);
+    expect(packet.artifactGovernance.storagePosture).toMatchObject({
+      externalObjectStoreCount: 1,
+      providerRetentionProofVerifiedCount: 1,
+      providerRetentionProofMissingCount: 0,
+      providerRetentionProofDeclaredCount: 0,
+    });
+    expect(packet.artifactGovernance.gaps).not.toEqual(
+      expect.arrayContaining([
+        'provider object-lock WORM retention mode is not configured',
+        'provider retention proof is not captured from the provider control plane',
+      ]),
+    );
+    expect(packet.artifactGovernance.gaps).toEqual(
+      expect.arrayContaining([
+        'malware scanning is limited to the local EICAR signature hook',
+        'retention enforcement is report-only and will not purge expired artifacts',
+      ]),
+    );
+  });
+
   it('adds signed external receipt readiness when evidence receipt controls are configured', async () => {
     const repository = repositoryMock();
     repository.getInvoiceReconciliation.mockResolvedValue({
@@ -2840,6 +2983,171 @@ describe('BillingService', () => {
         }),
       }),
     );
+  });
+
+  it('attaches provider retention proof to an externally stored invoice artifact', async () => {
+    const repository = repositoryMock();
+    const objectStore = {
+      bucketOrContainer: 'polycost-invoice-artifacts',
+      prefix: 'invoice-artifacts',
+      region: 'us-east-1',
+      key: 'invoice-artifacts/team/reconciliation/artifact.txt',
+      uri: 's3://polycost-invoice-artifacts/invoice-artifacts/team/reconciliation/artifact.txt',
+      version: 'v1',
+    };
+    const governance = {
+      storageProfile: {
+        storageBackend: 'aws-s3' as const,
+        encryptionStatus: 'customer-managed-kms' as const,
+        objectStore,
+        kmsKeyReference: 'arn:aws:kms:us-east-1:111122223333:key/demo',
+        kmsKeyRequiredForProduction: false,
+      },
+      retentionPolicy: {
+        retentionUntil: '2027-07-06T00:00:05.000Z',
+        retentionDays: 365,
+        legalHold: false,
+      },
+      providerRetentionProof: {
+        schemaVersion: 'invoice-artifact-provider-retention-proof/v1' as const,
+        status: 'missing' as const,
+        evidenceSource: 'local-config' as const,
+        storageBackend: 'aws-s3' as const,
+        checkedAt: '2026-07-06T00:00:05.000Z',
+        retentionMode: 'not-configured' as const,
+        retentionUntil: '2027-07-06T00:00:05.000Z',
+        legalHold: false,
+        objectStore,
+        caveats: ['provider retention proof is not captured from the provider control plane'],
+      },
+      malwareScan: {
+        status: 'passed' as const,
+        scanner: 'polycost-eicar-signature-v1',
+        checkedAt: '2026-07-06T00:00:05.000Z',
+        findings: [],
+      },
+    };
+    const reconciliationRecord = {
+      id: '66666666-6666-4666-8666-666666666666',
+      importRunId: '55555555-5555-4555-8555-555555555555',
+      comparisonId: comparisonResult.comparisonId,
+      provider: 'aws' as const,
+      estimatedTotalUsd: 100,
+      invoicedTotalUsd: 107,
+      varianceUsd: 7,
+      variancePercent: 7,
+      status: 'variance-warning' as const,
+      evidence: {
+        invoiceGradeArtifactRegister: {
+          artifacts: [
+            {
+              id: 'artifact-1',
+              provider: 'aws',
+              type: 'provider-invoice',
+              displayName: 'June AWS invoice control packet',
+              reference: 'demo://invoice-control',
+              verificationStatus: 'registered',
+              registeredAt: '2026-07-06T00:00:03.000Z',
+              storedBlob: {
+                storageStatus: 'stored',
+                storageMode: 'aws-s3',
+                fileName: 'aws-invoice-control.txt',
+                mimeType: 'text/plain',
+                contentSha256: 'd'.repeat(64),
+                contentSizeBytes: 7,
+                uploadedAt: '2026-07-06T00:00:05.000Z',
+                uploadedByAccountId: identity.accountId,
+                governance,
+              },
+            },
+          ],
+        },
+      },
+      createdAt: '2026-07-06T00:00:02.000Z',
+    };
+    repository.getInvoiceReconciliation.mockResolvedValue(reconciliationRecord);
+    repository.getBillingImport.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      teamId: identity.teamId,
+      provider: 'aws',
+      sourceType: 'aws-cur',
+      status: 'completed',
+      billingPeriodStart: '2026-06-01',
+      billingPeriodEnd: '2026-06-30',
+      originalFileSha256: 'a'.repeat(64),
+      rowsReceived: 1,
+      rowsAccepted: 1,
+      rowsRejected: 0,
+      totalCostUsd: 107,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    });
+    repository.updateInvoiceReconciliationEvidence.mockImplementation(async (input) => ({
+      ...reconciliationRecord,
+      evidence: input.evidence,
+    }));
+    const service = new BillingService(repository as never);
+
+    const result = await service.attachInvoiceArtifactProviderRetentionProof(
+      '66666666-6666-4666-8666-666666666666',
+      'artifact-1',
+      {
+        proofReference: 's3://polycost-invoice-artifacts/object-lock-proof.json',
+        proofDigestSha256: 'f'.repeat(64),
+        checkedAt: '2026-07-06T01:00:00.000Z',
+        notes: 'captured by release operator',
+      },
+      identity,
+    );
+    const artifacts = (
+      result.evidence.invoiceGradeArtifactRegister as { artifacts: Array<Record<string, unknown>> }
+    ).artifacts;
+    const storedBlob = artifacts[0]?.storedBlob as { governance?: Record<string, unknown> };
+    const updatedGovernance = storedBlob.governance as Record<string, unknown>;
+
+    expect(updatedGovernance.providerRetentionProof).toMatchObject({
+      status: 'provider-verified',
+      evidenceSource: 'provider-control-plane',
+      storageBackend: 'aws-s3',
+      retentionMode: 'provider-object-lock',
+      proofReference: 's3://polycost-invoice-artifacts/object-lock-proof.json',
+      proofDigestSha256: 'f'.repeat(64),
+      checkedAt: '2026-07-06T01:00:00.000Z',
+      objectStore,
+    });
+    expect(repository.updateInvoiceReconciliationEvidence).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reconciliationId: '66666666-6666-4666-8666-666666666666',
+        audit: expect.objectContaining({
+          action: 'billing.reconciliation.artifact_provider_retention_proof_attached',
+          metadata: expect.objectContaining({
+            artifactId: 'artifact-1',
+            proofReference: 's3://polycost-invoice-artifacts/object-lock-proof.json',
+            proofDigestSha256: 'f'.repeat(64),
+            objectStoreUri:
+              's3://polycost-invoice-artifacts/invoice-artifacts/team/reconciliation/artifact.txt',
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('rejects provider retention proof references with embedded signed-url credentials', async () => {
+    const repository = repositoryMock();
+    const service = new BillingService(repository as never);
+
+    await expect(
+      service.attachInvoiceArtifactProviderRetentionProof(
+        '66666666-6666-4666-8666-666666666666',
+        'artifact-1',
+        {
+          proofReference: 'https://storage.example.com/proof.json?sig=secret',
+          proofDigestSha256: 'f'.repeat(64),
+        },
+        identity,
+      ),
+    ).rejects.toThrow(ApiValidationError);
+    expect(repository.getInvoiceReconciliation).not.toHaveBeenCalled();
+    expect(repository.updateInvoiceReconciliationEvidence).not.toHaveBeenCalled();
   });
 
   it('lists invoice artifact review queue rows for an imported billing run', async () => {

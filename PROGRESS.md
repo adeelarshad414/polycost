@@ -134,6 +134,7 @@ say so explicitly rather than marking it done.
 | Phase 2.42 - Provider retention proof manifest          | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.43 - Provider retention proof artifact verifier | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.44 - Provider retention proof capture planner   | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.45 - Provider retention proof API intake        | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -4976,6 +4977,45 @@ Status: implemented and verified locally on 2026-07-09.
   credentials, prove chain of custody, or replace legal retention review. It
   creates the auditable command plan that operators run in their controlled cloud
   environment.
+
+## Phase 2.45 — Provider retention proof API intake
+
+Status: implemented and verified locally on 2026-07-09.
+
+- Added an Owner/Admin-only API handoff:
+  `PATCH /api/v1/billing/reconciliations/:id/artifacts/:artifactId/blob/provider-retention-proof`.
+  The endpoint attaches verifier output to the exact stored invoice artifact
+  without accepting provider credentials or fetching cloud provider APIs.
+- Added input validation for durable proof references and SHA-256 verifier
+  digests. References must use `s3://`, `azure-blob://`, `gs://`, or `https://`
+  and must not contain query strings/fragments, so signed URLs, SAS tokens, and
+  bearer-token material are not persisted in evidence or audit logs.
+- Updated artifact governance evidence to mark externally stored artifacts as
+  `provider-verified` with `provider-control-plane` evidence, `provider-object-lock`
+  retention mode, object-store pointer, proof reference, proof digest, and
+  bounded caveats.
+- Updated evidence-packet governance so artifact-level provider-verified proof can
+  satisfy the provider-retention proof gate without relying only on global runtime
+  config. Other KMS, scanner, retention deletion, and audit gaps remain visible.
+- Added focused API coverage for successful proof attach and signed URL rejection;
+  release-readiness guards now assert the endpoint, audit action, security test,
+  and docs anchors.
+- Verification: focused API test
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts`
+  passed with 52 tests, `npm run format:check`, `npm run ci:lint`,
+  `npm run release:check`, `npm run progress:verify`, and full `npm run check`
+  passed. The full run included API unit tests (56 suites, 474 tests), web unit
+  tests (11 suites, 147 tests), graph validation (322 nodes, 322 edges), pricing
+  coverage, progress verification (153 anchors), QA/security suppression hygiene,
+  DB, DevOps, cloud, release, handover, and provider-credential gates. Expected
+  caveats remained: `npm run impeccable` skipped because the repo targets Node 20
+  and the optional tool requires Node 24; DB validation skipped live
+  `schema_migrations` inspection because local Postgres was not running; provider
+  credentials warned that invoice artifact governance is still demo/local by
+  default.
+- Remaining caveat: this endpoint ingests and audits captured proof metadata only.
+  It still does not execute provider control-plane calls, hold cloud credentials,
+  prove full chain of custody, or replace legal retention sufficiency review.
 
 ## Deviations from spec log
 

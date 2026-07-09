@@ -57,6 +57,7 @@ export type TeamAuditAction =
   | 'billing.reconciliation.artifact_blob_uploaded'
   | 'billing.reconciliation.artifact_blob_downloaded'
   | 'billing.reconciliation.artifact_legal_hold_updated'
+  | 'billing.reconciliation.artifact_provider_retention_proof_attached'
   | 'billing.reconciliation.artifact_review_updated'
   | 'billing.reconciliation.artifact_exception_updated'
   | 'billing.reconciliation.evidence_packet_exported'

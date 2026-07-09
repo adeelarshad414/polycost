@@ -641,3 +641,43 @@ Honest boundary:
 - The planner creates an auditable command plan only. PolyCost still does not run
   cloud CLIs, receive cloud credentials, prove chain of custody, or replace legal
   retention sufficiency review.
+
+## Phase 2.45 - Provider Retention Proof API Intake
+
+Status: implemented and verified locally on 2026-07-09.
+
+Evidence added:
+
+- `PATCH /api/v1/billing/reconciliations/:id/artifacts/:artifactId/blob/provider-retention-proof`
+  lets billing Owners/Admins attach offline verifier output to an externally
+  stored invoice artifact.
+- The endpoint rejects unstored artifacts, database-backed artifacts, invalid
+  SHA-256 proof digests, and proof references that include query strings or
+  fragments where signed URL/SAS/token material commonly appears.
+- Artifact governance evidence is updated to `provider-verified` with
+  `provider-control-plane` source, `provider-object-lock` retention mode, durable
+  object-store pointer, proof reference, and proof digest.
+- Evidence-packet governance now lets artifact-level provider-verified proof
+  satisfy the provider-retention proof gate while preserving unrelated KMS,
+  scanner, retention deletion, and audit gaps.
+- Focused API coverage passed for successful proof attach and signed URL rejection;
+  release-readiness guards now require the route, service method, audit action,
+  docs anchor, and test anchors.
+- Verification passed with focused API test
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts`
+  (52 tests), `npm run format:check`, `npm run ci:lint`, `npm run release:check`,
+  `npm run progress:verify`, and full `npm run check`. The full run included API
+  unit tests (56 suites, 474 tests), web unit tests (11 suites, 147 tests), graph
+  validation (322 nodes, 322 edges), pricing coverage, progress verification (153
+  anchors), QA/security suppression hygiene, DB, DevOps, cloud, release,
+  handover, and provider-credential gates. Expected caveats remained: optional
+  impeccable skipped on Node 20, live Postgres `schema_migrations` inspection was
+  skipped because the container was not running, and local invoice artifact
+  governance remains demo/default unless production object storage controls are
+  configured.
+
+Honest boundary:
+
+- The intake endpoint persists proof metadata only. PolyCost still does not run
+  cloud provider APIs, receive provider credentials for proof capture, prove full
+  chain of custody, or replace legal retention sufficiency review.
