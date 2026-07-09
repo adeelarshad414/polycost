@@ -1,7 +1,7 @@
 # PolyCost Production Readiness Report
 
 Date: 2026-07-09
-Branch: cumulative production-readiness branches through `codex/invoice-record-evidence`
+Branch: cumulative production-readiness branches through `codex/diagram-llm-capture`
 PR: local phase gate, PR created after verification
 Run spec: `docs/design/master-production-readiness-orchestrator-v2.md`
 
@@ -94,6 +94,7 @@ performance/accessibility/best-practices/SEO metrics.
 | VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                                                                                                      |
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                                                                                                 |
 | LLM-READY-003  | Improved      | Phase 2.57 adds a labeled Tier 3 diagram-classifier corpus, sanitized prediction evidence bundle, accuracy metrics, raw prompt/response exclusion checks, and a strict `--require-live-model` production evidence gate                                           |
+| LLM-READY-004  | Improved      | Phase 2.60 adds `npm run diagram:llm-corpus:capture`, an operator-side sanitized evidence capture helper with sample smoke coverage, strict live-model mode, downstream checker handoff, and raw prompt/response/secret guards                                   |
 | UI-AUTH-002    | Improved      | Workspace billing panel now surfaces reconciliation readiness, source-fingerprint coverage, SKU match coverage, and the invoice-of-record caveat                                                                                                                 |
 | UI-AUTH-006    | Improved      | Workspace billing panel now surfaces usage-comparable variance plus invoice adjustment count, subtotal, and category summary for finance review                                                                                                                  |
 | UI-AUTH-007    | Improved      | Workspace billing panel now surfaces commitment row count, net commitment cost, and commitment category totals separately from generic invoice adjustments                                                                                                       |
@@ -198,6 +199,24 @@ Local static/regression gates:
     suites / `149` tests, graph validation `337` nodes / `337` edges, pricing
     coverage `36` frontend families, progress verification `250` anchors, and the
     new diagram LLM corpus gate in the aggregate floor.
+- Phase 2.60 diagram LLM evidence capture gates passed:
+  - `node --check scripts/diagram-llm-corpus-evidence-capture.mjs` passed.
+  - `npm run diagram:llm-corpus:capture:smoke -- --json` passed against the
+    sanitized `example-schema` capture profile with `12` predictions,
+    `categoryAccuracy=1`, `serviceTypeAccuracy=1`, `verifiedExampleCapture=true`,
+    and `verifiedLiveCapture=false`.
+  - `npm run diagram:llm-corpus:capture -- --require-live-model --json` failed as
+    intended for the sample capture profile because it is not production
+    endpoint/model/Vault/operator evidence.
+  - `npm run diagram:llm-corpus:capture -- --require-live-model --profile .tmp/diagram-llm-live-capture-profile.json --output .tmp/diagram-llm-live-evidence.json --json`
+    passed against a generated temporary live-model-shaped bundle with
+    `verifiedLiveCapture=true`.
+  - `npm run format:check`, `npm run release:check`, and `npm run progress:verify`
+    passed; progress verification reports `315` anchors.
+  - Full `npm run check` passed with API `59` suites / `494` tests, web `11`
+    suites / `149` tests, graph validation `352` nodes / `352` edges, pricing
+    coverage `36` frontend families, progress verification `315` anchors, and the
+    new diagram LLM capture smoke in the aggregate floor.
 - Phase 2.58 enterprise IdP pilot evidence gates passed:
   - `node --check scripts/enterprise-idp-pilot-evidence-check.mjs` passed.
   - `npm run enterprise:idp:evidence:check -- --json` passed against the sanitized
@@ -906,8 +925,9 @@ Machine-readable token evidence:
   corpus evaluation, and false-positive tracking. Phase 2.9 adds an explicit readiness
   surface so stub/unconfigured mode is not reported as production-connected. Phase 2.57
   adds the baseline labeled corpus, sanitized evidence bundle, metric gate, and
-  `--require-live-model` strict mode, but the checked-in sample remains
-  `example-schema` evidence rather than production model proof.
+  `--require-live-model` strict mode. Phase 2.60 adds a repeatable sanitized
+  capture helper and smoke gate, but the checked-in sample remains `example-schema`
+  evidence rather than production model proof.
 - Full enterprise auth product polish remains future scope: production email,
   production SSO/SAML certification, formal SCIM certification, account recovery,
   org billing UX, and broader team/account administration. Phase 2.11 closes active

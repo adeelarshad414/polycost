@@ -149,6 +149,7 @@ say so explicitly rather than marking it done.
 | Phase 2.57 - Diagram LLM corpus evidence gate           | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.58 - Enterprise IdP pilot evidence gate         | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.59 - Invoice-of-record pilot evidence gate      | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.60 - Diagram LLM evidence capture helper        | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -413,6 +414,69 @@ Known gaps carried forward:
   refund/fee classification, commitment inventory/amortization/allocation proof,
   retained evidence packets, notary/audit proof, and named finance/security
   reviewers.
+
+## Phase 2.60 - Diagram LLM evidence capture helper
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added `scripts/diagram-llm-corpus-evidence-capture.mjs`, an operator-side
+  capture helper that assembles the standard `polycost-diagram-llm-corpus-evidence/v1`
+  bundle from a capture profile and sanitized predictions artifact.
+- Added `docs/operations/evidence/diagram-llm-corpus-capture/diagram-llm-corpus-capture.example.json`
+  and `predictions.example.json` as checked-in sample capture inputs.
+- Added `docs/architecture/phase-2-diagram-llm-corpus-evidence-capture.md` to
+  document the capture workflow, strict `--require-live-model` path, and boundary
+  that the helper does not call the model endpoint, read Vault, or store raw
+  prompts/responses.
+- Added `npm run diagram:llm-corpus:capture` and
+  `npm run diagram:llm-corpus:capture:smoke`, then wired the smoke into the
+  aggregate `npm run check` floor.
+- Updated README, `docs/HOW-TO-USE.md`, `docs/PROVIDER-CREDENTIALS.md`,
+  `docs/ARCHITECTURE.md`, release checklist, release-readiness guards,
+  progress-verification guards, and the full-progress ledger so production LLM
+  claims use capture plus strict validation rather than an ad hoc bundle.
+
+Verification performed:
+
+- `node --check scripts/diagram-llm-corpus-evidence-capture.mjs` passed.
+- `npm run diagram:llm-corpus:capture:smoke -- --json` passed against the
+  checked-in sample with `12` predictions, `categoryAccuracy=1`,
+  `serviceTypeAccuracy=1`, `verifiedExampleCapture=true`, and
+  `verifiedLiveCapture=false`.
+- `npm run diagram:llm-corpus:capture -- --require-live-model --json` failed as
+  intended against the checked-in sample because it is `example-schema` evidence
+  without a configured endpoint, verified Vault secret, live-endpoint run mode, or
+  named production reviewer.
+- `npm run diagram:llm-corpus:capture -- --require-live-model --profile .tmp/diagram-llm-live-capture-profile.json --output .tmp/diagram-llm-live-evidence.json --json`
+  passed against a generated temporary live-model-shaped bundle with
+  `verifiedLiveCapture=true`, proving strict mode accepts properly attested
+  evidence shape.
+- `npm run format:check`, `npm run release:check`, and `npm run progress:verify`
+  passed; progress verification now reports `315` phase evidence anchors.
+- Full `npm run check` passed with the diagram LLM capture smoke in the aggregate
+  floor. The run included API unit `59` suites / `494` tests, web unit `11` suites /
+  `149` tests, graph validation `352` nodes / `352` edges, pricing coverage `36`
+  frontend families, progress verification `315` anchors, release readiness,
+  handover, DevOps/cloud/provider-credential gates, and invoice/Terraform/VSDX/LLM/
+  enterprise-IdP/provider-invoice evidence smokes. Expected caveats remained:
+  `impeccable` is skipped on the repo's Node 20 target, live Postgres migrations
+  were skipped because the local Postgres container was not running, the diagram
+  LLM provider check reports the endpoint/model are not configured in local mode,
+  and the default local env still warns that invoice-artifacts are demo/local
+  without live object-storage/KMS/scanner/WORM settings.
+
+Known gaps carried forward:
+
+- This makes production LLM evidence assembly repeatable and gated, but it does
+  not run or host a live model in the default OSS/CI path.
+- Real proof still requires a configured endpoint/model, Vault-backed
+  `secret/polycost/llm` `api_key`, sanitized live predictions, `evidenceLevel=live-model`,
+  strict `npm run diagram:llm-corpus:capture -- --require-live-model`, strict
+  `npm run diagram:llm-corpus:check -- --require-live-model`, operator review,
+  ongoing corpus refresh, false-positive tracking, and drift monitoring.
 
 ## Phase V3.6 - Terraform validation evidence
 
