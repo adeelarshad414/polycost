@@ -338,6 +338,11 @@ function validateRouting(routing, options) {
   if (!isNonEmptyString(routing.alertId)) {
     failures.push('routing.alertId is required.');
   }
+  for (const key of ['signatureSha256', 'deliveryEnvelopeSha256', 'receiverReceiptSha256']) {
+    if (routing[key] !== undefined && !SHA256_PATTERN.test(String(routing[key] ?? ''))) {
+      failures.push(`routing.${key} must be a SHA-256 hex digest when present.`);
+    }
+  }
 
   if (options.requireStagingAlert) {
     if (routing.mode === 'sample') {
@@ -364,6 +369,11 @@ function validateRouting(routing, options) {
     }
     if (routing.alertId === 'example-only') {
       failures.push('routing.alertId must identify the staging alert event.');
+    }
+    for (const key of ['signatureSha256', 'deliveryEnvelopeSha256', 'receiverReceiptSha256']) {
+      if (!SHA256_PATTERN.test(String(routing[key] ?? ''))) {
+        failures.push(`routing.${key} is required for staging alert proof.`);
+      }
     }
   }
 

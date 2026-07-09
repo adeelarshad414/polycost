@@ -179,6 +179,9 @@ if (!packageJson.scripts?.['diagram:llm-corpus:drift:check']) {
 if (!packageJson.scripts?.['diagram:llm-corpus:drift:alert:check']) {
   failures.push('package.json is missing diagram:llm-corpus:drift:alert:check');
 }
+if (!packageJson.scripts?.['diagram:llm-corpus:drift:alert:smoke']) {
+  failures.push('package.json is missing diagram:llm-corpus:drift:alert:smoke');
+}
 if (!packageJson.scripts?.['enterprise:idp:evidence:check']) {
   failures.push('package.json is missing enterprise:idp:evidence:check');
 }
@@ -279,6 +282,11 @@ if (!packageJson.scripts?.check?.includes('npm run diagram:llm-corpus:drift:chec
 if (!packageJson.scripts?.check?.includes('npm run diagram:llm-corpus:drift:alert:check')) {
   failures.push(
     'package.json check script must include npm run diagram:llm-corpus:drift:alert:check',
+  );
+}
+if (!packageJson.scripts?.check?.includes('npm run diagram:llm-corpus:drift:alert:smoke')) {
+  failures.push(
+    'package.json check script must include npm run diagram:llm-corpus:drift:alert:smoke',
   );
 }
 if (!packageJson.scripts?.check?.includes('npm run enterprise:idp:evidence:check')) {
@@ -968,8 +976,25 @@ await assertFileContains('scripts/diagram-llm-drift-alert-evidence-check.mjs', [
   ['diagram LLM drift alert check schema', 'polycost-diagram-llm-drift-alert-evidence-check/v1'],
   ['staging alert strict option', '--require-staging-alert'],
   ['receiver acceptance guard', 'receiverAccepted'],
+  ['signature digest guard', 'signatureSha256'],
+  ['receiver receipt digest guard', 'receiverReceiptSha256'],
   ['destination hash guard', 'destinationReferenceSha256'],
   ['raw prompt payload guard', 'findForbiddenRawPayloads'],
+]);
+
+await assertFileContains('scripts/diagram-llm-drift-alert-reference-receiver-smoke.mjs', [
+  [
+    'diagram LLM drift alert reference receiver schema',
+    'polycost-diagram-llm-drift-alert-reference-receiver/v1',
+  ],
+  [
+    'diagram LLM drift alert smoke schema',
+    'polycost-diagram-llm-drift-alert-reference-receiver-smoke/v1',
+  ],
+  ['live drift checker handoff', 'diagram-llm-corpus-drift-check.mjs'],
+  ['strict alert checker handoff', 'diagram-llm-drift-alert-evidence-check.mjs'],
+  ['HMAC signature evidence', 'hmacSha256'],
+  ['receiver receipt evidence', 'receiverReceiptSha256'],
 ]);
 
 await assertFileContains('scripts/enterprise-idp-pilot-evidence-check.mjs', [
@@ -1135,8 +1160,10 @@ await assertFileContains('docs/architecture/phase-2-diagram-llm-corpus-drift-mon
 await assertFileContains('docs/architecture/phase-2-diagram-llm-drift-alert-evidence.md', [
   ['diagram LLM drift alert title', 'Phase 2 Diagram LLM Drift Alert Evidence'],
   ['diagram LLM drift alert command', 'npm run diagram:llm-corpus:drift:alert:check'],
+  ['diagram LLM drift alert smoke command', 'npm run diagram:llm-corpus:drift:alert:smoke'],
   ['staging alert strict mode', '--require-staging-alert'],
   ['alert boundary', 'does not call the model endpoint'],
+  ['reference receiver boundary', 'local reference receiver smoke'],
   ['receiver retention boundary', 'receiver-side retention proof'],
 ]);
 

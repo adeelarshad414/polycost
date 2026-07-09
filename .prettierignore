@@ -5,6 +5,7 @@ coverage/
 reports/
 .turbo/
 .vite/
+.tmp/
 test-results/
 apps/web/tsconfig.tsbuildinfo
 package-lock.json

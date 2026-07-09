@@ -44,7 +44,8 @@ Natural-language mode:
   false-positive budget.
 - For alerting proof, archive sanitized receiver/incident evidence and run
   `npm run diagram:llm-corpus:drift:alert:check -- --require-staging-alert <evidence.json>`
-  before claiming drift regressions route to an owner workflow.
+  before claiming drift regressions route to an owner workflow. For a reproducible
+  local sender/receiver proof, run `npm run diagram:llm-corpus:drift:alert:smoke`.
 
 Guided-form mode:
 

@@ -358,7 +358,10 @@ Limits and safety behavior:
   `npm run diagram:llm-corpus:drift:check -- --require-live-model --profile <profile.json>`.
 - Prove drift alert handoff with
   `npm run diagram:llm-corpus:drift:alert:check -- --require-staging-alert <evidence.json>`.
-  The checked-in sample validates the contract only and is not production LLM proof.
+  Use `npm run diagram:llm-corpus:drift:alert:smoke` for the local reference
+  receiver proof that generates a signed staging evidence bundle and validates it
+  with the strict checker. The checked-in sample validates the contract only and
+  is not production LLM proof.
   See `docs/architecture/phase-2-diagram-llm-corpus-evidence.md` and
   `docs/architecture/phase-2-diagram-llm-corpus-evidence-capture.md` plus
   `docs/architecture/phase-2-diagram-llm-corpus-drift-monitoring.md` and

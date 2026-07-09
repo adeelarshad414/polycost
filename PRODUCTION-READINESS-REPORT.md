@@ -1,7 +1,7 @@
 # PolyCost Production Readiness Report
 
 Date: 2026-07-09
-Branch: cumulative production-readiness branches through `codex/diagram-llm-drift-alerts`
+Branch: cumulative production-readiness branches through `codex/diagram-llm-drift-alert-smoke`
 PR: local phase gate, PR created after verification
 Run spec: `docs/design/master-production-readiness-orchestrator-v2.md`
 
@@ -97,6 +97,7 @@ performance/accessibility/best-practices/SEO metrics.
 | LLM-READY-004  | Improved      | Phase 2.60 adds `npm run diagram:llm-corpus:capture`, an operator-side sanitized evidence capture helper with sample smoke coverage, strict live-model mode, downstream checker handoff, and raw prompt/response/secret guards                                   |
 | LLM-READY-005  | Improved      | Phase 2.61 adds `npm run diagram:llm-corpus:drift:check`, a monitored-baseline drift gate with accuracy-drop thresholds, high-confidence coverage checks, unreviewed mismatch failure, and sanitized false-positive register handling                            |
 | LLM-READY-006  | Improved      | Phase 2.62 adds `npm run diagram:llm-corpus:drift:alert:check`, a sanitized drift alert evidence gate for signed/TLS receiver acceptance, owner/SLO policy, reviewer handoff metadata, and raw receiver URL/secret rejection                                     |
+| LLM-READY-007  | Improved      | Phase 2.63 adds `npm run diagram:llm-corpus:drift:alert:smoke`, a local reference sender/receiver proof that generates live-model drift evidence, signs an alert envelope, archives a receiver receipt, and validates generated `staging-alert` evidence         |
 | UI-AUTH-002    | Improved      | Workspace billing panel now surfaces reconciliation readiness, source-fingerprint coverage, SKU match coverage, and the invoice-of-record caveat                                                                                                                 |
 | UI-AUTH-006    | Improved      | Workspace billing panel now surfaces usage-comparable variance plus invoice adjustment count, subtotal, and category summary for finance review                                                                                                                  |
 | UI-AUTH-007    | Improved      | Workspace billing panel now surfaces commitment row count, net commitment cost, and commitment category totals separately from generic invoice adjustments                                                                                                       |
@@ -258,6 +259,17 @@ Local static/regression gates:
     suites / `149` tests, graph validation `356` nodes / `356` edges, pricing
     coverage `36` frontend families, progress verification `347` anchors, and the
     new diagram LLM drift alert gate in the aggregate floor.
+- Phase 2.63 diagram LLM drift alert sender/receiver smoke gates passed:
+  - `node --check scripts/diagram-llm-drift-alert-reference-receiver-smoke.mjs`
+    passed.
+  - `npm run diagram:llm-corpus:drift:alert:smoke -- --captured-at 2026-07-09T00:00:00.000Z --json`
+    passed, generating sanitized live-model drift evidence, a signed alert
+    envelope, a local reference receiver receipt, and strict `staging-alert`
+    evidence with `verifiedStagingAlert=true`.
+  - Full `npm run check` passed with API `59` suites / `494` tests, web `11`
+    suites / `149` tests, graph validation `356` nodes / `356` edges, pricing
+    coverage `36` frontend families, progress verification `359` anchors, and the
+    new diagram LLM drift alert sender/receiver smoke in the aggregate floor.
 - Phase 2.58 enterprise IdP pilot evidence gates passed:
   - `node --check scripts/enterprise-idp-pilot-evidence-check.mjs` passed.
   - `npm run enterprise:idp:evidence:check -- --json` passed against the sanitized
@@ -968,9 +980,10 @@ Machine-readable token evidence:
   adds the baseline labeled corpus, sanitized evidence bundle, metric gate, and
   `--require-live-model` strict mode. Phase 2.60 adds a repeatable sanitized
   capture helper and smoke gate. Phase 2.61 adds monitored drift thresholds and a
-  false-positive register contract. Phase 2.62 adds alert handoff evidence, but
-  the checked-in sample remains `example-schema` evidence rather than production
-  model or alerting proof.
+  false-positive register contract. Phase 2.62 adds alert handoff evidence, and
+  Phase 2.63 adds a local signed sender/receiver smoke; the checked-in sample
+  remains `example-schema` evidence, and the local smoke is still not a deployed
+  production receiver or external incident-system proof.
 - Full enterprise auth product polish remains future scope: production email,
   production SSO/SAML certification, formal SCIM certification, account recovery,
   org billing UX, and broader team/account administration. Phase 2.11 closes active
