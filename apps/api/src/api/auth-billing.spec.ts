@@ -3081,10 +3081,12 @@ describe('BillingService', () => {
       totalCostUsd: 107,
       createdAt: '2026-07-06T00:00:00.000Z',
     });
-    repository.updateInvoiceReconciliationEvidence.mockImplementation(async (input) => ({
-      ...reconciliationRecord,
-      evidence: input.evidence,
-    }));
+    repository.updateInvoiceArtifactProviderRetentionProofAndEvidence.mockImplementation(
+      async (input) => ({
+        ...reconciliationRecord,
+        evidence: input.evidence,
+      }),
+    );
     const service = new BillingService(repository as never);
 
     const result = await service.attachInvoiceArtifactProviderRetentionProof(
@@ -3114,9 +3116,16 @@ describe('BillingService', () => {
       checkedAt: '2026-07-06T01:00:00.000Z',
       objectStore,
     });
-    expect(repository.updateInvoiceReconciliationEvidence).toHaveBeenCalledWith(
+    expect(repository.updateInvoiceArtifactProviderRetentionProofAndEvidence).toHaveBeenCalledWith(
       expect.objectContaining({
         reconciliationId: '66666666-6666-4666-8666-666666666666',
+        artifactId: 'artifact-1',
+        providerRetentionProof: expect.objectContaining({
+          status: 'provider-verified',
+          evidenceSource: 'provider-control-plane',
+          proofReference: 's3://polycost-invoice-artifacts/object-lock-proof.json',
+          proofDigestSha256: 'f'.repeat(64),
+        }),
         audit: expect.objectContaining({
           action: 'billing.reconciliation.artifact_provider_retention_proof_attached',
           metadata: expect.objectContaining({
@@ -3148,6 +3157,9 @@ describe('BillingService', () => {
     ).rejects.toThrow(ApiValidationError);
     expect(repository.getInvoiceReconciliation).not.toHaveBeenCalled();
     expect(repository.updateInvoiceReconciliationEvidence).not.toHaveBeenCalled();
+    expect(
+      repository.updateInvoiceArtifactProviderRetentionProofAndEvidence,
+    ).not.toHaveBeenCalled();
   });
 
   it('lists invoice artifact review queue rows for an imported billing run', async () => {
@@ -4845,6 +4857,7 @@ function repositoryMock() {
     updateInvoiceReconciliationEvidence: jest.fn(),
     saveInvoiceArtifactBlobAndUpdateEvidence: jest.fn(),
     updateInvoiceArtifactLegalHoldAndEvidence: jest.fn(),
+    updateInvoiceArtifactProviderRetentionProofAndEvidence: jest.fn(),
     getInvoiceArtifactBlob: jest.fn(),
     summarizeInvoiceArtifactRetention: jest.fn(),
     listExpiredInvoiceArtifactBlobDeletionCandidates: jest.fn(),

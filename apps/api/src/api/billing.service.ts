@@ -795,6 +795,7 @@ export class BillingService {
       ...(storedObject.objectStoreVersion
         ? { objectStoreVersion: storedObject.objectStoreVersion }
         : {}),
+      providerRetentionProof: storedGovernance.providerRetentionProof,
       uploadedByAccountId: identity.accountId,
       uploadedAt,
       ...(storedGovernance.storageProfile.kmsKeyReference
@@ -952,10 +953,23 @@ export class BillingService {
     }
 
     const updatedArtifact = providerRetentionProofInvoiceGradeArtifact(artifact, input);
+    const providerRetentionProof = updatedArtifact.storedBlob?.governance?.providerRetentionProof;
+
+    if (!providerRetentionProof) {
+      throw new ApiValidationError('invoice artifact provider retention proof was not generated', [
+        {
+          field: 'artifactId',
+          issue: 'attach provider retention proof through the governed external storage path',
+        },
+      ]);
+    }
+
     const evidence = replaceInvoiceGradeArtifactEvidence(reconciliation, updatedArtifact);
 
-    return this.repository.updateInvoiceReconciliationEvidence({
+    return this.repository.updateInvoiceArtifactProviderRetentionProofAndEvidence({
       reconciliationId,
+      artifactId,
+      providerRetentionProof,
       evidence,
       ...(importRun.teamId
         ? {

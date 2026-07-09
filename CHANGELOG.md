@@ -131,6 +131,9 @@ once tagged releases begin.
 - Provider-native invoice artifact object storage adapters for AWS S3, Azure Blob
   Storage, and GCP Cloud Storage, including Vault-backed credentials, object pointer
   persistence, checksum-verified reads, and production credential-check coverage.
+- Provider-retention proof attachments now persist status/source/mode/reference/
+  digest metadata on the exact invoice artifact blob row and read back as
+  artifact-level proof evidence for externally stored objects.
 - External invoice artifact retention deletion now purges AWS S3, Azure Blob Storage,
   and GCP Cloud Storage objects before deleting expired non-held database pointers.
 

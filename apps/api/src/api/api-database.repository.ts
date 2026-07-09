@@ -8,7 +8,12 @@ import { NormalizedWorkloadSpec } from '../nws/nws.types';
 import { calculateEgressCost } from '../pricing-normalization/egress-tier-calculator';
 import { providerRegionForCanonicalRegion } from '../pricing-normalization/region-map';
 import { SecretsReader, SecretsService } from '../secrets/secrets.service';
-import { ApiNotFoundError, DataHealthResponse, PricingStatusResponse } from './api-errors';
+import {
+  ApiNotFoundError,
+  ApiValidationError,
+  DataHealthResponse,
+  PricingStatusResponse,
+} from './api-errors';
 import {
   GeneratedReport,
   ReportExportJobRecord,
@@ -520,6 +525,20 @@ interface InvoiceArtifactBlobRow {
   object_store_uri: string | null;
   object_store_etag: string | null;
   object_store_version: string | null;
+  provider_retention_proof_status: Extract<
+    InvoiceArtifactProviderRetentionProof['status'],
+    'declared' | 'provider-verified'
+  > | null;
+  provider_retention_proof_evidence_source: Exclude<
+    InvoiceArtifactProviderRetentionProof['evidenceSource'],
+    'not-required'
+  > | null;
+  provider_retention_proof_checked_at: Date | null;
+  provider_retention_proof_retention_mode:
+    InvoiceArtifactProviderRetentionProof['retentionMode'] | null;
+  provider_retention_proof_reference: string | null;
+  provider_retention_proof_sha256: string | null;
+  provider_retention_proof_caveats: unknown;
 }
 
 interface InvoiceArtifactRetentionSummaryRow {
@@ -3917,6 +3936,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     objectStoreUri?: string;
     objectStoreETag?: string;
     objectStoreVersion?: string;
+    providerRetentionProof?: InvoiceArtifactProviderRetentionProof;
     uploadedByAccountId?: string;
     uploadedAt: string;
     kmsKeyReference?: string;
@@ -3928,6 +3948,8 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     audit?: TeamAuditEventInput;
   }): Promise<InvoiceReconciliationRecord> {
     return this.withTransaction(async (pool) => {
+      const providerRetentionProof = persistedProviderRetentionProof(input.providerRetentionProof);
+
       await pool.query<InvoiceArtifactBlobRow>(
         `
           INSERT INTO invoice_artifact_blobs (
@@ -3954,9 +3976,16 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
             object_store_key,
             object_store_uri,
             object_store_etag,
-            object_store_version
+            object_store_version,
+            provider_retention_proof_status,
+            provider_retention_proof_evidence_source,
+            provider_retention_proof_checked_at,
+            provider_retention_proof_retention_mode,
+            provider_retention_proof_reference,
+            provider_retention_proof_sha256,
+            provider_retention_proof_caveats
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'passed', 'polycost-eicar-signature-v1', $15, $16, $17, $18, $19, $20, $21, $22)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'passed', 'polycost-eicar-signature-v1', $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29::jsonb)
           ON CONFLICT (reconciliation_id, artifact_id)
           DO UPDATE SET
             team_id = EXCLUDED.team_id,
@@ -3980,7 +4009,14 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
             object_store_key = EXCLUDED.object_store_key,
             object_store_uri = EXCLUDED.object_store_uri,
             object_store_etag = EXCLUDED.object_store_etag,
-            object_store_version = EXCLUDED.object_store_version
+            object_store_version = EXCLUDED.object_store_version,
+            provider_retention_proof_status = EXCLUDED.provider_retention_proof_status,
+            provider_retention_proof_evidence_source = EXCLUDED.provider_retention_proof_evidence_source,
+            provider_retention_proof_checked_at = EXCLUDED.provider_retention_proof_checked_at,
+            provider_retention_proof_retention_mode = EXCLUDED.provider_retention_proof_retention_mode,
+            provider_retention_proof_reference = EXCLUDED.provider_retention_proof_reference,
+            provider_retention_proof_sha256 = EXCLUDED.provider_retention_proof_sha256,
+            provider_retention_proof_caveats = EXCLUDED.provider_retention_proof_caveats
         `,
         [
           input.reconciliationId,
@@ -4005,6 +4041,13 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
           input.objectStoreUri ?? null,
           input.objectStoreETag ?? null,
           input.objectStoreVersion ?? null,
+          providerRetentionProof?.status ?? null,
+          providerRetentionProof?.evidenceSource ?? null,
+          providerRetentionProof?.checkedAt ?? null,
+          providerRetentionProof?.retentionMode ?? null,
+          providerRetentionProof?.proofReference ?? null,
+          providerRetentionProof?.proofDigestSha256 ?? null,
+          providerRetentionProof?.caveatsJson ?? '[]',
         ],
       );
       const result = await pool.query<InvoiceReconciliationRow>(
@@ -4126,6 +4169,105 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     });
   }
 
+  async updateInvoiceArtifactProviderRetentionProofAndEvidence(input: {
+    reconciliationId: string;
+    artifactId: string;
+    providerRetentionProof: InvoiceArtifactProviderRetentionProof;
+    evidence: Record<string, unknown>;
+    audit?: TeamAuditEventInput;
+  }): Promise<InvoiceReconciliationRecord> {
+    const providerRetentionProof = persistedProviderRetentionProof(input.providerRetentionProof);
+
+    if (!providerRetentionProof) {
+      throw new ApiValidationError('invoice artifact provider retention proof is not persisted', [
+        {
+          field: 'providerRetentionProof',
+          issue: 'only declared or provider-verified proof is persisted to artifact blob rows',
+        },
+      ]);
+    }
+
+    return this.withTransaction(async (pool) => {
+      const artifactResult = await pool.query<{ id: string }>(
+        `
+          UPDATE invoice_artifact_blobs
+          SET provider_retention_proof_status = $3,
+              provider_retention_proof_evidence_source = $4,
+              provider_retention_proof_checked_at = $5,
+              provider_retention_proof_retention_mode = $6,
+              provider_retention_proof_reference = $7,
+              provider_retention_proof_sha256 = $8,
+              provider_retention_proof_caveats = $9::jsonb
+          WHERE reconciliation_id = $1
+            AND artifact_id = $2
+          RETURNING id
+        `,
+        [
+          input.reconciliationId,
+          input.artifactId,
+          providerRetentionProof.status,
+          providerRetentionProof.evidenceSource,
+          providerRetentionProof.checkedAt,
+          providerRetentionProof.retentionMode,
+          providerRetentionProof.proofReference ?? null,
+          providerRetentionProof.proofDigestSha256 ?? null,
+          providerRetentionProof.caveatsJson,
+        ],
+      );
+
+      if (!artifactResult.rows[0]) {
+        throw new ApiNotFoundError(
+          `Invoice artifact blob ${input.artifactId} was not found for reconciliation ${input.reconciliationId}`,
+        );
+      }
+
+      const result = await pool.query<InvoiceReconciliationRow>(
+        `
+          UPDATE invoice_reconciliation_results
+          SET evidence = $2::jsonb
+          WHERE id = $1
+          RETURNING id,
+                    import_run_id,
+                    comparison_id,
+                    provider,
+                    estimated_total_usd,
+                    invoiced_total_usd,
+                    variance_usd,
+                    variance_percent,
+                    status,
+                    evidence,
+                    created_at
+        `,
+        [input.reconciliationId, JSON.stringify(input.evidence)],
+      );
+      const row = result.rows[0];
+
+      if (!row) {
+        throw new ApiNotFoundError(
+          `Invoice reconciliation ${input.reconciliationId} was not found`,
+        );
+      }
+
+      if (input.audit) {
+        await this.insertTeamAuditEvent(pool, {
+          ...input.audit,
+          targetId: input.audit.targetId ?? row.id,
+          metadata: {
+            importRunId: row.import_run_id,
+            comparisonId: row.comparison_id,
+            provider: row.provider,
+            status: row.status,
+            varianceUsd: Number.parseFloat(row.variance_usd),
+            variancePercent: Number.parseFloat(row.variance_percent),
+            ...(input.audit.metadata ?? {}),
+          },
+        });
+      }
+
+      return toInvoiceReconciliationRecord(row);
+    });
+  }
+
   async getInvoiceArtifactBlob(
     reconciliationId: string,
     artifactId: string,
@@ -4158,7 +4300,14 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
                object_store_key,
                object_store_uri,
                object_store_etag,
-               object_store_version
+               object_store_version,
+               provider_retention_proof_status,
+               provider_retention_proof_evidence_source,
+               provider_retention_proof_checked_at,
+               provider_retention_proof_retention_mode,
+               provider_retention_proof_reference,
+               provider_retention_proof_sha256,
+               provider_retention_proof_caveats
         FROM invoice_artifact_blobs
         WHERE reconciliation_id = $1
           AND artifact_id = $2
@@ -4788,7 +4937,8 @@ function toInvoiceArtifactProviderRetentionProof(
   row: InvoiceArtifactBlobRow,
 ): InvoiceArtifactProviderRetentionProof {
   const retentionUntil = row.retention_until.toISOString();
-  const checkedAt = row.uploaded_at.toISOString();
+  const checkedAt =
+    row.provider_retention_proof_checked_at?.toISOString() ?? row.uploaded_at.toISOString();
 
   if (row.storage_backend === 'database-bytea') {
     return {
@@ -4803,6 +4953,41 @@ function toInvoiceArtifactProviderRetentionProof(
       caveats: [
         'database-bytea storage has no provider object-lock control plane; use external object storage for invoice-grade retention proof.',
       ],
+    };
+  }
+
+  const persistedStatus = row.provider_retention_proof_status;
+
+  if (persistedStatus) {
+    return {
+      schemaVersion: 'invoice-artifact-provider-retention-proof/v1',
+      status: persistedStatus,
+      evidenceSource: row.provider_retention_proof_evidence_source ?? 'local-config',
+      storageBackend: row.storage_backend,
+      checkedAt,
+      retentionMode: row.provider_retention_proof_retention_mode ?? 'not-configured',
+      retentionUntil,
+      legalHold: row.legal_hold,
+      ...(row.object_store_bucket
+        ? {
+            objectStore: {
+              bucketOrContainer: row.object_store_bucket,
+              prefix: objectPrefixFromKey(row.object_store_key),
+              ...(row.object_store_region ? { region: row.object_store_region } : {}),
+              ...(row.object_store_key ? { key: row.object_store_key } : {}),
+              ...(row.object_store_uri ? { uri: row.object_store_uri } : {}),
+              ...(row.object_store_etag ? { eTag: row.object_store_etag } : {}),
+              ...(row.object_store_version ? { version: row.object_store_version } : {}),
+            },
+          }
+        : {}),
+      ...(row.provider_retention_proof_reference
+        ? { proofReference: row.provider_retention_proof_reference }
+        : {}),
+      ...(row.provider_retention_proof_sha256
+        ? { proofDigestSha256: row.provider_retention_proof_sha256 }
+        : {}),
+      caveats: stringArrayFromJsonb(row.provider_retention_proof_caveats),
     };
   }
 
@@ -4832,6 +5017,48 @@ function toInvoiceArtifactProviderRetentionProof(
       'provider retention proof was not persisted with this artifact row; use the reconciliation evidence packet manifest for captured provider proof.',
     ],
   };
+}
+
+function persistedProviderRetentionProof(proof: InvoiceArtifactProviderRetentionProof | undefined):
+  | {
+      status: 'declared' | 'provider-verified';
+      evidenceSource: InvoiceArtifactProviderRetentionProof['evidenceSource'];
+      checkedAt: string;
+      retentionMode: InvoiceArtifactProviderRetentionProof['retentionMode'];
+      proofReference?: string;
+      proofDigestSha256?: string;
+      caveatsJson: string;
+    }
+  | undefined {
+  if (!proof || proof.status === 'missing' || proof.status === 'not-applicable') {
+    return undefined;
+  }
+
+  if (proof.evidenceSource === 'not-required') {
+    return undefined;
+  }
+
+  return {
+    status: proof.status,
+    evidenceSource: proof.evidenceSource,
+    checkedAt: proof.checkedAt,
+    retentionMode: proof.retentionMode,
+    ...(proof.proofReference ? { proofReference: proof.proofReference } : {}),
+    ...(proof.proofDigestSha256 ? { proofDigestSha256: proof.proofDigestSha256 } : {}),
+    caveatsJson: JSON.stringify(proof.caveats.slice(0, 20)),
+  };
+}
+
+function stringArrayFromJsonb(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((entry): entry is string => typeof entry === 'string')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .slice(0, 20);
 }
 
 function retentionDaysBetween(uploadedAt: Date, retentionUntil: Date): number {

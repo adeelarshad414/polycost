@@ -1609,6 +1609,15 @@ describe('ApiDatabaseRepository', () => {
       created_at: completedAt,
     };
     let legalHoldState = false;
+    let providerRetentionProofRow: Record<string, unknown> = {
+      provider_retention_proof_status: null,
+      provider_retention_proof_evidence_source: null,
+      provider_retention_proof_checked_at: null,
+      provider_retention_proof_retention_mode: null,
+      provider_retention_proof_reference: null,
+      provider_retention_proof_sha256: null,
+      provider_retention_proof_caveats: [],
+    };
     const blobRow = {
       id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       reconciliation_id: '66666666-6666-4666-8666-666666666666',
@@ -1635,6 +1644,7 @@ describe('ApiDatabaseRepository', () => {
       object_store_uri: null,
       object_store_etag: null,
       object_store_version: null,
+      ...providerRetentionProofRow,
     };
     const query = jest.fn(async (text: string, values?: unknown[]) => {
       if (text === 'BEGIN' || text === 'COMMIT' || text === 'ROLLBACK') {
@@ -1698,18 +1708,44 @@ describe('ApiDatabaseRepository', () => {
 
       if (text.includes('INSERT INTO invoice_artifact_blobs')) {
         legalHoldState = Boolean(values?.[13]);
+        providerRetentionProofRow = {
+          provider_retention_proof_status: values?.[22] ?? null,
+          provider_retention_proof_evidence_source: values?.[23] ?? null,
+          provider_retention_proof_checked_at: values?.[24] ?? null,
+          provider_retention_proof_retention_mode: values?.[25] ?? null,
+          provider_retention_proof_reference: values?.[26] ?? null,
+          provider_retention_proof_sha256: values?.[27] ?? null,
+          provider_retention_proof_caveats:
+            typeof values?.[28] === 'string' ? JSON.parse(values[28]) : [],
+        };
 
         return { rows: [blobRow], rowCount: 1 };
       }
 
       if (text.includes('UPDATE invoice_artifact_blobs')) {
-        legalHoldState = Boolean(values?.[2]);
+        if (text.includes('provider_retention_proof_status')) {
+          providerRetentionProofRow = {
+            provider_retention_proof_status: values?.[2] ?? null,
+            provider_retention_proof_evidence_source: values?.[3] ?? null,
+            provider_retention_proof_checked_at: values?.[4] ?? null,
+            provider_retention_proof_retention_mode: values?.[5] ?? null,
+            provider_retention_proof_reference: values?.[6] ?? null,
+            provider_retention_proof_sha256: values?.[7] ?? null,
+            provider_retention_proof_caveats:
+              typeof values?.[8] === 'string' ? JSON.parse(values[8]) : [],
+          };
+        } else {
+          legalHoldState = Boolean(values?.[2]);
+        }
 
         return { rows: [{ id: blobRow.id }], rowCount: 1 };
       }
 
       if (text.includes('FROM invoice_artifact_blobs')) {
-        return { rows: [{ ...blobRow, legal_hold: legalHoldState }], rowCount: 1 };
+        return {
+          rows: [{ ...blobRow, ...providerRetentionProofRow, legal_hold: legalHoldState }],
+          rowCount: 1,
+        };
       }
 
       if (text.includes('UPDATE invoice_reconciliation_results')) {
@@ -2074,12 +2110,98 @@ describe('ApiDatabaseRepository', () => {
         null,
         null,
         null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        '[]',
       ],
     );
     expect(query).toHaveBeenCalledWith(expect.stringContaining('UPDATE invoice_artifact_blobs'), [
       '66666666-6666-4666-8666-666666666666',
       'artifact-1',
       true,
+    ]);
+    await expect(
+      repository.updateInvoiceArtifactProviderRetentionProofAndEvidence({
+        reconciliationId: '66666666-6666-4666-8666-666666666666',
+        artifactId: 'artifact-1',
+        providerRetentionProof: {
+          schemaVersion: 'invoice-artifact-provider-retention-proof/v1',
+          status: 'provider-verified',
+          evidenceSource: 'provider-control-plane',
+          storageBackend: 'aws-s3',
+          checkedAt: '2026-07-06T01:00:00.000Z',
+          retentionMode: 'provider-object-lock',
+          retentionUntil: '2027-07-06T00:00:02.000Z',
+          legalHold: true,
+          proofReference: 's3://polycost-invoice-artifacts/object-lock-proof.json',
+          proofDigestSha256: 'f'.repeat(64),
+          caveats: ['captured from AWS S3 Object Lock control plane'],
+        },
+        evidence: {
+          invoiceLineItemHashes: ['b'.repeat(64)],
+          invoiceGradeArtifactRegister: {
+            registeredCount: 1,
+            artifacts: [
+              {
+                id: 'artifact-1',
+                storedBlob: {
+                  storageStatus: 'stored',
+                  contentSha256: 'd'.repeat(64),
+                  contentSizeBytes: 7,
+                  governance: {
+                    providerRetentionProof: {
+                      status: 'provider-verified',
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+        audit: {
+          teamId: '22222222-2222-4222-8222-222222222222',
+          actorAccountId: '11111111-1111-4111-8111-111111111111',
+          action: 'billing.reconciliation.artifact_provider_retention_proof_attached',
+          targetType: 'billing_reconciliation',
+          metadata: {
+            artifactId: 'artifact-1',
+          },
+        },
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        evidence: expect.objectContaining({
+          invoiceGradeArtifactRegister: expect.objectContaining({
+            artifacts: [
+              expect.objectContaining({
+                id: 'artifact-1',
+                storedBlob: expect.objectContaining({
+                  governance: expect.objectContaining({
+                    providerRetentionProof: expect.objectContaining({
+                      status: 'provider-verified',
+                    }),
+                  }),
+                }),
+              }),
+            ],
+          }),
+        }),
+      }),
+    );
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('provider_retention_proof_status'), [
+      '66666666-6666-4666-8666-666666666666',
+      'artifact-1',
+      'provider-verified',
+      'provider-control-plane',
+      '2026-07-06T01:00:00.000Z',
+      'provider-object-lock',
+      's3://polycost-invoice-artifacts/object-lock-proof.json',
+      'f'.repeat(64),
+      JSON.stringify(['captured from AWS S3 Object Lock control plane']),
     ]);
     expect(query).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO team_audit_events'),
@@ -2233,6 +2355,14 @@ describe('ApiDatabaseRepository', () => {
             's3://polycost-invoice-artifacts/invoice-artifacts/team/reconciliation/artifact.txt',
           object_store_etag: '"etag"',
           object_store_version: 'v1',
+          provider_retention_proof_status: 'provider-verified',
+          provider_retention_proof_evidence_source: 'provider-control-plane',
+          provider_retention_proof_checked_at: new Date('2026-07-08T01:00:00.000Z'),
+          provider_retention_proof_retention_mode: 'provider-object-lock',
+          provider_retention_proof_reference:
+            's3://polycost-invoice-artifacts/object-lock-proof.json',
+          provider_retention_proof_sha256: 'f'.repeat(64),
+          provider_retention_proof_caveats: ['captured from AWS S3 Object Lock control plane'],
         },
       ],
     }));
@@ -2257,6 +2387,15 @@ describe('ApiDatabaseRepository', () => {
           eTag: '"etag"',
           version: 'v1',
         },
+      },
+      providerRetentionProof: {
+        status: 'provider-verified',
+        evidenceSource: 'provider-control-plane',
+        checkedAt: '2026-07-08T01:00:00.000Z',
+        retentionMode: 'provider-object-lock',
+        proofReference: 's3://polycost-invoice-artifacts/object-lock-proof.json',
+        proofDigestSha256: 'f'.repeat(64),
+        caveats: ['captured from AWS S3 Object Lock control plane'],
       },
     });
   });

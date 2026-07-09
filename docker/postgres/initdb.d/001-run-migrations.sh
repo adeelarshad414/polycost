@@ -58,7 +58,17 @@ for migration in \
   026_auth_sessions_and_billing_actuals.sql \
   027_team_invites_and_sso.sql \
   028_pricing_lineage_metadata.sql \
-  029_auth_billing_runtime_privileges.sql
+  029_auth_billing_runtime_privileges.sql \
+  030_team_audit_events.sql \
+  031_team_audit_export_outbox.sql \
+  032_invoice_artifact_blobs.sql \
+  033_invoice_artifact_blob_governance.sql \
+  034_invoice_artifact_external_storage.sql \
+  035_team_audit_artifact_legal_hold_action.sql \
+  036_team_audit_artifact_review_action.sql \
+  037_team_audit_artifact_exception_action.sql \
+  038_team_audit_invoice_control_validation_action.sql \
+  039_invoice_artifact_provider_retention_proof_persistence.sql
 do
   psql \
     --username "$POSTGRES_USER" \

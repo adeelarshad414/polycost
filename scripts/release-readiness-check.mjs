@@ -646,6 +646,49 @@ await assertIssueTemplate('feature_request.yml', [
   ['acceptance criteria field', 'Acceptance criteria'],
 ]);
 
+await assertFileContains(
+  'database/migrations/039_invoice_artifact_provider_retention_proof_persistence.sql',
+  [
+    ['provider retention proof status column', 'provider_retention_proof_status'],
+    ['provider retention proof evidence source column', 'provider_retention_proof_evidence_source'],
+    ['provider retention proof consistency check', 'provider_retention_proof_consistency_check'],
+    [
+      'provider proof audit action',
+      'billing.reconciliation.artifact_provider_retention_proof_attached',
+    ],
+    ['schema migration registration', 'invoice_artifact_provider_retention_proof_persistence'],
+  ],
+);
+await assertFileContains('scripts/db.mjs', [
+  [
+    'provider retention proof migration in expected list',
+    '039_invoice_artifact_provider_retention_proof_persistence.sql',
+  ],
+]);
+await assertFileContains('docker/postgres/initdb.d/001-run-migrations.sh', [
+  [
+    'fresh database init applies provider proof migration',
+    '039_invoice_artifact_provider_retention_proof_persistence.sql',
+  ],
+]);
+await assertFileContains('apps/api/src/api/api-database.repository.ts', [
+  [
+    'provider retention proof row update method',
+    'updateInvoiceArtifactProviderRetentionProofAndEvidence',
+  ],
+  [
+    'provider retention proof blob readback',
+    'providerRetentionProof: toInvoiceArtifactProviderRetentionProof(row)',
+  ],
+  ['provider retention proof insert column', 'provider_retention_proof_status'],
+]);
+await assertFileContains('apps/api/src/api/auth-billing.spec.ts', [
+  [
+    'provider retention proof service wiring test',
+    'updateInvoiceArtifactProviderRetentionProofAndEvidence',
+  ],
+]);
+
 if (failures.length > 0) {
   console.error('Release readiness check failed:');
   for (const failure of failures) {
