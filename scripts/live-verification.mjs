@@ -14,6 +14,7 @@ const browserChannel = process.env.PLAYWRIGHT_BROWSER_CHANNEL ?? 'chrome';
 const templateThresholdMs = Number(process.env.POLYCOST_TEMPLATE_JOURNEY_MAX_MS ?? 60_000);
 const diagramThresholdMs = Number(process.env.POLYCOST_DIAGRAM_JOURNEY_MAX_MS ?? 180_000);
 const authThresholdMs = Number(process.env.POLYCOST_AUTH_JOURNEY_MAX_MS ?? 60_000);
+const scimThresholdMs = Number(process.env.POLYCOST_SCIM_JOURNEY_MAX_MS ?? 60_000);
 const verifyRedisDown = process.env.POLYCOST_VERIFY_REDIS_DOWN !== '0';
 const transcriptPath =
   process.env.POLYCOST_LIVE_VERIFY_TRANSCRIPT_PATH ??
@@ -30,6 +31,7 @@ const transcript = {
     templateToRecommendation: templateThresholdMs,
     diagramToPdf: diagramThresholdMs,
     workspaceAuth: authThresholdMs,
+    scimProvisioning: scimThresholdMs,
   },
   verifyRedisDown,
   journeys: [],
@@ -61,6 +63,8 @@ try {
   transcript.journeys.push(diagram);
   const auth = await verifyWorkspaceAuthJourney();
   transcript.journeys.push(auth);
+  const scim = await verifyScimProvisioningJourney();
+  transcript.journeys.push(scim);
   const redis = verifyRedisDown ? await verifyRedisDegradation() : undefined;
 
   transcript.status = 'passed';
@@ -75,6 +79,7 @@ try {
   );
   console.log(`- Diagram to PDF: ${diagram.durationMs}ms (limit ${diagramThresholdMs}ms)`);
   console.log(`- Workspace auth/RBAC: ${auth.durationMs}ms (limit ${authThresholdMs}ms)`);
+  console.log(`- SCIM provisioning: ${scim.durationMs}ms (limit ${scimThresholdMs}ms)`);
   if (redis) {
     console.log(
       `- Redis-down degradation: /health=${redis.healthStatus}, /health/deep=${redis.deepHealthStatus}, data-health HTTP ${redis.dataHealthStatus}`,
@@ -565,6 +570,260 @@ async function verifyWorkspaceAuthJourney() {
       providerType: 'oidc',
       mode: ssoStart.mode,
       stateVerified: teamScopedMember.sso.stateVerified,
+    },
+  };
+}
+
+async function verifyScimProvisioningJourney() {
+  const startedAt = Date.now();
+  const steps = [];
+  const markStep = (label) => {
+    steps.push({ label, atMs: Date.now() - startedAt });
+  };
+  const suffix = randomUUID().slice(0, 8);
+  const password = `ScimVerifyPassw0rd!-${suffix}`;
+  const ownerEmail = `scim-owner-${suffix}@example.com`;
+  const teamName = `SCIM Live Verify ${suffix}`;
+
+  const owner = await apiJson('/api/v1/auth/register', {
+    method: 'POST',
+    body: {
+      email: ownerEmail,
+      password,
+      displayName: 'SCIM Live Verify Owner',
+      teamName,
+    },
+    label: 'SCIM owner registration',
+  });
+  const teamId = owner?.team?.id;
+  if (!teamId || owner.team?.role !== 'owner' || !owner.token) {
+    throw new Error(`SCIM owner registration returned unexpected payload: ${redactedJson(owner)}`);
+  }
+  markStep('registered SCIM owner workspace');
+
+  const tokenRecord = await apiJson(`/api/v1/auth/teams/${teamId}/scim/tokens`, {
+    method: 'POST',
+    token: owner.token,
+    body: {
+      displayName: 'Live verification SCIM',
+    },
+    label: 'SCIM token creation',
+  });
+  if (
+    !tokenRecord?.token ||
+    typeof tokenRecord.tokenPrefix !== 'string' ||
+    !tokenRecord.token.startsWith('pc_scim_') ||
+    tokenRecord.tokenPrefix !== tokenRecord.token.slice(0, tokenRecord.tokenPrefix.length)
+  ) {
+    throw new Error(
+      `SCIM token creation returned unexpected payload: ${redactedJson(tokenRecord)}`,
+    );
+  }
+  markStep('created one-time SCIM token');
+
+  const tokenList = await apiJson(`/api/v1/auth/teams/${teamId}/scim/tokens`, {
+    token: owner.token,
+    label: 'SCIM token metadata list',
+  });
+  if (
+    !Array.isArray(tokenList) ||
+    !tokenList.some(
+      (candidate) =>
+        candidate.id === tokenRecord.id &&
+        candidate.tokenPrefix === tokenRecord.tokenPrefix &&
+        candidate.token === undefined,
+    )
+  ) {
+    throw new Error(`SCIM token list exposed unexpected metadata: ${redactedJson(tokenList)}`);
+  }
+  markStep('confirmed token list exposes metadata only');
+
+  const unauthenticatedDiscovery = await apiJson('/api/v1/scim/v2/ServiceProviderConfig', {
+    expectedStatus: 401,
+    label: 'SCIM unauthenticated discovery denial',
+  });
+  if (unauthenticatedDiscovery?.error?.code !== 'UNAUTHORIZED') {
+    throw new Error(
+      `SCIM unauthenticated discovery returned unexpected payload: ${redactedJson(
+        unauthenticatedDiscovery,
+      )}`,
+    );
+  }
+  markStep('confirmed SCIM discovery requires bearer token');
+
+  const serviceProviderConfig = await apiJson('/api/v1/scim/v2/ServiceProviderConfig', {
+    token: tokenRecord.token,
+    label: 'SCIM service provider config',
+  });
+  if (serviceProviderConfig?.patch?.supported !== true) {
+    throw new Error(
+      `SCIM service provider config returned unexpected payload: ${redactedJson(
+        serviceProviderConfig,
+      )}`,
+    );
+  }
+  markStep('loaded SCIM service provider config');
+
+  const schemas = await apiJson('/api/v1/scim/v2/Schemas', {
+    token: tokenRecord.token,
+    label: 'SCIM schemas',
+  });
+  if (
+    schemas?.totalResults !== 1 ||
+    !schemas.Resources?.[0]?.attributes?.some((attribute) => attribute.name === 'userName')
+  ) {
+    throw new Error(`SCIM schemas returned unexpected payload: ${redactedJson(schemas)}`);
+  }
+  markStep('loaded SCIM schemas');
+
+  const resourceTypes = await apiJson('/api/v1/scim/v2/ResourceTypes', {
+    token: tokenRecord.token,
+    label: 'SCIM resource types',
+  });
+  if (resourceTypes?.Resources?.[0]?.endpoint !== '/Users') {
+    throw new Error(
+      `SCIM resource types returned unexpected payload: ${redactedJson(resourceTypes)}`,
+    );
+  }
+  markStep('loaded SCIM resource types');
+
+  const scimUser = await apiJson('/api/v1/scim/v2/Users', {
+    method: 'POST',
+    token: tokenRecord.token,
+    body: {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+      externalId: `live-scim-user-${suffix}`,
+      userName: `scim-user-${suffix}@example.com`,
+      name: {
+        formatted: 'SCIM Live Verify User',
+      },
+      displayName: 'SCIM Live Verify User',
+      active: true,
+    },
+    label: 'SCIM user create',
+  });
+  if (
+    !scimUser?.id ||
+    scimUser.active !== true ||
+    scimUser.userName !== `scim-user-${suffix}@example.com`
+  ) {
+    throw new Error(`SCIM user create returned unexpected payload: ${redactedJson(scimUser)}`);
+  }
+  markStep('created SCIM user');
+
+  const listedUsers = await apiJson('/api/v1/scim/v2/Users', {
+    token: tokenRecord.token,
+    label: 'SCIM user list',
+  });
+  if (
+    listedUsers?.totalResults < 1 ||
+    !listedUsers.Resources?.some((candidate) => candidate.id === scimUser.id)
+  ) {
+    throw new Error(`SCIM user list did not include created user: ${redactedJson(listedUsers)}`);
+  }
+  markStep('listed SCIM user through bearer endpoint');
+
+  const adminUsers = await apiJson(`/api/v1/auth/teams/${teamId}/scim/users`, {
+    token: owner.token,
+    label: 'SCIM admin provisioned-user readback',
+  });
+  const adminUser = Array.isArray(adminUsers)
+    ? adminUsers.find((candidate) => candidate.id === scimUser.id)
+    : undefined;
+  if (!adminUser || adminUser.active !== true) {
+    throw new Error(`SCIM admin readback did not include active user: ${redactedJson(adminUsers)}`);
+  }
+  markStep('read SCIM user through workspace admin endpoint');
+
+  const deactivated = await apiJson(`/api/v1/scim/v2/Users/${encodeURIComponent(scimUser.id)}`, {
+    method: 'PATCH',
+    token: tokenRecord.token,
+    body: {
+      schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+      Operations: [
+        {
+          op: 'Replace',
+          path: 'active',
+          value: false,
+        },
+      ],
+    },
+    label: 'SCIM user deactivate patch',
+  });
+  if (deactivated?.active !== false) {
+    throw new Error(
+      `SCIM user deactivate returned unexpected payload: ${redactedJson(deactivated)}`,
+    );
+  }
+  markStep('deactivated SCIM user');
+
+  const adminUsersAfterDeactivate = await apiJson(`/api/v1/auth/teams/${teamId}/scim/users`, {
+    token: owner.token,
+    label: 'SCIM admin deactivated-user readback',
+  });
+  const deactivatedAdminUser = Array.isArray(adminUsersAfterDeactivate)
+    ? adminUsersAfterDeactivate.find((candidate) => candidate.id === scimUser.id)
+    : undefined;
+  if (!deactivatedAdminUser || deactivatedAdminUser.active !== false) {
+    throw new Error(
+      `SCIM admin readback did not include deactivated user: ${redactedJson(
+        adminUsersAfterDeactivate,
+      )}`,
+    );
+  }
+  markStep('confirmed deactivation in workspace admin endpoint');
+
+  const revoked = await apiJson(`/api/v1/auth/teams/${teamId}/scim/tokens/${tokenRecord.id}`, {
+    method: 'DELETE',
+    token: owner.token,
+    label: 'SCIM token revoke',
+  });
+  if (revoked?.revokedAt === undefined) {
+    throw new Error(`SCIM token revoke returned unexpected payload: ${redactedJson(revoked)}`);
+  }
+  markStep('revoked SCIM token');
+
+  const revokedTokenDenied = await apiJson('/api/v1/scim/v2/Users', {
+    token: tokenRecord.token,
+    expectedStatus: 401,
+    label: 'SCIM revoked-token denial',
+  });
+  if (revokedTokenDenied?.error?.code !== 'UNAUTHORIZED') {
+    throw new Error(
+      `SCIM revoked token returned unexpected payload: ${redactedJson(revokedTokenDenied)}`,
+    );
+  }
+  markStep('confirmed revoked SCIM token is denied');
+
+  const durationMs = Date.now() - startedAt;
+  assertWithin(durationMs, scimThresholdMs, 'SCIM provisioning journey');
+
+  return {
+    name: 'scim-provisioning-lifecycle',
+    status: 'passed',
+    durationMs,
+    thresholdMs: scimThresholdMs,
+    steps,
+    workspace: {
+      teamId,
+      ownerRole: owner.team.role,
+    },
+    scim: {
+      tokenPrefix: tokenRecord.tokenPrefix,
+      discovery: {
+        serviceProviderConfig: 'passed',
+        schemas: schemas.totalResults,
+        resourceTypes: resourceTypes.totalResults,
+        unauthenticatedDeniedStatus: 401,
+      },
+      userLifecycle: {
+        createdActive: scimUser.active,
+        listedThroughBearer: true,
+        listedThroughAdminReadback: true,
+        deactivatedActive: deactivated.active,
+        revokedTokenDeniedStatus: 401,
+      },
+      metadataOnlyTokenList: true,
     },
   };
 }

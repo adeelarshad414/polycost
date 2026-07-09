@@ -140,6 +140,7 @@ say so explicitly rather than marking it done.
 | Phase 2.48 - SCIM provisioning foundation               | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.49 - SCIM admin workspace UX                    | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.50 - SCIM discovery and IdP onboarding          | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.51 - SCIM live verification transcript          | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -153,6 +154,50 @@ say so explicitly rather than marking it done.
 | Browser audit artifact hardening                        | Complete with known gaps (see notes) | 2026-07-08   |
 | Formal browser audit tooling                            | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3.5 - Terraform bundle integrity validation      | Complete with known gaps (see notes) | 2026-07-08   |
+
+## Phase 2.51 - SCIM live verification transcript
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Extended `scripts/live-verification.mjs` with an API-only
+  `scim-provisioning-lifecycle` journey against the running stack.
+- The journey creates its own owner/team/session, creates a one-time SCIM token,
+  proves token metadata lists never expose raw bearer tokens, verifies
+  bearer-protected SCIM discovery, provisions a user, lists it through both SCIM
+  and workspace-admin readback, deactivates the user, revokes the token, and
+  confirms revoked bearer tokens receive structured `401` responses.
+- Added the `POLYCOST_SCIM_JOURNEY_MAX_MS` live threshold and sanitized transcript
+  fields that retain only token prefix/status/count evidence, never raw bearer
+  tokens.
+- Added progress and release-readiness guards so the SCIM live journey, denial
+  checks, and metadata-only token proof cannot be removed silently.
+- Updated the verification ledger and enterprise IdP onboarding guide to point to
+  the live SCIM lifecycle smoke path.
+
+Verification performed:
+
+- `node --check scripts/live-verification.mjs` passed.
+- `npm run ci:lint` passed.
+- `npm run progress:verify` passed with `160` phase evidence anchors verified.
+- `npm run release:check` passed.
+- `npm run format:check` passed.
+- `npm run check` passed. API unit suites: `58` / `487` tests. Web unit suites:
+  `11` / `149` tests. Expected caveats remained: `impeccable` is skipped on the
+  repo's Node 20 target, the live Postgres container was not running for
+  `db:validate`, and invoice-artifact storage remains demo/local without external
+  object-storage/WORM/KMS proof.
+
+Known gaps carried forward:
+
+- This is local/mock-stack proof, not formal Okta/Entra certification, group push,
+  IdP-driven role mapping, custom schema extensions, managed IdP pilot evidence, or
+  complete enterprise account administration.
+- The new `scim-provisioning-lifecycle` path was statically checked and release
+  guarded in this branch; executing it still requires a running local/demo stack via
+  `npm run live:verify` or the Compose E2E harness.
 
 ## Phase 2.50 - SCIM discovery and IdP onboarding
 

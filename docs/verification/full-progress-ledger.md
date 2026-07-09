@@ -266,11 +266,15 @@ Evidence:
 - `docs/ENTERPRISE-IDP-ONBOARDING.md` records the current operator setup path for
   Okta-style and Microsoft Entra-style SCIM clients while preserving the formal
   certification boundary.
-- `scripts/live-verification.mjs` records a `workspace-auth-rbac-sso` smoke journey
-  against the running stack: owner signup, session hydration, invite preview and
-  acceptance, member role change, mock OIDC start/authorize/callback, structured
-  `403` for member billing import, and server-side revoke-other-sessions. Tokens,
-  invite secrets, and OIDC state are intentionally excluded from the transcript.
+- `scripts/live-verification.mjs` records `workspace-auth-rbac-sso` and
+  `scim-provisioning-lifecycle` smoke journeys against the running stack. The auth
+  journey covers owner signup, session hydration, invite preview and acceptance,
+  member role change, mock OIDC start/authorize/callback, structured `403` for
+  member billing import, and server-side revoke-other-sessions. The SCIM journey
+  covers one-time token creation, metadata-only token listing, bearer-protected
+  discovery, user create/list/admin readback/deactivate, token revocation, and
+  revoked-token `401` denial. Tokens, invite secrets, and OIDC state are
+  intentionally excluded from the transcript.
 - Latest isolated local run completed `workspace-auth-rbac-sso` in `720ms` /
   `60000ms`, including `rbacDeniedStatus: 403` and `stateVerified: true`.
 - The isolated local `ci:e2e` run completed the same journey in `794ms` /
@@ -282,9 +286,10 @@ Evidence:
 Deferred:
 
 - Full enterprise account/team UX, formal SCIM certification, production email
-  delivery, production OIDC/SAML provider handshakes, group push, IdP-driven role
-  mapping, custom schema extensions, account recovery, invite/approval workflows,
-  and complete RBAC product polish remain future phases.
+  delivery, production OIDC/SAML provider handshakes, managed Okta/Entra pilot
+  evidence, group push, IdP-driven role mapping, custom schema extensions, account
+  recovery, invite/approval workflows, and complete RBAC product polish remain
+  future phases.
 
 ## Phase G - Operations, Security And Release Readiness
 
