@@ -447,8 +447,11 @@ To rehearse the full artifact-governance handoff, run
 `npm run invoice:artifact-rehearsal:plan` locally, then run
 `npm run invoice:artifact-rehearsal:live` from the staging environment after Vault,
 scanner, notary, audit-export, and provider object-lock evidence are configured.
-The local check also runs `npm run invoice:artifact-scanner:smoke:local`; sandboxes
-that block TCP listeners report a structured skip unless strict mode is enabled.
+Archive the JSON outputs into an evidence bundle and validate it with
+`npm run invoice:artifact-rehearsal:evidence:check -- --require-live <bundle.json>`.
+The checked-in example bundle is `example-schema` only, not live cloud proof. The
+local check also runs `npm run invoice:artifact-scanner:smoke:local`; sandboxes that
+block TCP listeners report a structured skip unless strict mode is enabled.
 
 ## Documentation
 

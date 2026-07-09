@@ -541,6 +541,21 @@ polycost/notary-reference-receiver:local .` passed. The receiver intentionally
   families, progress verification `189` anchors, release readiness, handover,
   DevOps/cloud/provider-credential gates, and invoice
   evidence/retention-proof/profile/rehearsal smokes.
+- Rehearsal evidence bundle verification now gives live target-environment outputs a
+  machine-readable archive contract. `provider:credentials:check` supports
+  `--json`, the live rehearsal uses the strict JSON credential step, and
+  `invoice:artifact-rehearsal:evidence:check` validates profile-check,
+  provider-credential, retention-proof, scanner, notary, audit-export, canary
+  archive, raw-secret, and profile-reference consistency. The checked-in
+  `example-schema` bundle passed the default checker while
+  `--require-live` failed as intended, keeping sample proof distinct from live proof.
+  The progress verifier passed afterward with `203` anchors.
+- Full `npm run check` passed afterward with the evidence bundle gate in the
+  aggregate floor: API unit `59` suites / `494` tests, web unit `11` suites / `149`
+  tests, graph validation `331` nodes / `331` edges, pricing coverage `36` frontend
+  families, progress verification `203` anchors, release readiness, handover,
+  DevOps/cloud/provider-credential gates, and invoice
+  evidence/retention-proof/profile/rehearsal/evidence-bundle smokes.
 
 Blocked:
 

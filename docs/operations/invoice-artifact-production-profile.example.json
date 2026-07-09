@@ -74,7 +74,9 @@
   },
   "operatorControls": [
     "Run npm run provider:credentials:check:strict in the target environment after seeding Vault.",
+    "Run npm run provider:credentials:check:strict -- --json when preparing the live rehearsal evidence bundle.",
     "Run npm run invoice:retention-proof:verify with --expected-sha256 against the archived provider proof artifact.",
+    "Run npm run invoice:artifact-rehearsal:evidence:check -- --require-live <bundle.json> after archiving scanner, notary, and audit canary receipts.",
     "Archive scanner, notary receiver, and audit-export canary receipts in WORM/object-lock backed storage.",
     "Keep raw secrets out of this profile; only Vault paths, key names, and durable evidence references belong here."
   ],

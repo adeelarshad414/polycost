@@ -144,6 +144,7 @@ say so explicitly rather than marking it done.
 | Phase 2.52 - Isolated E2E and runtime DI hardening      | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.53 - Invoice artifact production profile check  | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.54 - Invoice artifact staging rehearsal harness | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.55 - Rehearsal evidence bundle verification     | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -157,6 +158,77 @@ say so explicitly rather than marking it done.
 | Browser audit artifact hardening                        | Complete with known gaps (see notes) | 2026-07-08   |
 | Formal browser audit tooling                            | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3.5 - Terraform bundle integrity validation      | Complete with known gaps (see notes) | 2026-07-08   |
+
+## Phase 2.55 - Rehearsal evidence bundle verification
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added JSON output support to `scripts/provider-credential-check.mjs` via
+  `--json`, producing `polycost-provider-credential-check/v1` results with strict
+  status, pass/warn/fail counts, and sanitized provider findings.
+- Updated the live staging rehearsal path so the strict provider credential step runs
+  with `--json` and is parsed into the rehearsal result.
+- Added `scripts/invoice-artifact-rehearsal-evidence-check.mjs`, which validates a
+  `polycost-invoice-artifact-rehearsal-evidence/v1` bundle after an operator
+  archives live target-environment outputs.
+- Added
+  `docs/operations/evidence/invoice-artifact-rehearsal-evidence.example.json`, a
+  sanitized `example-schema` bundle that validates the contract without claiming
+  live cloud proof.
+- Added `npm run invoice:artifact-rehearsal:evidence:check` and wired it into the
+  aggregate `npm run check` floor.
+- Updated README, provider-credential docs, and the production profile operator
+  controls so live rehearsals end by validating a bundle with
+  `npm run invoice:artifact-rehearsal:evidence:check -- --require-live <bundle.json>`.
+- Extended release-readiness and progress-verification guards for the provider
+  credential JSON contract, evidence bundle checker, sample bundle schema, raw-secret
+  guard, live-required mode, and profile archive-reference drift checks.
+
+Verification performed:
+
+- `node --check scripts/provider-credential-check.mjs` passed.
+- `node --check scripts/invoice-artifact-rehearsal-evidence-check.mjs` passed.
+- `node --check scripts/invoice-artifact-staging-rehearsal.mjs` passed.
+- `npm run provider:credentials:check -- --json` passed, returning
+  `polycost-provider-credential-check/v1` with the expected local/demo
+  invoice-artifacts warning in non-strict mode.
+- `npm run invoice:artifact-rehearsal:evidence:check -- --json` passed against the
+  example bundle with `verifiedExampleSchema=true`, `verifiedLiveEvidence=false`,
+  and `liveEvidenceRequired=true`.
+- `npm run invoice:artifact-rehearsal:evidence:check -- --require-live --json`
+  failed as intended against the example bundle because sample evidence does not set
+  live-run/operator attestations.
+- `npm run invoice:artifact-rehearsal:plan -- --json` passed and now lists
+  `npm run provider:credentials:check:strict -- --json` in the live checklist.
+- `npm run release:check` passed.
+- `npm run progress:verify` passed with `203` phase evidence anchors verified.
+- Full `npm run check` passed with the evidence bundle checker in the aggregate floor.
+  The run included API unit `59` suites / `494` tests, web unit `11` suites / `149`
+  tests, graph validation `331` nodes / `331` edges, pricing coverage `36`
+  frontend families, progress verification `203` anchors, release readiness,
+  handover, DevOps/cloud/provider-credential gates, and invoice
+  evidence/retention-proof/profile/rehearsal/evidence-bundle smokes. Expected
+  caveats remained: `impeccable` is skipped on the repo's Node 20 target, live
+  Postgres migrations were skipped because the local Postgres container was not
+  running, the local cloud check is documentation/config only, and the default local
+  env still warns that invoice-artifacts are demo/local without live
+  object-storage/KMS/scanner/WORM settings.
+
+Known gaps carried forward:
+
+- This makes live rehearsal evidence machine-verifiable after capture, but it still
+  cannot create live cloud evidence without a real target environment, Vault,
+  provider object storage, scanner, notary, audit-export receiver, and operator-owned
+  WORM/object-lock archives.
+- The checked-in evidence bundle is intentionally `example-schema` only. It fails
+  `--require-live` until replaced with real staging/prod outputs and live
+  attestations.
+- Full invoice-grade billing still requires provider invoices of record, private
+  discount/credit/tax treatment, legal retention controls, and customer-specific
+  reconciliation review.
 
 ## Phase 2.54 - Invoice artifact staging rehearsal harness
 

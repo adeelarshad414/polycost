@@ -143,10 +143,12 @@ Validation command after credential storage:
 
 ```bash
 USE_MOCK_PROVIDERS=false npm run provider:credentials:check:strict
+USE_MOCK_PROVIDERS=false npm run provider:credentials:check:strict -- --json
 ```
 
 The strict check fails if Vault is missing, the token file is unreadable, the GCP
-secret path is absent, or the stored token/JSON is still a dummy placeholder.
+secret path is absent, or the stored token/JSON is still a dummy placeholder. Use
+the JSON form when preparing a live rehearsal evidence bundle.
 
 ## Invoice Artifact Object Storage
 
@@ -294,8 +296,8 @@ The check verifies:
 
 This closes a reviewer-readiness gap but still does not prove live cloud access.
 After replacing the example values with target-environment references, run
-`npm run provider:credentials:check:strict` and the staging scanner/notary/audit
-smokes from the deployed environment.
+`npm run provider:credentials:check:strict -- --json` and the staging
+scanner/notary/audit smokes from the deployed environment.
 
 ### Staging Rehearsal Harness
 
@@ -315,14 +317,22 @@ and audit-export canary:
 
 ```bash
 npm run invoice:artifact-rehearsal:live
+npm run invoice:artifact-rehearsal:evidence:check -- --require-live <bundle.json>
 ```
 
 Archive the JSON output from live mode together with receiver-side WORM/object-lock
-retention evidence for the scanner, notary, and audit-export canary references.
-If your local environment permits TCP listeners, `npm run
-invoice:artifact-scanner:smoke:local` also proves the scanner webhook HMAC
-contract. Sandboxes that block local TCP binding report a structured skipped
-status unless `POLYCOST_INVOICE_ARTIFACT_SCANNER_LOCAL_SMOKE_STRICT=1` is set.
+retention evidence for the scanner, notary, and audit-export canary references,
+then validate the assembled
+`polycost-invoice-artifact-rehearsal-evidence/v1` bundle with `--require-live`.
+The checker fails if provider credentials still warn, a webhook canary is missing,
+a receiver is not HTTPS, canary archive references drift from the profile, raw
+secret-shaped material is present, or the bundle is only sample evidence. The
+checked-in `docs/operations/evidence/invoice-artifact-rehearsal-evidence.example.json`
+bundle validates the schema only and is not live cloud proof. If your local
+environment permits TCP listeners, `npm run invoice:artifact-scanner:smoke:local`
+also proves the scanner webhook HMAC contract. Sandboxes that block local TCP
+binding report a structured skipped status unless
+`POLYCOST_INVOICE_ARTIFACT_SCANNER_LOCAL_SMOKE_STRICT=1` is set.
 
 After verification, billing Owners/Admins can attach the provider-retention proof
 to the exact stored invoice artifact without giving PolyCost provider credentials:

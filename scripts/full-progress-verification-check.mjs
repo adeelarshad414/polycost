@@ -104,6 +104,7 @@ async function assertPhaseEvidenceAnchors() {
     'npm run invoice:artifact-profile:check',
     'npm run invoice:artifact-scanner:smoke:local',
     'npm run invoice:artifact-rehearsal:plan',
+    'npm run invoice:artifact-rehearsal:evidence:check',
   ]);
   assertScriptIncludes(packageJson, 'ci:unit', [
     'npm run test:coverage',
@@ -344,6 +345,34 @@ async function assertPhaseEvidenceAnchors() {
     ['audit live step', 'audit-export-smoke'],
     ['secret handling statement', 'raw secrets must stay in Vault/runtime env'],
   ]);
+
+  await assertFileContains('scripts/invoice-artifact-rehearsal-evidence-check.mjs', [
+    ['rehearsal evidence bundle schema', 'polycost-invoice-artifact-rehearsal-evidence/v1'],
+    ['rehearsal evidence check schema', 'polycost-invoice-artifact-rehearsal-evidence-check/v1'],
+    ['require live mode', '--require-live'],
+    ['raw secret material guard', 'findSecretMaterial'],
+    ['provider credential JSON contract', 'polycost-provider-credential-check/v1'],
+    ['profile archive drift guard', 'archiveReference must match profile evidence'],
+  ]);
+
+  await assertFileContains('scripts/provider-credential-check.mjs', [
+    ['provider credential JSON schema', 'polycost-provider-credential-check/v1'],
+    ['provider credential JSON option', '--json'],
+  ]);
+
+  await assertFileContains(
+    'docs/operations/evidence/invoice-artifact-rehearsal-evidence.example.json',
+    [
+      ['rehearsal evidence example schema', 'polycost-invoice-artifact-rehearsal-evidence/v1'],
+      ['sample-only evidence level', 'example-schema'],
+      ['provider credential JSON schema', 'polycost-provider-credential-check/v1'],
+      [
+        'provider retention proof embedded output',
+        'invoice-artifact-provider-retention-proof-verification/v1',
+      ],
+      ['sample caveat', 'sanitized sample evidence for CI/schema validation only'],
+    ],
+  );
 
   await assertFileContains('docs/operations/invoice-artifact-production-profile.example.json', [
     ['production profile schema', 'polycost-invoice-artifact-production-profile/v1'],

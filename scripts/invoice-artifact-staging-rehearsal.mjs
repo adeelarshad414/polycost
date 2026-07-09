@@ -147,9 +147,10 @@ async function runRehearsal(options) {
     steps.push(
       runCommand(
         'provider-credentials-strict',
-        [process.execPath, providerCredentialsScript(), '--strict'],
+        [process.execPath, providerCredentialsScript(), '--strict', '--json'],
         {
           env: liveEnv,
+          parseJson: true,
         },
       ),
     );
@@ -229,7 +230,7 @@ function buildPlan({ profilePath, profile, runtimeConfig, evidence, secretRefere
     requiredCanaryArchives: canaries,
     liveCommands: [
       `npm run invoice:artifact-profile:check -- ${shellQuote(profilePath)}`,
-      'npm run provider:credentials:check:strict',
+      'npm run provider:credentials:check:strict -- --json',
       'npm run invoice:artifact-scanner:smoke',
       'npm run invoice:evidence:notary:smoke',
       'npm run audit:export:smoke',
