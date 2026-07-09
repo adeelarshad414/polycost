@@ -4699,6 +4699,51 @@ impeccable` was skipped by design because the repo targets Node 20 and the optio
   private contract/legal validation, WORM storage proof, or full invoice-grade
   billing coverage.
 
+## Phase 2.38 — Invoice evidence receipt and WORM posture
+
+Status: implemented and verified locally on 2026-07-09.
+
+- Added production-bound invoice evidence receipt configuration:
+  `INVOICE_EVIDENCE_RECEIPT_MODE`,
+  `INVOICE_EVIDENCE_RECEIPT_SIGNING_KEY_REFERENCE`,
+  `INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET`,
+  `INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL`, and
+  `INVOICE_EVIDENCE_WORM_RETENTION_MODE`.
+- Staging and production config now reject metadata-only evidence receipts and
+  missing WORM retention posture. Signed modes require a signing key reference and
+  runtime signing secret; external webhook mode additionally requires an HTTPS
+  notary/WORM URL outside development.
+- Invoice evidence packets now include a digest-covered `receipt` block. The receipt
+  signs the base evidence payload digest with HMAC-SHA256 when configured, records
+  the signing key reference, notary host/hash metadata, WORM retention mode, and
+  explicit readiness gaps without exposing the signing secret.
+- The offline evidence packet verifier now validates receipt binding when a receipt
+  is present by recomputing the base evidence payload digest and signed-payload
+  digest metadata.
+- Provider credential checks now include evidence receipt signing and WORM retention
+  posture; local/demo mode warns that receipts are metadata-only and WORM retention
+  is not configured.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/config/config.schema.spec.ts`
+  passed 64/64. `npm run typecheck --workspaces --if-present` passed for API, web,
+  and shared types. `npm run invoice:evidence:verify:smoke` passed.
+  `npm run test:unit --workspace @polycost/web -- --runInBand src/App.spec.tsx src/api-client.spec.ts`
+  passed 90/90. `npm run provider:credentials:check` passed with the expected
+  local/demo invoice-artifacts warning expanded to include metadata-only evidence
+  receipts and missing WORM retention mode. Full `npm run check` passed with API
+  55 suites / 467 tests, web 11 suites / 147 tests, graph validation 320 nodes /
+  320 edges, pricing coverage, progress verification 153 anchors, QA/security
+  suppression hygiene, DB, DevOps, cloud, release, handover, and provider-credential
+  gates green. `npm run impeccable` was skipped by design because the repo targets
+  Node 20 and the optional tool requires Node 24; DB validation skipped live
+  `schema_migrations` inspection because the local Postgres container was not
+  running.
+- Remaining caveat: signed receipts and WORM posture make exported packet handoff
+  stronger, but PolyCost still does not automatically submit packet bytes to an
+  external notary during download, prove provider object-lock retention from the
+  cloud control plane, render provider invoices, or become an invoice system of
+  record.
+
 ## Deviations from spec log
 
 Every implementation divergence from `00` through `11` should be logged here with

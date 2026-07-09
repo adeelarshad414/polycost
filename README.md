@@ -208,9 +208,11 @@ Accounts add workspace controls on top of that core flow:
   legal-hold, KMS-readiness, and scan-hook metadata. Admin readiness and retention
   endpoints expose object-store/KMS/scanner/retention posture, and strict provider
   checks warn or fail when those controls are missing. Evidence packets can be
-  downloaded with a tamper-evident manifest and verified locally with
-  `npm run invoice:evidence:verify -- <packet.json>`. This improves proof
-  discipline but is not a provider invoice system of record.
+  downloaded with a tamper-evident manifest, a signed receipt when configured, and
+  local verification through `npm run invoice:evidence:verify -- <packet.json>`.
+  Staging and production must configure signed receipts plus provider object-lock
+  or external WORM retention posture before claiming durable evidence handoff.
+  This improves proof discipline but is not a provider invoice system of record.
 
 The current self-hosted product does not yet include enterprise IdP login round-trips,
 full email-template management, org billing plans, or a hosted account marketplace.

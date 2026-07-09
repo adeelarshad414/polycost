@@ -1,7 +1,7 @@
 # PolyCost Production Readiness Report
 
 Date: 2026-07-08
-Branch: cumulative production-readiness branches through `codex/invoice-artifact-governance-audit`
+Branch: cumulative production-readiness branches through `codex/invoice-evidence-receipts`
 PR: local phase gate, PR created after verification
 Run spec: `docs/design/master-production-readiness-orchestrator-v2.md`
 
@@ -79,6 +79,7 @@ performance/accessibility/best-practices/SEO metrics.
 | INV-TRACE-020  | Improved      | Invoice evidence packets now carry a stable-JSON SHA-256 integrity manifest with payload byte length, subject IDs, artifact counts, caveat/disclaimer counts, and digest metadata for reviewer recomputation                                            |
 | INV-TRACE-021  | Improved      | Downloaded invoice evidence packets can now be verified offline with a local CLI that recomputes the stable-JSON digest, validates subject/count metadata, and rejects tampered payloads                                                                |
 | INV-TRACE-022  | Improved      | Invoice evidence packets now include a digest-covered artifact governance manifest, and packet export plus artifact file download are recorded as team audit events with checksum, scanner, storage, retention, and governance-gap metadata             |
+| INV-TRACE-023  | Improved      | Invoice evidence packets now include receipt/notary metadata with optional HMAC-SHA256 signing, WORM posture checks, strict production config guards, provider-credential guard coverage, and receipt-aware offline verification                        |
 | VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                                                                                             |
 | VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                                                                                             |
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                                                                                        |
@@ -318,6 +319,23 @@ Local static/regression gates:
     Node 24 skip under the repo's Node 20 target; DB validation skipped live
     `schema_migrations` inspection because the local Postgres container was not
     running.
+- Phase 2.38 invoice evidence receipt and WORM posture focused gate passed:
+  - API focused: `src/api/auth-billing.spec.ts` and
+    `src/config/config.schema.spec.ts`: 2 suites / 64 tests.
+  - Web focused: `src/App.spec.tsx` and `src/api-client.spec.ts`: 2 suites /
+    90 tests.
+  - `npm run typecheck --workspaces --if-present`: passed.
+  - `npm run invoice:evidence:verify:smoke`: passed with receipt-aware verifier.
+  - `npm run provider:credentials:check`: passed with the expected local/demo
+    invoice-artifacts warning expanded to include metadata-only evidence receipts
+    and missing WORM retention mode.
+  - Full `npm run check`: passed with API 55 suites / 467 tests, web 11 suites /
+    147 tests, graph validation 320 nodes / 320 edges, pricing coverage, progress
+    verification 153 anchors, QA/security suppression hygiene, DB, DevOps, cloud,
+    release, handover, and provider-credential gates. `npm run impeccable` remained
+    the expected Node 24 skip under the repo's Node 20 target; DB validation skipped
+    live `schema_migrations` inspection because the local Postgres container was
+    not running.
 - Phase 2.25 final local floor passed:
   - `npm run test:production-readiness`: API 12 suites / 165 tests; web 2 suites /
     86 tests.
@@ -628,8 +646,10 @@ Machine-readable token evidence:
   2.33 adds audited stored-artifact control-total validation against imported actuals
   and reconciliation totals. Phase 2.37 adds a digest-covered packet governance
   manifest plus audit events for evidence-packet exports and artifact downloads.
+  Phase 2.38 adds signed evidence receipt configuration, receipt-aware offline
+  verification, and declared WORM posture checks.
   PolyCost still does not provide provider invoice rendering, private contract
-  validation, WORM object-store proof, external legal-review routing,
+  validation, cloud-control-plane WORM object-store proof, external legal-review routing,
   contract/legal approval integration, or a full external reviewer queue.
   Full invoice-grade billing remains future scope.
   PolyCost is still not the invoice system of record.

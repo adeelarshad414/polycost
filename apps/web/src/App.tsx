@@ -1903,7 +1903,7 @@ function useInitialBootState(): boolean {
   return isBooting;
 }
 
-function ScrollProgressBar() {
+export function ScrollProgressBar() {
   const [progress, setProgress] = useState(0);
   const percent = Math.round(progress * 100);
 

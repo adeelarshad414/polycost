@@ -1,6 +1,8 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ComparisonResult } from '../comparison/comparison.types';
+import { AppConfig } from '../config/config.schema';
 import { ApiForbiddenError, ApiNotFoundError, ApiValidationError } from './api-errors';
 import {
   ApiDatabaseRepository,
@@ -24,8 +26,11 @@ import {
   InvoiceControlValidationStatus,
   InvoiceEvidencePacketArtifact,
   InvoiceEvidencePacketGovernance,
+  InvoiceEvidencePacketReceipt,
   InvoiceEvidencePacketResponse,
   InvoiceEvidencePacketStatus,
+  InvoiceEvidenceReceiptMode,
+  InvoiceEvidenceWormRetentionMode,
   BillingImportInput,
   BillingImportResponse,
   BillingProviderExportInput,
@@ -168,12 +173,22 @@ interface InvoiceGradeReadinessCheck {
   requiredArtifact: string;
 }
 
+interface InvoiceEvidenceReceiptRuntimeConfig {
+  mode: InvoiceEvidenceReceiptMode;
+  signingKeyReference?: string;
+  signingSecret?: string;
+  notaryWebhookUrl?: string;
+  wormRetentionMode: InvoiceEvidenceWormRetentionMode;
+  auditExportWebhookConfigured: boolean;
+}
+
 @Injectable()
 export class BillingService {
   constructor(
     private readonly repository: ApiDatabaseRepository,
     private readonly artifactGovernanceService: InvoiceArtifactGovernanceService = new InvoiceArtifactGovernanceService(),
     private readonly artifactStorageService: InvoiceArtifactStorageService = new InvoiceArtifactStorageService(),
+    private readonly configService?: ConfigService<AppConfig, true>,
   ) {}
 
   async importActuals(body: unknown, identity: AuthIdentity): Promise<BillingImportResponse> {
@@ -405,6 +420,7 @@ export class BillingService {
       reconciliation,
       importRun,
       this.artifactGovernanceService.storageReadiness(),
+      this.invoiceEvidenceReceiptConfig(),
     );
 
     if (importRun.teamId) {
@@ -420,6 +436,10 @@ export class BillingService {
           provider: reconciliation.provider,
           packetStatus: packet.packetStatus,
           payloadDigestSha256: packet.integrity.payloadDigestSha256,
+          receiptStatus: packet.receipt.status,
+          receiptMode: packet.receipt.mode,
+          receiptSigned: Boolean(packet.receipt.signature),
+          wormRetentionMode: packet.receipt.wormReadiness.retentionMode,
           artifactCount: packet.integrity.artifactCount,
           storedArtifactCount: packet.integrity.storedArtifactCount,
           verifiedArtifactCount: packet.integrity.verifiedArtifactCount,
@@ -1200,6 +1220,29 @@ export class BillingService {
         legalHold: input.blob.retentionPolicy.legalHold,
       },
     });
+  }
+
+  private invoiceEvidenceReceiptConfig(): InvoiceEvidenceReceiptRuntimeConfig {
+    return {
+      mode:
+        this.configService?.get('INVOICE_EVIDENCE_RECEIPT_MODE', { infer: true }) ??
+        'metadata-only',
+      signingKeyReference: this.optionalConfig('INVOICE_EVIDENCE_RECEIPT_SIGNING_KEY_REFERENCE'),
+      signingSecret: this.optionalConfig('INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET'),
+      notaryWebhookUrl: this.optionalConfig('INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL'),
+      wormRetentionMode:
+        this.configService?.get('INVOICE_EVIDENCE_WORM_RETENTION_MODE', { infer: true }) ??
+        'not-configured',
+      auditExportWebhookConfigured:
+        this.configService?.get('AUTH_AUDIT_EXPORT_MODE', { infer: true }) === 'webhook' &&
+        Boolean(this.optionalConfig('AUTH_AUDIT_EXPORT_WEBHOOK_URL')),
+    };
+  }
+
+  private optionalConfig(key: keyof AppConfig): string | undefined {
+    const value = this.configService?.get(key, { infer: true });
+
+    return typeof value === 'string' && value.trim() ? value.trim() : undefined;
   }
 }
 
@@ -3370,6 +3413,7 @@ function invoiceEvidencePacket(
   reconciliation: InvoiceReconciliationRecord,
   importRun: BillingImportResponse['importRun'],
   storageReadiness: InvoiceArtifactStorageReadiness,
+  receiptConfig: InvoiceEvidenceReceiptRuntimeConfig,
 ): InvoiceEvidencePacketResponse {
   const generatedAt = new Date().toISOString();
   const readiness = recordValue(reconciliation.evidence.invoiceGradeReadiness);
@@ -3407,7 +3451,7 @@ function invoiceEvidencePacket(
     Boolean(importRun.teamId),
   );
 
-  const packetPayload: Omit<InvoiceEvidencePacketResponse, 'integrity'> = {
+  const basePacketPayload: Omit<InvoiceEvidencePacketResponse, 'integrity' | 'receipt'> = {
     packetVersion: 'invoice-evidence-packet/v1',
     packetStatus: invoiceEvidencePacketStatus(artifacts, readiness, controls),
     generatedAt,
@@ -3444,6 +3488,24 @@ function invoiceEvidencePacket(
     caveats,
     disclaimers,
   };
+  const baseCanonicalPayload = stableJson(basePacketPayload);
+  const receipt = invoiceEvidencePacketReceipt({
+    basePayloadDigestSha256: sha256(baseCanonicalPayload),
+    basePayloadByteLength: Buffer.byteLength(baseCanonicalPayload, 'utf8'),
+    generatedAt,
+    subject: {
+      reconciliationId: reconciliation.id,
+      importRunId: reconciliation.importRunId,
+      comparisonId: reconciliation.comparisonId,
+      provider: reconciliation.provider,
+    },
+    storageReadiness,
+    receiptConfig,
+  });
+  const packetPayload: Omit<InvoiceEvidencePacketResponse, 'integrity'> = {
+    ...basePacketPayload,
+    receipt,
+  };
   const canonicalPayload = stableJson(packetPayload);
 
   return {
@@ -3467,6 +3529,131 @@ function invoiceEvidencePacket(
       disclaimerCount: disclaimers.length,
       generatedAt,
     },
+  };
+}
+
+function invoiceEvidencePacketReceipt(input: {
+  basePayloadDigestSha256: string;
+  basePayloadByteLength: number;
+  generatedAt: string;
+  subject: InvoiceEvidencePacketReceipt['subject'];
+  storageReadiness: InvoiceArtifactStorageReadiness;
+  receiptConfig: InvoiceEvidenceReceiptRuntimeConfig;
+}): InvoiceEvidencePacketReceipt {
+  const wormReadiness = invoiceEvidenceWormReadiness(input.storageReadiness, input.receiptConfig);
+  const signatureInput = {
+    schemaVersion: 'invoice-evidence-receipt-signature/v1',
+    issuedAt: input.generatedAt,
+    subject: input.subject,
+    basePayloadDigestSha256: input.basePayloadDigestSha256,
+    basePayloadByteLength: input.basePayloadByteLength,
+    mode: input.receiptConfig.mode,
+    wormRetentionMode: input.receiptConfig.wormRetentionMode,
+  };
+  const signedPayload = stableJson(signatureInput);
+  const canSign =
+    input.receiptConfig.mode !== 'metadata-only' &&
+    Boolean(input.receiptConfig.signingKeyReference && input.receiptConfig.signingSecret);
+  const notaryUrl =
+    input.receiptConfig.mode === 'external-webhook' && input.receiptConfig.notaryWebhookUrl
+      ? new URL(input.receiptConfig.notaryWebhookUrl)
+      : undefined;
+  const caveats = [
+    ...(canSign
+      ? []
+      : ['Receipt is metadata-only because signed receipt configuration is not enabled.']),
+    ...(notaryUrl
+      ? [
+          'External notary webhook is configured, but evidence packet export does not send bytes automatically; operators must archive the exported packet/receipt in the configured WORM system.',
+        ]
+      : []),
+    ...wormReadiness.gaps,
+  ];
+
+  return {
+    schemaVersion: 'invoice-evidence-receipt/v1',
+    mode: input.receiptConfig.mode,
+    status: canSign
+      ? input.receiptConfig.mode === 'external-webhook'
+        ? 'external-notary-ready'
+        : 'signed-local'
+      : 'metadata-only',
+    issuedAt: input.generatedAt,
+    subject: input.subject,
+    basePayloadDigestSha256: input.basePayloadDigestSha256,
+    basePayloadByteLength: input.basePayloadByteLength,
+    ...(canSign
+      ? {
+          signature: {
+            algorithm: 'hmac-sha256',
+            keyReference: input.receiptConfig.signingKeyReference!,
+            signedPayloadDigestSha256: sha256(signedPayload),
+            signature: createHmac('sha256', input.receiptConfig.signingSecret!)
+              .update(signedPayload)
+              .digest('hex'),
+            signedFields: Object.keys(signatureInput).sort(),
+          },
+        }
+      : {}),
+    ...(notaryUrl
+      ? {
+          notary: {
+            deliveryMode: 'operator-forwarded-webhook',
+            urlHost: notaryUrl.host,
+            urlSha256: sha256(input.receiptConfig.notaryWebhookUrl!),
+            deliveryEvidence: 'not-sent-by-api',
+          },
+        }
+      : {}),
+    wormReadiness,
+    caveats: [...new Set(caveats)],
+  };
+}
+
+function invoiceEvidenceWormReadiness(
+  storageReadiness: InvoiceArtifactStorageReadiness,
+  receiptConfig: InvoiceEvidenceReceiptRuntimeConfig,
+): InvoiceEvidencePacketReceipt['wormReadiness'] {
+  const objectStorageConfigured = storageReadiness.storageBackend !== 'database-bytea';
+  const customerManagedKmsConfigured = Boolean(storageReadiness.kmsKeyReference);
+  const scannerWebhookConfigured = storageReadiness.scannerMode === 'http-webhook';
+  const retentionDeleteExpiredConfigured =
+    storageReadiness.retentionEnforcementMode === 'delete-expired';
+  const signedReceiptConfigured =
+    receiptConfig.mode !== 'metadata-only' &&
+    Boolean(receiptConfig.signingKeyReference && receiptConfig.signingSecret);
+  const gaps = [
+    ...(!objectStorageConfigured
+      ? ['invoice artifacts are not configured for provider object storage']
+      : []),
+    ...(!customerManagedKmsConfigured ? ['customer-managed KMS reference is not configured'] : []),
+    ...(!scannerWebhookConfigured ? ['artifact malware scanner webhook is not configured'] : []),
+    ...(!retentionDeleteExpiredConfigured
+      ? ['retention enforcement is not configured to delete expired artifacts']
+      : []),
+    ...(!receiptConfig.auditExportWebhookConfigured
+      ? ['team audit export webhook is not configured for external retention']
+      : []),
+    ...(!signedReceiptConfigured ? ['signed evidence receipt is not configured'] : []),
+    ...(receiptConfig.wormRetentionMode === 'not-configured'
+      ? ['WORM retention mode is not configured']
+      : []),
+    ...(receiptConfig.wormRetentionMode === 'external-worm-receiver' &&
+    !receiptConfig.auditExportWebhookConfigured
+      ? ['external WORM receiver mode requires audit export webhook evidence']
+      : []),
+  ];
+
+  return {
+    retentionMode: receiptConfig.wormRetentionMode,
+    configured: gaps.length === 0,
+    objectStorageConfigured,
+    customerManagedKmsConfigured,
+    scannerWebhookConfigured,
+    retentionDeleteExpiredConfigured,
+    auditExportWebhookConfigured: receiptConfig.auditExportWebhookConfigured,
+    signedReceiptConfigured,
+    gaps: [...new Set(gaps)],
   };
 }
 

@@ -20,6 +20,9 @@ export type InvoiceGradeArtifactVerificationStatus = 'registered' | 'verified' |
 export type InvoiceArtifactStorageBackend = 'database-bytea' | 'aws-s3' | 'azure-blob' | 'gcp-gcs';
 export type InvoiceArtifactMalwareScannerMode = 'eicar-signature-only' | 'http-webhook';
 export type InvoiceArtifactRetentionEnforcementMode = 'report-only' | 'delete-expired';
+export type InvoiceEvidenceReceiptMode = 'metadata-only' | 'local-hmac' | 'external-webhook';
+export type InvoiceEvidenceWormRetentionMode =
+  'not-configured' | 'provider-object-lock' | 'external-worm-receiver';
 export type InvoiceAdjustmentCategory =
   | 'usage'
   | 'credit'
@@ -323,6 +326,41 @@ export interface InvoiceEvidencePacketGovernance {
   gaps: string[];
 }
 
+export interface InvoiceEvidencePacketReceipt {
+  schemaVersion: 'invoice-evidence-receipt/v1';
+  mode: InvoiceEvidenceReceiptMode;
+  status: 'metadata-only' | 'signed-local' | 'external-notary-ready';
+  issuedAt: string;
+  subject: InvoiceEvidencePacketIntegrity['subject'];
+  basePayloadDigestSha256: string;
+  basePayloadByteLength: number;
+  signature?: {
+    algorithm: 'hmac-sha256';
+    keyReference: string;
+    signedPayloadDigestSha256: string;
+    signature: string;
+    signedFields: string[];
+  };
+  notary?: {
+    deliveryMode: 'operator-forwarded-webhook';
+    urlHost: string;
+    urlSha256: string;
+    deliveryEvidence: 'not-sent-by-api';
+  };
+  wormReadiness: {
+    retentionMode: InvoiceEvidenceWormRetentionMode;
+    configured: boolean;
+    objectStorageConfigured: boolean;
+    customerManagedKmsConfigured: boolean;
+    scannerWebhookConfigured: boolean;
+    retentionDeleteExpiredConfigured: boolean;
+    auditExportWebhookConfigured: boolean;
+    signedReceiptConfigured: boolean;
+    gaps: string[];
+  };
+  caveats: string[];
+}
+
 export interface InvoiceEvidencePacketResponse {
   packetVersion: 'invoice-evidence-packet/v1';
   packetStatus: InvoiceEvidencePacketStatus;
@@ -358,6 +396,7 @@ export interface InvoiceEvidencePacketResponse {
   matchSummary: Record<string, unknown>;
   artifactRegister: Record<string, unknown>;
   artifactGovernance: InvoiceEvidencePacketGovernance;
+  receipt: InvoiceEvidencePacketReceipt;
   artifacts: InvoiceEvidencePacketArtifact[];
   controls: {
     registeredCount: number;

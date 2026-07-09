@@ -17,6 +17,12 @@ const productionArtifactConfig = {
   INVOICE_ARTIFACT_MALWARE_SCANNER_URL: 'https://scanner.example.com/polycost/artifacts',
   INVOICE_ARTIFACT_MALWARE_SCANNER_SECRET: 'production-scanner-webhook-secret',
   INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE: 'delete-expired',
+  INVOICE_EVIDENCE_RECEIPT_MODE: 'external-webhook',
+  INVOICE_EVIDENCE_RECEIPT_SIGNING_KEY_REFERENCE:
+    'arn:aws:kms:us-east-1:111122223333:alias/polycost-evidence-receipts',
+  INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET: 'production-evidence-receipt-signing-secret',
+  INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL: 'https://worm.example.com/polycost/evidence-receipts',
+  INVOICE_EVIDENCE_WORM_RETENTION_MODE: 'external-worm-receiver',
 };
 
 describe('config schema', () => {
@@ -62,6 +68,11 @@ describe('config schema', () => {
     expect(config.INVOICE_ARTIFACT_STORAGE_BACKEND).toBe('database-bytea');
     expect(config.INVOICE_ARTIFACT_MALWARE_SCANNER_MODE).toBe('eicar-signature-only');
     expect(config.INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE).toBe('report-only');
+    expect(config.INVOICE_EVIDENCE_RECEIPT_MODE).toBe('metadata-only');
+    expect(config.INVOICE_EVIDENCE_RECEIPT_SIGNING_KEY_REFERENCE).toBeUndefined();
+    expect(config.INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET).toBeUndefined();
+    expect(config.INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL).toBeUndefined();
+    expect(config.INVOICE_EVIDENCE_WORM_RETENTION_MODE).toBe('not-configured');
   });
 
   it('fails fast for invalid config', () => {
@@ -325,6 +336,51 @@ describe('config schema', () => {
         INVOICE_ARTIFACT_MALWARE_SCANNER_MODE: 'http-webhook',
       }),
     ).toThrow('INVOICE_ARTIFACT_MALWARE_SCANNER_URL is required for webhook artifact scanning.');
+  });
+
+  it('requires production-bound invoice evidence receipts and WORM retention posture', () => {
+    expect(() =>
+      validateConfig({
+        ...baseConfig,
+        NODE_ENV: 'production',
+        ...productionArtifactConfig,
+        INVOICE_EVIDENCE_RECEIPT_MODE: 'metadata-only',
+        CORS_ALLOWED_ORIGINS: 'https://polycost.example.com',
+        AUTH_SSO_STATE_SECRET: 'production-sso-state-secret-value',
+        AUTH_INVITE_DELIVERY_MODE: 'webhook',
+        AUTH_INVITE_DELIVERY_WEBHOOK_URL: 'https://mail.example.com/polycost/invites',
+        AUTH_INVITE_DELIVERY_WEBHOOK_SECRET: 'production-invite-webhook-secret',
+        AUTH_AUDIT_EXPORT_MODE: 'webhook',
+        AUTH_AUDIT_EXPORT_WEBHOOK_URL: 'https://siem.example.com/polycost/audit-events',
+        AUTH_AUDIT_EXPORT_WEBHOOK_SECRET: 'production-audit-export-secret',
+      }),
+    ).toThrow('Staging and production invoice evidence packets must use signed receipts.');
+
+    expect(() =>
+      validateConfig({
+        ...baseConfig,
+        INVOICE_EVIDENCE_RECEIPT_MODE: 'local-hmac',
+      }),
+    ).toThrow(
+      'INVOICE_EVIDENCE_RECEIPT_SIGNING_KEY_REFERENCE is required for signed invoice evidence receipts.',
+    );
+
+    expect(() =>
+      validateConfig({
+        ...baseConfig,
+        NODE_ENV: 'production',
+        ...productionArtifactConfig,
+        INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL: 'http://worm.example.com/polycost/evidence-receipts',
+        CORS_ALLOWED_ORIGINS: 'https://polycost.example.com',
+        AUTH_SSO_STATE_SECRET: 'production-sso-state-secret-value',
+        AUTH_INVITE_DELIVERY_MODE: 'webhook',
+        AUTH_INVITE_DELIVERY_WEBHOOK_URL: 'https://mail.example.com/polycost/invites',
+        AUTH_INVITE_DELIVERY_WEBHOOK_SECRET: 'production-invite-webhook-secret',
+        AUTH_AUDIT_EXPORT_MODE: 'webhook',
+        AUTH_AUDIT_EXPORT_WEBHOOK_URL: 'https://siem.example.com/polycost/audit-events',
+        AUTH_AUDIT_EXPORT_WEBHOOK_SECRET: 'production-audit-export-secret',
+      }),
+    ).toThrow('Invoice evidence notary webhook URL must use HTTPS outside development.');
   });
 
   it('keeps secret-shaped values out of the schema', () => {

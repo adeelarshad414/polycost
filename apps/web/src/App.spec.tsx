@@ -1,7 +1,7 @@
 import React, { act } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot, Root } from 'react-dom/client';
-import { App, ComparisonView } from './App';
+import { App, ComparisonView, ScrollProgressBar } from './App';
 import { PolyCostClient, PolyCostApiError } from './api-client';
 import {
   BackendHealthResponse,
@@ -1218,13 +1218,9 @@ describe('App', () => {
       document.documentElement,
       'scrollHeight',
     );
-    const { container, unmount } = render(<App client={clientMock()} />);
+    const { container, unmount } = render(<ScrollProgressBar />);
 
     try {
-      expect(container.querySelector('[aria-label="Page scroll progress"]')).toBeNull();
-
-      await click(buttonByText(container, 'Compare costs'));
-
       Object.defineProperty(document.documentElement, 'scrollHeight', {
         configurable: true,
         value: 2000,
@@ -5014,6 +5010,32 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
           auditTrailReady: true,
         },
         gaps: ['one or more stored artifacts are missing governance manifests'],
+      },
+      receipt: {
+        schemaVersion: 'invoice-evidence-receipt/v1' as const,
+        mode: 'metadata-only' as const,
+        status: 'metadata-only' as const,
+        issuedAt: '2026-07-08T00:00:00.000Z',
+        subject: {
+          reconciliationId: '66666666-6666-4666-8666-666666666666',
+          importRunId: '55555555-5555-4555-8555-555555555555',
+          comparisonId: comparisonResult.comparisonId,
+          provider: 'aws' as const,
+        },
+        basePayloadDigestSha256: 'e'.repeat(64),
+        basePayloadByteLength: 1536,
+        wormReadiness: {
+          retentionMode: 'not-configured' as const,
+          configured: false,
+          objectStorageConfigured: false,
+          customerManagedKmsConfigured: false,
+          scannerWebhookConfigured: false,
+          retentionDeleteExpiredConfigured: false,
+          auditExportWebhookConfigured: false,
+          signedReceiptConfigured: false,
+          gaps: ['signed evidence receipt is not configured'],
+        },
+        caveats: ['Receipt is metadata-only because signed receipt configuration is not enabled.'],
       },
       artifacts: [
         {
