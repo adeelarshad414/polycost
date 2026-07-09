@@ -134,6 +134,10 @@ once tagged releases begin.
 - Provider-retention proof attachments now persist status/source/mode/reference/
   digest metadata on the exact invoice artifact blob row and read back as
   artifact-level proof evidence for externally stored objects.
+- Provider-retention proof capture can now execute optional read-only AWS/Azure/GCP
+  CLI calls from an operator-authenticated shell with dry-run, no-shell argument
+  arrays, workspace-local artifact output, verifier handoff, and signed URI
+  rejection.
 - External invoice artifact retention deletion now purges AWS S3, Azure Blob Storage,
   and GCP Cloud Storage objects before deleting expired non-held database pointers.
 

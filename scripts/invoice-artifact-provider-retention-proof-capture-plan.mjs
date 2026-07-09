@@ -242,6 +242,9 @@ function parseObjectUri(provider, objectUri) {
     if (parsed.protocol !== 's3:') {
       throw new Error('AWS S3 object URI must use s3://bucket/key.');
     }
+    rejectFragment(parsed, 'AWS S3');
+    rejectUnexpectedSearchParams(parsed, ['versionId'], 'AWS S3');
+
     const key = parsed.pathname.replace(/^\//, '');
     if (!parsed.hostname || !key) {
       throw new Error('AWS S3 object URI must include bucket and key.');
@@ -261,6 +264,9 @@ function parseObjectUri(provider, objectUri) {
     if (parsed.protocol !== 'azure-blob:') {
       throw new Error('Azure Blob object URI must use azure-blob://account/container/blob.');
     }
+    rejectFragment(parsed, 'Azure Blob');
+    rejectUnexpectedSearchParams(parsed, [], 'Azure Blob');
+
     const [containerName, ...blobParts] = parsed.pathname.replace(/^\//, '').split('/');
     const blobName = blobParts.join('/');
     if (!parsed.hostname || !containerName || !blobName) {
@@ -279,6 +285,9 @@ function parseObjectUri(provider, objectUri) {
     if (parsed.protocol !== 'gs:') {
       throw new Error('GCP Cloud Storage object URI must use gs://bucket/object.');
     }
+    rejectFragment(parsed, 'GCP Cloud Storage');
+    rejectUnexpectedSearchParams(parsed, [], 'GCP Cloud Storage');
+
     const objectName = parsed.pathname.replace(/^\//, '');
     if (!parsed.hostname || !objectName) {
       throw new Error('GCP Cloud Storage object URI must include bucket and object name.');
@@ -291,6 +300,23 @@ function parseObjectUri(provider, objectUri) {
   }
 
   throw new Error(`Unsupported provider ${provider}.`);
+}
+
+function rejectFragment(parsed, label) {
+  if (parsed.hash) {
+    throw new Error(`${label} object URI must not include a fragment.`);
+  }
+}
+
+function rejectUnexpectedSearchParams(parsed, allowedParams, label) {
+  const allowed = new Set(allowedParams);
+  const unexpected = [...parsed.searchParams.keys()].filter((key) => !allowed.has(key));
+
+  if (unexpected.length > 0) {
+    throw new Error(
+      `${label} object URI contains unsupported query parameters; do not pass signed URLs, SAS tokens, or temporary credential material.`,
+    );
+  }
 }
 
 function durableReference(provider, object, proofFile) {

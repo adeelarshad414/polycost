@@ -401,6 +401,14 @@ receiver writes append-only JSONL evidence, but still does not itself prove clou
 immutability unless its artifact directory is backed by WORM storage and access-log
 evidence is archived.
 
+For provider object-retention evidence, run
+`npm run invoice:retention-proof:capture-plan` to generate provider CLI commands,
+or `npm run invoice:retention-proof:capture -- --dry-run` to inspect the
+structured no-shell execution plan before running read-only AWS/Azure/GCP CLI
+capture in an operator-authenticated shell. The capture command writes proof JSON
+under `artifacts/`, runs the offline verifier by default, and rejects signed URL
+or SAS-style object URI query strings.
+
 ## Documentation
 
 - `docs/HOW-TO-USE.md` explains the customer-facing product workflow and demo

@@ -214,6 +214,28 @@ az storage blob legal-hold show --account-name "<account>" --container-name "<co
 gcloud storage objects describe gs://polycost-invoice-artifacts/invoice-artifacts/... --format=json > gcp-object-retention.json
 ```
 
+For environments where the operator shell already has provider CLIs installed and
+authenticated, PolyCost also provides a local capture command that executes
+read-only provider CLI calls without storing credentials:
+
+```bash
+npm run invoice:retention-proof:capture -- aws-s3 \
+  's3://polycost-invoice-artifacts/invoice-artifacts/team/reconciliation/artifact.txt?versionId=v1'
+
+npm run invoice:retention-proof:capture -- azure-blob \
+  'azure-blob://account/container/invoice-artifacts/team/reconciliation/artifact.txt'
+
+npm run invoice:retention-proof:capture -- gcp-gcs \
+  'gs://polycost-invoice-artifacts/invoice-artifacts/team/reconciliation/artifact.txt'
+```
+
+Use `--dry-run --json` first to inspect the structured command plan without
+executing cloud CLIs. The capture command uses argument-array execution with
+`shell: false`, writes the proof JSON under the workspace `artifacts/` tree,
+then runs the offline verifier unless `--skip-verify` is supplied. Object URIs
+reject unsupported query parameters and fragments so signed URLs, SAS tokens, and
+temporary credential material are not echoed into proof plans or artifacts.
+
 Before copying the proof digest into runtime config, verify the captured JSON with
 PolyCost's offline verifier:
 
