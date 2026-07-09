@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "polycost-terraform-destination-evidence-capture/v1",
+  "bundleName": "revenue-portal-aws-terraform",
+  "targetCloud": "aws",
+  "environment": "staging",
+  "capturedAt": "2026-07-09T00:00:00.000Z",
+  "operator": "example-only",
+  "sensitiveValuesRedacted": true,
+  "destructivePlanExceptionApproved": false,
+  "requiredTags": ["CostCenter", "Environment", "ManagedBy"],
+  "policyTool": "conftest",
+  "paths": {
+    "bundleManifest": "BUNDLE-MANIFEST.json",
+    "manifestIntegrity": "terraform-manifest-integrity-result.json",
+    "terraformValidationResult": "terraform-validation-result.json",
+    "planJson": "tfplan.json",
+    "providerLockFile": ".terraform.lock.hcl",
+    "policyResult": "conftest-result.json",
+    "remoteStateEvidence": "remote-state-evidence.json"
+  }
+}

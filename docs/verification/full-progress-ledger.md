@@ -239,6 +239,13 @@ Evidence:
   exclusion, and operator attestations. The checked-in `example-schema` bundle passed
   the default checker while `--require-destination-plan` failed as intended, keeping
   sample evidence distinct from target-account proof.
+- V3.7 Terraform destination evidence capture adds
+  `npm run terraform:evidence:capture:smoke`, which builds a destination-plan
+  evidence bundle from operator-run artifacts and validates it with the existing
+  `terraform:evidence:check -- --require-destination-plan` gate. The smoke fixture
+  covers generated manifest evidence, validation output, `tfplan.json`, provider
+  lock hash, Conftest output, remote-state proof, cost-allocation tags, and the
+  no-PolyCost-apply attestation.
 - Full `npm run check` passed afterward with the Terraform validation evidence gate
   in the aggregate floor: API unit `59` suites / `494` tests, web unit `11` suites /
   `149` tests, graph validation `333` nodes / `333` edges, pricing coverage `36`
@@ -256,7 +263,7 @@ Deferred:
 - Request-time validation is static. Real `terraform init`, `terraform validate`,
   policy checks, and `terraform plan` require saving files and authenticating to
   target cloud accounts outside PolyCost; V3.6 verifies archived evidence from that
-  external run after operators capture it.
+  external run, and V3.7 makes operator-side evidence assembly repeatable.
 - Production landing-zone modules, private endpoints, WAF/CDN wiring, IAM
   least-privilege policies, Kubernetes/serverless modules, active-active DR, and
   provider-specific organization controls remain future IaC phases.

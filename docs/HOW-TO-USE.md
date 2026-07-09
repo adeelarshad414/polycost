@@ -121,7 +121,8 @@ After a comparison, use the Infrastructure as Code panel:
 5. Run the generated `scripts/validate-bundle.mjs` outside PolyCost with Terraform
    and the target provider credentials.
 6. Archive manifest, validation, plan, policy, remote-state, and tag evidence, then
-   run `npm run terraform:evidence:check -- --require-destination-plan <bundle.json>`.
+   run `npm run terraform:evidence:capture -- --profile <profile.json> --output <bundle.json>`
+   followed by `npm run terraform:evidence:check -- --require-destination-plan <bundle.json>`.
 
 PolyCost generates reviewable starter bundles. It does not run `terraform plan` or
 apply infrastructure inside the app.

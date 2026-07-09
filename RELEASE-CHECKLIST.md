@@ -48,6 +48,9 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Confirm production diagram-classifier evidence is archived with
   `npm run diagram:llm-corpus:check -- --require-live-model <bundle.json>` before
   claiming production LLM quality.
+- Confirm destination Terraform evidence can be assembled from runner artifacts with
+  `npm run terraform:evidence:capture:smoke` before claiming Terraform destination-plan
+  handoff readiness.
 - Confirm `docs/SECURITY-SUPPRESSIONS.md` is current.
 - Confirm `npm run security:audit` passes the high/critical gate.
 - Confirm audit export receiver evidence is archived before claiming SIEM/WORM
@@ -75,6 +78,7 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Run `npm run audit:export:smoke:local`.
 - Run `npm run invoice:evidence:notary:smoke:local`.
 - Run `npm run invoice:evidence:notary:receiver:smoke`.
+- Run `npm run terraform:evidence:capture:smoke`.
 - Run `npm run vsdx:visual-evidence:check`.
 - Run `npm run diagram:llm-corpus:check`.
 - Run `npm run release:check`.

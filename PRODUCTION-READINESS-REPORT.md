@@ -123,6 +123,7 @@ performance/accessibility/best-practices/SEO metrics.
 | TF-GEN-005     | Improved      | V3.4 replaces Terraform module placeholders with AWS/Azure/GCP network, compute, and data starter modules plus static module-library validation                                                                                                         |
 | TF-GEN-006     | Improved      | V3.5 adds credential-free Terraform bundle manifest verification and tamper-detection evidence before provider-authenticated validation                                                                                                                 |
 | TF-GEN-007     | Improved      | V3.6 adds a machine-verifiable Terraform destination-plan evidence contract for manifest integrity, validation output, plan summary, policy, remote-state posture, tag evidence, and operator attestations                                              |
+| TF-GEN-008     | Improved      | V3.7 adds an operator-side Terraform destination evidence capture helper that assembles V3.6 evidence from manifest, validation, plan, policy, lockfile, remote-state, and tag artifacts, then verifies strict destination-plan evidence in smoke mode  |
 | VSDX-VIS-004   | Improved      | Phase 2.56 adds `npm run vsdx:visual-evidence:check`, a machine-verifiable VSDX preview evidence contract that proves approximate SVG/layout-extraction evidence while preserving the no-full-Visio-rendering boundary                                  |
 | HND-001        | Added         | Customer handover package added under `docs/`, with usage, deployment, runbook, competitive comparison, architecture, and evidence ledger                                                                                                               |
 | HND-002        | Added         | `npm run handover:check` validates the handover package and runs inside the full local `npm run check` floor                                                                                                                                            |
@@ -620,6 +621,18 @@ polycost/notary-reference-receiver:local .`: passed.
     / `149` tests, graph validation `333` nodes / `333` edges, pricing coverage
     `36` frontend families, progress verification `218` anchors, and the Terraform
     validation evidence gate in the aggregate floor.
+- Phase V3.7 Terraform destination evidence capture gates passed:
+  - `node --check scripts/terraform-destination-evidence-capture.mjs` passed.
+  - `npm run terraform:evidence:capture:smoke -- --json` generated a
+    destination-plan evidence bundle under `.tmp/`, then validated it with
+    `terraform:evidence:check -- --require-destination-plan` and
+    `verifiedDestinationPlan=true`.
+  - `npm run release:check` passed and `npm run progress:verify` passed with `266`
+    anchors.
+  - Full `npm run check` passed with API `59` suites / `494` tests, web `11`
+    suites / `149` tests, graph validation `345` nodes / `345` edges, pricing
+    coverage `36` frontend families, progress verification `266` anchors, and the
+    new Terraform destination evidence capture smoke in the aggregate floor.
 - Phase V3.3/V3.4 full local regression floor passed with `npm run check`:
   - API unit: 51 suites / 400 tests.
   - Web unit: 9 suites / 132 tests.
@@ -870,12 +883,13 @@ Machine-readable token evidence:
 - Terraform generation now has a hardened root bundle, ZIP export, bundle
   manifest, credential-free manifest integrity verifier, validation runner,
   generation profile, private database networking, runtime identity baselines,
-  policy/test scaffolding, and AWS/Azure/GCP starter modules for network, compute,
-  and data. Full production IaC remains future scope: landing-zone integration,
-  edge/observability/DR modules, container/serverless/Kubernetes module generation,
-  active-active DR, destination-account policy gates, and real
-  `terraform init/validate/test/plan` execution with provider credentials are not
-  run by PolyCost request handling.
+  policy/test scaffolding, AWS/Azure/GCP starter modules for network, compute, and
+  data, destination-plan evidence validation, and operator-side evidence capture
+  from Terraform runner artifacts. Full production IaC remains future scope:
+  landing-zone integration, edge/observability/DR modules, container/serverless/
+  Kubernetes module generation, active-active DR, destination-account policy gates,
+  and real `terraform init/validate/test/plan` execution with provider credentials
+  are not run by PolyCost request handling.
 
 ## Rollback
 

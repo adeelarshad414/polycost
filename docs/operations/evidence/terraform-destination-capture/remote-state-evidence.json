@@ -1,0 +1,8 @@
+{
+  "backendConfigured": true,
+  "backendType": "s3",
+  "lockingConfigured": true,
+  "encryptionConfigured": true,
+  "stateLocationReference": "s3://example-terraform-state/revenue-portal/aws/staging.tfstate",
+  "lockLocationReference": "dynamodb://example-terraform-locks/revenue-portal"
+}

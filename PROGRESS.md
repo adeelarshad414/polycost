@@ -161,6 +161,7 @@ say so explicitly rather than marking it done.
 | Formal browser audit tooling                            | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3.5 - Terraform bundle integrity validation      | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3.6 - Terraform validation evidence              | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase V3.7 - Terraform destination evidence capture     | Complete with known gaps (see notes) | 2026-07-09   |
 
 ## Phase 2.56 - VSDX visual evidence verification
 
@@ -329,6 +330,66 @@ Known gaps carried forward:
   `terraform init`, `fmt`, `validate`, optional `test`/`tflint`, destination
   `terraform plan`, policy checks, remote-state locking/encryption proof, tag
   evidence, and human review.
+- Full production landing-zone Terraform remains future work for private endpoints,
+  WAF/CDN integration, least-privilege IAM expansion, Kubernetes/serverless modules,
+  active-active DR, and organization controls.
+
+## Phase V3.7 - Terraform destination evidence capture
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added `scripts/terraform-destination-evidence-capture.mjs`, an operator-side
+  capture helper that assembles V3.6 Terraform validation evidence from
+  destination-run artifacts without running Terraform or storing provider
+  credentials.
+- Added `docs/operations/evidence/terraform-destination-capture/`, including a
+  sanitized capture profile, generated bundle manifest, manifest-integrity result,
+  Terraform validation result, `tfplan.json`, provider lock fixture, Conftest result,
+  and remote-state evidence.
+- Added `docs/architecture/phase-v3-7-terraform-destination-evidence-capture.md` to
+  document the destination-run artifact workflow and the boundary that PolyCost still
+  does not manage state or execute `terraform apply`.
+- Added `npm run terraform:evidence:capture` and
+  `npm run terraform:evidence:capture:smoke`. The smoke builds a destination-plan
+  evidence bundle under `.tmp/` and validates it with
+  `terraform:evidence:check -- --require-destination-plan`.
+- Updated README, `docs/HOW-TO-USE.md`, release checklist, release-readiness guards,
+  progress-verification guards, and the full-progress ledger.
+
+Verification performed:
+
+- `node --check scripts/terraform-destination-evidence-capture.mjs` passed.
+- `npm run terraform:evidence:capture:smoke -- --json` passed. It generated
+  `.tmp/terraform-destination-evidence-capture/terraform-validation-evidence.json`
+  with `evidenceLevel=destination-plan`, `resourceChangeCount=5`,
+  `destructiveChangeCount=0`, `replacementChangeCount=0`,
+  `untaggedResourceCount=0`, and downstream strict validation
+  `verifiedDestinationPlan=true`.
+- `npm run release:check` passed and `npm run progress:verify` passed with `266`
+  anchors.
+- Full `npm run check` passed with the Terraform destination evidence capture smoke
+  in the aggregate floor. The run included API unit `59` suites / `494` tests, web
+  unit `11` suites / `149` tests, graph validation `345` nodes / `345` edges,
+  pricing coverage `36` frontend families, progress verification `266` anchors,
+  release readiness, handover, DevOps/cloud/provider-credential gates, and invoice/
+  Terraform/VSDX/LLM evidence smokes. Expected caveats remained: `impeccable` is
+  skipped on the repo's Node 20 target, live Postgres migrations were skipped
+  because the local Postgres container was not running, the diagram LLM provider
+  check reports the endpoint/model are not configured in local mode, and the default
+  local env still warns that invoice-artifacts are demo/local without live object-
+  storage/KMS/scanner/WORM settings. Jest also emitted its existing worker graceful-
+  exit warning after the web suite while still exiting successfully.
+
+Known gaps carried forward:
+
+- This makes destination evidence assembly repeatable, but it still requires an
+  operator-controlled account/subscription/project runner to execute Terraform,
+  authenticate to providers, run policy checks, and review the plan.
+- PolyCost still does not run `terraform apply`, hold provider credentials, manage
+  remote state, or certify a customer landing zone.
 - Full production landing-zone Terraform remains future work for private endpoints,
   WAF/CDN integration, least-privilege IAM expansion, Kubernetes/serverless modules,
   active-active DR, and organization controls.

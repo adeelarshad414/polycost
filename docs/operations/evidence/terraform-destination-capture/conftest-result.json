@@ -1,0 +1,9 @@
+{
+  "tool": "conftest",
+  "status": "passed",
+  "summary": {
+    "tests": 7,
+    "failures": 0,
+    "warnings": 0
+  }
+}
