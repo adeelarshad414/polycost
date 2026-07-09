@@ -80,6 +80,7 @@ performance/accessibility/best-practices/SEO metrics.
 | INV-TRACE-021  | Improved      | Downloaded invoice evidence packets can now be verified offline with a local CLI that recomputes the stable-JSON digest, validates subject/count metadata, and rejects tampered payloads                                                                |
 | INV-TRACE-022  | Improved      | Invoice evidence packets now include a digest-covered artifact governance manifest, and packet export plus artifact file download are recorded as team audit events with checksum, scanner, storage, retention, and governance-gap metadata             |
 | INV-TRACE-023  | Improved      | Invoice evidence packets now include receipt/notary metadata with optional HMAC-SHA256 signing, WORM posture checks, strict production config guards, provider-credential guard coverage, and receipt-aware offline verification                        |
+| INV-TRACE-024  | Improved      | External-webhook invoice evidence export now sends a signed notary/WORM handoff request, records sanitized accepted/failed delivery evidence in the receipt, recomputes packet integrity, and audits handoff status                                     |
 | VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                                                                                             |
 | VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                                                                                             |
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                                                                                        |
@@ -331,6 +332,22 @@ Local static/regression gates:
     and missing WORM retention mode.
   - Full `npm run check`: passed with API 55 suites / 467 tests, web 11 suites /
     147 tests, graph validation 320 nodes / 320 edges, pricing coverage, progress
+    verification 153 anchors, QA/security suppression hygiene, DB, DevOps, cloud,
+    release, handover, and provider-credential gates. `npm run impeccable` remained
+    the expected Node 24 skip under the repo's Node 20 target; DB validation skipped
+    live `schema_migrations` inspection because the local Postgres container was
+    not running.
+- Phase 2.39 invoice evidence notary API handoff focused gate passed:
+  - API focused: `src/api/invoice-evidence-notary.service.spec.ts` and
+    `src/api/auth-billing.spec.ts`: 2 suites / 52 tests.
+  - `npm run typecheck --workspaces --if-present`: passed.
+  - `npm run invoice:evidence:verify:smoke`: passed with API handoff-aware verifier.
+  - `npm run provider:credentials:check`: passed with the expected local/demo
+    invoice-artifacts warning.
+  - `npm run test:production-readiness`: API 14 suites / 200 tests; web 2 suites /
+    90 tests.
+  - Full `npm run check`: passed with API 56 suites / 470 tests, web 11 suites /
+    147 tests, graph validation 322 nodes / 322 edges, pricing coverage, progress
     verification 153 anchors, QA/security suppression hygiene, DB, DevOps, cloud,
     release, handover, and provider-credential gates. `npm run impeccable` remained
     the expected Node 24 skip under the repo's Node 20 target; DB validation skipped
@@ -647,10 +664,13 @@ Machine-readable token evidence:
   and reconciliation totals. Phase 2.37 adds a digest-covered packet governance
   manifest plus audit events for evidence-packet exports and artifact downloads.
   Phase 2.38 adds signed evidence receipt configuration, receipt-aware offline
-  verification, and declared WORM posture checks.
+  verification, and declared WORM posture checks. Phase 2.39 adds signed
+  external-webhook notary/WORM handoff during evidence packet export with
+  sanitized accepted/failed delivery evidence in the receipt.
   PolyCost still does not provide provider invoice rendering, private contract
-  validation, cloud-control-plane WORM object-store proof, external legal-review routing,
-  contract/legal approval integration, or a full external reviewer queue.
+  validation, cloud-control-plane WORM object-store proof, receiver-side
+  immutability proof, external legal-review routing, contract/legal approval
+  integration, or a full external reviewer queue.
   Full invoice-grade billing remains future scope.
   PolyCost is still not the invoice system of record.
 - VSDX support now includes extraction/evidence and approximate SVG previews, not full

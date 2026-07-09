@@ -50,6 +50,10 @@ import {
   InvoiceArtifactStorageService,
   StoredInvoiceArtifactObject,
 } from './invoice-artifact-storage.service';
+import {
+  InvoiceEvidenceNotaryDeliveryResult,
+  InvoiceEvidenceNotaryService,
+} from './invoice-evidence-notary.service';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
@@ -189,6 +193,9 @@ export class BillingService {
     private readonly artifactGovernanceService: InvoiceArtifactGovernanceService = new InvoiceArtifactGovernanceService(),
     private readonly artifactStorageService: InvoiceArtifactStorageService = new InvoiceArtifactStorageService(),
     private readonly configService?: ConfigService<AppConfig, true>,
+    private readonly evidenceNotaryService: InvoiceEvidenceNotaryService = new InvoiceEvidenceNotaryService(
+      configService,
+    ),
   ) {}
 
   async importActuals(body: unknown, identity: AuthIdentity): Promise<BillingImportResponse> {
@@ -416,12 +423,18 @@ export class BillingService {
 
     assertTeamAccess(importRun.teamId, identity);
 
-    const packet = invoiceEvidencePacket(
+    let packet = invoiceEvidencePacket(
       reconciliation,
       importRun,
       this.artifactGovernanceService.storageReadiness(),
       this.invoiceEvidenceReceiptConfig(),
     );
+    const notaryDelivery = await this.evidenceNotaryService.deliverPacket({
+      packet,
+      identity,
+      teamId: importRun.teamId,
+    });
+    packet = applyInvoiceEvidenceNotaryDelivery(packet, notaryDelivery);
 
     if (importRun.teamId) {
       await this.repository.recordTeamAuditEvent({
@@ -440,6 +453,11 @@ export class BillingService {
           receiptMode: packet.receipt.mode,
           receiptSigned: Boolean(packet.receipt.signature),
           wormRetentionMode: packet.receipt.wormReadiness.retentionMode,
+          notaryDeliveryStatus: notaryDelivery.status,
+          notaryDeliveryMode: notaryDelivery.mode,
+          notaryDeliveryEvidence: packet.receipt.notary?.deliveryEvidence,
+          notaryRequestDigestSha256: notaryDelivery.requestDigestSha256,
+          notaryResponseStatusCode: notaryDelivery.responseStatusCode,
           artifactCount: packet.integrity.artifactCount,
           storedArtifactCount: packet.integrity.storedArtifactCount,
           verifiedArtifactCount: packet.integrity.verifiedArtifactCount,
@@ -3506,6 +3524,13 @@ function invoiceEvidencePacket(
     ...basePacketPayload,
     receipt,
   };
+
+  return withInvoiceEvidenceIntegrity(packetPayload);
+}
+
+function withInvoiceEvidenceIntegrity(
+  packetPayload: Omit<InvoiceEvidencePacketResponse, 'integrity'>,
+): InvoiceEvidencePacketResponse {
   const canonicalPayload = stableJson(packetPayload);
 
   return {
@@ -3517,19 +3542,69 @@ function invoiceEvidencePacket(
       payloadDigestSha256: sha256(canonicalPayload),
       payloadByteLength: Buffer.byteLength(canonicalPayload, 'utf8'),
       subject: {
-        reconciliationId: reconciliation.id,
-        importRunId: reconciliation.importRunId,
-        comparisonId: reconciliation.comparisonId,
-        provider: reconciliation.provider,
+        reconciliationId: packetPayload.reconciliation.id,
+        importRunId: packetPayload.reconciliation.importRunId,
+        comparisonId: packetPayload.reconciliation.comparisonId,
+        provider: packetPayload.reconciliation.provider,
       },
-      artifactCount: artifacts.length,
-      storedArtifactCount: controls.storedCount,
-      verifiedArtifactCount: controls.verifiedCount,
-      caveatCount: caveats.length,
-      disclaimerCount: disclaimers.length,
-      generatedAt,
+      artifactCount: packetPayload.artifacts.length,
+      storedArtifactCount: packetPayload.controls.storedCount,
+      verifiedArtifactCount: packetPayload.controls.verifiedCount,
+      caveatCount: packetPayload.caveats.length,
+      disclaimerCount: packetPayload.disclaimers.length,
+      generatedAt: packetPayload.generatedAt,
     },
   };
+}
+
+const EXTERNAL_NOTARY_OPERATOR_ARCHIVE_CAVEAT =
+  'External notary webhook is configured, but evidence packet export does not send bytes automatically; operators must archive the exported packet/receipt in the configured WORM system.';
+
+function applyInvoiceEvidenceNotaryDelivery(
+  packet: InvoiceEvidencePacketResponse,
+  delivery: InvoiceEvidenceNotaryDeliveryResult,
+): InvoiceEvidencePacketResponse {
+  if (
+    !packet.receipt.notary ||
+    delivery.mode !== 'external-webhook' ||
+    delivery.status === 'skipped'
+  ) {
+    return packet;
+  }
+
+  const packetPayload = { ...packet } as Partial<InvoiceEvidencePacketResponse>;
+  delete packetPayload.integrity;
+  const notary = {
+    ...packet.receipt.notary,
+    deliveryMode: 'api-webhook' as const,
+    deliveryEvidence:
+      delivery.status === 'accepted'
+        ? ('accepted-by-api' as const)
+        : ('failed-api-webhook' as const),
+    ...(delivery.attemptedAt ? { attemptedAt: delivery.attemptedAt } : {}),
+    ...(delivery.requestDigestSha256 ? { requestDigestSha256: delivery.requestDigestSha256 } : {}),
+    ...(delivery.acceptedSubjectDigestSha256
+      ? { acceptedSubjectDigestSha256: delivery.acceptedSubjectDigestSha256 }
+      : {}),
+    ...(delivery.responseStatusCode ? { responseStatusCode: delivery.responseStatusCode } : {}),
+    message: delivery.message,
+  };
+  const receiptCaveats = packet.receipt.caveats.filter(
+    (caveat) => caveat !== EXTERNAL_NOTARY_OPERATOR_ARCHIVE_CAVEAT,
+  );
+  const handoffCaveat =
+    delivery.status === 'accepted'
+      ? 'External notary/WORM receiver accepted an API handoff request for this packet subject digest; receiver-side immutable retention remains external evidence.'
+      : 'External notary/WORM receiver did not accept the API handoff request; archive the exported packet manually before claiming immutable retention.';
+
+  return withInvoiceEvidenceIntegrity({
+    ...(packetPayload as Omit<InvoiceEvidencePacketResponse, 'integrity'>),
+    receipt: {
+      ...packet.receipt,
+      notary,
+      caveats: [...new Set([...receiptCaveats, handoffCaveat])],
+    },
+  });
 }
 
 function invoiceEvidencePacketReceipt(input: {
@@ -3562,11 +3637,7 @@ function invoiceEvidencePacketReceipt(input: {
     ...(canSign
       ? []
       : ['Receipt is metadata-only because signed receipt configuration is not enabled.']),
-    ...(notaryUrl
-      ? [
-          'External notary webhook is configured, but evidence packet export does not send bytes automatically; operators must archive the exported packet/receipt in the configured WORM system.',
-        ]
-      : []),
+    ...(notaryUrl ? [EXTERNAL_NOTARY_OPERATOR_ARCHIVE_CAVEAT] : []),
     ...wormReadiness.gaps,
   ];
 

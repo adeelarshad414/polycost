@@ -43,6 +43,7 @@ import { LivePricingRefreshService } from './live-pricing-refresh.service';
 import { InvitationDeliveryService } from './invitation-delivery.service';
 import { InvoiceArtifactGovernanceService } from './invoice-artifact-governance.service';
 import { InvoiceArtifactStorageService } from './invoice-artifact-storage.service';
+import { InvoiceEvidenceNotaryService } from './invoice-evidence-notary.service';
 import { DataHealthController } from './data-health.controller';
 import { PricingStatusController } from './pricing-status.controller';
 import { RegionsController } from './regions.controller';
@@ -94,6 +95,7 @@ import { WorkloadController } from './workload.controller';
     InvitationDeliveryService,
     TeamAuditExportService,
     InvoiceArtifactGovernanceService,
+    InvoiceEvidenceNotaryService,
     {
       provide: InvoiceArtifactStorageService,
       inject: [ConfigService, SecretsService],

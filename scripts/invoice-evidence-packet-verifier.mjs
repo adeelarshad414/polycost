@@ -339,6 +339,50 @@ function assertReceipt(failures, packet) {
     }
     assertEqual(failures, 'receipt.status', receipt.status, 'external-notary-ready');
   }
+
+  const notary = isPlainObject(receipt.notary) ? receipt.notary : undefined;
+
+  if (notary) {
+    if (
+      notary.deliveryMode !== 'operator-forwarded-webhook' &&
+      notary.deliveryMode !== 'api-webhook'
+    ) {
+      failures.push(
+        'receipt.notary.deliveryMode must be operator-forwarded-webhook or api-webhook.',
+      );
+    }
+
+    if (
+      notary.deliveryEvidence !== 'not-sent-by-api' &&
+      notary.deliveryEvidence !== 'accepted-by-api' &&
+      notary.deliveryEvidence !== 'failed-api-webhook'
+    ) {
+      failures.push(
+        'receipt.notary.deliveryEvidence must be not-sent-by-api, accepted-by-api, or failed-api-webhook.',
+      );
+    }
+
+    if (typeof notary.urlSha256 !== 'string' || !SHA256_PATTERN.test(notary.urlSha256)) {
+      failures.push('receipt.notary.urlSha256 must be a lowercase 64-character SHA-256 hex.');
+    }
+
+    if (notary.deliveryEvidence === 'accepted-by-api') {
+      if (
+        typeof notary.requestDigestSha256 !== 'string' ||
+        !SHA256_PATTERN.test(notary.requestDigestSha256)
+      ) {
+        failures.push(
+          'receipt.notary.requestDigestSha256 is required for accepted API handoff evidence.',
+        );
+      }
+      assertEqual(
+        failures,
+        'receipt.notary.acceptedSubjectDigestSha256',
+        notary.acceptedSubjectDigestSha256,
+        receipt.basePayloadDigestSha256,
+      );
+    }
+  }
 }
 
 function assertEqual(failures, field, actual, expected) {

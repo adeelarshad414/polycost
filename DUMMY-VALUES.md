@@ -65,8 +65,8 @@ The explicit placeholder token is `CHANGE_ME_DEV_ONLY`. Production and staging c
 - `INVOICE_EVIDENCE_RECEIPT_MODE=metadata-only`
 - Missing `INVOICE_EVIDENCE_RECEIPT_SIGNING_KEY_REFERENCE` or non-dummy
   `INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET` when signed receipts are enabled
-- Missing `INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL` when external receipt handoff is
-  enabled
+- Missing `INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL` when external API notary/WORM
+  handoff is enabled
 - `INVOICE_EVIDENCE_WORM_RETENTION_MODE=not-configured`
 - Any real provider mode without `VAULT_TOKEN_FILE`
 - Any strict provider credential check where Vault returns a dummy GCP access token or dummy LLM API key
