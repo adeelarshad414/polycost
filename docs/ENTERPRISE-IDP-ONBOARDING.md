@@ -201,3 +201,11 @@ PolyCost keeps representative SCIM payloads under `fixtures/scim/`:
 
 These fixtures are used by unit tests to protect basic interoperability shape.
 They are not a substitute for a customer-specific IdP pilot.
+
+## Local Stack Smoke
+
+`npm run live:verify` includes a `scim-provisioning-lifecycle` transcript journey
+for local/demo stacks. It creates a temporary team, creates a one-time SCIM token,
+confirms token metadata lists do not expose raw bearer tokens, exercises discovery,
+provisions and deactivates a user, revokes the token, and verifies the revoked token
+is denied. The transcript stores the token prefix and status evidence only.

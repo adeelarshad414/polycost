@@ -457,9 +457,11 @@ await assertFileContains('scripts/ci-e2e.mjs', [
 await assertFileContains('scripts/live-verification.mjs', [
   ['live verification transcript path', 'POLYCOST_LIVE_VERIFY_TRANSCRIPT_PATH'],
   ['live verification transcript schema', "schemaVersion: '1.0'"],
+  ['SCIM live threshold', 'POLYCOST_SCIM_JOURNEY_MAX_MS'],
   ['template transcript entry', "name: 'template-to-recommendation'"],
   ['diagram transcript entry', "name: 'diagram-to-PDF'"],
   ['workspace auth transcript entry', "name: 'workspace-auth-rbac-sso'"],
+  ['SCIM live transcript entry', "name: 'scim-provisioning-lifecycle'"],
   ['reserved pricing live smoke', 'selected reserved 3yr pricing model'],
   ['CSV export live smoke', 'CSV report generated and downloaded.'],
   ['Excel export live smoke', 'XLSX report generated and downloaded.'],
@@ -471,6 +473,9 @@ await assertFileContains('scripts/live-verification.mjs', [
   ['auth RBAC denial live smoke', 'member billing import RBAC denial'],
   ['auth RBAC transcript status', 'rbacDeniedStatus: 403'],
   ['auth SSO state verification transcript', 'stateVerified'],
+  ['SCIM live discovery denial', 'SCIM unauthenticated discovery denial'],
+  ['SCIM live revoked token denial', 'SCIM revoked-token denial'],
+  ['SCIM live metadata-only token list', 'metadataOnlyTokenList'],
   ['redis transcript event', 'redis-degradation'],
   ['live verification transcript writer', 'writeTranscript'],
 ]);
