@@ -223,5 +223,9 @@ For finance/FinOps:
     `POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true npm run pricing:catalog:snapshot:capture -- --live --operator <name> --previous-evidence <prior-live-bundle.json>`
     when an operator has provider network access and GCP Cloud Billing read
     credentials.
+    After live capture, archive the sanitized bundle in a manifest and run
+    `npm run pricing:catalog:snapshot:capture:archive:check`. Use
+    `npm run pricing:catalog:snapshot:capture:archive:strict -- <archive.json>`
+    before claiming archived live-provider capture proof.
     The checked-in sample can be validated with
     `npm run invoice:record:evidence:check`, but it is schema-only evidence.

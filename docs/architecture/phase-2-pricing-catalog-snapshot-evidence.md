@@ -85,6 +85,23 @@ through:
 npm run pricing:catalog:snapshot:check -- --require-live-provider <evidence.json>
 ```
 
+After the bundle is archived, validate the archive manifest:
+
+```bash
+npm run pricing:catalog:snapshot:capture:archive:check -- <archive.json>
+```
+
+Use strict archive mode before claiming live-provider archive proof:
+
+```bash
+npm run pricing:catalog:snapshot:capture:archive:strict -- <archive.json>
+```
+
+The archive verifier checks the manifest schema, referenced evidence SHA-256,
+operator attestation, strict preflight posture, capture metadata, provider
+coverage, and the underlying `--require-live-provider` result. The checked-in
+archive manifest is `example-schema` and is rejected by strict mode.
+
 ## Boundary
 
 The checked-in example is `example-schema`, and the smoke is fixture replay. They

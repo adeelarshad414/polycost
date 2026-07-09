@@ -76,6 +76,7 @@ Complete this checklist before changing the GitHub repository visibility from pr
   capture normalizers without credentials, run
   `npm run pricing:catalog:snapshot:capture:preflight:strict` in the target
   environment before claiming capture readiness, and use
+  `npm run pricing:catalog:snapshot:capture:archive:strict -- <archive.json>` plus
   `npm run pricing:catalog:snapshot:check -- --require-live-provider <bundle.json>`
   before claiming live provider snapshot proof.
 - Confirm destination Terraform evidence can be assembled from runner artifacts with
@@ -123,6 +124,7 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Run `npm run pricing:catalog:snapshot:capture:preflight`.
 - Run `npm run pricing:catalog:snapshot:capture:plan`.
 - Run `npm run pricing:catalog:snapshot:capture:smoke`.
+- Run `npm run pricing:catalog:snapshot:capture:archive:check`.
 - Run `npm run release:check`.
 - Run `npm run loading:check`.
 - Run `npm run handover:check`.

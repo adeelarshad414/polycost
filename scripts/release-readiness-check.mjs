@@ -178,6 +178,12 @@ if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:preflight']) {
 if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:preflight:strict']) {
   failures.push('package.json is missing pricing:catalog:snapshot:capture:preflight:strict');
 }
+if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:archive:check']) {
+  failures.push('package.json is missing pricing:catalog:snapshot:capture:archive:check');
+}
+if (!packageJson.scripts?.['pricing:catalog:snapshot:capture:archive:strict']) {
+  failures.push('package.json is missing pricing:catalog:snapshot:capture:archive:strict');
+}
 if (!packageJson.scripts?.['terraform:evidence:check']) {
   failures.push('package.json is missing terraform:evidence:check');
 }
@@ -311,6 +317,13 @@ if (!packageJson.scripts?.check?.includes('npm run pricing:catalog:snapshot:capt
 if (!packageJson.scripts?.check?.includes('npm run pricing:catalog:snapshot:capture:preflight')) {
   failures.push(
     'package.json check script must include npm run pricing:catalog:snapshot:capture:preflight',
+  );
+}
+if (
+  !packageJson.scripts?.check?.includes('npm run pricing:catalog:snapshot:capture:archive:check')
+) {
+  failures.push(
+    'package.json check script must include npm run pricing:catalog:snapshot:capture:archive:check',
   );
 }
 if (!packageJson.scripts?.check?.includes('npm run terraform:evidence:check')) {
@@ -1017,6 +1030,34 @@ await assertFileContains('scripts/pricing-catalog-live-snapshot-capture-prefligh
   ['strict checker handoff', '--require-live-provider'],
   ['no raw credential output', 'no_raw_credential_output'],
 ]);
+
+await assertFileContains('scripts/pricing-catalog-live-capture-archive-check.mjs', [
+  [
+    'pricing catalog live capture archive schema',
+    'polycost-pricing-catalog-live-capture-archive/v1',
+  ],
+  ['strict live archive option', '--require-live-archive'],
+  ['snapshot checker handoff', '--require-live-provider'],
+  ['digest verification', 'archiveDigestVerified'],
+  ['strict snapshot attestation', 'strictSnapshotCheckerPassed'],
+  ['no raw credential output', 'credentialsExcluded'],
+]);
+
+await assertFileContains(
+  'docs/operations/evidence/pricing-catalog-live-capture/pricing-catalog-live-capture-archive.example.json',
+  [
+    [
+      'pricing catalog live capture archive example schema',
+      'polycost-pricing-catalog-live-capture-archive/v1',
+    ],
+    ['sample-only evidence level', 'example-schema'],
+    [
+      'snapshot evidence digest',
+      '86aec3dd0cfa0a5f2358b4f98459ef8cf37eeb4c1df37b50d725defcaece668c',
+    ],
+    ['strict archive caveat', '--require-live-archive'],
+  ],
+);
 
 await assertFileContains(
   'docs/operations/evidence/invoice-artifact-rehearsal-evidence.example.json',

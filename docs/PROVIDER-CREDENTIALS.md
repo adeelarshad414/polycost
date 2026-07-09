@@ -445,6 +445,15 @@ AWS and Azure catalog capture use public read-only endpoints. GCP capture requir
 `secret/polycost/providers/gcp access_token`. The generated evidence must not
 contain raw provider payloads, bearer tokens, signed URLs, or credentials.
 
+After capture, bind the sanitized bundle to an archive manifest and run
+`npm run pricing:catalog:snapshot:capture:archive:check -- <archive.json>`.
+Use
+`npm run pricing:catalog:snapshot:capture:archive:strict -- <archive.json>`
+before claiming archived live-provider capture proof. The archive verifier checks
+the bundle digest, strict preflight posture, capture metadata, provider coverage,
+and the underlying `--require-live-provider` snapshot checker result without
+printing credentials or raw provider payloads.
+
 The checked-in example can be validated with `npm run invoice:record:evidence:check`
 for schema coverage only. It is not provider invoice proof and does not make
 PolyCost the provider invoice system of record. Do not place raw invoices, raw
