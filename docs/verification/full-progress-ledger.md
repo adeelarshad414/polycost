@@ -721,3 +721,45 @@ Honest boundary:
   proof metadata. PolyCost still does not execute provider control-plane proof
   capture, hold provider credentials, prove chain of custody, or replace legal
   retention sufficiency review.
+
+## Phase 2.47 - Provider Retention Proof CLI Capture
+
+Status: implemented and verified locally on 2026-07-09.
+
+Evidence added:
+
+- `npm run invoice:retention-proof:capture` can execute read-only provider CLI
+  capture commands for AWS S3 Object Lock, Azure Blob immutability/legal hold,
+  and GCP Cloud Storage object retention from an operator-authenticated shell.
+- The command writes provider-native proof JSON under workspace-local
+  `artifacts/`, computes the proof digest, and runs the existing offline verifier
+  unless `--skip-verify` is supplied.
+- Security controls include structured argument-array execution with `shell:
+false`, workspace-local output enforcement, no credential arguments, dry-run
+  preflight output, signed URL/SAS-style query rejection, fragment rejection, and
+  explicit `providerCredentialsStoredByPolyCost: false` evidence.
+- The existing capture planner now shares the signed-query/fragment rejection so
+  command plans cannot echo temporary credential-bearing object URIs.
+- `npm run invoice:retention-proof:capture:smoke` is wired into `npm run check`.
+  It proves AWS/Azure/GCP dry-run command arrays, no cloud CLI execution in
+  dry-run mode, provider credential non-storage, signed URI rejection, and
+  workspace output guards.
+- Verification passed with `npm run format`,
+  `npm run invoice:retention-proof:capture:smoke`,
+  `npm run invoice:retention-proof:capture-plan:smoke`,
+  `npm run release:check`, and `npm run ci:lint`. Full `npm run check` passed
+  with API 56 suites / 474 tests, web 11 suites / 147 tests, graph validation 322
+  nodes / 322 edges, pricing coverage, progress verification 153 anchors,
+  QA/security suppression hygiene, DB, DevOps, cloud, release, handover, and
+  provider-credential gates. Expected caveats remained: optional impeccable
+  skipped on Node 20, live DB `schema_migrations` inspection was skipped because
+  the local Postgres container was not running, and local invoice artifact
+  governance remains demo/default unless production object storage controls are
+  configured.
+
+Honest boundary:
+
+- This phase moves proof capture from a manual command plan to an optional local
+  operator-side CLI executor. PolyCost still does not store provider credentials,
+  run managed server-side proof capture, prove full chain of custody, or replace
+  legal retention sufficiency review.

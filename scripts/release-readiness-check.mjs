@@ -100,6 +100,12 @@ if (!packageJson.scripts?.['invoice:retention-proof:capture-plan']) {
 if (!packageJson.scripts?.['invoice:retention-proof:capture-plan:smoke']) {
   failures.push('package.json is missing invoice:retention-proof:capture-plan:smoke');
 }
+if (!packageJson.scripts?.['invoice:retention-proof:capture']) {
+  failures.push('package.json is missing invoice:retention-proof:capture');
+}
+if (!packageJson.scripts?.['invoice:retention-proof:capture:smoke']) {
+  failures.push('package.json is missing invoice:retention-proof:capture:smoke');
+}
 if (!packageJson.scripts?.['pricing:logic:coverage']) {
   failures.push('package.json is missing pricing:logic:coverage');
 }
@@ -152,6 +158,11 @@ if (!packageJson.scripts?.check?.includes('npm run invoice:retention-proof:captu
     'package.json check script must include npm run invoice:retention-proof:capture-plan:smoke',
   );
 }
+if (!packageJson.scripts?.check?.includes('npm run invoice:retention-proof:capture:smoke')) {
+  failures.push(
+    'package.json check script must include npm run invoice:retention-proof:capture:smoke',
+  );
+}
 
 assertScriptIncludes('test:production-readiness', [
   'src/api/finops-proof.spec.ts',
@@ -180,6 +191,7 @@ await assertFileContains('README.md', [
     'invoice evidence notary receiver smoke command',
     'npm run invoice:evidence:notary:receiver:smoke',
   ],
+  ['provider retention proof capture command', 'npm run invoice:retention-proof:capture'],
   [
     'catalog list-price honesty',
     'not a billing, invoicing, or live cloud-account spend management system',
@@ -618,6 +630,28 @@ await assertFileContains('apps/api/src/api/finops-proof.spec.ts', [
 await assertFileContains('apps/api/src/api/auth-billing.spec.ts', [
   ['team RBAC matrix', 'enforces the team RBAC matrix'],
   ['billing admin RBAC', 'requires owner or admin access for billing imports'],
+]);
+
+await assertFileContains('scripts/invoice-artifact-provider-retention-proof-capture.mjs', [
+  ['provider capture schema', 'invoice-artifact-provider-retention-proof-capture/v1'],
+  ['structured command execution', 'spawnSync(command.bin, command.args'],
+  ['shell disabled', 'shell: false'],
+  ['credential-free caveat', 'providerCredentialsStoredByPolyCost: false'],
+  ['signed URI rejection', 'unsupported query parameters'],
+]);
+
+await assertFileContains('scripts/invoice-artifact-provider-retention-proof-capture-smoke.mjs', [
+  ['dry-run smoke', '--dry-run'],
+  ['signed URI rejection smoke', 'X-Amz-Signature=secret'],
+  ['SAS rejection smoke', 'sig=secret'],
+  ['workspace output guard smoke', 'output-dir outside workspace'],
+]);
+
+await assertFileContains('docs/PROVIDER-CREDENTIALS.md', [
+  ['provider retention proof capture command docs', 'npm run invoice:retention-proof:capture'],
+  ['provider retention proof dry-run docs', '--dry-run --json'],
+  ['no-shell capture docs', 'shell: false'],
+  ['signed URI rejection docs', 'signed URLs, SAS tokens'],
 ]);
 
 await assertFileContains('apps/api/src/diagram-parser/diagram-parser.service.spec.ts', [

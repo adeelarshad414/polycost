@@ -136,6 +136,7 @@ say so explicitly rather than marking it done.
 | Phase 2.44 - Provider retention proof capture planner   | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.45 - Provider retention proof API intake        | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.46 - Provider retention proof row persistence   | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.47 - Provider retention proof CLI capture       | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -5054,6 +5055,44 @@ Status: implemented and verified locally on 2026-07-09.
   the artifact blob read model, but it still does not execute provider
   control-plane calls, hold cloud credentials, prove chain of custody, or replace
   legal retention sufficiency review.
+
+## Phase 2.47 — Provider retention proof CLI capture
+
+Status: implemented and verified locally on 2026-07-09.
+
+- Added `npm run invoice:retention-proof:capture`, an optional operator-side
+  capture command that executes read-only AWS S3, Azure Blob, or GCP Cloud Storage
+  CLI calls from the operator-authenticated shell and writes provider-native proof
+  JSON under the workspace `artifacts/` tree.
+- The capture command uses structured `spawnSync(command.bin, command.args)` with
+  `shell: false`, never accepts credentials as arguments, records
+  `providerCredentialsStoredByPolyCost: false`, and runs the existing offline
+  verifier by default after writing the proof file.
+- Added `--dry-run --json` support for preflight review, workspace-local output
+  path enforcement, signed URL/SAS-style query rejection, and fragment rejection.
+  AWS S3 allows only `versionId` in the object URI query string.
+- Hardened the existing capture planner with the same signed-query/fragment
+  rejection so command plans do not echo temporary credential material.
+- Added `npm run invoice:retention-proof:capture:smoke` to the full `npm run check`
+  floor. The smoke proves AWS/Azure/GCP dry-run command arrays, no cloud CLI
+  execution in dry-run mode, provider credential non-storage, signed URI
+  rejection for capture/planner paths, and workspace output guards.
+- Verification: `npm run format`, `npm run invoice:retention-proof:capture:smoke`,
+  `npm run invoice:retention-proof:capture-plan:smoke`, `npm run release:check`,
+  and `npm run ci:lint` passed. Full `npm run check` passed with API 56 suites /
+  474 tests, web 11 suites / 147 tests, graph validation 322 nodes / 322 edges,
+  pricing coverage, progress verification 153 anchors, QA/security suppression
+  hygiene, DB, DevOps, cloud, release, handover, and provider-credential gates
+  green. Expected caveats remained: optional `npm run impeccable` skipped because
+  the repo targets Node 20 and the tool requires Node 24, DB validation skipped
+  live `schema_migrations` inspection because local Postgres was not running, and
+  provider credentials warned that invoice artifact governance is still demo/local
+  by default.
+- Remaining caveat: the capture command can execute local provider CLIs only when
+  the operator environment already has the required tools, credentials, and
+  read-only object retention permissions. PolyCost still does not store provider
+  credentials, perform server-side managed proof capture, prove full chain of
+  custody, or replace legal retention sufficiency review.
 
 ## Deviations from spec log
 
