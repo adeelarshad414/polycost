@@ -43,10 +43,12 @@ const requiredFiles = [
   'docs/operations/evidence/terraform-destination-capture/tfplan.json',
   'docs/operations/evidence/vsdx-visual-evidence.example.json',
   'docs/operations/evidence/diagram-llm-corpus-evidence.example.json',
+  'docs/operations/evidence/enterprise-idp-pilot-evidence.example.json',
   'docs/architecture/phase-v3-6-terraform-validation-evidence.md',
   'docs/architecture/phase-v3-7-terraform-destination-evidence-capture.md',
   'docs/architecture/phase-2-vsdx-visual-evidence.md',
   'docs/architecture/phase-2-diagram-llm-corpus-evidence.md',
+  'docs/architecture/phase-2-enterprise-idp-pilot-evidence.md',
   'fixtures/diagrams/llm-corpus/diagram-llm-corpus.v1.json',
   'handover/HANDOVER-README.md',
   'handover/DESIGN-SYSTEM.md',
@@ -153,6 +155,9 @@ if (!packageJson.scripts?.['vsdx:visual-evidence:check']) {
 if (!packageJson.scripts?.['diagram:llm-corpus:check']) {
   failures.push('package.json is missing diagram:llm-corpus:check');
 }
+if (!packageJson.scripts?.['enterprise:idp:evidence:check']) {
+  failures.push('package.json is missing enterprise:idp:evidence:check');
+}
 if (!packageJson.scripts?.['pricing:logic:coverage']) {
   failures.push('package.json is missing pricing:logic:coverage');
 }
@@ -238,6 +243,9 @@ if (!packageJson.scripts?.check?.includes('npm run vsdx:visual-evidence:check'))
 if (!packageJson.scripts?.check?.includes('npm run diagram:llm-corpus:check')) {
   failures.push('package.json check script must include npm run diagram:llm-corpus:check');
 }
+if (!packageJson.scripts?.check?.includes('npm run enterprise:idp:evidence:check')) {
+  failures.push('package.json check script must include npm run enterprise:idp:evidence:check');
+}
 
 assertScriptIncludes('test:production-readiness', [
   'src/api/finops-proof.spec.ts',
@@ -278,6 +286,7 @@ await assertFileContains('README.md', [
   ['terraform destination evidence capture command', 'npm run terraform:evidence:capture'],
   ['VSDX visual evidence checker command', 'npm run vsdx:visual-evidence:check'],
   ['diagram LLM corpus checker command', 'npm run diagram:llm-corpus:check'],
+  ['enterprise IdP pilot evidence checker command', 'npm run enterprise:idp:evidence:check'],
   [
     'terraform validation evidence architecture link',
     'docs/architecture/phase-v3-6-terraform-validation-evidence.md',
@@ -290,6 +299,10 @@ await assertFileContains('README.md', [
   [
     'diagram LLM corpus architecture link',
     'docs/architecture/phase-2-diagram-llm-corpus-evidence.md',
+  ],
+  [
+    'enterprise IdP pilot architecture link',
+    'docs/architecture/phase-2-enterprise-idp-pilot-evidence.md',
   ],
   [
     'catalog list-price honesty',
@@ -338,6 +351,7 @@ await assertFileContains('docs/HOW-TO-USE.md', [
   ['diagram input paths', 'Diagram mode'],
   ['VSDX visual evidence checker', 'npm run vsdx:visual-evidence:check'],
   ['diagram LLM corpus checker', 'npm run diagram:llm-corpus:check'],
+  ['enterprise IdP pilot evidence checker', 'npm run enterprise:idp:evidence:check'],
   ['Terraform evidence capture workflow', 'npm run terraform:evidence:capture'],
   ['Terraform starter bundle workflow', 'Terraform Starter Bundles'],
 ]);
@@ -394,6 +408,8 @@ await assertFileContains('docs/PROVIDER-CREDENTIALS.md', [
   ],
   ['diagram LLM Vault path', 'secret/polycost/llm'],
   ['diagram LLM corpus checker', 'npm run diagram:llm-corpus:check'],
+  ['enterprise IdP Vault path', 'secret/polycost/auth/oidc'],
+  ['enterprise IdP pilot evidence checker', 'npm run enterprise:idp:evidence:check'],
   ['provider retention proof manifest', '## Provider Retention Proof Manifest'],
   ['provider retention proof mode', 'INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE'],
   ['provider retention proof verifier command', 'npm run invoice:retention-proof:verify'],
@@ -426,6 +442,7 @@ await assertFileContains('RELEASE-CHECKLIST.md', [
   ['known future gaps task', 'full visual VSDX rendering'],
   ['VSDX visual evidence checker command', 'npm run vsdx:visual-evidence:check'],
   ['diagram LLM corpus checker command', 'npm run diagram:llm-corpus:check'],
+  ['enterprise IdP pilot evidence checker command', 'npm run enterprise:idp:evidence:check'],
   ['Terraform evidence capture smoke command', 'npm run terraform:evidence:capture:smoke'],
   ['security audit gate', 'npm run security:audit'],
   ['clean-clone demo command', 'npm run demo:up'],
@@ -604,6 +621,8 @@ await assertFileContains('docs/ENTERPRISE-IDP-ONBOARDING.md', [
   ['Okta setup section', 'Okta-Style Setup'],
   ['Entra setup section', 'Microsoft Entra-Style Setup'],
   ['SCIM certification boundary', 'Formal SCIM certification'],
+  ['enterprise IdP pilot evidence checker', 'npm run enterprise:idp:evidence:check'],
+  ['managed IdP strict mode', '--require-managed-idp'],
 ]);
 
 await assertFileContains('fixtures/scim/okta-user-create.json', [
@@ -843,6 +862,14 @@ await assertFileContains('scripts/diagram-llm-corpus-check.mjs', [
   ['raw prompt payload guard', 'findForbiddenRawPayloads'],
 ]);
 
+await assertFileContains('scripts/enterprise-idp-pilot-evidence-check.mjs', [
+  ['enterprise IdP evidence schema', 'polycost-enterprise-idp-pilot-evidence/v1'],
+  ['enterprise IdP check schema', 'polycost-enterprise-idp-pilot-evidence-check/v1'],
+  ['managed IdP required option', '--require-managed-idp'],
+  ['SCIM lifecycle journey requirement', 'scim-provisioning-lifecycle'],
+  ['raw SSO payload guard', 'findForbiddenRawPayloads'],
+]);
+
 await assertFileContains('docs/operations/evidence/terraform-validation-evidence.example.json', [
   ['Terraform evidence example schema', 'polycost-terraform-validation-evidence/v1'],
   ['sample-only evidence level', 'example-schema'],
@@ -894,6 +921,14 @@ await assertFileContains('docs/operations/evidence/diagram-llm-corpus-evidence.e
   ['raw prompt exclusion', '"rawPromptsExcluded": true'],
 ]);
 
+await assertFileContains('docs/operations/evidence/enterprise-idp-pilot-evidence.example.json', [
+  ['enterprise IdP evidence example schema', 'polycost-enterprise-idp-pilot-evidence/v1'],
+  ['sample-only evidence level', 'example-schema'],
+  ['workspace auth journey', 'workspace-auth-rbac-sso'],
+  ['SCIM provisioning journey', 'scim-provisioning-lifecycle'],
+  ['managed IdP caveat', 'evidenceLevel=managed-idp-pilot'],
+]);
+
 await assertFileContains('docs/architecture/phase-v3-6-terraform-validation-evidence.md', [
   ['V3.6 title', 'Phase V3.6 Terraform Validation Evidence'],
   ['destination plan command', 'npm run terraform:evidence:check'],
@@ -921,6 +956,14 @@ await assertFileContains('docs/architecture/phase-2-diagram-llm-corpus-evidence.
   ['live model strict mode', '--require-live-model'],
   ['sample evidence distinction', 'example-schema'],
   ['production LLM boundary', 'not production LLM proof'],
+]);
+
+await assertFileContains('docs/architecture/phase-2-enterprise-idp-pilot-evidence.md', [
+  ['enterprise IdP evidence title', 'Phase 2 Enterprise IdP Pilot Evidence'],
+  ['enterprise IdP evidence command', 'npm run enterprise:idp:evidence:check'],
+  ['managed IdP strict mode', '--require-managed-idp'],
+  ['sample evidence distinction', 'example-schema'],
+  ['enterprise IAM boundary', 'complete hosted IAM product'],
 ]);
 
 await assertFileContains('docs/operations/invoice-artifact-production-profile.example.json', [

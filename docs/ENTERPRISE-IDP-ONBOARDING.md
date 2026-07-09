@@ -180,6 +180,40 @@ curl -fsS \
 Do not paste real bearer tokens into tickets, logs, pull requests, screenshots, or
 support chat.
 
+## Managed IdP Pilot Evidence
+
+For a real enterprise pilot, archive sanitized evidence after the IdP has exercised
+SSO and SCIM against the target PolyCost deployment. The evidence bundle should
+contain only digests and redacted metadata, then pass:
+
+```bash
+npm run enterprise:idp:evidence:check -- --require-managed-idp <bundle.json>
+```
+
+The default sample can be checked with:
+
+```bash
+npm run enterprise:idp:evidence:check
+```
+
+That sample is `example-schema` only. It proves the contract and CI guard, not a
+managed IdP tenant.
+
+Required managed-pilot proof:
+
+- OIDC or SAML sign-in plus SCIM provisioning in the same tenant.
+- SCIM discovery, user create/update/deactivate, metadata-only token listing, hash
+  only token storage, and revoked-token denial.
+- RBAC denial for member billing import plus owner/admin coverage for SCIM token
+  management and SSO configuration.
+- Team audit events for SSO configuration, SCIM token lifecycle, SCIM user upsert,
+  SCIM user deactivation, and token revocation.
+- Redacted screenshots or IdP configuration proof represented as SHA-256 digests.
+
+Never include raw SSO assertions, SCIM bearer tokens, session cookies, IdP tokens,
+private keys, client secrets, authorization headers, or unredacted screenshots in
+the bundle.
+
 ## Security Checklist
 
 - Use a dedicated token per IdP environment.

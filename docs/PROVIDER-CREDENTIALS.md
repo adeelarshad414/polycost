@@ -27,19 +27,34 @@ artifact without reading secrets or calling cloud APIs. Treat it as
 
 ## Credential Matrix
 
-| Integration               | Required when `USE_MOCK_PROVIDERS=false` | Runtime configuration                                                                               | Secret location                 | Current production expectation                                                                       |
-| ------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| AWS public catalog        | No                                       | Outbound HTTPS to `pricing.us-east-1.amazonaws.com`                                                 | None read by current adapter    | Public Price List bulk files only; no AWS access keys should be stored for the current adapter.      |
-| Azure public catalog      | No                                       | Outbound HTTPS to `prices.azure.com`                                                                | None read by current adapter    | Public Retail Prices API only; no Entra app registration scope or client secret is required.         |
-| GCP public catalog        | Yes                                      | `VAULT_ADDR`, `VAULT_TOKEN_FILE`, optional `VAULT_NAMESPACE`                                        | `secret/polycost/providers/gcp` | Store either `access_token` or `service_account_json`; dummy values are rejected outside local mode. |
-| Invoice artifact storage  | Yes, when external storage is enabled    | `INVOICE_ARTIFACT_STORAGE_BACKEND`, object store name/region/prefix, KMS, scanner, retention modes  | See artifact storage section    | Store least-privilege object-store credentials in Vault; strict checks reject missing/dummy secrets. |
-| Diagram/NL LLM classifier | Only when endpoint/model are configured  | `DIAGRAM_LLM_CLASSIFIER_ENDPOINT`, `DIAGRAM_LLM_CLASSIFIER_MODEL`, `VAULT_ADDR`, `VAULT_TOKEN_FILE` | `secret/polycost/llm`           | Store `api_key`; parser falls back to deterministic classification if endpoint/model are absent.     |
+| Integration               | Required when `USE_MOCK_PROVIDERS=false` | Runtime configuration                                                                               | Secret location                                            | Current production expectation                                                                        |
+| ------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| AWS public catalog        | No                                       | Outbound HTTPS to `pricing.us-east-1.amazonaws.com`                                                 | None read by current adapter                               | Public Price List bulk files only; no AWS access keys should be stored for the current adapter.       |
+| Azure public catalog      | No                                       | Outbound HTTPS to `prices.azure.com`                                                                | None read by current adapter                               | Public Retail Prices API only; no Entra app registration scope or client secret is required.          |
+| GCP public catalog        | Yes                                      | `VAULT_ADDR`, `VAULT_TOKEN_FILE`, optional `VAULT_NAMESPACE`                                        | `secret/polycost/providers/gcp`                            | Store either `access_token` or `service_account_json`; dummy values are rejected outside local mode.  |
+| Invoice artifact storage  | Yes, when external storage is enabled    | `INVOICE_ARTIFACT_STORAGE_BACKEND`, object store name/region/prefix, KMS, scanner, retention modes  | See artifact storage section                               | Store least-privilege object-store credentials in Vault; strict checks reject missing/dummy secrets.  |
+| Diagram/NL LLM classifier | Only when endpoint/model are configured  | `DIAGRAM_LLM_CLASSIFIER_ENDPOINT`, `DIAGRAM_LLM_CLASSIFIER_MODEL`, `VAULT_ADDR`, `VAULT_TOKEN_FILE` | `secret/polycost/llm`                                      | Store `api_key`; parser falls back to deterministic classification if endpoint/model are absent.      |
+| Enterprise IdP pilot      | Only when running managed IdP evidence   | SSO provider metadata, redirect URIs, SCIM base URL, `VAULT_ADDR`, `VAULT_TOKEN_FILE`               | `secret/polycost/auth/oidc` or `secret/polycost/auth/saml` | Store client secrets/private keys in Vault only; evidence bundles contain digests and redacted proof. |
 
 Before claiming production diagram-classifier quality, archive a sanitized corpus
 evaluation bundle and run
 `npm run diagram:llm-corpus:check -- --require-live-model <bundle.json>`. The
 checked-in example validates the evidence format only; it does not prove live
 model quality.
+
+Before claiming managed enterprise IdP readiness, run a customer-specific pilot
+against Okta, Microsoft Entra, Auth0, Google Workspace, generic OIDC, or generic
+SAML plus SCIM. Keep OIDC client secrets at `secret/polycost/auth/oidc`, SAML
+private material at `secret/polycost/auth/saml`, and SCIM bearer tokens in the IdP
+secret field only. Archive sanitized transcript, screenshot, IdP configuration,
+RBAC denial, and audit-review digests, then run:
+
+```bash
+npm run enterprise:idp:evidence:check -- --require-managed-idp <bundle.json>
+```
+
+The checked-in example validates the evidence format only. It is not formal
+SCIM/OIDC/SAML certification and does not prove a complete hosted IAM product.
 
 The API/web `.env` surface stays intentionally small:
 

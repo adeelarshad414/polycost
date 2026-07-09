@@ -46,6 +46,14 @@ The checked-in example bundle validates the schema only; PolyCost still provides
 layout-aware preview evidence, not full Visio visual rendering. See
 `docs/architecture/phase-2-vsdx-visual-evidence.md`.
 
+For enterprise IdP pilot evidence, archive sanitized workspace auth/RBAC/SSO,
+SCIM lifecycle, redacted screenshot, IdP configuration, and audit-review digests,
+then run
+`npm run enterprise:idp:evidence:check -- --require-managed-idp <bundle.json>`.
+The checked-in example validates the evidence contract only; it is not formal
+SCIM/OIDC/SAML certification. See
+`docs/architecture/phase-2-enterprise-idp-pilot-evidence.md`.
+
 ## Monorepo Layout
 
 ```text
@@ -247,6 +255,11 @@ Accounts add workspace controls on top of that core flow:
   one-time token creation, and token revocation. This is an integration foundation,
   not formal SCIM certification or a complete hosted IAM suite. Operator setup
   guidance lives in `docs/ENTERPRISE-IDP-ONBOARDING.md`.
+- Enterprise IdP pilot evidence can be checked with
+  `npm run enterprise:idp:evidence:check -- --require-managed-idp <bundle.json>`
+  after a real Okta, Microsoft Entra, Auth0, Google Workspace, generic OIDC, or
+  generic SAML pilot. The default sample is schema-only evidence, not production
+  IAM certification.
 - Three-role RBAC: Owner, Admin, and Member. Owners manage role changes; owners and
   admins manage members, invitations, SSO provider configuration, and billing import
   workflows; members keep comparison and report access.
@@ -513,6 +526,8 @@ block TCP listeners report a structured skip unless strict mode is enabled.
   Terraform destination-plan evidence contract.
 - `docs/architecture/phase-v3-7-terraform-destination-evidence-capture.md`
   documents the Terraform destination evidence capture helper.
+- `docs/architecture/phase-2-enterprise-idp-pilot-evidence.md` documents the
+  enterprise IdP pilot evidence contract.
 - `docs/development/open-source-readiness.md` tracks the private-to-public launch
   checklist.
 - `docs/operations/live-pricing-credentials.md` documents live-pricing ETL,

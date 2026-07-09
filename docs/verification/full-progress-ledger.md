@@ -299,6 +299,11 @@ Evidence:
 - `docs/ENTERPRISE-IDP-ONBOARDING.md` records the current operator setup path for
   Okta-style and Microsoft Entra-style SCIM clients while preserving the formal
   certification boundary.
+- Enterprise IdP pilot evidence now has a runnable contract through
+  `npm run enterprise:idp:evidence:check`, backed by
+  `docs/operations/evidence/enterprise-idp-pilot-evidence.example.json` and strict
+  `--require-managed-idp` mode for managed Okta, Entra, Auth0, Google Workspace,
+  generic OIDC, or generic SAML pilot bundles.
 - `scripts/live-verification.mjs` records `workspace-auth-rbac-sso` and
   `scim-provisioning-lifecycle` smoke journeys against the running stack. The auth
   journey covers owner signup, session hydration, invite preview and acceptance,
@@ -320,11 +325,10 @@ Evidence:
 
 Deferred:
 
-- Full enterprise account/team UX, formal SCIM certification, production email
-  delivery, production OIDC/SAML provider handshakes, managed Okta/Entra pilot
-  evidence, group push, IdP-driven role mapping, custom schema extensions, account
-  recovery, invite/approval workflows, and complete RBAC product polish remain
-  future phases.
+- Full enterprise account/team UX, formal SCIM/OIDC/SAML certification, production
+  email delivery, executed managed IdP pilot bundles, group push, IdP-driven role
+  mapping, custom schema extensions, account recovery, invite/approval workflows,
+  and complete RBAC product polish remain future phases.
 
 ## Phase G - Operations, Security And Release Readiness
 

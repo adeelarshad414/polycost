@@ -1,7 +1,7 @@
 # PolyCost Production Readiness Report
 
-Date: 2026-07-08
-Branch: cumulative production-readiness branches through `codex/invoice-evidence-receipts`
+Date: 2026-07-09
+Branch: cumulative production-readiness branches through `codex/enterprise-idp-evidence`
 PR: local phase gate, PR created after verification
 Run spec: `docs/design/master-production-readiness-orchestrator-v2.md`
 
@@ -110,6 +110,7 @@ performance/accessibility/best-practices/SEO metrics.
 | UI-AUTH-019    | Improved      | Workspace Team access now exposes SCIM provisioning posture, one-time token creation, token revocation, token metadata, and provisioned-user visibility through session-authenticated admin APIs                                                        |
 | IAM-SCIM-001   | Improved      | SCIM now exposes bearer-protected `/Schemas` and `/ResourceTypes` discovery endpoints, representative Okta/Entra fixtures, and an operator onboarding guide while preserving the non-certification boundary                                             |
 | IAM-SCIM-002   | Improved      | Live verification now records a sanitized `scim-provisioning-lifecycle` journey for token creation, metadata-only token listing, bearer-protected discovery, user create/list/admin readback/deactivate, token revocation, and revoked-token denial     |
+| IAM-IDP-001    | Improved      | Phase 2.58 adds `npm run enterprise:idp:evidence:check`, a machine-verifiable enterprise IdP pilot evidence contract with strict `--require-managed-idp` mode while preserving the formal SCIM/OIDC/SAML certification boundary                         |
 | OPS-E2E-002    | Improved      | Compose E2E now runs with isolated project names, dynamic host-port allocation, wildcard bind probing, owned-stack API/web origin wiring, and latest local proof across API E2E, web Playwright, live verification, SCIM, and Redis degradation         |
 | API-DI-001     | Improved      | Function-backed optional runtime collaborators now use explicit optional injection tokens, with a production-readiness metadata guard preventing Nest container boot regressions                                                                        |
 | UI-AUTH-003    | Improved      | Active workspace switching is now backend-backed, membership-checked, and exposed in the signed-in account panel                                                                                                                                        |
@@ -196,6 +197,24 @@ Local static/regression gates:
     suites / `149` tests, graph validation `337` nodes / `337` edges, pricing
     coverage `36` frontend families, progress verification `250` anchors, and the
     new diagram LLM corpus gate in the aggregate floor.
+- Phase 2.58 enterprise IdP pilot evidence gates passed:
+  - `node --check scripts/enterprise-idp-pilot-evidence-check.mjs` passed.
+  - `npm run enterprise:idp:evidence:check -- --json` passed against the sanitized
+    `example-schema` bundle with `verifiedExampleSchema=true`,
+    `verifiedManagedIdpPilot=false`, `journeyCount=5`, and
+    `requiredAuditActionCount=5`.
+  - `npm run enterprise:idp:evidence:check -- --require-managed-idp --json`
+    failed as intended for the sample bundle because it is not real managed IdP
+    evidence.
+  - `npm run enterprise:idp:evidence:check -- --require-managed-idp .tmp/enterprise-idp-managed-evidence.json --json`
+    passed against a generated temporary managed-pilot-shaped bundle with
+    `verifiedManagedIdpPilot=true`.
+  - `npm run release:check` passed and `npm run progress:verify` passed with `281`
+    anchors.
+  - Full `npm run check` passed with API `59` suites / `494` tests, web `11`
+    suites / `149` tests, graph validation `347` nodes / `347` edges, pricing
+    coverage `36` frontend families, progress verification `281` anchors, and the
+    new enterprise IdP evidence gate in the aggregate floor.
 - Phase 2.19 invoice adjustment evidence focused gates passed:
   - API focused: `src/api/auth-billing.spec.ts`: 1 suite / 23 tests.
   - Web focused: `src/App.spec.tsx`: 1 suite / 60 tests.
@@ -877,9 +896,10 @@ Machine-readable token evidence:
   2.50 adds SCIM discovery endpoints, representative IdP fixtures, and operator
   onboarding docs. Phase 2.51 adds a sanitized live SCIM lifecycle transcript for
   token creation, metadata-only token listing, discovery, provision/deactivate,
-  token revocation, and revoked-token denial, but managed IdP pilot evidence, group
-  push, IdP-driven role mapping, custom schema extensions, and formal certification
-  remain future scope.
+  token revocation, and revoked-token denial. Phase 2.58 adds a strict managed-IdP
+  pilot evidence contract for OIDC/SAML plus SCIM bundles, but executed customer
+  pilots, group push, IdP-driven role mapping, custom schema extensions, and formal
+  certification remain future scope.
 - Terraform generation now has a hardened root bundle, ZIP export, bundle
   manifest, credential-free manifest integrity verifier, validation runner,
   generation profile, private database networking, runtime identity baselines,
