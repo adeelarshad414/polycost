@@ -158,6 +158,64 @@ say so explicitly rather than marking it done.
 | Browser audit artifact hardening                        | Complete with known gaps (see notes) | 2026-07-08   |
 | Formal browser audit tooling                            | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3.5 - Terraform bundle integrity validation      | Complete with known gaps (see notes) | 2026-07-08   |
+| Phase V3.6 - Terraform validation evidence              | Complete with known gaps (see notes) | 2026-07-09   |
+
+## Phase V3.6 - Terraform validation evidence
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added `scripts/terraform-validation-evidence-check.mjs`, a machine-readable
+  verifier for destination-account Terraform validation evidence.
+- Added `docs/operations/evidence/terraform-validation-evidence.example.json`, a
+  sanitized `example-schema` bundle that validates the evidence contract without
+  claiming destination-account proof.
+- Added `docs/architecture/phase-v3-6-terraform-validation-evidence.md` to explain
+  the evidence levels, operator workflow, and boundary that PolyCost still does not
+  run `terraform apply` or manage state.
+- Added `npm run terraform:evidence:check` and wired it into the aggregate
+  `npm run check` floor.
+- Updated README and `docs/HOW-TO-USE.md` so operators archive manifest integrity,
+  validation runner, plan JSON, policy, remote-state, and tag evidence, then run
+  `npm run terraform:evidence:check -- --require-destination-plan <bundle.json>`.
+- Extended release-readiness and progress-verification guards for the new command,
+  V3.6 docs, sample evidence, remote-state locking/encryption checks, tag evidence,
+  raw-secret guard, and destination-plan mode.
+
+Verification performed:
+
+- `node --check scripts/terraform-validation-evidence-check.mjs` passed.
+- `npm run terraform:evidence:check -- --json` passed against the checked-in sample
+  with `verifiedExampleSchema=true`, `verifiedDestinationPlan=false`, and
+  `destinationPlanRequired=true`.
+- `npm run terraform:evidence:check -- --require-destination-plan --json` failed as
+  intended against the checked-in sample because it is `example-schema` evidence and
+  does not attest that a destination plan was executed.
+- Full `npm run check` passed with the Terraform validation evidence checker in the
+  aggregate floor. The run included API unit `59` suites / `494` tests, web unit
+  `11` suites / `149` tests, graph validation `333` nodes / `333` edges, pricing
+  coverage `36` frontend families, progress verification `218` anchors, release
+  readiness, handover, DevOps/cloud/provider-credential gates, and invoice plus
+  Terraform evidence smokes. Expected caveats remained: `impeccable` is skipped on
+  the repo's Node 20 target, live Postgres migrations were skipped because the local
+  Postgres container was not running, and the default local env still warns that
+  invoice-artifacts are demo/local without live object-storage/KMS/scanner/WORM
+  settings.
+
+Known gaps carried forward:
+
+- This verifies archived Terraform validation evidence after capture, but it still
+  does not run Terraform, hold provider credentials, manage remote state, or certify a
+  customer landing zone.
+- Real destination proof still requires a platform-owned CI/workstation run with
+  `terraform init`, `fmt`, `validate`, optional `test`/`tflint`, destination
+  `terraform plan`, policy checks, remote-state locking/encryption proof, tag
+  evidence, and human review.
+- Full production landing-zone Terraform remains future work for private endpoints,
+  WAF/CDN integration, least-privilege IAM expansion, Kubernetes/serverless modules,
+  active-active DR, and organization controls.
 
 ## Phase 2.55 - Rehearsal evidence bundle verification
 

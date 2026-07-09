@@ -37,6 +37,8 @@ const requiredFiles = [
   'docs/operations/invoice-artifact-production-profile.example.json',
   'docs/operations/evidence/aws-s3-retention-proof.example.json',
   'docs/operations/evidence/invoice-artifact-rehearsal-evidence.example.json',
+  'docs/operations/evidence/terraform-validation-evidence.example.json',
+  'docs/architecture/phase-v3-6-terraform-validation-evidence.md',
   'handover/HANDOVER-README.md',
   'handover/DESIGN-SYSTEM.md',
   'handover/JOURNEYS.md',
@@ -127,6 +129,9 @@ if (!packageJson.scripts?.['invoice:artifact-rehearsal:live']) {
 if (!packageJson.scripts?.['invoice:artifact-rehearsal:evidence:check']) {
   failures.push('package.json is missing invoice:artifact-rehearsal:evidence:check');
 }
+if (!packageJson.scripts?.['terraform:evidence:check']) {
+  failures.push('package.json is missing terraform:evidence:check');
+}
 if (!packageJson.scripts?.['pricing:logic:coverage']) {
   failures.push('package.json is missing pricing:logic:coverage');
 }
@@ -200,6 +205,9 @@ if (!packageJson.scripts?.check?.includes('npm run invoice:artifact-rehearsal:ev
     'package.json check script must include npm run invoice:artifact-rehearsal:evidence:check',
   );
 }
+if (!packageJson.scripts?.check?.includes('npm run terraform:evidence:check')) {
+  failures.push('package.json check script must include npm run terraform:evidence:check');
+}
 
 assertScriptIncludes('test:production-readiness', [
   'src/api/finops-proof.spec.ts',
@@ -235,6 +243,11 @@ await assertFileContains('README.md', [
   [
     'invoice artifact rehearsal evidence checker command',
     'npm run invoice:artifact-rehearsal:evidence:check',
+  ],
+  ['terraform validation evidence checker command', 'npm run terraform:evidence:check'],
+  [
+    'terraform validation evidence architecture link',
+    'docs/architecture/phase-v3-6-terraform-validation-evidence.md',
   ],
   [
     'catalog list-price honesty',
@@ -745,6 +758,31 @@ await assertFileContains(
     ['sample caveat', 'sanitized sample evidence for CI/schema validation only'],
   ],
 );
+
+await assertFileContains('scripts/terraform-validation-evidence-check.mjs', [
+  ['Terraform evidence bundle schema', 'polycost-terraform-validation-evidence/v1'],
+  ['Terraform evidence check schema', 'polycost-terraform-validation-evidence-check/v1'],
+  ['destination plan required option', '--require-destination-plan'],
+  ['remote state guard', 'remoteState.lockingConfigured must be true'],
+  ['destructive plan exception guard', 'destructivePlanExceptionApproved=true'],
+  ['raw secret material guard', 'findSecretMaterial'],
+]);
+
+await assertFileContains('docs/operations/evidence/terraform-validation-evidence.example.json', [
+  ['Terraform evidence example schema', 'polycost-terraform-validation-evidence/v1'],
+  ['sample-only evidence level', 'example-schema'],
+  ['bundle manifest schema', 'polycost.terraform.bundle.v1'],
+  ['destination-plan caveat', 'sanitized sample evidence for CI/schema validation only'],
+  ['remote state evidence', '"lockingConfigured": true'],
+  ['tag evidence', '"CostCenter"'],
+]);
+
+await assertFileContains('docs/architecture/phase-v3-6-terraform-validation-evidence.md', [
+  ['V3.6 title', 'Phase V3.6 Terraform Validation Evidence'],
+  ['destination plan command', 'npm run terraform:evidence:check'],
+  ['sample evidence distinction', 'example-schema'],
+  ['operator boundary', 'PolyCost still does not run `terraform apply`'],
+]);
 
 await assertFileContains('docs/operations/invoice-artifact-production-profile.example.json', [
   ['production profile schema', 'polycost-invoice-artifact-production-profile/v1'],

@@ -30,6 +30,12 @@ Terraform generation is now available as a reviewed starter-bundle workflow for 
 including ZIP export, manifest integrity verification, validation evidence, and starter module
 libraries. Reverse Terraform-to-diagram/cost workflows remain future roadmap scope.
 
+For destination-account Terraform evidence, archive the generated manifest integrity
+result, validation runner output, plan JSON summary, policy result, remote-state posture,
+and tag evidence, then run
+`npm run terraform:evidence:check -- --require-destination-plan <bundle.json>`.
+The checked-in example bundle validates the schema only and is not live cloud proof.
+
 ## Monorepo Layout
 
 ```text
@@ -489,6 +495,8 @@ block TCP listeners report a structured skip unless strict mode is enabled.
 - `CHANGELOG.md` tracks notable changes.
 - `docs/architecture/phase-10-cost-intelligence.md` documents the Phase 1
   cost-intelligence model and future import/Terraform hooks.
+- `docs/architecture/phase-v3-6-terraform-validation-evidence.md` documents the
+  Terraform destination-plan evidence contract.
 - `docs/development/open-source-readiness.md` tracks the private-to-public launch
   checklist.
 - `docs/operations/live-pricing-credentials.md` documents live-pricing ETL,
