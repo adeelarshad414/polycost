@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema';
 import { ApiForbiddenError, ApiUnauthorizedError, ApiValidationError } from './api-errors';
@@ -57,7 +57,11 @@ export class AuthService {
   constructor(
     private readonly repository: ApiDatabaseRepository,
     private readonly configService: ConfigService<AppConfig, true>,
-    private readonly invitationDeliveryService = new InvitationDeliveryService(configService),
+    @Optional()
+    @Inject(InvitationDeliveryService)
+    private readonly invitationDeliveryService: InvitationDeliveryService = new InvitationDeliveryService(
+      configService,
+    ),
   ) {}
 
   async register(body: unknown, metadata: AuthRequestMetadata = {}): Promise<AuthSessionResponse> {

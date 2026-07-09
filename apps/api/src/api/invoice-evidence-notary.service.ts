@@ -1,5 +1,5 @@
 import { createHash, createHmac } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema';
 import { AuthIdentity } from './auth.types';
@@ -7,6 +7,8 @@ import { InvoiceEvidencePacketResponse } from './billing.types';
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 type NowProvider = () => Date;
+export const INVOICE_EVIDENCE_NOTARY_FETCH = Symbol('INVOICE_EVIDENCE_NOTARY_FETCH');
+export const INVOICE_EVIDENCE_NOTARY_NOW = Symbol('INVOICE_EVIDENCE_NOTARY_NOW');
 
 const MAX_NOTARY_HANDOFF_BYTES = 512 * 1024;
 
@@ -43,7 +45,11 @@ interface InvoiceEvidenceNotaryHandoffPayload {
 export class InvoiceEvidenceNotaryService {
   constructor(
     private readonly configService?: ConfigService<AppConfig, true>,
+    @Optional()
+    @Inject(INVOICE_EVIDENCE_NOTARY_FETCH)
     private readonly fetcher: FetchLike = (input, init) => fetch(input, init),
+    @Optional()
+    @Inject(INVOICE_EVIDENCE_NOTARY_NOW)
     private readonly nowProvider: NowProvider = () => new Date(),
   ) {}
 

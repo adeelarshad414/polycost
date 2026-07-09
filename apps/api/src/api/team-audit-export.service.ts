@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   ApiDatabaseRepository,
@@ -11,6 +11,8 @@ import { TeamAuditEventRecord } from './auth.types';
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 type NowProvider = () => Date;
+export const TEAM_AUDIT_EXPORT_FETCH = Symbol('TEAM_AUDIT_EXPORT_FETCH');
+export const TEAM_AUDIT_EXPORT_NOW = Symbol('TEAM_AUDIT_EXPORT_NOW');
 
 export interface TeamAuditExportSummary {
   status: 'skipped' | 'success';
@@ -35,7 +37,11 @@ export class TeamAuditExportService {
   constructor(
     private readonly configService: ConfigService<AppConfig, true>,
     private readonly repository: ApiDatabaseRepository,
+    @Optional()
+    @Inject(TEAM_AUDIT_EXPORT_FETCH)
     private readonly fetcher: FetchLike = (input, init) => fetch(input, init),
+    @Optional()
+    @Inject(TEAM_AUDIT_EXPORT_NOW)
     private readonly nowProvider: NowProvider = () => new Date(),
   ) {}
 

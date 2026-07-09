@@ -1,10 +1,11 @@
 import { createHmac } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema';
 import { TeamInvitationDeliveryReceipt, TeamInvitationRecord } from './auth.types';
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
+export const INVITATION_DELIVERY_FETCH = Symbol('INVITATION_DELIVERY_FETCH');
 
 interface InvitationDeliveryRequest {
   invitation: Omit<TeamInvitationRecord, 'inviteToken' | 'inviteUrl' | 'delivery'>;
@@ -42,6 +43,8 @@ interface InvitationWebhookPayload {
 export class InvitationDeliveryService {
   constructor(
     private readonly configService: ConfigService<AppConfig, true>,
+    @Optional()
+    @Inject(INVITATION_DELIVERY_FETCH)
     private readonly fetcher: FetchLike = (input, init) => fetch(input, init),
   ) {}
 

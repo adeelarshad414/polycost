@@ -275,11 +275,13 @@ Evidence:
   discovery, user create/list/admin readback/deactivate, token revocation, and
   revoked-token `401` denial. Tokens, invite secrets, and OIDC state are
   intentionally excluded from the transcript.
-- Latest isolated local run completed `workspace-auth-rbac-sso` in `720ms` /
-  `60000ms`, including `rbacDeniedStatus: 403` and `stateVerified: true`.
-- The isolated local `ci:e2e` run completed the same journey in `794ms` /
-  `60000ms` after API E2E verified the signup/invite/role-change/mock-SSO/RBAC
-  acceptance path `16/16`.
+- Latest isolated `npm run ci:e2e` run used Compose project `polycoste2e88038`
+  with web `http://localhost:58174`, API `http://localhost:3301`, and Vault host
+  port `18220`. It passed API E2E `16/16`, web Playwright `7/7`, and live
+  verification with template-to-recommendation `6523ms` / `60000ms`,
+  diagram-to-PDF `2698ms` / `180000ms`, workspace auth/RBAC `406ms` / `60000ms`,
+  SCIM provisioning `281ms` / `60000ms`, and Redis-down degradation returning
+  `/health=degraded`, `/health/deep=degraded`, and data-health HTTP `200`.
 - Anonymous compare remains available in `apps/web/src/App.spec.tsx` and is
   documented in `README.md`.
 
@@ -500,11 +502,17 @@ polycost/notary-reference-receiver:local .` passed. The receiver intentionally
   `9` suites / `130` tests, graph validation, pricing coverage, progress
   verification, QA/security suppression, database, DevOps, cloud, release, and
   provider credential gates.
-- The latest isolated v2 runtime stack on `WEB_PORT=3230`, `API_HOST_PORT=3231`,
-  and `VAULT_HOST_PORT=8340` passed API E2E `16/16`, direct web Playwright `7/7`,
-  and direct `live:verify` with template-to-recommendation `4201ms` / `60000ms`,
-  diagram-to-PDF `3448ms` / `180000ms`, workspace auth/RBAC `507ms` / `60000ms`,
-  and Redis degradation data-health HTTP `200`.
+- The latest isolated `npm run ci:e2e` stack on web `58174`, API host `3301`, and
+  Vault host `18220` passed API E2E `16/16`, web Playwright `7/7`, and direct
+  `live:verify` with template-to-recommendation `6523ms` / `60000ms`,
+  diagram-to-PDF `2698ms` / `180000ms`, workspace auth/RBAC `406ms` / `60000ms`,
+  SCIM provisioning `281ms` / `60000ms`, and Redis degradation data-health HTTP
+  `200`.
+- Latest full `npm run check` passed with API unit `59` suites / `494` tests, web
+  unit `11` suites / `149` tests, graph validation `328` nodes / `328` edges,
+  pricing coverage `36` frontend families, progress verification `165` anchors,
+  release readiness, handover, DevOps/cloud/provider-credential gates, and invoice
+  evidence/retention-proof smokes.
 
 Blocked:
 
