@@ -254,8 +254,12 @@ Evidence:
   standard `ListResponse`/`User` shapes, active users attach as members, and
   deactivation removes team membership with audit events.
 - `apps/web/src/App.spec.tsx` verifies workspace session UX, invitation state,
-  member/role UI state, SSO readiness labels, and RBAC visibility/disabled-control
+  member/role UI state, SSO readiness labels, SCIM admin token create/revoke
+  controls, SCIM provisioned-user visibility, and RBAC visibility/disabled-control
   behavior.
+- `apps/web/src/api-client.spec.ts` proves the session-bearer web client wiring
+  for listing SCIM token metadata, listing SCIM provisioned users, creating
+  one-time-visible SCIM tokens, and revoking SCIM tokens.
 - `scripts/live-verification.mjs` records a `workspace-auth-rbac-sso` smoke journey
   against the running stack: owner signup, session hydration, invite preview and
   acceptance, member role change, mock OIDC start/authorize/callback, structured
@@ -272,9 +276,9 @@ Evidence:
 Deferred:
 
 - Full enterprise account/team UX, formal SCIM certification, production email
-  delivery, production OIDC/SAML provider handshakes, SSO administration depth,
-  account recovery, invite/approval workflows, and complete RBAC product polish
-  remain future phases.
+  delivery, production OIDC/SAML provider handshakes, production IdP onboarding
+  depth, account recovery, invite/approval workflows, and complete RBAC product
+  polish remain future phases.
 
 ## Phase G - Operations, Security And Release Readiness
 

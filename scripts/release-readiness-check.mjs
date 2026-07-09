@@ -479,6 +479,21 @@ await assertFileContains('README.md', [
   ['SCIM provisioning foundation', 'SCIM provisioning foundation'],
   ['SCIM token endpoint', '/api/v1/auth/teams/:teamId/scim/tokens'],
   ['SCIM user endpoint', '/api/v1/scim/v2/Users'],
+  ['SCIM admin workspace posture', 'access panel shows active token/user posture'],
+]);
+
+await assertFileContains('apps/web/src/api-client.ts', [
+  ['SCIM token client list', 'listTeamScimTokens'],
+  ['SCIM user client list', 'listTeamScimUsers'],
+  ['SCIM token client create', 'createTeamScimToken'],
+  ['SCIM token client revoke', 'revokeTeamScimToken'],
+]);
+
+await assertFileContains('apps/web/src/App.tsx', [
+  ['SCIM provisioning panel', 'SCIM provisioning'],
+  ['SCIM token creation label', 'SCIM token name'],
+  ['SCIM token one-time copy label', 'Copy now. It will not be shown again.'],
+  ['SCIM provisioned users list label', 'SCIM provisioned users'],
 ]);
 
 await assertFileContains('database/migrations/040_team_scim_provisioning.sql', [

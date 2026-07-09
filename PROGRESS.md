@@ -138,6 +138,7 @@ say so explicitly rather than marking it done.
 | Phase 2.46 - Provider retention proof row persistence   | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.47 - Provider retention proof CLI capture       | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase 2.48 - SCIM provisioning foundation               | Complete with known gaps (see notes) | 2026-07-09   |
+| Phase 2.49 - SCIM admin workspace UX                    | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3 - Terraform generation MVP                     | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.1 - Terraform hardening                        | Complete with known gaps (see notes) | 2026-07-07   |
 | Phase V3.2 - Terraform framework assurance              | Complete with known gaps (see notes) | 2026-07-07   |
@@ -151,6 +152,49 @@ say so explicitly rather than marking it done.
 | Browser audit artifact hardening                        | Complete with known gaps (see notes) | 2026-07-08   |
 | Formal browser audit tooling                            | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3.5 - Terraform bundle integrity validation      | Complete with known gaps (see notes) | 2026-07-08   |
+
+## Phase 2.49 - SCIM admin workspace UX
+
+**Status:** Complete with known gaps (see notes)
+**Date:** 2026-07-09
+
+What changed:
+
+- Added a session-authenticated admin read route,
+  `GET /api/v1/auth/teams/:teamId/scim/users`, so team owners/admins can inspect
+  provisioned SCIM users without using or exposing IdP bearer tokens in the browser.
+- Wired the web API client to list SCIM token metadata, list provisioned users,
+  create one-time-visible SCIM tokens, and revoke token metadata through the normal
+  workspace session bearer.
+- Added workspace Team access UI for SCIM provisioning posture: active token/user
+  counts, compact token/user lists, one-time token reveal, revoke action, revoked
+  and deactivated states, and SCIM audit-event labels.
+- Kept raw SCIM bearer tokens out of persistent browser storage. The only raw token
+  display is the immediate post-create response, labeled for copy-once handling.
+- Added release-readiness guards so the SCIM admin UI labels and web client routes
+  cannot be silently removed.
+
+Verification performed:
+
+- `npm run test:unit --workspace @polycost/api -- --runInBand src/api/scim-provisioning.service.spec.ts src/api/scim-provisioning.controller.spec.ts`
+  passed: 2 suites / 10 tests.
+- `npm run test:unit --workspace @polycost/web -- --runInBand src/api-client.spec.ts src/App.spec.tsx`
+  passed: 2 suites / 92 tests.
+- `npm run ci:lint`, `npm run progress:verify`, `npm run release:check`, and
+  `npm run format:check` passed after adding the SCIM UI/client guards.
+- Full `npm run check` passed: API unit 58 suites / 484 tests, web unit 11 suites
+  / 149 tests, graph validation 326/326, pricing coverage, progress verification
+  153 anchors, release/handover/provider gates green. Expected caveats remained:
+  live Postgres `schema_migrations` inspection skipped because the container was
+  not running, Node 20 skipped `impeccable`, and invoice-artifact governance warned
+  for demo/local storage posture.
+
+Known gaps carried forward:
+
+- This closes the visible self-hosted/demo SCIM admin loop, but not formal SCIM
+  certification, production IdP onboarding guides for every vendor, production SSO
+  certification, account recovery, org billing UX, or a complete enterprise IAM
+  administration product.
 
 ## Phase 2.48 - SCIM provisioning foundation
 

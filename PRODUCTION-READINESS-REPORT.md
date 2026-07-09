@@ -103,6 +103,7 @@ performance/accessibility/best-practices/SEO metrics.
 | UI-AUTH-016    | Improved      | Workspace billing panel now surfaces invoice control validation status, reconciliation/import deltas, period match state, validation timestamp, and a guarded validation action for stored verified artifacts                                           |
 | UI-AUTH-017    | Improved      | Workspace billing panel can now download a reviewer-ready invoice evidence JSON packet for the active reconciliation while keeping stored artifact byte downloads separate                                                                              |
 | UI-AUTH-018    | Improved      | Workspace evidence-packet downloads now include the packet digest prefix in the generated file name and completion notice                                                                                                                               |
+| UI-AUTH-019    | Improved      | Workspace Team access now exposes SCIM provisioning posture, one-time token creation, token revocation, token metadata, and provisioned-user visibility through session-authenticated admin APIs                                                        |
 | UI-AUTH-003    | Improved      | Active workspace switching is now backend-backed, membership-checked, and exposed in the signed-in account panel                                                                                                                                        |
 | UI-AUTH-004    | Improved      | Pending/expired workspace invites can now be resent through a guarded backend route that rotates the stored token hash and exposes the refreshed one-time token only in the response                                                                    |
 | UI-AUTH-005    | Improved      | Invite delivery now has local panel mode plus production HTTPS webhook mode with HMAC signatures, production config guards, and browser-safe delivery receipts                                                                                          |
@@ -744,9 +745,10 @@ Machine-readable token evidence:
 - Full enterprise auth product polish remains future scope: production email,
   production SSO/SAML certification, formal SCIM certification, account recovery,
   org billing UX, and broader team/account administration. Phase 2.11 closes active
-  workspace switching for existing team memberships, and Phase 2.48 adds the SCIM
+  workspace switching for existing team memberships, Phase 2.48 adds the SCIM
   provisioning foundation with hashed tokens, bearer-token user provisioning, team
-  membership deactivation, and audit events.
+  membership deactivation, and audit events, and Phase 2.49 exposes the SCIM
+  token/user posture plus create/revoke controls in the workspace admin UI.
 - Terraform generation now has a hardened root bundle, ZIP export, bundle
   manifest, credential-free manifest integrity verifier, validation runner,
   generation profile, private database networking, runtime identity baselines,

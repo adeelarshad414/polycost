@@ -50,6 +50,9 @@ import {
   SsoConnectionTestResult,
   SsoStartResponse,
   TeamAuditEventRecord,
+  CreatedTeamScimTokenRecord,
+  TeamScimTokenRecord,
+  TeamScimUserRecord,
   TeamSwitchResponse,
   TeamSettingsRecord,
   TeamInvitationRecord,
@@ -146,6 +149,14 @@ export interface PolyCostClient {
     token: string,
   ): Promise<TeamInvitationRecord>;
   listTeamAuditEvents(teamId: string, token: string): Promise<TeamAuditEventRecord[]>;
+  listTeamScimTokens(teamId: string, token: string): Promise<TeamScimTokenRecord[]>;
+  listTeamScimUsers(teamId: string, token: string): Promise<TeamScimUserRecord[]>;
+  createTeamScimToken(
+    teamId: string,
+    input: { displayName: string; expiresAt?: string },
+    token: string,
+  ): Promise<CreatedTeamScimTokenRecord>;
+  revokeTeamScimToken(teamId: string, tokenId: string, token: string): Promise<TeamScimTokenRecord>;
   previewTeamInvitation(tokenValue: string): Promise<TeamInvitationPreview>;
   acceptTeamInvitation(tokenValue: string, token: string): Promise<TeamInvitationRecord>;
   updateTeamMemberRole(
@@ -467,6 +478,45 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         baseUrl,
         `/auth/teams/${encodeURIComponent(teamId)}/audit-events?limit=25`,
         {
+          headers: authorizationHeaders(token),
+        },
+      );
+    },
+    listTeamScimTokens(teamId, token) {
+      return requestJson<TeamScimTokenRecord[]>(
+        baseUrl,
+        `/auth/teams/${encodeURIComponent(teamId)}/scim/tokens`,
+        {
+          headers: authorizationHeaders(token),
+        },
+      );
+    },
+    listTeamScimUsers(teamId, token) {
+      return requestJson<TeamScimUserRecord[]>(
+        baseUrl,
+        `/auth/teams/${encodeURIComponent(teamId)}/scim/users`,
+        {
+          headers: authorizationHeaders(token),
+        },
+      );
+    },
+    createTeamScimToken(teamId, input, token) {
+      return requestJson<CreatedTeamScimTokenRecord>(
+        baseUrl,
+        `/auth/teams/${encodeURIComponent(teamId)}/scim/tokens`,
+        {
+          method: 'POST',
+          headers: authorizationHeaders(token),
+          body: JSON.stringify(input),
+        },
+      );
+    },
+    revokeTeamScimToken(teamId, tokenId, token) {
+      return requestJson<TeamScimTokenRecord>(
+        baseUrl,
+        `/auth/teams/${encodeURIComponent(teamId)}/scim/tokens/${encodeURIComponent(tokenId)}`,
+        {
+          method: 'DELETE',
           headers: authorizationHeaders(token),
         },
       );

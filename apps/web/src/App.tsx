@@ -96,6 +96,9 @@ import {
   TeamInvitationPreview,
   TeamMemberRecord,
   TeamRole,
+  CreatedTeamScimTokenRecord,
+  TeamScimTokenRecord,
+  TeamScimUserRecord,
   TeamSwitchResponse,
 } from './types';
 import {
@@ -1978,6 +1981,8 @@ function WorkspaceControlCenter({
   const [members, setMembers] = useState<TeamMemberRecord[]>([]);
   const [invitations, setInvitations] = useState<TeamInvitationRecord[]>([]);
   const [auditEvents, setAuditEvents] = useState<TeamAuditEventRecord[]>([]);
+  const [scimTokens, setScimTokens] = useState<TeamScimTokenRecord[]>([]);
+  const [scimUsers, setScimUsers] = useState<TeamScimUserRecord[]>([]);
   const [accountSessions, setAccountSessions] = useState<AccountSessionRecord[]>([]);
   const [ssoStatus, setSsoStatus] = useState<SsoConfigurationStatus | null>(null);
   const [inviteEmail, setInviteEmail] = useState('finops@example.com');
@@ -1997,6 +2002,9 @@ function WorkspaceControlCenter({
   const [ssoClientSecret, setSsoClientSecret] = useState('CHANGE_ME_DEV_ONLY');
   const [ssoLoginEmail, setSsoLoginEmail] = useState('finops@example.com');
   const [ssoStart, setSsoStart] = useState<SsoStartResponse | null>(null);
+  const [scimTokenDisplayName, setScimTokenDisplayName] = useState('Okta production SCIM');
+  const [scimTokenExpiresAt, setScimTokenExpiresAt] = useState('');
+  const [createdScimToken, setCreatedScimToken] = useState<CreatedTeamScimTokenRecord | null>(null);
   const [provider, setProvider] = useState<ProviderId>('aws');
   const [billingPeriodStart, setBillingPeriodStart] = useState('2026-06-01');
   const [billingPeriodEnd, setBillingPeriodEnd] = useState('2026-06-30');
@@ -2014,6 +2022,8 @@ function WorkspaceControlCenter({
         ? 'Owner or admin role required for billing import and reconciliation.'
         : null;
   const ownerCount = members.filter((member) => member.role === 'owner').length;
+  const activeScimTokenCount = scimTokens.filter((scimToken) => !scimToken.revokedAt).length;
+  const activeScimUserCount = scimUsers.filter((scimUser) => scimUser.active).length;
   const sourceType = sourceTypeForProvider(provider);
   const sessionStatus = session ? workspaceSessionStatus(session.session.expiresAt) : null;
   const reconciliationSummary = reconciliation
@@ -2035,6 +2045,11 @@ function WorkspaceControlCenter({
     {
       id: 'sso-readiness',
       label: 'Checking SSO readiness',
+      state: workspaceDirectoryError ? 'pending' : isWorkspaceDirectoryLoading ? 'pending' : 'done',
+    },
+    {
+      id: 'scim-provisioning',
+      label: 'Checking SCIM provisioning',
       state: workspaceDirectoryError ? 'pending' : isWorkspaceDirectoryLoading ? 'pending' : 'done',
     },
     {
@@ -2079,6 +2094,8 @@ function WorkspaceControlCenter({
       setMembers([]);
       setInvitations([]);
       setAuditEvents([]);
+      setScimTokens([]);
+      setScimUsers([]);
       setAccountSessions([]);
       setSsoStatus(null);
       return undefined;
@@ -2162,7 +2179,10 @@ function WorkspaceControlCenter({
       setMembers([]);
       setInvitations([]);
       setAuditEvents([]);
+      setScimTokens([]);
+      setScimUsers([]);
       setSsoStatus(null);
+      setCreatedScimToken(null);
       return undefined;
     }
 
@@ -2174,19 +2194,32 @@ function WorkspaceControlCenter({
       client.listTeamMembers(activeTeam.id, token),
       client.listTeamInvitations(activeTeam.id, token),
       client.listTeamAuditEvents(activeTeam.id, token),
+      client.listTeamScimTokens(activeTeam.id, token),
+      client.listTeamScimUsers(activeTeam.id, token),
       client.getSsoStatus(token),
     ])
-      .then(([nextMembers, nextInvitations, nextAuditEvents, nextSsoStatus]) => {
-        if (!isMounted) {
-          return;
-        }
+      .then(
+        ([
+          nextMembers,
+          nextInvitations,
+          nextAuditEvents,
+          nextScimTokens,
+          nextScimUsers,
+          nextSsoStatus,
+        ]) => {
+          if (!isMounted) {
+            return;
+          }
 
-        setMembers(nextMembers);
-        setInvitations(nextInvitations);
-        setAuditEvents(nextAuditEvents);
-        setSsoStatus(nextSsoStatus);
-        setWorkspaceDirectoryError(null);
-      })
+          setMembers(nextMembers);
+          setInvitations(nextInvitations);
+          setAuditEvents(nextAuditEvents);
+          setScimTokens(nextScimTokens);
+          setScimUsers(nextScimUsers);
+          setSsoStatus(nextSsoStatus);
+          setWorkspaceDirectoryError(null);
+        },
+      )
       .catch((workspaceError) => {
         if (isMounted) {
           const message = formatApiError(workspaceError);
@@ -2279,6 +2312,9 @@ function WorkspaceControlCenter({
     setMembers([]);
     setInvitations([]);
     setAuditEvents([]);
+    setScimTokens([]);
+    setScimUsers([]);
+    setCreatedScimToken(null);
     setSsoStatus(null);
     setSsoStart(null);
     setBillingImport(null);
@@ -2294,6 +2330,23 @@ function WorkspaceControlCenter({
       setAuditEvents(await client.listTeamAuditEvents(activeTeam.id, token));
     } catch (auditError) {
       onError(formatApiError(auditError));
+    }
+  }
+
+  async function refreshScimPosture() {
+    if (!token || !activeTeam || !canManageTeam) {
+      return;
+    }
+
+    try {
+      const [nextTokens, nextUsers] = await Promise.all([
+        client.listTeamScimTokens(activeTeam.id, token),
+        client.listTeamScimUsers(activeTeam.id, token),
+      ]);
+      setScimTokens(nextTokens);
+      setScimUsers(nextUsers);
+    } catch (scimError) {
+      onError(formatApiError(scimError));
     }
   }
 
@@ -2619,6 +2672,64 @@ function WorkspaceControlCenter({
       onNotice(inviteDeliveryNotice(invitation, 'refreshed'));
     } catch (inviteError) {
       onError(formatApiError(inviteError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handleCreateScimToken(event: FormEvent) {
+    event.preventDefault();
+    if (!token || !activeTeam || !scimTokenDisplayName.trim()) {
+      return;
+    }
+
+    setWorkspaceBusy('scim-token-create');
+    onError(null);
+
+    try {
+      const created = await client.createTeamScimToken(
+        activeTeam.id,
+        {
+          displayName: scimTokenDisplayName,
+          ...(scimTokenExpiresAt ? { expiresAt: new Date(scimTokenExpiresAt).toISOString() } : {}),
+        },
+        token,
+      );
+      setCreatedScimToken(created);
+      setScimTokens((current) => [
+        created,
+        ...current.filter((scimToken) => scimToken.id !== created.id),
+      ]);
+      setScimTokenExpiresAt('');
+      await refreshScimPosture();
+      await refreshTeamAuditEvents();
+      onNotice('SCIM token created. Copy it now; PolyCost will not show it again.');
+    } catch (scimError) {
+      onError(formatApiError(scimError));
+    } finally {
+      setWorkspaceBusy(null);
+    }
+  }
+
+  async function handleRevokeScimToken(tokenId: string) {
+    if (!token || !activeTeam) {
+      return;
+    }
+
+    setWorkspaceBusy(`scim-token-revoke-${tokenId}`);
+    onError(null);
+
+    try {
+      const revoked = await client.revokeTeamScimToken(activeTeam.id, tokenId, token);
+      setScimTokens((current) =>
+        current.map((scimToken) => (scimToken.id === revoked.id ? revoked : scimToken)),
+      );
+      setCreatedScimToken((current) => (current?.id === revoked.id ? null : current));
+      await refreshScimPosture();
+      await refreshTeamAuditEvents();
+      onNotice('SCIM token revoked.');
+    } catch (scimError) {
+      onError(formatApiError(scimError));
     } finally {
       setWorkspaceBusy(null);
     }
@@ -3769,6 +3880,128 @@ function WorkspaceControlCenter({
                     : ''}
                 </small>
               </div>
+              <div className="workspace-sso-status workspace-scim-status">
+                <span>SCIM provisioning</span>
+                <strong>
+                  {activeScimTokenCount} active tokens · {activeScimUserCount} active users
+                </strong>
+                <small>
+                  Tokens are shown once, then stored as hashes. Provisioned IdP users attach to this
+                  team directory.
+                </small>
+              </div>
+              <form className="workspace-inline-form" onSubmit={handleCreateScimToken}>
+                <label className="workspace-field">
+                  <span>SCIM token name</span>
+                  <input
+                    value={scimTokenDisplayName}
+                    onChange={(event) => setScimTokenDisplayName(event.currentTarget.value)}
+                  />
+                </label>
+                <label className="workspace-field">
+                  <span>Expires at (optional)</span>
+                  <input
+                    type="datetime-local"
+                    value={scimTokenExpiresAt}
+                    onChange={(event) => setScimTokenExpiresAt(event.currentTarget.value)}
+                  />
+                </label>
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  loading={workspaceBusy === 'scim-token-create'}
+                  loadingLabel="Creating..."
+                  disabled={!scimTokenDisplayName.trim()}
+                >
+                  Create SCIM token
+                </Button>
+              </form>
+              {createdScimToken ? (
+                <p className="workspace-token-output workspace-sensitive-token" role="status">
+                  SCIM token: {createdScimToken.token} · Copy now. It will not be shown again.
+                </p>
+              ) : null}
+              <div className="workspace-scim-grid">
+                <div className="workspace-member-list workspace-scim-list" aria-label="SCIM tokens">
+                  {scimTokens.length > 0 ? (
+                    scimTokens.slice(0, 4).map((scimToken) => (
+                      <div
+                        className={`workspace-member-row ${scimToken.revokedAt ? 'is-muted' : ''}`}
+                        key={scimToken.id}
+                      >
+                        <span>
+                          <strong>{scimToken.displayName}</strong>
+                          <small>
+                            Prefix {scimToken.tokenPrefix} · created{' '}
+                            {formatDateTime(scimToken.createdAt)}
+                            {scimToken.lastUsedAt
+                              ? ` · last used ${formatDateTime(scimToken.lastUsedAt)}`
+                              : ' · never used'}
+                            {scimToken.expiresAt
+                              ? ` · expires ${formatDateTime(scimToken.expiresAt)}`
+                              : ' · no expiry'}
+                          </small>
+                        </span>
+                        <span
+                          className={`workspace-role-badge ${
+                            scimToken.revokedAt ? 'is-disabled' : 'is-admin'
+                          }`}
+                        >
+                          {scimToken.revokedAt ? 'Revoked' : 'Active'}
+                        </span>
+                        {!scimToken.revokedAt ? (
+                          <Button
+                            type="button"
+                            variant="destructiveQuiet"
+                            size="compact"
+                            className="workspace-link-button"
+                            aria-label={`Revoke SCIM token ${scimToken.displayName}`}
+                            loading={workspaceBusy === `scim-token-revoke-${scimToken.id}`}
+                            loadingLabel="Revoking..."
+                            onClick={() => void handleRevokeScimToken(scimToken.id)}
+                          >
+                            Revoke
+                          </Button>
+                        ) : null}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="workspace-empty-state">No SCIM tokens created yet.</p>
+                  )}
+                </div>
+                <div
+                  className="workspace-member-list workspace-scim-list"
+                  aria-label="SCIM provisioned users"
+                >
+                  {scimUsers.length > 0 ? (
+                    scimUsers.slice(0, 4).map((scimUser) => (
+                      <div
+                        className={`workspace-member-row ${scimUser.active ? '' : 'is-muted'}`}
+                        key={scimUser.id}
+                      >
+                        <span>
+                          <strong>{scimUser.displayName ?? scimUser.userName}</strong>
+                          <small>
+                            {scimUser.userName} · external {scimUser.externalId} · updated{' '}
+                            {formatDateTime(scimUser.updatedAt)}
+                          </small>
+                        </span>
+                        <span
+                          className={`workspace-role-badge ${
+                            scimUser.active ? 'is-member' : 'is-disabled'
+                          }`}
+                        >
+                          {scimUser.active ? 'Active' : 'Deactivated'}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="workspace-empty-state">
+                      Provisioned IdP users will appear here after SCIM sync.
+                    </p>
+                  )}
+                </div>
+              </div>
               <div className="workspace-inline-form">
                 <label className="workspace-field">
                   <span>Mock OIDC email</span>
@@ -3888,8 +4121,8 @@ function WorkspaceControlCenter({
             </>
           ) : (
             <p className="workspace-empty-state">
-              Sign in as a team owner or admin to manage members, issue invite tokens, and review
-              SSO status.
+              Sign in as a team owner or admin to manage members, issue invite and SCIM tokens, and
+              review SSO status.
             </p>
           )}
         </section>
@@ -4350,6 +4583,14 @@ function teamAuditActionLabel(action: TeamAuditEventRecord['action']): string {
       return 'Member removed';
     case 'team.sso.configured':
       return 'SSO configured';
+    case 'team.scim_token.created':
+      return 'SCIM token created';
+    case 'team.scim_token.revoked':
+      return 'SCIM token revoked';
+    case 'team.scim.user_upserted':
+      return 'SCIM user provisioned';
+    case 'team.scim.user_deactivated':
+      return 'SCIM user deactivated';
     case 'billing.import.created':
       return 'Billing import created';
     case 'billing.reconciliation.created':
@@ -4380,8 +4621,14 @@ function teamAuditEventDetail(event: TeamAuditEventRecord): string {
   const target = event.targetId
     ? `${event.targetType} ${event.targetId.slice(0, 8)}`
     : event.targetType;
+  const metadataLabel =
+    typeof event.metadata?.displayName === 'string'
+      ? event.metadata.displayName
+      : typeof event.metadata?.userName === 'string'
+        ? event.metadata.userName
+        : undefined;
 
-  return `${actor} · ${target}`;
+  return metadataLabel ? `${actor} · ${target} · ${metadataLabel}` : `${actor} · ${target}`;
 }
 
 function memberRoleControlState({

@@ -179,6 +179,14 @@ describe('App', () => {
       'session-token',
     );
     expect(client.listTeamInvitations).toHaveBeenCalled();
+    expect(client.listTeamScimTokens).toHaveBeenCalledWith(
+      '22222222-2222-4222-8222-222222222222',
+      'session-token',
+    );
+    expect(client.listTeamScimUsers).toHaveBeenCalledWith(
+      '22222222-2222-4222-8222-222222222222',
+      'session-token',
+    );
     expect(client.getSsoStatus).toHaveBeenCalledWith('session-token');
     expect(text(container)).toContain('Architecture team · owner');
     expect(text(container)).toContain('Architect');
@@ -191,6 +199,8 @@ describe('App', () => {
       '22222222-2222-4222-8222-222222222222',
     );
     expect(text(container)).toContain('OIDC ready · SAML ready');
+    expect(text(container)).toContain('SCIM provisioning');
+    expect(text(container)).toContain('0 active tokens · 0 active users');
     expect(text(container)).toContain('Current · last seen');
     expect(text(container)).toContain('expires');
     expect(text(container)).toContain('Other · last seen');
@@ -299,6 +309,93 @@ describe('App', () => {
     await changeInput(inputByWorkspaceLabel(container, 'Accept invite token'), 'invite-token');
     await submitForm(formContainingText(container, 'Accept invite token'));
     expect(client.acceptTeamInvitation).toHaveBeenCalledWith('invite-token', 'session-token');
+
+    unmount();
+  });
+
+  it('creates and revokes SCIM tokens from team admin controls', async () => {
+    window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
+    const createdScimToken = {
+      id: 'scim-token-1',
+      teamId: '22222222-2222-4222-8222-222222222222',
+      displayName: 'Okta production SCIM',
+      tokenPrefix: 'pc_scim_new',
+      token: 'pc_scim_new-secret',
+      createdAt: '2026-07-09T00:00:00.000Z',
+    };
+    const persistedCreatedScimToken = {
+      id: createdScimToken.id,
+      teamId: createdScimToken.teamId,
+      displayName: createdScimToken.displayName,
+      tokenPrefix: createdScimToken.tokenPrefix,
+      createdAt: createdScimToken.createdAt,
+    };
+    const existingScimToken = {
+      id: 'scim-token-existing',
+      teamId: '22222222-2222-4222-8222-222222222222',
+      displayName: 'Okta staging SCIM',
+      tokenPrefix: 'pc_scim_stage',
+      createdAt: '2026-07-08T00:00:00.000Z',
+      lastUsedAt: '2026-07-09T00:00:00.000Z',
+      expiresAt: '2027-01-01T00:00:00.000Z',
+    };
+    const revokedScimToken = {
+      ...persistedCreatedScimToken,
+      revokedAt: '2026-07-09T01:00:00.000Z',
+    };
+    const client = clientMock({
+      listTeamScimTokens: jest
+        .fn()
+        .mockResolvedValueOnce([existingScimToken])
+        .mockResolvedValueOnce([persistedCreatedScimToken, existingScimToken])
+        .mockResolvedValueOnce([revokedScimToken, existingScimToken]),
+      listTeamScimUsers: jest.fn(async () => [
+        {
+          id: 'scim-user-1',
+          teamId: '22222222-2222-4222-8222-222222222222',
+          externalId: 'idp-user-1',
+          accountId: '44444444-4444-4444-8444-444444444444',
+          userName: 'engineer@example.com',
+          displayName: 'Platform Engineer',
+          active: true,
+          createdAt: '2026-07-09T00:00:00.000Z',
+          updatedAt: '2026-07-09T00:15:00.000Z',
+        },
+      ]),
+      createTeamScimToken: jest.fn(async () => createdScimToken),
+      revokeTeamScimToken: jest.fn(async () => revokedScimToken),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await settleAsyncEffects();
+    await settleAsyncEffects();
+
+    expect(text(container)).toContain('1 active tokens · 1 active users');
+    expect(text(container)).toContain('Okta staging SCIM');
+    expect(text(container)).toContain('Platform Engineer');
+
+    await changeInput(inputByWorkspaceLabel(container, 'SCIM token name'), 'Okta production SCIM');
+    await submitForm(formContainingText(container, 'SCIM token name'));
+    await settleAsyncEffects();
+
+    expect(client.createTeamScimToken).toHaveBeenCalledWith(
+      '22222222-2222-4222-8222-222222222222',
+      { displayName: 'Okta production SCIM' },
+      'session-token',
+    );
+    expect(text(container)).toContain('SCIM token: pc_scim_new-secret');
+    expect(text(container)).toContain('2 active tokens · 1 active users');
+
+    await click(buttonByAriaLabel(container, 'Revoke SCIM token Okta production SCIM'));
+    await settleAsyncEffects();
+
+    expect(client.revokeTeamScimToken).toHaveBeenCalledWith(
+      '22222222-2222-4222-8222-222222222222',
+      'scim-token-1',
+      'session-token',
+    );
+    expect(text(container)).not.toContain('SCIM token: pc_scim_new-secret');
+    expect(text(container)).toContain('1 active tokens · 1 active users');
 
     unmount();
   });
@@ -819,7 +916,7 @@ describe('App', () => {
     expect(text(container)).toContain('Architecture team · member');
     expect(text(container)).toContain('Admin required');
     expect(text(container)).toContain(
-      'Sign in as a team owner or admin to manage members, issue invite tokens, and review SSO status.',
+      'Sign in as a team owner or admin to manage members, issue invite and SCIM tokens, and review SSO status.',
     );
     expect(text(container)).toContain(
       'Owner or admin role required for billing import and reconciliation.',
@@ -828,6 +925,8 @@ describe('App', () => {
     expect(buttonByText(container, 'Import & reconcile').disabled).toBe(true);
     expect(client.listTeamMembers).not.toHaveBeenCalled();
     expect(client.listTeamInvitations).not.toHaveBeenCalled();
+    expect(client.listTeamScimTokens).not.toHaveBeenCalled();
+    expect(client.listTeamScimUsers).not.toHaveBeenCalled();
     expect(client.getSsoStatus).not.toHaveBeenCalled();
 
     await submitForm(container.querySelector<HTMLFormElement>('.workspace-billing-panel'));
@@ -4162,6 +4261,25 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
         createdAt: '2026-07-06T00:00:01.000Z',
       },
     ]),
+    listTeamScimTokens: jest.fn(async () => []),
+    listTeamScimUsers: jest.fn(async () => []),
+    createTeamScimToken: jest.fn(async (_teamId, input) => ({
+      id: 'scim-token-1',
+      teamId: '22222222-2222-4222-8222-222222222222',
+      displayName: input.displayName,
+      tokenPrefix: 'pc_scim_new',
+      token: 'pc_scim_new-secret',
+      createdAt: '2026-07-09T00:00:00.000Z',
+      ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
+    })),
+    revokeTeamScimToken: jest.fn(async (_teamId, tokenId) => ({
+      id: tokenId,
+      teamId: '22222222-2222-4222-8222-222222222222',
+      displayName: 'Okta production SCIM',
+      tokenPrefix: 'pc_scim_new',
+      createdAt: '2026-07-09T00:00:00.000Z',
+      revokedAt: '2026-07-09T01:00:00.000Z',
+    })),
     resendTeamInvitation: jest.fn(async () => ({
       id: '88888888-8888-4888-8888-888888888888',
       teamId: '22222222-2222-4222-8222-222222222222',

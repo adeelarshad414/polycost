@@ -2407,6 +2407,16 @@ summary:focus-visible,
   color: color-mix(in srgb, var(--brand-green) 74%, var(--pc-text-primary));
 }
 
+.workspace-role-badge.is-disabled {
+  border-color: color-mix(in srgb, var(--pc-danger) 30%, var(--pc-border));
+  background: color-mix(in srgb, var(--pc-danger) 8%, transparent);
+  color: color-mix(in srgb, var(--pc-danger) 74%, var(--pc-text-primary));
+}
+
+.workspace-member-row.is-muted {
+  opacity: 0.74;
+}
+
 .workspace-member-row small,
 .workspace-empty-state,
 .workspace-token-output,
@@ -2454,6 +2464,12 @@ summary:focus-visible,
   border-left: 3px solid var(--brand-green);
   background: color-mix(in srgb, var(--brand-green) 8%, transparent);
   padding: 8px 10px;
+}
+
+.workspace-sensitive-token {
+  border-left-color: var(--brand-orange);
+  background: color-mix(in srgb, var(--brand-orange) 9%, transparent);
+  color: var(--pc-text-primary);
 }
 
 .workspace-delivery-output {
@@ -2531,6 +2547,20 @@ summary:focus-visible,
   justify-content: start;
   border-top: 1px solid color-mix(in srgb, var(--pc-border) 72%, transparent);
   padding-top: var(--pc-space-1);
+}
+
+.workspace-scim-status {
+  border-top-color: color-mix(in srgb, var(--brand-blue) 26%, var(--pc-border));
+}
+
+.workspace-scim-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--pc-space-1);
+}
+
+.workspace-scim-list {
+  max-height: 184px;
 }
 
 .workspace-reconciliation-result {
@@ -9373,6 +9403,7 @@ select:disabled {
   .workspace-control-grid,
   .workspace-inline-form,
   .workspace-billing-controls,
+  .workspace-scim-grid,
   .workspace-role-guide {
     grid-template-columns: 1fr;
   }
