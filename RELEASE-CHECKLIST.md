@@ -52,6 +52,9 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Confirm production diagram-classifier drift is monitored with
   `npm run diagram:llm-corpus:drift:check -- --require-live-model --profile <profile.json>`
   before claiming ongoing LLM quality remains within reviewed thresholds.
+- Confirm production diagram-classifier drift alerts are archived with
+  `npm run diagram:llm-corpus:drift:alert:check -- --require-staging-alert <evidence.json>`
+  before claiming drift regressions route to an owner/reviewer workflow.
 - Confirm managed enterprise IdP pilot evidence is archived with
   `npm run enterprise:idp:evidence:check -- --require-managed-idp <bundle.json>`
   before claiming Okta/Entra/Auth0/Google Workspace SSO plus SCIM pilot readiness.
@@ -93,6 +96,7 @@ Complete this checklist before changing the GitHub repository visibility from pr
 - Run `npm run diagram:llm-corpus:capture:smoke`.
 - Run `npm run diagram:llm-corpus:check`.
 - Run `npm run diagram:llm-corpus:drift:check`.
+- Run `npm run diagram:llm-corpus:drift:alert:check`.
 - Run `npm run enterprise:idp:evidence:check`.
 - Run `npm run invoice:record:evidence:check`.
 - Run `npm run release:check`.

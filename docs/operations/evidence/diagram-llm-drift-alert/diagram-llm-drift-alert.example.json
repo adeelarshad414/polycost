@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "polycost-diagram-llm-drift-alert-evidence/v1",
+  "alertName": "tier-3-diagram-classifier-drift-alert-example",
+  "evidenceLevel": "example-schema",
+  "productionClaim": false,
+  "capturedAt": "2026-07-09T00:00:00.000Z",
+  "source": {
+    "driftCheckSchemaVersion": "polycost-diagram-llm-corpus-drift-check/v1",
+    "monitoringLevel": "example-schema",
+    "evidenceLevel": "example-schema",
+    "driftStatus": "no-drift",
+    "driftCheckResultSha256": "74205fe6854b302d636d2f505be06ff68faed7d88330fcc388438ca06f0e269f",
+    "driftProfileSha256": "58e5e249c74df460b89965ac346508335978592a87fe7f28d786c2617ead4d12",
+    "corpusSha256": "74205fe6854b302d636d2f505be06ff68faed7d88330fcc388438ca06f0e269f",
+    "mismatchCount": 0,
+    "unreviewedMismatchCount": 0
+  },
+  "routing": {
+    "mode": "sample",
+    "destinationType": "example",
+    "destinationReferenceSha256": "2a7f26f6d4a58bcb9e83fb086056d7e5f0c4c76fa2bfde9b3c5e3129f9ddf7b9",
+    "hmacSigned": false,
+    "tlsVerified": false,
+    "receiverAccepted": false,
+    "receiverStatusCode": 202,
+    "alertId": "example-only"
+  },
+  "policy": {
+    "ownerTeam": "ml-platform",
+    "severity": "warning",
+    "responseSloMinutes": 240,
+    "escalationPathSha256": "94c7b695b70ca8f2fd7b4cf6e978ddc8e3a1fcb7778f934a4242d0282842d4ec",
+    "runbookReference": "docs/architecture/phase-2-diagram-llm-corpus-drift-monitoring.md"
+  },
+  "payload": {
+    "sanitizedCaseIds": [],
+    "includesRawPrompts": false,
+    "includesRawResponses": false,
+    "includesSecrets": false,
+    "includesPii": false,
+    "payloadSha256": "a8f77e032e3873f1ddbc4f5d710dc3bce0f72139d24b5270ac325495819458fc"
+  },
+  "review": {
+    "runbookSha256": "94c7b695b70ca8f2fd7b4cf6e978ddc8e3a1fcb7778f934a4242d0282842d4ec",
+    "reviewerQueue": "example-only",
+    "auditTrailReference": "example-only",
+    "retentionDays": 90,
+    "receiverEvidenceArchived": false
+  },
+  "operatorAttestations": {
+    "rawPromptsExcluded": true,
+    "rawResponsesExcluded": true,
+    "rawSecretsExcluded": true,
+    "customerPiiExcluded": true,
+    "alertRouteReviewed": false,
+    "receiverEvidenceArchived": false,
+    "productionClaimedByPolyCost": false,
+    "operator": "example-only"
+  },
+  "caveats": [
+    "This is sanitized sample alert evidence for CI/schema validation only.",
+    "A real production alert bundle must use evidenceLevel=staging-alert after a signed TLS receiver accepts a drift alert canary.",
+    "Receiver URLs, email addresses, signing secrets, raw prompts, raw responses, and provider payloads must stay out of alert evidence bundles."
+  ]
+}

@@ -43,8 +43,10 @@ then run `npm run diagram:llm-corpus:check -- --require-live-model <bundle.json>
 For ongoing monitoring, run
 `npm run diagram:llm-corpus:drift:check -- --require-live-model --profile <profile.json>`
 against the sanitized bundle and reviewed false-positive register. The checked-in
-capture, drift, and evidence examples validate the format only; they do not prove
-live model quality.
+capture, drift, alert, and evidence examples validate the format only; they do not
+prove live model quality. Before claiming drift alerting works, archive sanitized
+receiver acceptance evidence and run
+`npm run diagram:llm-corpus:drift:alert:check -- --require-staging-alert <evidence.json>`.
 
 Before claiming managed enterprise IdP readiness, run a customer-specific pilot
 against Okta, Microsoft Entra, Auth0, Google Workspace, generic OIDC, or generic

@@ -47,6 +47,7 @@ const requiredFiles = [
   'docs/operations/evidence/diagram-llm-corpus-capture/diagram-llm-corpus-capture.example.json',
   'docs/operations/evidence/diagram-llm-corpus-capture/predictions.example.json',
   'docs/operations/evidence/diagram-llm-corpus-drift/diagram-llm-corpus-drift.example.json',
+  'docs/operations/evidence/diagram-llm-drift-alert/diagram-llm-drift-alert.example.json',
   'docs/operations/evidence/enterprise-idp-pilot-evidence.example.json',
   'docs/architecture/phase-v3-6-terraform-validation-evidence.md',
   'docs/architecture/phase-v3-7-terraform-destination-evidence-capture.md',
@@ -55,6 +56,7 @@ const requiredFiles = [
   'docs/architecture/phase-2-diagram-llm-corpus-evidence.md',
   'docs/architecture/phase-2-diagram-llm-corpus-evidence-capture.md',
   'docs/architecture/phase-2-diagram-llm-corpus-drift-monitoring.md',
+  'docs/architecture/phase-2-diagram-llm-drift-alert-evidence.md',
   'docs/architecture/phase-2-enterprise-idp-pilot-evidence.md',
   'fixtures/diagrams/llm-corpus/diagram-llm-corpus.v1.json',
   'handover/HANDOVER-README.md',
@@ -174,6 +176,9 @@ if (!packageJson.scripts?.['diagram:llm-corpus:capture:smoke']) {
 if (!packageJson.scripts?.['diagram:llm-corpus:drift:check']) {
   failures.push('package.json is missing diagram:llm-corpus:drift:check');
 }
+if (!packageJson.scripts?.['diagram:llm-corpus:drift:alert:check']) {
+  failures.push('package.json is missing diagram:llm-corpus:drift:alert:check');
+}
 if (!packageJson.scripts?.['enterprise:idp:evidence:check']) {
   failures.push('package.json is missing enterprise:idp:evidence:check');
 }
@@ -271,6 +276,11 @@ if (!packageJson.scripts?.check?.includes('npm run diagram:llm-corpus:capture:sm
 if (!packageJson.scripts?.check?.includes('npm run diagram:llm-corpus:drift:check')) {
   failures.push('package.json check script must include npm run diagram:llm-corpus:drift:check');
 }
+if (!packageJson.scripts?.check?.includes('npm run diagram:llm-corpus:drift:alert:check')) {
+  failures.push(
+    'package.json check script must include npm run diagram:llm-corpus:drift:alert:check',
+  );
+}
 if (!packageJson.scripts?.check?.includes('npm run enterprise:idp:evidence:check')) {
   failures.push('package.json check script must include npm run enterprise:idp:evidence:check');
 }
@@ -321,6 +331,7 @@ await assertFileContains('README.md', [
   ['diagram LLM corpus checker command', 'npm run diagram:llm-corpus:check'],
   ['diagram LLM capture smoke command', 'npm run diagram:llm-corpus:capture:smoke'],
   ['diagram LLM drift checker command', 'npm run diagram:llm-corpus:drift:check'],
+  ['diagram LLM drift alert checker command', 'npm run diagram:llm-corpus:drift:alert:check'],
   ['enterprise IdP pilot evidence checker command', 'npm run enterprise:idp:evidence:check'],
   [
     'terraform validation evidence architecture link',
@@ -342,6 +353,10 @@ await assertFileContains('README.md', [
   [
     'diagram LLM drift architecture link',
     'docs/architecture/phase-2-diagram-llm-corpus-drift-monitoring.md',
+  ],
+  [
+    'diagram LLM drift alert architecture link',
+    'docs/architecture/phase-2-diagram-llm-drift-alert-evidence.md',
   ],
   [
     'enterprise IdP pilot architecture link',
@@ -396,6 +411,7 @@ await assertFileContains('docs/HOW-TO-USE.md', [
   ['diagram LLM corpus checker', 'npm run diagram:llm-corpus:check'],
   ['diagram LLM capture helper', 'npm run diagram:llm-corpus:capture'],
   ['diagram LLM drift checker', 'npm run diagram:llm-corpus:drift:check'],
+  ['diagram LLM drift alert checker', 'npm run diagram:llm-corpus:drift:alert:check'],
   ['enterprise IdP pilot evidence checker', 'npm run enterprise:idp:evidence:check'],
   ['invoice-of-record evidence checker', 'npm run invoice:record:evidence:check'],
   ['Terraform evidence capture workflow', 'npm run terraform:evidence:capture'],
@@ -456,6 +472,7 @@ await assertFileContains('docs/PROVIDER-CREDENTIALS.md', [
   ['diagram LLM corpus checker', 'npm run diagram:llm-corpus:check'],
   ['diagram LLM capture helper', 'npm run diagram:llm-corpus:capture'],
   ['diagram LLM drift checker', 'npm run diagram:llm-corpus:drift:check'],
+  ['diagram LLM drift alert checker', 'npm run diagram:llm-corpus:drift:alert:check'],
   ['enterprise IdP Vault path', 'secret/polycost/auth/oidc'],
   ['enterprise IdP pilot evidence checker', 'npm run enterprise:idp:evidence:check'],
   ['provider retention proof manifest', '## Provider Retention Proof Manifest'],
@@ -492,6 +509,7 @@ await assertFileContains('RELEASE-CHECKLIST.md', [
   ['diagram LLM corpus checker command', 'npm run diagram:llm-corpus:check'],
   ['diagram LLM capture smoke command', 'npm run diagram:llm-corpus:capture:smoke'],
   ['diagram LLM drift checker command', 'npm run diagram:llm-corpus:drift:check'],
+  ['diagram LLM drift alert checker command', 'npm run diagram:llm-corpus:drift:alert:check'],
   ['enterprise IdP pilot evidence checker command', 'npm run enterprise:idp:evidence:check'],
   ['invoice-of-record evidence checker command', 'npm run invoice:record:evidence:check'],
   ['Terraform evidence capture smoke command', 'npm run terraform:evidence:capture:smoke'],
@@ -945,6 +963,15 @@ await assertFileContains('scripts/diagram-llm-corpus-drift-check.mjs', [
   ['raw prompt payload guard', 'findForbiddenRawPayloads'],
 ]);
 
+await assertFileContains('scripts/diagram-llm-drift-alert-evidence-check.mjs', [
+  ['diagram LLM drift alert evidence schema', 'polycost-diagram-llm-drift-alert-evidence/v1'],
+  ['diagram LLM drift alert check schema', 'polycost-diagram-llm-drift-alert-evidence-check/v1'],
+  ['staging alert strict option', '--require-staging-alert'],
+  ['receiver acceptance guard', 'receiverAccepted'],
+  ['destination hash guard', 'destinationReferenceSha256'],
+  ['raw prompt payload guard', 'findForbiddenRawPayloads'],
+]);
+
 await assertFileContains('scripts/enterprise-idp-pilot-evidence-check.mjs', [
   ['enterprise IdP evidence schema', 'polycost-enterprise-idp-pilot-evidence/v1'],
   ['enterprise IdP check schema', 'polycost-enterprise-idp-pilot-evidence-check/v1'],
@@ -1034,6 +1061,17 @@ await assertFileContains(
   ],
 );
 
+await assertFileContains(
+  'docs/operations/evidence/diagram-llm-drift-alert/diagram-llm-drift-alert.example.json',
+  [
+    ['diagram LLM alert evidence schema', 'polycost-diagram-llm-drift-alert-evidence/v1'],
+    ['sample-only evidence level', 'example-schema'],
+    ['sample routing mode', '"mode": "sample"'],
+    ['destination hash evidence', '"destinationReferenceSha256"'],
+    ['raw prompt exclusion', '"rawPromptsExcluded": true'],
+  ],
+);
+
 await assertFileContains('docs/operations/evidence/enterprise-idp-pilot-evidence.example.json', [
   ['enterprise IdP evidence example schema', 'polycost-enterprise-idp-pilot-evidence/v1'],
   ['sample-only evidence level', 'example-schema'],
@@ -1092,6 +1130,14 @@ await assertFileContains('docs/architecture/phase-2-diagram-llm-corpus-drift-mon
   ['live model strict mode', '--require-live-model'],
   ['false positive boundary', 'false-positive/mismatch review record'],
   ['no endpoint call boundary', 'does not call the model endpoint'],
+]);
+
+await assertFileContains('docs/architecture/phase-2-diagram-llm-drift-alert-evidence.md', [
+  ['diagram LLM drift alert title', 'Phase 2 Diagram LLM Drift Alert Evidence'],
+  ['diagram LLM drift alert command', 'npm run diagram:llm-corpus:drift:alert:check'],
+  ['staging alert strict mode', '--require-staging-alert'],
+  ['alert boundary', 'does not call the model endpoint'],
+  ['receiver retention boundary', 'receiver-side retention proof'],
 ]);
 
 await assertFileContains('docs/architecture/phase-2-enterprise-idp-pilot-evidence.md', [
