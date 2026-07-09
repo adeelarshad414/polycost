@@ -220,6 +220,20 @@ Evidence:
 - V3.5 Terraform bundle integrity hardening added
   `scripts/verify-manifest.mjs` to generated bundles and proved it passes on a
   materialized bundle and fails after `main.tf` tampering.
+- V3.6 Terraform validation evidence adds `npm run terraform:evidence:check` and a
+  `polycost-terraform-validation-evidence/v1` contract for destination-account
+  proof. The checker validates bundle manifest evidence, manifest-integrity output,
+  generated validation-runner output, plan JSON digest/summary, Conftest policy
+  result, remote-state locking/encryption, cost-allocation tags, raw-secret
+  exclusion, and operator attestations. The checked-in `example-schema` bundle passed
+  the default checker while `--require-destination-plan` failed as intended, keeping
+  sample evidence distinct from target-account proof.
+- Full `npm run check` passed afterward with the Terraform validation evidence gate
+  in the aggregate floor: API unit `59` suites / `494` tests, web unit `11` suites /
+  `149` tests, graph validation `333` nodes / `333` edges, pricing coverage `36`
+  frontend families, progress verification `218` anchors, release readiness,
+  handover, DevOps/cloud/provider-credential gates, and invoice plus Terraform
+  evidence smokes.
 - Phase V3 full `npm run check` passed with API `51` suites / `398` tests, web
   `9` suites / `132` tests, graph validation, pricing coverage, progress
   verification, QA/security suppression, database, DevOps, cloud, release, and
@@ -230,7 +244,8 @@ Deferred:
 
 - Request-time validation is static. Real `terraform init`, `terraform validate`,
   policy checks, and `terraform plan` require saving files and authenticating to
-  target cloud accounts outside PolyCost.
+  target cloud accounts outside PolyCost; V3.6 verifies archived evidence from that
+  external run after operators capture it.
 - Production landing-zone modules, private endpoints, WAF/CDN wiring, IAM
   least-privilege policies, Kubernetes/serverless modules, active-active DR, and
   provider-specific organization controls remain future IaC phases.

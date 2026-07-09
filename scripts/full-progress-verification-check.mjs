@@ -105,6 +105,7 @@ async function assertPhaseEvidenceAnchors() {
     'npm run invoice:artifact-scanner:smoke:local',
     'npm run invoice:artifact-rehearsal:plan',
     'npm run invoice:artifact-rehearsal:evidence:check',
+    'npm run terraform:evidence:check',
   ]);
   assertScriptIncludes(packageJson, 'ci:unit', [
     'npm run test:coverage',
@@ -373,6 +374,29 @@ async function assertPhaseEvidenceAnchors() {
       ['sample caveat', 'sanitized sample evidence for CI/schema validation only'],
     ],
   );
+
+  await assertFileContains('scripts/terraform-validation-evidence-check.mjs', [
+    ['Terraform evidence bundle schema', 'polycost-terraform-validation-evidence/v1'],
+    ['Terraform evidence check schema', 'polycost-terraform-validation-evidence-check/v1'],
+    ['require destination-plan mode', '--require-destination-plan'],
+    ['remote state locking guard', 'remoteState.lockingConfigured must be true'],
+    ['raw secret material guard', 'findSecretMaterial'],
+  ]);
+
+  await assertFileContains('docs/operations/evidence/terraform-validation-evidence.example.json', [
+    ['Terraform evidence example schema', 'polycost-terraform-validation-evidence/v1'],
+    ['sample-only evidence level', 'example-schema'],
+    ['bundle manifest schema', 'polycost.terraform.bundle.v1'],
+    ['remote state evidence', '"lockingConfigured": true'],
+    ['tag evidence', '"CostCenter"'],
+  ]);
+
+  await assertFileContains('docs/architecture/phase-v3-6-terraform-validation-evidence.md', [
+    ['V3.6 title', 'Phase V3.6 Terraform Validation Evidence'],
+    ['destination plan command', 'npm run terraform:evidence:check'],
+    ['sample evidence distinction', 'example-schema'],
+    ['operator boundary', 'PolyCost still does not run `terraform apply`'],
+  ]);
 
   await assertFileContains('docs/operations/invoice-artifact-production-profile.example.json', [
     ['production profile schema', 'polycost-invoice-artifact-production-profile/v1'],
