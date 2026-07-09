@@ -1,7 +1,7 @@
 # PolyCost Production Readiness Report
 
 Date: 2026-07-09
-Branch: cumulative production-readiness branches through `codex/pricing-catalog-snapshot-evidence`
+Branch: cumulative production-readiness branches through `codex/pricing-catalog-live-snapshot-capture`
 PR: local phase gate, PR created after verification
 Run spec: `docs/design/master-production-readiness-orchestrator-v2.md`
 
@@ -92,6 +92,7 @@ performance/accessibility/best-practices/SEO metrics.
 | INV-TRACE-033  | Improved      | Phase 2.59 adds `npm run invoice:record:evidence:check`, a strict provider invoice-of-record pilot evidence contract for invoice control totals, billing export lineage, private pricing, adjustments, commitments, retention, notary, audit, and reviewer proof |
 | INV-TRACE-034  | Improved      | Phase 2.64 adds `npm run invoice:record:pricing-lineage:smoke`, proving provider-invoice pilot evidence can bind invoice SKUs to pricing catalog snapshot digests, source record IDs, source payload hashes, and exact SKU match coverage                        |
 | INV-TRACE-035  | Improved      | Phase 2.65 adds `npm run pricing:catalog:snapshot:check` and `npm run pricing:catalog:snapshot:smoke`, proving AWS/Azure/GCP catalog snapshot freshness, source payload hash coverage, and exact row-change comparison evidence                                  |
+| INV-TRACE-036  | Improved      | Phase 2.66 adds `npm run pricing:catalog:snapshot:capture:plan` and guarded `npm run pricing:catalog:snapshot:capture -- --live`, giving operators a read-only AWS/Azure/GCP live catalog capture path with GCP credential checks and sanitized evidence output  |
 | VSDX-VIS-002   | Improved      | VSDX extraction now includes page size, normalized preview bounds, geometry hints, and an explicit layout-extraction caveat                                                                                                                                      |
 | VSDX-VIS-003   | Improved      | VSDX parsing now emits sanitized approximate SVG visual previews from positioned page geometry, with browser display and explicit non-pixel-perfect caveats                                                                                                      |
 | LLM-READY-002  | Improved      | Diagram LLM client now exposes readiness without calling the provider or reading secrets, keeping stub/unconfigured mode distinct from production-connected mode                                                                                                 |
@@ -330,6 +331,20 @@ Local static/regression gates:
     suites / `149` tests, graph validation `358` nodes / `358` edges, pricing
     coverage `36` frontend families, progress verification `394` anchors, and the
     new pricing catalog snapshot checks in the aggregate floor.
+- Phase 2.66 live catalog snapshot capture guard gates passed:
+  - `node --check scripts/pricing-catalog-live-snapshot-capture.mjs` passed.
+  - `npm run pricing:catalog:snapshot:capture:plan -- --json` passed with
+    read-only AWS Price List, Azure Retail Prices, and GCP Cloud Billing capture
+    plans plus `POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true` guard evidence.
+  - `npm run pricing:catalog:snapshot:check -- --require-live-provider docs/operations/evidence/pricing-catalog-snapshot/pricing-catalog-snapshot.example.json --json`
+    failed as intended because the checked-in sample is not live-provider
+    evidence.
+  - `npm run release:check` and `npm run progress:verify` passed with the live
+    capture plan anchored in the aggregate floor.
+  - Full `npm run check` passed with API `59` suites / `494` tests, web `11`
+    suites / `149` tests, graph validation `358` nodes / `358` edges, pricing
+    coverage `36` frontend families, progress verification `400` anchors, and
+    the live catalog snapshot capture plan in the aggregate floor.
 - Phase 2.19 invoice adjustment evidence focused gates passed:
   - API focused: `src/api/auth-billing.spec.ts`: 1 suite / 23 tests.
   - Web focused: `src/App.spec.tsx`: 1 suite / 60 tests.
@@ -941,6 +956,11 @@ Machine-readable token evidence:
   SKU rows and catalog snapshot digests. Phase 2.65 adds provider catalog snapshot
   freshness and exact row-change evidence for AWS/Azure/GCP fixture replay, with a
   stricter `--require-live-provider` path for archived live provider API evidence.
+  Phase 2.66 adds a guarded operator-side live catalog capture path with read-only
+  AWS/Azure endpoints, GCP credential checks, previous-live-evidence comparison,
+  and sanitized evidence output. A real `verifiedLiveProviderSnapshot=true` bundle
+  still requires operator network access, GCP Cloud Billing read credentials, and
+  archived output from that command.
   These phases do not replace provider invoice rendering, private contract/legal
   validation, or provider-authenticated invoice-of-record reconciliation.
   Phase 2.25 adds durable database-backed artifact file upload/download with

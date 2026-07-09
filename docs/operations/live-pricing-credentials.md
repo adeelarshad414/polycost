@@ -98,8 +98,30 @@ Run the local AWS/Azure/GCP snapshot comparison smoke:
 npm run pricing:catalog:snapshot:smoke
 ```
 
-For live provider proof, archive a sanitized snapshot evidence bundle from real AWS
-Price List, Azure Retail Prices, and GCP Cloud Billing Catalog refreshes, then run:
+Review the live capture plan without provider network calls:
+
+```bash
+npm run pricing:catalog:snapshot:capture:plan
+```
+
+For live provider proof, use the guarded capture command from an
+operator-authenticated environment. AWS Price List and Azure Retail Prices use
+public read-only catalog endpoints. GCP requires one of:
+`GCP_CLOUD_BILLING_ACCESS_TOKEN`, `GCP_CLOUD_BILLING_ACCESS_TOKEN_FILE`, or Vault
+`secret/polycost/providers/gcp access_token`.
+
+```bash
+POLYCOST_LIVE_PRICING_SNAPSHOT_CAPTURE=true \
+  npm run pricing:catalog:snapshot:capture -- \
+  --live \
+  --operator "<reviewer-name>" \
+  --previous-evidence <prior-live-provider-bundle.json>
+```
+
+The command writes sanitized evidence only: row hashes, source record keys,
+source payload hashes, public endpoint references, and representative row
+samples. It does not write raw provider payloads, bearer tokens, signed URLs, or
+credentials. After archiving the generated bundle, run:
 
 ```bash
 npm run pricing:catalog:snapshot:check -- --require-live-provider <bundle.json>
