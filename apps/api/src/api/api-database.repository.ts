@@ -37,6 +37,7 @@ import {
   BillingImportRowInput,
   BillingSourceType,
   InvoiceArtifactBlobRecord,
+  InvoiceArtifactProviderRetentionProof,
   InvoiceArtifactStorageBackend,
   InvoiceLineItemRecord,
   InvoiceReconciliationRecord,
@@ -4773,12 +4774,63 @@ function toInvoiceArtifactBlobRecord(row: InvoiceArtifactBlobRow): InvoiceArtifa
       retentionDays: retentionDaysBetween(row.uploaded_at, row.retention_until),
       legalHold: row.legal_hold,
     },
+    providerRetentionProof: toInvoiceArtifactProviderRetentionProof(row),
     malwareScan: {
       status: row.malware_scan_status,
       scanner: row.malware_scan_engine,
       checkedAt: row.malware_scan_checked_at.toISOString(),
       findings: row.malware_scan_finding ? [row.malware_scan_finding] : [],
     },
+  };
+}
+
+function toInvoiceArtifactProviderRetentionProof(
+  row: InvoiceArtifactBlobRow,
+): InvoiceArtifactProviderRetentionProof {
+  const retentionUntil = row.retention_until.toISOString();
+  const checkedAt = row.uploaded_at.toISOString();
+
+  if (row.storage_backend === 'database-bytea') {
+    return {
+      schemaVersion: 'invoice-artifact-provider-retention-proof/v1',
+      status: 'not-applicable',
+      evidenceSource: 'not-required',
+      storageBackend: row.storage_backend,
+      checkedAt,
+      retentionMode: 'not-configured',
+      retentionUntil,
+      legalHold: row.legal_hold,
+      caveats: [
+        'database-bytea storage has no provider object-lock control plane; use external object storage for invoice-grade retention proof.',
+      ],
+    };
+  }
+
+  return {
+    schemaVersion: 'invoice-artifact-provider-retention-proof/v1',
+    status: 'missing',
+    evidenceSource: 'local-config',
+    storageBackend: row.storage_backend,
+    checkedAt,
+    retentionMode: 'not-configured',
+    retentionUntil,
+    legalHold: row.legal_hold,
+    ...(row.object_store_bucket
+      ? {
+          objectStore: {
+            bucketOrContainer: row.object_store_bucket,
+            prefix: objectPrefixFromKey(row.object_store_key),
+            ...(row.object_store_region ? { region: row.object_store_region } : {}),
+            ...(row.object_store_key ? { key: row.object_store_key } : {}),
+            ...(row.object_store_uri ? { uri: row.object_store_uri } : {}),
+            ...(row.object_store_etag ? { eTag: row.object_store_etag } : {}),
+            ...(row.object_store_version ? { version: row.object_store_version } : {}),
+          },
+        }
+      : {}),
+    caveats: [
+      'provider retention proof was not persisted with this artifact row; use the reconciliation evidence packet manifest for captured provider proof.',
+    ],
   };
 }
 

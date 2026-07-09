@@ -706,11 +706,14 @@ Machine-readable token evidence:
   packet export. Phase 2.41 adds a self-hostable notary reference receiver with
   health/readiness checks, append-only JSONL receipt capture, Docker packaging, and
   a smoke harness, while still requiring operator-owned WORM/object-lock storage
-  evidence before claiming immutability.
+  evidence before claiming immutability. Phase 2.42 adds a typed provider
+  retention proof manifest, packet-level proof counters, offline verifier checks,
+  and a `providerRetentionProofReady` gate that turns green only when every
+  external artifact has provider-control-plane proof reference and SHA-256 digest.
   PolyCost still does not provide provider invoice rendering, private contract
-  validation, cloud-control-plane WORM object-store proof, receiver-side
-  immutability proof, external legal-review routing, contract/legal approval
-  integration, or a full external reviewer queue.
+  validation, automated cloud-control-plane WORM object-store proof capture,
+  receiver-side immutability proof, external legal-review routing, contract/legal
+  approval integration, or a full external reviewer queue.
   Full invoice-grade billing remains future scope.
   PolyCost is still not the invoice system of record.
 - VSDX support now includes extraction/evidence and approximate SVG previews, not full

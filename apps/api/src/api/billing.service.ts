@@ -3789,6 +3789,26 @@ function invoiceEvidencePacketGovernance(
   const legalHoldCount = governanceRecords.filter(
     (governance) => governance.retentionPolicy.legalHold,
   ).length;
+  const providerRetentionProofs = governanceRecords
+    .map((governance) => governance.providerRetentionProof)
+    .filter((proof): proof is InvoiceArtifactBlobGovernance['providerRetentionProof'] =>
+      Boolean(proof),
+    );
+  const providerRetentionProofMissingCount = storedBlobs.filter(
+    (storedBlob) =>
+      !storedBlob.governance ||
+      !storedBlob.governance.providerRetentionProof ||
+      storedBlob.governance.providerRetentionProof.status === 'missing',
+  ).length;
+  const providerRetentionProofDeclaredCount = providerRetentionProofs.filter(
+    (proof) => proof.status === 'declared',
+  ).length;
+  const providerRetentionProofVerifiedCount = providerRetentionProofs.filter(
+    (proof) => proof.status === 'provider-verified',
+  ).length;
+  const providerRetentionProofNotApplicableCount = providerRetentionProofs.filter(
+    (proof) => proof.status === 'not-applicable',
+  ).length;
   const malwareScanPassedCount = governanceRecords.filter(
     (governance) => governance.malwareScan.status === 'passed',
   ).length;
@@ -3814,6 +3834,16 @@ function invoiceEvidencePacketGovernance(
       : []),
     ...(expiredRetentionCount > 0
       ? [`${expiredRetentionCount} stored artifact(s) are past retention without legal hold`]
+      : []),
+    ...(externalObjectStoreCount > 0 && providerRetentionProofMissingCount > 0
+      ? [
+          `${providerRetentionProofMissingCount} stored artifact(s) are missing provider retention proof`,
+        ]
+      : []),
+    ...(providerRetentionProofDeclaredCount > 0
+      ? [
+          `${providerRetentionProofDeclaredCount} stored artifact(s) have declared-only provider retention proof`,
+        ]
       : []),
     ...(malwareScanFailedCount > 0
       ? [`${malwareScanFailedCount} stored artifact(s) have failed malware scan status`]
@@ -3846,6 +3876,10 @@ function invoiceEvidencePacketGovernance(
       ).length,
       expiredRetentionCount,
       legalHoldCount,
+      providerRetentionProofMissingCount,
+      providerRetentionProofDeclaredCount,
+      providerRetentionProofVerifiedCount,
+      providerRetentionProofNotApplicableCount,
       malwareScanPassedCount,
       malwareScanFailedCount,
       malwareScannerEngines,
@@ -3869,6 +3903,11 @@ function invoiceEvidencePacketGovernance(
       retentionPolicyReady:
         storedArtifacts.length > 0 && governanceRecords.length === storedArtifacts.length,
       retentionDeletionReady: storageReadiness.retentionEnforcementMode === 'delete-expired',
+      providerRetentionProofReady:
+        externalObjectStoreCount > 0 &&
+        providerRetentionProofVerifiedCount === externalObjectStoreCount &&
+        providerRetentionProofMissingCount === 0 &&
+        providerRetentionProofDeclaredCount === 0,
       packetIntegrityReady: true,
       auditTrailReady: teamScoped,
     },
@@ -4083,6 +4122,14 @@ function legalHoldInvoiceGradeArtifact(
                 ...governance.retentionPolicy,
                 legalHold: input.legalHold,
               },
+              ...(governance.providerRetentionProof
+                ? {
+                    providerRetentionProof: {
+                      ...governance.providerRetentionProof,
+                      legalHold: input.legalHold,
+                    },
+                  }
+                : {}),
             },
           }
         : {}),
@@ -4254,26 +4301,32 @@ function governanceWithStoredObject(
   }
 
   const existingObjectStore = governance.storageProfile.objectStore;
+  const objectStore = {
+    bucketOrContainer:
+      storedObject.objectStoreBucket ?? existingObjectStore?.bucketOrContainer ?? 'unknown',
+    prefix: existingObjectStore?.prefix ?? 'invoice-artifacts',
+    ...(storedObject.objectStoreRegion
+      ? { region: storedObject.objectStoreRegion }
+      : existingObjectStore?.region
+        ? { region: existingObjectStore.region }
+        : {}),
+    ...(storedObject.objectStoreKey ? { key: storedObject.objectStoreKey } : {}),
+    ...(storedObject.objectStoreUri ? { uri: storedObject.objectStoreUri } : {}),
+    ...(storedObject.objectStoreETag ? { eTag: storedObject.objectStoreETag } : {}),
+    ...(storedObject.objectStoreVersion ? { version: storedObject.objectStoreVersion } : {}),
+  };
 
   return {
     ...governance,
     storageProfile: {
       ...governance.storageProfile,
       storageBackend: storedObject.storageBackend,
-      objectStore: {
-        bucketOrContainer:
-          storedObject.objectStoreBucket ?? existingObjectStore?.bucketOrContainer ?? 'unknown',
-        prefix: existingObjectStore?.prefix ?? 'invoice-artifacts',
-        ...(storedObject.objectStoreRegion
-          ? { region: storedObject.objectStoreRegion }
-          : existingObjectStore?.region
-            ? { region: existingObjectStore.region }
-            : {}),
-        ...(storedObject.objectStoreKey ? { key: storedObject.objectStoreKey } : {}),
-        ...(storedObject.objectStoreUri ? { uri: storedObject.objectStoreUri } : {}),
-        ...(storedObject.objectStoreETag ? { eTag: storedObject.objectStoreETag } : {}),
-        ...(storedObject.objectStoreVersion ? { version: storedObject.objectStoreVersion } : {}),
-      },
+      objectStore,
+    },
+    providerRetentionProof: {
+      ...governance.providerRetentionProof,
+      storageBackend: storedObject.storageBackend,
+      objectStore,
     },
   };
 }

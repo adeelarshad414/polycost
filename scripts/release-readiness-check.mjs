@@ -257,6 +257,9 @@ await assertFileContains('docs/PROVIDER-CREDENTIALS.md', [
     'USE_MOCK_PROVIDERS=false npm run provider:credentials:check:strict',
   ],
   ['diagram LLM Vault path', 'secret/polycost/llm'],
+  ['provider retention proof manifest', '## Provider Retention Proof Manifest'],
+  ['provider retention proof mode', 'INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE'],
+  ['provider retention proof ready gate', 'providerRetentionProofReady'],
   [
     'no env secret storage',
     'Do not put provider access tokens, service account JSON, OIDC client secrets, or LLM',
@@ -475,6 +478,19 @@ await assertFileContains('scripts/invoice-evidence-notary-reference-receiver-smo
   ['uses staging webhook smoke sender', 'invoice-evidence-notary-webhook-smoke.mjs'],
   ['local HTTP exception is explicit', '--allow-http-local'],
   ['verifies captured receiver artifact', 'Captured receipt packet digest'],
+]);
+
+await assertFileContains('scripts/invoice-evidence-packet-verifier.mjs', [
+  ['provider retention proof count verification', 'providerRetentionProofVerifiedCount'],
+  ['provider retention proof gate verification', 'providerRetentionProofReady'],
+]);
+
+await assertFileContains('scripts/provider-credential-check.mjs', [
+  [
+    'provider retention proof credential check',
+    'provider retention proof is not captured from the provider control plane',
+  ],
+  ['provider retention proof digest check', 'INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_SHA256'],
 ]);
 
 await assertFileContains('docker/notary-receiver/Dockerfile', [

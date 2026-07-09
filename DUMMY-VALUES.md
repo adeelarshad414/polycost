@@ -30,6 +30,9 @@ The explicit placeholder token is `CHANGE_ME_DEV_ONLY`. Production and staging c
   scanner safety checks
 - `INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE=report-only` for local/demo
   retention checks that do not delete bytes
+- `INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE=not-configured` for
+  local/demo invoice artifact governance without captured provider
+  control-plane retention proof
 - `INVOICE_EVIDENCE_RECEIPT_MODE=metadata-only` for local/demo evidence packet
   receipts without a signing secret
 - `INVOICE_EVIDENCE_WORM_RETENTION_MODE=not-configured` for local/demo evidence
@@ -64,6 +67,12 @@ The explicit placeholder token is `CHANGE_ME_DEV_ONLY`. Production and staging c
 - Missing `INVOICE_ARTIFACT_MALWARE_SCANNER_URL` or non-dummy scanner secret when
   scanner webhook mode is enabled
 - `INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE=report-only`
+- `INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE=not-configured` or
+  `declared-config` when `INVOICE_EVIDENCE_WORM_RETENTION_MODE=provider-object-lock`
+  outside development
+- Missing `INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_REFERENCE` or valid
+  `INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_SHA256` when provider control-plane
+  retention proof mode is enabled
 - `INVOICE_EVIDENCE_RECEIPT_MODE=metadata-only`
 - Missing `INVOICE_EVIDENCE_RECEIPT_SIGNING_KEY_REFERENCE` or non-dummy
   `INVOICE_EVIDENCE_RECEIPT_SIGNING_SECRET` when signed receipts are enabled
@@ -107,7 +116,12 @@ docker compose exec vault vault kv put secret/polycost/llm api_key="<llm-api-key
    `INVOICE_EVIDENCE_WORM_RETENTION_MODE` to `provider-object-lock` or
    `external-worm-receiver`. For external receipt handoff, also configure
    `INVOICE_EVIDENCE_NOTARY_WEBHOOK_URL`.
-8. Store selected artifact object-store credentials in Vault:
+8. For `provider-object-lock`, capture the selected cloud provider's retention
+   or immutability policy output, store it in durable evidence storage, then set
+   `INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE=provider-control-plane`,
+   `INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_REFERENCE`, and the captured
+   artifact's `INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_SHA256`.
+9. Store selected artifact object-store credentials in Vault:
 
 ```bash
 docker compose exec vault vault kv put secret/polycost/artifacts/aws access_key_id="<access-key-id>" secret_access_key="<secret-access-key>"

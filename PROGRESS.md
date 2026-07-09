@@ -4864,6 +4864,50 @@ impeccable` was skipped by design because the repo targets Node 20 and the
   external access logs, TLS termination, and object-lock/WORM guarantees still
   depend on the operator's storage and deployment environment.
 
+## Phase 2.42 — Provider retention proof manifest
+
+Status: implemented and verified locally on 2026-07-09.
+
+- Added a typed `invoice-artifact-provider-retention-proof/v1` manifest to stored
+  invoice artifact governance. The manifest distinguishes `not-applicable`,
+  `missing`, `declared`, and `provider-verified` states so packets no longer
+  collapse local configuration and provider control-plane evidence into one vague
+  WORM posture.
+- Added configuration for
+  `INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_MODE`,
+  `INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_REFERENCE`, and
+  `INVOICE_ARTIFACT_PROVIDER_RETENTION_PROOF_SHA256`. Staging/production
+  `provider-object-lock` mode now requires `provider-control-plane` proof with a
+  durable reference and SHA-256 digest before startup validation passes.
+- Evidence packet governance now aggregates provider retention proof counts and
+  exposes a `providerRetentionProofReady` production gate. The gate is true only
+  when every external object-store artifact has provider-verified proof; declared
+  or missing proof remains a visible blocker.
+- The offline evidence packet verifier checks the provider-retention proof count
+  fields and prevents packets from claiming provider-control-plane evidence unless
+  a provider-verified proof includes both reference and digest.
+- Provider credential docs, dummy-value guard docs, `.env.example`, and release
+  readiness anchors now document the operator-owned cloud proof capture path.
+- Verification:
+  `npm run test:unit --workspace @polycost/api -- --runInBand
+src/api/invoice-artifact-governance.service.spec.ts src/api/auth-billing.spec.ts
+src/config/config.schema.spec.ts` passed with 3 suites / 70 tests. `npm run
+invoice:evidence:verify:smoke`, `npm run release:check`, `npm run
+progress:verify`, `npm run format:check`, and `npm run ci:lint` passed. Full
+  `npm run check` passed with API 56 suites / 471 tests, web 11 suites / 147 tests,
+  graph validation 322 nodes / 322 edges, pricing coverage, progress verification
+  153 anchors, QA/security suppression hygiene, DB, DevOps, cloud, release,
+  handover, and provider-credential gates green. `npm run impeccable` was skipped
+  by design because the repo targets Node 20 and the optional tool requires Node
+  24; DB validation skipped live `schema_migrations` inspection because the local
+  Postgres container was not running. Local provider credential posture remains a
+  warning because `.env.example` defaults to demo Postgres/metadata-only invoice
+  evidence settings.
+- Remaining caveat: PolyCost records and verifies the retention proof manifest,
+  digest, object pointer, and object version metadata after upload. It still does
+  not call every cloud provider control plane itself or replace legal/invoice
+  system-of-record review.
+
 ## Deviations from spec log
 
 Every implementation divergence from `00` through `11` should be logged here with
