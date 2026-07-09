@@ -111,6 +111,7 @@ async function assertPhaseEvidenceAnchors() {
     'npm run vsdx:visual-evidence:check',
     'npm run diagram:llm-corpus:check',
     'npm run diagram:llm-corpus:capture:smoke',
+    'npm run diagram:llm-corpus:drift:check',
     'npm run enterprise:idp:evidence:check',
   ]);
   assertScriptIncludes(packageJson, 'ci:unit', [
@@ -438,6 +439,14 @@ async function assertPhaseEvidenceAnchors() {
     ['raw prompt payload guard', 'findForbiddenRawPayloads'],
   ]);
 
+  await assertFileContains('scripts/diagram-llm-corpus-drift-check.mjs', [
+    ['diagram LLM drift profile schema', 'polycost-diagram-llm-corpus-drift/v1'],
+    ['diagram LLM drift check schema', 'polycost-diagram-llm-corpus-drift-check/v1'],
+    ['require live model mode', '--require-live-model'],
+    ['false-positive review guard', 'falsePositiveRegister'],
+    ['unreviewed mismatch threshold', 'maxUnreviewedMismatches'],
+  ]);
+
   await assertFileContains('scripts/enterprise-idp-pilot-evidence-check.mjs', [
     ['enterprise IdP evidence schema', 'polycost-enterprise-idp-pilot-evidence/v1'],
     ['enterprise IdP check schema', 'polycost-enterprise-idp-pilot-evidence-check/v1'],
@@ -510,6 +519,17 @@ async function assertPhaseEvidenceAnchors() {
     ],
   );
 
+  await assertFileContains(
+    'docs/operations/evidence/diagram-llm-corpus-drift/diagram-llm-corpus-drift.example.json',
+    [
+      ['diagram LLM drift profile schema', 'polycost-diagram-llm-corpus-drift/v1'],
+      ['sample-only monitoring level', 'example-schema'],
+      ['baseline service-type accuracy', '"serviceTypeAccuracy": 1'],
+      ['false positive register', '"falsePositiveRegister": []'],
+      ['unreviewed mismatch threshold', '"maxUnreviewedMismatches": 0'],
+    ],
+  );
+
   await assertFileContains('docs/operations/evidence/enterprise-idp-pilot-evidence.example.json', [
     ['enterprise IdP evidence schema', 'polycost-enterprise-idp-pilot-evidence/v1'],
     ['sample-only evidence level', 'example-schema'],
@@ -559,6 +579,13 @@ async function assertPhaseEvidenceAnchors() {
     ['no endpoint call boundary', 'does not call the model endpoint'],
   ]);
 
+  await assertFileContains('docs/architecture/phase-2-diagram-llm-corpus-drift-monitoring.md', [
+    ['diagram LLM drift architecture note', 'Phase 2 Diagram LLM Corpus Drift Monitoring'],
+    ['diagram LLM drift command', 'npm run diagram:llm-corpus:drift:check'],
+    ['live model strict mode', '--require-live-model'],
+    ['false-positive review boundary', 'false-positive/mismatch review record'],
+  ]);
+
   await assertFileContains('docs/architecture/phase-2-enterprise-idp-pilot-evidence.md', [
     ['enterprise IdP pilot architecture note', 'Phase 2 Enterprise IdP Pilot Evidence'],
     ['enterprise IdP evidence command', 'npm run enterprise:idp:evidence:check'],
@@ -601,6 +628,7 @@ async function assertPhaseEvidenceAnchors() {
     ['VSDX visual evidence checker ledger', 'npm run vsdx:visual-evidence:check'],
     ['diagram LLM corpus checker ledger', 'npm run diagram:llm-corpus:check'],
     ['diagram LLM capture smoke ledger', 'npm run diagram:llm-corpus:capture:smoke'],
+    ['diagram LLM drift checker ledger', 'npm run diagram:llm-corpus:drift:check'],
     ['enterprise IdP pilot checker ledger', 'npm run enterprise:idp:evidence:check'],
     ['invoice-of-record pilot checker ledger', 'npm run invoice:record:evidence:check'],
     ['Terraform destination capture checker ledger', 'npm run terraform:evidence:capture:smoke'],

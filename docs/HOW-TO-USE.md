@@ -37,6 +37,11 @@ Natural-language mode:
   `npm run diagram:llm-corpus:capture -- --require-live-model --profile <profile.json> --output <bundle.json>`,
   and verify it before demo claims with
   `npm run diagram:llm-corpus:check -- --require-live-model <bundle.json>`.
+- For ongoing production monitoring, compare each sanitized live bundle against the
+  accepted baseline with
+  `npm run diagram:llm-corpus:drift:check -- --require-live-model --profile <profile.json>`
+  before claiming the classifier is still within its reviewed drift and
+  false-positive budget.
 
 Guided-form mode:
 

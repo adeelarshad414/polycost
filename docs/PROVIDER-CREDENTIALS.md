@@ -40,8 +40,11 @@ Before claiming production diagram-classifier quality, archive a sanitized corpu
 prediction artifact, assemble a standard evidence bundle with
 `npm run diagram:llm-corpus:capture -- --require-live-model --profile <profile.json> --output <bundle.json>`,
 then run `npm run diagram:llm-corpus:check -- --require-live-model <bundle.json>`.
-The checked-in capture and evidence examples validate the format only; they do not
-prove live model quality.
+For ongoing monitoring, run
+`npm run diagram:llm-corpus:drift:check -- --require-live-model --profile <profile.json>`
+against the sanitized bundle and reviewed false-positive register. The checked-in
+capture, drift, and evidence examples validate the format only; they do not prove
+live model quality.
 
 Before claiming managed enterprise IdP readiness, run a customer-specific pilot
 against Okta, Microsoft Entra, Auth0, Google Workspace, generic OIDC, or generic

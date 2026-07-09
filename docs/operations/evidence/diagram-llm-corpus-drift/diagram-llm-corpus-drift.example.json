@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "polycost-diagram-llm-corpus-drift/v1",
+  "monitoringName": "tier-3-diagram-classifier-drift-example",
+  "monitoringLevel": "example-schema",
+  "productionClaim": false,
+  "evaluatedAt": "2026-07-09T00:00:00.000Z",
+  "corpusSha256": "74205fe6854b302d636d2f505be06ff68faed7d88330fcc388438ca06f0e269f",
+  "paths": {
+    "corpus": "../../../../fixtures/diagrams/llm-corpus/diagram-llm-corpus.v1.json",
+    "evidence": "../diagram-llm-corpus-evidence.example.json"
+  },
+  "baselineMetrics": {
+    "caseCount": 12,
+    "predictionCount": 12,
+    "categoryAccuracy": 1,
+    "serviceTypeAccuracy": 1,
+    "highConfidenceCoverage": 1
+  },
+  "thresholds": {
+    "minCategoryAccuracy": 0.9,
+    "minServiceTypeAccuracy": 0.8,
+    "minHighConfidenceCoverage": 0.75,
+    "maxCategoryAccuracyDrop": 0.05,
+    "maxServiceTypeAccuracyDrop": 0.1,
+    "maxNewMismatches": 0,
+    "maxUnreviewedMismatches": 0
+  },
+  "falsePositiveRegister": [],
+  "operatorAttestations": {
+    "productionEndpointReviewed": false,
+    "driftReviewed": false,
+    "rawPromptsExcluded": true,
+    "rawSecretsExcluded": true,
+    "productionClaimedByPolyCost": false,
+    "operator": "example-only"
+  },
+  "caveats": [
+    "This is sanitized sample drift-monitoring evidence for CI/schema validation only.",
+    "A real production monitoring bundle must use monitoringLevel=live-model-monitoring and evidenceLevel=live-model.",
+    "False-positive and mismatch review must reference sanitized case IDs only; raw prompts, raw responses, API keys, and authorization headers must stay out of evidence."
+  ]
+}

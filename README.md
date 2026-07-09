@@ -354,9 +354,12 @@ Limits and safety behavior:
   Use `npm run diagram:llm-corpus:capture:smoke` for the checked-in sample contract.
 - Validate production classifier quality with
   `npm run diagram:llm-corpus:check -- --require-live-model <bundle.json>`.
+- Monitor ongoing classifier drift and reviewed false positives with
+  `npm run diagram:llm-corpus:drift:check -- --require-live-model --profile <profile.json>`.
   The checked-in sample validates the contract only and is not production LLM proof.
   See `docs/architecture/phase-2-diagram-llm-corpus-evidence.md` and
-  `docs/architecture/phase-2-diagram-llm-corpus-evidence-capture.md`.
+  `docs/architecture/phase-2-diagram-llm-corpus-evidence-capture.md` plus
+  `docs/architecture/phase-2-diagram-llm-corpus-drift-monitoring.md`.
 
 ## Common Commands
 
