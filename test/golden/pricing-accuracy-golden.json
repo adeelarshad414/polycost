@@ -1,0 +1,104 @@
+{
+  "meta": {
+    "description": "Golden accuracy dataset. Each workload is priced by PolyCost and compared, per provider, against the real AWS/Azure/GCP Pricing Calculator monthly total within a tolerance. This is the proof that 'PolyCost's numbers equal a manual provider calculation'.",
+    "hoursPerMonth": 730,
+    "howToCapture": [
+      "1. For each workload below, open the AWS, Azure, and GCP public pricing calculators.",
+      "2. Configure the equivalent resources (same region, on-demand, same size/quantity).",
+      "3. Read the calculator's monthly total and put it in expected.<provider>.calculatorMonthlyUsd.",
+      "4. Set capturedAt to the date you captured it and keep source specific (SKU + region).",
+      "5. Leave calculatorMonthlyUsd null to run that provider in report-only (capture) mode.",
+      "6. Run: npm run pricing:accuracy:golden  (against a running stack; live mode for real numbers)."
+    ],
+    "toleranceNote": "tolerancePercent is the allowed absolute deviation between PolyCost's monthly total and the calculator total before the row is marked FAIL."
+  },
+  "workloads": [
+    {
+      "id": "compute-2x8-linux-2nodes",
+      "description": "2 x general-purpose 2 vCPU / 8 GB Linux on-demand instances, no storage/db/network. The most predictable reference: monthly = hourlyRate x 2 x 730.",
+      "nws": {
+        "schemaVersion": "1.0",
+        "metadata": { "sourceType": "structured_form", "createdAt": "2026-08-21T00:00:00.000Z" },
+        "workload": {
+          "name": "golden-compute-only",
+          "type": "web_app",
+          "region": { "preference": "us-east-1", "isDefault": false }
+        },
+        "compute": [
+          { "role": "web", "vcpu": 2, "memoryGb": 8, "instanceCount": 2, "scalingType": "fixed" }
+        ],
+        "storage": [],
+        "database": [],
+        "network": { "cdn": false, "loadBalancer": false },
+        "availability": { "multiAz": false, "multiRegion": false }
+      },
+      "expected": {
+        "aws": {
+          "calculatorMonthlyUsd": 140.16,
+          "tolerancePercent": 10,
+          "source": "AWS Pricing Calculator: m6i.large us-east-1 Linux on-demand $0.096/hr x 2 x 730h",
+          "capturedAt": "2026-08-21",
+          "note": "Reference derived from list price; re-capture from calculator to confirm."
+        },
+        "azure": {
+          "calculatorMonthlyUsd": 140.16,
+          "tolerancePercent": 10,
+          "source": "Azure Pricing Calculator: D2s v5 eastus Linux pay-as-you-go $0.096/hr x 2 x 730h",
+          "capturedAt": "2026-08-21",
+          "note": "Reference derived from list price; re-capture from calculator to confirm."
+        },
+        "gcp": {
+          "calculatorMonthlyUsd": null,
+          "tolerancePercent": 12,
+          "source": "GCP: capture n2-standard-2 us-central1 WITH sustained-use discount",
+          "note": "Report-only: PolyCost may select the cheapest equivalent (e.g. ARM t2a-standard-2, which has no SUD) instead of n2. Compare both SKUs in the calculator."
+        }
+      }
+    },
+    {
+      "id": "web-small-fullstack",
+      "description": "2 x 2 vCPU / 8 GB compute, 100 GB SSD block storage, 100 GB managed PostgreSQL, 500 GB monthly internet egress. Exercises compute + storage + database + egress together.",
+      "nws": {
+        "schemaVersion": "1.0",
+        "metadata": { "sourceType": "structured_form", "createdAt": "2026-08-21T00:00:00.000Z" },
+        "workload": {
+          "name": "golden-web-small",
+          "type": "web_app",
+          "expectedUsers": { "dailyActiveUsers": 5000, "peakConcurrentUsers": 600 },
+          "region": { "preference": "us-east-1", "isDefault": false }
+        },
+        "compute": [
+          { "role": "web", "vcpu": 2, "memoryGb": 8, "instanceCount": 2, "scalingType": "fixed" }
+        ],
+        "storage": [
+          { "role": "app-data", "type": "block", "sizeGb": 100, "accessPattern": "frequent" }
+        ],
+        "database": [
+          { "role": "primary", "engine": "postgres", "sizeGb": 100, "highAvailability": false }
+        ],
+        "network": { "estimatedMonthlyEgressGb": 500, "cdn": false, "loadBalancer": false },
+        "availability": { "multiAz": false, "multiRegion": false }
+      },
+      "expected": {
+        "aws": {
+          "calculatorMonthlyUsd": null,
+          "tolerancePercent": 12,
+          "source": "AWS: m6i.large x2 + 100GB gp3 + RDS PostgreSQL db.m6g.large + 500GB egress (first 100GB free)",
+          "note": "Report-only until captured. Watch DB storage: PolyCost historically dropped managed-DB allocated storage (see PRICING-ACCURACY-AUDIT.md H1)."
+        },
+        "azure": {
+          "calculatorMonthlyUsd": null,
+          "tolerancePercent": 12,
+          "source": "Azure: D2s v5 x2 + 100GB Premium SSD + Azure Database for PostgreSQL Flexible + 500GB egress (first 100GB free)",
+          "note": "Report-only until captured."
+        },
+        "gcp": {
+          "calculatorMonthlyUsd": null,
+          "tolerancePercent": 12,
+          "source": "GCP: n2-standard-2 x2 (with SUD) + 100GB PD Balanced + Cloud SQL PostgreSQL + 500GB egress",
+          "note": "Report-only until captured."
+        }
+      }
+    }
+  ]
+}

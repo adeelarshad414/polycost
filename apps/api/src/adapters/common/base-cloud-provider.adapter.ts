@@ -556,7 +556,27 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       pricingModels?: PricingModelCost[];
     } = {},
   ): ProviderPricingLineItem {
-    const cost = this.monthlyCost(record, quantity);
+    let cost = this.monthlyCost(record, quantity);
+
+    // GCP applies Sustained-Use Discounts automatically to eligible Compute
+    // Engine on-demand usage. Without this, a steady full-month GCP VM was
+    // over-costed by ~20-30% versus an actual bill. Committed-use and spot
+    // pricing are handled separately (off list price) and must NOT stack SUD,
+    // so this only touches the on-demand headline cost.
+    const sustainedUseDiscount = this.sustainedUseDiscountRate(category, record);
+    let listMonthlyCostUsd: number | undefined;
+    if (sustainedUseDiscount > 0 && cost.monthlyCostUsd > 0) {
+      listMonthlyCostUsd = cost.monthlyCostUsd;
+      const discountedMonthly = this.roundCurrency(
+        listMonthlyCostUsd * (1 - sustainedUseDiscount),
+      );
+      cost = {
+        ...cost,
+        monthlyCostUsd: discountedMonthly,
+        hourlyCostUsd: this.roundCurrency(discountedMonthly / HOURS_PER_MONTH),
+      };
+    }
+
     const displayRegion =
       typeof record.attributes?.regionFallbackFrom === 'string'
         ? record.attributes.regionFallbackFrom
@@ -605,6 +625,12 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
         pricingTermCode,
         paymentOptionCode,
         rateCurrency,
+        ...(sustainedUseDiscount > 0 && listMonthlyCostUsd !== undefined
+          ? {
+              sustainedUseDiscountPercent: this.roundCurrency(sustainedUseDiscount * 100),
+              listMonthlyCostUsd,
+            }
+          : {}),
       }),
       ...(cost.egressTiers && cost.egressTiers.length > 0 ? { egressTiers: cost.egressTiers } : {}),
       ...(options.pricingModels ? { pricingModels: options.pricingModels } : {}),
@@ -724,6 +750,49 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     }
 
     return 1;
+  }
+
+  /**
+   * Maximum GCP Compute Engine sustained-use discount for eligible on-demand
+   * machine families running a full month (the default 730h steady profile).
+   * Returns 0 for non-GCP, non-compute, non-on-demand, or ineligible families
+   * (E2, Tau T2*, and newer C3/C4/N4/H3/Z3 which do not offer SUD).
+   */
+  private sustainedUseDiscountRate(
+    category: ServiceCategory,
+    record: PricingCatalogRecord,
+  ): number {
+    if (this.providerId !== 'gcp' || category !== 'compute') {
+      return 0;
+    }
+
+    const pricingModel =
+      typeof record.attributes?.pricingModel === 'string'
+        ? record.attributes.pricingModel
+        : 'on-demand';
+    if (pricingModel !== 'on-demand') {
+      return 0;
+    }
+
+    const family = this.gcpMachineFamily(record);
+    return family ? (GCP_SUSTAINED_USE_DISCOUNT_RATES[family] ?? 0) : 0;
+  }
+
+  private gcpMachineFamily(record: PricingCatalogRecord): string | undefined {
+    const haystack = [
+      this.stringAttribute(record, 'machineType'),
+      this.stringAttribute(record, 'instanceType'),
+      record.skuDescription,
+      record.skuId,
+    ]
+      .filter((value): value is string => typeof value === 'string' && value.length > 0)
+      .join(' ')
+      .toLowerCase();
+    // Longer family tokens first so n2d/c2d/c3d win over n2/c2/c3.
+    const match = haystack.match(
+      /\b(n2d|c2d|c3d|n1|n2|n4|c2|c3|c4|m1|m2|m3|a2|a3|g2|e2|t2d|t2a|h3|z3)\b/,
+    );
+    return match?.[1];
   }
 
   private savingsPercent(candidateMonthlyCostUsd: number, onDemandMonthlyCostUsd: number): number {
@@ -1169,6 +1238,23 @@ function normalizeStorageClass(value: string): StorageClass | undefined {
   return undefined;
 }
 
+// Maximum GCP Compute Engine sustained-use discount by eligible machine family.
+// N1 predefined/custom reaches ~30% at full month; N2/N2D/C2/C2D/M-series and
+// A2/A3/G2 reach ~20%. E2, Tau T2*, and newer C3/C4/N4/H3/Z3 have no SUD.
+const GCP_SUSTAINED_USE_DISCOUNT_RATES: Record<string, number> = {
+  n1: 0.3,
+  n2: 0.2,
+  n2d: 0.2,
+  c2: 0.2,
+  c2d: 0.2,
+  m1: 0.2,
+  m2: 0.2,
+  m3: 0.2,
+  a2: 0.2,
+  a3: 0.2,
+  g2: 0.2,
+};
+
 function catalogPricingTrace(input: {
   providerId: ProviderId;
   category: ServiceCategory;
@@ -1183,6 +1269,8 @@ function catalogPricingTrace(input: {
   pricingTermCode?: string;
   paymentOptionCode?: string;
   rateCurrency: string;
+  sustainedUseDiscountPercent?: number;
+  listMonthlyCostUsd?: number;
 }): PricingTrace {
   const lineage = pricingLineageForCatalogRecord(input.record);
   const sourceRecordKey = pricingSourceRecordKey({
@@ -1194,12 +1282,17 @@ function catalogPricingTrace(input: {
     effectiveDate: input.record.effectiveDate,
   });
   const hourlyUnit = isHourlyUnit(input.record.unit);
-  const expression =
+  const hasSustainedUseDiscount =
+    typeof input.sustainedUseDiscountPercent === 'number' && input.sustainedUseDiscountPercent > 0;
+  const baseExpression =
     input.pricingBasis === 'tiered'
       ? `${input.quantity} ${input.record.unit} through provider tiered rate card`
       : `${input.record.unitPriceUsd} USD/${input.record.unit} x ${input.quantity}${
           hourlyUnit ? ` x ${HOURS_PER_MONTH} hour-month standard` : ''
         }`;
+  const expression = hasSustainedUseDiscount
+    ? `${baseExpression} x (1 - ${(input.sustainedUseDiscountPercent as number) / 100} GCP sustained-use discount)`
+    : baseExpression;
 
   return {
     providerId: input.providerId,
@@ -1229,6 +1322,12 @@ function catalogPricingTrace(input: {
       monthlyCostUsd: input.monthlyCostUsd,
       hourlyCostUsd: input.hourlyCostUsd,
       ...(hourlyUnit ? { monthlyHours: HOURS_PER_MONTH } : {}),
+      ...(hasSustainedUseDiscount
+        ? {
+            sustainedUseDiscountPercent: input.sustainedUseDiscountPercent,
+            listMonthlyCostUsd: input.listMonthlyCostUsd,
+          }
+        : {}),
     },
     equivalenceConfidence: input.isApproximate ? 'approximate' : 'direct',
     ...(input.pricingTermCode ? { pricingTermCode: input.pricingTermCode } : {}),

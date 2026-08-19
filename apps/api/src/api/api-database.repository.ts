@@ -143,6 +143,8 @@ interface PricingCacheHealthRow {
   catalog_success_rows: string | number | null;
   catalog_partial_rows: string | number | null;
   catalog_failed_rows: string | number | null;
+  mock_catalog_rows: string | number | null;
+  seeded_catalog_rows: string | number | null;
   rate_success_rows: string | number | null;
   rate_partial_rows: string | number | null;
   rate_failed_rows: string | number | null;
@@ -878,6 +880,9 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         : undefined;
       const catalogRows = toCount(cacheRow?.catalog_rows);
       const currentRateRows = toCount(cacheRow?.current_rate_rows);
+      const mockRows = toCount(cacheRow?.mock_catalog_rows);
+      const seededRows = toCount(cacheRow?.seeded_catalog_rows);
+      const provenance = catalogProvenance(catalogRows, mockRows, seededRows);
       const cacheFreshness: DataHealthResponse['providers'][number]['cache']['freshness'] =
         cacheAgeHours === undefined
           ? 'missing'
@@ -909,10 +914,15 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
               : catalogRows === 0 && currentRateRows === 0
                 ? 'No cached pricing rows are available for this provider.'
                 : 'No successful provider sync has been recorded.';
+      const provenanceMessage =
+        provenance === 'live' || provenance === 'unknown'
+          ? message
+          : `${message} NOTE: this pricing is ${provenanceLabel(provenance)}, not live ${provider.providerId.toUpperCase()} data — recency does not imply real prices. Do not use for production cost decisions until USE_MOCK_PROVIDERS=false and the pricing ETL has run with provider credentials.`;
 
       return {
         ...provider,
         freshness,
+        provenance,
         ...(ageHours !== undefined ? { ageHours } : {}),
         cache: {
           catalogRows,
@@ -931,10 +941,10 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
             failed: toCount(cacheRow?.catalog_failed_rows) + toCount(cacheRow?.rate_failed_rows),
           },
         },
-        message,
+        message: provenanceMessage,
       };
     });
-    const alerts = providers
+    const freshnessAlerts = providers
       .filter((provider) => provider.freshness !== 'fresh')
       .map((provider) => ({
         providerId: provider.providerId,
@@ -944,6 +954,27 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
             : ('warning' as const),
         message: provider.message,
       }));
+    // Non-live pricing is a distinct, always-surfaced warning: without it the
+    // badge could read "fresh" while serving mock/seed data. This is the fix for
+    // the freshness-vs-authenticity gap.
+    const provenanceAlerts = providers
+      .filter(
+        (provider) =>
+          provider.provenance === 'mock' ||
+          provider.provenance === 'seeded' ||
+          provider.provenance === 'mixed',
+      )
+      .map((provider) => ({
+        providerId: provider.providerId,
+        severity: 'warning' as const,
+        message: `${provider.providerId.toUpperCase()} is serving ${provenanceLabel(
+          provider.provenance,
+        )} — not live provider pricing. Set USE_MOCK_PROVIDERS=false and run the pricing ETL with credentials before using these numbers for real decisions.`,
+      }));
+    const alerts = [...freshnessAlerts, ...provenanceAlerts];
+    const dataProvenance = rollUpProvenance(providers.map((provider) => provider.provenance));
+    const usesNonLivePricing =
+      dataProvenance === 'mock' || dataProvenance === 'seeded' || dataProvenance === 'mixed';
     const overallStatus = alerts.some((alert) => alert.severity === 'critical')
       ? 'degraded'
       : alerts.length > 0
@@ -954,6 +985,8 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
       generatedAt: now.toISOString(),
       freshnessPolicyHours: DATA_FRESHNESS_POLICY_HOURS,
       overallStatus,
+      dataProvenance,
+      usesNonLivePricing,
       alertCount: alerts.length,
       alerts,
       providers,
@@ -971,7 +1004,14 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
                  MAX(fetched_at) AS latest_catalog_sync_at,
                  COUNT(*) FILTER (WHERE sync_status = 'success') AS catalog_success_rows,
                  COUNT(*) FILTER (WHERE sync_status = 'partial') AS catalog_partial_rows,
-                 COUNT(*) FILTER (WHERE sync_status = 'failed') AS catalog_failed_rows
+                 COUNT(*) FILTER (WHERE sync_status = 'failed') AS catalog_failed_rows,
+                 COUNT(*) FILTER (
+                   WHERE COALESCE(source_endpoint, '') LIKE 'fixture://%'
+                      OR COALESCE(attributes->>'source', '') = 'mock_provider'
+                 ) AS mock_catalog_rows,
+                 COUNT(*) FILTER (
+                   WHERE COALESCE(attributes->>'source', '') = 'local_seed'
+                 ) AS seeded_catalog_rows
           FROM pricing_catalog
           GROUP BY provider
         ),
@@ -1006,6 +1046,8 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
                COALESCE(catalog.catalog_success_rows, 0) AS catalog_success_rows,
                COALESCE(catalog.catalog_partial_rows, 0) AS catalog_partial_rows,
                COALESCE(catalog.catalog_failed_rows, 0) AS catalog_failed_rows,
+               COALESCE(catalog.mock_catalog_rows, 0) AS mock_catalog_rows,
+               COALESCE(catalog.seeded_catalog_rows, 0) AS seeded_catalog_rows,
                COALESCE(rates.rate_success_rows, 0) AS rate_success_rows,
                COALESCE(rates.rate_partial_rows, 0) AS rate_partial_rows,
                COALESCE(rates.rate_failed_rows, 0) AS rate_failed_rows
@@ -5654,4 +5696,67 @@ function maxDefined(...values: Array<number | undefined>): number | undefined {
   const defined = values.filter((value): value is number => value !== undefined);
 
   return defined.length > 0 ? Math.max(...defined) : undefined;
+}
+
+type PricingProvenance = 'live' | 'mock' | 'seeded' | 'mixed' | 'unknown';
+
+/**
+ * Classifies the provenance of a provider's served catalog rows. Live rows are
+ * the complement of mock (fixture://) and seeded (local_seed) rows.
+ */
+function catalogProvenance(
+  catalogRows: number,
+  mockRows: number,
+  seededRows: number,
+): PricingProvenance {
+  if (catalogRows <= 0) {
+    return 'unknown';
+  }
+
+  const nonLiveRows = Math.min(catalogRows, mockRows + seededRows);
+  const liveRows = catalogRows - nonLiveRows;
+
+  if (liveRows === catalogRows) {
+    return 'live';
+  }
+  if (liveRows > 0) {
+    return 'mixed';
+  }
+  // All rows are non-live. If both mock and seed exist, it's mixed non-live;
+  // otherwise label by whichever kind is present (mock takes precedence since
+  // reads prefer mock/live rows over seed rows).
+  if (mockRows > 0 && seededRows > 0) {
+    return 'mixed';
+  }
+  return mockRows > 0 ? 'mock' : 'seeded';
+}
+
+function provenanceLabel(provenance: PricingProvenance): string {
+  switch (provenance) {
+    case 'mock':
+      return 'mock/demo fixture pricing';
+    case 'seeded':
+      return 'local seed pricing';
+    case 'mixed':
+      return 'a mix of mock/seed and live pricing';
+    case 'live':
+      return 'live provider pricing';
+    default:
+      return 'unknown-provenance pricing';
+  }
+}
+
+function rollUpProvenance(provenances: PricingProvenance[]): PricingProvenance {
+  const known = provenances.filter((provenance) => provenance !== 'unknown');
+  if (known.length === 0) {
+    return 'unknown';
+  }
+
+  const unique = new Set(known);
+  if (unique.size === 1) {
+    return [...unique][0];
+  }
+  // Any blend of live + non-live, or mock + seeded, is reported as mixed so the
+  // caller never sees a single clean label that hides non-live data.
+  return 'mixed';
 }

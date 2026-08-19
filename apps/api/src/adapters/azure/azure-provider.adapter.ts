@@ -124,6 +124,15 @@ export class AzureProviderAdapter extends BaseCloudProviderAdapter {
     category: ServiceCategory,
     fetchedAt: string,
   ): PricingCatalogRecord {
+    // Azure Retail Prices meters are priced per a *block* of units declared in
+    // `unitOfMeasure` (e.g. "1 Hour", "10 Hours", "100 Hours", "1 GB/Month").
+    // `unitPrice` is the price for the whole block, so we must divide by the
+    // block quantity to obtain a true per-single-unit rate. Storing the raw
+    // block price against a per-unit unit label overstated any meter with a
+    // quantity > 1 by that factor (up to 100x for "100 Hours" meters).
+    const { quantity, unit } = parseAzureUnitOfMeasure(item.unitOfMeasure);
+    const unitPriceUsd = quantity > 0 ? item.unitPrice / quantity : item.unitPrice;
+
     return {
       provider: this.providerId,
       serviceCategory: category,
@@ -131,8 +140,8 @@ export class AzureProviderAdapter extends BaseCloudProviderAdapter {
       skuId: item.skuId,
       skuDescription: `${item.productName} - ${item.meterName}`,
       region: item.armRegionName,
-      unit: item.unitOfMeasure,
-      unitPriceUsd: item.unitPrice,
+      unit,
+      unitPriceUsd,
       attributes: {
         currencyCode: item.currencyCode,
         sourceEndpoint: AZURE_RETAIL_PRICES_ENDPOINT,
@@ -148,11 +157,47 @@ export class AzureProviderAdapter extends BaseCloudProviderAdapter {
         isPrimaryMeterRegion: item.isPrimaryMeterRegion,
         vcpu: parseAzureVcpu(item.skuName),
         memoryGb: parseAzureMemoryGb(item.armSkuName ?? item.skuName),
+        // Preserve provenance so the block-normalization is auditable.
+        unitOfMeasure: item.unitOfMeasure,
+        unitOfMeasureQuantity: quantity,
+        rawBlockUnitPriceUsd: item.unitPrice,
       },
       effectiveDate: item.effectiveStartDate,
       fetchedAt,
     };
   }
+}
+
+/**
+ * Parses an Azure `unitOfMeasure` string into a numeric block quantity and the
+ * bare unit label. Examples:
+ *   "1 Hour"      -> { quantity: 1,   unit: "Hour" }
+ *   "10 Hours"    -> { quantity: 10,  unit: "Hours" }
+ *   "100 Hours"   -> { quantity: 100, unit: "Hours" }
+ *   "1 GB/Month"  -> { quantity: 1,   unit: "GB/Month" }
+ *   "1/Month"     -> { quantity: 1,   unit: "/Month" }
+ *   "GB"          -> { quantity: 1,   unit: "GB" }   (no leading quantity)
+ * Falls back to quantity 1 and the original string when no valid leading
+ * quantity is present, so a divide-by-zero or unit loss can never occur.
+ */
+export function parseAzureUnitOfMeasure(unitOfMeasure: string | undefined | null): {
+  quantity: number;
+  unit: string;
+} {
+  const raw = (unitOfMeasure ?? '').trim();
+  if (raw.length === 0) {
+    return { quantity: 1, unit: raw };
+  }
+
+  const match = raw.match(/^(?<qty>\d+(?:\.\d+)?)\s*(?<unit>.*)$/);
+  const parsedQuantity = match?.groups?.qty ? Number.parseFloat(match.groups.qty) : NaN;
+
+  if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+    return { quantity: 1, unit: raw };
+  }
+
+  const unitLabel = match?.groups?.unit?.trim() ?? '';
+  return { quantity: parsedQuantity, unit: unitLabel.length > 0 ? unitLabel : raw };
 }
 
 function catalogRefreshCategories(
