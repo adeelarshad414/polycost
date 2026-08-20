@@ -116,15 +116,18 @@ export class GcpProviderAdapter extends BaseCloudProviderAdapter {
       );
 
       for (const service of matchingServices) {
-        records.push(
-          ...(await this.fetchServiceSkus(
-            service.name,
-            category,
-            fetchedAt,
-            token,
-            options.region,
-          )),
+        const serviceSkus = await this.fetchServiceSkus(
+          service.name,
+          category,
+          fetchedAt,
+          token,
+          options.region,
         );
+        // Loop-push (not push(...largeArray)) — a service can expose thousands
+        // of SKUs; spreading them as call arguments would overflow the stack.
+        for (const record of serviceSkus) {
+          records.push(record);
+        }
       }
     }
 
@@ -162,7 +165,10 @@ export class GcpProviderAdapter extends BaseCloudProviderAdapter {
       });
       const parsed = await parseJsonResponse<GcpServicesResponse>(this.providerId, response);
 
-      services.push(...parsed.services);
+      // Loop-push (not push(...array)) to stay overflow-safe on large pages.
+      for (const service of parsed.services) {
+        services.push(service);
+      }
       pageToken = parsed.nextPageToken;
     } while (pageToken);
 
@@ -195,11 +201,12 @@ export class GcpProviderAdapter extends BaseCloudProviderAdapter {
       });
       const parsed = await parseJsonResponse<GcpSkusResponse>(this.providerId, response);
 
-      records.push(
-        ...parsed.skus.flatMap((sku) =>
-          this.normalizeSku(serviceName, sku, category, fetchedAt, region),
-        ),
-      );
+      // Loop-push (not push(...flatMap)) so a large SKU page cannot overflow.
+      for (const sku of parsed.skus) {
+        for (const record of this.normalizeSku(serviceName, sku, category, fetchedAt, region)) {
+          records.push(record);
+        }
+      }
       pageToken = parsed.nextPageToken;
     } while (pageToken);
 

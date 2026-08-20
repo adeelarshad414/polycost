@@ -251,6 +251,49 @@ describe('AzureProviderAdapter', () => {
     expect(result.baseMonthlyCostUsd).toBe(140.16);
   });
 
+  it('does not overflow the stack on a very large page (regression for push(...spread))', async () => {
+    // The old code did `records.push(...items.map(...))`; an array beyond ~125k
+    // elements throws "Maximum call stack size exceeded" when spread as call
+    // arguments. Azure's unfiltered global catalog easily exceeds that.
+    const N = 150_000;
+    const items = Array.from({ length: N }, (_, i) => ({
+      currencyCode: 'USD',
+      retailPrice: 0.01,
+      unitPrice: 0.01,
+      armRegionName: 'eastus',
+      effectiveStartDate: '2026-01-01T00:00:00Z',
+      meterId: `m${i}`,
+      meterName: `Meter ${i}`,
+      productId: `p${i}`,
+      skuId: `SKU-${i}`,
+      productName: 'Virtual Machines Dsv5 Series',
+      skuName: 'D2s v5',
+      serviceName: 'Virtual Machines',
+      serviceFamily: 'Compute',
+      unitOfMeasure: '1 Hour',
+      type: 'Consumption',
+      isPrimaryMeterRegion: true,
+      armSkuName: 'Standard_D2s_v5',
+    }));
+    const fetchClient = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ Items: items }))
+      .mockResolvedValue(jsonResponse({ Items: [] })) as unknown as FetchLike;
+    const adapter = new AzureProviderAdapter(
+      new InMemoryPricingCatalogReader([]),
+      'eastus',
+      fetchClient,
+      () => new Date('2026-06-28T00:00:00.000Z'),
+    );
+
+    const records = await adapter.refreshPricingCatalog({
+      categories: ['compute'],
+      fetchedAt: '2026-06-28T00:00:00.000Z',
+    });
+
+    expect(records).toHaveLength(N);
+  }, 30_000);
+
   it('filters live Azure pricing by requested service id', async () => {
     const fetchClient = jest.fn(async () =>
       jsonResponse(fixture('test/fixtures/pricing/azure/retail-storage.json')),

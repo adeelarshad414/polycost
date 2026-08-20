@@ -67,10 +67,20 @@ export class AzureProviderAdapter extends BaseCloudProviderAdapter {
   ): Promise<PricingCatalogRecord[]> {
     const categories = catalogRefreshCategories(options.categories);
     const fetchedAt = options.fetchedAt ?? this.now().toISOString();
+    // Default to the adapter's region so the Retail Prices $filter is scoped to
+    // one armRegionName. Without it the boot ETL pulls the entire global catalog
+    // (hundreds of thousands of meters), which is wasteful and — via the old
+    // push(...spread) — overflowed the call stack.
+    const region = options.region ?? this.defaultRegion;
     const records: PricingCatalogRecord[] = [];
 
     for (const category of categories) {
-      records.push(...(await this.fetchCategory(category, fetchedAt, options.region)));
+      const categoryRecords = await this.fetchCategory(category, fetchedAt, region);
+      // Accumulate with a loop, never `push(...largeArray)` — spreading a large
+      // array as call arguments throws "Maximum call stack size exceeded".
+      for (const record of categoryRecords) {
+        records.push(record);
+      }
     }
 
     return records;
@@ -111,7 +121,10 @@ export class AzureProviderAdapter extends BaseCloudProviderAdapter {
           response,
         );
 
-        records.push(...parsed.Items.map((item) => this.normalizeItem(item, category, fetchedAt)));
+        // Loop-push (not push(...map)) so a large page cannot overflow the stack.
+        for (const item of parsed.Items) {
+          records.push(this.normalizeItem(item, category, fetchedAt));
+        }
         nextPageUrl = parsed.NextPageLink;
       }
     }
