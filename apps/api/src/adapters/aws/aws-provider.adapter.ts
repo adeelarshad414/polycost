@@ -111,7 +111,18 @@ export class AwsProviderAdapter extends BaseCloudProviderAdapter {
 
     for (const category of categories) {
       for (const serviceCode of CATEGORY_SERVICE_CODES[category]) {
-        records.push(...(await this.fetchServiceProducts(serviceCode, category, fetchedAt, region)));
+        const serviceRecords = await this.fetchServiceProducts(
+          serviceCode,
+          category,
+          fetchedAt,
+          region,
+        );
+        // Loop-push (not push(...largeArray)) — a region's EC2 catalog can hold
+        // tens of thousands of matched SKUs; spreading them as call arguments
+        // would overflow the stack.
+        for (const record of serviceRecords) {
+          records.push(record);
+        }
       }
     }
 
