@@ -10,6 +10,10 @@ export interface HttpResponseLike {
   };
   text(): Promise<string>;
   arrayBuffer?(): Promise<ArrayBuffer>;
+  // The response body stream, when available (real fetch exposes a web
+  // ReadableStream; tests may inject a Node Readable). Used to stream-parse very
+  // large provider bulk feeds instead of buffering them into memory.
+  body?: unknown;
 }
 
 export type FetchLike = (
@@ -28,16 +32,16 @@ const DEFAULT_HTTP_TIMEOUT_MS = 60_000;
 // hanging and exhausting memory.
 const DEFAULT_HTTP_MAX_RESPONSE_BYTES = 64 * 1024 * 1024;
 
-function positiveIntEnv(name: string, fallback: number): number {
-  const raw = Number(process.env[name]);
-  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : fallback;
+function positiveInt(raw: string | undefined, fallback: number): number {
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
 }
 
 export const defaultFetch: FetchLike = async (input, init) => {
   const controller = new AbortController();
   const timeout = setTimeout(
     () => controller.abort(),
-    positiveIntEnv('PROVIDER_HTTP_TIMEOUT_MS', DEFAULT_HTTP_TIMEOUT_MS),
+    positiveInt(process.env.PROVIDER_HTTP_TIMEOUT_MS, DEFAULT_HTTP_TIMEOUT_MS),
   );
 
   try {
@@ -54,8 +58,8 @@ export async function parseJsonResponse<T>(
   providerId: ProviderId,
   response: HttpResponseLike,
 ): Promise<T> {
-  const maxBytes = positiveIntEnv(
-    'PROVIDER_HTTP_MAX_RESPONSE_BYTES',
+  const maxBytes = positiveInt(
+    process.env.PROVIDER_HTTP_MAX_RESPONSE_BYTES,
     DEFAULT_HTTP_MAX_RESPONSE_BYTES,
   );
   const declaredLength = Number(response.headers?.get('content-length') ?? '');

@@ -1,6 +1,7 @@
 /* eslint-disable security/detect-non-literal-fs-filename -- Reviewed 2026-07-06: fixture reads are resolved from repository-controlled test data; see docs/SECURITY-SUPPRESSIONS.md. */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { Readable } from 'node:stream';
 import { InMemoryPricingCatalogReader } from '../common/in-memory-pricing-catalog.reader';
 import { FetchLike } from '../common/http-client';
 import { PricingCatalogRecord } from '../common/cloud-provider-adapter';
@@ -190,8 +191,46 @@ describe('AwsProviderAdapter', () => {
       }),
     );
     expect(fetchClient).toHaveBeenCalledWith(
-      'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/index.json',
+      'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/us-east-1/index.json',
     );
+  });
+
+  it('stream-parses the bulk price list when the response exposes a body stream', async () => {
+    // The real ~480MB EC2 index must be streamed, not buffered. Providing a body
+    // stream (and a text() that throws) proves the streaming path is taken and
+    // yields the same normalized records as the buffered path.
+    const catalog = awsBulkFixture('test/fixtures/pricing/aws/get-products-ec2.json');
+    const fetchClient = jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      body: Readable.from(JSON.stringify(catalog)),
+      text: async () => {
+        throw new Error('streaming path must not buffer the body via text()');
+      },
+    })) as unknown as FetchLike;
+    const adapter = new AwsProviderAdapter(
+      new InMemoryPricingCatalogReader([]),
+      'us-east-1',
+      fetchClient,
+      () => new Date('2026-06-28T00:00:00.000Z'),
+    );
+
+    const records = await adapter.refreshPricingCatalog({
+      categories: ['compute'],
+      fetchedAt: '2026-06-28T00:00:00.000Z',
+    });
+
+    expect(records).toEqual([
+      expect.objectContaining({
+        provider: 'aws',
+        serviceCategory: 'compute',
+        skuId: 'AWS-EC2-T3SMALL',
+        unit: 'Hrs',
+        unitPriceUsd: 0.0208,
+      }),
+    ]);
+    expect(records[0].attributes).toEqual(expect.objectContaining({ vcpu: 2, memoryGb: 2 }));
   });
 
   it('normalizes AWS reserved terms when hourly recurring dimensions exist', async () => {

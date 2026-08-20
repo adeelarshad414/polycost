@@ -64,7 +64,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
 
   protected constructor(
     private readonly catalogReader: PricingCatalogReader,
-    private readonly defaultRegion: string,
+    protected readonly defaultRegion: string,
   ) {}
 
   async priceWorkload(input: unknown): Promise<ProviderPricingResult> {
