@@ -379,11 +379,28 @@ function awsProductMatchesCategory(
   }
 
   switch (category) {
-    case 'compute':
-      return (
+    case 'compute': {
+      const isComputeProduct =
         product.attributes.instanceType !== undefined ||
-        normalizedProductFamily(product).includes('compute')
+        normalizedProductFamily(product).includes('compute');
+      if (!isComputeProduct) {
+        return false;
+      }
+      // Keep only the standard on-demand rate: Linux, Shared tenancy, no
+      // pre-installed software, used (not capacity-reserved) capacity, on-demand
+      // market. Without this, "cheapest-wins" selection could pick a Windows,
+      // Dedicated, capacity-reservation, or Spot SKU. Attributes that are absent
+      // (e.g. sparse fixtures) are treated as matching so nothing is over-filtered.
+      const { operatingSystem, tenancy, preInstalledSw, capacitystatus, marketoption } =
+        product.attributes;
+      return (
+        (operatingSystem === undefined || operatingSystem === 'Linux') &&
+        (tenancy === undefined || tenancy === 'Shared') &&
+        (preInstalledSw === undefined || preInstalledSw === 'NA') &&
+        (capacitystatus === undefined || capacitystatus === 'Used') &&
+        (marketoption === undefined || marketoption === 'OnDemand')
       );
+    }
     case 'network':
       return (
         normalizedProductFamily(product).includes('data transfer') ||

@@ -189,6 +189,42 @@ describe('GcpProviderAdapter', () => {
     expect(derivation?.monthlyCostUsd).toBe(113.3);
   });
 
+  it('does not offer a savings-plan pricing model (GCP has none)', async () => {
+    const records: PricingCatalogRecord[] = [
+      {
+        provider: 'gcp',
+        serviceCategory: 'compute',
+        serviceName: 'Compute Engine E2',
+        skuId: 'GCP-E2-STANDARD-2',
+        region: 'us-central1',
+        unit: 'hour',
+        unitPriceUsd: 0.067,
+        effectiveDate: '2026-01-01T00:00:00Z',
+        fetchedAt: '2026-06-28T00:00:00.000Z',
+      },
+    ];
+    const adapter = new GcpProviderAdapter(
+      new InMemoryPricingCatalogReader(records),
+      'us-central1',
+      secretsReader(),
+    );
+
+    const result = await adapter.priceWorkload({
+      schemaVersion: '1.0',
+      metadata: { sourceType: 'structured_form', createdAt: '2026-06-28T00:00:00.000Z' },
+      workload: { type: 'web_app', region: { preference: 'us-central1', isDefault: false } },
+      compute: [{ role: 'web', scalingType: 'fixed', instanceCount: 1 }],
+      storage: [],
+      database: [],
+      network: { cdn: false, loadBalancer: false },
+      availability: { multiAz: false, multiRegion: false },
+    });
+
+    const models = (result.lineItems[0].pricingModels ?? []).map((m) => m.model);
+    expect(models).not.toContain('savings-plan');
+    expect(models).toContain('spot'); // spot estimate is still offered
+  });
+
   it('filters live GCP pricing by requested service id', async () => {
     const fetchClient = jest
       .fn()
