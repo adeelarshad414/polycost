@@ -294,6 +294,69 @@ describe('AzureProviderAdapter', () => {
     expect(records).toHaveLength(N);
   }, 30_000);
 
+  it('excludes Spot / Low-Priority / DevTest meters from the on-demand catalog', async () => {
+    const base = {
+      currencyCode: 'USD',
+      retailPrice: 0.096,
+      unitPrice: 0.096,
+      armRegionName: 'eastus',
+      effectiveStartDate: '2026-01-01T00:00:00Z',
+      productId: 'p',
+      productName: 'Virtual Machines Dsv5 Series',
+      serviceName: 'Virtual Machines',
+      serviceFamily: 'Compute',
+      unitOfMeasure: '1 Hour',
+      isPrimaryMeterRegion: true,
+      armSkuName: 'Standard_D2s_v5',
+    };
+    const page = {
+      Items: [
+        { ...base, meterId: 'm1', meterName: 'D2s v5', skuId: 'OD', skuName: 'D2s v5', type: 'Consumption' },
+        {
+          ...base,
+          meterId: 'm2',
+          meterName: 'D2s v5 Spot',
+          skuId: 'SPOT',
+          skuName: 'D2s v5 Spot',
+          unitPrice: 0.0038,
+          type: 'Consumption',
+        },
+        {
+          ...base,
+          meterId: 'm3',
+          meterName: 'D2s v5 Low Priority',
+          skuId: 'LOW',
+          skuName: 'D2s v5 Low Priority',
+          unitPrice: 0.02,
+          type: 'Consumption',
+        },
+        {
+          ...base,
+          meterId: 'm4',
+          meterName: 'D2s v5',
+          skuId: 'DEVTEST',
+          skuName: 'D2s v5',
+          type: 'DevTestConsumption',
+        },
+      ],
+    };
+    const fetchClient = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(page))
+      .mockResolvedValue(jsonResponse({ Items: [] })) as unknown as FetchLike;
+    const adapter = new AzureProviderAdapter(
+      new InMemoryPricingCatalogReader([]),
+      'eastus',
+      fetchClient,
+      () => new Date('2026-06-28T00:00:00.000Z'),
+    );
+
+    const records = await adapter.refreshPricingCatalog({ categories: ['compute'] });
+
+    // Only the true on-demand meter survives.
+    expect(records.map((r) => r.skuId)).toEqual(['OD']);
+  });
+
   it('filters live Azure pricing by requested service id', async () => {
     const fetchClient = jest.fn(async () =>
       jsonResponse(fixture('test/fixtures/pricing/azure/retail-storage.json')),
