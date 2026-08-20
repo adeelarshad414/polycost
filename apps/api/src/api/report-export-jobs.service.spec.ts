@@ -45,6 +45,8 @@ const dataHealth: DataHealthResponse = {
   generatedAt: '2026-07-01T00:00:00.000Z',
   freshnessPolicyHours: 48,
   overallStatus: 'fresh',
+  dataProvenance: 'live',
+  usesNonLivePricing: false,
   alertCount: 0,
   alerts: [],
   providers: [
@@ -52,6 +54,7 @@ const dataHealth: DataHealthResponse = {
       providerId: 'aws',
       status: 'success',
       freshness: 'fresh',
+      provenance: 'live',
       ageHours: 1,
       recordsUpdated: 12,
       recordsRejected: 0,

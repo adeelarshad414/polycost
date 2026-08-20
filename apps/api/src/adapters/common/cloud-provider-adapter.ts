@@ -88,6 +88,10 @@ export interface PricingTrace {
     monthlyCostUsd: number;
     hourlyCostUsd?: number;
     monthlyHours?: number;
+    // GCP Compute Engine sustained-use discount, when applied. `listMonthlyCostUsd`
+    // is the pre-discount on-demand cost so the derivation stays fully auditable.
+    listMonthlyCostUsd?: number;
+    sustainedUseDiscountPercent?: number;
   };
   equivalenceConfidence?: 'direct' | 'approximate' | 'modeled';
   pricingTermCode?: string;

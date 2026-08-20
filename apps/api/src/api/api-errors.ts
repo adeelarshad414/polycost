@@ -74,6 +74,13 @@ export interface DataHealthResponse {
   generatedAt: string;
   freshnessPolicyHours: number;
   overallStatus: 'fresh' | 'stale' | 'degraded';
+  // Provenance of the pricing actually being served, independent of freshness.
+  // 'live' = real provider APIs; 'mock' = in-repo fixtures; 'seeded' = local
+  // seed catalog; 'mixed' = a combination; 'unknown' = no pricing rows.
+  // `usesNonLivePricing` is true whenever any served pricing is not live, so a
+  // caller can never mistake demo/seed data for real provider prices.
+  dataProvenance: 'live' | 'mock' | 'seeded' | 'mixed' | 'unknown';
+  usesNonLivePricing: boolean;
   alertCount: number;
   alerts: Array<{
     providerId?: ProviderId;
@@ -84,6 +91,7 @@ export interface DataHealthResponse {
     providerId: ProviderId;
     status: 'success' | 'partial' | 'failed';
     freshness: 'fresh' | 'stale' | 'missing' | 'failed';
+    provenance: 'live' | 'mock' | 'seeded' | 'mixed' | 'unknown';
     lastSuccessfulRun?: string;
     ageHours?: number;
     recordsUpdated: number;

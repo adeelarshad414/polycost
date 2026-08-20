@@ -148,6 +148,47 @@ describe('GcpProviderAdapter', () => {
     expect(result.baseMonthlyCostUsd).toBe(97.82);
   });
 
+  it('applies the GCP sustained-use discount to eligible on-demand compute (N2)', async () => {
+    // N2 is SUD-eligible (20%). E2 (above) is not, which is why it stays at list.
+    const records: PricingCatalogRecord[] = [
+      {
+        provider: 'gcp',
+        serviceCategory: 'compute',
+        serviceName: 'Compute Engine N2',
+        skuId: 'GCP-N2-STANDARD-2',
+        region: 'us-central1',
+        unit: 'hour',
+        unitPriceUsd: 0.097,
+        attributes: { machineType: 'n2-standard-2', pricingModel: 'on-demand' },
+        effectiveDate: '2026-01-01T00:00:00Z',
+        fetchedAt: '2026-06-28T00:00:00.000Z',
+      },
+    ];
+    const adapter = new GcpProviderAdapter(
+      new InMemoryPricingCatalogReader(records),
+      'us-central1',
+      secretsReader(),
+    );
+
+    const result = await adapter.priceWorkload({
+      schemaVersion: '1.0',
+      metadata: { sourceType: 'structured_form', createdAt: '2026-06-28T00:00:00.000Z' },
+      workload: { type: 'web_app', region: { preference: 'us-central1', isDefault: false } },
+      compute: [{ role: 'web', scalingType: 'fixed', instanceCount: 2 }],
+      storage: [],
+      database: [],
+      network: { cdn: false, loadBalancer: false },
+      availability: { multiAz: false, multiRegion: false },
+    });
+
+    // List: 0.097 x 2 x 730 = 141.62; with 20% SUD -> 113.30 (not 141.62).
+    expect(result.baseMonthlyCostUsd).toBe(113.3);
+    const derivation = result.lineItems[0].pricingTrace?.derivation;
+    expect(derivation?.sustainedUseDiscountPercent).toBe(20);
+    expect(derivation?.listMonthlyCostUsd).toBe(141.62);
+    expect(derivation?.monthlyCostUsd).toBe(113.3);
+  });
+
   it('filters live GCP pricing by requested service id', async () => {
     const fetchClient = jest
       .fn()

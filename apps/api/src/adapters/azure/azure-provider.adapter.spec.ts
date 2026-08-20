@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { InMemoryPricingCatalogReader } from '../common/in-memory-pricing-catalog.reader';
 import { FetchLike } from '../common/http-client';
 import { PricingCatalogRecord } from '../common/cloud-provider-adapter';
-import { AzureProviderAdapter } from './azure-provider.adapter';
+import { AzureProviderAdapter, parseAzureUnitOfMeasure } from './azure-provider.adapter';
 
 const fixture = <T>(relativePath: string): T =>
   JSON.parse(readFileSync(resolve(__dirname, '../../../../..', relativePath), 'utf8')) as T;
@@ -44,12 +44,14 @@ describe('AzureProviderAdapter', () => {
         serviceName: 'Virtual Machines',
         skuId: 'AZURE-D2S-V5',
         region: 'eastus',
-        unit: '1 Hour',
+        unit: 'Hour',
         unitPriceUsd: 0.0416,
         attributes: expect.objectContaining({
           pricingModel: 'on-demand',
           vcpu: 2,
           memoryGb: 8,
+          unitOfMeasure: '1 Hour',
+          unitOfMeasureQuantity: 1,
         }),
       }),
     ]);
@@ -132,6 +134,73 @@ describe('AzureProviderAdapter', () => {
     });
 
     expect(result.baseMonthlyCostUsd).toBe(60.74);
+  });
+
+  it('divides block-priced meters ("N Hours"/"N GB") to a true per-unit rate', async () => {
+    // Regression for the unit-of-measure blocker: a meter priced per "100 Hours"
+    // must be normalized to per-hour, not stored as a 100x-inflated hourly rate.
+    const blockMeter = {
+      Items: [
+        {
+          currencyCode: 'USD',
+          retailPrice: 3.2,
+          unitPrice: 3.2, // price for the whole 100-hour block
+          armRegionName: 'eastus',
+          effectiveStartDate: '2026-01-01T00:00:00Z',
+          meterId: 'azure-meter-block',
+          meterName: 'Standard Data Processed',
+          productId: 'azure-product-block',
+          skuId: 'AZURE-BLOCK-100H',
+          productName: 'Some Metered Service',
+          skuName: 'Std S1',
+          serviceName: 'Some Service',
+          serviceFamily: 'Compute',
+          unitOfMeasure: '100 Hours',
+          type: 'Consumption',
+          isPrimaryMeterRegion: true,
+          armSkuName: 'Standard_S1',
+        },
+      ],
+    };
+    const fetchClient = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(blockMeter))
+      .mockResolvedValueOnce(jsonResponse({ Items: [] })) as FetchLike;
+    const adapter = new AzureProviderAdapter(
+      new InMemoryPricingCatalogReader([]),
+      'eastus',
+      fetchClient,
+      () => new Date('2026-06-28T00:00:00.000Z'),
+    );
+
+    const records = await adapter.refreshPricingCatalog({ categories: ['compute'] });
+
+    expect(records).toHaveLength(1);
+    // 3.2 / 100 = 0.032 per hour, NOT 3.2.
+    expect(records[0].unitPriceUsd).toBeCloseTo(0.032, 6);
+    expect(records[0].unit).toBe('Hours');
+    expect(records[0].attributes?.unitOfMeasureQuantity).toBe(100);
+    expect(records[0].attributes?.rawBlockUnitPriceUsd).toBe(3.2);
+  });
+
+  describe('parseAzureUnitOfMeasure', () => {
+    it.each([
+      ['1 Hour', 1, 'Hour'],
+      ['10 Hours', 10, 'Hours'],
+      ['100 Hours', 100, 'Hours'],
+      ['1 GB/Month', 1, 'GB/Month'],
+      ['100 GB', 100, 'GB'],
+      ['1/Month', 1, '/Month'],
+      ['GB', 1, 'GB'],
+      ['', 1, ''],
+    ])('parses %j into quantity %d and unit %j', (input, quantity, unit) => {
+      expect(parseAzureUnitOfMeasure(input as string)).toEqual({ quantity, unit });
+    });
+
+    it('never divides by zero or drops the unit on malformed input', () => {
+      expect(parseAzureUnitOfMeasure('0 Hours')).toEqual({ quantity: 1, unit: '0 Hours' });
+      expect(parseAzureUnitOfMeasure(undefined)).toEqual({ quantity: 1, unit: '' });
+    });
   });
 
   it('filters live Azure pricing by requested service id', async () => {

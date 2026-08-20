@@ -130,6 +130,7 @@
     "invoice:evidence:verify:fixture": "node scripts/invoice-evidence-packet-verifier.mjs test/fixtures/billing/invoice-evidence-packet.valid.json",
     "invoice:evidence:verify:smoke": "node scripts/invoice-evidence-packet-verifier-smoke.mjs",
     "live:verify": "node scripts/live-verification.mjs",
+    "pricing:accuracy:golden": "node scripts/pricing-accuracy-harness.mjs",
     "hooks:install": "node scripts/install-hooks.mjs",
     "security:audit": "npm audit --audit-level=high",
     "security:suppressions": "node scripts/security-suppression-check.mjs",

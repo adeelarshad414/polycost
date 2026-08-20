@@ -331,6 +331,8 @@ describe('ApiDatabaseRepository', () => {
       generatedAt: '2026-07-01T00:00:00.000Z',
       freshnessPolicyHours: 48,
       overallStatus: 'degraded',
+      dataProvenance: 'live',
+      usesNonLivePricing: false,
       alertCount: 2,
       alerts: [
         {
@@ -389,6 +391,63 @@ describe('ApiDatabaseRepository', () => {
         }),
       ],
     });
+  });
+
+  it('never reports fresh-live when the served catalog is mock/seeded data', async () => {
+    const repository = createRepository(
+      jest
+        .fn()
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              provider: 'aws',
+              status: 'success',
+              records_updated: 30,
+              records_rejected: 0,
+              records_skipped: 0,
+              last_successful_run: new Date('2026-07-01T00:00:00.000Z'),
+            },
+          ],
+          rowCount: 1,
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              provider: 'aws',
+              catalog_rows: '30',
+              current_rate_rows: '18',
+              latest_catalog_sync_at: new Date('2026-07-01T00:00:00.000Z'),
+              latest_rate_sync_at: new Date('2026-07-01T00:00:00.000Z'),
+              catalog_success_rows: '30',
+              catalog_partial_rows: '0',
+              catalog_failed_rows: '0',
+              // All 30 rows are mock fixtures (fixture:// source_endpoint).
+              mock_catalog_rows: '30',
+              seeded_catalog_rows: '0',
+              rate_success_rows: '18',
+              rate_partial_rows: '0',
+              rate_failed_rows: '0',
+            },
+          ],
+          rowCount: 1,
+        }),
+    );
+
+    const health = await repository.getDataHealth(new Date('2026-07-01T00:00:00.000Z'));
+
+    // Timestamp recency alone would have said "fresh"; provenance must override.
+    expect(health.dataProvenance).toBe('mock');
+    expect(health.usesNonLivePricing).toBe(true);
+    // Never "fresh" over non-live data (here also degraded because the other
+    // providers have no data at all in this fixture).
+    expect(health.overallStatus).not.toBe('fresh');
+    expect(health.providers[0].provenance).toBe('mock');
+    expect(health.providers[0].message).toMatch(/mock\/demo fixture pricing/i);
+    expect(
+      health.alerts.some(
+        (alert) => alert.providerId === 'aws' && /not live provider pricing/i.test(alert.message),
+      ),
+    ).toBe(true);
   });
 
   it('creates, transitions, and reads report export jobs', async () => {
