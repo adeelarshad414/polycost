@@ -474,14 +474,21 @@ function normalizeStorageTier(record: PricingCatalogRecord): NormalizedStorageTi
   if (text.includes('archive')) {
     return 'archive';
   }
-  if (text.includes('cool') || text.includes('infrequent') || text.includes('nearline')) {
+  if (
+    text.includes('cool') ||
+    text.includes('infrequent') ||
+    text.includes('nearline') ||
+    text.includes('coldline')
+  ) {
     return 'infrequent_access';
   }
-  if (text.includes('standard') || text.includes('hot') || text.includes('general purpose')) {
-    return 'standard';
-  }
-
-  return undefined;
+  // Everything else that reached here is a priced (GB-month) storage record with
+  // frequent/standard access: object Standard/Hot AND all block/managed-disk
+  // performance tiers (Balanced, SSD, Premium, Extreme, Hyperdisk, Ultra). Those
+  // are performance tiers, not access tiers, and were previously dropped when the
+  // description lacked a "standard/hot" keyword. Default to standard so they are
+  // priced instead of silently omitted.
+  return 'standard';
 }
 
 function normalizeEgressRecord(record: PricingCatalogRecord): NormalizedEgressTierRateRecord[] {

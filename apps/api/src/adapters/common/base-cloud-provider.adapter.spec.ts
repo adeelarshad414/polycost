@@ -205,7 +205,7 @@ describe('BaseCloudProviderAdapter', () => {
       expect.objectContaining({
         expression: '0.02 USD/GB-Mo x 100',
         quantity: 100,
-        hourlyCostUsd: 0,
+        hourlyCostUsd: 0.00274, // 100/730 x 0.02 as a 6dp rate (was rounded to 0)
         monthlyCostUsd: 2,
       }),
     );
