@@ -216,6 +216,23 @@ export class PostgresPricingCatalogRepository
     };
   }
 
+  async pruneStaleLiveRows(provider: ProviderId, fetchedAt: string): Promise<number> {
+    const pool = await this.getPool();
+    // Delete only live (provider-fetched) rows older than this run's generation.
+    // Seed rows (null source_endpoint) and mock rows (fixture://) are preserved
+    // as fallback data and are never live, so they are untouched.
+    const result = await pool.query(
+      `
+        DELETE FROM pricing_catalog
+        WHERE provider = $1
+          AND source_endpoint LIKE 'https://%'
+          AND fetched_at < $2
+      `,
+      [provider, fetchedAt],
+    );
+    return result.rowCount ?? 0;
+  }
+
   async upsertNormalizedPricingRecords(
     records: PricingCatalogRecord[],
   ): Promise<PricingCatalogWriteResult> {
