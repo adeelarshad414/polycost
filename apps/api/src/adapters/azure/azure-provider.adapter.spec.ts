@@ -203,6 +203,54 @@ describe('AzureProviderAdapter', () => {
     });
   });
 
+  it('does not let an undefined-spec cheap row out-rank a properly-specced instance', async () => {
+    // Regression: a compute row missing memoryGb must not masquerade as the
+    // "smallest fit" and win on price over a row that actually declares 2/8.
+    const records: PricingCatalogRecord[] = [
+      {
+        provider: 'azure',
+        serviceCategory: 'compute',
+        serviceName: 'Underspecified VM',
+        skuId: 'AZURE-UNKNOWN-CHEAP',
+        region: 'eastus',
+        unit: '1 Hour',
+        unitPriceUsd: 0.02,
+        attributes: { vcpu: 2, pricingModel: 'on-demand' }, // no memoryGb
+        effectiveDate: '2026-01-01T00:00:00Z',
+        fetchedAt: '2026-06-28T00:00:00.000Z',
+      },
+      {
+        provider: 'azure',
+        serviceCategory: 'compute',
+        serviceName: 'Virtual Machines D2s v5',
+        skuId: 'AZURE-D2S-V5',
+        region: 'eastus',
+        unit: '1 Hour',
+        unitPriceUsd: 0.096,
+        attributes: { vcpu: 2, memoryGb: 8, pricingModel: 'on-demand' },
+        effectiveDate: '2026-01-01T00:00:00Z',
+        fetchedAt: '2026-06-28T00:00:00.000Z',
+      },
+    ];
+    const adapter = new AzureProviderAdapter(new InMemoryPricingCatalogReader(records), 'eastus');
+
+    const result = await adapter.priceWorkload({
+      schemaVersion: '1.0',
+      metadata: { sourceType: 'structured_form', createdAt: '2026-06-28T00:00:00.000Z' },
+      workload: { type: 'web_app', region: { preference: 'eastus', isDefault: false } },
+      compute: [{ role: 'web', vcpu: 2, memoryGb: 8, instanceCount: 2, scalingType: 'fixed' }],
+      storage: [],
+      database: [],
+      network: { cdn: false, loadBalancer: false },
+      availability: { multiAz: false, multiRegion: false },
+    });
+
+    // Picks the properly-specced 2/8 D2s v5 (0.096 x 2 x 730 = 140.16),
+    // NOT the cheaper undefined-memory row (0.02 -> 29.20).
+    expect(result.lineItems[0].skuId).toBe('AZURE-D2S-V5');
+    expect(result.baseMonthlyCostUsd).toBe(140.16);
+  });
+
   it('filters live Azure pricing by requested service id', async () => {
     const fetchClient = jest.fn(async () =>
       jsonResponse(fixture('test/fixtures/pricing/azure/retail-storage.json')),

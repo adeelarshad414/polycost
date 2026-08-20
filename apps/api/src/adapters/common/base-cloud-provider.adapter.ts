@@ -902,9 +902,17 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
   }
 
   private resourceFitRank(record: PricingCatalogRecord): number {
+    // Lower rank = better fit; among predicate-passing candidates the smallest
+    // adequate instance wins, with price breaking ties. A row that does not
+    // declare vcpu/memory must NOT masquerade as the "smallest" (rank 0) and
+    // out-rank a properly-specced instance — it is ranked worst so it is only
+    // chosen when nothing better-specified exists.
+    const UNKNOWN_SPEC_PENALTY = 1_000_000_000;
+    const vcpu = this.numberAttribute(record, 'vcpu');
+    const memoryGb = this.numberAttribute(record, 'memoryGb');
     return (
-      (this.numberAttribute(record, 'vcpu') ?? 0) * 1000 +
-      (this.numberAttribute(record, 'memoryGb') ?? 0)
+      (vcpu === undefined ? UNKNOWN_SPEC_PENALTY : vcpu * 1000) +
+      (memoryGb === undefined ? UNKNOWN_SPEC_PENALTY : memoryGb)
     );
   }
 
