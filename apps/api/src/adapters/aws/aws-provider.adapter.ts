@@ -8,7 +8,9 @@ import {
   RefreshPricingCatalogOptions,
   ServiceCategory,
 } from '../common/cloud-provider-adapter';
-import { defaultFetch, FetchLike, parseJsonResponse } from '../common/http-client';
+import { Readable } from 'node:stream';
+import { defaultFetch, FetchLike, HttpResponseLike, parseJsonResponse } from '../common/http-client';
+import { streamAwsBulkPriceList } from './aws-bulk-stream';
 
 interface AwsBulkPriceListResponse {
   products: Record<string, AwsProduct>;
@@ -101,13 +103,15 @@ export class AwsProviderAdapter extends BaseCloudProviderAdapter {
   ): Promise<PricingCatalogRecord[]> {
     const categories = catalogRefreshCategories(options.categories);
     const fetchedAt = options.fetchedAt ?? this.now().toISOString();
+    // Default to the region-specific index (~480MB for EC2). Without a region
+    // the AWS bulk API serves the ALL-regions index (multiple GB), which is
+    // wasteful and impractical to fetch on every refresh.
+    const region = options.region ?? this.defaultRegion;
     const records: PricingCatalogRecord[] = [];
 
     for (const category of categories) {
       for (const serviceCode of CATEGORY_SERVICE_CODES[category]) {
-        records.push(
-          ...(await this.fetchServiceProducts(serviceCode, category, fetchedAt, options.region)),
-        );
+        records.push(...(await this.fetchServiceProducts(serviceCode, category, fetchedAt, region)));
       }
     }
 
@@ -136,9 +140,38 @@ export class AwsProviderAdapter extends BaseCloudProviderAdapter {
       ? `${AWS_BULK_PRICING_ENDPOINT}/${serviceCode}/current/${region}/index.json`
       : `${AWS_BULK_PRICING_ENDPOINT}/${serviceCode}/current/index.json`;
     const response = await this.fetchClient(url);
-    const parsed = await parseJsonResponse<AwsBulkPriceListResponse>(this.providerId, response);
+
+    const parsed = await this.readBulkPriceList(response, serviceCode, category);
 
     return this.normalizeBulkCatalog(parsed, serviceCode, category, fetchedAt, region);
+  }
+
+  /**
+   * The AWS EC2 region index is ~480 MB and OOMs a whole-buffer JSON.parse.
+   * When the response exposes a body stream (real fetch), stream-parse it and
+   * keep only the SKUs matching this category. Fall back to buffered parsing
+   * when no stream is available (e.g. small mocked responses in tests).
+   */
+  private async readBulkPriceList(
+    response: HttpResponseLike,
+    serviceCode: string,
+    category: ServiceCategory,
+  ): Promise<AwsBulkPriceListResponse> {
+    if (!response.ok) {
+      // Delegate to the buffered path purely to raise the standard AdapterApiError.
+      return parseJsonResponse<AwsBulkPriceListResponse>(this.providerId, response);
+    }
+
+    const bodyStream = toNodeReadable(response.body);
+    if (bodyStream) {
+      const streamed = await streamAwsBulkPriceList<AwsProduct, AwsOnDemandTerm>(
+        bodyStream,
+        (product) => awsProductMatchesCategory(product, category, serviceCode),
+      );
+      return streamed as unknown as AwsBulkPriceListResponse;
+    }
+
+    return parseJsonResponse<AwsBulkPriceListResponse>(this.providerId, response);
   }
 
   private normalizeBulkCatalog(
@@ -263,6 +296,20 @@ export class AwsProviderAdapter extends BaseCloudProviderAdapter {
       })
       .slice(0, 1);
   }
+}
+
+function toNodeReadable(body: unknown): Readable | undefined {
+  if (!body) {
+    return undefined;
+  }
+  if (body instanceof Readable) {
+    return body;
+  }
+  // Web ReadableStream (what the global fetch Response exposes) -> Node Readable.
+  if (typeof (body as { getReader?: unknown }).getReader === 'function') {
+    return Readable.fromWeb(body as Parameters<typeof Readable.fromWeb>[0]);
+  }
+  return undefined;
 }
 
 function catalogRefreshCategories(
