@@ -123,6 +123,12 @@ export class AzureProviderAdapter extends BaseCloudProviderAdapter {
 
         // Loop-push (not push(...map)) so a large page cannot overflow the stack.
         for (const item of parsed.Items) {
+          // Spot / Low-Priority / DevTest meters are `Consumption` type but are
+          // NOT standard on-demand prices; ingesting them let them masquerade as
+          // on-demand and made Azure compute look 10-90% too cheap.
+          if (isExcludedAzureMeter(item)) {
+            continue;
+          }
           records.push(this.normalizeItem(item, category, fetchedAt));
         }
         nextPageUrl = parsed.NextPageLink;
@@ -278,6 +284,36 @@ function parseAzureMemoryGb(skuName: string): number | undefined {
     default:
       return undefined;
   }
+}
+
+/**
+ * Spot and Low-Priority meters are `Consumption`-type but priced far below and
+ * differently from on-demand (interruptible, no capacity guarantee). They must
+ * not be ingested as on-demand pricing.
+ */
+function isSpotOrLowPriorityAzureMeter(item: AzureRetailPriceItem): boolean {
+  const raw = [item.meterName, item.skuName, item.productName, item.armSkuName]
+    .filter((value): value is string => typeof value === 'string' && value.length > 0)
+    .join(' ')
+    .toLowerCase();
+  // Normalize word separators to spaces and pad, so ` spot ` matches on a word
+  // boundary without a (ReDoS-flagged) regex and handles `_`/`-` delimited SKUs.
+  const padded = ` ${raw.replaceAll('_', ' ').replaceAll('-', ' ')} `;
+  return (
+    padded.includes(' spot ') || padded.includes(' low priority ') || raw.includes('lowpriority')
+  );
+}
+
+/**
+ * Meters to drop from the catalog: DevTest (and any non-standard price type) plus
+ * Spot/Low-Priority. Standard on-demand (`Consumption`) and `Reservation` meters
+ * are kept.
+ */
+function isExcludedAzureMeter(item: AzureRetailPriceItem): boolean {
+  if (item.type !== 'Consumption' && item.type !== 'Reservation') {
+    return true;
+  }
+  return isSpotOrLowPriorityAzureMeter(item);
 }
 
 function azurePricingModel(
