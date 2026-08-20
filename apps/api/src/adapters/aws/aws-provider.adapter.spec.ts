@@ -233,6 +233,70 @@ describe('AwsProviderAdapter', () => {
     expect(records[0].attributes).toEqual(expect.objectContaining({ vcpu: 2, memoryGb: 2 }));
   });
 
+  it('keeps only the standard Linux/Shared/Used/OnDemand EC2 SKU (excludes Windows/Dedicated/Spot/capacity-reservation)', async () => {
+    const onDemandTerm = (sku: string, usd: string) => ({
+      [`${sku}.OD`]: {
+        effectiveDate: '2026-01-01T00:00:00Z',
+        priceDimensions: {
+          [`${sku}.OD.1`]: { unit: 'Hrs', description: 'hr', pricePerUnit: { USD: usd } },
+        },
+      },
+    });
+    const attrs = (extra: Record<string, string>) => ({
+      servicecode: 'AmazonEC2',
+      location: 'US East (N. Virginia)',
+      regionCode: 'us-east-1',
+      instanceType: 'm6i.large',
+      vcpu: '2',
+      memory: '8 GiB',
+      operatingSystem: 'Linux',
+      tenancy: 'Shared',
+      preInstalledSw: 'NA',
+      capacitystatus: 'Used',
+      marketoption: 'OnDemand',
+      ...extra,
+    });
+    const product = (sku: string, extra: Record<string, string>) => ({
+      sku,
+      productFamily: 'Compute Instance',
+      attributes: attrs(extra),
+    });
+    const catalog = {
+      products: {
+        OK: product('OK', {}),
+        WIN: product('WIN', { operatingSystem: 'Windows' }),
+        DED: product('DED', { tenancy: 'Dedicated' }),
+        SPOT: product('SPOT', { marketoption: 'Spot' }),
+        CAPRES: product('CAPRES', { capacitystatus: 'AllocatedCapacityReservation' }),
+      },
+      terms: {
+        OnDemand: {
+          OK: onDemandTerm('OK', '0.1000000000'),
+          WIN: onDemandTerm('WIN', '0.0500000000'),
+          DED: onDemandTerm('DED', '0.0200000000'),
+          SPOT: onDemandTerm('SPOT', '0.0100000000'),
+          CAPRES: onDemandTerm('CAPRES', '0.0000000000'),
+        },
+        Reserved: {},
+      },
+      publicationDate: '2026-01-01T00:00:00Z',
+    };
+    const fetchClient = jest.fn(async () => jsonResponse(catalog)) as FetchLike;
+    const adapter = new AwsProviderAdapter(
+      new InMemoryPricingCatalogReader([]),
+      'us-east-1',
+      fetchClient,
+      () => new Date('2026-06-28T00:00:00.000Z'),
+    );
+
+    const records = await adapter.refreshPricingCatalog({
+      categories: ['compute'],
+      fetchedAt: '2026-06-28T00:00:00.000Z',
+    });
+
+    expect(records.map((r) => r.skuId)).toEqual(['OK']);
+  });
+
   it('normalizes AWS reserved terms when hourly recurring dimensions exist', async () => {
     const bulkCatalog = awsBulkFixture('test/fixtures/pricing/aws/get-products-ec2.json') as {
       terms: { Reserved: Record<string, unknown> };

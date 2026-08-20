@@ -489,11 +489,21 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       });
     }
 
-    for (const pricingModel of ESTIMATED_COMPUTE_PRICING_MODELS) {
+    for (const pricingModel of this.estimatedComputePricingModels()) {
       models.push(this.estimatedComputePricingModel(pricingModel, onDemandRecord, quantity));
     }
 
     return models;
+  }
+
+  private estimatedComputePricingModels(): PricingModelKey[] {
+    // GCP has no "Savings Plan" construct — its commitment discounts are modeled
+    // as reserved (committed-use). Emitting a savings-plan model for GCP would
+    // fabricate a pricing option that does not exist on the provider.
+    if (this.providerId === 'gcp') {
+      return ESTIMATED_COMPUTE_PRICING_MODELS.filter((model) => model !== 'savings-plan');
+    }
+    return ESTIMATED_COMPUTE_PRICING_MODELS;
   }
 
   private matchesPricingModel(
