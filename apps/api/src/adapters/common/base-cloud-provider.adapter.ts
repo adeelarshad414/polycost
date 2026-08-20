@@ -192,7 +192,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     const baseMonthlyCostUsd = this.roundCurrency(
       lineItems.reduce((sum, item) => sum + item.baseMonthlyCostUsd, 0),
     );
-    const baseHourlyCostUsd = this.roundCurrency(
+    const baseHourlyCostUsd = this.roundRate(
       lineItems.reduce(
         (sum, item) => sum + (item.baseHourlyCostUsd ?? item.baseMonthlyCostUsd / HOURS_PER_MONTH),
         0,
@@ -583,7 +583,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       cost = {
         ...cost,
         monthlyCostUsd: discountedMonthly,
-        hourlyCostUsd: this.roundCurrency(discountedMonthly / HOURS_PER_MONTH),
+        hourlyCostUsd: this.roundRate(discountedMonthly / HOURS_PER_MONTH),
       };
     }
 
@@ -655,7 +655,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       const monthlyCostUsd = this.roundCurrency(calculateEgressCost(tiers, quantity));
 
       return {
-        hourlyCostUsd: this.roundCurrency(monthlyCostUsd / HOURS_PER_MONTH),
+        hourlyCostUsd: this.roundRate(monthlyCostUsd / HOURS_PER_MONTH),
         monthlyCostUsd,
         pricingBasis: 'tiered',
         egressTiers,
@@ -667,7 +667,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     );
 
     return {
-      hourlyCostUsd: this.roundCurrency(
+      hourlyCostUsd: this.roundRate(
         this.hourlyQuantity(record.unit, quantity) * record.unitPriceUsd,
       ),
       monthlyCostUsd,
@@ -695,7 +695,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     const onDemandCost = this.monthlyCost(onDemandRecord, quantity);
     const factor = this.estimatedDiscountFactor(pricingModel);
     const monthlyCostUsd = this.roundCurrency(onDemandCost.monthlyCostUsd * factor);
-    const hourlyCostUsd = this.roundCurrency(monthlyCostUsd / HOURS_PER_MONTH);
+    const hourlyCostUsd = this.roundRate(monthlyCostUsd / HOURS_PER_MONTH);
 
     return {
       model: pricingModel,
@@ -1163,6 +1163,16 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
 
   protected roundCurrency(value: number): number {
     return Math.round((value + Number.EPSILON) * 100) / 100;
+  }
+
+  /**
+   * Rounds an hourly RATE (not a total) to 6 decimal places. Hourly rates are
+   * often sub-cent (e.g. $0.0136/hr), so rounding them to whole cents made
+   * hourly x 730 disagree with the monthly total. Monthly and longer totals
+   * still round to cents via roundCurrency.
+   */
+  protected roundRate(value: number): number {
+    return Math.round((value + Number.EPSILON) * 1_000_000) / 1_000_000;
   }
 }
 

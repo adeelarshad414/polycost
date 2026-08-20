@@ -120,6 +120,35 @@ describe('normalizePricingCatalogRecords', () => {
     );
   });
 
+  it('classifies block/performance disks (e.g. PD Balanced) as standard instead of dropping them', () => {
+    const records: PricingCatalogRecord[] = [
+      {
+        provider: 'gcp',
+        serviceCategory: 'storage',
+        serviceName: 'Compute Engine',
+        skuId: 'GCP-PD-BALANCED',
+        skuDescription: 'Balanced PD Capacity', // no "standard"/"hot" keyword
+        region: 'us-central1',
+        unit: 'gibibyte month',
+        unitPriceUsd: 0.1,
+        attributes: {},
+        effectiveDate,
+        fetchedAt,
+      },
+    ];
+
+    const normalized = normalizePricingCatalogRecords(records);
+
+    expect(normalized.storage).toEqual([
+      expect.objectContaining({
+        provider: 'gcp',
+        region: 'us-central1',
+        tier: 'standard',
+        pricePerGbMonth: 0.1,
+      }),
+    ]);
+  });
+
   it('normalizes storage and egress records into cache tables', () => {
     const records: PricingCatalogRecord[] = [
       {

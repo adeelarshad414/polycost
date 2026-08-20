@@ -88,6 +88,28 @@ const CATEGORY_MATCHERS: Record<CatalogRefreshCategory, RegExp[]> = {
   network: [/network/i, /vpc/i],
 };
 
+// Pin categories with a single well-known primary GCP service to its stable
+// serviceId, so an unrelated service whose display name merely contains
+// "compute"/"storage" (e.g. "Storage Transfer Service") is not swept in.
+// Categories left empty fall back to the display-name matchers above.
+const CATEGORY_SERVICE_IDS: Record<CatalogRefreshCategory, string[]> = {
+  compute: ['6F81-5844-456A'], // Compute Engine
+  storage: ['95FF-2EF5-5EA1'], // Cloud Storage
+  database: [],
+  network: [],
+};
+
+function gcpServiceMatchesCategory(
+  service: { serviceId: string; displayName: string },
+  category: CatalogRefreshCategory,
+): boolean {
+  const pinnedServiceIds = CATEGORY_SERVICE_IDS[category];
+  if (pinnedServiceIds.length > 0) {
+    return pinnedServiceIds.includes(service.serviceId);
+  }
+  return CATEGORY_MATCHERS[category].some((matcher) => matcher.test(service.displayName));
+}
+
 export class GcpProviderAdapter extends BaseCloudProviderAdapter {
   readonly providerId: ProviderId = 'gcp';
 
@@ -112,7 +134,7 @@ export class GcpProviderAdapter extends BaseCloudProviderAdapter {
 
     for (const category of categories) {
       const matchingServices = services.filter((service) =>
-        CATEGORY_MATCHERS[category].some((matcher) => matcher.test(service.displayName)),
+        gcpServiceMatchesCategory(service, category),
       );
 
       for (const service of matchingServices) {

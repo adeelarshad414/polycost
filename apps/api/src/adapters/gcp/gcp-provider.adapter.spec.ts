@@ -189,6 +189,39 @@ describe('GcpProviderAdapter', () => {
     expect(derivation?.monthlyCostUsd).toBe(113.3);
   });
 
+  it('pins the compute category to the Compute Engine serviceId (ignores decoy services)', async () => {
+    const services = {
+      services: [
+        { name: 'services/6F81-5844-456A', serviceId: '6F81-5844-456A', displayName: 'Compute Engine' },
+        // Decoy: display name contains "compute" (old regex would sweep it in),
+        // but a different serviceId — must be ignored.
+        {
+          name: 'services/DECOY-0000-0000',
+          serviceId: 'DECOY-0000-0000',
+          displayName: 'Compute Metadata Service',
+        },
+      ],
+    };
+    const skus = fixture('test/fixtures/pricing/gcp/compute-skus.json');
+    const fetchClient = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(services))
+      .mockResolvedValue(jsonResponse(skus)) as unknown as FetchLike;
+    const adapter = new GcpProviderAdapter(
+      new InMemoryPricingCatalogReader([]),
+      'us-central1',
+      secretsReader(),
+      fetchClient,
+      () => new Date('2026-06-28T00:00:00.000Z'),
+    );
+
+    await adapter.refreshPricingCatalog({ categories: ['compute'] });
+
+    const urls = (fetchClient as unknown as jest.Mock).mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => u.includes('6F81-5844-456A/skus'))).toBe(true);
+    expect(urls.some((u) => u.includes('DECOY-0000-0000'))).toBe(false);
+  });
+
   it('does not offer a savings-plan pricing model (GCP has none)', async () => {
     const records: PricingCatalogRecord[] = [
       {
