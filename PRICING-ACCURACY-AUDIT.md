@@ -6,6 +6,28 @@
 
 ---
 
+## Fix log (2026-08-20 remediation) — merged to `main`
+
+| Finding | Status | PR |
+| --- | --- | --- |
+| B2 freshness honesty | ✅ fixed | #115 |
+| B3 Azure unit-of-measure | ✅ fixed | #115 |
+| B4 GCP sustained-use discount | ✅ fixed (live: n2 → $113.30) | #115 |
+| N1 AWS live OOM/hang | ✅ fixed — streaming + region-specific (live: 2.6GB spool, no OOM) | #116, #117 |
+| N2 compute SKU fit | ✅ fixed | #116 |
+| Azure live ETL stack overflow | ✅ fixed (live: 14k rows, 0 overflow) | #118 |
+| H5 Azure Spot/DevTest leak | ✅ fixed (live: 0 spot ingested) | #119 |
+| Stale-row pruning (found via H5) | ✅ fixed (live: 3336 stale spot → 0) | #120 |
+| H3 GCP savings-plan (fabricated model) | ✅ fixed; rest of H3 already mitigated (reserved uses catalog, spot/savings labeled `estimated`) | #121 |
+| H4 AWS EC2 SKU filtering | ✅ fixed (Linux/Shared/Used/OnDemand only) | #121 |
+| **H1 managed-DB storage dropped** | ✅ **FALSE POSITIVE** — costed via migration-004 seed | — |
+| H2 hourly reconciliation | ⏳ open |  |
+| H6 GCP custom families / serviceId matching | ⏳ open (larger rework) |  |
+| Live AWS/Azure ETL persistence | ✅ resolved by N1/overflow fixes; AWS still network-bound locally |  |
+| GCP live pricing | ⛔ blocked on operator Vault token |  |
+
+---
+
 ## Bottom line
 
 **No — not for that bar.** As shipped, PolyCost is a **decision-grade planning estimator running on static, hand-seeded mock data**, not a live, invoice-accurate calculator.
