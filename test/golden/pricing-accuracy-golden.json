@@ -138,7 +138,7 @@
           "calculatorMonthlyUsd": null,
           "tolerancePercent": 12,
           "source": "AWS: m6i.large x2 + 100GB gp3 + RDS PostgreSQL db.m6g.large + 500GB egress (first 100GB free)",
-          "note": "Report-only until captured. Watch DB storage: PolyCost historically dropped managed-DB allocated storage (see PRICING-ACCURACY-AUDIT.md H1)."
+          "note": "Report-only until captured. DB storage is costed via the migration-004 usage:storage seed row (H1 was a verified false positive)."
         },
         "azure": {
           "calculatorMonthlyUsd": null,

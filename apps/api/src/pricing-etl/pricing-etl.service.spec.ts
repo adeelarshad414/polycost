@@ -472,4 +472,65 @@ describe('PricingEtlService', () => {
       }),
     );
   });
+
+  it('prunes stale live rows for a successfully refreshed provider using the run fetch stamp', async () => {
+    const writer: PricingCatalogWriter = {
+      upsertPricingRecords: jest.fn(async (records) => ({
+        recordsUpdated: records.length,
+        recordsRejected: 0,
+      })),
+      pruneStaleLiveRows: jest.fn(async () => 3),
+    };
+    const runRepository: PricingEtlRunRepository = {
+      recordProviderRun: jest.fn(async () => undefined),
+    };
+    const refreshPricingCatalog = jest.fn(async () => [createCatalogRecord('aws', 'AWS-1')]);
+    const service = new PricingEtlService(
+      [adapter('aws', refreshPricingCatalog)],
+      writer,
+      runRepository,
+      fixedClock(),
+    );
+
+    await service.refreshAllProviders();
+
+    // The adapter is told which fetch generation to stamp rows with.
+    expect(refreshPricingCatalog).toHaveBeenCalledWith(
+      expect.objectContaining({ fetchedAt: '2026-06-28T00:00:00.000Z' }),
+    );
+    // Prune runs once for the provider with the same generation stamp.
+    expect(writer.pruneStaleLiveRows).toHaveBeenCalledTimes(1);
+    expect(writer.pruneStaleLiveRows).toHaveBeenCalledWith('aws', '2026-06-28T00:00:00.000Z');
+  });
+
+  it('does not prune when the provider refresh fails', async () => {
+    const writer: PricingCatalogWriter = {
+      upsertPricingRecords: jest.fn(async () => ({ recordsUpdated: 0, recordsRejected: 0 })),
+      pruneStaleLiveRows: jest.fn(async () => 0),
+    };
+    const runRepository: PricingEtlRunRepository = {
+      recordProviderRun: jest.fn(async () => undefined),
+    };
+    const service = new PricingEtlService(
+      [
+        adapter(
+          'aws',
+          jest.fn(async () => {
+            throw new Error('provider down');
+          }),
+        ),
+      ],
+      writer,
+      runRepository,
+      fixedClock(),
+      undefined,
+      undefined,
+      singleAttemptRetry,
+    );
+
+    await service.refreshAllProviders();
+
+    expect(writer.upsertPricingRecords).not.toHaveBeenCalled();
+    expect(writer.pruneStaleLiveRows).not.toHaveBeenCalled();
+  });
 });

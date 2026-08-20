@@ -48,14 +48,21 @@ export class PricingEtlService {
 
   private async refreshProvider(adapter: CloudProviderAdapter): Promise<PricingEtlProviderResult> {
     const startedAt = this.timestamp();
+    // Single fetch-generation stamp: all rows upserted by this run get this
+    // fetchedAt, so stale live rows from earlier runs can be pruned by age.
+    const fetchedAt = startedAt;
     let result: PricingEtlProviderResult;
 
     try {
-      const records = await this.refreshCatalogWithRetry(adapter);
+      const records = await this.refreshCatalogWithRetry(adapter, fetchedAt);
       const catalogWriteResult = await this.catalogWriter.upsertPricingRecords(records);
       const normalizedWriteResult = this.normalizedPricingWriter
         ? await this.normalizedPricingWriter.upsertNormalizedPricingRecords(records)
         : { recordsUpdated: 0, recordsRejected: 0, recordsSkipped: 0 };
+      // Reconcile: drop live rows the provider no longer returns (discontinued
+      // or now-filtered SKUs) so they cannot pollute selection. Only runs after
+      // a successful fetch + upsert; failed fetches throw before reaching here.
+      await this.catalogWriter.pruneStaleLiveRows?.(adapter.providerId, fetchedAt);
       const recordsUpdated =
         catalogWriteResult.recordsUpdated + normalizedWriteResult.recordsUpdated;
       const recordsRejected =
@@ -105,6 +112,7 @@ export class PricingEtlService {
 
   private async refreshCatalogWithRetry(
     adapter: CloudProviderAdapter,
+    fetchedAt: string,
   ): Promise<PricingCatalogRecord[]> {
     const maxAttempts = Math.max(
       1,
@@ -114,7 +122,7 @@ export class PricingEtlService {
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
-        return await adapter.refreshPricingCatalog();
+        return await adapter.refreshPricingCatalog({ fetchedAt });
       } catch (error) {
         lastError = error;
 
