@@ -38,8 +38,15 @@ const AZURE_FAMILY_RULES: FamilyRule[] = [
 
 const GCP_FAMILY_RULES: FamilyRule[] = [
   { prefix: 'a2', family: 'accelerated-computing' },
+  { prefix: 'a3', family: 'accelerated-computing' },
+  { prefix: 'g2', family: 'accelerated-computing' },
+  // c2d/c3d must precede c2/c3 (prefix match); c4/h3 are modern compute-optimized.
+  { prefix: 'c2d', family: 'compute-optimized' },
   { prefix: 'c2', family: 'compute-optimized' },
+  { prefix: 'c3d', family: 'compute-optimized' },
   { prefix: 'c3', family: 'compute-optimized' },
+  { prefix: 'c4', family: 'compute-optimized' },
+  { prefix: 'h3', family: 'compute-optimized' },
   { prefix: 'e2-micro', family: 'burstable' },
   { prefix: 'e2-small', family: 'burstable' },
   { prefix: 'e2-medium', family: 'burstable' },
@@ -48,8 +55,12 @@ const GCP_FAMILY_RULES: FamilyRule[] = [
   { prefix: 'm2', family: 'memory-optimized' },
   { prefix: 'm3', family: 'memory-optimized' },
   { prefix: 'n1', family: 'general-purpose' },
+  // n2d must precede n2 (prefix match); n4 is a modern general-purpose family.
+  { prefix: 'n2d', family: 'general-purpose' },
   { prefix: 'n2', family: 'general-purpose' },
+  { prefix: 'n4', family: 'general-purpose' },
   { prefix: 't2d', family: 'general-purpose' },
+  { prefix: 't2a', family: 'general-purpose' },
   { prefix: 'z3', family: 'storage-optimized' },
 ];
 

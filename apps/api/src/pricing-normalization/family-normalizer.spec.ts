@@ -24,6 +24,18 @@ describe('normalizeInstanceFamily', () => {
     expect(normalizeInstanceFamily('gcp', 'z3-highmem-8')).toBe('storage-optimized');
   });
 
+  it('normalizes modern GCP machine families (H6.3), keeping d-variants distinct from their base', () => {
+    expect(normalizeInstanceFamily('gcp', 'n2d-standard-16')).toBe('general-purpose');
+    expect(normalizeInstanceFamily('gcp', 'n4-standard-8')).toBe('general-purpose');
+    expect(normalizeInstanceFamily('gcp', 't2a-standard-4')).toBe('general-purpose');
+    expect(normalizeInstanceFamily('gcp', 'c2d-standard-8')).toBe('compute-optimized');
+    expect(normalizeInstanceFamily('gcp', 'c3d-highmem-8')).toBe('compute-optimized');
+    expect(normalizeInstanceFamily('gcp', 'c4-standard-16')).toBe('compute-optimized');
+    expect(normalizeInstanceFamily('gcp', 'h3-standard-88')).toBe('compute-optimized');
+    expect(normalizeInstanceFamily('gcp', 'a3-highgpu-8g')).toBe('accelerated-computing');
+    expect(normalizeInstanceFamily('gcp', 'g2-standard-4')).toBe('accelerated-computing');
+  });
+
   it('returns undefined instead of guessing unknown families', () => {
     expect(normalizeInstanceFamily('aws', 'z99.experimental')).toBeUndefined();
   });
