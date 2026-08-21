@@ -4494,6 +4494,90 @@ describe('BillingService', () => {
     expect(repository.saveInvoiceArtifactBlobAndUpdateEvidence).not.toHaveBeenCalled();
   });
 
+  const wormReconciliation = (verificationStatus: string) => ({
+    id: '66666666-6666-4666-8666-666666666666',
+    importRunId: '55555555-5555-4555-8555-555555555555',
+    comparisonId: comparisonResult.comparisonId,
+    provider: 'aws' as const,
+    estimatedTotalUsd: 100,
+    invoicedTotalUsd: 107,
+    varianceUsd: 7,
+    variancePercent: 7,
+    status: 'variance-warning' as const,
+    evidence: {
+      invoiceGradeArtifactRegister: {
+        artifacts: [
+          {
+            id: 'artifact-1',
+            provider: 'aws',
+            type: 'provider-invoice',
+            displayName: 'June AWS invoice control packet',
+            reference: 'demo://invoice-control',
+            verificationStatus,
+            registeredAt: '2026-07-06T00:00:03.000Z',
+          },
+        ],
+      },
+    },
+    createdAt: '2026-07-06T00:00:02.000Z',
+  });
+  const wormImport = {
+    id: '55555555-5555-4555-8555-555555555555',
+    teamId: identity.teamId,
+    provider: 'aws' as const,
+    sourceType: 'aws-cur' as const,
+    status: 'completed' as const,
+    billingPeriodStart: '2026-06-01',
+    billingPeriodEnd: '2026-06-30',
+    originalFileSha256: 'a'.repeat(64),
+    rowsReceived: 1,
+    rowsAccepted: 1,
+    rowsRejected: 0,
+    totalCostUsd: 107,
+    createdAt: '2026-07-06T00:00:00.000Z',
+  };
+  const wormUpload = {
+    fileName: 'aws-invoice-control.txt',
+    mimeType: 'text/plain',
+    content: 'invoice',
+    encoding: 'text' as const,
+  };
+
+  it('SEC-3: rejects re-upload of an artifact under legal hold (no overwrite)', async () => {
+    const repository = repositoryMock();
+    repository.getInvoiceReconciliation.mockResolvedValue(wormReconciliation('registered'));
+    repository.getBillingImport.mockResolvedValue(wormImport);
+    repository.getInvoiceArtifactBlobLegalHold.mockResolvedValue(true);
+    const service = new BillingService(repository as never);
+
+    await expect(
+      service.uploadInvoiceArtifactBlob(
+        '66666666-6666-4666-8666-666666666666',
+        'artifact-1',
+        wormUpload,
+        identity,
+      ),
+    ).rejects.toThrow(/legal hold/i);
+    expect(repository.saveInvoiceArtifactBlobAndUpdateEvidence).not.toHaveBeenCalled();
+  });
+
+  it('SEC-3: rejects re-upload of a verified (immutable) artifact', async () => {
+    const repository = repositoryMock();
+    repository.getInvoiceReconciliation.mockResolvedValue(wormReconciliation('verified'));
+    repository.getBillingImport.mockResolvedValue(wormImport);
+    const service = new BillingService(repository as never);
+
+    await expect(
+      service.uploadInvoiceArtifactBlob(
+        '66666666-6666-4666-8666-666666666666',
+        'artifact-1',
+        wormUpload,
+        identity,
+      ),
+    ).rejects.toThrow(/immutable|verified/i);
+    expect(repository.saveInvoiceArtifactBlobAndUpdateEvidence).not.toHaveBeenCalled();
+  });
+
   it('rejects artifact blob uploads that trip the malware scan hook', async () => {
     const repository = repositoryMock();
     repository.getInvoiceReconciliation.mockResolvedValue({
@@ -4867,6 +4951,7 @@ function repositoryMock() {
     updateInvoiceArtifactLegalHoldAndEvidence: jest.fn(),
     updateInvoiceArtifactProviderRetentionProofAndEvidence: jest.fn(),
     getInvoiceArtifactBlob: jest.fn(),
+    getInvoiceArtifactBlobLegalHold: jest.fn(),
     summarizeInvoiceArtifactRetention: jest.fn(),
     listExpiredInvoiceArtifactBlobDeletionCandidates: jest.fn(),
     deleteInvoiceArtifactBlobsByIds: jest.fn(),

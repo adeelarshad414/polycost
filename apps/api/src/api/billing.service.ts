@@ -739,6 +739,26 @@ export class BillingService {
       );
     }
 
+    // WORM protection (SEC-3): a legally-held or verified artifact is immutable.
+    // Re-uploading must never overwrite its bytes, clear its legal hold, or
+    // shorten its retention. (The upsert additionally can only strengthen those.)
+    if (artifact.verificationStatus === 'verified') {
+      throw new ApiValidationError(
+        'a verified invoice artifact is immutable and cannot be re-uploaded',
+        [{ field: 'content', issue: 'verified artifacts are write-once; register a new artifact' }],
+      );
+    }
+    const underLegalHold = await this.repository.getInvoiceArtifactBlobLegalHold(
+      reconciliationId,
+      artifactId,
+    );
+    if (underLegalHold) {
+      throw new ApiValidationError(
+        'invoice artifact is under legal hold and cannot be overwritten',
+        [{ field: 'content', issue: 'release the legal hold before replacing this artifact' }],
+      );
+    }
+
     if (artifact.sha256 && artifact.sha256 !== decoded.sha256) {
       throw new ApiValidationError('artifact upload checksum does not match registered metadata', [
         {
