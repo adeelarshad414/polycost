@@ -766,6 +766,27 @@ describe('AuthService', () => {
     );
   });
 
+  it('SEC-4: disables the mock OIDC flow in production (no session minting)', async () => {
+    const repository = repositoryMock();
+    const service = new AuthService(
+      repository as never,
+      configService({ NODE_ENV: 'production' }),
+    );
+
+    await expect(
+      service.startMockOidcLogin({ teamId: account.defaultTeam!.teamId, email: 'a@b.com' }),
+    ).rejects.toThrow(/disabled in this environment/i);
+    expect(() => service.mockOidcAuthorize({ state: 'x', email: 'a@b.com' })).toThrow(
+      /disabled in this environment/i,
+    );
+    await expect(
+      service.completeMockOidcCallback({ state: 'x', email: 'a@b.com' }),
+    ).rejects.toThrow(/disabled in this environment/i);
+    // No account/session was created via the bypass.
+    expect(repository.upsertExternalAccountForTeam).not.toHaveBeenCalled();
+    expect(repository.createSession).not.toHaveBeenCalled();
+  });
+
   it('lists active account sessions and revokes other devices without touching current session', async () => {
     const repository = repositoryMock();
     repository.listAccountSessions.mockResolvedValue([
