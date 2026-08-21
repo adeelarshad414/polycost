@@ -642,7 +642,19 @@ export class AuthService {
     };
   }
 
+  // SEC-4: the mock OIDC start/authorize/callback flow is a development-only
+  // verification aid — it derives the authenticated email from an unsigned query
+  // param and issues a real session. It MUST be disabled in staging/production so
+  // it cannot be used to mint sessions as an arbitrary email for any OIDC team.
+  private assertMockSsoEnabled(): void {
+    const env = this.configService.get('NODE_ENV', { infer: true });
+    if (env === 'production' || env === 'staging') {
+      throw new ApiForbiddenError('Mock SSO is disabled in this environment');
+    }
+  }
+
   async startMockOidcLogin(body: unknown): Promise<SsoStartResponse> {
+    this.assertMockSsoEnabled();
     const input = parseSsoStartBody(body);
     const provider = await this.resolveOidcProvider(input.teamId);
     const baseUrl = this.publicBaseUrl();
@@ -676,6 +688,7 @@ export class AuthService {
   }
 
   mockOidcAuthorize(query: unknown): { redirectUrl: string; state: string; email: string } {
+    this.assertMockSsoEnabled();
     const input = parseSsoAuthorizeQuery(query);
     const statePayload = verifySsoState(input.state, this.ssoStateSecret());
     const email = input.email ?? statePayload.loginHint;
@@ -704,6 +717,7 @@ export class AuthService {
     query: unknown,
     metadata: AuthRequestMetadata = {},
   ): Promise<SsoCallbackResponse> {
+    this.assertMockSsoEnabled();
     const input = parseSsoCallbackQuery(query);
     const statePayload = verifySsoState(input.state, this.ssoStateSecret());
     const email = normalizeEmail(input.email ?? statePayload.loginHint);
