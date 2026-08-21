@@ -2288,14 +2288,23 @@ describe('ApiDatabaseRepository', () => {
       });
     const repository = createRepository(query);
     const evaluatedAt = '2026-07-08T00:00:00.000Z';
+    const teamId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
-    await expect(repository.summarizeInvoiceArtifactRetention(evaluatedAt)).resolves.toEqual({
+    await expect(
+      repository.summarizeInvoiceArtifactRetention(evaluatedAt, teamId),
+    ).resolves.toEqual({
       expiredCandidates: 2,
       legalHoldSkipped: 1,
     });
     await expect(repository.deleteExpiredInvoiceArtifactBlobs(evaluatedAt)).resolves.toBe(2);
     expect(query).toHaveBeenNthCalledWith(1, expect.stringContaining('COUNT(*) FILTER'), [
       evaluatedAt,
+      teamId,
+    ]);
+    // Summary is scoped to the caller's team (SEC-2).
+    expect(query).toHaveBeenNthCalledWith(1, expect.stringContaining('team_id = $2'), [
+      evaluatedAt,
+      teamId,
     ]);
     expect(query).toHaveBeenNthCalledWith(
       2,
@@ -2341,10 +2350,11 @@ describe('ApiDatabaseRepository', () => {
       });
     const repository = createRepository(query);
     const evaluatedAt = '2026-07-08T00:00:00.000Z';
+    const teamId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
     const ids = ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'];
 
     await expect(
-      repository.listExpiredInvoiceArtifactBlobDeletionCandidates(evaluatedAt),
+      repository.listExpiredInvoiceArtifactBlobDeletionCandidates(evaluatedAt, teamId),
     ).resolves.toEqual([
       {
         id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -2361,25 +2371,29 @@ describe('ApiDatabaseRepository', () => {
         storageBackend: 'database-bytea',
       },
     ]);
-    await expect(repository.deleteInvoiceArtifactBlobsByIds(ids, evaluatedAt)).resolves.toBe(2);
+    await expect(
+      repository.deleteInvoiceArtifactBlobsByIds(ids, evaluatedAt, teamId),
+    ).resolves.toBe(2);
     expect(query).toHaveBeenNthCalledWith(
       1,
       expect.stringContaining('FROM invoice_artifact_blobs'),
-      [evaluatedAt],
+      [evaluatedAt, teamId],
     );
     expect(query).toHaveBeenNthCalledWith(
       1,
       expect.stringContaining('ORDER BY retention_until ASC'),
-      [evaluatedAt],
+      [evaluatedAt, teamId],
     );
+    // The DELETE itself is team-scoped, so cross-tenant ids can never be removed (SEC-2).
     expect(query).toHaveBeenNthCalledWith(
       2,
-      expect.stringContaining('WHERE id = ANY($1::uuid[])'),
-      [ids, evaluatedAt],
+      expect.stringContaining('AND team_id = $3::uuid'),
+      [ids, evaluatedAt, teamId],
     );
     expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining('legal_hold = false'), [
       ids,
       evaluatedAt,
+      teamId,
     ]);
   });
 

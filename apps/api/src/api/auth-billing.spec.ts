@@ -4349,8 +4349,14 @@ describe('BillingService', () => {
       legalHoldSkipped: 2,
       deleted: 3,
     });
+    // SEC-2: all retention work is scoped to the caller's team.
+    expect(repository.summarizeInvoiceArtifactRetention).toHaveBeenCalledWith(
+      expect.any(String),
+      identity.teamId,
+    );
     expect(repository.listExpiredInvoiceArtifactBlobDeletionCandidates).toHaveBeenCalledWith(
       expect.any(String),
+      identity.teamId,
     );
     expect(repository.deleteInvoiceArtifactBlobsByIds).toHaveBeenCalledWith(
       [
@@ -4359,6 +4365,7 @@ describe('BillingService', () => {
         'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
       ],
       expect.any(String),
+      identity.teamId,
     );
     expect(repository.deleteExpiredInvoiceArtifactBlobs).not.toHaveBeenCalled();
   });
@@ -4420,6 +4427,7 @@ describe('BillingService', () => {
     expect(repository.deleteInvoiceArtifactBlobsByIds).toHaveBeenCalledWith(
       ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'],
       expect.any(String),
+      identity.teamId,
     );
   });
 

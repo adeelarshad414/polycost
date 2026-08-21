@@ -196,7 +196,10 @@ export class AlertsController {
       'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
     );
 
-    return this.costManagementService.listAlerts(parseOptionalUuid(workloadId, 'workloadId'));
+    // workloadId is REQUIRED: this is an anonymous capability-URL surface, so a
+    // caller may only list alerts for a workload id they already hold. Allowing
+    // it to be omitted previously returned every workload's alerts (data leak).
+    return this.costManagementService.listAlerts(parseUuid(workloadId, 'workloadId'));
   }
 
   @Patch(':id')

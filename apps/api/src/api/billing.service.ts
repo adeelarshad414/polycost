@@ -1255,14 +1255,18 @@ export class BillingService {
     identity: AuthIdentity,
   ): Promise<InvoiceArtifactRetentionEnforcementResult> {
     assertBillingAdmin(identity);
+    // assertBillingAdmin guarantees identity.teamId. Scope ALL retention work to
+    // the caller's team so a team admin can never summarize or delete another
+    // tenant's invoice artifacts (SEC-2: previously these ran globally).
+    const teamId = identity.teamId as string;
     const input = parseInvoiceArtifactRetentionEnforcementInput(body);
     const evaluatedAt = new Date().toISOString();
-    const summary = await this.repository.summarizeInvoiceArtifactRetention(evaluatedAt);
+    const summary = await this.repository.summarizeInvoiceArtifactRetention(evaluatedAt, teamId);
     const configuredMode = this.artifactGovernanceService.retentionMode();
     const dryRun = input.dryRun || configuredMode === 'report-only';
     const deletionCandidates = dryRun
       ? []
-      : await this.repository.listExpiredInvoiceArtifactBlobDeletionCandidates(evaluatedAt);
+      : await this.repository.listExpiredInvoiceArtifactBlobDeletionCandidates(evaluatedAt, teamId);
 
     if (!dryRun) {
       for (const candidate of deletionCandidates) {
@@ -1277,6 +1281,7 @@ export class BillingService {
       : await this.repository.deleteInvoiceArtifactBlobsByIds(
           deletionCandidates.map((candidate) => candidate.id),
           evaluatedAt,
+          teamId,
         );
 
     return {

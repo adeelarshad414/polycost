@@ -1682,7 +1682,9 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     return result.rows[0] ? toCostObservationRecord(result.rows[0]) : undefined;
   }
 
-  async listAlerts(workloadId?: string): Promise<AlertRecord[]> {
+  async listAlerts(workloadId: string): Promise<AlertRecord[]> {
+    // Always scoped to a single workload id. There is no global-list branch: an
+    // omitted workloadId must never return every workload's alerts.
     const result = await (
       await this.getPool()
     ).query<AlertRow>(
@@ -1699,10 +1701,10 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
                triggered_at,
                dismissed_at
         FROM alerts
-        WHERE ($1::uuid IS NULL OR workload_id = $1::uuid)
+        WHERE workload_id = $1::uuid
         ORDER BY triggered_at DESC
       `,
-      [workloadId ?? null],
+      [workloadId],
     );
 
     return result.rows.map(toAlertRecord);
@@ -4839,7 +4841,10 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     return result.rows[0] ? toInvoiceArtifactBlobRecord(result.rows[0]) : undefined;
   }
 
-  async summarizeInvoiceArtifactRetention(evaluatedAt: string): Promise<{
+  async summarizeInvoiceArtifactRetention(
+    evaluatedAt: string,
+    teamId: string,
+  ): Promise<{
     expiredCandidates: number;
     legalHoldSkipped: number;
   }> {
@@ -4856,8 +4861,9 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
                    AND legal_hold = true
                )::text AS legal_hold_skipped
         FROM invoice_artifact_blobs
+        WHERE team_id = $2::uuid
       `,
-      [evaluatedAt],
+      [evaluatedAt, teamId],
     );
     const row = result.rows[0];
 
@@ -4869,6 +4875,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
 
   async listExpiredInvoiceArtifactBlobDeletionCandidates(
     evaluatedAt: string,
+    teamId: string,
   ): Promise<InvoiceArtifactBlobDeletionCandidate[]> {
     const result = await (
       await this.getPool()
@@ -4884,9 +4891,10 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         FROM invoice_artifact_blobs
         WHERE retention_until <= $1
           AND legal_hold = false
+          AND team_id = $2::uuid
         ORDER BY retention_until ASC, uploaded_at ASC
       `,
-      [evaluatedAt],
+      [evaluatedAt, teamId],
     );
 
     return result.rows.map((row) => ({
@@ -4900,7 +4908,11 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     }));
   }
 
-  async deleteInvoiceArtifactBlobsByIds(ids: string[], evaluatedAt: string): Promise<number> {
+  async deleteInvoiceArtifactBlobsByIds(
+    ids: string[],
+    evaluatedAt: string,
+    teamId: string,
+  ): Promise<number> {
     if (ids.length === 0) {
       return 0;
     }
@@ -4913,9 +4925,10 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         WHERE id = ANY($1::uuid[])
           AND retention_until <= $2
           AND legal_hold = false
+          AND team_id = $3::uuid
         RETURNING id
       `,
-      [ids, evaluatedAt],
+      [ids, evaluatedAt, teamId],
     );
 
     return result.rows.length;
