@@ -65,7 +65,7 @@ interface ComputeShape {
   memoryGb: number;
 }
 
-const GCP_STANDARD_SHAPE_VCPUS = [2, 4, 8] as const;
+const GCP_STANDARD_SHAPE_VCPUS = [2, 4, 8, 16, 32, 48, 64, 96] as const;
 
 export function normalizePricingCatalogRecords(
   records: PricingCatalogRecord[],
@@ -295,7 +295,7 @@ function azureMemoryGb(familyPrefix: string, vcpu: number, variant: string): num
 function gcpMachineShape(providerSkuId: string): Omit<ComputeShape, 'providerSkuId'> | undefined {
   const normalized = providerSkuId.toLowerCase();
   const match = normalized.match(
-    /^(?<family>e2|n1|n2|c2|c3|t2d|m1|m2|m3)-(?<profile>standard|highmem|highcpu)-(?<vcpu>\d+)$/,
+    /^(?<family>n2d|c2d|c3d|e2|n1|n2|n4|c2|c3|c4|t2d|t2a|m1|m2|m3|h3|z3|a2|a3|g2)-(?<profile>standard|highmem|highcpu)-(?<vcpu>\d+)$/,
   );
 
   if (!match?.groups) {
@@ -417,13 +417,17 @@ function normalizeGcpComponentCompute(
 
 function gcpFamilyFromRecord(record: PricingCatalogRecord): string | undefined {
   const description = `${record.skuDescription ?? ''} ${record.serviceName}`.toLowerCase();
-  const descriptionMatch = description.match(/\b(?<family>e2|n1|n2|c2|c3|t2d|m1|m2|m3)\b/);
+  const descriptionMatch = description.match(
+    /\b(?<family>n2d|c2d|c3d|e2|n1|n2|n4|c2|c3|c4|t2d|t2a|m1|m2|m3|h3|z3|a2|a3|g2)\b/,
+  );
   if (descriptionMatch?.groups?.family) {
     return descriptionMatch.groups.family;
   }
 
   const resourceGroup = String(record.attributes?.resourceGroup ?? '').toLowerCase();
-  const resourceMatch = resourceGroup.match(/^(?<family>e2|n1|n2|c2|c3|t2d|m1|m2|m3)/);
+  const resourceMatch = resourceGroup.match(
+    /^(?<family>n2d|c2d|c3d|e2|n1|n2|n4|c2|c3|c4|t2d|t2a|m1|m2|m3|h3|z3|a2|a3|g2)/,
+  );
   return resourceMatch?.groups?.family;
 }
 
