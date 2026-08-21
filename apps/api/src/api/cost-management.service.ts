@@ -61,7 +61,7 @@ export class CostManagementService {
     return this.repository.createBudget(input);
   }
 
-  listAlerts(workloadId?: string): Promise<AlertRecord[]> {
+  listAlerts(workloadId: string): Promise<AlertRecord[]> {
     return this.repository.listAlerts(workloadId);
   }
 

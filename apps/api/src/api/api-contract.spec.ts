@@ -987,6 +987,8 @@ describe('API contracts', () => {
       }),
     ).toThrow(ApiValidationError);
     expect(() => alertsController.list('not-a-uuid')).toThrow(ApiValidationError);
+    // SEC-1: a missing workloadId must be rejected, never a global alert dump.
+    expect(() => alertsController.list(undefined)).toThrow(ApiValidationError);
     expect(() => alertsController.update('not-a-uuid', { dismissed: true })).toThrow(
       ApiValidationError,
     );
