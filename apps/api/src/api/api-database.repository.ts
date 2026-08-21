@@ -4520,8 +4520,12 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
             uploaded_at = EXCLUDED.uploaded_at,
             storage_backend = EXCLUDED.storage_backend,
             kms_key_reference = EXCLUDED.kms_key_reference,
-            retention_until = EXCLUDED.retention_until,
-            legal_hold = EXCLUDED.legal_hold,
+            -- WORM defense-in-depth (SEC-3): a re-upload may only strengthen
+            -- governance, never weaken it. Retention is extended to the later of
+            -- the two dates, and legal hold can only be turned on, never off,
+            -- via this path (release goes through the dedicated legal-hold API).
+            retention_until = GREATEST(invoice_artifact_blobs.retention_until, EXCLUDED.retention_until),
+            legal_hold = invoice_artifact_blobs.legal_hold OR EXCLUDED.legal_hold,
             malware_scan_status = EXCLUDED.malware_scan_status,
             malware_scan_engine = EXCLUDED.malware_scan_engine,
             malware_scan_checked_at = EXCLUDED.malware_scan_checked_at,
@@ -4839,6 +4843,28 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     );
 
     return result.rows[0] ? toInvoiceArtifactBlobRecord(result.rows[0]) : undefined;
+  }
+
+  async getInvoiceArtifactBlobLegalHold(
+    reconciliationId: string,
+    artifactId: string,
+  ): Promise<boolean | undefined> {
+    // Lightweight legal-hold probe (no content transfer) for the WORM re-upload
+    // guard (SEC-3). Returns undefined when no blob exists yet.
+    const result = await (
+      await this.getPool()
+    ).query<{ legal_hold: boolean }>(
+      `
+        SELECT legal_hold
+        FROM invoice_artifact_blobs
+        WHERE reconciliation_id = $1
+          AND artifact_id = $2
+        LIMIT 1
+      `,
+      [reconciliationId, artifactId],
+    );
+
+    return result.rows[0]?.legal_hold;
   }
 
   async summarizeInvoiceArtifactRetention(
