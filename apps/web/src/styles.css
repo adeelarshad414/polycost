@@ -10142,6 +10142,9 @@ select:disabled {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+    /* Stop any un-enumerated infinite animation after a single cycle so it can
+       never loop under reduced-motion, even at a near-zero duration (M-U1). */
+    animation-iteration-count: 1 !important;
   }
 
   .scroll-progress-bar {

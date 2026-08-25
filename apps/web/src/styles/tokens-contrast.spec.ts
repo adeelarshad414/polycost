@@ -40,8 +40,12 @@ function tokenValue(block: string, name: string): string {
   return match[1].toLowerCase();
 }
 
-const LIGHT_SURFACES = ['#f5f4ef', '#ffffff', '#eae8e2'];
-const DARK_SURFACES = ['#0b0e14', '#141824', '#1b2130'];
+// Read the surfaces from the same source of truth rather than hardcoding hex
+// (which would also trip the theme-hex guard that forbids raw hex outside
+// tokens.css).
+const SURFACE_TOKENS = ['surface-canvas', 'surface-card', 'surface-raised'];
+const LIGHT_SURFACES = SURFACE_TOKENS.map((token) => tokenValue(lightBlock, token));
+const DARK_SURFACES = SURFACE_TOKENS.map((token) => tokenValue(darkBlock, token));
 const AA_NORMAL = 4.5;
 
 describe('token contrast (WCAG AA)', () => {
