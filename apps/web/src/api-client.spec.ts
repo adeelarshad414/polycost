@@ -2597,6 +2597,27 @@ describe('api client', () => {
       expect.objectContaining({ 'Content-Type': 'application/json' }),
     );
   });
+
+  it('surfaces a malformed 2xx body as a typed API error instead of crashing (FE-3)', async () => {
+    const fetchMock = jest.fn(
+      async () =>
+        ({
+          ok: true,
+          status: 200,
+          json: jest.fn(async () => {
+            throw new SyntaxError('Unexpected token < in JSON at position 0');
+          }),
+        }) as unknown as Response,
+    );
+    global.fetch = fetchMock as typeof fetch;
+    const client = createPolyCostClient('http://api.test/api/v1');
+
+    await expect(client.getDataHealth()).rejects.toMatchObject({
+      name: 'PolyCostApiError',
+      code: 'MALFORMED_RESPONSE',
+      status: 200,
+    });
+  });
 });
 
 function jsonResponse(body: unknown, status = 200): Response {
