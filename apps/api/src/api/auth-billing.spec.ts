@@ -1495,6 +1495,7 @@ describe('BillingService', () => {
     repository.saveInvoiceReconciliation.mockImplementation(async (input) => ({
       id: '66666666-6666-4666-8666-666666666666',
       createdAt: '2026-07-06T00:00:02.000Z',
+      evidenceHash: 'a'.repeat(32),
       ...input,
     }));
     const service = new BillingService(repository as never);
@@ -1593,6 +1594,7 @@ describe('BillingService', () => {
     repository.saveInvoiceReconciliation.mockImplementation(async (input) => ({
       id: '66666666-6666-4666-8666-666666666666',
       createdAt: '2026-07-06T00:00:02.000Z',
+      evidenceHash: 'a'.repeat(32),
       ...input,
     }));
     const service = new BillingService(repository as never);
@@ -1669,6 +1671,7 @@ describe('BillingService', () => {
     repository.saveInvoiceReconciliation.mockImplementation(async (input) => ({
       id: '66666666-6666-4666-8666-666666666666',
       createdAt: '2026-07-06T00:00:02.000Z',
+      evidenceHash: 'a'.repeat(32),
       ...input,
     }));
     const service = new BillingService(repository as never);
@@ -1833,6 +1836,7 @@ describe('BillingService', () => {
   it('registers invoice-grade artifact metadata without marking evidence verified', async () => {
     const repository = repositoryMock();
     const reconciliationRecord = {
+      evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
       comparisonId: comparisonResult.comparisonId,
@@ -1964,6 +1968,7 @@ describe('BillingService', () => {
   it('verifies registered invoice-grade artifact evidence with checksum controls', async () => {
     const repository = repositoryMock();
     const reconciliationRecord = {
+      evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
       comparisonId: comparisonResult.comparisonId,
@@ -2118,6 +2123,7 @@ describe('BillingService', () => {
   it('validates invoice control packets against reconciliation and import totals', async () => {
     const repository = repositoryMock();
     const reconciliationRecord = {
+      evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
       comparisonId: comparisonResult.comparisonId,
@@ -2241,6 +2247,7 @@ describe('BillingService', () => {
   it('builds metadata-only invoice evidence packets for reconciliation review', async () => {
     const repository = repositoryMock();
     const reconciliationRecord = {
+      evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
       comparisonId: comparisonResult.comparisonId,
@@ -2482,6 +2489,7 @@ describe('BillingService', () => {
       version: 'v1',
     };
     repository.getInvoiceReconciliation.mockResolvedValue({
+      evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
       comparisonId: comparisonResult.comparisonId,
@@ -2617,6 +2625,7 @@ describe('BillingService', () => {
   it('adds signed external receipt readiness when evidence receipt controls are configured', async () => {
     const repository = repositoryMock();
     repository.getInvoiceReconciliation.mockResolvedValue({
+      evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
       comparisonId: comparisonResult.comparisonId,
@@ -2756,6 +2765,7 @@ describe('BillingService', () => {
     ].join('\n');
     const contentSha256 = sha256Hex(artifactContent);
     const reconciliationRecord = {
+      evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
       comparisonId: comparisonResult.comparisonId,
@@ -2908,6 +2918,7 @@ describe('BillingService', () => {
   it('updates invoice artifact legal hold state in row storage and reconciliation evidence', async () => {
     const repository = repositoryMock();
     const reconciliationRecord = {
+      evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
       comparisonId: comparisonResult.comparisonId,
@@ -3071,6 +3082,7 @@ describe('BillingService', () => {
       },
     };
     const reconciliationRecord = {
+      evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
       comparisonId: comparisonResult.comparisonId,
@@ -3224,6 +3236,7 @@ describe('BillingService', () => {
     });
     repository.listInvoiceReconciliations.mockResolvedValue([
       {
+        evidenceHash: 'a'.repeat(32),
         id: '66666666-6666-4666-8666-666666666666',
         importRunId: '55555555-5555-4555-8555-555555555555',
         comparisonId: comparisonResult.comparisonId,
@@ -3319,6 +3332,7 @@ describe('BillingService', () => {
     });
     repository.listInvoiceReconciliations.mockResolvedValue([
       {
+        evidenceHash: 'a'.repeat(32),
         id: '66666666-6666-4666-8666-666666666666',
         importRunId: '55555555-5555-4555-8555-555555555555',
         comparisonId: comparisonResult.comparisonId,
@@ -3401,6 +3415,7 @@ describe('BillingService', () => {
   it('updates invoice artifact review workflow state without marking the artifact verified', async () => {
     const repository = repositoryMock();
     const reconciliationRecord = {
+      evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
       comparisonId: comparisonResult.comparisonId,
@@ -3523,6 +3538,7 @@ describe('BillingService', () => {
   it('updates invoice artifact policy exception state without marking the artifact verified', async () => {
     const repository = repositoryMock();
     const reconciliationRecord = {
+      evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
       comparisonId: comparisonResult.comparisonId,
@@ -3655,6 +3671,7 @@ describe('BillingService', () => {
   it('rejects artifact review workflow changes before a file is stored', async () => {
     const repository = repositoryMock();
     repository.getInvoiceReconciliation.mockResolvedValue({
+      evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
       comparisonId: comparisonResult.comparisonId,
@@ -3716,6 +3733,7 @@ describe('BillingService', () => {
   it('rejects policy exception changes before an invoice artifact file is stored', async () => {
     const repository = repositoryMock();
     repository.getInvoiceReconciliation.mockResolvedValue({
+      evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
       comparisonId: comparisonResult.comparisonId,
@@ -3778,6 +3796,7 @@ describe('BillingService', () => {
   it('rejects invoice control validation before the artifact is stored and verified', async () => {
     const repository = repositoryMock();
     repository.getInvoiceReconciliation.mockResolvedValue({
+      evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
       comparisonId: comparisonResult.comparisonId,
@@ -3840,6 +3859,7 @@ describe('BillingService', () => {
   it('rejects legal hold changes before an invoice artifact file is stored', async () => {
     const repository = repositoryMock();
     repository.getInvoiceReconciliation.mockResolvedValue({
+      evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
       comparisonId: comparisonResult.comparisonId,
@@ -3903,6 +3923,7 @@ describe('BillingService', () => {
     const artifactContent = 'PolyCost external artifact packet';
     const contentSha256 = sha256Hex(artifactContent);
     const reconciliationRecord = {
+      evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
       comparisonId: comparisonResult.comparisonId,
@@ -4043,6 +4064,7 @@ describe('BillingService', () => {
   it('downloads stored invoice artifact blobs after team access is checked', async () => {
     const repository = repositoryMock();
     repository.getInvoiceReconciliation.mockResolvedValue({
+      evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
       comparisonId: comparisonResult.comparisonId,
@@ -4173,6 +4195,7 @@ describe('BillingService', () => {
   it('downloads external invoice artifact blobs through provider storage and validates checksum', async () => {
     const repository = repositoryMock();
     repository.getInvoiceReconciliation.mockResolvedValue({
+      evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
       comparisonId: comparisonResult.comparisonId,
@@ -4477,6 +4500,7 @@ describe('BillingService', () => {
   it('rejects artifact blob uploads when bytes do not match registered checksum metadata', async () => {
     const repository = repositoryMock();
     repository.getInvoiceReconciliation.mockResolvedValue({
+      evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
       comparisonId: comparisonResult.comparisonId,
@@ -4539,6 +4563,7 @@ describe('BillingService', () => {
 
   const wormReconciliation = (verificationStatus: string) => ({
     id: '66666666-6666-4666-8666-666666666666',
+    evidenceHash: 'a'.repeat(32),
     importRunId: '55555555-5555-4555-8555-555555555555',
     comparisonId: comparisonResult.comparisonId,
     provider: 'aws' as const,
@@ -4624,6 +4649,7 @@ describe('BillingService', () => {
   it('rejects artifact blob uploads that trip the malware scan hook', async () => {
     const repository = repositoryMock();
     repository.getInvoiceReconciliation.mockResolvedValue({
+      evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
       comparisonId: comparisonResult.comparisonId,
@@ -4686,6 +4712,7 @@ describe('BillingService', () => {
   it('rejects artifact verification when checksum evidence does not match metadata', async () => {
     const repository = repositoryMock();
     repository.getInvoiceReconciliation.mockResolvedValue({
+      evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
       importRunId: '55555555-5555-4555-8555-555555555555',
       comparisonId: comparisonResult.comparisonId,

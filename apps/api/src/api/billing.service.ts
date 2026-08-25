@@ -514,6 +514,7 @@ export class BillingService {
     return this.repository.updateInvoiceReconciliationEvidence({
       reconciliationId,
       evidence,
+      expectedEvidenceHash: reconciliation.evidenceHash,
       ...(importRun.teamId
         ? {
             audit: {
@@ -580,6 +581,7 @@ export class BillingService {
     return this.repository.updateInvoiceReconciliationEvidence({
       reconciliationId,
       evidence,
+      expectedEvidenceHash: reconciliation.evidenceHash,
       ...(importRun.teamId
         ? {
             audit: {
@@ -677,6 +679,7 @@ export class BillingService {
     return this.repository.updateInvoiceReconciliationEvidence({
       reconciliationId,
       evidence,
+      expectedEvidenceHash: reconciliation.evidenceHash,
       ...(importRun.teamId
         ? {
             audit: {
@@ -795,6 +798,7 @@ export class BillingService {
 
     return this.repository.saveInvoiceArtifactBlobAndUpdateEvidence({
       reconciliationId,
+      expectedEvidenceHash: reconciliation.evidenceHash,
       artifactId,
       ...(importRun.teamId ? { teamId: importRun.teamId } : {}),
       fileName: decoded.fileName,
@@ -905,6 +909,7 @@ export class BillingService {
 
     return this.repository.updateInvoiceArtifactLegalHoldAndEvidence({
       reconciliationId,
+      expectedEvidenceHash: reconciliation.evidenceHash,
       artifactId,
       legalHold: input.legalHold,
       evidence,
@@ -988,6 +993,7 @@ export class BillingService {
 
     return this.repository.updateInvoiceArtifactProviderRetentionProofAndEvidence({
       reconciliationId,
+      expectedEvidenceHash: reconciliation.evidenceHash,
       artifactId,
       providerRetentionProof,
       evidence,
@@ -1067,6 +1073,7 @@ export class BillingService {
     return this.repository.updateInvoiceReconciliationEvidence({
       reconciliationId,
       evidence,
+      expectedEvidenceHash: reconciliation.evidenceHash,
       ...(importRun.teamId
         ? {
             audit: {
@@ -1139,6 +1146,7 @@ export class BillingService {
     return this.repository.updateInvoiceReconciliationEvidence({
       reconciliationId,
       evidence,
+      expectedEvidenceHash: reconciliation.evidenceHash,
       ...(importRun.teamId
         ? {
             audit: {

@@ -4,6 +4,7 @@ import { AppConfig } from '../config/config.schema';
 import { NormalizedWorkloadSpec } from '../nws/nws.types';
 import { SecretsReader } from '../secrets/secrets.service';
 import { ApiDatabaseRepository, PgPoolLike } from './api-database.repository';
+import { ApiConflictError } from './api-errors';
 
 const configService = {
   get: jest.fn((key: keyof AppConfig) => {
@@ -1665,6 +1666,7 @@ describe('ApiDatabaseRepository', () => {
       evidence: {
         invoiceLineItemHashes: ['b'.repeat(64)],
       },
+      evidence_hash: 'e'.repeat(32),
       created_at: completedAt,
     };
     let legalHoldState = false;
@@ -1944,6 +1946,7 @@ describe('ApiDatabaseRepository', () => {
     await expect(
       repository.updateInvoiceReconciliationEvidence({
         reconciliationId: '66666666-6666-4666-8666-666666666666',
+        expectedEvidenceHash: 'e'.repeat(32),
         evidence: {
           invoiceLineItemHashes: ['b'.repeat(64)],
           invoiceGradeArtifactRegister: {
@@ -1970,6 +1973,7 @@ describe('ApiDatabaseRepository', () => {
     await expect(
       repository.saveInvoiceArtifactBlobAndUpdateEvidence({
         reconciliationId: '66666666-6666-4666-8666-666666666666',
+        expectedEvidenceHash: 'e'.repeat(32),
         artifactId: 'artifact-1',
         teamId: '22222222-2222-4222-8222-222222222222',
         fileName: 'aws-invoice-control.txt',
@@ -2047,6 +2051,7 @@ describe('ApiDatabaseRepository', () => {
     await expect(
       repository.updateInvoiceArtifactLegalHoldAndEvidence({
         reconciliationId: '66666666-6666-4666-8666-666666666666',
+        expectedEvidenceHash: 'e'.repeat(32),
         artifactId: 'artifact-1',
         legalHold: true,
         evidence: {
@@ -2186,6 +2191,7 @@ describe('ApiDatabaseRepository', () => {
     await expect(
       repository.updateInvoiceArtifactProviderRetentionProofAndEvidence({
         reconciliationId: '66666666-6666-4666-8666-666666666666',
+        expectedEvidenceHash: 'e'.repeat(32),
         artifactId: 'artifact-1',
         providerRetentionProof: {
           schemaVersion: 'invoice-artifact-provider-retention-proof/v1',
@@ -2912,6 +2918,46 @@ describe('ApiDatabaseRepository', () => {
     await repository.onModuleDestroy();
 
     expect(pool.end).toHaveBeenCalledTimes(1);
+  });
+
+  it('guards invoice evidence writes with an optimistic-hash check and raises a conflict on mismatch', async () => {
+    const query = jest.fn(async (text: string, _values?: unknown[]) => {
+      if (
+        text.includes('BEGIN') ||
+        text.includes('COMMIT') ||
+        text.includes('ROLLBACK') ||
+        text.includes('INSERT INTO team_audit_events')
+      ) {
+        return { rows: [], rowCount: 0 };
+      }
+      // Concurrent writer already advanced the evidence, so the md5 guard in the
+      // WHERE clause matches no row.
+      if (text.includes('UPDATE invoice_reconciliation_results')) {
+        return { rows: [], rowCount: 0 };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+    const repository = createRepository(query);
+
+    await expect(
+      repository.updateInvoiceReconciliationEvidence({
+        reconciliationId: '66666666-6666-4666-8666-666666666666',
+        evidence: { invoiceLineItemHashes: ['b'.repeat(64)] },
+        expectedEvidenceHash: 'stale-hash-value',
+      }),
+    ).rejects.toBeInstanceOf(ApiConflictError);
+
+    const updateCall = query.mock.calls.find(([text]) =>
+      String(text).includes('UPDATE invoice_reconciliation_results'),
+    );
+    expect(updateCall).toBeDefined();
+    // The optimistic guard is present in the SQL and the caller-supplied hash is
+    // bound as the third parameter.
+    expect(String(updateCall?.[0])).toContain('md5(evidence::text) = $3');
+    expect((updateCall?.[1] as unknown[])?.[2]).toBe('stale-hash-value');
+    // A failed evidence write must roll the transaction back rather than commit.
+    expect(query.mock.calls.some(([text]) => String(text).includes('ROLLBACK'))).toBe(true);
+    expect(query.mock.calls.some(([text]) => String(text).includes('COMMIT'))).toBe(false);
   });
 });
 
