@@ -207,9 +207,35 @@ describe('PostgresPricingCatalogRepository', () => {
     );
   });
 
-  it('upserts valid records and reports row-level rejects without logging values', async () => {
+  it('upserts a batch of valid records in a single multi-row statement', async () => {
+    const query = jest.fn(async () => ({ rows: [], rowCount: 3 }));
+    const pool: PgPoolLike = {
+      query: query as PgPoolLike['query'],
+      end: jest.fn(async () => undefined),
+    };
+    const repository = new PostgresPricingCatalogRepository(
+      configService(),
+      secretsReader(),
+      () => pool,
+    );
+
+    await expect(repository.upsertPricingRecords([record, record, record])).resolves.toEqual({
+      recordsUpdated: 3,
+      recordsRejected: 0,
+    });
+    // One batched round-trip for the whole chunk, not one per record.
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('jsonb_to_recordset'), [
+      expect.any(String),
+    ]);
+  });
+
+  it('falls back to per-row inserts so one bad row rejects only itself', async () => {
     const query = jest
       .fn()
+      // The batched chunk trips a constraint on one row...
+      .mockRejectedValueOnce(new Error('chunk constraint violation'))
+      // ...so it retries the chunk row-by-row: first row succeeds, second rejects.
       .mockResolvedValueOnce({ rows: [], rowCount: 1 })
       .mockRejectedValueOnce(new Error('constraint violation'));
     const pool: PgPoolLike = {
@@ -226,7 +252,8 @@ describe('PostgresPricingCatalogRepository', () => {
       recordsUpdated: 1,
       recordsRejected: 1,
     });
-    expect(query).toHaveBeenCalledTimes(2);
+    // 1 failed chunk attempt + 2 per-row retries.
+    expect(query).toHaveBeenCalledTimes(3);
   });
 
   it('uses safe defaults when optional record fields and row counts are absent', async () => {
@@ -245,10 +272,14 @@ describe('PostgresPricingCatalogRepository', () => {
       recordsUpdated: 0,
       recordsRejected: 0,
     });
-    expect(query).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.arrayContaining([null, JSON.stringify({})]),
-    );
+    // Optional fields default safely in the batched JSON payload: a missing
+    // description serializes as null and missing attributes as an empty object.
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('jsonb_to_recordset'), [
+      expect.stringContaining('"sku_description":null'),
+    ]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('jsonb_to_recordset'), [
+      expect.stringContaining('"attributes":{}'),
+    ]);
   });
 
   it('records provider ETL outcomes', async () => {

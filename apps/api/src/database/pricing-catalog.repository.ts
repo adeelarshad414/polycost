@@ -70,6 +70,11 @@ interface PricingCatalogRow {
 
 const defaultPgPoolFactory: PgPoolFactory = (config) => new Pool(config);
 
+// Rows per multi-row upsert. Bounds the number of bind parameters / statement
+// size per round-trip while still collapsing thousands of SKUs into a handful of
+// statements.
+const PRICING_CATALOG_UPSERT_CHUNK_SIZE = 500;
+
 @Injectable()
 export class PostgresPricingCatalogRepository
   implements
@@ -142,71 +147,25 @@ export class PostgresPricingCatalogRepository
     let recordsRejected = 0;
     const pool = await this.getPool();
 
-    for (const record of records) {
-      try {
-        const lineage = pricingLineageForCatalogRecord(record);
-        const result = await pool.query(
-          `
-            INSERT INTO pricing_catalog (
-              provider,
-              service_category,
-              service_name,
-              sku_id,
-              sku_description,
-              region,
-              unit,
-              unit_price_usd,
-              attributes,
-              effective_date,
-              fetched_at,
-              sync_status,
-              source_endpoint,
-              source_record_id,
-              source_record_key,
-              transform_version,
-              source_payload_hash
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17)
-            ON CONFLICT (provider, sku_id, region, effective_date)
-            DO UPDATE SET
-              service_category = EXCLUDED.service_category,
-              service_name = EXCLUDED.service_name,
-              sku_description = EXCLUDED.sku_description,
-              unit = EXCLUDED.unit,
-              unit_price_usd = EXCLUDED.unit_price_usd,
-              attributes = EXCLUDED.attributes,
-              fetched_at = EXCLUDED.fetched_at,
-              sync_status = EXCLUDED.sync_status,
-              source_endpoint = EXCLUDED.source_endpoint,
-              source_record_id = EXCLUDED.source_record_id,
-              source_record_key = EXCLUDED.source_record_key,
-              transform_version = EXCLUDED.transform_version,
-              source_payload_hash = EXCLUDED.source_payload_hash
-          `,
-          [
-            record.provider,
-            record.serviceCategory,
-            record.serviceName,
-            record.skuId,
-            record.skuDescription ?? null,
-            record.region,
-            record.unit,
-            record.unitPriceUsd,
-            JSON.stringify(record.attributes ?? {}),
-            record.effectiveDate,
-            record.fetchedAt,
-            'success',
-            lineage.sourceEndpoint,
-            lineage.sourceRecordId,
-            lineage.sourceRecordKey,
-            lineage.transformVersion,
-            lineage.sourcePayloadHash,
-          ],
-        );
+    // A live refresh can carry tens of thousands of SKUs. Writing one row per
+    // round-trip (the previous loop) made ETL dominated by network latency, not
+    // work. Batch each chunk into a single multi-row upsert; if a chunk fails
+    // (e.g. one malformed row trips a CHECK constraint), fall back to per-row
+    // inserts for that chunk only, so a single bad record still rejects just
+    // itself and the counts stay exact.
+    for (let offset = 0; offset < records.length; offset += PRICING_CATALOG_UPSERT_CHUNK_SIZE) {
+      const chunk = records.slice(offset, offset + PRICING_CATALOG_UPSERT_CHUNK_SIZE);
 
-        recordsUpdated += result.rowCount ?? 0;
+      try {
+        recordsUpdated += await this.upsertPricingRecordChunk(pool, chunk);
       } catch {
-        recordsRejected += 1;
+        for (const record of chunk) {
+          try {
+            recordsUpdated += await this.upsertPricingRecordChunk(pool, [record]);
+          } catch {
+            recordsRejected += 1;
+          }
+        }
       }
     }
 
@@ -214,6 +173,117 @@ export class PostgresPricingCatalogRepository
       recordsUpdated,
       recordsRejected,
     };
+  }
+
+  private async upsertPricingRecordChunk(
+    pool: PgPoolLike,
+    chunk: PricingCatalogRecord[],
+  ): Promise<number> {
+    if (chunk.length === 0) {
+      return 0;
+    }
+
+    const rows = chunk.map((record) => {
+      const lineage = pricingLineageForCatalogRecord(record);
+
+      return {
+        provider: record.provider,
+        service_category: record.serviceCategory,
+        service_name: record.serviceName,
+        sku_id: record.skuId,
+        sku_description: record.skuDescription ?? null,
+        region: record.region,
+        unit: record.unit,
+        unit_price_usd: record.unitPriceUsd,
+        attributes: record.attributes ?? {},
+        effective_date: record.effectiveDate,
+        fetched_at: record.fetchedAt,
+        sync_status: 'success',
+        source_endpoint: lineage.sourceEndpoint,
+        source_record_id: lineage.sourceRecordId,
+        source_record_key: lineage.sourceRecordKey,
+        transform_version: lineage.transformVersion,
+        source_payload_hash: lineage.sourcePayloadHash,
+      };
+    });
+
+    const result = await pool.query(
+      `
+        INSERT INTO pricing_catalog (
+          provider,
+          service_category,
+          service_name,
+          sku_id,
+          sku_description,
+          region,
+          unit,
+          unit_price_usd,
+          attributes,
+          effective_date,
+          fetched_at,
+          sync_status,
+          source_endpoint,
+          source_record_id,
+          source_record_key,
+          transform_version,
+          source_payload_hash
+        )
+        SELECT provider,
+               service_category,
+               service_name,
+               sku_id,
+               sku_description,
+               region,
+               unit,
+               unit_price_usd,
+               attributes,
+               effective_date,
+               fetched_at,
+               sync_status,
+               source_endpoint,
+               source_record_id,
+               source_record_key,
+               transform_version,
+               source_payload_hash
+        FROM jsonb_to_recordset($1::jsonb) AS incoming(
+          provider TEXT,
+          service_category TEXT,
+          service_name TEXT,
+          sku_id TEXT,
+          sku_description TEXT,
+          region TEXT,
+          unit TEXT,
+          unit_price_usd NUMERIC,
+          attributes JSONB,
+          effective_date TIMESTAMP,
+          fetched_at TIMESTAMP,
+          sync_status TEXT,
+          source_endpoint TEXT,
+          source_record_id TEXT,
+          source_record_key TEXT,
+          transform_version TEXT,
+          source_payload_hash TEXT
+        )
+        ON CONFLICT (provider, sku_id, region, effective_date)
+        DO UPDATE SET
+          service_category = EXCLUDED.service_category,
+          service_name = EXCLUDED.service_name,
+          sku_description = EXCLUDED.sku_description,
+          unit = EXCLUDED.unit,
+          unit_price_usd = EXCLUDED.unit_price_usd,
+          attributes = EXCLUDED.attributes,
+          fetched_at = EXCLUDED.fetched_at,
+          sync_status = EXCLUDED.sync_status,
+          source_endpoint = EXCLUDED.source_endpoint,
+          source_record_id = EXCLUDED.source_record_id,
+          source_record_key = EXCLUDED.source_record_key,
+          transform_version = EXCLUDED.transform_version,
+          source_payload_hash = EXCLUDED.source_payload_hash
+      `,
+      [JSON.stringify(rows)],
+    );
+
+    return result.rowCount ?? 0;
   }
 
   async pruneStaleLiveRows(provider: ProviderId, fetchedAt: string): Promise<number> {
