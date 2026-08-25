@@ -43,7 +43,9 @@ const classifierOutputSchema = z
         reason: z.string().min(1).max(200),
         assumedDefaults: z.array(z.string().min(1).max(120)).max(8).default([]),
         quantity: z.number().int().positive().max(250).default(1),
-        scaleParams: z.record(z.union([z.string(), z.number(), z.boolean()])).default({}),
+        scaleParams: z
+          .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+          .default({}),
       })
       .strict()
       .nullable(),
