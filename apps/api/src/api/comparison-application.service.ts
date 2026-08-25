@@ -103,8 +103,7 @@ export class ComparisonApplicationService {
     const result = await this.comparisonOrchestratorService.compare(nws);
     const resultWithHealthWarnings = mergeWarnings(result, await this.dataHealthWarnings());
 
-    await this.apiDatabaseRepository.saveComparison(nws, resultWithHealthWarnings);
-    await this.apiDatabaseRepository.recordComparisonAuditLog(resultWithHealthWarnings);
+    await this.apiDatabaseRepository.saveComparisonWithAuditLog(nws, resultWithHealthWarnings);
     this.comparisonPrewarmService?.enqueue(resultWithHealthWarnings);
 
     return resultWithHealthWarnings;
@@ -146,8 +145,7 @@ export class ComparisonApplicationService {
       await this.dataHealthWarnings(),
     );
 
-    await this.apiDatabaseRepository.saveComparison(snapshot.nwsSnapshot, refreshed);
-    await this.apiDatabaseRepository.recordComparisonAuditLog(refreshed);
+    await this.apiDatabaseRepository.saveComparisonWithAuditLog(snapshot.nwsSnapshot, refreshed);
 
     return refreshed;
   }

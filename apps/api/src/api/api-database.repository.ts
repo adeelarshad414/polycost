@@ -646,13 +646,27 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     private readonly poolFactory: PgPoolFactory = defaultPgPoolFactory,
   ) {}
 
-  async saveComparison(
+  // Persist the comparison and its rate-level audit log atomically. On the pool
+  // these ran as two autocommits, so a crash between them left a saved
+  // comparison with no audit trail (DB-3). Callers that need durability should
+  // use this instead of the two methods separately.
+  async saveComparisonWithAuditLog(
     nwsSnapshot: NormalizedWorkloadSpec,
     resultSnapshot: ComparisonResult,
   ): Promise<void> {
-    await (
-      await this.getPool()
-    ).query(
+    await this.withTransaction(async (queryRunner) => {
+      await this.saveComparison(nwsSnapshot, resultSnapshot, queryRunner);
+      await this.recordComparisonAuditLog(resultSnapshot, queryRunner);
+    });
+  }
+
+  async saveComparison(
+    nwsSnapshot: NormalizedWorkloadSpec,
+    resultSnapshot: ComparisonResult,
+    runner?: PgQueryRunner,
+  ): Promise<void> {
+    const queryRunner = runner ?? (await this.getPool());
+    await queryRunner.query(
       `
         INSERT INTO comparisons (
           id,
@@ -671,7 +685,10 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     );
   }
 
-  async recordComparisonAuditLog(resultSnapshot: ComparisonResult): Promise<void> {
+  async recordComparisonAuditLog(
+    resultSnapshot: ComparisonResult,
+    runner?: PgQueryRunner,
+  ): Promise<void> {
     const rows = resultSnapshot.providers.flatMap((provider) =>
       provider.lineItems.map((lineItem) => ({
         comparison_id: resultSnapshot.comparisonId,
@@ -707,9 +724,8 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
       return;
     }
 
-    await (
-      await this.getPool()
-    ).query(
+    const queryRunner = runner ?? (await this.getPool());
+    await queryRunner.query(
       `
         INSERT INTO comparison_audit_logs (
           comparison_id,
@@ -2879,7 +2895,11 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
   }
 
   async recordTeamAuditEvent(input: TeamAuditEventInput): Promise<TeamAuditEventRecord> {
-    return this.insertTeamAuditEvent(await this.getPool(), input);
+    // The audit-event insert and its export-outbox enqueue must commit atomically:
+    // on the raw pool they ran as two autocommits, so a crash (or a failed outbox
+    // insert) between them left a logged compliance event that would never be
+    // exported to the webhook. Wrap both in a single transaction.
+    return this.withTransaction((queryRunner) => this.insertTeamAuditEvent(queryRunner, input));
   }
 
   private async insertTeamAuditEvent(

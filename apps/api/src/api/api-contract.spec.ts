@@ -1390,6 +1390,7 @@ describe('API contracts', () => {
     const repository = {
       saveComparison: jest.fn(async () => undefined),
       recordComparisonAuditLog: jest.fn(async () => undefined),
+      saveComparisonWithAuditLog: jest.fn(async () => undefined),
       getComparison: jest.fn(async () => ({
         nwsSnapshot: validNws,
         resultSnapshot: comparisonResult,
@@ -1415,8 +1416,7 @@ describe('API contracts', () => {
     await expect(service.createComparison(validNws, { useLivePricing: false })).resolves.toEqual(
       comparisonResult,
     );
-    expect(repository.saveComparison).toHaveBeenCalledWith(validNws, comparisonResult);
-    expect(repository.recordComparisonAuditLog).toHaveBeenCalledWith(comparisonResult);
+    expect(repository.saveComparisonWithAuditLog).toHaveBeenCalledWith(validNws, comparisonResult);
     expect(prewarm.enqueue).toHaveBeenCalledWith(comparisonResult);
     await expect(service.getComparison(comparisonResult.comparisonId)).resolves.toEqual({
       nwsSnapshot: validNws,
@@ -1485,6 +1485,7 @@ describe('API contracts', () => {
     const repository = {
       saveComparison: jest.fn(async () => undefined),
       recordComparisonAuditLog: jest.fn(async () => undefined),
+      saveComparisonWithAuditLog: jest.fn(async () => undefined),
       getComparison: jest.fn(async () => ({
         nwsSnapshot: validNws,
         resultSnapshot: comparisonResult,
@@ -1520,17 +1521,7 @@ describe('API contracts', () => {
         },
       ],
     });
-    expect(repository.saveComparison).toHaveBeenCalledWith(validNws, {
-      ...refreshedResult,
-      warnings: [
-        {
-          providerId: 'azure',
-          code: 'live_refresh_failed',
-          message: 'azure live refresh failed: provider throttled',
-        },
-      ],
-    });
-    expect(repository.recordComparisonAuditLog).toHaveBeenCalledWith({
+    expect(repository.saveComparisonWithAuditLog).toHaveBeenCalledWith(validNws, {
       ...refreshedResult,
       warnings: [
         {
@@ -1559,6 +1550,7 @@ describe('API contracts', () => {
     const repository = {
       saveComparison: jest.fn(async () => undefined),
       recordComparisonAuditLog: jest.fn(async () => undefined),
+      saveComparisonWithAuditLog: jest.fn(async () => undefined),
       getDataHealth: jest.fn(async () => staleDataHealth),
     };
     const service = new ComparisonApplicationService(
@@ -1580,8 +1572,7 @@ describe('API contracts', () => {
     };
 
     await expect(service.createComparison(validNws)).resolves.toEqual(expected);
-    expect(repository.saveComparison).toHaveBeenCalledWith(validNws, expected);
-    expect(repository.recordComparisonAuditLog).toHaveBeenCalledWith(expected);
+    expect(repository.saveComparisonWithAuditLog).toHaveBeenCalledWith(validNws, expected);
   });
 
   it('reports comparison application not-found and disabled live-refresh failures', async () => {
