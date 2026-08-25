@@ -2398,7 +2398,7 @@ describe('BillingService', () => {
     });
     const service = new BillingService(repository as never);
 
-    const packet = await service.getInvoiceEvidencePacket(
+    const packet = await service.exportInvoiceEvidencePacket(
       '66666666-6666-4666-8666-666666666666',
       identity,
     );
@@ -2658,7 +2658,7 @@ describe('BillingService', () => {
       ),
     );
 
-    const packet = await service.getInvoiceEvidencePacket(
+    const packet = await service.exportInvoiceEvidencePacket(
       '66666666-6666-4666-8666-666666666666',
       identity,
     );
@@ -2759,7 +2759,7 @@ describe('BillingService', () => {
       ),
     );
 
-    const packet = await service.getInvoiceEvidencePacket(
+    const packet = await service.exportInvoiceEvidencePacket(
       '66666666-6666-4666-8666-666666666666',
       identity,
     );
@@ -4899,7 +4899,7 @@ describe('BillingService', () => {
       'Team admin access is required for billing reconciliation',
     );
     await expectForbidden(
-      service.getInvoiceEvidencePacket('66666666-6666-4666-8666-666666666666', memberIdentity),
+      service.exportInvoiceEvidencePacket('66666666-6666-4666-8666-666666666666', memberIdentity),
       'Team admin access is required for billing reconciliation',
     );
     await expectForbidden(

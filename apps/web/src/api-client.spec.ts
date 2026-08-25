@@ -1081,7 +1081,7 @@ describe('api client', () => {
     const client = createPolyCostClient('http://api.test/api/v1');
 
     await expect(
-      client.getInvoiceEvidencePacket('reconciliation-1', 'session-token'),
+      client.exportInvoiceEvidencePacket('reconciliation-1', 'session-token'),
     ).resolves.toEqual(
       expect.objectContaining({
         packetVersion: 'invoice-evidence-packet/v1',
@@ -1092,8 +1092,9 @@ describe('api client', () => {
       }),
     );
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://api.test/api/v1/billing/reconciliations/reconciliation-1/evidence-packet',
+      'http://api.test/api/v1/billing/reconciliations/reconciliation-1/evidence-packet/export',
       expect.objectContaining({
+        method: 'POST',
         headers: expect.objectContaining({
           Authorization: 'Bearer session-token',
         }),

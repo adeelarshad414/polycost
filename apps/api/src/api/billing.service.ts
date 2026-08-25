@@ -403,7 +403,10 @@ export class BillingService {
     );
   }
 
-  async getInvoiceEvidencePacket(
+  // Exports (notarizes + audits) an invoice evidence packet. This mutates —
+  // outbound notary delivery when configured, plus a team audit event — so it is
+  // reached via POST, never a GET.
+  async exportInvoiceEvidencePacket(
     reconciliationId: string,
     identity: AuthIdentity,
   ): Promise<InvoiceEvidencePacketResponse> {
