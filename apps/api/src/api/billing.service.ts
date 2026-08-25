@@ -403,7 +403,10 @@ export class BillingService {
     );
   }
 
-  async getInvoiceEvidencePacket(
+  // Exports (notarizes + audits) an invoice evidence packet. This mutates —
+  // outbound notary delivery when configured, plus a team audit event — so it is
+  // reached via POST, never a GET.
+  async exportInvoiceEvidencePacket(
     reconciliationId: string,
     identity: AuthIdentity,
   ): Promise<InvoiceEvidencePacketResponse> {
@@ -2174,15 +2177,39 @@ function firstString(row: Record<string, unknown>, keys: readonly string[]): str
   return undefined;
 }
 
+// Parse a numeric value that may arrive as a number or a string. Unlike a bare
+// Number.parseFloat, this correctly handles US-style thousands separators: a
+// provider cost of "1,234.56" must become 1234.56, not 1 (parseFloat stops at
+// the first comma, silently under-counting invoiced money by orders of
+// magnitude). Grouping commas are stripped ONLY when the entire string is a
+// well-formed grouped number, so genuinely malformed input still falls through
+// to parseFloat's existing behavior rather than being coerced into a wrong value.
+function parseNumericLike(value: unknown): number {
+  if (typeof value === 'number') {
+    return value;
+  }
+
+  if (typeof value !== 'string') {
+    return Number.NaN;
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return Number.NaN;
+  }
+
+  const normalized = /^[+-]?\d{1,3}(,\d{3})+(\.\d+)?$/.test(trimmed)
+    ? trimmed.replace(/,/g, '')
+    : trimmed;
+
+  return Number.parseFloat(normalized);
+}
+
 function firstNumber(row: Record<string, unknown>, keys: readonly string[]): number | undefined {
   for (const key of keys) {
     const value = rowValue(row, key);
-    const parsed =
-      typeof value === 'number'
-        ? value
-        : typeof value === 'string' && value.trim()
-          ? Number.parseFloat(value)
-          : Number.NaN;
+    const parsed = parseNumericLike(value);
 
     if (Number.isFinite(parsed)) {
       return parsed;
@@ -2701,7 +2728,7 @@ function parseOptionalRetentionDays(value: unknown): number | undefined {
     return undefined;
   }
 
-  const parsed = typeof value === 'number' ? value : Number.parseFloat(String(value));
+  const parsed = parseNumericLike(value);
 
   if (!Number.isInteger(parsed) || parsed < 1 || parsed > MAX_INVOICE_ARTIFACT_RETENTION_DAYS) {
     throw new ApiValidationError('retentionDays is invalid', [
@@ -2979,7 +3006,7 @@ function parseSha256(value: unknown, field: string): string {
 }
 
 function parseFiniteNumber(value: unknown, field: string): number {
-  const parsed = typeof value === 'number' ? value : Number.parseFloat(String(value));
+  const parsed = parseNumericLike(value);
 
   if (!Number.isFinite(parsed)) {
     throw new ApiValidationError(`${field} must be a number`, [

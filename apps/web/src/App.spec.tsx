@@ -837,7 +837,7 @@ describe('App', () => {
     await click(buttonByText(container, 'Download evidence packet'));
     await settleAsyncEffects();
 
-    expect(client.getInvoiceEvidencePacket).toHaveBeenCalledWith(
+    expect(client.exportInvoiceEvidencePacket).toHaveBeenCalledWith(
       '66666666-6666-4666-8666-666666666666',
       'session-token',
     );
@@ -5025,7 +5025,7 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
         reviewer: 'risk-review@example.com',
       },
     ]),
-    getInvoiceEvidencePacket: jest.fn(async () => ({
+    exportInvoiceEvidencePacket: jest.fn(async () => ({
       packetVersion: 'invoice-evidence-packet/v1' as const,
       packetStatus: 'blocked' as const,
       generatedAt: '2026-07-08T00:00:00.000Z',

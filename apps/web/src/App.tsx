@@ -3371,7 +3371,7 @@ function WorkspaceControlCenter({
     onError(null);
 
     try {
-      const packet = await client.getInvoiceEvidencePacket(reconciliation.id, token);
+      const packet = await client.exportInvoiceEvidencePacket(reconciliation.id, token);
       const digestPrefix = packet.integrity.payloadDigestSha256.slice(0, 12);
 
       downloadBlob(

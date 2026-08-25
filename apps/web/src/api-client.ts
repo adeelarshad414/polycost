@@ -267,7 +267,7 @@ export interface PolyCostClient {
     importRunId: string,
     token: string,
   ): Promise<InvoiceArtifactPolicyExceptionQueueItem[]>;
-  getInvoiceEvidencePacket(
+  exportInvoiceEvidencePacket(
     reconciliationId: string,
     token: string,
   ): Promise<InvoiceEvidencePacketResponse>;
@@ -797,11 +797,12 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         },
       );
     },
-    getInvoiceEvidencePacket(reconciliationId, token) {
+    exportInvoiceEvidencePacket(reconciliationId, token) {
       return requestJson<InvoiceEvidencePacketResponse>(
         baseUrl,
-        `/billing/reconciliations/${encodeURIComponent(reconciliationId)}/evidence-packet`,
+        `/billing/reconciliations/${encodeURIComponent(reconciliationId)}/evidence-packet/export`,
         {
+          method: 'POST',
           headers: authorizationHeaders(token),
         },
       );

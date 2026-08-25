@@ -1220,6 +1220,68 @@ describe('BillingService', () => {
     );
   });
 
+  it('Phase 1: parses provider costs with thousands separators instead of truncating at the comma', async () => {
+    const repository = repositoryMock();
+    repository.createBillingImport.mockImplementation(async (input) => ({
+      importRun: {
+        id: '55555555-5555-4555-8555-555555555555',
+        teamId: identity.teamId,
+        provider: input.importInput.provider,
+        sourceType: input.importInput.sourceType,
+        status: 'completed' as const,
+        billingPeriodStart: input.importInput.billingPeriodStart,
+        billingPeriodEnd: input.importInput.billingPeriodEnd,
+        originalFileSha256: input.originalFileSha256,
+        rowsReceived: input.rows.length,
+        rowsAccepted: input.rows.length,
+        rowsRejected: 0,
+        totalCostUsd: 1234.56,
+        createdByAccountId: identity.accountId,
+        createdAt: '2026-07-06T00:00:00.000Z',
+        completedAt: '2026-07-06T00:00:01.000Z',
+      },
+      lineItems: input.rows.map((row, index) => ({
+        id: `line-${index}`,
+        importRunId: '55555555-5555-4555-8555-555555555555',
+        teamId: identity.teamId,
+        provider: input.importInput.provider,
+        billingPeriodStart: input.importInput.billingPeriodStart,
+        billingPeriodEnd: input.importInput.billingPeriodEnd,
+        ...row,
+        createdAt: '2026-07-06T00:00:01.000Z',
+      })),
+    }));
+    const service = new BillingService(repository as never);
+
+    await service.importProviderExport(
+      {
+        provider: 'aws',
+        sourceType: 'aws-cur',
+        billingPeriodStart: '2026-06-01',
+        billingPeriodEnd: '2026-06-30',
+        content: [
+          'lineItem/ProductCode,lineItem/LineItemType,product/sku,lineItem/UsageStartDate,lineItem/UsageAmount,pricing/unit,lineItem/NetUnblendedCost,lineItem/CurrencyCode,product/region,lineItem/ResourceId,resourceTags/user:cost_center',
+          // Cost is written with a US thousands separator, e.g. from an
+          // Excel-massaged export. Number.parseFloat would stop at the comma and
+          // read this $1,234.56 charge as $1.
+          'AmazonEC2,Usage,sku-compute,2026-06-01T00:00:00Z,730,Hrs,"1,234.56",USD,us-east-1,i-demo,engineering',
+        ].join('\n'),
+      },
+      identity,
+    );
+
+    expect(repository.createBillingImport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rows: [
+          expect.objectContaining({
+            serviceName: 'AmazonEC2',
+            costUsd: 1234.56,
+          }),
+        ],
+      }),
+    );
+  });
+
   it('Phase 1: rejects a non-USD provider export instead of reconciling it as USD', async () => {
     const repository = repositoryMock();
     const service = new BillingService(repository as never);
@@ -2336,7 +2398,7 @@ describe('BillingService', () => {
     });
     const service = new BillingService(repository as never);
 
-    const packet = await service.getInvoiceEvidencePacket(
+    const packet = await service.exportInvoiceEvidencePacket(
       '66666666-6666-4666-8666-666666666666',
       identity,
     );
@@ -2596,7 +2658,7 @@ describe('BillingService', () => {
       ),
     );
 
-    const packet = await service.getInvoiceEvidencePacket(
+    const packet = await service.exportInvoiceEvidencePacket(
       '66666666-6666-4666-8666-666666666666',
       identity,
     );
@@ -2697,7 +2759,7 @@ describe('BillingService', () => {
       ),
     );
 
-    const packet = await service.getInvoiceEvidencePacket(
+    const packet = await service.exportInvoiceEvidencePacket(
       '66666666-6666-4666-8666-666666666666',
       identity,
     );
@@ -4837,7 +4899,7 @@ describe('BillingService', () => {
       'Team admin access is required for billing reconciliation',
     );
     await expectForbidden(
-      service.getInvoiceEvidencePacket('66666666-6666-4666-8666-666666666666', memberIdentity),
+      service.exportInvoiceEvidencePacket('66666666-6666-4666-8666-666666666666', memberIdentity),
       'Team admin access is required for billing reconciliation',
     );
     await expectForbidden(

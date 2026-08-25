@@ -45,9 +45,16 @@ export class BillingController {
     return this.billingService.listInvoiceArtifactPolicyExceptions(importRunId, request.auth!);
   }
 
-  @Get('reconciliations/:id/evidence-packet')
-  getInvoiceEvidencePacket(@Param('id') reconciliationId: string, @Req() request: RequestWithAuth) {
-    return this.billingService.getInvoiceEvidencePacket(reconciliationId, request.auth!);
+  // Exporting an evidence packet notarizes it (an outbound webhook delivery when
+  // configured) and writes a team audit event, so it is a POST action, not a
+  // safe/idempotent GET — a GET here would fire those side effects on every
+  // prefetch, cache revalidation, or retry.
+  @Post('reconciliations/:id/evidence-packet/export')
+  exportInvoiceEvidencePacket(
+    @Param('id') reconciliationId: string,
+    @Req() request: RequestWithAuth,
+  ) {
+    return this.billingService.exportInvoiceEvidencePacket(reconciliationId, request.auth!);
   }
 
   @Post('reconciliations/:id/artifacts')
