@@ -279,6 +279,30 @@ PolyCost keeps the core comparison workflow frictionless. Anonymous users can st
 parse requirements, upload diagrams, run comparisons, inspect pricing evidence, export
 reports, and create share links.
 
+### Anonymous comparison capability-URL model
+
+Comparisons, workloads, budgets, and alerts on the anonymous surface are **capability
+URLs**: they are keyed by an unguessable random UUID and are readable/actionable by
+anyone who holds that id. This is intentional — the core comparison flow requires no
+account. Callers can only reach a resource whose id they already have (list endpoints
+such as `GET /alerts` require the `workloadId`; there is no global enumeration).
+
+Abuse controls on this surface:
+
+- `POST /comparisons/:id/refresh-live` (the only action that re-queries provider
+  pricing) is per-client rate limited via `RATE_LIMIT_LIVE_REFRESH_PER_MINUTE`
+  (default 5/min), gated by `FEATURE_LIVE_PRICING_REFRESH_ENABLED`, and its per-group
+  results are cached for 60s. The live-pricing cache is bounded so distinct workloads
+  cannot grow it without limit. Provider pricing APIs (AWS/Azure public price lists,
+  GCP Cloud Billing Catalog) are free, so refresh-live has no per-call monetary cost;
+  the rate limit bounds bandwidth/CPU.
+- Treat a comparison/share-link URL like a secret: anyone with the link can view the
+  report. Share links additionally support an optional password and revocation.
+
+For account-bound, tenant-isolated data (teams, billing reconciliation, invoice
+artifacts, SCIM), a signed-in owner/admin session is always required and every such
+route is scoped to the caller's team.
+
 Accounts add workspace controls on top of that core flow:
 
 - Profile email/display-name update, password change, logout, account session list,
