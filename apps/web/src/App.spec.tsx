@@ -1598,6 +1598,31 @@ describe('App', () => {
     unmount();
   });
 
+  it('makes horizontally-scrollable tables keyboard-focusable and labeled (UX-3)', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Compare costs'));
+    await click(
+      disclosureSummary(
+        resultDisclosureByTitle(container, 'Show full breakdown, pricing models & export options'),
+      ),
+    );
+
+    const wrappers = Array.from(
+      container.querySelectorAll('.table-wrap, .bulk-service-table-wrap'),
+    );
+    expect(wrappers.length).toBeGreaterThan(0);
+    for (const wrapper of wrappers) {
+      // Each overflow-x:auto scroll container must be reachable and scrollable by
+      // keyboard, and announced as a labeled region to assistive tech.
+      expect(wrapper.getAttribute('tabindex')).toBe('0');
+      expect((wrapper.getAttribute('aria-label') ?? '').trim().length).toBeGreaterThan(0);
+    }
+
+    unmount();
+  });
+
   it('shows quick refresh API errors on the results page', async () => {
     const client = clientMock({
       refreshLiveComparison: jest.fn(async () => {
