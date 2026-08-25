@@ -1600,6 +1600,20 @@ function providerRow(input: {
     ]);
   }
 
+  // Reconciliation compares this cost 1:1 against a USD estimate. A non-USD
+  // invoice cost would be summed as if it were USD, producing a wrong variance.
+  // PolyCost has no historical FX at ingestion, so reject rather than silently
+  // mis-reconcile. (Rows with no currency column are assumed USD.)
+  const rowCurrency = (input.currency ?? 'USD').trim().toUpperCase();
+  if (rowCurrency !== 'USD') {
+    throw new ApiValidationError(`${input.provider} billing row is not in USD`, [
+      {
+        field: `rows.${input.index}.currency`,
+        issue: `invoice currency ${rowCurrency} is not supported; PolyCost reconciles USD invoices only. Convert the export to USD before importing.`,
+      },
+    ]);
+  }
+
   const adjustmentClassification = classifyInvoiceAdjustment({
     row: input.row,
     serviceName: input.serviceName,

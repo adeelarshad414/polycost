@@ -1220,6 +1220,28 @@ describe('BillingService', () => {
     );
   });
 
+  it('Phase 1: rejects a non-USD provider export instead of reconciling it as USD', async () => {
+    const repository = repositoryMock();
+    const service = new BillingService(repository as never);
+
+    await expect(
+      service.importProviderExport(
+        {
+          provider: 'aws',
+          sourceType: 'aws-cur',
+          billingPeriodStart: '2026-06-01',
+          billingPeriodEnd: '2026-06-30',
+          content: [
+            'lineItem/ProductCode,lineItem/NetUnblendedCost,lineItem/CurrencyCode',
+            'AmazonEC2,107.00,EUR',
+          ].join('\n'),
+        },
+        identity,
+      ),
+    ).rejects.toThrow(/not in USD|currency/i);
+    expect(repository.createBillingImport).not.toHaveBeenCalled();
+  });
+
   it('imports Azure Cost Management exports through the native mapper', async () => {
     const repository = repositoryMock();
     repository.createBillingImport.mockImplementation(async (input) => ({
