@@ -47,6 +47,7 @@ const expectedMigrations = [
   '039_invoice_artifact_provider_retention_proof_persistence.sql',
   '040_team_scim_provisioning.sql',
   '041_pricing_catalog_live_indexes.sql',
+  '042_utc_timestamptz.sql',
 ];
 
 if (!['migrate', 'seed', 'reset', 'validate'].includes(command)) {
