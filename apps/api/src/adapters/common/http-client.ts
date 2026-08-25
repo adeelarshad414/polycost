@@ -1,4 +1,4 @@
-import { AdapterApiError } from './adapter-errors';
+import { AdapterApiError, AdapterError } from './adapter-errors';
 import { ProviderId } from './cloud-provider-adapter';
 
 export interface HttpResponseLike {
@@ -164,6 +164,35 @@ async function readBodyText(
     if (timer) {
       clearTimeout(timer);
     }
+  }
+}
+
+// Guard a follow-on pagination link (taken from a provider response body) before
+// fetching it. Provider "next page" URLs are attacker-influenceable data: a
+// compromised or spoofed feed could point them at an internal host to exfiltrate
+// credentials or reach the metadata service (SSRF). Only follow links that share
+// the exact scheme and host of the pinned pricing endpoint.
+export function assertSameProviderOrigin(
+  providerId: ProviderId,
+  candidateUrl: string,
+  pinnedUrl: string,
+): void {
+  let candidate: URL;
+  try {
+    candidate = new URL(candidateUrl);
+  } catch {
+    throw new AdapterError(
+      providerId,
+      `pagination link is not a valid absolute URL: ${candidateUrl}`,
+    );
+  }
+
+  const pinned = new URL(pinnedUrl);
+  if (candidate.protocol !== pinned.protocol || candidate.host !== pinned.host) {
+    throw new AdapterError(
+      providerId,
+      `refusing to follow pagination link to ${candidate.protocol}//${candidate.host}: it does not match the pinned pricing host ${pinned.protocol}//${pinned.host} (possible SSRF)`,
+    );
   }
 }
 

@@ -1,4 +1,4 @@
-import { parseJsonResponse } from './http-client';
+import { assertSameProviderOrigin, parseJsonResponse } from './http-client';
 
 // Build a minimal web-ReadableStream-like body that yields the given chunks, so
 // tests can exercise the streaming read path (real fetch exposes getReader()).
@@ -129,5 +129,37 @@ describe('http-client', () => {
     } finally {
       process.env.PROVIDER_HTTP_BODY_TIMEOUT_MS = previous;
     }
+  });
+
+  describe('assertSameProviderOrigin (M-B1)', () => {
+    const pinned = 'https://prices.azure.com/api/retail/prices';
+
+    it('allows a same-origin pagination link', () => {
+      expect(() =>
+        assertSameProviderOrigin(
+          'azure',
+          'https://prices.azure.com/api/retail/prices?$skip=100',
+          pinned,
+        ),
+      ).not.toThrow();
+    });
+
+    it('refuses a cross-host pagination link (SSRF)', () => {
+      expect(() =>
+        assertSameProviderOrigin('azure', 'https://169.254.169.254/latest/meta-data', pinned),
+      ).toThrow(/possible SSRF/);
+    });
+
+    it('refuses a scheme downgrade to the same host', () => {
+      expect(() =>
+        assertSameProviderOrigin('azure', 'http://prices.azure.com/api/retail/prices', pinned),
+      ).toThrow(/possible SSRF/);
+    });
+
+    it('refuses a non-absolute pagination link', () => {
+      expect(() =>
+        assertSameProviderOrigin('azure', '/api/retail/prices?$skip=100', pinned),
+      ).toThrow(/not a valid absolute URL/);
+    });
   });
 });

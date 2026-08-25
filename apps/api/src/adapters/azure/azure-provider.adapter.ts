@@ -7,7 +7,13 @@ import {
   RefreshPricingCatalogOptions,
   ServiceCategory,
 } from '../common/cloud-provider-adapter';
-import { defaultFetch, FetchLike, parseJsonResponse } from '../common/http-client';
+import {
+  assertSameProviderOrigin,
+  defaultFetch,
+  FetchLike,
+  parseJsonResponse,
+} from '../common/http-client';
+import { AdapterError } from '../common/adapter-errors';
 
 interface AzureRetailPricesResponse {
   Items: AzureRetailPriceItem[];
@@ -36,6 +42,11 @@ interface AzureRetailPriceItem {
 }
 
 const AZURE_RETAIL_PRICES_ENDPOINT = 'https://prices.azure.com/api/retail/prices';
+// Hard ceiling on paginated requests per category filter. The Azure Retail
+// Prices API returns 100 items/page; even an unfiltered catalog is well under
+// this. It exists so a misbehaving or hostile feed that always returns a
+// NextPageLink cannot loop forever (H-B4).
+const MAX_AZURE_RETAIL_PAGES = 5_000;
 
 const CATALOG_REFRESH_CATEGORIES = ['compute', 'storage', 'database', 'network'] as const;
 type CatalogRefreshCategory = (typeof CATALOG_REFRESH_CATEGORIES)[number];
@@ -113,8 +124,21 @@ export class AzureProviderAdapter extends BaseCloudProviderAdapter {
       url.searchParams.set('currencyCode', 'USD');
       url.searchParams.set('$filter', filter);
       let nextPageUrl: string | undefined = url.toString();
+      let pageCount = 0;
 
       while (nextPageUrl) {
+        pageCount += 1;
+        if (pageCount > MAX_AZURE_RETAIL_PAGES) {
+          throw new AdapterError(
+            this.providerId,
+            `retail prices pagination exceeded ${MAX_AZURE_RETAIL_PAGES} pages for filter "${filter}"; aborting to avoid an unbounded loop`,
+          );
+        }
+
+        // The NextPageLink comes from the response body — untrusted data — so it
+        // must resolve to the pinned Azure pricing host before we fetch it.
+        assertSameProviderOrigin(this.providerId, nextPageUrl, AZURE_RETAIL_PRICES_ENDPOINT);
+
         const response = await this.fetchClient(nextPageUrl);
         const parsed = await parseJsonResponse<AzureRetailPricesResponse>(
           this.providerId,
