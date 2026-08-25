@@ -2481,46 +2481,32 @@ describe('ApiDatabaseRepository', () => {
 
   it('records and lists team audit events with actor display context', async () => {
     const createdAt = new Date('2026-07-06T00:00:00.000Z');
-    const query = jest
-      .fn()
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            id: '99999999-9999-4999-8999-999999999999',
-            team_id: '22222222-2222-4222-8222-222222222222',
-            actor_account_id: '11111111-1111-4111-8111-111111111111',
-            actor_email: null,
-            action: 'team.invitation.created',
-            target_type: 'invitation',
-            target_id: '88888888-8888-4888-8888-888888888888',
-            metadata: {
-              email: 'finops@example.com',
-              role: 'member',
-            },
-            created_at: createdAt,
-          },
-        ],
-        rowCount: 1,
-      })
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            id: '99999999-9999-4999-8999-999999999999',
-            team_id: '22222222-2222-4222-8222-222222222222',
-            actor_account_id: '11111111-1111-4111-8111-111111111111',
-            actor_email: 'architect@example.com',
-            action: 'team.invitation.created',
-            target_type: 'invitation',
-            target_id: '88888888-8888-4888-8888-888888888888',
-            metadata: {
-              email: 'finops@example.com',
-              role: 'member',
-            },
-            created_at: createdAt,
-          },
-        ],
-        rowCount: 1,
-      });
+    const auditRow = (actorEmail: string | null) => ({
+      id: '99999999-9999-4999-8999-999999999999',
+      team_id: '22222222-2222-4222-8222-222222222222',
+      actor_account_id: '11111111-1111-4111-8111-111111111111',
+      actor_email: actorEmail,
+      action: 'team.invitation.created',
+      target_type: 'invitation',
+      target_id: '88888888-8888-4888-8888-888888888888',
+      metadata: {
+        email: 'finops@example.com',
+        role: 'member',
+      },
+      created_at: createdAt,
+    });
+    // Route by SQL text so the assertions are robust to the BEGIN/COMMIT that now
+    // wrap the standalone recordTeamAuditEvent path (DB-3: event + outbox must be
+    // atomic).
+    const query = jest.fn(async (text: string) => {
+      if (text.includes('INSERT INTO team_audit_events')) {
+        return { rows: [auditRow(null)], rowCount: 1 };
+      }
+      if (text.includes('FROM team_audit_events')) {
+        return { rows: [auditRow('architect@example.com')], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 0 };
+    });
     const repository = createRepository(query);
 
     await expect(
@@ -2551,25 +2537,83 @@ describe('ApiDatabaseRepository', () => {
       }),
     ]);
 
-    expect(query).toHaveBeenNthCalledWith(
-      1,
-      expect.stringContaining('INSERT INTO team_audit_events'),
-      [
-        '22222222-2222-4222-8222-222222222222',
-        '11111111-1111-4111-8111-111111111111',
-        'team.invitation.created',
-        'invitation',
-        '88888888-8888-4888-8888-888888888888',
-        JSON.stringify({
-          email: 'finops@example.com',
-          role: 'member',
-        }),
-      ],
-    );
-    expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining('FROM team_audit_events'), [
+    // The standalone audit write is wrapped in a transaction (BEGIN before the
+    // insert, COMMIT after, no ROLLBACK on the happy path).
+    const texts = query.mock.calls.map(([text]) => String(text));
+    expect(texts[0]).toBe('BEGIN');
+    expect(texts.some((text) => text.includes('COMMIT'))).toBe(true);
+    expect(texts.some((text) => text.includes('ROLLBACK'))).toBe(false);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO team_audit_events'), [
+      '22222222-2222-4222-8222-222222222222',
+      '11111111-1111-4111-8111-111111111111',
+      'team.invitation.created',
+      'invitation',
+      '88888888-8888-4888-8888-888888888888',
+      JSON.stringify({
+        email: 'finops@example.com',
+        role: 'member',
+      }),
+    ]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('FROM team_audit_events'), [
       '22222222-2222-4222-8222-222222222222',
       100,
     ]);
+  });
+
+  it('enqueues the audit export outbox atomically with the event on the standalone path (DB-3)', async () => {
+    const createdAt = new Date('2026-07-06T00:00:00.000Z');
+    const query = jest.fn(async (text: string) => {
+      if (text.includes('INSERT INTO team_audit_events')) {
+        return {
+          rows: [
+            {
+              id: '99999999-9999-4999-8999-999999999999',
+              team_id: '22222222-2222-4222-8222-222222222222',
+              actor_account_id: null,
+              actor_email: null,
+              action: 'team.invitation.created',
+              target_type: 'invitation',
+              target_id: null,
+              metadata: {},
+              created_at: createdAt,
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+    const pool = {
+      query,
+      end: jest.fn(async () => undefined),
+    } as unknown as PgPoolLike;
+    const repository = new ApiDatabaseRepository(
+      configServiceWith({ AUTH_AUDIT_EXPORT_MODE: 'webhook' }),
+      secretsReader,
+      () => pool,
+    );
+
+    await repository.recordTeamAuditEvent({
+      teamId: '22222222-2222-4222-8222-222222222222',
+      action: 'team.invitation.created',
+      targetType: 'invitation',
+    });
+
+    const texts = query.mock.calls.map(([text]) => String(text));
+    const eventIndex = texts.findIndex((text) => text.includes('INSERT INTO team_audit_events'));
+    const outboxIndex = texts.findIndex((text) =>
+      text.includes('INSERT INTO team_audit_event_exports'),
+    );
+    const commitIndex = texts.findIndex((text) => text.includes('COMMIT'));
+
+    // BEGIN → event insert → outbox enqueue → COMMIT: the compliance event and
+    // its delivery outbox row commit as one unit, so there can be no
+    // logged-but-never-exported event.
+    expect(texts[0]).toBe('BEGIN');
+    expect(eventIndex).toBeGreaterThan(0);
+    expect(outboxIndex).toBeGreaterThan(eventIndex);
+    expect(commitIndex).toBeGreaterThan(outboxIndex);
+    expect(texts.some((text) => text.includes('ROLLBACK'))).toBe(false);
   });
 
   it('uses a checked-out database client for transaction-coupled audit writes', async () => {
@@ -2958,6 +3002,45 @@ describe('ApiDatabaseRepository', () => {
     // A failed evidence write must roll the transaction back rather than commit.
     expect(query.mock.calls.some(([text]) => String(text).includes('ROLLBACK'))).toBe(true);
     expect(query.mock.calls.some(([text]) => String(text).includes('COMMIT'))).toBe(false);
+  });
+
+  it('persists a comparison and its audit log atomically in one transaction (DB-3)', async () => {
+    const query = jest.fn(async (_text: string) => ({ rows: [], rowCount: 0 }));
+    const repository = createRepository(query);
+
+    await repository.saveComparisonWithAuditLog(nwsSnapshot as never, {
+      comparisonId: '11111111-1111-4111-8111-111111111111',
+      pricingAsOf: '2026-06-29T00:00:00.000Z',
+      cheapestProviderId: 'aws',
+      providers: [
+        {
+          providerId: 'aws',
+          lineItems: [
+            {
+              category: 'compute',
+              description: 'Compute',
+              baseMonthlyCostUsd: 10,
+              isApproximate: false,
+            },
+          ],
+        },
+      ],
+    } as never);
+
+    const texts = query.mock.calls.map(([text]) => String(text));
+    const comparisonIndex = texts.findIndex((text) => text.includes('INSERT INTO comparisons'));
+    const auditIndex = texts.findIndex((text) =>
+      text.includes('INSERT INTO comparison_audit_logs'),
+    );
+    const commitIndex = texts.findIndex((text) => text.includes('COMMIT'));
+
+    // BEGIN → comparison insert → audit-log insert → COMMIT: a saved comparison
+    // can never be missing its rate-level audit trail.
+    expect(texts[0]).toBe('BEGIN');
+    expect(comparisonIndex).toBeGreaterThan(0);
+    expect(auditIndex).toBeGreaterThan(comparisonIndex);
+    expect(commitIndex).toBeGreaterThan(auditIndex);
+    expect(texts.some((text) => text.includes('ROLLBACK'))).toBe(false);
   });
 });
 

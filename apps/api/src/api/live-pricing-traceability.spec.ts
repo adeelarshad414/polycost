@@ -117,7 +117,7 @@ describe('live pricing traceability', () => {
       normalizedWriterMock(),
     );
     const repository = {
-      saveComparison: jest.fn(
+      saveComparisonWithAuditLog: jest.fn(
         async (nwsSnapshot: NormalizedWorkloadSpec, resultSnapshot: ComparisonResult) => {
           snapshotStore.current = {
             nwsSnapshot,
