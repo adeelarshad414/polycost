@@ -3042,6 +3042,114 @@ describe('ApiDatabaseRepository', () => {
     expect(commitIndex).toBeGreaterThan(auditIndex);
     expect(texts.some((text) => text.includes('ROLLBACK'))).toBe(false);
   });
+
+  it('batches invoice line-item inserts and dedups repeated hashes within the import (DB-4)', async () => {
+    const createdAt = new Date('2026-07-06T00:00:00.000Z');
+    const billingDate = new Date('2026-06-01T00:00:00.000Z');
+    const importRunBase = {
+      id: '55555555-5555-4555-8555-555555555555',
+      team_id: null,
+      provider: 'aws',
+      source_type: 'aws-cur',
+      status: 'completed',
+      billing_period_start: billingDate,
+      billing_period_end: billingDate,
+      original_file_sha256: 'a'.repeat(64),
+      rows_received: 3,
+      rows_accepted: 0,
+      rows_rejected: 0,
+      total_cost_usd: '0',
+      created_by_account_id: null,
+      created_at: createdAt,
+      completed_at: createdAt,
+      error_detail: null,
+    };
+    const query = jest.fn(async (text: string, values?: unknown[]) => {
+      if (text.includes('INSERT INTO billing_import_runs')) {
+        return { rows: [importRunBase], rowCount: 1 };
+      }
+      if (text.includes('INSERT INTO invoice_line_items')) {
+        const payload = JSON.parse(String(values?.[0])) as Array<{
+          line_item_hash: string;
+          cost_usd: number;
+        }>;
+        return {
+          rows: payload.map((entry, index) => ({
+            id: `line-${index}`,
+            import_run_id: importRunBase.id,
+            team_id: null,
+            provider: 'aws',
+            billing_period_start: billingDate,
+            billing_period_end: billingDate,
+            usage_start: null,
+            usage_end: null,
+            service_name: 'AmazonEC2',
+            sku_id: null,
+            region: null,
+            resource_id: null,
+            usage_quantity: null,
+            usage_unit: null,
+            cost_usd: String(entry.cost_usd),
+            currency: 'USD',
+            tags: {},
+            raw_payload: {},
+            line_item_hash: entry.line_item_hash,
+            matched_comparison_id: null,
+            matched_trace_key: null,
+            created_at: createdAt,
+          })),
+          rowCount: payload.length,
+        };
+      }
+      if (text.includes('UPDATE billing_import_runs')) {
+        return {
+          rows: [
+            {
+              ...importRunBase,
+              rows_accepted: values?.[1],
+              rows_rejected: values?.[2],
+              total_cost_usd: String(values?.[3]),
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+    const repository = createRepository(query);
+
+    const lineItem = (lineItemHash: string, costUsd: number) => ({
+      serviceName: 'AmazonEC2',
+      costUsd,
+      lineItemHash,
+    });
+
+    const result = await repository.createBillingImport({
+      importInput: {
+        provider: 'aws',
+        sourceType: 'aws-cur',
+        billingPeriodStart: '2026-06-01',
+        billingPeriodEnd: '2026-06-30',
+        rows: [],
+      },
+      originalFileSha256: 'a'.repeat(64),
+      // Third row repeats the first row's hash: the import must count it as a
+      // reject, not double-insert it.
+      rows: [lineItem('a'.repeat(64), 100), lineItem('c'.repeat(64), 50), lineItem('a'.repeat(64), 100)],
+    });
+
+    const lineItemInsertCalls = query.mock.calls.filter(([text]) =>
+      String(text).includes('INSERT INTO invoice_line_items'),
+    );
+    // One batched statement for the whole import, not one per row.
+    expect(lineItemInsertCalls).toHaveLength(1);
+    const insertedPayload = JSON.parse(String(lineItemInsertCalls[0]?.[1]?.[0])) as unknown[];
+    expect(insertedPayload).toHaveLength(2); // 'a' hash deduped
+    expect(result.lineItems).toHaveLength(2);
+    expect(result.importRun.rowsAccepted).toBe(2);
+    expect(result.importRun.rowsRejected).toBe(1);
+    expect(result.importRun.totalCostUsd).toBe(150);
+  });
 });
 
 function createRepository(query: jest.Mock): ApiDatabaseRepository {
