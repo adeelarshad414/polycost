@@ -585,5 +585,8 @@ export interface InvoiceReconciliationRecord {
   variancePercent: number;
   status: InvoiceReconciliationStatus;
   evidence: Record<string, unknown>;
+  // DB-computed md5 of the evidence JSON at read time, used as an optimistic
+  // concurrency token so a stale read cannot silently clobber a concurrent write.
+  evidenceHash: string;
   createdAt: string;
 }

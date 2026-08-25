@@ -40,6 +40,14 @@ export class ApiForbiddenError extends Error {
   }
 }
 
+export class ApiConflictError extends Error {
+  constructor(message = 'Conflict') {
+    super(message);
+    this.name = 'ApiConflictError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
 export class RateLimitExceededError extends Error {
   constructor(
     message: string,

@@ -9,6 +9,7 @@ import { calculateEgressCost } from '../pricing-normalization/egress-tier-calcul
 import { providerRegionForCanonicalRegion } from '../pricing-normalization/region-map';
 import { SecretsReader, SecretsService } from '../secrets/secrets.service';
 import {
+  ApiConflictError,
   ApiNotFoundError,
   ApiValidationError,
   DataHealthResponse,
@@ -533,6 +534,7 @@ interface InvoiceReconciliationRow {
   variance_percent: string;
   status: InvoiceReconciliationStatus;
   evidence: Record<string, unknown>;
+  evidence_hash: string;
   created_at: Date;
 }
 
@@ -4299,6 +4301,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
                     variance_percent,
                     status,
                     evidence,
+                    md5(evidence::text) AS evidence_hash,
                     created_at
         `,
         [
@@ -4350,6 +4353,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
                variance_percent,
                status,
                evidence,
+               md5(evidence::text) AS evidence_hash,
                created_at
         FROM invoice_reconciliation_results
         WHERE import_run_id = $1
@@ -4378,6 +4382,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
                variance_percent,
                status,
                evidence,
+               md5(evidence::text) AS evidence_hash,
                created_at
         FROM invoice_reconciliation_results
         WHERE id = $1
@@ -4392,6 +4397,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
   async updateInvoiceReconciliationEvidence(input: {
     reconciliationId: string;
     evidence: Record<string, unknown>;
+    expectedEvidenceHash: string;
     audit?: TeamAuditEventInput;
   }): Promise<InvoiceReconciliationRecord> {
     return this.withTransaction(async (pool) => {
@@ -4400,6 +4406,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
           UPDATE invoice_reconciliation_results
           SET evidence = $2::jsonb
           WHERE id = $1
+            AND md5(evidence::text) = $3
           RETURNING id,
                     import_run_id,
                     comparison_id,
@@ -4410,15 +4417,19 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
                     variance_percent,
                     status,
                     evidence,
+                    md5(evidence::text) AS evidence_hash,
                     created_at
         `,
-        [input.reconciliationId, JSON.stringify(input.evidence)],
+        [input.reconciliationId, JSON.stringify(input.evidence), input.expectedEvidenceHash],
       );
       const row = result.rows[0];
 
       if (!row) {
-        throw new ApiNotFoundError(
-          `Invoice reconciliation ${input.reconciliationId} was not found`,
+        // Optimistic-concurrency guard: the evidence changed since it was read
+        // (or the row was removed). Fail loudly so the caller retries rather than
+        // silently clobbering a concurrent write.
+        throw new ApiConflictError(
+          `Invoice reconciliation ${input.reconciliationId} was modified concurrently; retry the operation`,
         );
       }
 
@@ -4467,6 +4478,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     malwareScanCheckedAt: string;
     malwareScanFinding?: string;
     evidence: Record<string, unknown>;
+    expectedEvidenceHash: string;
     audit?: TeamAuditEventInput;
   }): Promise<InvoiceReconciliationRecord> {
     return this.withTransaction(async (pool) => {
@@ -4581,6 +4593,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
           UPDATE invoice_reconciliation_results
           SET evidence = $2::jsonb
           WHERE id = $1
+            AND md5(evidence::text) = $3
           RETURNING id,
                     import_run_id,
                     comparison_id,
@@ -4591,15 +4604,18 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
                     variance_percent,
                     status,
                     evidence,
+                    md5(evidence::text) AS evidence_hash,
                     created_at
         `,
-        [input.reconciliationId, JSON.stringify(input.evidence)],
+        [input.reconciliationId, JSON.stringify(input.evidence), input.expectedEvidenceHash],
       );
       const row = result.rows[0];
 
       if (!row) {
-        throw new ApiNotFoundError(
-          `Invoice reconciliation ${input.reconciliationId} was not found`,
+        // Optimistic-concurrency guard: evidence changed since it was read
+        // (or the row was removed). Fail loudly so the caller retries.
+        throw new ApiConflictError(
+          `Invoice reconciliation ${input.reconciliationId} was modified concurrently; retry the operation`,
         );
       }
 
@@ -4628,6 +4644,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     artifactId: string;
     legalHold: boolean;
     evidence: Record<string, unknown>;
+    expectedEvidenceHash: string;
     audit?: TeamAuditEventInput;
   }): Promise<InvoiceReconciliationRecord> {
     return this.withTransaction(async (pool) => {
@@ -4653,6 +4670,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
           UPDATE invoice_reconciliation_results
           SET evidence = $2::jsonb
           WHERE id = $1
+            AND md5(evidence::text) = $3
           RETURNING id,
                     import_run_id,
                     comparison_id,
@@ -4663,15 +4681,18 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
                     variance_percent,
                     status,
                     evidence,
+                    md5(evidence::text) AS evidence_hash,
                     created_at
         `,
-        [input.reconciliationId, JSON.stringify(input.evidence)],
+        [input.reconciliationId, JSON.stringify(input.evidence), input.expectedEvidenceHash],
       );
       const row = result.rows[0];
 
       if (!row) {
-        throw new ApiNotFoundError(
-          `Invoice reconciliation ${input.reconciliationId} was not found`,
+        // Optimistic-concurrency guard: evidence changed since it was read
+        // (or the row was removed). Fail loudly so the caller retries.
+        throw new ApiConflictError(
+          `Invoice reconciliation ${input.reconciliationId} was modified concurrently; retry the operation`,
         );
       }
 
@@ -4700,6 +4721,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     artifactId: string;
     providerRetentionProof: InvoiceArtifactProviderRetentionProof;
     evidence: Record<string, unknown>;
+    expectedEvidenceHash: string;
     audit?: TeamAuditEventInput;
   }): Promise<InvoiceReconciliationRecord> {
     const providerRetentionProof = persistedProviderRetentionProof(input.providerRetentionProof);
@@ -4752,6 +4774,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
           UPDATE invoice_reconciliation_results
           SET evidence = $2::jsonb
           WHERE id = $1
+            AND md5(evidence::text) = $3
           RETURNING id,
                     import_run_id,
                     comparison_id,
@@ -4762,15 +4785,18 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
                     variance_percent,
                     status,
                     evidence,
+                    md5(evidence::text) AS evidence_hash,
                     created_at
         `,
-        [input.reconciliationId, JSON.stringify(input.evidence)],
+        [input.reconciliationId, JSON.stringify(input.evidence), input.expectedEvidenceHash],
       );
       const row = result.rows[0];
 
       if (!row) {
-        throw new ApiNotFoundError(
-          `Invoice reconciliation ${input.reconciliationId} was not found`,
+        // Optimistic-concurrency guard: evidence changed since it was read
+        // (or the row was removed). Fail loudly so the caller retries.
+        throw new ApiConflictError(
+          `Invoice reconciliation ${input.reconciliationId} was modified concurrently; retry the operation`,
         );
       }
 
@@ -5469,6 +5495,7 @@ function toInvoiceReconciliationRecord(row: InvoiceReconciliationRow): InvoiceRe
     variancePercent: Number.parseFloat(row.variance_percent),
     status: row.status,
     evidence: row.evidence,
+    evidenceHash: row.evidence_hash,
     createdAt: row.created_at.toISOString(),
   };
 }
