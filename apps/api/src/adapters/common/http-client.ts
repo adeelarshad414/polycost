@@ -54,6 +54,119 @@ export const defaultFetch: FetchLike = async (input, init) => {
   }
 };
 
+function tooLargeError(
+  providerId: ProviderId,
+  response: HttpResponseLike,
+  observedBytes: number,
+  maxBytes: number,
+): AdapterApiError {
+  return new AdapterApiError(
+    providerId,
+    response.status,
+    response.statusText,
+    `provider pricing response is too large to buffer safely: ${observedBytes} bytes exceeds the ${maxBytes} byte cap. Use a filtered/streaming pricing endpoint instead of the full bulk export (raise PROVIDER_HTTP_MAX_RESPONSE_BYTES only if the host can parse it).`,
+  );
+}
+
+// Returns a per-chunk async iterator over a response body, supporting both the
+// web ReadableStream that real fetch exposes (getReader) and a Node Readable /
+// async-iterable that tests may inject. Returns undefined when no stream body is
+// available (e.g. a test double that only implements text()).
+function streamChunks(
+  body: unknown,
+): AsyncIterable<Uint8Array> | undefined {
+  if (!body || typeof body !== 'object') {
+    return undefined;
+  }
+
+  const maybeReader = body as { getReader?: () => ReadableStreamDefaultReader<Uint8Array> };
+  if (typeof maybeReader.getReader === 'function') {
+    return {
+      async *[Symbol.asyncIterator]() {
+        const reader = maybeReader.getReader!();
+        try {
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) {
+              return;
+            }
+            if (value) {
+              yield value as Uint8Array;
+            }
+          }
+        } finally {
+          reader.releaseLock?.();
+        }
+      },
+    };
+  }
+
+  if (typeof (body as AsyncIterable<Uint8Array>)[Symbol.asyncIterator] === 'function') {
+    return body as AsyncIterable<Uint8Array>;
+  }
+
+  return undefined;
+}
+
+// Reads the response body to a string while enforcing an overall byte cap and an
+// overall wall-clock deadline. The cap is enforced *during* reading (H-B1: a
+// chunked body with no Content-Length cannot silently buffer past the limit),
+// and the deadline covers the whole body download (H-B2: fetch's own timeout
+// only guards the headers, so a slow-loris body would otherwise hang untimed).
+async function readBodyText(
+  providerId: ProviderId,
+  response: HttpResponseLike,
+  maxBytes: number,
+  timeoutMs: number,
+): Promise<string> {
+  let timer: NodeJS.Timeout | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      reject(
+        new AdapterApiError(
+          providerId,
+          response.status,
+          response.statusText,
+          `provider pricing response body did not complete within ${timeoutMs} ms`,
+        ),
+      );
+    }, timeoutMs);
+    if (typeof timer.unref === 'function') {
+      timer.unref();
+    }
+  });
+
+  const read = (async () => {
+    const chunks = streamChunks(response.body);
+    if (!chunks) {
+      const body = await response.text();
+      if (Buffer.byteLength(body, 'utf8') > maxBytes) {
+        throw tooLargeError(providerId, response, Buffer.byteLength(body, 'utf8'), maxBytes);
+      }
+      return body;
+    }
+
+    const collected: Uint8Array[] = [];
+    let total = 0;
+    for await (const chunk of chunks) {
+      total += chunk.byteLength;
+      if (total > maxBytes) {
+        throw tooLargeError(providerId, response, total, maxBytes);
+      }
+      collected.push(chunk);
+    }
+    return Buffer.concat(collected.map((chunk) => Buffer.from(chunk))).toString('utf8');
+  })();
+
+  try {
+    return await Promise.race([read, deadline]);
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
+}
+
 export async function parseJsonResponse<T>(
   providerId: ProviderId,
   response: HttpResponseLike,
@@ -62,17 +175,16 @@ export async function parseJsonResponse<T>(
     process.env.PROVIDER_HTTP_MAX_RESPONSE_BYTES,
     DEFAULT_HTTP_MAX_RESPONSE_BYTES,
   );
+  const bodyTimeoutMs = positiveInt(
+    process.env.PROVIDER_HTTP_BODY_TIMEOUT_MS ?? process.env.PROVIDER_HTTP_TIMEOUT_MS,
+    DEFAULT_HTTP_TIMEOUT_MS,
+  );
   const declaredLength = Number(response.headers?.get('content-length') ?? '');
   if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
-    throw new AdapterApiError(
-      providerId,
-      response.status,
-      response.statusText,
-      `provider pricing response is too large to buffer safely: ${declaredLength} bytes exceeds the ${maxBytes} byte cap. Use a filtered/streaming pricing endpoint instead of the full bulk export (raise PROVIDER_HTTP_MAX_RESPONSE_BYTES only if the host can parse it).`,
-    );
+    throw tooLargeError(providerId, response, declaredLength, maxBytes);
   }
 
-  const body = await response.text();
+  const body = await readBodyText(providerId, response, maxBytes, bodyTimeoutMs);
 
   if (!response.ok) {
     throw new AdapterApiError(providerId, response.status, response.statusText, body);
