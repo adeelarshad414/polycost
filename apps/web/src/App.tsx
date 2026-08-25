@@ -9040,7 +9040,11 @@ function BulkServiceImporter({
 
       {previewRows.length > 0 ? (
         <div className="bulk-service-preview" aria-label="Bulk service import preview">
-          <div className="bulk-service-table-wrap">
+          <div
+            className="bulk-service-table-wrap"
+            tabIndex={0}
+            aria-label="Bulk service import preview table"
+          >
             <table>
               <thead>
                 <tr>
@@ -9085,7 +9089,11 @@ function BulkServiceImporter({
           <strong>{rows.length}</strong>
         </div>
         {rows.length > 0 ? (
-          <div className="bulk-service-table-wrap">
+          <div
+            className="bulk-service-table-wrap"
+            tabIndex={0}
+            aria-label="Current bulk service mappings table"
+          >
             <table>
               <thead>
                 <tr>
@@ -11048,7 +11056,7 @@ function ServiceCheapestMatrix({
           mappings for architecture review.
         </p>
       </div>
-      <div className="table-wrap">
+      <div className="table-wrap" tabIndex={0} aria-label="Per-service decision matrix table">
         <table className="ranking-table service-matrix-table">
           <thead>
             <tr>
@@ -11183,7 +11191,11 @@ function ProviderDeltaAnalysisTable({ rows }: { rows: ProviderDeltaRow[] }) {
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap provider-delta-wrap">
+        <div
+          className="table-wrap provider-delta-wrap"
+          tabIndex={0}
+          aria-label="Why each service is cheaper table"
+        >
           <table className="ranking-table provider-delta-table">
             <thead>
               <tr>
@@ -11247,7 +11259,11 @@ function ServerCostCoverageMapPanel({
         </div>
       </div>
 
-      <div className="table-wrap provider-delta-wrap">
+      <div
+        className="table-wrap provider-delta-wrap"
+        tabIndex={0}
+        aria-label="Cost dimension coverage table"
+      >
         <table className="ranking-table provider-delta-table">
           <thead>
             <tr>
@@ -11303,7 +11319,11 @@ function ComputeSpecificationPanel({ rows }: { rows: ComputeSpecificationRow[] }
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap compute-specification-wrap">
+        <div
+          className="table-wrap compute-specification-wrap"
+          tabIndex={0}
+          aria-label="Compute specification comparison table"
+        >
           <table className="ranking-table compute-specification-table">
             <thead>
               <tr>
@@ -11468,7 +11488,11 @@ function ServerCommitmentExposurePanel({
           <h4>0% covered vs target blend vs 100% committed</h4>
         </div>
       </div>
-      <div className="table-wrap commitment-coverage-wrap">
+      <div
+        className="table-wrap commitment-coverage-wrap"
+        tabIndex={0}
+        aria-label="Commitment coverage cost table"
+      >
         <table className="ranking-table commitment-coverage-table">
           <thead>
             <tr>
@@ -11535,7 +11559,11 @@ function ServerOptimizationOpportunitiesPanel({
           <h4>Top deterministic savings actions</h4>
         </div>
       </div>
-      <div className="table-wrap provider-delta-wrap">
+      <div
+        className="table-wrap provider-delta-wrap"
+        tabIndex={0}
+        aria-label="Top savings actions table"
+      >
         <table className="ranking-table provider-delta-table">
           <thead>
             <tr>
@@ -11591,7 +11619,11 @@ function CommitmentCoverageGapPanel({ rows }: { rows: CommitmentCoverageGapRow[]
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap commitment-coverage-wrap">
+        <div
+          className="table-wrap commitment-coverage-wrap"
+          tabIndex={0}
+          aria-label="Commitment on-demand comparison table"
+        >
           <table className="ranking-table commitment-coverage-table">
             <thead>
               <tr>
@@ -11710,7 +11742,7 @@ function StorageOptimizationPanel({ rows }: { rows: StorageOptimizationRow[] }) 
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap storage-optimization-wrap">
+        <div className="table-wrap storage-optimization-wrap" tabIndex={0} aria-label="Storage optimization table">
           <table className="ranking-table storage-optimization-table">
             <thead>
               <tr>
@@ -11774,7 +11806,7 @@ function StorageAnatomyPanel({ rows }: { rows: StorageAnatomyRow[] }) {
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap storage-anatomy-wrap">
+        <div className="table-wrap storage-anatomy-wrap" tabIndex={0} aria-label="Storage anatomy table">
           <table className="ranking-table storage-anatomy-table">
             <thead>
               <tr>
@@ -11843,7 +11875,7 @@ function DatabaseOptimizationPanel({ rows }: { rows: DatabaseOptimizationRow[] }
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap database-optimization-wrap">
+        <div className="table-wrap database-optimization-wrap" tabIndex={0} aria-label="Database optimization table">
           <table className="ranking-table database-optimization-table">
             <thead>
               <tr>
@@ -11907,7 +11939,7 @@ function DatabaseAnatomyPanel({ rows }: { rows: DatabaseAnatomyRow[] }) {
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap database-anatomy-wrap">
+        <div className="table-wrap database-anatomy-wrap" tabIndex={0} aria-label="Database anatomy table">
           <table className="ranking-table database-anatomy-table">
             <thead>
               <tr>
@@ -11987,7 +12019,7 @@ function RuntimeOptimizationPanel({
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap runtime-optimization-wrap">
+        <div className="table-wrap runtime-optimization-wrap" tabIndex={0} aria-label="Runtime optimization table">
           <table className="ranking-table runtime-optimization-table">
             <thead>
               <tr>
@@ -12038,7 +12070,7 @@ function RuntimeOptimizationPanel({
       )}
 
       {memoryCurveRows.length > 0 && (
-        <div className="table-wrap runtime-memory-curve-wrap">
+        <div className="table-wrap runtime-memory-curve-wrap" tabIndex={0} aria-label="Runtime memory curve table">
           <table className="ranking-table runtime-memory-curve-table">
             <caption>Serverless memory-duration curve</caption>
             <thead>
@@ -12102,7 +12134,7 @@ function AppPlatformModelPanel({ rows }: { rows: AppPlatformModelRow[] }) {
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap app-platform-model-wrap">
+        <div className="table-wrap app-platform-model-wrap" tabIndex={0} aria-label="App platform model table">
           <table className="ranking-table app-platform-model-table">
             <thead>
               <tr>
@@ -12167,7 +12199,7 @@ function OperationsOptimizationPanel({ rows }: { rows: OperationsOptimizationRow
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap operations-optimization-wrap">
+        <div className="table-wrap operations-optimization-wrap" tabIndex={0} aria-label="Operations optimization table">
           <table className="ranking-table operations-optimization-table">
             <thead>
               <tr>
@@ -12231,7 +12263,7 @@ function EgressOptimizationPanel({ rows }: { rows: EgressOptimizationRow[] }) {
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap egress-optimization-wrap">
+        <div className="table-wrap egress-optimization-wrap" tabIndex={0} aria-label="Egress optimization table">
           <table className="ranking-table egress-optimization-table">
             <thead>
               <tr>
@@ -12295,7 +12327,7 @@ function NetworkingCostPanel({ rows }: { rows: NetworkingCostRow[] }) {
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap networking-cost-wrap">
+        <div className="table-wrap networking-cost-wrap" tabIndex={0} aria-label="Networking cost table">
           <table className="ranking-table networking-cost-table">
             <thead>
               <tr>
@@ -12357,7 +12389,7 @@ function SpotBlendOptimizerPanel({ rows }: { rows: SpotBlendOptimizerRow[] }) {
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap spot-blend-wrap">
+        <div className="table-wrap spot-blend-wrap" tabIndex={0} aria-label="Spot blend table">
           <table className="ranking-table spot-blend-table">
             <thead>
               <tr>
@@ -12432,7 +12464,7 @@ function LicenseOptimizationPanel({
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap license-optimization-wrap">
+        <div className="table-wrap license-optimization-wrap" tabIndex={0} aria-label="License optimization table">
           <table className="ranking-table license-optimization-table">
             <thead>
               <tr>
@@ -12532,7 +12564,7 @@ function ScenarioSensitivityTable({ rows }: { rows: SensitivityScenarioRow[] }) 
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap scenario-sensitivity-wrap">
+        <div className="table-wrap scenario-sensitivity-wrap" tabIndex={0} aria-label="Scenario sensitivity table">
           <table className="ranking-table scenario-sensitivity-table">
             <thead>
               <tr>
@@ -18974,7 +19006,7 @@ function ProviderRanking({
         <h3>Provider Ranking</h3>
         <span>{capitalize(interval)}</span>
       </div>
-      <div className="table-wrap">
+      <div className="table-wrap" tabIndex={0} aria-label="Provider ranking table">
         <table className="ranking-table">
           <thead>
             <tr>
