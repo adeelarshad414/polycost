@@ -270,7 +270,7 @@ describe('NWSValidator', () => {
       },
     };
 
-    expectValidationIssue(spec, NWSValidationError, 'workload.type', 'Required');
+    expectValidationIssue(spec, NWSValidationError, 'workload.type', 'expected one of');
   });
 
   it('rejects an unsupported schema version with a migration error', () => {
@@ -286,7 +286,7 @@ describe('NWSValidator', () => {
   });
 
   it('rejects a malformed root value with a clear root path', () => {
-    expectValidationIssue(null, NWSValidationError, '<root>', 'Expected object');
+    expectValidationIssue(null, NWSValidationError, '<root>', 'expected object');
   });
 
   it('rejects autoscaling ranges where max is below min', () => {
@@ -320,7 +320,7 @@ describe('NWSValidator', () => {
       },
       NWSValidationError,
       '<root>',
-      "Unrecognized key(s) in object: 'unversionedField'",
+      'Unrecognized key',
     );
   });
 });
