@@ -8,8 +8,11 @@
   --border-strong: #d6d3cb;
   --ink-900: #26241f;
   --ink-600: #5c5a57;
-  --ink-400: #8b8880;
-  --status-ok: #2e9e76;
+  /* Darkened to clear WCAG AA (4.5:1) as muted body text on all light surfaces
+     (canvas/card/raised). Was #8b8880 ≈ 3.2-3.5:1 (UX-1). */
+  --ink-400: #646259;
+  /* Darkened to clear AA as success text on light surfaces. Was #2e9e76 ≈ 3:1. */
+  --status-ok: #217255;
   --status-warn: #b45309;
   --status-crit: #c93338;
   --aws: #d85a30;
@@ -202,7 +205,9 @@
   --border-strong: #2f3850;
   --ink-900: #edeff5;
   --ink-600: #9aa1b2;
-  --ink-400: #646c80;
+  /* Lightened to clear WCAG AA (4.5:1) as muted body text on all dark surfaces.
+     Was #646c80 ≈ 3.1-3.7:1 (UX-1). Dark --status-ok already passes (>6:1). */
+  --ink-400: #868da2;
   --status-ok: #3fb68b;
   --status-warn: #f59e0b;
   --status-crit: #e5484d;
