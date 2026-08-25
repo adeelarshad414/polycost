@@ -38,6 +38,9 @@ interface LivePricingCacheEntry {
 const LIVE_PRICING_CACHE_TTL_MS = 60_000;
 const LIVE_PRICING_MAX_ATTEMPTS = 3;
 const LIVE_PRICING_BACKOFF_MS = 75;
+// SEC-5: cap the in-memory live-pricing cache so an anonymous caller varying
+// comparison workloads cannot grow it without bound (memory-exhaustion vector).
+const LIVE_PRICING_MAX_CACHE_ENTRIES = 500;
 
 @Injectable()
 export class LivePricingRefreshService {
@@ -152,6 +155,19 @@ export class LivePricingRefreshService {
       }),
     );
 
+    // Drop expired entries, then evict the oldest if still at capacity, so the
+    // cache can never grow without bound across distinct comparison workloads.
+    for (const [existingKey, entry] of this.livePricingCache) {
+      if (entry.expiresAt <= now) {
+        this.livePricingCache.delete(existingKey);
+      }
+    }
+    if (this.livePricingCache.size >= LIVE_PRICING_MAX_CACHE_ENTRIES) {
+      const oldestKey = this.livePricingCache.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.livePricingCache.delete(oldestKey);
+      }
+    }
     this.livePricingCache.set(key, {
       expiresAt: now + LIVE_PRICING_CACHE_TTL_MS,
       records,

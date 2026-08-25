@@ -98,7 +98,11 @@
 
 The four deep agents completed. These go **beyond** the baseline above. Most severe first.
 
-## 🔴🔴 SECURITY BLOCKERS (backend) — verify & fix before any real multi-tenant use
+## 🔴🔴 SECURITY BLOCKERS (backend) — Phase 0 status
+
+**FIXED & merged:** SEC-1 (#125), SEC-2 (#125), SEC-3 (#126), SEC-4 (#127), SEC-5 hardened via Option A (refresh-live rate-limit verified per-IP + bounded live-pricing cache + capability-URL model documented in README). The findings below are retained for the record.
+
+
 
 - **SEC-1 — `GET /api/v1/alerts` is unauthenticated and dumps every tenant's alerts.** No guard; `listAlerts` runs `WHERE ($1::uuid IS NULL OR workload_id=$1)` and with `workloadId` omitted returns **all budget alerts for all tenants** (thresholds, observed spend, anomaly %, messages). `api-database.repository.ts:1685-1706`, `cost-management.controller.ts:184`.
 - **SEC-2 — Cross-tenant destructive delete (IDOR).** `enforceInvoiceArtifactRetention` only checks the *caller's* team admin, then runs **global, unscoped** `deleteInvoiceArtifactBlobsByIds`. With `INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE=delete-expired`, one team's admin can permanently delete **every tenant's** expired invoice artifacts (DB rows + S3/Azure/GCS objects). `billing.service.ts:1253-1291`, `api-database.repository.ts:4842-4922`.
