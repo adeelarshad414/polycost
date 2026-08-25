@@ -216,6 +216,28 @@ describe('App', () => {
     unmount();
   });
 
+  it('keeps the panels that loaded when one workspace directory call fails (FE-5)', async () => {
+    const client = clientMock({
+      listTeamAuditEvents: jest.fn(async () => {
+        throw new PolyCostApiError(503, 'AUDIT_UNAVAILABLE', 'audit log temporarily unavailable');
+      }),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await submitForm(container.querySelector<HTMLFormElement>('.workspace-auth-form'));
+    await settleAsyncEffects();
+    await settleAsyncEffects();
+
+    // The audit call rejected, but the five that succeeded must still render —
+    // under the old Promise.all this would have discarded all of them.
+    expect(client.listTeamAuditEvents).toHaveBeenCalled();
+    expect(text(container)).toContain('OIDC ready · SAML ready');
+    expect(text(container)).toContain('SCIM provisioning');
+    expect(text(container)).toContain('Architecture team · owner');
+
+    unmount();
+  });
+
   it('clears expired stored workspace sessions while leaving anonymous comparison usable', async () => {
     window.localStorage.setItem('polycost-auth-session-v1', 'expired-token');
     window.localStorage.setItem('polycost-auth-session-expires-at-v1', '2000-01-01T00:00:00.000Z');

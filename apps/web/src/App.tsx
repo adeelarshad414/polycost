@@ -2190,7 +2190,10 @@ function WorkspaceControlCenter({
 
     setIsWorkspaceDirectoryLoading(true);
     setWorkspaceDirectoryError(null);
-    void Promise.all([
+    // Settle each panel independently: a single failing endpoint must not
+    // discard the five that succeeded (FE-5). Successful panels render their
+    // data; failures leave prior data intact and surface a message.
+    void Promise.allSettled([
       client.listTeamMembers(activeTeam.id, token),
       client.listTeamInvitations(activeTeam.id, token),
       client.listTeamAuditEvents(activeTeam.id, token),
@@ -2198,32 +2201,33 @@ function WorkspaceControlCenter({
       client.listTeamScimUsers(activeTeam.id, token),
       client.getSsoStatus(token),
     ])
-      .then(
-        ([
-          nextMembers,
-          nextInvitations,
-          nextAuditEvents,
-          nextScimTokens,
-          nextScimUsers,
-          nextSsoStatus,
-        ]) => {
-          if (!isMounted) {
-            return;
-          }
+      .then((results) => {
+        if (!isMounted) {
+          return;
+        }
 
-          setMembers(nextMembers);
-          setInvitations(nextInvitations);
-          setAuditEvents(nextAuditEvents);
-          setScimTokens(nextScimTokens);
-          setScimUsers(nextScimUsers);
-          setSsoStatus(nextSsoStatus);
+        const [membersR, invitationsR, auditR, scimTokensR, scimUsersR, ssoR] = results;
+        if (membersR.status === 'fulfilled') setMembers(membersR.value);
+        if (invitationsR.status === 'fulfilled') setInvitations(invitationsR.value);
+        if (auditR.status === 'fulfilled') setAuditEvents(auditR.value);
+        if (scimTokensR.status === 'fulfilled') setScimTokens(scimTokensR.value);
+        if (scimUsersR.status === 'fulfilled') setScimUsers(scimUsersR.value);
+        if (ssoR.status === 'fulfilled') setSsoStatus(ssoR.value);
+
+        const failures = results.filter(
+          (result): result is PromiseRejectedResult => result.status === 'rejected',
+        );
+
+        if (failures.length === 0) {
           setWorkspaceDirectoryError(null);
-        },
-      )
-      .catch((workspaceError) => {
-        if (isMounted) {
-          const message = formatApiError(workspaceError);
-          setWorkspaceDirectoryError(message);
+          return;
+        }
+
+        const message = formatApiError(failures[0].reason);
+        setWorkspaceDirectoryError(message);
+        // Only escalate to the global banner when nothing loaded; a partial
+        // failure stays scoped to the workspace panel so good data still shows.
+        if (failures.length === results.length) {
           onError(message);
         }
       })
