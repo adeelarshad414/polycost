@@ -607,6 +607,9 @@ export interface InvoiceArtifactBlobDeletionCandidate {
 
 const PROVIDERS: ProviderId[] = ['aws', 'azure', 'gcp'];
 const DATA_FRESHNESS_POLICY_HOURS = 48;
+// Rows per multi-row invoice line-item insert, bounding statement size while
+// collapsing a large import into a handful of round-trips.
+const INVOICE_LINE_ITEM_INSERT_CHUNK_SIZE = 500;
 type DatabaseTeamRole = TeamRole | 'viewer';
 type TeamAuditEventInput = {
   teamId: string;
@@ -4081,7 +4084,50 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
       );
       const importRunId = importResult.rows[0].id;
 
-      for (const row of input.rows) {
+      // Deduplicate by hash within the batch, keeping the first occurrence. The
+      // old per-row loop relied on ON CONFLICT DO NOTHING seeing the first insert
+      // in-transaction to drop later duplicates; a single multi-row insert cannot
+      // conflict against its own not-yet-visible rows, so the dedup is done here
+      // instead. The import_run_id is brand new, so there are no pre-existing rows
+      // to conflict with — only these intra-batch duplicates.
+      const seenLineItemHashes = new Set<string>();
+      const dedupedRows = input.rows.filter((row) => {
+        if (seenLineItemHashes.has(row.lineItemHash)) {
+          return false;
+        }
+        seenLineItemHashes.add(row.lineItemHash);
+        return true;
+      });
+
+      const insertedRowsByHash = new Map<string, InvoiceLineItemRow>();
+
+      for (
+        let offset = 0;
+        offset < dedupedRows.length;
+        offset += INVOICE_LINE_ITEM_INSERT_CHUNK_SIZE
+      ) {
+        const chunk = dedupedRows.slice(offset, offset + INVOICE_LINE_ITEM_INSERT_CHUNK_SIZE);
+        const payload = chunk.map((row) => ({
+          import_run_id: importRunId,
+          team_id: input.teamId ?? null,
+          provider: input.importInput.provider,
+          billing_period_start: input.importInput.billingPeriodStart,
+          billing_period_end: input.importInput.billingPeriodEnd,
+          usage_start: row.usageStart ?? null,
+          usage_end: row.usageEnd ?? null,
+          service_name: row.serviceName,
+          sku_id: row.skuId ?? null,
+          region: row.region ?? null,
+          resource_id: row.resourceId ?? null,
+          usage_quantity: row.usageQuantity ?? null,
+          usage_unit: row.usageUnit ?? null,
+          cost_usd: row.costUsd,
+          currency: row.currency ?? 'USD',
+          tags: row.tags ?? {},
+          raw_payload: row.rawPayload ?? {},
+          line_item_hash: row.lineItemHash,
+        }));
+
         const inserted = await pool.query<InvoiceLineItemRow>(
           `
             INSERT INTO invoice_line_items (
@@ -4104,10 +4150,43 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
               raw_payload,
               line_item_hash
             )
-            VALUES (
-              $1, $2, $3, $4, $5, $6, $7, $8,
-              $9, $10, $11, $12, $13, $14, $15,
-              $16::jsonb, $17::jsonb, $18
+            SELECT import_run_id,
+                   team_id,
+                   provider,
+                   billing_period_start,
+                   billing_period_end,
+                   usage_start,
+                   usage_end,
+                   service_name,
+                   sku_id,
+                   region,
+                   resource_id,
+                   usage_quantity,
+                   usage_unit,
+                   cost_usd,
+                   currency,
+                   tags,
+                   raw_payload,
+                   line_item_hash
+            FROM jsonb_to_recordset($1::jsonb) AS incoming(
+              import_run_id UUID,
+              team_id UUID,
+              provider TEXT,
+              billing_period_start DATE,
+              billing_period_end DATE,
+              usage_start TIMESTAMPTZ,
+              usage_end TIMESTAMPTZ,
+              service_name TEXT,
+              sku_id TEXT,
+              region TEXT,
+              resource_id TEXT,
+              usage_quantity NUMERIC,
+              usage_unit TEXT,
+              cost_usd NUMERIC,
+              currency TEXT,
+              tags JSONB,
+              raw_payload JSONB,
+              line_item_hash TEXT
             )
             ON CONFLICT (import_run_id, line_item_hash)
             DO NOTHING
@@ -4134,30 +4213,21 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
                       matched_trace_key,
                       created_at
           `,
-          [
-            importRunId,
-            input.teamId ?? null,
-            input.importInput.provider,
-            input.importInput.billingPeriodStart,
-            input.importInput.billingPeriodEnd,
-            row.usageStart ?? null,
-            row.usageEnd ?? null,
-            row.serviceName,
-            row.skuId ?? null,
-            row.region ?? null,
-            row.resourceId ?? null,
-            row.usageQuantity ?? null,
-            row.usageUnit ?? null,
-            row.costUsd,
-            row.currency ?? 'USD',
-            JSON.stringify(row.tags ?? {}),
-            JSON.stringify(row.rawPayload ?? {}),
-            row.lineItemHash,
-          ],
+          [JSON.stringify(payload)],
         );
 
-        if (inserted.rows[0]) {
-          importedLineItems.push(toInvoiceLineItemRecord(inserted.rows[0]));
+        for (const insertedRow of inserted.rows) {
+          insertedRowsByHash.set(insertedRow.line_item_hash, insertedRow);
+        }
+      }
+
+      // Preserve input order and inserted-only semantics: emit a record for each
+      // deduped row that was actually written (RETURNING row order is not
+      // guaranteed, so match back by hash).
+      for (const row of dedupedRows) {
+        const insertedRow = insertedRowsByHash.get(row.lineItemHash);
+        if (insertedRow) {
+          importedLineItems.push(toInvoiceLineItemRecord(insertedRow));
         }
       }
 
