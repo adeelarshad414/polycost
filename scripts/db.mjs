@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
@@ -175,7 +175,35 @@ function liveMigrationVersions(schemaMigrationsOutput) {
   return versions;
 }
 
+// A migration is applied atomically (psql --single-transaction) so that a failure
+// partway through rolls the whole file back instead of leaving the schema
+// half-migrated. The exception is a migration that must run outside a
+// transaction — CREATE INDEX CONCURRENTLY, or one that opts out with the
+// `-- migrate:no-transaction` marker — for which the flag is omitted. Combined
+// with ON_ERROR_STOP and IF NOT EXISTS / ON CONFLICT guards, migrations become
+// atomic and safely re-runnable.
+function migrationRunsInSingleTransaction(migration) {
+  const content = readFileSync(
+    path.join(root, 'database/migrations', migration),
+    'utf8',
+  );
+  if (/\bCONCURRENTLY\b/i.test(content)) {
+    return false;
+  }
+  if (content.includes('-- migrate:no-transaction')) {
+    return false;
+  }
+  return true;
+}
+
 function applyMigration(migration) {
+  const singleTransaction = migrationRunsInSingleTransaction(migration);
+  const transactionFlag = singleTransaction ? '--single-transaction ' : '';
+
+  if (!singleTransaction) {
+    console.log(`  (${migration} runs without a wrapping transaction)`);
+  }
+
   if (migration === '002_least_privilege_roles.sql') {
     runDocker([
       'compose',
@@ -184,7 +212,7 @@ function applyMigration(migration) {
       'postgres',
       'sh',
       '-lc',
-      'APP_DB_PASSWORD="$(cat /run/polycost-secrets/app_db_password)"; ETL_DB_PASSWORD="$(cat /run/polycost-secrets/etl_db_password)"; psql --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --set app_password="$APP_DB_PASSWORD" --set etl_password="$ETL_DB_PASSWORD" --file /polycost-migrations/002_least_privilege_roles.sql',
+      `APP_DB_PASSWORD="$(cat /run/polycost-secrets/app_db_password)"; ETL_DB_PASSWORD="$(cat /run/polycost-secrets/etl_db_password)"; psql ${transactionFlag}--username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --set app_password="$APP_DB_PASSWORD" --set etl_password="$ETL_DB_PASSWORD" --file /polycost-migrations/002_least_privilege_roles.sql`,
     ]);
     return;
   }
@@ -195,6 +223,7 @@ function applyMigration(migration) {
     '-T',
     'postgres',
     'psql',
+    ...(singleTransaction ? ['--single-transaction'] : []),
     '-U',
     'polycost_owner',
     '-d',
