@@ -138,7 +138,7 @@ export const workloadProfileSchema = z
       .object({
         scope: z.string().min(1),
         complianceLocked: z.boolean(),
-        frameworks: z.array(z.string().min(1)).optional(),
+        frameworks: z.array(z.string().min(1).max(200)).max(50).optional(),
       })
       .strict()
       .optional(),
@@ -159,11 +159,12 @@ export const workloadProfileSchema = z
       .array(
         z
           .object({
-            key: z.string().min(1),
-            value: z.string().min(1),
+            key: z.string().min(1).max(200),
+            value: z.string().min(1).max(500),
           })
           .strict(),
       )
+      .max(100)
       .optional(),
   })
   .strict();
@@ -244,9 +245,13 @@ export const normalizedWorkloadSpecSchema = z
           .strict(),
       })
       .strict(),
-    compute: z.array(computeComponentSchema),
-    storage: z.array(storageComponentSchema),
-    database: z.array(databaseComponentSchema),
+    // Bounded to prevent a single request from expanding into millions of
+    // per-component × 3-provider pricing iterations (DoS amplification). The cap
+    // sits above the diagram parser's 200-node ceiling so imported diagrams still
+    // validate.
+    compute: z.array(computeComponentSchema).max(250),
+    storage: z.array(storageComponentSchema).max(250),
+    database: z.array(databaseComponentSchema).max(250),
     network: z
       .object({
         estimatedMonthlyEgressGb: z.number().nonnegative().optional(),
@@ -286,8 +291,8 @@ export const normalizedWorkloadSpecSchema = z
       })
       .strict(),
     workloadProfile: workloadProfileSchema.optional(),
-    serviceRequirements: z.array(serviceRequirementSchema).optional(),
-    sourceTraceability: z.array(sourceTraceabilitySchema).optional(),
+    serviceRequirements: z.array(serviceRequirementSchema).max(200).optional(),
+    sourceTraceability: z.array(sourceTraceabilitySchema).max(1000).optional(),
   })
   .strict()
   .superRefine((spec, ctx) => {

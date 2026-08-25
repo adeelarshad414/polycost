@@ -66,6 +66,16 @@ describe('NWSValidator', () => {
     expect(NWSValidator.validate(baseSpec())).toEqual(baseSpec());
   });
 
+  it('rejects an oversized compute array (DoS amplification cap)', () => {
+    const spec = baseSpec();
+    spec.compute = Array.from({ length: 251 }, () => ({
+      role: 'web',
+      scalingType: 'fixed' as const,
+      instanceCount: 1,
+    }));
+    expect(() => NWSValidator.validate(spec)).toThrow(NWSValidationError);
+  });
+
   it('accepts a valid storage-only workload', () => {
     const spec = {
       ...baseSpec(),
