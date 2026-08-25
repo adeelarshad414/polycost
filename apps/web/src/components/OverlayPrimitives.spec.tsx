@@ -1,7 +1,7 @@
 import React, { act, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot, Root } from 'react-dom/client';
-import { Banner, ConfirmDialog, Dialog, ToastStack } from './OverlayPrimitives';
+import { Banner, ConfirmDialog, Dialog, Popover, ToastStack } from './OverlayPrimitives';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -80,6 +80,47 @@ describe('Overlay primitives', () => {
 
     expect(document.body.querySelector('[role="dialog"]')).toBeNull();
     expect(container.hasAttribute('aria-hidden')).toBe(false);
+    expect(document.activeElement).toBe(trigger);
+
+    unmount();
+  });
+
+  it('moves focus into the popover on open and returns it to the trigger on close (UX-2)', () => {
+    function Harness() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            Open popover
+          </button>
+          <Popover open={open} title="Pricing details" onOpenChange={setOpen}>
+            <button type="button">Popover action</button>
+          </Popover>
+        </>
+      );
+    }
+
+    const { container, unmount } = render(<Harness />);
+    const trigger = buttonByText(container, 'Open popover');
+
+    act(() => {
+      trigger.focus();
+      trigger.click();
+    });
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    // Focus moves into the popover content on open.
+    expect(document.body.querySelector('[role="dialog"]')).toBeInstanceOf(HTMLElement);
+    expect(document.activeElement).toBe(buttonByText(document.body, 'Popover action'));
+
+    act(() => {
+      dispatchKeyboard('Escape');
+    });
+
+    // Closing returns focus to the trigger instead of stranding the keyboard user.
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
     expect(document.activeElement).toBe(trigger);
 
     unmount();

@@ -283,6 +283,21 @@ export function Popover({ open, title, children, onOpenChange }: PopoverProps) {
       return undefined;
     }
 
+    // Remember where focus was so it can be returned when the popover closes
+    // (UX-2). Without this, a keyboard user who opens the popover is stranded and
+    // focus jumps to the top of the page on close.
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    // Move focus into the panel on open so its content is reachable. Deferred a
+    // tick so the panel is mounted; falls back to the panel itself (tabIndex=-1)
+    // when it has no focusable children.
+    const focusTimer = window.setTimeout(() => {
+      const panel = panelRef.current;
+      const target = focusableElements(panel)[0] ?? panel;
+      target?.focus();
+    }, 0);
+
     function handleDocumentPointer(event: MouseEvent) {
       if (!panelRef.current?.contains(event.target as Node)) {
         onOpenChange(false);
@@ -298,8 +313,10 @@ export function Popover({ open, title, children, onOpenChange }: PopoverProps) {
     document.addEventListener('mousedown', handleDocumentPointer);
     document.addEventListener('keydown', handleEscape);
     return () => {
+      window.clearTimeout(focusTimer);
       document.removeEventListener('mousedown', handleDocumentPointer);
       document.removeEventListener('keydown', handleEscape);
+      previouslyFocused?.focus();
     };
   }, [onOpenChange, open]);
 
@@ -314,6 +331,7 @@ export function Popover({ open, title, children, onOpenChange }: PopoverProps) {
       role="dialog"
       aria-modal="false"
       aria-labelledby={title ? titleId : undefined}
+      tabIndex={-1}
     >
       {title ? <h3 id={titleId}>{title}</h3> : null}
       <div className="pc-popover-body">{children}</div>
