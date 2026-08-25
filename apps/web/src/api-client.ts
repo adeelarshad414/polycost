@@ -1059,7 +1059,18 @@ async function requestJson<T>(
     throw await toApiError(response);
   }
 
-  return (await response.json()) as T;
+  try {
+    return (await response.json()) as T;
+  } catch {
+    // A 2xx with a malformed / non-JSON body would otherwise throw a raw
+    // SyntaxError and crash the app through the error boundary. Surface it as a
+    // typed API error the UI already knows how to display.
+    throw new PolyCostApiError(
+      response.status,
+      'MALFORMED_RESPONSE',
+      'The server returned a response that could not be read. Please try again.',
+    );
+  }
 }
 
 function normalizeHeaders(headers: HeadersInit | undefined): Record<string, string> {
