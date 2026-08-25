@@ -3377,6 +3377,9 @@ describe('BillingService', () => {
 
   it('lists invoice artifact policy exception queue rows for an imported billing run', async () => {
     const repository = repositoryMock();
+    // Relative to now so an approved-but-time-boxed exception stays "approved"
+    // rather than rotting to "expired" as wall-clock time passes the fixture date.
+    const futureExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
     repository.getBillingImport.mockResolvedValue({
       id: '55555555-5555-4555-8555-555555555555',
       teamId: identity.teamId,
@@ -3421,7 +3424,7 @@ describe('BillingService', () => {
                 policyExceptionStatus: 'approved',
                 policyExceptionReviewer: 'risk-review@example.com',
                 policyExceptionReason: 'Time-boxed risk acceptance.',
-                policyExceptionExpiresAt: '2026-08-10T00:00:00.000Z',
+                policyExceptionExpiresAt: futureExpiresAt,
                 policyExceptionRequestedAt: '2026-07-06T00:00:06.000Z',
                 storedBlob: {
                   storageStatus: 'stored',
@@ -3468,7 +3471,7 @@ describe('BillingService', () => {
         reviewStatus: 'approved',
         exceptionStatus: 'approved',
         reviewer: 'risk-review@example.com',
-        expiresAt: '2026-08-10T00:00:00.000Z',
+        expiresAt: futureExpiresAt,
         artifactBlobStored: true,
       }),
     ]);
@@ -3599,6 +3602,9 @@ describe('BillingService', () => {
 
   it('updates invoice artifact policy exception state without marking the artifact verified', async () => {
     const repository = repositoryMock();
+    // Must be in the future relative to now: the service rejects an approved
+    // exception whose expiry is already past, so a hardcoded date silently rots.
+    const futureExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
     const reconciliationRecord = {
       evidenceHash: 'a'.repeat(32),
       id: '66666666-6666-4666-8666-666666666666',
@@ -3690,7 +3696,7 @@ describe('BillingService', () => {
         exceptionStatus: 'approved',
         reviewer: 'risk-review@example.com',
         reason: 'Time-boxed exception approved for demo governance review.',
-        expiresAt: '2026-08-10T00:00:00.000Z',
+        expiresAt: futureExpiresAt,
         evidenceReference: 'exception://controls/artifact-1/approved',
         notes: 'Risk owner approved exception without invoice-grade verification.',
       },
@@ -3708,7 +3714,7 @@ describe('BillingService', () => {
       policyExceptionStatus: 'approved',
       policyExceptionReviewer: 'risk-review@example.com',
       policyExceptionReason: 'Time-boxed exception approved for demo governance review.',
-      policyExceptionExpiresAt: '2026-08-10T00:00:00.000Z',
+      policyExceptionExpiresAt: futureExpiresAt,
       policyExceptionEvidenceReference: 'exception://controls/artifact-1/approved',
       policyExceptionDecidedByAccountId: identity.accountId,
     });
@@ -3722,7 +3728,7 @@ describe('BillingService', () => {
             exceptionStatus: 'approved',
             reviewer: 'risk-review@example.com',
             reason: 'Time-boxed exception approved for demo governance review.',
-            expiresAt: '2026-08-10T00:00:00.000Z',
+            expiresAt: futureExpiresAt,
             evidenceReference: 'exception://controls/artifact-1/approved',
           }),
         }),
