@@ -9,7 +9,7 @@ import {
   RefreshPricingCatalogOptions,
   ServiceCategory,
 } from '../common/cloud-provider-adapter';
-import { AdapterCredentialError } from '../common/adapter-errors';
+import { AdapterCredentialError, AdapterError } from '../common/adapter-errors';
 import { defaultFetch, FetchLike, parseJsonResponse } from '../common/http-client';
 
 interface GcpServicesResponse {
@@ -74,6 +74,10 @@ interface GcpTokenResponse {
 }
 
 const GCP_CATALOG_ENDPOINT = 'https://cloudbilling.googleapis.com/v1/services';
+// Hard ceiling on paginated requests per listing. GCP returns up to 5000
+// items/page, so real catalogs need only a handful of pages; this bounds a feed
+// that keeps returning a nextPageToken forever (H-B4).
+const MAX_GCP_CATALOG_PAGES = 2_000;
 const GCP_DEFAULT_TOKEN_URI = 'https://oauth2.googleapis.com/token';
 const GCP_SECRET_PATH = 'polycost/providers/gcp';
 const GCP_BILLING_READ_SCOPE = 'https://www.googleapis.com/auth/cloud-billing.readonly';
@@ -171,8 +175,17 @@ export class GcpProviderAdapter extends BaseCloudProviderAdapter {
   private async fetchServices(token: string): Promise<GcpService[]> {
     const services: GcpService[] = [];
     let pageToken: string | undefined;
+    let pageCount = 0;
 
     do {
+      pageCount += 1;
+      if (pageCount > MAX_GCP_CATALOG_PAGES) {
+        throw new AdapterError(
+          this.providerId,
+          `service catalog pagination exceeded ${MAX_GCP_CATALOG_PAGES} pages; aborting to avoid an unbounded loop`,
+        );
+      }
+
       const url = new URL(GCP_CATALOG_ENDPOINT);
       url.searchParams.set('pageSize', '5000');
 
@@ -206,8 +219,17 @@ export class GcpProviderAdapter extends BaseCloudProviderAdapter {
   ): Promise<PricingCatalogRecord[]> {
     const records: PricingCatalogRecord[] = [];
     let pageToken: string | undefined;
+    let pageCount = 0;
 
     do {
+      pageCount += 1;
+      if (pageCount > MAX_GCP_CATALOG_PAGES) {
+        throw new AdapterError(
+          this.providerId,
+          `sku pagination for ${serviceName} exceeded ${MAX_GCP_CATALOG_PAGES} pages; aborting to avoid an unbounded loop`,
+        );
+      }
+
       const url = new URL(`https://cloudbilling.googleapis.com/v1/${serviceName}/skus`);
       url.searchParams.set('currencyCode', 'USD');
       url.searchParams.set('pageSize', '5000');

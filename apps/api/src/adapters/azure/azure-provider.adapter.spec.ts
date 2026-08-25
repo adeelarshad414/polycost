@@ -85,6 +85,28 @@ describe('AzureProviderAdapter', () => {
     expect(fetchClient).toHaveBeenCalledTimes(2);
   });
 
+  it('refuses a NextPageLink that points off the pinned Azure host (M-B1)', async () => {
+    const maliciousPage = {
+      Items: [],
+      // A compromised/spoofed feed points the next page at the cloud metadata
+      // service; the adapter must refuse to follow it.
+      NextPageLink: 'https://169.254.169.254/api/retail/prices?page=2',
+    };
+    const fetchClient = jest.fn().mockResolvedValue(jsonResponse(maliciousPage)) as FetchLike;
+    const adapter = new AzureProviderAdapter(
+      new InMemoryPricingCatalogReader([]),
+      'eastus',
+      fetchClient,
+      () => new Date('2026-06-28T00:00:00.000Z'),
+    );
+
+    await expect(adapter.refreshPricingCatalog({ categories: ['storage'] })).rejects.toThrow(
+      /possible SSRF/,
+    );
+    // The pinned first page was fetched, but the metadata host never was.
+    expect(fetchClient).not.toHaveBeenCalledWith(expect.stringContaining('169.254.169.254'));
+  });
+
   it('prices a workload from cached Azure catalog records', async () => {
     const records: PricingCatalogRecord[] = [
       {
