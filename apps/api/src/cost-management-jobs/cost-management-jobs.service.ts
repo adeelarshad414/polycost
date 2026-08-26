@@ -7,8 +7,13 @@ import { ExchangeRateClient } from './exchange-rate.client';
 import {
   AlertEvaluationSummary,
   CurrencySyncSummary,
+  DataRetentionSweepJobSummary,
   ShareLinkCleanupSummary,
 } from './cost-management-jobs.types';
+import {
+  DataRetentionMode,
+  DataRetentionWindows,
+} from '../api/api-database.repository';
 
 const WEEK_IN_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -82,6 +87,38 @@ export class CostManagementJobsService {
       status: 'success',
       revokedLinks,
       ranAt,
+    };
+  }
+
+  // DB-2: prune append-only tables past their retention window. Options are
+  // supplied by the scheduler (which owns ConfigService) so this service keeps
+  // its existing DI signature. Defaults are report-only, so this logs what would
+  // be removed until an operator explicitly opts into deletion.
+  async runDataRetentionSweep(options: {
+    mode: DataRetentionMode;
+    windows: DataRetentionWindows;
+    maxRowsPerTable: number;
+  }): Promise<DataRetentionSweepJobSummary> {
+    const result = await this.repository.pruneExpiredData({
+      now: new Date().toISOString(),
+      mode: options.mode,
+      windows: options.windows,
+      maxRowsPerTable: options.maxRowsPerTable,
+    });
+
+    this.logger.log(
+      result.mode === 'delete-expired'
+        ? `Data retention sweep deleted ${result.totalDeletedRows} of ${result.totalEligibleRows} expired rows`
+        : `Data retention sweep (report-only) found ${result.totalEligibleRows} expired rows; set DATA_RETENTION_ENFORCEMENT_MODE=delete-expired to prune them`,
+    );
+
+    return {
+      status: 'success',
+      mode: result.mode,
+      ranAt: result.ranAt,
+      totalEligibleRows: result.totalEligibleRows,
+      totalDeletedRows: result.totalDeletedRows,
+      tables: result.tables,
     };
   }
 

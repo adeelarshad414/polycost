@@ -607,6 +607,34 @@ export interface InvoiceArtifactBlobDeletionCandidate {
 
 const PROVIDERS: ProviderId[] = ['aws', 'azure', 'gcp'];
 const DATA_FRESHNESS_POLICY_HOURS = 48;
+
+export type DataRetentionMode = 'report-only' | 'delete-expired';
+
+export interface DataRetentionWindows {
+  teamAuditEventDays: number;
+  auditExportDays: number;
+  comparisonAuditLogDays: number;
+  accountSessionDays: number;
+  exchangeRateDays: number;
+  pricingEtlRunDays: number;
+}
+
+export interface DataRetentionTableResult {
+  table: string;
+  /** Rows currently past their retention window (independent of the row cap). */
+  eligibleRows: number;
+  /** Rows actually removed this run; always 0 in report-only mode. */
+  deletedRows: number;
+}
+
+export interface DataRetentionSweepResult {
+  mode: DataRetentionMode;
+  ranAt: string;
+  maxRowsPerTable: number;
+  tables: DataRetentionTableResult[];
+  totalEligibleRows: number;
+  totalDeletedRows: number;
+}
 // Rows per multi-row invoice line-item insert, bounding statement size while
 // collapsing a large import into a handful of round-trips.
 const INVOICE_LINE_ITEM_INSERT_CHUNK_SIZE = 500;
@@ -5096,6 +5124,108 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     if (this.pool) {
       await this.pool.end();
     }
+  }
+
+  // DB-2: prune the append-only tables that otherwise grow without bound.
+  //
+  // Safety properties:
+  // - report-only mode counts what WOULD be removed and deletes nothing. This is
+  //   the default; deletion is an explicit, irreversible opt-in.
+  // - Each table is bounded by maxRowsPerTable so a first run on a large table
+  //   cannot hold a long lock; the sweep simply continues on the next schedule.
+  // - team_audit_events is a compliance trail: rows are only eligible once past
+  //   the (long) retention window AND once no non-delivered export row refers to
+  //   them. team_audit_event_exports cascades on delete, so pruning an event with
+  //   a pending export would silently destroy an undelivered compliance export.
+  // - Only delivered outbox rows are pruned; pending/processing/failed are kept.
+  async pruneExpiredData(input: {
+    now: string;
+    mode: DataRetentionMode;
+    windows: DataRetentionWindows;
+    maxRowsPerTable: number;
+  }): Promise<DataRetentionSweepResult> {
+    const pool = await this.getPool();
+    const limit = Math.max(1, Math.trunc(input.maxRowsPerTable));
+    const cutoff = (days: number) =>
+      new Date(Date.parse(input.now) - days * 24 * 60 * 60 * 1000).toISOString();
+
+    // Ordered deliberately: delivered outbox rows first, then the audit events
+    // they referenced, so the NOT EXISTS guard sees the freshest outbox state.
+    const plans: Array<{ table: string; where: string; params: unknown[] }> = [
+      {
+        table: 'team_audit_event_exports',
+        where: `status = 'delivered' AND delivered_at < $1`,
+        params: [cutoff(input.windows.auditExportDays)],
+      },
+      {
+        table: 'comparison_audit_logs',
+        where: `created_at < $1`,
+        params: [cutoff(input.windows.comparisonAuditLogDays)],
+      },
+      {
+        table: 'account_sessions',
+        where: `expires_at < $1`,
+        params: [cutoff(input.windows.accountSessionDays)],
+      },
+      {
+        table: 'exchange_rates',
+        where: `fetched_at < $1`,
+        params: [cutoff(input.windows.exchangeRateDays)],
+      },
+      {
+        table: 'pricing_etl_runs',
+        where: `started_at < $1`,
+        params: [cutoff(input.windows.pricingEtlRunDays)],
+      },
+      {
+        table: 'team_audit_events',
+        where: `created_at < $1
+          AND NOT EXISTS (
+            SELECT 1
+            FROM team_audit_event_exports
+            WHERE team_audit_event_exports.audit_event_id = team_audit_events.id
+              AND team_audit_event_exports.status <> 'delivered'
+          )`,
+        params: [cutoff(input.windows.teamAuditEventDays)],
+      },
+    ];
+
+    const tables: DataRetentionTableResult[] = [];
+
+    for (const plan of plans) {
+      const eligible = await pool.query<{ eligible: string }>(
+        `SELECT COUNT(*)::text AS eligible FROM ${plan.table} WHERE ${plan.where}`,
+        plan.params,
+      );
+      const eligibleRows = Number.parseInt(eligible.rows[0]?.eligible ?? '0', 10);
+
+      if (input.mode !== 'delete-expired' || eligibleRows === 0) {
+        tables.push({ table: plan.table, eligibleRows, deletedRows: 0 });
+        continue;
+      }
+
+      const deleted = await pool.query(
+        `DELETE FROM ${plan.table}
+         WHERE ctid IN (
+           SELECT ctid FROM ${plan.table} WHERE ${plan.where} LIMIT ${limit}
+         )`,
+        plan.params,
+      );
+      tables.push({
+        table: plan.table,
+        eligibleRows,
+        deletedRows: deleted.rowCount ?? 0,
+      });
+    }
+
+    return {
+      mode: input.mode,
+      ranAt: input.now,
+      maxRowsPerTable: limit,
+      tables,
+      totalEligibleRows: tables.reduce((total, row) => total + row.eligibleRows, 0),
+      totalDeletedRows: tables.reduce((total, row) => total + row.deletedRows, 0),
+    };
   }
 
   private async withTransaction<T>(
