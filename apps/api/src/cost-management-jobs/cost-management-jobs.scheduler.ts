@@ -9,6 +9,7 @@ import {
   CostManagementJobName,
   CostManagementJobSummary,
   CURRENCY_SYNC_JOB_NAME,
+  DATA_RETENTION_JOB_NAME,
   SHARE_LINK_CLEANUP_JOB_NAME,
   TEAM_AUDIT_EXPORT_JOB_NAME,
 } from './cost-management-jobs.types';
@@ -75,7 +76,43 @@ export class CostManagementJobsScheduler implements OnModuleInit, OnModuleDestro
         TEAM_AUDIT_EXPORT_JOB_NAME,
         this.configService.get('AUTH_AUDIT_EXPORT_SCHEDULE_CRON', { infer: true }),
       ),
+      this.scheduleJob(
+        DATA_RETENTION_JOB_NAME,
+        this.configService.get('DATA_RETENTION_SCHEDULE_CRON', { infer: true }),
+      ),
     ]);
+  }
+
+  // Reads the DB-2 retention policy from config. The scheduler owns ConfigService,
+  // so the jobs service stays free of config wiring.
+  private dataRetentionOptions() {
+    return {
+      mode: this.configService.get('DATA_RETENTION_ENFORCEMENT_MODE', { infer: true }),
+      maxRowsPerTable: this.configService.get('DATA_RETENTION_MAX_ROWS_PER_TABLE', {
+        infer: true,
+      }),
+      windows: {
+        teamAuditEventDays: this.configService.get('DATA_RETENTION_TEAM_AUDIT_EVENT_DAYS', {
+          infer: true,
+        }),
+        auditExportDays: this.configService.get('DATA_RETENTION_AUDIT_EXPORT_DAYS', {
+          infer: true,
+        }),
+        comparisonAuditLogDays: this.configService.get(
+          'DATA_RETENTION_COMPARISON_AUDIT_LOG_DAYS',
+          { infer: true },
+        ),
+        accountSessionDays: this.configService.get('DATA_RETENTION_ACCOUNT_SESSION_DAYS', {
+          infer: true,
+        }),
+        exchangeRateDays: this.configService.get('DATA_RETENTION_EXCHANGE_RATE_DAYS', {
+          infer: true,
+        }),
+        pricingEtlRunDays: this.configService.get('DATA_RETENTION_PRICING_ETL_RUN_DAYS', {
+          infer: true,
+        }),
+      },
+    };
   }
 
   private async scheduleJob(jobName: CostManagementJobName, cronPattern: string): Promise<void> {
@@ -104,6 +141,8 @@ export class CostManagementJobsScheduler implements OnModuleInit, OnModuleDestro
           return await this.jobsService.cleanupExpiredShareLinks();
         case TEAM_AUDIT_EXPORT_JOB_NAME:
           return await this.jobsService.flushPendingAuditExports();
+        case DATA_RETENTION_JOB_NAME:
+          return await this.jobsService.runDataRetentionSweep(this.dataRetentionOptions());
         default:
           throw new Error(`Unsupported cost-management job: ${job.name}`);
       }

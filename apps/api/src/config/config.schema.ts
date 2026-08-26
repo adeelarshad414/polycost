@@ -48,6 +48,22 @@ export const configSchema = z
     CURRENCY_SYNC_SCHEDULE_CRON: z.string().default('0 * * * *'),
     ALERT_EVALUATOR_SCHEDULE_CRON: z.string().default('*/15 * * * *'),
     SHARE_LINK_CLEANUP_SCHEDULE_CRON: z.string().default('0 3 * * *'),
+    DATA_RETENTION_SCHEDULE_CRON: z.string().default('30 3 * * *'),
+    // Retention is OFF by default: 'report-only' counts what WOULD be pruned and
+    // deletes nothing. Switching to 'delete-expired' is an explicit, irreversible
+    // opt-in, mirroring INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE (DB-2).
+    DATA_RETENTION_ENFORCEMENT_MODE: z
+      .enum(['report-only', 'delete-expired'])
+      .default('report-only'),
+    // Windows are deliberately conservative; compliance trails get the longest.
+    DATA_RETENTION_TEAM_AUDIT_EVENT_DAYS: z.coerce.number().int().min(365).default(2555),
+    DATA_RETENTION_AUDIT_EXPORT_DAYS: z.coerce.number().int().min(7).default(90),
+    DATA_RETENTION_COMPARISON_AUDIT_LOG_DAYS: z.coerce.number().int().min(30).default(400),
+    DATA_RETENTION_ACCOUNT_SESSION_DAYS: z.coerce.number().int().min(1).default(30),
+    DATA_RETENTION_EXCHANGE_RATE_DAYS: z.coerce.number().int().min(90).default(730),
+    DATA_RETENTION_PRICING_ETL_RUN_DAYS: z.coerce.number().int().min(30).default(180),
+    // Bound each DELETE so a first run on a large table cannot hold long locks.
+    DATA_RETENTION_MAX_ROWS_PER_TABLE: z.coerce.number().int().min(100).default(50000),
     PRICING_SYNC_ALERT_WEBHOOK_URL: z.preprocess(
       (value) => (value === '' ? undefined : value),
       z.string().url().optional(),

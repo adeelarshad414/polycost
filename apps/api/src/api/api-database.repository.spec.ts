@@ -3150,7 +3150,91 @@ describe('ApiDatabaseRepository', () => {
     expect(result.importRun.rowsRejected).toBe(1);
     expect(result.importRun.totalCostUsd).toBe(150);
   });
+
+  it('reports expired rows without deleting in report-only mode (DB-2)', async () => {
+    const query = jest.fn(async (text: string) => {
+      if (text.startsWith('SELECT COUNT(*)')) {
+        return { rows: [{ eligible: '7' }], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+    const repository = createRepository(query);
+
+    const result = await repository.pruneExpiredData({
+      now: '2026-08-26T00:00:00.000Z',
+      mode: 'report-only',
+      windows: retentionWindows(),
+      maxRowsPerTable: 500,
+    });
+
+    // Report-only must count but never issue a DELETE.
+    expect(query.mock.calls.some(([text]) => String(text).includes('DELETE FROM'))).toBe(false);
+    expect(result.totalDeletedRows).toBe(0);
+    expect(result.totalEligibleRows).toBe(7 * result.tables.length);
+    expect(result.tables.map((row) => row.table)).toEqual([
+      'team_audit_event_exports',
+      'comparison_audit_logs',
+      'account_sessions',
+      'exchange_rates',
+      'pricing_etl_runs',
+      'team_audit_events',
+    ]);
+  });
+
+  it('deletes bounded batches and guards undelivered audit exports in delete mode (DB-2)', async () => {
+    const query = jest.fn(async (text: string) => {
+      if (text.startsWith('SELECT COUNT(*)')) {
+        return { rows: [{ eligible: '3' }], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 3 };
+    });
+    const repository = createRepository(query);
+
+    const result = await repository.pruneExpiredData({
+      now: '2026-08-26T00:00:00.000Z',
+      mode: 'delete-expired',
+      windows: retentionWindows(),
+      maxRowsPerTable: 500,
+    });
+
+    const deletes = query.mock.calls
+      .map(([text]) => String(text))
+      .filter((text) => text.includes('DELETE FROM'));
+    expect(deletes).toHaveLength(6);
+    expect(result.totalDeletedRows).toBe(18);
+
+    // Every delete is row-capped so a first sweep cannot hold a long lock.
+    for (const statement of deletes) {
+      expect(statement).toContain('LIMIT 500');
+    }
+
+    // team_audit_events must never remove an event that still has a
+    // non-delivered export row (the outbox cascades on delete).
+    const auditDelete = deletes.find((statement) =>
+      statement.includes('DELETE FROM team_audit_events'),
+    );
+    expect(auditDelete).toContain('NOT EXISTS');
+    expect(auditDelete).toContain("status <> 'delivered'");
+
+    // Only delivered outbox rows are pruned.
+    const outboxDelete = deletes.find((statement) =>
+      statement.includes('DELETE FROM team_audit_event_exports'),
+    );
+    expect(outboxDelete).toContain("status = 'delivered'");
+  });
+
 });
+
+function retentionWindows() {
+  return {
+    teamAuditEventDays: 2555,
+    auditExportDays: 90,
+    comparisonAuditLogDays: 400,
+    accountSessionDays: 30,
+    exchangeRateDays: 730,
+    pricingEtlRunDays: 180,
+  };
+}
 
 function createRepository(query: jest.Mock): ApiDatabaseRepository {
   const pool: PgPoolLike = {
