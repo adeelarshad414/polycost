@@ -16,12 +16,18 @@ export default defineConfig({
               return 'react-vendor';
             }
 
+            // FE-4: recharts and its d3 deps are used ONLY by the lazily
+            // imported Charts module. Returning undefined leaves them to
+            // automatic chunking so they land in the on-demand Charts chunk. A
+            // named manual chunk (even a separate 'charts' one) becomes part of
+            // the static graph and gets modulepreloaded on first paint, which
+            // defeats the lazy import.
             if (
               id.includes('/node_modules/recharts/') ||
               id.includes('/node_modules/d3-') ||
               id.includes('/node_modules/victory-vendor/')
             ) {
-              return 'charts';
+              return undefined;
             }
 
             return 'vendor';

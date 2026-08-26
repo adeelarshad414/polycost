@@ -1,6 +1,17 @@
 /* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: UI dictionaries are typed provider/form/report state maps, not privilege-bound object mutation; see docs/SECURITY-SUPPRESSIONS.md. */
-import { FormEvent, ReactNode, useEffect, useRef, useState } from 'react';
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, Tooltip, XAxis, YAxis } from 'recharts';
+import { FormEvent, lazy, ReactNode, Suspense, useEffect, useRef, useState } from 'react';
+import { formatCurrency, formatPercent, formatSignedCurrency } from './lib/format';
+// FE-4: charts (recharts, ~377 kB) are the single largest vendor chunk and are
+// only needed once a comparison renders, so they load on demand rather than
+// blocking first paint.
+const ProviderMixDonut = lazy(() =>
+  import('./components/Charts').then((module) => ({ default: module.ProviderMixDonut })),
+);
+const EngineeringProviderServiceChart = lazy(() =>
+  import('./components/Charts').then((module) => ({
+    default: module.EngineeringProviderServiceChart,
+  })),
+);
 import { formatApiError, PolyCostClient, PolyCostApiError, polyCostClient } from './api-client';
 import { POLYCOST_TAGLINE } from './brand';
 import { Button, ProviderBadge } from './components/Button';
@@ -10208,7 +10219,9 @@ function ExecutiveAnalyticsPreview({
           <span>Provider mix</span>
           <strong>Share of current estimates</strong>
         </div>
-        <ProviderMixDonut data={analytics.providerMix} />
+        <Suspense fallback={<div className="provider-mix-empty">Loading chart…</div>}>
+          <ProviderMixDonut data={analytics.providerMix} />
+        </Suspense>
       </article>
 
       <ExecutiveCostWaterfall analytics={serverAnalytics} comparison={comparison} />
@@ -10803,52 +10816,6 @@ function commitmentTermMonths(pricingModel: PricingModelKey): number {
   return 12;
 }
 
-function ProviderMixDonut({ data }: { data: ProviderMixDatum[] }) {
-  if (data.length === 0) {
-    return (
-      <div className="provider-mix-empty" role="status">
-        Provider mix pending until comparison totals are available.
-      </div>
-    );
-  }
-
-  return (
-    <div className="provider-mix-layout">
-      <div className="provider-mix-chart-shell" role="img" aria-label="Provider cost mix chart">
-        <PieChart width={220} height={220}>
-          <Pie
-            data={data}
-            dataKey="value"
-            nameKey="name"
-            cx="50%"
-            cy="50%"
-            innerRadius={58}
-            outerRadius={88}
-            paddingAngle={3}
-            stroke="var(--pc-bg-surface)"
-            strokeWidth={4}
-            isAnimationActive={false}
-          >
-            {data.map((entry) => (
-              <Cell fill={entry.color} key={entry.providerId} />
-            ))}
-          </Pie>
-        </PieChart>
-      </div>
-      <div className="provider-mix-legend">
-        {data.map((entry) => (
-          <span key={entry.providerId}>
-            <i className={`provider-dot provider-fill-${entry.providerId}`} aria-hidden="true" />
-            <strong>{entry.name}</strong>
-            <small>
-              {formatCurrency(entry.value)} · {formatPercent(entry.percent)}
-            </small>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function ExecutiveCostWaterfall({
   analytics,
@@ -17997,141 +17964,19 @@ function EngineeringServiceChartGrid({
       }
       aria-label="Provider service cost charts"
     >
-      {analytics.providers.map((provider) => (
-        <EngineeringProviderServiceChart
-          key={provider.providerId}
-          provider={provider}
-          compact={compact}
-        />
-      ))}
+      <Suspense fallback={<div className="engineering-bar-chart-shell">Loading charts…</div>}>
+        {analytics.providers.map((provider) => (
+          <EngineeringProviderServiceChart
+            key={provider.providerId}
+            provider={provider}
+            compact={compact}
+          />
+        ))}
+      </Suspense>
     </div>
   );
 }
 
-function EngineeringProviderServiceChart({
-  provider,
-  compact = false,
-}: {
-  provider: EngineeringProviderServiceModel;
-  compact?: boolean;
-}) {
-  const hasData = provider.total !== undefined && provider.total > 0;
-  const viewportWidth = useViewportWidth();
-  const { height: chartHeight, width: chartWidth } = engineeringChartDimensions(
-    compact,
-    viewportWidth,
-  );
-
-  return (
-    <article className={`engineering-chart-card engineering-chart-${provider.providerId}`}>
-      <div className="engineering-chart-title">
-        <span>{providerLabel(provider.providerId)}</span>
-        <strong>{hasData ? formatCurrency(provider.total ?? 0) : 'Pending'}</strong>
-      </div>
-
-      {hasData ? (
-        <>
-          <div
-            className="engineering-bar-chart-shell"
-            role="img"
-            aria-label={`${providerLabel(provider.providerId)} service cost breakdown chart`}
-          >
-            <BarChart
-              width={chartWidth}
-              height={chartHeight}
-              data={provider.services}
-              margin={{ top: 10, right: 4, bottom: 0, left: -20 }}
-            >
-              <CartesianGrid stroke="var(--pc-chart-grid)" strokeDasharray="3 3" vertical={false} />
-              <XAxis
-                dataKey="serviceLabel"
-                interval={0}
-                tick={{ fill: 'var(--pc-text-secondary)', fontSize: 10 }}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis hide />
-              <Tooltip
-                cursor={{ fill: 'var(--pc-chart-hover)' }}
-                formatter={(value) => [formatCurrency(Number(value)), 'Cost']}
-                contentStyle={{
-                  background: 'var(--pc-bg-surface)',
-                  border: '1px solid var(--pc-border)',
-                  borderRadius: '8px',
-                  color: 'var(--pc-text-primary)',
-                  fontSize: '12px',
-                }}
-              />
-              <Bar dataKey="value" radius={[6, 6, 2, 2]} isAnimationActive={false}>
-                {provider.services.map((service) => (
-                  <Cell
-                    key={`${provider.providerId}-${service.category}`}
-                    fill={service.color}
-                    opacity={service.value > 0 ? 1 : 0.2}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </div>
-          <div className="engineering-service-list">
-            {provider.services.map((service) => (
-              <span key={service.category}>
-                <i className={`category-dot category-${service.category}`} aria-hidden="true" />
-                <strong>{service.serviceLabel}</strong>
-                <small>
-                  {formatCurrency(service.value)} · {formatPercent(service.percent)}
-                </small>
-              </span>
-            ))}
-          </div>
-        </>
-      ) : (
-        <div className="engineering-chart-empty" role="status">
-          Run a comparison to populate {providerLabel(provider.providerId)} service bars.
-        </div>
-      )}
-
-      <p className="engineering-chart-footnote">
-        {provider.dominantService
-          ? `${provider.dominantService.serviceLabel} is the largest mapped driver.`
-          : 'Service concentration pending provider line items.'}
-      </p>
-    </article>
-  );
-}
-
-function useViewportWidth(): number {
-  const [viewportWidth, setViewportWidth] = useState(() =>
-    typeof window === 'undefined' ? 1024 : window.innerWidth,
-  );
-
-  useEffect(() => {
-    function handleResize() {
-      setViewportWidth(window.innerWidth);
-    }
-
-    window.addEventListener('resize', handleResize);
-
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  return viewportWidth;
-}
-
-function engineeringChartDimensions(
-  compact: boolean,
-  viewportWidth: number,
-): { width: number; height: number } {
-  if (viewportWidth < 420) {
-    return { width: 196, height: compact ? 126 : 140 };
-  }
-
-  if (viewportWidth < 768) {
-    return { width: compact ? 220 : 238, height: compact ? 132 : 148 };
-  }
-
-  return { width: compact ? 238 : 276, height: compact ? 138 : 164 };
-}
 
 function ProviderCostWorkspace({
   comparison,
@@ -21154,28 +20999,6 @@ function formValidationSummaryMessage(issues: WorkloadFormIssue[]): string {
   return `Fix ${issues.length} requirement field${issues.length === 1 ? '' : 's'} before comparing. ${issues
     .map((issue) => issue.message)
     .join(' ')}`;
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatSignedCurrency(value: number): string {
-  if (value === 0) {
-    return '$0.00';
-  }
-
-  return `${value > 0 ? '+' : '-'}${formatCurrency(Math.abs(value))}`;
-}
-
-function formatPercent(value: number): string {
-  return `${value.toLocaleString('en-US', {
-    maximumFractionDigits: value > 0 && value < 10 ? 1 : 0,
-  })}%`;
 }
 
 function formatDateTime(value: string | undefined): string {
