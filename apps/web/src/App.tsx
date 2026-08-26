@@ -1,5 +1,14 @@
 /* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: UI dictionaries are typed provider/form/report state maps, not privilege-bound object mutation; see docs/SECURITY-SUPPRESSIONS.md. */
-import { FormEvent, lazy, ReactNode, Suspense, useEffect, useRef, useState } from 'react';
+import {
+  FormEvent,
+  lazy,
+  ReactNode,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { formatCurrency, formatPercent, formatSignedCurrency } from './lib/format';
 // FE-4: charts (recharts, ~377 kB) are the single largest vendor chunk and are
 // only needed once a comparison renders, so they load on demand rather than
@@ -10172,7 +10181,7 @@ function ExecutiveAnalyticsPreview({
   form: WorkloadFormState;
   pricingModel: PricingModelKey;
 }) {
-  const analytics = executiveAnalyticsModel(comparison, form);
+  const analytics = useMemo(() => executiveAnalyticsModel(comparison, form), [comparison, form]);
   const pricedCount = analytics.pricedMonthlySummaries.length;
   const totalMonthly = analytics.totalMonthlyAcrossProviders;
   const forecast = executiveForecastForCheapest(serverAnalytics, comparison);
@@ -10308,7 +10317,7 @@ function ExecutiveDecisionDashboard({
   isLoading: boolean;
   onExport?: (format: ReportFormat) => void;
 }) {
-  const analytics = executiveAnalyticsModel(comparison, form);
+  const analytics = useMemo(() => executiveAnalyticsModel(comparison, form), [comparison, form]);
   const decision = analytics.review.executiveDecision;
   const recommendation = executiveRecommendation(analytics, form, regionCatalog);
   const forecast = executiveForecastForCheapest(serverAnalytics, comparison);
@@ -10986,7 +10995,10 @@ function EngineeringAnalyticsDashboard({
   comparison: ComparisonResult | null;
   interval: IntervalKey;
 }) {
-  const analytics = engineeringAnalyticsModel(comparison, interval);
+  const analytics = useMemo(
+    () => engineeringAnalyticsModel(comparison, interval),
+    [comparison, interval],
+  );
 
   return (
     <section className="engineering-analytics-dashboard" aria-label="Engineering service dashboard">
@@ -17985,10 +17997,19 @@ function ProviderCostWorkspace({
   comparison: ComparisonResult | null;
   interval: IntervalKey;
 }) {
-  const providerResults = new Map<ProviderId, ComparisonProviderResult>(
-    comparison?.providers.map((provider) => [provider.providerId, provider]) ?? [],
+  // FE-1: these rebuild every provider x line-item dataset. Without memoisation
+  // they were recomputed on every parent re-render (i.e. every keystroke).
+  const providerResults = useMemo(
+    () =>
+      new Map<ProviderId, ComparisonProviderResult>(
+        comparison?.providers.map((provider) => [provider.providerId, provider]) ?? [],
+      ),
+    [comparison],
   );
-  const summaries = providerCostSummaries(comparison, interval);
+  const summaries = useMemo(
+    () => providerCostSummaries(comparison, interval),
+    [comparison, interval],
+  );
 
   return (
     <section className="provider-cost-workspace" aria-label="Provider cost comparison">
@@ -18345,8 +18366,14 @@ function ArchitectureWorkspace({
   interval: IntervalKey;
   form: WorkloadFormState;
 }) {
-  const review = buildFinOpsReview(comparison, interval, form);
-  const summaries = providerCostSummaries(comparison, interval);
+  const review = useMemo(
+    () => buildFinOpsReview(comparison, interval, form),
+    [comparison, interval, form],
+  );
+  const summaries = useMemo(
+    () => providerCostSummaries(comparison, interval),
+    [comparison, interval],
+  );
 
   return (
     <section className="architecture-workspace" aria-label="Architecture and governance review">
@@ -18449,7 +18476,10 @@ export function CostDashboard({
   interval: IntervalKey;
   form: WorkloadFormState;
 }) {
-  const summaries = providerCostSummaries(comparison, interval);
+  const summaries = useMemo(
+    () => providerCostSummaries(comparison, interval),
+    [comparison, interval],
+  );
   const pricedSummaries = summaries.filter((summary) => summary.total !== undefined);
   const lowest = pricedSummaries[0];
   const secondLowest = pricedSummaries[1];
