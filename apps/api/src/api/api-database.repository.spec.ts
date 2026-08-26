@@ -2965,7 +2965,7 @@ describe('ApiDatabaseRepository', () => {
   });
 
   it('guards invoice evidence writes with an optimistic-hash check and raises a conflict on mismatch', async () => {
-    const query = jest.fn(async (text: string, _values?: unknown[]) => {
+    const query = jest.fn(async (text: string) => {
       if (
         text.includes('BEGIN') ||
         text.includes('COMMIT') ||
@@ -2993,7 +2993,7 @@ describe('ApiDatabaseRepository', () => {
 
     const updateCall = query.mock.calls.find(([text]) =>
       String(text).includes('UPDATE invoice_reconciliation_results'),
-    );
+    ) as unknown as [string, unknown[]] | undefined;
     expect(updateCall).toBeDefined();
     // The optimistic guard is present in the SQL and the caller-supplied hash is
     // bound as the third parameter.
@@ -3005,7 +3005,7 @@ describe('ApiDatabaseRepository', () => {
   });
 
   it('persists a comparison and its audit log atomically in one transaction (DB-3)', async () => {
-    const query = jest.fn(async (_text: string) => ({ rows: [], rowCount: 0 }));
+    const query = jest.fn(async () => ({ rows: [], rowCount: 0 }));
     const repository = createRepository(query);
 
     await repository.saveComparisonWithAuditLog(nwsSnapshot as never, {
@@ -3027,7 +3027,7 @@ describe('ApiDatabaseRepository', () => {
       ],
     } as never);
 
-    const texts = query.mock.calls.map(([text]) => String(text));
+    const texts = (query.mock.calls as unknown as Array<[string]>).map(([text]) => String(text));
     const comparisonIndex = texts.findIndex((text) => text.includes('INSERT INTO comparisons'));
     const auditIndex = texts.findIndex((text) =>
       text.includes('INSERT INTO comparison_audit_logs'),
