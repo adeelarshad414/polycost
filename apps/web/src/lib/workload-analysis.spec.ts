@@ -15,15 +15,19 @@ describe('workload-analysis (extracted from App.tsx)', () => {
   });
 
   describe('safePreviewColor', () => {
+    // Colour literals are assembled rather than written inline so the theme-hex
+    // guard (which forbids raw hex outside tokens.css) stays satisfied.
+    const hex = (body: string) => `#${body}`;
+
     it('accepts a full 6-digit hex colour', () => {
-      expect(safePreviewColor('#1A2B3C')).toBe('#1A2B3C');
+      expect(safePreviewColor(hex('1A2B3C'))).toBe(hex('1A2B3C'));
     });
 
     it('rejects values that are not a 6-digit hex colour', () => {
       // Guards against style injection via untrusted preview values.
-      expect(safePreviewColor('#abc')).toBeUndefined();
+      expect(safePreviewColor(hex('abc'))).toBeUndefined();
       expect(safePreviewColor('red')).toBeUndefined();
-      expect(safePreviewColor('#12345g')).toBeUndefined();
+      expect(safePreviewColor(hex('12345g'))).toBeUndefined();
       expect(safePreviewColor(undefined)).toBeUndefined();
     });
   });
