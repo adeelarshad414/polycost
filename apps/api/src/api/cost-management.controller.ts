@@ -723,16 +723,6 @@ function parseUuid(value: unknown, field: string): string {
   return parsed;
 }
 
-function parseOptionalUuid(value: unknown, field: string): string | undefined {
-  const parsed = optionalSingleString(value);
-
-  if (!parsed) {
-    return undefined;
-  }
-
-  return parseUuid(parsed, field);
-}
-
 function optionalSingleString(value: unknown): string | undefined {
   if (Array.isArray(value)) {
     return typeof value[0] === 'string' && value[0].trim() ? value[0].trim() : undefined;
