@@ -27,18 +27,23 @@ const comparisonResult: ComparisonResult = {
   providers: [provider('aws', 42), provider('azure', 38), provider('gcp', 30, true)],
 };
 
+// Clear ALL persisted state between tests. Removing a hand-maintained list of
+// keys let polycost-pricing-model leak between tests: a test that selected a
+// commitment term left it set, so a later test asserting the default
+// 'on-demand' export failed depending on execution order (jest --randomize
+// reproduced it every run). Clearing wholesale fixes this and any future key.
+function clearPolyCostStorage(): void {
+  window.localStorage.clear();
+  window.sessionStorage.clear();
+}
+
 describe('App', () => {
   const originalCreateObjectUrl = window.URL.createObjectURL;
   const originalRevokeObjectUrl = window.URL.revokeObjectURL;
   const originalAnchorClick = HTMLAnchorElement.prototype.click;
 
   beforeEach(() => {
-    window.localStorage.removeItem('polycost-persona-view');
-    window.localStorage.removeItem('polycost-dismissed-budget-alerts');
-    window.localStorage.removeItem('polycost-comparison-history-v1');
-    window.localStorage.removeItem('polycost-auth-session-v1');
-    window.localStorage.removeItem('polycost-auth-session-expires-at-v1');
-    window.sessionStorage.removeItem('polycost-current-requirements-v1');
+    clearPolyCostStorage();
     window.history.pushState({}, '', '/');
     window.URL.createObjectURL = jest.fn(() => 'blob:polycost-report');
     window.URL.revokeObjectURL = jest.fn();
@@ -51,12 +56,7 @@ describe('App', () => {
     HTMLAnchorElement.prototype.click = originalAnchorClick;
     document.documentElement.dataset.theme = 'light';
     document.documentElement.dataset.themeChoice = 'light';
-    window.localStorage.removeItem('polycost-persona-view');
-    window.localStorage.removeItem('polycost-dismissed-budget-alerts');
-    window.localStorage.removeItem('polycost-comparison-history-v1');
-    window.localStorage.removeItem('polycost-auth-session-v1');
-    window.localStorage.removeItem('polycost-auth-session-expires-at-v1');
-    window.sessionStorage.removeItem('polycost-current-requirements-v1');
+    clearPolyCostStorage();
     window.history.pushState({}, '', '/');
   });
 
