@@ -73,16 +73,17 @@ of exactly how every number was derived.
 
 ## 🚢 Deploy & operate
 
-| Document                                                                   | Purpose                           |
-| -------------------------------------------------------------------------- | --------------------------------- |
-| [🚀 Deploy](DEPLOY.md) · [docs version](docs/DEPLOYMENT.md)                | Deployment procedures             |
-| [📕 Runbook](docs/RUNBOOK.md)                                              | Operational runbook               |
-| [☁️ Cloud Readiness](docs/cloud/cloud-readiness.md)                        | Cloud posture                     |
-| [🔑 Provider Credentials](docs/PROVIDER-CREDENTIALS.md)                    | Provider API credentials          |
-| [💳 Live Pricing Credentials](docs/operations/live-pricing-credentials.md) | Enabling live pricing             |
-| [🔐 Config & Secrets](09-CONFIG-AND-SECRETS.md)                            | Configuration and secret handling |
-| [✅ Release Checklist](RELEASE-CHECKLIST.md)                               | Pre-release gate                  |
-| [🏭 Production Readiness](PRODUCTION-READINESS-REPORT.md)                  | Readiness assessment              |
+| Document                                                                             | Purpose                            |
+| ------------------------------------------------------------------------------------ | ---------------------------------- |
+| [🚀 Deploy](DEPLOY.md) · [docs version](docs/DEPLOYMENT.md)                          | Deployment procedures              |
+| [📕 Runbook](docs/RUNBOOK.md)                                                        | Operational runbook                |
+| [☁️ Cloud Readiness](docs/cloud/cloud-readiness.md)                                  | Cloud posture                      |
+| [🔑 Provider Credentials](docs/PROVIDER-CREDENTIALS.md)                              | Provider API credentials           |
+| [💳 Live Pricing Credentials](docs/operations/live-pricing-credentials.md)           | Enabling live pricing              |
+| [🔐 Config & Secrets](09-CONFIG-AND-SECRETS.md)                                      | Configuration and secret handling  |
+| [✅ Release Checklist](RELEASE-CHECKLIST.md)                                         | Pre-release gate                   |
+| [🏭 Production Readiness](PRODUCTION-READINESS-REPORT.md)                            | Readiness assessment               |
+| [🔎 **Production Readiness Audit (2026-08)**](PRODUCTION-READINESS-AUDIT-2026-08.md) | **Current gap analysis + roadmap** |
 
 ## 🔒 Security & governance
 
