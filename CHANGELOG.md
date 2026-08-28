@@ -9,6 +9,49 @@ once tagged releases begin.
 
 ### Added
 
+- 📚 Documentation set: `DOCUMENTATION.md` master index (all 99 documents),
+  plus `docs/HOW-IT-WORKS.md`, `docs/DIAGRAMS.md`, `docs/REQUIREMENTS.md`,
+  `docs/GLOSSARY.md`, `docs/LEARNING-PATH.md` and `docs/KNOWN-ISSUES.md`.
+  Diagrams are Mermaid (system, tiers, deployment, request flows, credentials
+  flow, pipelines, state machines, ER) so they render on GitHub and stay
+  reviewable in a pull request.
+- Scheduled data-retention sweep for the append-only tables, defaulting to
+  `report-only` so nothing is deleted without an explicit opt-in (DB-2).
+- Optimistic-concurrency guard on invoice evidence writes, returning 409 on a
+  concurrent modification instead of silently clobbering it.
+- Pricing-catalog indexes for the live prune and provenance filters.
+- UTC `timestamptz` migration for the compliance audit and pricing tables.
+
+### Changed
+
+- Provider pricing upserts and invoice line-item inserts are now batched rather
+  than one statement per row.
+- Charts are lazy-loaded, removing ~105 kB gzip (~35%) from first paint.
+- `App.tsx` decomposed from 21,227 to 14,540 lines (-31%) across four slices into
+  seven focused modules, extracted with the TypeScript compiler API.
+- Evidence-packet export moved from a side-effecting `GET` to `POST .../export`.
+- Migrations now apply atomically via `psql --single-transaction`, with
+  `CREATE INDEX CONCURRENTLY` files detected and run unwrapped.
+- Dependencies upgraded with their required code migrations: zod 4, vite 8
+  (plus `@vitejs/plugin-react` 6), `@types/node` 26, and the minor/patch group.
+
+### Fixed
+
+- Money values with thousands separators (`"1,234.56"`) parsed as `1`.
+- Non-USD provider exports were summed as USD; they are now rejected.
+- Response size cap was bypassed on chunked bodies, and the request timeout
+  covered only headers, not the body.
+- Azure `NextPageLink` was fetched without host validation (SSRF); provider
+  pagination was unbounded.
+- Audit event and its delivery outbox row could commit separately, allowing a
+  logged-but-never-exported compliance event.
+- WCAG AA contrast failures for muted and success text in both themes.
+- All 25 horizontally-scrollable tables were keyboard-unreachable.
+- `Popover` had no focus management despite `role="dialog"`.
+- A malformed `2xx` response crashed the app through the error boundary.
+- Order-dependent test failure caused by leaked `localStorage` between tests.
+- Repository-wide Prettier formatting; `format:check` passes again.
+
 - Loading/progress experience system with shared `BootSplash`, `SessionLoader`,
   skeleton presets, progress bars, task queue, job toast, and live-tail components.
 - Loading inventory and audit report with `npm run loading:check` wired into the
