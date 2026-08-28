@@ -879,25 +879,60 @@ function formulaCell(formula: string, value: number): FormulaCell {
   };
 }
 
+// Column indices (1-based) whose header names indicate a monetary value, so
+// their numeric cells can be given the currency format. Detected from headers
+// rather than applied to every number, because these sheets also carry counts
+// and row totals that must NOT render as "$22.00".
+function currencyColumns(rows: WorksheetRow[]): Set<number> {
+  const columns = new Set<number>();
+
+  for (const row of rows) {
+    row.cells.forEach((cell, index) => {
+      if (typeof cell === 'string' && /\busd\b|\bcost\b|\bprice\b|\bspend\b|\$/i.test(cell)) {
+        columns.add(index + 1);
+      }
+    });
+  }
+
+  return columns;
+}
+
 function worksheetXml(rows: WorksheetRow[]): string {
+  const moneyColumns = currencyColumns(rows);
+  // Freeze the first row so column headers stay visible while scrolling a long
+  // evidence sheet.
+  const freezePane =
+    rows.length > 1
+      ? '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
+      : '';
+
   return xmlDocument(`
     <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+      ${freezePane}
       <cols>
-        <col min="1" max="1" width="18" customWidth="1"/>
-        <col min="2" max="2" width="28" customWidth="1"/>
-        <col min="3" max="3" width="42" customWidth="1"/>
-        <col min="4" max="10" width="18" customWidth="1"/>
+        <col min="1" max="1" width="30" customWidth="1"/>
+        <col min="2" max="2" width="30" customWidth="1"/>
+        <col min="3" max="3" width="46" customWidth="1"/>
+        <col min="4" max="12" width="18" customWidth="1"/>
       </cols>
       <sheetData>
-        ${rows.map((row, rowIndex) => rowXml(row, rowIndex + 1)).join('')}
+        ${rows.map((row, rowIndex) => rowXml(row, rowIndex + 1, moneyColumns)).join('')}
       </sheetData>
     </worksheet>
   `);
 }
 
-function rowXml(row: WorksheetRow, rowIndex: number): string {
+function rowXml(row: WorksheetRow, rowIndex: number, moneyColumns?: Set<number>): string {
   return `<row r="${rowIndex}">${row.cells
-    .map((cell, cellIndex) => cellXml(cell, rowIndex, cellIndex + 1, row.style))
+    .map((cell, cellIndex) => {
+      const column = cellIndex + 1;
+      // An explicit row style (title / section heading) always wins. Otherwise a
+      // numeric cell in a money column gets the currency format.
+      const style =
+        row.style ?? (typeof cell === 'number' && moneyColumns?.has(column) ? 4 : undefined);
+
+      return cellXml(cell, rowIndex, column, style);
+    })
     .join('')}</row>`;
 }
 
@@ -996,22 +1031,56 @@ function workbookRelationshipsXml(sheetCount: number): string {
 }
 
 function stylesXml(): string {
+  // Enterprise workbook styling.
+  //
+  // Style indices are referenced by the `s` attribute on cells:
+  //   0 body · 1 title · 2 section heading · 3 column header
+  //   4 currency · 5 number · 6 percent · 7 muted/footnote
+  //
+  // Currency and number formats matter for more than looks: without an explicit
+  // numFmt every monetary cell renders as a bare General number (1702.31), which
+  // is unreadable in a cost report and cannot be summed with confidence by a
+  // reviewer scanning a column.
   return xmlDocument(`
     <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-      <fonts count="2">
-        <font><sz val="11"/><name val="Calibri"/></font>
-        <font><b/><sz val="14"/><name val="Calibri"/></font>
+      <numFmts count="3">
+        <numFmt numFmtId="164" formatCode="&quot;$&quot;#,##0.00"/>
+        <numFmt numFmtId="165" formatCode="#,##0.00"/>
+        <numFmt numFmtId="166" formatCode="0.0%"/>
+      </numFmts>
+      <fonts count="5">
+        <font><sz val="11"/><name val="Calibri"/><color rgb="FF1F2430"/></font>
+        <font><b/><sz val="18"/><name val="Calibri"/><color rgb="FF1F2430"/></font>
+        <font><b/><sz val="13"/><name val="Calibri"/><color rgb="FF1F2430"/></font>
+        <font><b/><sz val="11"/><name val="Calibri"/><color rgb="FFFFFFFF"/></font>
+        <font><i/><sz val="10"/><name val="Calibri"/><color rgb="FF5C6270"/></font>
       </fonts>
-      <fills count="2">
+      <fills count="4">
         <fill><patternFill patternType="none"/></fill>
         <fill><patternFill patternType="gray125"/></fill>
+        <fill><patternFill patternType="solid"><fgColor rgb="FF1F3864"/><bgColor indexed="64"/></patternFill></fill>
+        <fill><patternFill patternType="solid"><fgColor rgb="FFF2F5F9"/><bgColor indexed="64"/></patternFill></fill>
       </fills>
-      <borders count="1"><border/></borders>
+      <borders count="2">
+        <border><left/><right/><top/><bottom/><diagonal/></border>
+        <border>
+          <left style="thin"><color rgb="FFD4DAE3"/></left>
+          <right style="thin"><color rgb="FFD4DAE3"/></right>
+          <top style="thin"><color rgb="FFD4DAE3"/></top>
+          <bottom style="thin"><color rgb="FFD4DAE3"/></bottom>
+          <diagonal/>
+        </border>
+      </borders>
       <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-      <cellXfs count="3">
-        <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+      <cellXfs count="8">
+        <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
         <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
-        <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+        <xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1"/>
+        <xf numFmtId="0" fontId="3" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
+        <xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right"/></xf>
+        <xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right"/></xf>
+        <xf numFmtId="166" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right"/></xf>
+        <xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1"/>
       </cellXfs>
       <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
     </styleSheet>
@@ -1019,9 +1088,18 @@ function stylesXml(): string {
 }
 
 function xmlDocument(body: string): string {
+  // Minify the template without corrupting it.
+  //
+  // The previous implementation stripped `\n` plus following indentation with no
+  // replacement, which silently glued together attributes that were written on
+  // separate lines: `...main"` + `xmlns:r=...` became `...main"xmlns:r=...`.
+  // That made xl/workbook.xml malformed XML in every workbook produced. Collapse
+  // whitespace *between elements* to nothing, but reduce a line break *inside* a
+  // tag to a single space so adjacent attributes stay separated.
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>${body
     .trim()
-    .replace(/\n\s*/g, '')}`;
+    .replace(/>\s+</g, '><')
+    .replace(/\s*\n\s*/g, ' ')}`;
 }
 
 function xmlBuffer(value: string): Buffer {
