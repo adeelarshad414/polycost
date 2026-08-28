@@ -4,6 +4,23 @@ PolyCost is an open-source, self-hostable multi-cloud cost comparison platform. 
 
 PolyCost is built for decision-grade planning. It estimates and compares costs; it is not a billing, invoicing, or live cloud-account spend management system.
 
+---
+
+## 📚 Documentation
+
+**➡️ [Full Documentation Index](DOCUMENTATION.md)** — table of contents for all 99 documents.
+
+| Start here                                |                                                 |
+| ----------------------------------------- | ----------------------------------------------- |
+| 🧭 [Learning Path](docs/LEARNING-PATH.md) | Guided route through the repo, by role          |
+| ⚙️ [How It Works](docs/HOW-IT-WORKS.md)   | The pipeline, end to end                        |
+| 🗺️ [Diagrams](docs/DIAGRAMS.md)           | Architecture, deployment, flows, state machines |
+| 📋 [Requirements](docs/REQUIREMENTS.md)   | Functional & non-functional, with traceability  |
+| 📖 [Glossary](docs/GLOSSARY.md)           | NWS, SKU, SUD, WORM, outbox…                    |
+| 🐞 [Known Issues](docs/KNOWN-ISSUES.md)   | Verified defect register                        |
+
+---
+
 ## What PolyCost Does
 
 - Converts workload requirements into a Normalized Workload Specification (NWS).

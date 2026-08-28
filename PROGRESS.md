@@ -5602,8 +5602,13 @@ controls.
 Running list. Add here whenever a phase completes with known gaps. Remove an item only
 when it is actually resolved in a later phase, with a note on which phase resolved it.
 
-- npm audit high/critical gate passes, but the development dependency tree now reports
-  30 non-high advisories after adding Graphify. The remaining advisories are in
+- CORRECTION (current): the npm audit high/critical gate no longer passes. `npm audit`
+  reports 12 vulnerabilities (2 low, 3 moderate, 7 high). All 7 highs are in the
+  development/tooling tree (`@sentropic/graphify` -> `officeparser` -> `pdfjs-dist`,
+  plus transitive `brace-expansion`, `fast-uri`, `ip-address`, `js-yaml`), not runtime
+  dependencies. Tracked as K-2 in docs/KNOWN-ISSUES.md. The original note read:
+  "npm audit high/critical gate passes, but the development dependency tree now reports
+  30 non-high advisories after adding Graphify." The remaining advisories are in
   development/tooling dependency paths, including the existing Jest/ts-jest chain and
   Graphify transitive AI/provider packages.
 - Phase 3 unit coverage passes but Jest emits a worker teardown warning after the
