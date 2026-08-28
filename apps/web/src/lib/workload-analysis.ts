@@ -10,11 +10,47 @@
 import { PolyCostApiError } from '../api-client';
 import { hourlyFromMonthly, intervalMultiplierFromMonthly } from '../cost-time';
 import { formatCurrency } from '../lib/format';
-import { DEFAULT_CALCULATOR_URLS, DEFAULT_REGION_REFERENCE_URLS, FALLBACK_REGION_CATALOG } from '../region-catalog';
+import {
+  DEFAULT_CALCULATOR_URLS,
+  DEFAULT_REGION_REFERENCE_URLS,
+  FALLBACK_REGION_CATALOG,
+} from '../region-catalog';
 import { comparisonRegionLabel, regionPreferenceForResidencyLock } from '../region-normalization';
-import { CLOUD_SERVICE_CATALOG, CloudServiceFamily, SERVICE_CATALOG_CATEGORIES, orderedServiceFamilyIds } from '../service-catalog';
+import {
+  CLOUD_SERVICE_CATALOG,
+  CloudServiceFamily,
+  SERVICE_CATALOG_CATEGORIES,
+  orderedServiceFamilyIds,
+} from '../service-catalog';
 import { ResolvedTheme } from '../theme';
-import { AuthMeResponse, BillingSourceType, ComparisonAnalyticsResponse, ComparisonPricingEvidenceResponse, ComparisonProviderResult, ComparisonResult, DiagramInputFormat, IntervalKey, InvoiceArtifactPolicyExceptionStatus, InvoiceArtifactReviewStatus, InvoiceControlValidationStatus, PROVIDER_ORDER, PricingModelKey, ProviderId, RegionCatalogResponse, ReportFormat, ServiceRequirement, TeamAuditEventRecord, TeamInvitationRecord, TeamMemberRecord, TeamRole, TeamSwitchResponse, TerraformAvailabilityMode, TerraformGenerationResult, TerraformNetworkTopology, TerraformRuntimeTarget } from '../types';
+import {
+  AuthMeResponse,
+  BillingSourceType,
+  ComparisonAnalyticsResponse,
+  ComparisonPricingEvidenceResponse,
+  ComparisonProviderResult,
+  ComparisonResult,
+  DiagramInputFormat,
+  IntervalKey,
+  InvoiceArtifactPolicyExceptionStatus,
+  InvoiceArtifactReviewStatus,
+  InvoiceControlValidationStatus,
+  PROVIDER_ORDER,
+  PricingModelKey,
+  ProviderId,
+  RegionCatalogResponse,
+  ReportFormat,
+  ServiceRequirement,
+  TeamAuditEventRecord,
+  TeamInvitationRecord,
+  TeamMemberRecord,
+  TeamRole,
+  TeamSwitchResponse,
+  TerraformAvailabilityMode,
+  TerraformGenerationResult,
+  TerraformNetworkTopology,
+  TerraformRuntimeTarget,
+} from '../types';
 import { BulkServiceRow, WorkloadFormIssue, WorkloadFormState } from '../workload';
 
 export function activeTeamToMembership(
@@ -283,7 +319,10 @@ export function applyResidencyRegionLock(form: WorkloadFormState): WorkloadFormS
   };
 }
 
-export function providerServicesForFamily(family: CloudServiceFamily, providerId: ProviderId): string[] {
+export function providerServicesForFamily(
+  family: CloudServiceFamily,
+  providerId: ProviderId,
+): string[] {
   switch (providerId) {
     case 'aws':
       return family.providerServices.aws;
@@ -464,7 +503,10 @@ export function supportTierLabel(supportTier: WorkloadFormState['supportTier']):
   }
 }
 
-export function regionLabelForSummary(value: string, regionCatalog: RegionCatalogResponse | null): string {
+export function regionLabelForSummary(
+  value: string,
+  regionCatalog: RegionCatalogResponse | null,
+): string {
   const comparisonLabel = comparisonRegionLabel(value);
 
   if (comparisonLabel) {
@@ -571,7 +613,9 @@ export function costMatrixPricingModelLabel(pricingModel: PricingModelKey): stri
   }
 }
 
-export function evidenceSkuLabel(row: ComparisonPricingEvidenceResponse['evidence'][number]): string {
+export function evidenceSkuLabel(
+  row: ComparisonPricingEvidenceResponse['evidence'][number],
+): string {
   return (
     row.sku.resolvedSkuId ??
     row.sku.sourceSkuId ??
@@ -581,7 +625,9 @@ export function evidenceSkuLabel(row: ComparisonPricingEvidenceResponse['evidenc
   );
 }
 
-export function evidenceSourceLabel(row: ComparisonPricingEvidenceResponse['evidence'][number]): string {
+export function evidenceSourceLabel(
+  row: ComparisonPricingEvidenceResponse['evidence'][number],
+): string {
   const endpoint = row.rate.sourceEndpoint ?? row.rate.source;
   const sourceId = row.rate.sourceRecordId ?? row.rate.sourceRecordKey;
   const hashSuffix = row.rate.sourcePayloadHash
@@ -591,7 +637,9 @@ export function evidenceSourceLabel(row: ComparisonPricingEvidenceResponse['evid
   return sourceId ? `${endpoint} · ${sourceId}${hashSuffix}` : `${endpoint}${hashSuffix}`;
 }
 
-export function evidenceRateLabel(row: ComparisonPricingEvidenceResponse['evidence'][number]): string {
+export function evidenceRateLabel(
+  row: ComparisonPricingEvidenceResponse['evidence'][number],
+): string {
   if (row.rate.unitPriceUsd === undefined) {
     return row.rate.source;
   }
@@ -1112,7 +1160,9 @@ export function availabilityProfileLabel(availabilityMode: TerraformAvailability
   }
 }
 
-export function terraformAvailabilityModeFromForm(form: WorkloadFormState): TerraformAvailabilityMode {
+export function terraformAvailabilityModeFromForm(
+  form: WorkloadFormState,
+): TerraformAvailabilityMode {
   if (form.faultTolerance === 'active-active') {
     return 'active-active';
   }
@@ -1135,7 +1185,9 @@ export function previewTerraformContent(content: string): string {
   return lines.length > 42 ? `${preview}\n# ... ${lines.length - 42} more lines` : preview;
 }
 
-export function mappingLabel(mapping: TerraformGenerationResult['serviceMappings'][number]): string {
+export function mappingLabel(
+  mapping: TerraformGenerationResult['serviceMappings'][number],
+): string {
   return `${mapping.requirement}: ${mapping.terraformResource} (${mapping.confidence})`;
 }
 

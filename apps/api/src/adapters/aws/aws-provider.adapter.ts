@@ -9,7 +9,12 @@ import {
   ServiceCategory,
 } from '../common/cloud-provider-adapter';
 import { Readable } from 'node:stream';
-import { defaultFetch, FetchLike, HttpResponseLike, parseJsonResponse } from '../common/http-client';
+import {
+  defaultFetch,
+  FetchLike,
+  HttpResponseLike,
+  parseJsonResponse,
+} from '../common/http-client';
 import { streamAwsBulkPriceList } from './aws-bulk-stream';
 
 interface AwsBulkPriceListResponse {

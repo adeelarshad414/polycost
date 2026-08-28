@@ -72,9 +72,7 @@ function tooLargeError(
 // web ReadableStream that real fetch exposes (getReader) and a Node Readable /
 // async-iterable that tests may inject. Returns undefined when no stream body is
 // available (e.g. a test double that only implements text()).
-function streamChunks(
-  body: unknown,
-): AsyncIterable<Uint8Array> | undefined {
+function streamChunks(body: unknown): AsyncIterable<Uint8Array> | undefined {
   if (!body || typeof body !== 'object') {
     return undefined;
   }
@@ -196,18 +194,29 @@ export function assertSameProviderOrigin(
   }
 }
 
+export interface ParseJsonResponseLimits {
+  /** Max bytes buffered before the response is rejected as too large. */
+  maxBytes?: number;
+  /** Overall wall-clock budget for reading the body. */
+  bodyTimeoutMs?: number;
+}
+
 export async function parseJsonResponse<T>(
   providerId: ProviderId,
   response: HttpResponseLike,
+  limits: ParseJsonResponseLimits = {},
 ): Promise<T> {
-  const maxBytes = positiveInt(
-    process.env.PROVIDER_HTTP_MAX_RESPONSE_BYTES,
-    DEFAULT_HTTP_MAX_RESPONSE_BYTES,
-  );
-  const bodyTimeoutMs = positiveInt(
-    process.env.PROVIDER_HTTP_BODY_TIMEOUT_MS ?? process.env.PROVIDER_HTTP_TIMEOUT_MS,
-    DEFAULT_HTTP_TIMEOUT_MS,
-  );
+  // Limits are injectable so callers (and tests) can set them explicitly instead
+  // of mutating process.env; the env vars remain the deployment-level default.
+  const maxBytes =
+    limits.maxBytes ??
+    positiveInt(process.env.PROVIDER_HTTP_MAX_RESPONSE_BYTES, DEFAULT_HTTP_MAX_RESPONSE_BYTES);
+  const bodyTimeoutMs =
+    limits.bodyTimeoutMs ??
+    positiveInt(
+      process.env.PROVIDER_HTTP_BODY_TIMEOUT_MS ?? process.env.PROVIDER_HTTP_TIMEOUT_MS,
+      DEFAULT_HTTP_TIMEOUT_MS,
+    );
   const declaredLength = Number(response.headers?.get('content-length') ?? '');
   if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
     throw tooLargeError(providerId, response, declaredLength, maxBytes);

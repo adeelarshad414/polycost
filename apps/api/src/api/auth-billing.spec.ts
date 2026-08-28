@@ -768,10 +768,7 @@ describe('AuthService', () => {
 
   it('SEC-4: disables the mock OIDC flow in production (no session minting)', async () => {
     const repository = repositoryMock();
-    const service = new AuthService(
-      repository as never,
-      configService({ NODE_ENV: 'production' }),
-    );
+    const service = new AuthService(repository as never, configService({ NODE_ENV: 'production' }));
 
     await expect(
       service.startMockOidcLogin({ teamId: account.defaultTeam!.teamId, email: 'a@b.com' }),

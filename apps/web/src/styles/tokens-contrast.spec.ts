@@ -51,7 +51,12 @@ const AA_NORMAL = 4.5;
 describe('token contrast (WCAG AA)', () => {
   const cases: Array<{ label: string; token: string; block: string; surfaces: string[] }> = [
     { label: 'light muted text', token: 'ink-400', block: lightBlock, surfaces: LIGHT_SURFACES },
-    { label: 'light success text', token: 'status-ok', block: lightBlock, surfaces: LIGHT_SURFACES },
+    {
+      label: 'light success text',
+      token: 'status-ok',
+      block: lightBlock,
+      surfaces: LIGHT_SURFACES,
+    },
     { label: 'dark muted text', token: 'ink-400', block: darkBlock, surfaces: DARK_SURFACES },
     { label: 'dark success text', token: 'status-ok', block: darkBlock, surfaces: DARK_SURFACES },
   ];

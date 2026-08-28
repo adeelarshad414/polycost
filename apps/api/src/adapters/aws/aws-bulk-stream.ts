@@ -16,10 +16,7 @@ import { streamObject } from 'stream-json/streamers/StreamObject';
  * `terms.OnDemand` / `terms.Reserved` (kept only for the retained SKUs). The
  * assembled, filtered structure is small and safe to normalize as before.
  */
-export async function streamAwsBulkPriceList<
-  Product extends { sku: string },
-  Term,
->(
+export async function streamAwsBulkPriceList<Product extends { sku: string }, Term>(
   body: Readable,
   productMatches: (product: Product) => boolean,
 ): Promise<{

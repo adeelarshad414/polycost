@@ -10,10 +10,7 @@ import {
   DataRetentionSweepJobSummary,
   ShareLinkCleanupSummary,
 } from './cost-management-jobs.types';
-import {
-  DataRetentionMode,
-  DataRetentionWindows,
-} from '../api/api-database.repository';
+import { DataRetentionMode, DataRetentionWindows } from '../api/api-database.repository';
 
 const WEEK_IN_MS = 7 * 24 * 60 * 60 * 1000;
 

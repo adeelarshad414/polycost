@@ -333,7 +333,14 @@ describe('AzureProviderAdapter', () => {
     };
     const page = {
       Items: [
-        { ...base, meterId: 'm1', meterName: 'D2s v5', skuId: 'OD', skuName: 'D2s v5', type: 'Consumption' },
+        {
+          ...base,
+          meterId: 'm1',
+          meterName: 'D2s v5',
+          skuId: 'OD',
+          skuName: 'D2s v5',
+          type: 'Consumption',
+        },
         {
           ...base,
           meterId: 'm2',
