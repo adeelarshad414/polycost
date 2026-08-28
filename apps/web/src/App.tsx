@@ -1,14 +1,5 @@
 /* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: UI dictionaries are typed provider/form/report state maps, not privilege-bound object mutation; see docs/SECURITY-SUPPRESSIONS.md. */
-import {
-  FormEvent,
-  lazy,
-  ReactNode,
-  Suspense,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { FormEvent, lazy, ReactNode, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { formatCurrency, formatPercent, formatSignedCurrency } from './lib/format';
 import {
   appPlatformAlwaysOnMonthly,
@@ -307,18 +298,14 @@ import {
 import { PersonaComparisonWorkspace } from './components/PersonaComparisonWorkspace';
 import { ThemeSwitcher } from './components/ThemeSwitcher';
 import { TopLoadingBar } from './components/TopLoadingBar';
-import {
-  HOURS_PER_MONTH,
-} from './cost-time';
+import { HOURS_PER_MONTH } from './cost-time';
 import {
   canonicalRegionsForResidencyScope,
   COMPARISON_REGION_GROUPS,
   isRegionPreferenceAllowedForResidency,
   providerRegionSummary,
 } from './region-normalization';
-import {
-  FALLBACK_REGION_CATALOG,
-} from './region-catalog';
+import { FALLBACK_REGION_CATALOG } from './region-catalog';
 import {
   CLOUD_SERVICE_CATALOG,
   SERVICE_CATALOG_CATEGORIES,
@@ -400,113 +387,6 @@ import {
   WorkloadFormIssue,
   WorkloadFormState,
 } from './workload';
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 export function App({ client = polyCostClient }: AppProps) {
   const shareToken = shareTokenFromLocation();
@@ -4289,22 +4169,6 @@ function WorkspaceControlCenter({
   );
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 function AppHeader({
   resolvedTheme,
   themeChoice,
@@ -5403,8 +5267,6 @@ function ResultQuickActions({
   );
 }
 
-
-
 function StateDetailContent({
   busyAction,
   client,
@@ -5549,12 +5411,6 @@ function StateDetailContent({
   );
 }
 
-
-
-
-
-
-
 function InputModeTabs({
   inputMode,
   onInputModeChange,
@@ -5695,12 +5551,6 @@ function DataHealthBanner({
     </section>
   );
 }
-
-
-
-
-
-
 
 function RequirementsEditPanel({
   form,
@@ -6247,12 +6097,6 @@ function DiagramReviewPanel({
     </section>
   );
 }
-
-
-
-
-
-
 
 function DescribePanel({
   value,
@@ -7901,8 +7745,6 @@ function RequirementReviewCards({
   );
 }
 
-
-
 function ComputeSizingAssistant({
   form,
   compact = false,
@@ -8186,8 +8028,6 @@ function RegionSelectField({
   );
 }
 
-
-
 function CheckboxField({
   label,
   icon,
@@ -8287,8 +8127,6 @@ function ServiceCatalogPicker({
     </div>
   );
 }
-
-
 
 function BulkServiceImporter({
   rows,
@@ -8537,10 +8375,6 @@ function ServiceFamilyCard({
   );
 }
 
-
-
-
-
 function applyComputeSizingSuggestion(
   form: WorkloadFormState,
   suggestion: ComputeSizePreset,
@@ -8582,12 +8416,6 @@ function applyComputeStorageDefault(form: WorkloadFormState): WorkloadFormState 
   };
 }
 
-
-
-
-
-
-
 function computeSizingSuggestions(query: string, form: WorkloadFormState): ComputeSizePreset[] {
   const intent = computeSizingIntent(query, form);
 
@@ -8598,26 +8426,6 @@ function computeSizingSuggestions(query: string, form: WorkloadFormState): Compu
       left.memoryGb - right.memoryGb,
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 function parseBulkServiceRows(input: string): BulkServiceDraftRow[] {
   return input
@@ -8644,30 +8452,6 @@ function parseBulkServiceRows(input: string): BulkServiceDraftRow[] {
       };
     });
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 function SupportBadge({ status }: { status: ServiceSupportStatus }) {
   return <span className={`support-badge support-badge-${status}`}>{supportLabel(status)}</span>;
@@ -8712,26 +8496,6 @@ function ToggleIcon({ icon }: { icon: ToggleIconKind }) {
     </svg>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 function CloudCalculatorLinks({ regionCatalog }: { regionCatalog: RegionCatalogResponse | null }) {
   const catalogsByProvider = new Map(
@@ -9153,8 +8917,6 @@ function ExecutiveAnalyticsPreview({
   );
 }
 
-
-
 function ExecutiveDecisionDashboard({
   analytics: serverAnalytics,
   comparison,
@@ -9449,10 +9211,6 @@ function ExecutiveBreakEvenTimeline({
   );
 }
 
-
-
-
-
 function breakEvenTimelineModel(
   comparison: ComparisonResult | null,
   serverTimelines?: ComparisonAnalyticsResponse['commitmentRoiTimelines'],
@@ -9545,17 +9303,6 @@ function breakEvenTimelineModel(
         : undefined,
   };
 }
-
-
-
-
-
-
-
-
-
-
-
 
 function ExecutiveCostWaterfall({
   analytics,
@@ -9676,10 +9423,6 @@ function costWaterfallSteps(
       percent: Math.max(4, Math.min(100, (value / provider.totals.monthly) * 100)),
     }));
 }
-
-
-
-
 
 function ExecutiveStatTile({
   detail,
@@ -10442,7 +10185,11 @@ function StorageOptimizationPanel({ rows }: { rows: StorageOptimizationRow[] }) 
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap storage-optimization-wrap" tabIndex={0} aria-label="Storage optimization table">
+        <div
+          className="table-wrap storage-optimization-wrap"
+          tabIndex={0}
+          aria-label="Storage optimization table"
+        >
           <table className="ranking-table storage-optimization-table">
             <thead>
               <tr>
@@ -10506,7 +10253,11 @@ function StorageAnatomyPanel({ rows }: { rows: StorageAnatomyRow[] }) {
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap storage-anatomy-wrap" tabIndex={0} aria-label="Storage anatomy table">
+        <div
+          className="table-wrap storage-anatomy-wrap"
+          tabIndex={0}
+          aria-label="Storage anatomy table"
+        >
           <table className="ranking-table storage-anatomy-table">
             <thead>
               <tr>
@@ -10575,7 +10326,11 @@ function DatabaseOptimizationPanel({ rows }: { rows: DatabaseOptimizationRow[] }
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap database-optimization-wrap" tabIndex={0} aria-label="Database optimization table">
+        <div
+          className="table-wrap database-optimization-wrap"
+          tabIndex={0}
+          aria-label="Database optimization table"
+        >
           <table className="ranking-table database-optimization-table">
             <thead>
               <tr>
@@ -10639,7 +10394,11 @@ function DatabaseAnatomyPanel({ rows }: { rows: DatabaseAnatomyRow[] }) {
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap database-anatomy-wrap" tabIndex={0} aria-label="Database anatomy table">
+        <div
+          className="table-wrap database-anatomy-wrap"
+          tabIndex={0}
+          aria-label="Database anatomy table"
+        >
           <table className="ranking-table database-anatomy-table">
             <thead>
               <tr>
@@ -10719,7 +10478,11 @@ function RuntimeOptimizationPanel({
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap runtime-optimization-wrap" tabIndex={0} aria-label="Runtime optimization table">
+        <div
+          className="table-wrap runtime-optimization-wrap"
+          tabIndex={0}
+          aria-label="Runtime optimization table"
+        >
           <table className="ranking-table runtime-optimization-table">
             <thead>
               <tr>
@@ -10770,7 +10533,11 @@ function RuntimeOptimizationPanel({
       )}
 
       {memoryCurveRows.length > 0 && (
-        <div className="table-wrap runtime-memory-curve-wrap" tabIndex={0} aria-label="Runtime memory curve table">
+        <div
+          className="table-wrap runtime-memory-curve-wrap"
+          tabIndex={0}
+          aria-label="Runtime memory curve table"
+        >
           <table className="ranking-table runtime-memory-curve-table">
             <caption>Serverless memory-duration curve</caption>
             <thead>
@@ -10834,7 +10601,11 @@ function AppPlatformModelPanel({ rows }: { rows: AppPlatformModelRow[] }) {
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap app-platform-model-wrap" tabIndex={0} aria-label="App platform model table">
+        <div
+          className="table-wrap app-platform-model-wrap"
+          tabIndex={0}
+          aria-label="App platform model table"
+        >
           <table className="ranking-table app-platform-model-table">
             <thead>
               <tr>
@@ -10899,7 +10670,11 @@ function OperationsOptimizationPanel({ rows }: { rows: OperationsOptimizationRow
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap operations-optimization-wrap" tabIndex={0} aria-label="Operations optimization table">
+        <div
+          className="table-wrap operations-optimization-wrap"
+          tabIndex={0}
+          aria-label="Operations optimization table"
+        >
           <table className="ranking-table operations-optimization-table">
             <thead>
               <tr>
@@ -10963,7 +10738,11 @@ function EgressOptimizationPanel({ rows }: { rows: EgressOptimizationRow[] }) {
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap egress-optimization-wrap" tabIndex={0} aria-label="Egress optimization table">
+        <div
+          className="table-wrap egress-optimization-wrap"
+          tabIndex={0}
+          aria-label="Egress optimization table"
+        >
           <table className="ranking-table egress-optimization-table">
             <thead>
               <tr>
@@ -11027,7 +10806,11 @@ function NetworkingCostPanel({ rows }: { rows: NetworkingCostRow[] }) {
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap networking-cost-wrap" tabIndex={0} aria-label="Networking cost table">
+        <div
+          className="table-wrap networking-cost-wrap"
+          tabIndex={0}
+          aria-label="Networking cost table"
+        >
           <table className="ranking-table networking-cost-table">
             <thead>
               <tr>
@@ -11164,7 +10947,11 @@ function LicenseOptimizationPanel({
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap license-optimization-wrap" tabIndex={0} aria-label="License optimization table">
+        <div
+          className="table-wrap license-optimization-wrap"
+          tabIndex={0}
+          aria-label="License optimization table"
+        >
           <table className="ranking-table license-optimization-table">
             <thead>
               <tr>
@@ -11264,7 +11051,11 @@ function ScenarioSensitivityTable({ rows }: { rows: SensitivityScenarioRow[] }) 
       </div>
 
       {rows.length > 0 ? (
-        <div className="table-wrap scenario-sensitivity-wrap" tabIndex={0} aria-label="Scenario sensitivity table">
+        <div
+          className="table-wrap scenario-sensitivity-wrap"
+          tabIndex={0}
+          aria-label="Scenario sensitivity table"
+        >
           <table className="ranking-table scenario-sensitivity-table">
             <thead>
               <tr>
@@ -11539,18 +11330,6 @@ function CostMatrixValue({ cell }: { cell: CostMatrixCell }) {
   );
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
 function compareCostMatrixRows(
   left: FullCostMatrixRow,
   right: FullCostMatrixRow,
@@ -11572,8 +11351,6 @@ function compareCostMatrixRows(
   );
 }
 
-
-
 function parseCostMatrixSortKey(
   sortBy: CostMatrixSortKey,
 ): { providerId: ProviderId; pricingModel: PricingModelKey } | null {
@@ -11586,10 +11363,6 @@ function parseCostMatrixSortKey(
   return { providerId, pricingModel };
 }
 
-
-
-
-
 function costMatrixSortCost(
   row: FullCostMatrixRow,
   providerId: ProviderId,
@@ -11599,10 +11372,6 @@ function costMatrixSortCost(
     costMatrixCellFromRow(row, providerId, pricingModel).monthlyCostUsd ?? Number.POSITIVE_INFINITY
   );
 }
-
-
-
-
 
 function CostFormulaEvidence({ comparison }: { comparison: ComparisonResult | null }) {
   const rows = costFormulaRows(comparison);
@@ -11736,72 +11505,6 @@ function PricingEvidencePanel({
   );
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 function computeSpecificationRows(
   comparison: ComparisonResult | null,
   form: WorkloadFormState,
@@ -11877,18 +11580,6 @@ function computeSpecificationRows(
         PROVIDER_ORDER.indexOf(left.providerId) - PROVIDER_ORDER.indexOf(right.providerId),
     );
 }
-
-
-
-
-
-
-
-
-
-
-
-
 
 function storageOptimizationRows(
   comparison: ComparisonResult | null,
@@ -11989,8 +11680,6 @@ function storageOptimizationRows(
     .sort((left, right) => right.monthlySavings - left.monthlySavings);
 }
 
-
-
 function storageAnatomyRows(
   comparison: ComparisonResult | null,
   form: WorkloadFormState,
@@ -12088,31 +11777,11 @@ function storageAnatomyRows(
     );
 }
 
-
-
-
-
 function storageAnatomyProfile(form: WorkloadFormState): string {
   return `${capitalize(form.storageType.replace(/-/g, ' '))} · ${storageClassDisplayName(
     form.storageClass,
   )}`;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 function databaseOptimizationRows(
   comparison: ComparisonResult | null,
@@ -12229,8 +11898,6 @@ function databaseOptimizationRows(
     .sort((left, right) => right.monthlySavings - left.monthlySavings);
 }
 
-
-
 function databaseAnatomyRows(
   comparison: ComparisonResult | null,
   form: WorkloadFormState,
@@ -12326,28 +11993,6 @@ function databaseAnatomyRows(
     );
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 function serverlessMemoryCurveRows(
   comparison: ComparisonResult | null,
   form: WorkloadFormState,
@@ -12418,10 +12063,6 @@ function serverlessMemoryCurveRows(
     })
     .filter((row) => row.currentMonthly > 0 || row.modeledMonthly > 0);
 }
-
-
-
-
 
 function appPlatformModelRows(
   comparison: ComparisonResult | null,
@@ -12515,18 +12156,6 @@ function appPlatformModelRows(
     .sort((left, right) => right.monthlyDelta - left.monthlyDelta);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
 function egressOptimizationRows(
   comparison: ComparisonResult | null,
   form: WorkloadFormState,
@@ -12596,8 +12225,6 @@ function egressOptimizationRows(
     .sort((left, right) => right.monthlySavings - left.monthlySavings);
 }
 
-
-
 function networkingCostRows(
   comparison: ComparisonResult | null,
   serverRows?: ComparisonAnalyticsResponse['egressNetworkingDetails'],
@@ -12659,26 +12286,6 @@ function networkingCostRows(
       return providerDelta !== 0 ? providerDelta : right.monthly - left.monthly;
     });
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 function licenseOptimizationRows(
   comparison: ComparisonResult | null,
@@ -12888,12 +12495,6 @@ function mergedArchitectureRiskFlags(
     },
   ];
 }
-
-
-
-
-
-
 
 function commitmentCoverageGapRows(
   comparison: ComparisonResult | null,
@@ -13311,36 +12912,6 @@ function sensitivityScenarioRows(
   ];
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 function maxComponentShare(comparison: ComparisonResult | null, component: CostComponent): number {
   if (!comparison) {
     return 0;
@@ -13356,14 +12927,6 @@ function maxComponentShare(comparison: ComparisonResult | null, component: CostC
     return Math.max(maxShare, share);
   }, 0);
 }
-
-
-
-
-
-
-
-
 
 function EngineeringServiceChartGrid({
   analytics,
@@ -13391,7 +12954,6 @@ function EngineeringServiceChartGrid({
     </div>
   );
 }
-
 
 function ProviderCostWorkspace({
   comparison,
@@ -13786,8 +13348,6 @@ function ArchitectureWorkspace({
     </section>
   );
 }
-
-
 
 export function ProviderPanel({
   providerId,
@@ -14561,14 +14121,6 @@ function ExternalLinkIcon() {
   );
 }
 
-
-
-
-
-
-
-
-
 function ClearIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="button-icon">
@@ -14576,28 +14128,6 @@ function ClearIcon() {
     </svg>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 function providerCostSummaries(
   comparison: ComparisonResult | null,
@@ -14700,10 +14230,6 @@ function executiveAnalyticsModel(
   };
 }
 
-
-
-
-
 function engineeringAnalyticsModel(
   comparison: ComparisonResult | null,
   interval: IntervalKey,
@@ -14761,8 +14287,6 @@ function engineeringAnalyticsModel(
     topDriver,
   };
 }
-
-
 
 function buildFinOpsReview(
   comparison: ComparisonResult | null,
@@ -14839,22 +14363,6 @@ function buildFinOpsReview(
   };
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 function categoryCostSummaries(
   comparison: ComparisonResult | null,
   interval: IntervalKey,
@@ -14867,28 +14375,6 @@ function categoryCostSummaries(
     ? categoryTotalsForLineItems(cheapestProvider.lineItems, interval)
     : emptyCategoryTotals();
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 function readStoredAuthState(): { token: string; expired: boolean } {
   const token = window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY) ?? '';
@@ -14906,44 +14392,6 @@ function readStoredAuthState(): { token: string; expired: boolean } {
 
   return { token, expired: false };
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 function saveComparisonHistoryEntry(
   currentHistory: ComparisonHistoryEntry[],
@@ -15032,14 +14480,6 @@ function sanitizeComparisonHistoryEntry(
   };
 }
 
-
-
-
-
-
-
-
-
 function readStoredRequirementSession(): StoredRequirementSession | undefined {
   try {
     const stored = window.sessionStorage.getItem(REQUIREMENT_SESSION_STORAGE_KEY);
@@ -15075,16 +14515,6 @@ function readStoredRequirementSession(): StoredRequirementSession | undefined {
   }
 }
 
-
-
-
-
-
-
-
-
-
-
 function serviceRequirementForManualClassification(
   nodeId: string,
   serviceType: string,
@@ -15105,44 +14535,6 @@ function serviceRequirementForManualClassification(
   };
 }
 
-
-
-
-
 function serviceLabelForType(serviceType: string): string {
   return diagramServiceOptionForType(serviceType).label;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

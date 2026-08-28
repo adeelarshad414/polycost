@@ -192,7 +192,11 @@ describe('GcpProviderAdapter', () => {
   it('pins the compute category to the Compute Engine serviceId (ignores decoy services)', async () => {
     const services = {
       services: [
-        { name: 'services/6F81-5844-456A', serviceId: '6F81-5844-456A', displayName: 'Compute Engine' },
+        {
+          name: 'services/6F81-5844-456A',
+          serviceId: '6F81-5844-456A',
+          displayName: 'Compute Engine',
+        },
         // Decoy: display name contains "compute" (old regex would sweep it in),
         // but a different serviceId — must be ignored.
         {

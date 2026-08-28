@@ -7,8 +7,23 @@
 /* eslint-disable security/detect-object-injection -- Reviewed: typed lookup
    maps carried over verbatim from App.tsx. */
 
-import { AppPlatformModelRates, ComputeSizePreset, ComputeSpecificationProfile, ComputeStorageDefault, InputMode, ServerlessFunctionRates, ServiceCategory, ServiceRequirementCategory } from './app-view-types';
-import { PricingModelKey, ProviderId, TerraformAvailabilityMode, TerraformNetworkTopology, TerraformRuntimeTarget } from '../types';
+import {
+  AppPlatformModelRates,
+  ComputeSizePreset,
+  ComputeSpecificationProfile,
+  ComputeStorageDefault,
+  InputMode,
+  ServerlessFunctionRates,
+  ServiceCategory,
+  ServiceRequirementCategory,
+} from './app-view-types';
+import {
+  PricingModelKey,
+  ProviderId,
+  TerraformAvailabilityMode,
+  TerraformNetworkTopology,
+  TerraformRuntimeTarget,
+} from '../types';
 import { WorkloadFormState, defaultWorkloadForm } from '../workload';
 
 export const INPUT_MODE_OPTIONS: Array<{
@@ -256,7 +271,10 @@ export const COMPUTE_SIZE_PRESETS: ComputeSizePreset[] = [
   },
 ];
 
-export const COMPUTE_STORAGE_DEFAULTS: Record<WorkloadFormState['instanceTier'], ComputeStorageDefault> = {
+export const COMPUTE_STORAGE_DEFAULTS: Record<
+  WorkloadFormState['instanceTier'],
+  ComputeStorageDefault
+> = {
   small: {
     sizeGb: '50',
     storageRole: 'starter disk',
@@ -312,12 +330,13 @@ export const COMPUTE_STORAGE_DEFAULTS: Record<WorkloadFormState['instanceTier'],
   },
 };
 
-export const PROCESSOR_ARCHITECTURE_OPTIONS: Array<[WorkloadFormState['processorArchitecture'], string]> =
-  [
-    ['x86_64', 'x86 - Intel / AMD'],
-    ['arm64', 'ARM - Graviton / Ampere / Tau'],
-    ['gpu', 'GPU - accelerator attached'],
-  ];
+export const PROCESSOR_ARCHITECTURE_OPTIONS: Array<
+  [WorkloadFormState['processorArchitecture'], string]
+> = [
+  ['x86_64', 'x86 - Intel / AMD'],
+  ['arm64', 'ARM - Graviton / Ampere / Tau'],
+  ['gpu', 'GPU - accelerator attached'],
+];
 
 export const COMPUTE_TENANCY_OPTIONS: Array<[WorkloadFormState['computeTenancy'], string]> = [
   ['shared', 'Shared cloud tenancy'],
@@ -342,11 +361,12 @@ export const STORAGE_CLASS_OPTIONS: Array<[WorkloadFormState['storageClass'], st
   ['ultra', 'Ultra disk'],
 ];
 
-export const STORAGE_REPLICATION_OPTIONS: Array<[WorkloadFormState['storageReplication'], string]> = [
-  ['none', 'No replication modeled'],
-  ['same-region', 'Same-region replication'],
-  ['cross-region', 'Cross-region replication'],
-];
+export const STORAGE_REPLICATION_OPTIONS: Array<[WorkloadFormState['storageReplication'], string]> =
+  [
+    ['none', 'No replication modeled'],
+    ['same-region', 'Same-region replication'],
+    ['cross-region', 'Cross-region replication'],
+  ];
 
 export const SERVICE_CATEGORIES: ServiceCategory[] = [
   'compute',

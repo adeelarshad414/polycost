@@ -98,10 +98,9 @@ export class CostManagementJobsScheduler implements OnModuleInit, OnModuleDestro
         auditExportDays: this.configService.get('DATA_RETENTION_AUDIT_EXPORT_DAYS', {
           infer: true,
         }),
-        comparisonAuditLogDays: this.configService.get(
-          'DATA_RETENTION_COMPARISON_AUDIT_LOG_DAYS',
-          { infer: true },
-        ),
+        comparisonAuditLogDays: this.configService.get('DATA_RETENTION_COMPARISON_AUDIT_LOG_DAYS', {
+          infer: true,
+        }),
         accountSessionDays: this.configService.get('DATA_RETENTION_ACCOUNT_SESSION_DAYS', {
           infer: true,
         }),

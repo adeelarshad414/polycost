@@ -184,10 +184,7 @@ function liveMigrationVersions(schemaMigrationsOutput) {
 // with ON_ERROR_STOP and IF NOT EXISTS / ON CONFLICT guards, migrations become
 // atomic and safely re-runnable.
 function migrationRunsInSingleTransaction(migration) {
-  const content = readFileSync(
-    path.join(root, 'database/migrations', migration),
-    'utf8',
-  );
+  const content = readFileSync(path.join(root, 'database/migrations', migration), 'utf8');
   if (/\bCONCURRENTLY\b/i.test(content)) {
     return false;
   }

@@ -52,7 +52,9 @@ async function priceWorkload(nws) {
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`POST /comparisons -> HTTP ${res.status} ${res.statusText} ${text.slice(0, 300)}`);
+    throw new Error(
+      `POST /comparisons -> HTTP ${res.status} ${res.statusText} ${text.slice(0, 300)}`,
+    );
   }
   return res.json();
 }
@@ -67,7 +69,9 @@ async function main() {
   console.log(`\nPolyCost pricing accuracy harness`);
   console.log(`API:    ${API_BASE}`);
   console.log(`Golden: ${GOLDEN_PATH}`);
-  console.log(`Note:   compares PolyCost monthly total vs real provider calculator (golden) per row.\n`);
+  console.log(
+    `Note:   compares PolyCost monthly total vs real provider calculator (golden) per row.\n`,
+  );
 
   // Surface the provenance of the data the API is actually serving.
   try {
@@ -98,9 +102,7 @@ async function main() {
     }
 
     console.log(`■ ${workload.id} — ${workload.description}`);
-    console.log(
-      `  provider  polycost      calculator    delta     tol    result`,
-    );
+    console.log(`  provider  polycost      calculator    delta     tol    result`);
     for (const providerId of PROVIDERS) {
       const expected = workload.expected?.[providerId] ?? {};
       const calc = expected.calculatorMonthlyUsd ?? null;
@@ -108,7 +110,9 @@ async function main() {
       const tol = expected.tolerancePercent ?? 10;
 
       if (actual === null) {
-        console.log(`  ${providerId.padEnd(8)} ${money(null)}   ${money(calc)}   (no PolyCost result)`);
+        console.log(
+          `  ${providerId.padEnd(8)} ${money(null)}   ${money(calc)}   (no PolyCost result)`,
+        );
         failures += 1;
         continue;
       }

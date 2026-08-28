@@ -10,11 +10,87 @@
 
 import { TaskQueueItem } from '../components/LoadingExperience';
 import { HOURS_PER_MONTH } from '../cost-time';
-import { ArchitectureRiskFlag, BusyAction, CategoryCostSummary, ComparisonLineItem, ComputeSizePreset, ComputeSizingIntent, ComputeSpecificationProfile, CostComponent, CostMatrixCell, CostMatrixSortKey, DatabaseOptimizationRow, EgressOptimizationRow, ExecutiveAnalyticsModel, ExecutiveDecision, ExecutiveLens, InputMode, OperationsOptimizationRow, ProviderCostSummary, ProviderFitSummary, RuntimeOptimizationRow, SensitivityScenarioProviderCost, SensitivityScenarioRow, ServiceCategory, ServiceRequirementCategory, SolutionArchitectureReview, SpotBlendOptimizerRow, StorageOptimizationRow } from './app-view-types';
+import {
+  ArchitectureRiskFlag,
+  BusyAction,
+  CategoryCostSummary,
+  ComparisonLineItem,
+  ComputeSizePreset,
+  ComputeSizingIntent,
+  ComputeSpecificationProfile,
+  CostComponent,
+  CostMatrixCell,
+  CostMatrixSortKey,
+  DatabaseOptimizationRow,
+  EgressOptimizationRow,
+  ExecutiveAnalyticsModel,
+  ExecutiveDecision,
+  ExecutiveLens,
+  InputMode,
+  OperationsOptimizationRow,
+  ProviderCostSummary,
+  ProviderFitSummary,
+  RuntimeOptimizationRow,
+  SensitivityScenarioProviderCost,
+  SensitivityScenarioRow,
+  ServiceCategory,
+  ServiceRequirementCategory,
+  SolutionArchitectureReview,
+  SpotBlendOptimizerRow,
+  StorageOptimizationRow,
+} from './app-view-types';
 import { formatCurrency, formatPercent, formatSignedCurrency } from './format';
-import { arrayValue, booleanValue, capitalize, clampNumber, costForInterval, editStatusNotice, formatDateTime, formatDecimal, invoiceArtifactPolicyExceptionStatus, invoiceArtifactReviewStatus, invoiceControlValidationStatus, numberValue, objectValue, operationsDescriptionMatches, parseFormNumber, parseInputNumber, positiveFormNumber, providerLabel, providerServicesForFamily, regionLabelForSummary, roundChartCoordinate, roundCurrency, runtimeDescriptionMatches, safePreviewColor, serviceFamilyShortLabel, sizingTokenAt, sizingTokenKind, stringArrayValue, stringValue, workloadTypeLabel } from './workload-analysis';
+import {
+  arrayValue,
+  booleanValue,
+  capitalize,
+  clampNumber,
+  costForInterval,
+  editStatusNotice,
+  formatDateTime,
+  formatDecimal,
+  invoiceArtifactPolicyExceptionStatus,
+  invoiceArtifactReviewStatus,
+  invoiceControlValidationStatus,
+  numberValue,
+  objectValue,
+  operationsDescriptionMatches,
+  parseFormNumber,
+  parseInputNumber,
+  positiveFormNumber,
+  providerLabel,
+  providerServicesForFamily,
+  regionLabelForSummary,
+  roundChartCoordinate,
+  roundCurrency,
+  runtimeDescriptionMatches,
+  safePreviewColor,
+  serviceFamilyShortLabel,
+  sizingTokenAt,
+  sizingTokenKind,
+  stringArrayValue,
+  stringValue,
+  workloadTypeLabel,
+} from './workload-analysis';
 import { CloudServiceFamily } from '../service-catalog';
-import { ComparisonAnalyticsResponse, ComparisonProviderResult, ComparisonResult, DataHealthResponse, DiagramParseResult, INTERVALS, IntervalKey, InvoiceArtifactPolicyExceptionStatus, InvoiceArtifactReviewStatus, InvoiceControlValidationStatus, InvoiceReconciliationRecord, PROVIDER_ORDER, PricingModelKey, ProviderId, RegionCatalogResponse, ReportFormat } from '../types';
+import {
+  ComparisonAnalyticsResponse,
+  ComparisonProviderResult,
+  ComparisonResult,
+  DataHealthResponse,
+  DiagramParseResult,
+  INTERVALS,
+  IntervalKey,
+  InvoiceArtifactPolicyExceptionStatus,
+  InvoiceArtifactReviewStatus,
+  InvoiceControlValidationStatus,
+  InvoiceReconciliationRecord,
+  PROVIDER_ORDER,
+  PricingModelKey,
+  ProviderId,
+  RegionCatalogResponse,
+  ReportFormat,
+} from '../types';
 import { WorkloadFormState } from '../workload';
 
 export function quickActionTaskItems(
@@ -62,7 +138,10 @@ export function resultStatusNotice(notice: string | null): string | null {
   return editStatusNotice(notice);
 }
 
-export function dataHealthBannerDetail(health: DataHealthResponse | null, error: string | null): string {
+export function dataHealthBannerDetail(
+  health: DataHealthResponse | null,
+  error: string | null,
+): string {
   if (error) {
     return error;
   }
@@ -82,7 +161,9 @@ export function dataHealthBannerDetail(health: DataHealthResponse | null, error:
   )}`;
 }
 
-export function dataHealthProviderIssueLabel(provider: DataHealthResponse['providers'][number]): string {
+export function dataHealthProviderIssueLabel(
+  provider: DataHealthResponse['providers'][number],
+): string {
   const ageLabel =
     provider.ageHours !== undefined ? `${provider.ageHours}h old` : provider.freshness;
 
@@ -1153,7 +1234,9 @@ export function databaseOptimizationSignal(
   };
 }
 
-export function runtimeIntelligenceLineItems(provider: ComparisonProviderResult): ComparisonLineItem[] {
+export function runtimeIntelligenceLineItems(
+  provider: ComparisonProviderResult,
+): ComparisonLineItem[] {
   return provider.lineItems.filter((lineItem) =>
     runtimeDescriptionMatches(`${lineItem.skuId ?? ''} ${lineItem.description}`),
   );
@@ -1343,7 +1426,9 @@ export function runtimeOptimizationSignal(
   };
 }
 
-export function operationsIntelligenceLineItems(provider: ComparisonProviderResult): ComparisonLineItem[] {
+export function operationsIntelligenceLineItems(
+  provider: ComparisonProviderResult,
+): ComparisonLineItem[] {
   return provider.lineItems.filter((lineItem) =>
     operationsDescriptionMatches(`${lineItem.skuId ?? ''} ${lineItem.description}`),
   );

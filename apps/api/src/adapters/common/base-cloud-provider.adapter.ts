@@ -577,9 +577,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     let listMonthlyCostUsd: number | undefined;
     if (sustainedUseDiscount > 0 && cost.monthlyCostUsd > 0) {
       listMonthlyCostUsd = cost.monthlyCostUsd;
-      const discountedMonthly = this.roundCurrency(
-        listMonthlyCostUsd * (1 - sustainedUseDiscount),
-      );
+      const discountedMonthly = this.roundCurrency(listMonthlyCostUsd * (1 - sustainedUseDiscount));
       cost = {
         ...cost,
         monthlyCostUsd: discountedMonthly,

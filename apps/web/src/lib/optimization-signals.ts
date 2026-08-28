@@ -8,14 +8,120 @@
    provider/category lookup maps carried over verbatim from App.tsx. */
 
 import { HOURS_PER_MONTH, intervalMultiplierFromMonthly } from '../cost-time';
-import { APP_PLATFORM_MODEL_RATES, AUTH_SESSION_EXPIRES_AT_STORAGE_KEY, AUTH_SESSION_STORAGE_KEY, COMPARISON_HISTORY_STORAGE_KEY, COMPUTE_ARM_COST_FACTORS, COMPUTE_STORAGE_DEFAULTS, DIAGRAM_REVIEW_SERVICE_OPTIONS, INPUT_MODE_OPTIONS, PRICING_MODEL_OPTIONS, PRICING_MODEL_STORAGE_KEY, REGION_VARIANCE_PROFILES, REQUIREMENTS_FILE_EXTENSIONS, REQUIREMENTS_FILE_MIME_TYPES, REQUIREMENT_SESSION_STORAGE_KEY, SERVERLESS_FUNCTION_RATES, SERVICE_CATEGORIES, SERVICE_FAMILY_ALIASES, SPOT_ESTIMATE_TOOLTIP, STORAGE_CLASS_OPTIONS } from './app-catalogs';
-import { ArchitectureRiskFlag, BreakEvenTimelineModel, CategoryCostSummary, ComparisonHistoryEntry, ComparisonLineItem, ComputeSizingIntent, ComputeStorageDefault, CostComponent, CostMatrixCell, ExecutiveDecision, FullCostMatrixRow, InputMode, OperationsOptimizationRow, ProviderCostSummary, ProviderDeltaRow, RegionVarianceRow, RuntimeOptimizationRow, ServiceCategory, SolutionArchitectureReview, SpotBlendOptimizerRow, StoredRequirementSession } from './app-view-types';
-import { chartPoint, comparisonHistorySummary, confidenceDetail, costComponentForCategory, costMatrixCellForLineItem, dataHealthProviderIssueLabel, databaseDimensionTotals, decisionConfidence, finOpsRiskSeverity, formatCompactInput, lineItemCostComponent, lineItemTierBillableGb, manualAssumptionsForService, memoryGbFromTokens, missingCostMatrixCell, numberNearToken, operationsIntelligenceLineItems, operationsOptimizationSignal, runtimeIntelligenceLineItems, runtimeOptimizationSignal, serviceFamilyOptionLabel, serviceFamilySearchText, solutionArchitecturePosture, solutionArchitectureRisk, spotBlendWorkloadFit, spotInterruptionFrequency, tokenizeSizingQuery } from './comparison-models';
+import {
+  APP_PLATFORM_MODEL_RATES,
+  AUTH_SESSION_EXPIRES_AT_STORAGE_KEY,
+  AUTH_SESSION_STORAGE_KEY,
+  COMPARISON_HISTORY_STORAGE_KEY,
+  COMPUTE_ARM_COST_FACTORS,
+  COMPUTE_STORAGE_DEFAULTS,
+  DIAGRAM_REVIEW_SERVICE_OPTIONS,
+  INPUT_MODE_OPTIONS,
+  PRICING_MODEL_OPTIONS,
+  PRICING_MODEL_STORAGE_KEY,
+  REGION_VARIANCE_PROFILES,
+  REQUIREMENTS_FILE_EXTENSIONS,
+  REQUIREMENTS_FILE_MIME_TYPES,
+  REQUIREMENT_SESSION_STORAGE_KEY,
+  SERVERLESS_FUNCTION_RATES,
+  SERVICE_CATEGORIES,
+  SERVICE_FAMILY_ALIASES,
+  SPOT_ESTIMATE_TOOLTIP,
+  STORAGE_CLASS_OPTIONS,
+} from './app-catalogs';
+import {
+  ArchitectureRiskFlag,
+  BreakEvenTimelineModel,
+  CategoryCostSummary,
+  ComparisonHistoryEntry,
+  ComparisonLineItem,
+  ComputeSizingIntent,
+  ComputeStorageDefault,
+  CostComponent,
+  CostMatrixCell,
+  ExecutiveDecision,
+  FullCostMatrixRow,
+  InputMode,
+  OperationsOptimizationRow,
+  ProviderCostSummary,
+  ProviderDeltaRow,
+  RegionVarianceRow,
+  RuntimeOptimizationRow,
+  ServiceCategory,
+  SolutionArchitectureReview,
+  SpotBlendOptimizerRow,
+  StoredRequirementSession,
+} from './app-view-types';
+import {
+  chartPoint,
+  comparisonHistorySummary,
+  confidenceDetail,
+  costComponentForCategory,
+  costMatrixCellForLineItem,
+  dataHealthProviderIssueLabel,
+  databaseDimensionTotals,
+  decisionConfidence,
+  finOpsRiskSeverity,
+  formatCompactInput,
+  lineItemCostComponent,
+  lineItemTierBillableGb,
+  manualAssumptionsForService,
+  memoryGbFromTokens,
+  missingCostMatrixCell,
+  numberNearToken,
+  operationsIntelligenceLineItems,
+  operationsOptimizationSignal,
+  runtimeIntelligenceLineItems,
+  runtimeOptimizationSignal,
+  serviceFamilyOptionLabel,
+  serviceFamilySearchText,
+  solutionArchitecturePosture,
+  solutionArchitectureRisk,
+  spotBlendWorkloadFit,
+  spotInterruptionFrequency,
+  tokenizeSizingQuery,
+} from './comparison-models';
 import { formatCurrency, formatPercent } from './format';
-import { capitalize, databaseDescriptionMatches, formatDecimal, intervalCostMultiplier, networkDescriptionMatches, normalizeServiceSearchText, operationsAdvancedDescriptionMatches, parseFormNumber, parseInputNumber, positiveFormNumber, providerLabel, providerServicesForFamily, roundCurrency, runtimeAdvancedDescriptionMatches, spotBlendPercent, spotBlendRisk, storageDescriptionMatches, supportTierLabel, tierFromSizingQuery } from './workload-analysis';
-import { COMPARISON_REGION_GROUPS, canonicalRegionForRegionPreference, canonicalRegionsForResidencyScope, providerRegionSummary } from '../region-normalization';
+import {
+  capitalize,
+  databaseDescriptionMatches,
+  formatDecimal,
+  intervalCostMultiplier,
+  networkDescriptionMatches,
+  normalizeServiceSearchText,
+  operationsAdvancedDescriptionMatches,
+  parseFormNumber,
+  parseInputNumber,
+  positiveFormNumber,
+  providerLabel,
+  providerServicesForFamily,
+  roundCurrency,
+  runtimeAdvancedDescriptionMatches,
+  spotBlendPercent,
+  spotBlendRisk,
+  storageDescriptionMatches,
+  supportTierLabel,
+  tierFromSizingQuery,
+} from './workload-analysis';
+import {
+  COMPARISON_REGION_GROUPS,
+  canonicalRegionForRegionPreference,
+  canonicalRegionsForResidencyScope,
+  providerRegionSummary,
+} from '../region-normalization';
 import { CLOUD_SERVICE_CATALOG, CloudServiceFamily } from '../service-catalog';
-import { ComparisonAnalyticsResponse, ComparisonProviderResult, ComparisonResult, DataHealthResponse, DiagramParseResult, IntervalKey, PROVIDER_ORDER, PricingModelKey, ProviderId, ServiceRequirement } from '../types';
+import {
+  ComparisonAnalyticsResponse,
+  ComparisonProviderResult,
+  ComparisonResult,
+  DataHealthResponse,
+  DiagramParseResult,
+  IntervalKey,
+  PROVIDER_ORDER,
+  PricingModelKey,
+  ProviderId,
+  ServiceRequirement,
+} from '../types';
 import { WorkloadFormState, serviceRequirementsFromForm } from '../workload';
 
 export function dataHealthBannerSummary(
@@ -485,7 +591,9 @@ export function storageClassDisplayName(storageClass: WorkloadFormState['storage
   return option?.[1] ?? storageClass.replace(/-/g, ' ');
 }
 
-export function databaseIntelligenceLineItems(provider: ComparisonProviderResult): ComparisonLineItem[] {
+export function databaseIntelligenceLineItems(
+  provider: ComparisonProviderResult,
+): ComparisonLineItem[] {
   return provider.lineItems.filter(
     (lineItem) =>
       lineItem.category === 'database' ||
@@ -577,7 +685,9 @@ export function databaseAnalyticsSignal(input: {
   return parts.join(' · ') || 'No warehouse/cache/search row surfaced';
 }
 
-export function databaseDimensionSummary(dimensions: ReturnType<typeof databaseDimensionTotals>): string {
+export function databaseDimensionSummary(
+  dimensions: ReturnType<typeof databaseDimensionTotals>,
+): string {
   const active = Object.entries(dimensions)
     .filter(([, value]) => value > 0.005)
     .map(([key]) => key);
@@ -1108,7 +1218,10 @@ export function finOpsFindingRiskFlag(
   };
 }
 
-export function componentMonthly(provider: ComparisonProviderResult, component: CostComponent): number {
+export function componentMonthly(
+  provider: ComparisonProviderResult,
+  component: CostComponent,
+): number {
   return provider.lineItems
     .filter((lineItem) => lineItemCostComponent(lineItem) === component)
     .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);

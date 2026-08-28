@@ -6,7 +6,12 @@
 
 import { PolyCostClient } from '../api-client';
 import { CloudServiceFamily } from '../service-catalog';
-import { ComparisonProviderResult, PricingModelKey, ProviderId, ServiceRequirement } from '../types';
+import {
+  ComparisonProviderResult,
+  PricingModelKey,
+  ProviderId,
+  ServiceRequirement,
+} from '../types';
 import { WorkloadFormState } from '../workload';
 
 export type InputMode = 'describe' | 'form' | 'diagram';
@@ -21,7 +26,8 @@ export type CostComponent = NonNullable<ComparisonLineItem['costComponent']>;
 
 export type FormSectionTone = 'profile' | 'compute' | 'services' | 'portfolio' | 'data' | 'network';
 
-export type ToggleIconKind = 'storage' | 'database' | 'cdn' | 'loadBalancer' | 'multiAz' | 'multiRegion';
+export type ToggleIconKind =
+  'storage' | 'database' | 'cdn' | 'loadBalancer' | 'multiAz' | 'multiRegion';
 
 export type CostMatrixCategoryFilter = ServiceCategory | 'all';
 

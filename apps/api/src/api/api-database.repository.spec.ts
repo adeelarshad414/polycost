@@ -2391,11 +2391,11 @@ describe('ApiDatabaseRepository', () => {
       [evaluatedAt, teamId],
     );
     // The DELETE itself is team-scoped, so cross-tenant ids can never be removed (SEC-2).
-    expect(query).toHaveBeenNthCalledWith(
-      2,
-      expect.stringContaining('AND team_id = $3::uuid'),
-      [ids, evaluatedAt, teamId],
-    );
+    expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining('AND team_id = $3::uuid'), [
+      ids,
+      evaluatedAt,
+      teamId,
+    ]);
     expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining('legal_hold = false'), [
       ids,
       evaluatedAt,
@@ -3008,24 +3008,27 @@ describe('ApiDatabaseRepository', () => {
     const query = jest.fn(async () => ({ rows: [], rowCount: 0 }));
     const repository = createRepository(query);
 
-    await repository.saveComparisonWithAuditLog(nwsSnapshot as never, {
-      comparisonId: '11111111-1111-4111-8111-111111111111',
-      pricingAsOf: '2026-06-29T00:00:00.000Z',
-      cheapestProviderId: 'aws',
-      providers: [
-        {
-          providerId: 'aws',
-          lineItems: [
-            {
-              category: 'compute',
-              description: 'Compute',
-              baseMonthlyCostUsd: 10,
-              isApproximate: false,
-            },
-          ],
-        },
-      ],
-    } as never);
+    await repository.saveComparisonWithAuditLog(
+      nwsSnapshot as never,
+      {
+        comparisonId: '11111111-1111-4111-8111-111111111111',
+        pricingAsOf: '2026-06-29T00:00:00.000Z',
+        cheapestProviderId: 'aws',
+        providers: [
+          {
+            providerId: 'aws',
+            lineItems: [
+              {
+                category: 'compute',
+                description: 'Compute',
+                baseMonthlyCostUsd: 10,
+                isApproximate: false,
+              },
+            ],
+          },
+        ],
+      } as never,
+    );
 
     const texts = (query.mock.calls as unknown as Array<[string]>).map(([text]) => String(text));
     const comparisonIndex = texts.findIndex((text) => text.includes('INSERT INTO comparisons'));
@@ -3135,7 +3138,11 @@ describe('ApiDatabaseRepository', () => {
       originalFileSha256: 'a'.repeat(64),
       // Third row repeats the first row's hash: the import must count it as a
       // reject, not double-insert it.
-      rows: [lineItem('a'.repeat(64), 100), lineItem('c'.repeat(64), 50), lineItem('a'.repeat(64), 100)],
+      rows: [
+        lineItem('a'.repeat(64), 100),
+        lineItem('c'.repeat(64), 50),
+        lineItem('a'.repeat(64), 100),
+      ],
     });
 
     const lineItemInsertCalls = query.mock.calls.filter(([text]) =>
@@ -3222,7 +3229,6 @@ describe('ApiDatabaseRepository', () => {
     );
     expect(outboxDelete).toContain("status = 'delivered'");
   });
-
 });
 
 function retentionWindows() {

@@ -77,12 +77,15 @@ describe('http-client', () => {
   });
 
   it('enforces the byte cap while streaming a chunked body with no Content-Length (H-B1)', async () => {
-    const previous = process.env.PROVIDER_HTTP_MAX_RESPONSE_BYTES;
-    process.env.PROVIDER_HTTP_MAX_RESPONSE_BYTES = '10';
-    try {
-      const oversized = streamBody([encoder.encode('12345'), encoder.encode('67890'), encoder.encode('AB')]);
-      await expect(
-        parseJsonResponse('azure', {
+    const oversized = streamBody([
+      encoder.encode('12345'),
+      encoder.encode('67890'),
+      encoder.encode('AB'),
+    ]);
+    await expect(
+      parseJsonResponse(
+        'azure',
+        {
           ok: true,
           status: 200,
           statusText: 'OK',
@@ -91,11 +94,10 @@ describe('http-client', () => {
           headers: { get: () => null },
           text: async () => 'unreached',
           body: oversized,
-        }),
-      ).rejects.toThrow(/too large to buffer safely/);
-    } finally {
-      process.env.PROVIDER_HTTP_MAX_RESPONSE_BYTES = previous;
-    }
+        },
+        { maxBytes: 10 },
+      ),
+    ).rejects.toThrow(/too large to buffer safely/);
   });
 
   it('parses a chunked streamed body that stays under the cap (H-B1)', async () => {
@@ -113,22 +115,20 @@ describe('http-client', () => {
   });
 
   it('times out a body that never completes downloading (H-B2)', async () => {
-    const previous = process.env.PROVIDER_HTTP_BODY_TIMEOUT_MS;
-    process.env.PROVIDER_HTTP_BODY_TIMEOUT_MS = '40';
-    try {
-      await expect(
-        parseJsonResponse('aws', {
+    await expect(
+      parseJsonResponse(
+        'aws',
+        {
           ok: true,
           status: 200,
           statusText: 'OK',
           headers: { get: () => null },
           text: async () => 'unreached',
           body: streamBody([], { hang: true }),
-        }),
-      ).rejects.toThrow(/did not complete within 40 ms/);
-    } finally {
-      process.env.PROVIDER_HTTP_BODY_TIMEOUT_MS = previous;
-    }
+        },
+        { bodyTimeoutMs: 40 },
+      ),
+    ).rejects.toThrow(/did not complete within 40 ms/);
   });
 
   describe('assertSameProviderOrigin (M-B1)', () => {
