@@ -29,6 +29,9 @@ import { buildReportInsights } from './report-insights';
 import { sanitizeSpreadsheetText } from './report-security';
 import { ReportOptions } from './report.types';
 
+const UTF8_BOM = '\ufeff';
+const CSV_LINE_BREAK = '\r\n';
+
 @Injectable()
 export class CsvReportGenerator {
   generate(result: ComparisonResult, options: ReportOptions = {}): Buffer {
@@ -143,7 +146,13 @@ export class CsvReportGenerator {
       );
     }
 
-    return Buffer.from(`${rows.map((row) => row.map(csvCell).join(',')).join('\n')}\n`, 'utf8');
+    // RFC 4180 line endings, and a UTF-8 BOM so Excel detects the encoding when
+    // the file is opened directly. Without the BOM Excel assumes the legacy
+    // system codepage and mangles any non-ASCII text (currency symbols,
+    // accented provider or region names).
+    const body = rows.map((row) => row.map(csvCell).join(',')).join(CSV_LINE_BREAK);
+
+    return Buffer.from(`${UTF8_BOM}${body}${CSV_LINE_BREAK}`, 'utf8');
   }
 }
 

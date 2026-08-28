@@ -29,9 +29,13 @@ import { buildReportInsights } from './report-insights';
 import { escapePdfText } from './report-security';
 import { ReportOptions } from './report.types';
 
+const HEADING_FONT_SIZE = 12;
+
 interface PdfLine {
   text: string;
   fontSize: number;
+  /** Render with the Helvetica-Bold face (F2) rather than regular (F1). */
+  bold?: boolean;
 }
 
 interface RgbColor {
@@ -67,13 +71,20 @@ export class PdfReportGenerator {
     objects.push('<< /Type /Catalog /Pages 2 0 R >>');
     objects.push('');
     objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+    // F2: a real bold face. Without it, headings could only be distinguished by
+    // size and colour, which reads as flat next to a typeset enterprise report.
+    const boldFontObjectNumber = objects.length + 1;
+    objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');
 
-    for (const content of pageContents) {
+    const totalPages = pageContents.length;
+
+    for (const [pageIndex, rawContent] of pageContents.entries()) {
+      const content = `${rawContent}\n${pageFooter(pageIndex + 1, totalPages)}`;
       const pageObjectNumber = objects.length + 1;
       const contentObjectNumber = objects.length + 2;
       pageObjectNumbers.push(pageObjectNumber);
       objects.push(
-        `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentObjectNumber} 0 R >>`,
+        `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 ${boldFontObjectNumber} 0 R >> >> /Contents ${contentObjectNumber} 0 R >>`,
       );
       objects.push(`<< /Length ${Buffer.byteLength(content, 'utf8')} >>\nstream\n${content}\nendstream`);
     }
@@ -661,12 +672,41 @@ function pageContent(lines: PdfLine[]): string {
 
   lines.forEach((line, index) => {
     const y = 750 - index * 16;
-    commands.push(`/F1 ${line.fontSize} Tf`, `1 0 0 1 50 ${y} Tm`, `(${escapePdfText(line.text)}) Tj`);
+    // Anything set above body size is a heading, so give it the bold face unless
+    // the caller says otherwise. Body copy stays regular.
+    const bold = line.bold ?? line.fontSize >= HEADING_FONT_SIZE;
+    const font = bold ? 'F2' : 'F1';
+    commands.push(
+      `/${font} ${line.fontSize} Tf`,
+      `1 0 0 1 50 ${y} Tm`,
+      `(${escapePdfText(line.text)}) Tj`,
+    );
   });
 
   commands.push('ET');
 
   return commands.join('\n');
+}
+
+// Page furniture: a hairline rule and "Page N of M", so a printed or emailed
+// report can be reassembled and cited page-by-page.
+function pageFooter(pageNumber: number, totalPages: number): string {
+  const label = `PolyCost Comparison Report  |  Page ${pageNumber} of ${totalPages}`;
+
+  return [
+    '0.83 0.86 0.90 RG',
+    '0.5 w',
+    '50 58 m',
+    '562 58 l',
+    'S',
+    'BT',
+    '0.36 0.39 0.45 rg',
+    '/F1 8 Tf',
+    '1 0 0 1 50 44 Tm',
+    `(${escapePdfText(label)}) Tj`,
+    'ET',
+    '0 0 0 rg',
+  ].join('\n');
 }
 
 function buildPdf(objects: string[]): Buffer {

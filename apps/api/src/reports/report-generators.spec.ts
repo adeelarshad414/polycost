@@ -216,6 +216,61 @@ const reportDataHealth = {
 };
 
 describe('report generators', () => {
+  it('emits well-formed, enterprise-styled workbook XML', () => {
+    const xlsx = new ExcelReportGenerator().generate(comparison, {
+      interval: 'monthly',
+      pricingModel: 'on-demand',
+      generatedAt: '2026-07-02T00:00:00.000Z',
+    });
+    const raw = xlsx.toString('binary');
+
+    // Regression: xmlDocument() used to strip a newline plus indentation with no
+    // replacement, gluing `...main"` to `xmlns:r=...` and making workbook.xml
+    // malformed in every generated file. Adjacent namespace declarations must
+    // stay separated.
+    expect(raw).not.toMatch(/"xmlns:/);
+    expect(raw).toContain('main" xmlns:r=');
+
+    // Currency must carry an explicit format, otherwise money renders as a bare
+    // General number that a reviewer cannot scan.
+    expect(raw).toContain('formatCode="&quot;$&quot;#,##0.00"');
+    // Header fill and a frozen header row.
+    expect(raw).toContain('fgColor rgb="FF1F3864"');
+    expect(raw).toContain('state="frozen"');
+  });
+
+  it('emits CSV with a UTF-8 BOM and RFC 4180 line endings', () => {
+    const csv = new CsvReportGenerator().generate(comparison, {
+      interval: 'monthly',
+      pricingModel: 'on-demand',
+      generatedAt: '2026-07-02T00:00:00.000Z',
+    });
+
+    // Without the BOM, Excel opens the file in the legacy system codepage and
+    // mangles any non-ASCII text.
+    expect(csv[0]).toBe(0xef);
+    expect(csv[1]).toBe(0xbb);
+    expect(csv[2]).toBe(0xbf);
+    expect(csv.toString('utf8')).toContain('\r\n');
+  });
+
+  it('registers a bold face and stamps every PDF page with a page number', () => {
+    const pdf = new PdfReportGenerator()
+      .generate(comparison, {
+        interval: 'monthly',
+        pricingModel: 'on-demand',
+        generatedAt: '2026-07-02T00:00:00.000Z',
+      })
+      .toString('binary');
+
+    expect(pdf).toContain('/BaseFont /Helvetica-Bold');
+
+    const pageCount = (pdf.match(/\/Type \/Page[^s]/g) ?? []).length;
+    const footerCount = (pdf.match(/Page \d+ of \d+/g) ?? []).length;
+    expect(pageCount).toBeGreaterThan(1);
+    expect(footerCount).toBe(pageCount);
+  });
+
   it('creates a CSV report with matching totals and spreadsheet injection mitigation', () => {
     const csv = new CsvReportGenerator()
       .generate(comparison, {
@@ -313,7 +368,7 @@ describe('report generators', () => {
     expect(csv).toContain('Selected pricing model,On-demand');
     expect(csv).toContain('No normalized service requirements were attached to this comparison.');
     expect(csv).toContain('Warnings,No provider or live-refresh warnings were captured');
-    expect(csv).not.toContain('Warnings\nProvider,Code,Message');
+    expect(csv).not.toContain('Warnings\r\nProvider,Code,Message');
   });
 
   it('creates CSV warning rows for general warnings without provider IDs', () => {
@@ -329,7 +384,10 @@ describe('report generators', () => {
       })
       .toString('utf8');
 
-    expect(csv).toContain("Warnings\nProvider,Code,Message\n,live_refresh_failed,'@refresh unavailable");
+    // CSV is emitted with RFC 4180 CRLF line endings.
+    expect(csv).toContain(
+      "Warnings\r\nProvider,Code,Message\r\n,live_refresh_failed,'@refresh unavailable",
+    );
   });
 
   it('embeds data-health evidence across report formats when supplied', () => {
