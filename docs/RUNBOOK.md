@@ -25,19 +25,36 @@ target hosting environment before production commitments.
 
 All emitted metrics are on `GET /metrics` in Prometheus text format.
 
-| Signal                                         | Metric                                                                                                                              | Status             |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| Request rate, error rate, latency by route     | `http_requests_total`, `http_request_errors_total`, `http_request_duration_seconds`                                                 | ✅                 |
-| Pricing ETL rows and freshness by provider     | `pricing_etl_runs_total`, `pricing_etl_records_total`, `pricing_etl_duration_seconds`, `pricing_etl_last_success_timestamp_seconds` | ✅                 |
-| Report export duration and failures            | `report_exports_total`, `report_export_duration_seconds`                                                                            | ✅                 |
-| Auth failure and lockout rate                  | `auth_attempts_total`, `auth_lockouts_total`                                                                                        | ✅                 |
-| Diagram parse confidence and unresolved nodes  | `diagram_parses_total`, `diagram_parse_unresolved_nodes_total`, `diagram_parse_ignored_nodes_total`                                 | ✅                 |
-| Vault read failures                            | `vault_reads_total`                                                                                                                 | ✅                 |
-| Postgres connection latency, failed migrations | —                                                                                                                                   | ⏳ not emitted yet |
-| Redis availability and queue backlog           | —                                                                                                                                   | ⏳ not emitted yet |
+| Signal                                        | Metric                                                                                                                              | Status |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| Request rate, error rate, latency by route    | `http_requests_total`, `http_request_errors_total`, `http_request_duration_seconds`                                                 | ✅     |
+| Pricing ETL rows and freshness by provider    | `pricing_etl_runs_total`, `pricing_etl_records_total`, `pricing_etl_duration_seconds`, `pricing_etl_last_success_timestamp_seconds` | ✅     |
+| Report export duration and failures           | `report_exports_total`, `report_export_duration_seconds`                                                                            | ✅     |
+| Auth failure and lockout rate                 | `auth_attempts_total`, `auth_lockouts_total`                                                                                        | ✅     |
+| Diagram parse confidence and unresolved nodes | `diagram_parses_total`, `diagram_parse_unresolved_nodes_total`, `diagram_parse_ignored_nodes_total`                                 | ✅     |
+| Vault read failures                           | `vault_reads_total`                                                                                                                 | ✅     |
+| Postgres query latency and connection health  | `db_queries_total`, `db_query_duration_seconds`, `dependency_up{dependency="db"}`, `dependency_probe_duration_seconds`              | ✅     |
+| Redis availability and queue backlog          | `dependency_up{dependency="cache"}`, `job_queue_depth{queue,state}`                                                                 | ✅     |
 
-The two pending rows are scrape-time gauges rather than call-site counters, and
-land in the follow-up to this work.
+### How each is sampled
+
+Most instruments are counters incremented at the call site. Three are not:
+
+- **`job_queue_depth`** is read from BullMQ on every scrape. The queue is the
+  source of truth; a counter would drift the moment a job is retried, stalled or
+  removed by another process. If Redis is unreachable the series is **removed**
+  rather than left at its last value — a stale depth reads as a healthy queue.
+- **`dependency_up`** and **`dependency_probe_duration_seconds`** are set by the
+  existing `/health` TCP probe, which readiness checks already call on a
+  schedule, so there is no second polling loop.
+- **`db_query_duration_seconds`** comes from a Proxy around each of the four
+  connection pools, including statements run on a checked-out transaction
+  client. The `pool` label distinguishes them: `api`, `pricing_catalog`,
+  `pricing_rates`, `diagram_import`.
+
+> ℹ️ `failed migrations` from the original signal list is **not** covered here.
+> Migrations run outside the request path, so they need a job-level signal
+> rather than a metric on a live pool.
 
 ### Label discipline
 

@@ -1,4 +1,6 @@
-import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Optional, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { DomainMetricsService } from '../observability/domain-metrics.service';
+import { registerQueueDepth } from '../observability/queue-depth';
 import { ConfigService } from '@nestjs/config';
 import { JobsOptions } from 'bullmq';
 import { AppConfig } from '../config/config.schema';
@@ -20,6 +22,8 @@ export const PRICING_ETL_RUN_REPOSITORY = Symbol('PRICING_ETL_RUN_REPOSITORY');
 export interface PricingEtlQueue {
   add(name: string, data: Record<string, never>, options: JobsOptions): Promise<unknown>;
   close(): Promise<void>;
+  // Optional so existing test doubles need no change; BullMQ's Queue provides it.
+  getJobCounts?(...states: string[]): Promise<Record<string, number>>;
 }
 
 export interface PricingEtlWorker {
@@ -40,9 +44,11 @@ export class PricingEtlScheduler implements OnModuleInit, OnModuleDestroy {
     @Inject(PRICING_ETL_QUEUE) private readonly queue: PricingEtlQueue,
     @Inject(PRICING_ETL_WORKER_FACTORY)
     private readonly workerFactory: PricingEtlWorkerFactory,
+    @Optional() private readonly domainMetrics?: DomainMetricsService,
   ) {}
 
   async onModuleInit(): Promise<void> {
+    registerQueueDepth(this.domainMetrics, PRICING_ETL_QUEUE_NAME, this.queue);
     await this.scheduleRecurringRefresh();
     await this.scheduleStartupRefresh();
     this.worker = this.workerFactory(() => this.etlService.refreshAllProviders());

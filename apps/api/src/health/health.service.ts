@@ -1,6 +1,7 @@
 import net from 'node:net';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { DomainMetricsService } from '../observability/domain-metrics.service';
 import { DataHealthResponse } from '../api/api-errors';
 import { ApiDatabaseRepository } from '../api/api-database.repository';
 import { AppConfig } from '../config/config.schema';
@@ -51,6 +52,7 @@ export class HealthService {
     private readonly tcpProbe: TcpProbe = probeTcp,
     @Optional()
     private readonly apiDatabaseRepository?: ApiDatabaseRepository,
+    @Optional() private readonly domainMetrics?: DomainMetricsService,
   ) {}
 
   getLiveHealth(): LiveHealthResponse {
@@ -74,6 +76,11 @@ export class HealthService {
       ),
     ]);
 
+    // Recorded here rather than on a timer: readiness probes already call this
+    // on a schedule, so the gauge refreshes without a second polling loop.
+    this.recordDependency('db', db);
+    this.recordDependency('cache', cache);
+
     return {
       status: db.status === 'ok' && cache.status === 'ok' ? 'ok' : 'degraded',
       service: 'polycost-api',
@@ -82,6 +89,14 @@ export class HealthService {
         cache,
       },
     };
+  }
+
+  private recordDependency(dependency: string, result: HealthDependency): void {
+    this.domainMetrics?.recordDependencyProbe({
+      dependency,
+      up: result.status === 'ok',
+      latencySeconds: result.latencyMs === undefined ? undefined : result.latencyMs / 1000,
+    });
   }
 
   async getDeepHealth(): Promise<DeepHealthResponse> {

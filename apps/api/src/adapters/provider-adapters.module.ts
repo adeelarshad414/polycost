@@ -1,4 +1,7 @@
 import { Module } from '@nestjs/common';
+import { Pool } from 'pg';
+import { DomainMetricsService } from '../observability/domain-metrics.service';
+import { instrumentPool } from '../observability/instrumented-pool';
 import { ConfigService } from '@nestjs/config';
 import { AwsProviderAdapter } from './aws/aws-provider.adapter';
 import { AzureProviderAdapter } from './azure/azure-provider.adapter';
@@ -16,9 +19,15 @@ export const CLOUD_PROVIDER_ADAPTERS = Symbol('CLOUD_PROVIDER_ADAPTERS');
     SecretsService,
     {
       provide: PostgresPricingCatalogRepository,
-      inject: [ConfigService, SecretsService],
-      useFactory: (configService: ConfigService<AppConfig, true>, secretsService: SecretsService) =>
-        new PostgresPricingCatalogRepository(configService, secretsService),
+      inject: [ConfigService, SecretsService, DomainMetricsService],
+      useFactory: (
+        configService: ConfigService<AppConfig, true>,
+        secretsService: SecretsService,
+        domainMetrics: DomainMetricsService,
+      ) =>
+        new PostgresPricingCatalogRepository(configService, secretsService, (config) =>
+          instrumentPool(new Pool(config), domainMetrics, 'pricing_catalog'),
+        ),
     },
     {
       provide: CLOUD_PROVIDER_ADAPTERS,

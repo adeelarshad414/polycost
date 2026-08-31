@@ -1,4 +1,7 @@
 import { Module } from '@nestjs/common';
+import { Pool } from 'pg';
+import { DomainMetricsService } from '../observability/domain-metrics.service';
+import { instrumentPool } from '../observability/instrumented-pool';
 import { ConfigService } from '@nestjs/config';
 import { APP_FILTER } from '@nestjs/core';
 import {
@@ -87,9 +90,15 @@ import { WorkloadController } from './workload.controller';
     TerraformGenerationService,
     {
       provide: ApiDatabaseRepository,
-      inject: [ConfigService, SecretsService],
-      useFactory: (configService: ConfigService<AppConfig, true>, secretsService: SecretsService) =>
-        new ApiDatabaseRepository(configService, secretsService),
+      inject: [ConfigService, SecretsService, DomainMetricsService],
+      useFactory: (
+        configService: ConfigService<AppConfig, true>,
+        secretsService: SecretsService,
+        domainMetrics: DomainMetricsService,
+      ) =>
+        new ApiDatabaseRepository(configService, secretsService, (config) =>
+          instrumentPool(new Pool(config), domainMetrics, 'api'),
+        ),
     },
     {
       // Shared Redis client for rate limiting. Without it each instance keeps its

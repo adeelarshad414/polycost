@@ -1,4 +1,13 @@
-import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+  Optional,
+} from '@nestjs/common';
+import { DomainMetricsService } from '../observability/domain-metrics.service';
+import { registerQueueDepth } from '../observability/queue-depth';
 import { ConfigService } from '@nestjs/config';
 import { JobsOptions } from 'bullmq';
 import { AppConfig } from '../config/config.schema';
@@ -22,6 +31,8 @@ export const EXCHANGE_RATE_CLIENT = Symbol('EXCHANGE_RATE_CLIENT');
 export interface CostManagementQueue {
   add(name: string, data: Record<string, never>, options: JobsOptions): Promise<unknown>;
   close(): Promise<void>;
+  // Optional so existing test doubles need no change; BullMQ's Queue provides it.
+  getJobCounts?(...states: string[]): Promise<Record<string, number>>;
 }
 
 export interface CostManagementWorker {
@@ -43,9 +54,11 @@ export class CostManagementJobsScheduler implements OnModuleInit, OnModuleDestro
     @Inject(COST_MANAGEMENT_QUEUE) private readonly queue: CostManagementQueue,
     @Inject(COST_MANAGEMENT_WORKER_FACTORY)
     private readonly workerFactory: CostManagementWorkerFactory,
+    @Optional() private readonly domainMetrics?: DomainMetricsService,
   ) {}
 
   async onModuleInit(): Promise<void> {
+    registerQueueDepth(this.domainMetrics, COST_MANAGEMENT_QUEUE_NAME, this.queue);
     await this.scheduleRecurringJobs();
     this.worker = this.workerFactory((job) => this.runJob(job));
   }
