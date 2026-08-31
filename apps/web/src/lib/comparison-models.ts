@@ -5,9 +5,6 @@
 // referenced types declared there. They remain pure - no JSX, no hooks, no
 // App state.
 
-/* eslint-disable security/detect-object-injection -- Reviewed: typed
-   provider/category lookup maps carried over verbatim from App.tsx. */
-
 import { TaskQueueItem } from '../components/LoadingExperience';
 import { HOURS_PER_MONTH } from '../cost-time';
 import {
