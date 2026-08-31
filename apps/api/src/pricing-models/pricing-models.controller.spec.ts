@@ -53,13 +53,13 @@ describe('PricingModelsController', () => {
     expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
   });
 
-  it('lists dynamic model/payment options for selector-driven UIs', () => {
+  it('lists dynamic model/payment options for selector-driven UIs', async () => {
     const controller = pricingModelsController();
     const response = responseHeaders();
 
-    expect(
+    await expect(
       controller.models('aws', 'compute', 'us-east', requestIdentity(), response),
-    ).toMatchObject({
+    ).resolves.toMatchObject({
       schemaVersion: 2,
       provider: 'aws',
       region: 'us-east-1',
@@ -84,17 +84,19 @@ describe('PricingModelsController', () => {
 
     await controller.rate('aws', 'compute', {}, request);
     await controller.rate('aws', 'compute', {}, request);
-    expect(() => controller.rate('aws', 'compute', {}, request)).toThrow(RateLimitExceededError);
+    await expect(controller.rate('aws', 'compute', {}, request)).rejects.toThrow(
+      RateLimitExceededError,
+    );
 
-    controller.models('aws', 'compute', 'us-east', request);
-    controller.models('aws', 'compute', 'us-east', request);
-    expect(() => controller.models('aws', 'compute', 'us-east', request)).toThrow(
+    await controller.models('aws', 'compute', 'us-east', request);
+    await controller.models('aws', 'compute', 'us-east', request);
+    await expect(controller.models('aws', 'compute', 'us-east', request)).rejects.toThrow(
       RateLimitExceededError,
     );
 
     await controller.matrix('aws', 'compute', 'us-east', request);
     await controller.matrix('aws', 'compute', 'us-east', request);
-    expect(() => controller.matrix('aws', 'compute', 'us-east', request)).toThrow(
+    await expect(controller.matrix('aws', 'compute', 'us-east', request)).rejects.toThrow(
       RateLimitExceededError,
     );
   });
@@ -140,7 +142,7 @@ describe('PricingCompareV2Controller', () => {
 
     await controller.compare({}, request);
     await controller.compare({}, request);
-    expect(() => controller.compare({}, request)).toThrow(RateLimitExceededError);
+    await expect(controller.compare({}, request)).rejects.toThrow(RateLimitExceededError);
   });
 });
 

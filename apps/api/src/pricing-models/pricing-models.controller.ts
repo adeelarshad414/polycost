@@ -37,14 +37,14 @@ export class PricingModelsController {
   ) {}
 
   @Get(':provider/:service')
-  rate(
+  async rate(
     @Param('provider') providerParam: string,
     @Param('service') service: string,
     @Query() query: Record<string, QueryValue>,
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
-    this.consumeRateLimit('pricing_model_rate', request, response);
+    await this.consumeRateLimit('pricing_model_rate', request, response);
     const provider = parseProvider(providerParam);
 
     return this.pricingMatrixService.resolveRate({
@@ -58,14 +58,14 @@ export class PricingModelsController {
   }
 
   @Get(':provider/:service/models')
-  models(
+  async models(
     @Param('provider') providerParam: string,
     @Param('service') service: string,
     @Query('region') region: QueryValue,
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
-    this.consumeRateLimit('pricing_model_options', request, response);
+    await this.consumeRateLimit('pricing_model_options', request, response);
     const provider = parseProvider(providerParam);
 
     return this.pricingMatrixService.listModels(
@@ -76,14 +76,14 @@ export class PricingModelsController {
   }
 
   @Get(':provider/:service/matrix')
-  matrix(
+  async matrix(
     @Param('provider') providerParam: string,
     @Param('service') service: string,
     @Query('region') region: QueryValue,
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
-    this.consumeRateLimit('pricing_model_matrix', request, response);
+    await this.consumeRateLimit('pricing_model_matrix', request, response);
     const provider = parseProvider(providerParam);
 
     return this.pricingMatrixService.matrix({
@@ -93,12 +93,12 @@ export class PricingModelsController {
     });
   }
 
-  private consumeRateLimit(
+  private async consumeRateLimit(
     scope: string,
     request: RequestLike | undefined,
     response: RateLimitHeaderResponse | undefined,
-  ): void {
-    const state = this.apiRateLimitService.consume(
+  ): Promise<void> {
+    const state = await this.apiRateLimitService.consume(
       scope,
       requestIdentity(request ?? {}),
       this.configService.get('RATE_LIMIT_PUBLIC_READ_PER_MINUTE', { infer: true }),
@@ -116,12 +116,12 @@ export class PricingCompareV2Controller {
   ) {}
 
   @Get()
-  compare(
+  async compare(
     @Query() query: Record<string, QueryValue>,
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
-    const state = this.apiRateLimitService.consume(
+    const state = await this.apiRateLimitService.consume(
       'pricing_compare_v2',
       requestIdentity(request ?? {}),
       this.configService.get('RATE_LIMIT_COMPARISON_PER_MINUTE', { infer: true }),

@@ -48,7 +48,7 @@ export class ComparisonsController {
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: HeaderResponse,
   ) {
-    this.consumeRateLimit(
+    await this.consumeRateLimit(
       'comparison_create',
       request,
       response,
@@ -65,7 +65,12 @@ export class ComparisonsController {
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: HeaderResponse,
   ) {
-    this.consumeRateLimit('comparison_get', request, response, 'RATE_LIMIT_PUBLIC_READ_PER_MINUTE');
+    await this.consumeRateLimit(
+      'comparison_get',
+      request,
+      response,
+      'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
+    );
     const snapshot = await this.comparisonApplicationService.getComparison(comparisonId);
 
     return snapshot.resultSnapshot;
@@ -77,7 +82,7 @@ export class ComparisonsController {
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: HeaderResponse,
   ) {
-    this.consumeRateLimit(
+    await this.consumeRateLimit(
       'comparison_evidence',
       request,
       response,
@@ -93,7 +98,7 @@ export class ComparisonsController {
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: HeaderResponse,
   ) {
-    this.consumeRateLimit(
+    await this.consumeRateLimit(
       'comparison_analytics',
       request,
       response,
@@ -113,7 +118,12 @@ export class ComparisonsController {
     @Res({ passthrough: true }) response: HeaderResponse,
     @Req() request?: RequestLike,
   ): Promise<StreamableFile> {
-    this.consumeRateLimit('comparison_export', request, response, 'RATE_LIMIT_EXPORT_PER_MINUTE');
+    await this.consumeRateLimit(
+      'comparison_export',
+      request,
+      response,
+      'RATE_LIMIT_EXPORT_PER_MINUTE',
+    );
     const format = parseReportFormat(formatQuery);
     const options = {
       interval: parseReportInterval(intervalQuery),
@@ -147,7 +157,7 @@ export class ComparisonsController {
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: HeaderResponse,
   ) {
-    this.consumeRateLimit(
+    await this.consumeRateLimit(
       'comparison_export_job_create',
       request,
       response,
@@ -169,7 +179,7 @@ export class ComparisonsController {
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: HeaderResponse,
   ) {
-    this.consumeRateLimit(
+    await this.consumeRateLimit(
       'comparison_export_job_status',
       request,
       response,
@@ -186,7 +196,7 @@ export class ComparisonsController {
     @Res({ passthrough: true }) response: HeaderResponse,
     @Req() request?: RequestLike,
   ): Promise<StreamableFile> {
-    this.consumeRateLimit(
+    await this.consumeRateLimit(
       'comparison_export_job_download',
       request,
       response,
@@ -212,7 +222,7 @@ export class ComparisonsController {
     @Req() request: RequestLike,
     @Res({ passthrough: true }) response?: HeaderResponse,
   ) {
-    const rateLimit = this.apiRateLimitService.consume(
+    const rateLimit = await this.apiRateLimitService.consume(
       'comparison_refresh_live',
       requestIdentity(request),
       this.configService.get('RATE_LIMIT_LIVE_REFRESH_PER_MINUTE', { infer: true }),
@@ -225,7 +235,7 @@ export class ComparisonsController {
     );
   }
 
-  private consumeRateLimit(
+  private async consumeRateLimit(
     scope: string,
     request: RequestLike | undefined,
     response: HeaderResponse | undefined,
@@ -233,8 +243,8 @@ export class ComparisonsController {
       | 'RATE_LIMIT_COMPARISON_PER_MINUTE'
       | 'RATE_LIMIT_EXPORT_PER_MINUTE'
       | 'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
-  ): void {
-    const rateLimit = this.apiRateLimitService.consume(
+  ): Promise<void> {
+    const rateLimit = await this.apiRateLimitService.consume(
       scope,
       requestIdentity(request ?? {}),
       this.configService.get(configKey, { infer: true }),

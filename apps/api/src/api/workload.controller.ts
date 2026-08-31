@@ -32,7 +32,7 @@ export class WorkloadController {
     @Req() request: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ): Promise<ParsedNwsDraft> {
-    const rateLimit = this.apiRateLimitService.consume(
+    const rateLimit = await this.apiRateLimitService.consume(
       'workload_parse',
       requestIdentity(request),
       this.configService.get('RATE_LIMIT_NL_PARSE_PER_MINUTE', { infer: true }),
@@ -57,7 +57,7 @@ export class WorkloadController {
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ): Promise<{ valid: true }> {
-    const rateLimit = this.apiRateLimitService.consume(
+    const rateLimit = await this.apiRateLimitService.consume(
       'workload_validate',
       requestIdentity(request ?? {}),
       this.configService.get('RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE', { infer: true }),

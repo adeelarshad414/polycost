@@ -32,23 +32,23 @@ export class AuthController {
   ) {}
 
   @Post('register')
-  register(
+  async register(
     @Body() body: unknown,
     @Req() request?: RequestWithAuth,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
-    this.consumeAuthRateLimit('auth_register', request, response);
+    await this.consumeAuthRateLimit('auth_register', request, response);
 
     return this.authService.register(body, requestMetadata(request));
   }
 
   @Post('login')
-  login(
+  async login(
     @Body() body: unknown,
     @Req() request?: RequestWithAuth,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
-    this.consumeAuthRateLimit('auth_login', request, response);
+    await this.consumeAuthRateLimit('auth_login', request, response);
 
     return this.authService.login(body, requestMetadata(request));
   }
@@ -197,12 +197,12 @@ export class AuthController {
   }
 
   @Get('invitations/preview/:token')
-  previewInvitation(
+  async previewInvitation(
     @Param('token') token: string,
     @Req() request?: RequestWithAuth,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
-    this.consumeAuthRateLimit('auth_invitation_preview', request, response);
+    await this.consumeAuthRateLimit('auth_invitation_preview', request, response);
 
     return this.authService.previewInvitation(token);
   }
@@ -214,34 +214,34 @@ export class AuthController {
   }
 
   @Post('sso/oidc/start')
-  startMockOidcLogin(
+  async startMockOidcLogin(
     @Body() body: unknown,
     @Req() request?: RequestWithAuth,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
-    this.consumeAuthRateLimit('auth_sso_start', request, response);
+    await this.consumeAuthRateLimit('auth_sso_start', request, response);
 
     return this.authService.startMockOidcLogin(body);
   }
 
   @Get('sso/mock/oidc/authorize')
-  mockOidcAuthorize(
+  async mockOidcAuthorize(
     @Query() query: Record<string, unknown>,
     @Req() request?: RequestWithAuth,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
-    this.consumeAuthRateLimit('auth_sso_authorize', request, response);
+    await this.consumeAuthRateLimit('auth_sso_authorize', request, response);
 
     return this.authService.mockOidcAuthorize(query);
   }
 
   @Get('sso/oidc/callback')
-  completeMockOidcCallback(
+  async completeMockOidcCallback(
     @Query() query: Record<string, unknown>,
     @Req() request?: RequestWithAuth,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
-    this.consumeAuthRateLimit('auth_sso_callback', request, response);
+    await this.consumeAuthRateLimit('auth_sso_callback', request, response);
 
     return this.authService.completeMockOidcCallback(query, requestMetadata(request));
   }
@@ -258,7 +258,7 @@ export class AuthController {
 
   @Post('teams/:teamId/sso/test-connection')
   @UseGuards(SessionAuthGuard)
-  testSsoConnection(
+  async testSsoConnection(
     @Param('teamId') teamId: string,
     @Body() body: unknown,
     @Req() request: RequestWithAuth,
@@ -266,12 +266,12 @@ export class AuthController {
     return this.authService.testSsoConnection(teamId, body, request.auth!);
   }
 
-  private consumeAuthRateLimit(
+  private async consumeAuthRateLimit(
     scope: string,
     request: RequestWithAuth | undefined,
     response: RateLimitHeaderResponse | undefined,
-  ): void {
-    const state = this.apiRateLimitService.consume(
+  ): Promise<void> {
+    const state = await this.apiRateLimitService.consume(
       scope,
       requestIdentity(request ?? {}),
       this.configService.get('RATE_LIMIT_AUTH_PER_MINUTE', { infer: true }),

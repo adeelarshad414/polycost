@@ -20,7 +20,8 @@ import { TerraformGenerationService } from '../terraform/terraform-generation.se
 import { AdminApiKeyGuard } from './admin-api-key.guard';
 import { ApiDatabaseRepository } from './api-database.repository';
 import { ApiExceptionFilter } from './api-exception.filter';
-import { ApiRateLimitService } from './rate-limit.service';
+import Redis from 'ioredis';
+import { ApiRateLimitService, RATE_LIMIT_REDIS } from './rate-limit.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { BillingController } from './billing.controller';
@@ -91,8 +92,27 @@ import { WorkloadController } from './workload.controller';
         new ApiDatabaseRepository(configService, secretsService),
     },
     {
+      // Shared Redis client for rate limiting. Without it each instance keeps its
+      // own counters, so N replicas would allow N times the intended limit -
+      // which matters most for the auth and paid refresh-live endpoints.
+      provide: RATE_LIMIT_REDIS,
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService<AppConfig, true>) =>
+        new Redis({
+          host: configService.get('REDIS_HOST', { infer: true }),
+          port: configService.get('REDIS_PORT', { infer: true }),
+          // Fail fast instead of queueing: the service falls back to per-process
+          // counters when Redis is unreachable, and a queued command would defer
+          // that fallback behind a growing backlog.
+          maxRetriesPerRequest: 1,
+          enableOfflineQueue: false,
+          lazyConnect: false,
+        }),
+    },
+    {
       provide: ApiRateLimitService,
-      useFactory: () => new ApiRateLimitService(),
+      inject: [RATE_LIMIT_REDIS],
+      useFactory: (redis: Redis) => new ApiRateLimitService(undefined, redis),
     },
     AdminApiKeyGuard,
     InvitationDeliveryService,

@@ -905,7 +905,7 @@ describe('API contracts', () => {
     });
   });
 
-  it('GET /pricing/models returns provider-specific model terminology', () => {
+  it('GET /pricing/models returns provider-specific model terminology', async () => {
     const service = costManagementService();
     const controller = new CachedPricingController(
       service,
@@ -916,7 +916,7 @@ describe('API contracts', () => {
       header: jest.fn(),
     };
 
-    expect(
+    await expect(
       controller.models(
         {
           ip: '127.0.0.1',
@@ -924,7 +924,7 @@ describe('API contracts', () => {
         },
         response,
       ),
-    ).toEqual({
+    ).resolves.toEqual({
       defaultModel: 'on-demand',
       generatedAt: expect.any(String),
       models: expect.arrayContaining([
@@ -967,37 +967,37 @@ describe('API contracts', () => {
     );
   });
 
-  it('rejects invalid cached-management UUIDs before they reach persistence', () => {
+  it('rejects invalid cached-management UUIDs before they reach persistence', async () => {
     const service = costManagementService();
     const pricingController = new CachedPricingController(service);
     const budgetsController = new BudgetsController(service);
     const alertsController = new AlertsController(service);
     const shareLinksController = new ShareLinksController(service);
 
-    expect(() =>
+    await expect(
       pricingController.breakdown({
         workloadId: 'undefined',
         term: 'on_demand',
       }),
-    ).toThrow(ApiValidationError);
-    expect(() =>
+    ).rejects.toThrow(ApiValidationError);
+    await expect(
       budgetsController.create({
         workloadId: 'not-a-uuid',
         thresholdUsd: 500,
       }),
-    ).toThrow(ApiValidationError);
-    expect(() => alertsController.list('not-a-uuid')).toThrow(ApiValidationError);
+    ).rejects.toThrow(ApiValidationError);
+    await expect(alertsController.list('not-a-uuid')).rejects.toThrow(ApiValidationError);
     // SEC-1: a missing workloadId must be rejected, never a global alert dump.
-    expect(() => alertsController.list(undefined)).toThrow(ApiValidationError);
-    expect(() => alertsController.update('not-a-uuid', { dismissed: true })).toThrow(
+    await expect(alertsController.list(undefined)).rejects.toThrow(ApiValidationError);
+    await expect(alertsController.update('not-a-uuid', { dismissed: true })).rejects.toThrow(
       ApiValidationError,
     );
-    expect(() =>
+    await expect(
       shareLinksController.create({
         workloadId: 'not-a-uuid',
         expiresInDays: 30,
       }),
-    ).toThrow(ApiValidationError);
+    ).rejects.toThrow(ApiValidationError);
   });
 
   it('POST /workloads persists a normalized workload config', async () => {
@@ -1029,14 +1029,14 @@ describe('API contracts', () => {
   it('rejects unsupported canonical regions instead of guessing equivalence', async () => {
     const controller = new WorkloadsController(costManagementService());
 
-    expect(() =>
+    await expect(
       controller.create({
         instanceFamily: 'general-purpose',
         vcpu: 4,
         memoryGb: 16,
         region: 'moon-west',
       }),
-    ).toThrow(ApiValidationError);
+    ).rejects.toThrow(ApiValidationError);
   });
 
   it('POST /budgets and GET/PATCH /alerts expose budget alert workflows', async () => {
@@ -1252,7 +1252,7 @@ describe('API contracts', () => {
 
     await shareLinksController.create(shareLinkBody, identity, response);
     await shareLinksController.create(shareLinkBody, identity, response);
-    expect(() => shareLinksController.create(shareLinkBody, identity, response)).toThrow(
+    await expect(shareLinksController.create(shareLinkBody, identity, response)).rejects.toThrow(
       RateLimitExceededError,
     );
   });
@@ -1372,15 +1372,17 @@ describe('API contracts', () => {
     });
   });
 
-  it('uses forwarded IP identity and resets rate-limit windows', () => {
+  it('uses forwarded IP identity and resets rate-limit windows', async () => {
     let now = 0;
     const limiter = new ApiRateLimitService(() => now);
 
-    limiter.consume('parse', '203.0.113.1', 1);
-    expect(() => limiter.consume('parse', '203.0.113.1', 1)).toThrow(RateLimitExceededError);
+    await limiter.consume('parse', '203.0.113.1', 1);
+    await expect(limiter.consume('parse', '203.0.113.1', 1)).rejects.toThrow(
+      RateLimitExceededError,
+    );
 
     now = 60_000;
-    expect(() => limiter.consume('parse', '203.0.113.1', 1)).not.toThrow();
+    await expect(limiter.consume('parse', '203.0.113.1', 1)).resolves.toMatchObject({ limit: 1 });
   });
 
   it('runs comparison application persistence and status flows', async () => {
