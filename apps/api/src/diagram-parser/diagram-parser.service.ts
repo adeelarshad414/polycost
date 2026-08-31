@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { DomainMetricsService } from '../observability/domain-metrics.service';
 import { NWSValidator } from '../nws/nws-validator';
 import { NormalizedWorkloadSpec } from '../nws/nws.types';
 import { ParserConfidence } from '../nws-parser/nws-parser.types';
@@ -40,6 +41,7 @@ export class DiagramParserService {
     drawioExtractor: DrawioExtractor,
     lucidCsvExtractor: LucidCsvExtractor,
     vsdxExtractor: VsdxExtractor,
+    @Optional() private readonly domainMetrics?: DomainMetricsService,
   ) {
     this.extractors = {
       mermaid: mermaidExtractor,
@@ -63,6 +65,16 @@ export class DiagramParserService {
       review.components,
       review.unresolvedClassifications,
     );
+
+    // detectedFormat and parserConfidence are both closed unions (4 x 3), so
+    // this is 12 series at most. The file name and sha256 on `decoded` are
+    // deliberately not labels.
+    this.domainMetrics?.recordDiagramParse({
+      format: decoded.detectedFormat,
+      confidence: parserConfidence,
+      unresolvedCount: review.unresolvedClassifications.length,
+      ignoredCount: review.ignoredNodes.length,
+    });
 
     return {
       importId: randomUUID(),

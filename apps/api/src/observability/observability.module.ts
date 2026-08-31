@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { MetricsController } from './metrics.controller';
+import { DomainMetricsService } from './domain-metrics.service';
 import { MetricsService } from './metrics.service';
 
 /**
@@ -8,7 +9,7 @@ import { MetricsService } from './metrics.service';
 @Global()
 @Module({
   controllers: [MetricsController],
-  providers: [MetricsService],
-  exports: [MetricsService],
+  providers: [MetricsService, DomainMetricsService],
+  exports: [MetricsService, DomainMetricsService],
 })
 export class ObservabilityModule {}

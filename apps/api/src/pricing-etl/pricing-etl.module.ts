@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue, Worker } from 'bullmq';
+import { DomainMetricsService } from '../observability/domain-metrics.service';
 import { CloudProviderAdapter } from '../adapters/common/cloud-provider-adapter';
 import {
   CLOUD_PROVIDER_ADAPTERS,
@@ -60,6 +61,7 @@ const PRICING_SYNC_FAILURE_NOTIFIER = Symbol('PRICING_SYNC_FAILURE_NOTIFIER');
         PRICING_ETL_RUN_REPOSITORY,
         NORMALIZED_PRICING_WRITER,
         PRICING_SYNC_FAILURE_NOTIFIER,
+        DomainMetricsService,
       ],
       useFactory: (
         adapters: CloudProviderAdapter[],
@@ -67,6 +69,7 @@ const PRICING_SYNC_FAILURE_NOTIFIER = Symbol('PRICING_SYNC_FAILURE_NOTIFIER');
         runRepository: PostgresPricingCatalogRepository,
         normalizedPricingWriter: PostgresPricingCatalogRepository,
         failureNotifier: PricingSyncFailureNotifier,
+        domainMetrics: DomainMetricsService,
       ) =>
         new PricingEtlService(
           adapters,
@@ -75,6 +78,8 @@ const PRICING_SYNC_FAILURE_NOTIFIER = Symbol('PRICING_SYNC_FAILURE_NOTIFIER');
           undefined,
           normalizedPricingWriter,
           failureNotifier,
+          {},
+          domainMetrics,
         ),
     },
     {

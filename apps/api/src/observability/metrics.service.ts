@@ -18,7 +18,12 @@ export const METRICS_OPTIONS = Symbol('METRICS_OPTIONS');
 
 @Injectable()
 export class MetricsService {
-  private readonly registry = new Registry();
+  /**
+   * Shared by DomainMetricsService so business instruments render on the same
+   * /metrics scrape. Exposed read-only rather than injected as its own provider
+   * so direct construction in tests stays a one-liner.
+   */
+  readonly registry = new Registry();
 
   private readonly requests: Counter<'method' | 'route' | 'status'>;
   private readonly errors: Counter<'method' | 'route' | 'status'>;
