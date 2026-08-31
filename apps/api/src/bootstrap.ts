@@ -1,5 +1,10 @@
 import fastifyHelmet from '@fastify/helmet';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import {
+  REQUEST_ID_HEADER,
+  resolveRequestId,
+  runWithRequestContext,
+} from './observability/request-context';
 
 /**
  * Runtime wiring applied to an already-created Nest application.
@@ -9,10 +14,46 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify';
  */
 export type ConfigurableApp = Pick<
   NestFastifyApplication,
-  'register' | 'enableCors' | 'enableShutdownHooks'
+  'register' | 'enableCors' | 'enableShutdownHooks' | 'getHttpAdapter'
 >;
 
+interface RequestLike {
+  headers?: Record<string, unknown>;
+}
+
+interface ReplyLike {
+  header(name: string, value: string): unknown;
+}
+
+/**
+ * Establishes a correlation id for the lifetime of each request and echoes it
+ * back, so a caller reporting a problem can quote the id and it can be found in
+ * the logs.
+ *
+ * Registered as an onRequest hook wrapping the rest of the lifecycle in
+ * AsyncLocalStorage; every log line emitted downstream picks the id up
+ * automatically.
+ */
+export function registerRequestContext(instance: {
+  addHook(
+    name: 'onRequest',
+    handler: (req: RequestLike, reply: ReplyLike, done: () => void) => void,
+  ): unknown;
+}): void {
+  instance.addHook('onRequest', (request, reply, done) => {
+    const requestId = resolveRequestId(request.headers?.[REQUEST_ID_HEADER]);
+    reply.header(REQUEST_ID_HEADER, requestId);
+    runWithRequestContext({ requestId }, done);
+  });
+}
+
 export async function configureApp(app: ConfigurableApp, allowedOrigins: string[]): Promise<void> {
+  registerRequestContext(
+    (
+      app.getHttpAdapter() as { getInstance(): Parameters<typeof registerRequestContext>[0] }
+    ).getInstance(),
+  );
+
   await app.register(fastifyHelmet);
   app.enableCors({
     origin: allowedOrigins,

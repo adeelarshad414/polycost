@@ -39,6 +39,8 @@ export const configSchema = z
     NODE_ENV: z.enum(['development', 'test', 'staging', 'production']),
     PORT: z.coerce.number().default(3000),
     LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+    // Human-readable log lines for local development; production stays JSON.
+    LOG_PRETTY: z.coerce.boolean().default(false),
     DB_HOST: z.string().min(1),
     DB_PORT: z.coerce.number().default(5432),
     DB_NAME: z.string().min(1),
