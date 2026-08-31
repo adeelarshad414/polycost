@@ -38,7 +38,16 @@
 
 ## 🟠 Operational friction
 
-### K-3 · `pre-push` hook is impractical to satisfy locally
+### K-3b · Web container still runs nginx master as root
+
+|                  |                                                                                                                                                                                                                                                                                                                   |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**       | 🟠 Open — deployment decision needed                                                                                                                                                                                                                                                                              |
+| **Detail**       | The API container now runs as the unprivileged `node` user. The web container cannot follow directly: nginx already drops its _workers_ to the `nginx` user, but the master stays root purely to bind port 80. Running it fully non-root means moving the listener above 1024 and relocating the pid/cache paths. |
+| **Why deferred** | That changes the published port contract for `docker-compose` and every deployment target, so it is a deliberate decision rather than a drive-by change.                                                                                                                                                          |
+| **Fix**          | Choose a port (commonly 8080), update `nginx.conf`, `docker-compose.yml` and any ingress, then add `USER nginx`.                                                                                                                                                                                                  |
+
+### K-3 · ~~`pre-push` hook is impractical to satisfy locally~~ ✅ RESOLVED
 
 |                   |                                                                                                                                                                                                                                        |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

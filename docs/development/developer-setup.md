@@ -113,4 +113,6 @@ npm run hooks:install
 Hooks use `.githooks/`:
 
 - `pre-commit`: format check, lint/typecheck, unit tests, QA
-- `pre-push`: full verification
+- `pre-push`: fast static gates only - lint/typecheck, formatting, theme tokens
+  and the security-suppression ledger (~10s, no services required). CI runs the
+  full suite on every push; run it locally with `npm run check:full`.
