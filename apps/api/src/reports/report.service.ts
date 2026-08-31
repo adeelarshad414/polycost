@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { ComparisonResult } from '../comparison/comparison.types';
 import { CsvReportGenerator } from './csv-report.generator';
 import { ExcelReportGenerator } from './excel-report.generator';
 import { PdfReportGenerator } from './pdf-report.generator';
 import { GeneratedReport, ReportFormat, ReportOptions } from './report.types';
+import { DomainMetricsService } from '../observability/domain-metrics.service';
 
 @Injectable()
 export class ReportService {
@@ -11,6 +12,7 @@ export class ReportService {
     private readonly pdfReportGenerator: PdfReportGenerator,
     private readonly csvReportGenerator: CsvReportGenerator,
     private readonly excelReportGenerator: ExcelReportGenerator,
+    @Optional() private readonly domainMetrics?: DomainMetricsService,
   ) {}
 
   generate(result: ComparisonResult, format: ReportFormat, options: ReportOptions = {}): GeneratedReport {
@@ -20,11 +22,28 @@ export class ReportService {
       generatedAt: options.generatedAt ?? new Date().toISOString(),
     };
 
-    return {
-      fileName: `polycost-comparison-${result.comparisonId}.${metadata.extension}`,
-      contentType: metadata.contentType,
-      content: this.generateContent(result, format, enrichedOptions),
-    };
+    // Timed around content generation only: that is where a large comparison
+    // or a slow generator actually costs time, and a failure here is the one a
+    // user sees as a broken download.
+    const startedAt = process.hrtime.bigint();
+    let outcome: 'success' | 'failure' = 'failure';
+
+    try {
+      const content = this.generateContent(result, format, enrichedOptions);
+      outcome = 'success';
+
+      return {
+        fileName: `polycost-comparison-${result.comparisonId}.${metadata.extension}`,
+        contentType: metadata.contentType,
+        content,
+      };
+    } finally {
+      this.domainMetrics?.recordExport({
+        format,
+        outcome,
+        durationSeconds: Number(process.hrtime.bigint() - startedAt) / 1e9,
+      });
+    }
   }
 
   private generateContent(

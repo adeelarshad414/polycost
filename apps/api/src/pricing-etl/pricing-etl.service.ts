@@ -10,6 +10,7 @@ import {
 } from '../database/pricing-repository.types';
 import { PricingSyncFailureNotifier } from './pricing-sync-alert.service';
 import { PricingEtlProviderResult, PricingEtlSummary } from './pricing-etl.types';
+import { DomainMetricsService } from '../observability/domain-metrics.service';
 
 const MAX_ERROR_DETAIL_LENGTH = 2000;
 const PRICING_ETL_MAX_ATTEMPTS = 3;
@@ -33,6 +34,9 @@ export class PricingEtlService {
     private readonly normalizedPricingWriter?: NormalizedPricingWriter,
     private readonly failureNotifier?: PricingSyncFailureNotifier,
     private readonly retryOptions: PricingEtlRetryOptions = {},
+    // Optional so the many direct constructions in tests stay unchanged; a
+    // missing recorder simply means no metrics, never a failed refresh.
+    private readonly domainMetrics?: DomainMetricsService,
   ) {}
 
   async refreshAllProviders(): Promise<PricingEtlSummary> {
@@ -40,10 +44,48 @@ export class PricingEtlService {
       this.adapters.map((adapter) => this.refreshProvider(adapter)),
     );
 
+    for (const result of providerResults) {
+      this.recordProviderMetrics(result);
+    }
+
     return {
       status: summarize(providerResults),
       providerResults,
     };
+  }
+
+  /**
+   * Metrics must never be able to fail a refresh, so this swallows its own
+   * errors: a bad timestamp from a provider response should not cost us the
+   * pricing data we just wrote.
+   */
+  private recordProviderMetrics(result: PricingEtlProviderResult): void {
+    if (!this.domainMetrics) {
+      return;
+    }
+
+    try {
+      const startedAt = Date.parse(result.startedAt);
+      const completedAt = Date.parse(result.completedAt);
+      const durationSeconds =
+        Number.isFinite(startedAt) && Number.isFinite(completedAt) && completedAt >= startedAt
+          ? (completedAt - startedAt) / 1000
+          : 0;
+
+      this.domainMetrics.recordEtlProvider({
+        provider: result.provider,
+        status: result.status,
+        durationSeconds,
+        recordsUpdated: result.recordsUpdated,
+        recordsRejected: result.recordsRejected,
+        recordsSkipped: result.recordsSkipped,
+        completedAtSeconds: Number.isFinite(completedAt) ? completedAt / 1000 : undefined,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to record pricing ETL metrics for ${result.provider}: ${(error as Error).message}`,
+      );
+    }
   }
 
   private async refreshProvider(adapter: CloudProviderAdapter): Promise<PricingEtlProviderResult> {

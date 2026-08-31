@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { DomainMetricsService } from '../observability/domain-metrics.service';
 import { AppConfig } from '../config/config.schema';
 import { ApiForbiddenError, ApiUnauthorizedError, ApiValidationError } from './api-errors';
 import {
@@ -62,6 +63,7 @@ export class AuthService {
     private readonly invitationDeliveryService: InvitationDeliveryService = new InvitationDeliveryService(
       configService,
     ),
+    @Optional() private readonly domainMetrics?: DomainMetricsService,
   ) {}
 
   async register(body: unknown, metadata: AuthRequestMetadata = {}): Promise<AuthSessionResponse> {
@@ -101,10 +103,15 @@ export class AuthService {
     const account = await this.repository.findLocalAccountByEmail(input.email);
 
     if (!account || account.status !== 'active') {
+      this.domainMetrics?.recordAuthAttempt('invalid_credentials');
       throw new ApiUnauthorizedError('Invalid email or password');
     }
 
     if (account.lockedUntil && Date.parse(account.lockedUntil) > Date.now()) {
+      // Counted separately from a bad password: a spike of 'locked' means an
+      // attack is already being throttled, while a spike of
+      // 'invalid_credentials' means it is still in progress.
+      this.domainMetrics?.recordAuthAttempt('locked');
       throw new ApiUnauthorizedError('Account is temporarily locked');
     }
 
@@ -125,10 +132,17 @@ export class AuthService {
         failedAttempts,
         ...(lockedUntil ? { lockedUntil } : {}),
       });
+
+      this.domainMetrics?.recordAuthAttempt('invalid_credentials');
+      if (lockedUntil) {
+        this.domainMetrics?.recordAuthLockout();
+      }
+
       throw new ApiUnauthorizedError('Invalid email or password');
     }
 
     await this.repository.resetFailedLogin(account.accountId);
+    this.domainMetrics?.recordAuthAttempt('success');
 
     return this.issueSession(account, metadata);
   }

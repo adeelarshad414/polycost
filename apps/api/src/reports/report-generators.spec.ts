@@ -30,6 +30,8 @@ import {
 } from './report-evidence';
 import { sanitizeSpreadsheetText } from './report-security';
 import { ReportService } from './report.service';
+import { DomainMetricsService } from '../observability/domain-metrics.service';
+import { MetricsService } from '../observability/metrics.service';
 
 const comparison: ComparisonResult = {
   comparisonId: 'comparison-123',
@@ -1864,4 +1866,59 @@ describe('report generators', () => {
       expect(sanitizeSpreadsheetText(value)).toBe(`'${value}`);
     },
   );
+});
+
+describe('ReportService metrics', () => {
+  const harness = (pdfGenerator = new PdfReportGenerator()) => {
+    const metrics = new MetricsService({ collectDefaults: false });
+
+    return {
+      render: () => metrics.render(),
+      service: new ReportService(
+        pdfGenerator,
+        new CsvReportGenerator(),
+        new ExcelReportGenerator(),
+        new DomainMetricsService(metrics),
+      ),
+    };
+  };
+
+  it('records outcome and duration per format', async () => {
+    const { service, render } = harness();
+
+    service.generate(comparison, 'pdf');
+    service.generate(comparison, 'csv');
+    service.generate(comparison, 'csv');
+
+    const rendered = await render();
+
+    expect(rendered).toContain('report_exports_total{format="pdf",outcome="success"} 1');
+    expect(rendered).toContain('report_exports_total{format="csv",outcome="success"} 2');
+    expect(rendered).toContain('report_export_duration_seconds_count{format="pdf"} 1');
+  });
+
+  it('records a failed export and still propagates the error', async () => {
+    const exploding = {
+      generate: () => {
+        throw new Error('pdf generator exploded');
+      },
+    } as unknown as PdfReportGenerator;
+    const { service, render } = harness(exploding);
+
+    expect(() => service.generate(comparison, 'pdf')).toThrow('pdf generator exploded');
+
+    // Recorded from a finally block: a broken download is exactly the case
+    // that must show up in the error rate.
+    const rendered = await render();
+    expect(rendered).toContain('report_exports_total{format="pdf",outcome="failure"} 1');
+    expect(rendered).toContain('report_export_duration_seconds_count{format="pdf"} 1');
+  });
+
+  it('does not label the export metric with the comparison id', async () => {
+    const { service, render } = harness();
+
+    service.generate(comparison, 'xlsx');
+
+    expect(await render()).not.toContain(comparison.comparisonId);
+  });
 });

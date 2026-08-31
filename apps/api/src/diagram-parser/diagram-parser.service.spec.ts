@@ -18,6 +18,8 @@ import { NodeClassifierService } from './node-classifier.service';
 import { StencilMapRegistry } from './stencil-map.registry';
 import { VsdxExtractor } from './vsdx.extractor';
 import { LlmClassifierClient } from './diagram-parser.types';
+import { DomainMetricsService } from '../observability/domain-metrics.service';
+import { MetricsService } from '../observability/metrics.service';
 
 const fixtureRoot = resolve(__dirname, '../../../../fixtures/diagrams');
 
@@ -985,3 +987,56 @@ function zipWithStoredEntries(entries: Array<{ path: string; content: string }>)
 
   return Buffer.concat([...localParts, centralDirectoryContent, endOfCentralDirectory]);
 }
+
+describe('DiagramParserService metrics', () => {
+  function instrumented() {
+    const aliasDictionary = new AliasDictionary();
+    const metrics = new MetricsService({ collectDefaults: false });
+
+    return {
+      render: () => metrics.render(),
+      parser: new DiagramParserService(
+        new FormatDetectorService(),
+        new NodeClassifierService(new StencilMapRegistry(aliasDictionary), aliasDictionary),
+        new MermaidExtractor(),
+        new DrawioExtractor(),
+        new LucidCsvExtractor(),
+        new VsdxExtractor(),
+        new DomainMetricsService(metrics),
+      ),
+    };
+  }
+
+  it('records the detected format and parser confidence', async () => {
+    const { parser, render } = instrumented();
+
+    const parsed = await parser.parse({
+      content: readTextFixture('mermaid/web-app.mmd'),
+      fileName: 'mermaid/web-app.mmd',
+      inputFormat: 'auto',
+    });
+
+    expect(await render()).toContain(
+      `diagram_parses_total{format="mermaid",confidence="${parsed.parserConfidence}"} 1`,
+    );
+  });
+
+  it('keeps series bounded across many parses of different files', async () => {
+    const { parser, render } = instrumented();
+
+    for (let i = 0; i < 5; i += 1) {
+      await parser.parse({
+        content: readTextFixture('mermaid/web-app.mmd'),
+        // A distinct file name per parse: this must not become a label.
+        fileName: `upload-${i}.mmd`,
+        inputFormat: 'auto',
+      });
+    }
+
+    const rendered = await render();
+    const series = rendered.split('\n').filter((line) => line.startsWith('diagram_parses_total{'));
+
+    expect(series).toHaveLength(1);
+    expect(rendered).not.toContain('upload-3.mmd');
+  });
+});

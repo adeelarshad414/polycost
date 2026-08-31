@@ -9,6 +9,8 @@ import {
   PricingEtlRunRepository,
 } from '../database/pricing-repository.types';
 import { PricingEtlService } from './pricing-etl.service';
+import { DomainMetricsService } from '../observability/domain-metrics.service';
+import { MetricsService } from '../observability/metrics.service';
 
 const adapter = (
   providerId: CloudProviderAdapter['providerId'],
@@ -532,5 +534,113 @@ describe('PricingEtlService', () => {
 
     expect(writer.upsertPricingRecords).not.toHaveBeenCalled();
     expect(writer.pruneStaleLiveRows).not.toHaveBeenCalled();
+  });
+});
+
+describe('PricingEtlService metrics', () => {
+  // recordsRejected drives the provider status: any rejects downgrade a refresh
+  // to 'partial', so the two are varied together rather than independently.
+  const harness = (recordsRejected = 0) => {
+    const metrics = new MetricsService({ collectDefaults: false });
+    const writer: PricingCatalogWriter = {
+      upsertPricingRecords: jest.fn(async (records) => ({
+        recordsUpdated: records.length,
+        recordsRejected,
+      })),
+    };
+    const runRepository: PricingEtlRunRepository = {
+      recordProviderRun: jest.fn(async () => undefined),
+    };
+
+    return {
+      render: () => metrics.render(),
+      domainMetrics: new DomainMetricsService(metrics),
+      writer,
+      runRepository,
+    };
+  };
+
+  it('records the run, both row outcomes, duration and freshness', async () => {
+    const { render, domainMetrics, writer, runRepository } = harness(2);
+    const service = new PricingEtlService(
+      [
+        adapter(
+          'aws',
+          jest.fn(async () => [createCatalogRecord('aws', 'AWS-1')]),
+        ),
+      ],
+      writer,
+      runRepository,
+      fixedClock(),
+      undefined,
+      undefined,
+      {},
+      domainMetrics,
+    );
+
+    await service.refreshAllProviders();
+    const rendered = await render();
+
+    expect(rendered).toContain('pricing_etl_runs_total{provider="aws",status="partial"} 1');
+    expect(rendered).toContain('pricing_etl_records_total{provider="aws",outcome="updated"} 1');
+    expect(rendered).toContain('pricing_etl_records_total{provider="aws",outcome="rejected"} 2');
+    expect(rendered).toContain('pricing_etl_last_success_timestamp_seconds{provider="aws"}');
+    expect(rendered).toContain('pricing_etl_duration_seconds_count{provider="aws"} 1');
+  });
+
+  it('records a failed provider without advancing its freshness gauge', async () => {
+    const { render, domainMetrics, writer, runRepository } = harness();
+    const service = new PricingEtlService(
+      [
+        adapter(
+          'gcp',
+          jest.fn(async () => {
+            throw new Error('provider down');
+          }),
+        ),
+      ],
+      writer,
+      runRepository,
+      fixedClock(),
+      undefined,
+      undefined,
+      { maxAttempts: 1 },
+      domainMetrics,
+    );
+
+    await service.refreshAllProviders();
+    const rendered = await render();
+
+    expect(rendered).toContain('pricing_etl_runs_total{provider="gcp",status="failed"} 1');
+    // The staleness alert depends on this staying absent.
+    expect(rendered).not.toContain('pricing_etl_last_success_timestamp_seconds{provider="gcp"}');
+  });
+
+  it('still returns a summary when the recorder throws', async () => {
+    const { writer, runRepository } = harness();
+    const exploding = {
+      recordEtlProvider: jest.fn(() => {
+        throw new Error('registry exploded');
+      }),
+    } as unknown as DomainMetricsService;
+    const service = new PricingEtlService(
+      [
+        adapter(
+          'aws',
+          jest.fn(async () => [createCatalogRecord('aws', 'AWS-1')]),
+        ),
+      ],
+      writer,
+      runRepository,
+      fixedClock(),
+      undefined,
+      undefined,
+      {},
+      exploding,
+    );
+
+    // Observability must never cost us pricing data that was already written.
+    await expect(service.refreshAllProviders()).resolves.toMatchObject({ status: 'success' });
+    expect(exploding.recordEtlProvider).toHaveBeenCalled();
   });
 });

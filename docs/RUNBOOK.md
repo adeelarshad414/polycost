@@ -23,16 +23,33 @@ target hosting environment before production commitments.
 
 ## Golden Signals
 
-Track:
+All emitted metrics are on `GET /metrics` in Prometheus text format.
 
-- request rate, error rate, and latency by API route
-- Postgres connection latency and failed migrations
-- Redis availability and queue backlog
-- pricing ETL success, partial, rejected, skipped, and failed rows by provider
-- report export duration and failure count
-- auth failure/lockout rate
-- diagram parse rejection and partial-parse counts
-- Vault read failures
+| Signal                                         | Metric                                                                                                                              | Status             |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| Request rate, error rate, latency by route     | `http_requests_total`, `http_request_errors_total`, `http_request_duration_seconds`                                                 | ✅                 |
+| Pricing ETL rows and freshness by provider     | `pricing_etl_runs_total`, `pricing_etl_records_total`, `pricing_etl_duration_seconds`, `pricing_etl_last_success_timestamp_seconds` | ✅                 |
+| Report export duration and failures            | `report_exports_total`, `report_export_duration_seconds`                                                                            | ✅                 |
+| Auth failure and lockout rate                  | `auth_attempts_total`, `auth_lockouts_total`                                                                                        | ✅                 |
+| Diagram parse confidence and unresolved nodes  | `diagram_parses_total`, `diagram_parse_unresolved_nodes_total`, `diagram_parse_ignored_nodes_total`                                 | ✅                 |
+| Vault read failures                            | `vault_reads_total`                                                                                                                 | ✅                 |
+| Postgres connection latency, failed migrations | —                                                                                                                                   | ⏳ not emitted yet |
+| Redis availability and queue backlog           | —                                                                                                                                   | ⏳ not emitted yet |
+
+The two pending rows are scrape-time gauges rather than call-site counters, and
+land in the follow-up to this work.
+
+### Label discipline
+
+Every domain instrument is declared in
+`apps/api/src/observability/domain-metrics.service.ts`, deliberately in one
+file. Labels are closed vocabularies only — provider, format, outcome,
+confidence. **Never** label a metric with a workload id, tenant id, account id,
+email, secret path or file name: it is unbounded cardinality, and `/metrics` is
+unauthenticated, so it would also be a disclosure.
+
+> ⚠️ `/metrics` carries no tenant data, but it does describe traffic volume,
+> auth failure rates and ETL throughput. Expose it on the metrics network only.
 
 ## Health Endpoints
 

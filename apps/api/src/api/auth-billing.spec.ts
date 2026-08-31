@@ -11,6 +11,8 @@ import { InvoiceArtifactGovernanceService } from './invoice-artifact-governance.
 import { InvoiceArtifactStorageService } from './invoice-artifact-storage.service';
 import { InvoiceEvidenceNotaryService } from './invoice-evidence-notary.service';
 import { hashPassword } from './password-hash';
+import { DomainMetricsService } from '../observability/domain-metrics.service';
+import { MetricsService } from '../observability/metrics.service';
 
 const account: LocalAccountWithPassword = {
   accountId: '11111111-1111-4111-8111-111111111111',
@@ -5159,3 +5161,119 @@ function stableJson(value: unknown): string {
 
   return JSON.stringify(value);
 }
+
+describe('AuthService metrics', () => {
+  const recorder = () => {
+    const metrics = new MetricsService({ collectDefaults: false });
+    return { domainMetrics: new DomainMetricsService(metrics), render: () => metrics.render() };
+  };
+
+  const wrongPasswordAccount = {
+    ...account,
+    passwordHash:
+      'scrypt:v1:16384:8:1:Tm90VGhlUmlnaHRTYWx0:Os6fRvczjT_AZljxB0T2YRrNEKv5szyK7b57lFb2_iA',
+  };
+
+  it('counts a successful login', async () => {
+    const repository = repositoryMock();
+    // The shared `account` fixture's hash does not correspond to any known
+    // plaintext, so derive one here rather than hardcoding a second digest.
+    repository.findLocalAccountByEmail.mockResolvedValue({
+      ...account,
+      passwordHash: hashPassword('correct horse battery staple'),
+    });
+    repository.createSession.mockResolvedValue({
+      sessionId: identity.sessionId,
+      expiresAt: identity.expiresAt,
+    });
+    const { domainMetrics, render } = recorder();
+    const service = new AuthService(repository as never, configService(), undefined, domainMetrics);
+
+    await service.login({ email: account.email, password: 'correct horse battery staple' });
+
+    expect(await render()).toContain('auth_attempts_total{outcome="success"} 1');
+  });
+
+  it('counts an unknown email as invalid credentials', async () => {
+    const repository = repositoryMock();
+    repository.findLocalAccountByEmail.mockResolvedValue(undefined);
+    const { domainMetrics, render } = recorder();
+    const service = new AuthService(repository as never, configService(), undefined, domainMetrics);
+
+    await expect(
+      service.login({ email: 'nobody@example.com', password: 'whatever-password' }),
+    ).rejects.toThrow(ApiUnauthorizedError);
+
+    expect(await render()).toContain('auth_attempts_total{outcome="invalid_credentials"} 1');
+  });
+
+  it('counts a lockout separately from the failed attempt that caused it', async () => {
+    const repository = repositoryMock();
+    repository.findLocalAccountByEmail.mockResolvedValue({
+      ...wrongPasswordAccount,
+      failedAttempts: 4,
+    });
+    const { domainMetrics, render } = recorder();
+    const service = new AuthService(repository as never, configService(), undefined, domainMetrics);
+
+    await expect(
+      service.login({ email: account.email, password: 'wrong-password' }),
+    ).rejects.toThrow(ApiUnauthorizedError);
+
+    const rendered = await render();
+    expect(rendered).toContain('auth_attempts_total{outcome="invalid_credentials"} 1');
+    expect(rendered).toContain('auth_lockouts_total 1');
+  });
+
+  it('does not count a lockout for a failed attempt below the threshold', async () => {
+    const repository = repositoryMock();
+    repository.findLocalAccountByEmail.mockResolvedValue({
+      ...wrongPasswordAccount,
+      failedAttempts: 0,
+    });
+    const { domainMetrics, render } = recorder();
+    const service = new AuthService(repository as never, configService(), undefined, domainMetrics);
+
+    await expect(
+      service.login({ email: account.email, password: 'wrong-password' }),
+    ).rejects.toThrow(ApiUnauthorizedError);
+
+    expect(await render()).toContain('auth_lockouts_total 0');
+  });
+
+  it('counts an attempt against an already-locked account as locked', async () => {
+    const repository = repositoryMock();
+    repository.findLocalAccountByEmail.mockResolvedValue({
+      ...account,
+      lockedUntil: new Date(Date.now() + 60_000).toISOString(),
+    });
+    const { domainMetrics, render } = recorder();
+    const service = new AuthService(repository as never, configService(), undefined, domainMetrics);
+
+    await expect(
+      service.login({ email: account.email, password: 'correct horse battery staple' }),
+    ).rejects.toThrow(ApiUnauthorizedError);
+
+    // A spike of 'locked' means an attack is already being throttled; a spike
+    // of 'invalid_credentials' means it is still in progress. Alerting wants
+    // to tell those apart.
+    const rendered = await render();
+    expect(rendered).toContain('auth_attempts_total{outcome="locked"} 1');
+    expect(rendered).not.toContain('auth_attempts_total{outcome="invalid_credentials"}');
+  });
+
+  it('never labels an auth metric with the email address', async () => {
+    const repository = repositoryMock();
+    repository.findLocalAccountByEmail.mockResolvedValue(undefined);
+    const { domainMetrics, render } = recorder();
+    const service = new AuthService(repository as never, configService(), undefined, domainMetrics);
+
+    await expect(
+      service.login({ email: 'victim@example.com', password: 'whatever-password' }),
+    ).rejects.toThrow(ApiUnauthorizedError);
+
+    // /metrics is unauthenticated: an email label would make it a user
+    // enumeration endpoint, on top of being unbounded cardinality.
+    expect(await render()).not.toContain('victim@example.com');
+  });
+});
