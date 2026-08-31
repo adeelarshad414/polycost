@@ -4,8 +4,7 @@
 // were pinned inside App.tsx only because they read those lookup tables. They
 // remain pure - no JSX, no hooks, no App state.
 
-/* eslint-disable security/detect-object-injection -- Reviewed: typed
-   provider/category lookup maps carried over verbatim from App.tsx. */
+/* eslint-disable security/detect-object-injection -- Reviewed 2026-08-31: typed provider/category lookup maps carried over verbatim from App.tsx; no user-supplied key mutates an object on a privilege boundary; see docs/SECURITY-SUPPRESSIONS.md. */
 
 import { HOURS_PER_MONTH, intervalMultiplierFromMonthly } from '../cost-time';
 import {

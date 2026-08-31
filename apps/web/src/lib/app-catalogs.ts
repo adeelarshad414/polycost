@@ -4,9 +4,6 @@
 // defaults. Moving them out frees the remaining pure helpers that referenced
 // them, which were otherwise pinned inside the monolith.
 
-/* eslint-disable security/detect-object-injection -- Reviewed: typed lookup
-   maps carried over verbatim from App.tsx. */
-
 import {
   AppPlatformModelRates,
   ComputeSizePreset,

@@ -1,4 +1,3 @@
-/* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: UI dictionaries are typed provider/form/report state maps, not privilege-bound object mutation; see docs/SECURITY-SUPPRESSIONS.md. */
 import { FormEvent, lazy, ReactNode, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { formatCurrency, formatPercent, formatSignedCurrency } from './lib/format';
 import {

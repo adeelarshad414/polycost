@@ -4,8 +4,7 @@
 // reference to any symbol defined in App.tsx. That makes them safe to lift out
 // of the monolith and independently testable without rendering the app.
 
-/* eslint-disable security/detect-object-injection -- Reviewed: typed
-   provider/form/report lookup maps carried over verbatim from App.tsx. */
+/* eslint-disable security/detect-object-injection -- Reviewed 2026-08-31: typed provider/category lookup maps carried over verbatim from App.tsx; no user-supplied key mutates an object on a privilege boundary; see docs/SECURITY-SUPPRESSIONS.md. */
 
 import { PolyCostApiError } from '../api-client';
 import { hourlyFromMonthly, intervalMultiplierFromMonthly } from '../cost-time';
