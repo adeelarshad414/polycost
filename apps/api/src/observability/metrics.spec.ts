@@ -1,5 +1,7 @@
+import { NestFactory } from '@nestjs/core';
 import { MetricsController } from './metrics.controller';
 import { MetricsService, normalizeRoute } from './metrics.service';
+import { ObservabilityModule } from './observability.module';
 import { registerMetricsHook } from '../bootstrap';
 
 // Default process metrics are skipped in these tests: they add ~50 series of
@@ -217,5 +219,53 @@ describe('registerMetricsHook', () => {
 
     expect(onRequestDone).toHaveBeenCalledTimes(1);
     expect(onResponseDone).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ObservabilityModule', () => {
+  // Regression guard for a boot failure the unit tests missed and only E2E
+  // caught: MetricsService took its options as a plain constructor parameter,
+  // so emitDecoratorMetadata recorded a design type of Object and Nest tried to
+  // resolve it as a provider - UnknownDependenciesException, container dead on
+  // startup. Constructing the class directly (as every test above does) never
+  // exercises DI, so the module itself has to be compiled.
+  it('resolves MetricsService through the DI container', async () => {
+    // createApplicationContext runs the real injector, so a provider Nest
+    // cannot resolve throws here exactly as it does at boot. @nestjs/testing is
+    // not a dependency of this workspace; @nestjs/core already is.
+    const context = await NestFactory.createApplicationContext(ObservabilityModule, {
+      logger: false,
+      // Without this Nest calls process.exit(1) on a resolution failure, which
+      // kills the jest worker before it can report the failing test.
+      abortOnError: false,
+    });
+
+    try {
+      expect(context.get(MetricsService)).toBeInstanceOf(MetricsService);
+      expect(context.get(MetricsController)).toBeInstanceOf(MetricsController);
+    } finally {
+      await context.close();
+    }
+  });
+
+  it('serves metrics recorded through the injected instance', async () => {
+    const context = await NestFactory.createApplicationContext(ObservabilityModule, {
+      logger: false,
+      // Without this Nest calls process.exit(1) on a resolution failure, which
+      // kills the jest worker before it can report the failing test.
+      abortOnError: false,
+    });
+
+    try {
+      context
+        .get(MetricsService)
+        .observeRequest({ method: 'GET', route: '/wired', status: 200, durationSeconds: 0.01 });
+
+      await expect(
+        context.get(MetricsController).metrics({ header: jest.fn() }),
+      ).resolves.toContain('http_requests_total{method="GET",route="/wired",status="200"} 1');
+    } finally {
+      await context.close();
+    }
   });
 });

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { Counter, Histogram, Registry, collectDefaultMetrics } from 'prom-client';
 
 /**
@@ -9,6 +9,13 @@ import { Counter, Histogram, Registry, collectDefaultMetrics } from 'prom-client
  * an isolated instance; the global registry is process-wide state and would
  * leak metrics between test cases.
  */
+export interface MetricsOptions {
+  /** Set false in tests to skip prom-client's ~50 default process series. */
+  collectDefaults?: boolean;
+}
+
+export const METRICS_OPTIONS = Symbol('METRICS_OPTIONS');
+
 @Injectable()
 export class MetricsService {
   private readonly registry = new Registry();
@@ -17,7 +24,15 @@ export class MetricsService {
   private readonly errors: Counter<'method' | 'route' | 'status'>;
   private readonly duration: Histogram<'method' | 'route' | 'status'>;
 
-  constructor(options: { collectDefaults?: boolean } = {}) {
+  /**
+   * Options are injected through an explicit token rather than taken as a plain
+   * constructor parameter: emitDecoratorMetadata records the parameter's design
+   * type as Object, so Nest tries to resolve it as a provider and fails at boot
+   * with UnknownDependenciesException. A default parameter value does not help,
+   * because Nest never gets as far as calling the constructor. @Optional() makes
+   * it inject undefined instead, which lets the default apply.
+   */
+  constructor(@Optional() @Inject(METRICS_OPTIONS) options: MetricsOptions = {}) {
     this.requests = new Counter({
       name: 'http_requests_total',
       help: 'Total HTTP requests handled, labelled by method, route and status.',
