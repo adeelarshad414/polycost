@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { AppModule } from './app.module';
+import { setProviderHttpDefaults } from './adapters/common/http-client';
 import { configureApp, corsOriginsFromConfig } from './bootstrap';
 import type { AppConfig } from './config/config.schema';
 import { DIAGRAM_JSON_BODY_MAX_BYTES } from './diagram-parser/diagram-parser.types';
@@ -13,6 +14,16 @@ async function bootstrap() {
     new FastifyAdapter({ bodyLimit: DIAGRAM_JSON_BODY_MAX_BYTES }),
   );
   const config = app.get(ConfigService<AppConfig, true>);
+
+  // Seed the outbound HTTP limits from validated config before anything can make
+  // a provider call.
+  setProviderHttpDefaults({
+    timeoutMs: config.get('PROVIDER_HTTP_TIMEOUT_MS', { infer: true }),
+    bodyTimeoutMs:
+      config.get('PROVIDER_HTTP_BODY_TIMEOUT_MS', { infer: true }) ??
+      config.get('PROVIDER_HTTP_TIMEOUT_MS', { infer: true }),
+    maxResponseBytes: config.get('PROVIDER_HTTP_MAX_RESPONSE_BYTES', { infer: true }),
+  });
 
   await configureApp(
     app,
