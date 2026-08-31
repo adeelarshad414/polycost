@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ApiModule } from './api/api.module';
 import { ComparisonModule } from './comparison/comparison.module';
 import { AppConfigModule } from './config/app-config.module';
+import { ObservabilityModule } from './observability/observability.module';
 import { CostManagementJobsModule } from './cost-management-jobs/cost-management-jobs.module';
 import { DiagramParserModule } from './diagram-parser/diagram-parser.module';
 import { HealthController } from './health/health.controller';
@@ -14,6 +15,7 @@ import { ReportModule } from './reports/report.module';
 @Module({
   imports: [
     AppConfigModule,
+    ObservabilityModule,
     PricingEtlModule,
     NwsParserModule,
     ComparisonModule,
