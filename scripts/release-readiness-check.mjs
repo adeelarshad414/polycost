@@ -771,7 +771,7 @@ await assertFileContains('apps/web/src/styles/tokens.css', [
   ['PolyCost default accent', '--brand-500: #7c4fd0'],
   ['terracotta accent axis', "[data-accent='terracotta']"],
   ['provider accent tokens', '--aws: #d85a30'],
-  ['status semantic tokens', '--status-ok: #2e9e76'],
+  ['status semantic tokens', '--status-ok: #217255'],
 ]);
 
 await assertFileContains('scripts/ci-e2e.mjs', [
