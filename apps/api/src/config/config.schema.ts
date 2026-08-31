@@ -48,6 +48,16 @@ export const configSchema = z
     CURRENCY_SYNC_SCHEDULE_CRON: z.string().default('0 * * * *'),
     ALERT_EVALUATOR_SCHEDULE_CRON: z.string().default('*/15 * * * *'),
     SHARE_LINK_CLEANUP_SCHEDULE_CRON: z.string().default('0 3 * * *'),
+    // Outbound provider HTTP limits. These were previously read directly from
+    // the environment inside the adapter HTTP client, which bypassed schema
+    // validation and broke the repo's no-direct-environment-access rule.
+    PROVIDER_HTTP_TIMEOUT_MS: z.coerce.number().int().min(1000).default(60_000),
+    PROVIDER_HTTP_BODY_TIMEOUT_MS: z.coerce.number().int().min(1000).optional(),
+    PROVIDER_HTTP_MAX_RESPONSE_BYTES: z.coerce
+      .number()
+      .int()
+      .min(1024)
+      .default(64 * 1024 * 1024),
     DATA_RETENTION_SCHEDULE_CRON: z.string().default('30 3 * * *'),
     // Retention is OFF by default: 'report-only' counts what WOULD be pruned and
     // deletes nothing. Switching to 'delete-expired' is an explicit, irreversible

@@ -32,17 +32,33 @@ const DEFAULT_HTTP_TIMEOUT_MS = 60_000;
 // hanging and exhausting memory.
 const DEFAULT_HTTP_MAX_RESPONSE_BYTES = 64 * 1024 * 1024;
 
-function positiveInt(raw: string | undefined, fallback: number): number {
-  const value = Number(raw);
-  return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
+export interface ProviderHttpDefaults {
+  timeoutMs: number;
+  bodyTimeoutMs: number;
+  maxResponseBytes: number;
+}
+
+// Deployment-level limits. Seeded with safe fallbacks and overwritten once at
+// bootstrap from the validated config schema. Kept as module state because the
+// HTTP helpers are plain functions shared by six call sites, several of which
+// are not Nest providers and cannot inject ConfigService.
+let providerHttpDefaults: ProviderHttpDefaults = {
+  timeoutMs: DEFAULT_HTTP_TIMEOUT_MS,
+  bodyTimeoutMs: DEFAULT_HTTP_TIMEOUT_MS,
+  maxResponseBytes: DEFAULT_HTTP_MAX_RESPONSE_BYTES,
+};
+
+export function setProviderHttpDefaults(defaults: Partial<ProviderHttpDefaults>): void {
+  providerHttpDefaults = { ...providerHttpDefaults, ...defaults };
+}
+
+export function getProviderHttpDefaults(): ProviderHttpDefaults {
+  return providerHttpDefaults;
 }
 
 export const defaultFetch: FetchLike = async (input, init) => {
   const controller = new AbortController();
-  const timeout = setTimeout(
-    () => controller.abort(),
-    positiveInt(process.env.PROVIDER_HTTP_TIMEOUT_MS, DEFAULT_HTTP_TIMEOUT_MS),
-  );
+  const timeout = setTimeout(() => controller.abort(), providerHttpDefaults.timeoutMs);
 
   try {
     return await fetch(input, {
@@ -206,17 +222,9 @@ export async function parseJsonResponse<T>(
   response: HttpResponseLike,
   limits: ParseJsonResponseLimits = {},
 ): Promise<T> {
-  // Limits are injectable so callers (and tests) can set them explicitly instead
-  // of mutating process.env; the env vars remain the deployment-level default.
-  const maxBytes =
-    limits.maxBytes ??
-    positiveInt(process.env.PROVIDER_HTTP_MAX_RESPONSE_BYTES, DEFAULT_HTTP_MAX_RESPONSE_BYTES);
-  const bodyTimeoutMs =
-    limits.bodyTimeoutMs ??
-    positiveInt(
-      process.env.PROVIDER_HTTP_BODY_TIMEOUT_MS ?? process.env.PROVIDER_HTTP_TIMEOUT_MS,
-      DEFAULT_HTTP_TIMEOUT_MS,
-    );
+  // Limits are injectable per call; otherwise the deployment defaults apply.
+  const maxBytes = limits.maxBytes ?? providerHttpDefaults.maxResponseBytes;
+  const bodyTimeoutMs = limits.bodyTimeoutMs ?? providerHttpDefaults.bodyTimeoutMs;
   const declaredLength = Number(response.headers?.get('content-length') ?? '');
   if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
     throw tooLargeError(providerId, response, declaredLength, maxBytes);

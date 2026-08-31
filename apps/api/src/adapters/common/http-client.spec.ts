@@ -1,4 +1,9 @@
-import { assertSameProviderOrigin, parseJsonResponse } from './http-client';
+import {
+  assertSameProviderOrigin,
+  getProviderHttpDefaults,
+  parseJsonResponse,
+  setProviderHttpDefaults,
+} from './http-client';
 
 // Build a minimal web-ReadableStream-like body that yields the given chunks, so
 // tests can exercise the streaming read path (real fetch exposes getReader()).
@@ -129,6 +134,60 @@ describe('http-client', () => {
         { bodyTimeoutMs: 40 },
       ),
     ).rejects.toThrow(/did not complete within 40 ms/);
+  });
+
+  describe('provider HTTP defaults', () => {
+    // These limits used to be read directly from the environment inside this
+    // module, which skipped schema validation and broke the repo's
+    // no-direct-environment-access rule. They are now seeded once at bootstrap
+    // from validated config.
+    it('applies the configured defaults when a call passes no explicit limits', async () => {
+      const previous = getProviderHttpDefaults();
+      setProviderHttpDefaults({ maxResponseBytes: 10 });
+
+      try {
+        await expect(
+          parseJsonResponse('azure', {
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            headers: { get: () => null },
+            text: async () => 'unreached',
+            body: streamBody([
+              encoder.encode('12345'),
+              encoder.encode('67890'),
+              encoder.encode('AB'),
+            ]),
+          }),
+        ).rejects.toThrow(/too large to buffer safely/);
+      } finally {
+        setProviderHttpDefaults(previous);
+      }
+    });
+
+    it('lets an explicit per-call limit override the default', async () => {
+      const previous = getProviderHttpDefaults();
+      setProviderHttpDefaults({ maxResponseBytes: 5 });
+
+      try {
+        await expect(
+          parseJsonResponse(
+            'gcp',
+            {
+              ok: true,
+              status: 200,
+              statusText: 'OK',
+              headers: { get: () => null },
+              text: async () => 'unreached',
+              body: streamBody([encoder.encode('{"ok"'), encoder.encode(':true}')]),
+            },
+            { maxBytes: 4096 },
+          ),
+        ).resolves.toEqual({ ok: true });
+      } finally {
+        setProviderHttpDefaults(previous);
+      }
+    });
   });
 
   describe('assertSameProviderOrigin (M-B1)', () => {
