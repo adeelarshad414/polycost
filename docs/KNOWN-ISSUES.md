@@ -114,6 +114,43 @@ workspace module system; the third needs a human looking at the rendered UI.
 Recommended: option 2 first (small, unblocks TS 7), then plan option 1
 deliberately rather than under upgrade pressure.
 
+## 🟠 K-12 · The `impeccable` gate silently skips on CI's Node version
+
+|            |                                                   |
+| ---------- | ------------------------------------------------- |
+| **Status** | 🟠 Open — 24 findings unreviewed                  |
+| **Found**  | 2026-08-31, while landing the `/metrics` endpoint |
+
+`npm run qa` ends with `npm run impeccable`, a UI anti-pattern scanner.
+`impeccable@3.1.0` requires **Node 24+**, and `scripts/impeccable-check.mjs`
+deliberately exits 0 with a warning when the host is older — which is exactly
+what CI is (Node 20).
+
+The result is a gate that is green in CI and red on a modern developer machine.
+On Node 24+ it exits 2 and reports **24 anti-patterns** in
+`apps/web/src/styles.css`:
+
+| Rule                       | Count | What it flags                                       |
+| -------------------------- | ----- | --------------------------------------------------- |
+| `side-tab`                 | 19    | 3–4px `border-left` accents on cards                |
+| `border-accent-on-rounded` | 5     | Thick `border-top` on a card that also has a radius |
+
+None are correctness bugs — they are visual-polish findings — but the situation
+is worse than having no scanner: the pre-commit hook runs `qa`, so anyone on
+current Node **cannot commit without `--no-verify`**, which trains people to
+bypass every other check in that hook too.
+
+**Fix, in order:**
+
+1. Raise CI's Node to 24+ so the gate actually runs. This will fail the build
+   until step 2 lands, so do them together.
+2. Clear or explicitly waive the 24 findings.
+3. Make `scripts/impeccable-check.mjs` **fail** rather than warn when it cannot
+   run, once the engine floor is raised. A check that skips itself is not a check.
+
+Until then, treat an `impeccable` failure on a local commit as expected, and
+verify it reproduces on a clean tree before bypassing.
+
 ## 🔵 Incomplete by design
 
 | ID   | Item                                   | Note                                                                                                                                                             |

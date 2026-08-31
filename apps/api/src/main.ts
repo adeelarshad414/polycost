@@ -5,6 +5,7 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import { AppModule } from './app.module';
 import { setProviderHttpDefaults } from './adapters/common/http-client';
 import { configureApp, corsOriginsFromConfig } from './bootstrap';
+import { MetricsService } from './observability/metrics.service';
 import { StructuredLogger } from './observability/structured-logger';
 import type { AppConfig } from './config/config.schema';
 import { DIAGRAM_JSON_BODY_MAX_BYTES } from './diagram-parser/diagram-parser.types';
@@ -41,6 +42,7 @@ async function bootstrap() {
   await configureApp(
     app,
     corsOriginsFromConfig(config.get('CORS_ALLOWED_ORIGINS', { infer: true })),
+    app.get(MetricsService),
   );
 
   await app.listen({ port: config.get('PORT', { infer: true }), host: '0.0.0.0' });

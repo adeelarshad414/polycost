@@ -5,6 +5,7 @@ import {
   resolveRequestId,
   runWithRequestContext,
 } from './observability/request-context';
+import { MetricsService, normalizeRoute } from './observability/metrics.service';
 
 /**
  * Runtime wiring applied to an already-created Nest application.
@@ -34,6 +35,54 @@ interface ReplyLike {
  * AsyncLocalStorage; every log line emitted downstream picks the id up
  * automatically.
  */
+interface TimedRequest extends RequestLike {
+  method?: string;
+  url?: string;
+  routeOptions?: { url?: string };
+}
+
+interface TimedReply {
+  statusCode?: number;
+}
+
+/**
+ * Records RED metrics for every request.
+ *
+ * Uses Fastify's onResponse hook so the status code and full duration are known.
+ * The route template is preferred over the raw URL to keep label cardinality
+ * bounded.
+ */
+export function registerMetricsHook(
+  instance: {
+    addHook(
+      name: 'onRequest' | 'onResponse',
+      handler: (req: TimedRequest, reply: TimedReply, done: () => void) => void,
+    ): unknown;
+  },
+  metrics: MetricsService,
+): void {
+  const startTimes = new WeakMap<TimedRequest, bigint>();
+
+  instance.addHook('onRequest', (request, _reply, done) => {
+    startTimes.set(request, process.hrtime.bigint());
+    done();
+  });
+
+  instance.addHook('onResponse', (request, reply, done) => {
+    const startedAt = startTimes.get(request);
+    const durationSeconds =
+      startedAt === undefined ? 0 : Number(process.hrtime.bigint() - startedAt) / 1e9;
+
+    metrics.observeRequest({
+      method: request.method ?? 'UNKNOWN',
+      route: request.routeOptions?.url ?? normalizeRoute(request.url ?? '/'),
+      status: reply.statusCode ?? 0,
+      durationSeconds,
+    });
+    done();
+  });
+}
+
 export function registerRequestContext(instance: {
   addHook(
     name: 'onRequest',
@@ -47,12 +96,20 @@ export function registerRequestContext(instance: {
   });
 }
 
-export async function configureApp(app: ConfigurableApp, allowedOrigins: string[]): Promise<void> {
-  registerRequestContext(
-    (
-      app.getHttpAdapter() as { getInstance(): Parameters<typeof registerRequestContext>[0] }
-    ).getInstance(),
-  );
+export async function configureApp(
+  app: ConfigurableApp,
+  allowedOrigins: string[],
+  metrics?: MetricsService,
+): Promise<void> {
+  const httpInstance = (
+    app.getHttpAdapter() as { getInstance(): Parameters<typeof registerRequestContext>[0] }
+  ).getInstance();
+
+  registerRequestContext(httpInstance);
+
+  if (metrics) {
+    registerMetricsHook(httpInstance as never, metrics);
+  }
 
   await app.register(fastifyHelmet);
   app.enableCors({
