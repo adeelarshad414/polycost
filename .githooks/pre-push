@@ -1,4 +1,30 @@
 #!/bin/sh
 set -eu
 
-npm run check:full
+# Fast static gates only: lint, typecheck, formatting, theme tokens and the
+# security-suppression ledger. These run in roughly ten seconds, need no Docker,
+# database or browser, and are exactly the checks that have caught regressions
+# the test suites missed.
+#
+# This hook previously ran `npm run check:full` - 58 checks plus integration,
+# build, e2e and security scans. That needs a running database and e2e
+# infrastructure, so it failed on a normal developer machine and was routinely
+# bypassed with --no-verify. A hook everyone skips protects nothing; CI is the
+# right place for the full suite and already runs it on every push.
+#
+# Run the whole thing yourself any time with: npm run check:full
+# Skip this hook deliberately with:            git push --no-verify
+
+printf '\033[1mpre-push\033[0m  lint + typecheck\n'
+npm run --silent ci:lint
+
+printf '\033[1mpre-push\033[0m  formatting\n'
+npm run --silent format:check
+
+printf '\033[1mpre-push\033[0m  theme token guard\n'
+npm run --silent theme:hex:check
+
+printf '\033[1mpre-push\033[0m  security suppression ledger\n'
+npm run --silent security:suppressions
+
+printf '\033[32mpre-push checks passed\033[0m  (full suite runs in CI)\n'
