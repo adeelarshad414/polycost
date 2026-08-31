@@ -28,7 +28,7 @@ export class DataHealthController {
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ): Promise<DataHealthResponse> {
-    const state = this.apiRateLimitService.consume(
+    const state = await this.apiRateLimitService.consume(
       'data_health',
       requestIdentity(request ?? {}),
       this.configService.get('RATE_LIMIT_PUBLIC_READ_PER_MINUTE', { infer: true }),

@@ -63,12 +63,12 @@ export class CachedPricingController {
   ) {}
 
   @Get('compare')
-  compare(
+  async compare(
     @Query() query: Record<string, QueryValue>,
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
-    consumePublicRateLimit(
+    await consumePublicRateLimit(
       this.apiRateLimitService,
       this.configService,
       'pricing_compare',
@@ -81,12 +81,12 @@ export class CachedPricingController {
   }
 
   @Get('breakdown')
-  breakdown(
+  async breakdown(
     @Query() query: Record<string, QueryValue>,
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
-    consumePublicRateLimit(
+    await consumePublicRateLimit(
       this.apiRateLimitService,
       this.configService,
       'pricing_breakdown',
@@ -102,11 +102,11 @@ export class CachedPricingController {
   }
 
   @Get('models')
-  models(
+  async models(
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
-  ): PricingModelCatalogResponse {
-    consumePublicRateLimit(
+  ): Promise<PricingModelCatalogResponse> {
+    await consumePublicRateLimit(
       this.apiRateLimitService,
       this.configService,
       'pricing_models_catalog',
@@ -128,12 +128,12 @@ export class WorkloadsController {
   ) {}
 
   @Post()
-  create(
+  async create(
     @Body() body: unknown,
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
-    consumePublicRateLimit(
+    await consumePublicRateLimit(
       this.apiRateLimitService,
       this.configService,
       'workload_create',
@@ -155,12 +155,12 @@ export class BudgetsController {
   ) {}
 
   @Post()
-  create(
+  async create(
     @Body() body: unknown,
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
-    consumePublicRateLimit(
+    await consumePublicRateLimit(
       this.apiRateLimitService,
       this.configService,
       'budget_create',
@@ -182,12 +182,12 @@ export class AlertsController {
   ) {}
 
   @Get()
-  list(
+  async list(
     @Query('workloadId') workloadId?: QueryValue,
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
-    consumePublicRateLimit(
+    await consumePublicRateLimit(
       this.apiRateLimitService,
       this.configService,
       'alerts_list',
@@ -203,13 +203,13 @@ export class AlertsController {
   }
 
   @Patch(':id')
-  update(
+  async update(
     @Param('id') alertId: string,
     @Body() body: unknown,
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
-    consumePublicRateLimit(
+    await consumePublicRateLimit(
       this.apiRateLimitService,
       this.configService,
       'alert_update',
@@ -234,12 +234,12 @@ export class ShareLinksController {
   ) {}
 
   @Post()
-  create(
+  async create(
     @Body() body: unknown,
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
-    consumePublicRateLimit(
+    await consumePublicRateLimit(
       this.apiRateLimitService,
       this.configService,
       'share_link_create',
@@ -252,12 +252,12 @@ export class ShareLinksController {
   }
 
   @Post(':token/revoke')
-  revoke(
+  async revoke(
     @Param('token') token: string,
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
-    consumePublicRateLimit(
+    await consumePublicRateLimit(
       this.apiRateLimitService,
       this.configService,
       'share_link_revoke',
@@ -270,12 +270,12 @@ export class ShareLinksController {
   }
 
   @Get(':token/analytics')
-  analytics(
+  async analytics(
     @Param('token') token: string,
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
-    consumePublicRateLimit(
+    await consumePublicRateLimit(
       this.apiRateLimitService,
       this.configService,
       'share_link_analytics',
@@ -297,14 +297,14 @@ export class SharedReportsController {
   ) {}
 
   @Get(':token')
-  get(
+  async get(
     @Param('token') token: string,
     @Query('password') password: QueryValue,
     @Query('section') section: QueryValue,
     @Req() request: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
-    consumePublicRateLimit(
+    await consumePublicRateLimit(
       this.apiRateLimitService,
       this.configService,
       'shared_report_get',
@@ -330,12 +330,12 @@ export class ExchangeRatesController {
   ) {}
 
   @Get()
-  get(
+  async get(
     @Query('base') base?: QueryValue,
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
-    consumePublicRateLimit(
+    await consumePublicRateLimit(
       this.apiRateLimitService,
       this.configService,
       'exchange_rates_get',
@@ -348,16 +348,16 @@ export class ExchangeRatesController {
   }
 }
 
-function consumePublicRateLimit(
+async function consumePublicRateLimit(
   apiRateLimitService: ApiRateLimitService,
   configService: ConfigService<AppConfig, true> | undefined,
   scope: string,
   request: RequestLike | undefined,
   response: RateLimitHeaderResponse | undefined,
   configKey: PublicRateLimitConfigKey,
-): void {
+): Promise<void> {
   const limit = configService?.get(configKey, { infer: true }) ?? defaultRateLimitFor(configKey);
-  const state = apiRateLimitService.consume(scope, requestIdentity(request ?? {}), limit);
+  const state = await apiRateLimitService.consume(scope, requestIdentity(request ?? {}), limit);
   writeRateLimitHeaders(response, state);
 }
 

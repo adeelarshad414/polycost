@@ -33,7 +33,7 @@ export class DiagramParserController {
     @Req() request: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ): Promise<DiagramParseResult> {
-    const rateLimit = this.apiRateLimitService.consume(
+    const rateLimit = await this.apiRateLimitService.consume(
       'diagram_parse',
       requestIdentity(request),
       this.configService.get('RATE_LIMIT_DIAGRAM_PARSE_PER_MINUTE', { infer: true }),

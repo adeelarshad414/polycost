@@ -28,7 +28,7 @@ export class RegionsController {
     @Req() request?: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ): Promise<RegionCatalogResponse> {
-    const state = this.apiRateLimitService.consume(
+    const state = await this.apiRateLimitService.consume(
       'regions_catalog',
       requestIdentity(request ?? {}),
       this.configService.get('RATE_LIMIT_PUBLIC_READ_PER_MINUTE', { infer: true }),

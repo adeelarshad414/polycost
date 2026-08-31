@@ -25,18 +25,18 @@ describe('AuthController', () => {
     ip: '127.0.0.1',
   };
 
-  it('delegates account, session, team, invite, and SSO endpoints to AuthService', () => {
+  it('delegates account, session, team, invite, and SSO endpoints to AuthService', async () => {
     const service = createAuthServiceMock();
     const controller = authController(service);
     const body = { email: 'architect@example.com' };
 
-    expect(controller.register(body, request)).toBe('register');
+    await expect(controller.register(body, request)).resolves.toBe('register');
     expect(service.register).toHaveBeenCalledWith(body, {
       ip: '127.0.0.1',
       userAgent: 'jest',
     });
 
-    expect(controller.login(body, request)).toBe('login');
+    await expect(controller.login(body, request)).resolves.toBe('login');
     expect(service.login).toHaveBeenCalledWith(body, {
       ip: '127.0.0.1',
       userAgent: 'jest',
@@ -63,13 +63,13 @@ describe('AuthController', () => {
     expect(controller.revokeTeamInvitation('team-1', 'invite-1', request)).toBe('revoke-invite');
     expect(controller.resendTeamInvitation('team-1', 'invite-1', request)).toBe('resend-invite');
     expect(controller.acceptInvitation(body, request)).toBe('accept-invite');
-    expect(controller.previewInvitation('invite-token')).toBe('preview-invite');
+    await expect(controller.previewInvitation('invite-token')).resolves.toBe('preview-invite');
     expect(controller.ssoStatus(request)).toBe('sso-status');
-    expect(controller.startMockOidcLogin(body)).toBe('sso-start');
-    expect(controller.mockOidcAuthorize(body)).toBe('sso-authorize');
-    expect(controller.completeMockOidcCallback(body, request)).toBe('sso-callback');
+    await expect(controller.startMockOidcLogin(body)).resolves.toBe('sso-start');
+    await expect(controller.mockOidcAuthorize(body)).resolves.toBe('sso-authorize');
+    await expect(controller.completeMockOidcCallback(body, request)).resolves.toBe('sso-callback');
     expect(controller.configureSsoProvider('team-1', body, request)).toBe('sso-configure');
-    expect(controller.testSsoConnection('team-1', body, request)).toBe('sso-test');
+    await expect(controller.testSsoConnection('team-1', body, request)).resolves.toBe('sso-test');
 
     expect(service.updateProfile).toHaveBeenCalledWith(body, identity);
     expect(service.changePassword).toHaveBeenCalledWith(body, identity);
@@ -97,12 +97,12 @@ describe('AuthController', () => {
     expect(service.testSsoConnection).toHaveBeenCalledWith('team-1', body, identity);
   });
 
-  it('omits missing request metadata for anonymous register/login calls', () => {
+  it('omits missing request metadata for anonymous register/login calls', async () => {
     const service = createAuthServiceMock();
     const controller = authController(service);
 
-    controller.register({}, undefined);
-    controller.login(
+    await controller.register({}, undefined);
+    await controller.login(
       {},
       {
         headers: {
@@ -120,7 +120,7 @@ describe('AuthController', () => {
     );
   });
 
-  it('rate limits public auth entry points by request identity', () => {
+  it('rate limits public auth entry points by request identity', async () => {
     const service = createAuthServiceMock();
     const controller = authController(service, 2);
     const response = {
@@ -131,18 +131,18 @@ describe('AuthController', () => {
       headers: {},
     };
 
-    controller.login({ email: 'architect@example.com' }, request, response);
-    controller.login({ email: 'architect@example.com' }, request, response);
-    expect(() => controller.login({ email: 'architect@example.com' }, request, response)).toThrow(
-      RateLimitExceededError,
-    );
+    await controller.login({ email: 'architect@example.com' }, request, response);
+    await controller.login({ email: 'architect@example.com' }, request, response);
+    await expect(
+      controller.login({ email: 'architect@example.com' }, request, response),
+    ).rejects.toThrow(RateLimitExceededError);
     expect(response.header).toHaveBeenCalledWith('X-RateLimit-Limit', '2');
 
-    controller.startMockOidcLogin({ teamId: 'team-1' }, request, response);
-    controller.startMockOidcLogin({ teamId: 'team-1' }, request, response);
-    expect(() => controller.startMockOidcLogin({ teamId: 'team-1' }, request, response)).toThrow(
-      RateLimitExceededError,
-    );
+    await controller.startMockOidcLogin({ teamId: 'team-1' }, request, response);
+    await controller.startMockOidcLogin({ teamId: 'team-1' }, request, response);
+    await expect(
+      controller.startMockOidcLogin({ teamId: 'team-1' }, request, response),
+    ).rejects.toThrow(RateLimitExceededError);
   });
 
   it('keeps workspace account/team endpoints behind the session guard', () => {
