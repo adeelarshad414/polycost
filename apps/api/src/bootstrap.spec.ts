@@ -10,11 +10,17 @@ import { configureApp, corsOriginsFromConfig } from './bootstrap';
 
 describe('application bootstrap wiring', () => {
   function appDouble() {
+    const addHook = jest.fn();
+
     return {
       register: jest.fn(async () => undefined),
       enableCors: jest.fn(),
       enableShutdownHooks: jest.fn(),
       get: jest.fn(),
+      // configureApp installs the request-correlation hook on the underlying
+      // Fastify instance.
+      getHttpAdapter: jest.fn(() => ({ getInstance: () => ({ addHook }) })),
+      addHook,
     };
   }
 
@@ -24,6 +30,14 @@ describe('application bootstrap wiring', () => {
     await configureApp(app as never, ['https://example.test']);
 
     expect(app.enableShutdownHooks).toHaveBeenCalledTimes(1);
+  });
+
+  it('installs the request-correlation hook', async () => {
+    const app = appDouble();
+
+    await configureApp(app as never, []);
+
+    expect(app.addHook).toHaveBeenCalledWith('onRequest', expect.any(Function));
   });
 
   it('registers helmet and applies the configured CORS origins', async () => {
