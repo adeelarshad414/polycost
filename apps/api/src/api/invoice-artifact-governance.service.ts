@@ -217,7 +217,7 @@ export class InvoiceArtifactGovernanceService {
       contentBase64: input.content.toString('base64'),
     });
     const signature = createHmac('sha256', secret).update(body).digest('hex');
-    let responseText = '';
+    let responseText: string;
 
     try {
       const response = await this.fetcher(url, {
