@@ -46,11 +46,12 @@ export class DiagramParserController {
       fileName: decoded.fileName,
       mimeType: decoded.mimeType,
     });
-    let persisted = false;
     const storedFile = await this.diagramTempFileStore.store(decoded, parsed.importId);
 
-    try {
-      persisted = await this.diagramImportRepository.save({
+    // Persistence is best-effort: a failure downgrades `persisted` in the
+    // response rather than failing the import.
+    const persisted = await this.diagramImportRepository
+      .save({
         importId: parsed.importId,
         format: decoded.detectedFormat,
         fileName: decoded.fileName,
@@ -64,10 +65,8 @@ export class DiagramParserController {
         ignoredCount: parsed.review.ignoredNodes.length,
         graph: parsed.graph,
         draftNws: parsed.draftNws,
-      });
-    } catch {
-      persisted = false;
-    }
+      })
+      .catch(() => false);
 
     return {
       ...parsed,

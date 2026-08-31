@@ -1094,13 +1094,12 @@ function hasHeader(headers: Record<string, string>, headerName: string): boolean
 }
 
 async function toApiError(response: Response): Promise<PolyCostApiError> {
-  let body: ApiErrorEnvelope = {};
-
-  try {
-    body = (await response.json()) as ApiErrorEnvelope;
-  } catch {
-    body = {};
-  }
+  // An error response may carry no body, or a non-JSON one (a proxy error page),
+  // so fall back to an empty envelope rather than letting the parse throw.
+  const body: ApiErrorEnvelope = await response
+    .json()
+    .then((parsed) => parsed as ApiErrorEnvelope)
+    .catch(() => ({}) as ApiErrorEnvelope);
 
   return new PolyCostApiError(
     response.status,
