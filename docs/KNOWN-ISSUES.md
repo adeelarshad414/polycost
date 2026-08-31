@@ -82,6 +82,38 @@ fails.** Carried forward from Phase 3.
 
 ---
 
+## 🟠 K-11 · Three dependency majors are blocked behind an ESM migration
+
+|            |                                                 |
+| ---------- | ----------------------------------------------- |
+| **Status** | 🟠 Open — architectural decision needed         |
+| **Found**  | 2026-08-31, while clearing the Dependabot queue |
+
+The API is CommonJS (`module: commonjs`, ts-jest, `moduleResolution: node`). Three
+major upgrades each fail on that, for the same underlying reason:
+
+| Dependabot PR | Upgrade                 | How it fails                                                                                                                                                                                                                                       |
+| ------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #168          | TypeScript 5 → 7        | `moduleResolution: node10` is **removed**. Switching to `node16` then surfaces `TS1479`: the CommonJS API cannot `require` `@polycost/types`, which declares `"type": "module"` and exports a runtime value (`POLYCOST_AI_NATIVE_SCHEMA_VERSION`). |
+| #171          | `@nestjs/config` 4 → 12 | Ships **ESM-only**. Jest cannot load it under CommonJS: _"Must use import to load ES Module"_ — 6 suites fail to run, 550 tests drop to 257.                                                                                                       |
+| #170          | Tailwind 3 → 4          | Not ESM, but a **CSS-first rewrite**: `@tailwind` directives → `@import`, `tailwind.config.ts` → `@theme`, PostCSS moves to `@tailwindcss/postcss`. ~397 utility usages across the app, so it carries real visual-regression risk.                 |
+
+These are **not** routine bumps. The first two need a decision about the
+workspace module system; the third needs a human looking at the rendered UI.
+
+**Options for the ESM question:**
+
+1. **Migrate the API to ESM.** Cleanest long-term; touches `tsconfig`, Jest
+   config, and every `require`-shaped assumption.
+2. **Make `@polycost/types` dual-published** (or drop `"type": "module"` and
+   move its single runtime constant elsewhere). Smallest change that unblocks
+   TypeScript 7 specifically.
+3. **Stay on CommonJS and pin these three.** Viable now, but the ecosystem is
+   moving; expect the list to grow.
+
+Recommended: option 2 first (small, unblocks TS 7), then plan option 1
+deliberately rather than under upgrade pressure.
+
 ## 🔵 Incomplete by design
 
 | ID   | Item                                   | Note                                                                                                                                                             |
