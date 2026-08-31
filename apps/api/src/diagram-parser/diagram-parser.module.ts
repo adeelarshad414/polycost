@@ -1,4 +1,7 @@
 import { Module } from '@nestjs/common';
+import { Pool } from 'pg';
+import { DomainMetricsService } from '../observability/domain-metrics.service';
+import { instrumentPool } from '../observability/instrumented-pool';
 import { ConfigService } from '@nestjs/config';
 import { ApiRateLimitService } from '../api/rate-limit.service';
 import { AppConfig } from '../config/config.schema';
@@ -62,9 +65,15 @@ import { LlmClassifierClient } from './diagram-parser.types';
     DiagramTempFileStore,
     {
       provide: DiagramImportRepository,
-      inject: [ConfigService, SecretsService],
-      useFactory: (configService: ConfigService<AppConfig, true>, secretsService: SecretsService) =>
-        new DiagramImportRepository(configService, secretsService),
+      inject: [ConfigService, SecretsService, DomainMetricsService],
+      useFactory: (
+        configService: ConfigService<AppConfig, true>,
+        secretsService: SecretsService,
+        domainMetrics: DomainMetricsService,
+      ) =>
+        new DiagramImportRepository(configService, secretsService, (config) =>
+          instrumentPool(new Pool(config), domainMetrics, 'diagram_import'),
+        ),
     },
     {
       provide: ApiRateLimitService,

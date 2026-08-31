@@ -20,6 +20,17 @@ export type EtlRecordOutcome = 'updated' | 'rejected' | 'skipped';
 export type VaultOutcome = 'success' | 'failure';
 export type AuthOutcome = 'success' | 'invalid_credentials' | 'locked';
 export type ExportOutcome = 'success' | 'failure';
+export type DbQueryOutcome = 'success' | 'failure';
+
+/** Counts BullMQ reports per state; keys are the states we choose to publish. */
+export interface QueueDepthCounts {
+  waiting?: number;
+  active?: number;
+  delayed?: number;
+  failed?: number;
+}
+
+export type QueueDepthSource = () => Promise<QueueDepthCounts>;
 
 @Injectable()
 export class DomainMetricsService {
@@ -35,6 +46,12 @@ export class DomainMetricsService {
   private readonly diagramParses: Counter<'format' | 'confidence'>;
   private readonly diagramUnresolved: Counter<'format'>;
   private readonly diagramIgnored: Counter<'format'>;
+  private readonly dbQueries: Counter<'pool' | 'operation' | 'outcome'>;
+  private readonly dbQueryDuration: Histogram<'pool' | 'operation'>;
+  private readonly dependencyUp: Gauge<'dependency'>;
+  private readonly dependencyProbeDuration: Histogram<'dependency'>;
+  private readonly queueDepth: Gauge<'queue' | 'state'>;
+  private readonly queueDepthSources = new Map<string, QueueDepthSource>();
 
   constructor(metrics: MetricsService) {
     const registers = [metrics.registry];
@@ -124,6 +141,106 @@ export class DomainMetricsService {
       labelNames: ['format'],
       registers,
     });
+
+    this.dbQueries = new Counter({
+      name: 'db_queries_total',
+      help: 'Postgres statements executed, by pool, operation and outcome.',
+      labelNames: ['pool', 'operation', 'outcome'],
+      registers,
+    });
+
+    this.dbQueryDuration = new Histogram({
+      name: 'db_query_duration_seconds',
+      help: 'Postgres statement duration, by pool and operation.',
+      labelNames: ['pool', 'operation'],
+      buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1, 5],
+      registers,
+    });
+
+    this.dependencyUp = new Gauge({
+      name: 'dependency_up',
+      help: 'Whether a backing dependency answered its last health probe (1) or not (0).',
+      labelNames: ['dependency'],
+      registers,
+    });
+
+    this.dependencyProbeDuration = new Histogram({
+      name: 'dependency_probe_duration_seconds',
+      help: 'Connect latency measured by the health probe, by dependency.',
+      labelNames: ['dependency'],
+      buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5],
+      registers,
+    });
+
+    this.queueDepth = new Gauge({
+      name: 'job_queue_depth',
+      help: 'Jobs in each BullMQ queue by state, sampled at scrape time.',
+      labelNames: ['queue', 'state'],
+      registers,
+      // Collected on scrape rather than incremented on enqueue/dequeue: the
+      // queue is the source of truth, and counters would drift the moment a job
+      // is retried, stalled or removed by anything other than this process.
+      collect: async () => {
+        await this.collectQueueDepth();
+      },
+    });
+  }
+
+  recordDbQuery(input: {
+    pool: string;
+    operation: string;
+    outcome: DbQueryOutcome;
+    durationSeconds: number;
+  }): void {
+    this.dbQueries.inc({
+      pool: input.pool,
+      operation: input.operation,
+      outcome: input.outcome,
+    });
+    this.dbQueryDuration.observe(
+      { pool: input.pool, operation: input.operation },
+      input.durationSeconds,
+    );
+  }
+
+  recordDependencyProbe(input: { dependency: string; up: boolean; latencySeconds?: number }): void {
+    this.dependencyUp.set({ dependency: input.dependency }, input.up ? 1 : 0);
+
+    if (input.latencySeconds !== undefined && Number.isFinite(input.latencySeconds)) {
+      this.dependencyProbeDuration.observe({ dependency: input.dependency }, input.latencySeconds);
+    }
+  }
+
+  /**
+   * Registers a queue for scrape-time sampling. Queues live in their own
+   * feature modules, so they push a reader in here rather than this global
+   * service importing them and creating a dependency cycle.
+   */
+  registerQueueDepthSource(queue: string, source: QueueDepthSource): void {
+    this.queueDepthSources.set(queue, source);
+  }
+
+  private async collectQueueDepth(): Promise<void> {
+    for (const [queue, source] of this.queueDepthSources) {
+      try {
+        const counts = await source();
+
+        for (const [state, value] of Object.entries(counts)) {
+          if (typeof value === 'number' && Number.isFinite(value)) {
+            this.queueDepth.set({ queue, state }, value);
+          }
+        }
+      } catch {
+        // A scrape must never fail because Redis is down - that is precisely
+        // when the metrics are most wanted. Leaving the previous sample in
+        // place would be a lie, so the queue is reported as unknown by
+        // removing its series.
+        this.queueDepth.remove({ queue, state: 'waiting' });
+        this.queueDepth.remove({ queue, state: 'active' });
+        this.queueDepth.remove({ queue, state: 'delayed' });
+        this.queueDepth.remove({ queue, state: 'failed' });
+      }
+    }
   }
 
   recordEtlProvider(input: {
