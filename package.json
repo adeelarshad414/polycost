@@ -132,7 +132,7 @@
     "live:verify": "node scripts/live-verification.mjs",
     "pricing:accuracy:golden": "node scripts/pricing-accuracy-harness.mjs",
     "hooks:install": "node scripts/install-hooks.mjs",
-    "security:audit": "npm audit --audit-level=high",
+    "security:audit": "npm audit --omit=dev --audit-level=high",
     "security:suppressions": "node scripts/security-suppression-check.mjs",
     "security:secrets": "gitleaks detect --source . --no-git --redact",
     "security:containers": "trivy fs --exit-code 1 --severity HIGH,CRITICAL .",
@@ -144,7 +144,8 @@
     "ci:integration": "npm run test:integration",
     "ci:build": "npm run build",
     "ci:e2e": "node scripts/ci-e2e.mjs",
-    "ci:security": "npm run security:audit"
+    "ci:security": "npm run security:audit",
+    "security:audit:dev": "npm audit --audit-level=high"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",

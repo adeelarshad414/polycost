@@ -74,3 +74,39 @@ Follow-up before public release:
 1. Decide whether CI should add a Node 24 auxiliary quality job.
 2. Keep Node 20 as the supported runtime unless the project intentionally raises `engines.node`.
 3. Re-run `npm run impeccable` on Node 24 before cutting a public release candidate.
+
+## Dependency audit scope
+
+Reviewed 2026-08-31.
+
+The audit runs as two CI steps with deliberately different severity:
+
+| Step                                   | Command                      | Blocking                 | Covers                                                            |
+| -------------------------------------- | ---------------------------- | ------------------------ | ----------------------------------------------------------------- |
+| Dependency security scan (production)  | `npm run security:audit`     | **Yes**                  | `npm audit --omit=dev --audit-level=high` — everything that ships |
+| Dependency security scan (dev tooling) | `npm run security:audit:dev` | No (`continue-on-error`) | Whole tree, including development dependencies                    |
+
+Rationale: a high-severity advisory in a shipped dependency is a release
+blocker and must stay one. A high-severity advisory in build-time tooling is a
+genuine risk to developer machines and CI runners, but blocking every merge on
+an upstream fix that does not exist yet only trains people to ignore a
+permanently red pipeline. Reporting it keeps it visible without that failure
+mode.
+
+**Currently accepted (development tree only):**
+
+| Package               | Advisory                                                    | Why accepted                                                                   |
+| --------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `@sentropic/graphify` | Transitively pulls the chain below                          | Already on the latest published version (0.17.1); npm reports no fix available |
+| `officeparser`        | Reached via Graphify                                        | Not reachable at runtime; used only by `graphify:*` scripts                    |
+| `pdfjs-dist`          | Arbitrary JavaScript execution when opening a malicious PDF | The repository does not open untrusted PDFs during a Graphify run              |
+
+**Production tree is clean:** `npm audit --omit=dev --audit-level=high` reports
+0 vulnerabilities as of this review.
+
+Follow-up:
+
+1. Re-check for a patched Graphify release on each dependency sweep.
+2. If none appears, evaluate replacing or dropping Graphify — it backs
+   `npm run graphify:validate`, so removing it also removes that check.
+3. Remove `continue-on-error` from the dev step once the chain is clean.
