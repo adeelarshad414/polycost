@@ -254,6 +254,52 @@ describe('queue depth', () => {
     expect(samples(await render(), 'job_queue_depth')).toHaveLength(0);
   });
 
+  it('does not hang the scrape when the queue read never settles', async () => {
+    const { domain, render } = build();
+    registerQueueDepth(domain, 'pricing-etl', {
+      // The real failure mode. ioredis retries a lost connection indefinitely
+      // rather than rejecting, so a Redis outage produces a promise that never
+      // settles - which hung /metrics entirely until the read was bounded.
+      getJobCounts: () => new Promise(() => {}),
+    });
+
+    const rendered = await render();
+
+    expect(rendered).toContain('http_requests_total');
+    expect(samples(rendered, 'job_queue_depth')).toHaveLength(0);
+  }, 10_000);
+
+  it('bounds the scrape when several queues are unreachable at once', async () => {
+    const { domain, render } = build();
+    for (const queue of ['pricing-etl', 'cost-management', 'third']) {
+      registerQueueDepth(domain, queue, { getJobCounts: () => new Promise(() => {}) });
+    }
+
+    // Read concurrently, so three dead queues cost one timeout, not three.
+    const startedAt = Date.now();
+    await render();
+
+    expect(Date.now() - startedAt).toBeLessThan(2_500);
+  }, 10_000);
+
+  it('recovers once the queue answers again', async () => {
+    const { domain, render } = build();
+    let reachable = false;
+    registerQueueDepth(domain, 'pricing-etl', {
+      getJobCounts: async () => {
+        if (!reachable) {
+          throw new Error('ECONNREFUSED');
+        }
+        return { waiting: 4, active: 0, delayed: 0, failed: 0 };
+      },
+    });
+
+    expect(samples(await render(), 'job_queue_depth')).toHaveLength(0);
+    reachable = true;
+
+    expect(await render()).toContain('job_queue_depth{queue="pricing-etl",state="waiting"} 4');
+  });
+
   it('skips a queue whose driver cannot report counts', async () => {
     const { domain, render } = build();
     registerQueueDepth(domain, 'pricing-etl', {});
