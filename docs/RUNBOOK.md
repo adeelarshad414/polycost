@@ -42,8 +42,12 @@ Most instruments are counters incremented at the call site. Three are not:
 
 - **`job_queue_depth`** is read from BullMQ on every scrape. The queue is the
   source of truth; a counter would drift the moment a job is retried, stalled or
-  removed by another process. If Redis is unreachable the series is **removed**
-  rather than left at its last value — a stale depth reads as a healthy queue.
+  removed by another process. Each read is bounded at **1 s** and all queues are
+  read concurrently, because ioredis retries a lost connection indefinitely
+  rather than failing — an unbounded read hangs the whole scrape during exactly
+  the outage you need it for. If a read fails or times out the series is
+  **removed** rather than left at its last value: a stale depth reads as a
+  healthy queue.
 - **`dependency_up`** and **`dependency_probe_duration_seconds`** are set by the
   existing `/health` TCP probe, which readiness checks already call on a
   schedule, so there is no second polling loop.

@@ -32,6 +32,16 @@ export interface QueueDepthCounts {
 
 export type QueueDepthSource = () => Promise<QueueDepthCounts>;
 
+/**
+ * Upper bound on a single queue read during a scrape.
+ *
+ * A rejecting read is easy to handle; the dangerous case is one that never
+ * settles. ioredis retries a lost connection indefinitely rather than failing,
+ * so an unbounded read makes a Redis outage hang /metrics - exactly when the
+ * rest of the scrape matters most.
+ */
+const QUEUE_READ_TIMEOUT_MS = 1_000;
+
 @Injectable()
 export class DomainMetricsService {
   private readonly etlRuns: Counter<'provider' | 'status'>;
@@ -221,24 +231,29 @@ export class DomainMetricsService {
   }
 
   private async collectQueueDepth(): Promise<void> {
-    for (const [queue, source] of this.queueDepthSources) {
-      try {
-        const counts = await source();
+    // Read every queue concurrently: with a per-queue timeout, doing this
+    // serially would let N unreachable queues stack up N timeouts on one scrape.
+    await Promise.all(
+      [...this.queueDepthSources].map(([queue, source]) => this.collectOneQueue(queue, source)),
+    );
+  }
 
-        for (const [state, value] of Object.entries(counts)) {
-          if (typeof value === 'number' && Number.isFinite(value)) {
-            this.queueDepth.set({ queue, state }, value);
-          }
+  private async collectOneQueue(queue: string, source: QueueDepthSource): Promise<void> {
+    try {
+      const counts = await withTimeout(source(), QUEUE_READ_TIMEOUT_MS);
+
+      for (const [state, value] of Object.entries(counts)) {
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          this.queueDepth.set({ queue, state }, value);
         }
-      } catch {
-        // A scrape must never fail because Redis is down - that is precisely
-        // when the metrics are most wanted. Leaving the previous sample in
-        // place would be a lie, so the queue is reported as unknown by
-        // removing its series.
-        this.queueDepth.remove({ queue, state: 'waiting' });
-        this.queueDepth.remove({ queue, state: 'active' });
-        this.queueDepth.remove({ queue, state: 'delayed' });
-        this.queueDepth.remove({ queue, state: 'failed' });
+      }
+    } catch {
+      // A scrape must never fail or hang because Redis is down - that is
+      // precisely when the metrics are most wanted. Leaving the previous sample
+      // in place would be a lie, so the queue is reported as unknown by
+      // removing its series.
+      for (const state of ['waiting', 'active', 'delayed', 'failed']) {
+        this.queueDepth.remove({ queue, state });
       }
     }
   }
@@ -307,6 +322,29 @@ export class DomainMetricsService {
     }
     if (Number.isFinite(input.ignoredCount) && input.ignoredCount > 0) {
       this.diagramIgnored.inc(format, input.ignoredCount);
+    }
+  }
+}
+
+/**
+ * Rejects if the wrapped promise has not settled in time.
+ *
+ * The timer is unref'd so a pending scrape read cannot hold the process open
+ * during shutdown.
+ */
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`timed out after ${timeoutMs} ms`)), timeoutMs);
+    timer.unref?.();
+  });
+
+  try {
+    return await Promise.race([promise, deadline]);
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
     }
   }
 }
