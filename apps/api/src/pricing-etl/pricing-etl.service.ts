@@ -11,6 +11,8 @@ import {
 import { PricingSyncFailureNotifier } from './pricing-sync-alert.service';
 import { PricingEtlProviderResult, PricingEtlSummary } from './pricing-etl.types';
 import { DomainMetricsService } from '../observability/domain-metrics.service';
+import { trace } from '@opentelemetry/api';
+import { withSpan } from '../observability/span';
 
 const MAX_ERROR_DETAIL_LENGTH = 2000;
 const PRICING_ETL_MAX_ATTEMPTS = 3;
@@ -89,6 +91,24 @@ export class PricingEtlService {
   }
 
   private async refreshProvider(adapter: CloudProviderAdapter): Promise<PricingEtlProviderResult> {
+    return withSpan(
+      'pricing_etl.refresh_provider',
+      { 'polycost.provider': adapter.providerId },
+      async () => {
+        const result = await this.refreshProviderInner(adapter);
+        trace.getActiveSpan()?.setAttributes({
+          'polycost.etl.status': result.status,
+          'polycost.etl.records_updated': result.recordsUpdated,
+          'polycost.etl.records_rejected': result.recordsRejected,
+        });
+        return result;
+      },
+    );
+  }
+
+  private async refreshProviderInner(
+    adapter: CloudProviderAdapter,
+  ): Promise<PricingEtlProviderResult> {
     const startedAt = this.timestamp();
     // Single fetch-generation stamp: all rows upserted by this run get this
     // fetchedAt, so stale live rows from earlier runs can be pruned by age.
