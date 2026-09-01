@@ -285,6 +285,71 @@ Actions:
 npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.spec.ts src/api/auth.controller.spec.ts src/api/invitation-delivery.service.spec.ts
 ```
 
+## Incident: High API Error Rate
+
+**Alert:** `ApiErrorRateHigh` — over 5% of requests returning 5xx for 5 minutes.
+
+1. Check whether a dependency alert is also firing. `PostgresUnavailable` or
+   `VaultReadFailures` alongside this one means the cause is downstream, and
+   restarting the API will not help.
+2. Find a failing trace. `http_request_errors_total` is labelled by `route`, so
+   the affected endpoint is on the alert; look at that route's spans to see
+   whether the time and the failure are in Postgres, a provider call, or the
+   handler.
+3. Check `db_queries_total{outcome="failure"}` for a database-level cause.
+4. Only restart once you know what failed. A restart clears the symptom and the
+   evidence together.
+
+## Incident: API Latency Budget Breached
+
+**Alert:** `ApiLatencyBudgetBreached` — p95 over the 800 ms Service Objective for
+10 minutes.
+
+1. Confirm which route. Break `http_request_duration_seconds` down by `route`
+   rather than treating it as one number.
+2. Compare against `db_query_duration_seconds`. If database latency moved at the
+   same time, the API is a victim rather than the cause.
+3. Check `job_queue_depth` — a large backlog means workers are competing with
+   request handling for the same pool.
+4. Look at a slow trace end to end. Outbound provider calls are instrumented, so
+   a slow upstream shows up as its own span.
+
+> The 800 ms threshold is the objective for the slowest journey (pricing
+> matrix/breakdown). Cached comparisons target 500 ms, so a breach here means
+> the slow path is slow, not that everything is.
+
+## Incident: Job Queue Backlog
+
+**Alerts:** `JobQueueBacklogGrowing` (waiting > 100 for 15 min),
+`JobQueueFailuresAccumulating` (any failed job sitting for 30 min).
+
+1. Is the worker running at all? A backlog with zero `active` jobs means nothing
+   is draining the queue, which is a different problem from being too slow.
+2. Check `RedisUnavailable`. If Redis is down, the depth reading is missing
+   rather than zero — see `JobQueueDepthUnknown`.
+3. For failed jobs: once retries are exhausted BullMQ leaves them in place. They
+   never clear on their own, so a non-zero `failed` count is work someone has to
+   look at, not a transient.
+4. Inspect the failures before retrying them in bulk. A poison job re-queued at
+   scale will just fail again.
+
+## Incident: Vault Read Failures
+
+**Alert:** `VaultReadFailures` — any sustained failure rate for 5 minutes.
+
+1. Check Vault itself is up and unsealed. A sealed Vault answers but refuses
+   reads.
+2. Check the token. `VAULT_TOKEN_FILE` must exist and be readable by the `node`
+   user in the container; the token is cached in-process, so a rotated token
+   only surfaces on the next read after a restart.
+3. Database pools take credentials from Vault at creation, so a failure here
+   prevents **new** pools from opening while existing ones keep working — the
+   symptom can appear long after the cause.
+
+> `vault_reads_total` is deliberately not labelled with the secret path. The
+> path would be unbounded cardinality and would publish the secret layout on an
+> unauthenticated endpoint.
+
 ## Incident: GitHub Actions Do Not Run
 
 Symptoms:

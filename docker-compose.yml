@@ -58,6 +58,21 @@ services:
       timeout: 3s
       retries: 20
 
+  # Opt-in metrics + alerting, same profile as the collector:
+  # `docker compose --profile observability up`. Loads ops/prometheus/alerts.yaml
+  # so the rules can be checked against a real scrape rather than only linted.
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    profiles: ['observability']
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yaml'
+      - '--storage.tsdb.retention.time=6h'
+    volumes:
+      - ./ops/prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - ./ops/prometheus/alerts.yaml:/etc/prometheus/alerts.yaml:ro
+    ports:
+      - '${PROMETHEUS_PORT:-9090}:9090'
+
   # Opt-in trace collector: `docker compose --profile observability up`.
   # Kept behind a profile so the default stack stays small - tracing is a no-op
   # unless OTEL_EXPORTER_OTLP_ENDPOINT is set on the api service.
