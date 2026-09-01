@@ -46,10 +46,18 @@ export const configSchema = z
     // this module is even loaded. They are declared here so a typo fails
     // validation at boot and so the documented config surface stays complete -
     // not because the application reads them.
-    OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
-    OTEL_SERVICE_NAME: z.string().min(1).optional(),
-    OTEL_TRACES_SAMPLER_ARG: z.coerce.number().min(0).max(1).optional(),
-    OTEL_SDK_DISABLED: z.coerce.boolean().optional(),
+    // The optional* helpers matter here: compose passes ${VAR:-} as an empty
+    // string when the variable is unset, which a bare .url() rejects.
+    OTEL_EXPORTER_OTLP_ENDPOINT: optionalUrl,
+    OTEL_SERVICE_NAME: optionalNonEmptyString(),
+    OTEL_TRACES_SAMPLER_ARG: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.coerce.number().min(0).max(1).optional(),
+    ),
+    OTEL_SDK_DISABLED: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.coerce.boolean().optional(),
+    ),
     DB_HOST: z.string().min(1),
     DB_PORT: z.coerce.number().default(5432),
     DB_NAME: z.string().min(1),
