@@ -18,6 +18,7 @@ const yaml = require('js-yaml');
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RULES_FILE = path.join(root, 'ops/prometheus/alerts.yaml');
+const DASHBOARD_DIR = path.join(root, 'ops/grafana/dashboards');
 const RUNBOOK_RELATIVE = 'docs/RUNBOOK.md';
 const METRICS_DIR = path.join(root, 'apps/api/src/observability');
 
@@ -191,6 +192,50 @@ for (const rule of rules) {
   }
 }
 
+// Dashboards rot the same way, and worse: a renamed metric leaves a panel that
+// renders perfectly and is simply always empty, which reads as "nothing is
+// happening" rather than "this is broken".
+let panelCount = 0;
+
+for (const entry of await readdir(DASHBOARD_DIR)) {
+  if (!entry.endsWith('.json')) {
+    continue;
+  }
+
+  const file = path.join(DASHBOARD_DIR, entry);
+  let dashboard;
+
+  try {
+    dashboard = JSON.parse(await readFile(file, 'utf8'));
+  } catch (error) {
+    failures.push(`${entry}: not valid JSON (${error.message}).`);
+    continue;
+  }
+
+  for (const panel of dashboard.panels ?? []) {
+    panelCount += 1;
+
+    if (!panel.title) {
+      failures.push(`${entry}: a panel has no title.`);
+    }
+    // A panel nobody can interpret is decoration. The description is where the
+    // "what does a bad reading mean" lives.
+    if (!panel.description) {
+      failures.push(`${entry}: panel "${panel.title}" has no description.`);
+    }
+
+    for (const target of panel.targets ?? []) {
+      for (const metric of referencedMetrics(String(target.expr ?? ''))) {
+        if (!metrics.has(metric)) {
+          failures.push(
+            `${entry}: panel "${panel.title}" references a metric the service does not emit (${metric}).`,
+          );
+        }
+      }
+    }
+  }
+}
+
 if (failures.length > 0) {
   console.error('Alert rules check failed:');
   for (const failure of [...new Set(failures)]) {
@@ -200,5 +245,6 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `Alert rules check passed: ${rules.length} alerts, each with a severity, a summary, and a runbook section that exists.`,
+  `Alert rules check passed: ${rules.length} alerts and ${panelCount} dashboard panels, ` +
+    'each referencing only metrics the service emits.',
 );

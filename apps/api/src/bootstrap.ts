@@ -60,6 +60,7 @@ export function registerMetricsHook(
     ): unknown;
   },
   metrics: MetricsService,
+  logger?: { log(message: unknown, context?: string): void },
 ): void {
   const startTimes = new WeakMap<TimedRequest, bigint>();
 
@@ -73,14 +74,51 @@ export function registerMetricsHook(
     const durationSeconds =
       startedAt === undefined ? 0 : Number(process.hrtime.bigint() - startedAt) / 1e9;
 
-    metrics.observeRequest({
-      method: request.method ?? 'UNKNOWN',
-      route: request.routeOptions?.url ?? normalizeRoute(request.url ?? '/'),
-      status: reply.statusCode ?? 0,
-      durationSeconds,
-    });
+    const method = request.method ?? 'UNKNOWN';
+    const route = request.routeOptions?.url ?? normalizeRoute(request.url ?? '/');
+    const status = reply.statusCode ?? 0;
+
+    metrics.observeRequest({ method, route, status, durationSeconds });
+
+    // One access line per request. Until this existed the service logged only
+    // at startup and from background jobs, so requestId and traceId had almost
+    // nothing to correlate and an incident left no per-request trail at all.
+    //
+    // Probes and scrapes are skipped: they are polled constantly and would be
+    // the overwhelming majority of the log volume, for the same reason they are
+    // excluded from tracing.
+    if (logger && !isProbeRoute(route)) {
+      logger.log(
+        {
+          event: 'http_request',
+          method,
+          // The normalised route, never the raw URL - it can carry ids and
+          // query values into the log sink.
+          route,
+          status,
+          durationMs: Math.round(durationSeconds * 1000),
+        },
+        'HttpRequest',
+      );
+    }
+
     done();
   });
+}
+
+const PROBE_ROUTES = new Set([
+  '/metrics',
+  '/health',
+  '/health/live',
+  '/health/ready',
+  '/health/deep',
+  '/api/v1/health/live',
+  '/api/v1/health/ready',
+  '/api/v1/health/deep',
+]);
+
+export function isProbeRoute(route: string): boolean {
+  return PROBE_ROUTES.has(route);
 }
 
 export function registerRequestContext(instance: {
@@ -100,6 +138,7 @@ export async function configureApp(
   app: ConfigurableApp,
   allowedOrigins: string[],
   metrics?: MetricsService,
+  requestLogger?: { log(message: unknown, context?: string): void },
 ): Promise<void> {
   const httpInstance = (
     app.getHttpAdapter() as { getInstance(): Parameters<typeof registerRequestContext>[0] }
@@ -108,7 +147,7 @@ export async function configureApp(
   registerRequestContext(httpInstance);
 
   if (metrics) {
-    registerMetricsHook(httpInstance as never, metrics);
+    registerMetricsHook(httpInstance as never, metrics, requestLogger);
   }
 
   await app.register(fastifyHelmet);

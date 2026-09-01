@@ -5,7 +5,9 @@ import {
   HttpException,
   Injectable,
   Logger,
+  Optional,
 } from '@nestjs/common';
+import { ErrorReporter } from '../observability/error-reporter';
 import { ComparisonUnavailableError } from '../comparison/comparison-orchestrator.service';
 import { NWSMigrationError, NWSValidationError } from '../nws/nws-validator';
 import { NWSParseInputError } from '../nws-parser/nl-parser.service';
@@ -31,6 +33,8 @@ interface ErrorResponse {
 export class ApiExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(ApiExceptionFilter.name);
 
+  constructor(@Optional() private readonly errorReporter?: ErrorReporter) {}
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<ErrorResponse>();
     const mapped = mapException(exception);
@@ -46,6 +50,28 @@ export class ApiExceptionFilter implements ExceptionFilter {
         message: mapped.message,
         exception: serializeExceptionForLog(exception),
       });
+
+      // Only INTERNAL_ERROR is reported. The mapped 4xx cases are expected
+      // outcomes - a validation failure or a 404 is the API working - and
+      // sending them would bury genuine defects in noise.
+      //
+      // Deliberately not awaited: reporting must not delay the error response
+      // the caller is waiting for.
+      //
+      // The .catch() is not redundant with ErrorReporter's own guarantee. A
+      // floating promise that rejects is an unhandled rejection, which takes
+      // the process down - so the call site must not depend on the callee
+      // never rejecting. A stubbed or future reporter would otherwise turn one
+      // 500 into an outage.
+      this.errorReporter
+        ?.report(exception, { code: mapped.code, statusCode: mapped.statusCode })
+        .catch((reportError: unknown) => {
+          this.logger.warn(
+            `Failed to report exception to the error tracker: ${
+              reportError instanceof Error ? reportError.message : String(reportError)
+            }`,
+          );
+        });
     }
 
     response.status(mapped.statusCode).send({

@@ -96,6 +96,49 @@ when tracing is off, so log shape is unchanged in those deployments.
 > `node --require ./otel-register.cjs`. Starting the API any other way silently
 > produces no spans.
 
+## Dashboards and error tracking
+
+Both are opt-in, in the same compose profile as the collector:
+
+```bash
+docker compose --profile observability up -d prometheus grafana
+```
+
+Grafana comes up on `${GRAFANA_PORT:-3300}` with the Prometheus datasource and
+the **PolyCost · Service Health** dashboard provisioned **from files**. Nothing
+worth keeping lives in the container, so it can be recreated freely — but it
+also means dashboard edits made in the UI are discarded. Change the JSON in
+`ops/grafana/dashboards/`.
+
+Every panel carries a description saying what a bad reading means, so the
+dashboard is usable by someone who did not build it.
+
+### Error tracking
+
+Unhandled 500s are reported to a self-hosted GlitchTip instance when
+`ERROR_TRACKING_DSN` is set. Unset disables it entirely.
+
+Only `INTERNAL_ERROR` is reported. Mapped 4xx responses — validation failures,
+404s, 401s — are the API working correctly, and reporting them would bury
+genuine defects.
+
+Each report is tagged with `request_id` and `trace_id`, so an error in GlitchTip
+links back to the log lines and the trace for that exact request.
+
+> ⚠️ This payload leaves the machine. Redaction is applied to the whole context
+> tree — `authorization`, `cookie`, `password`, `token`, `secret`, `email` and
+> friends at any depth — and is asserted in tests plus verified on the wire.
+> If you add context to a report, check it against
+> `apps/api/src/observability/error-reporter.spec.ts`.
+
+### Keeping alerts and dashboards honest
+
+`npm run alerts:check` fails the build when an alert or a dashboard panel
+references a metric the service does not emit, when an alert has no runbook
+section, or when a panel has no description. Both rot the same way — a renamed
+metric leaves a rule that still parses and a panel that renders perfectly and is
+simply always empty.
+
 ### Label discipline
 
 Every domain instrument is declared in
