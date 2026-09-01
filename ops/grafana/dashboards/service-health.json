@@ -1,0 +1,446 @@
+{
+  "uid": "polycost-service-health",
+  "title": "PolyCost \u00b7 Service Health",
+  "description": "Every panel maps to a golden signal in docs/RUNBOOK.md. Panel descriptions say what a bad reading means, so the dashboard is readable by someone who did not build it.",
+  "tags": ["polycost", "golden-signals"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "editable": false,
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Request rate",
+      "description": "Requests per second by route. The first thing to check: a drop to zero is an outage, a spike is often the cause of everything else.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "polycost-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "polycost-prometheus"
+          },
+          "expr": "sum by (route) (rate(http_requests_total[5m]))",
+          "legendFormat": "{{route}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Error rate (5xx)",
+      "description": "Share of requests returning 5xx, excluding probes. This is what ApiErrorRateHigh alerts on at 5%.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "polycost-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "polycost-prometheus"
+          },
+          "expr": "sum(rate(http_request_errors_total{status=~\"5..\", route!~\"/metrics|/health.*|/api/v1/health.*\"}[5m])) / clamp_min(sum(rate(http_requests_total{route!~\"/metrics|/health.*|/api/v1/health.*\"}[5m])), 0.001)",
+          "legendFormat": "error ratio",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Latency p50 / p95 / p99",
+      "description": "Excludes probes and scrapes. The 800 ms line is the documented Service Objective that ApiLatencyBudgetBreached fires on.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "polycost-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "polycost-prometheus"
+          },
+          "refId": "A",
+          "legendFormat": "p50",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket{route!~\"/metrics|/health.*|/api/v1/health.*\"}[5m])))"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "polycost-prometheus"
+          },
+          "refId": "B",
+          "legendFormat": "p95",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{route!~\"/metrics|/health.*|/api/v1/health.*\"}[5m])))"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "polycost-prometheus"
+          },
+          "refId": "C",
+          "legendFormat": "p99",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{route!~\"/metrics|/health.*|/api/v1/health.*\"}[5m])))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.8
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Dependency health",
+      "description": "1 = the readiness probe reached it. Check this before anything else: most API symptoms are a dependency underneath.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "polycost-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "polycost-prometheus"
+          },
+          "expr": "dependency_up",
+          "legendFormat": "{{dependency}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Pricing data age by provider",
+      "description": "Time since the last successful refresh. The ETL runs daily at 02:00, so a healthy sawtooth peaks around 24h. PricingDataStale fires at 26h.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "polycost-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "polycost-prometheus"
+          },
+          "expr": "time() - max by (provider) (pricing_etl_last_success_timestamp_seconds)",
+          "legendFormat": "{{provider}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "ETL rows by outcome",
+      "description": "Rejected rows rising while updated stays flat means the provider changed its payload shape.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "polycost-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "polycost-prometheus"
+          },
+          "expr": "sum by (provider, outcome) (increase(pricing_etl_records_total[1h]))",
+          "legendFormat": "{{provider}} {{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Job queue depth",
+      "description": "Sampled from BullMQ at scrape time. An absent series means the queue could not be read, which is not the same as empty.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "polycost-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "polycost-prometheus"
+          },
+          "expr": "job_queue_depth",
+          "legendFormat": "{{queue}} {{state}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Postgres query latency p95 by pool",
+      "description": "The app runs four separate pools. Splitting by pool shows whether one workload is degrading the others.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "polycost-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "polycost-prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, pool) (rate(db_query_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{pool}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Report exports by outcome",
+      "description": "Failures here are broken downloads. The 30 s objective is what ReportExportBudgetBreached watches.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "polycost-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "polycost-prometheus"
+          },
+          "expr": "sum by (format, outcome) (increase(report_exports_total[1h]))",
+          "legendFormat": "{{format}} {{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Auth outcomes",
+      "description": "invalid_credentials climbing means an attack in progress; locked climbing means it is already being throttled.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "polycost-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "polycost-prometheus"
+          },
+          "expr": "sum by (outcome) (rate(auth_attempts_total[5m]))",
+          "legendFormat": "{{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Vault read failures",
+      "description": "Credentials for provider APIs and database pools come from Vault. Sustained failures block new pools from opening.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "polycost-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "polycost-prometheus"
+          },
+          "expr": "sum by (outcome) (rate(vault_reads_total[5m]))",
+          "legendFormat": "{{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Diagram parse confidence",
+      "description": "A rise in low-confidence parses usually means a new diagram format or stencil set the classifier does not know.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "polycost-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 40
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "polycost-prometheus"
+          },
+          "expr": "sum by (format, confidence) (increase(diagram_parses_total[1h]))",
+          "legendFormat": "{{format}} {{confidence}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

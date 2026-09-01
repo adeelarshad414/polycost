@@ -1,0 +1,10 @@
+# Provisioned rather than clicked: a datasource configured by hand in the UI
+# lives only in that container's database and disappears on recreate.
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    uid: polycost-prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true

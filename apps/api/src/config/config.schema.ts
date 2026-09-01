@@ -48,6 +48,8 @@ export const configSchema = z
     // not because the application reads them.
     // The optional* helpers matter here: compose passes ${VAR:-} as an empty
     // string when the variable is unset, which a bare .url() rejects.
+    // Self-hosted GlitchTip DSN. Unset disables error reporting entirely.
+    ERROR_TRACKING_DSN: optionalUrl,
     OTEL_EXPORTER_OTLP_ENDPOINT: optionalUrl,
     OTEL_SERVICE_NAME: optionalNonEmptyString(),
     OTEL_TRACES_SAMPLER_ARG: z.preprocess(
