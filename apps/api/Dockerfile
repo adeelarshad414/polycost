@@ -25,6 +25,7 @@ COPY packages/types packages/types
 RUN npm ci --omit=dev --workspace @polycost/api --include-workspace-root=false
 
 COPY --from=build --chown=node:node /app/apps/api/dist apps/api/dist
+COPY --chown=node:node apps/api/otel-register.cjs apps/api/otel-register.cjs
 WORKDIR /app/apps/api
 
 # Run as the unprivileged `node` user (uid 1000) that the base image ships.
@@ -43,4 +44,8 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-CMD ["node", "dist/main.js"]
+# --require loads the OpenTelemetry bootstrap before the application graph, so
+# instrumentation can patch pg, fastify and ioredis as they are required. It is
+# a no-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set, so images without a
+# collector are unaffected.
+CMD ["node", "--require", "./otel-register.cjs", "dist/main.js"]

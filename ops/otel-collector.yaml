@@ -1,0 +1,23 @@
+# Local development collector. Receives OTLP over HTTP and prints spans to the
+# container log, which is enough to confirm instrumentation without running a
+# full tracing backend. Point the exporter at Tempo/Jaeger/Honeycomb in a real
+# deployment.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]

@@ -60,6 +60,42 @@ Most instruments are counters incremented at the call site. Three are not:
 > Migrations run outside the request path, so they need a job-level signal
 > rather than a metric on a live pool.
 
+## Tracing
+
+Distributed tracing is **off by default**. It turns on when
+`OTEL_EXPORTER_OTLP_ENDPOINT` is set; without a collector configured, an
+always-on exporter would retry forever in every deployment.
+
+```bash
+docker compose --profile observability up -d otel-collector
+OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318 docker compose up -d api
+```
+
+| Variable                      | Purpose                                       |
+| ----------------------------- | --------------------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Collector base URL. **Unset = tracing off.**  |
+| `OTEL_SERVICE_NAME`           | Defaults to `polycost-api`.                   |
+| `OTEL_TRACES_SAMPLER_ARG`     | Root sample ratio, `0`–`1`. Defaults to `1`.  |
+| `OTEL_SDK_DISABLED`           | `true` forces tracing off even with endpoint. |
+
+**What is instrumented:** incoming HTTP and Fastify routes, Postgres queries,
+Redis/BullMQ, and outbound `fetch` (undici — provider pricing calls go through
+it, not the `http` module, so without that instrumentation they are invisible).
+Pricing refreshes add a manual `pricing_etl.refresh_provider` span carrying the
+provider, status and row counts.
+
+**`/health*` and `/metrics` are excluded.** They are polled constantly and would
+bury real requests. Verified: 15 probe requests produce zero spans.
+
+**Logs carry `traceId` and `spanId`** whenever a span is active, so a log line
+links to the trace showing where the time went. The fields are omitted entirely
+when tracing is off, so log shape is unchanged in those deployments.
+
+> ⚠️ Ordering matters. Instrumentation patches `pg`, `fastify` and `ioredis` as
+> they are required, so the bootstrap runs via
+> `node --require ./otel-register.cjs`. Starting the API any other way silently
+> produces no spans.
+
 ### Label discipline
 
 Every domain instrument is declared in

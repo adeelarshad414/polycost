@@ -41,6 +41,23 @@ export const configSchema = z
     LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
     // Human-readable log lines for local development; production stays JSON.
     LOG_PRETTY: z.coerce.boolean().default(false),
+    // Tracing is configured with the standard OTEL_* variables and consumed by
+    // the SDK itself, from apps/api/otel-register.cjs, which must run before
+    // this module is even loaded. They are declared here so a typo fails
+    // validation at boot and so the documented config surface stays complete -
+    // not because the application reads them.
+    // The optional* helpers matter here: compose passes ${VAR:-} as an empty
+    // string when the variable is unset, which a bare .url() rejects.
+    OTEL_EXPORTER_OTLP_ENDPOINT: optionalUrl,
+    OTEL_SERVICE_NAME: optionalNonEmptyString(),
+    OTEL_TRACES_SAMPLER_ARG: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.coerce.number().min(0).max(1).optional(),
+    ),
+    OTEL_SDK_DISABLED: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.coerce.boolean().optional(),
+    ),
     DB_HOST: z.string().min(1),
     DB_PORT: z.coerce.number().default(5432),
     DB_NAME: z.string().min(1),

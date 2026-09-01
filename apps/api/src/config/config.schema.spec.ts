@@ -391,3 +391,48 @@ describe('config schema', () => {
     expect(Object.keys(config)).not.toContain('OPENAI_API_KEY');
   });
 });
+
+describe('OpenTelemetry configuration', () => {
+  it('treats empty strings as unset', () => {
+    // docker compose renders ${VAR:-} as an empty string when the variable is
+    // not set, so every optional key has to tolerate '' rather than only
+    // undefined. A bare .url() here took the API down at boot in CI.
+    const config = validateConfig({
+      ...baseConfig,
+      OTEL_EXPORTER_OTLP_ENDPOINT: '',
+      OTEL_SERVICE_NAME: '',
+      OTEL_TRACES_SAMPLER_ARG: '',
+      OTEL_SDK_DISABLED: '',
+    });
+
+    expect(config.OTEL_EXPORTER_OTLP_ENDPOINT).toBeUndefined();
+    expect(config.OTEL_SERVICE_NAME).toBeUndefined();
+    expect(config.OTEL_TRACES_SAMPLER_ARG).toBeUndefined();
+    expect(config.OTEL_SDK_DISABLED).toBeUndefined();
+  });
+
+  it('validates the config with no OTEL keys at all', () => {
+    expect(() => validateConfig(baseConfig)).not.toThrow();
+  });
+
+  it('accepts a configured collector', () => {
+    const config = validateConfig({
+      ...baseConfig,
+      OTEL_EXPORTER_OTLP_ENDPOINT: 'http://otel-collector:4318',
+      OTEL_TRACES_SAMPLER_ARG: '0.25',
+    });
+
+    expect(config.OTEL_EXPORTER_OTLP_ENDPOINT).toBe('http://otel-collector:4318');
+    expect(config.OTEL_TRACES_SAMPLER_ARG).toBe(0.25);
+  });
+
+  it('rejects a malformed endpoint rather than silently disabling tracing', () => {
+    expect(() =>
+      validateConfig({ ...baseConfig, OTEL_EXPORTER_OTLP_ENDPOINT: 'not-a-url' }),
+    ).toThrow();
+  });
+
+  it('rejects a sample ratio outside 0..1', () => {
+    expect(() => validateConfig({ ...baseConfig, OTEL_TRACES_SAMPLER_ARG: '2' })).toThrow();
+  });
+});

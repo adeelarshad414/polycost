@@ -1,5 +1,6 @@
 import { LoggerService } from '@nestjs/common';
 import pino, { Logger as PinoLogger } from 'pino';
+import { trace } from '@opentelemetry/api';
 import { currentRequestId } from './request-context';
 
 export type LogLevel = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
@@ -57,6 +58,7 @@ export class StructuredLogger implements LoggerService {
     const payload: Record<string, unknown> = {
       ...(context ? { context } : {}),
       ...(requestId ? { requestId } : {}),
+      ...currentTraceFields(),
       ...(extra !== undefined ? { detail: extra } : {}),
     };
 
@@ -89,4 +91,25 @@ export class StructuredLogger implements LoggerService {
   verbose(message: unknown, context?: string): void {
     this.write('trace', message, context);
   }
+}
+
+/**
+ * Joins the active span onto every log line.
+ *
+ * requestId already groups the lines of one request; traceId links them to the
+ * spans that show where the time went and which downstream call failed. Without
+ * this the two systems have no shared key and an operator has to correlate by
+ * timestamp.
+ *
+ * Returns nothing when tracing is disabled or no span is active, so log shape
+ * is unchanged in deployments that do not run a collector.
+ */
+function currentTraceFields(): { traceId?: string; spanId?: string } {
+  const context = trace.getActiveSpan()?.spanContext();
+
+  if (!context || !trace.isSpanContextValid(context)) {
+    return {};
+  }
+
+  return { traceId: context.traceId, spanId: context.spanId };
 }
