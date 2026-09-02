@@ -51,7 +51,14 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    # Persistence is ON. BullMQ keeps all job state in Redis - queued, delayed
+    # and failed jobs alike - so with saving disabled every restart silently
+    # discarded scheduled work and the failure history needed to diagnose it.
+    # appendfsync everysec bounds the loss window to ~1s without the fsync cost
+    # of `always`.
+    command: ['redis-server', '--appendonly', 'yes', '--appendfsync', 'everysec', '--save', '900 1']
+    volumes:
+      - redis-data:/data
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
@@ -184,5 +191,6 @@ services:
 
 volumes:
   postgres-data:
+  redis-data:
   polycost-dev-secrets:
   polycost-vault-auth:

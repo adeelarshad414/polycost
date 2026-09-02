@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue, Worker } from 'bullmq';
+import { ErrorReporter } from '../observability/error-reporter';
+import { reportWorkerFailures } from '../observability/process-errors';
 import { DomainMetricsService } from '../observability/domain-metrics.service';
 import { CloudProviderAdapter } from '../adapters/common/cloud-provider-adapter';
 import {
@@ -92,13 +94,21 @@ const PRICING_SYNC_FAILURE_NOTIFIER = Symbol('PRICING_SYNC_FAILURE_NOTIFIER');
     },
     {
       provide: PRICING_ETL_WORKER_FACTORY,
-      inject: [ConfigService],
+      inject: [ConfigService, ErrorReporter],
       useFactory:
-        (configService: ConfigService<AppConfig, true>): PricingEtlWorkerFactory =>
-        (processor) =>
-          new Worker(PRICING_ETL_QUEUE_NAME, processor, {
+        (
+          configService: ConfigService<AppConfig, true>,
+          errorReporter: ErrorReporter,
+        ): PricingEtlWorkerFactory =>
+        (processor) => {
+          const worker = new Worker(PRICING_ETL_QUEUE_NAME, processor, {
             connection: redisConnection(configService),
-          }),
+          });
+
+          reportWorkerFailures(worker, PRICING_ETL_QUEUE_NAME, errorReporter);
+
+          return worker;
+        },
     },
     PricingEtlScheduler,
   ],
