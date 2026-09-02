@@ -2,7 +2,7 @@
   "name": "@polycost/types",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
+  "//type": "Deliberately NOT \"type\": \"module\". The package is consumed as TypeScript source by both an ESM web app and a CommonJS API; declaring it ESM-only made the CJS side unable to require it under node16 resolution (TS1479), which is what blocked the TypeScript 7 upgrade. See K-11.",
   "types": "src/index.ts",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit"

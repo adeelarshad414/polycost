@@ -7,6 +7,8 @@ import { setProviderHttpDefaults } from './adapters/common/http-client';
 import { configureApp, corsOriginsFromConfig } from './bootstrap';
 import { MetricsService } from './observability/metrics.service';
 import { StructuredLogger } from './observability/structured-logger';
+import { ErrorReporter } from './observability/error-reporter';
+import { registerProcessErrorHandlers } from './observability/process-errors';
 import type { AppConfig } from './config/config.schema';
 import { DIAGRAM_JSON_BODY_MAX_BYTES } from './diagram-parser/diagram-parser.types';
 
@@ -28,6 +30,11 @@ async function bootstrap() {
   });
 
   app.useLogger(logger);
+
+  // Errors outside the request path - unhandled rejections, throws from timers
+  // and event handlers - never reach the Nest exception filter, so they were
+  // previously invisible to both the logs and error tracking.
+  registerProcessErrorHandlers(app.get(ErrorReporter), logger);
 
   // Seed the outbound HTTP limits from validated config before anything can make
   // a provider call.
