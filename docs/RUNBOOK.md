@@ -157,7 +157,7 @@ unauthenticated, so it would also be a disclosure.
 | -------------------------- | ------------------------------------------------------------- |
 | `/health/live`             | container/process liveness                                    |
 | `/api/v1/health/live`      | versioned liveness alias                                      |
-| `/health/ready`            | readiness before routing                                      |
+| `/health/ready`            | readiness before routing — **503 when a dependency is down**  |
 | `/api/v1/health/ready`     | versioned readiness alias                                     |
 | `/health`                  | app plus dependency status                                    |
 | `/health/deep`             | deeper dependency and degradation probe                       |
@@ -443,6 +443,28 @@ still comfortably inside the objective.
 > Service Objectives section already says.
 
 Evidence lands in `docs/verification/load-test-summary.json`.
+
+## Kubernetes Deployment
+
+The Helm chart is at `deploy/helm/polycost` with its own README covering probe
+configuration and the requirements the backing services must meet.
+
+```bash
+helm install polycost deploy/helm/polycost --set config.dbHost=...
+```
+
+Two things that are easy to get wrong, both found by actually deploying it:
+
+1. **Liveness points at `/health/live`, never `/health/ready`.** Restarting
+   cannot fix an unavailable database, so a liveness probe on readiness turns a
+   dependency blip into a restart loop.
+2. **A startup probe is required.** Boot runs migrations and a pricing refresh
+   (40–50s measured). Without it the liveness probe kills the pod mid-boot and
+   the deployment never converges.
+
+> ⚠️ **The API does not start without Redis.** Queue construction happens during
+> module initialisation, so the process never binds its port — this is not a
+> degraded start. Rollouts during a Redis outage will not converge.
 
 ## API Contract
 
