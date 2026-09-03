@@ -149,7 +149,8 @@
     "alerts:check": "node scripts/alert-rules-check.mjs",
     "db:backup": "node scripts/db-backup.mjs",
     "db:fingerprint": "node scripts/db-fingerprint.mjs",
-    "db:restore-drill": "node scripts/restore-drill.mjs"
+    "db:restore-drill": "node scripts/restore-drill.mjs",
+    "load:test": "node scripts/load-test.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

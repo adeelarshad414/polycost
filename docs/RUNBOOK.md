@@ -393,6 +393,57 @@ npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.
 > path would be unbounded cardinality and would publish the secret layout on an
 > unauthenticated endpoint.
 
+## Performance Budgets
+
+The Service Objectives above are now executable. `ops/load/slo-budgets.js`
+turns them into k6 thresholds, so a breach exits non-zero rather than producing
+a report someone has to read.
+
+```bash
+npm run load:test                              # default: 10 VUs
+node scripts/load-test.mjs --vus 100 --duration 20s
+```
+
+| Journey           | Threshold     | Source                                  |
+| ----------------- | ------------- | --------------------------------------- |
+| Cached comparison | p95 < 500 ms  | Service Objectives                      |
+| Pricing matrix    | p95 < 800 ms  | Service Objectives                      |
+| Comparison create | p95 < 3000 ms | regression tripwire, not an SLO         |
+| Any journey       | <1% failures  | a fast run full of errors is not a pass |
+
+> ⚠️ **Raise the rate limits before running, or the result is meaningless.**
+> A 429 is fast, so a throttled run reports excellent latency for requests that
+> were never served. The script counts rejected requests separately and
+> **fails the run if any occur** — the first real run here was 99.94% rate
+> limited and was correctly refused.
+>
+> ```bash
+> RATE_LIMIT_COMPARISON_PER_MINUTE=1000000 \
+> RATE_LIMIT_PUBLIC_READ_PER_MINUTE=1000000 \
+> RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE=1000000 \
+>   docker compose up -d api
+> ```
+
+### Measured headroom
+
+Against the local Docker stack, all budgets met with no failures:
+
+| Load    | Cached comparison p95 | Pricing matrix p95 | Throughput |
+| ------- | --------------------- | ------------------ | ---------- |
+| 10 VUs  | 8 ms                  | 3 ms               | ~3,300 rps |
+| 100 VUs | **135 ms**            | 35 ms              | ~2,700 rps |
+
+At 10x concurrency the read path uses about 27% of its 500 ms budget. Latency
+grew roughly 16x for a 10x load increase, so it is approaching saturation while
+still comfortably inside the objective.
+
+> These numbers are from a local Docker stack on a developer machine, not
+> production hardware. They establish a regression baseline, not a capacity
+> plan. Re-measure in the target environment before making commitments — as the
+> Service Objectives section already says.
+
+Evidence lands in `docs/verification/load-test-summary.json`.
+
 ## Backup And Restore
 
 ### Taking a backup
