@@ -146,7 +146,10 @@
     "ci:e2e": "node scripts/ci-e2e.mjs",
     "ci:security": "npm run security:audit",
     "security:audit:dev": "npm audit --audit-level=high",
-    "alerts:check": "node scripts/alert-rules-check.mjs"
+    "alerts:check": "node scripts/alert-rules-check.mjs",
+    "db:backup": "node scripts/db-backup.mjs",
+    "db:fingerprint": "node scripts/db-fingerprint.mjs",
+    "db:restore-drill": "node scripts/restore-drill.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

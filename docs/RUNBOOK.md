@@ -393,6 +393,86 @@ npm run test:unit --workspace @polycost/api -- --runInBand src/api/auth-billing.
 > path would be unbounded cardinality and would publish the secret layout on an
 > unauthenticated endpoint.
 
+## Backup And Restore
+
+### Taking a backup
+
+```bash
+npm run db:backup
+```
+
+Produces **two** files, and the second is the one people forget:
+
+| File                  | Contains                                    |
+| --------------------- | ------------------------------------------- |
+| `<stamp>.dump`        | the database, custom format (`pg_dump -Fc`) |
+| `<stamp>.globals.sql` | cluster roles and their passwords           |
+
+> ⚠️ **A `pg_dump` on its own is not a restorable backup of this system.**
+> Migration `002_least_privilege_roles.sql` creates `polycost_app` and
+> `polycost_etl` as **cluster-level** roles, which `pg_dump` does not include.
+> Restoring a database-only dump into a fresh cluster fails outright:
+>
+> ```
+> pg_restore: error: could not execute query: ERROR:  role "polycost_app" does not exist
+> Command was: GRANT USAGE ON SCHEMA public TO polycost_app;
+> ```
+>
+> This is not hypothetical — it is the observed failure, reproduced by the drill
+> below.
+
+### Incident: Restore From Backup
+
+1. **Stop writers first.** Scale the API to zero, or stop the worker. A restore
+   racing live traffic produces a database that matches neither.
+2. Restore the globals, then the database, in that order — the `GRANT`
+   statements in the dump fail if the roles do not exist yet:
+   ```bash
+   psql -U polycost_owner -d postgres  -f <stamp>.globals.sql
+   createdb -U polycost_owner polycost_dev
+   pg_restore -U polycost_owner -d polycost_dev --no-owner <stamp>.dump
+   ```
+3. **Verify before restoring traffic**, rather than assuming:
+   ```bash
+   npm run db:fingerprint
+   ```
+   Compare against the fingerprint captured before the incident. Row counts
+   alone are not enough — check the sequences too. A sequence restored behind
+   its table causes primary-key collisions on the next insert, hours later,
+   looking like an unrelated bug.
+4. Restart the API and confirm `/health/deep` reports healthy.
+
+### The drill
+
+```bash
+npm run db:restore-drill
+```
+
+Backs up the running database, restores it into a **brand-new empty cluster**,
+and compares a fingerprint of both. The source database is only ever read.
+
+The separate cluster is the entire point. Restoring into the existing one would
+pass while proving nothing: the roles, extensions and target database are
+already there, so the two most common real-world restore failures cannot occur.
+
+What it compares, and why each one is there:
+
+| Checked        | Why it is not enough to skip                                           |
+| -------------- | ---------------------------------------------------------------------- |
+| Row counts     | the obvious check, and the only one most drills do                     |
+| Sequences      | restored behind the table means PK collisions later, looking unrelated |
+| Constraints    | a missing FK or CHECK admits bad data from then on                     |
+| Indexes        | everything works, only slowly, until something times out               |
+| Roles + grants | `pg_dump` omits cluster roles entirely                                 |
+| Content hashes | row counts can match while the rows are wrong                          |
+
+Evidence lands in `docs/verification/restore-drill-report.json`.
+
+**Last drill:** 38 tables, 20,603 rows, 118 indexes and 3 roles matched exactly.
+
+> Run it after any schema migration that adds roles, grants or sequences, and
+> before any production cutover. It takes about six seconds.
+
 ## Incident: GitHub Actions Do Not Run
 
 Symptoms:
