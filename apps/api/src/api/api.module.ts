@@ -44,6 +44,7 @@ import {
 } from './cost-management.controller';
 import { CostManagementService } from './cost-management.service';
 import { LivePricingRefreshService } from './live-pricing-refresh.service';
+import { OpenApiController } from './openapi.controller';
 import { CircuitBreakerRegistry } from '../adapters/common/circuit-breaker';
 
 /** Shared so every caller sees the same breaker state for a provider. */
@@ -72,6 +73,7 @@ import { WorkloadController } from './workload.controller';
     PricingModelsModule,
   ],
   controllers: [
+    OpenApiController,
     WorkloadController,
     ComparisonsController,
     DataHealthController,
