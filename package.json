@@ -152,7 +152,8 @@
     "db:restore-drill": "node scripts/restore-drill.mjs",
     "load:test": "node scripts/load-test.mjs",
     "openapi:generate": "node scripts/openapi-generate.mjs",
-    "openapi:check": "node scripts/openapi-check.mjs"
+    "openapi:check": "node scripts/openapi-check.mjs",
+    "helm:lint": "helm lint deploy/helm/polycost && helm template polycost deploy/helm/polycost > /dev/null"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

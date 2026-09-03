@@ -1,0 +1,101 @@
+# PolyCost API deployment values.
+#
+# Postgres, Redis and Vault are NOT bundled. They are stateful and this chart
+# should not be the thing that owns your data; point it at managed instances or
+# charts that specialise in them. See the requirements in the README before
+# doing so - Redis in particular has a hard requirement this project learned the
+# hard way.
+
+replicaCount: 2
+
+image:
+  repository: polycost-api
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 3000
+
+# The container listens here; the API reads PORT from validated config.
+containerPort: 3001
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    # No CPU limit on purpose: CPU throttling under a limit shows up as latency
+    # and would breach the p95 objectives the load test now enforces. Memory is
+    # limited because a leak should kill the pod rather than the node.
+    memory: 1Gi
+
+probes:
+  # The app runs migrations and a startup pricing refresh before it serves, and
+  # was measured at roughly 40-50s to healthy. The startup probe is what buys
+  # that time; without it the liveness probe kills the pod mid-boot and the
+  # deployment never converges.
+  startup:
+    periodSeconds: 5
+    failureThreshold: 30 # 150s budget
+  liveness:
+    # Liveness, deliberately not readiness. Restarting cannot fix a database or
+    # cache that is briefly unavailable, and a liveness probe on /health/ready
+    # turns a dependency blip into a restart loop.
+    path: /health/live
+    periodSeconds: 10
+    failureThreshold: 3
+  readiness:
+    path: /health/ready
+    periodSeconds: 5
+    failureThreshold: 3
+
+# Nest shutdown hooks close the HTTP server, drain BullMQ workers and flush
+# batched OpenTelemetry spans. Too short a grace period truncates all three.
+terminationGracePeriodSeconds: 45
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# /metrics is unauthenticated by design - scrapers carry no session token. It is
+# aggregate data with no tenant content, but it does describe traffic volume,
+# auth failure rates and ETL throughput, so it must not be publicly reachable.
+networkPolicy:
+  enabled: true
+  # Namespaces allowed to scrape /metrics.
+  monitoringNamespaceSelector:
+    kubernetes.io/metadata.name: monitoring
+
+config:
+  nodeEnv: production
+  logLevel: info
+  dbHost: postgres
+  dbPort: 5432
+  dbName: polycost
+  redisHost: redis
+  redisPort: 6379
+  vaultAddr: http://vault:8200
+  corsAllowedOrigins: ''
+  # Empty disables tracing; the OTel bootstrap is a no-op without an endpoint.
+  otelExporterEndpoint: ''
+  # Empty disables error reporting.
+  errorTrackingDsn: ''
+
+# The Vault token is read from a file, not an env var, so it can be a projected
+# service-account token or a CSI-mounted secret rather than sitting in the pod
+# spec.
+vaultToken:
+  secretName: polycost-vault-token
+  key: token
+  mountPath: /run/polycost-secrets
+
+serviceMonitor:
+  # Requires the Prometheus Operator CRDs; off by default so `helm install`
+  # works on a plain cluster.
+  enabled: false
+  interval: 15s
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

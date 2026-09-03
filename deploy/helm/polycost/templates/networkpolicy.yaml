@@ -1,0 +1,30 @@
+{{- if .Values.networkPolicy.enabled }}
+# /metrics is unauthenticated by design: Prometheus carries no session token.
+# The payload has no tenant data, but it does describe traffic volume, auth
+# failure rates and ETL throughput, so it should be reachable from the
+# monitoring namespace rather than from anywhere in the cluster.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "polycost.fullname" . }}-metrics
+  labels:
+    {{- include "polycost.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "polycost.selectorLabels" . | nindent 6 }}
+  policyTypes: ['Ingress']
+  ingress:
+    # Application traffic, from anywhere that can reach the Service.
+    - ports:
+        - port: http
+          protocol: TCP
+    # Scrapes are constrained to the monitoring namespace.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.monitoringNamespaceSelector | nindent 14 }}
+      ports:
+        - port: http
+          protocol: TCP
+{{- end }}

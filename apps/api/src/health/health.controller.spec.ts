@@ -207,3 +207,66 @@ describe('HealthController', () => {
     });
   });
 });
+
+describe('HealthController readiness status codes', () => {
+  function controllerWith(status: 'ok' | 'degraded') {
+    const service = {
+      getHealth: jest.fn(async () => ({
+        status,
+        service: 'polycost-api',
+        dependencies: {
+          db: { status: status === 'ok' ? 'ok' : 'degraded', host: 'postgres', port: 5432 },
+          cache: { status: 'ok', host: 'redis', port: 6379 },
+        },
+      })),
+      getLiveHealth: jest.fn(() => ({ status: 'ok', service: 'polycost-api' })),
+    };
+
+    return {
+      controller: new HealthController(service as never),
+      response: { status: jest.fn() },
+    };
+  }
+
+  it('leaves a healthy readiness response at 200', async () => {
+    const { controller, response } = controllerWith('ok');
+
+    await controller.getReadyHealth(response);
+
+    expect(response.status).not.toHaveBeenCalled();
+  });
+
+  it('answers 503 when a dependency is degraded', async () => {
+    const { controller, response } = controllerWith('degraded');
+
+    const body = await controller.getReadyHealth(response);
+
+    // Kubernetes reads the status code and ignores the body. Returning 200
+    // here marks the pod Ready and routes traffic to it with an unreachable
+    // database - observed on a real cluster before this was fixed.
+    expect(response.status).toHaveBeenCalledWith(503);
+    expect(body.status).toBe('degraded');
+  });
+
+  it('applies the same rule to the versioned alias', async () => {
+    const { controller, response } = controllerWith('degraded');
+
+    await controller.getApiReadyHealth(response);
+
+    expect(response.status).toHaveBeenCalledWith(503);
+  });
+
+  it('keeps liveness at 200 while degraded', () => {
+    const { controller } = controllerWith('degraded');
+
+    // Restarting the process cannot fix a dependency, so liveness must not
+    // fail with it - that turns a database blip into a restart loop.
+    expect(controller.getLiveHealth()).toEqual({ status: 'ok', service: 'polycost-api' });
+  });
+
+  it('works when no response object is supplied', async () => {
+    const { controller } = controllerWith('degraded');
+
+    await expect(controller.getReadyHealth()).resolves.toMatchObject({ status: 'degraded' });
+  });
+});
