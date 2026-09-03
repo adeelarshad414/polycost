@@ -29,17 +29,24 @@ const drillPort = args.port ?? '55433';
 const evidenceDir = path.resolve(args.evidence ?? 'docs/verification');
 
 const steps = [];
-let failed = false;
 
 function step(name, fn) {
   const startedAt = Date.now();
   try {
     const detail = fn();
-    steps.push({ name, ok: true, ms: Date.now() - startedAt, ...(detail ? { detail } : {}) });
+    // Only small, human-readable details are recorded. The fingerprints
+    // themselves are hundreds of lines and would make the committed evidence
+    // churn on every run while saying nothing a re-run cannot show.
+    const recorded = detail && Object.keys(detail).length <= 4 ? detail : undefined;
+    steps.push({
+      name,
+      ok: true,
+      ms: Date.now() - startedAt,
+      ...(recorded ? { detail: recorded } : {}),
+    });
     console.log(`  ok   ${name}`);
     return detail;
   } catch (error) {
-    failed = true;
     steps.push({ name, ok: false, ms: Date.now() - startedAt, error: error.message });
     console.error(`  FAIL ${name}: ${error.message}`);
     throw error;
