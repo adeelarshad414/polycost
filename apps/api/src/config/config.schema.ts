@@ -72,6 +72,11 @@ export const configSchema = z
     // Outbound provider HTTP limits. These were previously read directly from
     // the environment inside the adapter HTTP client, which bypassed schema
     // validation and broke the repo's no-direct-environment-access rule.
+    // Circuit breaker for outbound provider calls. Live refresh runs on the
+    // user request path, so a dead provider otherwise costs every request the
+    // full retry-times-timeout budget.
+    PROVIDER_CIRCUIT_FAILURE_THRESHOLD: z.coerce.number().int().min(1).default(5),
+    PROVIDER_CIRCUIT_COOLDOWN_MS: z.coerce.number().int().min(1000).default(30_000),
     PROVIDER_HTTP_TIMEOUT_MS: z.coerce.number().int().min(1000).default(60_000),
     PROVIDER_HTTP_BODY_TIMEOUT_MS: z.coerce.number().int().min(1000).optional(),
     PROVIDER_HTTP_MAX_RESPONSE_BYTES: z.coerce

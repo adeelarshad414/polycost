@@ -20,6 +20,7 @@ export type EtlRecordOutcome = 'updated' | 'rejected' | 'skipped';
 export type VaultOutcome = 'success' | 'failure';
 export type AuthOutcome = 'success' | 'invalid_credentials' | 'locked';
 export type ExportOutcome = 'success' | 'failure';
+export type CircuitState = 'closed' | 'open' | 'half_open';
 export type DbQueryOutcome = 'success' | 'failure';
 
 /** Counts BullMQ reports per state; keys are the states we choose to publish. */
@@ -62,6 +63,8 @@ export class DomainMetricsService {
   private readonly dependencyProbeDuration: Histogram<'dependency'>;
   private readonly queueDepth: Gauge<'queue' | 'state'>;
   private readonly queueDepthSources = new Map<string, QueueDepthSource>();
+  private readonly circuitState: Gauge<'provider'>;
+  private readonly circuitOpened: Counter<'provider'>;
 
   constructor(metrics: MetricsService) {
     const registers = [metrics.registry];
@@ -152,6 +155,20 @@ export class DomainMetricsService {
       registers,
     });
 
+    this.circuitState = new Gauge({
+      name: 'provider_circuit_state',
+      help: 'Outbound provider circuit breaker: 0 closed, 1 half-open, 2 open.',
+      labelNames: ['provider'],
+      registers,
+    });
+
+    this.circuitOpened = new Counter({
+      name: 'provider_circuit_opened_total',
+      help: 'Times a provider circuit has opened after repeated failures.',
+      labelNames: ['provider'],
+      registers,
+    });
+
     this.dbQueries = new Counter({
       name: 'db_queries_total',
       help: 'Postgres statements executed, by pool, operation and outcome.',
@@ -194,6 +211,21 @@ export class DomainMetricsService {
         await this.collectQueueDepth();
       },
     });
+  }
+
+  /**
+   * 0 closed, 1 half-open, 2 open - ordered by severity so a dashboard can
+   * alert on `> 0` without enumerating states.
+   */
+  recordCircuitState(input: { provider: string; state: CircuitState }): void {
+    const value = input.state === 'open' ? 2 : input.state === 'half_open' ? 1 : 0;
+    this.circuitState.set({ provider: input.provider }, value);
+
+    if (input.state === 'open') {
+      // A gauge alone cannot show flapping: a circuit that opens and closes
+      // repeatedly reads as healthy on every scrape in between.
+      this.circuitOpened.inc({ provider: input.provider });
+    }
   }
 
   recordDbQuery(input: {

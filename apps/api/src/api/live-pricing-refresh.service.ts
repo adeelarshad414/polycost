@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { CircuitBreakerRegistry } from '../adapters/common/circuit-breaker';
 import {
   CloudProviderAdapter,
   PricingCatalogRecord,
@@ -50,6 +51,9 @@ export class LivePricingRefreshService {
     private readonly adapters: CloudProviderAdapter[],
     private readonly catalogWriter: PricingCatalogWriter,
     private readonly normalizedPricingWriter: NormalizedPricingWriter,
+    // Optional so the direct constructions in tests are unchanged; without one,
+    // behaviour is exactly as before.
+    private readonly circuitBreakers?: CircuitBreakerRegistry,
   ) {}
 
   async refreshSnapshot(snapshot: ComparisonSnapshot): Promise<ComparisonWarning[]> {
@@ -148,12 +152,20 @@ export class LivePricingRefreshService {
       return cached.records;
     }
 
-    const records = await retryWithBackoff(() =>
-      adapter.refreshLivePricing(group.skuIds, {
-        categories: [group.category],
-        region: group.region,
-      }),
-    );
+    // The breaker wraps the whole retry block, not each attempt: one exhausted
+    // retry cycle is one failure. Wrapping each attempt would trip the circuit
+    // three times faster than the threshold suggests.
+    const call = () =>
+      retryWithBackoff(() =>
+        adapter.refreshLivePricing(group.skuIds, {
+          categories: [group.category],
+          region: group.region,
+        }),
+      );
+
+    const records = this.circuitBreakers
+      ? await this.circuitBreakers.get(adapter.providerId).execute(call)
+      : await call();
 
     // Drop expired entries, then evict the oldest if still at capacity, so the
     // cache can never grow without bound across distinct comparison workloads.

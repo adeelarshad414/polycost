@@ -9,6 +9,7 @@ import {
 import { LiveRefreshUnavailableError } from './api-errors';
 import { ComparisonSnapshot } from './api-database.repository';
 import { LivePricingRefreshService, livePricingReferences } from './live-pricing-refresh.service';
+import { CircuitBreakerRegistry } from '../adapters/common/circuit-breaker';
 
 const liveRecord: PricingCatalogRecord = {
   provider: 'aws',
@@ -308,3 +309,115 @@ function writerMock(): PricingCatalogWriter & NormalizedPricingWriter {
     })),
   };
 }
+
+describe('LivePricingRefreshService circuit breaker', () => {
+  const writers = () => ({
+    catalogWriter: {
+      upsertPricingRecords: jest.fn(async () => ({ recordsUpdated: 1, recordsRejected: 0 })),
+    } as PricingCatalogWriter,
+    normalizedWriter: {
+      upsertNormalizedPricingRecords: jest.fn(async () => ({
+        recordsUpdated: 1,
+        recordsRejected: 0,
+        recordsSkipped: 0,
+      })),
+    } as NormalizedPricingWriter,
+  });
+
+  function deadProvider() {
+    const refreshLivePricing = jest.fn(async () => {
+      throw new Error('provider down');
+    });
+
+    return {
+      refreshLivePricing,
+      adapter: {
+        providerId: 'aws',
+        priceWorkload: jest.fn(),
+        refreshPricingCatalog: jest.fn(),
+        refreshLivePricing,
+      } as unknown as CloudProviderAdapter,
+    };
+  }
+
+  it('stops calling a provider once its circuit opens', async () => {
+    const { adapter, refreshLivePricing } = deadProvider();
+    const { catalogWriter, normalizedWriter } = writers();
+    // Threshold 1 so a single exhausted retry cycle opens the circuit.
+    const breakers = new CircuitBreakerRegistry({ failureThreshold: 1, cooldownMs: 60_000 });
+    const service = new LivePricingRefreshService(
+      [adapter],
+      catalogWriter,
+      normalizedWriter,
+      breakers,
+    );
+
+    const first = await service.refreshSnapshot(snapshot);
+    const callsAfterFirst = refreshLivePricing.mock.calls.length;
+    const second = await service.refreshSnapshot(snapshot);
+
+    // The first request pays the full retry cost; every later one is rejected
+    // without touching the provider. That is the whole point: live refresh runs
+    // on the user request path.
+    expect(callsAfterFirst).toBeGreaterThan(0);
+    expect(refreshLivePricing).toHaveBeenCalledTimes(callsAfterFirst);
+    expect(breakers.get('aws').state).toBe('open');
+
+    // The user still gets a result, degraded to cached pricing with a warning.
+    expect(first[0]?.code).toBe('live_refresh_failed');
+    expect(second[0]?.code).toBe('live_refresh_failed');
+  });
+
+  it('explains that the circuit is open in the warning', async () => {
+    const { adapter } = deadProvider();
+    const { catalogWriter, normalizedWriter } = writers();
+    const breakers = new CircuitBreakerRegistry({ failureThreshold: 1, cooldownMs: 60_000 });
+    const service = new LivePricingRefreshService(
+      [adapter],
+      catalogWriter,
+      normalizedWriter,
+      breakers,
+    );
+
+    await service.refreshSnapshot(snapshot);
+    const warnings = await service.refreshSnapshot(snapshot);
+
+    expect(warnings[0]?.message).toContain('circuit');
+  });
+
+  it('behaves exactly as before when no registry is supplied', async () => {
+    const { adapter, refreshLivePricing } = deadProvider();
+    const { catalogWriter, normalizedWriter } = writers();
+    const service = new LivePricingRefreshService([adapter], catalogWriter, normalizedWriter);
+
+    await service.refreshSnapshot(snapshot);
+    const callsAfterFirst = refreshLivePricing.mock.calls.length;
+    await service.refreshSnapshot(snapshot);
+
+    // Without a breaker the provider is called again, unchanged.
+    expect(refreshLivePricing.mock.calls.length).toBeGreaterThan(callsAfterFirst);
+  });
+
+  it('keeps a healthy provider working while another is open', async () => {
+    const { adapter: broken } = deadProvider();
+    const healthy = {
+      providerId: 'gcp',
+      priceWorkload: jest.fn(),
+      refreshPricingCatalog: jest.fn(),
+      refreshLivePricing: jest.fn(async () => []),
+    } as unknown as CloudProviderAdapter;
+    const { catalogWriter, normalizedWriter } = writers();
+    const breakers = new CircuitBreakerRegistry({ failureThreshold: 1, cooldownMs: 60_000 });
+    const service = new LivePricingRefreshService(
+      [broken, healthy],
+      catalogWriter,
+      normalizedWriter,
+      breakers,
+    );
+
+    await service.refreshSnapshot(snapshot);
+
+    expect(breakers.get('aws').state).toBe('open');
+    expect(breakers.get('gcp').state).toBe('closed');
+  });
+});

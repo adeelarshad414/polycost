@@ -524,6 +524,40 @@ Evidence lands in `docs/verification/restore-drill-report.json`.
 > Run it after any schema migration that adds roles, grants or sequences, and
 > before any production cutover. It takes about six seconds.
 
+## Incident: Provider Circuit Open
+
+**Alerts:** `ProviderCircuitOpen`, `ProviderCircuitFlapping`.
+
+Live pricing refresh runs on the **user request path**. Without a breaker, a
+provider that is down costs every request the full retry budget — three
+attempts at up to `PROVIDER_HTTP_TIMEOUT_MS` each, per reference group — and the
+live-pricing cache only stores successes, so nothing remembers the failure and
+the next request pays it again.
+
+An open circuit is therefore the system protecting itself, not a new outage.
+Comparisons still return, served from cached pricing, with a
+`live_refresh_failed` warning attached.
+
+1. **Check whether the provider is actually down** before touching anything —
+   `vault_reads_total{outcome="failure"}` for a credentials problem, and the
+   provider's own status page.
+2. Look at the trace. Outbound calls are instrumented, so the failing request
+   and its error are visible.
+3. The circuit probes once per `PROVIDER_CIRCUIT_COOLDOWN_MS` (default 30 s) and
+   closes itself on the first success. **No manual reset exists, by design** —
+   a manual reset would just re-open on the next failure.
+4. For `ProviderCircuitFlapping`: the provider is recovering just long enough to
+   pass a probe and then failing again. Raising the cooldown reduces churn but
+   does not fix the provider.
+
+| Setting                              | Default | Meaning                             |
+| ------------------------------------ | ------- | ----------------------------------- |
+| `PROVIDER_CIRCUIT_FAILURE_THRESHOLD` | 5       | consecutive failures before opening |
+| `PROVIDER_CIRCUIT_COOLDOWN_MS`       | 30000   | wait before a single probe          |
+
+> `provider_circuit_state` is 0 closed, 1 half-open, 2 open — ordered by
+> severity, so a dashboard can alert on `> 1` without enumerating states.
+
 ## Incident: GitHub Actions Do Not Run
 
 Symptoms:

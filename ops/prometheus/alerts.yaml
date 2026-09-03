@@ -172,6 +172,29 @@ groups:
           description: 'The scrape succeeded but no queue reported its depth, which means the queue read timed out. Usually Redis.'
           runbook: 'docs/RUNBOOK.md#incident-redis-unavailable'
 
+  - name: polycost-providers
+    rules:
+      - alert: ProviderCircuitOpen
+        expr: provider_circuit_state > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Circuit breaker open for {{ $labels.provider }}'
+          description: 'Live pricing refresh is being skipped for this provider after repeated failures. Comparisons still work, served from cached pricing, and will say so in their warnings.'
+          runbook: 'docs/RUNBOOK.md#incident-provider-circuit-open'
+
+      # A circuit that opens and closes repeatedly reads as healthy on any
+      # single scrape, so the gauge alone would miss it.
+      - alert: ProviderCircuitFlapping
+        expr: increase(provider_circuit_opened_total[1h]) > 3
+        labels:
+          severity: warning
+        annotations:
+          summary: '{{ $labels.provider }} circuit has opened repeatedly in the last hour'
+          description: 'The provider is recovering just long enough to pass a probe and then failing again. Raising the cooldown will reduce the churn but not fix the provider.'
+          runbook: 'docs/RUNBOOK.md#incident-provider-circuit-open'
+
   - name: polycost-user-journeys
     rules:
       - alert: ReportExportsFailing
