@@ -44,6 +44,10 @@ import {
 } from './cost-management.controller';
 import { CostManagementService } from './cost-management.service';
 import { LivePricingRefreshService } from './live-pricing-refresh.service';
+import { CircuitBreakerRegistry } from '../adapters/common/circuit-breaker';
+
+/** Shared so every caller sees the same breaker state for a provider. */
+export const PROVIDER_CIRCUIT_BREAKERS = Symbol('PROVIDER_CIRCUIT_BREAKERS');
 import { InvitationDeliveryService } from './invitation-delivery.service';
 import { InvoiceArtifactGovernanceService } from './invoice-artifact-governance.service';
 import { InvoiceArtifactStorageService } from './invoice-artifact-storage.service';
@@ -140,12 +144,40 @@ import { WorkloadController } from './workload.controller';
     BillingService,
     ComparisonAnalyticsService,
     {
+      // One registry shared by the whole app: a breaker that is recreated per
+      // request has no memory, which is the entire feature.
+      provide: PROVIDER_CIRCUIT_BREAKERS,
+      inject: [ConfigService, DomainMetricsService],
+      useFactory: (
+        configService: ConfigService<AppConfig, true>,
+        domainMetrics: DomainMetricsService,
+      ) =>
+        new CircuitBreakerRegistry({
+          failureThreshold: configService.get('PROVIDER_CIRCUIT_FAILURE_THRESHOLD', {
+            infer: true,
+          }),
+          cooldownMs: configService.get('PROVIDER_CIRCUIT_COOLDOWN_MS', { infer: true }),
+          onStateChange: (provider, state) => domainMetrics.recordCircuitState({ provider, state }),
+        }),
+    },
+    {
       provide: LivePricingRefreshService,
-      inject: [CLOUD_PROVIDER_ADAPTERS, PostgresPricingCatalogRepository],
+      inject: [
+        CLOUD_PROVIDER_ADAPTERS,
+        PostgresPricingCatalogRepository,
+        PROVIDER_CIRCUIT_BREAKERS,
+      ],
       useFactory: (
         adapters: CloudProviderAdapter[],
         pricingRepository: PostgresPricingCatalogRepository,
-      ) => new LivePricingRefreshService(adapters, pricingRepository, pricingRepository),
+        circuitBreakers: CircuitBreakerRegistry,
+      ) =>
+        new LivePricingRefreshService(
+          adapters,
+          pricingRepository,
+          pricingRepository,
+          circuitBreakers,
+        ),
     },
     ComparisonApplicationService,
     {
