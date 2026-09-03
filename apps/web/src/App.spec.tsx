@@ -160,6 +160,10 @@ describe('App', () => {
     const client = clientMock();
     const { container, unmount } = render(<App client={client} />);
 
+    // Hidden until asked for; the header button is the way in.
+    expect(text(container)).not.toContain('Actuals reconciliation');
+    await openWorkspace(container);
+
     expect(text(container)).toContain('Workspace session');
     expect(text(container)).toContain('Actuals reconciliation');
 
@@ -223,6 +227,7 @@ describe('App', () => {
       }),
     });
     const { container, unmount } = render(<App client={client} />);
+    await openWorkspace(container);
 
     await submitForm(container.querySelector<HTMLFormElement>('.workspace-auth-form'));
     await settleAsyncEffects();
@@ -874,6 +879,7 @@ describe('App', () => {
   it('guards billing import until sign-in and supports workspace registration', async () => {
     const client = clientMock();
     const { container, unmount } = render(<App client={client} />);
+    await openWorkspace(container);
 
     await submitForm(container.querySelector<HTMLFormElement>('.workspace-billing-panel'));
 
@@ -3878,6 +3884,25 @@ function clearClientCalls(client: PolyCostClient): void {
 
 function text(container: HTMLElement): string {
   return container.textContent ?? '';
+}
+
+/**
+ * Reveals the workspace control center.
+ *
+ * It is hidden on the landing page now - an anonymous visitor should see the
+ * product, not a sign-in form and two "Admin required" panels - so anything
+ * exercising it has to open it the way a user does.
+ */
+async function openWorkspace(container: HTMLElement): Promise<void> {
+  const signIn = [...container.querySelectorAll('button')].find(
+    (button) => button.textContent?.trim() === 'Sign in',
+  );
+
+  if (!signIn) {
+    throw new Error('header Sign in button not found');
+  }
+
+  await click(signIn);
 }
 
 function deferred<T>(): {
