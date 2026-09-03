@@ -26,6 +26,8 @@ RUN npm ci --omit=dev --workspace @polycost/api --include-workspace-root=false
 
 COPY --from=build --chown=node:node /app/apps/api/dist apps/api/dist
 COPY --chown=node:node apps/api/otel-register.cjs apps/api/otel-register.cjs
+# The OpenAPI document is served by the API, so it has to be in the image.
+COPY --chown=node:node docs/api/openapi.json docs/api/openapi.json
 WORKDIR /app/apps/api
 
 # Run as the unprivileged `node` user (uid 1000) that the base image ships.

@@ -43,6 +43,7 @@ Suppression locations reviewed on 2026-07-06:
 
 Suppression locations reviewed on 2026-08-20:
 
+- `apps/api/src/api/openapi.controller.ts` — `security/detect-non-literal-fs-filename` on reading the generated OpenAPI document. The candidate paths are a fixed list defined in code and resolved from `__dirname`/`cwd` so the file can be found in both the container and a dev checkout; no part of any path comes from a request. Reviewed 2026-09-03.
 - `apps/api/src/adapters/aws/aws-bulk-stream.ts` — `security/detect-non-literal-fs-filename` on the mkdtemp temp-file spool used to stream the ~480MB AWS bulk price feed without buffering it into memory. The paths are process-owned (`mkdtemp` + a fixed `index.json` name), never derived from user input.
 
 ## npm Audit

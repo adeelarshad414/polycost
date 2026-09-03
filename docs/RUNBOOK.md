@@ -444,6 +444,40 @@ still comfortably inside the objective.
 
 Evidence lands in `docs/verification/load-test-summary.json`.
 
+## API Contract
+
+The OpenAPI 3.1 document is served at **`GET /openapi.json`** and committed at
+`docs/api/openapi.json`.
+
+```bash
+npm run openapi:generate   # rebuild from the controllers
+npm run openapi:check      # fail if it has drifted (runs in npm run check)
+```
+
+It is **generated from the controllers** with the TypeScript compiler API, not
+maintained by hand. A hand-written spec for 100+ routes is stale the day after
+it is written, and a published spec that has drifted is worse than none —
+clients generate code from it and find out at runtime.
+
+### What it does and does not cover
+
+| Covered                               | Not covered                       |
+| ------------------------------------- | --------------------------------- |
+| Every path, method and path parameter | Request and response body schemas |
+| The error envelope, exactly           | Per-endpoint auth requirements    |
+
+Body schemas are deliberately left unconstrained. Validation in this service is
+hand-rolled per controller rather than declared — there are no zod DTOs or
+class-validator decorators to generate from — so any schema published here would
+be a guess. A spec that is confidently wrong is worse for a client than one that
+is honestly incomplete.
+
+The **error envelope is exact**, because every failure passes through a single
+`ApiExceptionFilter`, so the code enum in the spec is the real list.
+
+> Adding or renaming a route without regenerating fails `npm run check`, naming
+> the specific operation that drifted.
+
 ## Backup And Restore
 
 ### Taking a backup
