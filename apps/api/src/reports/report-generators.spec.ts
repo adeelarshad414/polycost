@@ -577,8 +577,12 @@ describe('report generators', () => {
     expect(xlsxText).toContain('Pricing Model Availability');
     expect(xlsxText).toContain('Commitment Payment and TCO');
     expect(xlsxText).toContain('Upfront cash USD');
-    expect(xlsxText).toContain('<t>360</t>');
-    expect(xlsxText).toContain('<t>1872</t>');
+    // Money cells are written as numbers, not inline strings, so the currency
+    // format applies and the column can be summed, sorted and charted. As text
+    // (<t>360</t>) none of that worked.
+    expect(xlsxText).toContain('<v>360</v>');
+    expect(xlsxText).toContain('<v>1872</v>');
+    expect(xlsxText).not.toContain('<t>360</t>');
     expect(xlsxText).toContain('Egress Tiered Breakdown');
     expect(xlsxText).toContain('Optimization Opportunities');
     expect(xlsxText).toContain('Egress &amp; Networking Detail');
@@ -677,21 +681,30 @@ describe('report generators', () => {
     expect(pdfText).toContain('Decision summary');
     expect(pdfText).toContain('Cost baseline: aws ranks #1 for Reserved 3-year');
     expect(pdfText).toContain('Provider ranking');
-    expect(pdfText).toContain('aws | #1 | eligible yes | estimate no | selected $126');
+    // Tabular sections are rendered as real tables now, so the cells are placed
+    // individually rather than concatenated into one pipe-joined line.
+    expect(pdfText).toContain('Provider) Tj');
+    expect(pdfText).toContain('Evidence note) Tj');
+    expect(pdfText).toContain('AWS) Tj');
+    expect(pdfText).toContain('#1) Tj');
     expect(pdfText).toContain('Workload scope');
     expect(pdfText).toContain('Architecture overview');
-    expect(pdfText).toContain('compute | compute/vm-compute');
+    expect(pdfText).toContain('Confidence) Tj');
     expect(pdfText).toContain('FinOps summary');
     expect(pdfText).toContain('Executive recommendation: gcp is the current cost baseline');
     expect(pdfText).toContain('Decision confidence: Medium');
     expect(pdfText).toContain('Solution architect review: gcp requires service-equivalence');
     expect(pdfText).toContain('Architecture risk: Medium');
     expect(pdfText).toContain('Lowest monthly run rate: gcp $20');
-    expect(pdfText).toContain('aws: daily $2.33, weekly $16.34, monthly $71');
+    // Provider totals are a table too; the daily figure is now its own cell.
+    expect(pdfText).toContain('$2.33) Tj');
+    expect(pdfText).toContain('$16.34) Tj');
     expect(pdfText).toContain('Provider cost detail');
-    expect(pdfText).toContain('Provider total | aws | all / all | monthly $71');
+    expect(pdfText).toContain('Provider total) Tj');
+    expect(pdfText).toContain('Scope) Tj');
     expect(pdfText).toContain('Cost coverage map');
-    expect(pdfText).toContain('aws | Compute families and sizing | Covered');
+    expect(pdfText).toContain('Cost dimension) Tj');
+    expect(pdfText).toContain('Coverage) Tj');
     expect(pdfText).toContain('Selected pricing scenario');
     expect(pdfText).toContain('Pricing model availability');
     expect(pdfText).toContain('Commitment payment and TCO');

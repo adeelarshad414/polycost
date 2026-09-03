@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { ComparisonLineItem, ComparisonResult } from '../comparison/comparison.types';
 import {
+  REPORT_INK,
+  categoryColor as brandCategoryColor,
+  hexToRgb,
+  providerBrand,
+} from './report-brand';
+import {
   architectureOverviewRows,
   breakEvenSummaryRows,
   commitmentTcoRows,
@@ -36,6 +42,22 @@ interface PdfLine {
   fontSize: number;
   /** Render with the Helvetica-Bold face (F2) rather than regular (F1). */
   bold?: boolean;
+  /**
+   * When present the line is a table row: each cell is placed at its own x
+   * offset instead of being concatenated into one string. Tabular sections used
+   * to be emitted as pipe-joined prose that wrapped mid-record, which is what
+   * made the export unreadable.
+   */
+  cells?: PdfCell[];
+  /** Row background - the header band and zebra striping. */
+  fill?: RgbColor;
+  textColor?: RgbColor;
+}
+
+interface PdfCell {
+  text: string;
+  width: number;
+  align?: 'left' | 'right';
 }
 
 interface RgbColor {
@@ -51,9 +73,18 @@ interface ServiceMixSlice {
 }
 
 const LINES_PER_PAGE = 42;
+const PAGE_MARGIN = 50;
+const CONTENT_WIDTH = 512;
+const COLUMN_GAP = 6;
+const ROW_HEIGHT = 16;
+const HEADER_BAND_COLOR: RgbColor = hexToRgb(REPORT_INK.heading);
+const HEADER_TEXT_COLOR: RgbColor = { red: 1, green: 1, blue: 1 };
+const ZEBRA_COLOR: RgbColor = hexToRgb(REPORT_INK.zebraFill);
 const CHART_ORIGIN_X = 58;
 const PROVIDER_BAR_MAX_WIDTH = 330;
 const STACKED_BAR_WIDTH = 360;
+/** Right edge of the paper (612) less the chart origin and a matching margin. */
+const CHART_TEXT_WIDTH = 612 - CHART_ORIGIN_X - 50;
 const TEXT_COLOR: RgbColor = { red: 0.07, green: 0.08, blue: 0.12 };
 const MUTED_TEXT_COLOR: RgbColor = { red: 0.36, green: 0.39, blue: 0.45 };
 
@@ -70,11 +101,18 @@ export class PdfReportGenerator {
 
     objects.push('<< /Type /Catalog /Pages 2 0 R >>');
     objects.push('');
-    objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+    // WinAnsiEncoding, so the octal escapes emitted by escapePdfText resolve to
+    // the intended glyphs. Without it the reader falls back to
+    // StandardEncoding, where a middle dot rendered as two stray marks.
+    objects.push(
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+    );
     // F2: a real bold face. Without it, headings could only be distinguished by
     // size and colour, which reads as flat next to a typeset enterprise report.
     const boldFontObjectNumber = objects.length + 1;
-    objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');
+    objects.push(
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>',
+    );
 
     const totalPages = pageContents.length;
 
@@ -131,12 +169,24 @@ export class PdfReportGenerator {
         })),
       { text: '', fontSize: 10 },
       { text: 'Provider ranking', fontSize: 14 },
-      ...providerRankingRows(result, options)
-        .slice(1)
-        .map((row) => ({
-          text: providerRankingPdfText(row),
-          fontSize: 10,
-        })),
+      ...tableLines(
+        ['Provider', 'Rank', 'Eligible', 'Monthly', 'Yearly', 'Delta', 'Evidence note'],
+        providerRankingRows(result, options)
+          .slice(1)
+          // Source columns: 0 provider, 1 rank (already '#1'), 2 eligible,
+          // 5 monthly, 6 yearly, 7 delta vs lowest, 10 evidence note.
+          .map((row) => [
+            providerBrand(String(row[0] ?? '')).label,
+            String(row[1] ?? ''),
+            String(row[2] ?? ''),
+            `$${row[5] ?? ''}`,
+            `$${row[6] ?? ''}`,
+            `$${row[7] ?? ''}`,
+            String(row[10] ?? ''),
+          ]),
+        [1.1, 0.5, 0.7, 0.9, 0.9, 0.7, 2.6],
+        ['left', 'left', 'left', 'right', 'right', 'right', 'left'],
+      ),
       { text: '', fontSize: 10 },
       { text: 'Workload scope', fontSize: 14 },
       ...workloadScopeRows(result)
@@ -148,16 +198,20 @@ export class PdfReportGenerator {
       ...sourceDiagramPdfLines(result),
       { text: '', fontSize: 10 },
       { text: 'Architecture overview', fontSize: 14 },
-      {
-        text: 'Category | Requirement | AWS mapping | Azure mapping | GCP mapping | Confidence',
-        fontSize: 10,
-      },
-      ...architectureOverviewRows(result)
-        .slice(1)
-        .map((row) => ({
-          text: `${row[0]} | ${row[1]} | AWS ${row[2]} | Azure ${row[3]} | GCP ${row[4]} | confidence ${row[5]}`,
-          fontSize: 10,
-        })),
+      ...tableLines(
+        ['Category', 'Requirement', 'AWS', 'Azure', 'GCP', 'Confidence'],
+        architectureOverviewRows(result)
+          .slice(1)
+          .map((row) => [
+            String(row[0] ?? ''),
+            String(row[1] ?? ''),
+            String(row[2] ?? ''),
+            String(row[3] ?? ''),
+            String(row[4] ?? ''),
+            String(row[5] ?? ''),
+          ]),
+        [1, 1.6, 1.9, 1.9, 1.9, 1],
+      ),
       { text: '', fontSize: 10 },
       { text: 'FinOps summary', fontSize: 14 },
       ...buildReportInsights(result).map((insight) => ({
@@ -168,28 +222,62 @@ export class PdfReportGenerator {
       { text: 'Provider totals', fontSize: 14 },
     ];
 
-    for (const provider of result.providers) {
-      lines.push({
-        text: `${provider.providerId}: daily $${provider.totals.daily}, weekly $${provider.totals.weekly}, monthly $${provider.totals.monthly}, quarterly $${provider.totals.quarterly}, yearly $${provider.totals.yearly}`,
-        fontSize: 10,
-      });
-    }
+    lines.push(
+      ...tableLines(
+        ['Provider', 'Daily', 'Weekly', 'Monthly', 'Quarterly', 'Yearly'],
+        result.providers.map((provider) => [
+          providerBrand(provider.providerId).label,
+          `$${provider.totals.daily}`,
+          `$${provider.totals.weekly}`,
+          `$${provider.totals.monthly}`,
+          `$${provider.totals.quarterly}`,
+          `$${provider.totals.yearly}`,
+        ]),
+        [1.4, 1, 1, 1, 1, 1],
+        ['left', 'right', 'right', 'right', 'right', 'right'],
+      ),
+    );
 
     lines.push({ text: '', fontSize: 10 }, { text: 'Provider cost detail', fontSize: 14 });
-    for (const row of providerCostDetailRows(result).slice(1)) {
-      lines.push({
-        text: `${row[0]} | ${row[1]} | ${row[2]} / ${row[3]} | monthly $${row[7]} | share ${row[8]} | ${row[10]}`,
-        fontSize: 10,
-      });
-    }
+    lines.push(
+      ...tableLines(
+        ['Scope', 'Provider', 'Category', 'Service', 'Monthly', 'Share', 'Basis'],
+        providerCostDetailRows(result)
+          .slice(1)
+          .map((row) => [
+            String(row[0] ?? ''),
+            String(row[1] ?? '').toUpperCase(),
+            String(row[2] ?? ''),
+            String(row[3] ?? ''),
+            `$${row[7] ?? ''}`,
+            String(row[8] ?? ''),
+            String(row[10] ?? ''),
+          ]),
+        [1.2, 0.8, 1, 1.1, 0.9, 0.7, 2.3],
+        ['left', 'left', 'left', 'left', 'right', 'right', 'left'],
+      ),
+    );
 
     lines.push({ text: '', fontSize: 10 }, { text: 'Cost coverage map', fontSize: 14 });
-    for (const row of costCoverageMapRows(result).slice(1)) {
-      lines.push({
-        text: `${row[0]} | ${row[1]} | ${row[2]} | rows ${row[3]} | monthly $${row[5] || 'n/a'} | ${row[6]}`,
-        fontSize: 10,
-      });
-    }
+    lines.push(
+      ...tableLines(
+        // Source columns: 0 provider, 1 cost dimension, 2 coverage status,
+        // 3 priced rows, 5 monthly USD, 6 evidence.
+        ['Provider', 'Cost dimension', 'Coverage', 'Rows', 'Monthly', 'Evidence'],
+        costCoverageMapRows(result)
+          .slice(1)
+          .map((row) => [
+            providerBrand(String(row[0] ?? '')).label,
+            String(row[1] ?? ''),
+            String(row[2] ?? ''),
+            String(row[3] ?? ''),
+            row[5] ? `$${row[5]}` : 'n/a',
+            String(row[6] ?? ''),
+          ]),
+        [1, 1.7, 0.9, 0.5, 0.9, 2],
+        ['left', 'left', 'left', 'right', 'right', 'left'],
+      ),
+    );
 
     lines.push({ text: '', fontSize: 10 }, { text: 'Selected pricing scenario', fontSize: 14 });
     for (const row of selectedScenarioRows(result, options).slice(1)) {
@@ -411,12 +499,12 @@ function providerRunRateChartPage(result: ComparisonResult, options: ReportOptio
   });
 
   commands.push(
-    pdfText(
+    ...pdfParagraph(
       CHART_ORIGIN_X,
       220,
       11,
       'Executive readout: validate regional SKU availability, resilience, and transfer paths before vendor commitment.',
-      TEXT_COLOR,
+      CHART_TEXT_WIDTH,
     ),
   );
 
@@ -468,12 +556,12 @@ function serviceMixChartPage(result: ComparisonResult): string {
   });
 
   commands.push(
-    pdfText(
+    ...pdfParagraph(
       CHART_ORIGIN_X,
       210,
       10,
       'Line-item source: same evidence rows used by CSV and XLSX exports; approximate mappings remain labeled in the text section.',
-      TEXT_COLOR,
+      CHART_TEXT_WIDTH,
     ),
   );
 
@@ -529,36 +617,58 @@ function totalForCategory(lineItems: ComparisonLineItem[], category: string): nu
     .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
 }
 
+// Colours come from report-brand.ts so a provider looks the same here, in the
+// spreadsheet tab colour and in the table headers. These used to be per-file
+// approximations.
 function providerColor(providerId: ComparisonResult['providers'][number]['providerId']): RgbColor {
-  switch (providerId) {
-    case 'aws':
-      return { red: 0.85, green: 0.35, blue: 0.19 };
-    case 'azure':
-      return { red: 0.22, green: 0.54, blue: 0.87 };
-    case 'gcp':
-      return { red: 0.11, green: 0.62, blue: 0.46 };
-  }
+  return hexToRgb(providerBrand(providerId).primary);
 }
 
 function categoryColor(category: string): RgbColor {
-  switch (category) {
-    case 'compute':
-      return { red: 0.85, green: 0.35, blue: 0.19 };
-    case 'storage':
-      return { red: 0.22, green: 0.54, blue: 0.87 };
-    case 'database':
-      return { red: 0.11, green: 0.62, blue: 0.46 };
-    case 'network':
-      return { red: 0.56, green: 0.39, blue: 0.86 };
-    default:
-      return { red: 0.5, green: 0.54, blue: 0.6 };
-  }
+  return hexToRgb(brandCategoryColor(category));
 }
 
 function filledRect(x: number, y: number, width: number, height: number, color: RgbColor): string {
   return `${rgb(color)} rg\n${formatPdfNumber(x)} ${formatPdfNumber(y)} ${formatPdfNumber(
     width,
   )} ${formatPdfNumber(height)} re f`;
+}
+
+/**
+ * Wrapped text for the chart pages.
+ *
+ * pdfText draws a single unwrapped run, so the long footnotes on these pages
+ * ran off the right edge of the paper and the last words were simply lost.
+ */
+function pdfParagraph(
+  x: number,
+  y: number,
+  fontSize: number,
+  text: string,
+  maxWidth: number,
+  color: RgbColor = TEXT_COLOR,
+): string[] {
+  const words = text.split(' ');
+  const rows: string[] = [];
+  let current = '';
+
+  for (const word of words) {
+    const candidate = current.length === 0 ? word : `${current} ${word}`;
+
+    if (textWidth(candidate, fontSize) > maxWidth && current.length > 0) {
+      rows.push(current);
+      current = word;
+      continue;
+    }
+
+    current = candidate;
+  }
+
+  if (current.length > 0) {
+    rows.push(current);
+  }
+
+  return rows.map((row, index) => pdfText(x, y - index * (fontSize + 3), fontSize, row, color));
 }
 
 function pdfText(
@@ -586,6 +696,13 @@ function formatCurrency(value: number): string {
 }
 
 function wrapLine(line: PdfLine): PdfLine[] {
+  // A table row is laid out per cell and truncates to its column width. Wrapping
+  // it would split one record over several lines and drop the cell positions,
+  // turning the table back into the prose this replaced.
+  if (line.cells) {
+    return [line];
+  }
+
   if (line.text.length <= 96) {
     return [line];
   }
@@ -651,13 +768,6 @@ function serviceRequirementPdfText(row: string[]): string {
   return `${row[0]} | ${row[1]} | ${row[2]} | region ${row[3]} | ${row[4]} | qty ${row[5]}`;
 }
 
-function providerRankingPdfText(row: string[]): string {
-  if (row[2] === 'no') {
-    return `${row[0]} | ${row[1]} | not eligible for selected model | ${row[10]}`;
-  }
-
-  return `${row[0]} | ${row[1]} | eligible yes | estimate ${row[3]} | selected $${row[4]} | monthly $${row[5]} | delta $${row[7]} | ${row[10]}`;
-}
 
 function selectedScenarioPdfText(row: string[]): string {
   if (row[1] === 'no') {
@@ -668,24 +778,110 @@ function selectedScenarioPdfText(row: string[]): string {
 }
 
 function pageContent(lines: PdfLine[]): string {
-  const commands = ['BT'];
+  // Fills first: rectangles cannot be drawn inside a BT/ET text block, and a
+  // background painted afterwards would cover the text it is meant to sit behind.
+  const fills: string[] = [];
 
   lines.forEach((line, index) => {
-    const y = 750 - index * 16;
+    if (!line.fill) {
+      return;
+    }
+
+    const y = 750 - index * ROW_HEIGHT;
+    fills.push(
+      filledRect(PAGE_MARGIN - 4, y - 4, CONTENT_WIDTH + 8, ROW_HEIGHT - 2, line.fill),
+    );
+  });
+
+  const commands = [...fills, 'BT'];
+
+  lines.forEach((line, index) => {
+    const y = 750 - index * ROW_HEIGHT;
     // Anything set above body size is a heading, so give it the bold face unless
     // the caller says otherwise. Body copy stays regular.
     const bold = line.bold ?? line.fontSize >= HEADING_FONT_SIZE;
     const font = bold ? 'F2' : 'F1';
-    commands.push(
-      `/${font} ${line.fontSize} Tf`,
-      `1 0 0 1 50 ${y} Tm`,
-      `(${escapePdfText(line.text)}) Tj`,
-    );
+
+    commands.push(`/${font} ${line.fontSize} Tf`, rgb(line.textColor ?? TEXT_COLOR) + ' rg');
+
+    if (!line.cells) {
+      commands.push(`1 0 0 1 ${PAGE_MARGIN} ${y} Tm`, `(${escapePdfText(line.text)}) Tj`);
+      return;
+    }
+
+    let x = PAGE_MARGIN;
+    for (const cell of line.cells) {
+      const text = truncateToWidth(cell.text, cell.width, line.fontSize);
+      // Right alignment matters for money: a column of costs that does not line
+      // up on the decimal cannot be scanned.
+      const offset =
+        cell.align === 'right' ? Math.max(0, cell.width - textWidth(text, line.fontSize)) : 0;
+
+      commands.push(`1 0 0 1 ${formatPdfNumber(x + offset)} ${y} Tm`, `(${escapePdfText(text)}) Tj`);
+      x += cell.width + COLUMN_GAP;
+    }
   });
 
   commands.push('ET');
 
   return commands.join('\n');
+}
+
+/** Helvetica is ~0.52em average across mixed-case text; good enough to lay out columns. */
+function textWidth(text: string, fontSize: number): number {
+  return text.length * fontSize * 0.52;
+}
+
+function truncateToWidth(text: string, width: number, fontSize: number): string {
+  if (textWidth(text, fontSize) <= width) {
+    return text;
+  }
+
+  const maxCharacters = Math.max(1, Math.floor(width / (fontSize * 0.52)) - 1);
+  return `${text.slice(0, maxCharacters).trimEnd()}...`;
+}
+
+/**
+ * Builds a table: a filled header band, then zebra-striped rows.
+ *
+ * Column widths are supplied as weights and scaled to the content width, so a
+ * caller describes proportions rather than doing point arithmetic.
+ */
+function tableLines(
+  headers: string[],
+  rows: string[][],
+  weights: number[],
+  aligns: Array<'left' | 'right'> = [],
+): PdfLine[] {
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+  const available = CONTENT_WIDTH - COLUMN_GAP * (weights.length - 1);
+  const widths = weights.map((weight) => (weight / totalWeight) * available);
+
+  const toCells = (values: string[]): PdfCell[] =>
+    widths.map((width, index) => ({
+      text: values[index] ?? '',
+      width,
+      align: aligns[index] ?? 'left',
+    }));
+
+  return [
+    {
+      text: headers.join(' '),
+      fontSize: 9,
+      bold: true,
+      cells: toCells(headers),
+      fill: HEADER_BAND_COLOR,
+      textColor: HEADER_TEXT_COLOR,
+    },
+    ...rows.map((row, index) => ({
+      text: row.join(' '),
+      fontSize: 9,
+      cells: toCells(row),
+      // Banding, not borders: at nine point a ruled grid is heavier than the
+      // data it separates.
+      ...(index % 2 === 1 ? { fill: ZEBRA_COLOR } : {}),
+    })),
+  ];
 }
 
 // Page furniture: a hairline rule and "Page N of M", so a printed or emailed
