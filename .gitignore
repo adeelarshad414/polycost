@@ -24,3 +24,7 @@ test-results/
 artifacts/audit-export-smoke/
 artifacts/invoice-evidence-notary-smoke/
 artifacts/invoice-evidence-notary-reference-receiver/
+
+# Restore-drill working directory (backups are not committed)
+.restore-drill/
+backups/

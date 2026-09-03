@@ -1,0 +1,62 @@
+{
+  "ranAt": "2026-09-03T07:45:29.146Z",
+  "source": "polycost-postgres-1/polycost_dev",
+  "passed": true,
+  "steps": [
+    {
+      "name": "fingerprint the source database",
+      "ok": true,
+      "ms": 1746
+    },
+    {
+      "name": "take a backup (database + cluster globals)",
+      "ok": true,
+      "ms": 599,
+      "detail": {
+        "dump": "/Users/adeel.arshad/Documents/Work/Projects/polycost/.restore-drill/2026-09-03T07-45-24-632Z.dump",
+        "globals": "/Users/adeel.arshad/Documents/Work/Projects/polycost/.restore-drill/2026-09-03T07-45-24-632Z.globals.sql",
+        "stamp": "2026-09-03T07-45-24-632Z"
+      }
+    },
+    {
+      "name": "start an empty Postgres cluster",
+      "ok": true,
+      "ms": 1577,
+      "detail": {
+        "attempts": 2
+      }
+    },
+    {
+      "name": "restore cluster globals (roles)",
+      "ok": true,
+      "ms": 53
+    },
+    {
+      "name": "create the target database",
+      "ok": true,
+      "ms": 76
+    },
+    {
+      "name": "restore the database",
+      "ok": true,
+      "ms": 483,
+      "detail": {
+        "warnings": 0
+      }
+    },
+    {
+      "name": "fingerprint the restored database",
+      "ok": true,
+      "ms": 1771
+    },
+    {
+      "name": "compare the two fingerprints",
+      "ok": true,
+      "ms": 0,
+      "detail": []
+    }
+  ],
+  "differences": [],
+  "rowsVerified": 20603,
+  "tablesVerified": 38
+}
