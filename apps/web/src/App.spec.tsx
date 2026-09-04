@@ -86,14 +86,15 @@ describe('App', () => {
     expect(text(container)).toContain('Best value');
     expect(text(container)).toContain('Monthly estimate');
     expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);
-    expect(Array.from(container.querySelectorAll<HTMLElement>('.result-disclosure'))).toHaveLength(
-      1,
-    );
-    expect(
-      Array.from(container.querySelectorAll<HTMLElement>('.result-disclosure')).every(
-        (details) => details.dataset.open === 'false' && details.dataset.mounted === 'false',
-      ),
-    ).toBe(true);
+
+    // The detail used to sit behind one collapsed disclosure. It is a tab strip
+    // now: four panels, exactly one visible, the rest present but hidden so the
+    // report still prints whole.
+    const tabs = Array.from(container.querySelectorAll<HTMLElement>('[role="tab"]'));
+    const panels = Array.from(container.querySelectorAll<HTMLElement>('[role="tabpanel"]'));
+    expect(tabs).toHaveLength(4);
+    expect(tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true')).toHaveLength(1);
+    expect(panels.filter((panel) => !panel.hasAttribute('hidden'))).toHaveLength(1);
     expect(client.validateWorkload).toHaveBeenCalledWith(
       expect.objectContaining({
         schemaVersion: '1.0',
@@ -134,23 +135,31 @@ describe('App', () => {
     expect(text(container)).toContain('Server projection');
     expect(text(container)).toContain('$90.00 over 90 days');
     expect(container.querySelector('.recharts-wrapper')).toBeInstanceOf(HTMLElement);
-    expect(text(container)).toContain('Show full breakdown, pricing models & export options');
-    expect(text(container)).not.toContain('Engineering cost controls');
-    expect(text(container)).not.toContain('Service driver split');
-    expect(text(container)).not.toContain('Provider cost by mapped service family');
-    expect(text(container)).not.toContain('Cost periods & executive analytics');
-    expect(text(container)).not.toContain('Pricing models, breakdown, budget & share');
-    expect(text(container)).not.toContain('Architecture & engineering evidence');
-    expect(text(container)).not.toContain('Official calculators & regions');
-    expect(text(container)).not.toContain('Export report');
-    expect(text(container)).not.toContain('GCP is the current executive cost baseline');
-    expect(
-      container.querySelector<HTMLAnchorElement>('a[href="https://calculator.aws/#/"]'),
-    ).toBeNull();
-    expect(text(container)).not.toContain('Resource name');
-    expect(text(container)).not.toContain('Spec / SKU');
-    expect(text(container)).not.toContain('Export CSV');
-    expect(text(container)).not.toContain('API JSON');
+    // The disclosure is a tab strip now; its four labels replace that title.
+    expect(text(container)).toContain('Executive brief');
+    expect(text(container)).toContain('Cost controls');
+    expect(text(container)).toContain('Calculators & exports');
+    // These used to assert the collapsed disclosure rendered nothing. Panels now
+    // stay mounted so the report still prints whole, so the contract is that
+    // inactive content is HIDDEN rather than absent - present for print and for
+    // assistive tech that follows the tab, invisible on screen.
+    const hiddenText = Array.from(
+      container.querySelectorAll<HTMLElement>('[role="tabpanel"][hidden]'),
+    )
+      .map((panel) => panel.textContent ?? '')
+      .join(' ');
+
+    expect(hiddenText).toContain('Engineering cost controls');
+    expect(hiddenText).toContain('Service driver split');
+    expect(hiddenText).toContain('Architecture & engineering evidence');
+    expect(hiddenText).not.toContain('Executive decision brief');
+    // Same reasoning: these live in hidden panels rather than being unrendered.
+    const calculatorLink = container.querySelector<HTMLAnchorElement>(
+      'a[href="https://calculator.aws/#/"]',
+    );
+    expect(calculatorLink?.closest('[role="tabpanel"]')?.hasAttribute('hidden')).toBe(true);
+    expect(hiddenText).toContain('Resource name');
+    expect(hiddenText).toContain('Export CSV');
     expect(text(container)).not.toContain('SKU/spec pending API field');
 
     unmount();
@@ -1395,44 +1404,40 @@ describe('App', () => {
     }
   });
 
-  it('keeps relocated features functional inside a single accessible detail gate', async () => {
+  it('keeps relocated features reachable through an accessible tab strip', async () => {
     const client = clientMock();
     const { container, unmount } = render(<App client={client} />);
 
     await click(buttonByText(container, 'Compare costs'));
     await settleAsyncEffects();
 
-    const disclosures = Array.from(container.querySelectorAll<HTMLElement>('.result-disclosure'));
-    expect(disclosures).toHaveLength(1);
+    // The detail gate is a tablist. This is its accessibility contract: every tab
+    // points at a real panel, exactly one is selected, and only the selected tab
+    // is in the tab order so the arrow keys own movement between them.
+    const tabs = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    expect(tabs).toHaveLength(4);
     expect(
-      disclosures.every(
-        (details) => details.dataset.open === 'false' && details.dataset.mounted === 'false',
+      tabs.every((tab) =>
+        Boolean(document.getElementById(tab.getAttribute('aria-controls') ?? '')),
       ),
     ).toBe(true);
-    expect(
-      disclosures.every(
-        (details) =>
-          disclosureSummary(details).getAttribute('aria-expanded') === 'false' &&
-          Boolean(
-            document.getElementById(disclosureSummary(details).getAttribute('aria-controls') ?? ''),
-          ),
-      ),
-    ).toBe(true);
+    expect(tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true')).toHaveLength(1);
+    expect(tabs.filter((tab) => tab.tabIndex === 0)).toHaveLength(1);
 
-    const detailGate = resultDisclosureByTitle(
-      container,
-      'Show full breakdown, pricing models & export options',
-    );
-    await click(disclosureSummary(detailGate));
-    expect(detailGate.dataset.open).toBe('true');
-    expect(detailGate.dataset.mounted).toBe('true');
-    expect(disclosureSummary(detailGate).getAttribute('aria-expanded')).toBe('true');
-    expect(detailGate.querySelector('.result-disclosure-panel')?.getAttribute('aria-hidden')).toBe(
-      'false',
-    );
+    const panels = Array.from(container.querySelectorAll<HTMLElement>('[role="tabpanel"]'));
+    expect(panels.filter((panel) => !panel.hasAttribute('hidden'))).toHaveLength(1);
+
+    await selectResultTab(container, 'Cost controls');
+    const controlsTab = tabs.find((tab) => tab.textContent?.trim() === 'Cost controls');
+    expect(controlsTab?.getAttribute('aria-selected')).toBe('true');
+    expect(
+      document
+        .getElementById(controlsTab?.getAttribute('aria-controls') ?? '')
+        ?.hasAttribute('hidden'),
+    ).toBe(false);
+
     expect(text(container)).toContain('Executive decision brief');
     expect(text(container)).toContain('Export summary');
-    expect(detailGate.dataset.open).toBe('true');
     expect(text(container)).toContain('Engineering cost controls');
     expect(text(container)).toContain('Service driver split');
     expect(text(container)).toContain('Provider cost by mapped service family');
@@ -1473,7 +1478,7 @@ describe('App', () => {
     expect(text(container)).toContain(
       'Create a real read-only report link scoped to this workload, pricing model, and time granularity.',
     );
-    await click(buttonByText(detailGate, 'Create & copy link'));
+    await click(buttonByText(container, 'Create & copy link'));
     expect(client.createWorkload).toHaveBeenCalledWith(
       expect.objectContaining({ region: 'us-east' }),
     );
@@ -1511,18 +1516,21 @@ describe('App', () => {
     expect(text(container)).toContain('PDF report generated and downloaded.');
     expect(buttonByText(container, 'PDF downloaded')).toBeInstanceOf(HTMLButtonElement);
 
-    expect(detailGate.dataset.open).toBe('true');
     expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);
     expect(text(container)).toContain('Executive decision brief');
     expect(text(container)).toContain('Export summary');
     expect(text(container)).toContain('Filter by tag');
 
-    await click(disclosureSummary(detailGate));
-    expect(detailGate.dataset.open).toBe('false');
-    expect(detailGate.dataset.mounted).toBe('true');
-    expect(detailGate.querySelector('.result-disclosure-panel')?.getAttribute('aria-hidden')).toBe(
-      'true',
+    // Switching tabs hides the previous panel rather than unmounting it.
+    await selectResultTab(container, 'Executive brief');
+    const controls = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="tab"]')).find(
+      (tab) => tab.textContent?.trim() === 'Cost controls',
     );
+    expect(
+      document
+        .getElementById(controls?.getAttribute('aria-controls') ?? '')
+        ?.hasAttribute('hidden'),
+    ).toBe(true);
 
     unmount();
   }, 15_000);
@@ -1550,14 +1558,7 @@ describe('App', () => {
         await validateDeferred.promise;
       });
 
-      await click(
-        disclosureSummary(
-          resultDisclosureByTitle(
-            container,
-            'Show full breakdown, pricing models & export options',
-          ),
-        ),
-      );
+      await selectResultTab(container, 'Calculators & exports');
       await click(buttonByText(container, 'Refresh live catalog'));
 
       expect(
@@ -1589,11 +1590,7 @@ describe('App', () => {
     const { container, unmount } = render(<App client={client} />);
 
     await click(buttonByText(container, 'Compare costs'));
-    await click(
-      disclosureSummary(
-        resultDisclosureByTitle(container, 'Show full breakdown, pricing models & export options'),
-      ),
-    );
+    await selectResultTab(container, 'Cost controls');
     await click(buttonByText(container, 'Generate Terraform'));
     await settleAsyncEffects();
 
@@ -1631,11 +1628,7 @@ describe('App', () => {
     const { container, unmount } = render(<App client={client} />);
 
     await click(buttonByText(container, 'Compare costs'));
-    await click(
-      disclosureSummary(
-        resultDisclosureByTitle(container, 'Show full breakdown, pricing models & export options'),
-      ),
-    );
+    await selectResultTab(container, 'Cost controls');
 
     const wrappers = Array.from(
       container.querySelectorAll('.table-wrap, .bulk-service-table-wrap'),
@@ -1685,11 +1678,7 @@ describe('App', () => {
 
     expect(text(container)).not.toContain('Comparison ready.');
     expect(container.querySelector('.requirement-summary-strip')).toBeInstanceOf(HTMLElement);
-    await click(
-      disclosureSummary(
-        resultDisclosureByTitle(container, 'Show full breakdown, pricing models & export options'),
-      ),
-    );
+    await selectResultTab(container, 'Cost controls');
     expect(buttonByText(container, 'Refresh live catalog').disabled).toBe(false);
     expect(buttonByText(container, 'PDF').disabled).toBe(false);
     expect(container.querySelectorAll('.provider-summary-card')).toHaveLength(3);
@@ -1777,11 +1766,7 @@ describe('App', () => {
     await changeInput(inputById(container, 'sla-target'), '99.95%');
 
     await click(buttonByText(container, 'Compare'));
-    const detailGate = resultDisclosureByTitle(
-      container,
-      'Show full breakdown, pricing models & export options',
-    );
-    await click(disclosureSummary(detailGate));
+    await selectResultTab(container, 'Cost controls');
     await click(buttonByText(container, 'Yearly'));
     await click(buttonByText(container, 'Refresh live catalog'));
     await click(buttonByText(container, 'PDF'));
@@ -3832,26 +3817,22 @@ function comparisonHistoryButtonByText(container: HTMLElement, label: string): H
   return button;
 }
 
-function resultDisclosureByTitle(container: HTMLElement, title: string): HTMLElement {
-  const disclosure = Array.from(container.querySelectorAll<HTMLElement>('.result-disclosure')).find(
-    (details) => disclosureSummary(details).textContent?.includes(title),
+/**
+ * Selects a result tab.
+ *
+ * Replaces the old "expand the disclosure" step: the comparison detail is a tab
+ * strip now, so reaching a panel means choosing it the way a user does.
+ */
+async function selectResultTab(container: HTMLElement, label: string): Promise<void> {
+  const tab = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="tab"]')).find(
+    (candidate) => candidate.textContent?.trim() === label,
   );
 
-  if (!(disclosure instanceof HTMLElement)) {
-    throw new Error(`Result disclosure not found: ${title}`);
+  if (!tab) {
+    throw new Error(`Result tab not found: ${label}`);
   }
 
-  return disclosure;
-}
-
-function disclosureSummary(details: HTMLElement): HTMLButtonElement {
-  const summary = details.querySelector('.result-disclosure-heading');
-
-  if (!(summary instanceof HTMLButtonElement)) {
-    throw new Error('Result disclosure button not found');
-  }
-
-  return summary;
+  await click(tab);
 }
 
 function mobileProviderLabels(container: HTMLElement): string[] {

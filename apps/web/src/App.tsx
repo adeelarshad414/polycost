@@ -295,6 +295,7 @@ import {
   type LoadingStep,
 } from './components/LoadingExperience';
 import { PersonaComparisonWorkspace } from './components/PersonaComparisonWorkspace';
+import { ResultTabs, type ResultTab } from './components/ResultTabs';
 import { ThemeSwitcher } from './components/ThemeSwitcher';
 import { TopLoadingBar } from './components/TopLoadingBar';
 import { HOURS_PER_MONTH } from './cost-time';
@@ -5064,32 +5065,32 @@ function ProgressiveComparisonPage({
               />
             </div>
 
-            <div className="result-disclosure-stack" aria-label="Additional comparison details">
-              <ResultDisclosureSection
-                title="Show full breakdown, pricing models & export options"
-                description="Expand for cost periods, charts, commitment scenarios, budget alerts, sharing, architecture evidence, calculators, and exports."
-              >
-                <StateDetailContent
-                  busyAction={busyAction}
-                  client={client}
-                  comparison={comparison}
-                  comparisonAnalytics={comparisonAnalytics}
-                  comparisonPricingEvidence={comparisonPricingEvidence}
-                  comparisonPricingEvidenceError={comparisonPricingEvidenceError}
-                  error={error}
-                  exportingFormat={exportingFormat}
-                  completedExportFormat={completedExportFormat}
-                  form={submittedForm}
-                  interval={interval}
-                  pricingModel={pricingModel}
-                  regionCatalog={regionCatalog}
-                  onExport={onExport}
-                  onIntervalChange={onIntervalChange}
-                  onPricingModelChange={onPricingModelChange}
-                  onRefreshLive={onRefreshLive}
-                  isComparisonPricingEvidenceLoading={isComparisonPricingEvidenceLoading}
-                />
-              </ResultDisclosureSection>
+            {/*
+              No longer behind a disclosure. That toggle existed to hide a very
+              long scroll; the tab strip does that job better, and nesting tabs
+              inside a "show more" made the detail harder to reach than before.
+            */}
+            <div className="result-detail-stack" aria-label="Comparison detail">
+              <StateDetailContent
+                busyAction={busyAction}
+                client={client}
+                comparison={comparison}
+                comparisonAnalytics={comparisonAnalytics}
+                comparisonPricingEvidence={comparisonPricingEvidence}
+                comparisonPricingEvidenceError={comparisonPricingEvidenceError}
+                error={error}
+                exportingFormat={exportingFormat}
+                completedExportFormat={completedExportFormat}
+                form={submittedForm}
+                interval={interval}
+                pricingModel={pricingModel}
+                regionCatalog={regionCatalog}
+                onExport={onExport}
+                onIntervalChange={onIntervalChange}
+                onPricingModelChange={onPricingModelChange}
+                onRefreshLive={onRefreshLive}
+                isComparisonPricingEvidenceLoading={isComparisonPricingEvidenceLoading}
+              />
             </div>
           </>
         )}
@@ -5338,105 +5339,134 @@ function StateDetailContent({
 }) {
   const isLoading = busyAction === 'compare' || busyAction === 'refresh';
 
-  return (
-    <div className="state-detail-stack state-detail-stack-combined">
-      <section className="state-detail-panel" aria-label="Executive recommendation and export">
-        <ResultDetailHeading
-          title="Executive decision brief"
-          description="A plain-language recommendation, forecast, and board-ready PDF summary export."
-        />
-        <ExecutiveDecisionDashboard
-          comparison={comparison}
-          analytics={comparisonAnalytics}
-          form={form}
-          regionCatalog={regionCatalog}
-          exportingFormat={exportingFormat}
-          isLoading={isLoading}
-          onExport={onExport}
-        />
-      </section>
-
-      <section className="state-detail-panel" aria-label="Engineering cost controls">
-        <ResultDetailHeading
-          title="Engineering cost controls"
-          description="Cost periods, commitment scenarios, compute/storage/egress mix, budget alerts, currency, and share workflow."
-        />
-        <EngineeringAnalyticsDashboard comparison={comparison} interval={interval} />
-        <ServiceCheapestMatrix comparison={comparison} interval={interval} />
-        <ProductionDepthAnalytics
-          comparison={comparison}
-          form={form}
-          serverAnalytics={comparisonAnalytics}
-        />
-        <FullCostMatrixTable comparison={comparison} />
-        <CostFormulaEvidence comparison={comparison} />
-        <PricingEvidencePanel
-          evidence={comparisonPricingEvidence}
-          error={comparisonPricingEvidenceError}
-          isLoading={isComparisonPricingEvidenceLoading}
-        />
-        <ComparisonToolbar interval={interval} onIntervalChange={onIntervalChange} />
-        <FinOpsFeatureLayer
-          client={client}
-          comparison={comparison}
-          form={form}
-          interval={interval}
-          isLoading={isLoading}
-          pricingModelPreference={pricingModel}
-          onPricingModelPreferenceChange={onPricingModelChange}
-        />
-      </section>
-
-      <section className="state-detail-panel" aria-label="Architecture and engineering evidence">
-        <ResultDetailHeading
-          title="Architecture & engineering evidence"
-          description="Solution architecture review, governance checks, sortable resource rows, CSV export, and API-facing JSON."
-        />
-        <ArchitectureWorkspace comparison={comparison} interval={interval} form={form} />
-        <TerraformGenerationPanel client={client} comparison={comparison} form={form} />
-        <PersonaComparisonWorkspace
-          comparison={comparison}
-          interval={interval}
-          form={form}
-          defaultViewMode="engineering"
-          emptyStateMessage="Run a comparison to populate engineering rows, export controls, and API-facing cost evidence."
-          isLoading={isLoading}
-          error={error}
-          exportingFormat={exportingFormat}
-          onExport={onExport}
-          showViewSwitcher={false}
-        />
-      </section>
-
-      <section
-        className="state-detail-panel"
-        aria-label="Official calculators, regions, and exports"
-      >
-        <ResultDetailHeading
-          title="Official calculators, regions & exports"
-          description="Provider calculator links, official region references, live catalog refresh, and PDF/CSV/Excel report downloads."
-        />
-        <CloudCalculatorLinks regionCatalog={regionCatalog} />
-        <div className="progressive-export-panel">
-          <ExportBar
-            disabled={busyAction !== null && busyAction !== 'export'}
-            completedExportFormat={completedExportFormat}
+  const resultTabs: ResultTab[] = [
+    {
+      id: 'executive',
+      label: 'Executive brief',
+      hint: 'Plain-language recommendation, forecast, and the board-ready PDF summary.',
+      content: (
+        <section className="state-detail-panel" aria-label="Executive recommendation and export">
+          <ResultDetailHeading
+            title="Executive decision brief"
+            description="A plain-language recommendation, forecast, and board-ready PDF summary export."
+          />
+          <ExecutiveDecisionDashboard
+            comparison={comparison}
+            analytics={comparisonAnalytics}
+            form={form}
+            regionCatalog={regionCatalog}
             exportingFormat={exportingFormat}
+            isLoading={isLoading}
             onExport={onExport}
           />
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={onRefreshLive}
-            loading={busyAction === 'refresh'}
-            loadingLabel="Refreshing..."
-            disabled={busyAction !== null && busyAction !== 'refresh'}
-          >
-            <RefreshIcon />
-            Refresh live catalog
-          </Button>
-        </div>
-      </section>
+        </section>
+      ),
+    },
+    {
+      id: 'controls',
+      label: 'Cost controls',
+      hint: 'Periods, commitment scenarios, service mix, budget alerts, currency, and sharing.',
+      content: (
+        <section className="state-detail-panel" aria-label="Engineering cost controls">
+          <ResultDetailHeading
+            title="Engineering cost controls"
+            description="Cost periods, commitment scenarios, compute/storage/egress mix, budget alerts, currency, and share workflow."
+          />
+          <EngineeringAnalyticsDashboard comparison={comparison} interval={interval} />
+          <ServiceCheapestMatrix comparison={comparison} interval={interval} />
+          <ProductionDepthAnalytics
+            comparison={comparison}
+            form={form}
+            serverAnalytics={comparisonAnalytics}
+          />
+          <FullCostMatrixTable comparison={comparison} />
+          <CostFormulaEvidence comparison={comparison} />
+          <PricingEvidencePanel
+            evidence={comparisonPricingEvidence}
+            error={comparisonPricingEvidenceError}
+            isLoading={isComparisonPricingEvidenceLoading}
+          />
+          <ComparisonToolbar interval={interval} onIntervalChange={onIntervalChange} />
+          <FinOpsFeatureLayer
+            client={client}
+            comparison={comparison}
+            form={form}
+            interval={interval}
+            isLoading={isLoading}
+            pricingModelPreference={pricingModel}
+            onPricingModelPreferenceChange={onPricingModelChange}
+          />
+        </section>
+      ),
+    },
+    {
+      id: 'architecture',
+      label: 'Architecture',
+      hint: 'Solution review, governance checks, resource rows, and API-facing JSON.',
+      content: (
+        <section className="state-detail-panel" aria-label="Architecture and engineering evidence">
+          <ResultDetailHeading
+            title="Architecture & engineering evidence"
+            description="Solution architecture review, governance checks, sortable resource rows, CSV export, and API-facing JSON."
+          />
+          <ArchitectureWorkspace comparison={comparison} interval={interval} form={form} />
+          <TerraformGenerationPanel client={client} comparison={comparison} form={form} />
+          <PersonaComparisonWorkspace
+            comparison={comparison}
+            interval={interval}
+            form={form}
+            defaultViewMode="engineering"
+            emptyStateMessage="Run a comparison to populate engineering rows, export controls, and API-facing cost evidence."
+            isLoading={isLoading}
+            error={error}
+            exportingFormat={exportingFormat}
+            onExport={onExport}
+            showViewSwitcher={false}
+          />
+        </section>
+      ),
+    },
+    {
+      id: 'exports',
+      label: 'Calculators & exports',
+      hint: 'Provider calculator links, region references, live refresh, and report downloads.',
+      content: (
+        <section
+          className="state-detail-panel"
+          aria-label="Official calculators, regions, and exports"
+        >
+          <ResultDetailHeading
+            title="Official calculators, regions & exports"
+            description="Provider calculator links, official region references, live catalog refresh, and PDF/CSV/Excel report downloads."
+          />
+          <CloudCalculatorLinks regionCatalog={regionCatalog} />
+          <div className="progressive-export-panel">
+            <ExportBar
+              disabled={busyAction !== null && busyAction !== 'export'}
+              completedExportFormat={completedExportFormat}
+              exportingFormat={exportingFormat}
+              onExport={onExport}
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={onRefreshLive}
+              loading={busyAction === 'refresh'}
+              loadingLabel="Refreshing..."
+              disabled={busyAction !== null && busyAction !== 'refresh'}
+            >
+              <RefreshIcon />
+              Refresh live catalog
+            </Button>
+          </div>
+        </section>
+      ),
+    },
+  ];
+
+  return (
+    <div className="state-detail-stack state-detail-stack-combined">
+      <ResultTabs tabs={resultTabs} />
     </div>
   );
 }
@@ -5761,69 +5791,6 @@ function ProviderSummaryCards({
             </article>
           );
         })}
-      </div>
-    </section>
-  );
-}
-
-function ResultDisclosureSection({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: ReactNode;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [hasOpened, setHasOpened] = useState(false);
-  const headingId = `result-disclosure-${toId(title)}`;
-  const bodyId = `${headingId}-body`;
-  const actionLabel = isOpen ? 'Hide full breakdown' : title;
-  const actionDescription = isOpen
-    ? 'Collapse detailed cost periods, charts, commitment scenarios, budget alerts, sharing, architecture evidence, calculators, and exports.'
-    : description;
-
-  function handleToggle() {
-    setIsOpen((current) => {
-      const nextOpen = !current;
-      if (nextOpen) {
-        setHasOpened(true);
-      }
-
-      return nextOpen;
-    });
-  }
-
-  return (
-    <section
-      className="result-disclosure"
-      aria-labelledby={headingId}
-      data-open={isOpen ? 'true' : 'false'}
-      data-mounted={hasOpened ? 'true' : 'false'}
-    >
-      <button
-        type="button"
-        className="result-disclosure-heading"
-        aria-controls={bodyId}
-        aria-expanded={isOpen}
-        aria-label={`${actionLabel}. ${actionDescription}`}
-        onClick={handleToggle}
-      >
-        <span>
-          <strong id={headingId}>{actionLabel}</strong> <small>{actionDescription}</small>
-        </span>
-        <span className="result-disclosure-chevron" aria-hidden="true">
-          {isOpen ? '-' : '+'}
-        </span>
-      </button>
-      <div
-        id={bodyId}
-        className="result-disclosure-panel"
-        aria-hidden={!isOpen}
-        data-open={isOpen ? 'true' : 'false'}
-      >
-        <div className="result-disclosure-body">{hasOpened ? children : null}</div>
       </div>
     </section>
   );
