@@ -6,16 +6,16 @@ continuation.
 
 ## Stack Detection
 
-| Item                 | Status                                      | Evidence                                                                        |
-| -------------------- | ------------------------------------------- | ------------------------------------------------------------------------------- |
-| Product              | `PolyCost`                                  | `README.md`, `package.json`, `apps/web/src/brand.ts`                            |
-| Frontend framework   | React + Vite + TypeScript                   | `apps/web/src/main.tsx`, `apps/web/vite.config.ts`                              |
-| Styling              | Tailwind directives plus large app CSS file | `apps/web/src/styles.css`, `apps/web/tailwind.config.ts`                        |
-| Theme mode support   | Implemented, needs v2 audit                 | `apps/web/src/theme.ts`, `ThemeSwitcher.tsx`, `index.html` pre-hydration script |
-| Accent axis support  | Not built                                   | No `data-accent`, accent storage key, or Accent control found                   |
-| Dedicated token file | Not built                                   | Raw token hex values live in `apps/web/src/styles.css`                          |
-| shadcn/ui            | Not present                                 | No shadcn config or component imports found                                     |
-| Router               | Single SPA route with internal anchors      | `App.tsx`, `LandingPage.tsx`; no React Router/file router present               |
+| Item                 | Status                                              | Evidence                                                                        |
+| -------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Product              | `PolyCost`                                          | `README.md`, `package.json`, `apps/web/src/brand.ts`                            |
+| Frontend framework   | React + Vite + TypeScript                           | `apps/web/src/main.tsx`, `apps/web/vite.config.ts`                              |
+| Styling              | Tailwind 4 CSS-first config plus large app CSS file | `apps/web/src/styles.css` (holds both the `@theme` block and the app CSS)       |
+| Theme mode support   | Implemented, needs v2 audit                         | `apps/web/src/theme.ts`, `ThemeSwitcher.tsx`, `index.html` pre-hydration script |
+| Accent axis support  | Not built                                           | No `data-accent`, accent storage key, or Accent control found                   |
+| Dedicated token file | Not built                                           | Raw token hex values live in `apps/web/src/styles.css`                          |
+| shadcn/ui            | Not present                                         | No shadcn config or component imports found                                     |
+| Router               | Single SPA route with internal anchors              | `App.tsx`, `LandingPage.tsx`; no React Router/file router present               |
 
 ## Routes / Screens
 

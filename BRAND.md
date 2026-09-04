@@ -27,7 +27,7 @@ pair the logomark with alternate wordmark typography.
 ## Color Tokens
 
 Brand provider accent tokens live in `apps/web/src/styles.css` and are exposed through
-Tailwind in `apps/web/tailwind.config.ts`.
+Tailwind in the `@theme` block at the top of `apps/web/src/styles.css`. (Tailwind 4 moved theme configuration out of `tailwind.config.ts` and into CSS.)
 
 | Token                 | Value     | Use                                         |
 | --------------------- | --------- | ------------------------------------------- |

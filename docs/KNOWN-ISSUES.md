@@ -84,10 +84,10 @@ fails.** Carried forward from Phase 3.
 
 ## 🟠 K-11 · Three dependency majors are blocked behind an ESM migration
 
-|            |                                                        |
-| ---------- | ------------------------------------------------------ |
-| **Status** | 🟢 Blocker cleared 2026-09-02 — upgrades not yet taken |
-| **Found**  | 2026-08-31, while clearing the Dependabot queue        |
+|            |                                                                           |
+| ---------- | ------------------------------------------------------------------------- |
+| **Status** | 🟠 Tailwind 4 taken 2026-09-04 — TS 7 and @nestjs/config blocked upstream |
+| **Found**  | 2026-08-31, while clearing the Dependabot queue                           |
 
 The API is CommonJS (`module: commonjs`, ts-jest, `moduleResolution: node`). Three
 major upgrades each fail on that, for the same underlying reason:
@@ -134,6 +134,59 @@ risk. What matters is that it now _works_ when TypeScript 7 requires it.
 blocker is gone, so #168 (TypeScript 7) can be retried directly. #170
 (Tailwind 4) was never an ESM problem — it is a CSS-first rewrite touching ~397
 utility usages and still needs a human looking at the rendered UI.
+
+### ✅ / ⛔ Outcome (2026-09-04) — one taken, two genuinely blocked
+
+Each of the three was attempted against the running toolchain rather than
+assessed on paper. They did not turn out to be the same kind of problem.
+
+**#170 Tailwind 3 → 4 — taken.** The ~397 figure in the table above was a
+substring count and overstated the work: most of those matches were project
+class names that merely contain `grid` or `flex`. A token-level count against
+`styles.css` gives **292 distinct utilities** genuinely used and not defined
+locally, of which only **79 usages across 8 colour families** touch the custom
+theme. The whole `tailwind.config.ts` was `colors` mapping to CSS custom
+properties plus one keyframe/animation pair that nothing referenced — so it
+ported to a CSS `@theme` block almost mechanically.
+
+One thing the local build hid and the container build caught: `apps/web`
+declared its own `tailwindcss@^3.4.17`, so a clean `npm ci` gave the web
+workspace a nested Tailwind 3 while the root had 4. `@import 'tailwindcss'`
+then resolved to Tailwind 3's `lib/index.js` and postcss-import tried to parse
+JavaScript as CSS — _"Unknown word 'use strict'"_. The version now lives only in
+`apps/web`, where the build actually runs.
+
+Verified in the browser on the container build, not from a passing `vite build`:
+29 elements resolving `bg-surface-0` to `#f4f5fb` through the
+`--color-surface-0` → `--surface-0` chain, `text-xs` at 12px, `font-semibold` at
+600, and the provider cards still carrying their AWS/Azure/GCP tints.
+
+**#168 TypeScript 5 → 7 — blocked by ts-jest, not by us.** The architectural
+blocker really was cleared: with the config change below, all three workspaces
+report **0 errors on TypeScript 7.0.2**. The suite is what stops it.
+TypeScript 7 is the native compiler and does not expose the JavaScript compiler
+API `ts-jest` needs; `ts-jest@29.4.12` (latest) declares
+`typescript: ">=4.3 <7"` outright, and all 71 API suites fail to run on TS 7
+with a single message. Taking it today means running two compilers — TS 7 for
+build, an aliased `@typescript/typescript6` for tests — for a compiler still
+publishing `7.0.0-dev.*` previews. Not worth it yet; revisit when ts-jest
+supports 7.
+
+What _did_ land from this attempt is the config that TypeScript 7 will require:
+`tsconfig.base.json` no longer sets `moduleResolution: "node"` (that is node10,
+removed in TS 7 — it made the repo fail with `TS5108` before anything else), and
+the API moved to `module`/`moduleResolution: node16`. `apps/api/package.json` is
+`"type": "commonjs"`, so the emit is unchanged — `dist/main.js` is still
+`"use strict"` plus `require()`. Verified 0 errors and 784 passing tests on both
+TypeScript 5.9.3 and 7.0.2.
+
+**#171 `@nestjs/config` 4 → 12 — blocked, and it is the ESM migration.** Not a
+packaging oversight that a newer patch fixes: 12.0.0 is `"type": "module"` and
+its `exports` map offers only `import` and `default`, both pointing at the same
+ESM file. There is no CommonJS build to fall back to, so a CJS API cannot
+`require` it at all. This is option 1 from the analysis above — Nest bootstrap,
+ts-jest, and every `require`-shaped assumption — and should be planned
+deliberately, not taken under Dependabot pressure.
 
 ## 🟠 K-12 · The `impeccable` gate silently skips on CI's Node version
 

@@ -1,7 +1,16 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "module": "commonjs",
+    // node16 rather than commonjs + the old node10 resolution. TypeScript 7
+    // removes moduleResolution "node10" outright, and the base config's
+    // "moduleResolution": "node" was exactly that - so the repo could not
+    // typecheck at all on TS 7 (TS5108). apps/api/package.json declares
+    // "type": "commonjs", so node16 still emits CommonJS; this changes how
+    // modules are resolved, not what is emitted. Verified: 0 errors on both
+    // TypeScript 5.9.3 and 7.0.2, 784 API tests pass, and dist/main.js is
+    // still "use strict" + require(). See K-11.
+    "module": "node16",
+    "moduleResolution": "node16",
     "outDir": "dist",
     "rootDir": "src",
     "emitDecoratorMetadata": true,
