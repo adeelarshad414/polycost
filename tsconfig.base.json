@@ -1,7 +1,10 @@
 {
+  // No "moduleResolution" here on purpose: the three projects need different
+  // ones (node16 for the CommonJS API, bundler for the web app and the shared
+  // types), and the value that used to sit here - "node", i.e. node10 - is
+  // removed in TypeScript 7. See K-11.
   "compilerOptions": {
     "target": "ES2022",
-    "moduleResolution": "node",
     "strict": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,

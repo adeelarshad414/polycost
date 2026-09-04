@@ -1,6 +1,73 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/*
+  Tailwind 4 replaces the three @tailwind directives with a single import, and
+  moves theme configuration out of tailwind.config.ts and into CSS. The @theme
+  block below is that config: every entry used to be a `colors` key in the
+  config file, and each still resolves to the same custom property, so the
+  utility names the app already uses are unchanged.
+*/
+@import 'tailwindcss';
+
+@theme {
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-orange: var(--brand-orange);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-green: var(--brand-green);
+  --color-brand-orange-dark: var(--brand-orange-dark);
+  --color-brand-blue-dark: var(--brand-blue-dark);
+  --color-brand-green-dark: var(--brand-green-dark);
+
+  --color-surface-canvas: var(--surface-canvas);
+  --color-surface-card: var(--surface-card);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+
+  --color-line: var(--border-default);
+  --color-line-strong: var(--border-strong);
+
+  --color-ink-900: var(--ink-900);
+  --color-ink-600: var(--ink-600);
+  --color-ink-400: var(--ink-400);
+
+  --color-status-ok: var(--status-ok);
+  --color-status-warn: var(--status-warn);
+  --color-status-crit: var(--status-crit);
+
+  --color-provider-aws: var(--aws);
+  --color-provider-azure: var(--azure);
+  --color-provider-gcp: var(--gcp);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+
+  --color-action-primary: var(--primary-action);
+  --color-action-primary-hover: var(--primary-action-hover);
+  --color-action-primary-active: var(--primary-action-active);
+  --color-action-destructive: var(--destructive);
+
+  --color-landing-bg: var(--pc-landing-bg);
+  --color-landing-surface-1: var(--pc-landing-surface-1);
+  --color-landing-border: var(--pc-landing-border);
+  --color-landing-border-strong: var(--pc-landing-border-strong);
+  --color-landing-text-primary: var(--pc-landing-text-primary);
+  --color-landing-text-secondary: var(--pc-landing-text-secondary);
+  --color-landing-text-muted: var(--pc-landing-text-muted);
+  --color-landing-action-primary: var(--pc-landing-primary-action);
+  --color-landing-destructive: var(--pc-landing-destructive);
+  --color-landing-label-aws: var(--pc-landing-aws-label);
+  --color-landing-label-azure: var(--pc-landing-azure-label);
+  --color-landing-label-gcp: var(--pc-landing-gcp-label);
+  --color-landing-cost-down: var(--pc-landing-cost-down);
+  --color-landing-cost-up: var(--pc-landing-cost-up);
+}
 
 * {
   box-sizing: border-box;
