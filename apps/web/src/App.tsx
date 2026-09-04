@@ -5763,6 +5763,17 @@ function ProviderSummaryCards({
   const providerResults = new Map<ProviderId, ComparisonProviderResult>(
     comparison.providers.map((provider) => [provider.providerId, provider]),
   );
+  const costs = comparison.providers.map((provider) => costForInterval(provider, interval));
+  const lowestCost = costs.length > 0 ? Math.min(...costs) : undefined;
+  // Rank, deliberately not share-of-spend. These three are alternatives for the
+  // same workload, not a multi-cloud bill: you pick one. Dividing a provider by
+  // the sum of all three would imply you are paying all of them, which is the
+  // kind of number that survives into a slide and misleads someone.
+  const rankByProvider = new Map<ProviderId, number>(
+    [...comparison.providers]
+      .sort((a, b) => costForInterval(a, interval) - costForInterval(b, interval))
+      .map((provider, index) => [provider.providerId, index + 1]),
+  );
 
   return (
     <section className="provider-summary-results" aria-label="Provider cost summary">
@@ -5770,6 +5781,12 @@ function ProviderSummaryCards({
         {PROVIDER_ORDER.map((providerId) => {
           const provider = providerResults.get(providerId);
           const isCheapest = comparison.cheapestProviderId === providerId && Boolean(provider);
+          const cost = provider ? costForInterval(provider, interval) : undefined;
+          const rank = rankByProvider.get(providerId);
+          const overLowest =
+            cost !== undefined && lowestCost !== undefined && lowestCost > 0
+              ? (cost - lowestCost) / lowestCost
+              : undefined;
 
           return (
             <article
@@ -5777,23 +5794,62 @@ function ProviderSummaryCards({
               className={`provider-summary-card provider-summary-card-${providerId}`}
               aria-labelledby={`summary-${providerId}-title`}
             >
-              {isCheapest ? <span className="lowest-badge">Best value</span> : null}
               <div className="provider-summary-heading">
                 <div>
                   <h2 id={`summary-${providerId}-title`}>{providerLabel(providerId)}</h2>
                   <span>{providerSubtitle(providerId)}</span>
                 </div>
+                {rank !== undefined ? (
+                  <span className="provider-summary-share">
+                    #{rank} of {rankByProvider.size}
+                  </span>
+                ) : null}
               </div>
               <strong className="provider-summary-total">
-                {provider ? formatCurrency(costForInterval(provider, interval)) : 'Unavailable'}
+                {cost !== undefined ? formatCurrency(cost) : 'Unavailable'}
               </strong>
               <span className="provider-summary-period">{capitalize(interval)} estimate</span>
+              {provider ? (
+                <span className="provider-summary-services">{topServiceSummary(provider)}</span>
+              ) : null}
+              <span className="provider-summary-delta">
+                {isCheapest ? (
+                  <span className="provider-summary-best">Lowest cost for this workload</span>
+                ) : overLowest !== undefined ? (
+                  `${(overLowest * 100).toFixed(1)}% above the lowest-cost option`
+                ) : (
+                  'Not priced for this workload'
+                )}
+              </span>
             </article>
           );
         })}
       </div>
     </section>
   );
+}
+
+/**
+ * The two or three services driving a provider's cost, as one line.
+ *
+ * A total on its own does not tell an architect anything actionable; knowing it
+ * is mostly database rather than mostly compute does. Kept to three so the line
+ * stays scannable, and to line items that actually cost something - a list
+ * padded with $0.00 rows reads as noise.
+ */
+function topServiceSummary(provider: ComparisonProviderResult): string {
+  const drivers = [...provider.lineItems]
+    .filter((item) => item.baseMonthlyCostUsd > 0)
+    .sort((a, b) => b.baseMonthlyCostUsd - a.baseMonthlyCostUsd)
+    .slice(0, 3);
+
+  if (drivers.length === 0) {
+    return 'No priced line items';
+  }
+
+  return drivers
+    .map((item) => `${item.description} ${formatCurrency(item.baseMonthlyCostUsd)}`)
+    .join(' · ');
 }
 
 function ResultDetailHeading({ title, description }: { title: string; description: string }) {
