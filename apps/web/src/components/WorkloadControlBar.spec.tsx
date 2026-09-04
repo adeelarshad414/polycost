@@ -152,6 +152,53 @@ describe('WorkloadControlBar', () => {
     unmount();
   });
 
+  it('says so when the result no longer matches the levers', () => {
+    // The failure this exists for: a live recompute that errors leaves the
+    // previous figures on screen while the levers already read the new
+    // workload. Without this the numbers are silently wrong for the inputs
+    // shown directly above them.
+    const { container, unmount } = render(
+      <WorkloadControlBar dimensions={[dimension()]} choices={[]} variant="live" stale />,
+    );
+
+    const notice = container.querySelector('.workload-control-stale');
+    expect(notice?.getAttribute('role')).toBe('status');
+    expect(notice?.textContent).toContain('have not caught up');
+
+    unmount();
+  });
+
+  it('stays quiet while the result matches', () => {
+    const { container, unmount } = render(
+      <WorkloadControlBar dimensions={[dimension()]} choices={[]} variant="live" />,
+    );
+
+    expect(container.querySelector('.workload-control-stale')).toBeNull();
+
+    unmount();
+  });
+
+  it('titles the live variant as a heading below the page heading', () => {
+    // Beside a result this is a control strip within the result, not a second
+    // top-level section, so it must not open another h2 in the outline.
+    const { container, unmount } = render(
+      <WorkloadControlBar
+        dimensions={[dimension()]}
+        choices={[]}
+        variant="live"
+        title="Adjust and recompare"
+      />,
+    );
+
+    expect(container.querySelector('h2')).toBeNull();
+    expect(container.querySelector('h3')?.textContent).toBe('Adjust and recompare');
+    expect(container.querySelector('section')?.getAttribute('aria-label')).toBe(
+      'Adjust and recompare',
+    );
+
+    unmount();
+  });
+
   it('keeps segment buttons out of form submission', () => {
     const { container, unmount } = render(
       <WorkloadControlBar

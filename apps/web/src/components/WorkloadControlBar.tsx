@@ -53,19 +53,46 @@ export function WorkloadControlBar({
   dimensions,
   choices,
   note,
+  title = 'Workload inputs',
+  /**
+   * The result below no longer matches these levers - a recompute failed or has
+   * not landed. Says so rather than letting the numbers be read as current.
+   */
+  stale = false,
+  /**
+   * Renders the same levers above an existing result rather than above the
+   * form. Same controls, same state - only the framing differs, because next
+   * to a result these are for adjusting an answer, not composing a question.
+   */
+  variant = 'form',
   children,
 }: {
   dimensions: ControlDimension[];
   choices: Array<ControlChoice<string>>;
   note?: string;
+  title?: string;
+  stale?: boolean;
+  variant?: 'form' | 'live';
   /** The full workload form, behind a disclosure. */
   children?: ReactNode;
 }) {
   return (
-    <section className="workload-control-bar" aria-label="Workload inputs">
+    <section
+      className={
+        variant === 'live'
+          ? 'workload-control-bar workload-control-bar-live'
+          : 'workload-control-bar'
+      }
+      aria-label={title}
+    >
       <div className="workload-control-heading">
-        <h2>Workload inputs</h2>
+        {variant === 'live' ? <h3>{title}</h3> : <h2>{title}</h2>}
         {note ? <p>{note}</p> : null}
+        {stale ? (
+          <p className="workload-control-stale" role="status">
+            The figures below are from the previous inputs and have not caught up with these levers.
+          </p>
+        ) : null}
       </div>
 
       <div className="workload-control-sliders">

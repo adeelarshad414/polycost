@@ -10496,10 +10496,42 @@ select:disabled {
   box-shadow: var(--shadow-card);
 }
 
-.workload-control-heading h2 {
+.workload-control-heading h2,
+.workload-control-heading h3 {
   margin: 0;
   font-size: 1rem;
   color: var(--ink-900);
+}
+
+/*
+  Beside a result the bar is a control strip, not the page's main input. It
+  keeps the same levers and the same spacing rhythm, and gives up the card
+  elevation so it reads as attached to the result above it rather than as
+  another competing panel.
+*/
+.workload-control-bar-live {
+  gap: 14px;
+  padding: 16px 20px;
+  border-color: var(--border-subtle);
+  background: var(--surface-raised);
+  box-shadow: none;
+}
+
+.workload-control-bar-live .workload-control-heading h3 {
+  font-size: 0.9375rem;
+}
+
+.workload-control-stale {
+  margin: 6px 0 0;
+  font-size: 0.8125rem;
+  color: var(--warning-text);
+}
+
+@media print {
+  /* A printed report is a record of one estimate; controls are noise on paper. */
+  .workload-control-bar-live {
+    display: none;
+  }
 }
 
 .workload-control-heading p {
