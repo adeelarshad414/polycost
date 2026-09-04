@@ -10367,3 +10367,114 @@ select:disabled {
     display: block !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Cost by service (interface revamp, phase 3)
+
+   Horizontal bars scaled against the largest category rather than the total, so
+   small categories stay visible instead of collapsing to a sliver. The share
+   sits on the row for the absolute reading.
+   --------------------------------------------------------------------------- */
+
+.cost-by-service {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-card);
+}
+
+.cost-by-service-heading span {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+  margin-bottom: 3px;
+}
+
+.cost-by-service-heading h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--ink-900);
+}
+
+.cost-by-service-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.cost-by-service-row {
+  display: grid;
+  grid-template-columns: 1fr 48px;
+  grid-template-areas:
+    'label share'
+    'track share';
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 5px;
+}
+
+.cost-by-service-label {
+  grid-area: label;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.875rem;
+  color: var(--ink-600);
+}
+
+.cost-by-service-label strong {
+  color: var(--ink-900);
+  font-variant-numeric: tabular-nums;
+}
+
+.cost-by-service-track {
+  grid-area: track;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+
+.cost-by-service-bar {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--category-operations);
+}
+
+.cost-by-service-bar-compute {
+  background: var(--category-compute);
+}
+.cost-by-service-bar-storage {
+  background: var(--category-storage);
+}
+.cost-by-service-bar-database {
+  background: var(--category-database);
+}
+.cost-by-service-bar-network {
+  background: var(--category-network);
+}
+.cost-by-service-bar-support {
+  background: var(--category-support);
+}
+.cost-by-service-bar-licensing {
+  background: var(--category-licensing);
+}
+.cost-by-service-bar-operations {
+  background: var(--category-operations);
+}
+
+.cost-by-service-share {
+  grid-area: share;
+  text-align: right;
+  font-size: 0.8125rem;
+  color: var(--ink-400);
+  font-variant-numeric: tabular-nums;
+}
