@@ -295,6 +295,7 @@ import {
   type LoadingStep,
 } from './components/LoadingExperience';
 import { PersonaComparisonWorkspace } from './components/PersonaComparisonWorkspace';
+import { CostByService } from './components/CostByService';
 import { ResultTabs, type ResultTab } from './components/ResultTabs';
 import { ThemeSwitcher } from './components/ThemeSwitcher';
 import { TopLoadingBar } from './components/TopLoadingBar';
@@ -4981,6 +4982,14 @@ function ProgressiveComparisonPage({
   onRefreshLive: () => void;
   onExport: (format: ReportFormat) => void;
 }) {
+  // The option the page is recommending; the service breakdown follows it rather
+  // than pinning to a provider the reader has not been pointed at.
+  const cheapestProviderResult = comparison
+    ? (comparison.providers.find(
+        (provider) => provider.providerId === comparison.cheapestProviderId,
+      ) ?? comparison.providers[0])
+    : undefined;
+
   return (
     <section className="progressive-results" id="requirements" aria-label="Cost comparison results">
       <div className="progressive-results-inner">
@@ -5055,6 +5064,15 @@ function ProgressiveComparisonPage({
             />
 
             <ProviderSummaryCards comparison={comparison} interval={interval} />
+
+            {/*
+              What am I paying for, for the option actually being recommended.
+              The provider cards answer which cloud; this answers where the money
+              goes, which is the question that changes an architecture.
+            */}
+            {cheapestProviderResult ? (
+              <CostByService provider={cheapestProviderResult} formatCost={formatCurrency} />
+            ) : null}
 
             <div className="progressive-analytics-stack" aria-label="Executive analytics">
               <ExecutiveAnalyticsPreview
