@@ -10478,3 +10478,185 @@ select:disabled {
   color: var(--ink-400);
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------------------------------------------------------------------------
+   Workload control bar (interface revamp, phase 4)
+
+   Four headline levers above the full model. The bar and the detailed form read
+   and write the same state, so this is a summary rather than a second form.
+   --------------------------------------------------------------------------- */
+
+.workload-control-bar {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-card);
+}
+
+.workload-control-heading h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--ink-900);
+}
+
+.workload-control-heading p {
+  margin: 3px 0 0;
+  font-size: 0.8125rem;
+  color: var(--ink-400);
+}
+
+.workload-control-sliders {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 18px 24px;
+}
+
+.workload-control-slider label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.workload-control-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+.workload-control-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.workload-control-value strong {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--ink-900);
+  font-variant-numeric: tabular-nums;
+}
+
+.workload-control-value em {
+  font-style: normal;
+  font-size: 0.75rem;
+  color: var(--ink-400);
+}
+
+.workload-control-slider input[type='range'] {
+  width: 100%;
+  accent-color: var(--brand-600);
+  cursor: pointer;
+}
+
+.workload-control-slider input[type='range']:focus-visible {
+  outline: 2px solid var(--brand-600);
+  outline-offset: 3px;
+}
+
+.workload-control-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 32px;
+}
+
+.workload-control-choice {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.workload-control-choice legend {
+  padding: 0;
+  margin-bottom: 7px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+.workload-control-segmented {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface-raised);
+  border-radius: var(--radius-pill);
+}
+
+.workload-control-segment {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--ink-600);
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.workload-control-segment:hover {
+  color: var(--ink-900);
+}
+
+.workload-control-segment-active,
+.workload-control-segment-active:hover {
+  background: var(--brand-600);
+  color: var(--on-brand);
+}
+
+.workload-control-segment:focus-visible {
+  outline: 2px solid var(--brand-600);
+  outline-offset: 2px;
+}
+
+.workload-control-detail {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  margin-top: 16px;
+}
+
+.workload-control-detail > summary {
+  cursor: pointer;
+  padding: 14px 18px;
+  font-weight: 600;
+  color: var(--ink-900);
+  border-radius: var(--radius-card);
+}
+
+.workload-control-detail > summary span {
+  display: block;
+  margin-top: 2px;
+  font-weight: 400;
+  font-size: 0.8125rem;
+  color: var(--ink-400);
+}
+
+.workload-control-detail > summary:focus-visible {
+  outline: 2px solid var(--brand-600);
+  outline-offset: -2px;
+}
+
+.workload-control-detail[open] > summary {
+  border-bottom: 1px solid var(--border-default);
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workload-control-segment {
+    transition: none;
+  }
+}

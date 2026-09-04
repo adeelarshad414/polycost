@@ -296,6 +296,13 @@ import {
 } from './components/LoadingExperience';
 import { PersonaComparisonWorkspace } from './components/PersonaComparisonWorkspace';
 import { CostByService } from './components/CostByService';
+import {
+  WorkloadControlBar,
+  capacityUnit,
+  formatCapacity,
+  type ControlChoice,
+  type ControlDimension,
+} from './components/WorkloadControlBar';
 import { ResultTabs, type ResultTab } from './components/ResultTabs';
 import { ThemeSwitcher } from './components/ThemeSwitcher';
 import { TopLoadingBar } from './components/TopLoadingBar';
@@ -4325,6 +4332,82 @@ function InitialHomePage({
   requirementsFileName: string | null;
   diagramFileName: string | null;
 }) {
+  // The four headline levers, bound to the same fields the detailed form edits.
+  // Ranges are chosen to cover the workloads this tool is used for without the
+  // slider becoming useless at the small end: a two-vCPU dev box and a
+  // 500-vCPU fleet both need to be reachable.
+  const headlineDimensions: ControlDimension[] = [
+    {
+      id: 'vcpu',
+      label: 'Compute',
+      unit: 'vCPU',
+      value: clampNumber(parseInputNumber(form.vcpu) ?? 2, 1, 512),
+      min: 1,
+      max: 512,
+      step: 1,
+      onChange: (value) => update('vcpu', String(value)),
+    },
+    {
+      id: 'storage',
+      label: 'Storage',
+      unit: capacityUnit(clampNumber(parseInputNumber(form.storageSizeGb) ?? 0, 0, 262144)),
+      value: clampNumber(parseInputNumber(form.storageSizeGb) ?? 0, 0, 262144),
+      min: 0,
+      max: 262144,
+      step: 64,
+      format: formatCapacity,
+      onChange: (value) => updateStorageSize(String(value)),
+    },
+    {
+      id: 'egress',
+      label: 'Egress / transfer',
+      unit: capacityUnit(clampNumber(parseInputNumber(form.monthlyEgressGb) ?? 0, 0, 131072)),
+      value: clampNumber(parseInputNumber(form.monthlyEgressGb) ?? 0, 0, 131072),
+      min: 0,
+      max: 131072,
+      step: 32,
+      format: formatCapacity,
+      onChange: (value) => update('monthlyEgressGb', String(value)),
+    },
+    {
+      id: 'ai',
+      label: 'AI & ML',
+      unit: 'GPU hrs',
+      value: clampNumber(parseInputNumber(form.aiTrainingGpuHours) ?? 0, 0, 5000),
+      min: 0,
+      max: 5000,
+      step: 10,
+      onChange: (value) => update('aiTrainingGpuHours', String(value)),
+    },
+  ];
+
+  const headlineChoices: Array<ControlChoice<string>> = [
+    {
+      id: 'region',
+      label: 'Region',
+      value: form.regionPreference,
+      // The three primary groups only. The full catalogue - and its residency
+      // and compliance gating - stays in the detailed form, where the
+      // catalog-backed picker belongs.
+      options: COMPARISON_REGION_GROUPS.slice(0, 3).map((group) => ({
+        value: group.id,
+        label: group.label,
+      })),
+      onChange: (value) => update('regionPreference', value),
+    },
+    {
+      id: 'commitment',
+      label: 'Commitment',
+      value: form.commitmentPreferencePercent,
+      options: [
+        { value: '0', label: 'On-demand' },
+        { value: '65', label: 'Partial' },
+        { value: '100', label: 'Full' },
+      ],
+      onChange: (value) => update('commitmentPreferencePercent', value),
+    },
+  ];
+
   function update<K extends keyof WorkloadFormState>(key: K, value: WorkloadFormState[K]) {
     onChange(applyResidencyRegionLock({ ...form, [key]: value }));
   }
@@ -4416,125 +4499,146 @@ function InitialHomePage({
                 {requirementsAwaitingReview ? 'Confirm & compare' : 'Compare costs'}
               </Button>
             </div>
-            <div className="initial-home-fields">
-              {requirementsAwaitingReview ? (
-                <TextField
-                  label="Name"
-                  value={form.workloadName}
-                  onChange={(value) => update('workloadName', value)}
+            {/*
+              The four levers that dominate a cloud bill, above the full model.
+              PolyCost models over a hundred fields, which is exactly why this
+              exists: a reader can move the estimate immediately and open the
+              rest when they need it. Both read and write the same form state.
+            */}
+            <WorkloadControlBar
+              note="Adjust the headline levers, or open the full model below."
+              dimensions={headlineDimensions}
+              choices={headlineChoices}
+            />
+
+            <details className="workload-control-detail">
+              <summary>
+                Full workload model
+                <span>
+                  compute sizing, storage classes, databases, networking, security, AI, and
+                  operations
+                </span>
+              </summary>
+              <div className="initial-home-fields">
+                {requirementsAwaitingReview ? (
+                  <TextField
+                    label="Name"
+                    value={form.workloadName}
+                    onChange={(value) => update('workloadName', value)}
+                  />
+                ) : null}
+                <SelectField
+                  label="Service category"
+                  value={form.selectedServiceCategory}
+                  options={serviceCategoryOptions()}
+                  onChange={updateServiceCategory}
                 />
-              ) : null}
-              <SelectField
-                label="Service category"
-                value={form.selectedServiceCategory}
-                options={serviceCategoryOptions()}
-                onChange={updateServiceCategory}
-              />
-              <SelectField
-                label="Specific service"
-                value={form.selectedServiceFamilyId}
-                options={serviceFamilyOptions(form.selectedServiceCategory)}
-                onChange={(value) => update('selectedServiceFamilyId', value)}
-              />
-              <SelectField
-                label="Workload type"
-                value={form.workloadType}
-                options={[
-                  ['web_app', 'Web app'],
-                  ['api_backend', 'API backend'],
-                  ['static_site', 'Static site'],
-                  ['batch_processing', 'Batch'],
-                  ['data_pipeline', 'Data pipeline'],
-                  ['ml_workload', 'ML workload'],
-                  ['other', 'Other'],
-                ]}
-                onChange={(value) => update('workloadType', value)}
-              />
-              <SelectField
-                label="Instance tier"
-                value={form.instanceTier}
-                options={INSTANCE_TIER_OPTIONS}
-                onChange={updateInstanceTier}
-              />
-              <SelectField
-                label="Architecture"
-                value={form.processorArchitecture}
-                options={PROCESSOR_ARCHITECTURE_OPTIONS}
-                onChange={(value) => update('processorArchitecture', value)}
-              />
-              <SelectField
-                label="Tenancy"
-                value={form.computeTenancy}
-                options={COMPUTE_TENANCY_OPTIONS}
-                onChange={(value) => update('computeTenancy', value)}
-              />
-              <TextField
-                label="vCPU"
-                value={form.vcpu}
-                inputMode="decimal"
-                suffix="cores"
-                error={fieldErrors.vcpu}
-                onChange={(value) => update('vcpu', value)}
-              />
-              <TextField
-                label="Memory GB"
-                value={form.memoryGb}
-                inputMode="decimal"
-                suffix="GB"
-                error={fieldErrors.memoryGb}
-                onChange={(value) => update('memoryGb', value)}
-              />
-              <ComputeSizingAssistant form={form} compact onApply={applyComputeSizing} />
-              <RegionSelectField
-                value={form.regionPreference}
-                dataResidency={form.dataResidency}
-                complianceLocked={form.complianceLocked}
-                regionCatalog={regionCatalog}
-                regionCatalogError={regionCatalogError}
-                compact
-                onChange={(value) => update('regionPreference', value)}
-              />
-              <SelectField
-                label="Environment"
-                value={form.environment}
-                options={ENVIRONMENT_OPTIONS}
-                onChange={(value) => update('environment', value)}
-              />
-              <SelectField
-                label="OS / license"
-                value={form.operatingSystem}
-                options={OPERATING_SYSTEM_OPTIONS}
-                onChange={(value) => update('operatingSystem', value)}
-              />
-              <SelectField
-                label="Support"
-                value={form.supportTier}
-                options={SUPPORT_TIER_OPTIONS}
-                onChange={(value) => update('supportTier', value)}
-              />
-              <SelectField
-                label="Usage"
-                value={form.usagePattern}
-                options={USAGE_PATTERN_OPTIONS}
-                onChange={(value) => update('usagePattern', value)}
-              />
-              <TextField
-                label="Availability zones"
-                value={form.availabilityZoneCount}
-                inputMode="numeric"
-                suffix="AZs"
-                onChange={(value) => update('availabilityZoneCount', value)}
-              />
-              <RangeField
-                label="Commitment fit"
-                value={form.commitmentPreferencePercent}
-                min={0}
-                max={100}
-                suffix="%"
-                error={fieldErrors.commitmentPreferencePercent}
-                onChange={(value) => update('commitmentPreferencePercent', value)}
-              />
-            </div>
+                <SelectField
+                  label="Specific service"
+                  value={form.selectedServiceFamilyId}
+                  options={serviceFamilyOptions(form.selectedServiceCategory)}
+                  onChange={(value) => update('selectedServiceFamilyId', value)}
+                />
+                <SelectField
+                  label="Workload type"
+                  value={form.workloadType}
+                  options={[
+                    ['web_app', 'Web app'],
+                    ['api_backend', 'API backend'],
+                    ['static_site', 'Static site'],
+                    ['batch_processing', 'Batch'],
+                    ['data_pipeline', 'Data pipeline'],
+                    ['ml_workload', 'ML workload'],
+                    ['other', 'Other'],
+                  ]}
+                  onChange={(value) => update('workloadType', value)}
+                />
+                <SelectField
+                  label="Instance tier"
+                  value={form.instanceTier}
+                  options={INSTANCE_TIER_OPTIONS}
+                  onChange={updateInstanceTier}
+                />
+                <SelectField
+                  label="Architecture"
+                  value={form.processorArchitecture}
+                  options={PROCESSOR_ARCHITECTURE_OPTIONS}
+                  onChange={(value) => update('processorArchitecture', value)}
+                />
+                <SelectField
+                  label="Tenancy"
+                  value={form.computeTenancy}
+                  options={COMPUTE_TENANCY_OPTIONS}
+                  onChange={(value) => update('computeTenancy', value)}
+                />
+                <TextField
+                  label="vCPU"
+                  value={form.vcpu}
+                  inputMode="decimal"
+                  suffix="cores"
+                  error={fieldErrors.vcpu}
+                  onChange={(value) => update('vcpu', value)}
+                />
+                <TextField
+                  label="Memory GB"
+                  value={form.memoryGb}
+                  inputMode="decimal"
+                  suffix="GB"
+                  error={fieldErrors.memoryGb}
+                  onChange={(value) => update('memoryGb', value)}
+                />
+                <ComputeSizingAssistant form={form} compact onApply={applyComputeSizing} />
+                <RegionSelectField
+                  value={form.regionPreference}
+                  dataResidency={form.dataResidency}
+                  complianceLocked={form.complianceLocked}
+                  regionCatalog={regionCatalog}
+                  regionCatalogError={regionCatalogError}
+                  compact
+                  onChange={(value) => update('regionPreference', value)}
+                />
+                <SelectField
+                  label="Environment"
+                  value={form.environment}
+                  options={ENVIRONMENT_OPTIONS}
+                  onChange={(value) => update('environment', value)}
+                />
+                <SelectField
+                  label="OS / license"
+                  value={form.operatingSystem}
+                  options={OPERATING_SYSTEM_OPTIONS}
+                  onChange={(value) => update('operatingSystem', value)}
+                />
+                <SelectField
+                  label="Support"
+                  value={form.supportTier}
+                  options={SUPPORT_TIER_OPTIONS}
+                  onChange={(value) => update('supportTier', value)}
+                />
+                <SelectField
+                  label="Usage"
+                  value={form.usagePattern}
+                  options={USAGE_PATTERN_OPTIONS}
+                  onChange={(value) => update('usagePattern', value)}
+                />
+                <TextField
+                  label="Availability zones"
+                  value={form.availabilityZoneCount}
+                  inputMode="numeric"
+                  suffix="AZs"
+                  onChange={(value) => update('availabilityZoneCount', value)}
+                />
+                <RangeField
+                  label="Commitment fit"
+                  value={form.commitmentPreferencePercent}
+                  min={0}
+                  max={100}
+                  suffix="%"
+                  error={fieldErrors.commitmentPreferencePercent}
+                  onChange={(value) => update('commitmentPreferencePercent', value)}
+                />
+              </div>
+            </details>
 
             <details className="initial-optional-estimate">
               <summary>
