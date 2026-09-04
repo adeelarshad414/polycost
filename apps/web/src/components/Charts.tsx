@@ -2,6 +2,13 @@ import { useEffect, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, Tooltip, XAxis, YAxis } from 'recharts';
 import { ProviderId, ServiceCategory } from '../types';
 import { formatCurrency, formatPercent } from '../lib/format';
+import {
+  ChartGradients,
+  chartAxisTick,
+  chartTooltipLabelStyle,
+  chartTooltipStyle,
+  gradientId,
+} from './chart-theme';
 
 // FE-4: the only recharts consumers in the app live here so the ~377 kB charts
 // vendor chunk can be lazy-loaded off the first-paint critical path instead of
@@ -87,28 +94,56 @@ export function ProviderMixDonut({ data }: { data: ProviderMixDatum[] }) {
     );
   }
 
+  // Deliberately the lowest, not the sum. These segments are alternatives for
+  // the same workload, so adding them produces a figure nobody will ever pay -
+  // the donut shows relative share, and the number worth putting in the middle
+  // is what the cheapest option actually costs.
+  const lowest = Math.min(...data.map((entry) => entry.value));
+
   return (
     <div className="provider-mix-layout">
       <div className="provider-mix-chart-shell" role="img" aria-label="Provider cost mix chart">
         <PieChart width={220} height={220}>
+          <ChartGradients
+            ids={data.map((entry) => ({
+              id: gradientId('mix', entry.providerId),
+              color: entry.color,
+            }))}
+          />
           <Pie
             data={data}
             dataKey="value"
             nameKey="name"
             cx="50%"
             cy="50%"
-            innerRadius={58}
-            outerRadius={88}
+            innerRadius={62}
+            outerRadius={92}
             paddingAngle={3}
-            stroke="var(--pc-bg-surface)"
-            strokeWidth={4}
+            cornerRadius={4}
+            stroke="var(--surface-card)"
+            strokeWidth={3}
             isAnimationActive={false}
           >
             {data.map((entry) => (
-              <Cell fill={entry.color} key={entry.providerId} />
+              <Cell fill={`url(#${gradientId('mix', entry.providerId)})`} key={entry.providerId} />
             ))}
           </Pie>
+          <Tooltip
+            formatter={(value) => [formatCurrency(Number(value)), 'Monthly']}
+            contentStyle={chartTooltipStyle}
+            labelStyle={chartTooltipLabelStyle}
+          />
         </PieChart>
+        {/*
+          The hole was empty. Reference dashboards put a total there, but a total
+          would be wrong here: these are alternatives, not a combined bill. The
+          lowest cost is the equivalent actionable number. aria-hidden because
+          the legend below already states every value to assistive tech.
+        */}
+        <div className="provider-mix-center" aria-hidden="true">
+          <span>Lowest</span>
+          <strong>{formatCurrency(lowest)}</strong>
+        </div>
       </div>
       <div className="provider-mix-legend">
         {data.map((entry) => (
@@ -159,31 +194,32 @@ export function EngineeringProviderServiceChart({
               data={provider.services}
               margin={{ top: 10, right: 4, bottom: 0, left: -20 }}
             >
+              <ChartGradients
+                ids={provider.services.map((service) => ({
+                  id: gradientId(provider.providerId, service.category),
+                  color: service.color,
+                }))}
+              />
               <CartesianGrid stroke="var(--pc-chart-grid)" strokeDasharray="3 3" vertical={false} />
               <XAxis
                 dataKey="serviceLabel"
                 interval={0}
-                tick={{ fill: 'var(--pc-text-secondary)', fontSize: 10 }}
+                tick={chartAxisTick}
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis hide />
               <Tooltip
                 cursor={{ fill: 'var(--pc-chart-hover)' }}
-                formatter={(value) => [formatCurrency(Number(value)), 'Cost']}
-                contentStyle={{
-                  background: 'var(--pc-bg-surface)',
-                  border: '1px solid var(--pc-border)',
-                  borderRadius: '8px',
-                  color: 'var(--pc-text-primary)',
-                  fontSize: '12px',
-                }}
+                formatter={(value) => [formatCurrency(Number(value)), 'Monthly']}
+                contentStyle={chartTooltipStyle}
+                labelStyle={chartTooltipLabelStyle}
               />
               <Bar dataKey="value" radius={[6, 6, 2, 2]} isAnimationActive={false}>
                 {provider.services.map((service) => (
                   <Cell
                     key={`${provider.providerId}-${service.category}`}
-                    fill={service.color}
+                    fill={`url(#${gradientId(provider.providerId, service.category)})`}
                     opacity={service.value > 0 ? 1 : 0.2}
                   />
                 ))}

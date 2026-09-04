@@ -10660,3 +10660,35 @@ select:disabled {
     transition: none;
   }
 }
+
+/* Donut centre total (chart revamp). The hole was empty; every reference
+   dashboard puts the figure a reader wants first right there. */
+.provider-mix-chart-shell {
+  position: relative;
+}
+
+.provider-mix-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.provider-mix-center span {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+.provider-mix-center strong {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--ink-900);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
