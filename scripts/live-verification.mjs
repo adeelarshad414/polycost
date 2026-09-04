@@ -134,12 +134,12 @@ async function verifyTemplateRecommendationJourney() {
     await quickActions.waitFor({ state: 'visible', timeout: 15_000 });
     markStep('comparison quick actions visible');
 
-    await page.getByRole('button', { name: /show full breakdown/i }).click();
-    await page.getByRole('button', { name: /hide full breakdown/i }).waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    });
-    markStep('expanded full breakdown');
+    // The detail is a tab strip rather than a disclosure; cost controls is the
+    // panel holding the pricing-model buttons this journey goes on to use.
+    const controlsTab = page.getByRole('tab', { name: 'Cost controls' });
+    await controlsTab.click();
+    await controlsTab.waitFor({ state: 'visible', timeout: 15_000 });
+    markStep('opened cost controls tab');
 
     await page.getByRole('button', { name: /3yr reserved/i }).click();
     markStep('selected reserved 3yr pricing model');
