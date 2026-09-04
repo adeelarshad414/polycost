@@ -786,26 +786,63 @@ summary:focus-visible,
   position: relative;
   display: grid;
   min-width: 0;
-  gap: var(--pc-space-2);
-  border: 1px solid color-mix(in srgb, var(--pc-border) 86%, transparent);
-  border-top-width: 4px;
-  border-radius: 8px;
-  background: var(--pc-bg-surface);
-  box-shadow: var(--pc-shadow-soft);
+  gap: 6px;
+  /* The 4px coloured top border is gone. It read as a rail bolted onto a rounded
+     box, and it is one of the patterns the UI scanner flags (K-12). A wash of
+     the brand hue identifies the vendor without the hardware. */
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-card);
   animation: progressive-panel-enter 180ms ease-out both;
-  padding: var(--pc-space-2);
+  padding: 18px;
 }
 
 .provider-summary-card-aws {
-  border-top-color: var(--pc-provider-aws);
+  background: var(--aws-tint);
+  border-color: color-mix(in srgb, var(--aws) 22%, var(--border-default));
 }
 
 .provider-summary-card-azure {
-  border-top-color: var(--pc-provider-azure);
+  background: var(--azure-tint);
+  border-color: color-mix(in srgb, var(--azure) 22%, var(--border-default));
 }
 
 .provider-summary-card-gcp {
-  border-top-color: var(--pc-provider-gcp);
+  background: var(--gcp-tint);
+  border-color: color-mix(in srgb, var(--gcp) 22%, var(--border-default));
+}
+
+.provider-summary-share {
+  align-self: start;
+  white-space: nowrap;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-card) 72%, transparent);
+  color: var(--ink-600);
+}
+
+.provider-summary-services {
+  font-size: 0.8125rem;
+  color: var(--ink-600);
+  line-height: 1.45;
+}
+
+.provider-summary-delta {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--ink-900) 10%, transparent);
+  font-size: 0.8125rem;
+  color: var(--ink-400);
+}
+
+.provider-summary-best {
+  font-weight: 600;
+  color: var(--status-ok);
 }
 
 .provider-summary-heading {
@@ -831,6 +868,11 @@ summary:focus-visible,
 }
 
 .provider-summary-total {
+  font-size: var(--num-hero);
+  font-weight: 700;
+  letter-spacing: var(--num-display-tracking);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
   color: var(--pc-text-primary);
   font-family: var(--pc-font-display);
   font-size: clamp(var(--pc-text-2xl), 4vw, 3rem);
