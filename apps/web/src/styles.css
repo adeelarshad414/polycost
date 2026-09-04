@@ -525,17 +525,17 @@ summary:focus-visible,
   display: grid;
   min-width: 0;
   gap: 2px;
-  border-left: 3px solid var(--brand-blue);
+  --rail: var(--brand-blue);
   background: color-mix(in srgb, var(--pc-bg-surface-2) 68%, transparent);
   padding: 6px 10px;
 }
 
 .server-analytics-metrics span:nth-child(1) {
-  border-left-color: var(--brand-orange);
+  --rail: var(--brand-orange);
 }
 
 .server-analytics-metrics span:nth-child(3) {
-  border-left-color: var(--brand-green);
+  --rail: var(--brand-green);
 }
 
 .server-analytics-metrics strong {
@@ -656,7 +656,7 @@ summary:focus-visible,
   align-items: center;
   gap: var(--pc-space-2);
   border: 1px solid var(--pc-border);
-  border-left: 4px solid var(--pc-success);
+  --rail: var(--pc-success);
   border-radius: 8px;
   background: color-mix(in srgb, var(--pc-bg-surface-2) 70%, var(--pc-bg-surface));
   padding: 10px 12px;
@@ -1884,8 +1884,7 @@ summary:focus-visible,
   align-content: start;
   gap: var(--pc-space-1);
   border: 1px solid var(--pc-landing-border);
-  border-left-width: 3px;
-  border-radius: 0 8px 8px 0;
+  border-radius: 8px;
   background: var(--pc-landing-surface-1);
   padding: var(--pc-space-2);
 }
@@ -1897,33 +1896,33 @@ summary:focus-visible,
 }
 
 .landing-provider-card-aws {
-  border-left-color: var(--brand-orange);
+  --rail: var(--brand-orange);
 }
 
 .landing-provider-card-azure {
-  border-left-color: var(--brand-blue);
+  --rail: var(--brand-blue);
 }
 
 .landing-provider-card-gcp {
-  border-left-color: var(--brand-green);
+  --rail: var(--brand-green);
 }
 
 .landing-provider-card.is-best-value {
   border-color: var(--pc-landing-primary-action);
-  border-left-color: inherit;
+  --rail: inherit;
   border-width: 2px 2px 2px 3px;
 }
 
 .landing-provider-card-aws.is-best-value {
-  border-left-color: var(--brand-orange);
+  --rail: var(--brand-orange);
 }
 
 .landing-provider-card-azure.is-best-value {
-  border-left-color: var(--brand-blue);
+  --rail: var(--brand-blue);
 }
 
 .landing-provider-card-gcp.is-best-value {
-  border-left-color: var(--brand-green);
+  --rail: var(--brand-green);
 }
 
 .landing-best-badge {
@@ -2503,7 +2502,7 @@ summary:focus-visible,
 
 .workspace-token-output {
   overflow-wrap: anywhere;
-  border-left: 3px solid var(--brand-green);
+  --rail: var(--brand-green);
   background: color-mix(in srgb, var(--brand-green) 8%, transparent);
   padding: 8px 10px;
 }
@@ -2516,14 +2515,14 @@ summary:focus-visible,
 
 .workspace-delivery-output {
   overflow-wrap: anywhere;
-  border-left: 3px solid var(--brand-blue);
+  --rail: var(--brand-blue);
   background: color-mix(in srgb, var(--brand-blue) 8%, transparent);
   font-weight: 700;
   padding: 8px 10px;
 }
 
 .workspace-delivery-output.is-failed {
-  border-left-color: var(--pc-danger);
+  --rail: var(--pc-danger);
   background: color-mix(in srgb, var(--pc-danger) 8%, transparent);
 }
 
@@ -3593,7 +3592,7 @@ select:hover {
   min-width: 0;
   gap: 4px;
   border: 1px solid var(--pc-border);
-  border-left: 3px solid var(--pc-action-primary);
+  --rail: var(--pc-action-primary);
   border-radius: 8px;
   background: var(--pc-bg-surface);
   color: var(--pc-text-primary);
@@ -3607,15 +3606,15 @@ select:hover {
 }
 
 .architecture-template-button:nth-child(3n + 1) {
-  border-left-color: var(--brand-orange);
+  --rail: var(--brand-orange);
 }
 
 .architecture-template-button:nth-child(3n + 2) {
-  border-left-color: var(--brand-blue);
+  --rail: var(--brand-blue);
 }
 
 .architecture-template-button:nth-child(3n) {
-  border-left-color: var(--brand-green);
+  --rail: var(--brand-green);
 }
 
 .architecture-template-button:hover,
@@ -3724,7 +3723,7 @@ select:hover {
   align-items: center;
   gap: var(--pc-space-1);
   border: 1px solid var(--pc-border);
-  border-left: 3px solid var(--pc-action-primary);
+  --rail: var(--pc-action-primary);
   border-radius: 8px;
   background: var(--pc-bg-surface);
   color: var(--pc-text-primary);
@@ -3738,15 +3737,15 @@ select:hover {
 }
 
 .comparison-history-row:nth-child(3n + 1) {
-  border-left-color: var(--brand-orange);
+  --rail: var(--brand-orange);
 }
 
 .comparison-history-row:nth-child(3n + 2) {
-  border-left-color: var(--brand-blue);
+  --rail: var(--brand-blue);
 }
 
 .comparison-history-row:nth-child(3n) {
-  border-left-color: var(--brand-green);
+  --rail: var(--brand-green);
 }
 
 .comparison-history-row:hover,
@@ -3810,7 +3809,7 @@ select:hover {
   display: grid;
   min-width: 0;
   gap: var(--pc-space-0-5);
-  border-left: 3px solid var(--pc-action-primary);
+  --rail: var(--pc-action-primary);
   border-radius: 8px;
   background: var(--pc-bg-surface);
   padding: 10px 12px;
@@ -3895,7 +3894,7 @@ select:hover {
   display: grid;
   gap: 4px;
   min-width: 0;
-  border-left: 3px solid var(--pc-action-primary);
+  --rail: var(--pc-action-primary);
   border-radius: 8px;
   background: color-mix(in srgb, var(--pc-bg-surface-2) 72%, var(--pc-bg-surface));
   padding: 10px 12px;
@@ -3921,17 +3920,17 @@ select:hover {
 }
 
 .requirement-review-card-compute {
-  border-left-color: var(--brand-orange);
+  --rail: var(--brand-orange);
 }
 
 .requirement-review-card-storage,
 .requirement-review-card-database {
-  border-left-color: var(--brand-green);
+  --rail: var(--brand-green);
 }
 
 .requirement-review-card-networking,
 .requirement-review-card-edge {
-  border-left-color: var(--brand-blue);
+  --rail: var(--brand-blue);
 }
 
 .form-summary-chip-profile,
@@ -4296,7 +4295,7 @@ select:hover {
 
 .form-subsection-heading {
   min-height: 32px;
-  border-left: 3px solid var(--pc-action-primary);
+  --rail: var(--pc-action-primary);
   padding-left: var(--pc-space-1);
 }
 
@@ -4658,22 +4657,22 @@ select:hover {
   min-width: 0;
   gap: var(--pc-space-0-5);
   border: 1px solid var(--pc-border);
-  border-left: 3px solid var(--pc-action-primary);
+  --rail: var(--pc-action-primary);
   border-radius: 8px;
   background: color-mix(in srgb, var(--pc-bg-surface-2) 76%, var(--pc-bg-surface));
   padding: 10px 12px;
 }
 
 .service-stat-selected {
-  border-left-color: var(--pc-action-primary);
+  --rail: var(--pc-action-primary);
 }
 
 .service-stat-priced {
-  border-left-color: var(--pc-success);
+  --rail: var(--pc-success);
 }
 
 .service-stat-mapped {
-  border-left-color: var(--pc-info);
+  --rail: var(--pc-info);
 }
 
 .service-stat span,
@@ -5582,7 +5581,6 @@ select:disabled {
   grid-template-columns: minmax(0, 1fr) auto auto;
   gap: var(--pc-space-1);
   align-items: start;
-  border-left-width: 4px;
   border-radius: 8px;
   box-shadow: var(--pc-shadow-soft);
   padding: var(--pc-space-1);
@@ -5606,22 +5604,22 @@ select:disabled {
 
 .pc-toast-info,
 .pc-banner-info {
-  border-left-color: var(--brand-text);
+  --rail: var(--brand-text);
 }
 
 .pc-toast-success,
 .pc-banner-success {
-  border-left-color: var(--pc-success);
+  --rail: var(--pc-success);
 }
 
 .pc-toast-warning,
 .pc-banner-warning {
-  border-left-color: var(--pc-warning);
+  --rail: var(--pc-warning);
 }
 
 .pc-toast-critical,
 .pc-banner-critical {
-  border-left-color: var(--pc-error);
+  --rail: var(--pc-error);
 }
 
 .pc-banner {
@@ -5630,7 +5628,6 @@ select:disabled {
   justify-content: space-between;
   gap: var(--pc-space-2);
   border-radius: 8px;
-  border-left-width: 4px;
   padding: var(--pc-space-1) var(--pc-space-2);
 }
 
@@ -5953,7 +5950,7 @@ select:disabled {
   min-width: 0;
   gap: 5px;
   border: 1px solid var(--pc-border);
-  border-top: 3px solid var(--pc-provider-aws);
+  --rail: var(--pc-provider-aws);
   border-radius: 8px;
   cursor: pointer;
   background: color-mix(in srgb, var(--pc-bg-surface) 88%, var(--pc-bg-surface-2));
@@ -6176,7 +6173,7 @@ select:disabled {
   gap: var(--pc-space-2);
   align-items: center;
   border: 1px solid var(--pc-border);
-  border-left: 4px solid var(--pc-action-primary);
+  --rail: var(--pc-action-primary);
   border-radius: var(--pc-radius-card);
   background:
     linear-gradient(135deg, var(--pc-action-primary-soft) 0, transparent 38%), var(--pc-bg-surface);
@@ -7190,7 +7187,7 @@ select:disabled {
   min-width: 0;
   gap: 6px;
   border: 1px solid var(--pc-border);
-  border-left: 4px solid var(--pc-info);
+  --rail: var(--pc-info);
   border-radius: 8px;
   background: var(--pc-bg-surface);
   padding: 12px;
@@ -7374,7 +7371,7 @@ select:disabled {
   min-width: 0;
   gap: 6px;
   border: 1px solid var(--pc-border);
-  border-left: 4px solid var(--pc-info);
+  --rail: var(--pc-info);
   border-radius: 8px;
   background: var(--pc-bg-surface);
   padding: 12px;
@@ -7440,7 +7437,7 @@ select:disabled {
   min-width: 0;
   gap: 10px;
   border: 1px solid var(--pc-border);
-  border-top: 4px solid var(--pc-border-strong);
+  --rail: var(--pc-border-strong);
   border-radius: 8px;
   background: var(--pc-bg-surface);
   padding: 12px;
@@ -7988,7 +7985,7 @@ select:disabled {
   min-width: 0;
   gap: 6px;
   border: 1px solid var(--pc-border);
-  border-top: 4px solid var(--pc-border-strong);
+  --rail: var(--pc-border-strong);
   border-radius: 8px;
   background: var(--pc-bg-surface);
   padding: 12px;
@@ -8045,22 +8042,22 @@ select:disabled {
   min-width: 0;
   gap: 8px;
   border: 1px solid var(--pc-border);
-  border-top: 4px solid var(--pc-border-strong);
+  --rail: var(--pc-border-strong);
   border-radius: 8px;
   background: var(--pc-bg-surface);
   padding: 12px;
 }
 
 .pricing-evidence-card-aws {
-  border-top-color: var(--pc-provider-aws);
+  --rail: var(--pc-provider-aws);
 }
 
 .pricing-evidence-card-azure {
-  border-top-color: var(--pc-provider-azure);
+  --rail: var(--pc-provider-azure);
 }
 
 .pricing-evidence-card-gcp {
-  border-top-color: var(--pc-provider-gcp);
+  --rail: var(--pc-provider-gcp);
 }
 
 .pricing-evidence-card span {
@@ -8462,18 +8459,18 @@ select:disabled {
   gap: var(--pc-space-0-5);
   min-width: 0;
   border: 1px solid var(--pc-border);
-  border-left: 4px solid var(--pc-action-primary);
+  --rail: var(--pc-action-primary);
   border-radius: 8px;
   background: var(--pc-bg-surface);
   padding: 12px;
 }
 
 .financial-ratio-card:nth-child(2) {
-  border-left-color: var(--pc-provider-azure);
+  --rail: var(--pc-provider-azure);
 }
 
 .financial-ratio-card:nth-child(3) {
-  border-left-color: var(--pc-provider-gcp);
+  --rail: var(--pc-provider-gcp);
 }
 
 .dashboard-grid {
@@ -8594,7 +8591,6 @@ select:disabled {
   gap: var(--pc-space-0-5);
   min-width: 0;
   border: 1px solid var(--pc-border);
-  border-left-width: 4px;
   border-radius: 8px;
   background: var(--pc-bg-surface);
   padding: 12px;
@@ -8609,19 +8605,19 @@ select:disabled {
 }
 
 .architecture-checkpoint-good {
-  border-left-color: var(--pc-success);
+  --rail: var(--pc-success);
 }
 
 .architecture-checkpoint-review {
-  border-left-color: var(--pc-warning);
+  --rail: var(--pc-warning);
 }
 
 .architecture-checkpoint-risk {
-  border-left-color: var(--pc-error);
+  --rail: var(--pc-error);
 }
 
 .architecture-checkpoint-pending {
-  border-left-color: var(--pc-border-strong);
+  --rail: var(--pc-border-strong);
 }
 
 .finops-review {
@@ -8666,22 +8662,22 @@ select:disabled {
   gap: var(--pc-space-0-5);
   min-width: 0;
   border: 1px solid var(--pc-border);
-  border-top: 4px solid var(--pc-action-primary);
+  --rail: var(--pc-action-primary);
   border-radius: 8px;
   background: color-mix(in srgb, var(--pc-bg-surface) 90%, var(--pc-bg-surface-2));
   padding: 12px;
 }
 
 .finops-card-aws {
-  border-top-color: var(--pc-provider-aws);
+  --rail: var(--pc-provider-aws);
 }
 
 .finops-card-azure {
-  border-top-color: var(--pc-provider-azure);
+  --rail: var(--pc-provider-azure);
 }
 
 .finops-card-gcp {
-  border-top-color: var(--pc-provider-gcp);
+  --rail: var(--pc-provider-gcp);
 }
 
 .finops-card > span,
@@ -8739,7 +8735,6 @@ select:disabled {
   align-items: center;
   gap: var(--pc-space-1);
   border: 1px solid var(--pc-border);
-  border-left-width: 4px;
   border-radius: 8px;
   background: var(--pc-bg-surface);
   padding: 10px;
@@ -8764,15 +8759,15 @@ select:disabled {
 }
 
 .provider-fit-preferred {
-  border-left-color: var(--pc-success);
+  --rail: var(--pc-success);
 }
 
 .provider-fit-review {
-  border-left-color: var(--pc-warning);
+  --rail: var(--pc-warning);
 }
 
 .provider-fit-unavailable {
-  border-left-color: var(--pc-border-strong);
+  --rail: var(--pc-border-strong);
 }
 
 .advisor-list {
@@ -10723,4 +10718,118 @@ select:disabled {
   color: var(--ink-900);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
+}
+
+/*
+  Accent rails.
+
+  Each of these families used to carry a 3-4px border down one edge of a card
+  that also has a border-radius. Two things are wrong with that. The thick edge
+  has to taper into the corner arc, which leaves a visible wedge where the 4px
+  side meets the 1px one. And a coloured slab down the left of every card is the
+  single most recognisable stock-template tell there is - it was on nineteen
+  different components here, which is what made it read as a default rather than
+  a decision.
+
+  The signal itself is worth keeping: on a banner the colour is severity, on a
+  provider card it is the cloud, on a template button it is the category. So the
+  rail stays and only its geometry changes - a rounded bar inset from both ends,
+  drawn as a pseudo-element, sitting inside a card whose own border is a uniform
+  1px and whose corners are unbroken.
+
+  Colour arrives through --rail, so every existing state and provider modifier
+  keeps working by setting one custom property instead of a border colour.
+*/
+
+.architecture-checkpoint,
+.architecture-risk-card,
+.architecture-template-button,
+.comparison-history-row,
+.data-health-banner,
+.decision-brief,
+.financial-ratio-card,
+.form-subsection-heading,
+.form-summary-chip,
+.landing-provider-card,
+.pc-banner,
+.pc-toast,
+.production-depth-card,
+.provider-fit,
+.requirement-review-card,
+.service-stat,
+.workspace-delivery-output,
+.workspace-token-output,
+.server-analytics-metrics span,
+.finops-card,
+.formula-evidence-card,
+.pricing-evidence-card,
+.tco-signal-card,
+.terraform-target-card {
+  position: relative;
+}
+
+.architecture-checkpoint::before,
+.architecture-risk-card::before,
+.architecture-template-button::before,
+.comparison-history-row::before,
+.data-health-banner::before,
+.decision-brief::before,
+.financial-ratio-card::before,
+.form-subsection-heading::before,
+.form-summary-chip::before,
+.landing-provider-card::before,
+.pc-banner::before,
+.pc-toast::before,
+.production-depth-card::before,
+.provider-fit::before,
+.requirement-review-card::before,
+.service-stat::before,
+.workspace-delivery-output::before,
+.workspace-token-output::before,
+.server-analytics-metrics span::before,
+.finops-card::before,
+.formula-evidence-card::before,
+.pricing-evidence-card::before,
+.tco-signal-card::before,
+.terraform-target-card::before {
+  content: '';
+  position: absolute;
+  border-radius: var(--pc-radius-pill, 999px);
+  background: var(--rail, transparent);
+  /* Decoration only - never intercept a click meant for the card. */
+  pointer-events: none;
+}
+
+.architecture-checkpoint::before,
+.architecture-risk-card::before,
+.architecture-template-button::before,
+.comparison-history-row::before,
+.data-health-banner::before,
+.decision-brief::before,
+.financial-ratio-card::before,
+.form-subsection-heading::before,
+.form-summary-chip::before,
+.landing-provider-card::before,
+.pc-banner::before,
+.pc-toast::before,
+.production-depth-card::before,
+.provider-fit::before,
+.requirement-review-card::before,
+.service-stat::before,
+.workspace-delivery-output::before,
+.workspace-token-output::before,
+.server-analytics-metrics span::before {
+  /* 1px clears the card's own border; the vertical inset keeps the rail clear
+     of the corner radius at both ends. */
+  inset: 10px auto 10px 1px;
+  width: 3px;
+}
+
+.finops-card::before,
+.formula-evidence-card::before,
+.pricing-evidence-card::before,
+.tco-signal-card::before,
+.terraform-target-card::before {
+  inset: 1px 12px auto 12px;
+  height: 3px;
 }
