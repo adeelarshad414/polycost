@@ -443,6 +443,23 @@ export function App({ client = polyCostClient }: AppProps) {
   const [isEditingRequirements, setIsEditingRequirements] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Read exactly once, here, and passed down. readStoredAuthState() CLEARS an
+  // expired token as a side effect, so calling it in both App and the panel
+  // would swallow the "session expired" notice the second caller needs.
+  const [initialStoredAuth] = useState(() => readStoredAuthState());
+  // The account / team / SSO / reconciliation panel is an operator surface, not
+  // part of the landing page. It stays hidden until asked for, so a first-time
+  // visitor sees the product rather than a sign-in form and two "Admin
+  // required" panels they cannot use. Anyone with a live session - or one that
+  // just expired and needs telling - still gets it straight away.
+  const [workspaceOpen, setWorkspaceOpen] = useState(
+    () =>
+      initialStoredAuth.token !== '' ||
+      initialStoredAuth.expired ||
+      // Someone who followed an invite link came here specifically to join a
+      // team; hiding the panel would strand them on the landing page.
+      readInviteTokenFromUrl() !== '',
+  );
   const [requirementsFileName, setRequirementsFileName] = useState<string | null>(null);
   const [regionCatalog, setRegionCatalog] = useState<RegionCatalogResponse | null>(null);
   const [regionCatalogError, setRegionCatalogError] = useState<string | null>(null);
@@ -1306,9 +1323,18 @@ export function App({ client = polyCostClient }: AppProps) {
 
   function handleSignIn() {
     setError(null);
-    setNotice(
-      'Use the workspace control center below the header to sign in, invite teammates, and import billing exports.',
-    );
+    setNotice(null);
+    setWorkspaceOpen(true);
+
+    // The panel mounts in the same tick, so the scroll is deferred to the next
+    // frame; scrolling now would target an element that does not exist yet.
+    requestAnimationFrame(() => {
+      // Optional call: jsdom and older browsers do not implement scrollIntoView,
+      // and failing to scroll must not break revealing the panel.
+      document
+        .getElementById('workspace')
+        ?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    });
   }
 
   function startAsyncAction(): number {
@@ -1345,12 +1371,15 @@ export function App({ client = polyCostClient }: AppProps) {
         onThemeChange={setThemeChoice}
         onAccentChange={setAccentChoice}
       />
-      <WorkspaceControlCenter
-        client={client}
-        comparisonId={comparison?.comparisonId}
-        onNotice={setNotice}
-        onError={setError}
-      />
+      {workspaceOpen ? (
+        <WorkspaceControlCenter
+          client={client}
+          comparisonId={comparison?.comparisonId}
+          initialStoredAuth={initialStoredAuth}
+          onNotice={setNotice}
+          onError={setError}
+        />
+      ) : null}
       {comparison ? (
         <>
           <h1 id="page-title" className="sr-only">
@@ -1576,15 +1605,17 @@ export function ScrollProgressBar() {
 function WorkspaceControlCenter({
   client,
   comparisonId,
+  initialStoredAuth,
   onNotice,
   onError,
 }: {
   client: PolyCostClient;
   comparisonId?: string;
+  /** Read once by App; see the note there on the clearing side effect. */
+  initialStoredAuth: { token: string; expired: boolean };
   onNotice: (message: string | null) => void;
   onError: (message: string | null) => void;
 }) {
-  const [initialStoredAuth] = useState(() => readStoredAuthState());
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [token, setToken] = useState(initialStoredAuth.token);
   const [sessionExpiredNotice, setSessionExpiredNotice] = useState(initialStoredAuth.expired);

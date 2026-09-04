@@ -28,6 +28,7 @@ import {
 } from './report-evidence';
 import { PricingModelCost } from '../adapters/common/cloud-provider-adapter';
 import { escapeXml, sanitizeSpreadsheetText } from './report-security';
+import { PROVIDER_BRAND, REPORT_INK } from './report-brand';
 import { buildReportInsights } from './report-insights';
 import { ReportOptions } from './report.types';
 import { createZip } from './zip-writer';
@@ -89,7 +90,7 @@ export class ExcelReportGenerator {
     const workbook = this.workbook(result, options);
     const worksheetEntries = workbook.sheets.map((sheet, index) => ({
       path: `xl/worksheets/sheet${index + 1}.xml`,
-      content: xmlBuffer(worksheetXml(sheet.rows)),
+      content: xmlBuffer(worksheetXml(sheet.rows, sheetTabColor(sheet.name))),
     }));
 
     return createZip([
@@ -897,7 +898,36 @@ function currencyColumns(rows: WorksheetRow[]): Set<number> {
   return columns;
 }
 
-function worksheetXml(rows: WorksheetRow[]): string {
+/**
+ * Tab colour by role, using the same palette as the PDF.
+ *
+ * Decision sheets get the AWS amber so the reader lands on them first, evidence
+ * sheets get Azure blue, and appendices stay neutral. The point is that thirteen
+ * tabs become three groups you can find without reading every label.
+ */
+function sheetTabColor(name: string): string | undefined {
+  const decision = ['Comparison', 'What If', 'Break-Even Summary'];
+  const evidence = [
+    'Architecture Overview',
+    'Provider Cost Detail',
+    'Cost Coverage Map',
+    'Optimization Opportunities',
+    'Egress & Networking Detail',
+    'Region Comparison',
+    'Break-Even Analysis',
+  ];
+
+  if (decision.includes(name)) {
+    return PROVIDER_BRAND.aws.primary;
+  }
+  if (evidence.includes(name)) {
+    return PROVIDER_BRAND.azure.primary;
+  }
+
+  return REPORT_INK.muted;
+}
+
+function worksheetXml(rows: WorksheetRow[], tabColor?: string): string {
   const moneyColumns = currencyColumns(rows);
   // Freeze the first row so column headers stay visible while scrolling a long
   // evidence sheet.
@@ -906,8 +936,14 @@ function worksheetXml(rows: WorksheetRow[]): string {
       ? '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
       : '';
 
+  // A coloured tab is the fastest way to find a sheet in a thirteen-tab
+  // workbook, and it carries the same palette as the PDF so the two exports
+  // read as one document.
+  const tab = tabColor ? `<sheetPr><tabColor rgb="FF${tabColor}"/></sheetPr>` : '';
+
   return xmlDocument(`
     <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+      ${tab}
       ${freezePane}
       <cols>
         <col min="1" max="1" width="30" customWidth="1"/>
@@ -922,18 +958,50 @@ function worksheetXml(rows: WorksheetRow[]): string {
   `);
 }
 
+
 function rowXml(row: WorksheetRow, rowIndex: number, moneyColumns?: Set<number>): string {
   return `<row r="${rowIndex}">${row.cells
-    .map((cell, cellIndex) => {
+    .map((rawCell, cellIndex) => {
       const column = cellIndex + 1;
+      const isMoneyColumn = moneyColumns?.has(column) ?? false;
+      const cell = row.style === undefined && isMoneyColumn ? asNumberIfNumeric(rawCell) : rawCell;
+
       // An explicit row style (title / section heading) always wins. Otherwise a
       // numeric cell in a money column gets the currency format.
-      const style =
-        row.style ?? (typeof cell === 'number' && moneyColumns?.has(column) ? 4 : undefined);
+      const style = row.style ?? (typeof cell === 'number' && isMoneyColumn ? 4 : undefined);
 
       return cellXml(cell, rowIndex, column, style);
     })
     .join('')}</row>`;
+}
+
+/**
+ * Turns '104.27' into 104.27 in money columns.
+ *
+ * The evidence rows are shared with the CSV and PDF exporters, so every value
+ * arrives pre-formatted as a string. Written to a spreadsheet that way, the
+ * currency format never applies and - much worse - the column cannot be summed,
+ * sorted or charted. A cost workbook whose cost column is text is not a
+ * spreadsheet, it is a screenshot.
+ *
+ * Only clean numerics convert. Anything carrying a unit, a range or a note stays
+ * text rather than being silently reinterpreted.
+ */
+function asNumberIfNumeric(cell: CellValue): CellValue {
+  // A FormulaCell is already live; converting it would destroy the formula.
+  if (typeof cell !== 'string') {
+    return cell;
+  }
+
+  const trimmed = cell.trim();
+
+  if (trimmed === '' || !/^-?\d+(\.\d+)?$/.test(trimmed)) {
+    return cell;
+  }
+
+  const parsed = Number(trimmed);
+
+  return Number.isFinite(parsed) ? parsed : cell;
 }
 
 function cellXml(value: CellValue, rowIndex: number, columnIndex: number, style?: number): string {

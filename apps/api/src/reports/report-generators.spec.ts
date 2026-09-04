@@ -1,7 +1,16 @@
 import { ComparisonResult } from '../comparison/comparison.types';
 import { CsvReportGenerator } from './csv-report.generator';
 import { ExcelReportGenerator } from './excel-report.generator';
-import { PdfReportGenerator } from './pdf-report.generator';
+import {
+  PdfReportGenerator,
+  cellText,
+  pdfParagraph,
+  tableLines,
+  textWidth,
+  truncateToWidth,
+  wrapLine,
+  pageContent,
+} from './pdf-report.generator';
 import {
   architectureOverviewRows,
   breakEvenSummaryRows,
@@ -307,7 +316,9 @@ describe('report generators', () => {
     expect(csv).toContain('compute/vm-compute');
     expect(csv).toContain('FinOps Summary');
     expect(csv).toContain('Executive recommendation,gcp is the current cost baseline');
-    expect(csv).toContain('Decision confidence,Medium - 2/3 providers priced; 1 approximate mappings');
+    expect(csv).toContain(
+      'Decision confidence,Medium - 2/3 providers priced; 1 approximate mappings',
+    );
     expect(csv).toContain('Solution architect review');
     expect(csv).toContain('gcp requires service-equivalence');
     expect(csv).toContain('Architecture risk,Medium - validate provider coverage');
@@ -426,10 +437,7 @@ describe('report generators', () => {
           'Data freshness notice',
           '1 data-health alert(s) at 2026-07-02T00:00:00.000Z; refresh cached pricing before final commitment.',
         ],
-        [
-          'Data health status',
-          expect.stringContaining('stale; policy 48h; aws fresh'),
-        ],
+        ['Data health status', expect.stringContaining('stale; policy 48h; aws fresh')],
       ]),
     );
   });
@@ -498,7 +506,10 @@ describe('report generators', () => {
     expect(xlsx).toContain('source diagram:page:main/node:web');
     expect(sourceDiagramRows(diagramComparison)).toEqual(
       expect.arrayContaining([
-        ['Diagram node web evidence', 'Matched Visio stencil AWS19.EC2 -> vm-compute | assumed defaults 2'],
+        [
+          'Diagram node web evidence',
+          'Matched Visio stencil AWS19.EC2 -> vm-compute | assumed defaults 2',
+        ],
         [
           'Diagram node queue evidence',
           'LLM classification, confidence 0.72 for async jobs | assumed defaults 1',
@@ -577,8 +588,12 @@ describe('report generators', () => {
     expect(xlsxText).toContain('Pricing Model Availability');
     expect(xlsxText).toContain('Commitment Payment and TCO');
     expect(xlsxText).toContain('Upfront cash USD');
-    expect(xlsxText).toContain('<t>360</t>');
-    expect(xlsxText).toContain('<t>1872</t>');
+    // Money cells are written as numbers, not inline strings, so the currency
+    // format applies and the column can be summed, sorted and charted. As text
+    // (<t>360</t>) none of that worked.
+    expect(xlsxText).toContain('<v>360</v>');
+    expect(xlsxText).toContain('<v>1872</v>');
+    expect(xlsxText).not.toContain('<t>360</t>');
     expect(xlsxText).toContain('Egress Tiered Breakdown');
     expect(xlsxText).toContain('Optimization Opportunities');
     expect(xlsxText).toContain('Egress &amp; Networking Detail');
@@ -677,21 +692,30 @@ describe('report generators', () => {
     expect(pdfText).toContain('Decision summary');
     expect(pdfText).toContain('Cost baseline: aws ranks #1 for Reserved 3-year');
     expect(pdfText).toContain('Provider ranking');
-    expect(pdfText).toContain('aws | #1 | eligible yes | estimate no | selected $126');
+    // Tabular sections are rendered as real tables now, so the cells are placed
+    // individually rather than concatenated into one pipe-joined line.
+    expect(pdfText).toContain('Provider) Tj');
+    expect(pdfText).toContain('Evidence note) Tj');
+    expect(pdfText).toContain('AWS) Tj');
+    expect(pdfText).toContain('#1) Tj');
     expect(pdfText).toContain('Workload scope');
     expect(pdfText).toContain('Architecture overview');
-    expect(pdfText).toContain('compute | compute/vm-compute');
+    expect(pdfText).toContain('Confidence) Tj');
     expect(pdfText).toContain('FinOps summary');
     expect(pdfText).toContain('Executive recommendation: gcp is the current cost baseline');
     expect(pdfText).toContain('Decision confidence: Medium');
     expect(pdfText).toContain('Solution architect review: gcp requires service-equivalence');
     expect(pdfText).toContain('Architecture risk: Medium');
     expect(pdfText).toContain('Lowest monthly run rate: gcp $20');
-    expect(pdfText).toContain('aws: daily $2.33, weekly $16.34, monthly $71');
+    // Provider totals are a table too; the daily figure is now its own cell.
+    expect(pdfText).toContain('$2.33) Tj');
+    expect(pdfText).toContain('$16.34) Tj');
     expect(pdfText).toContain('Provider cost detail');
-    expect(pdfText).toContain('Provider total | aws | all / all | monthly $71');
+    expect(pdfText).toContain('Provider total) Tj');
+    expect(pdfText).toContain('Scope) Tj');
     expect(pdfText).toContain('Cost coverage map');
-    expect(pdfText).toContain('aws | Compute families and sizing | Covered');
+    expect(pdfText).toContain('Cost dimension) Tj');
+    expect(pdfText).toContain('Coverage) Tj');
     expect(pdfText).toContain('Selected pricing scenario');
     expect(pdfText).toContain('Pricing model availability');
     expect(pdfText).toContain('Commitment payment and TCO');
@@ -701,7 +725,9 @@ describe('report generators', () => {
     expect(pdfText).toContain('Egress and networking detail');
     expect(pdfText).toContain('aws | egress | internet egress | monthly $46.08');
     expect(pdfText).toContain('Optimization opportunities');
-    expect(pdfText).toContain('Commitment coverage | aws Reserved 3-year lowers recurring run rate');
+    expect(pdfText).toContain(
+      'Commitment coverage | aws Reserved 3-year lowers recurring run rate',
+    );
     expect(pdfText).toContain('Region comparison');
     expect(pdfText).toContain('aws | eu-west \\(eu-west-1\\) | modeled monthly $76.68');
     expect(pdfText).toContain('Break-even analysis');
@@ -751,12 +777,11 @@ describe('report generators', () => {
   });
 
   it('builds decision summary, ranking, availability, assumptions, and workload scope rows', () => {
-    expect(decisionSummaryRows(comparison, { interval: 'quarterly', pricingModel: 'reserved-3yr' })).toEqual(
+    expect(
+      decisionSummaryRows(comparison, { interval: 'quarterly', pricingModel: 'reserved-3yr' }),
+    ).toEqual(
       expect.arrayContaining([
-        [
-          'Cost baseline',
-          'aws ranks #1 for Reserved 3-year at $126 quarterly / $42 monthly.',
-        ],
+        ['Cost baseline', 'aws ranks #1 for Reserved 3-year at $126 quarterly / $42 monthly.'],
         [
           'Evidence confidence',
           'Review required - 2/3 providers priced, 1 approximate mapping(s), 1 warning(s).',
@@ -764,7 +789,9 @@ describe('report generators', () => {
       ]),
     );
 
-    expect(providerRankingRows(comparison, { interval: 'quarterly', pricingModel: 'reserved-3yr' })).toEqual(
+    expect(
+      providerRankingRows(comparison, { interval: 'quarterly', pricingModel: 'reserved-3yr' }),
+    ).toEqual(
       expect.arrayContaining([
         ['aws', '#1', 'yes', 'no', '126', '42', '504', '0', '0', '1', 'Three-year commitment.'],
         [
@@ -799,7 +826,10 @@ describe('report generators', () => {
 
     expect(reportAssumptionRows(comparison)).toEqual(
       expect.arrayContaining([
-        ['Pricing source', 'Cached provider catalog rates with 1 warning(s) captured in this export.'],
+        [
+          'Pricing source',
+          'Cached provider catalog rates with 1 warning(s) captured in this export.',
+        ],
         [
           'Approximate mappings',
           '1 line item(s) are approximate and should be reviewed by a solution architect before commitment.',
@@ -914,7 +944,9 @@ describe('report generators', () => {
       ]),
     );
 
-    const baseRequirements = comparison.requirements as NonNullable<ComparisonResult['requirements']>;
+    const baseRequirements = comparison.requirements as NonNullable<
+      ComparisonResult['requirements']
+    >;
     const monitoringOnlyComparison: ComparisonResult = {
       ...comparison,
       requirements: {
@@ -1011,9 +1043,7 @@ describe('report generators', () => {
     );
     const skuMappingRows = skuMappingAppendixRows(comparison);
     const skuMappingColumnCount = skuMappingRows[0].length;
-    expect(skuMappingRows.slice(1).every((row) => row.length === skuMappingColumnCount)).toBe(
-      true,
-    );
+    expect(skuMappingRows.slice(1).every((row) => row.length === skuMappingColumnCount)).toBe(true);
 
     expect(workloadScopeRows(comparison)).toEqual(
       expect.arrayContaining([
@@ -1082,7 +1112,9 @@ describe('report generators', () => {
       '',
       'Not available for this SKU/region.',
     ]);
-    expect(providerRankingRows(spotComparison, { interval: 'yearly', pricingModel: 'spot' })).toEqual(
+    expect(
+      providerRankingRows(spotComparison, { interval: 'yearly', pricingModel: 'spot' }),
+    ).toEqual(
       expect.arrayContaining([
         ['aws', '#1', 'yes', 'yes', '420', '35', '420', '0', '0', '1', spotEstimateCaveat],
       ]),
@@ -1820,7 +1852,9 @@ describe('report generators', () => {
     });
     const rowText = rows.map((row) => row.join(' | ')).join('\n');
 
-    expect(rowText).toContain('Commitment coverage | aws Reserved 1-year lowers recurring run rate');
+    expect(rowText).toContain(
+      'Commitment coverage | aws Reserved 1-year lowers recurring run rate',
+    );
     expect(rowText).not.toContain('Reserved 3-year lowers recurring run rate');
   });
 
@@ -1920,5 +1954,211 @@ describe('ReportService metrics', () => {
     service.generate(comparison, 'xlsx');
 
     expect(await render()).not.toContain(comparison.comparisonId);
+  });
+});
+
+describe('PDF layout primitives', () => {
+  it('measures wider text as wider', () => {
+    expect(textWidth('AWS', 10)).toBeLessThan(textWidth('Google Cloud', 10));
+    expect(textWidth('AWS', 9)).toBeLessThan(textWidth('AWS', 14));
+  });
+
+  describe('truncateToWidth', () => {
+    it('leaves text that already fits', () => {
+      expect(truncateToWidth('AWS', 200, 9)).toBe('AWS');
+    });
+
+    it('truncates with an ellipsis when it does not fit', () => {
+      const result = truncateToWidth('Compute families and sizing coverage', 60, 9);
+
+      expect(result.endsWith('...')).toBe(true);
+      expect(result.length).toBeLessThan('Compute families and sizing coverage'.length);
+    });
+
+    it('never returns an empty string, even in an absurdly narrow column', () => {
+      // A blank cell would silently lose the value; one character plus the
+      // ellipsis at least shows something is there.
+      expect(truncateToWidth('database', 1, 9).length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('tableLines', () => {
+    const headers = ['Provider', 'Monthly'];
+    const rows = [
+      ['AWS', '$104.27'],
+      ['Azure', '$106.89'],
+      ['Google Cloud', '$112.93'],
+    ];
+
+    it('emits a header row plus one row per record', () => {
+      expect(tableLines(headers, rows, [1, 1])).toHaveLength(4);
+    });
+
+    it('gives the header a fill and light text so it reads as a band', () => {
+      const [header] = tableLines(headers, rows, [1, 1]);
+
+      expect(header.bold).toBe(true);
+      expect(header.fill).toBeDefined();
+      expect(header.textColor).toEqual({ red: 1, green: 1, blue: 1 });
+    });
+
+    it('stripes alternate rows rather than ruling every cell', () => {
+      const [, first, second, third] = tableLines(headers, rows, [1, 1]);
+
+      expect(first.fill).toBeUndefined();
+      expect(second.fill).toBeDefined();
+      expect(third.fill).toBeUndefined();
+    });
+
+    it('splits the content width by weight', () => {
+      const [header] = tableLines(headers, rows, [3, 1]);
+      const [wide, narrow] = header.cells ?? [];
+
+      expect(wide.width).toBeGreaterThan(narrow.width * 2.5);
+    });
+
+    it('carries per-column alignment onto every cell', () => {
+      const [, row] = tableLines(headers, rows, [1, 1], ['left', 'right']);
+
+      expect(row.cells?.[0].align).toBe('left');
+      expect(row.cells?.[1].align).toBe('right');
+    });
+
+    it('defaults missing alignments to left', () => {
+      const [, row] = tableLines(headers, rows, [1, 1]);
+
+      expect(row.cells?.[1].align).toBe('left');
+    });
+
+    it('pads a short row rather than dropping the column', () => {
+      const [, row] = tableLines(headers, [['AWS']], [1, 1]);
+
+      expect(row.cells).toHaveLength(2);
+      expect(row.cells?.[1].text).toBe('');
+    });
+  });
+
+  describe('pdfParagraph', () => {
+    it('keeps short text on one line', () => {
+      expect(pdfParagraph(50, 700, 10, 'Short note.', 400)).toHaveLength(1);
+    });
+
+    it('wraps long text instead of running off the page', () => {
+      const long =
+        'Line-item source: same evidence rows used by CSV and XLSX exports; approximate mappings remain labeled in the text section.';
+
+      // This exact string used to be drawn as one unwrapped run and lost its
+      // last words off the right edge of the paper.
+      expect(pdfParagraph(58, 210, 10, long, 200).length).toBeGreaterThan(1);
+    });
+
+    it('does not lose a word that is wider than the line', () => {
+      const rows = pdfParagraph(50, 700, 10, 'supercalifragilisticexpialidocious', 20);
+
+      expect(rows.join(' ')).toContain('supercalifragilistic');
+    });
+
+    it('handles empty text without emitting a stray run', () => {
+      expect(pdfParagraph(50, 700, 10, '', 400)).toHaveLength(0);
+    });
+  });
+});
+
+describe('PDF line layout', () => {
+  describe('wrapLine', () => {
+    it('leaves a short line alone', () => {
+      expect(wrapLine({ text: 'Data freshness', fontSize: 10 })).toHaveLength(1);
+    });
+
+    it('wraps a long line at word boundaries', () => {
+      const line = { text: 'word '.repeat(40).trim(), fontSize: 10 };
+
+      expect(wrapLine(line).length).toBeGreaterThan(1);
+    });
+
+    it('hard-splits a single word too long to fit', () => {
+      // A 300-character SKU or URL has no spaces to break on; without this it
+      // would run off the page.
+      const wrapped = wrapLine({ text: 'x'.repeat(300), fontSize: 10 });
+
+      expect(wrapped.length).toBeGreaterThan(2);
+      expect(wrapped.every((row) => row.text.length <= 96)).toBe(true);
+    });
+
+    it('flushes pending text before hard-splitting a long word', () => {
+      const wrapped = wrapLine({ text: `short prefix ${'y'.repeat(200)}`, fontSize: 10 });
+
+      expect(wrapped[0].text).toContain('short prefix');
+    });
+
+    it('never wraps a table row', () => {
+      // Wrapping would split one record across lines and drop the cell
+      // positions, turning the table back into prose.
+      const row = {
+        text: 'a very long row '.repeat(20),
+        fontSize: 9,
+        cells: [{ text: 'AWS', width: 100 }],
+      };
+
+      expect(wrapLine(row)).toEqual([row]);
+    });
+  });
+
+  describe('pageContent', () => {
+    it('draws a row background before the text it sits behind', () => {
+      const content = pageContent([
+        { text: 'x', fontSize: 9, fill: { red: 0.9, green: 0.9, blue: 0.9 } },
+      ]);
+
+      // Rectangles cannot be drawn inside a BT/ET block, and a fill painted
+      // afterwards would cover the text.
+      expect(content.indexOf(' re f')).toBeLessThan(content.indexOf('BT'));
+    });
+
+    it('places each cell at its own offset', () => {
+      const content = pageContent([
+        {
+          text: 'AWS 104',
+          fontSize: 9,
+          cells: [
+            { text: 'AWS', width: 100 },
+            { text: '104', width: 100 },
+          ],
+        },
+      ]);
+
+      expect(content).toContain('(AWS) Tj');
+      expect(content).toContain('(104) Tj');
+    });
+
+    it('right-aligns a cell by shifting its origin', () => {
+      const left = pageContent([
+        { text: '1', fontSize: 9, cells: [{ text: '1', width: 100, align: 'left' }] },
+      ]);
+      const right = pageContent([
+        { text: '1', fontSize: 9, cells: [{ text: '1', width: 100, align: 'right' }] },
+      ]);
+
+      // A column of costs that does not line up cannot be scanned.
+      expect(right).not.toEqual(left);
+    });
+
+    it('renders a plain line without cells as a single run', () => {
+      const content = pageContent([{ text: 'Decision summary', fontSize: 14 }]);
+
+      expect(content).toContain('(Decision summary) Tj');
+    });
+  });
+});
+
+describe('cellText', () => {
+  it('reads a present cell', () => {
+    expect(cellText(['aws', '104.27'], 1)).toBe('104.27');
+  });
+
+  it('returns empty for a missing cell rather than "undefined"', () => {
+    // Evidence rows are ragged; without this the string "undefined" would be
+    // printed into the table.
+    expect(cellText(['aws'], 4)).toBe('');
   });
 });
