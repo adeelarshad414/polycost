@@ -3081,7 +3081,7 @@ summary:focus-visible,
   border: 1px solid color-mix(in srgb, var(--brand-blue) 34%, var(--pc-border));
   border-radius: 999px;
   background: color-mix(in srgb, var(--brand-blue) 12%, var(--pc-bg-surface));
-  color: var(--brand-blue);
+  color: var(--brand-blue-ink);
   padding: 6px 10px;
 }
 
@@ -3751,17 +3751,17 @@ select:hover {
 
 .comparison-history-best-aws {
   border-color: color-mix(in srgb, var(--brand-orange) 36%, var(--pc-border));
-  color: var(--brand-orange);
+  color: var(--brand-orange-ink);
 }
 
 .comparison-history-best-azure {
   border-color: color-mix(in srgb, var(--brand-blue) 36%, var(--pc-border));
-  color: var(--brand-blue);
+  color: var(--brand-blue-ink);
 }
 
 .comparison-history-best-gcp {
   border-color: color-mix(in srgb, var(--brand-green) 36%, var(--pc-border));
-  color: var(--brand-green);
+  color: var(--brand-green-ink);
 }
 
 .form-summary-chip {
@@ -10230,5 +10230,98 @@ select:disabled {
     break-inside: avoid;
     border-color: var(--pc-ink-200);
     background: var(--surface-1);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Result tabs (interface revamp, phase 1)
+
+   The comparison result was one continuous scroll behind a single disclosure.
+   These four groups already existed as separately headed sections; the tab
+   strip gives them a control surface so a reader can reach exports without
+   travelling through every analysis panel.
+   --------------------------------------------------------------------------- */
+
+.result-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+}
+
+.result-tablist {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface-raised);
+  border-radius: var(--radius-control);
+  overflow-x: auto;
+  /* The strip scrolls rather than wrapping: a tablist that reflows to two rows
+     stops reading as one control. */
+  scrollbar-width: thin;
+}
+
+.result-tab {
+  flex: 1 1 auto;
+  white-space: nowrap;
+  border: 0;
+  background: transparent;
+  color: var(--ink-600);
+  font: inherit;
+  font-weight: 500;
+  font-size: 0.9375rem;
+  padding: 9px 16px;
+  border-radius: calc(var(--radius-control) - 2px);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.result-tab:hover {
+  background: color-mix(in srgb, var(--surface-card) 70%, transparent);
+  color: var(--ink-900);
+}
+
+.result-tab-active,
+.result-tab-active:hover {
+  background: var(--surface-card);
+  color: var(--ink-900);
+  box-shadow: var(--shadow-control);
+}
+
+.result-tab:focus-visible,
+.result-tabpanel:focus-visible {
+  outline: 2px solid var(--brand-600);
+  outline-offset: 2px;
+}
+
+.result-tab-hint {
+  margin: 0;
+  color: var(--ink-400);
+  font-size: 0.875rem;
+}
+
+.result-tabpanel {
+  /* No border or fill: the panels inside already carry their own surfaces, and
+     a second frame around them would nest cards inside cards. */
+  outline-offset: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .result-tab {
+    transition: none;
+  }
+}
+
+@media print {
+  /* Print the whole report, not just the open tab. The tab strip is a screen
+     control and has no meaning on paper. */
+  .result-tablist,
+  .result-tab-hint {
+    display: none;
+  }
+
+  .result-tabpanel[hidden] {
+    display: block !important;
   }
 }

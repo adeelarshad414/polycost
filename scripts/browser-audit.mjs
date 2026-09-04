@@ -285,93 +285,33 @@ async function runScenario(browserInstance, scenario) {
   const executiveMetrics = await collectPageAudit(page, `${scenario.id}:executive`);
   const executiveAxe = await collectAxeAudit(page, `${scenario.id}:executive`);
 
-  const disclosure = page.getByRole('button', { name: /show full breakdown/i });
-  await disclosure.waitFor({ state: 'visible' });
-  await disclosure.scrollIntoViewIfNeeded();
-  const openResult = await page.evaluate(() => {
-    const buttons = [...document.querySelectorAll('.result-disclosure-heading')];
-    const target = buttons.find((button) => /show full breakdown/i.test(button.textContent ?? ''));
-    if (!(target instanceof HTMLButtonElement)) {
-      return {
-        opened: false,
-        buttonCount: buttons.length,
-        buttonTexts: buttons.map((button) => button.textContent?.trim().slice(0, 120) ?? ''),
-      };
-    }
+  // The comparison detail is a tab strip now. Selecting a tab is a plain click
+  // on a real button, so the synthetic pointer-event sequence the disclosure
+  // needed is gone with it.
+  const controlsTab = page.getByRole('tab', { name: 'Cost controls' });
+  await controlsTab.waitFor({ state: 'visible' });
+  await controlsTab.scrollIntoViewIfNeeded();
+  await controlsTab.click();
 
-    target.scrollIntoView({ block: 'center' });
-    for (const eventType of ['pointerdown', 'mousedown', 'mouseup', 'click']) {
-      target.dispatchEvent(
-        new MouseEvent(eventType, {
-          bubbles: true,
-          cancelable: true,
-          view: window,
-        }),
-      );
-    }
-
-    return {
-      opened: true,
-      buttonCount: buttons.length,
-      buttonTexts: buttons.map((button) => button.textContent?.trim().slice(0, 120) ?? ''),
-    };
-  });
-  if (!openResult.opened) {
-    throw new Error(`Could not find result disclosure button: ${JSON.stringify(openResult)}`);
-  }
   try {
     await page.waitForFunction(() => {
-      const disclosureElement = document.querySelector('.result-disclosure');
-      return (
-        disclosureElement?.getAttribute('data-open') === 'true' &&
-        disclosureElement.getAttribute('data-mounted') === 'true'
-      );
+      const selected = document.querySelector('[role="tab"][aria-selected="true"]');
+      const panelId = selected?.getAttribute('aria-controls') ?? '';
+      const panel = panelId ? document.getElementById(panelId) : null;
+      return Boolean(panel) && !panel?.hasAttribute('hidden');
     });
   } catch (error) {
-    const disclosureDebug = await page.evaluate(() => {
-      const disclosure = document.querySelector('.result-disclosure');
-      return {
-        url: window.location.href,
-        open: disclosure?.getAttribute('data-open') ?? null,
-        mounted: disclosure?.getAttribute('data-mounted') ?? null,
-        pageText: document.body.textContent?.trim().replace(/\s+/g, ' ').slice(0, 500) ?? null,
-      };
+    const tabDebug = await page.evaluate(() => ({
+      url: window.location.href,
+      tabs: [...document.querySelectorAll('[role="tab"]')].map((tab) => ({
+        label: tab.textContent?.trim() ?? '',
+        selected: tab.getAttribute('aria-selected'),
+      })),
+      pageText: document.body.textContent?.trim().replace(/\s+/g, ' ').slice(0, 500) ?? null,
+    }));
+    throw new Error(`Result tab did not open its panel: ${JSON.stringify(tabDebug)}`, {
+      cause: error,
     });
-    throw new Error(
-      `Expanded disclosure did not open: ${JSON.stringify({ openResult, disclosureDebug })}`,
-      {
-        cause: error,
-      },
-    );
-  }
-  try {
-    await page.waitForFunction(() => {
-      const body = document.querySelector('.result-disclosure-body');
-      return Boolean(body?.textContent && body.textContent.trim().length > 100);
-    });
-  } catch (error) {
-    const disclosureDebug = await page.evaluate(() => {
-      const disclosure = document.querySelector('.result-disclosure');
-      const body = document.querySelector('.result-disclosure-body');
-      return {
-        url: window.location.href,
-        open: disclosure?.getAttribute('data-open') ?? null,
-        mounted: disclosure?.getAttribute('data-mounted') ?? null,
-        bodyTextLength: body?.textContent?.trim().length ?? null,
-        bodyText: body?.textContent?.trim().slice(0, 240) ?? null,
-        pageText: document.body.textContent?.trim().replace(/\s+/g, ' ').slice(0, 500) ?? null,
-      };
-    });
-    throw new Error(
-      `Expanded disclosure body did not mount: ${JSON.stringify({
-        disclosureDebug,
-        pageErrors,
-        consoleErrors,
-      })}`,
-      {
-        cause: error,
-      },
-    );
   }
   await page.screenshot({
     path: path.join(artifactDir, scenario.screenshots.engineering),

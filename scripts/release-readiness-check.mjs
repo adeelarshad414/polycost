@@ -767,10 +767,16 @@ await assertFileContains('apps/web/e2e/polycost-browser.e2e.ts', [
   ['interactive accessible-name audit', 'expectInteractiveControlsAreNamed'],
 ]);
 
+// Pinned so an accidental edit to the palette is caught before release. Updated
+// deliberately in the interface revamp: the accent moved from purple to
+// periwinkle so it stops competing with the provider hues, and the provider
+// tokens became the vendors' published values rather than muted approximations,
+// matching the PDF and XLSX exporters.
 await assertFileContains('apps/web/src/styles/tokens.css', [
-  ['PolyCost default accent', '--brand-500: #7c4fd0'],
+  ['PolyCost default accent', '--brand-500: #6060e0'],
   ['terracotta accent axis', "[data-accent='terracotta']"],
-  ['provider accent tokens', '--aws: #d85a30'],
+  ['provider accent tokens', '--aws: #ff9900'],
+  ['provider text-safe pairs', '--aws-ink:'],
   ['status semantic tokens', '--status-ok: #217255'],
 ]);
 
