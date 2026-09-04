@@ -176,13 +176,13 @@ export class PdfReportGenerator {
           // Source columns: 0 provider, 1 rank (already '#1'), 2 eligible,
           // 5 monthly, 6 yearly, 7 delta vs lowest, 10 evidence note.
           .map((row) => [
-            providerBrand(String(row[0] ?? '')).label,
-            String(row[1] ?? ''),
-            String(row[2] ?? ''),
-            `$${row[5] ?? ''}`,
-            `$${row[6] ?? ''}`,
-            `$${row[7] ?? ''}`,
-            String(row[10] ?? ''),
+            providerBrand(cellText(row, 0)).label,
+            cellText(row, 1),
+            cellText(row, 2),
+            `$${cellText(row, 5)}`,
+            `$${cellText(row, 6)}`,
+            `$${cellText(row, 7)}`,
+            cellText(row, 10),
           ]),
         [1.1, 0.5, 0.7, 0.9, 0.9, 0.7, 2.6],
         ['left', 'left', 'left', 'right', 'right', 'right', 'left'],
@@ -203,12 +203,12 @@ export class PdfReportGenerator {
         architectureOverviewRows(result)
           .slice(1)
           .map((row) => [
-            String(row[0] ?? ''),
-            String(row[1] ?? ''),
-            String(row[2] ?? ''),
-            String(row[3] ?? ''),
-            String(row[4] ?? ''),
-            String(row[5] ?? ''),
+            cellText(row, 0),
+            cellText(row, 1),
+            cellText(row, 2),
+            cellText(row, 3),
+            cellText(row, 4),
+            cellText(row, 5),
           ]),
         [1, 1.6, 1.9, 1.9, 1.9, 1],
       ),
@@ -245,13 +245,13 @@ export class PdfReportGenerator {
         providerCostDetailRows(result)
           .slice(1)
           .map((row) => [
-            String(row[0] ?? ''),
-            String(row[1] ?? '').toUpperCase(),
-            String(row[2] ?? ''),
-            String(row[3] ?? ''),
-            `$${row[7] ?? ''}`,
-            String(row[8] ?? ''),
-            String(row[10] ?? ''),
+            cellText(row, 0),
+            cellText(row, 1).toUpperCase(),
+            cellText(row, 2),
+            cellText(row, 3),
+            `$${cellText(row, 7)}`,
+            cellText(row, 8),
+            cellText(row, 10),
           ]),
         [1.2, 0.8, 1, 1.1, 0.9, 0.7, 2.3],
         ['left', 'left', 'left', 'left', 'right', 'right', 'left'],
@@ -267,12 +267,12 @@ export class PdfReportGenerator {
         costCoverageMapRows(result)
           .slice(1)
           .map((row) => [
-            providerBrand(String(row[0] ?? '')).label,
-            String(row[1] ?? ''),
-            String(row[2] ?? ''),
-            String(row[3] ?? ''),
+            providerBrand(cellText(row, 0)).label,
+            cellText(row, 1),
+            cellText(row, 2),
+            cellText(row, 3),
             row[5] ? `$${row[5]}` : 'n/a',
-            String(row[6] ?? ''),
+            cellText(row, 6),
           ]),
         [1, 1.7, 0.9, 0.5, 0.9, 2],
         ['left', 'left', 'left', 'right', 'right', 'left'],
@@ -640,7 +640,7 @@ function filledRect(x: number, y: number, width: number, height: number, color: 
  * pdfText draws a single unwrapped run, so the long footnotes on these pages
  * ran off the right edge of the paper and the last words were simply lost.
  */
-function pdfParagraph(
+export function pdfParagraph(
   x: number,
   y: number,
   fontSize: number,
@@ -695,7 +695,7 @@ function formatCurrency(value: number): string {
   return (Math.round((value + Number.EPSILON) * 100) / 100).toString();
 }
 
-function wrapLine(line: PdfLine): PdfLine[] {
+export function wrapLine(line: PdfLine): PdfLine[] {
   // A table row is laid out per cell and truncates to its column width. Wrapping
   // it would split one record over several lines and drop the cell positions,
   // turning the table back into the prose this replaced.
@@ -777,7 +777,7 @@ function selectedScenarioPdfText(row: string[]): string {
   return `${row[0]}: eligible yes | estimate ${row[5]} | source ${row[6]} | selected $${row[2]} | monthly $${row[3]} | ${row[7]}`;
 }
 
-function pageContent(lines: PdfLine[]): string {
+export function pageContent(lines: PdfLine[]): string {
   // Fills first: rectangles cannot be drawn inside a BT/ET text block, and a
   // background painted afterwards would cover the text it is meant to sit behind.
   const fills: string[] = [];
@@ -828,11 +828,22 @@ function pageContent(lines: PdfLine[]): string {
 }
 
 /** Helvetica is ~0.52em average across mixed-case text; good enough to lay out columns. */
-function textWidth(text: string, fontSize: number): number {
+/**
+ * Reads a cell from an evidence row, defaulting to empty.
+ *
+ * One helper rather than `String(row[n] ?? '')` repeated at every call site:
+ * the fallback lives in a single place, and it is one branch to reason about
+ * instead of thirty.
+ */
+export function cellText(row: string[], index: number): string {
+  return String(row[index] ?? '');
+}
+
+export function textWidth(text: string, fontSize: number): number {
   return text.length * fontSize * 0.52;
 }
 
-function truncateToWidth(text: string, width: number, fontSize: number): string {
+export function truncateToWidth(text: string, width: number, fontSize: number): string {
   if (textWidth(text, fontSize) <= width) {
     return text;
   }
@@ -847,7 +858,7 @@ function truncateToWidth(text: string, width: number, fontSize: number): string 
  * Column widths are supplied as weights and scaled to the content width, so a
  * caller describes proportions rather than doing point arithmetic.
  */
-function tableLines(
+export function tableLines(
   headers: string[],
   rows: string[][],
   weights: number[],
