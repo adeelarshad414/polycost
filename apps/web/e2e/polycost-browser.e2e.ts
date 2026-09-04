@@ -59,20 +59,24 @@ test('compares the default workload on mobile without page-level horizontal over
   await page.getByRole('button', { name: /compare costs/i }).click();
   await expect(page.getByLabel('Provider cost summary')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText('Executive monthly baseline')).toBeVisible();
-  await expect(page.getByText('Service driver split')).toHaveCount(0);
+  // The detail is a tab strip now, not a disclosure. Inactive panels stay in the
+  // DOM so the report still prints whole, so this asserts visibility rather than
+  // absence.
+  await expect(page.getByText('Service driver split')).toBeHidden();
   await expectNoHorizontalOverflow(page);
 
-  const disclosure = page.getByRole('button', { name: /show full breakdown/i });
-  await expect(disclosure).toBeVisible();
-  await disclosure.click();
-  await expect(page.getByRole('button', { name: /hide full breakdown/i })).toHaveAttribute(
-    'aria-expanded',
-    'true',
-  );
+  const controlsTab = page.getByRole('tab', { name: 'Cost controls' });
+  await expect(controlsTab).toBeVisible();
+  await controlsTab.click();
+  await expect(controlsTab).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByLabel('Engineering cost controls')).toBeVisible();
   await expect(page.getByText('Service driver split')).toBeVisible();
-  await expect(page.getByLabel('Architecture and engineering evidence')).toBeVisible();
-  await expect(page.getByLabel('Official cloud pricing and region references')).toBeVisible();
+
+  // All four tabs exist on a 390px viewport. The strip scrolls rather than
+  // wrapping, so they are not all on screen at once - which is the behaviour
+  // this test cares about, since a wrapping tablist would push the page wide.
+  await expect(page.getByRole('tab')).toHaveCount(4);
+
   await expectNoHorizontalOverflow(page);
 });
 
@@ -124,7 +128,9 @@ test('surfaces provider pricing warnings in the engineering evidence view', asyn
   await page.getByRole('button', { name: /compare costs/i }).click();
   await expect(page.getByLabel('Provider cost summary')).toBeVisible();
 
-  await page.getByRole('button', { name: /show full breakdown/i }).click();
+  // The warning renders inside PersonaComparisonWorkspace, which sits in the
+  // architecture panel rather than cost controls.
+  await page.getByRole('tab', { name: 'Architecture' }).click();
   const pricingWarning = page.getByRole('alert').filter({ hasText: 'Pricing warnings:' });
 
   await expect(pricingWarning).toBeVisible();
@@ -276,7 +282,7 @@ test('requests PDF, CSV, and Excel exports with the selected scenario context', 
   }
 });
 
-test('supports keyboard-only comparison, disclosure, and interval controls', async ({ page }) => {
+test('supports keyboard-only comparison, tabs, and interval controls', async ({ page }) => {
   await mockRegionCatalog(page);
   await mockComparisonCreation(page, browserComparison());
 
@@ -288,12 +294,14 @@ test('supports keyboard-only comparison, disclosure, and interval controls', asy
   await page.keyboard.press('Enter');
   await expect(page.getByLabel('Provider cost summary')).toBeVisible();
 
-  const disclosure = page.getByRole('button', { name: /show full breakdown/i });
-  await disclosure.focus();
-  await expect(disclosure).toBeFocused();
-  await page.keyboard.press('Enter');
-  await expect(page.getByRole('button', { name: /hide full breakdown/i })).toHaveAttribute(
-    'aria-expanded',
+  // Roving focus: the selected tab is the one in the tab order, and the arrow
+  // keys move selection between them.
+  const executiveTab = page.getByRole('tab', { name: 'Executive brief' });
+  await executiveTab.focus();
+  await expect(executiveTab).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('tab', { name: 'Cost controls' })).toHaveAttribute(
+    'aria-selected',
     'true',
   );
 
