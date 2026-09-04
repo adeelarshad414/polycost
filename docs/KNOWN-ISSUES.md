@@ -137,10 +137,10 @@ utility usages and still needs a human looking at the rendered UI.
 
 ## 🟠 K-12 · The `impeccable` gate silently skips on CI's Node version
 
-|            |                                                   |
-| ---------- | ------------------------------------------------- |
-| **Status** | 🟠 Open — 24 findings unreviewed                  |
-| **Found**  | 2026-08-31, while landing the `/metrics` endpoint |
+|            |                                                    |
+| ---------- | -------------------------------------------------- |
+| **Status** | 🟠 Findings cleared 2026-09-04 — CI runner pending |
+| **Found**  | 2026-08-31, while landing the `/metrics` endpoint  |
 
 `npm run qa` ends with `npm run impeccable`, a UI anti-pattern scanner.
 `impeccable@3.1.0` requires **Node 24+**, and `scripts/impeccable-check.mjs`
@@ -182,12 +182,41 @@ that already got `check:full` removed from the pre-push hook. `npm run qa` now
 exits 0 on modern Node, and `IMPECCABLE_ENFORCE=1 npm run impeccable` still
 exits non-zero, so nothing has been quietly disabled.
 
-**Still open:** the 24 findings, and raising CI to Node 24. Clearing the
-findings means removing or softening 19 `border-left` accents and 5 `border-top`
-accents in `apps/web/src/styles.css` — a **visual design change**, not a bug fix,
-so it wants a human decision rather than a mechanical sweep. Raising CI's Node
-version needs a workflow-file edit, which the current token scope cannot make.
-Do both together: raising Node first would fail the build.
+### ✅ Mostly fixed (2026-09-04) — step 2, and the skip closed properly
+
+**The skip is no longer a silent pass.** `scripts/impeccable-check.mjs` now exits
+1 rather than 0 when the runtime is too old _and_ enforcement was requested. A
+gate that cannot run must not report a pass it never checked — that was the
+original defect, and until now the fix had only addressed its symptom.
+
+**All 24 findings are cleared** — by changing the geometry, not by waiving them.
+Every finding was the same construction: a 3–4px border down one edge of a card
+that also has a `border-radius`. Two things are wrong with it. The thick edge
+tapers into the corner arc and leaves a visible wedge where the 4px side meets
+the 1px one. And a coloured slab down the left of a card is the most
+recognisable stock-template tell there is — it was on nineteen separate
+components, which is what made it read as a default rather than a decision.
+
+The signal was worth keeping: on a banner the colour is severity, on a provider
+card it is the cloud, on a template button it is the category. So the rail
+stayed and only its geometry changed — a rounded bar inset from both ends, drawn
+as a pseudo-element inside a card whose border is now a uniform 1px with
+unbroken corners.
+
+Colour flows through a `--rail` custom property, so all 41 existing state and
+provider modifiers kept working by setting one property instead of a border
+colour. `.landing-provider-card` also got its left corners back: they had been
+squared (`border-radius: 0 8px 8px 0`) only to give the old slab a flat edge.
+
+Verified in the browser rather than from the scanner's exit code — thirteen of
+the families rendered on screen were measured directly, both edges, confirming a
+3px rail at the right colour with the card at a uniform 1px border.
+
+Two release-readiness assertions were inverted to match: they used to require
+that CI _explain its skip_, and now require that CI _runs and enforces_ the gate.
+The second one initially matched the prose comment rather than the directive, so
+it passed with the directive deleted; it now asserts `IMPECCABLE_ENFORCE: '1'`
+and was confirmed to fail without it.
 
 ## 🔴 K-13 · Redis had persistence disabled, silently discarding queued jobs
 
