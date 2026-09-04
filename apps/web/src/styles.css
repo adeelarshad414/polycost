@@ -3081,7 +3081,7 @@ summary:focus-visible,
   border: 1px solid color-mix(in srgb, var(--brand-blue) 34%, var(--pc-border));
   border-radius: 999px;
   background: color-mix(in srgb, var(--brand-blue) 12%, var(--pc-bg-surface));
-  color: var(--brand-blue);
+  color: var(--brand-blue-ink);
   padding: 6px 10px;
 }
 
@@ -3751,17 +3751,17 @@ select:hover {
 
 .comparison-history-best-aws {
   border-color: color-mix(in srgb, var(--brand-orange) 36%, var(--pc-border));
-  color: var(--brand-orange);
+  color: var(--brand-orange-ink);
 }
 
 .comparison-history-best-azure {
   border-color: color-mix(in srgb, var(--brand-blue) 36%, var(--pc-border));
-  color: var(--brand-blue);
+  color: var(--brand-blue-ink);
 }
 
 .comparison-history-best-gcp {
   border-color: color-mix(in srgb, var(--brand-green) 36%, var(--pc-border));
-  color: var(--brand-green);
+  color: var(--brand-green-ink);
 }
 
 .form-summary-chip {

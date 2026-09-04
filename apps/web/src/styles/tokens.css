@@ -1,29 +1,58 @@
 :root,
 :root[data-theme='light'] {
   color-scheme: light;
-  --surface-canvas: #f5f4ef;
+  /* Phase 0 of the interface revamp: the neutral ramp moved from warm cream to a
+     cool ground so the three provider hues read as data rather than decoration.
+     Every value below was checked against all three light surfaces before
+     landing; tokens-contrast.spec.ts holds the line. */
+  --surface-canvas: #f4f5fb;
   --surface-card: #ffffff;
-  --surface-raised: #eae8e2;
-  --border-default: #e4e2db;
-  --border-strong: #d6d3cb;
-  --ink-900: #26241f;
-  --ink-600: #5c5a57;
-  /* Darkened to clear WCAG AA (4.5:1) as muted body text on all light surfaces
-     (canvas/card/raised). Was #8b8880 ≈ 3.2-3.5:1 (UX-1). */
-  --ink-400: #646259;
-  /* Darkened to clear AA as success text on light surfaces. Was #2e9e76 ≈ 3:1. */
+  --surface-raised: #e8eaf4;
+  --border-default: #e2e5ef;
+  --border-strong: #ced3e2;
+  --ink-900: #14181f;
+  --ink-600: #4a5262;
+  /* Clears WCAG AA (4.5:1) as muted body text on canvas, card and raised. */
+  --ink-400: #5b6273;
+  /* Clears AA as success text on light surfaces. Was #2e9e76 ≈ 3:1. */
   --status-ok: #217255;
   --status-warn: #b45309;
   --status-crit: #c93338;
-  --aws: #d85a30;
-  --azure: #378add;
-  --gcp: #1d9e75;
-  --brand-600: #6b3fc0;
-  --brand-500: #7c4fd0;
-  --brand-400: #9a73df;
-  --brand-100: rgb(124 79 208 / 14%);
-  --brand-50: rgb(124 79 208 / 7%);
-  --brand-text: #6b3fc0;
+  /* The vendors' published brand values, matching the PDF and XLSX exports. A
+     reader identifies a provider by colour, so an approximation is a defect.
+     Google green rather than Google blue: #4285F4 sits almost on top of Azure's
+     #027DFF, and telling the three apart is the whole job of a comparison. */
+  --aws: #ff9900;
+  --azure: #027dff;
+  --gcp: #34a853;
+  /* Text-safe pairs. The fills above are for bars, chips and tints; at body size
+     on a light surface they fail AA, so anything that sets `color` uses these. */
+  --aws-ink: #8a5200;
+  --azure-ink: #0b63c5;
+  --gcp-ink: #1a7030;
+  --brand-600: #4f4fd4;
+  --brand-500: #6060e0;
+  --brand-400: #8b8bea;
+  --brand-100: rgb(79 79 212 / 14%);
+  --brand-50: rgb(79 79 212 / 7%);
+  --brand-text: #4a4ac9;
+  /* Money is the subject of this product, so it gets its own scale rather than
+     borrowing body sizes. Tabular figures keep columns aligned. */
+  --num-display: 3.25rem;
+  --num-display-tracking: -0.03em;
+  --num-hero: 2rem;
+  --num-strong: 1.25rem;
+
+  /* Elevation by role. One radius and one shadow stamped on every block flattens
+     the hierarchy; these separate the hero from a card from a control. */
+  --radius-hero: 16px;
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --radius-pill: 999px;
+  --shadow-hero: 0 18px 40px -18px rgb(20 24 31 / 28%);
+  --shadow-card: 0 2px 10px -4px rgb(20 24 31 / 12%);
+  --shadow-control: 0 1px 2px rgb(20 24 31 / 6%);
+
   --on-brand: #ffffff;
   --terracotta-brand-500: #d97757;
   --pc-ink-50: #f7f8fa;
@@ -58,6 +87,11 @@
   --brand-orange: var(--aws);
   --brand-blue: var(--azure);
   --brand-green: var(--gcp);
+  /* Text-safe aliases. The plain --brand-* values are the vendors' real fills,
+     which fail AA at body size; anything setting `color` uses these instead. */
+  --brand-orange-ink: var(--aws-ink);
+  --brand-blue-ink: var(--azure-ink);
+  --brand-green-ink: var(--gcp-ink);
   --brand-orange-dark: #e2783f;
   --brand-blue-dark: #5ba3e8;
   --brand-green-dark: #3fbe8e;
@@ -211,12 +245,20 @@
   --status-ok: #3fb68b;
   --status-warn: #f59e0b;
   --status-crit: #e5484d;
-  --brand-600: #8f5fe0;
-  --brand-500: #a879f0;
-  --brand-400: #bd95f4;
-  --brand-100: rgb(168 121 240 / 18%);
-  --brand-50: rgb(168 121 240 / 8%);
-  --brand-text: #bd95f4;
+  /* Provider fills carry over from the light block unchanged - a brand colour is
+     the same colour on either ground - but the text-safe pairs must lighten. */
+  --aws-ink: #ffb84d;
+  --azure-ink: #7cbcff;
+  --gcp-ink: #6ede8c;
+  --shadow-hero: 0 18px 40px -18px rgb(0 0 0 / 60%);
+  --shadow-card: 0 2px 10px -4px rgb(0 0 0 / 45%);
+  --shadow-control: 0 1px 2px rgb(0 0 0 / 35%);
+  --brand-600: #7b7bf0;
+  --brand-500: #9d9dfa;
+  --brand-400: #b6b6fc;
+  --brand-100: rgb(157 157 250 / 18%);
+  --brand-50: rgb(157 157 250 / 8%);
+  --brand-text: #b6b6fc;
   --on-brand: #0b0e14;
   --pc-ink-100: #1b2130;
   --pc-ink-700: #353e50;
