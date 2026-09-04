@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
       - run: npm ci
       - name: Install Playwright Chrome
@@ -24,12 +24,14 @@ jobs:
         run: npm run ci:lint
       - name: Theme token hex guard
         run: npm run theme:hex:check
-      # `npm run qa` invokes `npm run impeccable`; scripts/impeccable-check.mjs
-      # exits 0 with a documented warning on Node 20 because impeccable@3.1.0
-      # requires Node 24+. Tracking: docs/SECURITY-SUPPRESSIONS.md and
-      # RELEASE-CHECKLIST.md require a Node 24 run before public release unless
-      # the project intentionally raises engines.node.
+      # `npm run qa` invokes `npm run impeccable`. That check needs Node 24+, so
+      # on Node 20 it used to exit 0 with a warning - the gate was green in CI
+      # and red on any current developer machine. The runner is now Node 24 and
+      # IMPECCABLE_ENFORCE makes the findings fail, so CI evaluates what a
+      # developer evaluates.
       - name: Spec and workflow QA
+        env:
+          IMPECCABLE_ENFORCE: '1'
         run: npm run qa
       - name: Graph validation
         run: npm run graphify:validate

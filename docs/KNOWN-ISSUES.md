@@ -22,11 +22,12 @@
 | 🟡  | K-5 · ESLint security warnings (22)             | accepted, 0 errors                               |
 | 🟡  | K-6 · Jest worker teardown warning              | accepted, no test fails                          |
 | 🟢  | K-11 · majors blocked behind ESM                | resolved — only #168 remains, blocked by ts-jest |
-| 🟠  | K-12 · `impeccable` skips on CI's Node          | **open** — findings cleared, runner pending      |
+| 🟢  | K-12 · `impeccable` skips on CI's Node          | fixed — CI on Node 24, gate enforced             |
 | 🟢  | K-13 · Redis persistence disabled               | fixed                                            |
 
-**One genuinely open:** K-12, and it needs a token permission rather than code —
-the CI runner change is committed but cannot be pushed without `workflow` scope.
+**Nothing is open.** Every entry is fixed or accepted. K-5 and K-6 stay accepted
+rather than fixed: both are warnings with zero errors and no failing test, and
+the rationale is recorded with each.
 
 > This register has twice described a state that had already changed — K-1 and
 > K-3 were both fixed while still marked open. If an entry here contradicts the
@@ -414,12 +415,12 @@ ESM file. There is no CommonJS build to fall back to, so a CJS API cannot
 ts-jest, and every `require`-shaped assumption — and should be planned
 deliberately, not taken under Dependabot pressure.
 
-## 🟠 K-12 · The `impeccable` gate silently skips on CI's Node version
+## 🟢 K-12 · ~~The `impeccable` gate silently skips on CI's Node version~~
 
-|            |                                                    |
-| ---------- | -------------------------------------------------- |
-| **Status** | 🟠 Findings cleared 2026-09-04 — CI runner pending |
-| **Found**  | 2026-08-31, while landing the `/metrics` endpoint  |
+|            |                                                             |
+| ---------- | ----------------------------------------------------------- |
+| **Status** | 🟢 Fixed 2026-09-08 — CI runs Node 24 and enforces the gate |
+| **Found**  | 2026-08-31, while landing the `/metrics` endpoint           |
 
 `npm run qa` ends with `npm run impeccable`, a UI anti-pattern scanner.
 `impeccable@3.1.0` requires **Node 24+**, and `scripts/impeccable-check.mjs`
@@ -496,6 +497,25 @@ that CI _explain its skip_, and now require that CI _runs and enforces_ the gate
 The second one initially matched the prose comment rather than the directive, so
 it passed with the directive deleted; it now asserts `IMPECCABLE_ENFORCE: '1'`
 and was confirmed to fail without it.
+
+### ✅ Closed (2026-09-08) — the CI runner
+
+`.github/workflows/ci.yml` now sets `node-version: 24` and
+`IMPECCABLE_ENFORCE: '1'` on the QA step, so CI evaluates exactly what a
+developer's machine evaluates. The release-readiness assertions described above
+land with it — they were written on 2026-09-04 but could not be pushed, so until
+now this document described them as done while `main` still had the old ones.
+
+This sat blocked for four days on a token permission rather than on any work.
+GitHub rejects a push touching `.github/workflows/` from a token without
+`workflow` scope, and the rejection says so plainly. `gh auth refresh -s
+workflow` is the whole fix — worth knowing before assuming a workflow change is
+hard.
+
+Local runs stay advisory on purpose. The pre-commit hook also carries format,
+lint, typecheck and the unit tests, and a visual-polish finding is not worth
+pushing someone to `--no-verify` and skipping those. CI is where it is
+enforced.
 
 ## 🟢 K-13 · ~~Redis had persistence disabled~~, silently discarding queued jobs
 
