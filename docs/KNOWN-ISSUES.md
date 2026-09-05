@@ -14,11 +14,21 @@
 
 ## 🔴 Open — fails a quality gate
 
-### K-1 · `qa` gate fails: direct `process.env` in `http-client.ts`
+### K-1 · ~~`qa` gate fails: direct `process.env` in `http-client.ts`~~ ✅ RESOLVED
+
+> **Resolved — confirmed 2026-09-04.** The entry below described the state
+> before the fix landed; it was never updated. `node scripts/qa-check.mjs`
+> exits 0, `apps/api/src/adapters/common/http-client.ts` contains no
+> `process.env`, and the fix is exactly the one this row prescribed:
+> `PROVIDER_HTTP_TIMEOUT_MS`, `PROVIDER_HTTP_BODY_TIMEOUT_MS` and
+> `PROVIDER_HTTP_MAX_RESPONSE_BYTES` are declared in the zod schema
+> (`apps/api/src/config/config.schema.ts`) and read through `ConfigService` in
+> `apps/api/src/main.ts`. It went in alongside the circuit-breaker work (#193)
+> without this register being corrected.
 
 |               |                                                                                                                                                                                                                                                             |
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**    | 🔴 Open — **blocks `pre-commit`**                                                                                                                                                                                                                           |
+| **Status**    | 🟢 Fixed — verified 2026-09-04                                                                                                                                                                                                                              |
 | **Reproduce** | `node scripts/qa-check.mjs`                                                                                                                                                                                                                                 |
 | **Detail**    | Repo convention forbids direct `process.env` in `apps/*/src`. `apps/api/src/adapters/common/http-client.ts` reads `PROVIDER_HTTP_TIMEOUT_MS`, `PROVIDER_HTTP_MAX_RESPONSE_BYTES` and `PROVIDER_HTTP_BODY_TIMEOUT_MS` directly.                              |
 | **Age**       | Pre-existing — present before the current hardening work.                                                                                                                                                                                                   |
@@ -28,11 +38,52 @@
 
 |                  |                                                                                                                                                                                                                 |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**       | 🔴 Open — `npm audit --audit-level=high` exits 1                                                                                                                                                                |
+| **Status**       | 🟢 Fixed 2026-09-04 — `npm audit --audit-level=high` exits 0                                                                                                                                                    |
 | **Reproduce**    | `npm audit` → _12 vulnerabilities (2 low, 3 moderate, 7 high)_                                                                                                                                                  |
 | **Detail**       | All 7 highs are in the **development / tooling** tree, not runtime dependencies: `@sentropic/graphify` → `officeparser` → `pdfjs-dist`, plus transitive `brace-expansion`, `fast-uri`, `ip-address`, `js-yaml`. |
 | **⚠️ Doc drift** | [PROGRESS.md](../PROGRESS.md) still states this gate _passes_. It no longer does — advisories have accumulated since that was written.                                                                          |
-| **Fix**          | Upgrade or replace the Graphify tooling chain; re-run the gate.                                                                                                                                                 |
+| **Fix**          | `npm audit fix` for the fixable tree, plus a `pdfjs-dist` override for the Graphify chain. See below.                                                                                                           |
+
+#### ✅ Fixed (2026-09-04) — 7 highs → 0
+
+Two steps. `npm audit fix` cleared `browserslist` and two moderates without any
+manual intervention. The rest were one chain — `@sentropic/graphify` →
+`officeparser` → `pdfjs-dist` — which `npm audit` reported as
+`fixAvailable: false` at the top because `officeparser@7.8.0` is _already the
+latest_ and pins `pdfjs-dist@6.1.200`, inside the vulnerable range
+`>=5.6.83 <6.2.108` (arbitrary JS execution on opening a malicious PDF).
+
+The fix is a `pdfjs-dist: ^6.3.289` entry in the existing `overrides` block —
+same major, so `officeparser` is unaffected. Verified rather than assumed:
+`graphify:validate` still passes (430 nodes, 430 edges), `npm run graphify`
+still writes both outputs, and `officeparser` plus `pdfjs-dist` were imported
+directly to confirm the overridden version actually loads (`6.3.289`).
+
+**Doc drift resolved.** [PROGRESS.md](../PROGRESS.md) claimed this gate passed
+when it did not. It now does, so the claim is true again rather than quietly
+wrong.
+
+#### ⚠️ What is left, and why it is now a K-11 problem
+
+Six advisories remain — 3 low, 3 moderate — all below the gate's `high`
+threshold. Three are tooling. **Two are runtime dependencies, and both are
+blocked behind the ESM migration:**
+
+| Advisory                                                                                                   | Severity | Fix requires                  | Blocked by                |
+| ---------------------------------------------------------------------------------------------------------- | -------- | ----------------------------- | ------------------------- |
+| `fastify` schema-validation bypass via root primitive coercion                                             | moderate | `@nestjs/platform-fastify@12` | Nest 12 is ESM-only       |
+| `stream-json` `pick`/`ignore`/`filter`/`replace` are O(depth²) — crafted nested JSON blocks the event loop | moderate | `stream-json@3.6.0`           | 3.x is `"type": "module"` |
+
+The `stream-json` one is not theoretical for this codebase:
+`apps/api/src/adapters/aws/aws-bulk-stream.ts` uses `pick` from
+`stream-json/filters/Pick` to parse the AWS bulk price feed, which is exactly
+the affected filter on exactly the kind of large nested input described.
+
+`@nestjs/core`, `@nestjs/common`, `@nestjs/platform-fastify` and
+`@nestjs/config` at v12 are all `"type": "module"` with no CommonJS condition in
+their `exports`. **This changes what K-11's ESM migration is for.** It was
+filed as staying current; it is now the thing standing between this repo and
+two security fixes in runtime dependencies.
 
 ---
 
@@ -84,10 +135,10 @@ fails.** Carried forward from Phase 3.
 
 ## 🟠 K-11 · Three dependency majors are blocked behind an ESM migration
 
-|            |                                                                           |
-| ---------- | ------------------------------------------------------------------------- |
-| **Status** | 🟠 Tailwind 4 taken 2026-09-04 — TS 7 and @nestjs/config blocked upstream |
-| **Found**  | 2026-08-31, while clearing the Dependabot queue                           |
+|            |                                                                                  |
+| ---------- | -------------------------------------------------------------------------------- |
+| **Status** | 🔴 Escalated 2026-09-04 — the ESM migration now gates two runtime security fixes |
+| **Found**  | 2026-08-31, while clearing the Dependabot queue                                  |
 
 The API is CommonJS (`module: commonjs`, ts-jest, `moduleResolution: node`). Three
 major upgrades each fail on that, for the same underlying reason:
@@ -134,6 +185,32 @@ risk. What matters is that it now _works_ when TypeScript 7 requires it.
 blocker is gone, so #168 (TypeScript 7) can be retried directly. #170
 (Tailwind 4) was never an ESM problem — it is a CSS-first rewrite touching ~397
 utility usages and still needs a human looking at the rendered UI.
+
+### 🔴 Escalation (2026-09-04) — this is no longer only a currency problem
+
+Filed as staying current with the ecosystem. It is now the thing standing
+between this repo and **two security advisories in runtime dependencies**,
+found while clearing [K-2](#k-2--npm-audit-high-severity-gate-fails):
+
+| Advisory                                                                                                                                   | Severity | Fix requires                  | Why it is blocked                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | -------- | ----------------------------- | ---------------------------------- |
+| `fastify` schema-validation bypass via root primitive coercion mismatch                                                                    | moderate | `@nestjs/platform-fastify@12` | the whole Nest 12 line is ESM-only |
+| `stream-json` `pick`/`ignore`/`filter`/`replace` are O(depth²) on nested input — crafted JSON blocks the event loop for seconds to minutes | moderate | `stream-json@3.6.0`           | 3.x is `"type": "module"`          |
+
+`@nestjs/core`, `@nestjs/common`, `@nestjs/platform-fastify` and
+`@nestjs/config` at v12 are each `"type": "module"` with no CommonJS condition
+in their `exports` map, so none of them can be `require`d from this API.
+
+The `stream-json` advisory is not theoretical here.
+`apps/api/src/adapters/aws/aws-bulk-stream.ts` imports `pick` from
+`stream-json/filters/Pick` to parse the AWS bulk price feed — the exact filter
+named in the advisory, on exactly the large nested input it describes. The
+`PROVIDER_HTTP_MAX_RESPONSE_BYTES` and body-timeout caps bound the blast radius
+but do not remove the quadratic behaviour.
+
+Neither is above the `--audit-level=high` gate, so nothing is failing today.
+The point is that option 1 below has stopped being optional housekeeping and
+should be scheduled on its own merits.
 
 ### ✅ / ⛔ Outcome (2026-09-04) — one taken, two genuinely blocked
 
