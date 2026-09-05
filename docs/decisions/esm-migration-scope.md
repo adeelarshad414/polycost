@@ -97,14 +97,38 @@ apply.
 
 Two costs:
 
-- **Every spec file needs `import { jest } from '@jest/globals'`.** In ESM mode
-  Jest injects no globals — `jest` is simply not defined. All 72 files.
+- **Every spec file needs `import { … } from '@jest/globals'`.** In ESM mode
+  Jest injects no globals — `describe`, `it`, `expect` and `jest` are all
+  undefined. All 72 files. (See the correction below: this costs far more than
+  an import line.)
 - **`apps/api/src/health/health.service.spec.ts`** is the only file using
   `jest.mock` (mocking `node:net` to test `probeTcp`). It moves to
   `jest.unstable_mockModule`, or `probeTcp` takes `createConnection` as a
   parameter and the mock disappears entirely. The second is the better change.
 
 No runner switch is required: `ts-jest` ships a `default-esm` preset.
+
+> #### ⚠️ Correction (2026-09-04) — this step is not mechanical
+>
+> The estimate above was wrong, and attempting it is what showed that. Adding
+> the imports to all 72 files produces **249 type errors across 30 files**, and
+> dropping `jest` from the import list still leaves 65 — the stricter types
+> arrive with _any_ `@jest/globals` import, not only the `jest` one.
+>
+> All 249 share a single root cause: **`jest.fn()` with no type parameter.**
+> The ambient `@types/jest` global is permissive; `@jest/globals` types a bare
+> `jest.fn()` as `Mock<() => unknown>`. So `.mockResolvedValueOnce(response)`
+> resolves its parameter to `never` (TS2345, 132 of them) and
+> `toHaveBeenCalledWith(400)` becomes "expected 0 arguments, but got 1"
+> (TS2554, 61). There are **153 bare `jest.fn()` calls** in the API specs.
+>
+> This is a real improvement waiting to happen — those mocks assert against
+> signatures they never declared — but it is a test type-safety migration rather
+> than ESM plumbing, and it should not be automated: a wrongly inferred
+> signature still compiles while making the test assert the wrong thing.
+>
+> **Re-planned as its own piece of work**, sized by the 153 call sites rather
+> than by the 72 import lines. Steps 1 and 2 were unaffected and have landed.
 
 ### 4. Tracing bootstrap — the one piece that is not mechanical
 
@@ -158,16 +182,16 @@ the pristine builtin.
 
 ## Estimate
 
-| Step                                             | Size             | Risk                                          |
-| ------------------------------------------------ | ---------------- | --------------------------------------------- |
-| Append `.js` to 850 relative specifiers          | large, scripted  | low — fails loudly                            |
-| 113 `import type` fixes across 27 files          | medium, scripted | low                                           |
-| `import { jest }` into 72 spec files             | medium, scripted | low                                           |
-| Rewrite the one `jest.mock` file                 | small            | low                                           |
-| `__dirname` → `import.meta.dirname` (1 site)     | trivial          | low                                           |
-| `otel-register.mjs` + `--import` + loader hook   | small            | **highest** — silent failure mode             |
-| Dockerfile, `start:prod`, `start:dev`            | small            | medium — verify in the container, not locally |
-| Flip `"type": "module"` + tsconfig + jest config | small            | low                                           |
+| Step                                                       | Size              | Risk                                          |
+| ---------------------------------------------------------- | ----------------- | --------------------------------------------- |
+| Append `.js` to 850 relative specifiers                    | large, scripted   | low — fails loudly                            |
+| 113 `import type` fixes across 27 files                    | medium, scripted  | low                                           |
+| `@jest/globals` imports + 153 typed `jest.fn()` signatures | **large, manual** | medium — see correction                       |
+| Rewrite the one `jest.mock` file                           | small             | low                                           |
+| `__dirname` → `import.meta.dirname` (1 site)               | trivial           | low                                           |
+| `otel-register.mjs` + `--import` + loader hook             | small             | **highest** — silent failure mode             |
+| Dockerfile, `start:prod`, `start:dev`                      | small             | medium — verify in the container, not locally |
+| Flip `"type": "module"` + tsconfig + jest config           | small             | low                                           |
 
 Roughly **four mechanical passes and two genuine changes**. The mechanical
 passes are most of the diff and little of the risk; the tracing bootstrap is
@@ -179,13 +203,15 @@ little of the diff and most of the risk.
    today, so this lands and proves itself before anything moves.
 2. `.js` extensions on all 850 specifiers — also valid on CommonJS under
    `node16`, so this too lands independently.
-3. `import { jest }` into all 72 spec files — valid today.
+3. `@jest/globals` imports plus typed `jest.fn()` signatures — valid today,
+   but substantially larger than first estimated; see the correction above.
 4. Flip `"type": "module"`, jest to the ESM preset, rewrite the one mock file.
 5. `otel-register.mjs`, Dockerfile, start scripts.
 
-Steps 1–3 are ~95% of the diff and can all merge **before** the switch, each
-verifiable on the current runtime. That leaves the actual flip as a small,
-reviewable change instead of one 200-file commit that either works or does not.
+Steps 1–3 can all merge **before** the switch, each verifiable on the current
+runtime, leaving the actual flip a small reviewable change rather than one
+200-file commit that either works or does not. Steps 1 and 2 have landed and
+together are most of the diff; step 3 is re-planned above.
 
 ## Verification that must not be skipped
 
