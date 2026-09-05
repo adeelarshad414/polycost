@@ -186,6 +186,27 @@ blocker is gone, so #168 (TypeScript 7) can be retried directly. #170
 (Tailwind 4) was never an ESM problem — it is a CSS-first rewrite touching ~397
 utility usages and still needs a human looking at the rendered UI.
 
+### 📋 Scoped (2026-09-04)
+
+The migration has been sized against this repository with working spikes for the
+three risky parts — see
+[docs/decisions/esm-migration-scope.md](decisions/esm-migration-scope.md).
+
+Headline: **the application code is not the problem.** `apps/api/src` contains
+zero `require(`, zero `module.exports`, and exactly one real `__dirname` (already
+parameterised). The work is four mechanical passes — 850 import extensions, 113
+`import type` fixes across 27 files, an `@jest/globals` import in 72 spec files,
+and one `jest.mock` rewrite — plus one genuine change, the OpenTelemetry
+bootstrap.
+
+Proven rather than assumed: Nest 11 boots as real ESM with decorator-metadata DI
+and the Fastify adapter; `ts-jest`'s `default-esm` preset runs that DI plus
+`unstable_mockModule`, so no runner change is needed; and OTel does instrument
+under ESM provided `@opentelemetry/instrumentation/hook.mjs` is registered —
+without it the SDK starts and silently instruments nothing.
+
+Roughly 95% of the diff can land **before** the switch, valid on CommonJS today.
+
 ### 🔴 Escalation (2026-09-04) — this is no longer only a currency problem
 
 Filed as staying current with the ecosystem. It is now the thing standing
