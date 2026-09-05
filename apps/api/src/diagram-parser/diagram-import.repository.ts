@@ -2,7 +2,8 @@ import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
 import { AppConfig } from '../config/config.schema';
-import { SecretsReader, SecretsService } from '../secrets/secrets.service';
+import { SecretsService } from '../secrets/secrets.service';
+import type { SecretsReader } from '../secrets/secrets.service';
 import { DiagramImportRecordInput } from './diagram-parser.types';
 
 interface QueryResultLike<T> {

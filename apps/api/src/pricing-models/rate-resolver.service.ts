@@ -5,12 +5,12 @@ import { PricingCacheService } from './pricing-cache.service';
 import {
   PaymentOptionCode,
   PricingGranularity,
-  PricingRateReader,
   PricingRateRecord,
   RateIntervals,
   RateResolverQuery,
   RateResult,
 } from './pricing-models.types';
+import type { PricingRateReader } from './pricing-models.types';
 import { PricingTermsService } from './pricing-terms.service';
 
 const PRICING_TTL_SECONDS = 24 * 60 * 60;

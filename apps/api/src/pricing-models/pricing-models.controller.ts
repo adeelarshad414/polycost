@@ -4,10 +4,10 @@ import { ProviderId } from '../adapters/common/cloud-provider-adapter';
 import { ApiValidationError } from '../api/api-errors';
 import {
   ApiRateLimitService,
-  RateLimitHeaderResponse,
   requestIdentity,
   writeRateLimitHeaders,
 } from '../api/rate-limit.service';
+import type { RateLimitHeaderResponse } from '../api/rate-limit.service';
 import { AppConfig } from '../config/config.schema';
 import { providerRegionForCanonicalRegion } from '../pricing-normalization/region-map';
 import { PaymentOptionCode, PricingGranularity, PricingTermCode } from './pricing-models.types';

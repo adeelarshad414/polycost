@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema';
-import { SecretsReader } from '../secrets/secrets.service';
+import type { SecretsReader } from '../secrets/secrets.service';
 import { StructuredLlmClient, StructuredLlmRequest } from './nws-parser.types';
 
 const LLM_SECRET_PATH = 'polycost/llm';

@@ -1,7 +1,8 @@
 import { createHmac } from 'node:crypto';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { FetchLike, defaultFetch } from '../adapters/common/http-client';
+import { defaultFetch } from '../adapters/common/http-client';
+import type { FetchLike } from '../adapters/common/http-client';
 import { AppConfig } from '../config/config.schema';
 import { ApiValidationError } from './api-errors';
 import {

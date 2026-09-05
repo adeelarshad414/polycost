@@ -9,6 +9,11 @@
     // modules are resolved, not what is emitted. Verified: 0 errors on both
     // TypeScript 5.9.3 and 7.0.2, 784 API tests pass, and dist/main.js is
     // still "use strict" + require(). See K-11.
+    // Required by ts-jest for node16-family module kinds, and a precondition
+    // for the ESM move: it forces every type used in a decorated signature to
+    // be imported with `import type`, so the emit of one file never depends on
+    // type information from another. See docs/decisions/esm-migration-scope.md.
+    "isolatedModules": true,
     "module": "node16",
     "moduleResolution": "node16",
     "outDir": "dist",

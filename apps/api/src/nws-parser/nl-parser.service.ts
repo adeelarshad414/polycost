@@ -5,12 +5,8 @@ import { AppConfig } from '../config/config.schema';
 import { NWSValidator } from '../nws/nws-validator';
 import { NormalizedWorkloadSpec, ServiceRequirement } from '../nws/nws.types';
 import { NWS_PARSE_RESULT_JSON_SCHEMA } from './nws-parse-result.schema';
-import {
-  ParsedNwsDraft,
-  ParserConfidence,
-  STRUCTURED_LLM_CLIENT,
-  StructuredLlmClient,
-} from './nws-parser.types';
+import { ParsedNwsDraft, ParserConfidence, STRUCTURED_LLM_CLIENT } from './nws-parser.types';
+import type { StructuredLlmClient } from './nws-parser.types';
 
 const WORKLOAD_SIGNAL_PATTERN =
   /\b(ai|analytics|api|api gateway|app|aurora|azure ml|batch|bedrock|bigquery|bi|cdn|cloud armor|container|cosmos|data lake|data warehouse|database|db|ddos|defender|dynamodb|ec2|egress|embedding|embeddings|etl|event bus|event grid|eventbridge|file|firestore|generative ai|gpu|guardduty|inference|kubernetes|llm|load balancer|looker|machine learning|message queue|ml|model|mongo|mssql|mysql|nosql|openai|postgres|power bi|pub\/sub|pubsub|queue|redis|redshift|sagemaker|security command center|security hub|server|service|service bus|shield|spanner|sql server|sqlserver|step functions|storage|streaming|synapse|tokens|traffic|upload|users|vector|vertex ai|vm|waf|warehouse|web|website|workflow|workload)\b/i;

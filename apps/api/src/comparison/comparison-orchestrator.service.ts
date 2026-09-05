@@ -22,9 +22,8 @@ import {
   COMPARISON_CLOCK,
   COMPARISON_ID_FACTORY,
   COMPARISON_PROVIDER_ADAPTERS,
-  ComparisonClock,
-  ComparisonIdFactory,
 } from './comparison.tokens';
+import type { ComparisonClock, ComparisonIdFactory } from './comparison.tokens';
 import {
   ComparisonLineItem,
   ComparisonCostBreakdown,

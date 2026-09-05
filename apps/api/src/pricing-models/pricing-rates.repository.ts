@@ -3,7 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
 import { ProviderId } from '../adapters/common/cloud-provider-adapter';
 import { AppConfig } from '../config/config.schema';
-import { SecretsReader, SecretsService } from '../secrets/secrets.service';
+import { SecretsService } from '../secrets/secrets.service';
+import type { SecretsReader } from '../secrets/secrets.service';
 import {
   PaymentOptionCode,
   PricingRateQuery,

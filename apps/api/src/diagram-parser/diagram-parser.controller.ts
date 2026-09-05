@@ -3,12 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema';
 import {
   ApiRateLimitService,
-  RateLimitHeaderResponse,
   requestIdentity,
   writeRateLimitHeaders,
 } from '../api/rate-limit.service';
+import type { RateLimitHeaderResponse } from '../api/rate-limit.service';
 import { DiagramImportRepository } from './diagram-import.repository';
-import { DiagramParseRequest, DiagramParseResult } from './diagram-parser.types';
+import { DiagramParseResult } from './diagram-parser.types';
+import type { DiagramParseRequest } from './diagram-parser.types';
 import { DiagramParserService } from './diagram-parser.service';
 import { DiagramTempFileStore } from './diagram-temp-file.store';
 

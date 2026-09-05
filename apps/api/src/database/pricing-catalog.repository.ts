@@ -10,7 +10,7 @@ import {
 import { AppConfig } from '../config/config.schema';
 import { normalizePricingCatalogRecords } from '../pricing-normalization/normalized-pricing-records';
 import { pricingLineageForCatalogRecord } from '../pricing-normalization/pricing-lineage';
-import { SecretsReader } from '../secrets/secrets.service';
+import type { SecretsReader } from '../secrets/secrets.service';
 import {
   NormalizedPricingWriter,
   PricingCatalogWriteResult,

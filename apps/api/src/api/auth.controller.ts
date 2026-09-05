@@ -14,13 +14,9 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema';
 import { AuthService } from './auth.service';
-import { RequestWithAuth } from './auth.types';
-import {
-  ApiRateLimitService,
-  RateLimitHeaderResponse,
-  requestIdentity,
-  writeRateLimitHeaders,
-} from './rate-limit.service';
+import type { RequestWithAuth } from './auth.types';
+import { ApiRateLimitService, requestIdentity, writeRateLimitHeaders } from './rate-limit.service';
+import type { RateLimitHeaderResponse } from './rate-limit.service';
 import { SessionAuthGuard } from './session-auth.guard';
 
 @Controller('api/v1/auth')

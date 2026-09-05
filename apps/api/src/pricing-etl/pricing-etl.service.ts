@@ -3,12 +3,12 @@ import {
   CloudProviderAdapter,
   PricingCatalogRecord,
 } from '../adapters/common/cloud-provider-adapter';
-import {
+import type {
   NormalizedPricingWriter,
   PricingCatalogWriter,
   PricingEtlRunRepository,
 } from '../database/pricing-repository.types';
-import { PricingSyncFailureNotifier } from './pricing-sync-alert.service';
+import type { PricingSyncFailureNotifier } from './pricing-sync-alert.service';
 import { PricingEtlProviderResult, PricingEtlSummary } from './pricing-etl.types';
 import { DomainMetricsService } from '../observability/domain-metrics.service';
 import { trace } from '@opentelemetry/api';

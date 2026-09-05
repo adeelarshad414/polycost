@@ -1,9 +1,10 @@
 import { createHash, createHmac } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { FetchLike, defaultFetch } from '../adapters/common/http-client';
+import { defaultFetch } from '../adapters/common/http-client';
+import type { FetchLike } from '../adapters/common/http-client';
 import { AppConfig } from '../config/config.schema';
-import { SecretsReader } from '../secrets/secrets.service';
+import type { SecretsReader } from '../secrets/secrets.service';
 import { ApiValidationError } from './api-errors';
 import { InvoiceArtifactBlobGovernance, InvoiceArtifactStorageBackend } from './billing.types';
 
