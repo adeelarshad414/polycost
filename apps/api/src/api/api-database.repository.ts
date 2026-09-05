@@ -7,7 +7,8 @@ import { AppConfig } from '../config/config.schema';
 import { NormalizedWorkloadSpec } from '../nws/nws.types';
 import { calculateEgressCost } from '../pricing-normalization/egress-tier-calculator';
 import { providerRegionForCanonicalRegion } from '../pricing-normalization/region-map';
-import { SecretsReader, SecretsService } from '../secrets/secrets.service';
+import { SecretsService } from '../secrets/secrets.service';
+import type { SecretsReader } from '../secrets/secrets.service';
 import {
   ApiConflictError,
   ApiNotFoundError,

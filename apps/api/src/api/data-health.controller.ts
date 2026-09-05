@@ -3,12 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema';
 import { DataHealthResponse } from './api-errors';
 import { ComparisonApplicationService } from './comparison-application.service';
-import {
-  ApiRateLimitService,
-  RateLimitHeaderResponse,
-  requestIdentity,
-  writeRateLimitHeaders,
-} from './rate-limit.service';
+import { ApiRateLimitService, requestIdentity, writeRateLimitHeaders } from './rate-limit.service';
+import type { RateLimitHeaderResponse } from './rate-limit.service';
 
 interface RequestLike {
   ip?: string;

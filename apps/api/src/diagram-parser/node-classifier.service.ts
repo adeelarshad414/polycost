@@ -7,8 +7,8 @@ import {
   DiagramIgnoredNode,
   DiagramNodeClassification,
   ExtractedDiagramNode,
-  LlmClassifierClient,
 } from './diagram-parser.types';
+import type { LlmClassifierClient } from './diagram-parser.types';
 import { sanitizeDisplayText } from './diagram-security';
 import { StubLlmClassifierClient } from './llm-classifier.client';
 import { StencilMapRegistry } from './stencil-map.registry';

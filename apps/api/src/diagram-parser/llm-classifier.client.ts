@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { NormalizedRequirementCategory } from '@polycost/types';
 import { z } from 'zod';
 import { AppConfig } from '../config/config.schema';
-import { SecretsReader } from '../secrets/secrets.service';
+import type { SecretsReader } from '../secrets/secrets.service';
 import { DiagramNodeClassification, LlmClassifierClient } from './diagram-parser.types';
 
 const DIAGRAM_LLM_SECRET_PATH = 'polycost/llm';

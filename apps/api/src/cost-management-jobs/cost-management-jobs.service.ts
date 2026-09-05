@@ -3,7 +3,7 @@ import { ProviderId } from '../adapters/common/cloud-provider-adapter';
 import { ApiDatabaseRepository } from '../api/api-database.repository';
 import { BudgetEvaluationRecord, WorkloadCostBreakdown } from '../api/cost-management.types';
 import { TeamAuditExportService, TeamAuditExportSummary } from '../api/team-audit-export.service';
-import { ExchangeRateClient } from './exchange-rate.client';
+import type { ExchangeRateClient } from './exchange-rate.client';
 import {
   AlertEvaluationSummary,
   CurrencySyncSummary,

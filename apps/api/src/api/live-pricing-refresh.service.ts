@@ -8,7 +8,7 @@ import {
   ServiceCategory,
 } from '../adapters/common/cloud-provider-adapter';
 import { ComparisonResult, ComparisonWarning } from '../comparison/comparison.types';
-import {
+import type {
   NormalizedPricingWriter,
   PricingCatalogWriter,
 } from '../database/pricing-repository.types';

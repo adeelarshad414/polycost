@@ -10,7 +10,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { RequestWithAuth } from './auth.types';
+import type { RequestWithAuth } from './auth.types';
 import { ScimProvisioningService } from './scim-provisioning.service';
 import { SessionAuthGuard } from './session-auth.guard';
 

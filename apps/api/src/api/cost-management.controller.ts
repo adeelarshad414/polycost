@@ -17,12 +17,8 @@ import {
   StoragePricingTier,
   WorkloadInput,
 } from './cost-management.types';
-import {
-  ApiRateLimitService,
-  RateLimitHeaderResponse,
-  requestIdentity,
-  writeRateLimitHeaders,
-} from './rate-limit.service';
+import { ApiRateLimitService, requestIdentity, writeRateLimitHeaders } from './rate-limit.service';
+import type { RateLimitHeaderResponse } from './rate-limit.service';
 
 type QueryValue = string | string[] | undefined;
 interface RequestLike {
