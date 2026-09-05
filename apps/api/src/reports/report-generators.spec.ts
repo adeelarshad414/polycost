@@ -1,6 +1,6 @@
-import { ComparisonResult } from '../comparison/comparison.types';
-import { CsvReportGenerator } from './csv-report.generator';
-import { ExcelReportGenerator } from './excel-report.generator';
+import { ComparisonResult } from '../comparison/comparison.types.js';
+import { CsvReportGenerator } from './csv-report.generator.js';
+import { ExcelReportGenerator } from './excel-report.generator.js';
 import {
   PdfReportGenerator,
   cellText,
@@ -10,7 +10,7 @@ import {
   truncateToWidth,
   wrapLine,
   pageContent,
-} from './pdf-report.generator';
+} from './pdf-report.generator.js';
 import {
   architectureOverviewRows,
   breakEvenSummaryRows,
@@ -36,11 +36,11 @@ import {
   sourceDiagramRows,
   skuMappingAppendixRows,
   workloadScopeRows,
-} from './report-evidence';
-import { sanitizeSpreadsheetText } from './report-security';
-import { ReportService } from './report.service';
-import { DomainMetricsService } from '../observability/domain-metrics.service';
-import { MetricsService } from '../observability/metrics.service';
+} from './report-evidence.js';
+import { sanitizeSpreadsheetText } from './report-security.js';
+import { ReportService } from './report.service.js';
+import { DomainMetricsService } from '../observability/domain-metrics.service.js';
+import { MetricsService } from '../observability/metrics.service.js';
 
 const comparison: ComparisonResult = {
   comparisonId: 'comparison-123',

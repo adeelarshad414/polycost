@@ -1,12 +1,16 @@
 import { Body, Controller, Post, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
-import { NLParserService } from '../nws-parser/nl-parser.service';
-import { ParsedNwsDraft } from '../nws-parser/nws-parser.types';
-import { ApiValidationError } from './api-errors';
-import { ComparisonApplicationService } from './comparison-application.service';
-import { ApiRateLimitService, requestIdentity, writeRateLimitHeaders } from './rate-limit.service';
-import type { RateLimitHeaderResponse } from './rate-limit.service';
+import { AppConfig } from '../config/config.schema.js';
+import { NLParserService } from '../nws-parser/nl-parser.service.js';
+import { ParsedNwsDraft } from '../nws-parser/nws-parser.types.js';
+import { ApiValidationError } from './api-errors.js';
+import { ComparisonApplicationService } from './comparison-application.service.js';
+import {
+  ApiRateLimitService,
+  requestIdentity,
+  writeRateLimitHeaders,
+} from './rate-limit.service.js';
+import type { RateLimitHeaderResponse } from './rate-limit.service.js';
 
 interface RequestLike {
   ip?: string;

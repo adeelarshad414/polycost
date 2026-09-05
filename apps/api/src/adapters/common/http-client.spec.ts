@@ -3,7 +3,7 @@ import {
   getProviderHttpDefaults,
   parseJsonResponse,
   setProviderHttpDefaults,
-} from './http-client';
+} from './http-client.js';
 
 // Build a minimal web-ReadableStream-like body that yields the given chunks, so
 // tests can exercise the streaming read path (real fetch exposes getReader()).

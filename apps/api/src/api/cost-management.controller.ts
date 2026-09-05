@@ -1,13 +1,13 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { HOURS_PER_MONTH } from '../cost-time';
-import { AppConfig } from '../config/config.schema';
+import { HOURS_PER_MONTH } from '../cost-time.js';
+import { AppConfig } from '../config/config.schema.js';
 import {
   providerRegionsForCanonicalRegion,
   supportedCanonicalRegions,
-} from '../pricing-normalization/region-map';
-import { ApiValidationError } from './api-errors';
-import { CostManagementService } from './cost-management.service';
+} from '../pricing-normalization/region-map.js';
+import { ApiValidationError } from './api-errors.js';
+import { CostManagementService } from './cost-management.service.js';
 import {
   BudgetInput,
   CachedPricingCompareQuery,
@@ -16,9 +16,13 @@ import {
   ShareLinkInput,
   StoragePricingTier,
   WorkloadInput,
-} from './cost-management.types';
-import { ApiRateLimitService, requestIdentity, writeRateLimitHeaders } from './rate-limit.service';
-import type { RateLimitHeaderResponse } from './rate-limit.service';
+} from './cost-management.types.js';
+import {
+  ApiRateLimitService,
+  requestIdentity,
+  writeRateLimitHeaders,
+} from './rate-limit.service.js';
+import type { RateLimitHeaderResponse } from './rate-limit.service.js';
 
 type QueryValue = string | string[] | undefined;
 interface RequestLike {

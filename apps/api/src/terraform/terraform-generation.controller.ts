@@ -1,13 +1,13 @@
 import { Body, Controller, Post } from '@nestjs/common';
-import { ApiValidationError } from '../api/api-errors';
-import { TerraformGenerationService } from './terraform-generation.service';
+import { ApiValidationError } from '../api/api-errors.js';
+import { TerraformGenerationService } from './terraform-generation.service.js';
 import {
   TerraformAvailabilityMode,
   TerraformGenerateInput,
   TerraformNetworkTopology,
   TerraformRuntimeTarget,
   TerraformTargetCloud,
-} from './terraform.types';
+} from './terraform.types.js';
 
 @Controller('api/v1/terraform')
 export class TerraformGenerationController {

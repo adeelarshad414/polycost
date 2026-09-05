@@ -1,10 +1,14 @@
 import { Controller, Get, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
-import { ApiRateLimitService, requestIdentity, writeRateLimitHeaders } from './rate-limit.service';
-import type { RateLimitHeaderResponse } from './rate-limit.service';
-import { RegionCatalogResponse } from './regions.types';
-import { RegionsService } from './regions.service';
+import { AppConfig } from '../config/config.schema.js';
+import {
+  ApiRateLimitService,
+  requestIdentity,
+  writeRateLimitHeaders,
+} from './rate-limit.service.js';
+import type { RateLimitHeaderResponse } from './rate-limit.service.js';
+import { RegionCatalogResponse } from './regions.types.js';
+import { RegionsService } from './regions.service.js';
 
 interface RequestLike {
   ip?: string;

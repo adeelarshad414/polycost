@@ -2,9 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NormalizedRequirementCategory } from '@polycost/types';
 import { z } from 'zod';
-import { AppConfig } from '../config/config.schema';
-import type { SecretsReader } from '../secrets/secrets.service';
-import { DiagramNodeClassification, LlmClassifierClient } from './diagram-parser.types';
+import { AppConfig } from '../config/config.schema.js';
+import type { SecretsReader } from '../secrets/secrets.service.js';
+import { DiagramNodeClassification, LlmClassifierClient } from './diagram-parser.types.js';
 
 const DIAGRAM_LLM_SECRET_PATH = 'polycost/llm';
 const DIAGRAM_LLM_TIMEOUT_MS = 3_000;

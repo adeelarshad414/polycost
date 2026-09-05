@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
-import { SecretsReader } from '../secrets/secrets.service';
-import { PostgresPricingRatesRepository } from './pricing-rates.repository';
+import { AppConfig } from '../config/config.schema.js';
+import { SecretsReader } from '../secrets/secrets.service.js';
+import { PostgresPricingRatesRepository } from './pricing-rates.repository.js';
 
 const configService = {
   get: jest.fn((key: keyof AppConfig) => {

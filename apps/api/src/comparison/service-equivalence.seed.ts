@@ -1,4 +1,4 @@
-import { ProviderId, ServiceCategory } from '../adapters/common/cloud-provider-adapter';
+import { ProviderId, ServiceCategory } from '../adapters/common/cloud-provider-adapter.js';
 
 export interface ServiceEquivalenceRule {
   category: ServiceCategory;

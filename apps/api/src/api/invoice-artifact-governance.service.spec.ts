@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
-import { ApiValidationError } from './api-errors';
-import { InvoiceArtifactGovernanceService } from './invoice-artifact-governance.service';
+import { AppConfig } from '../config/config.schema.js';
+import { ApiValidationError } from './api-errors.js';
+import { InvoiceArtifactGovernanceService } from './invoice-artifact-governance.service.js';
 
 describe('InvoiceArtifactGovernanceService', () => {
   it('reports local database storage as not production ready', () => {

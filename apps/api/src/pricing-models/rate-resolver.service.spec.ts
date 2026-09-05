@@ -1,8 +1,8 @@
-import { ApiValidationError } from '../api/api-errors';
-import { PricingCacheService } from './pricing-cache.service';
-import { PricingRateReader, PricingRateRecord } from './pricing-models.types';
-import { PricingTermsService } from './pricing-terms.service';
-import { intervalsFromHourlyRate, RateResolverService } from './rate-resolver.service';
+import { ApiValidationError } from '../api/api-errors.js';
+import { PricingCacheService } from './pricing-cache.service.js';
+import { PricingRateReader, PricingRateRecord } from './pricing-models.types.js';
+import { PricingTermsService } from './pricing-terms.service.js';
+import { intervalsFromHourlyRate, RateResolverService } from './rate-resolver.service.js';
 
 const currentRate: PricingRateRecord = {
   provider: 'aws',

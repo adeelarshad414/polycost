@@ -1,5 +1,5 @@
-import { ComparisonResult } from '../comparison/comparison.types';
-import { ComparisonAnalyticsService } from './comparison-analytics.service';
+import { ComparisonResult } from '../comparison/comparison.types.js';
+import { ComparisonAnalyticsService } from './comparison-analytics.service.js';
 
 const comparison: ComparisonResult = {
   comparisonId: 'analytics-comparison-1',

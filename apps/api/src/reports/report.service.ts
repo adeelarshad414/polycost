@@ -1,10 +1,10 @@
 import { Injectable, Optional } from '@nestjs/common';
-import { ComparisonResult } from '../comparison/comparison.types';
-import { CsvReportGenerator } from './csv-report.generator';
-import { ExcelReportGenerator } from './excel-report.generator';
-import { PdfReportGenerator } from './pdf-report.generator';
-import { GeneratedReport, ReportFormat, ReportOptions } from './report.types';
-import { DomainMetricsService } from '../observability/domain-metrics.service';
+import { ComparisonResult } from '../comparison/comparison.types.js';
+import { CsvReportGenerator } from './csv-report.generator.js';
+import { ExcelReportGenerator } from './excel-report.generator.js';
+import { PdfReportGenerator } from './pdf-report.generator.js';
+import { GeneratedReport, ReportFormat, ReportOptions } from './report.types.js';
+import { DomainMetricsService } from '../observability/domain-metrics.service.js';
 
 @Injectable()
 export class ReportService {

@@ -1,5 +1,5 @@
-import { InMemoryPricingCatalogReader } from '../common/in-memory-pricing-catalog.reader';
-import { MockProviderAdapter } from './mock-provider.adapter';
+import { InMemoryPricingCatalogReader } from '../common/in-memory-pricing-catalog.reader.js';
+import { MockProviderAdapter } from './mock-provider.adapter.js';
 
 describe('MockProviderAdapter', () => {
   it('returns a production-demo catalog with at least 30 SKUs per provider', async () => {

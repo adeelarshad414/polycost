@@ -1,4 +1,4 @@
-import { ProviderId, ServiceCategory } from '../adapters/common/cloud-provider-adapter';
+import { ProviderId, ServiceCategory } from '../adapters/common/cloud-provider-adapter.js';
 
 export type PricingCoverageLevel = 'live_catalog' | 'seeded_catalog' | 'modeled' | 'future_work';
 export type PricingTraceLevel = 'sku_price_row' | 'modeled_assumption' | 'not_available';

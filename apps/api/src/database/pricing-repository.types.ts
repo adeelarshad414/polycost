@@ -1,4 +1,4 @@
-import { PricingCatalogRecord, ProviderId } from '../adapters/common/cloud-provider-adapter';
+import { PricingCatalogRecord, ProviderId } from '../adapters/common/cloud-provider-adapter.js';
 
 export type PricingEtlProviderStatus = 'success' | 'partial' | 'failed';
 

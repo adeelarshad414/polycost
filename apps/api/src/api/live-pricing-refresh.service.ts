@@ -1,19 +1,19 @@
 import { Injectable } from '@nestjs/common';
-import { CircuitBreakerRegistry } from '../adapters/common/circuit-breaker';
+import { CircuitBreakerRegistry } from '../adapters/common/circuit-breaker.js';
 import {
   CloudProviderAdapter,
   PricingCatalogRecord,
   ProviderId,
   RateSource,
   ServiceCategory,
-} from '../adapters/common/cloud-provider-adapter';
-import { ComparisonResult, ComparisonWarning } from '../comparison/comparison.types';
+} from '../adapters/common/cloud-provider-adapter.js';
+import { ComparisonResult, ComparisonWarning } from '../comparison/comparison.types.js';
 import type {
   NormalizedPricingWriter,
   PricingCatalogWriter,
-} from '../database/pricing-repository.types';
-import { LiveRefreshUnavailableError } from './api-errors';
-import { ComparisonSnapshot } from './api-database.repository';
+} from '../database/pricing-repository.types.js';
+import { LiveRefreshUnavailableError } from './api-errors.js';
+import { ComparisonSnapshot } from './api-database.repository.js';
 
 interface LivePricingReference {
   providerId: ProviderId;

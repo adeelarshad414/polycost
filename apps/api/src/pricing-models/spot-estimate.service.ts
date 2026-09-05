@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { PricingCacheService } from './pricing-cache.service';
-import { RateResolverQuery, RateResult } from './pricing-models.types';
-import { RateResolverService } from './rate-resolver.service';
+import { PricingCacheService } from './pricing-cache.service.js';
+import { RateResolverQuery, RateResult } from './pricing-models.types.js';
+import { RateResolverService } from './rate-resolver.service.js';
 
 const SPOT_ESTIMATE_TTL_SECONDS = 30 * 60;
 const SPOT_DISCLAIMER =

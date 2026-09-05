@@ -1,16 +1,16 @@
 import { Inject, Injectable, Optional, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { DomainMetricsService } from '../observability/domain-metrics.service';
-import { registerQueueDepth } from '../observability/queue-depth';
+import { DomainMetricsService } from '../observability/domain-metrics.service.js';
+import { registerQueueDepth } from '../observability/queue-depth.js';
 import { ConfigService } from '@nestjs/config';
 import { JobsOptions } from 'bullmq';
-import { AppConfig } from '../config/config.schema';
-import { PricingEtlService } from './pricing-etl.service';
+import { AppConfig } from '../config/config.schema.js';
+import { PricingEtlService } from './pricing-etl.service.js';
 import {
   PRICING_ETL_QUEUE_NAME,
   PRICING_ETL_REFRESH_JOB_NAME,
   PRICING_ETL_STARTUP_REFRESH_JOB_ID,
   PricingEtlSummary,
-} from './pricing-etl.types';
+} from './pricing-etl.types.js';
 
 export const PRICING_ETL_QUEUE = Symbol('PRICING_ETL_QUEUE');
 export const PRICING_ETL_WORKER_FACTORY = Symbol('PRICING_ETL_WORKER_FACTORY');

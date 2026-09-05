@@ -1,17 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { ApiValidationError } from '../api/api-errors';
+import { ApiValidationError } from '../api/api-errors.js';
 import {
   DecodedDiagramInput,
   DiagramInputFormat,
   DiagramParseRequest,
-} from './diagram-parser.types';
+} from './diagram-parser.types.js';
 import {
   assertNoBinaryImageSpoof,
   assertUploadSize,
   isZipBuffer,
   safeFileName,
   sha256,
-} from './diagram-security';
+} from './diagram-security.js';
 
 const SUPPORTED_FORMATS: DiagramInputFormat[] = ['mermaid', 'drawio', 'lucid_csv', 'vsdx'];
 

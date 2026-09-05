@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
-import { FetchLike } from '../adapters/common/http-client';
-import { FrankfurterExchangeRateClient } from './exchange-rate.client';
+import { AppConfig } from '../config/config.schema.js';
+import { FetchLike } from '../adapters/common/http-client.js';
+import { FrankfurterExchangeRateClient } from './exchange-rate.client.js';
 
 const configService = {
   get: jest.fn((key: keyof AppConfig) => {

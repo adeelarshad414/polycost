@@ -1,4 +1,4 @@
-import { ErrorReporter } from './error-reporter';
+import { ErrorReporter } from './error-reporter.js';
 
 /**
  * Captures errors that never reach the Nest exception filter.

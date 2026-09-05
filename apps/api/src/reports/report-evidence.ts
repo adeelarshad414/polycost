@@ -1,18 +1,18 @@
 /* eslint-disable security/detect-object-injection, security/detect-unsafe-regex -- Reviewed 2026-07-06: report dictionaries and bounded text cleanup operate on generated comparison/report data; see docs/SECURITY-SUPPRESSIONS.md. */
-import { PricingModelCost } from '../adapters/common/cloud-provider-adapter';
+import { PricingModelCost } from '../adapters/common/cloud-provider-adapter.js';
 import {
   ComparisonLineItem,
   ComparisonProviderResult,
   ComparisonResult,
-} from '../comparison/comparison.types';
-import { commitmentPricingModelCandidates } from '../comparison/commitment-policy';
-import { HOURS_PER_DAY, HOURS_PER_MONTH, HOURS_PER_WEEK } from '../cost-time';
-import { ServiceRequirement } from '../nws/nws.types';
+} from '../comparison/comparison.types.js';
+import { commitmentPricingModelCandidates } from '../comparison/commitment-policy.js';
+import { HOURS_PER_DAY, HOURS_PER_MONTH, HOURS_PER_WEEK } from '../cost-time.js';
+import { ServiceRequirement } from '../nws/nws.types.js';
 import {
   providerRegionForCanonicalRegion,
   supportedCanonicalRegions,
-} from '../pricing-normalization/region-map';
-import { ReportInterval, ReportOptions, ReportPricingModel } from './report.types';
+} from '../pricing-normalization/region-map.js';
+import { ReportInterval, ReportOptions, ReportPricingModel } from './report.types.js';
 
 const REPORT_PRICING_MODELS: ReportPricingModel[] = [
   'on-demand',

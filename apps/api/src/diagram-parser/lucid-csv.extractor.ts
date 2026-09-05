@@ -5,8 +5,8 @@ import {
   DiagramGraphEdge,
   ExtractedDiagram,
   ExtractedDiagramNode,
-} from './diagram-parser.types';
-import { sanitizeDisplayText, sanitizeSourceRef } from './diagram-security';
+} from './diagram-parser.types.js';
+import { sanitizeDisplayText, sanitizeSourceRef } from './diagram-security.js';
 
 @Injectable()
 export class LucidCsvExtractor implements DiagramExtractor {

@@ -1,6 +1,6 @@
 import { NormalizedRequirementCategory } from '@polycost/types';
-import { NormalizedWorkloadSpec, ServiceRequirement } from '../nws/nws.types';
-import { ParserConfidence } from '../nws-parser/nws-parser.types';
+import { NormalizedWorkloadSpec, ServiceRequirement } from '../nws/nws.types.js';
+import { ParserConfidence } from '../nws-parser/nws-parser.types.js';
 
 export const DIAGRAM_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 export const DIAGRAM_INFLATED_MAX_BYTES = 20 * 1024 * 1024;

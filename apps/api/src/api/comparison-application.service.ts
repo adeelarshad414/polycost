@@ -1,17 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { HOURS_PER_MONTH, hourlyFromMonthly, roundCurrency } from '../cost-time';
-import { ComparisonOrchestratorService } from '../comparison/comparison-orchestrator.service';
+import { HOURS_PER_MONTH, hourlyFromMonthly, roundCurrency } from '../cost-time.js';
+import { ComparisonOrchestratorService } from '../comparison/comparison-orchestrator.service.js';
 import {
   ComparisonLineItem,
   ComparisonProviderResult,
   ComparisonResult,
   ComparisonWarning,
-} from '../comparison/comparison.types';
-import { NWSValidator } from '../nws/nws-validator';
-import { ApiNotFoundError, DataHealthResponse, LiveRefreshUnavailableError } from './api-errors';
-import { ApiDatabaseRepository, ComparisonSnapshot } from './api-database.repository';
-import { ComparisonPrewarmService } from './comparison-prewarm.service';
-import { LivePricingRefreshService } from './live-pricing-refresh.service';
+} from '../comparison/comparison.types.js';
+import { NWSValidator } from '../nws/nws-validator.js';
+import { ApiNotFoundError, DataHealthResponse, LiveRefreshUnavailableError } from './api-errors.js';
+import { ApiDatabaseRepository, ComparisonSnapshot } from './api-database.repository.js';
+import { ComparisonPrewarmService } from './comparison-prewarm.service.js';
+import { LivePricingRefreshService } from './live-pricing-refresh.service.js';
 
 export interface CreateComparisonOptions {
   useLivePricing?: boolean;

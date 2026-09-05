@@ -2,17 +2,17 @@ import {
   CloudProviderAdapter,
   ProviderId,
   ProviderPricingResult,
-} from '../adapters/common/cloud-provider-adapter';
-import { InMemoryPricingCatalogReader } from '../adapters/common/in-memory-pricing-catalog.reader';
-import { MockProviderAdapter } from '../adapters/mock/mock-provider.adapter';
-import { NormalizedWorkloadSpec, ServiceRequirement } from '../nws/nws.types';
+} from '../adapters/common/cloud-provider-adapter.js';
+import { InMemoryPricingCatalogReader } from '../adapters/common/in-memory-pricing-catalog.reader.js';
+import { MockProviderAdapter } from '../adapters/mock/mock-provider.adapter.js';
+import { NormalizedWorkloadSpec, ServiceRequirement } from '../nws/nws.types.js';
 import {
   ComparisonOrchestratorService,
   ComparisonUnavailableError,
-} from './comparison-orchestrator.service';
-import { ComparisonLineItem, ComparisonProviderResult } from './comparison.types';
-import { EquivalentServiceMapper } from './equivalent-service-mapper';
-import { IntervalCostCalculator } from './interval-cost-calculator';
+} from './comparison-orchestrator.service.js';
+import { ComparisonLineItem, ComparisonProviderResult } from './comparison.types.js';
+import { EquivalentServiceMapper } from './equivalent-service-mapper.js';
+import { IntervalCostCalculator } from './interval-cost-calculator.js';
 
 const validWorkload: NormalizedWorkloadSpec = {
   schemaVersion: '1.0',

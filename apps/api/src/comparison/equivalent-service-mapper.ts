@@ -3,19 +3,19 @@ import {
   ProviderId,
   ProviderPricingLineItem,
   ServiceCategory,
-} from '../adapters/common/cloud-provider-adapter';
+} from '../adapters/common/cloud-provider-adapter.js';
 import {
   ComputeComponent,
   DatabaseComponent,
   NormalizedWorkloadSpec,
   StorageComponent,
-} from '../nws/nws.types';
+} from '../nws/nws.types.js';
 import {
   ProviderSkuPatterns,
   SERVICE_EQUIVALENCE_SEED,
   ServiceEquivalenceRule,
-} from './service-equivalence.seed';
-import { SERVICE_EQUIVALENCE_RULES } from './comparison.tokens';
+} from './service-equivalence.seed.js';
+import { SERVICE_EQUIVALENCE_RULES } from './comparison.tokens.js';
 
 export interface EquivalentServiceMapping {
   category: ServiceCategory;

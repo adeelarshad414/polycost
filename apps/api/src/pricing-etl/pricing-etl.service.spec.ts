@@ -2,15 +2,15 @@ import { Logger } from '@nestjs/common';
 import {
   CloudProviderAdapter,
   PricingCatalogRecord,
-} from '../adapters/common/cloud-provider-adapter';
+} from '../adapters/common/cloud-provider-adapter.js';
 import {
   NormalizedPricingWriter,
   PricingCatalogWriter,
   PricingEtlRunRepository,
-} from '../database/pricing-repository.types';
-import { PricingEtlService } from './pricing-etl.service';
-import { DomainMetricsService } from '../observability/domain-metrics.service';
-import { MetricsService } from '../observability/metrics.service';
+} from '../database/pricing-repository.types.js';
+import { PricingEtlService } from './pricing-etl.service.js';
+import { DomainMetricsService } from '../observability/domain-metrics.service.js';
+import { MetricsService } from '../observability/metrics.service.js';
 
 const adapter = (
   providerId: CloudProviderAdapter['providerId'],

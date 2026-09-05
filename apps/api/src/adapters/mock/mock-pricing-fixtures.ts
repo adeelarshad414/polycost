@@ -3,7 +3,7 @@ import {
   PricingCatalogRecord,
   PricingModelKey,
   ProviderId,
-} from '../common/cloud-provider-adapter';
+} from '../common/cloud-provider-adapter.js';
 
 type ComputeFamily =
   | 'general-purpose'

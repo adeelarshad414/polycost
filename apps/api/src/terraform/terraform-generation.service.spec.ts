@@ -3,9 +3,9 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { NormalizedWorkloadSpec } from '../nws/nws.types';
-import { TerraformGenerationService } from './terraform-generation.service';
-import { TerraformGenerationResult } from './terraform.types';
+import { NormalizedWorkloadSpec } from '../nws/nws.types.js';
+import { TerraformGenerationService } from './terraform-generation.service.js';
+import { TerraformGenerationResult } from './terraform.types.js';
 
 const validNws: NormalizedWorkloadSpec = {
   schemaVersion: '1.0',

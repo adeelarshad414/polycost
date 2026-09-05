@@ -1,4 +1,4 @@
-import { NormalizedWorkloadSpec } from '../nws/nws.types';
+import { NormalizedWorkloadSpec } from '../nws/nws.types.js';
 
 export type CommitmentPricingModel = 'reserved-1yr' | 'reserved-3yr' | 'savings-plan';
 export type CommitmentWorkloadProfile = NormalizedWorkloadSpec['workloadProfile'];

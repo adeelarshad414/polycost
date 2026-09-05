@@ -1,5 +1,5 @@
-import { PricingCatalogRecord } from '../adapters/common/cloud-provider-adapter';
-import { normalizePricingCatalogRecords } from './normalized-pricing-records';
+import { PricingCatalogRecord } from '../adapters/common/cloud-provider-adapter.js';
+import { normalizePricingCatalogRecords } from './normalized-pricing-records.js';
 
 const fetchedAt = '2026-06-28T00:00:00.000Z';
 const effectiveDate = '2026-01-01T00:00:00.000Z';

@@ -4,12 +4,12 @@ import { mkdir, readdir, stat, unlink, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
+import { AppConfig } from '../config/config.schema.js';
 import {
   DecodedDiagramInput,
   DIAGRAM_TEMP_RETENTION_HOURS,
   DiagramInputFormat,
-} from './diagram-parser.types';
+} from './diagram-parser.types.js';
 
 interface StoredDiagramImportFile {
   fileRef: string;

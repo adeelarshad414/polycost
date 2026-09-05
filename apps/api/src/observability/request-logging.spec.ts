@@ -1,8 +1,8 @@
-import { ApiExceptionFilter } from '../api/api-exception.filter';
-import { ApiValidationError } from '../api/api-errors';
-import { ErrorReporter } from './error-reporter';
-import { MetricsService } from './metrics.service';
-import { isProbeRoute, registerMetricsHook } from '../bootstrap';
+import { ApiExceptionFilter } from '../api/api-exception.filter.js';
+import { ApiValidationError } from '../api/api-errors.js';
+import { ErrorReporter } from './error-reporter.js';
+import { MetricsService } from './metrics.service.js';
+import { isProbeRoute, registerMetricsHook } from '../bootstrap.js';
 
 type Hook = (req: never, reply: never, done: () => void) => void;
 

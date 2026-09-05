@@ -4,7 +4,7 @@ import {
   PaymentOptionDefinition,
   PricingTermCode,
   PricingTermDefinition,
-} from './pricing-models.types';
+} from './pricing-models.types.js';
 
 const TERMS: PricingTermDefinition[] = [
   {

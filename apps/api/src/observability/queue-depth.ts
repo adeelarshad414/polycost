@@ -1,4 +1,4 @@
-import { DomainMetricsService } from './domain-metrics.service';
+import { DomainMetricsService } from './domain-metrics.service.js';
 
 /** The BullMQ states worth publishing; `completed` is unbounded and excluded. */
 const QUEUE_STATES = ['waiting', 'active', 'delayed', 'failed'] as const;

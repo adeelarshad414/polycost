@@ -1,4 +1,4 @@
-import { HOURS_PER_MONTH } from '../cost-time';
+import { HOURS_PER_MONTH } from '../cost-time.js';
 
 export const NWS_PARSE_RESULT_JSON_SCHEMA = {
   type: 'object',

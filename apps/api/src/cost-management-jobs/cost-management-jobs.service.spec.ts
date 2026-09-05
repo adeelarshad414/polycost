@@ -1,11 +1,11 @@
-import { ApiDatabaseRepository } from '../api/api-database.repository';
+import { ApiDatabaseRepository } from '../api/api-database.repository.js';
 import {
   BudgetEvaluationRecord,
   CostObservationRecord,
   WorkloadCostBreakdown,
-} from '../api/cost-management.types';
-import { ExchangeRateClient } from './exchange-rate.client';
-import { CostManagementJobsService } from './cost-management-jobs.service';
+} from '../api/cost-management.types.js';
+import { ExchangeRateClient } from './exchange-rate.client.js';
+import { CostManagementJobsService } from './cost-management-jobs.service.js';
 
 const budgetRecord: BudgetEvaluationRecord = {
   budget: {

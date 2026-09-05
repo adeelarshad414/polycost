@@ -1,14 +1,14 @@
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ComparisonResult } from '../comparison/comparison.types';
-import { AppConfig } from '../config/config.schema';
-import { ApiForbiddenError, ApiNotFoundError, ApiValidationError } from './api-errors';
+import { ComparisonResult } from '../comparison/comparison.types.js';
+import { AppConfig } from '../config/config.schema.js';
+import { ApiForbiddenError, ApiNotFoundError, ApiValidationError } from './api-errors.js';
 import {
   ApiDatabaseRepository,
   InvoiceArtifactBlobDeletionCandidate,
-} from './api-database.repository';
-import { AuthIdentity } from './auth.types';
+} from './api-database.repository.js';
+import { AuthIdentity } from './auth.types.js';
 import {
   InvoiceArtifactRetentionEnforcementResult,
   InvoiceArtifactBlobGovernance,
@@ -44,17 +44,17 @@ import {
   InvoiceAdjustmentCategory,
   InvoiceReconciliationRecord,
   InvoiceReconciliationStatus,
-} from './billing.types';
-import { InvoiceArtifactGovernanceService } from './invoice-artifact-governance.service';
+} from './billing.types.js';
+import { InvoiceArtifactGovernanceService } from './invoice-artifact-governance.service.js';
 import {
   InvoiceArtifactObjectPointer,
   InvoiceArtifactStorageService,
   StoredInvoiceArtifactObject,
-} from './invoice-artifact-storage.service';
+} from './invoice-artifact-storage.service.js';
 import {
   InvoiceEvidenceNotaryDeliveryResult,
   InvoiceEvidenceNotaryService,
-} from './invoice-evidence-notary.service';
+} from './invoice-evidence-notary.service.js';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;

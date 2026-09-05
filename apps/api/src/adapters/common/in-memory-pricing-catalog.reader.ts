@@ -2,7 +2,7 @@ import {
   PricingCatalogQuery,
   PricingCatalogReader,
   PricingCatalogRecord,
-} from './cloud-provider-adapter';
+} from './cloud-provider-adapter.js';
 
 export class InMemoryPricingCatalogReader implements PricingCatalogReader {
   constructor(private readonly records: PricingCatalogRecord[]) {}

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { HOURS_PER_MONTH } from '../cost-time';
+import { HOURS_PER_MONTH } from '../cost-time.js';
 
 export const SUPPORTED_NWS_SCHEMA_VERSIONS = ['1.0'] as const;
 

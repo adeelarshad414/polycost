@@ -1,5 +1,5 @@
 /* eslint-disable security/detect-object-injection, security/detect-unsafe-regex -- Reviewed 2026-07-06: provider catalog keys and bounded SKU parsing operate on controlled cloud catalog data; see docs/SECURITY-SUPPRESSIONS.md. */
-import { BaseCloudProviderAdapter } from '../common/base-cloud-provider.adapter';
+import { BaseCloudProviderAdapter } from '../common/base-cloud-provider.adapter.js';
 import {
   PricingCatalogReader,
   PricingCatalogRecord,
@@ -7,15 +7,15 @@ import {
   ProviderId,
   RefreshPricingCatalogOptions,
   ServiceCategory,
-} from '../common/cloud-provider-adapter';
+} from '../common/cloud-provider-adapter.js';
 import { Readable } from 'node:stream';
 import {
   defaultFetch,
   FetchLike,
   HttpResponseLike,
   parseJsonResponse,
-} from '../common/http-client';
-import { streamAwsBulkPriceList } from './aws-bulk-stream';
+} from '../common/http-client.js';
+import { streamAwsBulkPriceList } from './aws-bulk-stream.js';
 
 interface AwsBulkPriceListResponse {
   products: Record<string, AwsProduct>;

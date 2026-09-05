@@ -10,17 +10,21 @@ import {
   StreamableFile,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
-import { ReportService } from '../reports/report.service';
-import { ReportFormat, ReportInterval, ReportPricingModel } from '../reports/report.types';
-import { ApiValidationError } from './api-errors';
-import { ComparisonAnalyticsService } from './comparison-analytics.service';
+import { AppConfig } from '../config/config.schema.js';
+import { ReportService } from '../reports/report.service.js';
+import { ReportFormat, ReportInterval, ReportPricingModel } from '../reports/report.types.js';
+import { ApiValidationError } from './api-errors.js';
+import { ComparisonAnalyticsService } from './comparison-analytics.service.js';
 import {
   ComparisonApplicationService,
   CreateComparisonOptions,
-} from './comparison-application.service';
-import { ApiRateLimitService, requestIdentity, writeRateLimitHeaders } from './rate-limit.service';
-import { ReportExportJobsService } from './report-export-jobs.service';
+} from './comparison-application.service.js';
+import {
+  ApiRateLimitService,
+  requestIdentity,
+  writeRateLimitHeaders,
+} from './rate-limit.service.js';
+import { ReportExportJobsService } from './report-export-jobs.service.js';
 
 interface RequestLike {
   ip?: string;

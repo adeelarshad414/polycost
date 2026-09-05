@@ -6,11 +6,11 @@ import {
   OnModuleInit,
   Optional,
 } from '@nestjs/common';
-import { DomainMetricsService } from '../observability/domain-metrics.service';
-import { registerQueueDepth } from '../observability/queue-depth';
+import { DomainMetricsService } from '../observability/domain-metrics.service.js';
+import { registerQueueDepth } from '../observability/queue-depth.js';
 import { ConfigService } from '@nestjs/config';
 import { JobsOptions } from 'bullmq';
-import { AppConfig } from '../config/config.schema';
+import { AppConfig } from '../config/config.schema.js';
 import {
   ALERT_EVALUATOR_JOB_NAME,
   COST_MANAGEMENT_QUEUE_NAME,
@@ -21,8 +21,8 @@ import {
   DATA_RETENTION_JOB_NAME,
   SHARE_LINK_CLEANUP_JOB_NAME,
   TEAM_AUDIT_EXPORT_JOB_NAME,
-} from './cost-management-jobs.types';
-import { CostManagementJobsService } from './cost-management-jobs.service';
+} from './cost-management-jobs.types.js';
+import { CostManagementJobsService } from './cost-management-jobs.service.js';
 
 export const COST_MANAGEMENT_QUEUE = Symbol('COST_MANAGEMENT_QUEUE');
 export const COST_MANAGEMENT_WORKER_FACTORY = Symbol('COST_MANAGEMENT_WORKER_FACTORY');

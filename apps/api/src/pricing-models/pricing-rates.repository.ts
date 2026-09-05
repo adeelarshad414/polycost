@@ -1,17 +1,17 @@
 import { Inject, Injectable, OnModuleDestroy, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
-import { ProviderId } from '../adapters/common/cloud-provider-adapter';
-import { AppConfig } from '../config/config.schema';
-import { SecretsService } from '../secrets/secrets.service';
-import type { SecretsReader } from '../secrets/secrets.service';
+import { ProviderId } from '../adapters/common/cloud-provider-adapter.js';
+import { AppConfig } from '../config/config.schema.js';
+import { SecretsService } from '../secrets/secrets.service.js';
+import type { SecretsReader } from '../secrets/secrets.service.js';
 import {
   PaymentOptionCode,
   PricingRateQuery,
   PricingRateReader,
   PricingRateRecord,
   PricingTermCode,
-} from './pricing-models.types';
+} from './pricing-models.types.js';
 
 interface QueryResultLike<T> {
   rows: T[];

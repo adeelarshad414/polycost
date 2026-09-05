@@ -6,22 +6,22 @@ import {
 import {
   INVITATION_DELIVERY_FETCH,
   InvitationDeliveryService,
-} from './invitation-delivery.service';
-import { AuthService } from './auth.service';
+} from './invitation-delivery.service.js';
+import { AuthService } from './auth.service.js';
 import {
   INVOICE_ARTIFACT_GOVERNANCE_FETCH,
   InvoiceArtifactGovernanceService,
-} from './invoice-artifact-governance.service';
+} from './invoice-artifact-governance.service.js';
 import {
   INVOICE_EVIDENCE_NOTARY_FETCH,
   INVOICE_EVIDENCE_NOTARY_NOW,
   InvoiceEvidenceNotaryService,
-} from './invoice-evidence-notary.service';
+} from './invoice-evidence-notary.service.js';
 import {
   TEAM_AUDIT_EXPORT_FETCH,
   TEAM_AUDIT_EXPORT_NOW,
   TeamAuditExportService,
-} from './team-audit-export.service';
+} from './team-audit-export.service.js';
 
 interface SelfDeclaredDependency {
   index: number;

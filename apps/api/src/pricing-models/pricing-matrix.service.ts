@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import { ProviderId } from '../adapters/common/cloud-provider-adapter';
-import { PricingCacheService } from './pricing-cache.service';
+import { ProviderId } from '../adapters/common/cloud-provider-adapter.js';
+import { PricingCacheService } from './pricing-cache.service.js';
 import {
   PaymentOptionCode,
   PricingCompareV2Response,
@@ -10,10 +10,10 @@ import {
   PricingModelsResponse,
   PricingTermCode,
   RateResult,
-} from './pricing-models.types';
-import { PricingTermsService } from './pricing-terms.service';
-import { RateResolverService } from './rate-resolver.service';
-import { SpotEstimateService } from './spot-estimate.service';
+} from './pricing-models.types.js';
+import { PricingTermsService } from './pricing-terms.service.js';
+import { RateResolverService } from './rate-resolver.service.js';
+import { SpotEstimateService } from './spot-estimate.service.js';
 
 const PROVIDERS: ProviderId[] = ['aws', 'azure', 'gcp'];
 const COMPARISON_TTL_SECONDS = 15 * 60;

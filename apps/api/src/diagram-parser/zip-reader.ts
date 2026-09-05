@@ -1,7 +1,7 @@
 import { inflateRawSync } from 'node:zlib';
-import { ApiValidationError } from '../api/api-errors';
-import { DIAGRAM_INFLATED_MAX_BYTES } from './diagram-parser.types';
-import { assertInflatedPayloadSafe } from './diagram-security';
+import { ApiValidationError } from '../api/api-errors.js';
+import { DIAGRAM_INFLATED_MAX_BYTES } from './diagram-parser.types.js';
+import { assertInflatedPayloadSafe } from './diagram-security.js';
 
 export interface ZipEntryContent {
   path: string;

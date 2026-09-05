@@ -6,18 +6,18 @@ import {
   PricingCatalogReader,
   PricingCatalogRecord,
   ProviderId,
-} from '../adapters/common/cloud-provider-adapter';
-import { AppConfig } from '../config/config.schema';
-import { normalizePricingCatalogRecords } from '../pricing-normalization/normalized-pricing-records';
-import { pricingLineageForCatalogRecord } from '../pricing-normalization/pricing-lineage';
-import type { SecretsReader } from '../secrets/secrets.service';
+} from '../adapters/common/cloud-provider-adapter.js';
+import { AppConfig } from '../config/config.schema.js';
+import { normalizePricingCatalogRecords } from '../pricing-normalization/normalized-pricing-records.js';
+import { pricingLineageForCatalogRecord } from '../pricing-normalization/pricing-lineage.js';
+import type { SecretsReader } from '../secrets/secrets.service.js';
 import {
   NormalizedPricingWriter,
   PricingCatalogWriteResult,
   PricingEtlRunRecord,
   PricingEtlRunRepository,
   PricingCatalogWriter,
-} from './pricing-repository.types';
+} from './pricing-repository.types.js';
 
 interface QueryResultLike<T> {
   rows: T[];

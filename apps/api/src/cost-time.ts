@@ -1,4 +1,4 @@
-import { CostIntervals } from './comparison/comparison.types';
+import { CostIntervals } from './comparison/comparison.types.js';
 import monthlyHourStandard from '@polycost/types/monthly-hour-standard.json';
 
 export const HOURS_PER_DAY = monthlyHourStandard.hoursPerDay;

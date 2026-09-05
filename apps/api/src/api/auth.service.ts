@@ -1,14 +1,14 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DomainMetricsService } from '../observability/domain-metrics.service';
-import { AppConfig } from '../config/config.schema';
-import { ApiForbiddenError, ApiUnauthorizedError, ApiValidationError } from './api-errors';
+import { DomainMetricsService } from '../observability/domain-metrics.service.js';
+import { AppConfig } from '../config/config.schema.js';
+import { ApiForbiddenError, ApiUnauthorizedError, ApiValidationError } from './api-errors.js';
 import {
   AccountSessionPrincipal,
   ApiDatabaseRepository,
   LocalAccountWithPassword,
-} from './api-database.repository';
+} from './api-database.repository.js';
 import {
   AccountProfileResponse,
   AccountSessionRecord,
@@ -27,9 +27,9 @@ import {
   TeamInvitationPreview,
   TeamMemberRecord,
   TeamRole,
-} from './auth.types';
-import { InvitationDeliveryService } from './invitation-delivery.service';
-import { hashPassword, verifyPassword } from './password-hash';
+} from './auth.types.js';
+import { InvitationDeliveryService } from './invitation-delivery.service.js';
+import { hashPassword, verifyPassword } from './password-hash.js';
 
 interface AuthRequestMetadata {
   ip?: string;

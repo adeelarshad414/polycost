@@ -3,10 +3,10 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
-import { SecretsService } from './secrets.service';
-import { DomainMetricsService } from '../observability/domain-metrics.service';
-import { MetricsService } from '../observability/metrics.service';
+import { AppConfig } from '../config/config.schema.js';
+import { SecretsService } from './secrets.service.js';
+import { DomainMetricsService } from '../observability/domain-metrics.service.js';
+import { MetricsService } from '../observability/metrics.service.js';
 
 const configService = (values: Partial<AppConfig>) =>
   ({

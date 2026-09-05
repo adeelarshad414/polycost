@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { ProviderId } from '../adapters/common/cloud-provider-adapter';
+import { ProviderId } from '../adapters/common/cloud-provider-adapter.js';
 import {
   CloudRegion,
   CloudRegionProviderCatalog,
   RegionCatalogResponse,
   RegionCatalogSource,
-} from './regions.types';
+} from './regions.types.js';
 
 const REGION_CACHE_TTL_SECONDS = 12 * 60 * 60;
 const FETCH_TIMEOUT_MS = 3_000;

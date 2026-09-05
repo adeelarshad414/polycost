@@ -1,15 +1,15 @@
-import { NWSValidator } from '../../nws/nws-validator';
-import { NormalizedWorkloadSpec } from '../../nws/nws.types';
+import { NWSValidator } from '../../nws/nws-validator.js';
+import { NormalizedWorkloadSpec } from '../../nws/nws.types.js';
 import {
   calculateEgressCost,
   calculateEgressTierBreakdown,
   EgressTierRate,
-} from '../../pricing-normalization/egress-tier-calculator';
+} from '../../pricing-normalization/egress-tier-calculator.js';
 import {
   canonicalRegionForResidencyLock,
   canonicalRegionForProviderRegion,
   providerRegionForCanonicalRegion,
-} from '../../pricing-normalization/region-map';
+} from '../../pricing-normalization/region-map.js';
 import {
   CloudProviderAdapter,
   CostComponent,
@@ -23,15 +23,15 @@ import {
   ProviderPricingResult,
   RefreshPricingCatalogOptions,
   ServiceCategory,
-} from './cloud-provider-adapter';
-import { AdapterPricingError } from './adapter-errors';
+} from './cloud-provider-adapter.js';
+import { AdapterPricingError } from './adapter-errors.js';
 /* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: dynamic keys are typed provider service/dimension maps sourced from internal catalogs; see docs/SECURITY-SUPPRESSIONS.md. */
-import { HOURS_PER_MONTH } from '../../cost-time';
+import { HOURS_PER_MONTH } from '../../cost-time.js';
 import {
   normalizeInstanceFamily,
   NormalizedInstanceFamily,
-} from '../../pricing-normalization/family-normalizer';
-import { pricingLineageForCatalogRecord } from '../../pricing-normalization/pricing-lineage';
+} from '../../pricing-normalization/family-normalizer.js';
+import { pricingLineageForCatalogRecord } from '../../pricing-normalization/pricing-lineage.js';
 
 const CATALOG_COMMITMENT_PRICING_MODELS: PricingModelKey[] = ['reserved-1yr', 'reserved-3yr'];
 const ESTIMATED_COMPUTE_PRICING_MODELS: PricingModelKey[] = ['spot', 'savings-plan'];

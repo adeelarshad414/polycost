@@ -1,29 +1,29 @@
 import { Module } from '@nestjs/common';
 import { Pool } from 'pg';
-import { DomainMetricsService } from '../observability/domain-metrics.service';
-import { instrumentPool } from '../observability/instrumented-pool';
+import { DomainMetricsService } from '../observability/domain-metrics.service.js';
+import { instrumentPool } from '../observability/instrumented-pool.js';
 import { ConfigService } from '@nestjs/config';
-import { ApiRateLimitService } from '../api/rate-limit.service';
-import { AppConfig } from '../config/config.schema';
-import { SecretsService } from '../secrets/secrets.service';
-import { AliasDictionary } from './alias-dictionary';
-import { DiagramImportRepository } from './diagram-import.repository';
-import { DiagramParserController } from './diagram-parser.controller';
-import { DiagramParserService } from './diagram-parser.service';
-import { DiagramTempFileStore } from './diagram-temp-file.store';
-import { DrawioExtractor } from './drawio.extractor';
-import { FormatDetectorService } from './format-detector.service';
+import { ApiRateLimitService } from '../api/rate-limit.service.js';
+import { AppConfig } from '../config/config.schema.js';
+import { SecretsService } from '../secrets/secrets.service.js';
+import { AliasDictionary } from './alias-dictionary.js';
+import { DiagramImportRepository } from './diagram-import.repository.js';
+import { DiagramParserController } from './diagram-parser.controller.js';
+import { DiagramParserService } from './diagram-parser.service.js';
+import { DiagramTempFileStore } from './diagram-temp-file.store.js';
+import { DrawioExtractor } from './drawio.extractor.js';
+import { FormatDetectorService } from './format-detector.service.js';
 import {
   DIAGRAM_LLM_CLASSIFIER_CLIENT,
   OpenAiCompatibleDiagramLlmClassifierClient,
   StubLlmClassifierClient,
-} from './llm-classifier.client';
-import { LucidCsvExtractor } from './lucid-csv.extractor';
-import { MermaidExtractor } from './mermaid.extractor';
-import { NodeClassifierService } from './node-classifier.service';
-import { StencilMapRegistry } from './stencil-map.registry';
-import { VsdxExtractor } from './vsdx.extractor';
-import { LlmClassifierClient } from './diagram-parser.types';
+} from './llm-classifier.client.js';
+import { LucidCsvExtractor } from './lucid-csv.extractor.js';
+import { MermaidExtractor } from './mermaid.extractor.js';
+import { NodeClassifierService } from './node-classifier.service.js';
+import { StencilMapRegistry } from './stencil-map.registry.js';
+import { VsdxExtractor } from './vsdx.extractor.js';
+import { LlmClassifierClient } from './diagram-parser.types.js';
 
 @Module({
   controllers: [DiagramParserController],

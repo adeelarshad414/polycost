@@ -2,15 +2,15 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
-import { AppModule } from './app.module';
-import { setProviderHttpDefaults } from './adapters/common/http-client';
-import { configureApp, corsOriginsFromConfig } from './bootstrap';
-import { MetricsService } from './observability/metrics.service';
-import { StructuredLogger } from './observability/structured-logger';
-import { ErrorReporter } from './observability/error-reporter';
-import { registerProcessErrorHandlers } from './observability/process-errors';
-import type { AppConfig } from './config/config.schema';
-import { DIAGRAM_JSON_BODY_MAX_BYTES } from './diagram-parser/diagram-parser.types';
+import { AppModule } from './app.module.js';
+import { setProviderHttpDefaults } from './adapters/common/http-client.js';
+import { configureApp, corsOriginsFromConfig } from './bootstrap.js';
+import { MetricsService } from './observability/metrics.service.js';
+import { StructuredLogger } from './observability/structured-logger.js';
+import { ErrorReporter } from './observability/error-reporter.js';
+import { registerProcessErrorHandlers } from './observability/process-errors.js';
+import type { AppConfig } from './config/config.schema.js';
+import { DIAGRAM_JSON_BODY_MAX_BYTES } from './diagram-parser/diagram-parser.types.js';
 
 async function bootstrap() {
   // bufferLogs holds startup output until the configured logger is attached, so
