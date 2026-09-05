@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue, Worker } from 'bullmq';
-import { ErrorReporter } from '../observability/error-reporter';
-import { reportWorkerFailures } from '../observability/process-errors';
-import { ApiDatabaseRepository } from '../api/api-database.repository';
-import { ApiModule } from '../api/api.module';
-import { TeamAuditExportService } from '../api/team-audit-export.service';
-import { AppConfig } from '../config/config.schema';
+import { ErrorReporter } from '../observability/error-reporter.js';
+import { reportWorkerFailures } from '../observability/process-errors.js';
+import { ApiDatabaseRepository } from '../api/api-database.repository.js';
+import { ApiModule } from '../api/api.module.js';
+import { TeamAuditExportService } from '../api/team-audit-export.service.js';
+import { AppConfig } from '../config/config.schema.js';
 import {
   COST_MANAGEMENT_QUEUE,
   COST_MANAGEMENT_QUEUE_NAME,
@@ -14,9 +14,9 @@ import {
   CostManagementJobsScheduler,
   CostManagementWorkerFactory,
   EXCHANGE_RATE_CLIENT,
-} from './cost-management-jobs.scheduler';
-import { CostManagementJobsService } from './cost-management-jobs.service';
-import { ExchangeRateClient, FrankfurterExchangeRateClient } from './exchange-rate.client';
+} from './cost-management-jobs.scheduler.js';
+import { CostManagementJobsService } from './cost-management-jobs.service.js';
+import { ExchangeRateClient, FrankfurterExchangeRateClient } from './exchange-rate.client.js';
 
 @Module({
   imports: [ApiModule],

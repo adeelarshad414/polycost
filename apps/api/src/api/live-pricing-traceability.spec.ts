@@ -1,22 +1,22 @@
-import { BaseCloudProviderAdapter } from '../adapters/common/base-cloud-provider.adapter';
+import { BaseCloudProviderAdapter } from '../adapters/common/base-cloud-provider.adapter.js';
 import {
   PricingCatalogRecord,
   PricingCatalogReader,
   ProviderId,
-} from '../adapters/common/cloud-provider-adapter';
-import { InMemoryPricingCatalogReader } from '../adapters/common/in-memory-pricing-catalog.reader';
-import { ComparisonOrchestratorService } from '../comparison/comparison-orchestrator.service';
-import { ComparisonResult } from '../comparison/comparison.types';
-import { EquivalentServiceMapper } from '../comparison/equivalent-service-mapper';
-import { IntervalCostCalculator } from '../comparison/interval-cost-calculator';
+} from '../adapters/common/cloud-provider-adapter.js';
+import { InMemoryPricingCatalogReader } from '../adapters/common/in-memory-pricing-catalog.reader.js';
+import { ComparisonOrchestratorService } from '../comparison/comparison-orchestrator.service.js';
+import { ComparisonResult } from '../comparison/comparison.types.js';
+import { EquivalentServiceMapper } from '../comparison/equivalent-service-mapper.js';
+import { IntervalCostCalculator } from '../comparison/interval-cost-calculator.js';
 import {
   NormalizedPricingWriter,
   PricingCatalogWriter,
-} from '../database/pricing-repository.types';
-import { NormalizedWorkloadSpec } from '../nws/nws.types';
-import { ComparisonApplicationService } from './comparison-application.service';
-import { ComparisonSnapshot } from './api-database.repository';
-import { LivePricingRefreshService } from './live-pricing-refresh.service';
+} from '../database/pricing-repository.types.js';
+import { NormalizedWorkloadSpec } from '../nws/nws.types.js';
+import { ComparisonApplicationService } from './comparison-application.service.js';
+import { ComparisonSnapshot } from './api-database.repository.js';
+import { LivePricingRefreshService } from './live-pricing-refresh.service.js';
 
 class TraceableTestAdapter extends BaseCloudProviderAdapter {
   readonly providerId: ProviderId = 'aws';

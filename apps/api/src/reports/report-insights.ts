@@ -1,4 +1,4 @@
-import { ComparisonResult } from '../comparison/comparison.types';
+import { ComparisonResult } from '../comparison/comparison.types.js';
 
 export interface ReportInsight {
   label: string;

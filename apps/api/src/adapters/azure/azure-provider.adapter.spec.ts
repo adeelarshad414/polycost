@@ -1,10 +1,10 @@
 /* eslint-disable security/detect-non-literal-fs-filename -- Reviewed 2026-07-06: fixture reads are resolved from repository-controlled test data; see docs/SECURITY-SUPPRESSIONS.md. */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { InMemoryPricingCatalogReader } from '../common/in-memory-pricing-catalog.reader';
-import { FetchLike } from '../common/http-client';
-import { PricingCatalogRecord } from '../common/cloud-provider-adapter';
-import { AzureProviderAdapter, parseAzureUnitOfMeasure } from './azure-provider.adapter';
+import { InMemoryPricingCatalogReader } from '../common/in-memory-pricing-catalog.reader.js';
+import { FetchLike } from '../common/http-client.js';
+import { PricingCatalogRecord } from '../common/cloud-provider-adapter.js';
+import { AzureProviderAdapter, parseAzureUnitOfMeasure } from './azure-provider.adapter.js';
 
 const fixture = <T>(relativePath: string): T =>
   JSON.parse(readFileSync(resolve(__dirname, '../../../../..', relativePath), 'utf8')) as T;

@@ -1,8 +1,8 @@
 import { CanActivate, ExecutionContext, Inject, Injectable } from '@nestjs/common';
 import { timingSafeEqual } from 'node:crypto';
-import { SecretsService } from '../secrets/secrets.service';
-import type { SecretsReader } from '../secrets/secrets.service';
-import { ApiUnauthorizedError } from './api-errors';
+import { SecretsService } from '../secrets/secrets.service.js';
+import type { SecretsReader } from '../secrets/secrets.service.js';
+import { ApiUnauthorizedError } from './api-errors.js';
 
 interface HeaderRequest {
   headers: Record<string, string | string[] | undefined>;

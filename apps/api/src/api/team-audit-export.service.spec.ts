@@ -1,8 +1,8 @@
 import { createHmac } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
-import { ApiDatabaseRepository, TeamAuditExportClaimRecord } from './api-database.repository';
-import { TeamAuditExportService } from './team-audit-export.service';
+import { AppConfig } from '../config/config.schema.js';
+import { ApiDatabaseRepository, TeamAuditExportClaimRecord } from './api-database.repository.js';
+import { TeamAuditExportService } from './team-audit-export.service.js';
 
 const ranAt = new Date('2026-07-08T00:00:00.000Z');
 const auditExportRecord: TeamAuditExportClaimRecord = {

@@ -1,13 +1,13 @@
-import { mockPricingCatalogRecords } from '../adapters/mock/mock-pricing-fixtures';
-import { PricingCatalogRecord, ProviderId } from '../adapters/common/cloud-provider-adapter';
+import { mockPricingCatalogRecords } from '../adapters/mock/mock-pricing-fixtures.js';
+import { PricingCatalogRecord, ProviderId } from '../adapters/common/cloud-provider-adapter.js';
 import {
   NormalizedComputePricingRecord,
   NormalizedEgressTierRateRecord,
   normalizePricingCatalogRecords,
   NormalizedPricingRecords,
   NormalizedStoragePricingRecord,
-} from './normalized-pricing-records';
-import { pricingLineageForCatalogRecord } from './pricing-lineage';
+} from './normalized-pricing-records.js';
+import { pricingLineageForCatalogRecord } from './pricing-lineage.js';
 
 const providers: ProviderId[] = ['aws', 'azure', 'gcp'];
 const fetchedAt = '2026-07-06T00:00:00.000Z';

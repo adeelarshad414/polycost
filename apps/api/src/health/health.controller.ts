@@ -1,5 +1,5 @@
 import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
-import { HealthService } from './health.service';
+import { HealthService } from './health.service.js';
 
 /** Minimal shape of the Fastify reply; avoids importing the platform type. */
 interface StatusResponse {

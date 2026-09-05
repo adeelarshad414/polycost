@@ -12,12 +12,16 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
-import { AuthService } from './auth.service';
-import type { RequestWithAuth } from './auth.types';
-import { ApiRateLimitService, requestIdentity, writeRateLimitHeaders } from './rate-limit.service';
-import type { RateLimitHeaderResponse } from './rate-limit.service';
-import { SessionAuthGuard } from './session-auth.guard';
+import { AppConfig } from '../config/config.schema.js';
+import { AuthService } from './auth.service.js';
+import type { RequestWithAuth } from './auth.types.js';
+import {
+  ApiRateLimitService,
+  requestIdentity,
+  writeRateLimitHeaders,
+} from './rate-limit.service.js';
+import type { RateLimitHeaderResponse } from './rate-limit.service.js';
+import { SessionAuthGuard } from './session-auth.guard.js';
 
 @Controller('api/v1/auth')
 export class AuthController {

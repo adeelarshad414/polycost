@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
-import { PricingEtlProviderResult } from './pricing-etl.types';
+import { AppConfig } from '../config/config.schema.js';
+import { PricingEtlProviderResult } from './pricing-etl.types.js';
 
 export interface PricingSyncFailureNotifier {
   notifyProviderResult(result: PricingEtlProviderResult): Promise<void>;

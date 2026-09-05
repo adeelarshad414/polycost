@@ -1,4 +1,4 @@
-import { RegionsService } from './regions.service';
+import { RegionsService } from './regions.service.js';
 
 describe('RegionsService', () => {
   it('builds a live region catalog from public provider sources', async () => {

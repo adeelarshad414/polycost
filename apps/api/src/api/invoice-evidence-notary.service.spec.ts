@@ -1,9 +1,9 @@
 import { createHmac } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
-import { AuthIdentity } from './auth.types';
-import { InvoiceEvidencePacketResponse } from './billing.types';
-import { InvoiceEvidenceNotaryService } from './invoice-evidence-notary.service';
+import { AppConfig } from '../config/config.schema.js';
+import { AuthIdentity } from './auth.types.js';
+import { InvoiceEvidencePacketResponse } from './billing.types.js';
+import { InvoiceEvidenceNotaryService } from './invoice-evidence-notary.service.js';
 
 describe('InvoiceEvidenceNotaryService', () => {
   it('skips local and metadata-only modes without calling the webhook', async () => {

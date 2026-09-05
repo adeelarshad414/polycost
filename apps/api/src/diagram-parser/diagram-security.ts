@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
 import { inflateRawSync } from 'node:zlib';
-import { ApiValidationError } from '../api/api-errors';
+import { ApiValidationError } from '../api/api-errors.js';
 import {
   DIAGRAM_INFLATED_MAX_BYTES,
   DIAGRAM_UPLOAD_MAX_BYTES,
   DiagramInputFormat,
-} from './diagram-parser.types';
+} from './diagram-parser.types.js';
 
 const UNSUPPORTED_BINARY_SIGNATURES = [
   { label: 'PNG image', magic: Buffer.from([0x89, 0x50, 0x4e, 0x47]) },

@@ -1,19 +1,22 @@
 import { Module } from '@nestjs/common';
 import { Pool } from 'pg';
-import { DomainMetricsService } from '../observability/domain-metrics.service';
-import { instrumentPool } from '../observability/instrumented-pool';
-import { SecretsService } from '../secrets/secrets.service';
-import { ApiRateLimitService } from '../api/rate-limit.service';
-import { PricingCompareV2Controller, PricingModelsController } from './pricing-models.controller';
-import { PricingCacheService } from './pricing-cache.service';
-import { PricingMatrixService } from './pricing-matrix.service';
+import { DomainMetricsService } from '../observability/domain-metrics.service.js';
+import { instrumentPool } from '../observability/instrumented-pool.js';
+import { SecretsService } from '../secrets/secrets.service.js';
+import { ApiRateLimitService } from '../api/rate-limit.service.js';
+import {
+  PricingCompareV2Controller,
+  PricingModelsController,
+} from './pricing-models.controller.js';
+import { PricingCacheService } from './pricing-cache.service.js';
+import { PricingMatrixService } from './pricing-matrix.service.js';
 import {
   PRICING_RATES_POOL_FACTORY,
   PostgresPricingRatesRepository,
-} from './pricing-rates.repository';
-import { PricingTermsService } from './pricing-terms.service';
-import { RateResolverService } from './rate-resolver.service';
-import { SpotEstimateService } from './spot-estimate.service';
+} from './pricing-rates.repository.js';
+import { PricingTermsService } from './pricing-terms.service.js';
+import { RateResolverService } from './rate-resolver.service.js';
+import { SpotEstimateService } from './spot-estimate.service.js';
 
 @Module({
   controllers: [PricingModelsController, PricingCompareV2Controller],

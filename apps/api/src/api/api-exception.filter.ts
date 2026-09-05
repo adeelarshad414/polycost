@@ -7,10 +7,10 @@ import {
   Logger,
   Optional,
 } from '@nestjs/common';
-import { ErrorReporter } from '../observability/error-reporter';
-import { ComparisonUnavailableError } from '../comparison/comparison-orchestrator.service';
-import { NWSMigrationError, NWSValidationError } from '../nws/nws-validator';
-import { NWSParseInputError } from '../nws-parser/nl-parser.service';
+import { ErrorReporter } from '../observability/error-reporter.js';
+import { ComparisonUnavailableError } from '../comparison/comparison-orchestrator.service.js';
+import { NWSMigrationError, NWSValidationError } from '../nws/nws-validator.js';
+import { NWSParseInputError } from '../nws-parser/nl-parser.service.js';
 import {
   ApiConflictError,
   ApiForbiddenError,
@@ -19,7 +19,7 @@ import {
   ApiValidationError,
   LiveRefreshUnavailableError,
   RateLimitExceededError,
-} from './api-errors';
+} from './api-errors.js';
 
 interface ErrorResponse {
   status(statusCode: number): {

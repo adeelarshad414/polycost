@@ -1,8 +1,8 @@
 import { createHmac } from 'node:crypto';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
-import { TeamInvitationDeliveryReceipt, TeamInvitationRecord } from './auth.types';
+import { AppConfig } from '../config/config.schema.js';
+import { TeamInvitationDeliveryReceipt, TeamInvitationRecord } from './auth.types.js';
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 export const INVITATION_DELIVERY_FETCH = Symbol('INVITATION_DELIVERY_FETCH');

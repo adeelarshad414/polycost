@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ComparisonResult } from '../comparison/comparison.types';
+import { ComparisonResult } from '../comparison/comparison.types.js';
 import {
   architectureOverviewRows,
   breakEvenSummaryRows,
@@ -24,10 +24,10 @@ import {
   sourceDiagramRows,
   skuMappingAppendixRows,
   workloadScopeRows,
-} from './report-evidence';
-import { buildReportInsights } from './report-insights';
-import { sanitizeSpreadsheetText } from './report-security';
-import { ReportOptions } from './report.types';
+} from './report-evidence.js';
+import { buildReportInsights } from './report-insights.js';
+import { sanitizeSpreadsheetText } from './report-security.js';
+import { ReportOptions } from './report.types.js';
 
 const UTF8_BOM = '\ufeff';
 const CSV_LINE_BREAK = '\r\n';

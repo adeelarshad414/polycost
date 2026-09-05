@@ -1,4 +1,4 @@
-import { signAwsJsonRequest } from './aws-signature-v4';
+import { signAwsJsonRequest } from './aws-signature-v4.js';
 
 describe('signAwsJsonRequest', () => {
   it('includes session tokens in signed AWS requests when provided', () => {

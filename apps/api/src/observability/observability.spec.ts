@@ -4,9 +4,9 @@ import {
   currentRequestId,
   resolveRequestId,
   runWithRequestContext,
-} from './request-context';
-import { StructuredLogger } from './structured-logger';
-import { registerRequestContext } from '../bootstrap';
+} from './request-context.js';
+import { StructuredLogger } from './structured-logger.js';
+import { registerRequestContext } from '../bootstrap.js';
 
 /** Collects emitted log lines as parsed JSON. */
 function captureLogs(): { lines: Record<string, unknown>[]; stream: Writable } {

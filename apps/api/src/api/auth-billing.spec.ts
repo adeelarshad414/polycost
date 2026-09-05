@@ -1,18 +1,18 @@
 import { createHash } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
-import { ComparisonResult } from '../comparison/comparison.types';
-import { AppConfig } from '../config/config.schema';
-import { ApiForbiddenError, ApiUnauthorizedError, ApiValidationError } from './api-errors';
-import { ApiDatabaseRepository, LocalAccountWithPassword } from './api-database.repository';
-import { AuthService } from './auth.service';
-import { AuthIdentity, TeamRole } from './auth.types';
-import { BillingService } from './billing.service';
-import { InvoiceArtifactGovernanceService } from './invoice-artifact-governance.service';
-import { InvoiceArtifactStorageService } from './invoice-artifact-storage.service';
-import { InvoiceEvidenceNotaryService } from './invoice-evidence-notary.service';
-import { hashPassword } from './password-hash';
-import { DomainMetricsService } from '../observability/domain-metrics.service';
-import { MetricsService } from '../observability/metrics.service';
+import { ComparisonResult } from '../comparison/comparison.types.js';
+import { AppConfig } from '../config/config.schema.js';
+import { ApiForbiddenError, ApiUnauthorizedError, ApiValidationError } from './api-errors.js';
+import { ApiDatabaseRepository, LocalAccountWithPassword } from './api-database.repository.js';
+import { AuthService } from './auth.service.js';
+import { AuthIdentity, TeamRole } from './auth.types.js';
+import { BillingService } from './billing.service.js';
+import { InvoiceArtifactGovernanceService } from './invoice-artifact-governance.service.js';
+import { InvoiceArtifactStorageService } from './invoice-artifact-storage.service.js';
+import { InvoiceEvidenceNotaryService } from './invoice-evidence-notary.service.js';
+import { hashPassword } from './password-hash.js';
+import { DomainMetricsService } from '../observability/domain-metrics.service.js';
+import { MetricsService } from '../observability/metrics.service.js';
 
 const account: LocalAccountWithPassword = {
   accountId: '11111111-1111-4111-8111-111111111111',

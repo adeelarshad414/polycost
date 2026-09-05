@@ -1,16 +1,16 @@
 import { createSign } from 'node:crypto';
-import { SecretsReader } from '../../secrets/secrets.service';
+import { SecretsReader } from '../../secrets/secrets.service.js';
 /* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: provider catalog keys are controlled GCP Cloud Billing fields, not arbitrary user mutation; see docs/SECURITY-SUPPRESSIONS.md. */
-import { BaseCloudProviderAdapter } from '../common/base-cloud-provider.adapter';
+import { BaseCloudProviderAdapter } from '../common/base-cloud-provider.adapter.js';
 import {
   PricingCatalogReader,
   PricingCatalogRecord,
   ProviderId,
   RefreshPricingCatalogOptions,
   ServiceCategory,
-} from '../common/cloud-provider-adapter';
-import { AdapterCredentialError, AdapterError } from '../common/adapter-errors';
-import { defaultFetch, FetchLike, parseJsonResponse } from '../common/http-client';
+} from '../common/cloud-provider-adapter.js';
+import { AdapterCredentialError, AdapterError } from '../common/adapter-errors.js';
+import { defaultFetch, FetchLike, parseJsonResponse } from '../common/http-client.js';
 
 interface GcpServicesResponse {
   services: GcpService[];

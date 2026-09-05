@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
-import type { RequestWithAuth } from './auth.types';
-import { BillingService } from './billing.service';
-import { SessionAuthGuard } from './session-auth.guard';
+import type { RequestWithAuth } from './auth.types.js';
+import { BillingService } from './billing.service.js';
+import { SessionAuthGuard } from './session-auth.guard.js';
 
 @Controller('api/v1/billing')
 @UseGuards(SessionAuthGuard)

@@ -6,7 +6,7 @@ import {
   providerRegionsForCanonicalRegion,
   residencyScopeForRegionScope,
   supportedCanonicalRegions,
-} from './region-map';
+} from './region-map.js';
 
 describe('region-map', () => {
   it('maps canonical regions to provider-specific region codes', () => {

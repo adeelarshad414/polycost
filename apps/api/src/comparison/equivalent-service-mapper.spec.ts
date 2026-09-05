@@ -1,5 +1,5 @@
-import { NormalizedWorkloadSpec } from '../nws/nws.types';
-import { EquivalentServiceMapper } from './equivalent-service-mapper';
+import { NormalizedWorkloadSpec } from '../nws/nws.types.js';
+import { EquivalentServiceMapper } from './equivalent-service-mapper.js';
 
 const workload: NormalizedWorkloadSpec = {
   schemaVersion: '1.0',

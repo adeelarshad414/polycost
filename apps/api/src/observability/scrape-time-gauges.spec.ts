@@ -1,7 +1,7 @@
-import { DomainMetricsService } from './domain-metrics.service';
-import { MetricsService } from './metrics.service';
-import { InstrumentablePool, instrumentPool, queryOperation } from './instrumented-pool';
-import { registerQueueDepth } from './queue-depth';
+import { DomainMetricsService } from './domain-metrics.service.js';
+import { MetricsService } from './metrics.service.js';
+import { InstrumentablePool, instrumentPool, queryOperation } from './instrumented-pool.js';
+import { registerQueueDepth } from './queue-depth.js';
 
 function build() {
   const metrics = new MetricsService({ collectDefaults: false });

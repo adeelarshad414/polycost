@@ -1,5 +1,5 @@
-import { HealthController } from './health.controller';
-import { HealthService } from './health.service';
+import { HealthController } from './health.controller.js';
+import { HealthService } from './health.service.js';
 
 const configService = {
   get: jest.fn((key: string) => {

@@ -1,12 +1,12 @@
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
-import { PricingEtlService } from './pricing-etl.service';
+import { AppConfig } from '../config/config.schema.js';
+import { PricingEtlService } from './pricing-etl.service.js';
 import {
   PRICING_ETL_REFRESH_JOB_NAME,
   PRICING_ETL_STARTUP_REFRESH_JOB_ID,
   PricingEtlSummary,
-} from './pricing-etl.types';
-import { PricingEtlQueue, PricingEtlScheduler, PricingEtlWorker } from './pricing-etl.scheduler';
+} from './pricing-etl.types.js';
+import { PricingEtlQueue, PricingEtlScheduler, PricingEtlWorker } from './pricing-etl.scheduler.js';
 
 const configService = (cron: string, runOnBoot = true) =>
   ({

@@ -1,4 +1,4 @@
-import { CircuitBreaker, CircuitBreakerRegistry, CircuitOpenError } from './circuit-breaker';
+import { CircuitBreaker, CircuitBreakerRegistry, CircuitOpenError } from './circuit-breaker.js';
 
 function clock(start = 0) {
   let current = start;

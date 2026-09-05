@@ -1,11 +1,11 @@
-import { HOURS_PER_MONTH, intervalCostsFromHourly } from '../cost-time';
-import { ComparisonResult } from '../comparison/comparison.types';
+import { HOURS_PER_MONTH, intervalCostsFromHourly } from '../cost-time.js';
+import { ComparisonResult } from '../comparison/comparison.types.js';
 import {
   calculateEgressCost,
   calculateEgressTierBreakdown,
   EgressTierRate,
-} from '../pricing-normalization/egress-tier-calculator';
-import { ComparisonAnalyticsService } from './comparison-analytics.service';
+} from '../pricing-normalization/egress-tier-calculator.js';
+import { ComparisonAnalyticsService } from './comparison-analytics.service.js';
 
 describe('FinOps proof checks', () => {
   it('uses the shared 730-hour constant for all interval math', () => {

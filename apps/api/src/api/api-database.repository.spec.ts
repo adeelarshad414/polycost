@@ -1,10 +1,10 @@
 import { ConfigService } from '@nestjs/config';
-import { ComparisonResult } from '../comparison/comparison.types';
-import { AppConfig } from '../config/config.schema';
-import { NormalizedWorkloadSpec } from '../nws/nws.types';
-import { SecretsReader } from '../secrets/secrets.service';
-import { ApiDatabaseRepository, PgPoolLike } from './api-database.repository';
-import { ApiConflictError } from './api-errors';
+import { ComparisonResult } from '../comparison/comparison.types.js';
+import { AppConfig } from '../config/config.schema.js';
+import { NormalizedWorkloadSpec } from '../nws/nws.types.js';
+import { SecretsReader } from '../secrets/secrets.service.js';
+import { ApiDatabaseRepository, PgPoolLike } from './api-database.repository.js';
+import { ApiConflictError } from './api-errors.js';
 
 const configService = {
   get: jest.fn((key: keyof AppConfig) => {

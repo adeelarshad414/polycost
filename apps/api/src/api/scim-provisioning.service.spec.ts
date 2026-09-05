@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { ApiDatabaseRepository } from './api-database.repository';
-import { ApiForbiddenError, ApiUnauthorizedError, ApiValidationError } from './api-errors';
-import { AuthIdentity, TeamScimUserRecord } from './auth.types';
-import { ScimProvisioningService } from './scim-provisioning.service';
+import { ApiDatabaseRepository } from './api-database.repository.js';
+import { ApiForbiddenError, ApiUnauthorizedError, ApiValidationError } from './api-errors.js';
+import { AuthIdentity, TeamScimUserRecord } from './auth.types.js';
+import { ScimProvisioningService } from './scim-provisioning.service.js';
 
 const OKTA_USER_CREATE_FIXTURE = JSON.parse(
   readFileSync('../../fixtures/scim/okta-user-create.json', 'utf8'),

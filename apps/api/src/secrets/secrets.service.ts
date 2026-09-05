@@ -1,9 +1,9 @@
 /* eslint-disable security/detect-object-injection, security/detect-non-literal-fs-filename -- Reviewed 2026-07-06: secret names are configured allowlist lookups and Vault file paths are deployment-controlled; see docs/SECURITY-SUPPRESSIONS.md. */
 import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DomainMetricsService } from '../observability/domain-metrics.service';
+import { DomainMetricsService } from '../observability/domain-metrics.service.js';
 import { readFile } from 'node:fs/promises';
-import { AppConfig } from '../config/config.schema';
+import { AppConfig } from '../config/config.schema.js';
 
 export interface SecretsReader {
   getSecret(path: string, key: string): Promise<string>;

@@ -1,38 +1,38 @@
 import { Module } from '@nestjs/common';
 import { Pool } from 'pg';
-import { DomainMetricsService } from '../observability/domain-metrics.service';
-import { instrumentPool } from '../observability/instrumented-pool';
+import { DomainMetricsService } from '../observability/domain-metrics.service.js';
+import { instrumentPool } from '../observability/instrumented-pool.js';
 import { ConfigService } from '@nestjs/config';
 import { APP_FILTER } from '@nestjs/core';
 import {
   CLOUD_PROVIDER_ADAPTERS,
   ProviderAdaptersModule,
-} from '../adapters/provider-adapters.module';
-import { CloudProviderAdapter } from '../adapters/common/cloud-provider-adapter';
-import { ComparisonModule } from '../comparison/comparison.module';
-import { AppConfig } from '../config/config.schema';
-import { PostgresPricingCatalogRepository } from '../database/pricing-catalog.repository';
-import { NwsParserModule } from '../nws-parser/nws-parser.module';
-import { PricingModelsModule } from '../pricing-models/pricing-models.module';
-import { PricingMatrixService } from '../pricing-models/pricing-matrix.service';
-import { ReportModule } from '../reports/report.module';
-import { ReportService } from '../reports/report.service';
-import { SecretsService } from '../secrets/secrets.service';
-import { TerraformGenerationController } from '../terraform/terraform-generation.controller';
-import { TerraformGenerationService } from '../terraform/terraform-generation.service';
-import { AdminApiKeyGuard } from './admin-api-key.guard';
-import { ApiDatabaseRepository } from './api-database.repository';
-import { ApiExceptionFilter } from './api-exception.filter';
+} from '../adapters/provider-adapters.module.js';
+import { CloudProviderAdapter } from '../adapters/common/cloud-provider-adapter.js';
+import { ComparisonModule } from '../comparison/comparison.module.js';
+import { AppConfig } from '../config/config.schema.js';
+import { PostgresPricingCatalogRepository } from '../database/pricing-catalog.repository.js';
+import { NwsParserModule } from '../nws-parser/nws-parser.module.js';
+import { PricingModelsModule } from '../pricing-models/pricing-models.module.js';
+import { PricingMatrixService } from '../pricing-models/pricing-matrix.service.js';
+import { ReportModule } from '../reports/report.module.js';
+import { ReportService } from '../reports/report.service.js';
+import { SecretsService } from '../secrets/secrets.service.js';
+import { TerraformGenerationController } from '../terraform/terraform-generation.controller.js';
+import { TerraformGenerationService } from '../terraform/terraform-generation.service.js';
+import { AdminApiKeyGuard } from './admin-api-key.guard.js';
+import { ApiDatabaseRepository } from './api-database.repository.js';
+import { ApiExceptionFilter } from './api-exception.filter.js';
 import Redis from 'ioredis';
-import { ApiRateLimitService, RATE_LIMIT_REDIS } from './rate-limit.service';
-import { AuthController } from './auth.controller';
-import { AuthService } from './auth.service';
-import { BillingController } from './billing.controller';
-import { BillingService } from './billing.service';
-import { ComparisonAnalyticsService } from './comparison-analytics.service';
-import { ComparisonApplicationService } from './comparison-application.service';
-import { ComparisonPrewarmService } from './comparison-prewarm.service';
-import { ComparisonsController } from './comparisons.controller';
+import { ApiRateLimitService, RATE_LIMIT_REDIS } from './rate-limit.service.js';
+import { AuthController } from './auth.controller.js';
+import { AuthService } from './auth.service.js';
+import { BillingController } from './billing.controller.js';
+import { BillingService } from './billing.service.js';
+import { ComparisonAnalyticsService } from './comparison-analytics.service.js';
+import { ComparisonApplicationService } from './comparison-application.service.js';
+import { ComparisonPrewarmService } from './comparison-prewarm.service.js';
+import { ComparisonsController } from './comparisons.controller.js';
 import {
   AlertsController,
   BudgetsController,
@@ -41,28 +41,28 @@ import {
   SharedReportsController,
   ShareLinksController,
   WorkloadsController,
-} from './cost-management.controller';
-import { CostManagementService } from './cost-management.service';
-import { LivePricingRefreshService } from './live-pricing-refresh.service';
-import { OpenApiController } from './openapi.controller';
-import { CircuitBreakerRegistry } from '../adapters/common/circuit-breaker';
+} from './cost-management.controller.js';
+import { CostManagementService } from './cost-management.service.js';
+import { LivePricingRefreshService } from './live-pricing-refresh.service.js';
+import { OpenApiController } from './openapi.controller.js';
+import { CircuitBreakerRegistry } from '../adapters/common/circuit-breaker.js';
 
 /** Shared so every caller sees the same breaker state for a provider. */
 export const PROVIDER_CIRCUIT_BREAKERS = Symbol('PROVIDER_CIRCUIT_BREAKERS');
-import { InvitationDeliveryService } from './invitation-delivery.service';
-import { InvoiceArtifactGovernanceService } from './invoice-artifact-governance.service';
-import { InvoiceArtifactStorageService } from './invoice-artifact-storage.service';
-import { InvoiceEvidenceNotaryService } from './invoice-evidence-notary.service';
-import { DataHealthController } from './data-health.controller';
-import { PricingStatusController } from './pricing-status.controller';
-import { RegionsController } from './regions.controller';
-import { RegionsService } from './regions.service';
-import { ReportExportJobsService } from './report-export-jobs.service';
-import { ScimProvisioningController } from './scim-provisioning.controller';
-import { ScimProvisioningService } from './scim-provisioning.service';
-import { SessionAuthGuard } from './session-auth.guard';
-import { TeamAuditExportService } from './team-audit-export.service';
-import { WorkloadController } from './workload.controller';
+import { InvitationDeliveryService } from './invitation-delivery.service.js';
+import { InvoiceArtifactGovernanceService } from './invoice-artifact-governance.service.js';
+import { InvoiceArtifactStorageService } from './invoice-artifact-storage.service.js';
+import { InvoiceEvidenceNotaryService } from './invoice-evidence-notary.service.js';
+import { DataHealthController } from './data-health.controller.js';
+import { PricingStatusController } from './pricing-status.controller.js';
+import { RegionsController } from './regions.controller.js';
+import { RegionsService } from './regions.service.js';
+import { ReportExportJobsService } from './report-export-jobs.service.js';
+import { ScimProvisioningController } from './scim-provisioning.controller.js';
+import { ScimProvisioningService } from './scim-provisioning.service.js';
+import { SessionAuthGuard } from './session-auth.guard.js';
+import { TeamAuditExportService } from './team-audit-export.service.js';
+import { WorkloadController } from './workload.controller.js';
 
 @Module({
   imports: [

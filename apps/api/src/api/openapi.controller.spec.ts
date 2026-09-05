@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { NotFoundException } from '@nestjs/common';
-import { OpenApiController, specSearchPaths } from './openapi.controller';
+import { OpenApiController, specSearchPaths } from './openapi.controller.js';
 
 describe('OpenApiController', () => {
   it('serves the generated document', () => {

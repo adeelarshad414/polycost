@@ -1,18 +1,18 @@
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
+import { AppConfig } from '../config/config.schema.js';
 import {
   ALERT_EVALUATOR_JOB_NAME,
   CURRENCY_SYNC_JOB_NAME,
   DATA_RETENTION_JOB_NAME,
   SHARE_LINK_CLEANUP_JOB_NAME,
   TEAM_AUDIT_EXPORT_JOB_NAME,
-} from './cost-management-jobs.types';
-import { CostManagementJobsService } from './cost-management-jobs.service';
+} from './cost-management-jobs.types.js';
+import { CostManagementJobsService } from './cost-management-jobs.service.js';
 import {
   CostManagementJobsScheduler,
   CostManagementQueue,
   CostManagementWorker,
-} from './cost-management-jobs.scheduler';
+} from './cost-management-jobs.scheduler.js';
 
 const configService = {
   get: jest.fn((key: keyof AppConfig) => {

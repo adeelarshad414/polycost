@@ -1,4 +1,4 @@
-import { IntervalCostCalculator } from './interval-cost-calculator';
+import { IntervalCostCalculator } from './interval-cost-calculator.js';
 
 describe('IntervalCostCalculator', () => {
   const calculator = new IntervalCostCalculator();

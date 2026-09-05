@@ -1,4 +1,4 @@
-import { DomainMetricsService } from './domain-metrics.service';
+import { DomainMetricsService } from './domain-metrics.service.js';
 
 interface QueryResultLike<T> {
   rows: T[];

@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
-import { DomainMetricsService } from './domain-metrics.service';
-import { MetricsService } from './metrics.service';
-import { ObservabilityModule } from './observability.module';
+import { DomainMetricsService } from './domain-metrics.service.js';
+import { MetricsService } from './metrics.service.js';
+import { ObservabilityModule } from './observability.module.js';
 
 function build(): { domain: DomainMetricsService; render: () => Promise<string> } {
   const metrics = new MetricsService({ collectDefaults: false });

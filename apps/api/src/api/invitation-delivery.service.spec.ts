@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'node:crypto';
-import { AppConfig } from '../config/config.schema';
-import { InvitationDeliveryService } from './invitation-delivery.service';
+import { AppConfig } from '../config/config.schema.js';
+import { InvitationDeliveryService } from './invitation-delivery.service.js';
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 

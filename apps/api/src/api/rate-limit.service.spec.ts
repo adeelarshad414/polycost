@@ -1,5 +1,5 @@
-import { ApiRateLimitService, RateLimitRedis } from './rate-limit.service';
-import { RateLimitExceededError } from './api-errors';
+import { ApiRateLimitService, RateLimitRedis } from './rate-limit.service.js';
+import { RateLimitExceededError } from './api-errors.js';
 
 // The limiter guards auth, comparisons and the paid refresh-live path. Backing
 // it with Redis is what makes the limit shared: with per-process counters, N

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { ApiValidationError } from '../api/api-errors';
-import { HOURS_PER_DAY, HOURS_PER_MONTH, HOURS_PER_WEEK, HOURS_PER_YEAR } from '../cost-time';
-import { PricingCacheService } from './pricing-cache.service';
+import { ApiValidationError } from '../api/api-errors.js';
+import { HOURS_PER_DAY, HOURS_PER_MONTH, HOURS_PER_WEEK, HOURS_PER_YEAR } from '../cost-time.js';
+import { PricingCacheService } from './pricing-cache.service.js';
 import {
   PaymentOptionCode,
   PricingGranularity,
@@ -9,9 +9,9 @@ import {
   RateIntervals,
   RateResolverQuery,
   RateResult,
-} from './pricing-models.types';
-import type { PricingRateReader } from './pricing-models.types';
-import { PricingTermsService } from './pricing-terms.service';
+} from './pricing-models.types.js';
+import type { PricingRateReader } from './pricing-models.types.js';
+import { PricingTermsService } from './pricing-terms.service.js';
 
 const PRICING_TTL_SECONDS = 24 * 60 * 60;
 const GRANULARITY_MULTIPLIERS: Record<PricingGranularity, number> = {

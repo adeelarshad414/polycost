@@ -1,5 +1,5 @@
-import { NWSValidationError } from '../nws/nws-validator';
-import { FormToNWSService } from './form-to-nws.service';
+import { NWSValidationError } from '../nws/nws-validator.js';
+import { FormToNWSService } from './form-to-nws.service.js';
 
 const fixedNow = () => new Date('2026-06-28T12:00:00.000Z');
 

@@ -1,16 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ProviderId } from '../adapters/common/cloud-provider-adapter';
-import { ApiDatabaseRepository } from '../api/api-database.repository';
-import { BudgetEvaluationRecord, WorkloadCostBreakdown } from '../api/cost-management.types';
-import { TeamAuditExportService, TeamAuditExportSummary } from '../api/team-audit-export.service';
-import type { ExchangeRateClient } from './exchange-rate.client';
+import { ProviderId } from '../adapters/common/cloud-provider-adapter.js';
+import { ApiDatabaseRepository } from '../api/api-database.repository.js';
+import { BudgetEvaluationRecord, WorkloadCostBreakdown } from '../api/cost-management.types.js';
+import {
+  TeamAuditExportService,
+  TeamAuditExportSummary,
+} from '../api/team-audit-export.service.js';
+import type { ExchangeRateClient } from './exchange-rate.client.js';
 import {
   AlertEvaluationSummary,
   CurrencySyncSummary,
   DataRetentionSweepJobSummary,
   ShareLinkCleanupSummary,
-} from './cost-management-jobs.types';
-import { DataRetentionMode, DataRetentionWindows } from '../api/api-database.repository';
+} from './cost-management-jobs.types.js';
+import { DataRetentionMode, DataRetentionWindows } from '../api/api-database.repository.js';
 
 const WEEK_IN_MS = 7 * 24 * 60 * 60 * 1000;
 

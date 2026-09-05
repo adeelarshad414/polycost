@@ -8,7 +8,7 @@ jest.mock('node:net', () => ({
 }));
 
 import net from 'node:net';
-import { probeTcp } from './health.service';
+import { probeTcp } from './health.service.js';
 
 class FakeSocket extends EventEmitter {
   setTimeout = jest.fn();

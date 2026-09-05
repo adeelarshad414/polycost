@@ -1,11 +1,11 @@
-import { BaseCloudProviderAdapter } from '../common/base-cloud-provider.adapter';
+import { BaseCloudProviderAdapter } from '../common/base-cloud-provider.adapter.js';
 import {
   PricingCatalogReader,
   PricingCatalogRecord,
   ProviderId,
   RefreshPricingCatalogOptions,
-} from '../common/cloud-provider-adapter';
-import { mockPricingCatalogRecords } from './mock-pricing-fixtures';
+} from '../common/cloud-provider-adapter.js';
+import { mockPricingCatalogRecords } from './mock-pricing-fixtures.js';
 
 export class MockProviderAdapter extends BaseCloudProviderAdapter {
   constructor(

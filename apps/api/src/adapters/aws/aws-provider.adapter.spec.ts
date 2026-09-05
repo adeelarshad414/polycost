@@ -2,10 +2,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Readable } from 'node:stream';
-import { InMemoryPricingCatalogReader } from '../common/in-memory-pricing-catalog.reader';
-import { FetchLike } from '../common/http-client';
-import { PricingCatalogRecord } from '../common/cloud-provider-adapter';
-import { AwsProviderAdapter } from './aws-provider.adapter';
+import { InMemoryPricingCatalogReader } from '../common/in-memory-pricing-catalog.reader.js';
+import { FetchLike } from '../common/http-client.js';
+import { PricingCatalogRecord } from '../common/cloud-provider-adapter.js';
+import { AwsProviderAdapter } from './aws-provider.adapter.js';
 
 const fixture = <T>(relativePath: string): T =>
   JSON.parse(readFileSync(resolve(__dirname, '../../../../..', relativePath), 'utf8')) as T;

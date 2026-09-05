@@ -1,17 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { NormalizedRequirementCategory } from '@polycost/types';
-import { HOURS_PER_MONTH } from '../cost-time';
-import { ServiceRequirement } from '../nws/nws.types';
-import { AliasDictionary, AliasMatch } from './alias-dictionary';
+import { HOURS_PER_MONTH } from '../cost-time.js';
+import { ServiceRequirement } from '../nws/nws.types.js';
+import { AliasDictionary, AliasMatch } from './alias-dictionary.js';
 import {
   DiagramIgnoredNode,
   DiagramNodeClassification,
   ExtractedDiagramNode,
-} from './diagram-parser.types';
-import type { LlmClassifierClient } from './diagram-parser.types';
-import { sanitizeDisplayText } from './diagram-security';
-import { StubLlmClassifierClient } from './llm-classifier.client';
-import { StencilMapRegistry } from './stencil-map.registry';
+} from './diagram-parser.types.js';
+import type { LlmClassifierClient } from './diagram-parser.types.js';
+import { sanitizeDisplayText } from './diagram-security.js';
+import { StubLlmClassifierClient } from './llm-classifier.client.js';
+import { StencilMapRegistry } from './stencil-map.registry.js';
 
 interface NodeClassificationOptions {
   allowLlm?: boolean;

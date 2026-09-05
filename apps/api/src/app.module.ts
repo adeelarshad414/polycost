@@ -1,16 +1,16 @@
 import { Module } from '@nestjs/common';
-import { ApiModule } from './api/api.module';
-import { ComparisonModule } from './comparison/comparison.module';
-import { AppConfigModule } from './config/app-config.module';
-import { ObservabilityModule } from './observability/observability.module';
-import { CostManagementJobsModule } from './cost-management-jobs/cost-management-jobs.module';
-import { DiagramParserModule } from './diagram-parser/diagram-parser.module';
-import { HealthController } from './health/health.controller';
-import { HealthService } from './health/health.service';
-import { NwsParserModule } from './nws-parser/nws-parser.module';
-import { PricingEtlModule } from './pricing-etl/pricing-etl.module';
-import { PricingModelsModule } from './pricing-models/pricing-models.module';
-import { ReportModule } from './reports/report.module';
+import { ApiModule } from './api/api.module.js';
+import { ComparisonModule } from './comparison/comparison.module.js';
+import { AppConfigModule } from './config/app-config.module.js';
+import { ObservabilityModule } from './observability/observability.module.js';
+import { CostManagementJobsModule } from './cost-management-jobs/cost-management-jobs.module.js';
+import { DiagramParserModule } from './diagram-parser/diagram-parser.module.js';
+import { HealthController } from './health/health.controller.js';
+import { HealthService } from './health/health.service.js';
+import { NwsParserModule } from './nws-parser/nws-parser.module.js';
+import { PricingEtlModule } from './pricing-etl/pricing-etl.module.js';
+import { PricingModelsModule } from './pricing-models/pricing-models.module.js';
+import { ReportModule } from './reports/report.module.js';
 
 @Module({
   imports: [

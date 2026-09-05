@@ -1,4 +1,4 @@
-import { NormalizedWorkloadSpec, normalizedWorkloadSpecSchema } from './nws.types';
+import { NormalizedWorkloadSpec, normalizedWorkloadSpecSchema } from './nws.types.js';
 
 export interface NWSValidationIssue {
   path: string;

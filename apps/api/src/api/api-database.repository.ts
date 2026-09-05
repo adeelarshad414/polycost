@@ -1,28 +1,28 @@
 import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
-import { ProviderId } from '../adapters/common/cloud-provider-adapter';
-import { ComparisonResult } from '../comparison/comparison.types';
-import { AppConfig } from '../config/config.schema';
-import { NormalizedWorkloadSpec } from '../nws/nws.types';
-import { calculateEgressCost } from '../pricing-normalization/egress-tier-calculator';
-import { providerRegionForCanonicalRegion } from '../pricing-normalization/region-map';
-import { SecretsService } from '../secrets/secrets.service';
-import type { SecretsReader } from '../secrets/secrets.service';
+import { ProviderId } from '../adapters/common/cloud-provider-adapter.js';
+import { ComparisonResult } from '../comparison/comparison.types.js';
+import { AppConfig } from '../config/config.schema.js';
+import { NormalizedWorkloadSpec } from '../nws/nws.types.js';
+import { calculateEgressCost } from '../pricing-normalization/egress-tier-calculator.js';
+import { providerRegionForCanonicalRegion } from '../pricing-normalization/region-map.js';
+import { SecretsService } from '../secrets/secrets.service.js';
+import type { SecretsReader } from '../secrets/secrets.service.js';
 import {
   ApiConflictError,
   ApiNotFoundError,
   ApiValidationError,
   DataHealthResponse,
   PricingStatusResponse,
-} from './api-errors';
+} from './api-errors.js';
 import {
   GeneratedReport,
   ReportExportJobRecord,
   ReportFormat,
   ReportInterval,
   ReportPricingModel,
-} from '../reports/report.types';
+} from '../reports/report.types.js';
 import {
   AccountSessionRecord,
   AccountTeamMembership,
@@ -40,7 +40,7 @@ import {
   TeamInvitationRecord,
   TeamMemberRecord,
   TeamRole,
-} from './auth.types';
+} from './auth.types.js';
 import {
   BillingImportInput,
   BillingImportRecord,
@@ -52,7 +52,7 @@ import {
   InvoiceLineItemRecord,
   InvoiceReconciliationRecord,
   InvoiceReconciliationStatus,
-} from './billing.types';
+} from './billing.types.js';
 import {
   AlertRecord,
   BudgetInput,
@@ -72,7 +72,7 @@ import {
   WorkloadCostBreakdown,
   WorkloadInput,
   WorkloadRecord,
-} from './cost-management.types';
+} from './cost-management.types.js';
 
 interface QueryResultLike<T> {
   rows: T[];

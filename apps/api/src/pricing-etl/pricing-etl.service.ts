@@ -2,17 +2,17 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   CloudProviderAdapter,
   PricingCatalogRecord,
-} from '../adapters/common/cloud-provider-adapter';
+} from '../adapters/common/cloud-provider-adapter.js';
 import type {
   NormalizedPricingWriter,
   PricingCatalogWriter,
   PricingEtlRunRepository,
-} from '../database/pricing-repository.types';
-import type { PricingSyncFailureNotifier } from './pricing-sync-alert.service';
-import { PricingEtlProviderResult, PricingEtlSummary } from './pricing-etl.types';
-import { DomainMetricsService } from '../observability/domain-metrics.service';
+} from '../database/pricing-repository.types.js';
+import type { PricingSyncFailureNotifier } from './pricing-sync-alert.service.js';
+import { PricingEtlProviderResult, PricingEtlSummary } from './pricing-etl.types.js';
+import { DomainMetricsService } from '../observability/domain-metrics.service.js';
 import { trace } from '@opentelemetry/api';
-import { withSpan } from '../observability/span';
+import { withSpan } from '../observability/span.js';
 
 const MAX_ERROR_DETAIL_LENGTH = 2000;
 const PRICING_ETL_MAX_ATTEMPTS = 3;

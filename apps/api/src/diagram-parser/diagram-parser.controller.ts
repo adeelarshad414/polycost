@@ -1,17 +1,17 @@
 import { Body, Controller, Post, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
+import { AppConfig } from '../config/config.schema.js';
 import {
   ApiRateLimitService,
   requestIdentity,
   writeRateLimitHeaders,
-} from '../api/rate-limit.service';
-import type { RateLimitHeaderResponse } from '../api/rate-limit.service';
-import { DiagramImportRepository } from './diagram-import.repository';
-import { DiagramParseResult } from './diagram-parser.types';
-import type { DiagramParseRequest } from './diagram-parser.types';
-import { DiagramParserService } from './diagram-parser.service';
-import { DiagramTempFileStore } from './diagram-temp-file.store';
+} from '../api/rate-limit.service.js';
+import type { RateLimitHeaderResponse } from '../api/rate-limit.service.js';
+import { DiagramImportRepository } from './diagram-import.repository.js';
+import { DiagramParseResult } from './diagram-parser.types.js';
+import type { DiagramParseRequest } from './diagram-parser.types.js';
+import { DiagramParserService } from './diagram-parser.service.js';
+import { DiagramTempFileStore } from './diagram-temp-file.store.js';
 
 interface RequestLike {
   ip?: string;

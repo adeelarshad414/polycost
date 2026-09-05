@@ -1,5 +1,5 @@
-import { ProviderId } from '../adapters/common/cloud-provider-adapter';
-import { NormalizedWorkloadSpec } from '../nws/nws.types';
+import { ProviderId } from '../adapters/common/cloud-provider-adapter.js';
+import { NormalizedWorkloadSpec } from '../nws/nws.types.js';
 
 export type TerraformTargetCloud = ProviderId;
 export type TerraformValidationStatus = 'passed' | 'warning' | 'failed';

@@ -1,16 +1,16 @@
 import { Module } from '@nestjs/common';
 import { Pool } from 'pg';
-import { DomainMetricsService } from '../observability/domain-metrics.service';
-import { instrumentPool } from '../observability/instrumented-pool';
+import { DomainMetricsService } from '../observability/domain-metrics.service.js';
+import { instrumentPool } from '../observability/instrumented-pool.js';
 import { ConfigService } from '@nestjs/config';
-import { AwsProviderAdapter } from './aws/aws-provider.adapter';
-import { AzureProviderAdapter } from './azure/azure-provider.adapter';
-import { CloudProviderAdapter } from './common/cloud-provider-adapter';
-import { GcpProviderAdapter } from './gcp/gcp-provider.adapter';
-import { createMockProviderAdapters } from './mock/mock-provider.adapter';
-import { AppConfig } from '../config/config.schema';
-import { PostgresPricingCatalogRepository } from '../database/pricing-catalog.repository';
-import { SecretsService } from '../secrets/secrets.service';
+import { AwsProviderAdapter } from './aws/aws-provider.adapter.js';
+import { AzureProviderAdapter } from './azure/azure-provider.adapter.js';
+import { CloudProviderAdapter } from './common/cloud-provider-adapter.js';
+import { GcpProviderAdapter } from './gcp/gcp-provider.adapter.js';
+import { createMockProviderAdapters } from './mock/mock-provider.adapter.js';
+import { AppConfig } from '../config/config.schema.js';
+import { PostgresPricingCatalogRepository } from '../database/pricing-catalog.repository.js';
+import { SecretsService } from '../secrets/secrets.service.js';
 
 export const CLOUD_PROVIDER_ADAPTERS = Symbol('CLOUD_PROVIDER_ADAPTERS');
 

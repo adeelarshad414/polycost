@@ -1,11 +1,11 @@
 import { Global, Module } from '@nestjs/common';
-import { MetricsController } from './metrics.controller';
-import { DomainMetricsService } from './domain-metrics.service';
-import { MetricsService } from './metrics.service';
-import { TracingLifecycle } from './tracing.lifecycle';
-import { ErrorReporter } from './error-reporter';
+import { MetricsController } from './metrics.controller.js';
+import { DomainMetricsService } from './domain-metrics.service.js';
+import { MetricsService } from './metrics.service.js';
+import { TracingLifecycle } from './tracing.lifecycle.js';
+import { ErrorReporter } from './error-reporter.js';
 import { ConfigService } from '@nestjs/config';
-import type { AppConfig } from '../config/config.schema';
+import type { AppConfig } from '../config/config.schema.js';
 
 /**
  * Global so any provider can record a metric without importing the module.

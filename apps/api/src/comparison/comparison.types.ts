@@ -8,14 +8,14 @@ import {
   ProviderId,
   RateSource,
   ServiceCategory,
-} from '../adapters/common/cloud-provider-adapter';
+} from '../adapters/common/cloud-provider-adapter.js';
 import {
   NormalizedWorkloadSpec,
   ServiceRequirement,
   SourceTraceability,
   WorkloadSourceType,
   WorkloadType,
-} from '../nws/nws.types';
+} from '../nws/nws.types.js';
 
 export interface CostIntervals {
   hourly?: number;

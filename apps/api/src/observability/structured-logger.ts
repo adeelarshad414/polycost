@@ -1,7 +1,7 @@
 import { LoggerService } from '@nestjs/common';
 import pino, { Logger as PinoLogger } from 'pino';
 import { trace } from '@opentelemetry/api';
-import { currentRequestId } from './request-context';
+import { currentRequestId } from './request-context.js';
 
 export type LogLevel = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
 

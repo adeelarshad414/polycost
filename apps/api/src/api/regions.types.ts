@@ -1,4 +1,4 @@
-import { ProviderId } from '../adapters/common/cloud-provider-adapter';
+import { ProviderId } from '../adapters/common/cloud-provider-adapter.js';
 
 export type RegionCatalogSource = 'live' | 'fallback';
 

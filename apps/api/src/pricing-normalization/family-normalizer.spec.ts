@@ -1,4 +1,4 @@
-import { normalizeInstanceFamily } from './family-normalizer';
+import { normalizeInstanceFamily } from './family-normalizer.js';
 
 describe('normalizeInstanceFamily', () => {
   it('normalizes common AWS instance family prefixes', () => {

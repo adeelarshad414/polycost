@@ -5,9 +5,9 @@ import {
   ApiDatabaseRepository,
   TeamAuditExportClaimRecord,
   TeamAuditExportStatus,
-} from './api-database.repository';
-import { AppConfig } from '../config/config.schema';
-import { TeamAuditEventRecord } from './auth.types';
+} from './api-database.repository.js';
+import { AppConfig } from '../config/config.schema.js';
+import { TeamAuditEventRecord } from './auth.types.js';
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 type NowProvider = () => Date;

@@ -4,7 +4,7 @@ import {
   NormalizedWorkloadSpec,
   StorageComponent,
   WorkloadType,
-} from '../nws/nws.types';
+} from '../nws/nws.types.js';
 
 export const STRUCTURED_LLM_CLIENT = Symbol('STRUCTURED_LLM_CLIENT');
 

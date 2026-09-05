@@ -1,4 +1,4 @@
-import { validateConfig } from './config.schema';
+import { validateConfig } from './config.schema.js';
 
 const baseConfig = {
   NODE_ENV: 'development',

@@ -1,15 +1,18 @@
 import {
   CloudProviderAdapter,
   PricingCatalogRecord,
-} from '../adapters/common/cloud-provider-adapter';
+} from '../adapters/common/cloud-provider-adapter.js';
 import {
   NormalizedPricingWriter,
   PricingCatalogWriter,
-} from '../database/pricing-repository.types';
-import { LiveRefreshUnavailableError } from './api-errors';
-import { ComparisonSnapshot } from './api-database.repository';
-import { LivePricingRefreshService, livePricingReferences } from './live-pricing-refresh.service';
-import { CircuitBreakerRegistry } from '../adapters/common/circuit-breaker';
+} from '../database/pricing-repository.types.js';
+import { LiveRefreshUnavailableError } from './api-errors.js';
+import { ComparisonSnapshot } from './api-database.repository.js';
+import {
+  LivePricingRefreshService,
+  livePricingReferences,
+} from './live-pricing-refresh.service.js';
+import { CircuitBreakerRegistry } from '../adapters/common/circuit-breaker.js';
 
 const liveRecord: PricingCatalogRecord = {
   provider: 'aws',

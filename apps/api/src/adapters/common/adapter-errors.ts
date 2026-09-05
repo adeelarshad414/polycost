@@ -1,4 +1,4 @@
-import { ProviderId } from './cloud-provider-adapter';
+import { ProviderId } from './cloud-provider-adapter.js';
 
 export class AdapterError extends Error {
   constructor(

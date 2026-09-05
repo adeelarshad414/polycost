@@ -4,8 +4,8 @@ import {
   REQUEST_ID_HEADER,
   resolveRequestId,
   runWithRequestContext,
-} from './observability/request-context';
-import { MetricsService, normalizeRoute } from './observability/metrics.service';
+} from './observability/request-context.js';
+import { MetricsService, normalizeRoute } from './observability/metrics.service.js';
 
 /**
  * Runtime wiring applied to an already-created Nest application.

@@ -1,9 +1,9 @@
 import { createHash, createHmac } from 'node:crypto';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
-import { AuthIdentity } from './auth.types';
-import { InvoiceEvidencePacketResponse } from './billing.types';
+import { AppConfig } from '../config/config.schema.js';
+import { AuthIdentity } from './auth.types.js';
+import { InvoiceEvidencePacketResponse } from './billing.types.js';
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 type NowProvider = () => Date;

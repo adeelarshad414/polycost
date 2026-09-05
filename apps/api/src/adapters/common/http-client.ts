@@ -1,5 +1,5 @@
-import { AdapterApiError, AdapterError } from './adapter-errors';
-import { ProviderId } from './cloud-provider-adapter';
+import { AdapterApiError, AdapterError } from './adapter-errors.js';
+import { ProviderId } from './cloud-provider-adapter.js';
 
 export interface HttpResponseLike {
   ok: boolean;

@@ -1,5 +1,5 @@
 import { Controller, Get, Header, Res } from '@nestjs/common';
-import { MetricsService } from './metrics.service';
+import { MetricsService } from './metrics.service.js';
 
 interface MetricsResponse {
   header(name: string, value: string): unknown;

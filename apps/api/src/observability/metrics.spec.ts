@@ -1,8 +1,8 @@
 import { NestFactory } from '@nestjs/core';
-import { MetricsController } from './metrics.controller';
-import { MetricsService, normalizeRoute } from './metrics.service';
-import { ObservabilityModule } from './observability.module';
-import { registerMetricsHook } from '../bootstrap';
+import { MetricsController } from './metrics.controller.js';
+import { MetricsService, normalizeRoute } from './metrics.service.js';
+import { ObservabilityModule } from './observability.module.js';
+import { registerMetricsHook } from '../bootstrap.js';
 
 // Default process metrics are skipped in these tests: they add ~50 series of
 // noise to every render() assertion and are prom-client's code, not ours.

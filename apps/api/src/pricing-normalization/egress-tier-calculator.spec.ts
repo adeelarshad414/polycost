@@ -2,7 +2,7 @@ import {
   calculateEgressCost,
   calculateEgressTierBreakdown,
   EgressTierRate,
-} from './egress-tier-calculator';
+} from './egress-tier-calculator.js';
 
 describe('calculateEgressCost', () => {
   it('walks tier bands with explicit upper bounds', () => {
