@@ -1,5 +1,5 @@
-import { ErrorReporter } from './error-reporter';
-import { registerProcessErrorHandlers, reportWorkerFailures } from './process-errors';
+import { ErrorReporter } from './error-reporter.js';
+import { registerProcessErrorHandlers, reportWorkerFailures } from './process-errors.js';
 
 function captureReporter() {
   const sent: Array<{ exception: unknown; context: Record<string, unknown> }> = [];

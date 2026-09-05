@@ -3,7 +3,7 @@ import {
   hourlyFromMonthly,
   intervalCostsFromHourly,
   roundCurrency,
-} from './cost-time';
+} from './cost-time.js';
 
 describe('cost time utilities', () => {
   it('derives every reporting interval from the 730-hour month standard', () => {

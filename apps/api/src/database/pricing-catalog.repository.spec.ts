@@ -1,10 +1,10 @@
 /* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: repository test rows are controlled fixtures indexed by expected column names; see docs/SECURITY-SUPPRESSIONS.md. */
 import { ConfigService } from '@nestjs/config';
-import { PgPoolLike, PostgresPricingCatalogRepository } from './pricing-catalog.repository';
-import { AppConfig } from '../config/config.schema';
-import { SecretsReader } from '../secrets/secrets.service';
-import { PricingCatalogRecord } from '../adapters/common/cloud-provider-adapter';
-import { pricingLineageForCatalogRecord } from '../pricing-normalization/pricing-lineage';
+import { PgPoolLike, PostgresPricingCatalogRepository } from './pricing-catalog.repository.js';
+import { AppConfig } from '../config/config.schema.js';
+import { SecretsReader } from '../secrets/secrets.service.js';
+import { PricingCatalogRecord } from '../adapters/common/cloud-provider-adapter.js';
+import { pricingLineageForCatalogRecord } from '../pricing-normalization/pricing-lineage.js';
 
 const configService = () =>
   ({

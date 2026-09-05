@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Counter, Gauge, Histogram } from 'prom-client';
-import { MetricsService } from './metrics.service';
+import { MetricsService } from './metrics.service.js';
 
 /**
  * Business metrics for the golden signals declared in docs/RUNBOOK.md.

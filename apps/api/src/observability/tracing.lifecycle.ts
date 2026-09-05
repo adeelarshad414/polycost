@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
-import { shutdownTracing } from './tracing';
+import { shutdownTracing } from './tracing.js';
 
 /**
  * Flushes batched spans during shutdown.

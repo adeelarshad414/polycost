@@ -6,9 +6,9 @@ import {
   DiagramIgnoredNode,
   ExtractedDiagram,
   ExtractedDiagramNode,
-} from './diagram-parser.types';
-import { assertXmlSafe, sanitizeDisplayText, sanitizeSourceRef } from './diagram-security';
-import { readZipEntries } from './zip-reader';
+} from './diagram-parser.types.js';
+import { assertXmlSafe, sanitizeDisplayText, sanitizeSourceRef } from './diagram-security.js';
+import { readZipEntries } from './zip-reader.js';
 
 @Injectable()
 export class VsdxExtractor implements DiagramExtractor {

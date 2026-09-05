@@ -5,9 +5,9 @@ import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-base';
-import { buildSampler, isUntracedPath } from './tracing';
-import { withSpan } from './span';
-import { StructuredLogger } from './structured-logger';
+import { buildSampler, isUntracedPath } from './tracing.js';
+import { withSpan } from './span.js';
+import { StructuredLogger } from './structured-logger.js';
 
 describe('trace sampling', () => {
   it('samples everything by default', () => {

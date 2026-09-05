@@ -1,17 +1,17 @@
 import { Controller, Get, Param, Query, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ProviderId } from '../adapters/common/cloud-provider-adapter';
-import { ApiValidationError } from '../api/api-errors';
+import { ProviderId } from '../adapters/common/cloud-provider-adapter.js';
+import { ApiValidationError } from '../api/api-errors.js';
 import {
   ApiRateLimitService,
   requestIdentity,
   writeRateLimitHeaders,
-} from '../api/rate-limit.service';
-import type { RateLimitHeaderResponse } from '../api/rate-limit.service';
-import { AppConfig } from '../config/config.schema';
-import { providerRegionForCanonicalRegion } from '../pricing-normalization/region-map';
-import { PaymentOptionCode, PricingGranularity, PricingTermCode } from './pricing-models.types';
-import { PricingMatrixService } from './pricing-matrix.service';
+} from '../api/rate-limit.service.js';
+import type { RateLimitHeaderResponse } from '../api/rate-limit.service.js';
+import { AppConfig } from '../config/config.schema.js';
+import { providerRegionForCanonicalRegion } from '../pricing-normalization/region-map.js';
+import { PaymentOptionCode, PricingGranularity, PricingTermCode } from './pricing-models.types.js';
+import { PricingMatrixService } from './pricing-matrix.service.js';
 
 type QueryValue = string | string[] | undefined;
 interface RequestLike {

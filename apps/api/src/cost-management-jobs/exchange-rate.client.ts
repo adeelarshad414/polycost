@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { defaultFetch, HttpResponseLike } from '../adapters/common/http-client';
-import type { FetchLike } from '../adapters/common/http-client';
-import { AppConfig } from '../config/config.schema';
+import { defaultFetch, HttpResponseLike } from '../adapters/common/http-client.js';
+import type { FetchLike } from '../adapters/common/http-client.js';
+import { AppConfig } from '../config/config.schema.js';
 
 interface FrankfurterLatestResponse {
   amount: number;

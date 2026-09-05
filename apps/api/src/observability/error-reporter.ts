@@ -1,5 +1,5 @@
 import { trace } from '@opentelemetry/api';
-import { currentRequestId } from './request-context';
+import { currentRequestId } from './request-context.js';
 
 /**
  * Reports unhandled exceptions to a self-hosted GlitchTip instance.

@@ -1,12 +1,12 @@
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
-import { FormToNWSService } from './form-to-nws.service';
-import { NLParserService } from './nl-parser.service';
+import { AppConfig } from '../config/config.schema.js';
+import { FormToNWSService } from './form-to-nws.service.js';
+import { NLParserService } from './nl-parser.service.js';
 import {
   GuidedFormRequirementParser,
   NaturalLanguageRequirementParser,
   normalizedRequirementsFromNws,
-} from './requirement-parser.service';
+} from './requirement-parser.service.js';
 
 const configService = {
   get: jest.fn((key: keyof AppConfig) => {

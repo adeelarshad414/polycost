@@ -10,20 +10,20 @@ import {
   ProviderId,
   ProviderPricingResult,
   ServiceCategory,
-} from '../adapters/common/cloud-provider-adapter';
-import { HOURS_PER_MONTH } from '../cost-time';
-import { NormalizedWorkloadSpec, ServiceRequirement } from '../nws/nws.types';
-import { NWSValidator } from '../nws/nws-validator';
+} from '../adapters/common/cloud-provider-adapter.js';
+import { HOURS_PER_MONTH } from '../cost-time.js';
+import { NormalizedWorkloadSpec, ServiceRequirement } from '../nws/nws.types.js';
+import { NWSValidator } from '../nws/nws-validator.js';
 import {
   canonicalRegionForPreference,
   canonicalRegionForResidencyLock,
-} from '../pricing-normalization/region-map';
+} from '../pricing-normalization/region-map.js';
 import {
   COMPARISON_CLOCK,
   COMPARISON_ID_FACTORY,
   COMPARISON_PROVIDER_ADAPTERS,
-} from './comparison.tokens';
-import type { ComparisonClock, ComparisonIdFactory } from './comparison.tokens';
+} from './comparison.tokens.js';
+import type { ComparisonClock, ComparisonIdFactory } from './comparison.tokens.js';
 import {
   ComparisonLineItem,
   ComparisonCostBreakdown,
@@ -31,10 +31,10 @@ import {
   ComparisonResult,
   ComparisonWarning,
   PricingModelRecommendation,
-} from './comparison.types';
-import { commitmentPricingModelCandidates } from './commitment-policy';
-import { EquivalentServiceMapper } from './equivalent-service-mapper';
-import { IntervalCostCalculator } from './interval-cost-calculator';
+} from './comparison.types.js';
+import { commitmentPricingModelCandidates } from './commitment-policy.js';
+import { EquivalentServiceMapper } from './equivalent-service-mapper.js';
+import { IntervalCostCalculator } from './interval-cost-calculator.js';
 
 interface ProviderSuccess {
   result: ProviderPricingResult;

@@ -1,4 +1,4 @@
-import { NormalizedWorkloadSpec } from '../../nws/nws.types';
+import { NormalizedWorkloadSpec } from '../../nws/nws.types.js';
 
 export type ProviderId = 'aws' | 'azure' | 'gcp';
 export type ServiceCategory =

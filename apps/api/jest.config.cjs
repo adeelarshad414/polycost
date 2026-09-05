@@ -2,6 +2,13 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
+  // Relative imports now carry the .js extension that Node ESM requires. At
+  // test time the files on disk are still .ts, so the extension is stripped
+  // back off before resolution. This mapping is also exactly what the ESM
+  // preset needs later, so it does not change again at the flip.
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+  },
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/main.ts',

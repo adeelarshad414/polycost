@@ -2,11 +2,11 @@
 import { generateKeyPairSync } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { SecretsReader } from '../../secrets/secrets.service';
-import { InMemoryPricingCatalogReader } from '../common/in-memory-pricing-catalog.reader';
-import { PricingCatalogRecord } from '../common/cloud-provider-adapter';
-import { FetchLike } from '../common/http-client';
-import { GcpProviderAdapter } from './gcp-provider.adapter';
+import { SecretsReader } from '../../secrets/secrets.service.js';
+import { InMemoryPricingCatalogReader } from '../common/in-memory-pricing-catalog.reader.js';
+import { PricingCatalogRecord } from '../common/cloud-provider-adapter.js';
+import { FetchLike } from '../common/http-client.js';
+import { GcpProviderAdapter } from './gcp-provider.adapter.js';
 
 const fixture = <T>(relativePath: string): T =>
   JSON.parse(readFileSync(resolve(__dirname, '../../../../..', relativePath), 'utf8')) as T;

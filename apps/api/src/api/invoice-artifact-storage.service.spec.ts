@@ -1,8 +1,8 @@
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
-import { SecretsReader } from '../secrets/secrets.service';
-import { InvoiceArtifactBlobGovernance, InvoiceArtifactStorageBackend } from './billing.types';
-import { InvoiceArtifactStorageService } from './invoice-artifact-storage.service';
+import { AppConfig } from '../config/config.schema.js';
+import { SecretsReader } from '../secrets/secrets.service.js';
+import { InvoiceArtifactBlobGovernance, InvoiceArtifactStorageBackend } from './billing.types.js';
+import { InvoiceArtifactStorageService } from './invoice-artifact-storage.service.js';
 
 const content = Buffer.from('invoice artifact bytes');
 

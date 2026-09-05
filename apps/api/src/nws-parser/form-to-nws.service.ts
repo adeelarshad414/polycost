@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { NWSValidator } from '../nws/nws-validator';
-import { NormalizedWorkloadSpec } from '../nws/nws.types';
-import { StructuredWorkloadFormInput } from './nws-parser.types';
+import { NWSValidator } from '../nws/nws-validator.js';
+import { NormalizedWorkloadSpec } from '../nws/nws.types.js';
+import { StructuredWorkloadFormInput } from './nws-parser.types.js';
 
 @Injectable()
 export class FormToNWSService {

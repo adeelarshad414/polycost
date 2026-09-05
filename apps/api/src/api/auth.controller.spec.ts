@@ -1,12 +1,12 @@
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
-import { RateLimitExceededError } from './api-errors';
-import { AuthController } from './auth.controller';
-import { AuthService } from './auth.service';
-import { AuthIdentity, RequestWithAuth } from './auth.types';
-import { ApiRateLimitService } from './rate-limit.service';
-import { SessionAuthGuard } from './session-auth.guard';
+import { AppConfig } from '../config/config.schema.js';
+import { RateLimitExceededError } from './api-errors.js';
+import { AuthController } from './auth.controller.js';
+import { AuthService } from './auth.service.js';
+import { AuthIdentity, RequestWithAuth } from './auth.types.js';
+import { ApiRateLimitService } from './rate-limit.service.js';
+import { SessionAuthGuard } from './session-auth.guard.js';
 
 describe('AuthController', () => {
   const identity: AuthIdentity = {

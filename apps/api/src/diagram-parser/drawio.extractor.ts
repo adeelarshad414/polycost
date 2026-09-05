@@ -1,18 +1,18 @@
 import { Injectable } from '@nestjs/common';
-import { ApiValidationError } from '../api/api-errors';
+import { ApiValidationError } from '../api/api-errors.js';
 import {
   DecodedDiagramInput,
   DiagramExtractor,
   DiagramGraphEdge,
   ExtractedDiagram,
   ExtractedDiagramNode,
-} from './diagram-parser.types';
+} from './diagram-parser.types.js';
 import {
   assertXmlSafe,
   inflateRawDiagramPayload,
   sanitizeDisplayText,
   sanitizeSourceRef,
-} from './diagram-security';
+} from './diagram-security.js';
 
 @Injectable()
 export class DrawioExtractor implements DiagramExtractor {

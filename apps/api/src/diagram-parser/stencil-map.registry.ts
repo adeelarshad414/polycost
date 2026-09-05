@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AliasDictionary, AliasMatch } from './alias-dictionary';
+import { AliasDictionary, AliasMatch } from './alias-dictionary.js';
 
 @Injectable()
 export class StencilMapRegistry {

@@ -1,12 +1,12 @@
 import { createHash, createHmac } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { defaultFetch } from '../adapters/common/http-client';
-import type { FetchLike } from '../adapters/common/http-client';
-import { AppConfig } from '../config/config.schema';
-import type { SecretsReader } from '../secrets/secrets.service';
-import { ApiValidationError } from './api-errors';
-import { InvoiceArtifactBlobGovernance, InvoiceArtifactStorageBackend } from './billing.types';
+import { defaultFetch } from '../adapters/common/http-client.js';
+import type { FetchLike } from '../adapters/common/http-client.js';
+import { AppConfig } from '../config/config.schema.js';
+import type { SecretsReader } from '../secrets/secrets.service.js';
+import { ApiValidationError } from './api-errors.js';
+import { InvoiceArtifactBlobGovernance, InvoiceArtifactStorageBackend } from './billing.types.js';
 
 const AWS_ARTIFACT_SECRET_PATH = 'polycost/artifacts/aws';
 const AZURE_ARTIFACT_SECRET_PATH = 'polycost/artifacts/azure';

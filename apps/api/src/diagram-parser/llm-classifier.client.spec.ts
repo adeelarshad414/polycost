@@ -1,10 +1,10 @@
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
-import { SecretsReader } from '../secrets/secrets.service';
+import { AppConfig } from '../config/config.schema.js';
+import { SecretsReader } from '../secrets/secrets.service.js';
 import {
   OpenAiCompatibleDiagramLlmClassifierClient,
   StubLlmClassifierClient,
-} from './llm-classifier.client';
+} from './llm-classifier.client.js';
 
 const configService = (values: Partial<AppConfig>) =>
   ({

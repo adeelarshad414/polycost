@@ -2,13 +2,13 @@ import {
   PricingCatalogRecord,
   PricingModelKey,
   ProviderId,
-} from '../adapters/common/cloud-provider-adapter';
-import { normalizeInstanceFamily, NormalizedInstanceFamily } from './family-normalizer';
+} from '../adapters/common/cloud-provider-adapter.js';
+import { normalizeInstanceFamily, NormalizedInstanceFamily } from './family-normalizer.js';
 import {
   combinePricingLineage,
   pricingLineageForCatalogRecord,
   PricingSourceLineage,
-} from './pricing-lineage';
+} from './pricing-lineage.js';
 
 export type NormalizedPricingTerm =
   'on_demand' | 'reserved_1yr' | 'reserved_3yr' | 'spot' | 'savings_plan';

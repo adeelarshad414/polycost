@@ -3,9 +3,9 @@ import {
   PricingCatalogRecord,
   ProviderPricingLineItem,
   ProviderId,
-} from './cloud-provider-adapter';
-import { BaseCloudProviderAdapter } from './base-cloud-provider.adapter';
-import { InMemoryPricingCatalogReader } from './in-memory-pricing-catalog.reader';
+} from './cloud-provider-adapter.js';
+import { BaseCloudProviderAdapter } from './base-cloud-provider.adapter.js';
+import { InMemoryPricingCatalogReader } from './in-memory-pricing-catalog.reader.js';
 
 class TestProviderAdapter extends BaseCloudProviderAdapter {
   readonly providerId: ProviderId = 'aws';

@@ -1,5 +1,5 @@
-import { ProviderId } from '../adapters/common/cloud-provider-adapter';
-import { NormalizedInstanceFamily } from '../pricing-normalization/family-normalizer';
+import { ProviderId } from '../adapters/common/cloud-provider-adapter.js';
+import { NormalizedInstanceFamily } from '../pricing-normalization/family-normalizer.js';
 
 export type CachedPricingTerm =
   'on_demand' | 'reserved_1yr' | 'reserved_3yr' | 'spot' | 'savings_plan';

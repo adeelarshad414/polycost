@@ -1,9 +1,9 @@
-import { ReportService } from '../reports/report.service';
-import { GeneratedReport, ReportExportJobRecord } from '../reports/report.types';
-import { ApiNotFoundError, ApiValidationError, DataHealthResponse } from './api-errors';
-import { ApiDatabaseRepository, ComparisonSnapshot } from './api-database.repository';
-import { ComparisonApplicationService } from './comparison-application.service';
-import { ReportExportJobsService } from './report-export-jobs.service';
+import { ReportService } from '../reports/report.service.js';
+import { GeneratedReport, ReportExportJobRecord } from '../reports/report.types.js';
+import { ApiNotFoundError, ApiValidationError, DataHealthResponse } from './api-errors.js';
+import { ApiDatabaseRepository, ComparisonSnapshot } from './api-database.repository.js';
+import { ComparisonApplicationService } from './comparison-application.service.js';
+import { ReportExportJobsService } from './report-export-jobs.service.js';
 
 const comparisonId = '11111111-1111-4111-8111-111111111111';
 const jobId = '66666666-6666-4666-8666-666666666666';

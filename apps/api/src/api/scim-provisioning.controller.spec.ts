@@ -1,8 +1,8 @@
 import { GUARDS_METADATA } from '@nestjs/common/constants';
-import { AuthIdentity, RequestWithAuth } from './auth.types';
-import { ScimProvisioningController } from './scim-provisioning.controller';
-import { ScimProvisioningService } from './scim-provisioning.service';
-import { SessionAuthGuard } from './session-auth.guard';
+import { AuthIdentity, RequestWithAuth } from './auth.types.js';
+import { ScimProvisioningController } from './scim-provisioning.controller.js';
+import { ScimProvisioningService } from './scim-provisioning.service.js';
+import { SessionAuthGuard } from './session-auth.guard.js';
 
 describe('ScimProvisioningController', () => {
   const identity: AuthIdentity = {

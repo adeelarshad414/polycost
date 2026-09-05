@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto';
-import { ApiNotFoundError, ApiUnauthorizedError } from './api-errors';
-import { CostManagementService } from './cost-management.service';
+import { ApiNotFoundError, ApiUnauthorizedError } from './api-errors.js';
+import { CostManagementService } from './cost-management.service.js';
 import {
   ShareLinkAnalyticsResponse,
   ShareLinkRecord,
   WorkloadCostBreakdown,
   WorkloadRecord,
-} from './cost-management.types';
+} from './cost-management.types.js';
 
 const workload: WorkloadRecord = {
   id: '22222222-2222-4222-8222-222222222222',

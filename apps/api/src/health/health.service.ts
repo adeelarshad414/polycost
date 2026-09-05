@@ -1,10 +1,10 @@
 import net from 'node:net';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DomainMetricsService } from '../observability/domain-metrics.service';
-import { DataHealthResponse } from '../api/api-errors';
-import { ApiDatabaseRepository } from '../api/api-database.repository';
-import { AppConfig } from '../config/config.schema';
+import { DomainMetricsService } from '../observability/domain-metrics.service.js';
+import { DataHealthResponse } from '../api/api-errors.js';
+import { ApiDatabaseRepository } from '../api/api-database.repository.js';
+import { AppConfig } from '../config/config.schema.js';
 
 export type DependencyStatus = 'ok' | 'degraded';
 

@@ -1,16 +1,16 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
-import { SecretsService } from '../secrets/secrets.service';
-import { FormToNWSService } from './form-to-nws.service';
-import { NLParserService } from './nl-parser.service';
-import { OpenAiCompatibleNwsLlmClient } from './openai-compatible-nws-llm.client';
-import { STRUCTURED_LLM_CLIENT } from './nws-parser.types';
+import { AppConfig } from '../config/config.schema.js';
+import { SecretsService } from '../secrets/secrets.service.js';
+import { FormToNWSService } from './form-to-nws.service.js';
+import { NLParserService } from './nl-parser.service.js';
+import { OpenAiCompatibleNwsLlmClient } from './openai-compatible-nws-llm.client.js';
+import { STRUCTURED_LLM_CLIENT } from './nws-parser.types.js';
 import {
   GuidedFormRequirementParser,
   NaturalLanguageRequirementParser,
   REQUIREMENT_PARSERS,
-} from './requirement-parser.service';
+} from './requirement-parser.service.js';
 
 @Module({
   providers: [

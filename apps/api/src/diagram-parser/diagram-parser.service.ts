@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable, Optional } from '@nestjs/common';
-import { DomainMetricsService } from '../observability/domain-metrics.service';
-import { NWSValidator } from '../nws/nws-validator';
-import { NormalizedWorkloadSpec } from '../nws/nws.types';
-import { ParserConfidence } from '../nws-parser/nws-parser.types';
-import { normalizedRequirementsFromNws } from '../nws-parser/requirement-parser.service';
-import { DrawioExtractor } from './drawio.extractor';
+import { DomainMetricsService } from '../observability/domain-metrics.service.js';
+import { NWSValidator } from '../nws/nws-validator.js';
+import { NormalizedWorkloadSpec } from '../nws/nws.types.js';
+import { ParserConfidence } from '../nws-parser/nws-parser.types.js';
+import { normalizedRequirementsFromNws } from '../nws-parser/requirement-parser.service.js';
+import { DrawioExtractor } from './drawio.extractor.js';
 import {
   ClassifiedDiagramNode,
   DecodedDiagramInput,
@@ -22,13 +22,13 @@ import {
   DiagramVisualPreview,
   ExtractedDiagram,
   ExtractedDiagramNode,
-} from './diagram-parser.types';
-import { FormatDetectorService } from './format-detector.service';
-import { LucidCsvExtractor } from './lucid-csv.extractor';
-import { MermaidExtractor } from './mermaid.extractor';
-import { NodeClassifierService } from './node-classifier.service';
-import { sanitizeDisplayText } from './diagram-security';
-import { VsdxExtractor } from './vsdx.extractor';
+} from './diagram-parser.types.js';
+import { FormatDetectorService } from './format-detector.service.js';
+import { LucidCsvExtractor } from './lucid-csv.extractor.js';
+import { MermaidExtractor } from './mermaid.extractor.js';
+import { NodeClassifierService } from './node-classifier.service.js';
+import { sanitizeDisplayText } from './diagram-security.js';
+import { VsdxExtractor } from './vsdx.extractor.js';
 
 @Injectable()
 export class DiagramParserService {

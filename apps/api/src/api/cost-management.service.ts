@@ -1,7 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import { ApiNotFoundError, ApiUnauthorizedError } from './api-errors';
-import { ApiDatabaseRepository } from './api-database.repository';
+import { ApiNotFoundError, ApiUnauthorizedError } from './api-errors.js';
+import { ApiDatabaseRepository } from './api-database.repository.js';
 import {
   AlertRecord,
   BudgetInput,
@@ -18,7 +18,7 @@ import {
   WorkloadCostBreakdown,
   WorkloadInput,
   WorkloadRecord,
-} from './cost-management.types';
+} from './cost-management.types.js';
 
 export interface ShareLinkViewContext {
   countryCode?: string;

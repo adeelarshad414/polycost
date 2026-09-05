@@ -1,12 +1,15 @@
-import { PricingCacheService } from './pricing-cache.service';
-import { PricingMatrixService } from './pricing-matrix.service';
-import { PricingCompareV2Controller, PricingModelsController } from './pricing-models.controller';
-import { PricingRateReader, PricingRateRecord } from './pricing-models.types';
-import { PricingTermsService } from './pricing-terms.service';
-import { RateResolverService } from './rate-resolver.service';
-import { SpotEstimateService } from './spot-estimate.service';
-import { ApiRateLimitService } from '../api/rate-limit.service';
-import { RateLimitExceededError } from '../api/api-errors';
+import { PricingCacheService } from './pricing-cache.service.js';
+import { PricingMatrixService } from './pricing-matrix.service.js';
+import {
+  PricingCompareV2Controller,
+  PricingModelsController,
+} from './pricing-models.controller.js';
+import { PricingRateReader, PricingRateRecord } from './pricing-models.types.js';
+import { PricingTermsService } from './pricing-terms.service.js';
+import { RateResolverService } from './rate-resolver.service.js';
+import { SpotEstimateService } from './spot-estimate.service.js';
+import { ApiRateLimitService } from '../api/rate-limit.service.js';
+import { RateLimitExceededError } from '../api/api-errors.js';
 
 const rate: PricingRateRecord = {
   provider: 'aws',

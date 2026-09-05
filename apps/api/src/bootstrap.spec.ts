@@ -1,4 +1,4 @@
-import { configureApp, corsOriginsFromConfig } from './bootstrap';
+import { configureApp, corsOriginsFromConfig } from './bootstrap.js';
 
 // Regression guard for the graceful-shutdown defect.
 //

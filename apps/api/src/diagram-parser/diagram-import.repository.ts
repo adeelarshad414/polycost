@@ -1,10 +1,10 @@
 import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
-import { AppConfig } from '../config/config.schema';
-import { SecretsService } from '../secrets/secrets.service';
-import type { SecretsReader } from '../secrets/secrets.service';
-import { DiagramImportRecordInput } from './diagram-parser.types';
+import { AppConfig } from '../config/config.schema.js';
+import { SecretsService } from '../secrets/secrets.service.js';
+import type { SecretsReader } from '../secrets/secrets.service.js';
+import { DiagramImportRecordInput } from './diagram-parser.types.js';
 
 interface QueryResultLike<T> {
   rows: T[];

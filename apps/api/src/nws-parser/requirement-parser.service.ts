@@ -4,10 +4,10 @@ import type {
   RequirementInputSource,
   RequirementParserService,
 } from '@polycost/types';
-import { NormalizedWorkloadSpec, ServiceRequirement } from '../nws/nws.types';
-import { FormToNWSService } from './form-to-nws.service';
-import { NLParserService } from './nl-parser.service';
-import { StructuredWorkloadFormInput } from './nws-parser.types';
+import { NormalizedWorkloadSpec, ServiceRequirement } from '../nws/nws.types.js';
+import { FormToNWSService } from './form-to-nws.service.js';
+import { NLParserService } from './nl-parser.service.js';
+import { StructuredWorkloadFormInput } from './nws-parser.types.js';
 
 export const REQUIREMENT_PARSERS = Symbol('REQUIREMENT_PARSERS');
 

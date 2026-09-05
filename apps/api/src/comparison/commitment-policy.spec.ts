@@ -1,4 +1,4 @@
-import { commitmentPricingModelCandidates } from './commitment-policy';
+import { commitmentPricingModelCandidates } from './commitment-policy.js';
 
 describe('commitmentPricingModelCandidates', () => {
   it('allows 3-year commitments only for production workloads with very high commitment appetite', () => {

@@ -3,9 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { env } from 'node:process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { ComparisonResult } from '../comparison/comparison.types';
-import { DiagramParseResult } from '../diagram-parser/diagram-parser.types';
-import { NormalizedWorkloadSpec } from '../nws/nws.types';
+import { ComparisonResult } from '../comparison/comparison.types.js';
+import { DiagramParseResult } from '../diagram-parser/diagram-parser.types.js';
+import { NormalizedWorkloadSpec } from '../nws/nws.types.js';
 import {
   AuthMeResponse,
   AuthSessionResponse,
@@ -14,15 +14,15 @@ import {
   TeamInvitationPreview,
   TeamInvitationRecord,
   TeamMemberRecord,
-} from './auth.types';
-import { ComparisonPricingEvidenceResponse } from './comparison-application.service';
+} from './auth.types.js';
+import { ComparisonPricingEvidenceResponse } from './comparison-application.service.js';
 import {
   ShareLinkAnalyticsResponse,
   SharedReportResponse,
   ShareLinkResponse,
   WorkloadRecord,
-} from './cost-management.types';
-import { RegionCatalogResponse } from './regions.types';
+} from './cost-management.types.js';
+import { RegionCatalogResponse } from './regions.types.js';
 
 const API_ORIGIN = env.POLYCOST_API_ORIGIN ?? `http://localhost:${env.API_PORT ?? '3001'}`;
 const API_BASE_URL = env.POLYCOST_API_BASE_URL ?? `${API_ORIGIN}/api/v1`;

@@ -3,7 +3,7 @@ import {
   PricingCatalogRecord,
   ProviderId,
   ServiceCategory,
-} from '../adapters/common/cloud-provider-adapter';
+} from '../adapters/common/cloud-provider-adapter.js';
 
 export const PRICING_TRANSFORM_VERSION = 'pricing-normalization-v3';
 

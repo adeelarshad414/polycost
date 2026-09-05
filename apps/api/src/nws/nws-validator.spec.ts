@@ -1,5 +1,5 @@
-import { NWSMigrationError, NWSValidationError, NWSValidator } from './nws-validator';
-import { NormalizedWorkloadSpec } from './nws.types';
+import { NWSMigrationError, NWSValidationError, NWSValidator } from './nws-validator.js';
+import { NormalizedWorkloadSpec } from './nws.types.js';
 
 const baseSpec = (): NormalizedWorkloadSpec => ({
   schemaVersion: '1.0',

@@ -1,12 +1,12 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import { ApiDatabaseRepository } from './api-database.repository';
+import { ApiDatabaseRepository } from './api-database.repository.js';
 import {
   ApiForbiddenError,
   ApiNotFoundError,
   ApiUnauthorizedError,
   ApiValidationError,
-} from './api-errors';
+} from './api-errors.js';
 import {
   AuthIdentity,
   CreatedTeamScimTokenRecord,
@@ -14,7 +14,7 @@ import {
   TeamScimIdentity,
   TeamScimTokenRecord,
   TeamScimUserRecord,
-} from './auth.types';
+} from './auth.types.js';
 
 const SCIM_USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User';
 const SCIM_LIST_RESPONSE_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:ListResponse';

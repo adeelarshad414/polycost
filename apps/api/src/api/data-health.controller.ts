@@ -1,10 +1,14 @@
 import { Controller, Get, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
-import { DataHealthResponse } from './api-errors';
-import { ComparisonApplicationService } from './comparison-application.service';
-import { ApiRateLimitService, requestIdentity, writeRateLimitHeaders } from './rate-limit.service';
-import type { RateLimitHeaderResponse } from './rate-limit.service';
+import { AppConfig } from '../config/config.schema.js';
+import { DataHealthResponse } from './api-errors.js';
+import { ComparisonApplicationService } from './comparison-application.service.js';
+import {
+  ApiRateLimitService,
+  requestIdentity,
+  writeRateLimitHeaders,
+} from './rate-limit.service.js';
+import type { RateLimitHeaderResponse } from './rate-limit.service.js';
 
 interface RequestLike {
   ip?: string;

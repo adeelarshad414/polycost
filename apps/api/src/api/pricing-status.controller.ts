@@ -1,9 +1,9 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
-import { AdminApiKeyGuard } from './admin-api-key.guard';
-import { PricingStatusResponse } from './api-errors';
-import { ComparisonApplicationService } from './comparison-application.service';
-import { pricingCoverageResponse } from './pricing-coverage';
-import type { PricingCoverageResponse } from './pricing-coverage';
+import { AdminApiKeyGuard } from './admin-api-key.guard.js';
+import { PricingStatusResponse } from './api-errors.js';
+import { ComparisonApplicationService } from './comparison-application.service.js';
+import { pricingCoverageResponse } from './pricing-coverage.js';
+import type { PricingCoverageResponse } from './pricing-coverage.js';
 
 @Controller('api/v1/pricing')
 export class PricingStatusController {

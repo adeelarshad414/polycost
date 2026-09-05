@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { ComparisonLineItem, ComparisonResult } from '../comparison/comparison.types';
-import { PricingMatrixService } from '../pricing-models/pricing-matrix.service';
+import { ComparisonLineItem, ComparisonResult } from '../comparison/comparison.types.js';
+import { PricingMatrixService } from '../pricing-models/pricing-matrix.service.js';
 import {
   PaymentOptionCode,
   PricingGranularity,
   PricingTermCode,
-} from '../pricing-models/pricing-models.types';
-import { ApiDatabaseRepository, ComparisonPrewarmJobRecord } from './api-database.repository';
+} from '../pricing-models/pricing-models.types.js';
+import { ApiDatabaseRepository, ComparisonPrewarmJobRecord } from './api-database.repository.js';
 
 const MAX_PREWARM_ERROR_LENGTH = 1000;
 

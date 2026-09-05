@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { hourlyFromMonthly, intervalCostsFromHourly, roundCurrency } from '../cost-time';
-import { CostIntervals } from './comparison.types';
+import { hourlyFromMonthly, intervalCostsFromHourly, roundCurrency } from '../cost-time.js';
+import { CostIntervals } from './comparison.types.js';
 
 @Injectable()
 export class IntervalCostCalculator {

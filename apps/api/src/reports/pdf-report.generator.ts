@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { ComparisonLineItem, ComparisonResult } from '../comparison/comparison.types';
+import { ComparisonLineItem, ComparisonResult } from '../comparison/comparison.types.js';
 import {
   REPORT_INK,
   categoryColor as brandCategoryColor,
   hexToRgb,
   providerBrand,
-} from './report-brand';
+} from './report-brand.js';
 import {
   architectureOverviewRows,
   breakEvenSummaryRows,
@@ -30,10 +30,10 @@ import {
   skuMappingAppendixRows,
   sourceDiagramRows,
   workloadScopeRows,
-} from './report-evidence';
-import { buildReportInsights } from './report-insights';
-import { escapePdfText } from './report-security';
-import { ReportOptions } from './report.types';
+} from './report-evidence.js';
+import { buildReportInsights } from './report-insights.js';
+import { escapePdfText } from './report-security.js';
+import { ReportOptions } from './report.types.js';
 
 const HEADING_FONT_SIZE = 12;
 

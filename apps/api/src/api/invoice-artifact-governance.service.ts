@@ -1,10 +1,10 @@
 import { createHmac } from 'node:crypto';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { defaultFetch } from '../adapters/common/http-client';
-import type { FetchLike } from '../adapters/common/http-client';
-import { AppConfig } from '../config/config.schema';
-import { ApiValidationError } from './api-errors';
+import { defaultFetch } from '../adapters/common/http-client.js';
+import type { FetchLike } from '../adapters/common/http-client.js';
+import { AppConfig } from '../config/config.schema.js';
+import { ApiValidationError } from './api-errors.js';
 import {
   InvoiceArtifactBlobGovernance,
   InvoiceArtifactBlobUploadInput,
@@ -15,7 +15,7 @@ import {
   InvoiceArtifactStorageBackend,
   InvoiceArtifactStorageReadiness,
   InvoiceEvidenceWormRetentionMode,
-} from './billing.types';
+} from './billing.types.js';
 
 const EICAR_TEST_SIGNATURE = 'EICAR-STANDARD-ANTIVIRUS-TEST-FILE';
 const DEFAULT_INVOICE_ARTIFACT_RETENTION_DAYS = 365;

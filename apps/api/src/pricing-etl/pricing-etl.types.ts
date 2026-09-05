@@ -1,5 +1,5 @@
-import { ProviderId } from '../adapters/common/cloud-provider-adapter';
-import { PricingEtlProviderStatus } from '../database/pricing-repository.types';
+import { ProviderId } from '../adapters/common/cloud-provider-adapter.js';
+import { PricingEtlProviderStatus } from '../database/pricing-repository.types.js';
 
 export const PRICING_ETL_QUEUE_NAME = 'pricing-etl';
 export const PRICING_ETL_REFRESH_JOB_NAME = 'refresh-pricing-catalog';

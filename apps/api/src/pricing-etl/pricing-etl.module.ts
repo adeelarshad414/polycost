@@ -1,16 +1,16 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue, Worker } from 'bullmq';
-import { ErrorReporter } from '../observability/error-reporter';
-import { reportWorkerFailures } from '../observability/process-errors';
-import { DomainMetricsService } from '../observability/domain-metrics.service';
-import { CloudProviderAdapter } from '../adapters/common/cloud-provider-adapter';
+import { ErrorReporter } from '../observability/error-reporter.js';
+import { reportWorkerFailures } from '../observability/process-errors.js';
+import { DomainMetricsService } from '../observability/domain-metrics.service.js';
+import { CloudProviderAdapter } from '../adapters/common/cloud-provider-adapter.js';
 import {
   CLOUD_PROVIDER_ADAPTERS,
   ProviderAdaptersModule,
-} from '../adapters/provider-adapters.module';
-import { AppConfig } from '../config/config.schema';
-import { PostgresPricingCatalogRepository } from '../database/pricing-catalog.repository';
+} from '../adapters/provider-adapters.module.js';
+import { AppConfig } from '../config/config.schema.js';
+import { PostgresPricingCatalogRepository } from '../database/pricing-catalog.repository.js';
 import {
   PRICING_CATALOG_WRITER,
   PRICING_ETL_ADAPTERS,
@@ -21,12 +21,12 @@ import {
   NORMALIZED_PRICING_WRITER,
   PricingEtlScheduler,
   PricingEtlWorkerFactory,
-} from './pricing-etl.scheduler';
-import { PricingEtlService } from './pricing-etl.service';
+} from './pricing-etl.scheduler.js';
+import { PricingEtlService } from './pricing-etl.service.js';
 import {
   PricingSyncFailureNotifier,
   WebhookPricingSyncFailureNotifier,
-} from './pricing-sync-alert.service';
+} from './pricing-sync-alert.service.js';
 
 const PRICING_SYNC_FAILURE_NOTIFIER = Symbol('PRICING_SYNC_FAILURE_NOTIFIER');
 

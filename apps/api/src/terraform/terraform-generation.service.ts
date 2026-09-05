@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import { ProviderId } from '../adapters/common/cloud-provider-adapter';
-import { DatabaseComponent, NormalizedWorkloadSpec, StorageComponent } from '../nws/nws.types';
-import { NWSValidator } from '../nws/nws-validator';
+import { ProviderId } from '../adapters/common/cloud-provider-adapter.js';
+import { DatabaseComponent, NormalizedWorkloadSpec, StorageComponent } from '../nws/nws.types.js';
+import { NWSValidator } from '../nws/nws-validator.js';
 import {
   TerraformBundleArchive,
   TerraformGeneratedFile,
@@ -12,7 +12,7 @@ import {
   TerraformGenerationValidation,
   TerraformResourceSummary,
   TerraformTargetCloud,
-} from './terraform.types';
+} from './terraform.types.js';
 
 interface TerraformBundleDraft {
   files: Array<{

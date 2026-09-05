@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { ReportService } from '../reports/report.service';
+import { ReportService } from '../reports/report.service.js';
 import {
   GeneratedReport,
   ReportExportJobRecord,
   ReportExportJobResponse,
   ReportFormat,
   ReportOptions,
-} from '../reports/report.types';
-import { ApiNotFoundError, ApiValidationError } from './api-errors';
-import { ApiDatabaseRepository } from './api-database.repository';
-import { ComparisonApplicationService } from './comparison-application.service';
+} from '../reports/report.types.js';
+import { ApiNotFoundError, ApiValidationError } from './api-errors.js';
+import { ApiDatabaseRepository } from './api-database.repository.js';
+import { ComparisonApplicationService } from './comparison-application.service.js';
 
 const MAX_EXPORT_ERROR_LENGTH = 1000;
 

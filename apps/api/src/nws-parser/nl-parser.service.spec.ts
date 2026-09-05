@@ -1,11 +1,11 @@
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from '../config/config.schema';
-import { NWSValidationError } from '../nws/nws-validator';
-import { NormalizedWorkloadSpec } from '../nws/nws.types';
-import { FormToNWSService } from './form-to-nws.service';
-import { NLParserService, NWSParseInputError } from './nl-parser.service';
-import { NWS_PARSE_RESULT_JSON_SCHEMA } from './nws-parse-result.schema';
-import { StructuredLlmClient } from './nws-parser.types';
+import { AppConfig } from '../config/config.schema.js';
+import { NWSValidationError } from '../nws/nws-validator.js';
+import { NormalizedWorkloadSpec } from '../nws/nws.types.js';
+import { FormToNWSService } from './form-to-nws.service.js';
+import { NLParserService, NWSParseInputError } from './nl-parser.service.js';
+import { NWS_PARSE_RESULT_JSON_SCHEMA } from './nws-parse-result.schema.js';
+import { StructuredLlmClient } from './nws-parser.types.js';
 
 const fixedNow = () => new Date('2026-06-28T12:00:00.000Z');
 

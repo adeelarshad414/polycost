@@ -1,4 +1,4 @@
-import { ProviderId } from '../adapters/common/cloud-provider-adapter';
+import { ProviderId } from '../adapters/common/cloud-provider-adapter.js';
 
 export type BillingSourceType =
   'aws-cur' | 'azure-cost-management' | 'gcp-billing-export' | 'normalized-csv';

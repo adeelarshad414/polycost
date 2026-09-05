@@ -3,18 +3,18 @@ import { randomUUID } from 'node:crypto';
 import {
   CLOUD_PROVIDER_ADAPTERS,
   ProviderAdaptersModule,
-} from '../adapters/provider-adapters.module';
-import { CloudProviderAdapter } from '../adapters/common/cloud-provider-adapter';
-import { ComparisonOrchestratorService } from './comparison-orchestrator.service';
+} from '../adapters/provider-adapters.module.js';
+import { CloudProviderAdapter } from '../adapters/common/cloud-provider-adapter.js';
+import { ComparisonOrchestratorService } from './comparison-orchestrator.service.js';
 import {
   COMPARISON_CLOCK,
   COMPARISON_ID_FACTORY,
   COMPARISON_PROVIDER_ADAPTERS,
   SERVICE_EQUIVALENCE_RULES,
-} from './comparison.tokens';
-import { EquivalentServiceMapper } from './equivalent-service-mapper';
-import { IntervalCostCalculator } from './interval-cost-calculator';
-import { SERVICE_EQUIVALENCE_SEED } from './service-equivalence.seed';
+} from './comparison.tokens.js';
+import { EquivalentServiceMapper } from './equivalent-service-mapper.js';
+import { IntervalCostCalculator } from './interval-cost-calculator.js';
+import { SERVICE_EQUIVALENCE_SEED } from './service-equivalence.seed.js';
 
 @Module({
   imports: [ProviderAdaptersModule],

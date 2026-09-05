@@ -1,25 +1,25 @@
 /* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: aggregation keys are typed provider/service/time buckets from comparison results; see docs/SECURITY-SUPPRESSIONS.md. */
 import { Injectable } from '@nestjs/common';
-import { PricingModelKey, ProviderId } from '../adapters/common/cloud-provider-adapter';
+import { PricingModelKey, ProviderId } from '../adapters/common/cloud-provider-adapter.js';
 import {
   ComparisonLineItem,
   ComparisonProviderResult,
   ComparisonResult,
-} from '../comparison/comparison.types';
+} from '../comparison/comparison.types.js';
 import {
   CommitmentPricingModel,
   commitmentPricingModelCandidates,
-} from '../comparison/commitment-policy';
+} from '../comparison/commitment-policy.js';
 import {
   costCoverageMapRows,
   egressNetworkingDetailRows,
   optimizationOpportunityRows,
   regionComparisonEvidenceRows,
-} from '../reports/report-evidence';
+} from '../reports/report-evidence.js';
 import {
   canonicalRegionForPreference,
   canonicalRegionsForResidencyScope,
-} from '../pricing-normalization/region-map';
+} from '../pricing-normalization/region-map.js';
 
 type AnalyticsDimension =
   | 'compute'

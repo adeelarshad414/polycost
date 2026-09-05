@@ -1,23 +1,23 @@
 import { HttpException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ComparisonUnavailableError } from '../comparison/comparison-orchestrator.service';
-import { ComparisonResult } from '../comparison/comparison.types';
-import { AppConfig } from '../config/config.schema';
-import { NormalizedWorkloadSpec } from '../nws/nws.types';
-import { NWSMigrationError, NWSValidationError } from '../nws/nws-validator';
-import { NWSParseInputError } from '../nws-parser/nl-parser.service';
-import { ParsedNwsDraft } from '../nws-parser/nws-parser.types';
-import { CsvReportGenerator } from '../reports/csv-report.generator';
-import { ExcelReportGenerator } from '../reports/excel-report.generator';
-import { PdfReportGenerator } from '../reports/pdf-report.generator';
-import { ReportService } from '../reports/report.service';
-import { ReportExportJobResponse } from '../reports/report.types';
-import { AdminApiKeyGuard } from './admin-api-key.guard';
-import { ApiExceptionFilter } from './api-exception.filter';
-import { ApiRateLimitService } from './rate-limit.service';
-import { ComparisonApplicationService } from './comparison-application.service';
-import { ComparisonPrewarmService } from './comparison-prewarm.service';
-import { ComparisonsController } from './comparisons.controller';
+import { ComparisonUnavailableError } from '../comparison/comparison-orchestrator.service.js';
+import { ComparisonResult } from '../comparison/comparison.types.js';
+import { AppConfig } from '../config/config.schema.js';
+import { NormalizedWorkloadSpec } from '../nws/nws.types.js';
+import { NWSMigrationError, NWSValidationError } from '../nws/nws-validator.js';
+import { NWSParseInputError } from '../nws-parser/nl-parser.service.js';
+import { ParsedNwsDraft } from '../nws-parser/nws-parser.types.js';
+import { CsvReportGenerator } from '../reports/csv-report.generator.js';
+import { ExcelReportGenerator } from '../reports/excel-report.generator.js';
+import { PdfReportGenerator } from '../reports/pdf-report.generator.js';
+import { ReportService } from '../reports/report.service.js';
+import { ReportExportJobResponse } from '../reports/report.types.js';
+import { AdminApiKeyGuard } from './admin-api-key.guard.js';
+import { ApiExceptionFilter } from './api-exception.filter.js';
+import { ApiRateLimitService } from './rate-limit.service.js';
+import { ComparisonApplicationService } from './comparison-application.service.js';
+import { ComparisonPrewarmService } from './comparison-prewarm.service.js';
+import { ComparisonsController } from './comparisons.controller.js';
 import {
   AlertsController,
   BudgetsController,
@@ -26,10 +26,10 @@ import {
   SharedReportsController,
   ShareLinksController,
   WorkloadsController,
-} from './cost-management.controller';
-import { CostManagementService } from './cost-management.service';
-import { DataHealthController } from './data-health.controller';
-import { ReportExportJobsService } from './report-export-jobs.service';
+} from './cost-management.controller.js';
+import { CostManagementService } from './cost-management.service.js';
+import { DataHealthController } from './data-health.controller.js';
+import { ReportExportJobsService } from './report-export-jobs.service.js';
 import {
   AlertRecord,
   BudgetRecord,
@@ -39,7 +39,7 @@ import {
   ShareLinkResponse,
   WorkloadCostBreakdown,
   WorkloadRecord,
-} from './cost-management.types';
+} from './cost-management.types.js';
 import {
   ApiNotFoundError,
   ApiUnauthorizedError,
@@ -47,13 +47,13 @@ import {
   DataHealthResponse,
   LiveRefreshUnavailableError,
   RateLimitExceededError,
-} from './api-errors';
-import { ComparisonAnalyticsService } from './comparison-analytics.service';
-import { PricingStatusController } from './pricing-status.controller';
-import { RegionsController } from './regions.controller';
-import { WorkloadController } from './workload.controller';
-import { TerraformGenerationController } from '../terraform/terraform-generation.controller';
-import { TerraformGenerationService } from '../terraform/terraform-generation.service';
+} from './api-errors.js';
+import { ComparisonAnalyticsService } from './comparison-analytics.service.js';
+import { PricingStatusController } from './pricing-status.controller.js';
+import { RegionsController } from './regions.controller.js';
+import { WorkloadController } from './workload.controller.js';
+import { TerraformGenerationController } from '../terraform/terraform-generation.controller.js';
+import { TerraformGenerationService } from '../terraform/terraform-generation.service.js';
 
 const validNws: NormalizedWorkloadSpec = {
   schemaVersion: '1.0',

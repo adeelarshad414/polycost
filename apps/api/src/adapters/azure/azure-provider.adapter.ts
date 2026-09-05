@@ -1,19 +1,19 @@
 /* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: provider catalog keys are controlled Azure Retail Prices fields, not arbitrary user mutation; see docs/SECURITY-SUPPRESSIONS.md. */
-import { BaseCloudProviderAdapter } from '../common/base-cloud-provider.adapter';
+import { BaseCloudProviderAdapter } from '../common/base-cloud-provider.adapter.js';
 import {
   PricingCatalogReader,
   PricingCatalogRecord,
   ProviderId,
   RefreshPricingCatalogOptions,
   ServiceCategory,
-} from '../common/cloud-provider-adapter';
+} from '../common/cloud-provider-adapter.js';
 import {
   assertSameProviderOrigin,
   defaultFetch,
   FetchLike,
   parseJsonResponse,
-} from '../common/http-client';
-import { AdapterError } from '../common/adapter-errors';
+} from '../common/http-client.js';
+import { AdapterError } from '../common/adapter-errors.js';
 
 interface AzureRetailPricesResponse {
   Items: AzureRetailPriceItem[];

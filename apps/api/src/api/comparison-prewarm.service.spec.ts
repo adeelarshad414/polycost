@@ -1,8 +1,11 @@
-import { ComparisonResult } from '../comparison/comparison.types';
-import { PricingMatrixService } from '../pricing-models/pricing-matrix.service';
-import { RateResult } from '../pricing-models/pricing-models.types';
-import { ApiDatabaseRepository, ComparisonPrewarmJobRecord } from './api-database.repository';
-import { ComparisonPrewarmService, comparisonPrewarmRequests } from './comparison-prewarm.service';
+import { ComparisonResult } from '../comparison/comparison.types.js';
+import { PricingMatrixService } from '../pricing-models/pricing-matrix.service.js';
+import { RateResult } from '../pricing-models/pricing-models.types.js';
+import { ApiDatabaseRepository, ComparisonPrewarmJobRecord } from './api-database.repository.js';
+import {
+  ComparisonPrewarmService,
+  comparisonPrewarmRequests,
+} from './comparison-prewarm.service.js';
 
 const comparisonId = '11111111-1111-4111-8111-111111111111';
 const jobId = '77777777-7777-4777-8777-777777777777';

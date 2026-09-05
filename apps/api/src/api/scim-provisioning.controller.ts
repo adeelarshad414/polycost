@@ -10,9 +10,9 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import type { RequestWithAuth } from './auth.types';
-import { ScimProvisioningService } from './scim-provisioning.service';
-import { SessionAuthGuard } from './session-auth.guard';
+import type { RequestWithAuth } from './auth.types.js';
+import { ScimProvisioningService } from './scim-provisioning.service.js';
+import { SessionAuthGuard } from './session-auth.guard.js';
 
 @Controller('api/v1')
 export class ScimProvisioningController {

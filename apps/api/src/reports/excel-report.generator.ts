@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ComparisonResult } from '../comparison/comparison.types';
+import { ComparisonResult } from '../comparison/comparison.types.js';
 import {
   architectureOverviewRows,
   breakEvenSummaryRows,
@@ -25,13 +25,13 @@ import {
   sourceDiagramRows,
   skuMappingAppendixRows,
   workloadScopeRows,
-} from './report-evidence';
-import { PricingModelCost } from '../adapters/common/cloud-provider-adapter';
-import { escapeXml, sanitizeSpreadsheetText } from './report-security';
-import { PROVIDER_BRAND, REPORT_INK } from './report-brand';
-import { buildReportInsights } from './report-insights';
-import { ReportOptions } from './report.types';
-import { createZip } from './zip-writer';
+} from './report-evidence.js';
+import { PricingModelCost } from '../adapters/common/cloud-provider-adapter.js';
+import { escapeXml, sanitizeSpreadsheetText } from './report-security.js';
+import { PROVIDER_BRAND, REPORT_INK } from './report-brand.js';
+import { buildReportInsights } from './report-insights.js';
+import { ReportOptions } from './report.types.js';
+import { createZip } from './zip-writer.js';
 
 type CellValue = string | number | FormulaCell;
 
