@@ -1,4 +1,5 @@
 /* eslint-disable security/detect-non-literal-fs-filename -- Reviewed 2026-07-06: E2E fixture reads are resolved under repository fixture roots; see docs/SECURITY-SUPPRESSIONS.md. */
+import { describe, it, expect, beforeAll, jest } from '@jest/globals';
 import { randomUUID } from 'node:crypto';
 import { env } from 'node:process';
 import { readFileSync } from 'node:fs';

@@ -1,9 +1,10 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { RegionsService } from './regions.service.js';
 
 describe('RegionsService', () => {
   it('builds a live region catalog from public provider sources', async () => {
     const fetchMock = jest
-      .fn()
+      .fn<typeof fetch>()
       .mockResolvedValueOnce(
         textResponse(
           JSON.stringify({
@@ -35,7 +36,7 @@ describe('RegionsService', () => {
             ],
           }),
         ),
-      ) as typeof fetch;
+      );
     const service = RegionsService.withFetch(fetchMock);
 
     const catalog = await service.getRegionCatalog();
@@ -80,12 +81,12 @@ describe('RegionsService', () => {
 
   it('falls back per provider when a live source fails', async () => {
     const fetchMock = jest
-      .fn()
+      .fn<typeof fetch>()
       .mockRejectedValueOnce(new Error('aws down'))
       .mockResolvedValueOnce(
         textResponse('const data = [{ "RegionName": "East US", "GeographyName": "US" }];'),
       )
-      .mockResolvedValueOnce(textResponse(JSON.stringify({ prefixes: [] }))) as typeof fetch;
+      .mockResolvedValueOnce(textResponse(JSON.stringify({ prefixes: [] })));
     const service = RegionsService.withFetch(fetchMock);
 
     const catalog = await service.getRegionCatalog();
@@ -105,6 +106,6 @@ function textResponse(body: string): Response {
   return {
     ok: true,
     status: 200,
-    text: jest.fn(async () => body),
+    text: jest.fn<Response['text']>(async () => body),
   } as unknown as Response;
 }

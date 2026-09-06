@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { readFileSync } from 'node:fs';
 import { NotFoundException } from '@nestjs/common';
 import { OpenApiController, specSearchPaths } from './openapi.controller.js';

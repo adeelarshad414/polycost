@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import {
   CloudProviderAdapter,
@@ -11,6 +12,7 @@ import {
 import { PricingEtlService } from './pricing-etl.service.js';
 import { DomainMetricsService } from '../observability/domain-metrics.service.js';
 import { MetricsService } from '../observability/metrics.service.js';
+import type { PricingSyncFailureNotifier } from './pricing-sync-alert.service.js';
 
 const adapter = (
   providerId: CloudProviderAdapter['providerId'],
@@ -58,13 +60,17 @@ const createCatalogRecord = (
 describe('PricingEtlService', () => {
   it('refreshes every provider, persists records, and logs success independently', async () => {
     const writer: PricingCatalogWriter = {
-      upsertPricingRecords: jest.fn(async (records) => ({
-        recordsUpdated: records.length,
-        recordsRejected: 0,
-      })),
+      upsertPricingRecords: jest.fn<PricingCatalogWriter['upsertPricingRecords']>(
+        async (records) => ({
+          recordsUpdated: records.length,
+          recordsRejected: 0,
+        }),
+      ),
     };
     const runRepository: PricingEtlRunRepository = {
-      recordProviderRun: jest.fn(async () => undefined),
+      recordProviderRun: jest.fn<PricingEtlRunRepository['recordProviderRun']>(
+        async () => undefined,
+      ),
     };
     const service = new PricingEtlService(
       [
@@ -102,13 +108,17 @@ describe('PricingEtlService', () => {
 
   it('retries transient provider refresh failures before recording success', async () => {
     const writer: PricingCatalogWriter = {
-      upsertPricingRecords: jest.fn(async (records) => ({
-        recordsUpdated: records.length,
-        recordsRejected: 0,
-      })),
+      upsertPricingRecords: jest.fn<PricingCatalogWriter['upsertPricingRecords']>(
+        async (records) => ({
+          recordsUpdated: records.length,
+          recordsRejected: 0,
+        }),
+      ),
     };
     const runRepository: PricingEtlRunRepository = {
-      recordProviderRun: jest.fn(async () => undefined),
+      recordProviderRun: jest.fn<PricingEtlRunRepository['recordProviderRun']>(
+        async () => undefined,
+      ),
     };
     const refreshPricingCatalog = jest.fn() as jest.MockedFunction<
       CloudProviderAdapter['refreshPricingCatalog']
@@ -116,7 +126,7 @@ describe('PricingEtlService', () => {
     refreshPricingCatalog
       .mockRejectedValueOnce(new Error('provider throttled'))
       .mockResolvedValueOnce([createCatalogRecord('aws', 'AWS-1')]);
-    const retryDelay = jest.fn(async () => undefined);
+    const retryDelay = jest.fn<(durationMs: number) => Promise<void>>(async () => undefined);
     const service = new PricingEtlService(
       [adapter('aws', refreshPricingCatalog)],
       writer,
@@ -147,20 +157,26 @@ describe('PricingEtlService', () => {
 
   it('persists normalized pricing rows during each provider refresh', async () => {
     const writer: PricingCatalogWriter = {
-      upsertPricingRecords: jest.fn(async (records) => ({
-        recordsUpdated: records.length,
-        recordsRejected: 0,
-      })),
+      upsertPricingRecords: jest.fn<PricingCatalogWriter['upsertPricingRecords']>(
+        async (records) => ({
+          recordsUpdated: records.length,
+          recordsRejected: 0,
+        }),
+      ),
     };
     const normalizedWriter: NormalizedPricingWriter = {
-      upsertNormalizedPricingRecords: jest.fn(async () => ({
+      upsertNormalizedPricingRecords: jest.fn<
+        NormalizedPricingWriter['upsertNormalizedPricingRecords']
+      >(async () => ({
         recordsUpdated: 2,
         recordsRejected: 0,
         recordsSkipped: 1,
       })),
     };
     const runRepository: PricingEtlRunRepository = {
-      recordProviderRun: jest.fn(async () => undefined),
+      recordProviderRun: jest.fn<PricingEtlRunRepository['recordProviderRun']>(
+        async () => undefined,
+      ),
     };
     const service = new PricingEtlService(
       [
@@ -201,13 +217,17 @@ describe('PricingEtlService', () => {
 
   it('returns a partial summary when one provider fails and logs all outcomes', async () => {
     const writer: PricingCatalogWriter = {
-      upsertPricingRecords: jest.fn(async (records) => ({
-        recordsUpdated: records.length,
-        recordsRejected: 0,
-      })),
+      upsertPricingRecords: jest.fn<PricingCatalogWriter['upsertPricingRecords']>(
+        async (records) => ({
+          recordsUpdated: records.length,
+          recordsRejected: 0,
+        }),
+      ),
     };
     const runRepository: PricingEtlRunRepository = {
-      recordProviderRun: jest.fn(async () => undefined),
+      recordProviderRun: jest.fn<PricingEtlRunRepository['recordProviderRun']>(
+        async () => undefined,
+      ),
     };
     const service = new PricingEtlService(
       [
@@ -256,16 +276,22 @@ describe('PricingEtlService', () => {
 
   it('notifies configured alerting when a provider sync fails', async () => {
     const writer: PricingCatalogWriter = {
-      upsertPricingRecords: jest.fn(async (records) => ({
-        recordsUpdated: records.length,
-        recordsRejected: 0,
-      })),
+      upsertPricingRecords: jest.fn<PricingCatalogWriter['upsertPricingRecords']>(
+        async (records) => ({
+          recordsUpdated: records.length,
+          recordsRejected: 0,
+        }),
+      ),
     };
     const runRepository: PricingEtlRunRepository = {
-      recordProviderRun: jest.fn(async () => undefined),
+      recordProviderRun: jest.fn<PricingEtlRunRepository['recordProviderRun']>(
+        async () => undefined,
+      ),
     };
     const notifier = {
-      notifyProviderResult: jest.fn(async () => undefined),
+      notifyProviderResult: jest.fn<PricingSyncFailureNotifier['notifyProviderResult']>(
+        async () => undefined,
+      ),
     };
     const service = new PricingEtlService(
       [
@@ -304,15 +330,19 @@ describe('PricingEtlService', () => {
   });
 
   it('keeps ETL summaries intact when alert notification delivery fails', async () => {
-    const loggerSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    const loggerSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
     const writer: PricingCatalogWriter = {
-      upsertPricingRecords: jest.fn(async (records) => ({
-        recordsUpdated: records.length,
-        recordsRejected: 0,
-      })),
+      upsertPricingRecords: jest.fn<PricingCatalogWriter['upsertPricingRecords']>(
+        async (records) => ({
+          recordsUpdated: records.length,
+          recordsRejected: 0,
+        }),
+      ),
     };
     const runRepository: PricingEtlRunRepository = {
-      recordProviderRun: jest.fn(async () => undefined),
+      recordProviderRun: jest.fn<PricingEtlRunRepository['recordProviderRun']>(
+        async () => undefined,
+      ),
     };
     const notifier = {
       notifyProviderResult: jest.fn(async () => {
@@ -371,13 +401,15 @@ describe('PricingEtlService', () => {
 
   it('marks a provider run partial when some catalog rows are rejected', async () => {
     const writer: PricingCatalogWriter = {
-      upsertPricingRecords: jest.fn(async () => ({
+      upsertPricingRecords: jest.fn<PricingCatalogWriter['upsertPricingRecords']>(async () => ({
         recordsUpdated: 1,
         recordsRejected: 2,
       })),
     };
     const runRepository: PricingEtlRunRepository = {
-      recordProviderRun: jest.fn(async () => undefined),
+      recordProviderRun: jest.fn<PricingEtlRunRepository['recordProviderRun']>(
+        async () => undefined,
+      ),
     };
     const service = new PricingEtlService(
       [
@@ -407,13 +439,15 @@ describe('PricingEtlService', () => {
 
   it('returns failed when every provider fails and truncates long error details', async () => {
     const writer: PricingCatalogWriter = {
-      upsertPricingRecords: jest.fn(async () => ({
+      upsertPricingRecords: jest.fn<PricingCatalogWriter['upsertPricingRecords']>(async () => ({
         recordsUpdated: 0,
         recordsRejected: 0,
       })),
     };
     const runRepository: PricingEtlRunRepository = {
-      recordProviderRun: jest.fn(async () => undefined),
+      recordProviderRun: jest.fn<PricingEtlRunRepository['recordProviderRun']>(
+        async () => undefined,
+      ),
     };
     const service = new PricingEtlService(
       [
@@ -440,13 +474,15 @@ describe('PricingEtlService', () => {
 
   it('uses a safe error message when a provider rejects without an Error object', async () => {
     const writer: PricingCatalogWriter = {
-      upsertPricingRecords: jest.fn(async () => ({
+      upsertPricingRecords: jest.fn<PricingCatalogWriter['upsertPricingRecords']>(async () => ({
         recordsUpdated: 0,
         recordsRejected: 0,
       })),
     };
     const runRepository: PricingEtlRunRepository = {
-      recordProviderRun: jest.fn(async () => undefined),
+      recordProviderRun: jest.fn<PricingEtlRunRepository['recordProviderRun']>(
+        async () => undefined,
+      ),
     };
     const service = new PricingEtlService(
       [
@@ -477,16 +513,24 @@ describe('PricingEtlService', () => {
 
   it('prunes stale live rows for a successfully refreshed provider using the run fetch stamp', async () => {
     const writer: PricingCatalogWriter = {
-      upsertPricingRecords: jest.fn(async (records) => ({
-        recordsUpdated: records.length,
-        recordsRejected: 0,
-      })),
-      pruneStaleLiveRows: jest.fn(async () => 3),
+      upsertPricingRecords: jest.fn<PricingCatalogWriter['upsertPricingRecords']>(
+        async (records) => ({
+          recordsUpdated: records.length,
+          recordsRejected: 0,
+        }),
+      ),
+      pruneStaleLiveRows: jest.fn<NonNullable<PricingCatalogWriter['pruneStaleLiveRows']>>(
+        async () => 3,
+      ),
     };
     const runRepository: PricingEtlRunRepository = {
-      recordProviderRun: jest.fn(async () => undefined),
+      recordProviderRun: jest.fn<PricingEtlRunRepository['recordProviderRun']>(
+        async () => undefined,
+      ),
     };
-    const refreshPricingCatalog = jest.fn(async () => [createCatalogRecord('aws', 'AWS-1')]);
+    const refreshPricingCatalog = jest.fn<CloudProviderAdapter['refreshPricingCatalog']>(
+      async () => [createCatalogRecord('aws', 'AWS-1')],
+    );
     const service = new PricingEtlService(
       [adapter('aws', refreshPricingCatalog)],
       writer,
@@ -507,11 +551,18 @@ describe('PricingEtlService', () => {
 
   it('does not prune when the provider refresh fails', async () => {
     const writer: PricingCatalogWriter = {
-      upsertPricingRecords: jest.fn(async () => ({ recordsUpdated: 0, recordsRejected: 0 })),
-      pruneStaleLiveRows: jest.fn(async () => 0),
+      upsertPricingRecords: jest.fn<PricingCatalogWriter['upsertPricingRecords']>(async () => ({
+        recordsUpdated: 0,
+        recordsRejected: 0,
+      })),
+      pruneStaleLiveRows: jest.fn<NonNullable<PricingCatalogWriter['pruneStaleLiveRows']>>(
+        async () => 0,
+      ),
     };
     const runRepository: PricingEtlRunRepository = {
-      recordProviderRun: jest.fn(async () => undefined),
+      recordProviderRun: jest.fn<PricingEtlRunRepository['recordProviderRun']>(
+        async () => undefined,
+      ),
     };
     const service = new PricingEtlService(
       [
@@ -543,13 +594,17 @@ describe('PricingEtlService metrics', () => {
   const harness = (recordsRejected = 0) => {
     const metrics = new MetricsService({ collectDefaults: false });
     const writer: PricingCatalogWriter = {
-      upsertPricingRecords: jest.fn(async (records) => ({
-        recordsUpdated: records.length,
-        recordsRejected,
-      })),
+      upsertPricingRecords: jest.fn<PricingCatalogWriter['upsertPricingRecords']>(
+        async (records) => ({
+          recordsUpdated: records.length,
+          recordsRejected,
+        }),
+      ),
     };
     const runRepository: PricingEtlRunRepository = {
-      recordProviderRun: jest.fn(async () => undefined),
+      recordProviderRun: jest.fn<PricingEtlRunRepository['recordProviderRun']>(
+        async () => undefined,
+      ),
     };
 
     return {
@@ -619,7 +674,7 @@ describe('PricingEtlService metrics', () => {
   it('still returns a summary when the recorder throws', async () => {
     const { writer, runRepository } = harness();
     const exploding = {
-      recordEtlProvider: jest.fn(() => {
+      recordEtlProvider: jest.fn<DomainMetricsService['recordEtlProvider']>(() => {
         throw new Error('registry exploded');
       }),
     } as unknown as DomainMetricsService;

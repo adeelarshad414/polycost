@@ -1,10 +1,11 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema.js';
 import { SecretsReader } from '../secrets/secrets.service.js';
 import { PostgresPricingRatesRepository } from './pricing-rates.repository.js';
 
 const configService = {
-  get: jest.fn((key: keyof AppConfig) => {
+  get: jest.fn<ConfigService['get']>((key: keyof AppConfig) => {
     switch (key) {
       case 'DB_HOST':
         return 'postgres';
@@ -19,7 +20,7 @@ const configService = {
 } as unknown as ConfigService<AppConfig, true>;
 
 const secretsReader: SecretsReader = {
-  getSecret: jest.fn(async () => 'secret'),
+  getSecret: jest.fn<SecretsReader['getSecret']>(async () => 'secret'),
 };
 
 describe('PostgresPricingRatesRepository', () => {

@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema.js';
 import {
@@ -15,7 +16,7 @@ import {
 } from './cost-management-jobs.scheduler.js';
 
 const configService = {
-  get: jest.fn((key: keyof AppConfig) => {
+  get: jest.fn<ConfigService['get']>((key: keyof AppConfig) => {
     switch (key) {
       case 'CURRENCY_SYNC_SCHEDULE_CRON':
         return '0 * * * *';
@@ -186,25 +187,27 @@ function workerMock(): CostManagementWorker {
 
 function jobsServiceMock() {
   return {
-    runDataRetentionSweep: jest.fn(async () => ({
-      status: 'success',
-      mode: 'report-only',
-      ranAt: '2026-08-26T00:00:00.000Z',
-      totalEligibleRows: 0,
-      totalDeletedRows: 0,
-      tables: [],
-    })),
-    syncCurrencyRates: jest.fn(async () => ({
-      status: 'success',
-    })),
-    evaluateBudgetAlerts: jest.fn(async () => ({
-      status: 'success',
-    })),
-    cleanupExpiredShareLinks: jest.fn(async () => ({
-      status: 'success',
-    })),
-    flushPendingAuditExports: jest.fn(async () => ({
-      status: 'success',
-    })),
+    runDataRetentionSweep: jest.fn<CostManagementJobsService['runDataRetentionSweep']>(
+      async () => ({
+        status: 'success',
+        mode: 'report-only',
+        ranAt: '2026-08-26T00:00:00.000Z',
+        totalEligibleRows: 0,
+        totalDeletedRows: 0,
+        tables: [],
+      }),
+    ),
+    syncCurrencyRates: jest.fn<CostManagementJobsService['syncCurrencyRates']>(
+      async () => ({ status: 'success' }) as never,
+    ),
+    evaluateBudgetAlerts: jest.fn<CostManagementJobsService['evaluateBudgetAlerts']>(
+      async () => ({ status: 'success' }) as never,
+    ),
+    cleanupExpiredShareLinks: jest.fn<CostManagementJobsService['cleanupExpiredShareLinks']>(
+      async () => ({ status: 'success' }) as never,
+    ),
+    flushPendingAuditExports: jest.fn<CostManagementJobsService['flushPendingAuditExports']>(
+      async () => ({ status: 'success' }) as never,
+    ),
   };
 }

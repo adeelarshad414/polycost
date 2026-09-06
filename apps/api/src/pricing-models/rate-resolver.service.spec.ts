@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { ApiValidationError } from '../api/api-errors.js';
 import { PricingCacheService } from './pricing-cache.service.js';
 import { PricingRateReader, PricingRateRecord } from './pricing-models.types.js';
@@ -131,9 +132,9 @@ function resolver(reader: PricingRateReader): RateResolverService {
 }
 
 function readerMock(record: PricingRateRecord): PricingRateReader & {
-  findCurrentRate: jest.Mock<Promise<PricingRateRecord>>;
+  findCurrentRate: jest.Mock<PricingRateReader['findCurrentRate']>;
 } {
   return {
-    findCurrentRate: jest.fn(async () => record),
+    findCurrentRate: jest.fn<PricingRateReader['findCurrentRate']>(async () => record),
   };
 }

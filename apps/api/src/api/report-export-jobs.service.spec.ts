@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { ReportService } from '../reports/report.service.js';
 import { GeneratedReport, ReportExportJobRecord } from '../reports/report.types.js';
 import { ApiNotFoundError, ApiValidationError, DataHealthResponse } from './api-errors.js';
@@ -106,10 +107,7 @@ describe('ReportExportJobsService', () => {
     const comparisonApplicationService = comparisonServiceMock();
     const apiDatabaseRepository = repositoryMock({
       createReportExportJob: jest
-        .fn<
-          ReturnType<ApiDatabaseRepository['createReportExportJob']>,
-          Parameters<ApiDatabaseRepository['createReportExportJob']>
-        >()
+        .fn<ApiDatabaseRepository['createReportExportJob']>()
         .mockResolvedValue(pendingJob),
     });
     const service = createService(comparisonApplicationService, apiDatabaseRepository, undefined, {
@@ -140,10 +138,7 @@ describe('ReportExportJobsService', () => {
   it('generates and stores the report artifact for pending jobs', async () => {
     const apiDatabaseRepository = repositoryMock({
       getReportExportJob: jest
-        .fn<
-          ReturnType<ApiDatabaseRepository['getReportExportJob']>,
-          Parameters<ApiDatabaseRepository['getReportExportJob']>
-        >()
+        .fn<ApiDatabaseRepository['getReportExportJob']>()
         .mockResolvedValue(pendingJob),
     });
     const reportService = reportServiceMock();
@@ -170,10 +165,7 @@ describe('ReportExportJobsService', () => {
   it('marks export jobs failed when report generation throws', async () => {
     const apiDatabaseRepository = repositoryMock({
       getReportExportJob: jest
-        .fn<
-          ReturnType<ApiDatabaseRepository['getReportExportJob']>,
-          Parameters<ApiDatabaseRepository['getReportExportJob']>
-        >()
+        .fn<ApiDatabaseRepository['getReportExportJob']>()
         .mockResolvedValue(pendingJob),
     });
     const reportService = reportServiceMock();
@@ -194,7 +186,7 @@ describe('ReportExportJobsService', () => {
   it('downloads completed artifacts and rejects missing or incomplete jobs', async () => {
     const apiDatabaseRepository = repositoryMock({
       getReportExportJobArtifact: jest
-        .fn()
+        .fn<ApiDatabaseRepository['getReportExportJobArtifact']>()
         .mockResolvedValueOnce({
           job: completedJob,
           content: report.content,
@@ -202,7 +194,7 @@ describe('ReportExportJobsService', () => {
         .mockResolvedValueOnce(undefined)
         .mockResolvedValueOnce(undefined),
       getReportExportJob: jest
-        .fn()
+        .fn<ApiDatabaseRepository['getReportExportJob']>()
         .mockResolvedValueOnce({ ...pendingJob, status: 'running' })
         .mockResolvedValueOnce(undefined),
     });
@@ -220,7 +212,7 @@ describe('ReportExportJobsService', () => {
   it('includes a download URL only after the job completes', async () => {
     const apiDatabaseRepository = repositoryMock({
       getReportExportJob: jest
-        .fn()
+        .fn<ApiDatabaseRepository['getReportExportJob']>()
         .mockResolvedValueOnce(pendingJob)
         .mockResolvedValueOnce(completedJob),
     });
@@ -257,8 +249,8 @@ function createService(
 
 function comparisonServiceMock(): jest.Mocked<ComparisonApplicationService> {
   return {
-    getComparison: jest.fn(async () => snapshot),
-    getDataHealth: jest.fn(async () => dataHealth),
+    getComparison: jest.fn<ApiDatabaseRepository['getComparison']>(async () => snapshot),
+    getDataHealth: jest.fn<ApiDatabaseRepository['getDataHealth']>(async () => dataHealth),
   } as unknown as jest.Mocked<ComparisonApplicationService>;
 }
 
@@ -266,18 +258,30 @@ function repositoryMock(
   overrides: Partial<jest.Mocked<ApiDatabaseRepository>> = {},
 ): jest.Mocked<ApiDatabaseRepository> {
   return {
-    createReportExportJob: jest.fn(async () => pendingJob),
-    getReportExportJob: jest.fn(async () => pendingJob),
-    markReportExportJobRunning: jest.fn(async () => undefined),
-    completeReportExportJob: jest.fn(async () => undefined),
-    failReportExportJob: jest.fn(async () => undefined),
-    getReportExportJobArtifact: jest.fn(async () => undefined),
+    createReportExportJob: jest.fn<ApiDatabaseRepository['createReportExportJob']>(
+      async () => pendingJob,
+    ),
+    getReportExportJob: jest.fn<ApiDatabaseRepository['getReportExportJob']>(
+      async () => pendingJob,
+    ),
+    markReportExportJobRunning: jest.fn<ApiDatabaseRepository['markReportExportJobRunning']>(
+      async () => undefined,
+    ),
+    completeReportExportJob: jest.fn<ApiDatabaseRepository['completeReportExportJob']>(
+      async () => undefined,
+    ),
+    failReportExportJob: jest.fn<ApiDatabaseRepository['failReportExportJob']>(
+      async () => undefined,
+    ),
+    getReportExportJobArtifact: jest.fn<ApiDatabaseRepository['getReportExportJobArtifact']>(
+      async () => undefined,
+    ),
     ...overrides,
   } as unknown as jest.Mocked<ApiDatabaseRepository>;
 }
 
 function reportServiceMock(): jest.Mocked<ReportService> {
   return {
-    generate: jest.fn(() => report),
+    generate: jest.fn<ReportService['generate']>(() => report),
   } as unknown as jest.Mocked<ReportService>;
 }

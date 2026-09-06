@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { ComparisonResult } from '../comparison/comparison.types.js';
 import { PricingMatrixService } from '../pricing-models/pricing-matrix.service.js';
 import { RateResult } from '../pricing-models/pricing-models.types.js';
@@ -156,7 +157,7 @@ describe('ComparisonPrewarmService', () => {
     const repository = repositoryMock();
     const pricingMatrixService = pricingMatrixServiceMock({
       resolveRate: jest
-        .fn()
+        .fn<PricingMatrixService['resolveRate']>()
         .mockRejectedValueOnce(new Error('reserved rate missing'))
         .mockResolvedValue(rateResult()),
     });
@@ -199,9 +200,15 @@ function repositoryMock(
   overrides: Partial<Record<keyof ApiDatabaseRepository, unknown>> = {},
 ): jest.Mocked<ApiDatabaseRepository> {
   return {
-    createComparisonPrewarmJob: jest.fn(async () => prewarmJob),
-    markComparisonPrewarmJobRunning: jest.fn(async () => undefined),
-    finishComparisonPrewarmJob: jest.fn(async () => undefined),
+    createComparisonPrewarmJob: jest.fn<ApiDatabaseRepository['createComparisonPrewarmJob']>(
+      async () => prewarmJob,
+    ),
+    markComparisonPrewarmJobRunning: jest.fn<
+      ApiDatabaseRepository['markComparisonPrewarmJobRunning']
+    >(async () => undefined),
+    finishComparisonPrewarmJob: jest.fn<ApiDatabaseRepository['finishComparisonPrewarmJob']>(
+      async () => undefined,
+    ),
     ...overrides,
   } as unknown as jest.Mocked<ApiDatabaseRepository>;
 }
@@ -210,7 +217,7 @@ function pricingMatrixServiceMock(
   overrides: Partial<Record<keyof PricingMatrixService, unknown>> = {},
 ): jest.Mocked<PricingMatrixService> {
   return {
-    resolveRate: jest.fn(async () => rateResult()),
+    resolveRate: jest.fn<PricingMatrixService['resolveRate']>(async () => rateResult()),
     ...overrides,
   } as unknown as jest.Mocked<PricingMatrixService>;
 }

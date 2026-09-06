@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { HttpException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ComparisonUnavailableError } from '../comparison/comparison-orchestrator.service.js';
@@ -14,9 +15,12 @@ import { ReportService } from '../reports/report.service.js';
 import { ReportExportJobResponse } from '../reports/report.types.js';
 import { AdminApiKeyGuard } from './admin-api-key.guard.js';
 import { ApiExceptionFilter } from './api-exception.filter.js';
+import type { ErrorResponse } from './api-exception.filter.js';
 import { ApiRateLimitService } from './rate-limit.service.js';
 import { ComparisonApplicationService } from './comparison-application.service.js';
 import { ComparisonPrewarmService } from './comparison-prewarm.service.js';
+import type { ApiDatabaseRepository } from './api-database.repository.js';
+import type { LivePricingRefreshService } from './live-pricing-refresh.service.js';
 import { ComparisonsController } from './comparisons.controller.js';
 import {
   AlertsController,
@@ -318,7 +322,7 @@ const exportJobResponse: ReportExportJobResponse = {
 };
 
 const configService = {
-  get: jest.fn((key: keyof AppConfig) => {
+  get: jest.fn<ConfigService['get']>((key: keyof AppConfig) => {
     switch (key) {
       case 'RATE_LIMIT_NL_PARSE_PER_MINUTE':
       case 'RATE_LIMIT_LIVE_REFRESH_PER_MINUTE':
@@ -850,6 +854,8 @@ describe('API contracts', () => {
       generatedAt: '2026-07-01T00:00:00.000Z',
       freshnessPolicyHours: 48,
       overallStatus: 'fresh',
+      dataProvenance: 'live',
+      usesNonLivePricing: false,
       alertCount: 0,
       alerts: [],
       providers: [
@@ -857,6 +863,7 @@ describe('API contracts', () => {
           providerId: 'aws',
           status: 'success',
           freshness: 'fresh',
+          provenance: 'live',
           ageHours: 1,
           recordsUpdated: 12,
           recordsRejected: 0,
@@ -1392,7 +1399,9 @@ describe('API contracts', () => {
     const repository = {
       saveComparison: jest.fn(async () => undefined),
       recordComparisonAuditLog: jest.fn(async () => undefined),
-      saveComparisonWithAuditLog: jest.fn(async () => undefined),
+      saveComparisonWithAuditLog: jest.fn<ApiDatabaseRepository['saveComparisonWithAuditLog']>(
+        async () => undefined,
+      ),
       getComparison: jest.fn(async () => ({
         nwsSnapshot: validNws,
         resultSnapshot: comparisonResult,
@@ -1403,10 +1412,10 @@ describe('API contracts', () => {
       getDataHealth: jest.fn(async () => freshDataHealth),
     };
     const liveRefresh = {
-      refreshSnapshot: jest.fn(async () => []),
+      refreshSnapshot: jest.fn<LivePricingRefreshService['refreshSnapshot']>(async () => []),
     };
     const prewarm = {
-      enqueue: jest.fn(),
+      enqueue: jest.fn<ComparisonPrewarmService['enqueue']>(),
     };
     const service = new ComparisonApplicationService(
       orchestrator as never,
@@ -1487,7 +1496,9 @@ describe('API contracts', () => {
     const repository = {
       saveComparison: jest.fn(async () => undefined),
       recordComparisonAuditLog: jest.fn(async () => undefined),
-      saveComparisonWithAuditLog: jest.fn(async () => undefined),
+      saveComparisonWithAuditLog: jest.fn<ApiDatabaseRepository['saveComparisonWithAuditLog']>(
+        async () => undefined,
+      ),
       getComparison: jest.fn(async () => ({
         nwsSnapshot: validNws,
         resultSnapshot: comparisonResult,
@@ -1501,7 +1512,7 @@ describe('API contracts', () => {
       } as never,
       repository as never,
       {
-        refreshSnapshot: jest.fn(async () => [
+        refreshSnapshot: jest.fn<LivePricingRefreshService['refreshSnapshot']>(async () => [
           {
             providerId: 'azure',
             code: 'live_refresh_failed',
@@ -1552,7 +1563,9 @@ describe('API contracts', () => {
     const repository = {
       saveComparison: jest.fn(async () => undefined),
       recordComparisonAuditLog: jest.fn(async () => undefined),
-      saveComparisonWithAuditLog: jest.fn(async () => undefined),
+      saveComparisonWithAuditLog: jest.fn<ApiDatabaseRepository['saveComparisonWithAuditLog']>(
+        async () => undefined,
+      ),
       getDataHealth: jest.fn(async () => staleDataHealth),
     };
     const service = new ComparisonApplicationService(
@@ -1561,7 +1574,10 @@ describe('API contracts', () => {
       } as never,
       repository as never,
     );
-    const expected = {
+    // Annotated so the literal narrows to the real result type - untyped, its
+    // providerId widened to string and the assertion compared against a shape
+    // ComparisonResult does not permit.
+    const expected: ComparisonResult = {
       ...comparisonResult,
       warnings: [
         {
@@ -1604,12 +1620,14 @@ describe('API contracts', () => {
 
 function comparisonApplicationService(result: ComparisonResult = comparisonResult) {
   return {
-    createComparison: jest.fn(async () => result),
-    getComparison: jest.fn(async () => ({
+    createComparison: jest.fn<ComparisonApplicationService['createComparison']>(async () => result),
+    getComparison: jest.fn<ComparisonApplicationService['getComparison']>(async () => ({
       nwsSnapshot: validNws,
       resultSnapshot: result,
     })),
-    getComparisonPricingEvidence: jest.fn(async () =>
+    getComparisonPricingEvidence: jest.fn<
+      ComparisonApplicationService['getComparisonPricingEvidence']
+    >(async () =>
       new ComparisonApplicationService(
         {
           compare: jest.fn(),
@@ -1622,8 +1640,10 @@ function comparisonApplicationService(result: ComparisonResult = comparisonResul
         } as never,
       ).getComparisonPricingEvidence(result.comparisonId),
     ),
-    refreshLiveComparison: jest.fn(async () => result),
-    getPricingStatus: jest.fn(async () => ({
+    refreshLiveComparison: jest.fn<ComparisonApplicationService['refreshLiveComparison']>(
+      async () => result,
+    ),
+    getPricingStatus: jest.fn<ComparisonApplicationService['getPricingStatus']>(async () => ({
       providers: [
         {
           providerId: 'aws',
@@ -1635,10 +1655,12 @@ function comparisonApplicationService(result: ComparisonResult = comparisonResul
         },
       ],
     })),
-    getDataHealth: jest.fn(async () => ({
+    getDataHealth: jest.fn<ComparisonApplicationService['getDataHealth']>(async () => ({
       generatedAt: '2026-07-01T00:00:00.000Z',
       freshnessPolicyHours: 48,
       overallStatus: 'fresh' as const,
+      dataProvenance: 'live' as const,
+      usesNonLivePricing: false,
       alertCount: 0,
       alerts: [],
       providers: [
@@ -1646,6 +1668,7 @@ function comparisonApplicationService(result: ComparisonResult = comparisonResul
           providerId: 'aws' as const,
           status: 'success' as const,
           freshness: 'fresh' as const,
+          provenance: 'live' as const,
           ageHours: 1,
           recordsUpdated: 12,
           recordsRejected: 0,
@@ -1674,25 +1697,43 @@ function comparisonApplicationService(result: ComparisonResult = comparisonResul
 
 function costManagementService() {
   return {
-    createWorkload: jest.fn(async () => workloadRecord),
-    compareCachedPricing: jest.fn(async () => cachedCompareRows),
-    getWorkloadCostBreakdown: jest.fn(async () => workloadBreakdown),
-    createBudget: jest.fn(async () => budgetRecord),
-    listAlerts: jest.fn(async () => [alertRecord]),
-    updateAlertDismissed: jest.fn(async () => alertRecord),
-    createShareLink: jest.fn(async () => shareLinkResponse),
-    getSharedReport: jest.fn(async () => sharedReportResponse),
-    getShareLinkAnalytics: jest.fn(async () => shareLinkAnalyticsResponse),
-    revokeShareLink: jest.fn(async () => shareLinkResponse),
-    getExchangeRates: jest.fn(async () => exchangeRatesResponse),
+    createWorkload: jest.fn<CostManagementService['createWorkload']>(async () => workloadRecord),
+    compareCachedPricing: jest.fn<CostManagementService['compareCachedPricing']>(
+      async () => cachedCompareRows,
+    ),
+    getWorkloadCostBreakdown: jest.fn<CostManagementService['getWorkloadCostBreakdown']>(
+      async () => workloadBreakdown,
+    ),
+    createBudget: jest.fn<CostManagementService['createBudget']>(async () => budgetRecord),
+    listAlerts: jest.fn<CostManagementService['listAlerts']>(async () => [alertRecord]),
+    updateAlertDismissed: jest.fn<CostManagementService['updateAlertDismissed']>(
+      async () => alertRecord,
+    ),
+    createShareLink: jest.fn<CostManagementService['createShareLink']>(
+      async () => shareLinkResponse,
+    ),
+    getSharedReport: jest.fn<CostManagementService['getSharedReport']>(
+      async () => sharedReportResponse,
+    ),
+    getShareLinkAnalytics: jest.fn<CostManagementService['getShareLinkAnalytics']>(
+      async () => shareLinkAnalyticsResponse,
+    ),
+    revokeShareLink: jest.fn<CostManagementService['revokeShareLink']>(
+      async () => shareLinkResponse,
+    ),
+    getExchangeRates: jest.fn<CostManagementService['getExchangeRates']>(
+      async () => exchangeRatesResponse,
+    ),
   } as unknown as jest.Mocked<CostManagementService>;
 }
 
 function reportExportJobsService() {
   return {
-    createExportJob: jest.fn(async () => exportJobResponse),
-    getExportJob: jest.fn(async () => exportJobResponse),
-    downloadExportJob: jest.fn(async () => ({
+    createExportJob: jest.fn<ReportExportJobsService['createExportJob']>(
+      async () => exportJobResponse,
+    ),
+    getExportJob: jest.fn<ReportExportJobsService['getExportJob']>(async () => exportJobResponse),
+    downloadExportJob: jest.fn<ReportExportJobsService['downloadExportJob']>(async () => ({
       fileName:
         exportJobResponse.fileName ?? `polycost-comparison-${comparisonResult.comparisonId}.pdf`,
       contentType: exportJobResponse.contentType ?? 'application/pdf',
@@ -1730,11 +1771,15 @@ function executionContext(headers: Record<string, string | string[] | undefined>
 }
 
 function applyFilter(exception: unknown, includeHeader = false) {
-  const sent = jest.fn();
-  const status = jest.fn(() => ({
+  // Signatures taken from the filter's own ErrorResponse rather than written
+  // out here. Untyped, these doubles declared no parameters at all, so
+  // `toHaveBeenCalledWith(400)` was asserting against a mock that could not
+  // have received 400.
+  const sent = jest.fn<ReturnType<ErrorResponse['status']>['send']>();
+  const status = jest.fn<ErrorResponse['status']>(() => ({
     send: sent,
   }));
-  const header = jest.fn();
+  const header = jest.fn<NonNullable<ErrorResponse['header']>>();
   const response = includeHeader
     ? {
         status,

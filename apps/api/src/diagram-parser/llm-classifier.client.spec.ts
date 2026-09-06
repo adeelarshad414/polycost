@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema.js';
 import { SecretsReader } from '../secrets/secrets.service.js';
@@ -34,7 +35,7 @@ const secretsReader = (): SecretsReader => ({
 describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
   it('reports whether the production classifier path is configured without reading secrets', () => {
     const secrets = secretsReader();
-    const fetchClient = jest.fn() as unknown as typeof fetch;
+    const fetchClient = jest.fn<typeof fetch>();
     const client = new OpenAiCompatibleDiagramLlmClassifierClient(
       configService({
         DIAGRAM_LLM_CLASSIFIER_ENDPOINT: 'https://llm.example.test/v1/chat/completions',
@@ -78,30 +79,33 @@ describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
   });
 
   it('classifies unresolved diagram labels through an OpenAI-compatible JSON schema request', async () => {
-    const fetchClient = jest.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                classification: {
-                  serviceCategory: 'database',
-                  serviceType: 'relational-database',
-                  confidence: 'low',
-                  reason: 'label mentions Postgres but no managed service icon was present',
-                  assumedDefaults: ['100 GB database storage'],
-                  quantity: 2,
-                  scaleParams: {
-                    engine: 'postgres',
-                  },
+    const fetchClient = jest.fn<typeof fetch>(
+      async () =>
+        ({
+          ok: true,
+          json: async () => ({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    classification: {
+                      serviceCategory: 'database',
+                      serviceType: 'relational-database',
+                      confidence: 'low',
+                      reason: 'label mentions Postgres but no managed service icon was present',
+                      assumedDefaults: ['100 GB database storage'],
+                      quantity: 2,
+                      scaleParams: {
+                        engine: 'postgres',
+                      },
+                    },
+                  }),
                 },
-              }),
-            },
-          },
-        ],
-      }),
-    })) as unknown as typeof fetch;
+              },
+            ],
+          }),
+        }) as unknown as Response,
+    );
     const secrets = secretsReader();
     const client = new OpenAiCompatibleDiagramLlmClassifierClient(
       configService({
@@ -150,7 +154,7 @@ describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
         body: expect.stringContaining('polycost_diagram_node_classification'),
       }),
     );
-    expect(JSON.parse(String((fetchClient as jest.Mock).mock.calls[0][1].body))).toMatchObject({
+    expect(JSON.parse(String(fetchClient.mock.calls[0][1]?.body))).toMatchObject({
       model: 'diagram-classifier',
       temperature: 0,
       messages: expect.arrayContaining([
@@ -169,7 +173,7 @@ describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
 
   it('does not fetch secrets when classifier endpoint or model config is missing', async () => {
     const secrets = secretsReader();
-    const fetchClient = jest.fn() as unknown as typeof fetch;
+    const fetchClient = jest.fn<typeof fetch>();
     const client = new OpenAiCompatibleDiagramLlmClassifierClient(
       configService({}),
       secrets,
@@ -183,37 +187,40 @@ describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
   });
 
   it('classifies unresolved diagram labels through one bounded batch request', async () => {
-    const fetchClient = jest.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                classifications: [
-                  {
-                    diagramNodeId: 'node-a',
-                    classification: {
-                      serviceCategory: 'integration',
-                      serviceType: 'queue-or-event-bus',
-                      confidence: 'low',
-                      reason: 'label looks like an asynchronous handoff',
-                      assumedDefaults: ['1 million messages per month'],
-                      quantity: 1,
-                      scaleParams: {},
-                    },
-                  },
-                  {
-                    diagramNodeId: 'node-b',
-                    classification: null,
-                  },
-                ],
-              }),
-            },
-          },
-        ],
-      }),
-    })) as unknown as typeof fetch;
+    const fetchClient = jest.fn<typeof fetch>(
+      async () =>
+        ({
+          ok: true,
+          json: async () => ({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    classifications: [
+                      {
+                        diagramNodeId: 'node-a',
+                        classification: {
+                          serviceCategory: 'integration',
+                          serviceType: 'queue-or-event-bus',
+                          confidence: 'low',
+                          reason: 'label looks like an asynchronous handoff',
+                          assumedDefaults: ['1 million messages per month'],
+                          quantity: 1,
+                          scaleParams: {},
+                        },
+                      },
+                      {
+                        diagramNodeId: 'node-b',
+                        classification: null,
+                      },
+                    ],
+                  }),
+                },
+              },
+            ],
+          }),
+        }) as unknown as Response,
+    );
     const client = new OpenAiCompatibleDiagramLlmClassifierClient(
       configService({
         DIAGRAM_LLM_CLASSIFIER_ENDPOINT: 'https://llm.example.test/v1/chat/completions',
@@ -258,7 +265,7 @@ describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
     ]);
 
     expect(fetchClient).toHaveBeenCalledTimes(1);
-    const requestBody = JSON.parse(String((fetchClient as jest.Mock).mock.calls[0][1].body));
+    const requestBody = JSON.parse(String(fetchClient.mock.calls[0][1]?.body));
     expect(requestBody.response_format.json_schema.name).toBe(
       'polycost_diagram_node_classification_batch',
     );
@@ -282,20 +289,23 @@ describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
   });
 
   it('caps direct batch requests at 20 nodes and returns same-length fallback results', async () => {
-    const fetchClient = jest.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                classifications: [],
-              }),
-            },
-          },
-        ],
-      }),
-    })) as unknown as typeof fetch;
+    const fetchClient = jest.fn<typeof fetch>(
+      async () =>
+        ({
+          ok: true,
+          json: async () => ({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    classifications: [],
+                  }),
+                },
+              },
+            ],
+          }),
+        }) as unknown as Response,
+    );
     const client = new OpenAiCompatibleDiagramLlmClassifierClient(
       configService({
         DIAGRAM_LLM_CLASSIFIER_ENDPOINT: 'https://llm.example.test/v1/chat/completions',
@@ -314,17 +324,20 @@ describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
 
     expect(results).toHaveLength(25);
     expect(results.every((result) => result === undefined)).toBe(true);
-    const requestBody = JSON.parse(String((fetchClient as jest.Mock).mock.calls[0][1].body));
+    const requestBody = JSON.parse(String(fetchClient.mock.calls[0][1]?.body));
     expect(JSON.parse(requestBody.messages[1].content).nodes).toHaveLength(20);
   });
 
   it('falls back to unresolved classification when provider output is malformed', async () => {
-    const fetchClient = jest.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        choices: [{ message: { content: JSON.stringify({ classification: { nope: true } }) } }],
-      }),
-    })) as unknown as typeof fetch;
+    const fetchClient = jest.fn<typeof fetch>(
+      async () =>
+        ({
+          ok: true,
+          json: async () => ({
+            choices: [{ message: { content: JSON.stringify({ classification: { nope: true } }) } }],
+          }),
+        }) as unknown as Response,
+    );
     const client = new OpenAiCompatibleDiagramLlmClassifierClient(
       configService({
         DIAGRAM_LLM_CLASSIFIER_ENDPOINT: 'https://llm.example.test/v1/chat/completions',
@@ -342,12 +355,12 @@ describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
 
   it('retries transient provider failures and keeps graceful fallback semantics', async () => {
     const fetchClient = jest
-      .fn()
+      .fn<typeof fetch>()
       .mockResolvedValueOnce({
         ok: false,
         status: 503,
         json: async () => ({}),
-      })
+      } as unknown as Response)
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -370,7 +383,7 @@ describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
             },
           ],
         }),
-      }) as unknown as typeof fetch;
+      } as unknown as Response) as typeof fetch;
     const client = new OpenAiCompatibleDiagramLlmClassifierClient(
       configService({
         DIAGRAM_LLM_CLASSIFIER_ENDPOINT: 'https://llm.example.test/v1/chat/completions',
@@ -391,7 +404,7 @@ describe('OpenAiCompatibleDiagramLlmClassifierClient', () => {
   it('returns unresolved when the provider call throws or times out', async () => {
     const fetchClient = jest.fn(async () => {
       throw new Error('network timeout');
-    }) as unknown as typeof fetch;
+    });
     const client = new OpenAiCompatibleDiagramLlmClassifierClient(
       configService({
         DIAGRAM_LLM_CLASSIFIER_ENDPOINT: 'https://llm.example.test/v1/chat/completions',

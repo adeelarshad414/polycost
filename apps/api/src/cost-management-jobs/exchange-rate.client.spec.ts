@@ -1,10 +1,11 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema.js';
 import { FetchLike } from '../adapters/common/http-client.js';
 import { FrankfurterExchangeRateClient } from './exchange-rate.client.js';
 
 const configService = {
-  get: jest.fn((key: keyof AppConfig) => {
+  get: jest.fn<ConfigService['get']>((key: keyof AppConfig) => {
     switch (key) {
       case 'EXCHANGE_RATE_API_URL':
         return 'https://api.frankfurter.app/latest';

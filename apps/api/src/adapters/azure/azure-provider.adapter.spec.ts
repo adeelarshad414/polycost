@@ -1,4 +1,5 @@
 /* eslint-disable security/detect-non-literal-fs-filename -- Reviewed 2026-07-06: fixture reads are resolved from repository-controlled test data; see docs/SECURITY-SUPPRESSIONS.md. */
+import { describe, it, expect, jest } from '@jest/globals';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { InMemoryPricingCatalogReader } from '../common/in-memory-pricing-catalog.reader.js';
@@ -19,11 +20,11 @@ const jsonResponse = (body: unknown) => ({
 describe('AzureProviderAdapter', () => {
   it('normalizes Azure Retail Prices responses into catalog records', async () => {
     const fetchClient = jest
-      .fn()
+      .fn<FetchLike>()
       .mockResolvedValueOnce(
         jsonResponse(fixture('test/fixtures/pricing/azure/retail-compute.json')),
       )
-      .mockResolvedValueOnce(jsonResponse({ Items: [] })) as FetchLike;
+      .mockResolvedValueOnce(jsonResponse({ Items: [] }));
     const adapter = new AzureProviderAdapter(
       new InMemoryPricingCatalogReader([]),
       'eastus',
@@ -68,9 +69,9 @@ describe('AzureProviderAdapter', () => {
     };
     const secondPage = fixture('test/fixtures/pricing/azure/retail-storage.json');
     const fetchClient = jest
-      .fn()
+      .fn<FetchLike>()
       .mockResolvedValueOnce(jsonResponse(firstPage))
-      .mockResolvedValueOnce(jsonResponse(secondPage)) as FetchLike;
+      .mockResolvedValueOnce(jsonResponse(secondPage));
     const adapter = new AzureProviderAdapter(
       new InMemoryPricingCatalogReader([]),
       'eastus',
@@ -92,7 +93,7 @@ describe('AzureProviderAdapter', () => {
       // service; the adapter must refuse to follow it.
       NextPageLink: 'https://169.254.169.254/api/retail/prices?page=2',
     };
-    const fetchClient = jest.fn().mockResolvedValue(jsonResponse(maliciousPage)) as FetchLike;
+    const fetchClient = jest.fn<FetchLike>().mockResolvedValue(jsonResponse(maliciousPage));
     const adapter = new AzureProviderAdapter(
       new InMemoryPricingCatalogReader([]),
       'eastus',
@@ -185,9 +186,9 @@ describe('AzureProviderAdapter', () => {
       ],
     };
     const fetchClient = jest
-      .fn()
+      .fn<FetchLike>()
       .mockResolvedValueOnce(jsonResponse(blockMeter))
-      .mockResolvedValueOnce(jsonResponse({ Items: [] })) as FetchLike;
+      .mockResolvedValueOnce(jsonResponse({ Items: [] }));
     const adapter = new AzureProviderAdapter(
       new InMemoryPricingCatalogReader([]),
       'eastus',
@@ -298,9 +299,9 @@ describe('AzureProviderAdapter', () => {
       armSkuName: 'Standard_D2s_v5',
     }));
     const fetchClient = jest
-      .fn()
+      .fn<FetchLike>()
       .mockResolvedValueOnce(jsonResponse({ Items: items }))
-      .mockResolvedValue(jsonResponse({ Items: [] })) as unknown as FetchLike;
+      .mockResolvedValue(jsonResponse({ Items: [] }));
     const adapter = new AzureProviderAdapter(
       new InMemoryPricingCatalogReader([]),
       'eastus',
@@ -370,9 +371,9 @@ describe('AzureProviderAdapter', () => {
       ],
     };
     const fetchClient = jest
-      .fn()
+      .fn<FetchLike>()
       .mockResolvedValueOnce(jsonResponse(page))
-      .mockResolvedValue(jsonResponse({ Items: [] })) as unknown as FetchLike;
+      .mockResolvedValue(jsonResponse({ Items: [] }));
     const adapter = new AzureProviderAdapter(
       new InMemoryPricingCatalogReader([]),
       'eastus',

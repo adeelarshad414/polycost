@@ -1,3 +1,4 @@
+import { describe, it, expect } from '@jest/globals';
 import { ComparisonResult } from '../comparison/comparison.types.js';
 import { ComparisonAnalyticsService } from './comparison-analytics.service.js';
 

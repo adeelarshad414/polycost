@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import {
   CloudProviderAdapter,
   PricingCatalogRecord,
@@ -173,13 +174,15 @@ describe('LivePricingRefreshService', () => {
       skuIds.includes('AWS-COMPUTE-1') ? [liveRecord] : [],
     );
     const catalogWriter: PricingCatalogWriter = {
-      upsertPricingRecords: jest.fn(async () => ({
+      upsertPricingRecords: jest.fn<PricingCatalogWriter['upsertPricingRecords']>(async () => ({
         recordsUpdated: 1,
         recordsRejected: 0,
       })),
     };
     const normalizedWriter: NormalizedPricingWriter = {
-      upsertNormalizedPricingRecords: jest.fn(async () => ({
+      upsertNormalizedPricingRecords: jest.fn<
+        NormalizedPricingWriter['upsertNormalizedPricingRecords']
+      >(async () => ({
         recordsUpdated: 1,
         recordsRejected: 0,
         recordsSkipped: 0,
@@ -293,8 +296,8 @@ function adapterMock(
 ): CloudProviderAdapter {
   return {
     providerId,
-    priceWorkload: jest.fn(),
-    refreshPricingCatalog: jest.fn(),
+    priceWorkload: jest.fn<CloudProviderAdapter['priceWorkload']>(),
+    refreshPricingCatalog: jest.fn<CloudProviderAdapter['refreshPricingCatalog']>(),
     refreshLivePricing: jest.fn(refreshLivePricing),
   };
 }
@@ -316,10 +319,15 @@ function writerMock(): PricingCatalogWriter & NormalizedPricingWriter {
 describe('LivePricingRefreshService circuit breaker', () => {
   const writers = () => ({
     catalogWriter: {
-      upsertPricingRecords: jest.fn(async () => ({ recordsUpdated: 1, recordsRejected: 0 })),
+      upsertPricingRecords: jest.fn<PricingCatalogWriter['upsertPricingRecords']>(async () => ({
+        recordsUpdated: 1,
+        recordsRejected: 0,
+      })),
     } as PricingCatalogWriter,
     normalizedWriter: {
-      upsertNormalizedPricingRecords: jest.fn(async () => ({
+      upsertNormalizedPricingRecords: jest.fn<
+        NormalizedPricingWriter['upsertNormalizedPricingRecords']
+      >(async () => ({
         recordsUpdated: 1,
         recordsRejected: 0,
         recordsSkipped: 0,
@@ -336,8 +344,8 @@ describe('LivePricingRefreshService circuit breaker', () => {
       refreshLivePricing,
       adapter: {
         providerId: 'aws',
-        priceWorkload: jest.fn(),
-        refreshPricingCatalog: jest.fn(),
+        priceWorkload: jest.fn<CloudProviderAdapter['priceWorkload']>(),
+        refreshPricingCatalog: jest.fn<CloudProviderAdapter['refreshPricingCatalog']>(),
         refreshLivePricing,
       } as unknown as CloudProviderAdapter,
     };
@@ -405,9 +413,9 @@ describe('LivePricingRefreshService circuit breaker', () => {
     const { adapter: broken } = deadProvider();
     const healthy = {
       providerId: 'gcp',
-      priceWorkload: jest.fn(),
-      refreshPricingCatalog: jest.fn(),
-      refreshLivePricing: jest.fn(async () => []),
+      priceWorkload: jest.fn<CloudProviderAdapter['priceWorkload']>(),
+      refreshPricingCatalog: jest.fn<CloudProviderAdapter['refreshPricingCatalog']>(),
+      refreshLivePricing: jest.fn<CloudProviderAdapter['refreshLivePricing']>(async () => []),
     } as unknown as CloudProviderAdapter;
     const { catalogWriter, normalizedWriter } = writers();
     const breakers = new CircuitBreakerRegistry({ failureThreshold: 1, cooldownMs: 60_000 });

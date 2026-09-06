@@ -1,8 +1,10 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema.js';
 import { SecretsReader } from '../secrets/secrets.service.js';
 import { InvoiceArtifactBlobGovernance, InvoiceArtifactStorageBackend } from './billing.types.js';
 import { InvoiceArtifactStorageService } from './invoice-artifact-storage.service.js';
+import type { FetchLike } from '../adapters/common/http-client.js';
 
 const content = Buffer.from('invoice artifact bytes');
 
@@ -17,7 +19,7 @@ describe('InvoiceArtifactStorageService', () => {
   });
 
   it('writes AWS S3 artifacts with SigV4 and KMS headers', async () => {
-    const fetcher = jest.fn(async () =>
+    const fetcher = jest.fn<FetchLike>(async () =>
       okResponse('', { etag: '"aws-etag"', 'x-amz-version-id': 'v1' }),
     );
     const service = new InvoiceArtifactStorageService(
@@ -60,7 +62,7 @@ describe('InvoiceArtifactStorageService', () => {
   });
 
   it('writes Azure Blob artifacts through SAS-backed native blob storage', async () => {
-    const fetcher = jest.fn(async () =>
+    const fetcher = jest.fn<FetchLike>(async () =>
       okResponse('', { etag: '"azure-etag"', 'x-ms-version-id': '2' }),
     );
     const service = new InvoiceArtifactStorageService(
@@ -99,7 +101,7 @@ describe('InvoiceArtifactStorageService', () => {
   });
 
   it('writes GCP Cloud Storage artifacts through the JSON upload API', async () => {
-    const fetcher = jest.fn(async () =>
+    const fetcher = jest.fn<FetchLike>(async () =>
       okResponse(JSON.stringify({ etag: 'gcp-etag', generation: '3' })),
     );
     const service = new InvoiceArtifactStorageService(
@@ -135,7 +137,7 @@ describe('InvoiceArtifactStorageService', () => {
   });
 
   it('reads external object bytes and returns a buffer for checksum verification', async () => {
-    const fetcher = jest.fn(async () => okBinaryResponse(content));
+    const fetcher = jest.fn<FetchLike>(async () => okBinaryResponse(content));
     const service = new InvoiceArtifactStorageService(
       configService({
         INVOICE_ARTIFACT_STORAGE_BACKEND: 'gcp-gcs',
@@ -157,7 +159,7 @@ describe('InvoiceArtifactStorageService', () => {
   });
 
   it('deletes AWS S3 artifact objects with SigV4 and version id support', async () => {
-    const fetcher = jest.fn(async () => okResponse(''));
+    const fetcher = jest.fn<FetchLike>(async () => okResponse(''));
     const service = new InvoiceArtifactStorageService(
       configService({
         INVOICE_ARTIFACT_OBJECT_STORE_REGION: 'us-east-1',
@@ -192,7 +194,7 @@ describe('InvoiceArtifactStorageService', () => {
   });
 
   it('deletes Azure Blob artifact objects through SAS-backed REST calls', async () => {
-    const fetcher = jest.fn(async () => okResponse(''));
+    const fetcher = jest.fn<FetchLike>(async () => okResponse(''));
     const service = new InvoiceArtifactStorageService(
       configService(),
       secretsReader({
@@ -223,7 +225,7 @@ describe('InvoiceArtifactStorageService', () => {
   });
 
   it('deletes GCP Cloud Storage artifact objects by generation', async () => {
-    const fetcher = jest.fn(async () => okResponse(''));
+    const fetcher = jest.fn<FetchLike>(async () => okResponse(''));
     const service = new InvoiceArtifactStorageService(
       configService(),
       secretsReader({
@@ -253,7 +255,7 @@ describe('InvoiceArtifactStorageService', () => {
   });
 
   it('treats missing provider objects as already deleted for retention retries', async () => {
-    const fetcher = jest.fn(async () => ({
+    const fetcher = jest.fn<FetchLike>(async () => ({
       ok: false,
       status: 404,
       statusText: 'Not Found',
@@ -352,7 +354,7 @@ function configService(overrides: Partial<AppConfig> = {}): ConfigService<AppCon
   const overrideMap = new Map(Object.entries(overrides));
 
   return {
-    get: jest.fn((key: keyof AppConfig) => overrideMap.get(key)),
+    get: jest.fn<ConfigService['get']>((key: keyof AppConfig) => overrideMap.get(key)),
   } as unknown as ConfigService<AppConfig, true>;
 }
 

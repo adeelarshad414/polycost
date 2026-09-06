@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { ErrorReporter, parseDsn, redactValue } from './error-reporter.js';
 
 const DSN = 'https://publickey123@glitchtip.internal/7';

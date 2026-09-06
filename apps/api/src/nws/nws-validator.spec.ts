@@ -1,3 +1,4 @@
+import { describe, it, expect } from '@jest/globals';
 import { NWSMigrationError, NWSValidationError, NWSValidator } from './nws-validator.js';
 import { NormalizedWorkloadSpec } from './nws.types.js';
 

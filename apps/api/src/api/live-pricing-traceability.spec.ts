@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { BaseCloudProviderAdapter } from '../adapters/common/base-cloud-provider.adapter.js';
 import {
   PricingCatalogRecord,
@@ -17,6 +18,7 @@ import { NormalizedWorkloadSpec } from '../nws/nws.types.js';
 import { ComparisonApplicationService } from './comparison-application.service.js';
 import { ComparisonSnapshot } from './api-database.repository.js';
 import { LivePricingRefreshService } from './live-pricing-refresh.service.js';
+import type { ApiDatabaseRepository } from './api-database.repository.js';
 
 class TraceableTestAdapter extends BaseCloudProviderAdapter {
   readonly providerId: ProviderId = 'aws';
@@ -117,7 +119,7 @@ describe('live pricing traceability', () => {
       normalizedWriterMock(),
     );
     const repository = {
-      saveComparisonWithAuditLog: jest.fn(
+      saveComparisonWithAuditLog: jest.fn<ApiDatabaseRepository['saveComparisonWithAuditLog']>(
         async (nwsSnapshot: NormalizedWorkloadSpec, resultSnapshot: ComparisonResult) => {
           snapshotStore.current = {
             nwsSnapshot,
@@ -125,13 +127,21 @@ describe('live pricing traceability', () => {
           };
         },
       ),
-      recordComparisonAuditLog: jest.fn(async () => undefined),
-      getComparison: jest.fn(async () => snapshotStore.current),
-      getPricingStatus: jest.fn(async () => ({ providers: [] })),
-      getDataHealth: jest.fn(async () => ({
+      recordComparisonAuditLog: jest.fn<ApiDatabaseRepository['recordComparisonAuditLog']>(
+        async () => undefined,
+      ),
+      getComparison: jest.fn<ApiDatabaseRepository['getComparison']>(
+        async () => snapshotStore.current,
+      ),
+      getPricingStatus: jest.fn<ApiDatabaseRepository['getPricingStatus']>(async () => ({
+        providers: [],
+      })),
+      getDataHealth: jest.fn<ApiDatabaseRepository['getDataHealth']>(async () => ({
         generatedAt: '2026-07-06T12:00:00.000Z',
         freshnessPolicyHours: 48,
         overallStatus: 'fresh',
+        dataProvenance: 'live',
+        usesNonLivePricing: false,
         alertCount: 0,
         alerts: [],
         providers: [],
@@ -216,7 +226,7 @@ describe('live pricing traceability', () => {
 
 function mutableCatalogWriter(records: PricingCatalogRecord[]): PricingCatalogWriter {
   return {
-    upsertPricingRecords: jest.fn(async (updates) => {
+    upsertPricingRecords: jest.fn<PricingCatalogWriter['upsertPricingRecords']>(async (updates) => {
       for (const update of updates) {
         const index = records.findIndex(
           (record) =>
@@ -243,7 +253,9 @@ function mutableCatalogWriter(records: PricingCatalogRecord[]): PricingCatalogWr
 
 function normalizedWriterMock(): NormalizedPricingWriter {
   return {
-    upsertNormalizedPricingRecords: jest.fn(async (records) => ({
+    upsertNormalizedPricingRecords: jest.fn<
+      NormalizedPricingWriter['upsertNormalizedPricingRecords']
+    >(async (records) => ({
       recordsUpdated: records.length,
       recordsRejected: 0,
       recordsSkipped: 0,

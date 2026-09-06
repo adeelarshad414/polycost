@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { AuthIdentity, RequestWithAuth } from './auth.types.js';
 import { ScimProvisioningController } from './scim-provisioning.controller.js';
@@ -87,21 +88,31 @@ describe('ScimProvisioningController', () => {
 
 function createServiceMock(): ScimProvisioningService {
   return {
-    listTokens: jest.fn(() => 'tokens'),
-    listProvisionedUsers: jest.fn(() => 'provisioned-users'),
-    createToken: jest.fn(() => 'create-token'),
-    revokeToken: jest.fn(() => 'revoke-token'),
-    serviceProviderConfig: jest.fn(() => 'service-provider-config'),
-    listSchemas: jest.fn(() => 'schemas'),
-    getSchema: jest.fn(() => 'schema'),
-    listResourceTypes: jest.fn(() => 'resource-types'),
-    getResourceType: jest.fn(() => 'resource-type'),
-    listUsers: jest.fn(() => 'users'),
-    createUser: jest.fn(() => 'create-user'),
-    getUser: jest.fn(() => 'get-user'),
-    replaceUser: jest.fn(() => 'replace-user'),
-    patchUser: jest.fn(() => 'patch-user'),
-    deactivateUser: jest.fn(() => 'deactivate-user'),
+    listTokens: jest.fn<ScimProvisioningService['listTokens']>(() => 'tokens' as never),
+    listProvisionedUsers: jest.fn<ScimProvisioningService['listProvisionedUsers']>(
+      () => 'provisioned-users' as never,
+    ),
+    createToken: jest.fn<ScimProvisioningService['createToken']>(() => 'create-token' as never),
+    revokeToken: jest.fn<ScimProvisioningService['revokeToken']>(() => 'revoke-token' as never),
+    serviceProviderConfig: jest.fn<ScimProvisioningService['serviceProviderConfig']>(
+      () => 'service-provider-config' as never,
+    ),
+    listSchemas: jest.fn<ScimProvisioningService['listSchemas']>(() => 'schemas' as never),
+    getSchema: jest.fn<ScimProvisioningService['getSchema']>(() => 'schema' as never),
+    listResourceTypes: jest.fn<ScimProvisioningService['listResourceTypes']>(
+      () => 'resource-types' as never,
+    ),
+    getResourceType: jest.fn<ScimProvisioningService['getResourceType']>(
+      () => 'resource-type' as never,
+    ),
+    listUsers: jest.fn<ScimProvisioningService['listUsers']>(() => 'users' as never),
+    createUser: jest.fn<ScimProvisioningService['createUser']>(() => 'create-user' as never),
+    getUser: jest.fn<ScimProvisioningService['getUser']>(() => 'get-user' as never),
+    replaceUser: jest.fn<ScimProvisioningService['replaceUser']>(() => 'replace-user' as never),
+    patchUser: jest.fn<ScimProvisioningService['patchUser']>(() => 'patch-user' as never),
+    deactivateUser: jest.fn<ScimProvisioningService['deactivateUser']>(
+      () => 'deactivate-user' as never,
+    ),
   } as unknown as ScimProvisioningService;
 }
 

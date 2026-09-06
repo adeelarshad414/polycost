@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { ApiExceptionFilter } from '../api/api-exception.filter.js';
 import { ApiValidationError } from '../api/api-errors.js';
 import { ErrorReporter } from './error-reporter.js';
@@ -118,19 +119,25 @@ describe('request access logging', () => {
 });
 
 describe('ApiExceptionFilter error reporting', () => {
-  function host(reply: { status: jest.Mock }) {
+  function host(replyDouble: ReturnType<typeof reply>) {
     return {
-      switchToHttp: () => ({ getResponse: () => reply }),
+      switchToHttp: () => ({ getResponse: () => replyDouble }),
     } as never;
   }
 
   function reply() {
     const send = jest.fn();
-    return { status: jest.fn(() => ({ send })), send, header: jest.fn() };
+    return {
+      status: jest.fn<(statusCode: number) => { send: typeof send }>(() => ({ send })),
+      send,
+      header: jest.fn<(name: string, value: string) => void>(),
+    };
   }
 
   it('reports a 500 to the error tracker', () => {
-    const reporter = { report: jest.fn(async () => undefined) } as unknown as ErrorReporter;
+    const reporter = {
+      report: jest.fn<ErrorReporter['report']>(async () => undefined),
+    } as unknown as ErrorReporter;
     const response = reply();
 
     new ApiExceptionFilter(reporter).catch(new Error('boom'), host(response));
@@ -142,7 +149,9 @@ describe('ApiExceptionFilter error reporting', () => {
   });
 
   it('does not report expected 4xx outcomes', () => {
-    const reporter = { report: jest.fn(async () => undefined) } as unknown as ErrorReporter;
+    const reporter = {
+      report: jest.fn<ErrorReporter['report']>(async () => undefined),
+    } as unknown as ErrorReporter;
 
     new ApiExceptionFilter(reporter).catch(
       new ApiValidationError('bad payload', []),
@@ -163,7 +172,7 @@ describe('ApiExceptionFilter error reporting', () => {
 
   it('does not let a failing reporter break the error response', () => {
     const reporter = {
-      report: jest.fn(() => Promise.reject(new Error('collector down'))),
+      report: jest.fn<ErrorReporter['report']>(() => Promise.reject(new Error('collector down'))),
     } as unknown as ErrorReporter;
     const response = reply();
 

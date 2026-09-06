@@ -1,3 +1,4 @@
+import { describe, it, expect } from '@jest/globals';
 import { HOURS_PER_MONTH, intervalCostsFromHourly } from '../cost-time.js';
 import { ComparisonResult } from '../comparison/comparison.types.js';
 import {

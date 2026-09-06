@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema.js';
@@ -191,7 +192,7 @@ describe('AuthController', () => {
 
 function authController(service: AuthService, limitPerMinute = 10): AuthController {
   return new AuthController(service, new ApiRateLimitService(() => 0), {
-    get: jest.fn((key: keyof AppConfig) => {
+    get: jest.fn<ConfigService['get']>((key: keyof AppConfig) => {
       if (key === 'RATE_LIMIT_AUTH_PER_MINUTE') {
         return limitPerMinute;
       }
@@ -205,36 +206,58 @@ function guardMetadataFor(handler: (...args: never[]) => unknown): unknown[] {
   return Reflect.getMetadata(GUARDS_METADATA, handler) ?? [];
 }
 
+/*
+  Delegation doubles. Each returns a unique sentinel so a test can prove the
+  controller handed back the service's value unchanged - `resolves.toBe(
+  'register')` is the assertion, and replacing the sentinels with fabricated
+  response objects would destroy exactly what it proves.
+
+  The signature is still the real one, because 21 assertions here check the
+  arguments the controller forwarded. So the parameters are type-checked and
+  only the return is cast: `as never` is assignable to any return type, and
+  the cast marks the one place the double deliberately departs from the
+  contract.
+*/
 function createAuthServiceMock(): AuthService {
   return {
-    register: jest.fn(() => 'register'),
-    login: jest.fn(() => 'login'),
-    authenticateRequest: jest.fn(),
-    me: jest.fn(() => 'me'),
-    logout: jest.fn(() => 'logout'),
-    updateProfile: jest.fn(() => 'profile'),
-    changePassword: jest.fn(() => 'password'),
-    deleteAccount: jest.fn(() => 'account'),
-    listSessions: jest.fn(() => 'sessions'),
-    revokeOtherSessions: jest.fn(() => 'revoke-other'),
-    switchActiveTeam: jest.fn(() => 'switch-team'),
-    createTeam: jest.fn(() => 'create-team'),
-    updateTeamSettings: jest.fn(() => 'team-settings'),
-    listTeamMembers: jest.fn(() => 'members'),
-    inviteTeamMember: jest.fn(() => 'invite'),
-    listTeamInvitations: jest.fn(() => 'invitations'),
-    listTeamAuditEvents: jest.fn(() => 'audit-events'),
-    revokeTeamInvitation: jest.fn(() => 'revoke-invite'),
-    resendTeamInvitation: jest.fn(() => 'resend-invite'),
-    acceptInvitation: jest.fn(() => 'accept-invite'),
-    previewInvitation: jest.fn(() => 'preview-invite'),
-    updateTeamMemberRole: jest.fn(() => 'member-role'),
-    removeTeamMember: jest.fn(() => 'remove-member'),
-    ssoStatus: jest.fn(() => 'sso-status'),
-    startMockOidcLogin: jest.fn(() => 'sso-start'),
-    mockOidcAuthorize: jest.fn(() => 'sso-authorize'),
-    completeMockOidcCallback: jest.fn(() => 'sso-callback'),
-    configureSsoProvider: jest.fn(() => 'sso-configure'),
-    testSsoConnection: jest.fn(() => 'sso-test'),
+    register: jest.fn<AuthService['register']>(() => 'register' as never),
+    login: jest.fn<AuthService['login']>(() => 'login' as never),
+    authenticateRequest: jest.fn<AuthService['authenticateRequest']>(),
+    me: jest.fn<AuthService['me']>(() => 'me' as never),
+    logout: jest.fn<AuthService['logout']>(() => 'logout' as never),
+    updateProfile: jest.fn<AuthService['updateProfile']>(() => 'profile' as never),
+    changePassword: jest.fn<AuthService['changePassword']>(() => 'password' as never),
+    deleteAccount: jest.fn<AuthService['deleteAccount']>(() => 'account' as never),
+    listSessions: jest.fn<AuthService['listSessions']>(() => 'sessions' as never),
+    revokeOtherSessions: jest.fn<AuthService['revokeOtherSessions']>(() => 'revoke-other' as never),
+    switchActiveTeam: jest.fn<AuthService['switchActiveTeam']>(() => 'switch-team' as never),
+    createTeam: jest.fn<AuthService['createTeam']>(() => 'create-team' as never),
+    updateTeamSettings: jest.fn<AuthService['updateTeamSettings']>(() => 'team-settings' as never),
+    listTeamMembers: jest.fn<AuthService['listTeamMembers']>(() => 'members' as never),
+    inviteTeamMember: jest.fn<AuthService['inviteTeamMember']>(() => 'invite' as never),
+    listTeamInvitations: jest.fn<AuthService['listTeamInvitations']>(() => 'invitations' as never),
+    listTeamAuditEvents: jest.fn<AuthService['listTeamAuditEvents']>(() => 'audit-events' as never),
+    revokeTeamInvitation: jest.fn<AuthService['revokeTeamInvitation']>(
+      () => 'revoke-invite' as never,
+    ),
+    resendTeamInvitation: jest.fn<AuthService['resendTeamInvitation']>(
+      () => 'resend-invite' as never,
+    ),
+    acceptInvitation: jest.fn<AuthService['acceptInvitation']>(() => 'accept-invite' as never),
+    previewInvitation: jest.fn<AuthService['previewInvitation']>(() => 'preview-invite' as never),
+    updateTeamMemberRole: jest.fn<AuthService['updateTeamMemberRole']>(
+      () => 'member-role' as never,
+    ),
+    removeTeamMember: jest.fn<AuthService['removeTeamMember']>(() => 'remove-member' as never),
+    ssoStatus: jest.fn<AuthService['ssoStatus']>(() => 'sso-status' as never),
+    startMockOidcLogin: jest.fn<AuthService['startMockOidcLogin']>(() => 'sso-start' as never),
+    mockOidcAuthorize: jest.fn<AuthService['mockOidcAuthorize']>(() => 'sso-authorize' as never),
+    completeMockOidcCallback: jest.fn<AuthService['completeMockOidcCallback']>(
+      () => 'sso-callback' as never,
+    ),
+    configureSsoProvider: jest.fn<AuthService['configureSsoProvider']>(
+      () => 'sso-configure' as never,
+    ),
+    testSsoConnection: jest.fn<AuthService['testSsoConnection']>(() => 'sso-test' as never),
   } as unknown as AuthService;
 }

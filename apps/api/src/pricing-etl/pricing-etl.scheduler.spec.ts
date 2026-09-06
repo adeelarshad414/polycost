@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema.js';
 import { PricingEtlService } from './pricing-etl.service.js';
@@ -30,14 +31,14 @@ const summary: PricingEtlSummary = {
 describe('PricingEtlScheduler', () => {
   it('schedules recurring and startup BullMQ jobs from config and starts a worker', async () => {
     const queue: PricingEtlQueue = {
-      add: jest.fn(async () => undefined),
-      close: jest.fn(async () => undefined),
+      add: jest.fn<PricingEtlQueue['add']>(async () => undefined),
+      close: jest.fn<PricingEtlQueue['close']>(async () => undefined),
     };
     const worker: PricingEtlWorker = {
-      close: jest.fn(async () => undefined),
+      close: jest.fn<PricingEtlWorker['close']>(async () => undefined),
     };
     const etlService = {
-      refreshAllProviders: jest.fn(async () => summary),
+      refreshAllProviders: jest.fn<PricingEtlService['refreshAllProviders']>(async () => summary),
     } as unknown as PricingEtlService;
     let capturedProcessor: (() => Promise<PricingEtlSummary>) | undefined;
     const workerFactory = jest.fn((processor: () => Promise<PricingEtlSummary>) => {
@@ -79,13 +80,13 @@ describe('PricingEtlScheduler', () => {
 
   it('can disable startup refresh for scheduled-only deployments', async () => {
     const queue: PricingEtlQueue = {
-      add: jest.fn(async () => undefined),
-      close: jest.fn(async () => undefined),
+      add: jest.fn<PricingEtlQueue['add']>(async () => undefined),
+      close: jest.fn<PricingEtlQueue['close']>(async () => undefined),
     };
     const scheduler = new PricingEtlScheduler(
       configService('0 2 * * *', false),
       {
-        refreshAllProviders: jest.fn(async () => summary),
+        refreshAllProviders: jest.fn<PricingEtlService['refreshAllProviders']>(async () => summary),
       } as unknown as PricingEtlService,
       queue,
       () => ({
@@ -107,16 +108,16 @@ describe('PricingEtlScheduler', () => {
 
   it('closes worker and queue on module destroy', async () => {
     const queue: PricingEtlQueue = {
-      add: jest.fn(async () => undefined),
-      close: jest.fn(async () => undefined),
+      add: jest.fn<PricingEtlQueue['add']>(async () => undefined),
+      close: jest.fn<PricingEtlQueue['close']>(async () => undefined),
     };
     const worker: PricingEtlWorker = {
-      close: jest.fn(async () => undefined),
+      close: jest.fn<PricingEtlWorker['close']>(async () => undefined),
     };
     const scheduler = new PricingEtlScheduler(
       configService('0 2 * * *'),
       {
-        refreshAllProviders: jest.fn(async () => summary),
+        refreshAllProviders: jest.fn<PricingEtlService['refreshAllProviders']>(async () => summary),
       } as unknown as PricingEtlService,
       queue,
       () => worker,
@@ -131,13 +132,13 @@ describe('PricingEtlScheduler', () => {
 
   it('closes the queue even if the worker was never started', async () => {
     const queue: PricingEtlQueue = {
-      add: jest.fn(async () => undefined),
-      close: jest.fn(async () => undefined),
+      add: jest.fn<PricingEtlQueue['add']>(async () => undefined),
+      close: jest.fn<PricingEtlQueue['close']>(async () => undefined),
     };
     const scheduler = new PricingEtlScheduler(
       configService('0 2 * * *'),
       {
-        refreshAllProviders: jest.fn(async () => summary),
+        refreshAllProviders: jest.fn<PricingEtlService['refreshAllProviders']>(async () => summary),
       } as unknown as PricingEtlService,
       queue,
       () => ({

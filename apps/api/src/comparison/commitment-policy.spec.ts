@@ -1,3 +1,4 @@
+import { describe, it, expect } from '@jest/globals';
 import { commitmentPricingModelCandidates } from './commitment-policy.js';
 
 describe('commitmentPricingModelCandidates', () => {

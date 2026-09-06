@@ -1,8 +1,13 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { createHmac } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema.js';
 import { ApiDatabaseRepository, TeamAuditExportClaimRecord } from './api-database.repository.js';
 import { TeamAuditExportService } from './team-audit-export.service.js';
+
+// Matches the alias the sibling delivery specs declare; the service takes this
+// shape, and typing the double against it means a signature change breaks here.
+type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 const ranAt = new Date('2026-07-08T00:00:00.000Z');
 const auditExportRecord: TeamAuditExportClaimRecord = {
@@ -33,7 +38,7 @@ const auditExportRecord: TeamAuditExportClaimRecord = {
 describe('TeamAuditExportService', () => {
   it('skips export when audit webhook mode is disabled', async () => {
     const repository = repositoryMock();
-    const fetcher = jest.fn();
+    const fetcher = jest.fn<FetchLike>();
     const service = new TeamAuditExportService(
       configService({
         AUTH_AUDIT_EXPORT_MODE: 'disabled',
@@ -58,7 +63,9 @@ describe('TeamAuditExportService', () => {
 
   it('sends signed audit events and marks delivered exports', async () => {
     const repository = repositoryMock({
-      claimPendingTeamAuditExports: jest.fn(async () => [auditExportRecord]),
+      claimPendingTeamAuditExports: jest.fn<ApiDatabaseRepository['claimPendingTeamAuditExports']>(
+        async () => [auditExportRecord],
+      ),
     });
     const fetcher = jest.fn(async () => ({ ok: true, status: 202 }) as Response);
     const service = new TeamAuditExportService(
@@ -113,13 +120,17 @@ describe('TeamAuditExportService', () => {
 
   it('retries failed exports and counts dead-lettered rows', async () => {
     const repository = repositoryMock({
-      claimPendingTeamAuditExports: jest.fn(async () => [
-        {
-          ...auditExportRecord,
-          attempts: 5,
-        },
-      ]),
-      markTeamAuditExportFailed: jest.fn(async () => 'failed'),
+      claimPendingTeamAuditExports: jest.fn<ApiDatabaseRepository['claimPendingTeamAuditExports']>(
+        async () => [
+          {
+            ...auditExportRecord,
+            attempts: 5,
+          },
+        ],
+      ),
+      markTeamAuditExportFailed: jest.fn<ApiDatabaseRepository['markTeamAuditExportFailed']>(
+        async () => 'failed',
+      ),
     });
     const fetcher = jest.fn(async () => ({ ok: false, status: 503 }) as Response);
     const service = new TeamAuditExportService(
@@ -148,9 +159,15 @@ describe('TeamAuditExportService', () => {
 
 function repositoryMock(overrides: Record<string, unknown> = {}) {
   return {
-    claimPendingTeamAuditExports: jest.fn(async () => []),
-    markTeamAuditExportDelivered: jest.fn(async () => undefined),
-    markTeamAuditExportFailed: jest.fn(async () => 'pending'),
+    claimPendingTeamAuditExports: jest.fn<ApiDatabaseRepository['claimPendingTeamAuditExports']>(
+      async () => [],
+    ),
+    markTeamAuditExportDelivered: jest.fn<ApiDatabaseRepository['markTeamAuditExportDelivered']>(
+      async () => undefined,
+    ),
+    markTeamAuditExportFailed: jest.fn<ApiDatabaseRepository['markTeamAuditExportFailed']>(
+      async () => 'pending',
+    ),
     ...overrides,
   };
 }
@@ -166,7 +183,7 @@ function configService(overrides: Partial<AppConfig> = {}): ConfigService<AppCon
   };
 
   return {
-    get: jest.fn((key: keyof AppConfig) => {
+    get: jest.fn<ConfigService['get']>((key: keyof AppConfig) => {
       switch (key) {
         case 'AUTH_AUDIT_EXPORT_MODE':
           return values.AUTH_AUDIT_EXPORT_MODE;

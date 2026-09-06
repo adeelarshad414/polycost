@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { createHmac } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema.js';
@@ -5,9 +6,13 @@ import { AuthIdentity } from './auth.types.js';
 import { InvoiceEvidencePacketResponse } from './billing.types.js';
 import { InvoiceEvidenceNotaryService } from './invoice-evidence-notary.service.js';
 
+// Matches the alias the sibling delivery specs declare; the service takes this
+// shape, and typing the double against it means a signature change breaks here.
+type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
+
 describe('InvoiceEvidenceNotaryService', () => {
   it('skips local and metadata-only modes without calling the webhook', async () => {
-    const fetcher = jest.fn();
+    const fetcher = jest.fn<FetchLike>();
     const service = new InvoiceEvidenceNotaryService(configService({}), fetcher);
 
     const result = await service.deliverPacket({
@@ -288,6 +293,6 @@ function configService(overrides: Partial<AppConfig>): ConfigService<AppConfig, 
   );
 
   return {
-    get: jest.fn((key: keyof AppConfig) => values.get(key)),
+    get: jest.fn<ConfigService['get']>((key: keyof AppConfig) => values.get(key)),
   } as unknown as ConfigService<AppConfig, true>;
 }

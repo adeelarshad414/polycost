@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { DomainMetricsService } from './domain-metrics.service.js';
 import { MetricsService } from './metrics.service.js';
 import { InstrumentablePool, instrumentPool, queryOperation } from './instrumented-pool.js';
@@ -84,7 +85,9 @@ describe('instrumentPool', () => {
 
   it('passes query arguments through untouched', async () => {
     const { domain } = build();
-    const query = jest.fn(async () => okResult);
+    const query = jest.fn<(text: string, values?: unknown[]) => Promise<typeof okResult>>(
+      async () => okResult,
+    );
     const pool = instrumentPool(fakePool({ query }), domain, 'api');
 
     await pool.query('SELECT $1', ['value']);
