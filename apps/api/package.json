@@ -2,18 +2,18 @@
   "name": "@polycost/api",
   "version": "0.1.0",
   "private": true,
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint \"src/**/*.ts\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run test:unit",
-    "test:unit": "jest --config jest.config.cjs --testPathIgnorePatterns \"\\.integration\\.spec\\.ts$\" --testPathIgnorePatterns \"\\.e2e\\.spec\\.ts$\"",
-    "test:integration": "jest --config jest.config.cjs --runInBand --testMatch \"**/*.integration.spec.ts\" --passWithNoTests",
-    "test:e2e": "jest --config jest.config.cjs --runInBand --testMatch \"**/*.e2e.spec.ts\" --passWithNoTests",
-    "test:coverage": "jest --config jest.config.cjs --coverage --testPathIgnorePatterns \"\\.integration\\.spec\\.ts$\" --testPathIgnorePatterns \"\\.e2e\\.spec\\.ts$\"",
-    "start:dev": "ts-node src/main.ts",
-    "start:prod": "node --require ./otel-register.cjs dist/main.js"
+    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.config.cjs --testPathIgnorePatterns \"\\.integration\\.spec\\.ts$\" --testPathIgnorePatterns \"\\.e2e\\.spec\\.ts$\"",
+    "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.config.cjs --runInBand --testMatch \"**/*.integration.spec.ts\" --passWithNoTests",
+    "test:e2e": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.config.cjs --runInBand --testMatch \"**/*.e2e.spec.ts\" --passWithNoTests",
+    "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.config.cjs --coverage --testPathIgnorePatterns \"\\.integration\\.spec\\.ts$\" --testPathIgnorePatterns \"\\.e2e\\.spec\\.ts$\"",
+    "start:dev": "node --import tsx ./src/main.ts",
+    "start:prod": "node --import ./otel-register.mjs dist/main.js"
   },
   "dependencies": {
     "@fastify/helmet": "^13.1.1",
@@ -23,6 +23,7 @@
     "@nestjs/platform-fastify": "^11.2.1",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/exporter-trace-otlp-http": "^0.222.0",
+    "@opentelemetry/instrumentation": "^0.222.0",
     "@opentelemetry/instrumentation-fastify": "^0.57.0",
     "@opentelemetry/instrumentation-http": "^0.222.0",
     "@opentelemetry/instrumentation-ioredis": "^0.70.0",

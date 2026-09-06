@@ -1,5 +1,8 @@
 module.exports = {
-  preset: 'ts-jest',
+  // The ESM preset, because apps/api is now "type": "module". Requires
+  // node --experimental-vm-modules, which the test scripts pass.
+  preset: 'ts-jest/presets/default-esm',
+  extensionsToTreatAsEsm: ['.ts'],
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
   // Relative imports now carry the .js extension that Node ESM requires. At

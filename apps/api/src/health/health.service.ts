@@ -155,11 +155,27 @@ function deepHealthStatus(
   return 'healthy';
 }
 
-export function probeTcp(host: string, port: number, timeoutMs: number): Promise<HealthDependency> {
+/** How a TCP connection is opened. A parameter so the probe is testable. */
+export type ConnectionFactory = (options: { host: string; port: number }) => net.Socket;
+
+/**
+ * The connection factory takes the place of a module mock.
+ *
+ * The spec used to reach for `jest.mock('node:net')`, which does not work under
+ * ESM without `unstable_mockModule` and its dynamic-import dance. Passing the
+ * factory in is both simpler and a better test: it exercises the real control
+ * flow instead of replacing the module the flow depends on.
+ */
+export function probeTcp(
+  host: string,
+  port: number,
+  timeoutMs: number,
+  createConnection: ConnectionFactory = (options) => net.createConnection(options),
+): Promise<HealthDependency> {
   const startedAt = Date.now();
 
   return new Promise((resolve) => {
-    const socket = net.createConnection({ host, port });
+    const socket = createConnection({ host, port });
     let settled = false;
 
     function finish(status: DependencyStatus, error?: string) {

@@ -3,7 +3,7 @@ import {
   OPTIONAL_DEPS_METADATA,
   PARAMTYPES_METADATA,
   SELF_DECLARED_DEPS_METADATA,
-} from '@nestjs/common/constants';
+} from '@nestjs/common/constants.js';
 import {
   INVITATION_DELIVERY_FETCH,
   InvitationDeliveryService,

@@ -4,10 +4,18 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { chain } from 'stream-chain';
-import { parser } from 'stream-json';
-import { pick } from 'stream-json/filters/Pick';
-import { streamObject } from 'stream-json/streamers/StreamObject';
+// Default imports, then destructure: these are CommonJS packages, and Node's
+// ESM interop lexer cannot see their named exports, so `import { chain }` throws
+// at runtime while type-checking cleanly. See src/types/stream-json.d.ts.
+import streamChain from 'stream-chain';
+import streamJson from 'stream-json';
+import pickModule from 'stream-json/filters/Pick.js';
+import streamObjectModule from 'stream-json/streamers/StreamObject.js';
+
+const { chain } = streamChain;
+const { parser } = streamJson;
+const { pick } = pickModule;
+const { streamObject } = streamObjectModule;
 
 /**
  * Streams the AWS bulk Price List index without buffering the whole (~480 MB)

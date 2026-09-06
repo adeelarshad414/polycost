@@ -22,7 +22,7 @@ import { LlmClassifierClient } from './diagram-parser.types.js';
 import { DomainMetricsService } from '../observability/domain-metrics.service.js';
 import { MetricsService } from '../observability/metrics.service.js';
 
-const fixtureRoot = resolve(__dirname, '../../../../fixtures/diagrams');
+const fixtureRoot = resolve(import.meta.dirname, '../../../../fixtures/diagrams');
 
 describe('DiagramParserService', () => {
   it.each([

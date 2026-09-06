@@ -1,5 +1,5 @@
 import { describe, it, expect, jest } from '@jest/globals';
-import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { GUARDS_METADATA } from '@nestjs/common/constants.js';
 import { AuthIdentity, RequestWithAuth } from './auth.types.js';
 import { ScimProvisioningController } from './scim-provisioning.controller.js';
 import { ScimProvisioningService } from './scim-provisioning.service.js';

@@ -8,7 +8,9 @@ import { PricingCatalogRecord } from '../common/cloud-provider-adapter.js';
 import { AzureProviderAdapter, parseAzureUnitOfMeasure } from './azure-provider.adapter.js';
 
 const fixture = <T>(relativePath: string): T =>
-  JSON.parse(readFileSync(resolve(__dirname, '../../../../..', relativePath), 'utf8')) as T;
+  JSON.parse(
+    readFileSync(resolve(import.meta.dirname, '../../../../..', relativePath), 'utf8'),
+  ) as T;
 
 const jsonResponse = (body: unknown) => ({
   ok: true,

@@ -10,7 +10,9 @@ import { FetchLike } from '../common/http-client.js';
 import { GcpProviderAdapter } from './gcp-provider.adapter.js';
 
 const fixture = <T>(relativePath: string): T =>
-  JSON.parse(readFileSync(resolve(__dirname, '../../../../..', relativePath), 'utf8')) as T;
+  JSON.parse(
+    readFileSync(resolve(import.meta.dirname, '../../../../..', relativePath), 'utf8'),
+  ) as T;
 
 const jsonResponse = (body: unknown) => ({
   ok: true,

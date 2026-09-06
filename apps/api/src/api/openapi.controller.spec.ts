@@ -56,7 +56,7 @@ describe('OpenApiController', () => {
 
 describe('specSearchPaths', () => {
   it('resolves the container layout to where the Dockerfile puts the spec', () => {
-    // Runtime __dirname is /app/apps/api/dist/api, and the Dockerfile COPY runs
+    // Runtime import.meta.dirname is /app/apps/api/dist/api, and the Dockerfile COPY runs
     // while WORKDIR is /app, so the file lands at /app/docs/api/openapi.json.
     // If either side moves, this is the test that should fail rather than a 404
     // in production.

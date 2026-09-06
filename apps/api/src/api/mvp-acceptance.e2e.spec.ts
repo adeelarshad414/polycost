@@ -28,7 +28,7 @@ import { RegionCatalogResponse } from './regions.types.js';
 const API_ORIGIN = env.POLYCOST_API_ORIGIN ?? `http://localhost:${env.API_PORT ?? '3001'}`;
 const API_BASE_URL = env.POLYCOST_API_BASE_URL ?? `${API_ORIGIN}/api/v1`;
 const WEB_BASE_URL = env.POLYCOST_WEB_BASE_URL ?? `http://localhost:${env.WEB_PORT ?? '3000'}`;
-const DIAGRAM_FIXTURE_ROOT = resolve(__dirname, '../../../../fixtures/diagrams');
+const DIAGRAM_FIXTURE_ROOT = resolve(import.meta.dirname, '../../../../fixtures/diagrams');
 
 interface ParsedNwsDraftResponse {
   draftNws: NormalizedWorkloadSpec;

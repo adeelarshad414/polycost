@@ -1,5 +1,5 @@
 import { describe, it, expect, jest } from '@jest/globals';
-import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { GUARDS_METADATA } from '@nestjs/common/constants.js';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema.js';
 import { RateLimitExceededError } from './api-errors.js';
