@@ -863,20 +863,60 @@ summary:focus-visible,
   box-shadow: var(--shadow-card);
   animation: progressive-panel-enter 180ms ease-out both;
   padding: 18px;
+  /* Only the properties that change, so the browser can keep this on the
+     compositor rather than re-laying-out three cards on every hover. */
+  transition:
+    transform 160ms ease-out,
+    box-shadow 160ms ease-out;
 }
 
+/*
+  The cards lift on hover.
+
+  These are the one genuinely comparative surface on the page - three options,
+  read side by side - so a little physical feedback on the one under the cursor
+  helps the eye hold its place while scanning across. It is deliberately small:
+  2px and a slightly deeper shadow, not a card that jumps.
+*/
+@media (hover: hover) {
+  .provider-summary-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card-raised);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .provider-summary-card {
+    transition: none;
+  }
+
+  /* The shadow still deepens - that is the signal. Only the movement goes. */
+  .provider-summary-card:hover {
+    transform: none;
+  }
+}
+
+/*
+  Provider identity as a diagonal wash rather than a flat fill.
+
+  The tint still starts at the top-left corner, where the provider name sits, and
+  fades to the card surface by the bottom-right, where the figures are - so the
+  colour identifies the vendor without sitting underneath the numbers being
+  compared. A flat tint reads as a swatch; this reads as a card belonging to
+  something. Both ends are theme tokens, so it inverts correctly in dark.
+*/
 .provider-summary-card-aws {
-  background: var(--aws-tint);
+  background: linear-gradient(135deg, var(--aws-tint), var(--surface-card) 78%);
   border-color: color-mix(in srgb, var(--aws) 22%, var(--border-default));
 }
 
 .provider-summary-card-azure {
-  background: var(--azure-tint);
+  background: linear-gradient(135deg, var(--azure-tint), var(--surface-card) 78%);
   border-color: color-mix(in srgb, var(--azure) 22%, var(--border-default));
 }
 
 .provider-summary-card-gcp {
-  background: var(--gcp-tint);
+  background: linear-gradient(135deg, var(--gcp-tint), var(--surface-card) 78%);
   border-color: color-mix(in srgb, var(--gcp) 22%, var(--border-default));
 }
 
