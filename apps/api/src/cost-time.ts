@@ -1,5 +1,7 @@
 import { CostIntervals } from './comparison/comparison.types.js';
-import monthlyHourStandard from '@polycost/types/monthly-hour-standard.json';
+// The `with { type: 'json' }` attribute is required by Node ESM; without it the
+// process refuses to load the module at all (ERR_IMPORT_ASSERTION_TYPE_MISSING).
+import monthlyHourStandard from '@polycost/types/monthly-hour-standard.json' with { type: 'json' };
 
 export const HOURS_PER_DAY = monthlyHourStandard.hoursPerDay;
 export const DAYS_PER_WEEK = monthlyHourStandard.daysPerWeek;

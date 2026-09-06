@@ -25,7 +25,7 @@ COPY packages/types packages/types
 RUN npm ci --omit=dev --workspace @polycost/api --include-workspace-root=false
 
 COPY --from=build --chown=node:node /app/apps/api/dist apps/api/dist
-COPY --chown=node:node apps/api/otel-register.cjs apps/api/otel-register.cjs
+COPY --chown=node:node apps/api/otel-register.mjs apps/api/otel-register.mjs
 # The OpenAPI document is served by the API, so it has to be in the image.
 COPY --chown=node:node docs/api/openapi.json docs/api/openapi.json
 WORKDIR /app/apps/api
@@ -46,8 +46,11 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-# --require loads the OpenTelemetry bootstrap before the application graph, so
-# instrumentation can patch pg, fastify and ioredis as they are required. It is
-# a no-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set, so images without a
-# collector are unaffected.
-CMD ["node", "--require", "./otel-register.cjs", "dist/main.js"]
+# --import loads the OpenTelemetry bootstrap before the application graph, so
+# instrumentation can patch pg, fastify and ioredis as they are imported. It was
+# --require while this app was CommonJS; under ESM the bootstrap also has to
+# register @opentelemetry/instrumentation/hook.mjs, without which the SDK starts
+# cleanly and instruments nothing. It is a no-op unless
+# OTEL_EXPORTER_OTLP_ENDPOINT is set, so images without a collector are
+# unaffected.
+CMD ["node", "--import", "./otel-register.mjs", "dist/main.js"]

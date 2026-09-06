@@ -43,7 +43,10 @@ export class OpenApiController {
  * Tries the locations the file occupies in a container and in a dev checkout.
  * Exported so the resolution order is testable rather than discovered in prod.
  */
-export function specSearchPaths(baseDir: string = __dirname): string[] {
+// import.meta.dirname rather than __dirname: this module is ESM now, and
+// __dirname does not exist there. Same value, and the parameter default is what
+// the spec exercises, so resolution stays testable.
+export function specSearchPaths(baseDir: string = import.meta.dirname): string[] {
   return [
     // Container: dist/api/ -> /app/docs/api/openapi.json
     path.resolve(baseDir, '../../../../docs/api/openapi.json'),
@@ -56,7 +59,7 @@ export function specSearchPaths(baseDir: string = __dirname): string[] {
 function loadSpec(): string | undefined {
   for (const candidate of specSearchPaths()) {
     try {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- Reviewed 2026-09-03: candidates are a fixed, code-defined list derived from __dirname and cwd, never from user input or request data; see docs/SECURITY-SUPPRESSIONS.md.
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- Reviewed 2026-09-03: candidates are a fixed, code-defined list derived from import.meta.dirname and cwd, never from user input or request data; see docs/SECURITY-SUPPRESSIONS.md.
       return readFileSync(candidate, 'utf8');
     } catch {
       // Try the next location.

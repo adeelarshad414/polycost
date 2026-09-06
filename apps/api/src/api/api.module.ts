@@ -23,7 +23,10 @@ import { TerraformGenerationService } from '../terraform/terraform-generation.se
 import { AdminApiKeyGuard } from './admin-api-key.guard.js';
 import { ApiDatabaseRepository } from './api-database.repository.js';
 import { ApiExceptionFilter } from './api-exception.filter.js';
-import Redis from 'ioredis';
+// Named import rather than default: ioredis is CommonJS, and under ESM with
+// node16 resolution its default import resolves to the module namespace, which
+// is neither constructable nor usable as a type. The named Redis is the class.
+import { Redis } from 'ioredis';
 import { ApiRateLimitService, RATE_LIMIT_REDIS } from './rate-limit.service.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';

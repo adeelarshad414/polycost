@@ -1,20 +1,22 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    // node16 rather than commonjs + the old node10 resolution. TypeScript 7
-    // removes moduleResolution "node10" outright, and the base config's
-    // "moduleResolution": "node" was exactly that - so the repo could not
-    // typecheck at all on TS 7 (TS5108). apps/api/package.json declares
-    // "type": "commonjs", so node16 still emits CommonJS; this changes how
-    // modules are resolved, not what is emitted. Verified: 0 errors on both
-    // TypeScript 5.9.3 and 7.0.2, 784 API tests pass, and dist/main.js is
-    // still "use strict" + require(). See K-11.
+    // The API is ESM: apps/api/package.json declares "type": "module", and
+    // module: node20 makes tsc emit real ESM for it. node20 rather than node16
+    // because import attributes - `with { type: 'json' }`, which Node ESM
+    // requires for a JSON import - are only supported from node18 upwards.
+    // moduleResolution stays node16; that is the name of the resolution
+    // algorithm, and node20 is not a valid value for it.
+    //
+    // The base config used to set moduleResolution "node" (i.e. node10), which
+    // TypeScript 7 removes outright - the repo could not typecheck at all on
+    // TS 7 (TS5108) until that moved here. See K-11.
     // Required by ts-jest for node16-family module kinds, and a precondition
     // for the ESM move: it forces every type used in a decorated signature to
     // be imported with `import type`, so the emit of one file never depends on
     // type information from another. See docs/decisions/esm-migration-scope.md.
     "isolatedModules": true,
-    "module": "node16",
+    "module": "node20",
     "moduleResolution": "node16",
     "outDir": "dist",
     "rootDir": "src",
