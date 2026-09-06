@@ -49,9 +49,14 @@
   --radius-card: 12px;
   --radius-control: 8px;
   --radius-pill: 999px;
-  --shadow-hero: 0 18px 40px -18px rgb(20 24 31 / 28%);
-  --shadow-card: 0 2px 10px -4px rgb(20 24 31 / 12%);
-  --shadow-control: 0 1px 2px rgb(20 24 31 / 6%);
+  /* Shadows carry a little of the brand hue rather than being neutral grey.
+     A grey drop shadow is what you get by not choosing; tinting it toward the
+     surface's own accent is the difference between a default and a decision.
+     Kept low-saturation so it reads as depth, not as a coloured glow. */
+  --shadow-hero: 0 18px 40px -18px rgb(38 34 82 / 30%);
+  --shadow-card: 0 2px 10px -4px rgb(38 34 82 / 14%);
+  --shadow-card-raised: 0 10px 26px -12px rgb(38 34 82 / 26%);
+  --shadow-control: 0 1px 2px rgb(38 34 82 / 8%);
 
   --on-brand: #ffffff;
   --terracotta-brand-500: #d97757;
@@ -277,8 +282,12 @@
   --category-support: #67c4ee;
   --category-licensing: #bb8fe0;
   --category-operations: #98a1b3;
+  /* Dark stays near-black rather than brand-tinted: on a dark ground a coloured
+     shadow reads as a glow, which is the opposite of depth. Only the raised
+     variant is added, to match the light theme's hover lift. */
   --shadow-hero: 0 18px 40px -18px rgb(0 0 0 / 60%);
   --shadow-card: 0 2px 10px -4px rgb(0 0 0 / 45%);
+  --shadow-card-raised: 0 10px 26px -12px rgb(0 0 0 / 58%);
   --shadow-control: 0 1px 2px rgb(0 0 0 / 35%);
   --brand-600: #7b7bf0;
   --brand-500: #9d9dfa;
