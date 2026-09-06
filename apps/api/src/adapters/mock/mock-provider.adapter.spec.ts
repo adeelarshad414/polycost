@@ -1,3 +1,4 @@
+import { describe, it, expect } from '@jest/globals';
 import { InMemoryPricingCatalogReader } from '../common/in-memory-pricing-catalog.reader.js';
 import { MockProviderAdapter } from './mock-provider.adapter.js';
 

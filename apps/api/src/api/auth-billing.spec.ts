@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { createHash } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 import { ComparisonResult } from '../comparison/comparison.types.js';
@@ -13,6 +14,7 @@ import { InvoiceEvidenceNotaryService } from './invoice-evidence-notary.service.
 import { hashPassword } from './password-hash.js';
 import { DomainMetricsService } from '../observability/domain-metrics.service.js';
 import { MetricsService } from '../observability/metrics.service.js';
+import type { InvitationDeliveryService } from './invitation-delivery.service.js';
 
 const account: LocalAccountWithPassword = {
   accountId: '11111111-1111-4111-8111-111111111111',
@@ -38,6 +40,11 @@ const identity: AuthIdentity = {
   sessionId: '33333333-3333-4333-8333-333333333333',
   expiresAt: '2026-07-07T00:00:00.000Z',
 };
+
+// AuthIdentity.teamId is optional by design, but this fixture always has a
+// default team and the repository methods asserted below require a string.
+// Narrowed once here rather than at each assertion.
+const identityTeamId = identity.teamId as string;
 
 const comparisonResult: ComparisonResult = {
   comparisonId: '44444444-4444-4444-8444-444444444444',
@@ -328,13 +335,15 @@ describe('AuthService', () => {
       createdAt: '2026-07-06T00:00:00.000Z',
     }));
     const deliveryService = {
-      deliverTeamInvitation: jest.fn(async () => ({
-        mode: 'webhook' as const,
-        status: 'accepted' as const,
-        message: 'Invite delivery webhook accepted the invitation.',
-        tokenExposedInResponse: false,
-        deliveredAt: '2026-07-06T00:00:01.000Z',
-      })),
+      deliverTeamInvitation: jest.fn<InvitationDeliveryService['deliverTeamInvitation']>(
+        async () => ({
+          mode: 'webhook' as const,
+          status: 'accepted' as const,
+          message: 'Invite delivery webhook accepted the invitation.',
+          tokenExposedInResponse: false,
+          deliveredAt: '2026-07-06T00:00:01.000Z',
+        }),
+      ),
     };
     const service = new AuthService(repository as never, configService(), deliveryService as never);
 
@@ -4038,7 +4047,7 @@ describe('BillingService', () => {
       evidence: input.evidence,
     }));
     const storageService = {
-      store: jest.fn(async () => ({
+      store: jest.fn<InvoiceArtifactStorageService['store']>(async () => ({
         storageBackend: 'aws-s3' as const,
         objectStoreBucket: 'polycost-invoice-artifacts',
         objectStoreRegion: 'us-east-1',
@@ -4048,7 +4057,7 @@ describe('BillingService', () => {
         objectStoreETag: '"etag"',
         objectStoreVersion: 'v1',
       })),
-      read: jest.fn(),
+      read: jest.fn<InvoiceArtifactStorageService['read']>(),
     } as unknown as InvoiceArtifactStorageService;
     const service = new BillingService(
       repository as never,
@@ -4361,8 +4370,8 @@ describe('BillingService', () => {
       },
     });
     const storageService = {
-      store: jest.fn(),
-      read: jest.fn(async () => Buffer.from('invoice')),
+      store: jest.fn<InvoiceArtifactStorageService['store']>(),
+      read: jest.fn<InvoiceArtifactStorageService['read']>(async () => Buffer.from('invoice')),
     } as unknown as InvoiceArtifactStorageService;
     const service = new BillingService(
       repository as never,
@@ -4485,11 +4494,11 @@ describe('BillingService', () => {
     // SEC-2: all retention work is scoped to the caller's team.
     expect(repository.summarizeInvoiceArtifactRetention).toHaveBeenCalledWith(
       expect.any(String),
-      identity.teamId,
+      identityTeamId,
     );
     expect(repository.listExpiredInvoiceArtifactBlobDeletionCandidates).toHaveBeenCalledWith(
       expect.any(String),
-      identity.teamId,
+      identityTeamId,
     );
     expect(repository.deleteInvoiceArtifactBlobsByIds).toHaveBeenCalledWith(
       [
@@ -4498,7 +4507,7 @@ describe('BillingService', () => {
         'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
       ],
       expect.any(String),
-      identity.teamId,
+      identityTeamId,
     );
     expect(repository.deleteExpiredInvoiceArtifactBlobs).not.toHaveBeenCalled();
   });
@@ -4527,7 +4536,7 @@ describe('BillingService', () => {
     ]);
     repository.deleteInvoiceArtifactBlobsByIds.mockResolvedValue(2);
     const storageService = {
-      delete: jest.fn().mockResolvedValue(undefined),
+      delete: jest.fn<InvoiceArtifactStorageService['delete']>().mockResolvedValue(undefined),
     } as unknown as InvoiceArtifactStorageService;
     const service = new BillingService(
       repository as never,
@@ -4560,7 +4569,7 @@ describe('BillingService', () => {
     expect(repository.deleteInvoiceArtifactBlobsByIds).toHaveBeenCalledWith(
       ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'],
       expect.any(String),
-      identity.teamId,
+      identityTeamId,
     );
   });
 
@@ -5044,55 +5053,65 @@ function invoiceLineItem(serviceName: string, skuId: string, costUsd: number, ca
 
 function repositoryMock() {
   return {
-    findLocalAccountByEmail: jest.fn(),
-    createLocalAccountWithTeam: jest.fn(),
-    updateAccountProfile: jest.fn(),
-    updateAccountPassword: jest.fn(),
-    deactivateAccount: jest.fn(),
-    createSession: jest.fn(),
-    listAccountSessions: jest.fn(),
-    revokeOtherSessions: jest.fn(),
-    updateSessionTeam: jest.fn(),
-    recordFailedLogin: jest.fn(),
-    resetFailedLogin: jest.fn(),
-    resolveSession: jest.fn(),
-    listAccountTeams: jest.fn(),
-    createTeamForAccount: jest.fn(),
-    updateTeamSettings: jest.fn(),
-    recordTeamAuditEvent: jest.fn(),
-    listTeamAuditEvents: jest.fn(),
-    getTeamMembership: jest.fn(),
-    listTeamMembers: jest.fn(),
-    createTeamInvitation: jest.fn(),
-    listTeamInvitations: jest.fn(),
-    revokeTeamInvitation: jest.fn(),
-    resendTeamInvitation: jest.fn(),
-    findInvitationByTokenHash: jest.fn(),
-    findPendingInvitationByTokenHash: jest.fn(),
-    acceptTeamInvitation: jest.fn(),
-    countTeamOwners: jest.fn(),
-    updateTeamMemberRole: jest.fn(),
-    removeTeamMember: jest.fn(),
-    listSsoProviderConfigs: jest.fn(),
-    upsertSsoProviderConfig: jest.fn(),
-    upsertExternalAccountForTeam: jest.fn(),
-    createBillingImport: jest.fn(),
-    getBillingImport: jest.fn(),
-    listInvoiceLineItems: jest.fn(),
-    getComparison: jest.fn(),
-    saveInvoiceReconciliation: jest.fn(),
-    listInvoiceReconciliations: jest.fn(),
-    getInvoiceReconciliation: jest.fn(),
-    updateInvoiceReconciliationEvidence: jest.fn(),
-    saveInvoiceArtifactBlobAndUpdateEvidence: jest.fn(),
-    updateInvoiceArtifactLegalHoldAndEvidence: jest.fn(),
-    updateInvoiceArtifactProviderRetentionProofAndEvidence: jest.fn(),
-    getInvoiceArtifactBlob: jest.fn(),
-    getInvoiceArtifactBlobLegalHold: jest.fn(),
-    summarizeInvoiceArtifactRetention: jest.fn(),
-    listExpiredInvoiceArtifactBlobDeletionCandidates: jest.fn(),
-    deleteInvoiceArtifactBlobsByIds: jest.fn(),
-    deleteExpiredInvoiceArtifactBlobs: jest.fn(),
+    findLocalAccountByEmail: jest.fn<ApiDatabaseRepository['findLocalAccountByEmail']>(),
+    createLocalAccountWithTeam: jest.fn<ApiDatabaseRepository['createLocalAccountWithTeam']>(),
+    updateAccountProfile: jest.fn<ApiDatabaseRepository['updateAccountProfile']>(),
+    updateAccountPassword: jest.fn<ApiDatabaseRepository['updateAccountPassword']>(),
+    deactivateAccount: jest.fn<ApiDatabaseRepository['deactivateAccount']>(),
+    createSession: jest.fn<ApiDatabaseRepository['createSession']>(),
+    listAccountSessions: jest.fn<ApiDatabaseRepository['listAccountSessions']>(),
+    revokeOtherSessions: jest.fn<ApiDatabaseRepository['revokeOtherSessions']>(),
+    updateSessionTeam: jest.fn<ApiDatabaseRepository['updateSessionTeam']>(),
+    recordFailedLogin: jest.fn<ApiDatabaseRepository['recordFailedLogin']>(),
+    resetFailedLogin: jest.fn<ApiDatabaseRepository['resetFailedLogin']>(),
+    resolveSession: jest.fn<ApiDatabaseRepository['resolveSession']>(),
+    listAccountTeams: jest.fn<ApiDatabaseRepository['listAccountTeams']>(),
+    createTeamForAccount: jest.fn<ApiDatabaseRepository['createTeamForAccount']>(),
+    updateTeamSettings: jest.fn<ApiDatabaseRepository['updateTeamSettings']>(),
+    recordTeamAuditEvent: jest.fn<ApiDatabaseRepository['recordTeamAuditEvent']>(),
+    listTeamAuditEvents: jest.fn<ApiDatabaseRepository['listTeamAuditEvents']>(),
+    getTeamMembership: jest.fn<ApiDatabaseRepository['getTeamMembership']>(),
+    listTeamMembers: jest.fn<ApiDatabaseRepository['listTeamMembers']>(),
+    createTeamInvitation: jest.fn<ApiDatabaseRepository['createTeamInvitation']>(),
+    listTeamInvitations: jest.fn<ApiDatabaseRepository['listTeamInvitations']>(),
+    revokeTeamInvitation: jest.fn<ApiDatabaseRepository['revokeTeamInvitation']>(),
+    resendTeamInvitation: jest.fn<ApiDatabaseRepository['resendTeamInvitation']>(),
+    findInvitationByTokenHash: jest.fn<ApiDatabaseRepository['findInvitationByTokenHash']>(),
+    findPendingInvitationByTokenHash:
+      jest.fn<ApiDatabaseRepository['findPendingInvitationByTokenHash']>(),
+    acceptTeamInvitation: jest.fn<ApiDatabaseRepository['acceptTeamInvitation']>(),
+    countTeamOwners: jest.fn<ApiDatabaseRepository['countTeamOwners']>(),
+    updateTeamMemberRole: jest.fn<ApiDatabaseRepository['updateTeamMemberRole']>(),
+    removeTeamMember: jest.fn<ApiDatabaseRepository['removeTeamMember']>(),
+    listSsoProviderConfigs: jest.fn<ApiDatabaseRepository['listSsoProviderConfigs']>(),
+    upsertSsoProviderConfig: jest.fn<ApiDatabaseRepository['upsertSsoProviderConfig']>(),
+    upsertExternalAccountForTeam: jest.fn<ApiDatabaseRepository['upsertExternalAccountForTeam']>(),
+    createBillingImport: jest.fn<ApiDatabaseRepository['createBillingImport']>(),
+    getBillingImport: jest.fn<ApiDatabaseRepository['getBillingImport']>(),
+    listInvoiceLineItems: jest.fn<ApiDatabaseRepository['listInvoiceLineItems']>(),
+    getComparison: jest.fn<ApiDatabaseRepository['getComparison']>(),
+    saveInvoiceReconciliation: jest.fn<ApiDatabaseRepository['saveInvoiceReconciliation']>(),
+    listInvoiceReconciliations: jest.fn<ApiDatabaseRepository['listInvoiceReconciliations']>(),
+    getInvoiceReconciliation: jest.fn<ApiDatabaseRepository['getInvoiceReconciliation']>(),
+    updateInvoiceReconciliationEvidence:
+      jest.fn<ApiDatabaseRepository['updateInvoiceReconciliationEvidence']>(),
+    saveInvoiceArtifactBlobAndUpdateEvidence:
+      jest.fn<ApiDatabaseRepository['saveInvoiceArtifactBlobAndUpdateEvidence']>(),
+    updateInvoiceArtifactLegalHoldAndEvidence:
+      jest.fn<ApiDatabaseRepository['updateInvoiceArtifactLegalHoldAndEvidence']>(),
+    updateInvoiceArtifactProviderRetentionProofAndEvidence:
+      jest.fn<ApiDatabaseRepository['updateInvoiceArtifactProviderRetentionProofAndEvidence']>(),
+    getInvoiceArtifactBlob: jest.fn<ApiDatabaseRepository['getInvoiceArtifactBlob']>(),
+    getInvoiceArtifactBlobLegalHold:
+      jest.fn<ApiDatabaseRepository['getInvoiceArtifactBlobLegalHold']>(),
+    summarizeInvoiceArtifactRetention:
+      jest.fn<ApiDatabaseRepository['summarizeInvoiceArtifactRetention']>(),
+    listExpiredInvoiceArtifactBlobDeletionCandidates:
+      jest.fn<ApiDatabaseRepository['listExpiredInvoiceArtifactBlobDeletionCandidates']>(),
+    deleteInvoiceArtifactBlobsByIds:
+      jest.fn<ApiDatabaseRepository['deleteInvoiceArtifactBlobsByIds']>(),
+    deleteExpiredInvoiceArtifactBlobs:
+      jest.fn<ApiDatabaseRepository['deleteExpiredInvoiceArtifactBlobs']>(),
   } as unknown as jest.Mocked<ApiDatabaseRepository>;
 }
 
@@ -5112,7 +5131,7 @@ function configService(overrides: Partial<AppConfig> = {}): ConfigService<AppCon
   const overrideMap = new Map(Object.entries(overrides));
 
   return {
-    get: jest.fn((key: keyof AppConfig) => {
+    get: jest.fn<ConfigService['get']>((key: keyof AppConfig) => {
       if (overrideMap.has(key)) {
         return overrideMap.get(key);
       }

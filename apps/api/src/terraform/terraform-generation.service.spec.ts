@@ -1,4 +1,5 @@
 /* eslint-disable security/detect-non-literal-fs-filename -- Reviewed 2026-07-08: this spec materializes generated Terraform files into an isolated mkdtemp directory to execute the generated manifest verifier and tamper check; see docs/SECURITY-SUPPRESSIONS.md. */
+import { describe, it, expect } from '@jest/globals';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

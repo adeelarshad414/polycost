@@ -1,3 +1,4 @@
+import { describe, it, expect } from '@jest/globals';
 import { IntervalCostCalculator } from './interval-cost-calculator.js';
 
 describe('IntervalCostCalculator', () => {

@@ -1,3 +1,4 @@
+import { describe, it, expect } from '@jest/globals';
 import { NormalizedWorkloadSpec } from '../nws/nws.types.js';
 import { EquivalentServiceMapper } from './equivalent-service-mapper.js';
 

@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { NestFactory } from '@nestjs/core';
 import { MetricsController } from './metrics.controller.js';
 import { MetricsService, normalizeRoute } from './metrics.service.js';

@@ -1,3 +1,4 @@
+import { describe, it, expect } from '@jest/globals';
 import { PricingCatalogRecord } from '../adapters/common/cloud-provider-adapter.js';
 import { normalizePricingCatalogRecords } from './normalized-pricing-records.js';
 

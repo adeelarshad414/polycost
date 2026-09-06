@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import {
   CloudProviderAdapter,
   ProviderId,
@@ -849,7 +850,7 @@ describe('ComparisonOrchestratorService', () => {
     expect(result.providers).toHaveLength(3);
     expect(
       result.requirements?.serviceRequirements.map((requirement) => requirement.serviceType),
-    ).toEqual(expect.arrayContaining(UI_PRICED_SERVICE_FAMILY_IDS));
+    ).toEqual(expect.arrayContaining([...UI_PRICED_SERVICE_FAMILY_IDS]));
 
     for (const provider of result.providers) {
       const skuIds = new Set(provider.lineItems.map((lineItem) => lineItem.skuId));

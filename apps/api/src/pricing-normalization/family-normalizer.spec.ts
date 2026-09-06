@@ -1,3 +1,4 @@
+import { describe, it, expect } from '@jest/globals';
 import { normalizeInstanceFamily } from './family-normalizer.js';
 
 describe('normalizeInstanceFamily', () => {

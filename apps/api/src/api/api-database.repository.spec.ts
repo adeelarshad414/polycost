@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { ConfigService } from '@nestjs/config';
 import { ComparisonResult } from '../comparison/comparison.types.js';
 import { AppConfig } from '../config/config.schema.js';
@@ -6,8 +7,19 @@ import { SecretsReader } from '../secrets/secrets.service.js';
 import { ApiDatabaseRepository, PgPoolLike } from './api-database.repository.js';
 import { ApiConflictError } from './api-errors.js';
 
+/**
+ * The signature every pg query double must satisfy.
+ *
+ * Taken from the production interface rather than written out here, so a mock
+ * cannot drift from the contract it stands in for. Before @jest/globals these
+ * were bare `jest.fn()`, typed `() => unknown` - which let a test assert
+ * `toHaveBeenCalledWith(sql, params)` against a mock that declared no
+ * parameters at all.
+ */
+type QueryMock = (...args: Parameters<PgPoolLike['query']>) => ReturnType<PgPoolLike['query']>;
+
 const configService = {
-  get: jest.fn((key: keyof AppConfig) => {
+  get: jest.fn<ConfigService['get']>((key: keyof AppConfig) => {
     switch (key) {
       case 'DB_HOST':
         return 'postgres';
@@ -22,7 +34,7 @@ const configService = {
 } as unknown as ConfigService<AppConfig, true>;
 
 const secretsReader: SecretsReader = {
-  getSecret: jest.fn(async (_path: string, key: string) =>
+  getSecret: jest.fn<SecretsReader['getSecret']>(async (_path: string, key: string) =>
     key === 'username' ? 'polycost_app' : 'app-password',
   ),
 };
@@ -67,7 +79,7 @@ const nwsSnapshot: NormalizedWorkloadSpec = {
 describe('ApiDatabaseRepository', () => {
   it('saves and retrieves comparison snapshots through the app DB role', async () => {
     const query = jest
-      .fn()
+      .fn<QueryMock>()
       .mockResolvedValueOnce({
         rows: [],
         rowCount: 1,
@@ -99,7 +111,7 @@ describe('ApiDatabaseRepository', () => {
 
   it('returns undefined for missing comparison snapshots', async () => {
     const repository = createRepository(
-      jest.fn(async () => ({
+      jest.fn<QueryMock>(async () => ({
         rows: [],
         rowCount: 0,
       })),
@@ -109,7 +121,7 @@ describe('ApiDatabaseRepository', () => {
   });
 
   it('records comparison audit rows from provider line items', async () => {
-    const query = jest.fn(async () => ({
+    const query = jest.fn<QueryMock>(async () => ({
       rows: [],
       rowCount: 1,
     }));
@@ -211,7 +223,7 @@ describe('ApiDatabaseRepository', () => {
 
   it('returns latest pricing status for every provider', async () => {
     const repository = createRepository(
-      jest.fn(async () => ({
+      jest.fn<QueryMock>(async () => ({
         rows: [
           {
             provider: 'aws',
@@ -265,7 +277,7 @@ describe('ApiDatabaseRepository', () => {
   it('summarizes provider freshness through the data-health response', async () => {
     const repository = createRepository(
       jest
-        .fn()
+        .fn<QueryMock>()
         .mockResolvedValueOnce({
           rows: [
             {
@@ -397,7 +409,7 @@ describe('ApiDatabaseRepository', () => {
   it('never reports fresh-live when the served catalog is mock/seeded data', async () => {
     const repository = createRepository(
       jest
-        .fn()
+        .fn<QueryMock>()
         .mockResolvedValueOnce({
           rows: [
             {
@@ -455,7 +467,7 @@ describe('ApiDatabaseRepository', () => {
     const createdAt = new Date('2026-07-01T00:00:00.000Z');
     const startedAt = new Date('2026-07-01T00:00:05.000Z');
     const query = jest
-      .fn()
+      .fn<QueryMock>()
       .mockResolvedValueOnce({
         rows: [
           {
@@ -565,7 +577,7 @@ describe('ApiDatabaseRepository', () => {
 
   it('reads completed report export artifacts and records export failures', async () => {
     const query = jest
-      .fn()
+      .fn<QueryMock>()
       .mockResolvedValueOnce({
         rows: [
           {
@@ -619,7 +631,7 @@ describe('ApiDatabaseRepository', () => {
 
   it('creates, starts, and finishes comparison prewarm jobs', async () => {
     const query = jest
-      .fn()
+      .fn<QueryMock>()
       .mockResolvedValueOnce({
         rows: [
           {
@@ -694,7 +706,7 @@ describe('ApiDatabaseRepository', () => {
 
   it('creates normalized workload records through the app DB role', async () => {
     const repository = createRepository(
-      jest.fn(async () => ({
+      jest.fn<QueryMock>(async () => ({
         rows: [
           {
             id: '22222222-2222-4222-8222-222222222222',
@@ -737,7 +749,7 @@ describe('ApiDatabaseRepository', () => {
   });
 
   it('compares normalized cached pricing across canonical provider regions', async () => {
-    const query = jest.fn(async () => ({
+    const query = jest.fn<QueryMock>(async () => ({
       rows: [
         {
           provider: 'aws',
@@ -787,7 +799,7 @@ describe('ApiDatabaseRepository', () => {
 
   it('returns cached exchange rates keyed by quote currency', async () => {
     const repository = createRepository(
-      jest.fn(async () => ({
+      jest.fn<QueryMock>(async () => ({
         rows: [
           {
             quote_currency: 'EUR',
@@ -816,7 +828,7 @@ describe('ApiDatabaseRepository', () => {
 
   it('lists budgets with workload details for modeled-cost evaluation', async () => {
     const repository = createRepository(
-      jest.fn(async () => ({
+      jest.fn<QueryMock>(async () => ({
         rows: [
           {
             budget_id: '11111111-1111-4111-8111-111111111111',
@@ -863,7 +875,7 @@ describe('ApiDatabaseRepository', () => {
 
   it('upserts exchange-rate snapshots and cleans up expired share links', async () => {
     const query = jest
-      .fn()
+      .fn<QueryMock>()
       .mockResolvedValueOnce({ rows: [], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [], rowCount: 3 });
@@ -893,7 +905,7 @@ describe('ApiDatabaseRepository', () => {
 
   it('records and summarizes non-PII share-link analytics', async () => {
     const query = jest
-      .fn()
+      .fn<QueryMock>()
       .mockResolvedValueOnce({
         rows: [],
         rowCount: 1,
@@ -956,7 +968,7 @@ describe('ApiDatabaseRepository', () => {
     const createdAt = new Date('2026-07-06T00:00:00.000Z');
     const expiresAt = new Date('2026-07-07T00:00:00.000Z');
     const query = jest
-      .fn()
+      .fn<QueryMock>()
       .mockResolvedValueOnce({ rows: [], rowCount: 0 })
       .mockResolvedValueOnce({
         rows: [
@@ -1144,7 +1156,7 @@ describe('ApiDatabaseRepository', () => {
     const createdAt = new Date('2026-07-06T00:00:00.000Z');
     const expiresAt = new Date('2026-07-13T00:00:00.000Z');
     const query = jest
-      .fn()
+      .fn<QueryMock>()
       .mockResolvedValueOnce({ rows: [], rowCount: 0 })
       .mockResolvedValueOnce({ rows: [], rowCount: 0 })
       .mockResolvedValueOnce({
@@ -1228,7 +1240,7 @@ describe('ApiDatabaseRepository', () => {
 
   it('switches the current session to another account team through membership proof', async () => {
     const expiresAt = new Date('2026-07-07T00:00:00.000Z');
-    const query = jest.fn().mockResolvedValueOnce({
+    const query = jest.fn<QueryMock>().mockResolvedValueOnce({
       rows: [
         {
           session_id: '33333333-3333-4333-8333-333333333333',
@@ -1271,7 +1283,7 @@ describe('ApiDatabaseRepository', () => {
     ]);
 
     const missingRepository = createRepository(
-      jest.fn(async () => ({
+      jest.fn<QueryMock>(async () => ({
         rows: [],
         rowCount: 0,
       })),
@@ -1304,7 +1316,7 @@ describe('ApiDatabaseRepository', () => {
       accepted_at: null,
       revoked_at: null,
     };
-    const query = jest.fn(async (text: string) => {
+    const query = jest.fn<QueryMock>(async (text: string) => {
       if (text === 'BEGIN' || text === 'COMMIT' || text === 'ROLLBACK') {
         return { rows: [], rowCount: 0 };
       }
@@ -1707,7 +1719,7 @@ describe('ApiDatabaseRepository', () => {
       object_store_version: null,
       ...providerRetentionProofRow,
     };
-    const query = jest.fn(async (text: string, values?: unknown[]) => {
+    const query = jest.fn<QueryMock>(async (text: string, values?: unknown[]) => {
       if (text === 'BEGIN' || text === 'COMMIT' || text === 'ROLLBACK') {
         return { rows: [], rowCount: 0 };
       }
@@ -2280,7 +2292,7 @@ describe('ApiDatabaseRepository', () => {
 
   it('summarizes and deletes expired invoice artifact blobs without touching legal holds', async () => {
     const query = jest
-      .fn()
+      .fn<QueryMock>()
       .mockResolvedValueOnce({
         rows: [
           {
@@ -2288,9 +2300,11 @@ describe('ApiDatabaseRepository', () => {
             legal_hold_skipped: '1',
           },
         ],
+        rowCount: 1,
       })
       .mockResolvedValueOnce({
         rows: [{ id: 'artifact-blob-1' }, { id: 'artifact-blob-2' }],
+        rowCount: 2,
       });
     const repository = createRepository(query);
     const evaluatedAt = '2026-07-08T00:00:00.000Z';
@@ -2324,7 +2338,7 @@ describe('ApiDatabaseRepository', () => {
 
   it('lists expired invoice artifact deletion candidates and deletes eligible ids only', async () => {
     const query = jest
-      .fn()
+      .fn<QueryMock>()
       .mockResolvedValueOnce({
         rows: [
           {
@@ -2347,12 +2361,14 @@ describe('ApiDatabaseRepository', () => {
             object_store_version: null,
           },
         ],
+        rowCount: 2,
       })
       .mockResolvedValueOnce({
         rows: [
           { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
           { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' },
         ],
+        rowCount: 2,
       });
     const repository = createRepository(query);
     const evaluatedAt = '2026-07-08T00:00:00.000Z';
@@ -2405,7 +2421,7 @@ describe('ApiDatabaseRepository', () => {
 
   it('maps externally stored invoice artifact blob pointers without inline bytes', async () => {
     const uploadedAt = new Date('2026-07-08T00:00:00.000Z');
-    const query = jest.fn(async () => ({
+    const query = jest.fn<QueryMock>(async () => ({
       rows: [
         {
           id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -2444,6 +2460,7 @@ describe('ApiDatabaseRepository', () => {
           provider_retention_proof_caveats: ['captured from AWS S3 Object Lock control plane'],
         },
       ],
+      rowCount: 1,
     }));
     const repository = createRepository(query);
 
@@ -2498,7 +2515,7 @@ describe('ApiDatabaseRepository', () => {
     // Route by SQL text so the assertions are robust to the BEGIN/COMMIT that now
     // wrap the standalone recordTeamAuditEvent path (DB-3: event + outbox must be
     // atomic).
-    const query = jest.fn(async (text: string) => {
+    const query = jest.fn<QueryMock>(async (text: string) => {
       if (text.includes('INSERT INTO team_audit_events')) {
         return { rows: [auditRow(null)], rowCount: 1 };
       }
@@ -2562,7 +2579,7 @@ describe('ApiDatabaseRepository', () => {
 
   it('enqueues the audit export outbox atomically with the event on the standalone path (DB-3)', async () => {
     const createdAt = new Date('2026-07-06T00:00:00.000Z');
-    const query = jest.fn(async (text: string) => {
+    const query = jest.fn<QueryMock>(async (text: string) => {
       if (text.includes('INSERT INTO team_audit_events')) {
         return {
           rows: [
@@ -2585,7 +2602,7 @@ describe('ApiDatabaseRepository', () => {
     });
     const pool = {
       query,
-      end: jest.fn(async () => undefined),
+      end: jest.fn<PgPoolLike['end']>(async () => undefined),
     } as unknown as PgPoolLike;
     const repository = new ApiDatabaseRepository(
       configServiceWith({ AUTH_AUDIT_EXPORT_MODE: 'webhook' }),
@@ -2632,7 +2649,7 @@ describe('ApiDatabaseRepository', () => {
       accepted_at: null,
       revoked_at: null,
     };
-    const clientQuery = jest.fn(async (text: string) => {
+    const clientQuery = jest.fn<QueryMock>(async (text: string) => {
       if (text === 'BEGIN' || text === 'COMMIT' || text === 'ROLLBACK') {
         return { rows: [], rowCount: 0 };
       }
@@ -2670,7 +2687,7 @@ describe('ApiDatabaseRepository', () => {
       query: clientQuery,
       release: jest.fn(),
     };
-    const poolQuery = jest.fn(async () => ({
+    const poolQuery = jest.fn<QueryMock>(async () => ({
       rows: [],
       rowCount: 0,
     }));
@@ -2678,7 +2695,7 @@ describe('ApiDatabaseRepository', () => {
     const pool = {
       query: poolQuery,
       connect,
-      end: jest.fn(async () => undefined),
+      end: jest.fn<PgPoolLike['end']>(async () => undefined),
     } as unknown as PgPoolLike;
     const repository = new ApiDatabaseRepository(
       configServiceWith({ AUTH_AUDIT_EXPORT_MODE: 'webhook' }),
@@ -2743,7 +2760,7 @@ describe('ApiDatabaseRepository', () => {
   });
 
   it('releases checked-out database clients when transaction start fails', async () => {
-    const clientQuery = jest.fn(async (text: string) => {
+    const clientQuery = jest.fn<QueryMock>(async (text: string) => {
       if (text === 'BEGIN') {
         throw new Error('begin failed');
       }
@@ -2755,12 +2772,14 @@ describe('ApiDatabaseRepository', () => {
       release: jest.fn(),
     };
     const pool = {
-      query: jest.fn(async () => ({
+      query: jest.fn<QueryMock>(async () => ({
         rows: [],
         rowCount: 0,
       })),
-      connect: jest.fn(async () => client),
-      end: jest.fn(async () => undefined),
+      connect: jest.fn<NonNullable<PgPoolLike['connect']>>(
+        async () => client as unknown as Awaited<ReturnType<NonNullable<PgPoolLike['connect']>>>,
+      ),
+      end: jest.fn<PgPoolLike['end']>(async () => undefined),
     } as unknown as PgPoolLike;
     const repository = new ApiDatabaseRepository(configService, secretsReader, () => pool);
 
@@ -2783,7 +2802,7 @@ describe('ApiDatabaseRepository', () => {
   it('claims and updates team audit export outbox rows', async () => {
     const createdAt = new Date('2026-07-06T00:00:00.000Z');
     const attemptedAt = new Date('2026-07-06T00:05:00.000Z');
-    const query = jest.fn(async (text: string) => {
+    const query = jest.fn<QueryMock>(async (text: string) => {
       if (text.includes('WITH selected_exports')) {
         return {
           rows: [
@@ -2881,7 +2900,7 @@ describe('ApiDatabaseRepository', () => {
 
   it('rolls back transactional auth and billing writes and closes the pool', async () => {
     const authFailureQuery = jest
-      .fn()
+      .fn<QueryMock>()
       .mockResolvedValueOnce({ rows: [], rowCount: 0 })
       .mockRejectedValueOnce(new Error('account insert failed'))
       .mockResolvedValueOnce({ rows: [], rowCount: 0 });
@@ -2900,7 +2919,7 @@ describe('ApiDatabaseRepository', () => {
     expect(authFailureQuery).toHaveBeenNthCalledWith(3, 'ROLLBACK');
 
     const invitationFailureQuery = jest
-      .fn()
+      .fn<QueryMock>()
       .mockResolvedValueOnce({ rows: [], rowCount: 0 })
       .mockResolvedValueOnce({ rows: [], rowCount: 0 })
       .mockResolvedValueOnce({ rows: [], rowCount: 0 });
@@ -2917,7 +2936,7 @@ describe('ApiDatabaseRepository', () => {
     expect(invitationFailureQuery).toHaveBeenNthCalledWith(3, 'ROLLBACK');
 
     const billingFailureQuery = jest
-      .fn()
+      .fn<QueryMock>()
       .mockResolvedValueOnce({ rows: [], rowCount: 0 })
       .mockRejectedValueOnce(new Error('billing insert failed'))
       .mockResolvedValueOnce({ rows: [], rowCount: 0 });
@@ -2940,7 +2959,7 @@ describe('ApiDatabaseRepository', () => {
     expect(billingFailureQuery).toHaveBeenNthCalledWith(3, 'ROLLBACK');
 
     const missingSessionRepository = createRepository(
-      jest.fn(async () => ({
+      jest.fn<QueryMock>(async () => ({
         rows: [],
         rowCount: 0,
       })),
@@ -2950,11 +2969,11 @@ describe('ApiDatabaseRepository', () => {
     ).resolves.toBeUndefined();
 
     const pool: PgPoolLike = {
-      query: jest.fn(async () => ({
+      query: jest.fn<QueryMock>(async () => ({
         rows: [],
         rowCount: 0,
-      })),
-      end: jest.fn(async () => undefined),
+      })) as unknown as PgPoolLike['query'],
+      end: jest.fn<PgPoolLike['end']>(async () => undefined),
     };
     const repository = new ApiDatabaseRepository(configService, secretsReader, () => pool);
 
@@ -2965,7 +2984,7 @@ describe('ApiDatabaseRepository', () => {
   });
 
   it('guards invoice evidence writes with an optimistic-hash check and raises a conflict on mismatch', async () => {
-    const query = jest.fn(async (text: string) => {
+    const query = jest.fn<QueryMock>(async (text: string) => {
       if (
         text.includes('BEGIN') ||
         text.includes('COMMIT') ||
@@ -3005,7 +3024,7 @@ describe('ApiDatabaseRepository', () => {
   });
 
   it('persists a comparison and its audit log atomically in one transaction (DB-3)', async () => {
-    const query = jest.fn(async () => ({ rows: [], rowCount: 0 }));
+    const query = jest.fn<QueryMock>(async () => ({ rows: [], rowCount: 0 }));
     const repository = createRepository(query);
 
     await repository.saveComparisonWithAuditLog(
@@ -3067,7 +3086,7 @@ describe('ApiDatabaseRepository', () => {
       completed_at: createdAt,
       error_detail: null,
     };
-    const query = jest.fn(async (text: string, values?: unknown[]) => {
+    const query = jest.fn<QueryMock>(async (text: string, values?: unknown[]) => {
       if (text.includes('INSERT INTO billing_import_runs')) {
         return { rows: [importRunBase], rowCount: 1 };
       }
@@ -3159,7 +3178,7 @@ describe('ApiDatabaseRepository', () => {
   });
 
   it('reports expired rows without deleting in report-only mode (DB-2)', async () => {
-    const query = jest.fn(async (text: string) => {
+    const query = jest.fn<QueryMock>(async (text: string) => {
       if (text.startsWith('SELECT COUNT(*)')) {
         return { rows: [{ eligible: '7' }], rowCount: 1 };
       }
@@ -3189,7 +3208,7 @@ describe('ApiDatabaseRepository', () => {
   });
 
   it('deletes bounded batches and guards undelivered audit exports in delete mode (DB-2)', async () => {
-    const query = jest.fn(async (text: string) => {
+    const query = jest.fn<QueryMock>(async (text: string) => {
       if (text.startsWith('SELECT COUNT(*)')) {
         return { rows: [{ eligible: '3' }], rowCount: 1 };
       }
@@ -3242,10 +3261,14 @@ function retentionWindows() {
   };
 }
 
-function createRepository(query: jest.Mock): ApiDatabaseRepository {
+function createRepository(query: jest.Mock<QueryMock>): ApiDatabaseRepository {
   const pool: PgPoolLike = {
-    query,
-    end: jest.fn(async () => undefined),
+    // PgPoolLike['query'] is generic in its row type; a mock is a concrete
+    // function and cannot be. QueryMock is that same signature with the row
+    // type instantiated as unknown, so this cast is the seam between the two
+    // and the only one in the file.
+    query: query as unknown as PgPoolLike['query'],
+    end: jest.fn<PgPoolLike['end']>(async () => undefined),
   };
 
   return new ApiDatabaseRepository(configService, secretsReader, () => pool);
@@ -3253,7 +3276,7 @@ function createRepository(query: jest.Mock): ApiDatabaseRepository {
 
 function configServiceWith(overrides: Partial<AppConfig>): ConfigService<AppConfig, true> {
   return {
-    get: jest.fn((key: keyof AppConfig) => {
+    get: jest.fn<ConfigService['get']>((key: keyof AppConfig) => {
       if (key === 'AUTH_AUDIT_EXPORT_MODE' && overrides.AUTH_AUDIT_EXPORT_MODE !== undefined) {
         return overrides.AUTH_AUDIT_EXPORT_MODE;
       }

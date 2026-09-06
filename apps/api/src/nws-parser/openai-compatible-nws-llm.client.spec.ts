@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema.js';
 import { SecretsReader } from '../secrets/secrets.service.js';

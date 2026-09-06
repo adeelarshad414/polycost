@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema.js';
 import { NWSValidationError } from '../nws/nws-validator.js';
@@ -82,7 +83,7 @@ const llmDraft = (): NormalizedWorkloadSpec => ({
 describe('NLParserService', () => {
   it('requests strict structured output and validates the returned NWS draft', async () => {
     const client: StructuredLlmClient = {
-      createStructuredOutput: jest.fn(async () => ({
+      createStructuredOutput: jest.fn<StructuredLlmClient['createStructuredOutput']>(async () => ({
         draftNws: llmDraft(),
         parserConfidence: 'high',
         fieldsRequiringReview: ['compute.0.instanceCount', 123],
@@ -118,7 +119,7 @@ describe('NLParserService', () => {
 
   it('rejects empty, oversized, and clearly non-workload input before calling the LLM', async () => {
     const client: StructuredLlmClient = {
-      createStructuredOutput: jest.fn(async () => ({
+      createStructuredOutput: jest.fn<StructuredLlmClient['createStructuredOutput']>(async () => ({
         draftNws: llmDraft(),
         parserConfidence: 'high',
         fieldsRequiringReview: [],
@@ -136,7 +137,7 @@ describe('NLParserService', () => {
 
   it('uses low confidence defaults for malformed confidence metadata', async () => {
     const client: StructuredLlmClient = {
-      createStructuredOutput: jest.fn(async () => ({
+      createStructuredOutput: jest.fn<StructuredLlmClient['createStructuredOutput']>(async () => ({
         draftNws: llmDraft(),
         parserConfidence: 'certain',
         fieldsRequiringReview: 'compute',
@@ -154,7 +155,7 @@ describe('NLParserService', () => {
 
   it('falls back to local parsing when no LLM endpoint is configured', async () => {
     const client: StructuredLlmClient = {
-      createStructuredOutput: jest.fn(),
+      createStructuredOutput: jest.fn<StructuredLlmClient['createStructuredOutput']>(),
     };
     const service = new NLParserService(configService(4000, false), client, fixedNow);
 
@@ -248,7 +249,7 @@ describe('NLParserService', () => {
 
   it('infers production workload profile signals from natural language', async () => {
     const client: StructuredLlmClient = {
-      createStructuredOutput: jest.fn(),
+      createStructuredOutput: jest.fn<StructuredLlmClient['createStructuredOutput']>(),
     };
     const service = new NLParserService(configService(4000, false), client, fixedNow);
 
@@ -287,7 +288,7 @@ describe('NLParserService', () => {
 
   it('infers SQL Server, BYOL, and enterprise-on-ramp support intent', async () => {
     const client: StructuredLlmClient = {
-      createStructuredOutput: jest.fn(),
+      createStructuredOutput: jest.fn<StructuredLlmClient['createStructuredOutput']>(),
     };
     const service = new NLParserService(configService(4000, false), client, fixedNow);
 
@@ -311,7 +312,7 @@ describe('NLParserService', () => {
 
   it('parses common vCPU and GB server shorthand without confusing storage size', async () => {
     const client: StructuredLlmClient = {
-      createStructuredOutput: jest.fn(),
+      createStructuredOutput: jest.fn<StructuredLlmClient['createStructuredOutput']>(),
     };
     const service = new NLParserService(configService(4000, false), client, fixedNow);
 
@@ -359,7 +360,7 @@ describe('NLParserService', () => {
 
   it('parses burstable and shared-core compute intent explicitly', async () => {
     const client: StructuredLlmClient = {
-      createStructuredOutput: jest.fn(),
+      createStructuredOutput: jest.fn<StructuredLlmClient['createStructuredOutput']>(),
     };
     const service = new NLParserService(configService(4000, false), client, fixedNow);
 
@@ -389,7 +390,7 @@ describe('NLParserService', () => {
 
   it('infers advanced storage dimensions from natural language', async () => {
     const client: StructuredLlmClient = {
-      createStructuredOutput: jest.fn(),
+      createStructuredOutput: jest.fn<StructuredLlmClient['createStructuredOutput']>(),
     };
     const service = new NLParserService(configService(4000, false), client, fixedNow);
 
@@ -437,7 +438,7 @@ describe('NLParserService', () => {
 
   it('infers advanced database dimensions from natural language', async () => {
     const client: StructuredLlmClient = {
-      createStructuredOutput: jest.fn(),
+      createStructuredOutput: jest.fn<StructuredLlmClient['createStructuredOutput']>(),
     };
     const service = new NLParserService(configService(4000, false), client, fixedNow);
 
@@ -491,7 +492,7 @@ describe('NLParserService', () => {
 
   it('infers analytics platform dimensions from natural language', async () => {
     const client: StructuredLlmClient = {
-      createStructuredOutput: jest.fn(),
+      createStructuredOutput: jest.fn<StructuredLlmClient['createStructuredOutput']>(),
     };
     const service = new NLParserService(configService(4000, false), client, fixedNow);
 
@@ -563,7 +564,7 @@ describe('NLParserService', () => {
 
   it('infers AI and machine-learning platform dimensions from natural language', async () => {
     const client: StructuredLlmClient = {
-      createStructuredOutput: jest.fn(),
+      createStructuredOutput: jest.fn<StructuredLlmClient['createStructuredOutput']>(),
     };
     const service = new NLParserService(configService(4000, false), client, fixedNow);
 
@@ -639,7 +640,7 @@ describe('NLParserService', () => {
 
   it('infers integration and API gateway dimensions from natural language', async () => {
     const client: StructuredLlmClient = {
-      createStructuredOutput: jest.fn(),
+      createStructuredOutput: jest.fn<StructuredLlmClient['createStructuredOutput']>(),
     };
     const service = new NLParserService(configService(4000, false), client, fixedNow);
 
@@ -702,7 +703,7 @@ describe('NLParserService', () => {
 
   it('infers security posture and WAF dimensions from natural language', async () => {
     const client: StructuredLlmClient = {
-      createStructuredOutput: jest.fn(),
+      createStructuredOutput: jest.fn<StructuredLlmClient['createStructuredOutput']>(),
     };
     const service = new NLParserService(configService(4000, false), client, fixedNow);
 
@@ -745,7 +746,7 @@ describe('NLParserService', () => {
 
   it('infers accelerated compute families for GPU and ML workloads', async () => {
     const client: StructuredLlmClient = {
-      createStructuredOutput: jest.fn(),
+      createStructuredOutput: jest.fn<StructuredLlmClient['createStructuredOutput']>(),
     };
     const service = new NLParserService(configService(4000, false), client, fixedNow);
 
@@ -782,7 +783,7 @@ describe('NLParserService', () => {
 
   it('infers ARM architecture and dedicated tenancy from natural language', async () => {
     const client: StructuredLlmClient = {
-      createStructuredOutput: jest.fn(),
+      createStructuredOutput: jest.fn<StructuredLlmClient['createStructuredOutput']>(),
     };
     const service = new NLParserService(configService(4000, false), client, fixedNow);
 
@@ -814,7 +815,7 @@ describe('NLParserService', () => {
 
   it('rejects invalid LLM output through the shared NWS validator', async () => {
     const client: StructuredLlmClient = {
-      createStructuredOutput: jest.fn(async () => ({
+      createStructuredOutput: jest.fn<StructuredLlmClient['createStructuredOutput']>(async () => ({
         draftNws: {
           ...llmDraft(),
           compute: [],
@@ -834,7 +835,7 @@ describe('NLParserService', () => {
 
   it('produces the same NWS shape as structured form parsing', async () => {
     const client: StructuredLlmClient = {
-      createStructuredOutput: jest.fn(async () => ({
+      createStructuredOutput: jest.fn<StructuredLlmClient['createStructuredOutput']>(async () => ({
         draftNws: llmDraft(),
         parserConfidence: 'high',
         fieldsRequiringReview: [],

@@ -1,6 +1,15 @@
 /* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: repository test rows are controlled fixtures indexed by expected column names; see docs/SECURITY-SUPPRESSIONS.md. */
+import { describe, it, expect, jest } from '@jest/globals';
 import { ConfigService } from '@nestjs/config';
 import { PgPoolLike, PostgresPricingCatalogRepository } from './pricing-catalog.repository.js';
+
+/**
+ * The signature every pg query double must satisfy, derived from the
+ * production interface so a mock cannot drift from the contract it stands in
+ * for. PgPoolLike['query'] is generic in its row type and a mock is a concrete
+ * function, so the row type is instantiated here.
+ */
+type QueryMock = (...args: Parameters<PgPoolLike['query']>) => ReturnType<PgPoolLike['query']>;
 import { AppConfig } from '../config/config.schema.js';
 import { SecretsReader } from '../secrets/secrets.service.js';
 import { PricingCatalogRecord } from '../adapters/common/cloud-provider-adapter.js';
@@ -63,7 +72,7 @@ const minimalRecord: PricingCatalogRecord = {
 
 describe('PostgresPricingCatalogRepository', () => {
   it('reads catalog rows with parameterized filters', async () => {
-    const query = jest.fn(async () => ({
+    const query = jest.fn<QueryMock>(async () => ({
       rows: [
         {
           provider: 'aws',
@@ -84,8 +93,8 @@ describe('PostgresPricingCatalogRepository', () => {
       rowCount: 1,
     }));
     const pool: PgPoolLike = {
-      query: query as PgPoolLike['query'],
-      end: jest.fn(async () => undefined),
+      query: query as unknown as PgPoolLike['query'],
+      end: jest.fn<PgPoolLike['end']>(async () => undefined),
     };
     const repository = new PostgresPricingCatalogRepository(
       configService(),
@@ -108,7 +117,7 @@ describe('PostgresPricingCatalogRepository', () => {
   });
 
   it('reads catalog rows without optional filters or nullable row fields', async () => {
-    const query = jest.fn(async () => ({
+    const query = jest.fn<QueryMock>(async () => ({
       rows: [
         {
           provider: 'azure',
@@ -127,8 +136,8 @@ describe('PostgresPricingCatalogRepository', () => {
       rowCount: 1,
     }));
     const pool: PgPoolLike = {
-      query: query as PgPoolLike['query'],
-      end: jest.fn(async () => undefined),
+      query: query as unknown as PgPoolLike['query'],
+      end: jest.fn<PgPoolLike['end']>(async () => undefined),
     };
     const repository = new PostgresPricingCatalogRepository(
       configService(),
@@ -145,7 +154,7 @@ describe('PostgresPricingCatalogRepository', () => {
   it('returns persisted catalog source lineage as queryable record attributes', async () => {
     const sourcePayloadHash = 'a'.repeat(64);
     const sourceRecordKey = 'aws|compute|SKU-1|us-east-1|Hrs|2026-01-01T00:00:00.000Z';
-    const query = jest.fn(async () => ({
+    const query = jest.fn<QueryMock>(async () => ({
       rows: [
         {
           provider: 'aws',
@@ -172,8 +181,8 @@ describe('PostgresPricingCatalogRepository', () => {
       rowCount: 1,
     }));
     const pool: PgPoolLike = {
-      query: query as PgPoolLike['query'],
-      end: jest.fn(async () => undefined),
+      query: query as unknown as PgPoolLike['query'],
+      end: jest.fn<PgPoolLike['end']>(async () => undefined),
     };
     const repository = new PostgresPricingCatalogRepository(
       configService(),
@@ -208,10 +217,10 @@ describe('PostgresPricingCatalogRepository', () => {
   });
 
   it('upserts a batch of valid records in a single multi-row statement', async () => {
-    const query = jest.fn(async () => ({ rows: [], rowCount: 3 }));
+    const query = jest.fn<QueryMock>(async () => ({ rows: [], rowCount: 3 }));
     const pool: PgPoolLike = {
-      query: query as PgPoolLike['query'],
-      end: jest.fn(async () => undefined),
+      query: query as unknown as PgPoolLike['query'],
+      end: jest.fn<PgPoolLike['end']>(async () => undefined),
     };
     const repository = new PostgresPricingCatalogRepository(
       configService(),
@@ -232,15 +241,15 @@ describe('PostgresPricingCatalogRepository', () => {
 
   it('falls back to per-row inserts so one bad row rejects only itself', async () => {
     const query = jest
-      .fn()
+      .fn<QueryMock>()
       // The batched chunk trips a constraint on one row...
       .mockRejectedValueOnce(new Error('chunk constraint violation'))
       // ...so it retries the chunk row-by-row: first row succeeds, second rejects.
       .mockResolvedValueOnce({ rows: [], rowCount: 1 })
       .mockRejectedValueOnce(new Error('constraint violation'));
     const pool: PgPoolLike = {
-      query: query as PgPoolLike['query'],
-      end: jest.fn(async () => undefined),
+      query: query as unknown as PgPoolLike['query'],
+      end: jest.fn<PgPoolLike['end']>(async () => undefined),
     };
     const repository = new PostgresPricingCatalogRepository(
       configService(),
@@ -257,10 +266,10 @@ describe('PostgresPricingCatalogRepository', () => {
   });
 
   it('uses safe defaults when optional record fields and row counts are absent', async () => {
-    const query = jest.fn(async () => ({ rows: [], rowCount: null }));
+    const query = jest.fn<QueryMock>(async () => ({ rows: [], rowCount: null }));
     const pool: PgPoolLike = {
-      query: query as PgPoolLike['query'],
-      end: jest.fn(async () => undefined),
+      query: query as unknown as PgPoolLike['query'],
+      end: jest.fn<PgPoolLike['end']>(async () => undefined),
     };
     const repository = new PostgresPricingCatalogRepository(
       configService(),
@@ -283,10 +292,10 @@ describe('PostgresPricingCatalogRepository', () => {
   });
 
   it('records provider ETL outcomes', async () => {
-    const query = jest.fn(async () => ({ rows: [], rowCount: 1 }));
+    const query = jest.fn<QueryMock>(async () => ({ rows: [], rowCount: 1 }));
     const pool: PgPoolLike = {
-      query: query as PgPoolLike['query'],
-      end: jest.fn(async () => undefined),
+      query: query as unknown as PgPoolLike['query'],
+      end: jest.fn<PgPoolLike['end']>(async () => undefined),
     };
     const repository = new PostgresPricingCatalogRepository(
       configService(),
@@ -318,10 +327,10 @@ describe('PostgresPricingCatalogRepository', () => {
   });
 
   it('upserts normalized compute, storage, and egress cache rows', async () => {
-    const query = jest.fn(async () => ({ rows: [], rowCount: 1 }));
+    const query = jest.fn<QueryMock>(async () => ({ rows: [], rowCount: 1 }));
     const pool: PgPoolLike = {
-      query: query as PgPoolLike['query'],
-      end: jest.fn(async () => undefined),
+      query: query as unknown as PgPoolLike['query'],
+      end: jest.fn<PgPoolLike['end']>(async () => undefined),
     };
     const repository = new PostgresPricingCatalogRepository(
       configService(),
@@ -419,10 +428,10 @@ describe('PostgresPricingCatalogRepository', () => {
   });
 
   it('reports unsupported normalized records as skipped without rejecting the run', async () => {
-    const query = jest.fn(async () => ({ rows: [], rowCount: 1 }));
+    const query = jest.fn<QueryMock>(async () => ({ rows: [], rowCount: 1 }));
     const pool: PgPoolLike = {
-      query: query as PgPoolLike['query'],
-      end: jest.fn(async () => undefined),
+      query: query as unknown as PgPoolLike['query'],
+      end: jest.fn<PgPoolLike['end']>(async () => undefined),
     };
     const repository = new PostgresPricingCatalogRepository(
       configService(),
@@ -439,10 +448,10 @@ describe('PostgresPricingCatalogRepository', () => {
   });
 
   it('records provider ETL outcomes without optional error detail', async () => {
-    const query = jest.fn(async () => ({ rows: [], rowCount: 1 }));
+    const query = jest.fn<QueryMock>(async () => ({ rows: [], rowCount: 1 }));
     const pool: PgPoolLike = {
-      query: query as PgPoolLike['query'],
-      end: jest.fn(async () => undefined),
+      query: query as unknown as PgPoolLike['query'],
+      end: jest.fn<PgPoolLike['end']>(async () => undefined),
     };
     const repository = new PostgresPricingCatalogRepository(
       configService(),
@@ -490,8 +499,11 @@ describe('PostgresPricingCatalogRepository', () => {
 
   it('closes the lazy pool on module destroy', async () => {
     const pool: PgPoolLike = {
-      query: jest.fn(async () => ({ rows: [], rowCount: 0 })),
-      end: jest.fn(async () => undefined),
+      query: jest.fn<QueryMock>(async () => ({
+        rows: [],
+        rowCount: 0,
+      })) as unknown as PgPoolLike['query'],
+      end: jest.fn<PgPoolLike['end']>(async () => undefined),
     };
     const repository = new PostgresPricingCatalogRepository(
       configService(),

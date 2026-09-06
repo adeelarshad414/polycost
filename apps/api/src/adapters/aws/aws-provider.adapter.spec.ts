@@ -1,4 +1,5 @@
 /* eslint-disable security/detect-non-literal-fs-filename -- Reviewed 2026-07-06: fixture reads are resolved from repository-controlled test data; see docs/SECURITY-SUPPRESSIONS.md. */
+import { describe, it, expect, jest } from '@jest/globals';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Readable } from 'node:stream';
@@ -407,9 +408,9 @@ describe('AwsProviderAdapter', () => {
     expect(computeRecords.map((record) => record.skuId)).toEqual(['AWS-EC2-T3SMALL']);
 
     const networkFetchClient = jest
-      .fn()
+      .fn<FetchLike>()
       .mockResolvedValueOnce(jsonResponse(emptyAwsBulkCatalog))
-      .mockResolvedValueOnce(jsonResponse(mixedEc2BulkCatalog)) as FetchLike;
+      .mockResolvedValueOnce(jsonResponse(mixedEc2BulkCatalog));
     const networkAdapter = new AwsProviderAdapter(
       new InMemoryPricingCatalogReader([]),
       'us-east-1',
@@ -460,11 +461,11 @@ describe('AwsProviderAdapter', () => {
       },
     };
     const fetchClient = jest
-      .fn()
+      .fn<FetchLike>()
       .mockResolvedValueOnce(
         jsonResponse(awsBulkFixture('test/fixtures/pricing/aws/get-products-ec2.json')),
       )
-      .mockResolvedValueOnce(jsonResponse(noPriceRecord)) as FetchLike;
+      .mockResolvedValueOnce(jsonResponse(noPriceRecord));
     const adapter = new AwsProviderAdapter(
       new InMemoryPricingCatalogReader([]),
       'us-east-1',

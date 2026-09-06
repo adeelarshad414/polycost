@@ -1,12 +1,15 @@
+import { describe, it, expect, afterEach, jest } from '@jest/globals';
 import { ErrorReporter } from './error-reporter.js';
 import { registerProcessErrorHandlers, reportWorkerFailures } from './process-errors.js';
 
 function captureReporter() {
   const sent: Array<{ exception: unknown; context: Record<string, unknown> }> = [];
   const reporter = {
-    report: jest.fn(async (exception: unknown, context: Record<string, unknown> = {}) => {
-      sent.push({ exception, context });
-    }),
+    report: jest.fn<ErrorReporter['report']>(
+      async (exception: unknown, context: Record<string, unknown> = {}) => {
+        sent.push({ exception, context });
+      },
+    ),
   } as unknown as ErrorReporter;
 
   return { reporter, sent };

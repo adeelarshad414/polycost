@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { PricingCacheService } from './pricing-cache.service.js';
 import { PricingMatrixService } from './pricing-matrix.service.js';
 import {
@@ -198,7 +199,7 @@ function service(): PricingMatrixService {
 
 function reader(): PricingRateReader {
   return {
-    findCurrentRate: jest.fn(async (query) => ({
+    findCurrentRate: jest.fn<PricingRateReader['findCurrentRate']>(async (query) => ({
       ...rate,
       provider: query.provider,
       region: query.region,

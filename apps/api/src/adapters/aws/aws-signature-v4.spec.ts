@@ -1,3 +1,4 @@
+import { describe, it, expect } from '@jest/globals';
 import { signAwsJsonRequest } from './aws-signature-v4.js';
 
 describe('signAwsJsonRequest', () => {

@@ -1,4 +1,5 @@
 /* eslint-disable security/detect-non-literal-fs-filename -- Reviewed 2026-07-06: fixture reads are resolved from repository-controlled test data; see docs/SECURITY-SUPPRESSIONS.md. */
+import { describe, it, expect, jest } from '@jest/globals';
 import { generateKeyPairSync } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -54,11 +55,9 @@ function serviceAccountJson(): string {
 describe('GcpProviderAdapter', () => {
   it('normalizes GCP Cloud Billing Catalog responses into catalog records', async () => {
     const fetchClient = jest
-      .fn()
+      .fn<FetchLike>()
       .mockResolvedValueOnce(jsonResponse(fixture('test/fixtures/pricing/gcp/services.json')))
-      .mockResolvedValueOnce(
-        jsonResponse(fixture('test/fixtures/pricing/gcp/compute-skus.json')),
-      ) as FetchLike;
+      .mockResolvedValueOnce(jsonResponse(fixture('test/fixtures/pricing/gcp/compute-skus.json')));
     const adapter = new GcpProviderAdapter(
       new InMemoryPricingCatalogReader([]),
       'us-central1',
@@ -208,9 +207,9 @@ describe('GcpProviderAdapter', () => {
     };
     const skus = fixture('test/fixtures/pricing/gcp/compute-skus.json');
     const fetchClient = jest
-      .fn()
+      .fn<FetchLike>()
       .mockResolvedValueOnce(jsonResponse(services))
-      .mockResolvedValue(jsonResponse(skus)) as unknown as FetchLike;
+      .mockResolvedValue(jsonResponse(skus));
     const adapter = new GcpProviderAdapter(
       new InMemoryPricingCatalogReader([]),
       'us-central1',
@@ -221,7 +220,7 @@ describe('GcpProviderAdapter', () => {
 
     await adapter.refreshPricingCatalog({ categories: ['compute'] });
 
-    const urls = (fetchClient as unknown as jest.Mock).mock.calls.map((c) => String(c[0]));
+    const urls = fetchClient.mock.calls.map((c) => String(c[0]));
     expect(urls.some((u) => u.includes('6F81-5844-456A/skus'))).toBe(true);
     expect(urls.some((u) => u.includes('DECOY-0000-0000'))).toBe(false);
   });
@@ -264,12 +263,10 @@ describe('GcpProviderAdapter', () => {
 
   it('filters live GCP pricing by requested service id', async () => {
     const fetchClient = jest
-      .fn()
+      .fn<FetchLike>()
       .mockResolvedValueOnce(jsonResponse(fixture('test/fixtures/pricing/gcp/services.json')))
       .mockResolvedValueOnce(jsonResponse(fixture('test/fixtures/pricing/gcp/compute-skus.json')))
-      .mockResolvedValueOnce(
-        jsonResponse(fixture('test/fixtures/pricing/gcp/storage-skus.json')),
-      ) as FetchLike;
+      .mockResolvedValueOnce(jsonResponse(fixture('test/fixtures/pricing/gcp/storage-skus.json')));
     const adapter = new GcpProviderAdapter(
       new InMemoryPricingCatalogReader([]),
       'us-central1',
@@ -285,12 +282,10 @@ describe('GcpProviderAdapter', () => {
 
   it('exchanges service account JSON for a GCP Cloud Billing access token', async () => {
     const fetchClient = jest
-      .fn()
+      .fn<FetchLike>()
       .mockResolvedValueOnce(jsonResponse({ access_token: 'service-account-token' }))
       .mockResolvedValueOnce(jsonResponse(fixture('test/fixtures/pricing/gcp/services.json')))
-      .mockResolvedValueOnce(
-        jsonResponse(fixture('test/fixtures/pricing/gcp/compute-skus.json')),
-      ) as FetchLike;
+      .mockResolvedValueOnce(jsonResponse(fixture('test/fixtures/pricing/gcp/compute-skus.json')));
     const adapter = new GcpProviderAdapter(
       new InMemoryPricingCatalogReader([]),
       'us-central1',
@@ -338,7 +333,7 @@ describe('GcpProviderAdapter', () => {
 
   it('follows GCP service and SKU pagination while applying region filters', async () => {
     const fetchClient = jest
-      .fn()
+      .fn<FetchLike>()
       .mockResolvedValueOnce(
         jsonResponse({
           services: [],
@@ -352,9 +347,7 @@ describe('GcpProviderAdapter', () => {
           nextPageToken: 'sku-page-2',
         }),
       )
-      .mockResolvedValueOnce(
-        jsonResponse(fixture('test/fixtures/pricing/gcp/compute-skus.json')),
-      ) as FetchLike;
+      .mockResolvedValueOnce(jsonResponse(fixture('test/fixtures/pricing/gcp/compute-skus.json')));
     const adapter = new GcpProviderAdapter(
       new InMemoryPricingCatalogReader([]),
       'us-central1',
@@ -383,7 +376,7 @@ describe('GcpProviderAdapter', () => {
       'test/fixtures/pricing/gcp/compute-skus.json',
     );
     const fetchClient = jest
-      .fn()
+      .fn<FetchLike>()
       .mockResolvedValueOnce(jsonResponse(fixture('test/fixtures/pricing/gcp/services.json')))
       .mockResolvedValueOnce(
         jsonResponse({
@@ -394,7 +387,7 @@ describe('GcpProviderAdapter', () => {
             },
           ],
         }),
-      ) as FetchLike;
+      );
     const adapter = new GcpProviderAdapter(
       new InMemoryPricingCatalogReader([]),
       'us-central1',
@@ -439,13 +432,13 @@ describe('GcpProviderAdapter', () => {
       ],
     };
     const fetchClient = jest
-      .fn()
+      .fn<FetchLike>()
       .mockResolvedValueOnce(jsonResponse(fixture('test/fixtures/pricing/gcp/services.json')))
       .mockResolvedValueOnce(
         jsonResponse({
           skus: [sku],
         }),
-      ) as FetchLike;
+      );
     const adapter = new GcpProviderAdapter(
       new InMemoryPricingCatalogReader([]),
       'us-central1',

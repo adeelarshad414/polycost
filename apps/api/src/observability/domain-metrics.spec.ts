@@ -1,3 +1,4 @@
+import { describe, it, expect } from '@jest/globals';
 import { NestFactory } from '@nestjs/core';
 import { DomainMetricsService } from './domain-metrics.service.js';
 import { MetricsService } from './metrics.service.js';

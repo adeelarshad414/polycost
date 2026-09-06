@@ -1,3 +1,4 @@
+import { describe, it, expect } from '@jest/globals';
 import { mockPricingCatalogRecords } from '../adapters/mock/mock-pricing-fixtures.js';
 import { PricingCatalogRecord, ProviderId } from '../adapters/common/cloud-provider-adapter.js';
 import {

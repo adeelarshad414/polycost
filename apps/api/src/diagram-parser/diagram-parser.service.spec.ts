@@ -1,4 +1,5 @@
 /* eslint-disable security/detect-non-literal-fs-filename -- Reviewed 2026-07-06: diagram fixture reads are resolved from repository-controlled generated fixtures; see docs/SECURITY-SUPPRESSIONS.md. */
+import { describe, it, expect, jest } from '@jest/globals';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ConfigService } from '@nestjs/config';
@@ -531,7 +532,7 @@ describe('DiagramParserService', () => {
 
   it('classifies unresolved nodes through the mocked Tier 3 LLM path', async () => {
     const llmClient: LlmClassifierClient = {
-      classify: jest.fn(async (input) => ({
+      classify: jest.fn<LlmClassifierClient['classify']>(async (input) => ({
         serviceCategory: 'integration',
         serviceType: 'queue-or-event-bus',
         confidence: 'low',
@@ -569,8 +570,8 @@ describe('DiagramParserService', () => {
 
   it('batches unresolved nodes through the Tier 3 LLM client when available', async () => {
     const llmClient: LlmClassifierClient = {
-      classify: jest.fn(),
-      classifyBatch: jest.fn(async (inputs) =>
+      classify: jest.fn<LlmClassifierClient['classify']>(),
+      classifyBatch: jest.fn<NonNullable<LlmClassifierClient['classifyBatch']>>(async (inputs) =>
         inputs.map((input) => ({
           serviceCategory: 'integration',
           serviceType: 'queue-or-event-bus',
@@ -626,8 +627,10 @@ describe('DiagramParserService', () => {
 
   it('surfaces Tier 3 LLM fallback diagnostics on unresolved review rows', async () => {
     const llmClient: LlmClassifierClient = {
-      classify: jest.fn(async () => undefined),
-      lastFailureReason: jest.fn(() => 'Tier 3 LLM classifier request failed or timed out'),
+      classify: jest.fn<LlmClassifierClient['classify']>(async () => undefined),
+      lastFailureReason: jest.fn<NonNullable<LlmClassifierClient['lastFailureReason']>>(
+        () => 'Tier 3 LLM classifier request failed or timed out',
+      ),
     };
 
     const parsed = await service(llmClient).parse({
@@ -649,7 +652,7 @@ describe('DiagramParserService', () => {
 
   it('caps Tier 3 LLM classifier calls per parse and leaves overflow nodes reviewable', async () => {
     const llmClient: LlmClassifierClient = {
-      classify: jest.fn(async (input) => ({
+      classify: jest.fn<LlmClassifierClient['classify']>(async (input) => ({
         serviceCategory: 'integration',
         serviceType: 'queue-or-event-bus',
         confidence: 'low',
@@ -766,12 +769,12 @@ describe('DiagramParserService', () => {
 describe('DiagramParserController', () => {
   it('returns parser metadata and keeps responding when import persistence is unavailable', async () => {
     const repository = {
-      save: jest.fn(async () => {
+      save: jest.fn<DiagramImportRepository['save']>(async () => {
         throw new Error('db unavailable');
       }),
     } as unknown as DiagramImportRepository;
     const tempFileStore = {
-      store: jest.fn(async () => ({
+      store: jest.fn<DiagramTempFileStore['store']>(async () => ({
         fileRef: '77777777-7777-4777-8777-777777777777-random.mmd',
         expiresAt: '2026-07-07T00:00:00.000Z',
       })),
@@ -913,7 +916,7 @@ function service(llmClassifierClient?: LlmClassifierClient): DiagramParserServic
 
 function configService(): ConfigService<AppConfig, true> {
   return {
-    get: jest.fn(() => 2),
+    get: jest.fn<ConfigService['get']>(() => 2),
   } as unknown as ConfigService<AppConfig, true>;
 }
 

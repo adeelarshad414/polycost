@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { ApiDatabaseRepository } from '../api/api-database.repository.js';
 import {
   BudgetEvaluationRecord,
@@ -71,10 +72,10 @@ const observation: CostObservationRecord = {
 describe('CostManagementJobsService', () => {
   it('syncs currency rates into the cached exchange-rate table', async () => {
     const repository = repositoryMock({
-      upsertExchangeRates: jest.fn(async () => 2),
+      upsertExchangeRates: jest.fn<ApiDatabaseRepository['upsertExchangeRates']>(async () => 2),
     });
     const exchangeRateClient: ExchangeRateClient = {
-      fetchLatest: jest.fn(async () => ({
+      fetchLatest: jest.fn<ExchangeRateClient['fetchLatest']>(async () => ({
         baseCurrency: 'USD',
         rates: {
           EUR: 0.87673,
@@ -110,32 +111,32 @@ describe('CostManagementJobsService', () => {
 
   it('records modeled spend and creates threshold/anomaly alerts', async () => {
     const repository = repositoryMock({
-      getWorkloadCostBreakdown: jest.fn(async () => ({
-        ...breakdown,
-        providers: [
-          {
-            ...breakdown.providers[0],
-            total: 1200,
-          },
-          breakdown.providers[1],
-        ],
-      })),
-      insertCostObservation: jest.fn(async () => ({
+      getWorkloadCostBreakdown: jest.fn<ApiDatabaseRepository['getWorkloadCostBreakdown']>(
+        async () => ({
+          ...breakdown,
+          providers: [
+            {
+              ...breakdown.providers[0],
+              total: 1200,
+            },
+            breakdown.providers[1],
+          ],
+        }),
+      ),
+      insertCostObservation: jest.fn<ApiDatabaseRepository['insertCostObservation']>(async () => ({
         ...observation,
         observedMonthlyUsd: 950,
       })),
-      getLatestCostObservationBefore: jest.fn(async () => ({
+      getLatestCostObservationBefore: jest.fn<
+        ApiDatabaseRepository['getLatestCostObservationBefore']
+      >(async () => ({
         ...observation,
         observedMonthlyUsd: 600,
       })),
       createAlertIfNotActive: jest
-        .fn()
-        .mockResolvedValueOnce({
-          id: '44444444-4444-4444-8444-444444444444',
-        })
-        .mockResolvedValueOnce({
-          id: '55555555-5555-4555-8555-555555555555',
-        }),
+        .fn<ApiDatabaseRepository['createAlertIfNotActive']>()
+        .mockResolvedValueOnce({ id: '44444444-4444-4444-8444-444444444444' } as never)
+        .mockResolvedValueOnce({ id: '55555555-5555-4555-8555-555555555555' } as never),
     });
     const service = new CostManagementJobsService(
       repository as unknown as ApiDatabaseRepository,
@@ -174,13 +175,15 @@ describe('CostManagementJobsService', () => {
 
   it('skips budget alerts when cached pricing cannot produce a non-zero modeled total', async () => {
     const repository = repositoryMock({
-      getWorkloadCostBreakdown: jest.fn(async () => ({
-        ...breakdown,
-        providers: breakdown.providers.map((provider) => ({
-          ...provider,
-          total: 0,
-        })),
-      })),
+      getWorkloadCostBreakdown: jest.fn<ApiDatabaseRepository['getWorkloadCostBreakdown']>(
+        async () => ({
+          ...breakdown,
+          providers: breakdown.providers.map((provider) => ({
+            ...provider,
+            total: 0,
+          })),
+        }),
+      ),
     });
     const service = new CostManagementJobsService(
       repository as unknown as ApiDatabaseRepository,
@@ -228,13 +231,25 @@ describe('CostManagementJobsService', () => {
 
 function repositoryMock(overrides: Record<string, unknown> = {}) {
   return {
-    upsertExchangeRates: jest.fn(async () => 0),
-    listBudgetsForEvaluation: jest.fn(async () => [budgetRecord]),
-    getWorkloadCostBreakdown: jest.fn(async () => breakdown),
-    insertCostObservation: jest.fn(async () => observation),
-    getLatestCostObservationBefore: jest.fn(async () => undefined),
-    createAlertIfNotActive: jest.fn(async () => undefined),
-    cleanupExpiredShareLinks: jest.fn(async () => 0),
+    upsertExchangeRates: jest.fn<ApiDatabaseRepository['upsertExchangeRates']>(async () => 0),
+    listBudgetsForEvaluation: jest.fn<ApiDatabaseRepository['listBudgetsForEvaluation']>(
+      async () => [budgetRecord],
+    ),
+    getWorkloadCostBreakdown: jest.fn<ApiDatabaseRepository['getWorkloadCostBreakdown']>(
+      async () => breakdown,
+    ),
+    insertCostObservation: jest.fn<ApiDatabaseRepository['insertCostObservation']>(
+      async () => observation,
+    ),
+    getLatestCostObservationBefore: jest.fn<
+      ApiDatabaseRepository['getLatestCostObservationBefore']
+    >(async () => undefined),
+    createAlertIfNotActive: jest.fn<ApiDatabaseRepository['createAlertIfNotActive']>(
+      async () => undefined,
+    ),
+    cleanupExpiredShareLinks: jest.fn<ApiDatabaseRepository['cleanupExpiredShareLinks']>(
+      async () => 0,
+    ),
     ...overrides,
   };
 }

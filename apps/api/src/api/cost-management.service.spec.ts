@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { createHash } from 'node:crypto';
 import { ApiNotFoundError, ApiUnauthorizedError } from './api-errors.js';
 import { CostManagementService } from './cost-management.service.js';
@@ -7,6 +8,7 @@ import {
   WorkloadCostBreakdown,
   WorkloadRecord,
 } from './cost-management.types.js';
+import type { ApiDatabaseRepository } from './api-database.repository.js';
 
 const workload: WorkloadRecord = {
   id: '22222222-2222-4222-8222-222222222222',
@@ -130,8 +132,12 @@ describe('CostManagementService', () => {
       passwordHash: hashedPassword('client-demo'),
     };
     const repository = repositoryMock({
-      getActiveShareLink: jest.fn(async () => protectedShareLink),
-      revokeShareLink: jest.fn(async () => protectedShareLink),
+      getActiveShareLink: jest.fn<ApiDatabaseRepository['getActiveShareLink']>(
+        async () => protectedShareLink,
+      ),
+      revokeShareLink: jest.fn<ApiDatabaseRepository['revokeShareLink']>(
+        async () => protectedShareLink,
+      ),
     });
     const service = new CostManagementService(repository as never);
 
@@ -158,9 +164,13 @@ describe('CostManagementService', () => {
 
   it('fails clearly for missing workloads and expired share links', async () => {
     const repository = repositoryMock({
-      getWorkload: jest.fn(async () => undefined),
-      getActiveShareLink: jest.fn(async () => undefined),
-      getShareLinkAnalytics: jest.fn(async () => undefined),
+      getWorkload: jest.fn<ApiDatabaseRepository['getWorkload']>(async () => undefined),
+      getActiveShareLink: jest.fn<ApiDatabaseRepository['getActiveShareLink']>(
+        async () => undefined,
+      ),
+      getShareLinkAnalytics: jest.fn<ApiDatabaseRepository['getShareLinkAnalytics']>(
+        async () => undefined,
+      ),
     });
     const service = new CostManagementService(repository as never);
 
@@ -177,19 +187,25 @@ describe('CostManagementService', () => {
 
 function repositoryMock(overrides: Record<string, unknown> = {}) {
   return {
-    createWorkload: jest.fn(async () => workload),
-    getWorkload: jest.fn(async () => workload),
-    compareCachedPricing: jest.fn(async () => []),
-    getWorkloadCostBreakdown: jest.fn(async () => breakdown),
-    createBudget: jest.fn(),
-    listAlerts: jest.fn(),
-    updateAlertDismissed: jest.fn(),
-    createShareLink: jest.fn(async () => shareLink),
-    getActiveShareLink: jest.fn(async () => shareLink),
-    recordShareLinkEvent: jest.fn(async () => undefined),
-    getShareLinkAnalytics: jest.fn(async () => analytics),
-    revokeShareLink: jest.fn(async () => shareLink),
-    getExchangeRates: jest.fn(),
+    createWorkload: jest.fn<ApiDatabaseRepository['createWorkload']>(async () => workload),
+    getWorkload: jest.fn<ApiDatabaseRepository['getWorkload']>(async () => workload),
+    compareCachedPricing: jest.fn<ApiDatabaseRepository['compareCachedPricing']>(async () => []),
+    getWorkloadCostBreakdown: jest.fn<ApiDatabaseRepository['getWorkloadCostBreakdown']>(
+      async () => breakdown,
+    ),
+    createBudget: jest.fn<ApiDatabaseRepository['createBudget']>(),
+    listAlerts: jest.fn<ApiDatabaseRepository['listAlerts']>(),
+    updateAlertDismissed: jest.fn<ApiDatabaseRepository['updateAlertDismissed']>(),
+    createShareLink: jest.fn<ApiDatabaseRepository['createShareLink']>(async () => shareLink),
+    getActiveShareLink: jest.fn<ApiDatabaseRepository['getActiveShareLink']>(async () => shareLink),
+    recordShareLinkEvent: jest.fn<ApiDatabaseRepository['recordShareLinkEvent']>(
+      async () => undefined,
+    ),
+    getShareLinkAnalytics: jest.fn<ApiDatabaseRepository['getShareLinkAnalytics']>(
+      async () => analytics,
+    ),
+    revokeShareLink: jest.fn<ApiDatabaseRepository['revokeShareLink']>(async () => shareLink),
+    getExchangeRates: jest.fn<ApiDatabaseRepository['getExchangeRates']>(),
     ...overrides,
   };
 }

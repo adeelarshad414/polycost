@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { CircuitBreaker, CircuitBreakerRegistry, CircuitOpenError } from './circuit-breaker.js';
 
 function clock(start = 0) {

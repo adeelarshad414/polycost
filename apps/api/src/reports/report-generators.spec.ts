@@ -1,3 +1,4 @@
+import { describe, it, expect } from '@jest/globals';
 import { ComparisonResult } from '../comparison/comparison.types.js';
 import { CsvReportGenerator } from './csv-report.generator.js';
 import { ExcelReportGenerator } from './excel-report.generator.js';

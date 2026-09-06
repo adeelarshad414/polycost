@@ -1,3 +1,4 @@
+import { describe, it, expect } from '@jest/globals';
 import { validateConfig } from './config.schema.js';
 
 const baseConfig = {

@@ -21,7 +21,13 @@ import {
   RateLimitExceededError,
 } from './api-errors.js';
 
-interface ErrorResponse {
+/**
+ * The subset of the Fastify reply this filter uses.
+ *
+ * Exported so the spec's doubles can be typed from it rather than from a
+ * hand-written shape - a double that stops matching this stops compiling.
+ */
+export interface ErrorResponse {
   status(statusCode: number): {
     send(body: unknown): void;
   };

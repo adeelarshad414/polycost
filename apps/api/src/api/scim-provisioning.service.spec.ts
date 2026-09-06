@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { readFileSync } from 'node:fs';
 import { ApiDatabaseRepository } from './api-database.repository.js';
 import { ApiForbiddenError, ApiUnauthorizedError, ApiValidationError } from './api-errors.js';
@@ -362,14 +363,14 @@ function scimUserRecord(overrides: Partial<TeamScimUserRecord> = {}): TeamScimUs
 
 function repositoryMock() {
   return {
-    getTeamMembership: jest.fn(),
-    createTeamScimToken: jest.fn(),
-    listTeamScimTokens: jest.fn(),
-    revokeTeamScimToken: jest.fn(),
-    resolveTeamScimToken: jest.fn(),
-    listTeamScimUsers: jest.fn(),
-    getTeamScimUser: jest.fn(),
-    upsertTeamScimUser: jest.fn(),
-    deactivateTeamScimUser: jest.fn(),
+    getTeamMembership: jest.fn<ApiDatabaseRepository['getTeamMembership']>(),
+    createTeamScimToken: jest.fn<ApiDatabaseRepository['createTeamScimToken']>(),
+    listTeamScimTokens: jest.fn<ApiDatabaseRepository['listTeamScimTokens']>(),
+    revokeTeamScimToken: jest.fn<ApiDatabaseRepository['revokeTeamScimToken']>(),
+    resolveTeamScimToken: jest.fn<ApiDatabaseRepository['resolveTeamScimToken']>(),
+    listTeamScimUsers: jest.fn<ApiDatabaseRepository['listTeamScimUsers']>(),
+    getTeamScimUser: jest.fn<ApiDatabaseRepository['getTeamScimUser']>(),
+    upsertTeamScimUser: jest.fn<ApiDatabaseRepository['upsertTeamScimUser']>(),
+    deactivateTeamScimUser: jest.fn<ApiDatabaseRepository['deactivateTeamScimUser']>(),
   } as unknown as jest.Mocked<ApiDatabaseRepository>;
 }

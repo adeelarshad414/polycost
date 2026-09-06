@@ -1,8 +1,10 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { createHash } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema.js';
 import { ApiValidationError } from './api-errors.js';
 import { InvoiceArtifactGovernanceService } from './invoice-artifact-governance.service.js';
+import type { FetchLike } from '../adapters/common/http-client.js';
 
 describe('InvoiceArtifactGovernanceService', () => {
   it('reports local database storage as not production ready', () => {
@@ -133,7 +135,7 @@ describe('InvoiceArtifactGovernanceService', () => {
   it('calls the signed scanner webhook when configured', async () => {
     const content = Buffer.from('invoice artifact bytes');
     const sha256 = createHash('sha256').update(content).digest('hex');
-    const fetcher = jest.fn(async () => ({
+    const fetcher = jest.fn<FetchLike>(async () => ({
       ok: true,
       status: 200,
       statusText: 'OK',
@@ -192,7 +194,7 @@ describe('InvoiceArtifactGovernanceService', () => {
   });
 
   it('rejects webhook scanner failures', async () => {
-    const fetcher = jest.fn(async () => ({
+    const fetcher = jest.fn<FetchLike>(async () => ({
       ok: true,
       status: 200,
       statusText: 'OK',
@@ -232,6 +234,6 @@ function configService(overrides: Partial<AppConfig> = {}): ConfigService<AppCon
   const overrideMap = new Map(Object.entries(overrides));
 
   return {
-    get: jest.fn((key: keyof AppConfig) => overrideMap.get(key)),
+    get: jest.fn<ConfigService['get']>((key: keyof AppConfig) => overrideMap.get(key)),
   } as unknown as ConfigService<AppConfig, true>;
 }

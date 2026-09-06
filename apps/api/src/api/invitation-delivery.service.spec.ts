@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'node:crypto';
 import { AppConfig } from '../config/config.schema.js';
@@ -18,7 +19,7 @@ const invitation = {
 
 describe('InvitationDeliveryService', () => {
   it('uses panel delivery for local demos without calling outbound webhooks', async () => {
-    const fetcher = jest.fn();
+    const fetcher = jest.fn<FetchLike>();
     const service = new InvitationDeliveryService(configService({}), fetcher);
 
     await expect(service.deliverTeamInvitation(deliveryInput())).resolves.toMatchObject({
@@ -129,7 +130,7 @@ function response(status: number): Response {
 
 function configService(values: Partial<AppConfig>): ConfigService<AppConfig, true> {
   return {
-    get: jest.fn((key: keyof AppConfig) => {
+    get: jest.fn<ConfigService['get']>((key: keyof AppConfig) => {
       switch (key) {
         case 'AUTH_INVITE_DELIVERY_MODE':
           return values.AUTH_INVITE_DELIVERY_MODE;

@@ -1,3 +1,4 @@
+import { describe, it, expect, jest } from '@jest/globals';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema.js';
 import { FormToNWSService } from './form-to-nws.service.js';
@@ -7,9 +8,10 @@ import {
   NaturalLanguageRequirementParser,
   normalizedRequirementsFromNws,
 } from './requirement-parser.service.js';
+import type { StructuredLlmClient } from './nws-parser.types.js';
 
 const configService = {
-  get: jest.fn((key: keyof AppConfig) => {
+  get: jest.fn<ConfigService['get']>((key: keyof AppConfig) => {
     if (key === 'NL_PARSE_MAX_INPUT_CHARS') {
       return 4_000;
     }
@@ -22,7 +24,7 @@ describe('AI-native requirement parser adapters', () => {
   it('turns natural language into normalized requirements and NWS', async () => {
     const parser = new NaturalLanguageRequirementParser(
       new NLParserService(configService, {
-        createStructuredOutput: jest.fn(),
+        createStructuredOutput: jest.fn<StructuredLlmClient['createStructuredOutput']>(),
       }),
     );
 

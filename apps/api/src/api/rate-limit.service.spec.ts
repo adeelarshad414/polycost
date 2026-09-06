@@ -1,3 +1,4 @@
+import { describe, it, expect } from '@jest/globals';
 import { ApiRateLimitService, RateLimitRedis } from './rate-limit.service.js';
 import { RateLimitExceededError } from './api-errors.js';
 

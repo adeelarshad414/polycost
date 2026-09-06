@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { EventEmitter } from 'node:events';
 
 jest.mock('node:net', () => ({

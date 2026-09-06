@@ -1,3 +1,4 @@
+import { describe, it, expect, afterEach, afterAll } from '@jest/globals';
 import { SpanStatusCode, context, trace } from '@opentelemetry/api';
 import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
 import {
