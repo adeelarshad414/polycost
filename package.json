@@ -169,7 +169,7 @@
     "lighthouse": "^13.4.0",
     "prettier": "^3.9.6",
     "ts-jest": "^29.4.12",
-    "typescript": "^5.7.3",
+    "typescript": "^7.0.2",
     "typescript-eslint": "^8.67.0"
   },
   "overrides": {
