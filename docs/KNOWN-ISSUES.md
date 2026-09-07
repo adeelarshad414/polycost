@@ -10,9 +10,35 @@
 
 **Severity key:** 🔴 blocker · 🟠 high · 🟡 medium · 🔵 low / informational
 
+### At a glance — 2026-09-07
+
+|     | Entry                                           | State                                            |
+| --- | ----------------------------------------------- | ------------------------------------------------ |
+| 🟢  | K-1 · `process.env` in `http-client.ts`         | fixed                                            |
+| 🟢  | K-2 · `npm audit` high-severity gate            | fixed — 0 high, 0 moderate                       |
+| 🟠  | K-3b · web container nginx runs as root         | **open** — needs a port decision                 |
+| 🟢  | K-3 · `pre-push` impractical locally            | fixed                                            |
+| 🟠  | K-4 · timeout when both suites run concurrently | **open** — reproduced again 2026-09-07           |
+| 🟡  | K-5 · ESLint security warnings (22)             | accepted, 0 errors                               |
+| 🟡  | K-6 · Jest worker teardown warning              | accepted, no test fails                          |
+| 🟢  | K-11 · majors blocked behind ESM                | resolved — only #168 remains, blocked by ts-jest |
+| 🟠  | K-12 · `impeccable` skips on CI's Node          | **open** — findings cleared, runner pending      |
+| 🟢  | K-13 · Redis persistence disabled               | fixed                                            |
+
+**Three genuinely open:** K-3b and K-12 both need a decision or a permission
+rather than code; K-4 needs a CI configuration change.
+
+> This register has twice described a state that had already changed — K-1 and
+> K-3 were both fixed while still marked open. If an entry here contradicts the
+> code, trust the code and correct the entry.
+
 ---
 
-## 🔴 Open — fails a quality gate
+## ✅ Was: fails a quality gate — both entries now resolved
+
+Nothing in this register fails a quality gate as of 2026-09-07. Both entries
+below are kept with their original detail because the reasoning is still useful;
+their status rows carry the resolution.
 
 ### K-1 · ~~`qa` gate fails: direct `process.env` in `http-client.ts`~~ ✅ RESOLVED
 
@@ -34,7 +60,7 @@
 | **Age**       | Pre-existing — present before the current hardening work.                                                                                                                                                                                                   |
 | **Fix**       | Add `PROVIDER_HTTP_*` to the zod config schema and thread `ConfigService` through the 7 call sites. `parseJsonResponse` already accepts optional `{ maxBytes, bodyTimeoutMs }`, so tests no longer need env mutation — the production path is what remains. |
 
-### K-2 · `npm audit` high-severity gate fails
+### K-2 · ~~`npm audit` high-severity gate fails~~ ✅ RESOLVED
 
 |                  |                                                                                                                                                                                                                 |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -81,9 +107,14 @@ the affected filter on exactly the kind of large nested input described.
 
 `@nestjs/core`, `@nestjs/common`, `@nestjs/platform-fastify` and
 `@nestjs/config` at v12 are all `"type": "module"` with no CommonJS condition in
-their `exports`. **This changes what K-11's ESM migration is for.** It was
-filed as staying current; it is now the thing standing between this repo and
-two security fixes in runtime dependencies.
+their `exports`. **This changed what K-11's ESM migration was for.** It had been
+filed as staying current; it became the thing standing between this repo and two
+security fixes in runtime dependencies.
+
+> **Both are now closed (2026-09-07).** The API moved to ESM in #212, then
+> `stream-json` 3 (#217) and Nest 12 (#218) were taken. `npm audit` reports
+> **0 high, 0 moderate**; the three remaining lows are in the graphify tooling
+> chain with no fix available. See [K-11](#-k-11--three-dependency-majors-are-blocked-behind-an-esm-migration).
 
 ---
 
@@ -100,30 +131,33 @@ two security fixes in runtime dependencies.
 
 ### K-3 · ~~`pre-push` hook is impractical to satisfy locally~~ ✅ RESOLVED
 
-|                   |                                                                                                                                                                                                                                        |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**        | 🟠 Open — design decision needed                                                                                                                                                                                                       |
-| **Detail**        | `.githooks/pre-push` runs `check:full`: 58 checks **plus** integration, build, e2e and security scans. It requires Docker, a live database and e2e infrastructure, and aborts locally (observed: invoice-artifact-scanner smoke test). |
-| **Consequence**   | Developers bypass it with `--no-verify`, which defeats the hook entirely.                                                                                                                                                              |
-| **Suggested fix** | Slim `pre-push` to the fast static gates — `ci:lint`, `format:check`, `theme:hex:check` (~10s, no services) — and leave `check:full` to CI. This is a **project policy call**, so it has not been changed unilaterally.                |
+|                   |                                                                                                                                                                                                                                                                                                                     |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**        | 🟢 Fixed — verified 2026-09-07. The table below describes the state before the fix; it was never updated. `.githooks/pre-push` now runs exactly the four fast static gates the suggested fix proposed — `ci:lint`, `format:check`, `theme:hex:check`, `security:suppressions` — and prints "full suite runs in CI". |
+| **Detail**        | Previously `.githooks/pre-push` ran `check:full`: 58 checks **plus** integration, build, e2e and security scans. It requires Docker, a live database and e2e infrastructure, and aborts locally (observed: invoice-artifact-scanner smoke test).                                                                    |
+| **Consequence**   | Developers bypass it with `--no-verify`, which defeats the hook entirely.                                                                                                                                                                                                                                           |
+| **Suggested fix** | Slim `pre-push` to the fast static gates — `ci:lint`, `format:check`, `theme:hex:check` (~10s, no services) — and leave `check:full` to CI. This is a **project policy call**, so it has not been changed unilaterally.                                                                                             |
 
 ### K-4 · Test timeout when both suites run concurrently
 
-|               |                                                                                                                                                                    |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Status**    | 🟠 Open — CI configuration risk                                                                                                                                    |
-| **Reproduce** | Run the API and web Jest suites in parallel on one machine.                                                                                                        |
-| **Detail**    | Observed `Exceeded timeout of 5000 ms` in a web test purely from CPU contention. Each suite passes reliably on its own (verified across repeated randomized runs). |
-| **Fix**       | Run suites sequentially in CI, cap `--maxWorkers`, or raise the timeout for the affected test.                                                                     |
+|                |                                                                                                                                                                                                   |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**     | 🟠 Open — CI configuration risk                                                                                                                                                                   |
+| **Reproduce**  | Run the API and web Jest suites in parallel on one machine.                                                                                                                                       |
+| **Detail**     | Observed `Exceeded timeout of 5000 ms` in a web test purely from CPU contention. Each suite passes reliably on its own (verified across repeated randomized runs).                                |
+| **Still live** | Reproduced 2026-09-07: a web suite run competing with a container build took **594s and failed one test**; the same suite standalone passed in 13s. This is the entry's clearest evidence so far. |
+| **Fix**        | Run suites sequentially in CI, cap `--maxWorkers`, or raise the timeout for the affected test.                                                                                                    |
 
 ---
 
 ## 🟡 Accepted / reviewed
 
-### K-5 · ESLint security-plugin warnings (11)
+### K-5 · ESLint security-plugin warnings (22)
 
 Reviewed and accepted: controlled fixture reads, provider-response dictionary
-access, and a local Vault token-file read. **0 errors**, warnings only.
+access, and a local Vault token-file read. **0 errors**, warnings only. The
+count was 11 when this was written and is 22 as of 2026-09-07 — the codebase
+grew, the categories did not.
 Rationale: [docs/SECURITY-SUPPRESSIONS.md](SECURITY-SUPPRESSIONS.md).
 
 ### K-6 · Jest worker teardown warning
@@ -133,15 +167,44 @@ fails.** Carried forward from Phase 3.
 
 ---
 
-## 🟠 K-11 · Three dependency majors are blocked behind an ESM migration
+## 🟢 K-11 · ~~Three dependency majors are blocked behind an ESM migration~~
 
-|            |                                                                                  |
-| ---------- | -------------------------------------------------------------------------------- |
-| **Status** | 🔴 Escalated 2026-09-04 — the ESM migration now gates two runtime security fixes |
-| **Found**  | 2026-08-31, while clearing the Dependabot queue                                  |
+|            |                                                                                     |
+| ---------- | ----------------------------------------------------------------------------------- |
+| **Status** | 🟢 Resolved 2026-09-07 — the migration landed and two of the three majors are taken |
+| **Found**  | 2026-08-31, while clearing the Dependabot queue                                     |
 
-The API is CommonJS (`module: commonjs`, ts-jest, `moduleResolution: node`). Three
-major upgrades each fail on that, for the same underlying reason:
+### ✅ Closed (2026-09-07)
+
+The blocker is gone: **the API runs as ESM** (#212), delivered as three pre-flip
+steps that each landed and were verified on CommonJS first — `isolatedModules`
+(#207), import extensions (#210) and typed jest doubles (#211) — then the flip
+itself.
+
+Both upgrades this entry escalated for are now taken, and both security
+advisories with them:
+
+| Upgrade                    | Outcome                                                                                                                                                                       |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `stream-json` 1 → 3 (#217) | taken. Closes the O(depth²) filter DoS. v3 is native ESM with its own types, so 43 lines of hand-written ambient declarations were deleted with it.                           |
+| Nest 11 → 12 (#218)        | taken — `core`, `common`, `platform-fastify` and `config` together, as their peer ranges require. Closes the fastify schema-validation bypass. No source changes were needed. |
+| TypeScript 5 → 7 (#168)    | **still open, and never an ESM problem.** See below.                                                                                                                          |
+
+`npm audit` is now **0 high, 0 moderate**. The three remaining lows are in the
+`@sentropic/graphify` tooling chain with `fixAvailable: false`, so every fixable
+advisory in the tree is closed.
+
+**What is left of this entry is #168 alone**, and it is blocked by the test
+runner rather than the module system: TypeScript 7 is the native compiler and
+does not expose the JavaScript compiler API `ts-jest` needs. `ts-jest@29.4.12`,
+the latest, declares `typescript: ">=4.3 <7"`. Revisit when ts-jest supports 7.
+
+---
+
+### Original analysis (2026-08-31), kept for the reasoning
+
+The API was CommonJS (`module: commonjs`, ts-jest, `moduleResolution: node`).
+Three major upgrades each failed on that, for the same underlying reason:
 
 | Dependabot PR | Upgrade                 | How it fails                                                                                                                                                                                                                                       |
 | ------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -207,9 +270,12 @@ without it the SDK starts and silently instruments nothing.
 
 Roughly 95% of the diff can land **before** the switch, valid on CommonJS today.
 
-### 🔴 Escalation (2026-09-04) — this is no longer only a currency problem
+### ~~🔴 Escalation (2026-09-04)~~ — resolved, kept for the reasoning
 
-Filed as staying current with the ecosystem. It is now the thing standing
+> Superseded by the closure above: the migration landed and both advisories are
+> fixed. Kept because the escalation is why it was scheduled at all.
+
+Filed as staying current with the ecosystem. It became the thing standing
 between this repo and **two security advisories in runtime dependencies**,
 found while clearing [K-2](#k-2--npm-audit-high-severity-gate-fails):
 
@@ -369,7 +435,7 @@ The second one initially matched the prose comment rather than the directive, so
 it passed with the directive deleted; it now asserts `IMPECCABLE_ENFORCE: '1'`
 and was confirmed to fail without it.
 
-## 🔴 K-13 · Redis had persistence disabled, silently discarding queued jobs
+## 🟢 K-13 · ~~Redis had persistence disabled~~, silently discarding queued jobs
 
 |            |                                                    |
 | ---------- | -------------------------------------------------- |
@@ -419,19 +485,24 @@ and job name are sent, because job data carries workload and tenant details.
 
 ## ✅ Recently fixed
 
-| Issue                                           | Fix                                                        |
-| ----------------------------------------------- | ---------------------------------------------------------- |
-| Money `"1,234.56"` parsed as `1`                | Thousands-separator-aware parsing                          |
-| Evidence lost-update race                       | Optimistic-concurrency hash → 409                          |
-| Evidence packet exported on a `GET`             | Moved to `POST …/export`                                   |
-| Audit event could be logged but never delivered | Event + outbox in one transaction                          |
-| Retention could destroy an undelivered export   | `NOT EXISTS` guard on prune                                |
-| Azure `NextPageLink` SSRF                       | Same-origin pagination guard                               |
-| Response body could OOM / hang                  | Cap enforced while streaming + body deadline               |
-| WCAG AA contrast failures                       | Token contrast fixed, guarded by a unit test               |
-| Scrollable tables keyboard-unreachable          | `tabindex=0` + labelled regions on all 25                  |
-| Order-dependent flaky test                      | Storage cleared between tests; verified with `--randomize` |
-| `format:check` failing (22 files)               | Repo formatted                                             |
+| Issue                                           | Fix                                                         |
+| ----------------------------------------------- | ----------------------------------------------------------- |
+| Money `"1,234.56"` parsed as `1`                | Thousands-separator-aware parsing                           |
+| Evidence lost-update race                       | Optimistic-concurrency hash → 409                           |
+| Evidence packet exported on a `GET`             | Moved to `POST …/export`                                    |
+| Audit event could be logged but never delivered | Event + outbox in one transaction                           |
+| Retention could destroy an undelivered export   | `NOT EXISTS` guard on prune                                 |
+| Azure `NextPageLink` SSRF                       | Same-origin pagination guard                                |
+| Response body could OOM / hang                  | Cap enforced while streaming + body deadline                |
+| WCAG AA contrast failures                       | Token contrast fixed, guarded by a unit test                |
+| Scrollable tables keyboard-unreachable          | `tabindex=0` + labelled regions on all 25                   |
+| Order-dependent flaky test                      | Storage cleared between tests; verified with `--randomize`  |
+| `format:check` failing (22 files)               | Repo formatted                                              |
+| API could not consume ESM-only packages         | API moved to ESM (#212), after three pre-flip steps         |
+| `stream-json` O(depth²) filter DoS              | stream-json 3 (#217); ambient type declarations deleted     |
+| fastify schema-validation bypass                | Nest 12 (#218) — core, common, platform-fastify, config     |
+| `pdfjs-dist` arbitrary JS execution             | `overrides` pin to ^6.3.289 (#205)                          |
+| 24 UI anti-patterns, gate green in CI only      | Accent rails re-drawn; skip no longer reports a pass (#203) |
 
 ---
 
