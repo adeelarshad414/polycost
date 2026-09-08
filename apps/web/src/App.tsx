@@ -1329,7 +1329,14 @@ export function App({ client = polyCostClient }: AppProps) {
     // Nothing to refresh until the reader has asked for a comparison once. Auto
     // running on first load would fire a request at someone who has not asked
     // for anything yet.
-    if (!comparison || inputMode !== 'form') {
+    //
+    // And nothing while the edit panel is open. That panel deliberately hides
+    // the previous result so a new set of requirements can be composed, and a
+    // reader editing field by field will pause longer than the debounce between
+    // two of them - so without this guard, changing vCPU and then pausing before
+    // changing memory submits a half-edited draft behind them. It spends a
+    // rate-limit slot and puts a result on screen nobody asked for.
+    if (!comparison || inputMode !== 'form' || isEditingRequirements) {
       lastLiveSignature.current = liveSignature;
       return;
     }
@@ -1352,7 +1359,7 @@ export function App({ client = polyCostClient }: AppProps) {
     }, 600);
 
     return () => window.clearTimeout(timer);
-  }, [comparison, inputMode, liveSignature]);
+  }, [comparison, inputMode, isEditingRequirements, liveSignature]);
 
   useEffect(() => {
     busyActionRef.current = busyAction;

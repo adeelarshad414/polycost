@@ -18,15 +18,15 @@
 | 🟢  | K-2 · `npm audit` high-severity gate            | fixed — 0 high, 0 moderate                       |
 | 🟠  | K-3b · web container nginx runs as root         | **open** — needs a port decision                 |
 | 🟢  | K-3 · `pre-push` impractical locally            | fixed                                            |
-| 🟠  | K-4 · timeout when both suites run concurrently | **open** — reproduced again 2026-09-07           |
+| 🟢  | K-4 · timeout when both suites run concurrently | fixed — was a product race, not CPU starvation   |
 | 🟡  | K-5 · ESLint security warnings (22)             | accepted, 0 errors                               |
 | 🟡  | K-6 · Jest worker teardown warning              | accepted, no test fails                          |
 | 🟢  | K-11 · majors blocked behind ESM                | resolved — only #168 remains, blocked by ts-jest |
 | 🟠  | K-12 · `impeccable` skips on CI's Node          | **open** — findings cleared, runner pending      |
 | 🟢  | K-13 · Redis persistence disabled               | fixed                                            |
 
-**Three genuinely open:** K-3b and K-12 both need a decision or a permission
-rather than code; K-4 needs a CI configuration change.
+**Two genuinely open:** K-3b and K-12, and both need a decision or a permission
+rather than code.
 
 > This register has twice described a state that had already changed — K-1 and
 > K-3 were both fixed while still marked open. If an entry here contradicts the
@@ -138,15 +138,47 @@ security fixes in runtime dependencies.
 | **Consequence**   | Developers bypass it with `--no-verify`, which defeats the hook entirely.                                                                                                                                                                                                                                           |
 | **Suggested fix** | Slim `pre-push` to the fast static gates — `ci:lint`, `format:check`, `theme:hex:check` (~10s, no services) — and leave `check:full` to CI. This is a **project policy call**, so it has not been changed unilaterally.                                                                                             |
 
-### K-4 · Test timeout when both suites run concurrently
+### K-4 · ~~Test timeout when both suites run concurrently~~ ✅ RESOLVED
 
 |                |                                                                                                                                                                                                   |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**     | 🟠 Open — CI configuration risk                                                                                                                                                                   |
+| **Status**     | 🟢 Fixed 2026-09-07 — the root cause was a product race, not CPU starvation                                                                                                                       |
 | **Reproduce**  | Run the API and web Jest suites in parallel on one machine.                                                                                                                                       |
 | **Detail**     | Observed `Exceeded timeout of 5000 ms` in a web test purely from CPU contention. Each suite passes reliably on its own (verified across repeated randomized runs).                                |
 | **Still live** | Reproduced 2026-09-07: a web suite run competing with a container build took **594s and failed one test**; the same suite standalone passed in 13s. This is the entry's clearest evidence so far. |
-| **Fix**        | Run suites sequentially in CI, cap `--maxWorkers`, or raise the timeout for the affected test.                                                                                                    |
+| **Fix**        | None of the three suggested below. See the resolution.                                                                                                                                            |
+
+#### ✅ Fixed (2026-09-07) — and it was not a timeout
+
+All three suggested fixes — sequential suites, capped `--maxWorkers`, a longer
+timeout — treated this as CPU starvation. It was not. Reproducing it properly
+showed a real bug in the application.
+
+Saturating all cores and running the web suite failed **1 of 181**, and the
+failure was a _wrong value_, not a timeout: `16 vCPU · 64GB` expected,
+`16 vCPU · 8GB` received.
+
+The cause is the live-recompute debounce added in Phase 5 (#202). It fires 600ms
+after a headline field changes, and its guard checked `comparison` and
+`inputMode` but **not whether the edit panel was open**. That panel deliberately
+hides the previous result so a new set of requirements can be composed, and a
+reader editing field by field pauses longer than 600ms between two of them. So
+changing vCPU and pausing before changing memory submitted a half-edited draft —
+spending a rate-limit slot, putting a result on screen nobody asked for, and
+**closing the edit panel while the reader was still typing in it.**
+
+CPU load did not cause this. It only widened the window enough to lose the race
+every time instead of rarely.
+
+Fixed by adding `isEditingRequirements` to the guard, with a regression test
+asserting the panel stays open and no comparison is requested 900ms into an
+edit. Confirmed the test fails without the fix. The original reproduction now
+passes: **three consecutive runs of the full suite under full core saturation,
+182/182 each time.**
+
+Worth noting for CI: `npm run test:unit --workspaces` is sequential, so the API
+and web suites never actually ran in parallel there. The premise in the
+Reproduce row describes a developer's machine, not the pipeline.
 
 ---
 
