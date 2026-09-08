@@ -17,19 +17,19 @@
   },
   "dependencies": {
     "@polycost/types": "0.1.0",
+    "@tailwindcss/postcss": "^4.3.3",
     "@vitejs/plugin-react": "^4.3.4",
-    "postcss": "^8.5.16",
+    "postcss": "^8.5.28",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "recharts": "^3.10.1",
-    "@tailwindcss/postcss": "^4.3.3",
     "tailwindcss": "^4.3.3",
     "vite": "^6.0.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
     "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.4",
+    "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
     "vite": "^8.1.4"
   }
