@@ -1857,6 +1857,42 @@ describe('App', () => {
     unmount();
   });
 
+  it('does not recompute behind the reader while the edit panel is open', async () => {
+    /*
+      Regression for a race the CPU-contention repro in K-4 exposed. Live
+      recompute debounces 600ms after a headline field changes. The edit panel
+      deliberately hides the previous result so a new set of requirements can be
+      composed, and a reader editing field by field pauses longer than 600ms
+      between two of them - so without a guard, changing vCPU and then pausing
+      before changing memory submits a half-edited draft. It spends a rate-limit
+      slot and puts a result on screen nobody asked for.
+
+      Asserted on the call count rather than on rendered text: the rendered
+      symptom depends on which field the timer happens to catch, which is
+      exactly the nondeterminism that made the original failure load-dependent.
+    */
+    const createComparison = jest.fn(async () => comparisonResult);
+    const client = clientMock({ createComparison });
+    const { container, unmount } = render(<App client={client} />);
+
+    await changeInput(inputById(container, 'vcpu'), '4');
+    await click(buttonByText(container, 'Compare costs'));
+    expect(createComparison).toHaveBeenCalledTimes(1);
+
+    await click(buttonByText(container, 'Edit'));
+    await changeInput(inputById(container, 'vcpu'), '16');
+
+    // Well past the 600ms debounce, with the edit panel still open.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 900));
+    });
+
+    expect(container.querySelector('.requirements-edit-panel')).toBeInstanceOf(HTMLElement);
+    expect(createComparison).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
   it('hides submitted results while editing draft requirements', async () => {
     const client = clientMock();
     const { container, unmount } = render(<App client={client} />);
