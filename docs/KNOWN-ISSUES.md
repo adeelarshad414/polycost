@@ -16,7 +16,7 @@
 | --- | ----------------------------------------------- | ------------------------------------------------ |
 | 🟢  | K-1 · `process.env` in `http-client.ts`         | fixed                                            |
 | 🟢  | K-2 · `npm audit` high-severity gate            | fixed — 0 high, 0 moderate                       |
-| 🟠  | K-3b · web container nginx runs as root         | **open** — needs a port decision                 |
+| 🟢  | K-3b · web container nginx runs as root         | fixed — 8080, container runs as `nginx`          |
 | 🟢  | K-3 · `pre-push` impractical locally            | fixed                                            |
 | 🟢  | K-4 · timeout when both suites run concurrently | fixed — was a product race, not CPU starvation   |
 | 🟡  | K-5 · ESLint security warnings (22)             | accepted, 0 errors                               |
@@ -25,8 +25,8 @@
 | 🟠  | K-12 · `impeccable` skips on CI's Node          | **open** — findings cleared, runner pending      |
 | 🟢  | K-13 · Redis persistence disabled               | fixed                                            |
 
-**Two genuinely open:** K-3b and K-12, and both need a decision or a permission
-rather than code.
+**One genuinely open:** K-12, and it needs a token permission rather than code —
+the CI runner change is committed but cannot be pushed without `workflow` scope.
 
 > This register has twice described a state that had already changed — K-1 and
 > K-3 were both fixed while still marked open. If an entry here contradicts the
@@ -120,14 +120,44 @@ security fixes in runtime dependencies.
 
 ## 🟠 Operational friction
 
-### K-3b · Web container still runs nginx master as root
+### K-3b · ~~Web container still runs nginx master as root~~ ✅ RESOLVED
 
 |                  |                                                                                                                                                                                                                                                                                                                   |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**       | 🟠 Open — deployment decision needed                                                                                                                                                                                                                                                                              |
+| **Status**       | 🟢 Fixed 2026-09-08 — port 8080 chosen; the whole container runs as `nginx`                                                                                                                                                                                                                                       |
 | **Detail**       | The API container now runs as the unprivileged `node` user. The web container cannot follow directly: nginx already drops its _workers_ to the `nginx` user, but the master stays root purely to bind port 80. Running it fully non-root means moving the listener above 1024 and relocating the pid/cache paths. |
 | **Why deferred** | That changes the published port contract for `docker-compose` and every deployment target, so it is a deliberate decision rather than a drive-by change.                                                                                                                                                          |
-| **Fix**          | Choose a port (commonly 8080), update `nginx.conf`, `docker-compose.yml` and any ingress, then add `USER nginx`.                                                                                                                                                                                                  |
+| **Fix**          | Done as described, with one wrinkle. See the resolution.                                                                                                                                                                                                                                                          |
+
+#### ✅ Fixed (2026-09-08)
+
+Port **8080** chosen. `nginx.conf` listens there, `docker-compose.yml` maps
+`${WEB_PORT:-3000}:8080`, and the Dockerfile adds `USER nginx`.
+
+**The published contract does not change.** The host port is still
+`${WEB_PORT:-3000}`; only the container-side port moved, so nothing outside the
+container sees it. The Helm chart is API-only and needed no change, and there is
+no ingress in the repo to update.
+
+The wrinkle was the pid file. Chowning `/var/run` — which the "relocate the
+pid/cache paths" note above implies is enough — is not: nginx still failed with
+
+```
+[emerg] open() "/run/nginx.pid" failed (13: Permission denied)
+```
+
+`/var/run` is a symlink to `/run` on Alpine, and the ownership does not hold.
+The pid is now written to `/tmp/nginx.pid` via a `sed` on the image's main
+config, which is where the unprivileged nginx images put it. The same `sed`
+drops the `user` directive, which is meaningless once the master is not root and
+otherwise logs a warning on every boot.
+
+Verified in the running container rather than from the Dockerfile: **PID 1 is
+`nginx`**, `id` reports `uid=101(nginx)`, the pid file is owned by nginx, and
+writing to `/etc/passwd` is correctly refused. Functionally unchanged — the host
+port still answers 200, the `/health` proxy to the API still answers 200, the
+SPA fallback and hashed assets still serve, and a full comparison renders three
+provider cards and four result tabs.
 
 ### K-3 · ~~`pre-push` hook is impractical to satisfy locally~~ ✅ RESOLVED
 

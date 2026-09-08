@@ -187,7 +187,9 @@ services:
       api:
         condition: service_healthy
     ports:
-      - '${WEB_PORT:-3000}:80'
+      # Container-side 8080: nginx runs unprivileged and cannot bind 80.
+      # The published host port is unchanged.
+      - '${WEB_PORT:-3000}:8080'
 
 volumes:
   postgres-data:
