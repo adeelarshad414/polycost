@@ -749,8 +749,12 @@ await assertFileContains('.github/workflows/ci.yml', [
   ['production-readiness focused regression CI gate', 'npm run test:production-readiness'],
   ['live E2E verification CI gate', 'npm run ci:e2e'],
   ['pricing logic coverage CI path', 'npm run ci:unit'],
-  ['Node 20 impeccable skip reason', 'impeccable@3.1.0'],
-  ['Node 24 release tracking note', 'RELEASE-CHECKLIST.md'],
+  // These two used to assert that CI explained why it was skipping the
+  // impeccable gate. That explanation is gone because the skip is gone: the
+  // runner is Node 24 and the gate is enforced, so what release readiness
+  // needs to prove is now the opposite - that CI actually runs it.
+  ['impeccable gate runs on a supported runtime', 'node-version: 24'],
+  ['impeccable gate is enforced in CI', "IMPECCABLE_ENFORCE: '1'"],
 ]);
 
 await assertFileContains('scripts/pricing-logic-coverage-check.mjs', [
