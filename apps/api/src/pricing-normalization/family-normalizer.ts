@@ -64,6 +64,29 @@ const GCP_FAMILY_RULES: FamilyRule[] = [
   { prefix: 'z3', family: 'storage-optimized' },
 ];
 
+/**
+ * True when a string looks like an instance TYPE, not an opaque SKU id.
+ *
+ * The prefix rules below are single letters, so running them against an opaque
+ * identifier matches essentially at random. That is not hypothetical: AWS's live
+ * Price List gives every row an id like `TJCB42XUUBBP8KKF`, and 295 of 8,249
+ * rows in one region start with `t`. One of them is r4.16xlarge - 64 vCPU, 488
+ * GB - which was therefore classified `burstable`, became an exact match for a
+ * 7-vCPU burstable request, and out-ranked every correct 8-vCPU candidate. The
+ * comparison came out 25x too expensive.
+ *
+ * Real instance types are recognisable: AWS and GCP use a dotted or hyphenated
+ * shape (`t3.medium`, `e2-standard-4`), Azure an underscored one
+ * (`Standard_B2s`). Requiring that shape is what stops an id being read as a
+ * family.
+ *
+ * This guards the CALLER, not normalizeInstanceFamily itself: azureVmShape and
+ * gcpMachineShape pass a deliberate bare prefix letter, which this would reject.
+ */
+export function looksLikeInstanceType(descriptor: string): boolean {
+  return /[._-]/.test(descriptor) && /\d/.test(descriptor);
+}
+
 export function normalizeInstanceFamily(
   provider: ProviderId,
   providerSkuId: string,
@@ -74,6 +97,57 @@ export function normalizeInstanceFamily(
   );
 
   return matchingRule?.family;
+}
+
+/**
+ * Maps a provider's own family label onto the normalized taxonomy.
+ *
+ * Live catalogs publish their marketing category - AWS says "Memory optimized",
+ * Azure "memoryOptimized" - which `isNormalizedInstanceFamily` rejects, so
+ * before this the label was discarded and the code fell back to guessing from
+ * identifiers. Reading the label the provider already gives us is both more
+ * accurate and cheaper than inferring it.
+ */
+export function normalizeProviderFamilyLabel(
+  label: string | undefined,
+): NormalizedInstanceFamily | undefined {
+  if (!label) {
+    return undefined;
+  }
+
+  const collapsed = label.toLowerCase().replace(/[^a-z]/g, '');
+
+  if (collapsed.includes('burstable') || collapsed.includes('microinstances')) {
+    return 'burstable';
+  }
+
+  if (collapsed.includes('computeoptimized')) {
+    return 'compute-optimized';
+  }
+
+  if (collapsed.includes('memoryoptimized')) {
+    return 'memory-optimized';
+  }
+
+  if (collapsed.includes('storageoptimized')) {
+    return 'storage-optimized';
+  }
+
+  if (
+    collapsed.includes('gpu') ||
+    collapsed.includes('accelerated') ||
+    collapsed.includes('fpga') ||
+    collapsed.includes('machinelearning') ||
+    collapsed.includes('mediaaccelerator')
+  ) {
+    return 'accelerated-computing';
+  }
+
+  if (collapsed.includes('generalpurpose')) {
+    return 'general-purpose';
+  }
+
+  return undefined;
 }
 
 function familyRulesForProvider(provider: ProviderId): FamilyRule[] {

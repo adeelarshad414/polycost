@@ -30,6 +30,8 @@ import { HOURS_PER_MONTH } from '../../cost-time.js';
 import {
   normalizeInstanceFamily,
   NormalizedInstanceFamily,
+  normalizeProviderFamilyLabel,
+  looksLikeInstanceType,
 } from '../../pricing-normalization/family-normalizer.js';
 import { pricingLineageForCatalogRecord } from '../../pricing-normalization/pricing-lineage.js';
 
@@ -945,6 +947,13 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     ].filter((value): value is string => typeof value === 'string' && value.length > 0);
 
     for (const descriptor of descriptors) {
+      // Only descriptors shaped like an instance type. skuId is in this list
+      // and, for live catalogs, is an opaque identifier - matching single-letter
+      // family prefixes against it succeeds at random.
+      if (!looksLikeInstanceType(descriptor)) {
+        continue;
+      }
+
       const family = normalizeInstanceFamily(this.providerId, descriptor);
 
       if (family) {
@@ -952,7 +961,19 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       }
     }
 
-    return undefined;
+    /*
+      The provider's own marketing label, last.
+
+      It is a coarser taxonomy than ours and deliberately ranks below the
+      instance type: AWS labels t3.2xlarge "General purpose", but t3 is
+      burstable, and a burstable request must be able to find it. Reading the
+      label first excluded every live burstable instance and fell back to seed
+      pricing.
+
+      It still earns its place for rows that publish no parseable instance type,
+      where the alternative is no family at all.
+    */
+    return normalizeProviderFamilyLabel(explicitFamily);
   }
 
   private recordProcessorArchitecture(
@@ -1137,6 +1158,14 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       this.stringAttribute(record, 'armSkuName'),
       this.stringAttribute(record, 'machineType'),
       this.stringAttribute(record, 'processor'),
+      // The field that actually carries the instruction set. AWS's
+      // `processorArchitecture` says "64-bit" for Graviton and Intel alike - it
+      // is word size, not ISA - so without this the arm64/x86_64 heuristics fall
+      // back to pattern-matching the instance type, which only works for older
+      // names: /\bc\d\b/ matches c4.2xlarge but not c6i.2xlarge, so most modern
+      // types resolved to undefined and ranked worse than older ones regardless
+      // of price.
+      this.stringAttribute(record, 'physicalProcessor'),
     ].filter((value): value is string => typeof value === 'string' && value.length > 0);
   }
 
