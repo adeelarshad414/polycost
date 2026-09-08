@@ -19,13 +19,32 @@ FROM nginx:1.27-alpine
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html
 
-EXPOSE 80
+# Run the whole container as the unprivileged `nginx` user, master included.
+#
+# nginx already dropped its workers; the master stayed root purely to bind port
+# 80. The listener moved to 8080 (see nginx.conf), which leaves two things the
+# master can no longer do:
+#
+#   the pid file  the image's main config writes /run/nginx.pid, and /run is
+#                 root-owned. Chowning it is not enough - the first attempt did
+#                 exactly that and still failed with EACCES - so the pid is
+#                 moved to /tmp, which is writable by anyone and is where the
+#                 unprivileged nginx images put it.
+#   temp dirs     /var/cache/nginx holds the proxy and fastcgi temp
+#                 directories, created at startup.
+#
+# The `user` directive in the main config is dropped too: it only means anything
+# when the master is root, and nginx warns about it on every boot otherwise.
+RUN sed -i \
+      -e 's#^pid .*#pid /tmp/nginx.pid;#' \
+      -e '/^user /d' \
+      /etc/nginx/nginx.conf \
+  && mkdir -p /var/cache/nginx \
+  && chown -R nginx:nginx /var/cache/nginx /etc/nginx/conf.d /usr/share/nginx/html
 
-# nginx already drops its worker processes to the unprivileged `nginx` user; the
-# master stays root only to bind port 80. Running the whole container non-root
-# additionally requires moving the listener to a port above 1024 and relocating
-# the pid/cache paths, which changes the published port contract for compose and
-# any deployment. That is a deliberate deployment decision, so it is tracked as
-# follow-up rather than changed here - see docs/KNOWN-ISSUES.md.
+USER nginx
+
+EXPOSE 8080
+
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://127.0.0.1/ || exit 1
+  CMD wget --quiet --tries=1 --spider http://127.0.0.1:8080/ || exit 1
