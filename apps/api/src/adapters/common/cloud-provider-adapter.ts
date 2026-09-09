@@ -19,6 +19,33 @@ export type PricingVolatility = 'stable' | 'variable' | 'volatile';
 export type PricingSource = 'catalog' | 'modeled-estimate';
 export type RateSource = 'pricing_catalog' | 'pricing_rates' | 'modeled_estimate' | 'manual_model';
 
+/**
+ * Whether a priced row came from the provider or from fixture data.
+ *
+ * Distinct from RateSource, which says which store the rate was read from. This
+ * says whether the number is real. A comparison can mix them - live AWS beside
+ * seeded GCP - and until a reader can see which is which, fixture prices carry
+ * the same visual weight as real ones on the same screen.
+ */
+export type PricingProvenance = 'live' | 'mock' | 'seeded';
+
+/** Reads provenance off a catalog row. Live rows carry no source marker. */
+export function catalogRecordProvenance(record: {
+  attributes?: Record<string, unknown> | null;
+}): PricingProvenance {
+  const source = record.attributes?.source;
+
+  if (source === 'mock_provider') {
+    return 'mock';
+  }
+
+  if (source === 'local_seed') {
+    return 'seeded';
+  }
+
+  return 'live';
+}
+
 export interface EgressTierBreakdown {
   tierFromGb: number;
   tierToGb?: number;
@@ -106,6 +133,8 @@ export interface ProviderPricingLineItem {
   costComponent?: CostComponent;
   description: string;
   isApproximate: boolean;
+  /** See PricingProvenance: whether this rate is real or fixture data. */
+  pricingProvenance?: PricingProvenance;
   baseHourlyCostUsd?: number;
   baseMonthlyCostUsd: number;
   skuId: string;
