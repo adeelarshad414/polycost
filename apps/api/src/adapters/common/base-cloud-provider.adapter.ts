@@ -1002,12 +1002,22 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       return 'gpu';
     }
 
-    if (
-      descriptors.some((descriptor) =>
-        /\b(arm|arm64|aarch64|graviton|ampere|t2a)\b/i.test(descriptor),
-      )
-    ) {
+    if (descriptors.some((descriptor) => ARM_DESCRIPTOR_PATTERN.test(descriptor))) {
       return 'arm64';
+    }
+
+    // Azure publishes no processor field at all, so the size name is the only
+    // ISA signal it gives us. Read it from the size attributes rather than the
+    // whole descriptor list: a stray `p` in a product description would
+    // otherwise flip an x86 row to arm64.
+    if (this.providerId === 'azure') {
+      const azureArchitecture = azureArchitectureFromSizeName(
+        this.stringAttribute(record, 'armSkuName') ?? this.stringAttribute(record, 'skuName'),
+      );
+
+      if (azureArchitecture) {
+        return azureArchitecture;
+      }
     }
 
     if (
@@ -1027,8 +1037,10 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       this.stringAttribute(record, 'hostTenancy') ??
       this.stringAttribute(record, 'computeTenancy');
 
-    if (isComputeTenancy(explicitTenancy)) {
-      return explicitTenancy;
+    const normalizedTenancy = normalizeProviderTenancyLabel(explicitTenancy);
+
+    if (normalizedTenancy) {
+      return normalizedTenancy;
     }
 
     const descriptors = this.recordDescriptors(record);
@@ -1224,8 +1236,93 @@ function isComputeProcessorArchitecture(
   return value === 'x86_64' || value === 'arm64' || value === 'gpu';
 }
 
-function isComputeTenancy(value: string | undefined): value is ComputeTenancy {
-  return value === 'shared' || value === 'dedicated-host' || value === 'sole-tenant';
+/*
+  Providers publish tenancy as a marketing label, not as our taxonomy's token.
+  Every live AWS compute row reports `Shared` with a capital S, so an equality
+  check against 'shared' rejected all 1,389 of them and left tenancy undefined
+  across the whole catalog - which made the tenancy clause of the selection
+  predicate a no-op that would accept a Dedicated SKU for a shared request.
+
+  AWS's `Dedicated` is a Dedicated Instance and `Host` is a Dedicated Host. Both
+  map to 'dedicated-host' here, matching what the descriptor fallback below
+  already does for the phrase "dedicated instance"; the NWS taxonomy draws its
+  line between shared and not-shared tenancy, not between the two AWS products.
+*/
+function normalizeProviderTenancyLabel(label: string | undefined): ComputeTenancy | undefined {
+  if (!label) {
+    return undefined;
+  }
+
+  const collapsed = label.toLowerCase().replace(/[^a-z]/g, '');
+
+  if (collapsed === 'shared' || collapsed === 'default' || collapsed === 'multitenant') {
+    return 'shared';
+  }
+
+  if (collapsed === 'soletenant' || collapsed === 'singletenant' || collapsed === 'sole') {
+    return 'sole-tenant';
+  }
+
+  if (
+    collapsed === 'dedicated' ||
+    collapsed === 'dedicatedhost' ||
+    collapsed === 'dedicatedinstance' ||
+    collapsed === 'host'
+  ) {
+    return 'dedicated-host';
+  }
+
+  return undefined;
+}
+
+/*
+  `graviton` needed a trailing \b, and AWS names every generation with a digit
+  ("AWS Graviton4 Processor"): n->4 is not a word boundary, so the token never
+  matched. 412 of 1,389 live AWS compute rows are Graviton and every one of them
+  resolved to an unknown architecture - so an arm64 request ranked real Graviton
+  no better than any unlabelled x86 row, and an x86_64 request would silently
+  accept a Graviton instance when no known-x86 row fitted.
+*/
+const ARM_DESCRIPTOR_PATTERN = /\b(?:arm|arm64|aarch64|graviton\d*|ampere|t2a)\b/i;
+
+/*
+  Azure marks Ampere ARM parts with a `p` in the size name's variant segment -
+  the letters between the vCPU count and the version suffix: Standard_D4ps_v5,
+  Standard_B2pls_v2, Standard_E8pds_v6. The `p` has to come from that segment
+  specifically, because other size names carry a p in the family letters
+  (Standard_NP10s is an x86-hosted FPGA part) or in a product name.
+
+  Checked against the live catalog: this matches 97 distinct sizes across 314
+  rows, all of them genuine Ampere parts, and no non-ARM size.
+
+  The variant charclass is closed to Azure's documented variant letters rather
+  than [a-z], because the size name is not the whole string: Standard_H16_Promo
+  and Standard_NC12_Promo collapse to `...16promo` / `...12promo`, and an open
+  charclass reads the `p` of "Promo" as Ampere - flipping an x86 H-series part
+  and eleven NVIDIA parts to arm64. Closing the class makes those names fail to
+  parse at all, which is the correct answer for them.
+*/
+const AZURE_SIZE_NAME_VERSION_SUFFIX = /v\d+$/;
+const AZURE_SIZE_NAME_PATTERN = /^[a-z]+\d+([abcdilmprst]*)$/;
+
+function azureArchitectureFromSizeName(
+  sizeName: string | undefined,
+): ComputeProcessorArchitecture | undefined {
+  if (!sizeName) {
+    return undefined;
+  }
+
+  // The version suffix is peeled off before matching rather than written as an
+  // optional group: `(?:v\d+)?` nests a quantifier inside an optional, which is
+  // the shape the ReDoS lint rule flags. Stripping it first leaves every
+  // quantifier in the pattern at star height one.
+  const collapsed = sizeName
+    .toLowerCase()
+    .replace(/[_\s-]/g, '')
+    .replace(AZURE_SIZE_NAME_VERSION_SUFFIX, '');
+  const variant = AZURE_SIZE_NAME_PATTERN.exec(collapsed)?.[1];
+
+  return variant?.includes('p') ? 'arm64' : undefined;
 }
 
 function normalizeStorageClass(value: string): StorageClass | undefined {
