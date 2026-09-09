@@ -569,6 +569,9 @@ and job name are sent, because job data carries workload and tenant details.
 
 | Issue                                           | Fix                                                         |
 | ----------------------------------------------- | ----------------------------------------------------------- |
+| Graviton never resolved as arm64                | `\b` after `graviton` vs `Graviton4` (#227); 412 live rows  |
+| Azure Ampere parts invisible                    | Size-name variant `p` read directly (#227); 314 live rows   |
+| Tenancy undefined across the whole catalog      | AWS reports `Shared`; label normalizer (#227)               |
 | Money `"1,234.56"` parsed as `1`                | Thousands-separator-aware parsing                           |
 | Evidence lost-update race                       | Optimistic-concurrency hash → 409                           |
 | Evidence packet exported on a `GET`             | Moved to `POST …/export`                                    |
