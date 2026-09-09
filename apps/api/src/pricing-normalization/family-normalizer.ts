@@ -92,6 +92,30 @@ export function normalizeInstanceFamily(
   providerSkuId: string,
 ): NormalizedInstanceFamily | undefined {
   const normalizedSku = providerSkuId.toLowerCase();
+
+  /*
+    AWS matches the family token exactly; the others still match by prefix.
+
+    An AWS instance type is <family letters><generation digit><attributes>, so
+    the family is the leading run of letters: `t3` -> t, `m7i` -> m, `trn1` ->
+    trn. The rules here are single letters, and matching them with startsWith
+    reads `trn1.32xlarge` - a 128-vCPU Trainium accelerator - as `t`, burstable.
+    That is how a $21.50/hr ML instance won a 13-vCPU web request. The same trap
+    catches dl1, hpc7a and u-6tb1.
+
+    GCP and Azure keep prefix matching: GCP's rules are already specific
+    (`a2`, `c2d`, `c3`), and azureVmShape deliberately passes a bare family
+    letter rather than a full type, which an exact-token match would still
+    satisfy but a letters-only extraction on a full name would not.
+  */
+  if (provider === 'aws') {
+    const familyToken = /^[a-z]+/.exec(normalizedSku)?.[0];
+
+    return familyToken
+      ? familyRulesForProvider(provider).find((rule) => rule.prefix === familyToken)?.family
+      : undefined;
+  }
+
   const matchingRule = familyRulesForProvider(provider).find((rule) =>
     normalizedSku.startsWith(rule.prefix),
   );
