@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
 import {
@@ -74,6 +74,22 @@ const defaultPgPoolFactory: PgPoolFactory = (config) => new Pool(config);
 // size per round-trip while still collapsing thousands of SKUs into a handful of
 // statements.
 const PRICING_CATALOG_UPSERT_CHUNK_SIZE = 500;
+/** Enough to see the shape of a systematic failure without flooding the log. */
+const MAX_LOGGED_REJECTION_REASONS = 5;
+
+/**
+ * Records why a row was rejected, deduplicated by message.
+ *
+ * These writes used to swallow the error entirely, so a live refresh could drop
+ * 1,297 AWS rows and report only the count. A systematic cause repeats thousands
+ * of times, so what matters is which distinct failures exist - not how many rows
+ * each one claimed.
+ */
+function recordRejection(reasons: Map<string, number>, error: unknown): void {
+  const reason = error instanceof Error ? error.message : String(error);
+
+  reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
+}
 
 @Injectable()
 export class PostgresPricingCatalogRepository
@@ -84,6 +100,8 @@ export class PostgresPricingCatalogRepository
     NormalizedPricingWriter,
     PricingEtlRunRepository
 {
+  private readonly logger = new Logger(PostgresPricingCatalogRepository.name);
+
   private pool?: PgPoolLike;
 
   constructor(
@@ -145,6 +163,7 @@ export class PostgresPricingCatalogRepository
   async upsertPricingRecords(records: PricingCatalogRecord[]): Promise<PricingCatalogWriteResult> {
     let recordsUpdated = 0;
     let recordsRejected = 0;
+    const rejectionReasons = new Map<string, number>();
     const pool = await this.getPool();
 
     // A live refresh can carry tens of thousands of SKUs. Writing one row per
@@ -162,17 +181,54 @@ export class PostgresPricingCatalogRepository
         for (const record of chunk) {
           try {
             recordsUpdated += await this.upsertPricingRecordChunk(pool, [record]);
-          } catch {
+          } catch (error) {
             recordsRejected += 1;
+            // A bare `catch {}` here dropped 1,297 AWS and 801 Azure rows per
+            // live refresh with no way to find out why. The reason is kept -
+            // deduplicated, because a systematic cause repeats thousands of
+            // times and the point is which distinct failures exist, not how
+            // many rows each claimed.
+            const reason = error instanceof Error ? error.message : String(error);
+            rejectionReasons.set(reason, (rejectionReasons.get(reason) ?? 0) + 1);
           }
         }
       }
     }
 
+    this.logRejections(rejectionReasons, recordsRejected, 'catalog');
+
     return {
       recordsUpdated,
       recordsRejected,
     };
+  }
+
+  /**
+   * Emits why rows were rejected, most frequent first.
+   *
+   * Counts alone said "1,297 pricing records were rejected" and nothing else,
+   * which is not enough to act on. Capped so a systematic failure cannot flood
+   * the log with one message repeated thousands of times.
+   */
+  private logRejections(
+    reasons: Map<string, number>,
+    recordsRejected: number,
+    stage: 'catalog' | 'normalized',
+  ): void {
+    if (reasons.size === 0) {
+      return;
+    }
+
+    this.logger.warn({
+      event: 'pricing_rows_rejected',
+      stage,
+      recordsRejected,
+      distinctReasons: reasons.size,
+      reasons: [...reasons.entries()]
+        .sort((left, right) => right[1] - left[1])
+        .slice(0, MAX_LOGGED_REJECTION_REASONS)
+        .map(([reason, count]) => ({ count, reason })),
+    });
   }
 
   private async upsertPricingRecordChunk(
@@ -308,6 +364,7 @@ export class PostgresPricingCatalogRepository
   ): Promise<PricingCatalogWriteResult> {
     const normalized = normalizePricingCatalogRecords(records);
     const pool = await this.getPool();
+    const rejectionReasons = new Map<string, number>();
     let recordsUpdated = 0;
     let recordsRejected = 0;
 
@@ -374,8 +431,9 @@ export class PostgresPricingCatalogRepository
 
         recordsUpdated += result.rowCount ?? 0;
         recordsUpdated += await this.upsertCurrentPricingRates(pool, record);
-      } catch {
+      } catch (error) {
         recordsRejected += 1;
+        recordRejection(rejectionReasons, error);
       }
     }
 
@@ -426,8 +484,9 @@ export class PostgresPricingCatalogRepository
         );
 
         recordsUpdated += result.rowCount ?? 0;
-      } catch {
+      } catch (error) {
         recordsRejected += 1;
+        recordRejection(rejectionReasons, error);
       }
     }
 
@@ -478,10 +537,13 @@ export class PostgresPricingCatalogRepository
         );
 
         recordsUpdated += result.rowCount ?? 0;
-      } catch {
+      } catch (error) {
         recordsRejected += 1;
+        recordRejection(rejectionReasons, error);
       }
     }
+
+    this.logRejections(rejectionReasons, recordsRejected, 'normalized');
 
     return {
       recordsUpdated,
@@ -528,6 +590,61 @@ export class PostgresPricingCatalogRepository
     const lineage = record.sourceLineage;
 
     for (const rate of pricingRateRowsForComputeRecord(record)) {
+      /*
+        Close the previous current rate in its own statement, before inserting
+        the new one.
+
+        This used to be a `closed_previous` data-modifying CTE inside the insert.
+        Every part of a statement in Postgres runs on the same snapshot, so the
+        INSERT could not see the UPDATE's effect - and the partial unique index
+        `uq_pricing_rates_one_current`, which allows one row per
+        (sku, region, term, payment option) where valid_to IS NULL, rejected it.
+
+        The insert's ON CONFLICT target includes valid_from, so it only matched a
+        re-run of the same effective date. A genuinely NEW rate - a price change,
+        which is the case that matters - fell through to a plain insert and hit
+        that index. Every one was dropped: 801 of 801 Azure rejections in a live
+        refresh were this single cause, meaning a rate never changed once first
+        recorded.
+      */
+      await pool.query(
+        `
+          WITH resolved AS (
+            SELECT provider_skus.id AS sku_id,
+                   pricing_terms.id AS pricing_term_id,
+                   payment_options.id AS payment_option_id
+            FROM provider_skus
+            JOIN pricing_terms
+              ON pricing_terms.code = $4
+            LEFT JOIN payment_options
+              ON payment_options.code = $5
+            WHERE provider_skus.provider = $1
+              AND provider_skus.provider_sku_id = $2
+              AND provider_skus.region = $3
+          )
+          UPDATE pricing_rates
+          SET valid_to = $6::timestamptz
+          FROM resolved
+          WHERE pricing_rates.sku_id = resolved.sku_id
+            AND pricing_rates.region = $3
+            AND pricing_rates.pricing_term_id = resolved.pricing_term_id
+            AND (
+              (pricing_rates.payment_option_id IS NULL AND resolved.payment_option_id IS NULL)
+              OR pricing_rates.payment_option_id = resolved.payment_option_id
+            )
+            AND pricing_rates.valid_to IS NULL
+            AND pricing_rates.valid_from <> $6::timestamptz
+        `,
+        [
+          record.provider,
+          record.providerSkuId,
+          record.region,
+          rate.pricingTermCode,
+          rate.paymentOptionCode ?? null,
+          record.effectiveDate,
+        ],
+      );
+
       const result = await pool.query(
         `
           WITH resolved AS (
@@ -542,21 +659,6 @@ export class PostgresPricingCatalogRepository
             WHERE provider_skus.provider = $1
               AND provider_skus.provider_sku_id = $2
               AND provider_skus.region = $3
-          ),
-          closed_previous AS (
-            UPDATE pricing_rates
-            SET valid_to = $12::timestamptz
-            FROM resolved
-            WHERE pricing_rates.sku_id = resolved.sku_id
-              AND pricing_rates.region = $3
-              AND pricing_rates.pricing_term_id = resolved.pricing_term_id
-              AND (
-                (pricing_rates.payment_option_id IS NULL AND resolved.payment_option_id IS NULL)
-                OR pricing_rates.payment_option_id = resolved.payment_option_id
-              )
-              AND pricing_rates.valid_to IS NULL
-              AND pricing_rates.valid_from <> $12::timestamptz
-            RETURNING pricing_rates.id
           )
           INSERT INTO pricing_rates (
             sku_id,
