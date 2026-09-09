@@ -386,13 +386,31 @@ describe('PostgresPricingCatalogRepository', () => {
       expect.stringContaining('INSERT INTO provider_skus'),
       expect.arrayContaining(['aws', 't3.small', 'burstable', 2, 2, 'us-east-1']),
     );
+    /*
+      The supersede runs as its own statement, immediately before the insert,
+      and that ordering is the fix rather than an implementation detail.
+
+      It was a data-modifying CTE inside the insert. Every part of a Postgres
+      statement runs on one snapshot, so the insert could not see the update and
+      the partial unique index uq_pricing_rates_one_current rejected it - which
+      dropped every genuine price change. Asserting the order here is what stops
+      it being folded back in.
+    */
     expect(query).toHaveBeenNthCalledWith(
       2,
+      expect.stringContaining('UPDATE pricing_rates'),
+      expect.arrayContaining(['aws', 't3.small', 'us-east-1', 'on_demand']),
+    );
+    expect(query.mock.calls[1][0]).toContain('valid_to');
+    expect(query).toHaveBeenNthCalledWith(
+      3,
       expect.stringContaining('INSERT INTO pricing_rates'),
       expect.arrayContaining(['aws', 't3.small', 'us-east-1', 'on_demand']),
     );
+    // The insert must no longer carry the supersede as a CTE.
+    expect(query.mock.calls[2][0]).not.toContain('closed_previous');
     expect(query).toHaveBeenNthCalledWith(
-      3,
+      4,
       expect.stringContaining('INSERT INTO storage_pricing'),
       expect.arrayContaining([
         'aws',
@@ -409,7 +427,7 @@ describe('PostgresPricingCatalogRepository', () => {
       ]),
     );
     expect(query).toHaveBeenNthCalledWith(
-      4,
+      5,
       expect.stringContaining('INSERT INTO egress_tier_rates'),
       expect.arrayContaining([
         'aws',
