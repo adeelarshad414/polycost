@@ -83,6 +83,15 @@ const CATALOG: PricingCatalogRecord[] = [
   // No family label, so resolution falls through to the descriptors - and the
   // opaque id begins with `t`. This is the row the original bug picked.
   awsRow('TQQQQQQQQQQQQQQQ', 'r5.24xlarge', 96, 768, 6.048),
+  /*
+    Real instance types whose family is more than one letter. Matching the AWS
+    rules by prefix reads all three as burstable, compute-optimized and so on
+    from their first character: trn1 -> t, dl1 -> d, hpc7a -> h. trn1.32xlarge
+    at $21.50/hr actually won a 13-vCPU web request this way on live data.
+  */
+  awsRow('WVVQPJVCQU4SR8XF', 'trn1.32xlarge', 128, 512, 21.5, 'Machine Learning ASIC Instances'),
+  awsRow('DLLLLLLLLLLLLLLL', 'dl1.24xlarge', 96, 768, 13.109, 'GPU instance'),
+  awsRow('HPCCCCCCCCCCCCCC', 'hpc7a.96xlarge', 192, 768, 7.2, 'Compute optimized'),
 ];
 
 function workload(vcpu: number, memoryGb: number): NormalizedWorkloadSpec {
@@ -179,6 +188,20 @@ describe('compute SKU selection against a realistic catalog', () => {
     const skuIds = await computeSkuIds(7, 4);
 
     expect(skuIds).not.toContain('TQQQQQQQQQQQQQQQ');
+  });
+
+  it('does not read a family from the first letter of a multi-letter one', async () => {
+    /*
+      trn1, dl1 and hpc7a are real AWS families. Matched by prefix they read as
+      t, d and h - burstable, general-purpose, and nothing - so a Trainium
+      accelerator at $21.50/hr became an exact match for a burstable request.
+      The family is the leading run of letters, not the first character.
+    */
+    const skuIds = await computeSkuIds(13, 8);
+
+    expect(skuIds).not.toContain('WVVQPJVCQU4SR8XF');
+    expect(skuIds).not.toContain('DLLLLLLLLLLLLLLL');
+    expect(skuIds).not.toContain('HPCCCCCCCCCCCCCC');
   });
 
   it('never selects an instance smaller than the request', async () => {

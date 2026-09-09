@@ -23,6 +23,7 @@ import {
   ProviderPricingResult,
   RefreshPricingCatalogOptions,
   ServiceCategory,
+  catalogRecordProvenance,
 } from './cloud-provider-adapter.js';
 import { AdapterPricingError } from './adapter-errors.js';
 /* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: dynamic keys are typed provider service/dimension maps sourced from internal catalogs; see docs/SECURITY-SUPPRESSIONS.md. */
@@ -615,6 +616,9 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
       unitPriceUsd: record.unitPriceUsd,
       pricingBasis: cost.pricingBasis,
       rateSource: 'pricing_catalog',
+      // Read off the row that was actually selected, so a card can say whether
+      // the figure beside it is a real provider price.
+      pricingProvenance: catalogRecordProvenance(record),
       rateSourceSkuId: record.skuId,
       ...(pricingTermCode ? { pricingTermCode } : {}),
       ...(paymentOptionCode ? { paymentOptionCode } : {}),

@@ -5911,6 +5911,7 @@ function ProviderSummaryCards({
             cost !== undefined && lowestCost !== undefined && lowestCost > 0
               ? (cost - lowestCost) / lowestCost
               : undefined;
+          const provenance = provider ? providerPricingProvenance(provider) : undefined;
 
           return (
             <article
@@ -5929,6 +5930,11 @@ function ProviderSummaryCards({
                   </span>
                 ) : null}
               </div>
+              {provenance ? (
+                <span className="provider-summary-provenance" title={provenance.detail}>
+                  {provenance.label}
+                </span>
+              ) : null}
               <strong className="provider-summary-total">
                 {cost !== undefined ? formatCurrency(cost) : 'Unavailable'}
               </strong>
@@ -6093,6 +6099,46 @@ function headlineSignature(form: WorkloadFormState): string {
     form.regionPreference,
     form.commitmentPreferencePercent,
   ].join('|');
+}
+
+/**
+ * Whether a provider's figures are real, and what to call it if not.
+ *
+ * A comparison can mix live and fixture pricing - live AWS beside seeded GCP is
+ * the normal state when a provider has no credentials - and until this, all
+ * three cards rendered identically. A reader had no way to tell which numbers
+ * were real, which is the one thing a cost comparison must not be ambiguous
+ * about.
+ *
+ * Priced lines that carry no provenance are modeled rather than looked up, so
+ * they are ignored here rather than counted as suspect.
+ */
+function providerPricingProvenance(
+  provider: ComparisonProviderResult,
+): { label: string; detail: string } | undefined {
+  const sources = new Set(
+    provider.lineItems
+      .map((lineItem) => lineItem.pricingProvenance)
+      .filter((value): value is 'live' | 'mock' | 'seeded' => value !== undefined),
+  );
+
+  if (sources.size === 0 || (sources.size === 1 && sources.has('live'))) {
+    return undefined;
+  }
+
+  const kind = sources.has('mock') ? 'Sample' : 'Seed';
+
+  if (sources.has('live')) {
+    return {
+      label: `Part ${kind.toLowerCase()} data`,
+      detail: `Some of this estimate uses ${kind.toLowerCase()} pricing, not live provider rates.`,
+    };
+  }
+
+  return {
+    label: `${kind} data`,
+    detail: `This estimate uses ${kind.toLowerCase()} pricing, not live provider rates.`,
+  };
 }
 
 function ResultDetailHeading({ title, description }: { title: string; description: string }) {

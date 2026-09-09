@@ -933,6 +933,28 @@ summary:focus-visible,
   color: var(--ink-600);
 }
 
+/*
+  Marks a card whose figures are not live provider pricing.
+
+  Deliberately quiet - a small warning-toned chip rather than a banner. It has
+  to be noticeable enough that nobody reads a seeded number as real, and calm
+  enough that the common case of one provider lacking credentials does not look
+  like a failure.
+*/
+.provider-summary-provenance {
+  justify-self: start;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--status-warn) 40%, transparent);
+  background: color-mix(in srgb, var(--status-warn) 12%, transparent);
+  color: var(--warning-text);
+  cursor: help;
+}
+
 .provider-summary-services {
   font-size: 0.8125rem;
   color: var(--ink-600);

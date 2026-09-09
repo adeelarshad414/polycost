@@ -290,6 +290,7 @@ export class ComparisonOrchestratorService {
         unitPriceUsd: annotatedLineItem.unitPriceUsd,
         pricingBasis: annotatedLineItem.pricingBasis ?? 'flat',
         rateSource: annotatedLineItem.rateSource,
+        pricingProvenance: annotatedLineItem.pricingProvenance,
         rateSourceSkuId: annotatedLineItem.rateSourceSkuId,
         pricingTermCode: annotatedLineItem.pricingTermCode,
         paymentOptionCode: annotatedLineItem.paymentOptionCode,
@@ -494,6 +495,7 @@ export class ComparisonOrchestratorService {
     return {
       ...lineItem,
       rateSource,
+      pricingProvenance: lineItem.pricingProvenance,
       rateSourceSkuId: lineItem.rateSourceSkuId ?? lineItem.skuId,
       rateCurrency:
         lineItem.rateCurrency ??

@@ -8,6 +8,7 @@ import {
   ProviderId,
   RateSource,
   ServiceCategory,
+  PricingProvenance,
 } from '../adapters/common/cloud-provider-adapter.js';
 import {
   NormalizedWorkloadSpec,
@@ -39,6 +40,11 @@ export interface ComparisonLineItem {
   unitPriceUsd?: number;
   pricingBasis?: PricingBasis;
   rateSource?: RateSource;
+  /**
+   * Whether this line's rate is real provider pricing or fixture data. Absent
+   * for modeled lines that were never priced from a catalog row.
+   */
+  pricingProvenance?: PricingProvenance;
   rateSourceSkuId?: string;
   pricingTermCode?: string;
   paymentOptionCode?: string;

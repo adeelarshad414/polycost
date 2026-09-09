@@ -1217,6 +1217,11 @@ export interface ComparisonLineItem {
   unitPriceUsd?: number;
   pricingBasis?: PricingBasis;
   rateSource?: 'pricing_catalog' | 'pricing_rates' | 'modeled_estimate' | 'manual_model';
+  /**
+   * Whether this line's rate is real provider pricing or fixture data. Absent
+   * on modeled lines that were never priced from a catalog row.
+   */
+  pricingProvenance?: 'live' | 'mock' | 'seeded';
   rateSourceSkuId?: string;
   pricingTermCode?: string;
   paymentOptionCode?: string;

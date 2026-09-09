@@ -1893,6 +1893,47 @@ describe('App', () => {
     unmount();
   });
 
+  it('marks a provider whose pricing is not live', async () => {
+    /*
+      A comparison routinely mixes live and fixture pricing - live AWS beside
+      seeded GCP is the normal state when one provider has no credentials - and
+      before this every card rendered identically. A reader had no way to tell
+      which figures were real, which is the one thing a cost comparison must not
+      leave ambiguous.
+    */
+    const mixed: ComparisonResult = {
+      ...comparisonResult,
+      providers: [provider('aws', 42), provider('azure', 38), provider('gcp', 30, false, 'seeded')],
+    };
+    const client = clientMock({ createComparison: jest.fn(async () => mixed) });
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Compare costs'));
+
+    const marks = Array.from(
+      container.querySelectorAll<HTMLElement>('.provider-summary-provenance'),
+    );
+
+    expect(marks).toHaveLength(1);
+    expect(marks[0].textContent).toBe('Seed data');
+    // The explanation is on the element rather than only in a tooltip's prose,
+    // so it is available to a reader who never hovers.
+    expect(marks[0].getAttribute('title')).toContain('not live provider rates');
+
+    unmount();
+  });
+
+  it('marks nothing when every provider is priced live', async () => {
+    const client = clientMock();
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Compare costs'));
+
+    expect(container.querySelectorAll('.provider-summary-provenance')).toHaveLength(0);
+
+    unmount();
+  });
+
   it('hides submitted results while editing draft requirements', async () => {
     const client = clientMock();
     const { container, unmount } = render(<App client={client} />);
@@ -6076,6 +6117,7 @@ function provider(
   providerId: ComparisonResult['providers'][number]['providerId'],
   monthly: number,
   approximate = false,
+  pricingProvenance: 'live' | 'mock' | 'seeded' = 'live',
 ): ComparisonResult['providers'][number] {
   return {
     providerId,
@@ -6085,6 +6127,7 @@ function provider(
         description: `${providerId} compute`,
         isApproximate: approximate,
         baseMonthlyCostUsd: monthly,
+        pricingProvenance,
       },
     ],
     totals: {
