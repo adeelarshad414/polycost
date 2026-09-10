@@ -169,6 +169,53 @@ docker compose exec vault vault kv put secret/polycost/providers/gcp service_acc
 
 Treat service account JSON as a sensitive fallback. Rotate it, scope it to Cloud Billing catalog reads only, and prefer workload identity or externally minted short-lived tokens for production.
 
+### When your organization blocks service account keys
+
+`constraints/iam.disableServiceAccountKeyCreation` is a common org policy, and
+it makes the `service_account_json` route above unavailable — there is no key
+to store. This does **not** block PolyCost. The adapter checks `access_token`
+first and only falls back to service account JSON, so a token minted from your
+own credentials works with no key involved:
+
+1. Install the Google Cloud CLI if you do not have it, and sign in. This is an
+   ordinary user login, not a service account, and creates no key:
+
+   ```bash
+   gcloud auth login
+   ```
+
+2. Select the project with the Cloud Billing API enabled:
+
+   ```bash
+   gcloud config set project <your-project-id>
+   ```
+
+3. Mint a token and write it straight into Vault. Piping it keeps the value out
+   of your shell history and off your screen:
+
+   ```bash
+   gcloud auth print-access-token | docker compose exec -T vault sh -c 'vault kv put secret/polycost/providers/gcp access_token=-'
+   ```
+
+4. Confirm it worked without revealing the token:
+
+   ```bash
+   USE_MOCK_PROVIDERS=false npm run provider:credentials:check:strict
+   ```
+
+Your account needs a Cloud Billing read role — `roles/billing.viewer` on the
+billing account is enough for catalog reads.
+
+**The limitation is lifetime, not permission.** A `print-access-token` token
+lasts about an hour, which is fine for verifying the live GCP path and for a
+one-off catalog capture, but it will not carry a scheduled refresh. For
+unattended refresh under a key-blocking policy the answer is Workload Identity
+Federation: it issues short-lived tokens to an external workload without ever
+creating a downloadable key, and is normally permitted by the same policies
+that block key creation. That is a deployment-side setup and PolyCost needs no
+code change for it — federation produces exactly the `access_token` this path
+already consumes.
+
 Validation command after credential storage:
 
 ```bash

@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- Reviewed 2026-09-10: reads a repository-controlled diagram fixture from the fixtures root, matching diagram-parser.service.spec.ts; see docs/SECURITY-SUPPRESSIONS.md. */
 import { describe, it, expect } from '@jest/globals';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';

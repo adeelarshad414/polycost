@@ -31,6 +31,7 @@ Suppression locations reviewed on 2026-07-06:
 - `apps/api/src/comparison/comparison-orchestrator.service.ts`
 - `apps/api/src/database/pricing-catalog.repository.spec.ts`
 - `apps/api/src/diagram-parser/diagram-parser.service.spec.ts`
+- `apps/api/src/diagram-parser/lucid-csv-real-export.spec.ts`
 - `apps/api/src/diagram-parser/diagram-temp-file.store.ts`
 - `apps/api/src/nws-parser/nl-parser.service.ts`
 - `apps/api/src/reports/report-evidence.ts`
