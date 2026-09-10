@@ -52,6 +52,7 @@
     "graphify:visualize": "node scripts/graphify-local.mjs visualize",
     "graphify:tool": "graphify --help",
     "pricing:coverage:check": "node scripts/pricing-service-coverage-check.mjs",
+    "pricing:shapes:build": "node scripts/pricing-catalog-shape-fixture-build.mjs",
     "pricing:logic:coverage": "node scripts/pricing-logic-coverage-check.mjs",
     "pricing:catalog:snapshot:check": "node scripts/pricing-catalog-snapshot-evidence-check.mjs",
     "pricing:catalog:snapshot:smoke": "node scripts/pricing-catalog-snapshot-smoke.mjs",
