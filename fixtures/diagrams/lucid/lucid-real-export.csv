@@ -1,0 +1,6 @@
+Id,Name,Shape Library,Page ID,Contained By,Group,Line Source,Line Destination,Source Arrow,Destination Arrow,Status,Text Area 1,Text Area 2
+1,Process,AWS 2017,p1,,,,,,,,EC2 Web Server,
+2,Process,AWS 2017,p1,,,,,,,,RDS PostgreSQL database 200GB,
+3,Process,AWS 2017,p1,,,,,,,,S3 Bucket 500GB,
+4,Process,AWS 2017,p1,,,,,,,,Application Load Balancer,
+5,Line,,p1,,,1,2,None,Arrow,,,

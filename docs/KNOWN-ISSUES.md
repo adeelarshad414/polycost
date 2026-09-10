@@ -556,40 +556,43 @@ and job name are sent, because job data carries workload and tenant details.
 
 ## 🔵 Incomplete by design
 
-| ID   | Item                                   | Note                                                                                                                                                                                                                               |
-| ---- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| K-7  | **GCP live pricing** not enabled       | Needs a GCP Vault token. AWS and Azure live paths are verified.                                                                                                                                                                    |
-| K-8  | **`App.tsx` decomposition incomplete** | 21,227 → 14,540 lines (−31%) over four slices; ~215 pure functions remain, with diminishing returns as it nears the component-coupled core.                                                                                        |
-| K-9  | **Rich structured import** partial     | Plain requirements-file loading works; rich CSV/Excel/DrawIO structured import remains a documented hook.                                                                                                                          |
-| K-10 | **Refresh-live determinism**           | Closed. `catalog-change-determinism.spec.ts` proves it through `InMemoryPricingCatalogReader`: same catalog same result, a changed selected row moves the total by exactly its rate delta, a changed unselected row moves nothing. |
+| ID   | Item                                   | Note                                                                                                                                                                                                                                                                                                       |
+| ---- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| K-7  | **GCP live pricing** not enabled       | Unblocked on this deployment's org policy: the adapter reads `access_token` before service-account JSON, so `gcloud auth print-access-token` works with no key. Documented in PROVIDER-CREDENTIALS.md; unattended refresh still wants Workload Identity Federation. AWS and Azure live paths are verified. |
+| K-8  | **`App.tsx` decomposition incomplete** | 21,227 → 12,043 lines (−43%). The fifth slice took a component rather than more pure functions: WorkspaceControlCenter (2,596 lines) plus the shared icon and field atoms.                                                                                                                                 |
+| K-9  | **Rich structured import** partial     | Mostly a wayfinding bug, now fixed: DrawIO, Lucid CSV, Visio and Mermaid all work through the diagram uploader, and the requirements uploader said they did not exist. Lucid CSV also failed on Lucidchart's real export format. Excel remains genuinely unsupported.                                      |
+| K-10 | **Refresh-live determinism**           | Closed. `catalog-change-determinism.spec.ts` proves it through `InMemoryPricingCatalogReader`: same catalog same result, a changed selected row moves the total by exactly its rate delta, a changed unselected row moves nothing.                                                                         |
 
 ---
 
 ## ✅ Recently fixed
 
-| Issue                                            | Fix                                                         |
-| ------------------------------------------------ | ----------------------------------------------------------- |
-| Resolvers untested against real attribute shapes | 951 captured live shapes, distribution + landmark gates     |
-| K-10 refresh-live determinism unproven           | Catalog-change spec via the in-memory reader                |
-| Graviton never resolved as arm64                 | `\b` after `graviton` vs `Graviton4` (#227); 412 live rows  |
-| Azure Ampere parts invisible                     | Size-name variant `p` read directly (#227); 314 live rows   |
-| Tenancy undefined across the whole catalog       | AWS reports `Shared`; label normalizer (#227)               |
-| Money `"1,234.56"` parsed as `1`                 | Thousands-separator-aware parsing                           |
-| Evidence lost-update race                        | Optimistic-concurrency hash → 409                           |
-| Evidence packet exported on a `GET`              | Moved to `POST …/export`                                    |
-| Audit event could be logged but never delivered  | Event + outbox in one transaction                           |
-| Retention could destroy an undelivered export    | `NOT EXISTS` guard on prune                                 |
-| Azure `NextPageLink` SSRF                        | Same-origin pagination guard                                |
-| Response body could OOM / hang                   | Cap enforced while streaming + body deadline                |
-| WCAG AA contrast failures                        | Token contrast fixed, guarded by a unit test                |
-| Scrollable tables keyboard-unreachable           | `tabindex=0` + labelled regions on all 25                   |
-| Order-dependent flaky test                       | Storage cleared between tests; verified with `--randomize`  |
-| `format:check` failing (22 files)                | Repo formatted                                              |
-| API could not consume ESM-only packages          | API moved to ESM (#212), after three pre-flip steps         |
-| `stream-json` O(depth²) filter DoS               | stream-json 3 (#217); ambient type declarations deleted     |
-| fastify schema-validation bypass                 | Nest 12 (#218) — core, common, platform-fastify, config     |
-| `pdfjs-dist` arbitrary JS execution              | `overrides` pin to ^6.3.289 (#205)                          |
-| 24 UI anti-patterns, gate green in CI only       | Accent rails re-drawn; skip no longer reports a pass (#203) |
+| Issue                                              | Fix                                                         |
+| -------------------------------------------------- | ----------------------------------------------------------- |
+| Lucid CSV import broken on real Lucidchart exports | Label from `Text Area 1`, not the shape type in `Name`      |
+| Requirements upload denied working DrawIO import   | Message now points at the diagram uploader                  |
+| Dev proxy hardcoded port 3001                      | Follows `API_HOST_PORT`, as docker-compose does             |
+| Resolvers untested against real attribute shapes   | 951 captured live shapes, distribution + landmark gates     |
+| K-10 refresh-live determinism unproven             | Catalog-change spec via the in-memory reader                |
+| Graviton never resolved as arm64                   | `\b` after `graviton` vs `Graviton4` (#227); 412 live rows  |
+| Azure Ampere parts invisible                       | Size-name variant `p` read directly (#227); 314 live rows   |
+| Tenancy undefined across the whole catalog         | AWS reports `Shared`; label normalizer (#227)               |
+| Money `"1,234.56"` parsed as `1`                   | Thousands-separator-aware parsing                           |
+| Evidence lost-update race                          | Optimistic-concurrency hash → 409                           |
+| Evidence packet exported on a `GET`                | Moved to `POST …/export`                                    |
+| Audit event could be logged but never delivered    | Event + outbox in one transaction                           |
+| Retention could destroy an undelivered export      | `NOT EXISTS` guard on prune                                 |
+| Azure `NextPageLink` SSRF                          | Same-origin pagination guard                                |
+| Response body could OOM / hang                     | Cap enforced while streaming + body deadline                |
+| WCAG AA contrast failures                          | Token contrast fixed, guarded by a unit test                |
+| Scrollable tables keyboard-unreachable             | `tabindex=0` + labelled regions on all 25                   |
+| Order-dependent flaky test                         | Storage cleared between tests; verified with `--randomize`  |
+| `format:check` failing (22 files)                  | Repo formatted                                              |
+| API could not consume ESM-only packages            | API moved to ESM (#212), after three pre-flip steps         |
+| `stream-json` O(depth²) filter DoS                 | stream-json 3 (#217); ambient type declarations deleted     |
+| fastify schema-validation bypass                   | Nest 12 (#218) — core, common, platform-fastify, config     |
+| `pdfjs-dist` arbitrary JS execution                | `overrides` pin to ^6.3.289 (#205)                          |
+| 24 UI anti-patterns, gate green in CI only         | Accent rails re-drawn; skip no longer reports a pass (#203) |
 
 ---
 
