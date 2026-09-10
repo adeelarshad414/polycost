@@ -860,7 +860,12 @@ await assertFileContains('apps/web/src/api-client.ts', [
   ['SCIM token client revoke', 'revokeTeamScimToken'],
 ]);
 
-await assertFileContains('apps/web/src/App.tsx', [
+// The SCIM panel lives in WorkspaceControlCenter, which was lifted out of
+// App.tsx in the K-8 decomposition. The assertion follows the component rather
+// than being loosened to a tree-wide search: these strings belong to one
+// screen, and a match anywhere under src/ would not say that screen still has
+// them.
+await assertFileContains('apps/web/src/components/WorkspaceControlCenter.tsx', [
   ['SCIM provisioning panel', 'SCIM provisioning'],
   ['SCIM token creation label', 'SCIM token name'],
   ['SCIM token one-time copy label', 'Copy now. It will not be shown again.'],
@@ -1707,6 +1712,20 @@ function assertScriptIncludes(scriptName, snippets) {
 async function assertFileContains(relativePath, expectations) {
   const absolutePath = path.join(root, relativePath);
   if (!existsSync(absolutePath)) {
+    /*
+      A missing file is a failure, not a skip.
+
+      This used to return silently, which meant a path that no longer existed
+      quietly disabled every assertion attached to it - and the way a path stops
+      existing is a refactor moving the code, exactly when you most want the
+      check to speak up. Worse, it made a typo in a path look like a fix: point
+      an assertion at a file that is not there and the whole gate goes green.
+
+      All 117 paths asserted here exist, so nothing is legitimately optional.
+    */
+    failures.push(
+      `${relativePath} does not exist, so ${expectations.length} assertion(s) could not run`,
+    );
     return;
   }
 
