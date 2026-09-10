@@ -28,12 +28,12 @@ import {
 import { AdapterPricingError } from './adapter-errors.js';
 /* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: dynamic keys are typed provider service/dimension maps sourced from internal catalogs; see docs/SECURITY-SUPPRESSIONS.md. */
 import { HOURS_PER_MONTH } from '../../cost-time.js';
+import { NormalizedInstanceFamily } from '../../pricing-normalization/family-normalizer.js';
 import {
-  normalizeInstanceFamily,
-  NormalizedInstanceFamily,
-  normalizeProviderFamilyLabel,
-  looksLikeInstanceType,
-} from '../../pricing-normalization/family-normalizer.js';
+  resolveComputeTenancy,
+  resolveInstanceFamily,
+  resolveProcessorArchitecture,
+} from '../../pricing-normalization/compute-attribute-resolver.js';
 import { pricingLineageForCatalogRecord } from '../../pricing-normalization/pricing-lineage.js';
 
 const CATALOG_COMMITMENT_PRICING_MODELS: PricingModelKey[] = ['reserved-1yr', 'reserved-3yr'];
@@ -931,137 +931,17 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
   }
 
   private recordInstanceFamily(record: PricingCatalogRecord): NormalizedInstanceFamily | undefined {
-    const explicitFamily =
-      this.stringAttribute(record, 'family') ??
-      this.stringAttribute(record, 'instanceFamily') ??
-      this.stringAttribute(record, 'normalizedFamily');
-
-    if (isNormalizedInstanceFamily(explicitFamily)) {
-      return explicitFamily;
-    }
-
-    const descriptors = [
-      record.skuId,
-      record.serviceName,
-      record.skuDescription,
-      this.stringAttribute(record, 'instanceType'),
-      this.stringAttribute(record, 'skuName'),
-      this.stringAttribute(record, 'armSkuName'),
-      this.stringAttribute(record, 'machineType'),
-    ].filter((value): value is string => typeof value === 'string' && value.length > 0);
-
-    for (const descriptor of descriptors) {
-      // Only descriptors shaped like an instance type. skuId is in this list
-      // and, for live catalogs, is an opaque identifier - matching single-letter
-      // family prefixes against it succeeds at random.
-      if (!looksLikeInstanceType(descriptor)) {
-        continue;
-      }
-
-      const family = normalizeInstanceFamily(this.providerId, descriptor);
-
-      if (family) {
-        return family;
-      }
-    }
-
-    /*
-      The provider's own marketing label, last.
-
-      It is a coarser taxonomy than ours and deliberately ranks below the
-      instance type: AWS labels t3.2xlarge "General purpose", but t3 is
-      burstable, and a burstable request must be able to find it. Reading the
-      label first excluded every live burstable instance and fell back to seed
-      pricing.
-
-      It still earns its place for rows that publish no parseable instance type,
-      where the alternative is no family at all.
-    */
-    return normalizeProviderFamilyLabel(explicitFamily);
+    return resolveInstanceFamily(this.providerId, record);
   }
 
   private recordProcessorArchitecture(
     record: PricingCatalogRecord,
   ): ComputeProcessorArchitecture | undefined {
-    const explicitArchitecture =
-      this.stringAttribute(record, 'processorArchitecture') ??
-      this.stringAttribute(record, 'architecture') ??
-      this.stringAttribute(record, 'cpuArchitecture');
-
-    if (isComputeProcessorArchitecture(explicitArchitecture)) {
-      return explicitArchitecture;
-    }
-
-    const descriptors = this.recordDescriptors(record);
-
-    if (
-      descriptors.some((descriptor) =>
-        /\b(gpu|nvidia|a100|h100|v100|p4d|g5|nc|nd|a2|g2)\b/i.test(descriptor),
-      )
-    ) {
-      return 'gpu';
-    }
-
-    if (descriptors.some((descriptor) => ARM_DESCRIPTOR_PATTERN.test(descriptor))) {
-      return 'arm64';
-    }
-
-    // Azure publishes no processor field at all, so the size name is the only
-    // ISA signal it gives us. Read it from the size attributes rather than the
-    // whole descriptor list: a stray `p` in a product description would
-    // otherwise flip an x86 row to arm64.
-    if (this.providerId === 'azure') {
-      const azureArchitecture = azureArchitectureFromSizeName(
-        this.stringAttribute(record, 'armSkuName') ?? this.stringAttribute(record, 'skuName'),
-      );
-
-      if (azureArchitecture) {
-        return azureArchitecture;
-      }
-    }
-
-    if (
-      descriptors.some((descriptor) =>
-        /\b(x86|x64|intel|amd|xeon|epyc|m\d|c\d|r\d|d\d|fsv2)\b/i.test(descriptor),
-      )
-    ) {
-      return 'x86_64';
-    }
-
-    return undefined;
+    return resolveProcessorArchitecture(this.providerId, record);
   }
 
   private recordComputeTenancy(record: PricingCatalogRecord): ComputeTenancy | undefined {
-    const explicitTenancy =
-      this.stringAttribute(record, 'tenancy') ??
-      this.stringAttribute(record, 'hostTenancy') ??
-      this.stringAttribute(record, 'computeTenancy');
-
-    const normalizedTenancy = normalizeProviderTenancyLabel(explicitTenancy);
-
-    if (normalizedTenancy) {
-      return normalizedTenancy;
-    }
-
-    const descriptors = this.recordDescriptors(record);
-
-    if (
-      descriptors.some((descriptor) =>
-        /\b(sole[- ]tenant|sole tenant|single tenant)\b/i.test(descriptor),
-      )
-    ) {
-      return 'sole-tenant';
-    }
-
-    if (
-      descriptors.some((descriptor) =>
-        /\b(dedicated host|dedicated instance|dedicated tenancy)\b/i.test(descriptor),
-      )
-    ) {
-      return 'dedicated-host';
-    }
-
-    return undefined;
+    return resolveComputeTenancy(record);
   }
 
   private instanceFamilyFitRank(
@@ -1164,27 +1044,6 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     return this.numberValue(record.attributes?.[key]);
   }
 
-  private recordDescriptors(record: PricingCatalogRecord): string[] {
-    return [
-      record.skuId,
-      record.serviceName,
-      record.skuDescription,
-      this.stringAttribute(record, 'instanceType'),
-      this.stringAttribute(record, 'skuName'),
-      this.stringAttribute(record, 'armSkuName'),
-      this.stringAttribute(record, 'machineType'),
-      this.stringAttribute(record, 'processor'),
-      // The field that actually carries the instruction set. AWS's
-      // `processorArchitecture` says "64-bit" for Graviton and Intel alike - it
-      // is word size, not ISA - so without this the arm64/x86_64 heuristics fall
-      // back to pattern-matching the instance type, which only works for older
-      // names: /\bc\d\b/ matches c4.2xlarge but not c6i.2xlarge, so most modern
-      // types resolved to undefined and ranked worse than older ones regardless
-      // of price.
-      this.stringAttribute(record, 'physicalProcessor'),
-    ].filter((value): value is string => typeof value === 'string' && value.length > 0);
-  }
-
   private stringAttribute(record: PricingCatalogRecord, key: string): string | undefined {
     const value = record.attributes?.[key];
 
@@ -1217,112 +1076,6 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
   protected roundRate(value: number): number {
     return Math.round((value + Number.EPSILON) * 1_000_000) / 1_000_000;
   }
-}
-
-function isNormalizedInstanceFamily(value: string | undefined): value is NormalizedInstanceFamily {
-  return (
-    value === 'general-purpose' ||
-    value === 'burstable' ||
-    value === 'compute-optimized' ||
-    value === 'memory-optimized' ||
-    value === 'storage-optimized' ||
-    value === 'accelerated-computing'
-  );
-}
-
-function isComputeProcessorArchitecture(
-  value: string | undefined,
-): value is ComputeProcessorArchitecture {
-  return value === 'x86_64' || value === 'arm64' || value === 'gpu';
-}
-
-/*
-  Providers publish tenancy as a marketing label, not as our taxonomy's token.
-  Every live AWS compute row reports `Shared` with a capital S, so an equality
-  check against 'shared' rejected all 1,389 of them and left tenancy undefined
-  across the whole catalog - which made the tenancy clause of the selection
-  predicate a no-op that would accept a Dedicated SKU for a shared request.
-
-  AWS's `Dedicated` is a Dedicated Instance and `Host` is a Dedicated Host. Both
-  map to 'dedicated-host' here, matching what the descriptor fallback below
-  already does for the phrase "dedicated instance"; the NWS taxonomy draws its
-  line between shared and not-shared tenancy, not between the two AWS products.
-*/
-function normalizeProviderTenancyLabel(label: string | undefined): ComputeTenancy | undefined {
-  if (!label) {
-    return undefined;
-  }
-
-  const collapsed = label.toLowerCase().replace(/[^a-z]/g, '');
-
-  if (collapsed === 'shared' || collapsed === 'default' || collapsed === 'multitenant') {
-    return 'shared';
-  }
-
-  if (collapsed === 'soletenant' || collapsed === 'singletenant' || collapsed === 'sole') {
-    return 'sole-tenant';
-  }
-
-  if (
-    collapsed === 'dedicated' ||
-    collapsed === 'dedicatedhost' ||
-    collapsed === 'dedicatedinstance' ||
-    collapsed === 'host'
-  ) {
-    return 'dedicated-host';
-  }
-
-  return undefined;
-}
-
-/*
-  `graviton` needed a trailing \b, and AWS names every generation with a digit
-  ("AWS Graviton4 Processor"): n->4 is not a word boundary, so the token never
-  matched. 412 of 1,389 live AWS compute rows are Graviton and every one of them
-  resolved to an unknown architecture - so an arm64 request ranked real Graviton
-  no better than any unlabelled x86 row, and an x86_64 request would silently
-  accept a Graviton instance when no known-x86 row fitted.
-*/
-const ARM_DESCRIPTOR_PATTERN = /\b(?:arm|arm64|aarch64|graviton\d*|ampere|t2a)\b/i;
-
-/*
-  Azure marks Ampere ARM parts with a `p` in the size name's variant segment -
-  the letters between the vCPU count and the version suffix: Standard_D4ps_v5,
-  Standard_B2pls_v2, Standard_E8pds_v6. The `p` has to come from that segment
-  specifically, because other size names carry a p in the family letters
-  (Standard_NP10s is an x86-hosted FPGA part) or in a product name.
-
-  Checked against the live catalog: this matches 97 distinct sizes across 314
-  rows, all of them genuine Ampere parts, and no non-ARM size.
-
-  The variant charclass is closed to Azure's documented variant letters rather
-  than [a-z], because the size name is not the whole string: Standard_H16_Promo
-  and Standard_NC12_Promo collapse to `...16promo` / `...12promo`, and an open
-  charclass reads the `p` of "Promo" as Ampere - flipping an x86 H-series part
-  and eleven NVIDIA parts to arm64. Closing the class makes those names fail to
-  parse at all, which is the correct answer for them.
-*/
-const AZURE_SIZE_NAME_VERSION_SUFFIX = /v\d+$/;
-const AZURE_SIZE_NAME_PATTERN = /^[a-z]+\d+([abcdilmprst]*)$/;
-
-function azureArchitectureFromSizeName(
-  sizeName: string | undefined,
-): ComputeProcessorArchitecture | undefined {
-  if (!sizeName) {
-    return undefined;
-  }
-
-  // The version suffix is peeled off before matching rather than written as an
-  // optional group: `(?:v\d+)?` nests a quantifier inside an optional, which is
-  // the shape the ReDoS lint rule flags. Stripping it first leaves every
-  // quantifier in the pattern at star height one.
-  const collapsed = sizeName
-    .toLowerCase()
-    .replace(/[_\s-]/g, '')
-    .replace(AZURE_SIZE_NAME_VERSION_SUFFIX, '');
-  const variant = AZURE_SIZE_NAME_PATTERN.exec(collapsed)?.[1];
-
-  return variant?.includes('p') ? 'arm64' : undefined;
 }
 
 function normalizeStorageClass(value: string): StorageClass | undefined {
