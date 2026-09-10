@@ -1154,7 +1154,11 @@ export function App({ client = polyCostClient }: AppProps) {
 
     if (!isSupportedRequirementsFile(file)) {
       setError(
-        'Upload a plain text, Markdown, JSON, or YAML requirements file. CSV, Excel, and DrawIO imports are Phase 2 hook points.',
+        // DrawIO, Lucid CSV, Visio and Mermaid are all supported - through the
+        // diagram uploader, not this one. The old copy said they were "Phase 2
+        // hook points", which sent anyone holding one of those files away from
+        // a feature that was one tab over.
+        'Upload a plain text, Markdown, JSON, or YAML requirements file. For a DrawIO, Lucid CSV, Visio or Mermaid diagram, use Upload diagram instead. Excel is not supported yet.',
       );
       setNotice(null);
       return;

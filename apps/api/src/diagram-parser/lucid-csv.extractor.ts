@@ -52,16 +52,28 @@ export class LucidCsvExtractor implements DiagramExtractor {
         return;
       }
 
+      /*
+        `text area 1` first, because that is where a real Lucidchart export puts
+        the shape's visible label. Its `Name` column is the shape TYPE - every
+        box in a diagram comes out as "Process" or "Rectangle" - so reading
+        `name` first classified an entire real export as nothing. Kept as a
+        fallback below it for the hand-written and draw.io-style CSVs where
+        `Name` genuinely is the label.
+      */
       const label =
         firstNonEmpty(
+          readRecord(record, 'text area 1'),
           readRecord(record, 'name'),
           readRecord(record, 'text'),
           readRecord(record, 'label'),
           readRecord(record, 'title'),
           readRecord(record, 'shape'),
         ) ?? id;
+      // `shape library` is Lucid's own column name; `library` is not a header
+      // it ever emits, and readRecord matches exactly.
       const stencilId = firstNonEmpty(
         readRecord(record, 'shape'),
+        readRecord(record, 'shape library'),
         readRecord(record, 'type'),
         readRecord(record, 'library'),
         readRecord(record, 'stencil'),
