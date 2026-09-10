@@ -30,8 +30,8 @@ const REGION = 'us-east-1';
   Stated here rather than imported from cost-time.ts on purpose. Importing it
   would put the same value on both sides of every assertion below, and changing
   the monthly-hour standard would silently keep the tests green; verified by
-  setting hoursPerMonth to 720 in packages/types, which fails this spec and
-  would not if the constant were shared.
+  lowering hoursPerMonth in packages/types, which fails this spec and would not
+  if the constant were shared.
 */
 const HOURS_PER_MONTH = 730;
 
