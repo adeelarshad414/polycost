@@ -158,20 +158,20 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.62.1",
-    "@sentropic/graphify": "^0.17.1",
+    "@playwright/test": "^1.63.0",
+    "@sentropic/graphify": "^0.18.0",
     "@types/jest": "^30.0.0",
-    "@types/node": "^26.4.1",
+    "@types/node": "^26.6.1",
     "axe-core": "^4.13.0",
-    "eslint": "^10.9.0",
+    "eslint": "^10.10.0",
     "eslint-plugin-security": "^4.0.1",
     "jest": "^30.5.1",
     "jest-environment-jsdom": "^30.5.1",
     "lighthouse": "^13.4.0",
-    "prettier": "^3.9.6",
+    "prettier": "^3.9.8",
     "ts-jest": "^29.4.12",
     "typescript": "^5.7.3",
-    "typescript-eslint": "^8.69.0"
+    "typescript-eslint": "^8.70.0"
   },
   "overrides": {
     "@babel/core": "^7.29.7",
