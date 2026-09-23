@@ -12,6 +12,7 @@ import {
   COST_MANAGEMENT_QUEUE_NAME,
   COST_MANAGEMENT_WORKER_FACTORY,
   CostManagementJobsScheduler,
+  CostManagementQueue,
   CostManagementWorkerFactory,
   EXCHANGE_RATE_CLIENT,
 } from './cost-management-jobs.scheduler.js';
@@ -43,7 +44,15 @@ import { ExchangeRateClient, FrankfurterExchangeRateClient } from './exchange-ra
     {
       provide: COST_MANAGEMENT_QUEUE,
       inject: [ConfigService],
-      useFactory: (configService: ConfigService<AppConfig, true>) =>
+      /*
+        Return type annotated deliberately. The DI token is a Symbol, so Nest
+        cannot check that what this factory produces matches what the scheduler
+        injects - and CostManagementQueue is a narrow hand-written view of BullMQ's
+        Queue. Without this, a signature drift (BullMQ 6 renaming the recurring
+        API is exactly that) compiles clean and fails at runtime, where the
+        symptom is a scheduled job that silently never registers.
+      */
+      useFactory: (configService: ConfigService<AppConfig, true>): CostManagementQueue =>
         new Queue(COST_MANAGEMENT_QUEUE_NAME, {
           connection: redisConnection(configService),
         }),
