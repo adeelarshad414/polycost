@@ -32,6 +32,9 @@ describe('PricingEtlScheduler', () => {
   it('schedules recurring and startup BullMQ jobs from config and starts a worker', async () => {
     const queue: PricingEtlQueue = {
       add: jest.fn<PricingEtlQueue['add']>(async () => undefined),
+      upsertJobScheduler: jest.fn<PricingEtlQueue['upsertJobScheduler']>(async () => undefined),
+      getJobSchedulers: jest.fn<PricingEtlQueue['getJobSchedulers']>(async () => []),
+      removeJobScheduler: jest.fn<PricingEtlQueue['removeJobScheduler']>(async () => true),
       close: jest.fn<PricingEtlQueue['close']>(async () => undefined),
     };
     const worker: PricingEtlWorker = {
@@ -54,14 +57,19 @@ describe('PricingEtlScheduler', () => {
 
     await scheduler.onModuleInit();
 
-    expect(queue.add).toHaveBeenCalledWith(
+    /*
+      BullMQ 6: the recurring refresh is a job SCHEDULER keyed on its id, not a
+      `queue.add` carrying `repeat`. The template name is asserted because that
+      is what the worker switches on - a scheduler that stamped out jobs named
+      after the scheduler id instead would still register cleanly and then
+      never match.
+    */
+    expect(queue.upsertJobScheduler).toHaveBeenCalledWith(
       PRICING_ETL_REFRESH_JOB_NAME,
-      {},
+      { pattern: '0 2 * * *' },
       expect.objectContaining({
-        jobId: PRICING_ETL_REFRESH_JOB_NAME,
-        repeat: {
-          pattern: '0 2 * * *',
-        },
+        name: PRICING_ETL_REFRESH_JOB_NAME,
+        data: {},
       }),
     );
     expect(queue.add).toHaveBeenCalledWith(
@@ -81,6 +89,9 @@ describe('PricingEtlScheduler', () => {
   it('can disable startup refresh for scheduled-only deployments', async () => {
     const queue: PricingEtlQueue = {
       add: jest.fn<PricingEtlQueue['add']>(async () => undefined),
+      upsertJobScheduler: jest.fn<PricingEtlQueue['upsertJobScheduler']>(async () => undefined),
+      getJobSchedulers: jest.fn<PricingEtlQueue['getJobSchedulers']>(async () => []),
+      removeJobScheduler: jest.fn<PricingEtlQueue['removeJobScheduler']>(async () => true),
       close: jest.fn<PricingEtlQueue['close']>(async () => undefined),
     };
     const scheduler = new PricingEtlScheduler(
@@ -96,19 +107,68 @@ describe('PricingEtlScheduler', () => {
 
     await scheduler.onModuleInit();
 
-    expect(queue.add).toHaveBeenCalledTimes(1);
-    expect(queue.add).toHaveBeenCalledWith(
+    /*
+      The recurring schedule is still registered; only the one-off boot refresh
+      is suppressed. Asserted as "no adds at all" rather than "one add", which
+      is what this said before BullMQ 6 - back then the recurring registration
+      was itself a queue.add, so the count conflated the two. Separating them
+      is the point: a change that stopped scheduling the recurring refresh
+      would have kept the old assertion green.
+    */
+    expect(queue.upsertJobScheduler).toHaveBeenCalledTimes(1);
+    expect(queue.upsertJobScheduler).toHaveBeenCalledWith(
       PRICING_ETL_REFRESH_JOB_NAME,
-      {},
-      expect.objectContaining({
-        jobId: PRICING_ETL_REFRESH_JOB_NAME,
-      }),
+      { pattern: '0 2 * * *' },
+      expect.objectContaining({ name: PRICING_ETL_REFRESH_JOB_NAME }),
     );
+    expect(queue.add).not.toHaveBeenCalled();
+  });
+
+  it('retires a BullMQ 5 scheduler left behind by the upgrade', async () => {
+    /*
+      Upgrading to BullMQ 6 does not replace the old repeatable entries, it
+      adds alongside them. Observed against a live Redis that had run v5:
+      getJobSchedulers() returned the v5 entry keyed by an opaque hash AND the
+      new one keyed by the job name, same cron, same job name - so the pricing
+      catalog would refresh twice a day instead of once. v6 removed
+      removeRepeatable, so this is the only way to clear them.
+
+      The legacy id below is a real one taken from that Redis.
+    */
+    const queue: PricingEtlQueue = {
+      add: jest.fn<PricingEtlQueue['add']>(async () => undefined),
+      upsertJobScheduler: jest.fn<PricingEtlQueue['upsertJobScheduler']>(async () => undefined),
+      getJobSchedulers: jest.fn<PricingEtlQueue['getJobSchedulers']>(async () => [
+        { key: PRICING_ETL_REFRESH_JOB_NAME },
+        { key: 'c7310bf36b03dc34f57b19d9ed651c0b' },
+      ]),
+      removeJobScheduler: jest.fn<PricingEtlQueue['removeJobScheduler']>(async () => true),
+      close: jest.fn<PricingEtlQueue['close']>(async () => undefined),
+    };
+    const scheduler = new PricingEtlScheduler(
+      configService('0 2 * * *', false),
+      {
+        refreshAllProviders: jest.fn<PricingEtlService['refreshAllProviders']>(async () => summary),
+      } as unknown as PricingEtlService,
+      queue,
+      () => ({ close: jest.fn(async () => undefined) }),
+    );
+
+    await scheduler.onModuleInit();
+
+    expect(queue.removeJobScheduler).toHaveBeenCalledWith('c7310bf36b03dc34f57b19d9ed651c0b');
+    // The one we just registered must survive - a cleanup that removed
+    // everything it found would leave the queue with no schedule at all.
+    expect(queue.removeJobScheduler).not.toHaveBeenCalledWith(PRICING_ETL_REFRESH_JOB_NAME);
+    expect(queue.removeJobScheduler).toHaveBeenCalledTimes(1);
   });
 
   it('closes worker and queue on module destroy', async () => {
     const queue: PricingEtlQueue = {
       add: jest.fn<PricingEtlQueue['add']>(async () => undefined),
+      upsertJobScheduler: jest.fn<PricingEtlQueue['upsertJobScheduler']>(async () => undefined),
+      getJobSchedulers: jest.fn<PricingEtlQueue['getJobSchedulers']>(async () => []),
+      removeJobScheduler: jest.fn<PricingEtlQueue['removeJobScheduler']>(async () => true),
       close: jest.fn<PricingEtlQueue['close']>(async () => undefined),
     };
     const worker: PricingEtlWorker = {
@@ -133,6 +193,9 @@ describe('PricingEtlScheduler', () => {
   it('closes the queue even if the worker was never started', async () => {
     const queue: PricingEtlQueue = {
       add: jest.fn<PricingEtlQueue['add']>(async () => undefined),
+      upsertJobScheduler: jest.fn<PricingEtlQueue['upsertJobScheduler']>(async () => undefined),
+      getJobSchedulers: jest.fn<PricingEtlQueue['getJobSchedulers']>(async () => []),
+      removeJobScheduler: jest.fn<PricingEtlQueue['removeJobScheduler']>(async () => true),
       close: jest.fn<PricingEtlQueue['close']>(async () => undefined),
     };
     const scheduler = new PricingEtlScheduler(

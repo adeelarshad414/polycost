@@ -19,6 +19,7 @@ import {
   PRICING_ETL_RUN_REPOSITORY,
   PRICING_ETL_WORKER_FACTORY,
   NORMALIZED_PRICING_WRITER,
+  PricingEtlQueue,
   PricingEtlScheduler,
   PricingEtlWorkerFactory,
 } from './pricing-etl.scheduler.js';
@@ -87,7 +88,15 @@ const PRICING_SYNC_FAILURE_NOTIFIER = Symbol('PRICING_SYNC_FAILURE_NOTIFIER');
     {
       provide: PRICING_ETL_QUEUE,
       inject: [ConfigService],
-      useFactory: (configService: ConfigService<AppConfig, true>) =>
+      /*
+        Return type annotated deliberately. The DI token is a Symbol, so Nest
+        cannot check that what this factory produces matches what the scheduler
+        injects - and PricingEtlQueue is a narrow hand-written view of BullMQ's
+        Queue. Without this, a signature drift (BullMQ 6 renaming the recurring
+        API is exactly that) compiles clean and fails at runtime, where the
+        symptom is a scheduled job that silently never registers.
+      */
+      useFactory: (configService: ConfigService<AppConfig, true>): PricingEtlQueue =>
         new Queue(PRICING_ETL_QUEUE_NAME, {
           connection: redisConnection(configService),
         }),

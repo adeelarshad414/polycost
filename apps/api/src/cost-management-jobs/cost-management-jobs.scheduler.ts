@@ -9,7 +9,7 @@ import {
 import { DomainMetricsService } from '../observability/domain-metrics.service.js';
 import { registerQueueDepth } from '../observability/queue-depth.js';
 import { ConfigService } from '@nestjs/config';
-import { JobsOptions } from 'bullmq';
+import { JobSchedulerTemplateOptions, JobsOptions } from 'bullmq';
 import { AppConfig } from '../config/config.schema.js';
 import {
   ALERT_EVALUATOR_JOB_NAME,
@@ -30,6 +30,38 @@ export const EXCHANGE_RATE_CLIENT = Symbol('EXCHANGE_RATE_CLIENT');
 
 export interface CostManagementQueue {
   add(name: string, data: Record<string, never>, options: JobsOptions): Promise<unknown>;
+  /*
+    BullMQ 6 removed `repeat` from JobsOptions: a recurring job is now a job
+    SCHEDULER, upserted by id, that stamps out jobs from a template. The
+    rename is not cosmetic - `queue.add` with `repeat` also took a `jobId`
+    that BullMQ ignored for repeatables, so two calls with the same id could
+    leave two schedulers behind. `upsertJobScheduler` is keyed on the id by
+    construction, which is what makes re-running it on every boot safe.
+  */
+  upsertJobScheduler(
+    jobSchedulerId: string,
+    repeatOpts: { pattern: string },
+    jobTemplate?: {
+      name?: string;
+      data?: Record<string, never>;
+      opts?: JobSchedulerTemplateOptions;
+    },
+  ): Promise<unknown>;
+  /*
+    Used to retire schedulers left by BullMQ 5.
+
+    Upgrading does not replace the old repeatable entries, it adds alongside
+    them: after the upgrade `getJobSchedulers()` returns both the v5 entries
+    (keyed by an opaque hash) and the new ones (keyed by our job name), with
+    identical patterns. Verified against a live Redis that had run v5 - all
+    five jobs came back twice, which would mean two data-retention sweeps and
+    two audit-export flushes per schedule, not one.
+
+    v6 removed `removeRepeatable`, so this is the only way to clear them, and
+    it does work on a legacy hash id.
+  */
+  getJobSchedulers(): Promise<Array<{ key: string }>>;
+  removeJobScheduler(jobSchedulerId: string): Promise<boolean>;
   close(): Promise<void>;
   // Optional so existing test doubles need no change; BullMQ's Queue provides it.
   getJobCounts?(...states: string[]): Promise<Record<string, number>>;
@@ -60,6 +92,13 @@ export class CostManagementJobsScheduler implements OnModuleInit, OnModuleDestro
   async onModuleInit(): Promise<void> {
     registerQueueDepth(this.domainMetrics, COST_MANAGEMENT_QUEUE_NAME, this.queue);
     await this.scheduleRecurringJobs();
+    await this.retireUnknownSchedulers([
+      CURRENCY_SYNC_JOB_NAME,
+      ALERT_EVALUATOR_JOB_NAME,
+      SHARE_LINK_CLEANUP_JOB_NAME,
+      TEAM_AUDIT_EXPORT_JOB_NAME,
+      DATA_RETENTION_JOB_NAME,
+    ]);
     this.worker = this.workerFactory((job) => this.runJob(job));
   }
 
@@ -127,17 +166,40 @@ export class CostManagementJobsScheduler implements OnModuleInit, OnModuleDestro
     };
   }
 
+  /**
+   * Retires schedulers this build did not register - in practice the entries
+   * BullMQ 5 left behind, which otherwise keep firing alongside the new ones.
+   * Idempotent, so it simply finds nothing to do from the second boot onwards.
+   */
+  private async retireUnknownSchedulers(expectedIds: readonly string[]): Promise<void> {
+    const expected = new Set(expectedIds);
+    const schedulers = await this.queue.getJobSchedulers();
+
+    for (const scheduler of schedulers) {
+      if (expected.has(scheduler.key)) {
+        continue;
+      }
+
+      await this.queue.removeJobScheduler(scheduler.key);
+      this.logger.log(
+        `Retired a BullMQ 5 job scheduler left in the cost-management queue: ${scheduler.key}`,
+      );
+    }
+  }
+
   private async scheduleJob(jobName: CostManagementJobName, cronPattern: string): Promise<void> {
-    await this.queue.add(
+    await this.queue.upsertJobScheduler(
       jobName,
-      {},
+      { pattern: cronPattern },
       {
-        jobId: jobName,
-        repeat: {
-          pattern: cronPattern,
+        // The template's name is what the worker switches on, so it has to
+        // stay the job name rather than defaulting to the scheduler id.
+        name: jobName,
+        data: {},
+        opts: {
+          removeOnComplete: true,
+          removeOnFail: 100,
         },
-        removeOnComplete: true,
-        removeOnFail: 100,
       },
     );
   }

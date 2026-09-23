@@ -62,54 +62,51 @@ describe('CostManagementJobsScheduler', () => {
 
     await scheduler.scheduleRecurringJobs();
 
-    expect(queue.add).toHaveBeenCalledWith(
+    /*
+      BullMQ 6: recurring jobs are schedulers keyed on their id, not adds
+      carrying `repeat`. Each template's name is asserted because the worker
+      switches on job.name - a scheduler whose jobs took the scheduler id as
+      their name instead would register cleanly and then match nothing, which
+      is a silent stop rather than a crash.
+    */
+    expect(queue.upsertJobScheduler).toHaveBeenCalledWith(
       CURRENCY_SYNC_JOB_NAME,
-      {},
+      { pattern: '0 * * * *' },
       expect.objectContaining({
-        jobId: CURRENCY_SYNC_JOB_NAME,
-        repeat: {
-          pattern: '0 * * * *',
-        },
+        name: CURRENCY_SYNC_JOB_NAME,
+        data: {},
       }),
     );
-    expect(queue.add).toHaveBeenCalledWith(
+    expect(queue.upsertJobScheduler).toHaveBeenCalledWith(
       ALERT_EVALUATOR_JOB_NAME,
-      {},
+      { pattern: '*/15 * * * *' },
       expect.objectContaining({
-        jobId: ALERT_EVALUATOR_JOB_NAME,
-        repeat: {
-          pattern: '*/15 * * * *',
-        },
+        name: ALERT_EVALUATOR_JOB_NAME,
+        data: {},
       }),
     );
-    expect(queue.add).toHaveBeenCalledWith(
+    expect(queue.upsertJobScheduler).toHaveBeenCalledWith(
       SHARE_LINK_CLEANUP_JOB_NAME,
-      {},
+      { pattern: '0 3 * * *' },
       expect.objectContaining({
-        jobId: SHARE_LINK_CLEANUP_JOB_NAME,
-        repeat: {
-          pattern: '0 3 * * *',
-        },
+        name: SHARE_LINK_CLEANUP_JOB_NAME,
+        data: {},
       }),
     );
-    expect(queue.add).toHaveBeenCalledWith(
+    expect(queue.upsertJobScheduler).toHaveBeenCalledWith(
       TEAM_AUDIT_EXPORT_JOB_NAME,
-      {},
+      { pattern: '*/5 * * * *' },
       expect.objectContaining({
-        jobId: TEAM_AUDIT_EXPORT_JOB_NAME,
-        repeat: {
-          pattern: '*/5 * * * *',
-        },
+        name: TEAM_AUDIT_EXPORT_JOB_NAME,
+        data: {},
       }),
     );
-    expect(queue.add).toHaveBeenCalledWith(
+    expect(queue.upsertJobScheduler).toHaveBeenCalledWith(
       DATA_RETENTION_JOB_NAME,
-      {},
+      { pattern: '30 3 * * *' },
       expect.objectContaining({
-        jobId: DATA_RETENTION_JOB_NAME,
-        repeat: {
-          pattern: '30 3 * * *',
-        },
+        name: DATA_RETENTION_JOB_NAME,
+        data: {},
       }),
     );
   });
@@ -175,6 +172,9 @@ describe('CostManagementJobsScheduler', () => {
 function queueMock(): CostManagementQueue {
   return {
     add: jest.fn(async () => undefined),
+    upsertJobScheduler: jest.fn(async () => undefined),
+    getJobSchedulers: jest.fn(async () => []),
+    removeJobScheduler: jest.fn(async () => true),
     close: jest.fn(async () => undefined),
   };
 }
