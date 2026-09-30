@@ -57,7 +57,7 @@ import {
   confidenceDetail,
   costComponentForCategory,
   costMatrixCellForLineItem,
-  dataHealthProviderIssueLabel,
+  dataHealthSampleProviders,
   databaseDimensionTotals,
   decisionConfidence,
   finOpsRiskSeverity,
@@ -123,32 +123,26 @@ import {
 } from '../types';
 import { WorkloadFormState, serviceRequirementsFromForm } from '../workload';
 
+/** Banner title: "Pricing data: <state>", short enough to scan. */
 export function dataHealthBannerSummary(
   health: DataHealthResponse | null,
   error: string | null,
-  currentRateRows: number,
 ): string {
   if (error) {
-    return 'Pricing data health unavailable';
+    return 'Pricing data: unavailable';
   }
 
   if (!health) {
-    return 'Pricing data health pending';
+    return 'Pricing data: checking';
   }
 
-  if (health.overallStatus === 'fresh') {
-    return `Pricing cache fresh across ${health.providers.length} providers · ${currentRateRows} current rates`;
+  if (health.overallStatus !== 'fresh') {
+    return 'Pricing data: needs refresh';
   }
 
-  const affectedProviders = health.providers.filter(
-    (provider) => provider.freshness !== 'fresh' || provider.status !== 'success',
-  );
-  const affectedSummary =
-    affectedProviders.length > 0
-      ? affectedProviders.map(dataHealthProviderIssueLabel).join(', ')
-      : `${health.alertCount} pricing data alert${health.alertCount === 1 ? '' : 's'}`;
-
-  return `${affectedSummary} · refresh before final commitment`;
+  return dataHealthSampleProviders(health).length > 0
+    ? 'Pricing data: includes sample prices'
+    : 'Pricing data: up to date';
 }
 
 export function shouldApplyComputeStorageDefault(form: WorkloadFormState): boolean {

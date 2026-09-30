@@ -384,6 +384,9 @@ summary:focus-visible,
 
 .progressive-results-inner {
   display: grid;
+  /* UI-0: an implicit auto track sized to the widest child's min-content (583px),
+     so every results panel overflowed and was clipped on phones. */
+  grid-template-columns: minmax(0, 1fr);
   max-width: 1180px;
   gap: var(--pc-space-3);
   margin: 0 auto;
@@ -592,17 +595,10 @@ summary:focus-visible,
   display: grid;
   min-width: 0;
   gap: 2px;
-  --rail: var(--brand-blue);
+  /* UI-0: provider hues mark providers only; these chips are not provider data. */
+  --rail: var(--pc-action-primary);
   background: color-mix(in srgb, var(--pc-bg-surface-2) 68%, transparent);
   padding: 6px 10px;
-}
-
-.server-analytics-metrics span:nth-child(1) {
-  --rail: var(--brand-orange);
-}
-
-.server-analytics-metrics span:nth-child(3) {
-  --rail: var(--brand-green);
 }
 
 .server-analytics-metrics strong {
@@ -733,12 +729,14 @@ summary:focus-visible,
   margin-top: calc(-1 * var(--pc-space-1));
 }
 
+/* UI-0: tone drives the rail. It used to recolour only the left border, so a failed
+   state showed a red edge beside a green rail. */
 .data-health-stale {
-  border-left-color: var(--pc-warning);
+  --rail: var(--pc-warning);
 }
 
 .data-health-degraded {
-  border-left-color: var(--pc-error);
+  --rail: var(--pc-error);
 }
 
 .data-health-main {
@@ -769,7 +767,33 @@ summary:focus-visible,
 
 .data-health-main small {
   overflow-wrap: anywhere;
+  font-weight: 500;
   line-height: 1.35;
+}
+
+.data-health-main .data-health-sample-note {
+  color: var(--pc-warning);
+  font-weight: 600;
+}
+
+.data-health-details {
+  grid-column: 1 / -1;
+  color: var(--pc-text-secondary);
+  font-size: var(--pc-text-xs);
+}
+
+.data-health-details summary {
+  width: fit-content;
+  color: var(--pc-action-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.data-health-details ul {
+  display: grid;
+  gap: 2px;
+  margin: 6px 0 0;
+  padding-left: 18px;
 }
 
 .data-health-providers {
@@ -1111,6 +1135,9 @@ summary:focus-visible,
 
 .state-detail-stack {
   display: grid;
+  /* UI-0: same implicit-track overflow as .progressive-results-inner; the tab
+     strip's nowrap labels widened the column instead of scrolling. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--pc-space-3);
 }
 
@@ -2852,16 +2879,7 @@ summary:focus-visible,
   gap: 4px;
 }
 
-.theme-toggle-label {
-  color: var(--pc-text-secondary);
-  font-size: 0.66rem;
-  font-weight: 800;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.theme-mode-control,
-.theme-accent-control {
+.theme-mode-control {
   display: grid;
   min-height: 44px;
   align-items: center;
@@ -2879,12 +2897,7 @@ summary:focus-visible,
   grid-template-columns: repeat(3, 44px);
 }
 
-.theme-accent-control {
-  grid-template-columns: repeat(2, minmax(94px, auto));
-}
-
-.theme-mode-button,
-.theme-accent-button {
+.theme-mode-button {
   display: inline-grid;
   min-height: 44px;
   place-items: center;
@@ -2904,22 +2917,12 @@ summary:focus-visible,
   width: 44px;
 }
 
-.theme-accent-button {
-  grid-template-columns: auto 1fr;
-  gap: 7px;
-  justify-items: start;
-  padding: 0 11px;
-  text-align: left;
-}
-
-.theme-mode-button:hover,
-.theme-accent-button:hover {
+.theme-mode-button:hover {
   background: color-mix(in srgb, var(--pc-action-primary-soft) 42%, transparent);
   color: var(--pc-text-primary);
 }
 
-.theme-mode-button[aria-checked='true'],
-.theme-accent-button[aria-checked='true'] {
+.theme-mode-button[aria-checked='true'] {
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--pc-bg-surface) 94%, transparent), transparent),
     color-mix(in srgb, var(--pc-action-primary-soft) 72%, var(--pc-bg-surface));
@@ -2929,25 +2932,8 @@ summary:focus-visible,
   color: var(--pc-text-primary);
 }
 
-.theme-mode-button:active,
-.theme-accent-button:active {
+.theme-mode-button:active {
   transform: translateY(1px);
-}
-
-.accent-swatch {
-  width: 16px;
-  height: 16px;
-  border: 1px solid color-mix(in srgb, var(--pc-border) 76%, transparent);
-  border-radius: 999px;
-  box-shadow: inset 0 0 0 3px var(--pc-bg-surface);
-}
-
-.accent-swatch-default {
-  background: var(--brand-500);
-}
-
-.accent-swatch-terracotta {
-  background: var(--terracotta-brand-500);
 }
 
 .theme-switch-button {
@@ -3150,8 +3136,7 @@ summary:focus-visible,
   box-shadow: none;
 }
 
-.landing-theme-switcher .theme-mode-control,
-.landing-theme-switcher .theme-accent-control {
+.landing-theme-switcher .theme-mode-control {
   box-shadow: none;
 }
 
@@ -3734,18 +3719,6 @@ select:hover {
     transform 120ms ease;
 }
 
-.architecture-template-button:nth-child(3n + 1) {
-  --rail: var(--brand-orange);
-}
-
-.architecture-template-button:nth-child(3n + 2) {
-  --rail: var(--brand-blue);
-}
-
-.architecture-template-button:nth-child(3n) {
-  --rail: var(--brand-green);
-}
-
 .architecture-template-button:hover,
 .architecture-template-button:focus-visible {
   border-color: color-mix(in srgb, var(--pc-action-primary) 42%, var(--pc-border));
@@ -3863,18 +3836,6 @@ select:hover {
     border-color 120ms ease,
     box-shadow 120ms ease,
     transform 120ms ease;
-}
-
-.comparison-history-row:nth-child(3n + 1) {
-  --rail: var(--brand-orange);
-}
-
-.comparison-history-row:nth-child(3n + 2) {
-  --rail: var(--brand-blue);
-}
-
-.comparison-history-row:nth-child(3n) {
-  --rail: var(--brand-green);
 }
 
 .comparison-history-row:hover,
@@ -4046,20 +4007,6 @@ select:hover {
   color: var(--pc-text-secondary);
   font-size: var(--pc-text-xs);
   line-height: 1.4;
-}
-
-.requirement-review-card-compute {
-  --rail: var(--brand-orange);
-}
-
-.requirement-review-card-storage,
-.requirement-review-card-database {
-  --rail: var(--brand-green);
-}
-
-.requirement-review-card-networking,
-.requirement-review-card-edge {
-  --rail: var(--brand-blue);
 }
 
 .form-summary-chip-profile,
@@ -6388,8 +6335,6 @@ select:disabled {
 .metric-card,
 .dashboard-panel,
 .executive-analytics-preview,
-.executive-headline-card,
-.executive-provider-mix-card,
 .executive-decision-dashboard,
 .executive-decision,
 .financial-analytics,
@@ -6605,8 +6550,6 @@ select:disabled {
   background: var(--pc-bg-surface);
 }
 
-.executive-headline-card,
-.executive-provider-mix-card,
 .executive-waterfall-card,
 .executive-break-even-card,
 .executive-provider-card,
@@ -6621,8 +6564,6 @@ select:disabled {
   background: color-mix(in srgb, var(--pc-bg-surface) 92%, var(--pc-bg-surface-2));
 }
 
-.executive-headline-card,
-.executive-provider-mix-card,
 .executive-waterfall-card,
 .executive-break-even-card,
 .executive-pricing-bars {
@@ -6737,7 +6678,21 @@ select:disabled {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--brand-orange), var(--brand-blue), var(--brand-green));
+  /* UI-0: one provider's breakdown, so one provider hue. The old orange-to-blue-to-green
+     gradient painted every provider's colour onto a single provider's bars. */
+  background: var(--pc-action-primary);
+}
+
+.executive-waterfall-aws .waterfall-track i {
+  background: var(--brand-orange);
+}
+
+.executive-waterfall-azure .waterfall-track i {
+  background: var(--brand-blue);
+}
+
+.executive-waterfall-gcp .waterfall-track i {
+  background: var(--brand-green);
 }
 
 .waterfall-total {
@@ -6918,6 +6873,12 @@ select:disabled {
   color: var(--pc-provider-gcp-on-solid);
 }
 
+.executive-pricing-unavailable {
+  border: 1px dashed var(--pc-border-strong);
+  background: transparent;
+  color: var(--pc-text-secondary);
+}
+
 .executive-pricing-bar i,
 .executive-pricing-bar b {
   overflow: hidden;
@@ -6931,10 +6892,6 @@ select:disabled {
 .executive-pricing-bar b {
   font-family: var(--pc-font-mono);
   font-variant-numeric: tabular-nums;
-}
-
-.executive-headline-card {
-  align-content: start;
 }
 
 .executive-card-heading {
@@ -6961,16 +6918,6 @@ select:disabled {
   text-align: right;
 }
 
-.executive-headline-value {
-  color: var(--pc-text-primary);
-  font-family: var(--pc-font-mono);
-  font-size: clamp(2rem, 5vw, 3.35rem);
-  font-variant-numeric: tabular-nums;
-  font-weight: 850;
-  line-height: 1;
-}
-
-.executive-headline-card p,
 .executive-data-gap-card p,
 .executive-recommendation-card p,
 .executive-lens-card p {
@@ -6981,8 +6928,6 @@ select:disabled {
   line-height: 1.55;
 }
 
-.executive-trend-pending,
-.executive-trend-ready,
 .executive-data-gap-chart {
   display: grid;
   gap: var(--pc-space-1);
@@ -6992,8 +6937,6 @@ select:disabled {
   padding: var(--pc-space-2);
 }
 
-.executive-trend-pending > span,
-.executive-trend-ready > span,
 .executive-data-gap-chart > span {
   color: var(--pc-warning);
   font-size: var(--pc-text-xs);
@@ -7002,105 +6945,13 @@ select:disabled {
   text-transform: uppercase;
 }
 
-.executive-trend-ready,
 .executive-data-gap-chart.is-ready {
   border-style: solid;
   border-color: color-mix(in srgb, var(--brand-green) 28%, var(--pc-border));
 }
 
-.executive-trend-ready > span,
 .executive-data-gap-chart.is-ready > span {
   color: color-mix(in srgb, var(--pc-success) 64%, var(--pc-text-primary));
-}
-
-.executive-trend-pending strong {
-  color: var(--pc-text-primary);
-  font-size: var(--pc-text-sm);
-}
-
-.executive-trend-ready strong {
-  color: var(--pc-text-primary);
-  font-size: var(--pc-text-sm);
-}
-
-.executive-pending-sparkline {
-  display: grid;
-  height: 48px;
-  grid-template-columns: repeat(5, 1fr);
-  align-items: end;
-  gap: 6px;
-}
-
-.executive-pending-sparkline i {
-  display: block;
-  min-height: 10px;
-  border-radius: 999px 999px 4px 4px;
-  background: color-mix(in srgb, var(--pc-border-strong) 34%, transparent);
-}
-
-.executive-pending-sparkline i:nth-child(1) {
-  height: 34%;
-}
-
-.executive-pending-sparkline i:nth-child(2) {
-  height: 54%;
-}
-
-.executive-pending-sparkline i:nth-child(3) {
-  height: 42%;
-}
-
-.executive-pending-sparkline i:nth-child(4) {
-  height: 72%;
-}
-
-.executive-pending-sparkline i:nth-child(5) {
-  height: 58%;
-}
-
-.provider-mix-layout {
-  display: grid;
-  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
-  gap: var(--pc-space-2);
-  align-items: center;
-}
-
-.provider-mix-chart-shell {
-  display: grid;
-  width: min(100%, 220px);
-  justify-self: center;
-  place-items: center;
-}
-
-.provider-mix-chart-shell svg {
-  max-width: 100%;
-  height: auto;
-}
-
-.provider-mix-legend {
-  display: grid;
-  gap: 8px;
-}
-
-.provider-mix-legend span {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 2px 8px;
-  align-items: center;
-}
-
-.provider-mix-legend strong {
-  min-width: 0;
-  color: var(--pc-text-primary);
-  font-size: var(--pc-text-sm);
-  overflow-wrap: anywhere;
-}
-
-.provider-mix-legend small {
-  grid-column: 2;
-  color: var(--pc-text-secondary);
-  font-size: var(--pc-text-xs);
-  font-weight: 750;
 }
 
 .provider-dot {
@@ -7109,7 +6960,7 @@ select:disabled {
   border-radius: 999px;
 }
 
-.provider-mix-empty {
+.executive-chart-empty {
   display: grid;
   min-height: 180px;
   place-items: center;
@@ -8594,14 +8445,6 @@ select:disabled {
   padding: 12px;
 }
 
-.financial-ratio-card:nth-child(2) {
-  --rail: var(--pc-provider-azure);
-}
-
-.financial-ratio-card:nth-child(3) {
-  --rail: var(--pc-provider-gcp);
-}
-
 .dashboard-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
@@ -9997,7 +9840,6 @@ select:disabled {
     grid-template-columns: 1fr;
   }
 
-  .provider-mix-layout,
   .executive-stat-grid,
   .executive-lens-grid,
   .engineering-chart-grid {
@@ -10015,10 +9857,6 @@ select:disabled {
 
   .engineering-service-list small {
     grid-column: 2;
-  }
-
-  .provider-mix-chart-shell {
-    justify-self: stretch;
   }
 
   .executive-card-heading {
@@ -10815,38 +10653,6 @@ select:disabled {
   .workload-control-segment {
     transition: none;
   }
-}
-
-/* Donut centre total (chart revamp). The hole was empty; every reference
-   dashboard puts the figure a reader wants first right there. */
-.provider-mix-chart-shell {
-  position: relative;
-}
-
-.provider-mix-center {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 2px;
-  pointer-events: none;
-}
-
-.provider-mix-center span {
-  font-size: 0.625rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink-400);
-}
-
-.provider-mix-center strong {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: var(--ink-900);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
 }
 
 /*

@@ -107,7 +107,8 @@ describe('App', () => {
     expect(client.getComparisonAnalytics).toHaveBeenCalledWith(comparisonResult.comparisonId);
     expect(client.getComparisonPricingEvidence).toHaveBeenCalledWith(comparisonResult.comparisonId);
     expect(text(container)).not.toContain('Comparison ready.');
-    expect(text(container)).toContain('Server analytics');
+    expect(text(container)).toContain('Analysis');
+    expect(text(container)).not.toContain('Server analytics');
     expect(text(container)).toContain('Coverage');
     expect(text(container)).toContain('Deltas');
     expect(text(container)).toContain('Findings');
@@ -121,8 +122,9 @@ describe('App', () => {
       cheapestProviderId: 'gcp',
       providerCount: 3,
     });
-    expect(text(container)).toContain('Executive monthly baseline');
-    expect(text(container)).toContain('Provider mix');
+    // UI-0: alternatives are never summed or charted as shares of a whole.
+    expect(text(container)).not.toContain('Executive monthly baseline');
+    expect(text(container)).not.toContain('Provider mix');
     expect(text(container)).toContain('Cost composition waterfall');
     expect(text(container)).toContain('Backend compute base');
     expect(text(container)).toContain('Pricing model comparison');
@@ -1244,10 +1246,12 @@ describe('App', () => {
 
     await settleAsyncEffects();
 
-    expect(text(container)).toContain('Azure stale (72h old) · refresh before final commitment');
+    expect(text(container)).toContain('Pricing data: needs refresh');
     expect(text(container)).toContain(
-      'Azure pricing data is 72 hours old; refresh before proposal use.',
+      'Azure partially synced (3 days old). Refresh before a final commitment.',
     );
+    // The API's operator message is not shown to end users.
+    expect(text(container)).not.toContain('refresh before proposal use');
 
     unmount();
   });
@@ -2561,9 +2565,10 @@ describe('ComparisonView', () => {
     );
 
     expect(text(container)).toContain('$30.00');
-    expect(text(container)).toContain('Executive monthly baseline');
-    expect(text(container)).toContain('Provider mix');
-    expect(text(container)).toContain('$110.00');
+    expect(text(container)).not.toContain('Executive monthly baseline');
+    expect(text(container)).not.toContain('Provider mix');
+    // $110.00 was the sum of three alternative quotes; it must not appear.
+    expect(text(container)).not.toContain('$110.00');
     expect(text(container)).toContain('90-day forecast');
     expect(text(container)).toContain('Trend data not yet available');
     expect(text(container)).toContain('Shortlist GCP');

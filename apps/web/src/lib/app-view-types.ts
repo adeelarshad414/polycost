@@ -100,20 +100,10 @@ export interface ProviderCostSummary {
   categoryTotals: CategoryCostSummary[];
 }
 
-export interface ProviderMixDatum {
-  providerId: ProviderId;
-  name: string;
-  value: number;
-  percent: number;
-  color: string;
-}
-
 export interface ExecutiveAnalyticsModel {
   review: FinOpsReview;
   monthlySummaries: ProviderCostSummary[];
   pricedMonthlySummaries: ProviderCostSummary[];
-  totalMonthlyAcrossProviders?: number;
-  providerMix: ProviderMixDatum[];
   cheapest?: ProviderCostSummary;
   highest?: ProviderCostSummary;
   annualPotentialSavings?: number;
