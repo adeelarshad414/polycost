@@ -771,17 +771,17 @@ await assertFileContains('apps/web/e2e/polycost-browser.e2e.ts', [
   ['interactive accessible-name audit', 'expectInteractiveControlsAreNamed'],
 ]);
 
-// Pinned so an accidental edit to the palette is caught before release. Updated
-// deliberately in the interface revamp: the accent moved from purple to
-// periwinkle so it stops competing with the provider hues, and the provider
-// tokens became the vendors' published values rather than muted approximations,
-// matching the PDF and XLSX exporters. UI-0 removed the terracotta accent axis:
-// a single brand accent is the enterprise requirement.
+// Pinned so an accidental edit to the palette is caught before release. UI-1
+// replaced the palette with the Aurora system (UI audit, section 10): an indigo
+// brand accent, and provider hues re-stepped from the vendors' published values
+// because the official orange and green are indistinguishable under protanopia.
+// The PDF/XLSX exporters still use the vendor values until UI-8 aligns them.
 await assertFileContains('apps/web/src/styles/tokens.css', [
-  ['PolyCost default accent', '--brand-500: #6060e0'],
-  ['provider accent tokens', '--aws: #ff9900'],
-  ['provider text-safe pairs', '--aws-ink:'],
-  ['status semantic tokens', '--status-ok: #217255'],
+  ['Aurora brand accent', '--brand-primary: #4f46e5'],
+  ['provider identity tokens', '--provider-aws: #e98a15'],
+  ['provider text-safe pairs', '--provider-aws-ink:'],
+  ['status semantic tokens', '--success: #047857'],
+  ['OS-preference dark block', '@media (prefers-color-scheme: dark)'],
 ]);
 
 await assertFileContains('scripts/ci-e2e.mjs', [

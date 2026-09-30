@@ -117,7 +117,7 @@ export function EngineeringProviderServiceChart({
                   color: service.color,
                 }))}
               />
-              <CartesianGrid stroke="var(--pc-chart-grid)" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" vertical={false} />
               <XAxis
                 dataKey="serviceLabel"
                 interval={0}
@@ -127,7 +127,7 @@ export function EngineeringProviderServiceChart({
               />
               <YAxis hide />
               <Tooltip
-                cursor={{ fill: 'var(--pc-chart-hover)' }}
+                cursor={{ fill: 'var(--chart-hover)' }}
                 formatter={(value) => [formatCurrency(Number(value)), 'Monthly']}
                 contentStyle={chartTooltipStyle}
                 labelStyle={chartTooltipLabelStyle}

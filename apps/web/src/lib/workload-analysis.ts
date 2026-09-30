@@ -1210,11 +1210,11 @@ export function costForInterval(provider: ComparisonProviderResult, interval: In
 export function providerChartColor(providerId: ProviderId): string {
   switch (providerId) {
     case 'aws':
-      return 'var(--pc-provider-aws)';
+      return 'var(--provider-aws)';
     case 'azure':
-      return 'var(--pc-provider-azure)';
+      return 'var(--provider-azure)';
     case 'gcp':
-      return 'var(--pc-provider-gcp)';
+      return 'var(--provider-gcp)';
   }
 }
 

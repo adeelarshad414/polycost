@@ -474,7 +474,7 @@ function EngineeringPersonaView({
                   <tr key={row.id} className="hover:bg-surface-0">
                     <th
                       scope="row"
-                      className="sticky left-0 z-10 bg-surface-1 px-3 py-3 font-mono text-xs font-semibold text-text-primary shadow-[1px_0_0_var(--border)]"
+                      className="sticky left-0 z-10 bg-surface-1 px-3 py-3 font-mono text-xs font-semibold text-text-primary shadow-[1px_0_0_var(--border-subtle)]"
                     >
                       <div>{row.resourceName}</div>
                       <div className="mt-1 font-sans text-xs font-normal text-text-secondary">
@@ -652,7 +652,7 @@ function EngineeringRowsEmptyState({
       </span>
       <a
         href="#requirements"
-        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-action-primary bg-action-primary px-4 py-2 text-sm font-semibold text-[color:var(--on-primary-action)] shadow-sm transition hover:bg-action-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
+        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-action-primary bg-action-primary px-4 py-2 text-sm font-semibold text-[color:var(--on-brand)] shadow-sm transition hover:bg-action-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
         aria-label="Add services to see your comparison"
       >
         Add services
@@ -766,7 +766,7 @@ function SharedComparisonState({
         </div>
         <a
           href="#requirements"
-          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-action-primary bg-action-primary px-4 py-2 text-sm font-semibold text-[color:var(--on-primary-action)] shadow-sm transition hover:bg-action-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-action-primary bg-action-primary px-4 py-2 text-sm font-semibold text-[color:var(--on-brand)] shadow-sm transition hover:bg-action-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
           aria-label="Describe your infrastructure above"
         >
           Describe infrastructure
@@ -793,7 +793,7 @@ function SharedComparisonState({
       </div>
       {data.warningMessages.length > 0 ? (
         <div
-          className="rounded-md border border-[color:var(--pc-warning)] bg-[color:var(--pc-warning-soft)] p-2 text-text-primary"
+          className="rounded-md border border-[color:var(--warning)] bg-[color:var(--warning-soft)] p-2 text-text-primary"
           role="alert"
         >
           <strong>Pricing warnings:</strong> {data.warningMessages.join(' ')}
@@ -872,7 +872,9 @@ function SortableHeader({
       className={[
         'px-3 py-2',
         alignRight ? 'text-right' : 'text-left',
-        sticky ? 'sticky left-0 z-20 bg-surface-0 shadow-[1px_0_0_var(--border)]' : undefined,
+        sticky
+          ? 'sticky left-0 z-20 bg-surface-0 shadow-[1px_0_0_var(--border-subtle)]'
+          : undefined,
       ]
         .filter(Boolean)
         .join(' ')}

@@ -260,9 +260,10 @@ async function assertPhaseEvidenceAnchors() {
 
   await assertFileContains('apps/web/src/styles.css', [
     ['reduced motion rule', 'prefers-reduced-motion'],
-    ['brand orange token usage', '--brand-orange'],
-    ['brand blue token usage', '--brand-blue'],
-    ['brand green token usage', '--brand-green'],
+    // UI-1 renamed the provider colours to Aurora semantic tokens.
+    ['AWS provider token usage', '--provider-aws'],
+    ['Azure provider token usage', '--provider-azure'],
+    ['GCP provider token usage', '--provider-gcp'],
   ]);
 
   await assertFileContains('.github/workflows/ci.yml', [

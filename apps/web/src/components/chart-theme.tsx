@@ -15,24 +15,24 @@ import type { CSSProperties, ReactNode } from 'react';
 
 /** Tooltip surface, matched to the card elevation rather than recharts' default. */
 export const chartTooltipStyle: CSSProperties = {
-  background: 'var(--surface-card)',
-  border: '1px solid var(--border-default)',
+  background: 'var(--bg-surface)',
+  border: '1px solid var(--border-subtle)',
   borderRadius: 'var(--radius-control)',
-  boxShadow: 'var(--shadow-card)',
-  color: 'var(--ink-900)',
-  fontSize: '12px',
+  boxShadow: 'var(--shadow-md)',
+  color: 'var(--text-primary)',
+  fontSize: 'var(--fs-12)',
   padding: '8px 10px',
 };
 
 export const chartTooltipLabelStyle: CSSProperties = {
-  color: 'var(--ink-400)',
-  fontSize: '11px',
+  color: 'var(--text-muted)',
+  fontSize: 'var(--fs-12)',
   marginBottom: '2px',
 };
 
 export const chartAxisTick = {
-  fill: 'var(--ink-400)',
-  fontSize: 10,
+  fill: 'var(--text-muted)',
+  fontSize: 12,
 } as const;
 
 /**

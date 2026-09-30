@@ -734,7 +734,7 @@ export function FinOpsFeatureLayer({
 
           {budgetAlertActive && parsedThreshold !== undefined && cheapestMonthly !== undefined ? (
             <div
-              className="rounded-lg border border-[color:var(--pc-warning)] bg-[color:var(--pc-warning-soft)] p-3 text-sm text-text-primary"
+              className="rounded-lg border border-[color:var(--warning)] bg-[color:var(--warning-soft)] p-3 text-sm text-text-primary"
               role="alert"
             >
               <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -1007,7 +1007,7 @@ function PricingModelSavingsCue({
   return (
     <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2 text-xs font-semibold">
       {bestModel?.savingsPercentVsOnDemand !== undefined ? (
-        <span className="rounded-full border border-[color:var(--pc-success)] bg-[color:var(--pc-success-soft)] px-2 py-1 text-text-primary">
+        <span className="rounded-full border border-[color:var(--success)] bg-[color:var(--success-soft)] px-2 py-1 text-text-primary">
           Best:{' '}
           {bestModel.providerTerm ?? bestModel.displayName ?? pricingModelLabel(bestModel.model)}{' '}
           saves {formatPercent(bestModel.savingsPercentVsOnDemand)}
@@ -1056,8 +1056,8 @@ function PricingModelDeltaCue({
       className={[
         'mt-2 rounded-lg border px-2 py-1 text-xs font-semibold',
         savesMoney
-          ? 'border-[color:var(--pc-success)] bg-[color:var(--pc-success-soft)] text-text-primary'
-          : 'border-[color:var(--pc-warning)] bg-[color:var(--pc-warning-soft)] text-text-primary',
+          ? 'border-[color:var(--success)] bg-[color:var(--success-soft)] text-text-primary'
+          : 'border-[color:var(--warning)] bg-[color:var(--warning-soft)] text-text-primary',
       ].join(' ')}
     >
       What-if delta: {savesMoney ? 'saves' : 'adds'} {formatMoney(Math.abs(delta), currency)}/mo vs
@@ -1445,7 +1445,7 @@ function WorkloadBreakdown({
                     </p>
                   ) : null}
                   {warning ? (
-                    <div className="rounded-lg border border-[color:var(--pc-warning)] bg-[color:var(--pc-warning-soft)] p-2 text-xs font-semibold text-text-primary">
+                    <div className="rounded-lg border border-[color:var(--warning)] bg-[color:var(--warning-soft)] p-2 text-xs font-semibold text-text-primary">
                       Egress risk: {formatMoney(warning.amount, currency)} is{' '}
                       {formatPercent(warning.percentOverLowest)} above the lowest provider.
                     </div>

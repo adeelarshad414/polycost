@@ -296,7 +296,7 @@ export function diagramLayoutPreview(
         ...(lineColor ? { borderColor: lineColor } : {}),
         ...(fillColor
           ? {
-              backgroundColor: `color-mix(in srgb, ${fillColor} 13%, var(--pc-bg-surface))`,
+              backgroundColor: `color-mix(in srgb, ${fillColor} 13%, var(--bg-surface))`,
             }
           : {}),
       },

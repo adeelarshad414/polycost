@@ -3,59 +3,66 @@
 PolyCost's brand system is intentionally cloud-neutral. AWS, Azure, and GCP colors are
 provider accents, not the application's primary action palette.
 
+## Color Tokens: PolyCost Aurora
+
+All colour, type, radius, elevation, gradient and motion tokens live in
+`apps/web/src/styles/tokens.css`, which is the only file allowed to contain raw
+colour values (`npm run theme:hex:check` enforces this, including `rgb()`/`hsl()`).
+Components read semantic names only. `stylelint` (part of `npm run lint`) rejects
+literal colours, font sizes, font weights and radii elsewhere.
+
+Themes: **Light**, **Dark** and **System** (the default, which follows the OS setting).
+Dark values are declared under both `@media (prefers-color-scheme: dark)` and
+`:root[data-theme='dark']`, so the page is correct before scripts run and the
+toggle always wins. There is one brand accent; the terracotta alternate was removed.
+
+### Brand and gradients
+
+| Token                                   | Light           | Dark          | Use                                 |
+| --------------------------------------- | --------------- | ------------- | ----------------------------------- |
+| `--brand-primary`                       | `#4F46E5`       | `#818CF8`     | Primary buttons, links, focus       |
+| `--brand-violet`                        | `#7C3AED`       | `#A78BFA`     | Gradient midpoint                   |
+| `--brand-magenta`                       | `#DB2777`       | `#F472B6`     | Gradient end (decorative only)      |
+| `--brand-cyan`                          | `#0891B2`       | `#22D3EE`     | Highlight spark (decorative only)   |
+| `--grad-cta`                            | indigo → violet | same, lighter | The only gradient that carries text |
+| `--grad-brand-line`, `--grad-hero-mesh` | multi-stop      | multi-stop    | Hairlines and hero backgrounds      |
+
+### Provider identity
+
+Use provider colours only to identify a provider: chart series, provider cards,
+provider marks. Never use them for categories, gradients, rails or decoration.
+The vendors' published fills (`#FF9900 / #027DFF / #34A853`) fail colour-blind
+separation (orange and green collapse under protanopia), so the tokens are
+re-stepped values that pass a CVD validator in both themes.
+
+| Token              | Light fill | Dark fill | Text-safe ink (light / dark) |
+| ------------------ | ---------- | --------- | ---------------------------- |
+| `--provider-aws`   | `#E98A15`  | `#D07A1A` | `#9A4F00` / `#F5A54A`        |
+| `--provider-azure` | `#3B6FE8`  | `#5B86F0` | `#1D4ED8` / `#8AB0FF`        |
+| `--provider-gcp`   | `#0F7A43`  | `#0F8F6E` | `#0B6B3A` / `#4FD1A1`        |
+
+Text that names a provider uses the `-ink` token; the fills are for bars, chips and tints.
+
+### Status
+
+`--success`, `--warning`, `--danger`, `--info` and `--estimate` are text-safe
+(4.5:1 or better on every surface, asserted in `tokens-contrast.spec.ts`), and
+each has a `-soft` background. Always pair a status colour with an icon or a label.
+
 ## Logo
 
-The logomark is three ascending rounded vertical bars:
-
-- Orange bar: AWS reference
-- Blue bar: Azure reference
-- Green bar: GCP reference
-
-Use the generated assets in `apps/web/public/brand/`:
-
-- `polycost-logomark.svg` for mark-only usage
-- `polycost-lockup.svg` for the primary horizontal lockup on light surfaces
-- `polycost-lockup-dark.svg` for dark surfaces
-- `polycost-lockup-stacked.svg` for square or stacked placements
-- `polycost-lockup-monochrome.svg` for watermark, print, or single-color contexts
-- `favicon-16.svg`, `favicon-32.svg`, `favicon-48.svg`, `apple-touch-icon.svg`, and
-  `icon-maskable-512.svg` for icon surfaces
-
-Do not redraw the logo, recolor the provider bars, compress the lockup horizontally, or
-pair the logomark with alternate wordmark typography.
-
-## Color Tokens
-
-Brand provider accent tokens live in `apps/web/src/styles.css` and are exposed through
-Tailwind in the `@theme` block at the top of `apps/web/src/styles.css`. (Tailwind 4 moved theme configuration out of `tailwind.config.ts` and into CSS.)
-
-| Token                 | Value     | Use                                         |
-| --------------------- | --------- | ------------------------------------------- |
-| `--brand-orange`      | `#D85A30` | AWS/logo/provider accent                    |
-| `--brand-blue`        | `#378ADD` | Azure/logo/provider accent                  |
-| `--brand-green`       | `#1D9E75` | GCP/logo/provider accent                    |
-| `--brand-orange-dark` | `#E2783F` | AWS/logo/provider accent on dark surfaces   |
-| `--brand-blue-dark`   | `#5BA3E8` | Azure/logo/provider accent on dark surfaces |
-| `--brand-green-dark`  | `#3FBE8E` | GCP/logo/provider accent on dark surfaces   |
-
-Use provider colors for comparison charts, provider cards, provider marks, and small
-provider-specific accents only. Primary buttons, links, active navigation, focus rings,
-and generic UI states use the neutral action aliases:
-
-- `--pc-action-primary`
-- `--pc-action-primary-hover`
-- `--pc-action-primary-soft`
-
-Do not turn all CTAs orange, blue, or green.
+The logomark is three ascending rounded vertical bars in the provider fills
+(AWS, Azure, GCP). The SVGs in `apps/web/public/brand/` use the Aurora values above.
 
 ## Typography
 
-Keep the existing project typography:
+Fonts are self-hosted through `@fontsource` packages imported in `apps/web/src/main.tsx`:
 
-- Display: `var(--pc-font-display)`
-- Body: `var(--pc-font-body)`
-- Mono/data: `var(--pc-font-mono)`
+- Display: Sora Variable (`var(--font-display)`), weights 600/700
+- Body/UI: Inter Variable (`var(--font-body)`), weights 400/500/600
+- Mono: JetBrains Mono 500 (`var(--font-mono)`), for code and IDs
 
+Sizes come from `--fs-12 … --fs-56` and weights from `--fw-regular|medium|semibold|bold`.
 Do not introduce a new font family unless the design system is explicitly revised.
 
 ## Final Copy
