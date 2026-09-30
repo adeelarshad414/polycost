@@ -285,6 +285,12 @@ import {
 import { ResultTabs, type ResultTab } from './components/ResultTabs';
 import { ThemeSwitcher } from './components/ThemeSwitcher';
 import { EmptyState, KpiTile, ProvenancePill } from './components/ui';
+import {
+  CostByServiceStacked,
+  ProviderComparisonBar,
+  comparisonCategoryBreakdown,
+  comparisonQuotes,
+} from './charts';
 import { TopLoadingBar } from './components/TopLoadingBar';
 import { HOURS_PER_MONTH } from './cost-time';
 import {
@@ -6457,6 +6463,13 @@ function ExecutiveAnalyticsPreview({
   return (
     <section className="executive-analytics-preview" aria-label="Executive analytics dashboard">
       <ExecutiveProviderHero comparison={comparison} pricingModel={pricingModel} />
+
+      {/* UI-3: the Aurora chart system. Sorted comparison first (the answer and the
+          size of the gap), then where each provider's money goes. */}
+      <div className="executive-chart-pair">
+        <ProviderComparisonBar quotes={comparisonQuotes(comparison)} />
+        <CostByServiceStacked providers={comparisonCategoryBreakdown(comparison)} />
+      </div>
 
       {/* UI-0: the "total across priced clouds" tile and the provider-mix donut were
           removed. Provider estimates are alternatives, so summing them or charting
