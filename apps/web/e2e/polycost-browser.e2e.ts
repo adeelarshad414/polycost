@@ -58,7 +58,7 @@ test('compares the default workload on mobile without page-level horizontal over
 
   await page.getByRole('button', { name: /compare costs/i }).click();
   await expect(page.getByLabel('Provider cost summary')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText('Executive monthly baseline')).toBeVisible();
+  await expect(page.getByText('Cost composition waterfall')).toBeVisible();
   // The detail is a tab strip now, not a disclosure. Inactive panels stay in the
   // DOM so the report still prints whole, so this asserts visibility rather than
   // absence.
@@ -102,11 +102,33 @@ test('keeps the primary comparison workflow accessible across locked breakpoints
 
     await page.getByRole('button', { name: /compare costs/i }).click();
     await expect(page.getByLabel('Provider cost summary')).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText('Executive monthly baseline')).toBeVisible();
+    await expect(page.getByText('Cost composition waterfall')).toBeVisible();
     await expect(page.getByLabel('Comparison quick actions')).toBeVisible();
     await expectInteractiveControlsAreNamed(page, `${viewport.label} comparison state`);
     await expectNoHorizontalOverflow(page);
   }
+});
+
+test('shows no internal copy, summed alternatives, or clipped content on phones (UI-0)', async ({
+  page,
+}) => {
+  await mockRegionCatalog(page);
+  await mockComparisonCreation(page, browserComparison());
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/');
+
+  await expectNoInternalCopy(page);
+  await expectNoClippedContent(page);
+  await expect(page.getByRole('radio', { name: /terracotta/i })).toHaveCount(0);
+
+  await page.getByRole('button', { name: /compare costs/i }).click();
+  await expect(page.getByLabel('Provider cost summary')).toBeVisible({ timeout: 30_000 });
+
+  await expectNoInternalCopy(page);
+  await expectNoClippedContent(page);
+  // Provider quotes are alternatives: never summed, never a part-to-whole chart.
+  await expect(page.getByText('Executive monthly baseline')).toHaveCount(0);
+  await expect(page.getByText('Provider mix')).toHaveCount(0);
 });
 
 test('surfaces provider pricing warnings in the engineering evidence view', async ({ page }) => {
@@ -385,6 +407,39 @@ async function expectNoHorizontalOverflow(page: Page): Promise<void> {
   });
 
   expect(overflowPixels).toBeLessThanOrEqual(1);
+}
+
+/** Environment-variable names and internal labels must never reach end users. */
+async function expectNoInternalCopy(page: Page): Promise<void> {
+  const visibleText = await page.evaluate(() => document.body.innerText);
+
+  expect(visibleText).not.toMatch(/[A-Z_]{6,}=/);
+  for (const phrase of ['Demo controls', 'Server analytics', 'pricing ETL']) {
+    expect(visibleText).not.toContain(phrase);
+  }
+}
+
+/**
+ * Page-level scrollWidth misses content hidden by an overflowing grid track, so
+ * check that no visible element sticks out past the viewport. Horizontal scrollers
+ * (the result tab strip) are allowed to hold wider content.
+ */
+async function expectNoClippedContent(page: Page): Promise<void> {
+  const clipped = await page.evaluate(() => {
+    const viewportWidth = document.documentElement.clientWidth;
+    return [...document.querySelectorAll<HTMLElement>('body *')]
+      .filter((element) => {
+        if (element.offsetParent === null || element.closest('.result-tablist')) {
+          return false;
+        }
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && rect.right > viewportWidth + 1;
+      })
+      .slice(0, 5)
+      .map((element) => `${element.tagName.toLowerCase()}.${element.className}`);
+  });
+
+  expect(clipped).toEqual([]);
 }
 
 async function expectInteractiveControlsAreNamed(page: Page, label: string): Promise<void> {
