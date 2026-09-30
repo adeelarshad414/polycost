@@ -1,21 +1,13 @@
 import { KeyboardEvent } from 'react';
-import { AccentChoice, ThemeChoice } from '../theme';
+import { ThemeChoice } from '../theme';
 
 interface ThemeSwitcherProps {
   themeChoice: ThemeChoice;
-  accentChoice: AccentChoice;
   onThemeChange: (choice: ThemeChoice) => void;
-  onAccentChange: (choice: AccentChoice) => void;
   className?: string;
 }
 
-export function ThemeSwitcher({
-  themeChoice,
-  accentChoice,
-  onThemeChange,
-  onAccentChange,
-  className,
-}: ThemeSwitcherProps) {
+export function ThemeSwitcher({ themeChoice, onThemeChange, className }: ThemeSwitcherProps) {
   return (
     <div
       className={['theme-toggle', className].filter(Boolean).join(' ')}
@@ -23,7 +15,6 @@ export function ThemeSwitcher({
       aria-label="Appearance"
     >
       <div className="theme-toggle-section" aria-label="Mode">
-        <span className="theme-toggle-label">Mode</span>
         <div className="theme-mode-control" role="radiogroup" aria-label="Mode">
           {THEME_OPTIONS.map((option) => (
             <button
@@ -46,38 +37,11 @@ export function ThemeSwitcher({
           ))}
         </div>
       </div>
-
-      <div className="theme-toggle-section" aria-label="Accent">
-        <span className="theme-toggle-label">Accent</span>
-        <div className="theme-accent-control" role="radiogroup" aria-label="Accent">
-          {ACCENT_OPTIONS.map((option) => (
-            <button
-              type="button"
-              key={option.choice}
-              className="theme-accent-button"
-              role="radio"
-              aria-label={option.ariaLabel}
-              aria-checked={accentChoice === option.choice}
-              data-accent-choice={option.choice}
-              tabIndex={accentChoice === option.choice ? 0 : -1}
-              title={option.title}
-              onClick={() => onAccentChange(option.choice)}
-              onKeyDown={(event) =>
-                handleChoiceKeyDown(event, option.choice, ACCENT_CHOICES, 'accent', onAccentChange)
-              }
-            >
-              <span className={`accent-swatch accent-swatch-${option.choice}`} aria-hidden="true" />
-              <span>{option.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
 
 const THEME_CHOICES: ThemeChoice[] = ['system', 'light', 'dark'];
-const ACCENT_CHOICES: AccentChoice[] = ['default', 'terracotta'];
 
 const THEME_OPTIONS: Array<{
   choice: ThemeChoice;
@@ -87,26 +51,6 @@ const THEME_OPTIONS: Array<{
   { choice: 'system', ariaLabel: 'Use system theme', title: 'Use system theme' },
   { choice: 'light', ariaLabel: 'Use light theme', title: 'Use light theme' },
   { choice: 'dark', ariaLabel: 'Use dark theme', title: 'Use dark theme' },
-];
-
-const ACCENT_OPTIONS: Array<{
-  choice: AccentChoice;
-  label: string;
-  ariaLabel: string;
-  title: string;
-}> = [
-  {
-    choice: 'default',
-    label: 'Default',
-    ariaLabel: 'Use PolyCost violet accent',
-    title: 'Use PolyCost violet accent',
-  },
-  {
-    choice: 'terracotta',
-    label: 'Terracotta',
-    ariaLabel: 'Use terracotta accent',
-    title: 'Use terracotta accent',
-  },
 ];
 
 function handleChoiceKeyDown<TChoice extends string>(
