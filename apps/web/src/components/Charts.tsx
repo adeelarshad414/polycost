@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Cell, Tooltip, XAxis, YAxis } from 'recharts';
 import { ProviderId, ServiceCategory } from '../types';
 import { formatCurrency, formatPercent } from '../lib/format';
 import {
@@ -13,14 +13,6 @@ import {
 // FE-4: the only recharts consumers in the app live here so the ~377 kB charts
 // vendor chunk can be lazy-loaded off the first-paint critical path instead of
 // being pulled in synchronously by App.tsx.
-
-export interface ProviderMixDatum {
-  providerId: ProviderId;
-  name: string;
-  value: number;
-  percent: number;
-  color: string;
-}
 
 export interface EngineeringServiceDatum {
   category: ServiceCategory;
@@ -83,81 +75,6 @@ function engineeringChartDimensions(
   }
 
   return { width: compact ? 238 : 276, height: compact ? 138 : 164 };
-}
-
-export function ProviderMixDonut({ data }: { data: ProviderMixDatum[] }) {
-  if (data.length === 0) {
-    return (
-      <div className="provider-mix-empty" role="status">
-        Provider mix pending until comparison totals are available.
-      </div>
-    );
-  }
-
-  // Deliberately the lowest, not the sum. These segments are alternatives for
-  // the same workload, so adding them produces a figure nobody will ever pay -
-  // the donut shows relative share, and the number worth putting in the middle
-  // is what the cheapest option actually costs.
-  const lowest = Math.min(...data.map((entry) => entry.value));
-
-  return (
-    <div className="provider-mix-layout">
-      <div className="provider-mix-chart-shell" role="img" aria-label="Provider cost mix chart">
-        <PieChart width={220} height={220}>
-          <ChartGradients
-            ids={data.map((entry) => ({
-              id: gradientId('mix', entry.providerId),
-              color: entry.color,
-            }))}
-          />
-          <Pie
-            data={data}
-            dataKey="value"
-            nameKey="name"
-            cx="50%"
-            cy="50%"
-            innerRadius={62}
-            outerRadius={92}
-            paddingAngle={3}
-            cornerRadius={4}
-            stroke="var(--surface-card)"
-            strokeWidth={3}
-            isAnimationActive={false}
-          >
-            {data.map((entry) => (
-              <Cell fill={`url(#${gradientId('mix', entry.providerId)})`} key={entry.providerId} />
-            ))}
-          </Pie>
-          <Tooltip
-            formatter={(value) => [formatCurrency(Number(value)), 'Monthly']}
-            contentStyle={chartTooltipStyle}
-            labelStyle={chartTooltipLabelStyle}
-          />
-        </PieChart>
-        {/*
-          The hole was empty. Reference dashboards put a total there, but a total
-          would be wrong here: these are alternatives, not a combined bill. The
-          lowest cost is the equivalent actionable number. aria-hidden because
-          the legend below already states every value to assistive tech.
-        */}
-        <div className="provider-mix-center" aria-hidden="true">
-          <span>Lowest</span>
-          <strong>{formatCurrency(lowest)}</strong>
-        </div>
-      </div>
-      <div className="provider-mix-legend">
-        {data.map((entry) => (
-          <span key={entry.providerId}>
-            <i className={`provider-dot provider-fill-${entry.providerId}`} aria-hidden="true" />
-            <strong>{entry.name}</strong>
-            <small>
-              {formatCurrency(entry.value)} · {formatPercent(entry.percent)}
-            </small>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 export function EngineeringProviderServiceChart({

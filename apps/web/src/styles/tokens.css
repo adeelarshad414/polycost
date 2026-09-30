@@ -59,7 +59,6 @@
   --shadow-control: 0 1px 2px rgb(38 34 82 / 8%);
 
   --on-brand: #ffffff;
-  --terracotta-brand-500: #d97757;
   --pc-ink-50: #f7f8fa;
   --pc-ink-100: var(--surface-raised);
   --pc-ink-200: #dde3ea;
@@ -325,25 +324,4 @@
   --pc-focus-ring: color-mix(in srgb, var(--pc-action-primary) 28%, transparent);
   --pc-chart-grid: color-mix(in srgb, var(--pc-border-strong) 64%, transparent);
   --pc-chart-hover: color-mix(in srgb, var(--pc-border-strong) 42%, transparent);
-}
-
-:root[data-accent='terracotta'],
-:root[data-accent='terracotta'][data-theme='dark'] {
-  --brand-600: #c96442;
-  --brand-500: #d97757;
-  --brand-400: #e08d6f;
-  --brand-100: rgb(217 119 87 / 18%);
-  --brand-50: rgb(217 119 87 / 8%);
-  --brand-text: #e08d6f;
-  --on-brand: #ffffff;
-}
-
-:root[data-accent='terracotta'][data-theme='light'] {
-  --brand-600: #c05b3c;
-  --brand-500: #d97757;
-  --brand-400: #e08d6f;
-  --brand-100: rgb(217 119 87 / 14%);
-  --brand-50: rgb(217 119 87 / 7%);
-  --brand-text: #c05b3c;
-  --on-brand: #ffffff;
 }

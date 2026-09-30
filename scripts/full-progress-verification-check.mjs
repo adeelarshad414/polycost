@@ -192,7 +192,7 @@ async function assertPhaseEvidenceAnchors() {
   ]);
 
   await assertFileContains('apps/web/src/App.spec.tsx', [
-    ['executive view evidence', 'Executive monthly baseline'],
+    ['executive view evidence', 'Cost composition waterfall'],
     ['engineering view evidence', 'Engineering cost controls'],
     ['break-even UI evidence', 'Break-even timeline'],
     [

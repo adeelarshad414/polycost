@@ -135,36 +135,99 @@ export function resultStatusNotice(notice: string | null): string | null {
   return editStatusNotice(notice);
 }
 
+/**
+ * Human wording for a data age. Ages were shown as raw hours ("538.1h old"),
+ * which nobody reads as "three weeks". Under two days stays in hours.
+ */
+export function formatDataAge(hours: number): string {
+  if (hours < 1) {
+    return 'under an hour';
+  }
+
+  if (hours < 48) {
+    const rounded = Math.round(hours);
+    return `${rounded} hour${rounded === 1 ? '' : 's'}`;
+  }
+
+  const days = Math.round(hours / 24);
+  return `${days} days`;
+}
+
+type DataHealthProvider = DataHealthResponse['providers'][number];
+
+/** Providers whose catalog is sample or seed data rather than live provider pricing. */
+export function dataHealthSampleProviders(health: DataHealthResponse | null): DataHealthProvider[] {
+  return (
+    health?.providers.filter(
+      (provider) =>
+        provider.provenance !== undefined &&
+        provider.provenance !== 'live' &&
+        provider.provenance !== 'unknown',
+    ) ?? []
+  );
+}
+
+/**
+ * One plain sentence under the banner title. It never repeats the API's operator
+ * message, which names environment variables and pipeline internals.
+ */
 export function dataHealthBannerDetail(
   health: DataHealthResponse | null,
   error: string | null,
 ): string {
   if (error) {
-    return error;
+    return 'Pricing freshness could not be checked. Confirm prices before a final commitment.';
   }
 
   if (!health) {
-    return 'Waiting for pricing cache health.';
+    return 'Checking how recent the pricing data is.';
   }
 
-  const firstAlert = health.alerts[0]?.message;
+  const affected = health.providers.filter(
+    (provider) => provider.freshness !== 'fresh' || provider.status !== 'success',
+  );
 
-  if (health.overallStatus !== 'fresh' && firstAlert) {
-    return firstAlert;
+  if (affected.length > 0) {
+    return `${affected.map(dataHealthProviderIssueLabel).join(', ')}. Refresh before a final commitment.`;
   }
 
-  return `Freshness policy ${health.freshnessPolicyHours}h · generated ${formatDateTime(
-    health.generatedAt,
-  )}`;
+  const ages = health.providers
+    .map((provider) => provider.ageHours)
+    .filter((age): age is number => age !== undefined);
+
+  return ages.length > 0
+    ? `All providers refreshed within the last ${formatDataAge(Math.max(...ages))}.`
+    : 'All providers have current pricing.';
 }
 
-export function dataHealthProviderIssueLabel(
-  provider: DataHealthResponse['providers'][number],
-): string {
-  const ageLabel =
-    provider.ageHours !== undefined ? `${provider.ageHours}h old` : provider.freshness;
+export function dataHealthProviderIssueLabel(provider: DataHealthProvider): string {
+  const state =
+    provider.freshness === 'failed' || provider.status === 'failed'
+      ? 'sync failed'
+      : provider.freshness === 'missing'
+        ? 'has no pricing yet'
+        : provider.status === 'partial'
+          ? 'partially synced'
+          : 'is out of date';
+  const age = provider.ageHours !== undefined ? ` (${formatDataAge(provider.ageHours)} old)` : '';
 
-  return `${providerLabel(provider.providerId)} ${provider.freshness} (${ageLabel})`;
+  return `${providerLabel(provider.providerId)} ${state}${age}`;
+}
+
+/** Plain name for where a provider's prices come from, for the details disclosure. */
+export function dataHealthProvenanceLabel(provenance: DataHealthProvider['provenance']): string {
+  switch (provenance) {
+    case 'live':
+      return 'live provider pricing';
+    case 'seeded':
+      return 'bundled seed prices';
+    case 'mock':
+      return 'sample prices';
+    case 'mixed':
+      return 'a mix of sample and live prices';
+    default:
+      return 'unknown source';
+  }
 }
 
 export function diagramLayoutPreview(

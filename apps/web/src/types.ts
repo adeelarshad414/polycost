@@ -1634,6 +1634,8 @@ export interface DataHealthResponse {
     providerId: ProviderId;
     status: 'success' | 'partial' | 'failed';
     freshness: 'fresh' | 'stale' | 'missing' | 'failed';
+    /** Where this provider's catalog came from. Sent by the API; optional for older servers. */
+    provenance?: 'live' | 'mock' | 'seeded' | 'mixed' | 'unknown';
     lastSuccessfulRun?: string;
     ageHours?: number;
     recordsUpdated: number;

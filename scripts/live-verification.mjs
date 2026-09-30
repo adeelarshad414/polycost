@@ -124,7 +124,9 @@ async function verifyTemplateRecommendationJourney() {
       timeout: templateThresholdMs,
     });
     markStep('provider cost summary visible');
-    await page.getByText('Executive monthly baseline').waitFor({
+    // UI-0 removed the summed "Executive monthly baseline" tile; the cost
+    // composition card is the executive view's first chart now.
+    await page.getByText('Cost composition waterfall').waitFor({
       state: 'visible',
       timeout: 15_000,
     });

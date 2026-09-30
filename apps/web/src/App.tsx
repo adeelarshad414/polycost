@@ -107,6 +107,9 @@ import {
   costFormulaRows,
   costMatrixSortKey,
   dataHealthBannerDetail,
+  dataHealthProvenanceLabel,
+  dataHealthSampleProviders,
+  formatDataAge,
   databaseDimensionTotals,
   databaseOptimizationSignal,
   databaseRateEvidence,
@@ -260,9 +263,6 @@ import {
 // FE-4: charts (recharts, ~377 kB) are the single largest vendor chunk and are
 // only needed once a comparison renders, so they load on demand rather than
 // blocking first paint.
-const ProviderMixDonut = lazy(() =>
-  import('./components/Charts').then((module) => ({ default: module.ProviderMixDonut })),
-);
 const EngineeringProviderServiceChart = lazy(() =>
   import('./components/Charts').then((module) => ({
     default: module.EngineeringProviderServiceChart,
@@ -304,11 +304,8 @@ import {
 } from './service-catalog';
 import {
   applyTheme,
-  applyAccent,
-  AccentChoice,
   ResolvedTheme,
   resolveTheme,
-  storedAccent,
   storedTheme,
   subscribeToSystemTheme,
   ThemeChoice,
@@ -373,7 +370,6 @@ export function App({ client = polyCostClient }: AppProps) {
   const activeAsyncActionId = useRef(0);
   const initialRequirementSession = useRef(readStoredRequirementSession()).current;
   const [themeChoice, setThemeChoice] = useState<ThemeChoice>(() => storedTheme());
-  const [accentChoice, setAccentChoice] = useState<AccentChoice>(() => storedAccent());
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
     resolveTheme(storedTheme()),
   );
@@ -462,10 +458,6 @@ export function App({ client = polyCostClient }: AppProps) {
       setResolvedTheme(nextTheme);
     });
   }, [themeChoice]);
-
-  useEffect(() => {
-    applyAccent(accentChoice);
-  }, [accentChoice]);
 
   useEffect(() => {
     storeRequirementSession({
@@ -1404,10 +1396,8 @@ export function App({ client = polyCostClient }: AppProps) {
       <AppHeader
         resolvedTheme={resolvedTheme}
         themeChoice={themeChoice}
-        accentChoice={accentChoice}
         onSignIn={handleSignIn}
         onThemeChange={setThemeChoice}
-        onAccentChange={setAccentChoice}
       />
       {workspaceOpen ? (
         <WorkspaceControlCenter
@@ -1643,17 +1633,13 @@ export function ScrollProgressBar() {
 function AppHeader({
   resolvedTheme,
   themeChoice,
-  accentChoice,
   onSignIn,
   onThemeChange,
-  onAccentChange,
 }: {
   resolvedTheme: ResolvedTheme;
   themeChoice: ThemeChoice;
-  accentChoice: AccentChoice;
   onSignIn: () => void;
   onThemeChange: (choice: ThemeChoice) => void;
-  onAccentChange: (choice: AccentChoice) => void;
 }) {
   return (
     <header className="app-header" aria-label="PolyCost workspace header">
@@ -1668,12 +1654,7 @@ function AppHeader({
       </a>
 
       <div className="app-header-actions">
-        <ThemeSwitcher
-          themeChoice={themeChoice}
-          accentChoice={accentChoice}
-          onThemeChange={onThemeChange}
-          onAccentChange={onAccentChange}
-        />
+        <ThemeSwitcher themeChoice={themeChoice} onThemeChange={onThemeChange} />
         <Button
           type="button"
           variant="secondary"
@@ -2645,20 +2626,20 @@ function ServerAnalyticsStatusStrip({
   return (
     <section
       className={`server-analytics-strip server-analytics-${tone}`}
-      aria-label="Backend analytics status"
+      aria-label="Analysis status"
     >
       <div className="server-analytics-main">
-        <span>{isLoading ? 'Server analytics syncing' : 'Server analytics'}</span>
+        <span>{isLoading ? 'Analysis updating' : 'Analysis'}</span>
         <strong>
           {error
-            ? 'Backend intelligence unavailable'
+            ? 'Analysis unavailable'
             : analytics
               ? `Generated ${formatDateTime(analytics.generatedAt)}`
-              : 'Preparing deterministic insights'}
+              : 'Preparing insights'}
         </strong>
         {error ? <p>{error}</p> : null}
       </div>
-      <div className="server-analytics-metrics" aria-label="Backend analytics coverage">
+      <div className="server-analytics-metrics" aria-label="Analysis coverage">
         <ServerAnalyticsMetric
           label="Coverage"
           value={analytics ? String(coveredDimensionCount) : '...'}
@@ -2762,7 +2743,7 @@ function ResultQuickActions({
   return (
     <section className="result-quick-actions" aria-label="Comparison quick actions">
       <div className="result-quick-actions-copy">
-        <span className="result-quick-actions-kicker">Demo controls</span>
+        <span className="result-quick-actions-kicker">Result</span>
         <strong>
           {cheapestProvider
             ? `${providerLabel(comparison.cheapestProviderId)} leads at ${formatCurrency(
@@ -3073,10 +3054,9 @@ function DataHealthBanner({
   }
 
   const tone = error ? 'degraded' : (health?.overallStatus ?? 'degraded');
-  const currentRateRows =
-    health?.providers.reduce((total, provider) => total + provider.cache.currentRateRows, 0) ?? 0;
-  const summary = dataHealthBannerSummary(health, error, currentRateRows);
+  const summary = dataHealthBannerSummary(health, error);
   const detail = dataHealthBannerDetail(health, error);
+  const sampleProviders = dataHealthSampleProviders(health);
 
   return (
     <section
@@ -3088,9 +3068,14 @@ function DataHealthBanner({
       aria-label="Pricing data health"
     >
       <div className="data-health-main">
-        <span>Data health</span>
         <strong>{summary}</strong>
         <small>{detail}</small>
+        {sampleProviders.length > 0 ? (
+          <small className="data-health-sample-note">
+            Sample prices for {sampleProviders.map((p) => providerLabel(p.providerId)).join(', ')}:
+            fine for exploring, not for final decisions.
+          </small>
+        ) : null}
       </div>
       {health ? (
         <div className="data-health-providers" aria-label="Provider data freshness">
@@ -3098,16 +3083,35 @@ function DataHealthBanner({
             <span
               className={`data-health-provider data-health-provider-${provider.freshness}`}
               key={provider.providerId}
-              title={provider.message}
             >
               {providerLabel(provider.providerId)}
               <small>
-                {provider.ageHours !== undefined ? `${provider.ageHours}h` : provider.freshness}
-                {` · ${provider.cache.currentRateRows} rates`}
+                {provider.ageHours !== undefined
+                  ? formatDataAge(provider.ageHours)
+                  : provider.freshness}
               </small>
             </span>
           ))}
         </div>
+      ) : null}
+      {health ? (
+        <details className="data-health-details">
+          <summary>Details</summary>
+          <ul>
+            {health.providers.map((provider) => (
+              <li key={provider.providerId}>
+                <strong>{providerLabel(provider.providerId)}</strong>:{' '}
+                {provider.provenance ? `${dataHealthProvenanceLabel(provider.provenance)}, ` : ''}
+                {provider.cache.currentRateRows.toLocaleString('en-US')} current prices, last sync{' '}
+                {provider.status}
+                {provider.lastSuccessfulRun
+                  ? `, last success ${formatDateTime(provider.lastSuccessfulRun)}`
+                  : ''}
+                .
+              </li>
+            ))}
+          </ul>
+        </details>
       ) : null}
     </section>
   );
@@ -6444,56 +6448,15 @@ function ExecutiveAnalyticsPreview({
   pricingModel: PricingModelKey;
 }) {
   const analytics = useMemo(() => executiveAnalyticsModel(comparison, form), [comparison, form]);
-  const pricedCount = analytics.pricedMonthlySummaries.length;
-  const totalMonthly = analytics.totalMonthlyAcrossProviders;
   const forecast = executiveForecastForCheapest(serverAnalytics, comparison);
 
   return (
     <section className="executive-analytics-preview" aria-label="Executive analytics dashboard">
       <ExecutiveProviderHero comparison={comparison} pricingModel={pricingModel} />
 
-      <article className="executive-headline-card">
-        <div className="executive-card-heading">
-          <span>Executive monthly baseline</span>
-          <strong>Total across priced clouds</strong>
-        </div>
-        <div className="executive-headline-value">
-          {totalMonthly !== undefined ? formatCurrency(totalMonthly) : 'Pending'}
-        </div>
-        <p>
-          {pricedCount > 0
-            ? `${pricedCount}/3 provider estimates priced for this workload.`
-            : 'Run a comparison to calculate provider estimates.'}
-        </p>
-        <div
-          className={forecast ? 'executive-trend-ready' : 'executive-trend-pending'}
-          role="status"
-        >
-          <span>{forecast ? 'Server projection' : 'Trend pending'}</span>
-          <strong>
-            {forecast
-              ? `${formatCurrency(forecast.ninetyDayRunRateUsd)} over 90 days`
-              : 'Historical spend data not yet available'}
-          </strong>
-          <div className="executive-pending-sparkline" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-            <i />
-            <i />
-          </div>
-        </div>
-      </article>
-
-      <article className="executive-provider-mix-card">
-        <div className="executive-card-heading">
-          <span>Provider mix</span>
-          <strong>Share of current estimates</strong>
-        </div>
-        <Suspense fallback={<div className="provider-mix-empty">Loading chart…</div>}>
-          <ProviderMixDonut data={analytics.providerMix} />
-        </Suspense>
-      </article>
+      {/* UI-0: the "total across priced clouds" tile and the provider-mix donut were
+          removed. Provider estimates are alternatives, so summing them or charting
+          them as shares of a whole describes a spend nobody would incur. */}
 
       <ExecutiveCostWaterfall analytics={serverAnalytics} comparison={comparison} />
 
@@ -6710,23 +6673,34 @@ function ExecutivePricingModelBars({ comparison }: { comparison: ComparisonResul
             <div className="executive-pricing-row" key={row.providerId}>
               <span>{providerLabel(row.providerId)}</span>
               <div className="executive-pricing-bar-stack">
-                {row.values.map((value) => (
-                  <span
-                    key={`${row.providerId}-${value.model}`}
-                    className={`executive-pricing-bar executive-pricing-${row.providerId}`}
-                    style={{
-                      inlineSize: `${Math.max(6, ((value.monthly ?? 0) / maxMonthly) * 100)}%`,
-                    }}
-                    title={`${providerLabel(row.providerId)} ${pricingModelSummaryLabel(
-                      value.model,
-                    )}: ${
-                      value.monthly !== undefined ? formatCurrency(value.monthly) : 'Unavailable'
-                    } monthly`}
-                  >
-                    <i>{costMatrixPricingModelLabel(value.model)}</i>
-                    <b>{value.monthly !== undefined ? formatCurrency(value.monthly) : 'N/A'}</b>
-                  </span>
-                ))}
+                {row.values.map((value) =>
+                  value.monthly === undefined ? (
+                    // UI-0: a term with no price is not data, so it is never drawn as a bar.
+                    <span
+                      key={`${row.providerId}-${value.model}`}
+                      className="executive-pricing-bar executive-pricing-unavailable"
+                    >
+                      <i>{costMatrixPricingModelLabel(value.model)}</i>
+                      <b>— No {pricingModelSummaryLabel(value.model)} pricing in catalog</b>
+                    </span>
+                  ) : (
+                    <span
+                      key={`${row.providerId}-${value.model}`}
+                      className={`executive-pricing-bar executive-pricing-${row.providerId}`}
+                      style={{
+                        inlineSize: `${Math.max(6, ((value.monthly ?? 0) / maxMonthly) * 100)}%`,
+                      }}
+                      title={`${providerLabel(row.providerId)} ${pricingModelSummaryLabel(
+                        value.model,
+                      )}: ${
+                        value.monthly !== undefined ? formatCurrency(value.monthly) : 'Unavailable'
+                      } monthly`}
+                    >
+                      <i>{costMatrixPricingModelLabel(value.model)}</i>
+                      <b>{formatCurrency(value.monthly)}</b>
+                    </span>
+                  ),
+                )}
               </div>
             </div>
           ))
@@ -6825,7 +6799,7 @@ function ExecutiveBreakEvenTimeline({
           </div>
         </>
       ) : (
-        <div className="provider-mix-empty" role="status">
+        <div className="executive-chart-empty" role="status">
           Run a comparison with reserved, Savings Plan, or CUD evidence to populate the ROI
           timeline.
         </div>
@@ -6952,7 +6926,10 @@ function ExecutiveCostWaterfall({
         </strong>
       </div>
       {provider && steps.length > 0 ? (
-        <div className="executive-waterfall" aria-label="Cost composition waterfall bars">
+        <div
+          className={`executive-waterfall executive-waterfall-${provider.providerId}`}
+          aria-label="Cost composition waterfall bars"
+        >
           {steps.map((step) => (
             <div className="waterfall-row" key={step.label}>
               <span>{step.label}</span>
@@ -6968,7 +6945,7 @@ function ExecutiveCostWaterfall({
           </div>
         </div>
       ) : (
-        <div className="provider-mix-empty" role="status">
+        <div className="executive-chart-empty" role="status">
           Run a comparison to populate cost composition.
         </div>
       )}
@@ -11691,21 +11668,7 @@ function executiveAnalyticsModel(
   form: WorkloadFormState,
 ): ExecutiveAnalyticsModel {
   const monthlySummaries = providerCostSummaries(comparison, 'monthly');
-  const summaryByProvider = new Map(
-    monthlySummaries.map((summary) => [summary.providerId, summary]),
-  );
   const pricedMonthlySummaries = monthlySummaries.filter((summary) => summary.total !== undefined);
-  const pricedInProviderOrder = PROVIDER_ORDER.map((providerId) =>
-    summaryByProvider.get(providerId),
-  )
-    .filter((summary): summary is ProviderCostSummary => Boolean(summary))
-    .filter((summary) => summary.total !== undefined);
-  const totalMonthlyAcrossProviders =
-    pricedMonthlySummaries.length > 0
-      ? roundCurrency(
-          pricedMonthlySummaries.reduce((sum, summary) => sum + (summary.total ?? 0), 0),
-        )
-      : undefined;
   const review = buildFinOpsReview(comparison, 'monthly', form);
   const highest = pricedMonthlySummaries.at(-1);
   const monthlyPotentialSavings = review.monthlySpread;
@@ -11719,17 +11682,6 @@ function executiveAnalyticsModel(
     review,
     monthlySummaries,
     pricedMonthlySummaries,
-    totalMonthlyAcrossProviders,
-    providerMix:
-      totalMonthlyAcrossProviders !== undefined && totalMonthlyAcrossProviders > 0
-        ? pricedInProviderOrder.map((summary) => ({
-            providerId: summary.providerId,
-            name: providerLabel(summary.providerId),
-            value: roundCurrency(summary.total ?? 0),
-            percent: ((summary.total ?? 0) / totalMonthlyAcrossProviders) * 100,
-            color: providerChartColor(summary.providerId),
-          }))
-        : [],
     cheapest: review.monthlyLowest,
     highest,
     annualPotentialSavings,
