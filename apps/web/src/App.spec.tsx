@@ -594,12 +594,28 @@ describe('App', () => {
       'session-token',
     );
 
-    await changeInput(inputByWorkspaceLabel(container, 'Delete confirmation'), 'DELETE');
     await changeInput(
       inputByWorkspaceLabel(container, 'Delete current password'),
       'current-password',
     );
-    await submitForm(formContainingText(container, 'Delete confirmation'));
+    await submitForm(formContainingText(container, 'Delete current password'));
+
+    // UI-2: the typed confirmation lives in a ConfirmDialog portalled to <body>.
+    const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]');
+    expect(dialog?.textContent).toContain('Disable your account?');
+    expect(client.deleteAccount).not.toHaveBeenCalled();
+    const dialogInput = dialog?.querySelector('input');
+    if (!(dialogInput instanceof HTMLInputElement)) {
+      throw new Error('Expected the confirmation input inside the dialog');
+    }
+    await changeInput(dialogInput, 'DELETE');
+    const confirmButton = Array.from(dialog?.querySelectorAll('button') ?? []).find(
+      (button) => button.textContent === 'Disable account',
+    );
+    await act(async () => {
+      confirmButton?.click();
+      await Promise.resolve();
+    });
 
     expect(client.deleteAccount).toHaveBeenCalledWith(
       {

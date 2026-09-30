@@ -10,6 +10,7 @@ import '@fontsource-variable/sora';
 import '@fontsource/jetbrains-mono/500.css';
 import './styles/tokens.css';
 import './styles.css';
+import './styles/components.css';
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
