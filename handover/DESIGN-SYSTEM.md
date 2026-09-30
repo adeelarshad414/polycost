@@ -5,7 +5,7 @@
 - Product: PolyCost.
 - Logo: three ascending bars plus PolyCost wordmark under `apps/web/public/brand/`.
 - Accent providers: AWS orange, Azure blue, GCP green are accents only, not page-wide themes.
-- Primary app accent: PolyCost brand violet with terracotta alternate accent.
+- Primary app accent: PolyCost brand violet (single accent; the terracotta alternate was removed in UI-0).
 
 ## Tokens
 
@@ -14,7 +14,6 @@ Canonical tokens live in `apps/web/src/styles/tokens.css`.
 | Axis       | Values               | Notes                                           |
 | ---------- | -------------------- | ----------------------------------------------- |
 | Theme      | system, light, dark  | Theme choice persists in local storage          |
-| Accent     | default, terracotta  | Appearance controls expose both                 |
 | Surfaces   | canvas, card, raised | Overlay/card surfaces stay neutral              |
 | Status     | ok, warn, crit, info | RAG colors are status-only                      |
 | Typography | display, body, mono  | Numeric/evidence surfaces use mono where useful |
