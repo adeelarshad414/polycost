@@ -937,16 +937,8 @@ summary:focus-visible,
   like a failure.
 */
 .provider-summary-provenance {
+  /* Colour and shape come from ProvenancePill (components/ui); this only places it. */
   justify-self: start;
-  font-size: var(--fs-12);
-  font-weight: var(--fw-semibold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
-  background: color-mix(in srgb, var(--warning) 12%, transparent);
-  color: var(--warning);
   cursor: help;
 }
 
@@ -5286,21 +5278,30 @@ select:disabled {
   transform: none;
 }
 
+/* UI-2: the primary action carries the Aurora CTA gradient. It is the only
+   gradient that holds text (white on both stops clears 5.7:1). The border stays
+   transparent so the gradient reaches the rounded edge. */
 .pc-button-primary {
-  border-color: var(--brand-primary);
-  background: var(--brand-primary);
-  box-shadow: 0 10px 22px color-mix(in srgb, var(--brand-primary) 26%, transparent);
+  border-color: transparent;
+  background: var(--grad-cta);
+  box-shadow: var(--shadow-sm);
   color: var(--on-brand);
+  transition:
+    background var(--dur-base) var(--ease-standard),
+    box-shadow var(--dur-base) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
 }
 
 .pc-button-primary:hover:not(:disabled) {
-  border-color: var(--brand-primary-hover);
-  background: var(--brand-primary-hover);
-  box-shadow: 0 12px 28px color-mix(in srgb, var(--brand-primary) 32%, transparent);
+  border-color: transparent;
+  background: var(--grad-cta-hover);
+  box-shadow: var(--shadow-glow-brand);
 }
 
 .pc-button-primary:active:not(:disabled) {
-  background: var(--brand-primary-active);
+  background: var(--grad-cta-hover);
+  box-shadow: var(--shadow-sm);
+  transform: scale(0.98);
 }
 
 .pc-button-secondary {
@@ -6924,18 +6925,6 @@ select:disabled {
   width: 10px;
   height: 10px;
   border-radius: var(--radius-pill);
-}
-
-.executive-chart-empty {
-  display: grid;
-  min-height: 180px;
-  place-items: center;
-  border: 1px dashed var(--border-subtle);
-  border-radius: var(--radius-control);
-  color: var(--text-secondary);
-  font-size: var(--fs-14);
-  font-weight: var(--fw-bold);
-  text-align: center;
 }
 
 .executive-stat-grid {

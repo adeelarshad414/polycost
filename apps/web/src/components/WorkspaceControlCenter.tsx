@@ -12,6 +12,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { formatApiError, type PolyCostClient } from './../api-client';
 import { Button } from './Button';
+import { ConfirmDialog } from './OverlayPrimitives';
 import { SessionLoader, type LoadingStep } from './LoadingExperience';
 import { TextField } from './fields';
 import { CompareIcon, ParseIcon, ShieldIcon, SignInIcon } from './icons';
@@ -95,6 +96,7 @@ export function WorkspaceControlCenter({
   const [newPassword, setNewPassword] = useState('');
   const [deleteCurrentPassword, setDeleteCurrentPassword] = useState('');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [newTeamName, setNewTeamName] = useState('Platform cost office');
   const [teamSettingsName, setTeamSettingsName] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
@@ -589,12 +591,23 @@ export function WorkspaceControlCenter({
     }
   }
 
-  async function handleAccountDeletion(event: FormEvent) {
+  // UI-2: disabling an account is confirmed in the accessible ConfirmDialog
+  // (focus trap, inert background, typed confirmation) instead of an inline field.
+  function handleAccountDeletionRequest(event: FormEvent) {
     event.preventDefault();
+    if (!token || !deleteCurrentPassword) {
+      return;
+    }
+    setDeleteConfirmation('');
+    setDeleteDialogOpen(true);
+  }
+
+  async function handleAccountDeletion() {
     if (!token || deleteConfirmation !== 'DELETE') {
       return;
     }
 
+    setDeleteDialogOpen(false);
     setWorkspaceBusy('delete-account');
     onError(null);
 
@@ -1676,15 +1689,7 @@ export function WorkspaceControlCenter({
                 <SignInIcon />
                 Sign out
               </Button>
-              <form className="workspace-inline-form" onSubmit={handleAccountDeletion}>
-                <label className="workspace-field">
-                  <span>Delete confirmation</span>
-                  <input
-                    value={deleteConfirmation}
-                    placeholder="DELETE"
-                    onChange={(event) => setDeleteConfirmation(event.currentTarget.value)}
-                  />
-                </label>
+              <form className="workspace-inline-form" onSubmit={handleAccountDeletionRequest}>
                 <label className="workspace-field">
                   <span>Delete current password</span>
                   <input
@@ -1695,14 +1700,30 @@ export function WorkspaceControlCenter({
                 </label>
                 <Button
                   type="submit"
-                  variant="secondary"
+                  variant="destructiveQuiet"
                   loading={workspaceBusy === 'delete-account'}
                   loadingLabel="Disabling..."
-                  disabled={deleteConfirmation !== 'DELETE'}
+                  disabled={!deleteCurrentPassword}
                 >
-                  Disable account
+                  Disable account…
                 </Button>
               </form>
+              <ConfirmDialog
+                open={deleteDialogOpen}
+                destructive
+                title="Disable your account?"
+                description="This signs you out everywhere and revokes every active session. Team data you own stays with the team."
+                confirmLabel="Disable account"
+                confirmationText="DELETE"
+                confirmationValue={deleteConfirmation}
+                confirming={workspaceBusy === 'delete-account'}
+                onConfirmationValueChange={setDeleteConfirmation}
+                onConfirm={() => void handleAccountDeletion()}
+                onCancel={() => {
+                  setDeleteDialogOpen(false);
+                  setDeleteConfirmation('');
+                }}
+              />
             </div>
           ) : (
             <form className="workspace-auth-form" onSubmit={handleAuthSubmit}>

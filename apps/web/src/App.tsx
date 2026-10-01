@@ -284,6 +284,7 @@ import {
 } from './components/WorkloadControlBar';
 import { ResultTabs, type ResultTab } from './components/ResultTabs';
 import { ThemeSwitcher } from './components/ThemeSwitcher';
+import { EmptyState, KpiTile, ProvenancePill } from './components/ui';
 import { TopLoadingBar } from './components/TopLoadingBar';
 import { HOURS_PER_MONTH } from './cost-time';
 import {
@@ -3312,9 +3313,12 @@ function ProviderSummaryCards({
                 ) : null}
               </div>
               {provenance ? (
-                <span className="provider-summary-provenance" title={provenance.detail}>
-                  {provenance.label}
-                </span>
+                <ProvenancePill
+                  provenance="seed"
+                  label={provenance.label}
+                  detail={provenance.detail}
+                  className="provider-summary-provenance"
+                />
               ) : null}
               <strong className="provider-summary-total">
                 {cost !== undefined ? formatCurrency(cost) : 'Unavailable'}
@@ -6465,7 +6469,7 @@ function ExecutiveAnalyticsPreview({
       <ExecutiveBreakEvenTimeline analytics={serverAnalytics} comparison={comparison} />
 
       <div className="executive-stat-grid" aria-label="Executive compact stats">
-        <ExecutiveStatTile
+        <KpiTile
           label="Cheapest provider"
           value={analytics.cheapest ? providerLabel(analytics.cheapest.providerId) : 'Pending'}
           detail={
@@ -6475,7 +6479,7 @@ function ExecutiveAnalyticsPreview({
           }
           providerId={analytics.cheapest?.providerId}
         />
-        <ExecutiveStatTile
+        <KpiTile
           label="90-day forecast"
           value={forecast ? formatCurrency(forecast.ninetyDayRunRateUsd) : 'Pending'}
           detail={
@@ -6485,7 +6489,12 @@ function ExecutiveAnalyticsPreview({
           }
           providerId={forecast?.providerId}
         />
-        <ExecutiveStatTile
+        <KpiTile
+          tone={
+            analytics.annualPotentialSavings !== undefined && analytics.annualPotentialSavings > 0
+              ? 'positive'
+              : 'neutral'
+          }
           label="Potential savings"
           value={
             analytics.annualPotentialSavings !== undefined && analytics.annualPotentialSavings > 0
@@ -6799,10 +6808,10 @@ function ExecutiveBreakEvenTimeline({
           </div>
         </>
       ) : (
-        <div className="executive-chart-empty" role="status">
-          Run a comparison with reserved, Savings Plan, or CUD evidence to populate the ROI
-          timeline.
-        </div>
+        <EmptyState
+          title="No commitment pricing yet"
+          description="Choose a 1- or 3-year commitment scenario to see when it breaks even against on-demand."
+        />
       )}
     </article>
   );
@@ -6945,9 +6954,10 @@ function ExecutiveCostWaterfall({
           </div>
         </div>
       ) : (
-        <div className="executive-chart-empty" role="status">
-          Run a comparison to populate cost composition.
-        </div>
+        <EmptyState
+          title="No cost breakdown yet"
+          description="Run a comparison to see how the lowest-cost option builds up by service."
+        />
       )}
     </article>
   );
@@ -7022,30 +7032,6 @@ function costWaterfallSteps(
       value: roundCurrency(value),
       percent: Math.max(4, Math.min(100, (value / provider.totals.monthly) * 100)),
     }));
-}
-
-function ExecutiveStatTile({
-  detail,
-  label,
-  providerId,
-  value,
-}: {
-  detail: string;
-  label: string;
-  providerId?: ProviderId;
-  value: string;
-}) {
-  return (
-    <article
-      className={
-        providerId ? `executive-stat-tile executive-stat-${providerId}` : 'executive-stat-tile'
-      }
-    >
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <small>{detail}</small>
-    </article>
-  );
 }
 
 function EngineeringAnalyticsDashboard({

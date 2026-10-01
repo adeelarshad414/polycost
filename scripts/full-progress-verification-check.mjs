@@ -2,6 +2,11 @@ import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
+// Installed and generated trees are not project source. Scanning them made the
+// audit depend on local state: a Vite dev-server cache or a workspace-nested
+// dependency containing "720" failed the check on one machine and not another.
+const GENERATED_DIRECTORIES = new Set(['node_modules', 'dist', 'coverage', '.vite', '.tmp']);
+
 const root = process.cwd();
 const failures = [];
 let evidenceAnchors = 0;
@@ -955,6 +960,9 @@ async function listFilesRecursive(directory) {
   for (const entry of entries) {
     const entryPath = path.join(directory, entry.name);
     if (entry.isDirectory()) {
+      if (GENERATED_DIRECTORIES.has(entry.name)) {
+        continue;
+      }
       files.push(...(await listFilesRecursive(entryPath)));
     } else if (/\.(ts|tsx|js|jsx|mjs|cjs|sql|json)$/.test(entry.name)) {
       files.push(entryPath);

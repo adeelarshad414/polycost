@@ -1,0 +1,318 @@
+/*
+  Aurora component styles (UI-2). Every value is a token from tokens.css;
+  stylelint rejects literal colours, sizes, weights and radii here.
+*/
+
+/* Card */
+.ui-card {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  gap: var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--grad-card-sheen);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-2) var(--space-3);
+}
+
+.ui-card-accent {
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.ui-card-accent::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: var(--grad-brand-line);
+}
+
+.ui-card-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.ui-card-heading {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-0-5);
+}
+
+.ui-eyebrow {
+  color: var(--text-muted);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ui-card-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--fs-20);
+  font-weight: var(--fw-semibold);
+  line-height: 1.25;
+}
+
+.ui-card-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+/* KPI tile */
+.ui-kpi {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: var(--space-0-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-2);
+  transition:
+    box-shadow var(--dur-base) var(--ease-standard),
+    transform var(--dur-base) var(--ease-standard);
+}
+
+.ui-kpi:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.ui-kpi-positive {
+  border-color: color-mix(in srgb, var(--success) 22%, var(--border-subtle));
+  background: var(--grad-kpi-positive);
+}
+
+.ui-kpi-attention {
+  border-color: color-mix(in srgb, var(--warning) 22%, var(--border-subtle));
+  background: var(--grad-kpi-attention);
+}
+
+.ui-kpi-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ui-kpi-value {
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--fs-28);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-tight);
+  line-height: 1.1;
+}
+
+.ui-kpi-detail {
+  color: var(--text-secondary);
+  font-size: var(--fs-14);
+  line-height: 1.4;
+}
+
+.ui-kpi-sparkline {
+  margin-top: var(--space-1);
+}
+
+.ui-provider-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+}
+
+.ui-provider-dot-aws {
+  background: var(--provider-aws);
+}
+
+.ui-provider-dot-azure {
+  background: var(--provider-azure);
+}
+
+.ui-provider-dot-gcp {
+  background: var(--provider-gcp);
+}
+
+/* Delta chip */
+.ui-delta {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: var(--space-0-5);
+  border-radius: var(--radius-pill);
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  font-size: var(--fs-12);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-semibold);
+  padding: 2px var(--space-1) 2px var(--space-0-5);
+}
+
+.ui-delta-good {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.ui-delta-bad {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.ui-delta-icon {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.2;
+}
+
+/* Badge and provenance */
+.ui-badge {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: var(--space-0-5);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
+  line-height: 1.4;
+  padding: 1px var(--space-1);
+  white-space: nowrap;
+}
+
+.ui-badge-brand {
+  background: var(--brand-primary-soft);
+  color: var(--brand-primary-text);
+}
+
+.ui-badge-success {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.ui-badge-warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.ui-badge-danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.ui-badge-info {
+  background: var(--info-soft);
+  color: var(--info);
+}
+
+.ui-badge-estimate {
+  border-color: color-mix(in srgb, var(--estimate) 24%, transparent);
+  background: var(--estimate-soft);
+  color: var(--estimate);
+}
+
+.ui-provenance-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+/* Skeleton */
+.ui-skeleton {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.ui-skeleton-line {
+  display: block;
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background: var(--grad-skeleton);
+  background-size: 200% 100%;
+  animation: ui-skeleton-shimmer 1.4s var(--ease-standard) infinite;
+}
+
+.ui-skeleton-line:last-child {
+  width: 62%;
+}
+
+@keyframes ui-skeleton-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
+  }
+}
+
+/* Empty state */
+.ui-empty {
+  display: grid;
+  min-height: 160px;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-1);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--bg-raised) 50%, transparent);
+  padding: var(--space-3);
+  text-align: center;
+}
+
+.ui-empty-icon {
+  display: inline-grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--brand-primary-soft);
+  color: var(--brand-primary-text);
+}
+
+.ui-empty-icon svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.75;
+}
+
+.ui-empty-title {
+  color: var(--text-primary);
+  font-size: var(--fs-16);
+  font-weight: var(--fw-semibold);
+}
+
+.ui-empty-description {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-14);
+  line-height: 1.5;
+}
+
+.ui-empty-action {
+  margin-top: var(--space-1);
+}
