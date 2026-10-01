@@ -44,6 +44,24 @@ test('persists light and dark theme choices across reloads', async ({ page }) =>
   );
 });
 
+test('loads the Aurora brand fonts and follows the OS theme live (UI-1)', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto('/');
+
+  const families = await page.evaluate(async () => {
+    await document.fonts.ready;
+    return [...document.fonts]
+      .filter((face) => face.status === 'loaded')
+      .map((face) => face.family.replace(/["']/g, ''));
+  });
+  expect(families).toEqual(expect.arrayContaining(['Inter Variable', 'Sora Variable']));
+
+  // System is the default choice, so an OS switch repaints without a reload.
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+});
+
 test('compares the default workload on mobile without page-level horizontal overflow', async ({
   page,
 }) => {

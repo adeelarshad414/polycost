@@ -1,11 +1,11 @@
 <svg width="360" height="100" viewBox="0 0 360 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
   <title id="title">PolyCost</title>
   <g aria-hidden="true">
-    <rect x="0" y="46" width="16" height="46" rx="4" fill="#D85A30"/>
-    <rect x="22" y="28" width="16" height="64" rx="4" fill="#378ADD"/>
-    <rect x="44" y="6" width="16" height="86" rx="4" fill="#1D9E75"/>
+    <rect x="0" y="46" width="16" height="46" rx="4" fill="#E98A15"/>
+    <rect x="22" y="28" width="16" height="64" rx="4" fill="#3B6FE8"/>
+    <rect x="44" y="6" width="16" height="86" rx="4" fill="#0F7A43"/>
   </g>
   <text x="112" y="64" font-family="Sora, system-ui, sans-serif" font-size="42" font-weight="500" letter-spacing="0">
-    <tspan fill="#12151C">Poly</tspan><tspan fill="#4D596F">Cost</tspan>
+    <tspan fill="#0F1222">Poly</tspan><tspan fill="#565C74">Cost</tspan>
   </text>
 </svg>

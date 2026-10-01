@@ -6,6 +6,8 @@ const scanRoots = ['apps/web/src'];
 const allowedFiles = new Set([path.normalize('apps/web/src/styles/tokens.css')]);
 const sourceExtensions = new Set(['.css', '.ts', '.tsx']);
 const hexPattern = /#[0-9A-Fa-f]{3,8}\b/g;
+// UI-1: raw functional colours bypassed the hex check (e.g. shadow rgb() literals).
+const functionalColorPattern = /\b(?:rgba?|hsla?)\(/g;
 const findings = [];
 
 for (const scanRoot of scanRoots) {
@@ -41,9 +43,11 @@ async function scanDirectory(directory) {
     }
 
     const source = await readFile(absolutePath, 'utf8');
-    for (const match of source.matchAll(hexPattern)) {
-      const line = source.slice(0, match.index).split('\n').length;
-      findings.push(`${relativePath}:${line}: ${match[0]}`);
+    for (const pattern of [hexPattern, functionalColorPattern]) {
+      for (const match of source.matchAll(pattern)) {
+        const line = source.slice(0, match.index).split('\n').length;
+        findings.push(`${relativePath}:${line}: ${match[0]}`);
+      }
     }
   }
 }

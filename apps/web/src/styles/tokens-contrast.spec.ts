@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-// UX-1 regression guard: muted body text and success text must clear WCAG AA
-// (4.5:1) against every surface in both themes. These tokens previously shipped
-// at ~3:1. Kept as a test (not just a CI script) so a token edit that regresses
-// contrast fails the unit gate.
+// Aurora contrast guard (UI-1): every token that sets text colour must clear
+// WCAG 2.2 AA (4.5:1) on every surface it can sit on, in both themes, and the
+// dark values must be identical under the OS-preference and toggle selectors.
+// Kept as a unit test so a token edit that regresses contrast fails the gate.
 
 const tokensCss = readFileSync(path.join(__dirname, 'tokens.css'), 'utf8');
 
@@ -26,45 +26,82 @@ function contrastRatio(foreground: string, background: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-// tokens.css is ordered: the light block first, then the [data-theme='dark']
-// block. Reading the first vs last occurrence of each token yields the two
-// theme values without a full CSS parser.
-const lightBlock = tokensCss.split("data-theme='dark'")[0];
-const darkBlock = tokensCss.slice(tokensCss.indexOf("data-theme='dark'"));
-
-function tokenValue(block: string, name: string): string {
-  const match = block.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`));
-  if (!match) {
-    throw new Error(`token --${name} not found`);
+/** The body of the first rule whose selector text starts at `marker`. */
+function blockAfter(marker: string): string {
+  const start = tokensCss.indexOf(marker);
+  if (start < 0) {
+    throw new Error(`selector ${marker} not found in tokens.css`);
   }
-  return match[1].toLowerCase();
+  const open = tokensCss.indexOf('{', start);
+  const close = tokensCss.indexOf('\n}', open);
+  return tokensCss.slice(open + 1, close);
 }
 
-// Read the surfaces from the same source of truth rather than hardcoding hex
-// (which would also trip the theme-hex guard that forbids raw hex outside
-// tokens.css).
-const SURFACE_TOKENS = ['surface-canvas', 'surface-card', 'surface-raised'];
-const LIGHT_SURFACES = SURFACE_TOKENS.map((token) => tokenValue(lightBlock, token));
-const DARK_SURFACES = SURFACE_TOKENS.map((token) => tokenValue(darkBlock, token));
+const lightBlock = blockAfter(':root {');
+const mediaDarkBlock = blockAfter(":root:where(:not([data-theme='light']))");
+const toggleDarkBlock = blockAfter(":root[data-theme='dark']");
+
+function hexTokens(block: string): Map<string, string> {
+  return new Map(
+    [...block.matchAll(/--([a-z0-9-]+):\s*(#[0-9a-f]{6})\b/gi)].map((match) => [
+      match[1],
+      match[2].toLowerCase(),
+    ]),
+  );
+}
+
+const light = hexTokens(lightBlock);
+const dark = hexTokens(toggleDarkBlock);
+
+function value(tokens: Map<string, string>, name: string): string {
+  const hex = tokens.get(name);
+  if (!hex) {
+    throw new Error(`token --${name} not found`);
+  }
+  return hex;
+}
+
+const SURFACES = ['bg-canvas', 'bg-surface', 'bg-raised'];
+const TEXT_TOKENS = [
+  'text-primary',
+  'text-secondary',
+  'text-muted',
+  'brand-primary',
+  'brand-primary-text',
+  'success',
+  'warning',
+  'danger',
+  'info',
+  'estimate',
+  'provider-aws-ink',
+  'provider-azure-ink',
+  'provider-gcp-ink',
+];
 const AA_NORMAL = 4.5;
 
-describe('token contrast (WCAG AA)', () => {
-  const cases: Array<{ label: string; token: string; block: string; surfaces: string[] }> = [
-    { label: 'light muted text', token: 'ink-400', block: lightBlock, surfaces: LIGHT_SURFACES },
-    {
-      label: 'light success text',
-      token: 'status-ok',
-      block: lightBlock,
-      surfaces: LIGHT_SURFACES,
-    },
-    { label: 'dark muted text', token: 'ink-400', block: darkBlock, surfaces: DARK_SURFACES },
-    { label: 'dark success text', token: 'status-ok', block: darkBlock, surfaces: DARK_SURFACES },
-  ];
+describe('Aurora token contrast (WCAG 2.2 AA)', () => {
+  const cases = (['light', 'dark'] as const).flatMap((theme) =>
+    TEXT_TOKENS.map((token) => ({ theme, token })),
+  );
 
-  it.each(cases)('$label clears AA on every surface', ({ token, block, surfaces }) => {
-    const color = tokenValue(block, token);
-    for (const surface of surfaces) {
-      expect(contrastRatio(color, surface)).toBeGreaterThanOrEqual(AA_NORMAL);
+  it.each(cases)('$theme --$token clears 4.5:1 on every surface', ({ theme, token }) => {
+    const tokens = theme === 'light' ? light : dark;
+    for (const surface of SURFACES) {
+      expect(contrastRatio(value(tokens, token), value(tokens, surface))).toBeGreaterThanOrEqual(
+        AA_NORMAL,
+      );
     }
+  });
+
+  it.each(['light', 'dark'] as const)('%s --on-brand clears 4.5:1 on the brand fill', (theme) => {
+    const tokens = theme === 'light' ? light : dark;
+    expect(
+      contrastRatio(value(tokens, 'on-brand'), value(tokens, 'brand-primary')),
+    ).toBeGreaterThanOrEqual(AA_NORMAL);
+  });
+
+  it('declares identical dark values for the OS preference and the toggle', () => {
+    expect(hexTokens(mediaDarkBlock)).toEqual(dark);
+    expect(dark.size).toBeGreaterThan(40);
   });
 });

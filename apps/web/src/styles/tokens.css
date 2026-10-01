@@ -1,230 +1,127 @@
-:root,
-:root[data-theme='light'] {
+/*
+  PolyCost "Aurora" design tokens (UI-1).
+
+  Two layers only: raw values live here and nowhere else (scripts/theme-hex-guard.mjs
+  enforces it), and every component reads the semantic names below. Contrast pairs
+  are asserted in tokens-contrast.spec.ts; provider and category hues were chosen
+  with a colour-vision-deficiency validator (see the UI audit, section 10).
+
+  Light is the default. Dark is declared twice with identical values: once for
+  the OS preference, so the page is right before any script runs, and once for
+  the explicit toggle, which always wins in both directions.
+*/
+
+:root {
   color-scheme: light;
-  /* Phase 0 of the interface revamp: the neutral ramp moved from warm cream to a
-     cool ground so the three provider hues read as data rather than decoration.
-     Every value below was checked against all three light surfaces before
-     landing; tokens-contrast.spec.ts holds the line. */
-  --surface-canvas: #f4f5fb;
-  --surface-card: #ffffff;
-  --surface-raised: #e8eaf4;
-  --border-default: #e2e5ef;
-  --border-strong: #ced3e2;
-  --ink-900: #14181f;
-  --ink-600: #4a5262;
-  /* Clears WCAG AA (4.5:1) as muted body text on canvas, card and raised. */
-  --ink-400: #5b6273;
-  /* Clears AA as success text on light surfaces. Was #2e9e76 ≈ 3:1. */
-  --status-ok: #217255;
-  --status-warn: #b45309;
-  --status-crit: #c93338;
-  /* The vendors' published brand values, matching the PDF and XLSX exports. A
-     reader identifies a provider by colour, so an approximation is a defect.
-     Google green rather than Google blue: #4285F4 sits almost on top of Azure's
-     #027DFF, and telling the three apart is the whole job of a comparison. */
-  --aws: #ff9900;
-  --azure: #027dff;
-  --gcp: #34a853;
-  /* Text-safe pairs. The fills above are for bars, chips and tints; at body size
-     on a light surface they fail AA, so anything that sets `color` uses these. */
-  --aws-ink: #8a5200;
-  --azure-ink: #0b63c5;
-  --gcp-ink: #1a7030;
-  --brand-600: #4f4fd4;
-  --brand-500: #6060e0;
-  --brand-400: #8b8bea;
-  --brand-100: rgb(79 79 212 / 14%);
-  --brand-50: rgb(79 79 212 / 7%);
-  --brand-text: #4a4ac9;
-  /* Money is the subject of this product, so it gets its own scale rather than
-     borrowing body sizes. Tabular figures keep columns aligned. */
-  --num-display: 3.25rem;
-  --num-display-tracking: -0.03em;
-  --num-hero: 2rem;
-  --num-strong: 1.25rem;
-
-  /* Elevation by role. One radius and one shadow stamped on every block flattens
-     the hierarchy; these separate the hero from a card from a control. */
-  --radius-hero: 16px;
-  --radius-card: 12px;
-  --radius-control: 8px;
-  --radius-pill: 999px;
-  /* Shadows carry a little of the brand hue rather than being neutral grey.
-     A grey drop shadow is what you get by not choosing; tinting it toward the
-     surface's own accent is the difference between a default and a decision.
-     Kept low-saturation so it reads as depth, not as a coloured glow. */
-  --shadow-hero: 0 18px 40px -18px rgb(38 34 82 / 30%);
-  --shadow-card: 0 2px 10px -4px rgb(38 34 82 / 14%);
-  --shadow-card-raised: 0 10px 26px -12px rgb(38 34 82 / 26%);
-  --shadow-control: 0 1px 2px rgb(38 34 82 / 8%);
-
+  --bg-canvas: #f5f6fb;
+  --bg-surface: #ffffff;
+  --bg-raised: #eef0f8;
+  --bg-sunken: #e9ebf4;
+  --border-subtle: #e4e7f0;
+  --border-strong: #cdd2e1;
+  --text-primary: #0f1222;
+  --text-secondary: #2e3348;
+  --text-muted: #565c74;
+  --brand-primary: #4f46e5;
+  --brand-primary-hover: #4338ca;
+  --brand-primary-active: #3730a3;
+  --brand-primary-text: #4338ca;
+  --brand-primary-subtle: #818cf8;
+  --brand-violet: #7c3aed;
+  --brand-magenta: #db2777;
+  --brand-cyan: #0891b2;
   --on-brand: #ffffff;
-  --pc-ink-50: #f7f8fa;
-  --pc-ink-100: var(--surface-raised);
-  --pc-ink-200: #dde3ea;
-  --pc-ink-300: #c2cad6;
-  --pc-ink-400: #97a2b5;
-  --pc-ink-500: #6b7790;
-  --pc-ink-600: #4d596f;
-  --pc-ink-700: #353e50;
-  --pc-ink-800: #212733;
-  --pc-ink-900: #12151c;
-  --surface-0: var(--surface-canvas);
-  --surface-1: var(--surface-card);
-  --border: var(--border-default);
-  --text-primary: var(--ink-900);
-  --text-secondary: var(--ink-600);
-  --text-muted: var(--ink-400);
-  --primary-action: var(--brand-500);
-  --primary-action-hover: var(--brand-600);
-  --primary-action-active: #57319f;
-  --destructive: var(--status-crit);
-  --destructive-hover: #a62b30;
-  --destructive-active: #852126;
-  --success-text: var(--status-ok);
-  --warning-text: var(--status-warn);
-  --inverted-action-hover: #353533;
-  --aws-label-tint: #993c1d;
-  --azure-label-tint: #185fa5;
-  --gcp-label-tint: #0f6e56;
-  --on-primary-action: var(--on-brand);
-  --brand-orange: var(--aws);
-  --brand-blue: var(--azure);
-  --brand-green: var(--gcp);
-  /* Text-safe aliases. The plain --brand-* values are the vendors' real fills,
-     which fail AA at body size; anything setting `color` uses these instead. */
-  --brand-orange-ink: var(--aws-ink);
-  --brand-blue-ink: var(--azure-ink);
-  --brand-green-ink: var(--gcp-ink);
-  /* Card tints. A provider card carried a 4px coloured top border, which the UI
-     scanner flags and which reads as a rail bolted onto a rounded box. A wash of
-     the brand hue identifies the vendor without the hardware. */
-  --aws-tint: #fff6e8;
-  --azure-tint: #e9f2ff;
-  --gcp-tint: #e9f5ec;
-  /* Service-category hues for the cost-by-service bars. Seven categories need a
-     qualitative set, not a ramp: adjacent bars must be told apart, and a
-     sequential scale would imply an order the categories do not have. */
-  --category-compute: #4f4fd4;
-  --category-storage: #b26a00;
-  --category-database: #217455;
-  --category-network: #b3261e;
-  --category-support: #1392d3;
-  --category-licensing: #7a3fb0;
-  --category-operations: #5b6273;
-  --brand-orange-dark: #e2783f;
-  --brand-blue-dark: #5ba3e8;
-  --brand-green-dark: #3fbe8e;
-  --pc-landing-bg: var(--surface-0);
-  --pc-landing-surface-1: var(--surface-1);
-  --pc-landing-border: var(--border);
-  --pc-landing-border-strong: var(--border-strong);
-  --pc-landing-text-primary: var(--text-primary);
-  --pc-landing-text-secondary: var(--text-secondary);
-  --pc-landing-text-muted: var(--text-muted);
-  --pc-landing-primary-action: var(--primary-action);
-  --pc-landing-destructive: var(--destructive);
-  --pc-landing-aws-label: var(--aws-label-tint);
-  --pc-landing-azure-label: var(--azure-label-tint);
-  --pc-landing-gcp-label: var(--gcp-label-tint);
-  --pc-landing-cost-down: var(--success-text);
-  --pc-landing-cost-up: var(--warning-text);
-  --pc-brand-accent: var(--primary-action);
-  --pc-brand-accent-hover: var(--primary-action-hover);
-  --pc-brand-accent-soft: var(--brand-50);
-  --pc-action-primary: var(--primary-action);
-  --pc-action-primary-hover: var(--pc-brand-accent-hover);
-  --pc-action-primary-soft: var(--pc-brand-accent-soft);
-  --pc-success: var(--success-text);
-  --pc-success-soft: rgb(46 158 118 / 14%);
-  --pc-warning: var(--warning-text);
-  --pc-warning-soft: rgb(180 83 9 / 14%);
-  --pc-error: var(--destructive);
-  --pc-error-soft: rgb(201 51 56 / 13%);
-  --pc-info: var(--brand-text);
-  --pc-info-soft: var(--brand-50);
-  --pc-provider-aws: var(--brand-orange);
-  --pc-provider-azure: var(--brand-blue);
-  --pc-provider-gcp: var(--brand-green);
-  --pc-provider-aws-on-solid: #0b0e14;
-  --pc-provider-azure-on-solid: #0b0e14;
-  --pc-provider-gcp-on-solid: #0b0e14;
-  --pc-provider-gcp-blue: var(--brand-blue);
-  --pc-provider-gcp-red: #ea4335;
-  --pc-provider-gcp-yellow: #fbbc04;
-  --pc-provider-aws-soft: rgb(216 90 48 / 12%);
-  --pc-provider-azure-soft: rgb(55 138 221 / 12%);
-  --pc-provider-gcp-soft: rgb(29 158 117 / 12%);
-  --pc-bg-canvas: var(--surface-0);
-  --pc-bg-surface: var(--surface-1);
-  --pc-bg-surface-2: var(--surface-raised);
-  --pc-border: var(--border);
-  --pc-border-strong: var(--border-strong);
-  --pc-text-primary: var(--text-primary);
-  --pc-text-secondary: var(--text-secondary);
-  --pc-text-tertiary: var(--text-muted);
-  --pc-font-display: Sora, system-ui, sans-serif;
-  --pc-font-body: Inter, system-ui, sans-serif;
-  --pc-font-mono: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
-  --pc-text-xs: 0.75rem;
-  --pc-text-sm: 0.875rem;
-  --pc-text-base: 1rem;
-  --pc-text-lg: 1.25rem;
-  --pc-text-xl: 1.5625rem;
-  --pc-text-2xl: 1.953rem;
-  --pc-text-3xl: 2.441rem;
-  --pc-space-0-5: 4px;
-  --pc-space-1: 8px;
-  --pc-space-2: 16px;
-  --pc-space-3: 24px;
-  --pc-space-4: 32px;
-  --pc-space-6: 48px;
-  --pc-space-8: 64px;
-  --pc-radius-card: 12px;
-  --pc-shadow-soft: 0 1px 2px rgb(18 21 28 / 5%), 0 10px 28px rgb(18 21 28 / 7%);
-  --pc-shadow-card: 0 1px 2px rgb(18 21 28 / 6%), 0 18px 42px rgb(18 21 28 / 8%);
-  --pc-shadow-strong: 0 18px 54px rgb(18 21 28 / 12%);
-  --pc-focus-ring: color-mix(in srgb, var(--pc-action-primary) 22%, transparent);
-  --pc-chart-grid: color-mix(in srgb, var(--pc-border-strong) 58%, transparent);
-  --pc-chart-hover: color-mix(in srgb, var(--pc-border) 48%, transparent);
-  --pc-bg: var(--pc-bg-canvas);
-  --pc-danger: var(--pc-error);
-  --color-bg-base: var(--pc-bg-canvas);
-  --color-bg-surface: var(--pc-bg-surface);
-  --color-bg-elevated: color-mix(in srgb, var(--pc-bg-surface) 86%, var(--pc-bg-surface-2));
-  --color-bg-overlay: color-mix(in srgb, var(--pc-bg-surface-2) 72%, var(--pc-bg-surface));
-  --color-bg-subtle: color-mix(in srgb, var(--pc-bg-surface-2) 58%, var(--pc-bg-surface));
-  --color-text-primary: var(--pc-text-primary);
-  --color-text-secondary: var(--pc-text-secondary);
-  --color-text-tertiary: var(--pc-text-tertiary);
-  --color-text-inverse: var(--on-primary-action);
-  --color-border-default: var(--pc-border);
-  --color-border-subtle: color-mix(in srgb, var(--pc-border) 66%, transparent);
-  --color-border-strong: var(--pc-border-strong);
-  --color-border-focus: var(--pc-action-primary);
-  --color-action-primary: var(--pc-action-primary);
-  --color-action-primary-hover: var(--primary-action-hover);
-  --color-action-primary-active: var(--primary-action-active);
-  --color-action-primary-muted: var(--pc-action-primary-soft);
-  --color-aws: var(--brand-orange);
-  --color-aws-bright: var(--brand-orange-dark);
-  --color-aws-muted: color-mix(in srgb, var(--brand-orange) 12%, transparent);
-  --color-azure: var(--brand-blue);
-  --color-azure-bright: var(--brand-blue-dark);
-  --color-azure-muted: color-mix(in srgb, var(--brand-blue) 12%, transparent);
-  --color-gcp: var(--brand-green);
-  --color-gcp-bright: var(--brand-green-dark);
-  --color-gcp-muted: color-mix(in srgb, var(--brand-green) 12%, transparent);
-  --color-success: var(--pc-success);
-  --color-success-muted: var(--pc-success-soft);
-  --color-warning: var(--pc-warning);
-  --color-warning-muted: var(--pc-warning-soft);
-  --color-error: var(--pc-error);
-  --color-error-muted: var(--pc-error-soft);
-  --color-info: var(--pc-info);
-  --color-info-muted: var(--pc-info-soft);
-  --color-estimate: var(--brand-text);
-  --color-estimate-muted: color-mix(in srgb, var(--color-estimate) 12%, transparent);
+  --success: #047857;
+  --warning: #a14a08;
+  --danger: #c2263b;
+  --info: #0369a1;
+  --estimate: #6d28d9;
+  --danger-hover: #a51f32;
+  --danger-active: #861a29;
+  --success-soft: #e7f6f0;
+  --warning-soft: #fdf3e6;
+  --danger-soft: #fcecee;
+  --info-soft: #e6f2fa;
+  --estimate-soft: #f1ecfd;
+  --provider-aws: #e98a15;
+  --provider-azure: #3b6fe8;
+  --provider-gcp: #0f7a43;
+  --provider-aws-ink: #9a4f00;
+  --provider-azure-ink: #1d4ed8;
+  --provider-gcp-ink: #0b6b3a;
+  --provider-aws-tint: #fdf1e3;
+  --provider-azure-tint: #e8effd;
+  --provider-gcp-tint: #e4f4eb;
+  --provider-on-solid: #0a0b14;
+  --provider-gcp-logo-blue: #4285f4;
+  --cat-compute: #4a3aa7;
+  --cat-storage: #1baf7a;
+  --cat-database: #eda100;
+  --cat-network: #e87ba4;
+  --cat-support: #008300;
+  --cat-licensing: #2a78d6;
+  --cat-operations: #eb6834;
+
+  /* Soft washes derived from the solid tokens so both themes stay in step. */
+  --brand-primary-soft: color-mix(in srgb, var(--brand-primary) 9%, transparent);
+  --brand-primary-soft-strong: color-mix(in srgb, var(--brand-primary) 16%, transparent);
+  --provider-aws-soft: color-mix(in srgb, var(--provider-aws) 12%, transparent);
+  --provider-azure-soft: color-mix(in srgb, var(--provider-azure) 12%, transparent);
+  --provider-gcp-soft: color-mix(in srgb, var(--provider-gcp) 12%, transparent);
+  --focus-ring: color-mix(in srgb, var(--brand-primary) 45%, transparent);
+  --chart-grid: color-mix(in srgb, var(--border-strong) 60%, transparent);
+  --chart-hover: color-mix(in srgb, var(--border-subtle) 50%, transparent);
+
+  /* Gradients. Text sits only on --grad-cta (white on #4f46e5 6.3:1, on #7c3aed 5.7:1).
+     Never a gradient across provider colours or inside a single-value bar. */
+  --grad-cta: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-violet) 100%);
+  --grad-cta-hover: linear-gradient(135deg, var(--brand-primary-hover) 0%, #6d28d9 100%);
+  --grad-brand-line: linear-gradient(
+    90deg,
+    var(--brand-primary),
+    var(--brand-violet) 45%,
+    var(--brand-magenta) 75%,
+    var(--brand-cyan)
+  );
+  --grad-hero-mesh:
+    radial-gradient(60% 50% at 15% 10%, #c7d2fe 0%, transparent 60%),
+    radial-gradient(50% 45% at 85% 5%, #f5d0fe 0%, transparent 60%),
+    radial-gradient(55% 50% at 50% 100%, #a5f3fc 0%, transparent 65%), var(--bg-canvas);
+  --grad-card-sheen: linear-gradient(180deg, #ffffff 0%, #f8f9fe 100%);
+  --grad-glass: rgb(255 255 255 / 72%);
+  --grad-kpi-positive: linear-gradient(135deg, #ecfdf5, #e0f2fe);
+  --grad-kpi-attention: linear-gradient(135deg, #fffbeb, #fdf2f8);
+  --grad-skeleton: linear-gradient(90deg, var(--bg-raised) 0%, #f7f8fc 50%, var(--bg-raised) 100%);
+
+  /* Elevation carries a little of the brand hue in light mode. */
+  --shadow-sm: 0 1px 2px rgb(15 18 34 / 6%);
+  --shadow-md: 0 8px 24px -8px rgb(49 46 129 / 16%);
+  --shadow-lg: 0 24px 48px -16px rgb(49 46 129 / 24%);
+  --shadow-glow-brand: 0 8px 28px -6px rgb(79 70 229 / 45%);
+  --shadow-focus: 0 0 0 3px var(--focus-ring);
+  --shadow-color: rgb(15 18 34 / 12%);
+  --shadow-inset: inset 0 1px 2px rgb(15 18 34 / 8%);
+  --shadow-inset-highlight: inset 0 1px 0 rgb(255 255 255 / 50%);
+
+  /* Typography. Fonts are self-hosted (see main.tsx). */
+  --font-display: 'Sora Variable', Sora, system-ui, sans-serif;
+  --font-body: 'Inter Variable', Inter, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+  --fs-12: 0.75rem;
+  --fs-14: 0.875rem;
+  --fs-16: 1rem;
+  --fs-20: 1.25rem;
+  --fs-28: 1.75rem;
+  --fs-36: 2.25rem;
+  --fs-48: 3rem;
+  --fs-56: 3.5rem;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --tracking-tight: -0.03em;
+
+  /* Spacing (8px grid) */
   --space-0-25: 2px;
   --space-0-5: 4px;
   --space-1: 8px;
@@ -236,92 +133,172 @@
   --space-5: 40px;
   --space-6: 48px;
   --space-8: 64px;
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-full: 9999px;
-  --shadow-sm: var(--pc-shadow-soft);
-  --shadow-md: var(--pc-shadow-card);
-  --shadow-lg: var(--pc-shadow-strong);
-  --shadow-glow-aws: 0 0 20px color-mix(in srgb, var(--brand-orange) 16%, transparent);
-  --shadow-glow-azure: 0 0 20px color-mix(in srgb, var(--brand-blue) 16%, transparent);
-  --shadow-glow-gcp: 0 0 20px color-mix(in srgb, var(--brand-green) 16%, transparent);
+
+  /* Radius */
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-control: 10px;
+  --radius-card: 16px;
+  --radius-hero: 24px;
+  --radius-pill: 999px;
+
+  /* Motion */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) {
+    color-scheme: dark;
+    --bg-canvas: #0a0b14;
+    --bg-surface: #12141f;
+    --bg-raised: #1b1e2d;
+    --bg-sunken: #07080f;
+    --border-subtle: #232738;
+    --border-strong: #343a52;
+    --text-primary: #eef0f8;
+    --text-secondary: #b8bdd0;
+    --text-muted: #8c92a9;
+    --brand-primary: #818cf8;
+    --brand-primary-hover: #a5b4fc;
+    --brand-primary-active: #c7d2fe;
+    --brand-primary-text: #a5b4fc;
+    --brand-primary-subtle: #6366f1;
+    --brand-violet: #a78bfa;
+    --brand-magenta: #f472b6;
+    --brand-cyan: #22d3ee;
+    --on-brand: #0a0b14;
+    --success: #34d399;
+    --warning: #fbbf24;
+    --danger: #f87171;
+    --info: #38bdf8;
+    --estimate: #c4b5fd;
+    --danger-hover: #fca5a5;
+    --danger-active: #fecaca;
+    --success-soft: #0e2a22;
+    --warning-soft: #2e230c;
+    --danger-soft: #2f1519;
+    --info-soft: #0c2432;
+    --estimate-soft: #1f1836;
+    --provider-aws: #d07a1a;
+    --provider-azure: #5b86f0;
+    --provider-gcp: #0f8f6e;
+    --provider-aws-ink: #f5a54a;
+    --provider-azure-ink: #8ab0ff;
+    --provider-gcp-ink: #4fd1a1;
+    --provider-aws-tint: #2a1e10;
+    --provider-azure-tint: #111e3a;
+    --provider-gcp-tint: #0d2a20;
+    --provider-on-solid: #0a0b14;
+    --provider-gcp-logo-blue: #8ab4f8;
+    --cat-compute: #9085e9;
+    --cat-storage: #199e70;
+    --cat-database: #c98500;
+    --cat-network: #d55181;
+    --cat-support: #008300;
+    --cat-licensing: #3987e5;
+    --cat-operations: #d95926;
+
+    --grad-cta-hover: linear-gradient(135deg, var(--brand-primary-hover) 0%, #c4b5fd 100%);
+    --grad-hero-mesh:
+      radial-gradient(60% 50% at 15% 10%, #312e81 0%, transparent 60%),
+      radial-gradient(50% 45% at 85% 5%, #701a75 0%, transparent 60%),
+      radial-gradient(55% 50% at 50% 100%, #164e63 0%, transparent 65%), var(--bg-canvas);
+    --grad-card-sheen: linear-gradient(180deg, #161927 0%, #12141f 100%);
+    --grad-glass: rgb(18 20 31 / 70%);
+    --grad-kpi-positive: linear-gradient(135deg, #0b2a22, #0c2432);
+    --grad-kpi-attention: linear-gradient(135deg, #2e230c, #2a1424);
+    --grad-skeleton: linear-gradient(
+      90deg,
+      var(--bg-raised) 0%,
+      #23273a 50%,
+      var(--bg-raised) 100%
+    );
+    --focus-ring: color-mix(in srgb, var(--brand-primary) 55%, transparent);
+    --chart-grid: color-mix(in srgb, var(--border-strong) 64%, transparent);
+    --chart-hover: color-mix(in srgb, var(--border-strong) 42%, transparent);
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+    --shadow-md: 0 8px 24px -8px rgb(0 0 0 / 50%);
+    --shadow-lg: 0 24px 48px -16px rgb(0 0 0 / 60%);
+    --shadow-glow-brand: 0 8px 28px -6px rgb(129 140 248 / 35%);
+    --shadow-color: rgb(0 0 0 / 40%);
+    --shadow-inset: inset 0 1px 2px rgb(0 0 0 / 35%);
+    --shadow-inset-highlight: inset 0 1px 0 rgb(255 255 255 / 4%);
+  }
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --surface-canvas: #0b0e14;
-  --surface-card: #141824;
-  --surface-raised: #1b2130;
-  --border-default: #232a3b;
-  --border-strong: #2f3850;
-  --ink-900: #edeff5;
-  --ink-600: #9aa1b2;
-  /* Lightened to clear WCAG AA (4.5:1) as muted body text on all dark surfaces.
-     Was #646c80 ≈ 3.1-3.7:1 (UX-1). Dark --status-ok already passes (>6:1). */
-  --ink-400: #868da2;
-  --status-ok: #3fb68b;
-  --status-warn: #f59e0b;
-  --status-crit: #e5484d;
-  /* Provider fills carry over from the light block unchanged - a brand colour is
-     the same colour on either ground - but the text-safe pairs must lighten. */
-  --aws-ink: #ffb84d;
-  --azure-ink: #7cbcff;
-  --gcp-ink: #6ede8c;
-  /* On a dark ground a pale wash would glow; these are the hue at low lightness. */
-  --aws-tint: #2a2013;
-  --azure-tint: #10203a;
-  --gcp-tint: #14271a;
-  --category-compute: #9d9dfa;
-  --category-storage: #e8a94a;
-  --category-database: #6cc9a4;
-  --category-network: #f2726b;
-  --category-support: #67c4ee;
-  --category-licensing: #bb8fe0;
-  --category-operations: #98a1b3;
-  /* Dark stays near-black rather than brand-tinted: on a dark ground a coloured
-     shadow reads as a glow, which is the opposite of depth. Only the raised
-     variant is added, to match the light theme's hover lift. */
-  --shadow-hero: 0 18px 40px -18px rgb(0 0 0 / 60%);
-  --shadow-card: 0 2px 10px -4px rgb(0 0 0 / 45%);
-  --shadow-card-raised: 0 10px 26px -12px rgb(0 0 0 / 58%);
-  --shadow-control: 0 1px 2px rgb(0 0 0 / 35%);
-  --brand-600: #7b7bf0;
-  --brand-500: #9d9dfa;
-  --brand-400: #b6b6fc;
-  --brand-100: rgb(157 157 250 / 18%);
-  --brand-50: rgb(157 157 250 / 8%);
-  --brand-text: #b6b6fc;
-  --on-brand: #0b0e14;
-  --pc-ink-100: #1b2130;
-  --pc-ink-700: #353e50;
-  --pc-bg-surface-2: var(--surface-raised);
-  --primary-action-active: #7b4fc2;
-  --destructive-hover: #c93f3f;
-  --destructive-active: #b33636;
-  --inverted-action-hover: #ffffff;
-  --brand-orange-dark: #e2783f;
-  --brand-blue-dark: #5ba3e8;
-  --brand-green-dark: #3fbe8e;
-  --aws-label-tint: #e2a088;
-  --azure-label-tint: #8fb8e8;
-  --gcp-label-tint: #7fcbaa;
-  --pc-provider-gcp-blue: var(--brand-blue);
-  --pc-provider-gcp-red: #ff7b72;
-  --pc-provider-gcp-yellow: #ffd666;
-  --pc-provider-aws-soft: rgb(216 90 48 / 16%);
-  --pc-provider-azure-soft: rgb(55 138 221 / 16%);
-  --pc-provider-gcp-soft: rgb(29 158 117 / 16%);
-  --pc-success-soft: rgb(63 182 139 / 16%);
-  --pc-warning-soft: rgb(245 158 11 / 16%);
-  --pc-error-soft: rgb(229 72 77 / 16%);
-  --pc-info-soft: var(--brand-50);
-  --pc-shadow-soft: 0 1px 2px rgb(0 0 0 / 22%), 0 14px 38px rgb(0 0 0 / 25%);
-  --pc-shadow-card: 0 1px 2px rgb(0 0 0 / 26%), 0 22px 50px rgb(0 0 0 / 28%);
-  --pc-shadow-strong: 0 24px 68px rgb(0 0 0 / 34%);
-  --pc-focus-ring: color-mix(in srgb, var(--pc-action-primary) 28%, transparent);
-  --pc-chart-grid: color-mix(in srgb, var(--pc-border-strong) 64%, transparent);
-  --pc-chart-hover: color-mix(in srgb, var(--pc-border-strong) 42%, transparent);
+  --bg-canvas: #0a0b14;
+  --bg-surface: #12141f;
+  --bg-raised: #1b1e2d;
+  --bg-sunken: #07080f;
+  --border-subtle: #232738;
+  --border-strong: #343a52;
+  --text-primary: #eef0f8;
+  --text-secondary: #b8bdd0;
+  --text-muted: #8c92a9;
+  --brand-primary: #818cf8;
+  --brand-primary-hover: #a5b4fc;
+  --brand-primary-active: #c7d2fe;
+  --brand-primary-text: #a5b4fc;
+  --brand-primary-subtle: #6366f1;
+  --brand-violet: #a78bfa;
+  --brand-magenta: #f472b6;
+  --brand-cyan: #22d3ee;
+  --on-brand: #0a0b14;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --info: #38bdf8;
+  --estimate: #c4b5fd;
+  --danger-hover: #fca5a5;
+  --danger-active: #fecaca;
+  --success-soft: #0e2a22;
+  --warning-soft: #2e230c;
+  --danger-soft: #2f1519;
+  --info-soft: #0c2432;
+  --estimate-soft: #1f1836;
+  --provider-aws: #d07a1a;
+  --provider-azure: #5b86f0;
+  --provider-gcp: #0f8f6e;
+  --provider-aws-ink: #f5a54a;
+  --provider-azure-ink: #8ab0ff;
+  --provider-gcp-ink: #4fd1a1;
+  --provider-aws-tint: #2a1e10;
+  --provider-azure-tint: #111e3a;
+  --provider-gcp-tint: #0d2a20;
+  --provider-on-solid: #0a0b14;
+  --provider-gcp-logo-blue: #8ab4f8;
+  --cat-compute: #9085e9;
+  --cat-storage: #199e70;
+  --cat-database: #c98500;
+  --cat-network: #d55181;
+  --cat-support: #008300;
+  --cat-licensing: #3987e5;
+  --cat-operations: #d95926;
+
+  --grad-cta-hover: linear-gradient(135deg, var(--brand-primary-hover) 0%, #c4b5fd 100%);
+  --grad-hero-mesh:
+    radial-gradient(60% 50% at 15% 10%, #312e81 0%, transparent 60%),
+    radial-gradient(50% 45% at 85% 5%, #701a75 0%, transparent 60%),
+    radial-gradient(55% 50% at 50% 100%, #164e63 0%, transparent 65%), var(--bg-canvas);
+  --grad-card-sheen: linear-gradient(180deg, #161927 0%, #12141f 100%);
+  --grad-glass: rgb(18 20 31 / 70%);
+  --grad-kpi-positive: linear-gradient(135deg, #0b2a22, #0c2432);
+  --grad-kpi-attention: linear-gradient(135deg, #2e230c, #2a1424);
+  --grad-skeleton: linear-gradient(90deg, var(--bg-raised) 0%, #23273a 50%, var(--bg-raised) 100%);
+  --focus-ring: color-mix(in srgb, var(--brand-primary) 55%, transparent);
+  --chart-grid: color-mix(in srgb, var(--border-strong) 64%, transparent);
+  --chart-hover: color-mix(in srgb, var(--border-strong) 42%, transparent);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-md: 0 8px 24px -8px rgb(0 0 0 / 50%);
+  --shadow-lg: 0 24px 48px -16px rgb(0 0 0 / 60%);
+  --shadow-glow-brand: 0 8px 28px -6px rgb(129 140 248 / 35%);
+  --shadow-color: rgb(0 0 0 / 40%);
+  --shadow-inset: inset 0 1px 2px rgb(0 0 0 / 35%);
+  --shadow-inset-highlight: inset 0 1px 0 rgb(255 255 255 / 4%);
 }
