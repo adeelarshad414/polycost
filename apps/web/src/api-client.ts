@@ -206,6 +206,7 @@ export interface PolyCostClient {
     region?: string;
     options?: TerraformGenerateOptions;
   }): Promise<TerraformGenerationResult>;
+  getComparison(comparisonId: string): Promise<ComparisonResult>;
   getComparisonAnalytics(comparisonId: string): Promise<ComparisonAnalyticsResponse>;
   getComparisonPricingEvidence(comparisonId: string): Promise<ComparisonPricingEvidenceResponse>;
   refreshLiveComparison(comparisonId: string): Promise<ComparisonResult>;
@@ -639,6 +640,12 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         method: 'POST',
         body: JSON.stringify(input),
       });
+    },
+    getComparison(comparisonId) {
+      return requestJson<ComparisonResult>(
+        baseUrl,
+        `/comparisons/${encodeURIComponent(comparisonId)}`,
+      );
     },
     getComparisonAnalytics(comparisonId) {
       return requestJson<ComparisonAnalyticsResponse>(

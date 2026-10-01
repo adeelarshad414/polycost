@@ -272,7 +272,7 @@ describe('App', () => {
     await settleAsyncEffects();
 
     expect(client.createComparison).toHaveBeenCalled();
-    expect(text(container)).toContain('GCP leads at $30.00');
+    expect(text(container)).toContain('GCP is the lowest-cost option for this workload');
 
     unmount();
   });
@@ -4559,6 +4559,7 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     validateWorkload: jest.fn(async () => ({ valid: true as const })),
     createComparison: jest.fn(async () => comparisonResult),
     generateTerraform: jest.fn(async () => terraformBundle),
+    getComparison: jest.fn(async () => comparisonResult),
     getComparisonAnalytics: jest.fn(async () => ({
       comparisonId: comparisonResult.comparisonId,
       generatedAt: '2026-07-02T12:00:00.000Z',

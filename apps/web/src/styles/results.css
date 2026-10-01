@@ -1,0 +1,213 @@
+/*
+  Answer-first results (UI-4). The verdict, key figures and sorted comparison
+  lead; evidence sits in one disclosure below. Tokens only.
+*/
+
+.verdict-section {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-2);
+}
+
+.verdict-hero {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-hero);
+  background: var(--grad-hero-mesh);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-4);
+}
+
+.verdict-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: var(--grad-brand-line);
+}
+
+.verdict-copy {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-1);
+}
+
+.verdict-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-secondary);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.verdict-title {
+  max-width: 40ch;
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: clamp(var(--fs-20), 2.4vw, var(--fs-28));
+  font-weight: var(--fw-semibold);
+  line-height: 1.2;
+}
+
+.verdict-price {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-16);
+}
+
+.verdict-price strong {
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: clamp(var(--fs-36), 5vw, var(--fs-56));
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-tight);
+  line-height: 1;
+}
+
+.verdict-deltas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.verdict-trust {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-0-5);
+}
+
+.verdict-actions {
+  min-width: 0;
+  border-top: 1px solid color-mix(in srgb, var(--border-strong) 60%, transparent);
+  padding-top: var(--space-2);
+}
+
+/* Quick actions become the hero's action cluster. */
+.result-quick-actions.is-compact {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+.result-quick-actions.is-compact::before {
+  display: none;
+}
+
+.result-quick-actions.is-compact .result-quick-actions-copy {
+  color: var(--text-secondary);
+  font-size: var(--fs-12);
+}
+
+.verdict-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: var(--space-2);
+}
+
+.verdict-chart-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+  gap: var(--space-2);
+}
+
+/* Evidence disclosure */
+.evidence-disclosure {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.evidence-disclosure > summary {
+  display: grid;
+  gap: 2px;
+  cursor: pointer;
+  list-style: none;
+  padding: var(--space-2) var(--space-3);
+}
+
+.evidence-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.evidence-disclosure > summary:focus-visible {
+  border-radius: var(--radius-card);
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+.evidence-summary-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-primary);
+  font-size: var(--fs-16);
+  font-weight: var(--fw-semibold);
+}
+
+.evidence-summary-title::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--dur-base) var(--ease-standard);
+}
+
+.evidence-disclosure[open] .evidence-summary-title::before {
+  transform: rotate(45deg);
+}
+
+.evidence-summary-hint {
+  color: var(--text-muted);
+  font-size: var(--fs-14);
+}
+
+.evidence-body {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  padding: var(--space-3);
+}
+
+@media (max-width: 720px) {
+  .verdict-hero {
+    padding: var(--space-3);
+  }
+
+  .evidence-body {
+    padding: var(--space-2);
+  }
+}
+
+@media print {
+  /* Printed reports carry the evidence expanded. */
+  .evidence-disclosure > summary {
+    display: none;
+  }
+
+  .evidence-body {
+    display: grid !important;
+    border-top: 0;
+  }
+}

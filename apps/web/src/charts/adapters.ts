@@ -1,13 +1,35 @@
-import type { ComparisonResult } from '../types';
+import type { ComparisonResult, CostIntervals } from '../types';
 import type { CategoryValue, ChartProviderId, ProviderQuote } from './models';
 
 const PROVIDERS: ChartProviderId[] = ['aws', 'azure', 'gcp'];
 
-/** Monthly quote per provider; a provider missing from the result is unpriced. */
-export function comparisonQuotes(comparison: ComparisonResult | null): ProviderQuote[] {
+export type QuoteInterval = Exclude<keyof CostIntervals, 'hourly'>;
+
+const INTERVAL_PERIOD = new Map<QuoteInterval, string>([
+  ['daily', 'day'],
+  ['weekly', 'week'],
+  ['monthly', 'month'],
+  ['quarterly', 'quarter'],
+  ['yearly', 'year'],
+]);
+
+/** The unit a chart states for an interval, e.g. "yearly" is "year". */
+export function intervalPeriod(interval: QuoteInterval): string {
+  return INTERVAL_PERIOD.get(interval) ?? 'month';
+}
+
+/** One quote per provider for the interval; a provider missing from the result is unpriced. */
+export function comparisonQuotes(
+  comparison: ComparisonResult | null,
+  interval: QuoteInterval = 'monthly',
+): ProviderQuote[] {
   return PROVIDERS.map((providerId) => {
     const provider = comparison?.providers.find((entry) => entry.providerId === providerId);
-    return { providerId, value: provider?.totals.monthly };
+    if (!provider) {
+      return { providerId, value: undefined };
+    }
+    const totals = new Map(Object.entries(provider.totals));
+    return { providerId, value: totals.get(interval) };
   });
 }
 

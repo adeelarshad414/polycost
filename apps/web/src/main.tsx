@@ -12,6 +12,7 @@ import './styles/tokens.css';
 import './styles.css';
 import './styles/components.css';
 import './styles/charts.css';
+import './styles/results.css';
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

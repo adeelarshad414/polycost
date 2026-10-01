@@ -7,4 +7,9 @@ export {
   TrendForecastArea,
 } from './LineCharts';
 export * from './models';
-export { comparisonCategoryBreakdown, comparisonQuotes } from './adapters';
+export {
+  comparisonCategoryBreakdown,
+  comparisonQuotes,
+  intervalPeriod,
+  type QuoteInterval,
+} from './adapters';
