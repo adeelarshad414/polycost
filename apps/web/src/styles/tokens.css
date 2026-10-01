@@ -61,6 +61,26 @@
   --cat-support: #008300;
   --cat-licensing: #2a78d6;
   --cat-operations: #eb6834;
+  /* Sequential (magnitude) and diverging (variance) ramps; see UI audit §10.4. */
+  --seq-1: #eef0ff;
+  --seq-2: #dce0ff;
+  --seq-3: #c0c7fe;
+  --seq-4: #9ea8fb;
+  --seq-5: #7c84f4;
+  --seq-6: #5f63e8;
+  --seq-7: #4f46e5;
+  --seq-8: #4036bf;
+  --seq-9: #332c96;
+  --seq-10: #272370;
+  /* Text on sequential steps 6-10 (4.7:1 or better); steps 1-5 use --text-primary. */
+  --seq-ink-strong: #ffffff;
+  --div-under-3: #0f766e;
+  --div-under-2: #2da39a;
+  --div-under-1: #8fd3cb;
+  --div-mid: #eef0f4;
+  --div-over-1: #f6b7a8;
+  --div-over-2: #e0694f;
+  --div-over-3: #b42318;
 
   /* Soft washes derived from the solid tokens so both themes stay in step. */
   --brand-primary-soft: color-mix(in srgb, var(--brand-primary) 9%, transparent);
@@ -201,6 +221,24 @@
     --cat-support: #008300;
     --cat-licensing: #3987e5;
     --cat-operations: #d95926;
+    --seq-1: #1c1a45;
+    --seq-2: #26226a;
+    --seq-3: #332c96;
+    --seq-4: #4036bf;
+    --seq-5: #4f46e5;
+    --seq-6: #6f75ee;
+    --seq-7: #8e97f8;
+    --seq-8: #aeb6fc;
+    --seq-9: #cdd2fe;
+    --seq-10: #e6e9ff;
+    --seq-ink-strong: #0a0b14;
+    --div-under-3: #2dd4bf;
+    --div-under-2: #14a394;
+    --div-under-1: #0f5f58;
+    --div-mid: #2a2e3f;
+    --div-over-1: #6b2a20;
+    --div-over-2: #d9573c;
+    --div-over-3: #fca5a5;
 
     --grad-cta-hover: linear-gradient(135deg, var(--brand-primary-hover) 0%, #c4b5fd 100%);
     --grad-hero-mesh:
@@ -280,6 +318,24 @@
   --cat-support: #008300;
   --cat-licensing: #3987e5;
   --cat-operations: #d95926;
+  --seq-1: #1c1a45;
+  --seq-2: #26226a;
+  --seq-3: #332c96;
+  --seq-4: #4036bf;
+  --seq-5: #4f46e5;
+  --seq-6: #6f75ee;
+  --seq-7: #8e97f8;
+  --seq-8: #aeb6fc;
+  --seq-9: #cdd2fe;
+  --seq-10: #e6e9ff;
+  --seq-ink-strong: #0a0b14;
+  --div-under-3: #2dd4bf;
+  --div-under-2: #14a394;
+  --div-under-1: #0f5f58;
+  --div-mid: #2a2e3f;
+  --div-over-1: #6b2a20;
+  --div-over-2: #d9573c;
+  --div-over-3: #fca5a5;
 
   --grad-cta-hover: linear-gradient(135deg, var(--brand-primary-hover) 0%, #c4b5fd 100%);
   --grad-hero-mesh:

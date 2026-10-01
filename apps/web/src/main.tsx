@@ -11,6 +11,7 @@ import '@fontsource/jetbrains-mono/500.css';
 import './styles/tokens.css';
 import './styles.css';
 import './styles/components.css';
+import './styles/charts.css';
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
