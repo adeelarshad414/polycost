@@ -159,15 +159,40 @@ export function writeRateLimitHeaders(
   response.header('X-RateLimit-Reset', state.resetSeconds.toString());
 }
 
+/**
+ * The client address a rate limit is keyed on.
+ *
+ * Only Fastify's `request.ip` is trusted. With `trustProxy` set to the number of
+ * proxy hops in front of the API (TRUST_PROXY_HOPS), Fastify resolves it from
+ * the right-hand end of X-Forwarded-For, where our own proxies append. Reading
+ * the left-most X-Forwarded-For entry, as this used to, let any caller choose
+ * their own identity per request and walk past every per-IP limit (audit H-02).
+ */
 export function requestIdentity(request: {
   ip?: string;
   headers?: Record<string, unknown>;
 }): string {
-  const forwardedFor = request.headers?.['x-forwarded-for'];
-
-  if (typeof forwardedFor === 'string' && forwardedFor.trim()) {
-    return forwardedFor.split(',')[0].trim();
-  }
-
   return request.ip ?? 'unknown';
+}
+
+/**
+ * proxy-addr trust for Fastify, set from validated config (TRUST_PROXY_HOPS).
+ *
+ * Fastify needs `trustProxy` when the adapter is constructed, before Nest's
+ * ConfigService exists. The function is only consulted per request, which
+ * happens after listen(), so bootstrap creates it first and sets the hop count
+ * once config is validated. The address at hop index i (0 = the socket peer) is
+ * trusted only while i < hops; until configured, nothing is trusted.
+ */
+export function createProxyTrust(): {
+  trust: (address: string, hopIndex: number) => boolean;
+  setHops: (hops: number) => void;
+} {
+  let hops = 0;
+  return {
+    trust: (_address, hopIndex) => hopIndex < hops,
+    setHops: (next) => {
+      hops = next;
+    },
+  };
 }

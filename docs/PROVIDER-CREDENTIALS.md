@@ -5,6 +5,12 @@ PolyCost can run two pricing modes:
 - `USE_MOCK_PROVIDERS=true`: deterministic fixture-backed AWS, Azure, and GCP catalog rows for local demos and CI.
 - `USE_MOCK_PROVIDERS=false`: provider adapters fetch public catalog list prices and persist traced catalog/cache rows.
 
+The API defaults to `USE_MOCK_PROVIDERS=false`. `docker-compose.yml` and `.env.example` set
+`true` explicitly for local development. In `production` and `staging` the API refuses to start
+with `USE_MOCK_PROVIDERS=true`, because fixture prices would be presented as real, unless
+`ALLOW_MOCK_PROVIDERS_OUTSIDE_DEVELOPMENT=true` is also set for a clearly labelled demo stack.
+The Helm chart sets both values explicitly (`config.useMockProviders: false`).
+
 Real provider mode is still catalog list-price mode. It is not invoice-grade billing: it does not include private discounts, enterprise agreements, credits, tax, support contracts, committed-use inventory already owned by the customer, or actual billed usage.
 
 ## Startup Guardrails

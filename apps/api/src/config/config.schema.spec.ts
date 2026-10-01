@@ -1,6 +1,17 @@
 import { describe, it, expect } from '@jest/globals';
 import { validateConfig } from './config.schema.js';
 
+const productionWebhookConfig = {
+  CORS_ALLOWED_ORIGINS: 'https://polycost.example.com',
+  AUTH_SSO_STATE_SECRET: 'production-sso-state-secret-value',
+  AUTH_INVITE_DELIVERY_MODE: 'webhook',
+  AUTH_INVITE_DELIVERY_WEBHOOK_URL: 'https://mail.example.com/polycost/invites',
+  AUTH_INVITE_DELIVERY_WEBHOOK_SECRET: 'production-invite-webhook-secret',
+  AUTH_AUDIT_EXPORT_MODE: 'webhook',
+  AUTH_AUDIT_EXPORT_WEBHOOK_URL: 'https://siem.example.com/polycost/audit-events',
+  AUTH_AUDIT_EXPORT_WEBHOOK_SECRET: 'production-audit-export-secret',
+};
+
 const baseConfig = {
   NODE_ENV: 'development',
   DB_HOST: 'postgres',
@@ -10,6 +21,8 @@ const baseConfig = {
 };
 
 const productionArtifactConfig = {
+  // Production runs real provider pricing, which reads credentials from Vault.
+  VAULT_TOKEN_FILE: '/run/polycost-vault-auth/token',
   INVOICE_ARTIFACT_STORAGE_BACKEND: 'aws-s3',
   INVOICE_ARTIFACT_OBJECT_STORE_NAME: 'polycost-invoice-artifacts',
   INVOICE_ARTIFACT_OBJECT_STORE_REGION: 'us-east-1',
@@ -42,7 +55,8 @@ describe('config schema', () => {
     expect(config.PRICING_ETL_DEFAULT_REGION_AWS).toBe('us-east-1');
     expect(config.PRICING_ETL_DEFAULT_REGION_AZURE).toBe('eastus');
     expect(config.PRICING_ETL_DEFAULT_REGION_GCP).toBe('us-central1');
-    expect(config.USE_MOCK_PROVIDERS).toBe(true);
+    expect(config.USE_MOCK_PROVIDERS).toBe(false);
+    expect(config.ALLOW_MOCK_PROVIDERS_OUTSIDE_DEVELOPMENT).toBe(false);
     expect(config.PRICING_ETL_RUN_ON_BOOT).toBe(true);
     expect(config.RATE_LIMIT_COMPARISON_PER_MINUTE).toBe(30);
     expect(config.RATE_LIMIT_EXPORT_PER_MINUTE).toBe(10);
@@ -124,6 +138,37 @@ describe('config schema', () => {
     expect(config.PRICING_SYNC_ALERT_WEBHOOK_URL).toBe(
       'https://hooks.example.com/polycost-pricing-sync',
     );
+  });
+
+  it.each(['production', 'staging'])(
+    'refuses mock provider pricing in %s unless a demo stack opts in',
+    (nodeEnv) => {
+      const env = {
+        ...baseConfig,
+        ...productionArtifactConfig,
+        ...productionWebhookConfig,
+        NODE_ENV: nodeEnv,
+      };
+
+      expect(() => validateConfig({ ...env, USE_MOCK_PROVIDERS: 'true' })).toThrow(
+        /USE_MOCK_PROVIDERS=true serves fixture prices as real ones/,
+      );
+      expect(
+        validateConfig({
+          ...env,
+          USE_MOCK_PROVIDERS: 'true',
+          ALLOW_MOCK_PROVIDERS_OUTSIDE_DEVELOPMENT: 'true',
+        }).USE_MOCK_PROVIDERS,
+      ).toBe(true);
+      expect(validateConfig(env).USE_MOCK_PROVIDERS).toBe(false);
+    },
+  );
+
+  it('still allows mock provider pricing in development and test', () => {
+    expect(
+      validateConfig({ ...baseConfig, NODE_ENV: 'development', USE_MOCK_PROVIDERS: 'true' })
+        .USE_MOCK_PROVIDERS,
+    ).toBe(true);
   });
 
   it('treats blank optional webhooks as unset', () => {
@@ -272,6 +317,7 @@ describe('config schema', () => {
         ...baseConfig,
         NODE_ENV: 'production',
         ...productionArtifactConfig,
+        VAULT_TOKEN_FILE: undefined,
         USE_MOCK_PROVIDERS: 'false',
         CORS_ALLOWED_ORIGINS: 'https://polycost.example.com',
         AUTH_SSO_STATE_SECRET: 'production-sso-state-secret-value',

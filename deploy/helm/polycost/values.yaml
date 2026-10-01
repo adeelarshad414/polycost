@@ -77,6 +77,13 @@ config:
   redisPort: 6379
   vaultAddr: http://vault:8200
   corsAllowedOrigins: ''
+  # Proxy hops between clients and the API. Raise it if a CDN or extra load
+  # balancer sits in front of the ingress; never set it higher than reality.
+  trustProxyHops: 1
+  # Real provider pricing. The API refuses to boot in production with mock
+  # providers unless allowMockProvidersOutsideDevelopment is also true (demo only).
+  useMockProviders: false
+  allowMockProvidersOutsideDevelopment: false
   # Empty disables tracing; the OTel bootstrap is a no-op without an endpoint.
   otelExporterEndpoint: ''
   # Empty disables error reporting.

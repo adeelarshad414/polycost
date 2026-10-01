@@ -3177,6 +3177,86 @@ describe('ApiDatabaseRepository', () => {
     expect(result.importRun.totalCostUsd).toBe(150);
   });
 
+  describe('SCIM provisioning of existing accounts (audit H-01)', () => {
+    const scimInput = {
+      teamId: '22222222-2222-4222-8222-222222222222',
+      externalId: 'okta-123',
+      externalSubjectHash: 'f'.repeat(64),
+      userName: 'victim@other-tenant.example',
+      displayName: 'Renamed By Attacker',
+      active: true,
+      rawProfile: {},
+    };
+    const existingAccount = {
+      id: '33333333-3333-4333-8333-333333333333',
+      email: 'victim@other-tenant.example',
+      display_name: 'Victim',
+      status: 'active',
+    };
+
+    function scimQuery(eligible: boolean) {
+      return jest.fn<QueryMock>(async (text: string) => {
+        if (text.includes('FROM accounts') && text.includes('lower(email) = lower($1)')) {
+          return { rows: [existingAccount], rowCount: 1 };
+        }
+        if (text.includes('AS eligible')) {
+          return { rows: [{ eligible }], rowCount: 1 };
+        }
+        if (text.includes('UPDATE accounts')) {
+          return {
+            rows: [{ ...existingAccount, display_name: scimInput.displayName }],
+            rowCount: 1,
+          };
+        }
+        if (text.includes('INSERT INTO team_scim_external_users')) {
+          return {
+            rows: [
+              {
+                id: '44444444-4444-4444-8444-444444444444',
+                team_id: scimInput.teamId,
+                external_id: scimInput.externalId,
+                account_id: existingAccount.id,
+                user_name: scimInput.userName,
+                display_name: scimInput.displayName,
+                active: true,
+                created_at: new Date('2026-09-30T00:00:00.000Z'),
+                updated_at: new Date('2026-09-30T00:00:00.000Z'),
+                deactivated_at: null,
+              },
+            ],
+            rowCount: 1,
+          };
+        }
+        return { rows: [], rowCount: 0 };
+      });
+    }
+
+    it('refuses an account that is not in the team, without touching it', async () => {
+      const query = scimQuery(false);
+      const repository = createRepository(query);
+
+      await expect(repository.upsertTeamScimUser(scimInput)).rejects.toThrow(
+        /existing PolyCost account outside this team/,
+      );
+      const sql = query.mock.calls.map(([text]) => String(text));
+      expect(sql.some((text) => text.includes('UPDATE accounts'))).toBe(false);
+      expect(sql.some((text) => text.includes('INSERT INTO team_memberships'))).toBe(false);
+      expect(sql).toContain('ROLLBACK');
+    });
+
+    it('links an account that is a member, invitee or already linked to the team', async () => {
+      const query = scimQuery(true);
+      const repository = createRepository(query);
+
+      const user = await repository.upsertTeamScimUser(scimInput);
+
+      expect(user?.externalId).toBe('okta-123');
+      expect(
+        query.mock.calls.some(([text]) => String(text).includes('INSERT INTO team_memberships')),
+      ).toBe(true);
+    });
+  });
+
   it('reports expired rows without deleting in report-only mode (DB-2)', async () => {
     const query = jest.fn<QueryMock>(async (text: string) => {
       if (text.startsWith('SELECT COUNT(*)')) {

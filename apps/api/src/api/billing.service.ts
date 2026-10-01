@@ -3062,8 +3062,11 @@ function requireRecord(value: unknown, message: string): Record<string, unknown>
   return value as Record<string, unknown>;
 }
 
-function assertTeamAccess(teamId: string | undefined, identity: AuthIdentity): void {
-  if (teamId && teamId !== identity.teamId) {
+function assertTeamAccess(teamId: string | undefined | null, identity: AuthIdentity): void {
+  // Fail closed (audit M-01): billing rows keep team_id ON DELETE SET NULL, so a
+  // deleted team's imports, reconciliations and invoice blobs end up team-less.
+  // Treating "no team" as "anyone's" exposed them to every other team's admins.
+  if (!teamId || teamId !== identity.teamId) {
     throw new ApiForbiddenError('Billing import belongs to a different active team');
   }
 }
