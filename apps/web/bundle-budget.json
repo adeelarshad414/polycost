@@ -1,0 +1,4 @@
+{
+  "description": "Gzipped size of the JS and CSS the landing page loads before any interaction (scripts/bundle-budget-check.mjs). Raise deliberately, in the same PR as the code that needs it.",
+  "initialGzipKb": 280
+}

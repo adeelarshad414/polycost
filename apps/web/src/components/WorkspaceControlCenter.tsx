@@ -13,6 +13,14 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { formatApiError, type PolyCostClient } from './../api-client';
 import { Button } from './Button';
 import { ConfirmDialog } from './OverlayPrimitives';
+import { ResultTabs } from './ResultTabs';
+import { WorkspaceOverview } from '../features/workspace/WorkspaceOverview';
+import {
+  isWorkspaceSection,
+  workspaceSectionFromHash,
+  workspaceSectionHash,
+  type WorkspaceSection,
+} from '../lib/workspace-route';
 import { SessionLoader, type LoadingStep } from './LoadingExperience';
 import { TextField } from './fields';
 import { CompareIcon, ParseIcon, ShieldIcon, SignInIcon } from './icons';
@@ -97,6 +105,32 @@ export function WorkspaceControlCenter({
   const [deleteCurrentPassword, setDeleteCurrentPassword] = useState('');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [section, setSection] = useState<WorkspaceSection>(
+    () => workspaceSectionFromHash(window.location.hash) ?? 'overview',
+  );
+
+  // Mirror the section in the hash so it can be linked, and follow Back/Forward.
+  function showSection(next: WorkspaceSection) {
+    setSection(next);
+    if (window.location.hash !== workspaceSectionHash(next)) {
+      window.history.pushState(null, '', workspaceSectionHash(next));
+    }
+  }
+
+  useEffect(() => {
+    const onNavigate = () => {
+      const fromHash = workspaceSectionFromHash(window.location.hash);
+      if (fromHash) {
+        setSection(fromHash);
+      }
+    };
+    window.addEventListener('popstate', onNavigate);
+    window.addEventListener('hashchange', onNavigate);
+    return () => {
+      window.removeEventListener('popstate', onNavigate);
+      window.removeEventListener('hashchange', onNavigate);
+    };
+  }, []);
   const [newTeamName, setNewTeamName] = useState('Platform cost office');
   const [teamSettingsName, setTeamSettingsName] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
@@ -1532,1155 +1566,1176 @@ export function WorkspaceControlCenter({
     }
   }
 
-  return (
-    <section className="workspace-control-center" id="workspace" aria-label="Workspace controls">
-      <div className="workspace-control-heading">
-        <div>
-          <span>Production hardening layer</span>
-          <h2>Account, team, SSO readiness, and invoice reconciliation foundation</h2>
-        </div>
-        <strong>{session ? session.account.email : 'Local session required'}</strong>
+  // UI-5: each panel is a tab; all stay mounted so form state survives switching.
+  const accountPanel = (
+    <section className="workspace-panel">
+      <div className="workspace-panel-heading">
+        <span>Workspace session</span>
+        <strong>{session ? 'Connected' : authMode === 'register' ? 'Register' : 'Sign in'}</strong>
       </div>
-
-      <div className="workspace-control-grid">
-        <section className="workspace-panel">
-          <div className="workspace-panel-heading">
-            <span>Workspace session</span>
-            <strong>
-              {session ? 'Connected' : authMode === 'register' ? 'Register' : 'Sign in'}
-            </strong>
-          </div>
-          {invitePreview ? (
-            <div className={`workspace-invite-preview is-${invitePreview.status}`}>
-              <strong>
-                Invite {invitePreview.status}
-                {invitePreview.email ? ` · ${invitePreview.email}` : ''}
-              </strong>
-              <span>{invitePreview.message}</span>
+      {invitePreview ? (
+        <div className={`workspace-invite-preview is-${invitePreview.status}`}>
+          <strong>
+            Invite {invitePreview.status}
+            {invitePreview.email ? ` · ${invitePreview.email}` : ''}
+          </strong>
+          <span>{invitePreview.message}</span>
+        </div>
+      ) : null}
+      {sessionExpiredNotice && !session ? (
+        <div className="workspace-session-policy is-expired" role="status">
+          <strong>Workspace session expired</strong>
+          <span>
+            Anonymous comparisons still work. Sign in again for team, SSO, and billing-export
+            controls.
+          </span>
+        </div>
+      ) : null}
+      {isSessionHydrating && token && !session ? (
+        <SessionLoader compact phase="Verifying workspace access" steps={sessionHydrationSteps} />
+      ) : session ? (
+        <div className="workspace-session-summary">
+          <span>{session.account.displayName ?? session.account.email}</span>
+          <strong>
+            {activeTeam ? `${activeTeam.name} · ${activeTeam.role}` : 'No active team'}
+          </strong>
+          {sessionStatus ? (
+            <div className={`workspace-session-policy is-${sessionStatus.tone}`} role="status">
+              <strong>{sessionStatus.label}</strong>
+              <span>{sessionStatus.detail}</span>
             </div>
           ) : null}
-          {sessionExpiredNotice && !session ? (
-            <div className="workspace-session-policy is-expired" role="status">
-              <strong>Workspace session expired</strong>
-              <span>
-                Anonymous comparisons still work. Sign in again for team, SSO, and billing-export
-                controls.
+          {activeTeamOptions.length > 0 ? (
+            <label className="workspace-field">
+              <span>Active team</span>
+              <select
+                aria-label="Active team"
+                value={activeTeam?.id ?? ''}
+                disabled={workspaceBusy === 'switch-team'}
+                onChange={(event) => void handleActiveTeamSwitch(event.currentTarget.value)}
+              >
+                {activeTeamOptions.map((team) => (
+                  <option key={team.teamId} value={team.teamId}>
+                    {team.teamName} · {teamRoleLabel(team.role)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <form className="workspace-inline-form" onSubmit={handleProfileUpdate}>
+            <label className="workspace-field">
+              <span>Profile email</span>
+              <input
+                value={profileEmail}
+                onChange={(event) => setProfileEmail(event.currentTarget.value)}
+              />
+            </label>
+            <label className="workspace-field">
+              <span>Display name</span>
+              <input
+                value={profileDisplayName}
+                onChange={(event) => setProfileDisplayName(event.currentTarget.value)}
+              />
+            </label>
+            <label className="workspace-field">
+              <span>Current password (email changes)</span>
+              <input
+                type="password"
+                value={profileCurrentPassword}
+                onChange={(event) => setProfileCurrentPassword(event.currentTarget.value)}
+              />
+            </label>
+            <Button
+              type="submit"
+              variant="secondary"
+              loading={workspaceBusy === 'profile'}
+              loadingLabel="Saving..."
+            >
+              Save profile
+            </Button>
+          </form>
+          <form className="workspace-inline-form" onSubmit={handlePasswordChange}>
+            <label className="workspace-field">
+              <span>Current password</span>
+              <input
+                type="password"
+                value={profileCurrentPassword}
+                onChange={(event) => setProfileCurrentPassword(event.currentTarget.value)}
+              />
+            </label>
+            <label className="workspace-field">
+              <span>New password</span>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.currentTarget.value)}
+              />
+            </label>
+            <Button
+              type="submit"
+              variant="secondary"
+              loading={workspaceBusy === 'password'}
+              loadingLabel="Changing..."
+            >
+              Change password
+            </Button>
+          </form>
+          <div className="workspace-session-list" aria-label="Active account sessions">
+            {accountSessions.slice(0, 3).map((accountSession) => (
+              <span key={accountSession.id}>
+                {accountSession.current ? 'Current' : 'Other'} · last seen{' '}
+                {formatDateTime(accountSession.lastSeenAt)} · expires{' '}
+                {formatDateTime(accountSession.expiresAt)}
               </span>
-            </div>
+            ))}
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => void handleRevokeOtherSessions()}
+            loading={workspaceBusy === 'revoke-sessions'}
+            disabled={accountSessions.filter((item) => !item.current).length === 0}
+          >
+            <ShieldIcon />
+            Sign out other devices
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => void handleLogout()}
+            loading={authBusy}
+          >
+            <SignInIcon />
+            Sign out
+          </Button>
+          <form className="workspace-inline-form" onSubmit={handleAccountDeletionRequest}>
+            <label className="workspace-field">
+              <span>Delete current password</span>
+              <input
+                type="password"
+                value={deleteCurrentPassword}
+                onChange={(event) => setDeleteCurrentPassword(event.currentTarget.value)}
+              />
+            </label>
+            <Button
+              type="submit"
+              variant="destructiveQuiet"
+              loading={workspaceBusy === 'delete-account'}
+              loadingLabel="Disabling..."
+              disabled={!deleteCurrentPassword}
+            >
+              Disable account…
+            </Button>
+          </form>
+          <ConfirmDialog
+            open={deleteDialogOpen}
+            destructive
+            title="Disable your account?"
+            description="This signs you out everywhere and revokes every active session. Team data you own stays with the team."
+            confirmLabel="Disable account"
+            confirmationText="DELETE"
+            confirmationValue={deleteConfirmation}
+            confirming={workspaceBusy === 'delete-account'}
+            onConfirmationValueChange={setDeleteConfirmation}
+            onConfirm={() => void handleAccountDeletion()}
+            onCancel={() => {
+              setDeleteDialogOpen(false);
+              setDeleteConfirmation('');
+            }}
+          />
+        </div>
+      ) : (
+        <form className="workspace-auth-form" onSubmit={handleAuthSubmit}>
+          <div className="workspace-auth-toggle" role="group" aria-label="Authentication mode">
+            <button
+              type="button"
+              className={authMode === 'login' ? 'is-active' : ''}
+              aria-pressed={authMode === 'login'}
+              onClick={() => setAuthMode('login')}
+            >
+              Sign in
+            </button>
+            <button
+              type="button"
+              className={authMode === 'register' ? 'is-active' : ''}
+              aria-pressed={authMode === 'register'}
+              onClick={() => setAuthMode('register')}
+            >
+              Register
+            </button>
+          </div>
+          <label className="workspace-field">
+            <span>Email</span>
+            <input value={email} onChange={(event) => setEmail(event.currentTarget.value)} />
+          </label>
+          <label className="workspace-field">
+            <span>Password</span>
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.currentTarget.value)}
+            />
+          </label>
+          {authMode === 'register' ? (
+            <>
+              <label className="workspace-field">
+                <span>Display name</span>
+                <input
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.currentTarget.value)}
+                />
+              </label>
+              <label className="workspace-field">
+                <span>Team name</span>
+                <input
+                  value={teamName}
+                  onChange={(event) => setTeamName(event.currentTarget.value)}
+                />
+              </label>
+            </>
           ) : null}
-          {isSessionHydrating && token && !session ? (
+          <Button type="submit" variant="primary" loading={authBusy} loadingLabel="Connecting...">
+            <SignInIcon />
+            {authMode === 'register' ? 'Create workspace' : 'Sign in'}
+          </Button>
+        </form>
+      )}
+    </section>
+  );
+
+  const teamPanel = (
+    <section className="workspace-panel">
+      <div className="workspace-panel-heading">
+        <span>Team access</span>
+        <strong>{canManageTeam ? `${members.length} members` : 'Admin required'}</strong>
+      </div>
+      {canManageTeam && activeTeam && session && token ? (
+        <>
+          {isWorkspaceDirectoryLoading || workspaceDirectoryError ? (
             <SessionLoader
               compact
-              phase="Verifying workspace access"
-              steps={sessionHydrationSteps}
+              identity={{
+                name: session.account.displayName ?? session.account.email,
+                detail: `${activeTeam.name} · ${activeTeam.role}`,
+              }}
+              phase={
+                workspaceDirectoryError ? 'Workspace sync needs attention' : 'Syncing team access'
+              }
+              steps={workspaceDirectorySteps}
+              trustCue={Boolean(token && session)}
+              error={workspaceDirectoryError}
             />
-          ) : session ? (
-            <div className="workspace-session-summary">
-              <span>{session.account.displayName ?? session.account.email}</span>
-              <strong>
-                {activeTeam ? `${activeTeam.name} · ${activeTeam.role}` : 'No active team'}
-              </strong>
-              {sessionStatus ? (
-                <div className={`workspace-session-policy is-${sessionStatus.tone}`} role="status">
-                  <strong>{sessionStatus.label}</strong>
-                  <span>{sessionStatus.detail}</span>
-                </div>
-              ) : null}
-              {activeTeamOptions.length > 0 ? (
-                <label className="workspace-field">
-                  <span>Active team</span>
-                  <select
-                    aria-label="Active team"
-                    value={activeTeam?.id ?? ''}
-                    disabled={workspaceBusy === 'switch-team'}
-                    onChange={(event) => void handleActiveTeamSwitch(event.currentTarget.value)}
-                  >
-                    {activeTeamOptions.map((team) => (
-                      <option key={team.teamId} value={team.teamId}>
-                        {team.teamName} · {teamRoleLabel(team.role)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
-              <form className="workspace-inline-form" onSubmit={handleProfileUpdate}>
-                <label className="workspace-field">
-                  <span>Profile email</span>
-                  <input
-                    value={profileEmail}
-                    onChange={(event) => setProfileEmail(event.currentTarget.value)}
-                  />
-                </label>
-                <label className="workspace-field">
-                  <span>Display name</span>
-                  <input
-                    value={profileDisplayName}
-                    onChange={(event) => setProfileDisplayName(event.currentTarget.value)}
-                  />
-                </label>
-                <label className="workspace-field">
-                  <span>Current password (email changes)</span>
-                  <input
-                    type="password"
-                    value={profileCurrentPassword}
-                    onChange={(event) => setProfileCurrentPassword(event.currentTarget.value)}
-                  />
-                </label>
-                <Button
-                  type="submit"
-                  variant="secondary"
-                  loading={workspaceBusy === 'profile'}
-                  loadingLabel="Saving..."
-                >
-                  Save profile
-                </Button>
-              </form>
-              <form className="workspace-inline-form" onSubmit={handlePasswordChange}>
-                <label className="workspace-field">
-                  <span>Current password</span>
-                  <input
-                    type="password"
-                    value={profileCurrentPassword}
-                    onChange={(event) => setProfileCurrentPassword(event.currentTarget.value)}
-                  />
-                </label>
-                <label className="workspace-field">
-                  <span>New password</span>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(event) => setNewPassword(event.currentTarget.value)}
-                  />
-                </label>
-                <Button
-                  type="submit"
-                  variant="secondary"
-                  loading={workspaceBusy === 'password'}
-                  loadingLabel="Changing..."
-                >
-                  Change password
-                </Button>
-              </form>
-              <div className="workspace-session-list" aria-label="Active account sessions">
-                {accountSessions.slice(0, 3).map((accountSession) => (
-                  <span key={accountSession.id}>
-                    {accountSession.current ? 'Current' : 'Other'} · last seen{' '}
-                    {formatDateTime(accountSession.lastSeenAt)} · expires{' '}
-                    {formatDateTime(accountSession.expiresAt)}
-                  </span>
-                ))}
-              </div>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => void handleRevokeOtherSessions()}
-                loading={workspaceBusy === 'revoke-sessions'}
-                disabled={accountSessions.filter((item) => !item.current).length === 0}
-              >
-                <ShieldIcon />
-                Sign out other devices
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => void handleLogout()}
-                loading={authBusy}
-              >
-                <SignInIcon />
-                Sign out
-              </Button>
-              <form className="workspace-inline-form" onSubmit={handleAccountDeletionRequest}>
-                <label className="workspace-field">
-                  <span>Delete current password</span>
-                  <input
-                    type="password"
-                    value={deleteCurrentPassword}
-                    onChange={(event) => setDeleteCurrentPassword(event.currentTarget.value)}
-                  />
-                </label>
-                <Button
-                  type="submit"
-                  variant="destructiveQuiet"
-                  loading={workspaceBusy === 'delete-account'}
-                  loadingLabel="Disabling..."
-                  disabled={!deleteCurrentPassword}
-                >
-                  Disable account…
-                </Button>
-              </form>
-              <ConfirmDialog
-                open={deleteDialogOpen}
-                destructive
-                title="Disable your account?"
-                description="This signs you out everywhere and revokes every active session. Team data you own stays with the team."
-                confirmLabel="Disable account"
-                confirmationText="DELETE"
-                confirmationValue={deleteConfirmation}
-                confirming={workspaceBusy === 'delete-account'}
-                onConfirmationValueChange={setDeleteConfirmation}
-                onConfirm={() => void handleAccountDeletion()}
-                onCancel={() => {
-                  setDeleteDialogOpen(false);
-                  setDeleteConfirmation('');
-                }}
+          ) : null}
+          <form className="workspace-inline-form" onSubmit={handleCreateTeam}>
+            <label className="workspace-field">
+              <span>New team</span>
+              <input
+                value={newTeamName}
+                onChange={(event) => setNewTeamName(event.currentTarget.value)}
               />
-            </div>
-          ) : (
-            <form className="workspace-auth-form" onSubmit={handleAuthSubmit}>
-              <div className="workspace-auth-toggle" role="group" aria-label="Authentication mode">
-                <button
-                  type="button"
-                  className={authMode === 'login' ? 'is-active' : ''}
-                  aria-pressed={authMode === 'login'}
-                  onClick={() => setAuthMode('login')}
-                >
-                  Sign in
-                </button>
-                <button
-                  type="button"
-                  className={authMode === 'register' ? 'is-active' : ''}
-                  aria-pressed={authMode === 'register'}
-                  onClick={() => setAuthMode('register')}
-                >
-                  Register
-                </button>
-              </div>
-              <label className="workspace-field">
-                <span>Email</span>
-                <input value={email} onChange={(event) => setEmail(event.currentTarget.value)} />
-              </label>
-              <label className="workspace-field">
-                <span>Password</span>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.currentTarget.value)}
-                />
-              </label>
-              {authMode === 'register' ? (
-                <>
-                  <label className="workspace-field">
-                    <span>Display name</span>
-                    <input
-                      value={displayName}
-                      onChange={(event) => setDisplayName(event.currentTarget.value)}
-                    />
-                  </label>
-                  <label className="workspace-field">
-                    <span>Team name</span>
-                    <input
-                      value={teamName}
-                      onChange={(event) => setTeamName(event.currentTarget.value)}
-                    />
-                  </label>
-                </>
-              ) : null}
-              <Button
-                type="submit"
-                variant="primary"
-                loading={authBusy}
-                loadingLabel="Connecting..."
-              >
-                <SignInIcon />
-                {authMode === 'register' ? 'Create workspace' : 'Sign in'}
-              </Button>
-            </form>
-          )}
-        </section>
-
-        <section className="workspace-panel">
-          <div className="workspace-panel-heading">
-            <span>Team access</span>
-            <strong>{canManageTeam ? `${members.length} members` : 'Admin required'}</strong>
+            </label>
+            <Button
+              type="submit"
+              variant="secondary"
+              loading={workspaceBusy === 'create-team'}
+              loadingLabel="Creating..."
+            >
+              Create team
+            </Button>
+          </form>
+          <form className="workspace-inline-form" onSubmit={handleTeamSettingsUpdate}>
+            <label className="workspace-field">
+              <span>Current team name</span>
+              <input
+                value={teamSettingsName}
+                onChange={(event) => setTeamSettingsName(event.currentTarget.value)}
+              />
+            </label>
+            <Button
+              type="submit"
+              variant="secondary"
+              loading={workspaceBusy === 'team-settings'}
+              loadingLabel="Saving..."
+            >
+              Save team
+            </Button>
+          </form>
+          <div className="workspace-role-guide" aria-label="Role permissions">
+            <span>Owner: billing, SSO, roles, deletion</span>
+            <span>Admin: members, invites, SSO setup</span>
+            <span>Member: comparisons and shared evidence</span>
           </div>
-          {canManageTeam && activeTeam && session && token ? (
-            <>
-              {isWorkspaceDirectoryLoading || workspaceDirectoryError ? (
-                <SessionLoader
-                  compact
-                  identity={{
-                    name: session.account.displayName ?? session.account.email,
-                    detail: `${activeTeam.name} · ${activeTeam.role}`,
-                  }}
-                  phase={
-                    workspaceDirectoryError
-                      ? 'Workspace sync needs attention'
-                      : 'Syncing team access'
-                  }
-                  steps={workspaceDirectorySteps}
-                  trustCue={Boolean(token && session)}
-                  error={workspaceDirectoryError}
-                />
-              ) : null}
-              <form className="workspace-inline-form" onSubmit={handleCreateTeam}>
-                <label className="workspace-field">
-                  <span>New team</span>
-                  <input
-                    value={newTeamName}
-                    onChange={(event) => setNewTeamName(event.currentTarget.value)}
-                  />
-                </label>
-                <Button
-                  type="submit"
-                  variant="secondary"
-                  loading={workspaceBusy === 'create-team'}
-                  loadingLabel="Creating..."
-                >
-                  Create team
-                </Button>
-              </form>
-              <form className="workspace-inline-form" onSubmit={handleTeamSettingsUpdate}>
-                <label className="workspace-field">
-                  <span>Current team name</span>
-                  <input
-                    value={teamSettingsName}
-                    onChange={(event) => setTeamSettingsName(event.currentTarget.value)}
-                  />
-                </label>
-                <Button
-                  type="submit"
-                  variant="secondary"
-                  loading={workspaceBusy === 'team-settings'}
-                  loadingLabel="Saving..."
-                >
-                  Save team
-                </Button>
-              </form>
-              <div className="workspace-role-guide" aria-label="Role permissions">
-                <span>Owner: billing, SSO, roles, deletion</span>
-                <span>Admin: members, invites, SSO setup</span>
-                <span>Member: comparisons and shared evidence</span>
-              </div>
-              <form className="workspace-inline-form" onSubmit={handleInvite}>
-                <label className="workspace-field">
-                  <span>Invite email</span>
-                  <input
-                    value={inviteEmail}
-                    onChange={(event) => setInviteEmail(event.currentTarget.value)}
-                  />
-                </label>
-                <label className="workspace-field">
-                  <span>Role</span>
+          <form className="workspace-inline-form" onSubmit={handleInvite}>
+            <label className="workspace-field">
+              <span>Invite email</span>
+              <input
+                value={inviteEmail}
+                onChange={(event) => setInviteEmail(event.currentTarget.value)}
+              />
+            </label>
+            <label className="workspace-field">
+              <span>Role</span>
+              <select
+                value={inviteRole}
+                onChange={(event) =>
+                  setInviteRole(event.currentTarget.value as Exclude<TeamRole, 'owner'>)
+                }
+              >
+                <option value="member">Member</option>
+                <option value="admin">Admin</option>
+              </select>
+            </label>
+            <Button
+              type="submit"
+              variant="secondary"
+              loading={workspaceBusy === 'invite'}
+              loadingLabel="Inviting..."
+            >
+              <ParseIcon />
+              Invite
+            </Button>
+          </form>
+          {lastInviteToken ? (
+            <p className="workspace-token-output">
+              Invite token: {lastInviteToken}
+              {lastInviteUrl ? ` · URL: ${lastInviteUrl}` : ''}
+            </p>
+          ) : null}
+          {lastInviteDelivery ? (
+            <p className={`workspace-delivery-output is-${lastInviteDelivery.status}`}>
+              Delivery: {lastInviteDelivery.message}
+              {lastInviteDelivery.deliveredAt
+                ? ` · ${formatDateTime(lastInviteDelivery.deliveredAt)}`
+                : ''}
+            </p>
+          ) : null}
+          <div className="workspace-member-list">
+            {members.map((member) => {
+              const roleControl = memberRoleControlState({
+                actorRole: activeTeam.role,
+                currentAccountId: session.account.id,
+                member,
+                ownerCount,
+                busyKey: workspaceBusy,
+              });
+              const removeControl = memberRemoveControlState({
+                actorRole: activeTeam.role,
+                currentAccountId: session.account.id,
+                member,
+                ownerCount,
+                busyKey: workspaceBusy,
+              });
+
+              return (
+                <div className="workspace-member-row" key={member.accountId}>
+                  <span>
+                    <strong>{member.displayName ?? member.email}</strong>
+                    <small>{member.email}</small>
+                  </span>
+                  <span className={`workspace-role-badge is-${member.role}`}>
+                    {teamRoleLabel(member.role)}
+                  </span>
                   <select
-                    value={inviteRole}
+                    value={member.role}
+                    aria-label={`Change role for ${member.email}`}
+                    disabled={roleControl.disabled}
+                    title={roleControl.reason}
                     onChange={(event) =>
-                      setInviteRole(event.currentTarget.value as Exclude<TeamRole, 'owner'>)
+                      void handleRoleChange(member.accountId, event.currentTarget.value as TeamRole)
                     }
                   >
-                    <option value="member">Member</option>
+                    <option value="owner">Owner</option>
                     <option value="admin">Admin</option>
+                    <option value="member">Member</option>
                   </select>
-                </label>
-                <Button
-                  type="submit"
-                  variant="secondary"
-                  loading={workspaceBusy === 'invite'}
-                  loadingLabel="Inviting..."
-                >
-                  <ParseIcon />
-                  Invite
-                </Button>
-              </form>
-              {lastInviteToken ? (
-                <p className="workspace-token-output">
-                  Invite token: {lastInviteToken}
-                  {lastInviteUrl ? ` · URL: ${lastInviteUrl}` : ''}
-                </p>
-              ) : null}
-              {lastInviteDelivery ? (
-                <p className={`workspace-delivery-output is-${lastInviteDelivery.status}`}>
-                  Delivery: {lastInviteDelivery.message}
-                  {lastInviteDelivery.deliveredAt
-                    ? ` · ${formatDateTime(lastInviteDelivery.deliveredAt)}`
-                    : ''}
-                </p>
-              ) : null}
-              <div className="workspace-member-list">
-                {members.map((member) => {
-                  const roleControl = memberRoleControlState({
-                    actorRole: activeTeam.role,
-                    currentAccountId: session.account.id,
-                    member,
-                    ownerCount,
-                    busyKey: workspaceBusy,
-                  });
-                  const removeControl = memberRemoveControlState({
-                    actorRole: activeTeam.role,
-                    currentAccountId: session.account.id,
-                    member,
-                    ownerCount,
-                    busyKey: workspaceBusy,
-                  });
-
-                  return (
-                    <div className="workspace-member-row" key={member.accountId}>
-                      <span>
-                        <strong>{member.displayName ?? member.email}</strong>
-                        <small>{member.email}</small>
-                      </span>
-                      <span className={`workspace-role-badge is-${member.role}`}>
-                        {teamRoleLabel(member.role)}
-                      </span>
-                      <select
-                        value={member.role}
-                        aria-label={`Change role for ${member.email}`}
-                        disabled={roleControl.disabled}
-                        title={roleControl.reason}
-                        onChange={(event) =>
-                          void handleRoleChange(
-                            member.accountId,
-                            event.currentTarget.value as TeamRole,
-                          )
-                        }
+                  <Button
+                    type="button"
+                    variant="destructiveQuiet"
+                    size="compact"
+                    className="workspace-link-button"
+                    aria-label={`Remove ${member.email}`}
+                    disabled={removeControl.disabled}
+                    title={removeControl.reason}
+                    onClick={() => void handleRemoveMember(member.accountId)}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+          <div className="workspace-member-list" aria-label="Team invitations">
+            {invitations
+              .filter(
+                (invitation) => invitation.status === 'pending' || invitation.status === 'expired',
+              )
+              .slice(0, 4)
+              .map((invitation) => (
+                <div className="workspace-member-row" key={invitation.id}>
+                  <span>
+                    <strong>{invitation.email}</strong>
+                    <small>
+                      {invitation.role} invite · {invitation.status} · expires{' '}
+                      {formatDateTime(invitation.expiresAt)}
+                    </small>
+                  </span>
+                  <span className="workspace-row-actions">
+                    {invitation.status === 'pending' || invitation.status === 'expired' ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="compact"
+                        loading={workspaceBusy === `resend-invite-${invitation.id}`}
+                        loadingLabel="Refreshing..."
+                        onClick={() => void handleResendInvitation(invitation.id)}
                       >
-                        <option value="owner">Owner</option>
-                        <option value="admin">Admin</option>
-                        <option value="member">Member</option>
-                      </select>
+                        Resend
+                      </Button>
+                    ) : null}
+                    {invitation.status === 'pending' ? (
                       <Button
                         type="button"
                         variant="destructiveQuiet"
                         size="compact"
                         className="workspace-link-button"
-                        aria-label={`Remove ${member.email}`}
-                        disabled={removeControl.disabled}
-                        title={removeControl.reason}
-                        onClick={() => void handleRemoveMember(member.accountId)}
+                        disabled={workspaceBusy === `revoke-invite-${invitation.id}`}
+                        onClick={() => void handleRevokeInvitation(invitation.id)}
                       >
-                        Remove
+                        Revoke
                       </Button>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="workspace-member-list" aria-label="Team invitations">
-                {invitations
-                  .filter(
-                    (invitation) =>
-                      invitation.status === 'pending' || invitation.status === 'expired',
-                  )
-                  .slice(0, 4)
-                  .map((invitation) => (
-                    <div className="workspace-member-row" key={invitation.id}>
-                      <span>
-                        <strong>{invitation.email}</strong>
-                        <small>
-                          {invitation.role} invite · {invitation.status} · expires{' '}
-                          {formatDateTime(invitation.expiresAt)}
-                        </small>
-                      </span>
-                      <span className="workspace-row-actions">
-                        {invitation.status === 'pending' || invitation.status === 'expired' ? (
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="compact"
-                            loading={workspaceBusy === `resend-invite-${invitation.id}`}
-                            loadingLabel="Refreshing..."
-                            onClick={() => void handleResendInvitation(invitation.id)}
-                          >
-                            Resend
-                          </Button>
-                        ) : null}
-                        {invitation.status === 'pending' ? (
-                          <Button
-                            type="button"
-                            variant="destructiveQuiet"
-                            size="compact"
-                            className="workspace-link-button"
-                            disabled={workspaceBusy === `revoke-invite-${invitation.id}`}
-                            onClick={() => void handleRevokeInvitation(invitation.id)}
-                          >
-                            Revoke
-                          </Button>
-                        ) : null}
-                      </span>
-                    </div>
-                  ))}
-              </div>
-              <form className="workspace-inline-form" onSubmit={handleAcceptInvitation}>
-                <label className="workspace-field workspace-field-wide">
-                  <span>Accept invite token</span>
-                  <input
-                    value={acceptToken}
-                    onChange={(event) => setAcceptToken(event.currentTarget.value)}
-                  />
-                </label>
-                <Button
-                  type="submit"
-                  variant="secondary"
-                  loading={workspaceBusy === 'accept-invite'}
-                  loadingLabel="Accepting..."
-                >
-                  Accept
-                </Button>
-              </form>
-              <div className="workspace-sso-status">
-                <span>SSO readiness</span>
-                <strong>
-                  OIDC {ssoStatus?.oidcConfigured ? 'configured' : 'ready'} · SAML{' '}
-                  {ssoStatus?.samlConfigured ? 'configured' : 'ready'}
-                </strong>
-                <small>
-                  {invitations.filter((item) => item.status === 'pending').length} pending
-                  invitations
-                  {ssoStatus?.callbackUrls.oidc
-                    ? ` · OIDC callback ${ssoStatus.callbackUrls.oidc}`
-                    : ''}
-                </small>
-              </div>
-              <div className="workspace-sso-status workspace-scim-status">
-                <span>SCIM provisioning</span>
-                <strong>
-                  {activeScimTokenCount} active tokens · {activeScimUserCount} active users
-                </strong>
-                <small>
-                  Tokens are shown once, then stored as hashes. Provisioned IdP users attach to this
-                  team directory.
-                </small>
-              </div>
-              <form className="workspace-inline-form" onSubmit={handleCreateScimToken}>
-                <label className="workspace-field">
-                  <span>SCIM token name</span>
-                  <input
-                    value={scimTokenDisplayName}
-                    onChange={(event) => setScimTokenDisplayName(event.currentTarget.value)}
-                  />
-                </label>
-                <label className="workspace-field">
-                  <span>Expires at (optional)</span>
-                  <input
-                    type="datetime-local"
-                    value={scimTokenExpiresAt}
-                    onChange={(event) => setScimTokenExpiresAt(event.currentTarget.value)}
-                  />
-                </label>
-                <Button
-                  type="submit"
-                  variant="secondary"
-                  loading={workspaceBusy === 'scim-token-create'}
-                  loadingLabel="Creating..."
-                  disabled={!scimTokenDisplayName.trim()}
-                >
-                  Create SCIM token
-                </Button>
-              </form>
-              {createdScimToken ? (
-                <p className="workspace-token-output workspace-sensitive-token" role="status">
-                  SCIM token: {createdScimToken.token} · Copy now. It will not be shown again.
-                </p>
-              ) : null}
-              <div className="workspace-scim-grid">
-                <div className="workspace-member-list workspace-scim-list" aria-label="SCIM tokens">
-                  {scimTokens.length > 0 ? (
-                    scimTokens.slice(0, 4).map((scimToken) => (
-                      <div
-                        className={`workspace-member-row ${scimToken.revokedAt ? 'is-muted' : ''}`}
-                        key={scimToken.id}
-                      >
-                        <span>
-                          <strong>{scimToken.displayName}</strong>
-                          <small>
-                            Prefix {scimToken.tokenPrefix} · created{' '}
-                            {formatDateTime(scimToken.createdAt)}
-                            {scimToken.lastUsedAt
-                              ? ` · last used ${formatDateTime(scimToken.lastUsedAt)}`
-                              : ' · never used'}
-                            {scimToken.expiresAt
-                              ? ` · expires ${formatDateTime(scimToken.expiresAt)}`
-                              : ' · no expiry'}
-                          </small>
-                        </span>
-                        <span
-                          className={`workspace-role-badge ${
-                            scimToken.revokedAt ? 'is-disabled' : 'is-admin'
-                          }`}
-                        >
-                          {scimToken.revokedAt ? 'Revoked' : 'Active'}
-                        </span>
-                        {!scimToken.revokedAt ? (
-                          <Button
-                            type="button"
-                            variant="destructiveQuiet"
-                            size="compact"
-                            className="workspace-link-button"
-                            aria-label={`Revoke SCIM token ${scimToken.displayName}`}
-                            loading={workspaceBusy === `scim-token-revoke-${scimToken.id}`}
-                            loadingLabel="Revoking..."
-                            onClick={() => void handleRevokeScimToken(scimToken.id)}
-                          >
-                            Revoke
-                          </Button>
-                        ) : null}
-                      </div>
-                    ))
-                  ) : (
-                    <p className="workspace-empty-state">No SCIM tokens created yet.</p>
-                  )}
+                    ) : null}
+                  </span>
                 </div>
-                <div
-                  className="workspace-member-list workspace-scim-list"
-                  aria-label="SCIM provisioned users"
-                >
-                  {scimUsers.length > 0 ? (
-                    scimUsers.slice(0, 4).map((scimUser) => (
-                      <div
-                        className={`workspace-member-row ${scimUser.active ? '' : 'is-muted'}`}
-                        key={scimUser.id}
-                      >
-                        <span>
-                          <strong>{scimUser.displayName ?? scimUser.userName}</strong>
-                          <small>
-                            {scimUser.userName} · external {scimUser.externalId} · updated{' '}
-                            {formatDateTime(scimUser.updatedAt)}
-                          </small>
-                        </span>
-                        <span
-                          className={`workspace-role-badge ${
-                            scimUser.active ? 'is-member' : 'is-disabled'
-                          }`}
-                        >
-                          {scimUser.active ? 'Active' : 'Deactivated'}
-                        </span>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="workspace-empty-state">
-                      Provisioned IdP users will appear here after SCIM sync.
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="workspace-inline-form">
-                <label className="workspace-field">
-                  <span>Mock OIDC email</span>
-                  <input
-                    value={ssoLoginEmail}
-                    onChange={(event) => setSsoLoginEmail(event.currentTarget.value)}
-                  />
-                </label>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  loading={workspaceBusy === 'sso-start'}
-                  loadingLabel="Starting..."
-                  onClick={() => void handleStartMockOidcLogin()}
-                >
-                  Start mock OIDC
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  loading={workspaceBusy === 'sso-complete'}
-                  loadingLabel="Completing..."
-                  disabled={!ssoStart}
-                  onClick={() => void handleCompleteMockOidcCallback()}
-                >
-                  Complete callback
-                </Button>
-              </div>
-              {ssoStart ? (
-                <p className="workspace-token-output">
-                  Mock authorization: {ssoStart.authorizationUrl} · callback {ssoStart.callbackUrl}{' '}
-                  · state expires {formatDateTime(ssoStart.expiresAt)}
-                </p>
-              ) : null}
-              <form className="workspace-inline-form" onSubmit={handleConfigureSso}>
-                <label className="workspace-field">
-                  <span>SSO provider</span>
-                  <select
-                    value={ssoProviderType}
-                    onChange={(event) =>
-                      setSsoProviderType(event.currentTarget.value as 'oidc' | 'saml')
-                    }
-                  >
-                    <option value="oidc">OIDC</option>
-                    <option value="saml">SAML</option>
-                  </select>
-                </label>
-                <label className="workspace-field">
-                  <span>Display name</span>
-                  <input
-                    value={ssoDisplayName}
-                    onChange={(event) => setSsoDisplayName(event.currentTarget.value)}
-                  />
-                </label>
-                <label className="workspace-field workspace-field-wide">
-                  <span>Issuer URL</span>
-                  <input
-                    value={ssoIssuerUrl}
-                    onChange={(event) => setSsoIssuerUrl(event.currentTarget.value)}
-                  />
-                </label>
-                <label className="workspace-field">
-                  <span>Client ID</span>
-                  <input
-                    value={ssoClientId}
-                    onChange={(event) => setSsoClientId(event.currentTarget.value)}
-                  />
-                </label>
-                <label className="workspace-field">
-                  <span>Client secret</span>
-                  <input
-                    type="password"
-                    value={ssoClientSecret}
-                    onChange={(event) => setSsoClientSecret(event.currentTarget.value)}
-                  />
-                </label>
-                <Button
-                  type="submit"
-                  variant="secondary"
-                  loading={workspaceBusy === 'sso-configure'}
-                  loadingLabel="Saving..."
-                >
-                  Save SSO
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  loading={workspaceBusy === 'sso-test'}
-                  loadingLabel="Testing..."
-                  onClick={() => void handleTestSsoConnection()}
-                >
-                  Test connection
-                </Button>
-              </form>
-              <div className="workspace-audit-list" aria-label="Team audit trail">
-                <div className="workspace-audit-heading">
-                  <span>Recent audit trail</span>
-                  <strong>{auditEvents.length} events</strong>
-                </div>
-                {auditEvents.length > 0 ? (
-                  auditEvents.slice(0, 6).map((event) => (
-                    <div className="workspace-audit-row" key={event.id}>
-                      <span>
-                        <strong>{teamAuditActionLabel(event.action)}</strong>
-                        <small>{teamAuditEventDetail(event)}</small>
-                      </span>
-                      <time dateTime={event.createdAt}>{formatDateTime(event.createdAt)}</time>
-                    </div>
-                  ))
-                ) : (
-                  <p className="workspace-empty-state">
-                    Team, SSO, invite, and billing actions will appear here after the first audited
-                    change.
-                  </p>
-                )}
-              </div>
-            </>
-          ) : (
-            <p className="workspace-empty-state">
-              Sign in as a team owner or admin to manage members, issue invite and SCIM tokens, and
-              review SSO status.
-            </p>
-          )}
-        </section>
-
-        <form
-          className="workspace-panel workspace-billing-panel"
-          onSubmit={handleImportProviderExport}
-        >
-          <div className="workspace-panel-heading">
-            <span>Actuals reconciliation</span>
-            <strong>
-              {billingImport
-                ? `${billingImport.acceptedRows} rows imported`
-                : billingAccessMessage
-                  ? 'Admin required'
-                  : 'Provider export'}
-            </strong>
+              ))}
           </div>
-          {billingAccessMessage ? (
-            <p className="workspace-empty-state">{billingAccessMessage}</p>
-          ) : null}
-          <div className="workspace-billing-controls">
+          <form className="workspace-inline-form" onSubmit={handleAcceptInvitation}>
+            <label className="workspace-field workspace-field-wide">
+              <span>Accept invite token</span>
+              <input
+                value={acceptToken}
+                onChange={(event) => setAcceptToken(event.currentTarget.value)}
+              />
+            </label>
+            <Button
+              type="submit"
+              variant="secondary"
+              loading={workspaceBusy === 'accept-invite'}
+              loadingLabel="Accepting..."
+            >
+              Accept
+            </Button>
+          </form>
+          <div className="workspace-sso-status">
+            <span>SSO readiness</span>
+            <strong>
+              OIDC {ssoStatus?.oidcConfigured ? 'configured' : 'ready'} · SAML{' '}
+              {ssoStatus?.samlConfigured ? 'configured' : 'ready'}
+            </strong>
+            <small>
+              {invitations.filter((item) => item.status === 'pending').length} pending invitations
+              {ssoStatus?.callbackUrls.oidc
+                ? ` · OIDC callback ${ssoStatus.callbackUrls.oidc}`
+                : ''}
+            </small>
+          </div>
+          <div className="workspace-sso-status workspace-scim-status">
+            <span>SCIM provisioning</span>
+            <strong>
+              {activeScimTokenCount} active tokens · {activeScimUserCount} active users
+            </strong>
+            <small>
+              Tokens are shown once, then stored as hashes. Provisioned IdP users attach to this
+              team directory.
+            </small>
+          </div>
+          <form className="workspace-inline-form" onSubmit={handleCreateScimToken}>
             <label className="workspace-field">
-              <span>Provider</span>
+              <span>SCIM token name</span>
+              <input
+                value={scimTokenDisplayName}
+                onChange={(event) => setScimTokenDisplayName(event.currentTarget.value)}
+              />
+            </label>
+            <label className="workspace-field">
+              <span>Expires at (optional)</span>
+              <input
+                type="datetime-local"
+                value={scimTokenExpiresAt}
+                onChange={(event) => setScimTokenExpiresAt(event.currentTarget.value)}
+              />
+            </label>
+            <Button
+              type="submit"
+              variant="secondary"
+              loading={workspaceBusy === 'scim-token-create'}
+              loadingLabel="Creating..."
+              disabled={!scimTokenDisplayName.trim()}
+            >
+              Create SCIM token
+            </Button>
+          </form>
+          {createdScimToken ? (
+            <p className="workspace-token-output workspace-sensitive-token" role="status">
+              SCIM token: {createdScimToken.token} · Copy now. It will not be shown again.
+            </p>
+          ) : null}
+          <div className="workspace-scim-grid">
+            <div className="workspace-member-list workspace-scim-list" aria-label="SCIM tokens">
+              {scimTokens.length > 0 ? (
+                scimTokens.slice(0, 4).map((scimToken) => (
+                  <div
+                    className={`workspace-member-row ${scimToken.revokedAt ? 'is-muted' : ''}`}
+                    key={scimToken.id}
+                  >
+                    <span>
+                      <strong>{scimToken.displayName}</strong>
+                      <small>
+                        Prefix {scimToken.tokenPrefix} · created{' '}
+                        {formatDateTime(scimToken.createdAt)}
+                        {scimToken.lastUsedAt
+                          ? ` · last used ${formatDateTime(scimToken.lastUsedAt)}`
+                          : ' · never used'}
+                        {scimToken.expiresAt
+                          ? ` · expires ${formatDateTime(scimToken.expiresAt)}`
+                          : ' · no expiry'}
+                      </small>
+                    </span>
+                    <span
+                      className={`workspace-role-badge ${
+                        scimToken.revokedAt ? 'is-disabled' : 'is-admin'
+                      }`}
+                    >
+                      {scimToken.revokedAt ? 'Revoked' : 'Active'}
+                    </span>
+                    {!scimToken.revokedAt ? (
+                      <Button
+                        type="button"
+                        variant="destructiveQuiet"
+                        size="compact"
+                        className="workspace-link-button"
+                        aria-label={`Revoke SCIM token ${scimToken.displayName}`}
+                        loading={workspaceBusy === `scim-token-revoke-${scimToken.id}`}
+                        loadingLabel="Revoking..."
+                        onClick={() => void handleRevokeScimToken(scimToken.id)}
+                      >
+                        Revoke
+                      </Button>
+                    ) : null}
+                  </div>
+                ))
+              ) : (
+                <p className="workspace-empty-state">No SCIM tokens created yet.</p>
+              )}
+            </div>
+            <div
+              className="workspace-member-list workspace-scim-list"
+              aria-label="SCIM provisioned users"
+            >
+              {scimUsers.length > 0 ? (
+                scimUsers.slice(0, 4).map((scimUser) => (
+                  <div
+                    className={`workspace-member-row ${scimUser.active ? '' : 'is-muted'}`}
+                    key={scimUser.id}
+                  >
+                    <span>
+                      <strong>{scimUser.displayName ?? scimUser.userName}</strong>
+                      <small>
+                        {scimUser.userName} · external {scimUser.externalId} · updated{' '}
+                        {formatDateTime(scimUser.updatedAt)}
+                      </small>
+                    </span>
+                    <span
+                      className={`workspace-role-badge ${
+                        scimUser.active ? 'is-member' : 'is-disabled'
+                      }`}
+                    >
+                      {scimUser.active ? 'Active' : 'Deactivated'}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="workspace-empty-state">
+                  Provisioned IdP users will appear here after SCIM sync.
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="workspace-inline-form">
+            <label className="workspace-field">
+              <span>Mock OIDC email</span>
+              <input
+                value={ssoLoginEmail}
+                onChange={(event) => setSsoLoginEmail(event.currentTarget.value)}
+              />
+            </label>
+            <Button
+              type="button"
+              variant="secondary"
+              loading={workspaceBusy === 'sso-start'}
+              loadingLabel="Starting..."
+              onClick={() => void handleStartMockOidcLogin()}
+            >
+              Start mock OIDC
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              loading={workspaceBusy === 'sso-complete'}
+              loadingLabel="Completing..."
+              disabled={!ssoStart}
+              onClick={() => void handleCompleteMockOidcCallback()}
+            >
+              Complete callback
+            </Button>
+          </div>
+          {ssoStart ? (
+            <p className="workspace-token-output">
+              Mock authorization: {ssoStart.authorizationUrl} · callback {ssoStart.callbackUrl} ·
+              state expires {formatDateTime(ssoStart.expiresAt)}
+            </p>
+          ) : null}
+          <form className="workspace-inline-form" onSubmit={handleConfigureSso}>
+            <label className="workspace-field">
+              <span>SSO provider</span>
               <select
-                value={provider}
-                disabled={Boolean(billingAccessMessage)}
-                onChange={(event) => {
-                  const nextProvider = event.currentTarget.value as ProviderId;
-                  setProvider(nextProvider);
-                  setExportContent(providerExportSample(nextProvider));
-                }}
+                value={ssoProviderType}
+                onChange={(event) =>
+                  setSsoProviderType(event.currentTarget.value as 'oidc' | 'saml')
+                }
               >
-                <option value="aws">AWS CUR</option>
-                <option value="azure">Azure Cost Management</option>
-                <option value="gcp">GCP Billing Export</option>
+                <option value="oidc">OIDC</option>
+                <option value="saml">SAML</option>
               </select>
             </label>
-            <TextField
-              label="Billing period start"
-              value={billingPeriodStart}
-              disabled={Boolean(billingAccessMessage)}
-              onChange={setBillingPeriodStart}
-            />
-            <TextField
-              label="Billing period end"
-              value={billingPeriodEnd}
-              disabled={Boolean(billingAccessMessage)}
-              onChange={setBillingPeriodEnd}
-            />
-          </div>
-          <label className="workspace-field workspace-export-field">
-            <span>{sourceType} CSV or JSON content</span>
-            <textarea
-              value={exportContent}
-              disabled={Boolean(billingAccessMessage)}
-              onChange={(event) => setExportContent(event.currentTarget.value)}
-            />
-          </label>
-          <Button
-            type="submit"
-            variant="primary"
-            loading={workspaceBusy === 'billing-import'}
-            loadingLabel="Importing actuals..."
-            disabled={Boolean(billingAccessMessage)}
-          >
-            <CompareIcon />
-            Import & reconcile
-          </Button>
-          {billingImport ? (
-            <div className="workspace-reconciliation-result">
-              <span>Import {billingImport.importRun.id.slice(0, 8)}</span>
-              <strong>{formatCurrency(billingImport.importRun.totalCostUsd)}</strong>
-              <small>
-                {reconciliation
-                  ? `${reconciliation.status} · ${formatCurrency(
-                      reconciliation.varianceUsd,
-                    )} variance`
-                  : 'Run a comparison to attach estimate-vs-actual evidence'}
-              </small>
-              {reconciliationSummary ? (
-                <div className="workspace-reconciliation-audit">
-                  <span>{reconciliationSummary.readiness}</span>
-                  <small>
-                    {reconciliationSummary.sourceFingerprintPercent}% source fingerprinted ·{' '}
-                    {reconciliationSummary.skuMatchPercent}% SKU matched
-                  </small>
-                  <small>
-                    Usage-comparable variance{' '}
-                    {formatCurrency(reconciliationSummary.estimateComparableVarianceUsd)} ·{' '}
-                    {reconciliationSummary.adjustmentLineItemCount} adjustment rows (
-                    {formatCurrency(reconciliationSummary.adjustmentCostUsd)})
-                  </small>
-                  <small>
-                    Invoice-grade readiness: {reconciliationSummary.invoiceGradeStatus} ·{' '}
-                    {reconciliationSummary.invoiceGradeMissingCount} missing ·{' '}
-                    {reconciliationSummary.invoiceGradePartialCount} partial
-                  </small>
-                  {reconciliationSummary.invoiceGradeBlockers.length > 0 ? (
-                    <small>
-                      Invoice blockers: {reconciliationSummary.invoiceGradeBlockers.join(', ')}
-                    </small>
-                  ) : null}
-                  <small>
-                    Artifact metadata: {reconciliationSummary.artifactRegisteredCount} registered ·{' '}
-                    {reconciliationSummary.artifactVerifiedCount} verified ·{' '}
-                    {reconciliationSummary.artifactRegisterStatus}
-                  </small>
-                  {reconciliationSummary.artifactBlobStored ? (
-                    <>
-                      <small>
-                        Stored file: {reconciliationSummary.artifactBlobFileName} ·{' '}
-                        {formatFileSize(reconciliationSummary.artifactBlobSizeBytes)} · sha256{' '}
-                        {reconciliationSummary.artifactBlobSha256?.slice(0, 12)}
-                      </small>
-                      <small>
-                        Governance: scan {reconciliationSummary.artifactMalwareScanStatus} · retain
-                        until {formatDateTime(reconciliationSummary.artifactRetentionUntil)} · legal
-                        hold {reconciliationSummary.artifactLegalHold ? 'on' : 'off'} ·{' '}
-                        {reconciliationSummary.artifactKmsRequiredForProduction
-                          ? 'KMS required for production'
-                          : 'KMS reference recorded'}
-                      </small>
-                      <small>
-                        Review queue: {reconciliationSummary.artifactReviewStatus.replace('-', ' ')}
-                        {reconciliationSummary.artifactReviewReviewer
-                          ? ` · ${reconciliationSummary.artifactReviewReviewer}`
-                          : ''}{' '}
-                        · pending {reconciliationSummary.artifactReviewPendingCount} · approved{' '}
-                        {reconciliationSummary.artifactReviewApprovedCount} · rejected{' '}
-                        {reconciliationSummary.artifactReviewRejectedCount}
-                      </small>
-                      <small>
-                        Policy exception:{' '}
-                        {reconciliationSummary.artifactPolicyExceptionStatus.replace('-', ' ')}
-                        {reconciliationSummary.artifactPolicyExceptionReviewer
-                          ? ` · ${reconciliationSummary.artifactPolicyExceptionReviewer}`
-                          : ''}
-                        {reconciliationSummary.artifactPolicyExceptionExpiresAt
-                          ? ` · expires ${formatDateTime(
-                              reconciliationSummary.artifactPolicyExceptionExpiresAt,
-                            )}`
-                          : ''}{' '}
-                        · requested {reconciliationSummary.artifactPolicyExceptionRequestedCount} ·
-                        approved {reconciliationSummary.artifactPolicyExceptionApprovedCount} ·
-                        rejected {reconciliationSummary.artifactPolicyExceptionRejectedCount} ·
-                        expired {reconciliationSummary.artifactPolicyExceptionExpiredCount}
-                      </small>
-                      <small>
-                        Invoice control:{' '}
-                        {reconciliationSummary.artifactInvoiceControlValidationStatus.replace(
-                          '-',
-                          ' ',
-                        )}{' '}
-                        · reconciliation delta{' '}
-                        {formatSignedCurrency(
-                          reconciliationSummary.artifactInvoiceControlTotalDeltaUsd,
-                        )}{' '}
-                        · import delta{' '}
-                        {formatSignedCurrency(
-                          reconciliationSummary.artifactInvoiceControlImportDeltaUsd,
-                        )}{' '}
-                        · period{' '}
-                        {reconciliationSummary.artifactInvoiceControlValidationStatus === 'not-run'
-                          ? 'pending'
-                          : reconciliationSummary.artifactInvoiceControlPeriodMatched
-                            ? 'matched'
-                            : 'not matched'}{' '}
-                        {reconciliationSummary.artifactInvoiceControlValidatedAt
-                          ? `· ${formatDateTime(
-                              reconciliationSummary.artifactInvoiceControlValidatedAt,
-                            )}`
-                          : ''}
-                      </small>
-                    </>
-                  ) : reconciliationSummary.artifactId ? (
-                    <small>
-                      Artifact file not stored yet. Metadata is registered, but no evidence blob is
-                      attached.
-                    </small>
-                  ) : null}
-                  <small>{reconciliationSummary.artifactPrimaryCaveat}</small>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="compact"
-                    loading={workspaceBusy === 'billing-evidence-packet'}
-                    loadingLabel="Preparing packet..."
-                    disabled={Boolean(billingAccessMessage)}
-                    onClick={handleDownloadInvoiceEvidencePacket}
-                  >
-                    <CompareIcon />
-                    Download evidence packet
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="compact"
-                    loading={workspaceBusy === 'billing-artifact'}
-                    loadingLabel="Registering artifact..."
-                    disabled={Boolean(billingAccessMessage)}
-                    onClick={handleRegisterInvoiceArtifact}
-                  >
-                    <CompareIcon />
-                    Register invoice artifact
-                  </Button>
-                  {reconciliationSummary.artifactId && !reconciliationSummary.artifactBlobStored ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="compact"
-                      loading={workspaceBusy === 'billing-artifact-upload'}
-                      loadingLabel="Storing artifact..."
-                      disabled={Boolean(billingAccessMessage)}
-                      onClick={handleStoreInvoiceArtifactBlob}
-                    >
-                      <CompareIcon />
-                      Store artifact file
-                    </Button>
-                  ) : null}
-                  {reconciliationSummary.artifactId && reconciliationSummary.artifactBlobStored ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="compact"
-                      loading={workspaceBusy === 'billing-artifact-download'}
-                      loadingLabel="Opening artifact..."
-                      disabled={Boolean(billingAccessMessage)}
-                      onClick={handleDownloadInvoiceArtifactBlob}
-                    >
-                      <CompareIcon />
-                      Download stored file
-                    </Button>
-                  ) : null}
-                  {reconciliationSummary.artifactId && reconciliationSummary.artifactBlobStored ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="compact"
-                      loading={workspaceBusy === 'billing-artifact-legal-hold'}
-                      loadingLabel={
-                        reconciliationSummary.artifactLegalHold
-                          ? 'Releasing legal hold...'
-                          : 'Placing legal hold...'
-                      }
-                      disabled={Boolean(billingAccessMessage)}
-                      onClick={handleToggleInvoiceArtifactLegalHold}
-                    >
-                      <CompareIcon />
-                      {reconciliationSummary.artifactLegalHold
-                        ? 'Release legal hold'
-                        : 'Place legal hold'}
-                    </Button>
-                  ) : null}
-                  {reconciliationSummary.artifactId &&
-                  reconciliationSummary.artifactBlobStored &&
-                  reconciliationSummary.artifactReviewStatus === 'not-requested' ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="compact"
-                      loading={workspaceBusy === 'billing-artifact-review-pending'}
-                      loadingLabel="Sending to review..."
-                      disabled={Boolean(billingAccessMessage)}
-                      onClick={() => void handleUpdateInvoiceArtifactReview('pending')}
-                    >
-                      <CompareIcon />
-                      Send to review
-                    </Button>
-                  ) : null}
-                  {reconciliationSummary.artifactId &&
-                  reconciliationSummary.artifactBlobStored &&
-                  reconciliationSummary.artifactReviewStatus === 'pending' ? (
-                    <>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="compact"
-                        loading={workspaceBusy === 'billing-artifact-review-approved'}
-                        loadingLabel="Approving review..."
-                        disabled={Boolean(billingAccessMessage)}
-                        onClick={() => void handleUpdateInvoiceArtifactReview('approved')}
-                      >
-                        <CompareIcon />
-                        Approve review
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="compact"
-                        loading={workspaceBusy === 'billing-artifact-review-rejected'}
-                        loadingLabel="Rejecting review..."
-                        disabled={Boolean(billingAccessMessage)}
-                        onClick={() => void handleUpdateInvoiceArtifactReview('rejected')}
-                      >
-                        <CompareIcon />
-                        Reject review
-                      </Button>
-                    </>
-                  ) : null}
-                  {reconciliationSummary.artifactId &&
-                  reconciliationSummary.artifactBlobStored &&
-                  (reconciliationSummary.artifactPolicyExceptionStatus === 'not-requested' ||
-                    reconciliationSummary.artifactPolicyExceptionStatus === 'expired') ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="compact"
-                      loading={workspaceBusy === 'billing-artifact-exception-requested'}
-                      loadingLabel="Requesting exception..."
-                      disabled={Boolean(billingAccessMessage)}
-                      onClick={() => void handleUpdateInvoiceArtifactPolicyException('requested')}
-                    >
-                      <CompareIcon />
-                      Request exception
-                    </Button>
-                  ) : null}
-                  {reconciliationSummary.artifactId &&
-                  reconciliationSummary.artifactBlobStored &&
-                  reconciliationSummary.artifactPolicyExceptionStatus === 'requested' ? (
-                    <>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="compact"
-                        loading={workspaceBusy === 'billing-artifact-exception-approved'}
-                        loadingLabel="Approving exception..."
-                        disabled={Boolean(billingAccessMessage)}
-                        onClick={() => void handleUpdateInvoiceArtifactPolicyException('approved')}
-                      >
-                        <CompareIcon />
-                        Approve exception
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="compact"
-                        loading={workspaceBusy === 'billing-artifact-exception-rejected'}
-                        loadingLabel="Rejecting exception..."
-                        disabled={Boolean(billingAccessMessage)}
-                        onClick={() => void handleUpdateInvoiceArtifactPolicyException('rejected')}
-                      >
-                        <CompareIcon />
-                        Reject exception
-                      </Button>
-                    </>
-                  ) : null}
-                  {reconciliationSummary.artifactId &&
-                  reconciliationSummary.artifactVerifiedCount <
-                    reconciliationSummary.artifactRegisteredCount ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="compact"
-                      loading={workspaceBusy === 'billing-artifact-verify'}
-                      loadingLabel="Verifying artifact..."
-                      disabled={Boolean(billingAccessMessage)}
-                      onClick={handleVerifyInvoiceArtifact}
-                    >
-                      <CompareIcon />
-                      Verify artifact evidence
-                    </Button>
-                  ) : null}
-                  {reconciliationSummary.artifactId &&
-                  reconciliationSummary.artifactBlobStored &&
-                  reconciliationSummary.artifactVerifiedCount > 0 ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="compact"
-                      loading={workspaceBusy === 'billing-invoice-control-validate'}
-                      loadingLabel="Validating controls..."
-                      disabled={Boolean(billingAccessMessage)}
-                      onClick={handleValidateInvoiceControlPacket}
-                    >
-                      <CompareIcon />
-                      Validate invoice control
-                    </Button>
-                  ) : null}
-                  {reconciliationSummary.commitmentLineItemCount > 0 ? (
-                    <>
-                      <small>
-                        Commitments: {reconciliationSummary.commitmentLineItemCount} rows · net{' '}
-                        {formatCurrency(reconciliationSummary.commitmentNetCostUsd)}
-                        {reconciliationSummary.commitmentCategories.length > 0
-                          ? ` (${reconciliationSummary.commitmentCategories.join(', ')})`
-                          : ''}
-                      </small>
-                      <small>
-                        Commitment evidence needed:{' '}
-                        {reconciliationSummary.commitmentRowsRequiringProviderInventory} inventory ·{' '}
-                        {reconciliationSummary.commitmentRowsRequiringAmortizationPeriod}{' '}
-                        amortization ·{' '}
-                        {reconciliationSummary.commitmentRowsRequiringAllocationEvidence} allocation
-                      </small>
-                    </>
-                  ) : null}
-                  {reconciliationSummary.adjustmentCategories.length > 0 ? (
-                    <small>
-                      Adjustments: {reconciliationSummary.adjustmentCategories.join(', ')}
-                    </small>
-                  ) : null}
-                  <small>{reconciliationSummary.primaryCaveat}</small>
+            <label className="workspace-field">
+              <span>Display name</span>
+              <input
+                value={ssoDisplayName}
+                onChange={(event) => setSsoDisplayName(event.currentTarget.value)}
+              />
+            </label>
+            <label className="workspace-field workspace-field-wide">
+              <span>Issuer URL</span>
+              <input
+                value={ssoIssuerUrl}
+                onChange={(event) => setSsoIssuerUrl(event.currentTarget.value)}
+              />
+            </label>
+            <label className="workspace-field">
+              <span>Client ID</span>
+              <input
+                value={ssoClientId}
+                onChange={(event) => setSsoClientId(event.currentTarget.value)}
+              />
+            </label>
+            <label className="workspace-field">
+              <span>Client secret</span>
+              <input
+                type="password"
+                value={ssoClientSecret}
+                onChange={(event) => setSsoClientSecret(event.currentTarget.value)}
+              />
+            </label>
+            <Button
+              type="submit"
+              variant="secondary"
+              loading={workspaceBusy === 'sso-configure'}
+              loadingLabel="Saving..."
+            >
+              Save SSO
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              loading={workspaceBusy === 'sso-test'}
+              loadingLabel="Testing..."
+              onClick={() => void handleTestSsoConnection()}
+            >
+              Test connection
+            </Button>
+          </form>
+          <div className="workspace-audit-list" aria-label="Team audit trail">
+            <div className="workspace-audit-heading">
+              <span>Recent audit trail</span>
+              <strong>{auditEvents.length} events</strong>
+            </div>
+            {auditEvents.length > 0 ? (
+              auditEvents.slice(0, 6).map((event) => (
+                <div className="workspace-audit-row" key={event.id}>
+                  <span>
+                    <strong>{teamAuditActionLabel(event.action)}</strong>
+                    <small>{teamAuditEventDetail(event)}</small>
+                  </span>
+                  <time dateTime={event.createdAt}>{formatDateTime(event.createdAt)}</time>
                 </div>
+              ))
+            ) : (
+              <p className="workspace-empty-state">
+                Team, SSO, invite, and billing actions will appear here after the first audited
+                change.
+              </p>
+            )}
+          </div>
+        </>
+      ) : (
+        <p className="workspace-empty-state">
+          Sign in as a team owner or admin to manage members, issue invite and SCIM tokens, and
+          review SSO status.
+        </p>
+      )}
+    </section>
+  );
+
+  const reconciliationPanel = (
+    <form className="workspace-panel workspace-billing-panel" onSubmit={handleImportProviderExport}>
+      <div className="workspace-panel-heading">
+        <span>Actuals reconciliation</span>
+        <strong>
+          {billingImport
+            ? `${billingImport.acceptedRows} rows imported`
+            : billingAccessMessage
+              ? 'Admin required'
+              : 'Provider export'}
+        </strong>
+      </div>
+      {billingAccessMessage ? (
+        <p className="workspace-empty-state">{billingAccessMessage}</p>
+      ) : null}
+      <div className="workspace-billing-controls">
+        <label className="workspace-field">
+          <span>Provider</span>
+          <select
+            value={provider}
+            disabled={Boolean(billingAccessMessage)}
+            onChange={(event) => {
+              const nextProvider = event.currentTarget.value as ProviderId;
+              setProvider(nextProvider);
+              setExportContent(providerExportSample(nextProvider));
+            }}
+          >
+            <option value="aws">AWS CUR</option>
+            <option value="azure">Azure Cost Management</option>
+            <option value="gcp">GCP Billing Export</option>
+          </select>
+        </label>
+        <TextField
+          label="Billing period start"
+          value={billingPeriodStart}
+          disabled={Boolean(billingAccessMessage)}
+          onChange={setBillingPeriodStart}
+        />
+        <TextField
+          label="Billing period end"
+          value={billingPeriodEnd}
+          disabled={Boolean(billingAccessMessage)}
+          onChange={setBillingPeriodEnd}
+        />
+      </div>
+      <label className="workspace-field workspace-export-field">
+        <span>{sourceType} CSV or JSON content</span>
+        <textarea
+          value={exportContent}
+          disabled={Boolean(billingAccessMessage)}
+          onChange={(event) => setExportContent(event.currentTarget.value)}
+        />
+      </label>
+      <Button
+        type="submit"
+        variant="primary"
+        loading={workspaceBusy === 'billing-import'}
+        loadingLabel="Importing actuals..."
+        disabled={Boolean(billingAccessMessage)}
+      >
+        <CompareIcon />
+        Import & reconcile
+      </Button>
+      {billingImport ? (
+        <div className="workspace-reconciliation-result">
+          <span>Import {billingImport.importRun.id.slice(0, 8)}</span>
+          <strong>{formatCurrency(billingImport.importRun.totalCostUsd)}</strong>
+          <small>
+            {reconciliation
+              ? `${reconciliation.status} · ${formatCurrency(reconciliation.varianceUsd)} variance`
+              : 'Run a comparison to attach estimate-vs-actual evidence'}
+          </small>
+          {reconciliationSummary ? (
+            <div className="workspace-reconciliation-audit">
+              <span>{reconciliationSummary.readiness}</span>
+              <small>
+                {reconciliationSummary.sourceFingerprintPercent}% source fingerprinted ·{' '}
+                {reconciliationSummary.skuMatchPercent}% SKU matched
+              </small>
+              <small>
+                Usage-comparable variance{' '}
+                {formatCurrency(reconciliationSummary.estimateComparableVarianceUsd)} ·{' '}
+                {reconciliationSummary.adjustmentLineItemCount} adjustment rows (
+                {formatCurrency(reconciliationSummary.adjustmentCostUsd)})
+              </small>
+              <small>
+                Invoice-grade readiness: {reconciliationSummary.invoiceGradeStatus} ·{' '}
+                {reconciliationSummary.invoiceGradeMissingCount} missing ·{' '}
+                {reconciliationSummary.invoiceGradePartialCount} partial
+              </small>
+              {reconciliationSummary.invoiceGradeBlockers.length > 0 ? (
+                <small>
+                  Invoice blockers: {reconciliationSummary.invoiceGradeBlockers.join(', ')}
+                </small>
               ) : null}
+              <small>
+                Artifact metadata: {reconciliationSummary.artifactRegisteredCount} registered ·{' '}
+                {reconciliationSummary.artifactVerifiedCount} verified ·{' '}
+                {reconciliationSummary.artifactRegisterStatus}
+              </small>
+              {reconciliationSummary.artifactBlobStored ? (
+                <>
+                  <small>
+                    Stored file: {reconciliationSummary.artifactBlobFileName} ·{' '}
+                    {formatFileSize(reconciliationSummary.artifactBlobSizeBytes)} · sha256{' '}
+                    {reconciliationSummary.artifactBlobSha256?.slice(0, 12)}
+                  </small>
+                  <small>
+                    Governance: scan {reconciliationSummary.artifactMalwareScanStatus} · retain
+                    until {formatDateTime(reconciliationSummary.artifactRetentionUntil)} · legal
+                    hold {reconciliationSummary.artifactLegalHold ? 'on' : 'off'} ·{' '}
+                    {reconciliationSummary.artifactKmsRequiredForProduction
+                      ? 'KMS required for production'
+                      : 'KMS reference recorded'}
+                  </small>
+                  <small>
+                    Review queue: {reconciliationSummary.artifactReviewStatus.replace('-', ' ')}
+                    {reconciliationSummary.artifactReviewReviewer
+                      ? ` · ${reconciliationSummary.artifactReviewReviewer}`
+                      : ''}{' '}
+                    · pending {reconciliationSummary.artifactReviewPendingCount} · approved{' '}
+                    {reconciliationSummary.artifactReviewApprovedCount} · rejected{' '}
+                    {reconciliationSummary.artifactReviewRejectedCount}
+                  </small>
+                  <small>
+                    Policy exception:{' '}
+                    {reconciliationSummary.artifactPolicyExceptionStatus.replace('-', ' ')}
+                    {reconciliationSummary.artifactPolicyExceptionReviewer
+                      ? ` · ${reconciliationSummary.artifactPolicyExceptionReviewer}`
+                      : ''}
+                    {reconciliationSummary.artifactPolicyExceptionExpiresAt
+                      ? ` · expires ${formatDateTime(
+                          reconciliationSummary.artifactPolicyExceptionExpiresAt,
+                        )}`
+                      : ''}{' '}
+                    · requested {reconciliationSummary.artifactPolicyExceptionRequestedCount} ·
+                    approved {reconciliationSummary.artifactPolicyExceptionApprovedCount} · rejected{' '}
+                    {reconciliationSummary.artifactPolicyExceptionRejectedCount} · expired{' '}
+                    {reconciliationSummary.artifactPolicyExceptionExpiredCount}
+                  </small>
+                  <small>
+                    Invoice control:{' '}
+                    {reconciliationSummary.artifactInvoiceControlValidationStatus.replace('-', ' ')}{' '}
+                    · reconciliation delta{' '}
+                    {formatSignedCurrency(
+                      reconciliationSummary.artifactInvoiceControlTotalDeltaUsd,
+                    )}{' '}
+                    · import delta{' '}
+                    {formatSignedCurrency(
+                      reconciliationSummary.artifactInvoiceControlImportDeltaUsd,
+                    )}{' '}
+                    · period{' '}
+                    {reconciliationSummary.artifactInvoiceControlValidationStatus === 'not-run'
+                      ? 'pending'
+                      : reconciliationSummary.artifactInvoiceControlPeriodMatched
+                        ? 'matched'
+                        : 'not matched'}{' '}
+                    {reconciliationSummary.artifactInvoiceControlValidatedAt
+                      ? `· ${formatDateTime(
+                          reconciliationSummary.artifactInvoiceControlValidatedAt,
+                        )}`
+                      : ''}
+                  </small>
+                </>
+              ) : reconciliationSummary.artifactId ? (
+                <small>
+                  Artifact file not stored yet. Metadata is registered, but no evidence blob is
+                  attached.
+                </small>
+              ) : null}
+              <small>{reconciliationSummary.artifactPrimaryCaveat}</small>
+              <Button
+                type="button"
+                variant="secondary"
+                size="compact"
+                loading={workspaceBusy === 'billing-evidence-packet'}
+                loadingLabel="Preparing packet..."
+                disabled={Boolean(billingAccessMessage)}
+                onClick={handleDownloadInvoiceEvidencePacket}
+              >
+                <CompareIcon />
+                Download evidence packet
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="compact"
+                loading={workspaceBusy === 'billing-artifact'}
+                loadingLabel="Registering artifact..."
+                disabled={Boolean(billingAccessMessage)}
+                onClick={handleRegisterInvoiceArtifact}
+              >
+                <CompareIcon />
+                Register invoice artifact
+              </Button>
+              {reconciliationSummary.artifactId && !reconciliationSummary.artifactBlobStored ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="compact"
+                  loading={workspaceBusy === 'billing-artifact-upload'}
+                  loadingLabel="Storing artifact..."
+                  disabled={Boolean(billingAccessMessage)}
+                  onClick={handleStoreInvoiceArtifactBlob}
+                >
+                  <CompareIcon />
+                  Store artifact file
+                </Button>
+              ) : null}
+              {reconciliationSummary.artifactId && reconciliationSummary.artifactBlobStored ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="compact"
+                  loading={workspaceBusy === 'billing-artifact-download'}
+                  loadingLabel="Opening artifact..."
+                  disabled={Boolean(billingAccessMessage)}
+                  onClick={handleDownloadInvoiceArtifactBlob}
+                >
+                  <CompareIcon />
+                  Download stored file
+                </Button>
+              ) : null}
+              {reconciliationSummary.artifactId && reconciliationSummary.artifactBlobStored ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="compact"
+                  loading={workspaceBusy === 'billing-artifact-legal-hold'}
+                  loadingLabel={
+                    reconciliationSummary.artifactLegalHold
+                      ? 'Releasing legal hold...'
+                      : 'Placing legal hold...'
+                  }
+                  disabled={Boolean(billingAccessMessage)}
+                  onClick={handleToggleInvoiceArtifactLegalHold}
+                >
+                  <CompareIcon />
+                  {reconciliationSummary.artifactLegalHold
+                    ? 'Release legal hold'
+                    : 'Place legal hold'}
+                </Button>
+              ) : null}
+              {reconciliationSummary.artifactId &&
+              reconciliationSummary.artifactBlobStored &&
+              reconciliationSummary.artifactReviewStatus === 'not-requested' ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="compact"
+                  loading={workspaceBusy === 'billing-artifact-review-pending'}
+                  loadingLabel="Sending to review..."
+                  disabled={Boolean(billingAccessMessage)}
+                  onClick={() => void handleUpdateInvoiceArtifactReview('pending')}
+                >
+                  <CompareIcon />
+                  Send to review
+                </Button>
+              ) : null}
+              {reconciliationSummary.artifactId &&
+              reconciliationSummary.artifactBlobStored &&
+              reconciliationSummary.artifactReviewStatus === 'pending' ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="compact"
+                    loading={workspaceBusy === 'billing-artifact-review-approved'}
+                    loadingLabel="Approving review..."
+                    disabled={Boolean(billingAccessMessage)}
+                    onClick={() => void handleUpdateInvoiceArtifactReview('approved')}
+                  >
+                    <CompareIcon />
+                    Approve review
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="compact"
+                    loading={workspaceBusy === 'billing-artifact-review-rejected'}
+                    loadingLabel="Rejecting review..."
+                    disabled={Boolean(billingAccessMessage)}
+                    onClick={() => void handleUpdateInvoiceArtifactReview('rejected')}
+                  >
+                    <CompareIcon />
+                    Reject review
+                  </Button>
+                </>
+              ) : null}
+              {reconciliationSummary.artifactId &&
+              reconciliationSummary.artifactBlobStored &&
+              (reconciliationSummary.artifactPolicyExceptionStatus === 'not-requested' ||
+                reconciliationSummary.artifactPolicyExceptionStatus === 'expired') ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="compact"
+                  loading={workspaceBusy === 'billing-artifact-exception-requested'}
+                  loadingLabel="Requesting exception..."
+                  disabled={Boolean(billingAccessMessage)}
+                  onClick={() => void handleUpdateInvoiceArtifactPolicyException('requested')}
+                >
+                  <CompareIcon />
+                  Request exception
+                </Button>
+              ) : null}
+              {reconciliationSummary.artifactId &&
+              reconciliationSummary.artifactBlobStored &&
+              reconciliationSummary.artifactPolicyExceptionStatus === 'requested' ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="compact"
+                    loading={workspaceBusy === 'billing-artifact-exception-approved'}
+                    loadingLabel="Approving exception..."
+                    disabled={Boolean(billingAccessMessage)}
+                    onClick={() => void handleUpdateInvoiceArtifactPolicyException('approved')}
+                  >
+                    <CompareIcon />
+                    Approve exception
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="compact"
+                    loading={workspaceBusy === 'billing-artifact-exception-rejected'}
+                    loadingLabel="Rejecting exception..."
+                    disabled={Boolean(billingAccessMessage)}
+                    onClick={() => void handleUpdateInvoiceArtifactPolicyException('rejected')}
+                  >
+                    <CompareIcon />
+                    Reject exception
+                  </Button>
+                </>
+              ) : null}
+              {reconciliationSummary.artifactId &&
+              reconciliationSummary.artifactVerifiedCount <
+                reconciliationSummary.artifactRegisteredCount ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="compact"
+                  loading={workspaceBusy === 'billing-artifact-verify'}
+                  loadingLabel="Verifying artifact..."
+                  disabled={Boolean(billingAccessMessage)}
+                  onClick={handleVerifyInvoiceArtifact}
+                >
+                  <CompareIcon />
+                  Verify artifact evidence
+                </Button>
+              ) : null}
+              {reconciliationSummary.artifactId &&
+              reconciliationSummary.artifactBlobStored &&
+              reconciliationSummary.artifactVerifiedCount > 0 ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="compact"
+                  loading={workspaceBusy === 'billing-invoice-control-validate'}
+                  loadingLabel="Validating controls..."
+                  disabled={Boolean(billingAccessMessage)}
+                  onClick={handleValidateInvoiceControlPacket}
+                >
+                  <CompareIcon />
+                  Validate invoice control
+                </Button>
+              ) : null}
+              {reconciliationSummary.commitmentLineItemCount > 0 ? (
+                <>
+                  <small>
+                    Commitments: {reconciliationSummary.commitmentLineItemCount} rows · net{' '}
+                    {formatCurrency(reconciliationSummary.commitmentNetCostUsd)}
+                    {reconciliationSummary.commitmentCategories.length > 0
+                      ? ` (${reconciliationSummary.commitmentCategories.join(', ')})`
+                      : ''}
+                  </small>
+                  <small>
+                    Commitment evidence needed:{' '}
+                    {reconciliationSummary.commitmentRowsRequiringProviderInventory} inventory ·{' '}
+                    {reconciliationSummary.commitmentRowsRequiringAmortizationPeriod} amortization ·{' '}
+                    {reconciliationSummary.commitmentRowsRequiringAllocationEvidence} allocation
+                  </small>
+                </>
+              ) : null}
+              {reconciliationSummary.adjustmentCategories.length > 0 ? (
+                <small>Adjustments: {reconciliationSummary.adjustmentCategories.join(', ')}</small>
+              ) : null}
+              <small>{reconciliationSummary.primaryCaveat}</small>
             </div>
           ) : null}
-        </form>
+        </div>
+      ) : null}
+    </form>
+  );
+
+  return (
+    <section className="workspace-control-center" id="workspace" aria-label="Workspace controls">
+      <div className="workspace-control-heading">
+        <div>
+          <span>Workspace</span>
+          <h2>{session?.activeTeam?.name ?? 'Account, team and billing'}</h2>
+        </div>
+        <strong>{session ? session.account.email : 'Local session required'}</strong>
       </div>
+
+      <ResultTabs
+        ariaLabel="Workspace sections"
+        activeId={section}
+        onActiveChange={(id) => {
+          if (isWorkspaceSection(id)) {
+            showSection(id);
+          }
+        }}
+        tabs={[
+          {
+            id: 'overview',
+            label: 'Overview',
+            hint: 'Team, invites, the latest invoice against its estimate, and recent activity.',
+            content: (
+              <WorkspaceOverview
+                session={session}
+                members={members}
+                invitations={invitations}
+                auditEvents={auditEvents}
+                reconciliation={reconciliation}
+                onNavigate={showSection}
+              />
+            ),
+          },
+          {
+            id: 'account',
+            label: 'Account',
+            hint: 'Sign in, sessions and account security.',
+            content: accountPanel,
+          },
+          {
+            id: 'team',
+            label: 'Team',
+            hint: 'Members, invitations, SSO, SCIM provisioning and the audit trail.',
+            content: teamPanel,
+          },
+          {
+            id: 'reconciliation',
+            label: 'Reconciliation',
+            hint: 'Import a provider bill and reconcile it with the estimate.',
+            content: reconciliationPanel,
+          },
+        ]}
+      />
     </section>
   );
 }

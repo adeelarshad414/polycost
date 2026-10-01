@@ -13,6 +13,7 @@ import './styles.css';
 import './styles/components.css';
 import './styles/charts.css';
 import './styles/results.css';
+import './styles/workspace.css';
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

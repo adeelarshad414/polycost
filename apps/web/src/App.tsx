@@ -284,7 +284,7 @@ import {
 } from './components/WorkloadControlBar';
 import { ResultTabs, type ResultTab } from './components/ResultTabs';
 import { ThemeSwitcher } from './components/ThemeSwitcher';
-import { EmptyState, KpiTile, ProvenancePill } from './components/ui';
+import { EmptyState, KpiTile, ProvenancePill, Skeleton } from './components/ui';
 import {
   CommitmentBreakEven,
   CostByServiceStacked,
@@ -372,7 +372,13 @@ import {
   UploadIcon,
 } from './components/icons';
 import { RangeField, TextField } from './components/fields';
-import { WorkspaceControlCenter } from './components/WorkspaceControlCenter';
+// UI-5: the workspace (account, team, SCIM, billing import) is only for signed-in
+// operators, so it loads on demand instead of shipping to every first visit.
+const WorkspaceControlCenter = lazy(() =>
+  import('./components/WorkspaceControlCenter').then((module) => ({
+    default: module.WorkspaceControlCenter,
+  })),
+);
 import { comparisonIdFromPath, comparisonPath } from './lib/comparison-route';
 
 export function App({ client = polyCostClient }: AppProps) {
@@ -448,7 +454,9 @@ export function App({ client = polyCostClient }: AppProps) {
       initialStoredAuth.expired ||
       // Someone who followed an invite link came here specifically to join a
       // team; hiding the panel would strand them on the landing page.
-      readInviteTokenFromUrl() !== '',
+      readInviteTokenFromUrl() !== '' ||
+      // A linked workspace section (#workspace/team) opens the panel on it.
+      window.location.hash.startsWith('#workspace/'),
   );
   const [requirementsFileName, setRequirementsFileName] = useState<string | null>(null);
   const [regionCatalog, setRegionCatalog] = useState<RegionCatalogResponse | null>(null);
@@ -1433,6 +1441,12 @@ export function App({ client = polyCostClient }: AppProps) {
     setError(null);
     setNotice(null);
     setWorkspaceOpen(true);
+    // UI-5: land on the Account tab. The workspace reads the hash when it mounts
+    // and follows hashchange once it is already open.
+    if (window.location.hash !== '#workspace/account') {
+      window.history.pushState(null, '', '#workspace/account');
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    }
 
     // The panel mounts in the same tick, so the scroll is deferred to the next
     // frame; scrolling now would target an element that does not exist yet.
@@ -1478,13 +1492,21 @@ export function App({ client = polyCostClient }: AppProps) {
         onThemeChange={setThemeChoice}
       />
       {workspaceOpen ? (
-        <WorkspaceControlCenter
-          client={client}
-          comparisonId={comparison?.comparisonId}
-          initialStoredAuth={initialStoredAuth}
-          onNotice={setNotice}
-          onError={setError}
-        />
+        <Suspense
+          fallback={
+            <div className="workspace-loading">
+              <Skeleton lines={4} label="Loading workspace" />
+            </div>
+          }
+        >
+          <WorkspaceControlCenter
+            client={client}
+            comparisonId={comparison?.comparisonId}
+            initialStoredAuth={initialStoredAuth}
+            onNotice={setNotice}
+            onError={setError}
+          />
+        </Suspense>
       ) : null}
       {comparison ? (
         <>

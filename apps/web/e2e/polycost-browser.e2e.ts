@@ -195,6 +195,27 @@ test('gives every comparison a URL that survives reload and Back (UI-4)', async 
   await expect(page.getByRole('button', { name: /compare costs/i })).toBeVisible();
 });
 
+test('opens a linked workspace section and keeps it in the URL (UI-5)', async ({ page }) => {
+  await mockRegionCatalog(page);
+  await page.goto('/#workspace/team');
+
+  const tabs = page.getByRole('tablist', { name: 'Workspace sections' });
+  await expect(tabs).toBeVisible({ timeout: 30_000 });
+  await expect(tabs.getByRole('tab', { name: 'Team' })).toHaveAttribute('aria-selected', 'true');
+
+  await tabs.getByRole('tab', { name: 'Overview' }).click();
+  await expect(page).toHaveURL(/#workspace\/overview$/);
+  await expect(page.getByRole('button', { name: 'Go to sign in' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Go to sign in' }).click();
+  await expect(page).toHaveURL(/#workspace\/account$/);
+  await page.goBack();
+  await expect(tabs.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+});
+
 test('surfaces provider pricing warnings in the engineering evidence view', async ({ page }) => {
   await mockRegionCatalog(page);
   await mockComparisonCreation(

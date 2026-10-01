@@ -560,3 +560,110 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
   gap: var(--space-2);
 }
+
+/* Estimate vs invoice variance (UI-5): diverging around a zero axis. */
+.variance-rows {
+  display: grid;
+  gap: var(--space-1-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.variance-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) minmax(120px, auto);
+  align-items: center;
+  gap: var(--space-1-5);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+}
+
+.variance-row:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+.variance-label {
+  color: var(--text-primary);
+  font-size: var(--fs-14);
+  font-weight: var(--fw-semibold);
+}
+
+.variance-track {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2px minmax(0, 1fr);
+  align-items: center;
+  height: 22px;
+}
+
+.variance-half {
+  display: flex;
+  height: 100%;
+}
+
+.variance-half-under {
+  justify-content: end;
+}
+
+.variance-axis {
+  height: 100%;
+  background: var(--border-strong);
+}
+
+.variance-bar {
+  display: block;
+  height: 100%;
+  background: var(--div);
+  animation: chart-grow var(--dur-slow) var(--ease-emphasized) both;
+}
+
+.variance-half-under .variance-bar {
+  border-radius: var(--radius-xs) 0 0 var(--radius-xs);
+  transform-origin: right center;
+}
+
+.variance-half-over .variance-bar {
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+  transform-origin: left center;
+}
+
+.variance-value {
+  color: var(--text-primary);
+  font-size: var(--fs-14);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-semibold);
+  text-align: right;
+}
+
+.variance-row.is-over .variance-value {
+  color: var(--danger);
+}
+
+.variance-row.is-under .variance-value {
+  color: var(--success);
+}
+
+.div-under-1 {
+  --div: var(--div-under-1);
+}
+
+.div-under-2 {
+  --div: var(--div-under-2);
+}
+
+.div-under-3 {
+  --div: var(--div-under-3);
+}
+
+.div-over-1 {
+  --div: var(--div-over-1);
+}
+
+.div-over-2 {
+  --div: var(--div-over-2);
+}
+
+.div-over-3 {
+  --div: var(--div-over-3);
+}
