@@ -270,7 +270,7 @@ const EngineeringProviderServiceChart = lazy(() =>
 );
 import { formatApiError, PolyCostClient, polyCostClient } from './api-client';
 import { POLYCOST_TAGLINE } from './brand';
-import { Button, ProviderBadge } from './components/Button';
+import { Button } from './components/Button';
 import { FinOpsFeatureLayer, SharedReportPlaceholder } from './components/FinOpsFeatureLayer';
 import { BootSplash, LoadingStatus, TaskQueue } from './components/LoadingExperience';
 import { PersonaComparisonWorkspace } from './components/PersonaComparisonWorkspace';
@@ -295,6 +295,18 @@ import {
   type CumulativeTerm,
 } from './charts';
 import { VerdictHero, VerdictKpis } from './components/results/VerdictHero';
+import { LandingHero } from './features/landing/LandingHero';
+import {
+  Boxes,
+  BrainCircuit,
+  Gauge,
+  Globe,
+  Layers,
+  LayoutTemplate,
+  Server,
+  Workflow,
+  type LucideIcon,
+} from 'lucide-react';
 import { TopLoadingBar } from './components/TopLoadingBar';
 import { HOURS_PER_MONTH } from './cost-time';
 import {
@@ -1886,26 +1898,18 @@ function InitialHomePage({
 
   return (
     <section className="initial-home" id="requirements" aria-labelledby="page-title">
-      <div className="initial-home-brand">
-        <h1 id="page-title">{POLYCOST_TAGLINE}</h1>
-        <p>Compare AWS, Azure, and GCP costs — instantly.</p>
-        <div className="initial-provider-badges" aria-label="Supported cloud providers">
-          <ProviderBadge provider="aws" className="initial-provider-badge">
-            <span className="provider-badge-dot" aria-hidden="true" />
-            AWS
-          </ProviderBadge>
-          <ProviderBadge provider="azure" className="initial-provider-badge">
-            <span className="provider-badge-dot" aria-hidden="true" />
-            Azure
-          </ProviderBadge>
-          <ProviderBadge provider="gcp" className="initial-provider-badge">
-            <span className="provider-badge-dot" aria-hidden="true" />
-            GCP
-          </ProviderBadge>
-        </div>
-      </div>
+      <LandingHero
+        title={POLYCOST_TAGLINE}
+        subtitle="Describe a workload once and see what it costs on AWS, Azure and GCP, side by side, with the evidence behind every number."
+        dataHealth={dataHealth}
+        onStart={() => focusCompareForm()}
+        onUploadDiagram={() => {
+          onInputModeChange('diagram');
+          focusCompareForm();
+        }}
+      />
 
-      <div className="initial-home-form" aria-label="Compare cloud costs">
+      <div className="initial-home-form" id="compare-form" aria-label="Compare cloud costs">
         <DataHealthBanner health={dataHealth} error={dataHealthError} />
         <InputModeTabs inputMode={inputMode} onInputModeChange={onInputModeChange} />
         <PricingModelPreferenceControl
@@ -1920,6 +1924,7 @@ function InitialHomePage({
 
         {inputMode === 'form' ? (
           <form className="initial-guided-form" onSubmit={onSubmit}>
+            <FormStep number={1} title="Pick a starting point" />
             <ArchitectureTemplatePicker onApply={applyTemplate} compact />
             <FormValidationSummary issues={validationIssues} />
             {requirementsAwaitingReview ? <RequirementReviewCards form={form} /> : null}
@@ -1946,12 +1951,14 @@ function InitialHomePage({
               exists: a reader can move the estimate immediately and open the
               rest when they need it. Both read and write the same form state.
             */}
+            <FormStep number={2} title="Shape the workload" />
             <WorkloadControlBar
               note="Adjust the headline levers, or open the full model below."
               dimensions={headlineDimensions}
               choices={headlineChoices}
             />
 
+            <FormStep number={3} title="Fine-tune assumptions" optional />
             <details className="workload-control-detail">
               <summary>
                 Full workload model
@@ -5494,6 +5501,53 @@ function FormSummaryChip({
   );
 }
 
+/** One icon per quick start so the cards scan by shape, not by colour (UI-6). */
+function TemplateIcon({ templateId }: { templateId: string }) {
+  const Icon = TEMPLATE_ICONS.get(templateId) ?? LayoutTemplate;
+  return <Icon aria-hidden="true" className="architecture-template-icon" strokeWidth={1.75} />;
+}
+
+const TEMPLATE_ICONS = new Map<string, LucideIcon>([
+  ['web-application-tier', Globe],
+  ['data-analytics-pipeline', Workflow],
+  ['machine-learning-training', BrainCircuit],
+  ['high-traffic-api', Gauge],
+  ['lamp-stack', Server],
+  ['three-tier-enterprise-app', Layers],
+  ['microservices-platform', Boxes],
+]);
+
+/** A numbered stage of the comparison form (UI-6), so the long form reads as three steps. */
+function FormStep({
+  number,
+  title,
+  optional = false,
+}: {
+  number: number;
+  title: string;
+  optional?: boolean;
+}) {
+  return (
+    <h2 className="form-step">
+      <span className="form-step-number" aria-hidden="true">
+        {number}
+      </span>
+      <span>
+        <span className="sr-only">Step {number}: </span>
+        {title}
+      </span>
+      {optional ? <span className="form-step-optional">Optional</span> : null}
+    </h2>
+  );
+}
+
+/** Scroll the comparison form into view and put focus on its primary action. */
+function focusCompareForm() {
+  const form = document.getElementById('compare-form');
+  form?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  form?.querySelector<HTMLButtonElement>('button[type="submit"]')?.focus({ preventScroll: true });
+}
+
 function ArchitectureTemplatePicker({
   compact = false,
   onApply,
@@ -5522,6 +5576,7 @@ function ArchitectureTemplatePicker({
             className="architecture-template-button"
             onClick={() => onApply(template)}
           >
+            <TemplateIcon templateId={template.id} />
             <span>{template.label}</span>
             <small>{template.summary}</small>
           </button>

@@ -216,6 +216,21 @@ test('opens a linked workspace section and keeps it in the URL (UI-5)', async ({
   );
 });
 
+test('lands on a hero whose calls to action reach the form (UI-6)', async ({ page }) => {
+  await mockRegionCatalog(page);
+  await page.goto('/');
+
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.getByText('Sample result')).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Pick a starting point/ })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Upload a diagram' }).click();
+  await expect(page.getByRole('tab', { name: /upload diagram/i })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+});
+
 test('surfaces provider pricing warnings in the engineering evidence view', async ({ page }) => {
   await mockRegionCatalog(page);
   await mockComparisonCreation(

@@ -14,6 +14,7 @@ import './styles/components.css';
 import './styles/charts.css';
 import './styles/results.css';
 import './styles/workspace.css';
+import './styles/landing.css';
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

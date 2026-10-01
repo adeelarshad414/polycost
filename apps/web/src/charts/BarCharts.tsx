@@ -22,7 +22,9 @@ export function ProviderComparisonBar({
   quotes,
   period = 'month',
   title = 'Provider comparison',
+  headingLevel,
 }: {
+  headingLevel?: 2 | 3 | 4;
   quotes: ProviderQuote[];
   /** Unit the quotes are expressed in: month, year, quarter, week, day or hour. */
   period?: string;
@@ -35,6 +37,7 @@ export function ProviderComparisonBar({
     <ChartFrame
       title={title}
       unit={unit}
+      headingLevel={headingLevel}
       className="chart-comparison"
       table={{
         caption: `${title} (${unit})`,
