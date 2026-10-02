@@ -1,4 +1,4 @@
-import { comparisonCategoryBreakdown, comparisonQuotes } from './adapters';
+import { comparisonCategoryBreakdown, comparisonQuotes, intervalPeriod } from './adapters';
 import type { ComparisonResult } from '../types';
 
 function comparison(providers: unknown[]): ComparisonResult {
@@ -15,6 +15,19 @@ describe('chart adapters', () => {
       { providerId: 'gcp', value: undefined },
     ]);
     expect(comparisonQuotes(null).every((quote) => quote.value === undefined)).toBe(true);
+  });
+
+  it('reads the requested interval and names its period', () => {
+    const result = comparison([{ providerId: 'gcp', totals: { monthly: 30, yearly: 360 } }]);
+
+    expect(
+      comparisonQuotes(result, 'yearly').find((quote) => quote.providerId === 'gcp')?.value,
+    ).toBe(360);
+    expect([intervalPeriod('yearly'), intervalPeriod('daily'), intervalPeriod('monthly')]).toEqual([
+      'year',
+      'day',
+      'month',
+    ]);
   });
 
   it('maps the breakdown to categories, merges network, and keeps the remainder', () => {

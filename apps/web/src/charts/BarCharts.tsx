@@ -24,7 +24,8 @@ export function ProviderComparisonBar({
   title = 'Provider comparison',
 }: {
   quotes: ProviderQuote[];
-  period?: 'month' | 'year';
+  /** Unit the quotes are expressed in: month, year, quarter, week, day or hour. */
+  period?: string;
   title?: string;
 }) {
   const model = useMemo(() => providerComparison(quotes), [quotes]);

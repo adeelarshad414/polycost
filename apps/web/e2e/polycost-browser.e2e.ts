@@ -76,7 +76,7 @@ test('compares the default workload on mobile without page-level horizontal over
 
   await page.getByRole('button', { name: /compare costs/i }).click();
   await expect(page.getByLabel('Provider cost summary')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText('Cost composition waterfall')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Provider comparison' })).toBeVisible();
   // The detail is a tab strip now, not a disclosure. Inactive panels stay in the
   // DOM so the report still prints whole, so this asserts visibility rather than
   // absence.
@@ -120,7 +120,7 @@ test('keeps the primary comparison workflow accessible across locked breakpoints
 
     await page.getByRole('button', { name: /compare costs/i }).click();
     await expect(page.getByLabel('Provider cost summary')).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText('Cost composition waterfall')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Provider comparison' })).toBeVisible();
     await expect(page.getByLabel('Comparison quick actions')).toBeVisible();
     await expectInteractiveControlsAreNamed(page, `${viewport.label} comparison state`);
     await expectNoHorizontalOverflow(page);
@@ -147,6 +147,52 @@ test('shows no internal copy, summed alternatives, or clipped content on phones 
   // Provider quotes are alternatives: never summed, never a part-to-whole chart.
   await expect(page.getByText('Executive monthly baseline')).toHaveCount(0);
   await expect(page.getByText('Provider mix')).toHaveCount(0);
+});
+
+test('leads results with the verdict and keeps evidence collapsed (UI-4)', async ({ page }) => {
+  await mockRegionCatalog(page);
+  await mockComparisonCreation(page, browserComparison());
+
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 375, height: 812 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+    await page.getByRole('button', { name: /compare costs/i }).click();
+
+    const verdict = page.getByRole('heading', { name: /is the lowest-cost option/ });
+    await expect(verdict).toBeVisible({ timeout: 30_000 });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect(verdict).toBeInViewport();
+    await expect(page.getByText('Evidence and assumptions')).toBeVisible();
+    await expect(page.getByText('Cost composition waterfall')).toBeHidden();
+    await expectNoClippedContent(page);
+  }
+});
+
+test('gives every comparison a URL that survives reload and Back (UI-4)', async ({ page }) => {
+  const comparison = browserComparison();
+  await mockRegionCatalog(page);
+  await mockComparisonCreation(page, comparison);
+
+  await page.goto('/');
+  await page.getByRole('button', { name: /compare costs/i }).click();
+  await expect(page).toHaveURL(new RegExp(`/compare/${comparison.comparisonId}$`), {
+    timeout: 30_000,
+  });
+
+  await page.reload();
+  await expect(page.getByRole('heading', { name: /is the lowest-cost option/ })).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(page.getByText('Opened a saved comparison.')).toBeVisible();
+  // A linked comparison has no form behind it, so the live levers stay hidden.
+  await expect(page.getByText('Adjust and recompare')).toHaveCount(0);
+
+  await page.goBack();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('button', { name: /compare costs/i })).toBeVisible();
 });
 
 test('surfaces provider pricing warnings in the engineering evidence view', async ({ page }) => {
@@ -350,7 +396,8 @@ test('supports keyboard-only comparison, tabs, and interval controls', async ({ 
   await expect(yearly).toBeFocused();
   await page.keyboard.press('Space');
   await expect(yearly).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByText('Yearly estimate').first()).toBeVisible();
+  // UI-4: the visible provider comparison follows the selected interval.
+  await expect(page.getByText('USD per year, lowest first')).toBeVisible();
 });
 
 async function mockRegionCatalog(page: Page): Promise<void> {
@@ -371,6 +418,18 @@ async function mockComparisonCreation(page: Page, comparison: ComparisonResult):
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ valid: true }),
+    });
+  });
+  await page.route(`**/api/v1/comparisons/${comparison.comparisonId}`, async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.fallback();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(comparison),
     });
   });
   await page.route('**/api/v1/comparisons', async (route) => {

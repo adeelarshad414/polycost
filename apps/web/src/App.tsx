@@ -286,11 +286,15 @@ import { ResultTabs, type ResultTab } from './components/ResultTabs';
 import { ThemeSwitcher } from './components/ThemeSwitcher';
 import { EmptyState, KpiTile, ProvenancePill } from './components/ui';
 import {
+  CommitmentBreakEven,
   CostByServiceStacked,
   ProviderComparisonBar,
   comparisonCategoryBreakdown,
   comparisonQuotes,
+  intervalPeriod,
+  type CumulativeTerm,
 } from './charts';
+import { VerdictHero, VerdictKpis } from './components/results/VerdictHero';
 import { TopLoadingBar } from './components/TopLoadingBar';
 import { HOURS_PER_MONTH } from './cost-time';
 import {
@@ -369,6 +373,7 @@ import {
 } from './components/icons';
 import { RangeField, TextField } from './components/fields';
 import { WorkspaceControlCenter } from './components/WorkspaceControlCenter';
+import { comparisonIdFromPath, comparisonPath } from './lib/comparison-route';
 
 export function App({ client = polyCostClient }: AppProps) {
   const shareToken = shareTokenFromLocation();
@@ -451,6 +456,69 @@ export function App({ client = polyCostClient }: AppProps) {
   const [dataHealth, setDataHealth] = useState<DataHealthResponse | null>(null);
   const [dataHealthError, setDataHealthError] = useState<string | null>(null);
   const [formValidationIssues, setFormValidationIssues] = useState<WorkloadFormIssue[]>([]);
+  // UI-4: a comparison opened from a /compare/<id> link has no form behind it, so
+  // the requirement summary and live levers are hidden until the user edits.
+  const [openedFromLink, setOpenedFromLink] = useState(false);
+  const comparisonIdRef = useRef<string | undefined>(undefined);
+  const routeLoadRef = useRef(false);
+  comparisonIdRef.current = comparison?.comparisonId;
+
+  // Keep the URL on the result being viewed: /compare/<id> while a comparison is
+  // open, / otherwise. Back and Forward drive the same state in reverse.
+  useEffect(() => {
+    if (shareToken) {
+      return undefined;
+    }
+
+    async function openFromLocation() {
+      const routeId = comparisonIdFromPath(window.location.pathname);
+      if (!routeId) {
+        if (comparisonIdRef.current) {
+          setComparison(null);
+          setOpenedFromLink(false);
+          setNotice(null);
+        }
+        return;
+      }
+      if (routeId === comparisonIdRef.current) {
+        return;
+      }
+
+      routeLoadRef.current = true;
+      setError(null);
+      try {
+        const result = await client.getComparison(routeId);
+        setComparison(result);
+        setOpenedFromLink(true);
+        setIsEditingRequirements(false);
+        setNotice('Opened a saved comparison. Edit the requirements to compare again.');
+      } catch (routeError) {
+        setError(`That comparison could not be opened. ${formatApiError(routeError)}`);
+        window.history.replaceState(null, '', '/');
+      } finally {
+        routeLoadRef.current = false;
+      }
+    }
+
+    void openFromLocation();
+    const onPopState = () => void openFromLocation();
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+    // Runs once on mount; later navigation arrives through popstate.
+  }, []);
+
+  useEffect(() => {
+    if (shareToken || routeLoadRef.current) {
+      return;
+    }
+    const currentRouteId = comparisonIdFromPath(window.location.pathname);
+    const comparisonId = comparison?.comparisonId;
+    if (comparisonId && currentRouteId !== comparisonId) {
+      window.history.pushState(null, '', comparisonPath(comparisonId));
+    } else if (!comparisonId && currentRouteId) {
+      window.history.pushState(null, '', '/');
+    }
+  }, [comparison?.comparisonId, shareToken]);
 
   useEffect(() => {
     setResolvedTheme(applyTheme(themeChoice));
@@ -766,6 +834,7 @@ export function App({ client = polyCostClient }: AppProps) {
       const recommendedPricingModel =
         result.pricingModelRecommendation?.preferredModel ?? pricingModel;
       setComparison(result);
+      setOpenedFromLink(false);
       setPricingModel(recommendedPricingModel);
       storePricingModel(recommendedPricingModel);
       setSubmittedForm(submittedComparisonForm);
@@ -866,6 +935,7 @@ export function App({ client = polyCostClient }: AppProps) {
       const recommendedPricingModel =
         result.pricingModelRecommendation?.preferredModel ?? pricingModel;
       setComparison(result);
+      setOpenedFromLink(false);
       setPricingModel(recommendedPricingModel);
       storePricingModel(recommendedPricingModel);
       setNotice('Live refresh snapshot created.');
@@ -1227,6 +1297,7 @@ export function App({ client = polyCostClient }: AppProps) {
 
   function handleClearComparison() {
     cancelAsyncActions();
+    setOpenedFromLink(false);
     setForm(INITIAL_HOME_FORM);
     setRequirementsAwaitingReview(false);
     clearRequirementSession();
@@ -1451,6 +1522,7 @@ export function App({ client = polyCostClient }: AppProps) {
             dataHealthError={dataHealthError}
             isComparisonAnalyticsLoading={isComparisonAnalyticsLoading}
             isComparisonPricingEvidenceLoading={isComparisonPricingEvidenceLoading}
+            openedFromLink={openedFromLink}
             onClear={handleClearComparison}
             onEdit={handleEditComparison}
             onInputModeChange={setInputMode}
@@ -2326,6 +2398,7 @@ function InitialHomePage({
 
 function ProgressiveComparisonPage({
   client,
+  openedFromLink = false,
   comparison,
   comparisonAnalytics,
   comparisonAnalyticsError,
@@ -2380,6 +2453,7 @@ function ProgressiveComparisonPage({
   onExport,
 }: {
   client: PolyCostClient;
+  openedFromLink?: boolean;
   comparison: ComparisonResult;
   comparisonAnalytics: ComparisonAnalyticsResponse | null;
   comparisonAnalyticsError: string | null;
@@ -2482,22 +2556,61 @@ function ProgressiveComparisonPage({
           </>
         ) : (
           <>
-            <RequirementSummaryStrip
-              form={submittedForm}
-              inputMode={submittedInputMode}
-              pricingModel={pricingModel}
-              regionCatalog={regionCatalog}
-              onClear={onClear}
-              onEdit={onEdit}
-            />
+            {openedFromLink ? null : (
+              <RequirementSummaryStrip
+                form={submittedForm}
+                inputMode={submittedInputMode}
+                pricingModel={pricingModel}
+                regionCatalog={regionCatalog}
+                onClear={onClear}
+                onEdit={onEdit}
+              />
+            )}
+
+            <StatusMessage notice={resultStatusNotice(notice)} error={error} />
+
+            {/*
+              UI-4: answer first. The verdict, the four figures a decision needs and
+              the sorted comparison come before anything that explains them.
+            */}
+            <section className="verdict-section" aria-label="Provider cost summary">
+              <VerdictHero
+                comparison={comparison}
+                provenanceLabel={comparisonProvenanceLabel(comparison)}
+                confidence={comparison.pricingModelRecommendation?.confidence}
+                regionLabel={comparison.requirements?.regionPreference}
+                actions={
+                  <ResultQuickActions
+                    compact
+                    comparison={comparison}
+                    interval={interval}
+                    pricingModel={pricingModel}
+                    busyAction={busyAction}
+                    exportingFormat={exportingFormat}
+                    completedExportFormat={completedExportFormat}
+                    onExport={onExport}
+                    onRefreshLive={onRefreshLive}
+                  />
+                }
+              />
+              <VerdictKpis comparison={comparison} dataHealth={dataHealth} />
+              <ProviderComparisonBar
+                quotes={comparisonQuotes(comparison, interval === 'hourly' ? 'monthly' : interval)}
+                period={intervalPeriod(interval === 'hourly' ? 'monthly' : interval)}
+              />
+            </section>
+
+            <div className="verdict-chart-pair">
+              <CostByServiceStacked providers={comparisonCategoryBreakdown(comparison)} />
+              <CommitmentBreakEven terms={commitmentTerms(cheapestProviderResult)} />
+            </div>
 
             {/*
               The same four levers that composed the estimate, kept beside the
-              result. Live recompute is what makes this worth having: without
-              the levers on this view the debounce had nothing to drive, because
-              reaching an input meant leaving the answer behind.
+              result so a change recomputes it. Hidden for a comparison opened from
+              a link, which has no form behind it.
             */}
-            {inputMode === 'form' && !isEditingRequirements ? (
+            {inputMode === 'form' && !isEditingRequirements && !openedFromLink ? (
               <WorkloadControlBar
                 title="Adjust and recompare"
                 variant="live"
@@ -2511,48 +2624,35 @@ function ProgressiveComparisonPage({
               />
             ) : null}
 
-            <DataHealthBanner health={dataHealth} error={dataHealthError} compact />
-
-            <ResultQuickActions
-              comparison={comparison}
-              interval={interval}
-              pricingModel={pricingModel}
-              busyAction={busyAction}
-              exportingFormat={exportingFormat}
-              completedExportFormat={completedExportFormat}
-              onExport={onExport}
-              onRefreshLive={onRefreshLive}
-            />
-
-            <PricingModelRecommendationCallout comparison={comparison} />
-
-            <StatusMessage notice={resultStatusNotice(notice)} error={error} />
-
-            <ServerAnalyticsStatusStrip
-              analytics={comparisonAnalytics}
-              error={comparisonAnalyticsError}
-              isLoading={isComparisonAnalyticsLoading}
-            />
-
-            <ProviderSummaryCards comparison={comparison} interval={interval} />
-
-            {/*
-              What am I paying for, for the option actually being recommended.
-              The provider cards answer which cloud; this answers where the money
-              goes, which is the question that changes an architecture.
-            */}
-            {cheapestProviderResult ? (
-              <CostByService provider={cheapestProviderResult} formatCost={formatCurrency} />
-            ) : null}
-
-            <div className="progressive-analytics-stack" aria-label="Executive analytics">
-              <ExecutiveAnalyticsPreview
-                comparison={comparison}
-                form={submittedForm}
-                pricingModel={pricingModel}
-                analytics={comparisonAnalytics}
-              />
-            </div>
+            <details className="evidence-disclosure">
+              <summary>
+                <span className="evidence-summary-title">Evidence and assumptions</span>
+                <span className="evidence-summary-hint">
+                  Pricing data, per-provider detail, recommendation rationale and analysis
+                </span>
+              </summary>
+              <div className="evidence-body">
+                <DataHealthBanner health={dataHealth} error={dataHealthError} compact />
+                <PricingModelRecommendationCallout comparison={comparison} />
+                <ServerAnalyticsStatusStrip
+                  analytics={comparisonAnalytics}
+                  error={comparisonAnalyticsError}
+                  isLoading={isComparisonAnalyticsLoading}
+                />
+                <ProviderSummaryCards comparison={comparison} interval={interval} />
+                {cheapestProviderResult ? (
+                  <CostByService provider={cheapestProviderResult} formatCost={formatCurrency} />
+                ) : null}
+                <div className="progressive-analytics-stack" aria-label="Executive analytics">
+                  <ExecutiveAnalyticsPreview
+                    comparison={comparison}
+                    form={submittedForm}
+                    pricingModel={pricingModel}
+                    analytics={comparisonAnalytics}
+                  />
+                </div>
+              </div>
+            </details>
 
             {/*
               No longer behind a disclosure. That toggle existed to hide a very
@@ -2727,6 +2827,7 @@ function ResultQuickActions({
   exportingFormat,
   onExport,
   onRefreshLive,
+  compact = false,
 }: {
   comparison: ComparisonResult;
   interval: IntervalKey;
@@ -2736,6 +2837,8 @@ function ResultQuickActions({
   exportingFormat: ReportFormat | null;
   onExport: (format: ReportFormat) => void;
   onRefreshLive: () => void;
+  /** Inside the verdict hero the headline is already stated; keep only context and actions. */
+  compact?: boolean;
 }) {
   const cheapestProvider = comparison.providers.find(
     (provider) => provider.providerId === comparison.cheapestProviderId,
@@ -2748,16 +2851,21 @@ function ResultQuickActions({
   const taskItems = quickActionTaskItems(busyAction, exportingFormat, completedExportFormat);
 
   return (
-    <section className="result-quick-actions" aria-label="Comparison quick actions">
+    <section
+      className={compact ? 'result-quick-actions is-compact' : 'result-quick-actions'}
+      aria-label="Comparison quick actions"
+    >
       <div className="result-quick-actions-copy">
-        <span className="result-quick-actions-kicker">Result</span>
-        <strong>
-          {cheapestProvider
-            ? `${providerLabel(comparison.cheapestProviderId)} leads at ${formatCurrency(
-                costForInterval(cheapestProvider, interval),
-              )}`
-            : 'Provider recommendation pending'}
-        </strong>
+        {compact ? null : <span className="result-quick-actions-kicker">Result</span>}
+        {compact ? null : (
+          <strong>
+            {cheapestProvider
+              ? `${providerLabel(comparison.cheapestProviderId)} leads at ${formatCurrency(
+                  costForInterval(cheapestProvider, interval),
+                )}`
+              : 'Provider recommendation pending'}
+          </strong>
+        )}
         <span>
           {intervalLabel} · {scenarioLabel} · {pricedProviderCount}/{comparison.providers.length}{' '}
           providers priced
@@ -3288,7 +3396,7 @@ function ProviderSummaryCards({
   );
 
   return (
-    <section className="provider-summary-results" aria-label="Provider cost summary">
+    <section className="provider-summary-results" aria-label="Provider cost detail">
       <div className="provider-summary-grid">
         {PROVIDER_ORDER.map((providerId) => {
           const provider = providerResults.get(providerId);
@@ -3490,6 +3598,41 @@ function headlineSignature(form: WorkloadFormState): string {
     form.regionPreference,
     form.commitmentPreferencePercent,
   ].join('|');
+}
+
+/** One provenance label for the verdict: set if any priced provider is not live. */
+function comparisonProvenanceLabel(comparison: ComparisonResult): string | undefined {
+  const labels = comparison.providers
+    .map((provider) => providerPricingProvenance(provider)?.label)
+    .filter((label): label is string => Boolean(label));
+  return labels.length > 0 ? 'Includes seed pricing' : undefined;
+}
+
+/** Cumulative-cost inputs for the recommended provider's commitment terms. */
+function commitmentTerms(provider: ComparisonProviderResult | undefined): CumulativeTerm[] {
+  if (!provider) {
+    return [];
+  }
+  return [
+    {
+      id: 'on-demand',
+      label: 'On-demand',
+      upfront: 0,
+      monthly: executiveModelMonthlyCost(provider, 'on-demand'),
+    },
+    {
+      id: '1yr',
+      label: '1-year reserved',
+      upfront: 0,
+      monthly: executiveModelMonthlyCost(provider, 'reserved-1yr'),
+    },
+    {
+      id: '3yr',
+      label: '3-year reserved',
+      upfront: 0,
+      monthly: executiveModelMonthlyCost(provider, 'reserved-3yr'),
+    },
+  ];
 }
 
 /**
@@ -6463,13 +6606,6 @@ function ExecutiveAnalyticsPreview({
   return (
     <section className="executive-analytics-preview" aria-label="Executive analytics dashboard">
       <ExecutiveProviderHero comparison={comparison} pricingModel={pricingModel} />
-
-      {/* UI-3: the Aurora chart system. Sorted comparison first (the answer and the
-          size of the gap), then where each provider's money goes. */}
-      <div className="executive-chart-pair">
-        <ProviderComparisonBar quotes={comparisonQuotes(comparison)} />
-        <CostByServiceStacked providers={comparisonCategoryBreakdown(comparison)} />
-      </div>
 
       {/* UI-0: the "total across priced clouds" tile and the provider-mix donut were
           removed. Provider estimates are alternatives, so summing them or charting
