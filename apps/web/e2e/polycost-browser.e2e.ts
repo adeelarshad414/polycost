@@ -45,6 +45,44 @@ test('persists light and dark theme choices across reloads', async ({ page }) =>
   );
 });
 
+// Audit H-05: nginx serves a strict CSP hashed from the built index.html. This
+// runs against the real nginx container in ci:e2e, so a new inline script, an
+// external font or a new API origin fails here instead of in production.
+test('serves security headers and runs a comparison with no CSP violations', async ({ page }) => {
+  await page.addInitScript(() => {
+    const violations: string[] = [];
+    (window as unknown as { __cspViolations: string[] }).__cspViolations = violations;
+    document.addEventListener('securitypolicyviolation', (event) => {
+      violations.push(`${event.violatedDirective} ${event.blockedURI}`);
+    });
+  });
+
+  const response = await page.goto('/');
+  const headers = response?.headers() ?? {};
+  const csp = headers['content-security-policy'] ?? '';
+  expect(csp).toContain("frame-ancestors 'none'");
+  expect(csp).toMatch(/script-src 'self' 'sha256-[A-Za-z0-9+/=]+'/);
+  expect(csp).not.toContain('unsafe-inline');
+  expect(headers['x-content-type-options']).toBe('nosniff');
+  expect(headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
+  expect(headers['server'] ?? '').not.toMatch(/\d/);
+
+  // The hashed pre-paint theme script must still run under the policy.
+  await expect(page.locator('html')).toHaveAttribute('data-theme-choice', 'system');
+
+  await page.getByRole('button', { name: /^compare costs$/i }).click();
+  await expect(page.getByRole('heading', { name: /is the lowest-cost option/ })).toBeVisible({
+    timeout: 60_000,
+  });
+  await page.getByRole('radio', { name: /use dark theme/i }).click();
+  await page.evaluate(() => document.fonts.ready);
+
+  const violations = await page.evaluate(
+    () => (window as unknown as { __cspViolations: string[] }).__cspViolations,
+  );
+  expect(violations).toEqual([]);
+});
+
 test('loads the Aurora brand fonts and follows the OS theme live (UI-1)', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light' });
   await page.goto('/');
