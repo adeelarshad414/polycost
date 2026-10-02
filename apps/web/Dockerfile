@@ -17,7 +17,7 @@ RUN npm run build
 # CSP and other security headers, hashed from the built index.html (H-05).
 RUN node scripts/write-security-headers.mjs dist/index.html /app/security-headers.conf
 
-FROM nginx:1.30-alpine
+FROM nginx:1.31-alpine
 # Pick up Alpine security fixes released after the base image was built; the
 # release workflow fails on any fixable HIGH/CRITICAL finding (audit H-13).
 RUN apk upgrade --no-cache
