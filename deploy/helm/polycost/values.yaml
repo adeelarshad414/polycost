@@ -46,8 +46,11 @@ probes:
     periodSeconds: 10
     failureThreshold: 3
   readiness:
+    # Ready = the database answers SELECT 1 (bounded at 1s in the app). Redis
+    # being down degrades the pod but keeps it in service (audit M-09).
     path: /health/ready
     periodSeconds: 5
+    timeoutSeconds: 2
     failureThreshold: 3
 
 # Nest shutdown hooks close the HTTP server, drain BullMQ workers and flush
@@ -84,8 +87,30 @@ config:
   dbHost: postgres
   dbPort: 5432
   dbName: polycost
+  db:
+    # Per pool; there are four pools per pod.
+    poolMax: 5
+    statementTimeoutMs: 30000
+    # Bulk pricing upserts and the catalog prune.
+    etlStatementTimeoutMs: 300000
+    # disable | require | verify-full. Use verify-full for managed Postgres.
+    sslMode: disable
+    # Optional CA bundle for verify-full, read from a Secret.
+    sslCaSecret:
+      name: ''
+      key: ca.crt
   redisHost: redis
   redisPort: 6379
+  redis:
+    tls: false
+    username: ''
+    # Optional AUTH password, read from a Secret rather than the ConfigMap.
+    passwordSecret:
+      name: ''
+      key: password
+  # Run BullMQ workers in the API pods. Set false when a dedicated worker
+  # deployment processes jobs.
+  jobWorkersEnabled: true
   vaultAddr: http://vault:8200
   corsAllowedOrigins: ''
   # Proxy hops between clients and the API. Raise it if a CDN or extra load

@@ -121,11 +121,17 @@ Core groups:
 
 Health and operations:
 
-- `/health/live`
-- `/health/ready`
-- `/health`
-- `/health/deep`
+- `/health/live`: process liveness only; never fails on a dependency.
+- `/health/ready`: 503 only when the database fails `SELECT 1` (app pool, 1s);
+  Redis down leaves the instance ready but `degraded`.
+- `/health`: dependency status (`status`, `ready`, per-dependency latency).
+- `/health/deep`: adds pricing-data freshness.
 - `/api/v1/data-health`
+
+Runtime limits: four Postgres pools per process, each capped at `DB_POOL_MAX`
+with a server-side `statement_timeout` and optional TLS; BullMQ jobs retry with
+exponential backoff, and `JOB_WORKERS_ENABLED=false` runs a process without
+workers.
 
 ## Security Boundaries
 

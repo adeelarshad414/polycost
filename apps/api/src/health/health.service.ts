@@ -23,6 +23,12 @@ export interface LiveHealthResponse {
 
 export interface HealthResponse {
   status: 'ok' | 'degraded';
+  /**
+   * Whether this instance should receive traffic. Only the database decides
+   * it: without Redis the rate limiter falls back to in-process counters and
+   * jobs wait, so the API still serves requests (audit M-09).
+   */
+  ready: boolean;
   service: 'polycost-api';
   dependencies: {
     db: HealthDependency;
@@ -42,6 +48,9 @@ export interface DeepHealthResponse {
 export type TcpProbe = (host: string, port: number, timeoutMs: number) => Promise<HealthDependency>;
 
 export const HEALTH_TCP_PROBE = Symbol('HEALTH_TCP_PROBE');
+
+/** Under the Helm readiness timeout (2s), so a slow DB reads as not ready. */
+const DB_PROBE_TIMEOUT_MS = 1_000;
 
 @Injectable()
 export class HealthService {
@@ -64,11 +73,7 @@ export class HealthService {
 
   async getHealth(): Promise<HealthResponse> {
     const [db, cache] = await Promise.all([
-      this.tcpProbe(
-        this.configService.get('DB_HOST', { infer: true }),
-        this.configService.get('DB_PORT', { infer: true }),
-        500,
-      ),
+      this.probeDatabase(),
       this.tcpProbe(
         this.configService.get('REDIS_HOST', { infer: true }),
         this.configService.get('REDIS_PORT', { infer: true }),
@@ -83,12 +88,51 @@ export class HealthService {
 
     return {
       status: db.status === 'ok' && cache.status === 'ok' ? 'ok' : 'degraded',
+      ready: db.status === 'ok',
       service: 'polycost-api',
       dependencies: {
         db,
         cache,
       },
     };
+  }
+
+  /**
+   * SELECT 1 through the app pool when the repository is available; the TCP
+   * probe remains for runtimes without it (tests, a misconfigured module).
+   */
+  private async probeDatabase(): Promise<HealthDependency> {
+    const host = this.configService.get('DB_HOST', { infer: true });
+    const port = this.configService.get('DB_PORT', { infer: true });
+
+    if (!this.apiDatabaseRepository) {
+      return this.tcpProbe(host, port, DB_PROBE_TIMEOUT_MS);
+    }
+
+    const started = Date.now();
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      await Promise.race([
+        this.apiDatabaseRepository.ping(),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error(`SELECT 1 timed out after ${DB_PROBE_TIMEOUT_MS}ms`)),
+            DB_PROBE_TIMEOUT_MS,
+          );
+        }),
+      ]);
+      return { status: 'ok', host, port, latencyMs: Date.now() - started };
+    } catch (error) {
+      return {
+        status: 'degraded',
+        host,
+        port,
+        latencyMs: Date.now() - started,
+        error: error instanceof Error ? error.message : 'Database query failed',
+      };
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   private recordDependency(dependency: string, result: HealthDependency): void {

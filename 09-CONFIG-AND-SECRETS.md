@@ -38,9 +38,18 @@ export const configSchema = z.object({
   DB_HOST: z.string(),
   DB_PORT: z.coerce.number().default(5432),
   DB_NAME: z.string(),
+  DB_POOL_MAX: z.coerce.number().default(5), // per pool; 4 pools per process
+  DB_STATEMENT_TIMEOUT_MS: z.coerce.number().default(30_000),
+  DB_ETL_STATEMENT_TIMEOUT_MS: z.coerce.number().default(300_000),
+  DB_SSL_MODE: z.enum(['disable', 'require', 'verify-full']).default('disable'),
+  DB_SSL_CA: z.string().optional(),
 
   REDIS_HOST: z.string(),
   REDIS_PORT: z.coerce.number().default(6379),
+  REDIS_USERNAME: z.string().optional(),
+  REDIS_PASSWORD: z.string().optional(), // from a secret store, never committed
+  REDIS_TLS: z.boolean().default(false),
+  JOB_WORKERS_ENABLED: z.boolean().default(true),
 
   PRICING_ETL_SCHEDULE_CRON: z.string().default('0 2 * * *'),
   PRICING_ETL_DEFAULT_REGION_AWS: z.string().default('us-east-1'),

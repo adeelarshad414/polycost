@@ -5,6 +5,7 @@ import { AppConfig } from '../config/config.schema.js';
 import { SecretsService } from '../secrets/secrets.service.js';
 import type { SecretsReader } from '../secrets/secrets.service.js';
 import { DiagramImportRecordInput } from './diagram-parser.types.js';
+import { pgPoolTuning, type PgPoolTuning } from '../database/pg-pool-options.js';
 
 interface QueryResultLike<T> {
   rows: T[];
@@ -16,7 +17,7 @@ export interface PgPoolLike {
   end(): Promise<void>;
 }
 
-interface PgPoolConfig {
+interface PgPoolConfig extends Partial<PgPoolTuning> {
   host: string;
   port: number;
   database: string;
@@ -104,6 +105,7 @@ export class DiagramImportRepository implements OnModuleDestroy {
   private async getPool(): Promise<PgPoolLike> {
     if (!this.pool) {
       this.pool = this.poolFactory({
+        ...pgPoolTuning(this.configService, 'diagram_import'),
         host: this.configService.get('DB_HOST', { infer: true }),
         port: this.configService.get('DB_PORT', { infer: true }),
         database: this.configService.get('DB_NAME', { infer: true }),

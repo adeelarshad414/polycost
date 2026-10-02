@@ -18,6 +18,8 @@ import {
 const configService = {
   get: jest.fn<ConfigService['get']>((key: keyof AppConfig) => {
     switch (key) {
+      case 'JOB_WORKERS_ENABLED':
+        return true;
       case 'CURRENCY_SYNC_SCHEDULE_CRON':
         return '0 * * * *';
       case 'ALERT_EVALUATOR_SCHEDULE_CRON':
@@ -75,6 +77,12 @@ describe('CostManagementJobsScheduler', () => {
       expect.objectContaining({
         name: CURRENCY_SYNC_JOB_NAME,
         data: {},
+        // M-05: every scheduled job retries with backoff and keeps failures.
+        opts: expect.objectContaining({
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 30_000 },
+          removeOnFail: 500,
+        }),
       }),
     );
     expect(queue.upsertJobScheduler).toHaveBeenCalledWith(

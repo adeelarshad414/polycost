@@ -5,6 +5,19 @@ export const SHARE_LINK_CLEANUP_JOB_NAME = 'share-link-cleanup';
 export const TEAM_AUDIT_EXPORT_JOB_NAME = 'team-audit-export';
 export const DATA_RETENTION_JOB_NAME = 'data-retention';
 
+/**
+ * Audit M-05: retry transient failures with backoff. Every job here is safe to
+ * repeat: currency sync and retention are idempotent, alert creation is
+ * deduplicated, and share-link cleanup and audit export only act on rows
+ * still pending.
+ */
+export const COST_MANAGEMENT_JOB_OPTIONS = {
+  attempts: 3,
+  backoff: { type: 'exponential', delay: 30_000 },
+  removeOnComplete: true,
+  removeOnFail: 500,
+} as const;
+
 export type CostManagementJobName =
   | typeof CURRENCY_SYNC_JOB_NAME
   | typeof ALERT_EVALUATOR_JOB_NAME

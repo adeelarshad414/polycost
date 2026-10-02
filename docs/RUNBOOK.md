@@ -155,18 +155,18 @@ unauthenticated, so it would also be a disclosure.
 
 ## Health Endpoints
 
-| Endpoint                   | Use                                                           |
-| -------------------------- | ------------------------------------------------------------- |
-| `/health/live`             | container/process liveness                                    |
-| `/api/v1/health/live`      | versioned liveness alias                                      |
-| `/health/ready`            | readiness before routing — **503 when a dependency is down**  |
-| `/api/v1/health/ready`     | versioned readiness alias                                     |
-| `/health`                  | app plus dependency status                                    |
-| `/health/deep`             | deeper dependency and degradation probe                       |
-| `/api/v1/data-health`      | pricing/cache data health used by comparison warning surfaces |
-| `/api/v1/pricing/coverage` | catalog/model coverage and invoice-grade caveats              |
-| `/api/v1/pricing/status`   | pricing sync status                                           |
-| `/api/v1/regions`          | region catalog status and official links                      |
+| Endpoint                   | Use                                                            |
+| -------------------------- | -------------------------------------------------------------- |
+| `/health/live`             | container/process liveness                                     |
+| `/api/v1/health/live`      | versioned liveness alias                                       |
+| `/health/ready`            | readiness — **503 only when the DB fails `SELECT 1` in 1s**    |
+| `/api/v1/health/ready`     | versioned readiness alias                                      |
+| `/health`                  | app plus dependency status (`ready`, `status`, per-dependency) |
+| `/health/deep`             | deeper dependency and degradation probe                        |
+| `/api/v1/data-health`      | pricing/cache data health used by comparison warning surfaces  |
+| `/api/v1/pricing/coverage` | catalog/model coverage and invoice-grade caveats               |
+| `/api/v1/pricing/status`   | pricing sync status                                            |
+| `/api/v1/regions`          | region catalog status and official links                       |
 
 ## Incident: App Does Not Start
 
@@ -190,24 +190,34 @@ Actions:
 
 Symptoms:
 
-- readiness fails
-- comparison creation fails
-- exports or share links cannot persist
+- `/health/ready` answers **503** and pods leave the Service; `/health/live`
+  stays 200, so nothing restarts
+- `dependencies.db.error` names the cause: authentication, `SELECT 1 timed out
+after 1000ms`, or `timeout exceeded when trying to connect` (pool exhausted)
+- comparison creation fails; exports or share links cannot persist
 
 Actions:
 
 1. Confirm Postgres network reachability from the API environment.
-2. Check connection limits and storage.
-3. Verify migration state.
-4. Restore from backup only after preserving logs and current migration state.
-5. After recovery, run `npm run db:validate` and a smoke comparison.
+2. Check connection limits and storage. `pg_stat_activity` grouped by
+   `application_name` (`polycost-api`, `polycost-pricing_catalog`,
+   `polycost-pricing_rates`, `polycost-diagram_import`) shows which pool holds
+   the connections. Total is `4 × DB_POOL_MAX × replicas`; keep it below
+   `max_connections` minus the admin reserve.
+3. `canceling statement due to statement timeout` means a query hit
+   `DB_STATEMENT_TIMEOUT_MS` (30s; ETL pool `DB_ETL_STATEMENT_TIMEOUT_MS`,
+   300s). Fix the query rather than raising the limit.
+4. Verify migration state.
+5. Restore from backup only after preserving logs and current migration state.
+6. After recovery, run `npm run db:validate` and a smoke comparison.
 
 ## Incident: Redis Unavailable
 
 Symptoms:
 
-- `/health` or `/health/deep` reports degraded
-- queue-backed jobs lag or fail
+- `/health` or `/health/deep` reports degraded with `cache` down
+- `/health/ready` still answers **200**: pods stay in service by design
+- queue-backed jobs lag (`JobQueueDepthUnknown` fires while depth is unreadable)
 
 Actions:
 
@@ -217,7 +227,12 @@ Actions:
 4. Re-run `npm run live:verify` when the stack is healthy.
 
 Expected behavior: PolyCost should degrade clearly rather than silently hiding Redis
-loss. The readiness report records Redis-degradation evidence.
+loss. Rate limits fall back to per-process counters (so N replicas allow N times
+the limit until Redis returns), and scheduled jobs resume when it does. Jobs that
+failed meanwhile retry with exponential backoff (ETL 2 attempts, cost-management
+3); anything still failing stays in the failed set for
+`JobQueueFailuresAccumulating`. The readiness report records Redis-degradation
+evidence.
 
 ## Incident: Pricing Data Is Stale Or Missing
 

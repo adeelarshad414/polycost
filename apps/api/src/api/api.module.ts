@@ -49,6 +49,7 @@ import { CostManagementService } from './cost-management.service.js';
 import { LivePricingRefreshService } from './live-pricing-refresh.service.js';
 import { OpenApiController } from './openapi.controller.js';
 import { CircuitBreakerRegistry } from '../adapters/common/circuit-breaker.js';
+import { redisConnectionOptions } from '../config/redis-connection.js';
 
 /** Shared so every caller sees the same breaker state for a provider. */
 export const PROVIDER_CIRCUIT_BREAKERS = Symbol('PROVIDER_CIRCUIT_BREAKERS');
@@ -117,8 +118,7 @@ import { WorkloadController } from './workload.controller.js';
       inject: [ConfigService],
       useFactory: (configService: ConfigService<AppConfig, true>) =>
         new Redis({
-          host: configService.get('REDIS_HOST', { infer: true }),
-          port: configService.get('REDIS_PORT', { infer: true }),
+          ...redisConnectionOptions(configService),
           // Fail fast instead of queueing: the service falls back to per-process
           // counters when Redis is unreachable, and a queued command would defer
           // that fallback behind a growing backlog.

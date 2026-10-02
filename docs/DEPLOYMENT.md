@@ -54,6 +54,9 @@ Start from `.env.example`. The most important runtime variables are:
 | Vault         | `VAULT_ADDR`, `VAULT_TOKEN_FILE`, optional `VAULT_NAMESPACE`                                                   |
 | Pricing       | `USE_MOCK_PROVIDERS`, `PRICING_ETL_RUN_ON_BOOT`, `PRICING_ETL_PRUNE_MIN_FRESH_RATIO`, provider default regions |
 | Proxy         | `TRUST_PROXY_HOPS` (proxies in front of the API; default 1)                                                    |
+| DB pools/TLS  | `DB_POOL_MAX`, `DB_STATEMENT_TIMEOUT_MS`, `DB_ETL_STATEMENT_TIMEOUT_MS`, `DB_SSL_MODE`, `DB_SSL_CA`            |
+| Redis auth    | `REDIS_USERNAME`, `REDIS_PASSWORD` (secret), `REDIS_TLS`                                                       |
+| Workers       | `JOB_WORKERS_ENABLED` (false = HTTP only; a worker deployment runs jobs)                                       |
 | Observability | `GRAFANA_PASSWORD` (required by the compose `observability` profile)                                           |
 | Jobs          | pricing, currency, alert, and share-link cleanup cron variables                                                |
 | Auth          | session TTL, registration, lockout, SSO, invite delivery mode/webhook                                          |

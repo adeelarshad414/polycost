@@ -42,6 +42,28 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "polycost.fullname" . }}
+          {{- if or .Values.config.redis.passwordSecret.name .Values.config.db.sslCaSecret.name }}
+          env:
+            {{- with .Values.config.redis.passwordSecret }}
+            {{- if .name }}
+            # From a Secret, never the ConfigMap.
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .name }}
+                  key: {{ .key }}
+            {{- end }}
+            {{- end }}
+            {{- with .Values.config.db.sslCaSecret }}
+            {{- if .name }}
+            - name: DB_SSL_CA
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .name }}
+                  key: {{ .key }}
+            {{- end }}
+            {{- end }}
+          {{- end }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -73,6 +95,7 @@ spec:
               path: {{ .Values.probes.readiness.path }}
               port: http
             periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
             failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

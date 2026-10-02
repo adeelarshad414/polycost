@@ -16,6 +16,7 @@ import {
   PRICING_ETL_QUEUE_NAME,
   PRICING_ETL_REFRESH_JOB_NAME,
   PRICING_ETL_STARTUP_REFRESH_JOB_ID,
+  PRICING_ETL_JOB_OPTIONS,
   PricingEtlSummary,
 } from './pricing-etl.types.js';
 
@@ -92,7 +93,9 @@ export class PricingEtlScheduler implements OnModuleInit, OnModuleDestroy {
     await this.scheduleRecurringRefresh();
     await this.retireUnknownSchedulers([PRICING_ETL_REFRESH_JOB_NAME]);
     await this.scheduleStartupRefresh();
-    this.worker = this.workerFactory(() => this.etlService.refreshAllProviders());
+    if (this.configService.get('JOB_WORKERS_ENABLED', { infer: true }) !== false) {
+      this.worker = this.workerFactory(() => this.etlService.refreshAllProviders());
+    }
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -116,10 +119,7 @@ export class PricingEtlScheduler implements OnModuleInit, OnModuleDestroy {
         // stay the job name rather than defaulting to the scheduler id.
         name: PRICING_ETL_REFRESH_JOB_NAME,
         data: {},
-        opts: {
-          removeOnComplete: true,
-          removeOnFail: 100,
-        },
+        opts: { ...PRICING_ETL_JOB_OPTIONS },
       },
     );
   }
@@ -159,8 +159,7 @@ export class PricingEtlScheduler implements OnModuleInit, OnModuleDestroy {
       {},
       {
         jobId: PRICING_ETL_STARTUP_REFRESH_JOB_ID,
-        removeOnComplete: true,
-        removeOnFail: 100,
+        ...PRICING_ETL_JOB_OPTIONS,
       },
     );
   }

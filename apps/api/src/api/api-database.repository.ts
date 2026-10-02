@@ -73,6 +73,7 @@ import {
   WorkloadInput,
   WorkloadRecord,
 } from './cost-management.types.js';
+import { pgPoolTuning, type PgPoolTuning } from '../database/pg-pool-options.js';
 
 interface QueryResultLike<T> {
   rows: T[];
@@ -92,7 +93,7 @@ export interface PgPoolLike extends PgQueryRunner {
   end(): Promise<void>;
 }
 
-interface PgPoolConfig {
+interface PgPoolConfig extends Partial<PgPoolTuning> {
   host: string;
   port: number;
   database: string;
@@ -908,6 +909,15 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         };
       }),
     };
+  }
+
+  /**
+   * Readiness probe (audit M-09): a real round trip with the app credentials
+   * through the app pool, so wrong credentials, an exhausted pool or a database
+   * refusing queries all fail it - a TCP connect caught none of those.
+   */
+  async ping(): Promise<void> {
+    await (await this.getPool()).query('SELECT 1');
   }
 
   async getDataHealth(now: Date = new Date()): Promise<DataHealthResponse> {
@@ -5294,6 +5304,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
   private async getPool(): Promise<PgPoolLike> {
     if (!this.pool) {
       this.pool = this.poolFactory({
+        ...pgPoolTuning(this.configService, 'api'),
         host: this.configService.get('DB_HOST', { infer: true }),
         port: this.configService.get('DB_PORT', { infer: true }),
         database: this.configService.get('DB_NAME', { infer: true }),

@@ -9,7 +9,7 @@ import {
 } from './pricing-etl.types.js';
 import { PricingEtlQueue, PricingEtlScheduler, PricingEtlWorker } from './pricing-etl.scheduler.js';
 
-const configService = (cron: string, runOnBoot = true) =>
+const configService = (cron: string, runOnBoot = true, workersEnabled = true) =>
   ({
     get: jest.fn((key: keyof AppConfig) => {
       if (key === 'PRICING_ETL_SCHEDULE_CRON') {
@@ -17,6 +17,9 @@ const configService = (cron: string, runOnBoot = true) =>
       }
       if (key === 'PRICING_ETL_RUN_ON_BOOT') {
         return runOnBoot;
+      }
+      if (key === 'JOB_WORKERS_ENABLED') {
+        return workersEnabled;
       }
 
       throw new Error(`Unexpected config key ${String(key)}`);
@@ -70,6 +73,12 @@ describe('PricingEtlScheduler', () => {
       expect.objectContaining({
         name: PRICING_ETL_REFRESH_JOB_NAME,
         data: {},
+        // M-05: scheduled runs retry with backoff and keep failures.
+        opts: expect.objectContaining({
+          attempts: 2,
+          backoff: { type: 'exponential', delay: 60_000 },
+          removeOnFail: 500,
+        }),
       }),
     );
     expect(queue.add).toHaveBeenCalledWith(
@@ -77,6 +86,7 @@ describe('PricingEtlScheduler', () => {
       {},
       expect.objectContaining({
         jobId: PRICING_ETL_STARTUP_REFRESH_JOB_ID,
+        attempts: 2,
       }),
     );
     expect(workerFactory).toHaveBeenCalledTimes(1);
@@ -84,6 +94,30 @@ describe('PricingEtlScheduler', () => {
       throw new Error('Expected the scheduler to register a worker processor');
     }
     await expect(capturedProcessor()).resolves.toBe(summary);
+  });
+
+  it('keeps schedulers current but starts no worker when JOB_WORKERS_ENABLED=false', async () => {
+    const queue: PricingEtlQueue = {
+      add: jest.fn<PricingEtlQueue['add']>(async () => undefined),
+      upsertJobScheduler: jest.fn<PricingEtlQueue['upsertJobScheduler']>(async () => undefined),
+      getJobSchedulers: jest.fn<PricingEtlQueue['getJobSchedulers']>(async () => []),
+      removeJobScheduler: jest.fn<PricingEtlQueue['removeJobScheduler']>(async () => true),
+      close: jest.fn<PricingEtlQueue['close']>(async () => undefined),
+    };
+    const workerFactory = jest.fn();
+    const scheduler = new PricingEtlScheduler(
+      configService('0 2 * * *', false, false),
+      {} as PricingEtlService,
+      queue,
+      workerFactory as never,
+    );
+
+    await scheduler.onModuleInit();
+    await scheduler.onModuleDestroy();
+
+    expect(queue.upsertJobScheduler).toHaveBeenCalledTimes(1);
+    expect(workerFactory).not.toHaveBeenCalled();
+    expect(queue.close).toHaveBeenCalledTimes(1);
   });
 
   it('can disable startup refresh for scheduled-only deployments', async () => {
