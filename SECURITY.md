@@ -49,7 +49,38 @@ npm run qa
 - `security:audit` runs the high/critical npm audit gate.
 - `security:suppressions` verifies security-rule ESLint suppressions include dated
   review evidence and a ledger reference.
-- `security:scan` runs gitleaks and Trivy when those CLIs are installed.
+- `security:scan` runs the same scans CI runs: gitleaks over the full git history,
+  Trivy over dependencies and secrets, and Trivy IaC over the Dockerfiles and Helm
+  chart (HIGH/CRITICAL fail).
+
+## Enforced In CI
+
+Every pull request must pass four required checks before it can merge into
+`main` (branch protection): `quality`, `visual`, `security` and CodeQL `analyze`.
+
+- **`security`** runs gitleaks (full history, so a secret committed and then
+  deleted is still caught) and both Trivy scans from digest-pinned images.
+- **CodeQL** (`security-extended`) runs on every PR, on `main`, and weekly.
+- Reviewed exceptions are versioned with a reason: `.gitleaksignore` (historical
+  false positives) and `.trivyignore.yaml` (path-scoped). Inline
+  `gitleaks:allow` comments mark current false positives. Dismissed CodeQL
+  alerts carry a dismissal comment.
+- Every GitHub Action is pinned to a commit SHA and the workflow token is
+  read-only unless a job asks for more.
+
+## Runtime Protections
+
+- **Web:** nginx serves a strict Content-Security-Policy (no `'unsafe-inline'`;
+  the pre-paint theme script is allowed by its SHA-256 hash, computed at image
+  build), `frame-ancestors 'none'`, `nosniff`, Referrer-Policy,
+  Permissions-Policy, COOP and HSTS.
+- **Auth:** credential routes accept at most 16 KB; scrypt runs asynchronously;
+  unknown, disabled and locked accounts get the same response, after the same
+  work, as a wrong password; repeated failures lock the account.
+- **Rate limits** key on the client address resolved through exactly
+  `TRUST_PROXY_HOPS` proxies, so a forged `X-Forwarded-For` is ignored.
+- **Share links** are stored as SHA-256 hashes, expire within 90 days, use
+  salted scrypt for passwords, and take the password only in a POST body.
 - `qa` checks required workflow files and verifies application source does not add
   direct `process.env` access outside the config/secrets boundary, then runs the
   suppression hygiene gate.

@@ -268,8 +268,9 @@ The main API is versioned under `/api/v1`.
 - `POST /workloads` persists normalized workload records.
 - `POST /budgets` creates budget thresholds.
 - `GET /alerts` and `PATCH /alerts/:id` support alert workflows.
-- `POST /share-links` creates scoped read-only report links.
-- `GET /share/:token` reads a shared report.
+- `POST /share-links` creates scoped read-only report links (expiry ≤ 90 days).
+- `GET /share/:token` reads a shared report; `POST /share/:token` with
+  `{ "password" }` opens a password-protected one.
 - `GET /exchange-rates` returns cached exchange-rate data.
 - `GET /regions` returns the cloud region catalog used by the UI.
 - `POST /auth/teams/:teamId/scim/tokens` creates a one-time-visible SCIM bearer
@@ -314,7 +315,9 @@ Abuse controls on this surface:
   GCP Cloud Billing Catalog) are free, so refresh-live has no per-call monetary cost;
   the rate limit bounds bandwidth/CPU.
 - Treat a comparison/share-link URL like a secret: anyone with the link can view the
-  report. Share links additionally support an optional password and revocation.
+  report. Share links additionally support an optional password and revocation,
+  expire within 90 days, and are stored only as a SHA-256 hash, so a database or
+  backup leak does not reveal working links.
 
 For account-bound, tenant-isolated data (teams, billing reconciliation, invoice
 artifacts, SCIM), a signed-in owner/admin session is always required and every such

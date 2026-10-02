@@ -29,6 +29,8 @@ All emitted metrics are on `GET /metrics` in Prometheus text format.
 | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------ |
 | Request rate, error rate, latency by route    | `http_requests_total`, `http_request_errors_total`, `http_request_duration_seconds`                                                 | ✅     |
 | Pricing ETL rows and freshness by provider    | `pricing_etl_runs_total`, `pricing_etl_records_total`, `pricing_etl_duration_seconds`, `pricing_etl_last_success_timestamp_seconds` | ✅     |
+| Pricing ETL prune decisions                   | `pricing_etl_prunes_total{outcome}`, `pricing_etl_pruned_rows_total`                                                                | ✅     |
+| Modeled-rate fallbacks (catalog miss/outage)  | `pricing_rate_fallbacks_total{provider,reason}`                                                                                     | ✅     |
 | Report export duration and failures           | `report_exports_total`, `report_export_duration_seconds`                                                                            | ✅     |
 | Auth failure and lockout rate                 | `auth_attempts_total`, `auth_lockouts_total`                                                                                        | ✅     |
 | Diagram parse confidence and unresolved nodes | `diagram_parses_total`, `diagram_parse_unresolved_nodes_total`, `diagram_parse_ignored_nodes_total`                                 | ✅     |
@@ -232,6 +234,15 @@ Actions:
 3. Inspect pricing ETL logs by provider.
 4. Review rejected/skipped row counts.
 5. Re-run ETL in a controlled window.
+
+Comparisons show "modeled estimate" rows unexpectedly:
+
+- `pricing_rate_fallbacks_total{reason="schema_or_connection_unavailable"}`
+  rising means the API could not read the pricing catalog (an error log
+  `pricing_rate_fallback` names the cause). Treat it as a database incident.
+- `reason="not_cached"` means no catalog row exists for that provider, service,
+  region and term; check ETL coverage. Modeled rows carry
+  `sourceFetchedAt: null`, never a fetch time.
 
 Catalog shrank, or stale SKUs are still listed:
 

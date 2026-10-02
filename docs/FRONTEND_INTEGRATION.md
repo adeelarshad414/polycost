@@ -175,9 +175,15 @@ Body:
 {
   "workloadId": "uuid",
   "watermark": true,
-  "expiresInDays": 30
+  "expiresInDays": 30,
+  "password": "optional"
 }
 ```
+
+- `expiresInDays` is required and at most **90**; larger values return `400`.
+- The response is the only time the raw token is shown. The API stores
+  `sha256(token)`, so a lost token cannot be recovered, only revoked and reissued.
+- An optional `password` is stored as a salted scrypt hash.
 
 Response:
 
@@ -188,7 +194,16 @@ Response:
 }
 ```
 
-`GET /share/:token`
+`GET /share/:token` opens a link without a password.
+
+`POST /share/:token` opens a password-protected link:
+
+```json
+{ "password": "client-demo", "section": "summary" }
+```
+
+Never send the password in the query string: `GET /share/:token?password=…`
+returns `400`, because URLs end up in access logs, proxy logs and browser history.
 
 Response:
 
@@ -205,6 +220,7 @@ Response:
 Error cases:
 
 - Expired, revoked, or missing tokens return `404`.
+- A missing or wrong password on a protected link returns `401`.
 - Shared payload is scoped to the single workload and its comparison breakdown.
 
 ## Exchange Rates
