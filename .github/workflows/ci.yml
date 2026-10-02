@@ -63,3 +63,35 @@ jobs:
         run: npm run ci:e2e
       - name: Dependency security scan
         run: npm run security:audit
+
+  # UI-7: screenshot regression and Lighthouse budgets. Runs inside the same
+  # Playwright image the baselines were generated in, so fonts and rasterisation
+  # match pixel for pixel. To refresh baselines after an intended visual change:
+  #   docker run --rm -v "$PWD":/work -w /work mcr.microsoft.com/playwright:v1.63.0-noble \
+  #     bash -lc 'npm ci && npm run build --workspace @polycost/web && cd apps/web && npm run test:visual:update'
+  visual:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      # Playwright's recommended setting: share the host IPC namespace so
+      # Chromium is not limited to Docker's 64 MB /dev/shm.
+      options: --ipc=host
+    steps:
+      - uses: actions/checkout@v7
+      - run: npm ci
+      - name: Build web
+        run: npm run build --workspace @polycost/web
+      - name: Visual regression
+        run: npm run test:visual --workspace @polycost/web
+      - name: Lighthouse budgets
+        run: |
+          export CHROME_PATH="$(node -e "console.log(require('playwright-core').chromium.executablePath())")"
+          npm run lighthouse:ci
+      - name: Upload visual diffs and Lighthouse reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-and-lighthouse
+          path: |
+            test-results/web-playwright
+            .lighthouseci/reports
