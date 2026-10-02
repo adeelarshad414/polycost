@@ -7,7 +7,29 @@ once tagged releases begin.
 
 ## Unreleased
 
+### Security
+
+- Audit Phase 0 and Phase 1 (#244, #249, #250, #256, #257, #258):
+  - Production refuses to boot on mock pricing unless explicitly allowed.
+  - Rate limits key on the real client address (`TRUST_PROXY_HOPS`).
+  - Linear email validation, a 16 KB body limit on credential routes, async
+    scrypt, and uniform login failures that do not reveal which emails exist.
+  - Billing and SCIM tenant checks fail closed.
+  - Compose is labelled dev-only: infrastructure ports bind to `127.0.0.1` and
+    Grafana requires `GRAFANA_PASSWORD`.
+  - The Helm NetworkPolicy admits only the ingress and monitoring namespaces.
+  - CI blocks on gitleaks (full history), Trivy (dependencies, secrets, IaC)
+    and CodeQL; actions are SHA-pinned and the token is read-only.
+  - Strict Content-Security-Policy and security headers on the web app.
+  - Share links: tokens stored as SHA-256, salted scrypt passwords sent only in
+    a POST body, and expiry capped at 90 days (migration 043).
+
 ### Added
+
+- `pricing_rate_fallbacks_total`, `pricing_etl_prunes_total` and
+  `pricing_etl_pruned_rows_total` metrics.
+- Branch protection on `main` requiring `quality`, `visual`, `security` and
+  CodeQL.
 
 - 📚 Documentation set: `DOCUMENTATION.md` master index (all 99 documents),
   plus `docs/HOW-IT-WORKS.md`, `docs/DIAGRAMS.md`, `docs/REQUIREMENTS.md`,
@@ -23,6 +45,14 @@ once tagged releases begin.
 - UTC `timestamptz` migration for the compliance audit and pricing tables.
 
 ### Changed
+
+- The pricing ETL never prunes after a partial run, and skips the prune unless
+  the run refreshed at least `PRICING_ETL_PRUNE_MIN_FRESH_RATIO` (default 0.9)
+  of the live catalog.
+- A modeled pricing fallback is logged and has `sourceFetchedAt: null`.
+- Docker images run on `node:24-alpine`, matching CI.
+- Deploy docs use `npm run db:backup` / `db:restore-drill` instead of a bare
+  `pg_dump`.
 
 - Provider pricing upserts and invoice line-item inserts are now batched rather
   than one statement per row.

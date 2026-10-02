@@ -120,7 +120,7 @@ graph TB
             A["api<br/>:3001"]
             P[("postgres:16-alpine<br/>:5432")]
             R[("redis:7-alpine<br/>:6379")]
-            V{{"vault:1.18<br/>:8200"}}
+            V{{"vault:1.18<br/>127.0.0.1:8200"}}
             VS["vault-seed<br/><i>run-once</i>"]
         end
         VOL[("volumes<br/>postgres-data · dev-secrets · vault-auth")]
@@ -144,7 +144,13 @@ docker compose up -d
 npm run db:migrate
 ```
 
+> ⚠️ Compose is a **development and demo** stack: Vault runs in dev mode, so
+> Vault, Grafana, Prometheus and the OTel collector publish on `127.0.0.1` only,
+> and Grafana will not start without `GRAFANA_PASSWORD`.
+>
 > ℹ️ Ports are remappable via environment variables — see [DEPLOY.md](../DEPLOY.md).
+> The `web` container (nginx) serves the app with a strict Content-Security-Policy
+> generated from the built `index.html` at image build time.
 > `vault-seed` is a run-once container that provisions local development secrets;
 > it exits after seeding.
 
@@ -261,12 +267,19 @@ flowchart LR
     CRON["⏰ Cron<br/><i>PRICING_ETL_SCHEDULE_CRON</i>"] --> FETCH
     FETCH["📥 Fetch provider feed<br/><i>streamed, size + time capped</i>"] --> NORM
     NORM["🧹 Normalise to catalog rows"] --> UPSERT
-    UPSERT["💾 Batched upsert<br/><i>jsonb_to_recordset</i>"] --> PRUNE
-    PRUNE["🧽 Prune stale live rows"] --> HEALTH
+    UPSERT["💾 Batched upsert<br/><i>jsonb_to_recordset</i>"] --> CLEAN
+    CLEAN{"Any rows<br/>rejected?"} -->|yes: partial run| KEEP
+    CLEAN -->|no| GUARD
+    GUARD{"fresh ≥ 90% of<br/>live catalog?"} -->|no| KEEP
+    GUARD -->|yes| PRUNE
+    PRUNE["🧽 Prune stale live rows<br/><i>count + delete in one statement</i>"] --> HEALTH
+    KEEP["🛑 Keep stale rows<br/><i>logged + pricing_etl_prunes_total</i>"] --> HEALTH
     HEALTH["🩺 Record run + data health"]
 
     classDef step fill:#e8f0fe,stroke:#4285f4,color:#111
+    classDef warn fill:#fef7e0,stroke:#f9ab00,color:#111
     class FETCH,NORM,UPSERT,PRUNE,HEALTH step
+    class KEEP warn
 ```
 
 Resilience properties built into this pipeline:
@@ -279,18 +292,43 @@ Resilience properties built into this pipeline:
   host is refused (SSRF).
 - 📦 **Batched upserts** with a per-row fallback, so one malformed row rejects
   only itself.
+- 🧯 **Prune guard** — a partial run never prunes, and a run that refreshed less
+  than `PRICING_ETL_PRUNE_MIN_FRESH_RATIO` (default 0.9) of the live catalog
+  keeps the stale rows, so a truncated feed cannot wipe the catalog.
 
 ### CI pipeline
 
 ```mermaid
 flowchart LR
-    PR["📥 Push / PR"] --> FMT["🎨 format:check"] --> LINT["🔍 lint + typecheck"]
-    LINT --> UNIT["🧪 unit tests"] --> INT["🔗 integration"] --> BUILD["📦 build"]
-    BUILD --> E2E["🌐 e2e"] --> SEC["🔐 security scan"] --> OK["✅ mergeable"]
+    PR["📥 Push / PR"] --> Q & S & V & C
+
+    subgraph Q["quality"]
+        direction TB
+        FMT["🎨 format · lint · typecheck"] --> CONTRACT["📜 openapi · alerts · helm lint"]
+        CONTRACT --> UNIT["🧪 unit · integration"] --> BUILD["📦 build · bundle budget"]
+        BUILD --> E2E["🌐 e2e (Docker)"] --> AUDIT["📦 npm audit"]
+    end
+    subgraph S["security"]
+        direction TB
+        GL["🔑 gitleaks<br/><i>full git history</i>"] --> TV["🛡️ Trivy deps + secrets"] --> TC["🏗️ Trivy IaC<br/><i>Dockerfiles · Helm</i>"]
+    end
+    subgraph V["visual"]
+        direction TB
+        SHOT["🖼️ screenshot diffs"] --> LH["⚡ Lighthouse budgets"]
+    end
+    subgraph C["CodeQL"]
+        SAST["🔍 analyze<br/><i>security-extended</i>"]
+    end
+
+    Q & S & V & C --> OK["✅ mergeable<br/><i>branch protection requires all four</i>"]
 
     classDef pass fill:#e6f4ea,stroke:#34a853,color:#111
     class OK pass
 ```
+
+All actions are pinned to a commit SHA, scanner images to a digest, and the
+workflow token is read-only by default. Reviewed scanner exceptions live in
+`.gitleaksignore` and `.trivyignore.yaml`, each with its reason.
 
 ### Local git hooks
 

@@ -47,6 +47,7 @@ request-time API
   PATCH /api/v1/alerts/:id
   POST /api/v1/share-links
   GET  /api/v1/share/:token
+  POST /api/v1/share/:token
   GET  /api/v1/exchange-rates
 ```
 
@@ -68,7 +69,9 @@ The V1 normalized pricing cache is:
 - `workloads`: persisted normalized workload inputs for comparison, sharing, and alerting.
 - `budgets`: one budget threshold per workload.
 - `alerts`: generated budget threshold and modeled-cost anomaly alerts.
-- `share_links`: public token-scoped read-only report links with expiry and revocation.
+- `share_links`: public token-scoped read-only report links with expiry (≤ 90 days)
+  and revocation. `token` holds `sha256(token)` (migration 043); the raw token is
+  returned once at creation. `password_hash` is salted scrypt for new links.
 - `workload_cost_observations`: modeled monthly-cost history used for week-over-week anomaly evaluation.
 
 ## 4. Region And Family Normalization
@@ -133,6 +136,9 @@ Request-time endpoints read from PostgreSQL only:
 - `PATCH /api/v1/alerts/:id`: toggles dismissal.
 - `POST /api/v1/share-links`: creates token-scoped read-only links.
 - `GET /api/v1/share/:token`: returns only the shared workload and its comparison breakdown.
+  A password in the query string is refused with `400`.
+- `POST /api/v1/share/:token`: same, for a password-protected link; body
+  `{ "password", "section" }`.
 - `GET /api/v1/exchange-rates`: reads latest cached exchange rates.
 
 `POST /api/v1/comparisons/:id/refresh-live` is not a broad live-pricing fallback. It
