@@ -1,20 +1,15 @@
 /**
- * Brand palette for exported reports.
+ * Brand palette for exported reports (PolyCost Aurora, UI-8).
  *
- * One source of truth shared by the PDF and XLSX exporters so a provider is the
- * same colour in a chart, a table header and a spreadsheet tab. Previously each
- * exporter picked its own approximate colours, so the same report looked like
- * three different documents.
+ * One source of truth shared by the PDF and XLSX exporters, and the same values
+ * as the web app's tokens (apps/web/src/styles/tokens.css), so a provider is the
+ * same colour on screen, in a PDF chart and on a spreadsheet tab.
  *
- * Provider colours are the vendors' own published brand values, not
- * approximations:
- *
- *   AWS    #FF9900 with #252F3E as the dark pair
- *   Azure  #027DFF, from the Azure blue ramp
- *   GCP    #4285F4, with the red/green/yellow of the Google mark
- *
- * Using a vendor's colour to label that vendor's own data is nominative use and
- * is what a reader expects; it is not co-branding, and no vendor logo is drawn.
+ * Provider fills are re-stepped from the vendors' published colours: the official
+ * AWS orange #FF9900 and Google green #34A853 collapse into one another under
+ * protanopia, and telling the three providers apart is the whole job of these
+ * charts. The Aurora steps pass a colour-vision-deficiency validator (see the UI
+ * audit, section 10.4). No vendor logo is drawn.
  */
 
 export interface RgbColor {
@@ -45,59 +40,75 @@ export interface BrandColors {
 }
 
 export const PROVIDER_BRAND: Record<'aws' | 'azure' | 'gcp', BrandColors> = {
-  aws: { primary: 'FF9900', deep: '252F3E', tint: 'FFF3E0', label: 'AWS' },
-  azure: { primary: '027DFF', deep: '0039A9', tint: 'E6F2FF', label: 'Azure' },
-  // Google green rather than Google blue, and deliberately so: #4285F4 sits
-  // almost on top of Azure's #027DFF, and the whole point of these charts is
-  // telling the three providers apart at a glance. Green is one of the four
-  // colours of the Google mark, so this stays on-brand while staying legible.
-  gcp: { primary: '34A853', deep: '1E7E34', tint: 'E6F4EA', label: 'Google Cloud' },
+  aws: { primary: 'E98A15', deep: '9A4F00', tint: 'FDF1E3', label: 'AWS' },
+  azure: { primary: '3B6FE8', deep: '1D4ED8', tint: 'E8EFFD', label: 'Azure' },
+  gcp: { primary: '0F7A43', deep: '0B6B3A', tint: 'E4F4EB', label: 'Google Cloud' },
 };
 
-/** Azure ramp, kept for sequential shading where one hue is wanted. */
-export const AZURE_RAMP = ['0039A9', '027DFF', '3399FF', '41AADE', '88D1F1', '1392D3'];
+/** Aurora brand colours, for the report header hairline and accents only. */
+export const BRAND_ACCENTS = {
+  indigo: '4F46E5',
+  violet: '7C3AED',
+  magenta: 'DB2777',
+  cyan: '0891B2',
+};
+
+/** Sequential indigo ramp (light to dark) for single-hue magnitude shading. */
+export const SEQUENTIAL_RAMP = [
+  'EEF0FF',
+  'DCE0FF',
+  'C0C7FE',
+  '9EA8FB',
+  '7C84F4',
+  '5F63E8',
+  '4F46E5',
+  '4036BF',
+  '332C96',
+  '272370',
+];
 
 /**
- * Service-category colours, taken from the Google mark because it is the only
- * one of the three brands that supplies a full qualitative set. Categories are
- * not vendor-specific, so a neutral multi-hue palette is the right choice and
- * this one is already in the document.
+ * Service-category colours in the same fixed order as the web charts. Seven
+ * categories need a qualitative set; this order clears the CVD checks for
+ * adjacent stacked segments. Categories never borrow a provider's identity.
  */
 export const CATEGORY_COLORS: Record<string, string> = {
-  compute: '4285F4',
-  storage: 'FBBC04',
-  database: '34A853',
-  network: 'EA4335',
-  operations: '1392D3',
-  other: '5F6673',
+  compute: '4A3AA7',
+  storage: '1BAF7A',
+  database: 'EDA100',
+  network: 'E87BA4',
+  support: '008300',
+  licensing: '2A78D6',
+  operations: 'EB6834',
+  other: '565C74',
 };
 
 /** Neutrals. Kept out of the brand hues so text never competes with data. */
 export const REPORT_INK = {
-  heading: '111827',
-  body: '1F2430',
-  muted: '5B6270',
-  hairline: 'D8DCE3',
-  bandFill: 'F3F5F8',
-  zebraFill: 'FAFBFC',
+  heading: '0F1222',
+  body: '2E3348',
+  muted: '565C74',
+  hairline: 'E4E7F0',
+  bandFill: 'EEF0F8',
+  zebraFill: 'F5F6FB',
   paper: 'FFFFFF',
-  /** Data-bar fill: a mid Azure blue that stays legible behind black numerals. */
-  dataBar: '88D1F1',
+  /** Data-bar fill: light indigo that keeps black numerals at 11:1 or better. */
+  dataBar: 'C0C7FE',
 };
 
-/** Status colours for confidence and risk, chosen to clear AA on white. */
+/** Status colours for confidence and risk; each clears 4.5:1 on white. */
 export const STATUS_COLORS = {
-  good: '217455',
-  warning: 'B26A00',
-  danger: 'B3261E',
+  good: '047857',
+  warning: 'A14A08',
+  danger: 'C2263B',
 };
 
 export function providerBrand(providerId: string): BrandColors {
   return (
     PROVIDER_BRAND[providerId as keyof typeof PROVIDER_BRAND] ?? {
-      primary: '5F6673',
-      deep: '30343C',
-      tint: 'F1F2F4',
+      primary: '565C74',
+      deep: '2E3348',
+      tint: 'EEF0F8',
       label: providerId.toUpperCase(),
     }
   );

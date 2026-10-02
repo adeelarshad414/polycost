@@ -9,6 +9,7 @@ import {
   tableLines,
   textWidth,
   truncateToWidth,
+  verdictLines,
   wrapLine,
   pageContent,
 } from './pdf-report.generator.js';
@@ -246,8 +247,9 @@ describe('report generators', () => {
     // Currency must carry an explicit format, otherwise money renders as a bare
     // General number that a reviewer cannot scan.
     expect(raw).toContain('formatCode="&quot;$&quot;#,##0.00"');
-    // Header fill and a frozen header row.
-    expect(raw).toContain('fgColor rgb="FF1F3864"');
+    // Aurora indigo header fill (UI-8), hairline borders, and a frozen header row.
+    expect(raw).toContain('fgColor rgb="FF4F46E5"');
+    expect(raw).toContain('color rgb="FFE4E7F0"');
     expect(raw).toContain('state="frozen"');
   });
 
@@ -264,6 +266,22 @@ describe('report generators', () => {
     expect(csv[1]).toBe(0xbb);
     expect(csv[2]).toBe(0xbf);
     expect(csv.toString('utf8')).toContain('\r\n');
+  });
+
+  it('opens the PDF with the verdict and the gap to each alternative (UI-8)', () => {
+    const pdf = new PdfReportGenerator()
+      .generate(comparison, {
+        interval: 'monthly',
+        pricingModel: 'on-demand',
+        generatedAt: '2026-07-02T00:00:00.000Z',
+      })
+      .toString('binary');
+
+    const verdictAt = pdf.indexOf('is the lowest-cost option at');
+    expect(verdictAt).toBeGreaterThan(-1);
+    expect(verdictAt).toBeLessThan(pdf.indexOf('Comparison ID'));
+    expect(pdf).toMatch(/\d+% below AWS/);
+    expect(verdictLines({ ...comparison, providers: [] })).toEqual([]);
   });
 
   it('registers a bold face and stamps every PDF page with a page number', () => {

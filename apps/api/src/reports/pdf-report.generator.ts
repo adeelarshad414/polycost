@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ComparisonLineItem, ComparisonResult } from '../comparison/comparison.types.js';
 import {
+  BRAND_ACCENTS,
   REPORT_INK,
   categoryColor as brandCategoryColor,
   hexToRgb,
@@ -77,7 +78,8 @@ const PAGE_MARGIN = 50;
 const CONTENT_WIDTH = 512;
 const COLUMN_GAP = 6;
 const ROW_HEIGHT = 16;
-const HEADER_BAND_COLOR: RgbColor = hexToRgb(REPORT_INK.heading);
+// Aurora indigo for table header bands; white text on it is 6.3:1.
+const HEADER_BAND_COLOR: RgbColor = hexToRgb(BRAND_ACCENTS.indigo);
 const HEADER_TEXT_COLOR: RgbColor = { red: 1, green: 1, blue: 1 };
 const ZEBRA_COLOR: RgbColor = hexToRgb(REPORT_INK.zebraFill);
 const CHART_ORIGIN_X = 58;
@@ -85,8 +87,8 @@ const PROVIDER_BAR_MAX_WIDTH = 330;
 const STACKED_BAR_WIDTH = 360;
 /** Right edge of the paper (612) less the chart origin and a matching margin. */
 const CHART_TEXT_WIDTH = 612 - CHART_ORIGIN_X - 50;
-const TEXT_COLOR: RgbColor = { red: 0.07, green: 0.08, blue: 0.12 };
-const MUTED_TEXT_COLOR: RgbColor = { red: 0.36, green: 0.39, blue: 0.45 };
+const TEXT_COLOR: RgbColor = hexToRgb(REPORT_INK.heading);
+const MUTED_TEXT_COLOR: RgbColor = hexToRgb(REPORT_INK.muted);
 
 @Injectable()
 export class PdfReportGenerator {
@@ -137,6 +139,8 @@ export class PdfReportGenerator {
   private lines(result: ComparisonResult, options: ReportOptions): PdfLine[] {
     const lines: PdfLine[] = [
       { text: 'PolyCost Comparison Report', fontSize: 18 },
+      // UI-8: the answer first, as on screen, before any metadata.
+      ...verdictLines(result),
       ...reportCoverRows(result, options)
         .slice(1)
         .map((row) => ({
@@ -628,6 +632,45 @@ function categoryColor(category: string): RgbColor {
   return hexToRgb(brandCategoryColor(category));
 }
 
+/**
+ * The recommendation in one sentence plus the gap to each alternative, drawn at
+ * the top of page one so a reader gets the answer before the evidence. Quotes
+ * are ranked, never summed.
+ */
+export function verdictLines(result: ComparisonResult): PdfLine[] {
+  const ranked = result.providers
+    .filter((provider) => Number.isFinite(provider.totals.monthly))
+    .map((provider) => ({ id: provider.providerId, monthly: provider.totals.monthly }))
+    .sort((a, b) => a.monthly - b.monthly);
+  const [lowest, ...others] = ranked;
+
+  if (!lowest) {
+    return [];
+  }
+
+  const money = (value: number) =>
+    `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const gaps = others
+    .filter((other) => other.monthly > 0)
+    .map((other) => {
+      const below = Math.round(((other.monthly - lowest.monthly) / other.monthly) * 100);
+      return `${below}% below ${providerBrand(other.id).label}`;
+    });
+
+  return [
+    {
+      text: `${providerBrand(lowest.id).label} is the lowest-cost option at ${money(
+        lowest.monthly,
+      )} per month`,
+      fontSize: 14,
+      bold: true,
+      textColor: hexToRgb(BRAND_ACCENTS.indigo),
+    },
+    ...(gaps.length > 0 ? [{ text: gaps.join('  |  '), fontSize: 11 }] : []),
+    { text: '', fontSize: 6 },
+  ];
+}
+
 function filledRect(x: number, y: number, width: number, height: number, color: RgbColor): string {
   return `${rgb(color)} rg\n${formatPdfNumber(x)} ${formatPdfNumber(y)} ${formatPdfNumber(
     width,
@@ -895,19 +938,39 @@ export function tableLines(
   ];
 }
 
+/**
+ * The Aurora brand line across the top of every page (UI-8): indigo, violet,
+ * magenta and cyan in four equal bands, the PDF equivalent of the web app's
+ * gradient hairline without needing a shading dictionary.
+ */
+function brandHairline(): string {
+  const colors = [
+    BRAND_ACCENTS.indigo,
+    BRAND_ACCENTS.violet,
+    BRAND_ACCENTS.magenta,
+    BRAND_ACCENTS.cyan,
+  ];
+  const width = 612 / colors.length;
+
+  return colors
+    .map((color, index) => filledRect(index * width, 788, width, 4, hexToRgb(color)))
+    .join('\n');
+}
+
 // Page furniture: a hairline rule and "Page N of M", so a printed or emailed
 // report can be reassembled and cited page-by-page.
 function pageFooter(pageNumber: number, totalPages: number): string {
   const label = `PolyCost Comparison Report  |  Page ${pageNumber} of ${totalPages}`;
 
   return [
-    '0.83 0.86 0.90 RG',
+    brandHairline(),
+    `${rgb(hexToRgb(REPORT_INK.hairline))} RG`,
     '0.5 w',
     '50 58 m',
     '562 58 l',
     'S',
     'BT',
-    '0.36 0.39 0.45 rg',
+    `${rgb(MUTED_TEXT_COLOR)} rg`,
     '/F1 8 Tf',
     '1 0 0 1 50 44 Tm',
     `(${escapePdfText(label)}) Tj`,
