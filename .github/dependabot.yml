@@ -20,3 +20,15 @@ updates:
       day: monday
       time: '09:00'
     open-pull-requests-limit: 5
+
+  # Base images in the Dockerfiles (node, nginx).
+  - package-ecosystem: docker
+    directories:
+      - /apps/api
+      - /apps/web
+      - /docker/notary-receiver
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+    open-pull-requests-limit: 5
