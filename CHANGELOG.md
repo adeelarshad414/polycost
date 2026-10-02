@@ -46,6 +46,12 @@ once tagged releases begin.
 
 ### Changed
 
+- One migrator (`docker/postgres/migrate.sh`) for the compose init hook,
+  `npm run db:migrate` and a new Helm pre-install/pre-upgrade Job: advisory lock,
+  per-file transactions, sha256 checksums that reject edited migrations, and a
+  dry run. Migrations are discovered rather than listed; `db:validate` rejects
+  lock-heavy DDL from 044 on. Migration 002 no longer hard-codes the database
+  name and tolerates existing roles (H-06, H-09).
 - Postgres pools are bounded (`DB_POOL_MAX`, default 5 per pool), every
   statement has a server-side timeout, pools name themselves in
   `pg_stat_activity`, and TLS is configurable (`DB_SSL_MODE`) (M-06).

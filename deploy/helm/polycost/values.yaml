@@ -13,6 +13,35 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
+# Pre-install / pre-upgrade migration Job (templates/migrations-job.yaml).
+migrations:
+  enabled: true
+  image:
+    # Built from database/Dockerfile.
+    repository: polycost-migrations
+    tag: latest
+    pullPolicy: IfNotPresent
+  # The migrator is idempotent and lock-protected, so one retry is safe.
+  backoffLimit: 1
+  activeDeadlineSeconds: 1800
+  # Database owner credentials: schema changes need more than the app role.
+  ownerSecret:
+    name: polycost-db-owner
+    usernameKey: username
+    passwordKey: password
+  # Only needed on a database where polycost_app / polycost_etl do not exist
+  # yet; the passwords must match Vault's polycost/db secret.
+  rolePasswordsSecret:
+    name: ''
+    appKey: app_password
+    etlKey: etl_password
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
 service:
   type: ClusterIP
   port: 3000
@@ -31,7 +60,8 @@ resources:
     memory: 1Gi
 
 probes:
-  # The app runs migrations and a startup pricing refresh before it serves, and
+  # The app runs a startup pricing refresh before it serves (migrations run
+  # earlier, in the pre-install/pre-upgrade Job), and
   # was measured at roughly 40-50s to healthy. The startup probe is what buys
   # that time; without it the liveness probe kills the pod mid-boot and the
   # deployment never converges.

@@ -169,7 +169,9 @@ equivalent managed services.
    - HTTP listener redirects to HTTPS.
    - Health check uses a dedicated `/health` endpoint.
 
-6. Run migrations against production as a one-off task.
+6. Run migrations against production as a one-off task: the migrations image
+   (`database/Dockerfile`) with the owner's libpq variables. It is lock-protected
+   and idempotent; see [database/README.md](database/README.md).
 
 7. Point DNS at the load balancer and verify HTTPS, app loading, comparison, and
    export journeys.

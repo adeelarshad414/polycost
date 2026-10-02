@@ -34,7 +34,7 @@ flowchart LR
 | `apps/web`            | React UI, comparison workspace, exports, diagrams, Terraform panel |
 | `apps/api`            | API controllers, pricing adapters, comparison, reports, auth, jobs |
 | `packages/types`      | shared workload, comparison, report, and time-standard definitions |
-| `database/migrations` | additive schema history                                            |
+| `database/migrations` | additive schema history, applied by `docker/postgres/migrate.sh`   |
 | `fixtures/diagrams`   | parser safety and service-classification fixtures                  |
 | `scripts`             | release gates, demo boot, live verification, evidence checks       |
 | `docs/architecture`   | phase-specific architecture notes                                  |

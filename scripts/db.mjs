@@ -1,54 +1,42 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 
 const command = process.argv[2] ?? 'validate';
 const root = process.cwd();
-const expectedMigrations = [
-  '001_core_schema.sql',
-  '002_least_privilege_roles.sql',
-  '003_seed_service_equivalence_map.sql',
-  '004_seed_local_pricing_catalog.sql',
-  '005_backend_architecture_tables.sql',
-  '006_cost_management_jobs.sql',
-  '007_pricing_etl_run_counters.sql',
-  '008_pricing_model_terms.sql',
-  '009_pricing_rates_matrix.sql',
-  '010_share_link_context.sql',
-  '011_seed_local_commitment_pricing_catalog.sql',
-  '012_production_depth_audit_analytics.sql',
-  '013_report_export_jobs.sql',
-  '014_comparison_prewarm_jobs.sql',
-  '015_seed_accelerated_compute_pricing_catalog.sql',
-  '016_pricing_cache_sync_status.sql',
-  '017_seed_burstable_compute_catalog.sql',
-  '018_pricing_rates_active_uniqueness.sql',
-  '019_comparison_audit_rate_evidence.sql',
-  '020_pricing_rates_estimate_only_guard.sql',
-  '021_seed_distinct_payment_option_rates.sql',
-  '022_diagram_imports.sql',
-  '023_seed_sql_server_database_catalog.sql',
-  '024_comparison_audit_pricing_trace.sql',
-  '025_account_team_foundation.sql',
-  '026_auth_sessions_and_billing_actuals.sql',
-  '027_team_invites_and_sso.sql',
-  '028_pricing_lineage_metadata.sql',
-  '029_auth_billing_runtime_privileges.sql',
-  '030_team_audit_events.sql',
-  '031_team_audit_export_outbox.sql',
-  '032_invoice_artifact_blobs.sql',
-  '033_invoice_artifact_blob_governance.sql',
-  '034_invoice_artifact_external_storage.sql',
-  '035_team_audit_artifact_legal_hold_action.sql',
-  '036_team_audit_artifact_review_action.sql',
-  '037_team_audit_artifact_exception_action.sql',
-  '038_team_audit_invoice_control_validation_action.sql',
-  '039_invoice_artifact_provider_retention_proof_persistence.sql',
-  '040_team_scim_provisioning.sql',
-  '041_pricing_catalog_live_indexes.sql',
-  '042_utc_timestamptz.sql',
-  '043_share_link_token_hash.sql',
+const migrationsDir = path.join(root, 'database/migrations');
+
+// Discovered, not listed (audit H-06): the hand-written list drifted, and a
+// fresh volume silently missed 041/042.
+const MIGRATION_FILE = /^(\d{3})_[a-z0-9_]+\.sql$/;
+
+// Audit H-09: from this version on, lock-heavy DDL must be written the
+// non-blocking way or carry an explicit, reviewed opt-out. Earlier migrations
+// already ran everywhere and are left byte-identical (their checksums are
+// recorded by the migrator).
+const LOCK_SAFETY_FROM_VERSION = 44;
+const LOCK_SAFETY_OPT_OUT = /--\s*migrate:allow-lock\s+\S/;
+const LOCK_RULES = [
+  {
+    pattern: /\bCREATE\s+(UNIQUE\s+)?INDEX\b(?![^;]*\bCONCURRENTLY\b)/i,
+    advice:
+      'use CREATE INDEX CONCURRENTLY (it blocks writes otherwise; the migrator runs such files outside a transaction)',
+  },
+  {
+    pattern: /\bADD\s+CONSTRAINT\b[^;]*\b(CHECK|FOREIGN\s+KEY)\b(?![^;]*\bNOT\s+VALID\b)/i,
+    advice:
+      'add CHECK / FOREIGN KEY constraints NOT VALID, then VALIDATE CONSTRAINT in a later statement',
+  },
+  {
+    pattern: /\bALTER\s+COLUMN\s+\S+\s+(SET\s+DATA\s+)?TYPE\b/i,
+    advice:
+      'a column type change rewrites the table under an exclusive lock; add a new column and backfill',
+  },
+  {
+    pattern: /\bSET\s+NOT\s+NULL\b/i,
+    advice:
+      'SET NOT NULL scans the table under an exclusive lock; add a NOT VALID CHECK (col IS NOT NULL) first',
+  },
 ];
 
 if (!['migrate', 'seed', 'reset', 'validate'].includes(command)) {
@@ -57,10 +45,12 @@ if (!['migrate', 'seed', 'reset', 'validate'].includes(command)) {
 }
 
 if (command === 'validate') {
-  await validateMigrations();
+  validateMigrations();
+  validateLiveSchema();
   console.log('Database validation passed.');
 } else if (command === 'migrate') {
-  await migrateDatabase();
+  validateMigrations();
+  migrateDatabase();
 } else if (command === 'seed') {
   runDocker(['compose', 'up', '-d', 'vault', 'vault-seed']);
   console.log('Vault seed service requested. Local DB secrets are generated into Docker volumes.');
@@ -70,50 +60,82 @@ if (command === 'validate') {
   console.log('Database reset complete. Project Docker volumes were recreated.');
 }
 
-async function migrateDatabase() {
-  runDocker(['compose', 'up', '-d', 'postgres']);
-
-  const appliedVersions = liveMigrationVersions(await readLiveSchemaMigrations());
-  const missingMigrations = expectedMigrations.filter(
-    (migration) => !appliedVersions.has(migration.slice(0, 3)),
-  );
-
-  if (missingMigrations.length === 0) {
-    console.log('Database service is up. No pending migrations found.');
-    await validateMigrations();
-    return;
-  }
-
-  for (const migration of missingMigrations) {
-    console.log(`Applying migration ${migration}...`);
-    applyMigration(migration);
-  }
-
-  await validateMigrations();
-  console.log(`Database migrated successfully: ${missingMigrations.join(', ')}`);
-}
-
-async function validateMigrations() {
-  const migrationsDir = path.join(root, 'database/migrations');
+function migrationFiles() {
   if (!existsSync(migrationsDir)) {
     fail('Missing database/migrations directory.');
   }
+  return readdirSync(migrationsDir)
+    .filter((file) => file.endsWith('.sql'))
+    .sort();
+}
 
-  for (const migration of expectedMigrations) {
-    const migrationPath = path.join(migrationsDir, migration);
-    if (!existsSync(migrationPath)) {
-      fail(`Missing migration: ${migration}`);
+function validateMigrations() {
+  const files = migrationFiles();
+  const seen = new Map();
+  const problems = [];
+
+  files.forEach((file, index) => {
+    const match = file.match(MIGRATION_FILE);
+    if (!match) {
+      problems.push(`${file}: name must be NNN_lower_snake_case.sql`);
+      return;
+    }
+    const version = Number(match[1]);
+    if (seen.has(match[1])) {
+      problems.push(`${file}: version ${match[1]} is also used by ${seen.get(match[1])}`);
+    }
+    seen.set(match[1], file);
+    if (version !== index + 1) {
+      problems.push(`${file}: expected version ${String(index + 1).padStart(3, '0')} (no gaps)`);
     }
 
-    const content = await readFile(migrationPath, 'utf8');
+    const content = readFileSync(path.join(migrationsDir, file), 'utf8');
     if (!content.includes('\\set ON_ERROR_STOP on')) {
-      fail(`${migration} must enable ON_ERROR_STOP.`);
+      problems.push(`${file}: must enable ON_ERROR_STOP`);
     }
     if (!content.includes('schema_migrations')) {
-      fail(`${migration} must update schema_migrations.`);
+      problems.push(`${file}: must record itself in schema_migrations`);
     }
-  }
+    if (version >= LOCK_SAFETY_FROM_VERSION && !LOCK_SAFETY_OPT_OUT.test(content)) {
+      const sql = content.replace(/--[^\n]*/g, '');
+      for (const rule of LOCK_RULES) {
+        if (rule.pattern.test(sql)) {
+          problems.push(
+            `${file}: ${rule.advice}. If the table is known to be small, add "-- migrate:allow-lock <reason>".`,
+          );
+        }
+      }
+    }
+  });
 
+  if (problems.length > 0) {
+    fail(`Migration validation failed:\n- ${problems.join('\n- ')}`);
+  }
+  console.log(`Validated ${files.length} migration files.`);
+}
+
+function migrateDatabase() {
+  runDocker(['compose', 'up', '-d', '--wait', 'postgres']);
+  // The same migrator the initdb hook and the Helm Job run (docker/postgres/migrate.sh).
+  runDocker([
+    'compose',
+    'exec',
+    '-T',
+    '-e',
+    'APP_DB_PASSWORD_FILE=/run/polycost-secrets/app_db_password',
+    '-e',
+    'ETL_DB_PASSWORD_FILE=/run/polycost-secrets/etl_db_password',
+    '-e',
+    'MIGRATIONS_DIR=/polycost-migrations',
+    ...(process.env.MIGRATE_DRY_RUN === '1' ? ['-e', 'MIGRATE_DRY_RUN=1'] : []),
+    'postgres',
+    'sh',
+    '-c',
+    'PGUSER="$POSTGRES_USER" PGDATABASE="$POSTGRES_DB" sh /polycost-postgres/migrate.sh',
+  ]);
+}
+
+function validateLiveSchema() {
   const status = spawnSync('docker', ['compose', 'ps', '--status=running', 'postgres'], {
     cwd: root,
     encoding: 'utf8',
@@ -125,19 +147,6 @@ async function validateMigrations() {
     return;
   }
 
-  const schemaMigrationsOutput = await readLiveSchemaMigrations();
-  const appliedVersions = liveMigrationVersions(schemaMigrationsOutput);
-
-  const missingVersions = expectedMigrations
-    .map((migration) => migration.slice(0, 3))
-    .filter((version) => !appliedVersions.has(version));
-
-  if (missingVersions.length > 0) {
-    fail(`Live schema_migrations output is missing expected versions:\n${schemaMigrationsOutput}`);
-  }
-}
-
-async function readLiveSchemaMigrations() {
   const result = spawnSync(
     'docker',
     [
@@ -145,91 +154,25 @@ async function readLiveSchemaMigrations() {
       'exec',
       '-T',
       'postgres',
-      'psql',
-      '-U',
-      'polycost_owner',
-      '-d',
-      'polycost_dev',
+      'sh',
       '-c',
-      'SELECT version, name FROM schema_migrations ORDER BY version;',
+      'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT version FROM schema_migrations ORDER BY version"',
     ],
     { cwd: root, encoding: 'utf8' },
   );
-
   if (result.status !== 0) {
     fail(`Live schema_migrations check failed:\n${result.stderr || result.stdout}`);
   }
 
-  return result.stdout;
-}
-
-function liveMigrationVersions(schemaMigrationsOutput) {
-  const versions = new Set();
-
-  for (const line of schemaMigrationsOutput.split('\n')) {
-    const match = line.match(/^\s*(\d{3})\s*\|/);
-
-    if (match) {
-      versions.add(match[1]);
-    }
+  const applied = new Set(result.stdout.split('\n').map((line) => line.trim()));
+  const pending = migrationFiles()
+    .map((file) => file.slice(0, 3))
+    .filter((version) => !applied.has(version));
+  if (pending.length > 0) {
+    fail(
+      `The running database is missing migrations ${pending.join(', ')}. Run: npm run db:migrate`,
+    );
   }
-
-  return versions;
-}
-
-// A migration is applied atomically (psql --single-transaction) so that a failure
-// partway through rolls the whole file back instead of leaving the schema
-// half-migrated. The exception is a migration that must run outside a
-// transaction — CREATE INDEX CONCURRENTLY, or one that opts out with the
-// `-- migrate:no-transaction` marker — for which the flag is omitted. Combined
-// with ON_ERROR_STOP and IF NOT EXISTS / ON CONFLICT guards, migrations become
-// atomic and safely re-runnable.
-function migrationRunsInSingleTransaction(migration) {
-  const content = readFileSync(path.join(root, 'database/migrations', migration), 'utf8');
-  if (/\bCONCURRENTLY\b/i.test(content)) {
-    return false;
-  }
-  if (content.includes('-- migrate:no-transaction')) {
-    return false;
-  }
-  return true;
-}
-
-function applyMigration(migration) {
-  const singleTransaction = migrationRunsInSingleTransaction(migration);
-  const transactionFlag = singleTransaction ? '--single-transaction ' : '';
-
-  if (!singleTransaction) {
-    console.log(`  (${migration} runs without a wrapping transaction)`);
-  }
-
-  if (migration === '002_least_privilege_roles.sql') {
-    runDocker([
-      'compose',
-      'exec',
-      '-T',
-      'postgres',
-      'sh',
-      '-lc',
-      `APP_DB_PASSWORD="$(cat /run/polycost-secrets/app_db_password)"; ETL_DB_PASSWORD="$(cat /run/polycost-secrets/etl_db_password)"; psql ${transactionFlag}--username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --set app_password="$APP_DB_PASSWORD" --set etl_password="$ETL_DB_PASSWORD" --file /polycost-migrations/002_least_privilege_roles.sql`,
-    ]);
-    return;
-  }
-
-  runDocker([
-    'compose',
-    'exec',
-    '-T',
-    'postgres',
-    'psql',
-    ...(singleTransaction ? ['--single-transaction'] : []),
-    '-U',
-    'polycost_owner',
-    '-d',
-    'polycost_dev',
-    '-f',
-    `/polycost-migrations/${migration}`,
-  ]);
 }
 
 function runDocker(args) {

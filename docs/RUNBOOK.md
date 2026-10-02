@@ -58,7 +58,9 @@ Most instruments are counters incremented at the call site. Three are not:
   client. The `pool` label distinguishes them: `api`, `pricing_catalog`,
   `pricing_rates`, `diagram_import`.
 
-> ℹ️ `failed migrations` from the original signal list is **not** covered here.
+> ℹ️ `failed migrations` is a release signal rather than a metric: the Helm
+> pre-upgrade Job fails the release (see _Incident: Migration Fails_).
+> The original note follows.
 > Migrations run outside the request path, so they need a job-level signal
 > rather than a metric on a live pool.
 
@@ -210,6 +212,27 @@ Actions:
 4. Verify migration state.
 5. Restore from backup only after preserving logs and current migration state.
 6. After recovery, run `npm run db:validate` and a smoke comparison.
+
+## Incident: Migration Fails
+
+Symptoms:
+
+- `helm upgrade` fails on the `*-migrate` pre-upgrade Job; old pods keep serving
+- `npm run db:migrate` exits non-zero
+
+Actions:
+
+1. Read the Job log: `kubectl logs job/<release>-polycost-migrate`. The failing
+   file is the last `applying NNN_…` line. Each file ran in a transaction (unless it
+   uses `CONCURRENTLY`), so a failed file left no partial changes.
+2. `changed after it was applied`: an applied migration was edited. Restore the
+   original file and ship the change as a new migration.
+3. The Job is stuck at start: another runner holds the advisory lock. Find it in
+   `pg_locks` (`locktype = 'advisory'`) before doing anything else.
+4. A failed `CREATE INDEX CONCURRENTLY` leaves an `INVALID` index. Drop it, then
+   re-run.
+5. Fix forward with a new migration and re-run the release. Restoring from backup
+   is a last resort (see Backup And Restore).
 
 ## Incident: Redis Unavailable
 
@@ -497,8 +520,8 @@ Two things that are easy to get wrong, both found by actually deploying it:
 1. **Liveness points at `/health/live`, never `/health/ready`.** Restarting
    cannot fix an unavailable database, so a liveness probe on readiness turns a
    dependency blip into a restart loop.
-2. **A startup probe is required.** Boot runs migrations and a pricing refresh
-   (40–50s measured). Without it the liveness probe kills the pod mid-boot and
+2. **A startup probe is required.** Boot runs a startup pricing refresh
+   (40–50s measured; migrations already ran in the pre-upgrade Job). Without it the liveness probe kills the pod mid-boot and
    the deployment never converges.
 
 > ⚠️ **The API does not start without Redis.** Queue construction happens during
