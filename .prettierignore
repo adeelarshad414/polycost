@@ -2,7 +2,8 @@ node_modules/
 dist/
 coverage/
 .graphify/
-reports/
+# Root-level generated reports only; apps/api/src/reports is source code.
+/reports/
 .turbo/
 .vite/
 .tmp/

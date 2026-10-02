@@ -60,10 +60,22 @@ Observed on a real cluster, with the fix in place:
 - **`readOnlyRootFilesystem: true`** with a `/tmp` mount, because the AWS bulk
   price feed spools to a temp file instead of buffering ~480 MB in memory.
 - **`maxUnavailable: 0`** — capacity is never reduced during a rollout.
-- **NetworkPolicy on `/metrics`.** It is unauthenticated by design (scrapers
-  carry no session token) and has no tenant data, but it does describe traffic
-  volume, auth failure rates and ETL throughput, so it is restricted to the
-  monitoring namespace.
+- **NetworkPolicy.** `/metrics` is unauthenticated by design (scrapers carry no
+  session token) and has no tenant data, but it does describe traffic volume, auth
+  failure rates and ETL throughput. It shares the `http` port with the API, and a
+  NetworkPolicy cannot filter by path, so the pod only accepts traffic from the
+  ingress controller (`networkPolicy.ingressNamespaceSelector`), the monitoring
+  namespace and `networkPolicy.extraIngressFrom`. **The ingress must deny
+  `/metrics`**, or it is public through the load balancer. With ingress-nginx:
+
+  ```yaml
+  metadata:
+    annotations:
+      nginx.ingress.kubernetes.io/server-snippet: |
+        location = /metrics { return 404; }
+  ```
+
+  (or route only `/api` and `/health` paths to the Service).
 
 ## Tracing
 

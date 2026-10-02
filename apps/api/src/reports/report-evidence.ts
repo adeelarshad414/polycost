@@ -78,14 +78,7 @@ interface ComputeSpecEvidenceProfile {
 }
 
 type ComputeSpecTier =
-  | 'small'
-  | 'burstable'
-  | 'balanced'
-  | 'compute'
-  | 'memory'
-  | 'storage'
-  | 'accelerated'
-  | 'custom';
+  'small' | 'burstable' | 'balanced' | 'compute' | 'memory' | 'storage' | 'accelerated' | 'custom';
 
 interface CostCoverageDimension {
   key: string;
@@ -345,7 +338,8 @@ const COST_COVERAGE_DIMENSIONS: CostCoverageDimension[] = [
     key: 'compute',
     label: 'Compute families and sizing',
     requirementCategories: ['compute'],
-    reviewCue: 'Validate family, architecture, vCPU/RAM, tenancy, bandwidth, disk baseline, and commitment eligibility.',
+    reviewCue:
+      'Validate family, architecture, vCPU/RAM, tenancy, bandwidth, disk baseline, and commitment eligibility.',
     matches: (lineItem) => lineItem.category === 'compute' || lineItem.costComponent === 'compute',
   },
   {
@@ -364,7 +358,8 @@ const COST_COVERAGE_DIMENSIONS: CostCoverageDimension[] = [
     key: 'networking',
     label: 'Networking, egress, CDN, NAT, DNS, and private connectivity',
     requirementCategories: ['networking', 'edge'],
-    reviewCue: 'Validate tiered internet egress, CDN hit ratio, NAT path, DNS volume, inter-region, cross-AZ, VPN, and private circuit assumptions.',
+    reviewCue:
+      'Validate tiered internet egress, CDN hit ratio, NAT path, DNS volume, inter-region, cross-AZ, VPN, and private circuit assumptions.',
     matches: (lineItem) =>
       lineItem.category === 'network' ||
       lineItem.costComponent === 'egress' ||
@@ -376,7 +371,8 @@ const COST_COVERAGE_DIMENSIONS: CostCoverageDimension[] = [
     key: 'database',
     label: 'Database, NoSQL, cache, warehouse, and search',
     requirementCategories: ['database', 'analytics'],
-    reviewCue: 'Validate engine tier, storage growth, backup retention, IOPS, replicas, RU/s, cache, warehouse query, and search capacity.',
+    reviewCue:
+      'Validate engine tier, storage growth, backup retention, IOPS, replicas, RU/s, cache, warehouse query, and search capacity.',
     matches: (lineItem) =>
       lineItem.category === 'database' ||
       lineItem.costComponent === 'database' ||
@@ -388,7 +384,8 @@ const COST_COVERAGE_DIMENSIONS: CostCoverageDimension[] = [
     key: 'runtime',
     label: 'Serverless, containers, registry, and app platforms',
     requirementCategories: ['containers', 'application', 'integration'],
-    reviewCue: 'Validate invocation duration, memory curve, control-plane overhead, node cost, registry storage/transfer, and request-vs-always-on fit.',
+    reviewCue:
+      'Validate invocation duration, memory curve, control-plane overhead, node cost, registry storage/transfer, and request-vs-always-on fit.',
     matches: (lineItem) =>
       /lambda|function|serverless|container|kubernetes|eks|aks|gke|registry|artifact|app runner|app service|cloud run|api gateway|queue|event/i.test(
         lineItem.description,
@@ -409,7 +406,8 @@ const COST_COVERAGE_DIMENSIONS: CostCoverageDimension[] = [
     key: 'operations',
     label: 'Monitoring, observability, secrets, WAF, and security operations',
     requirementCategories: ['operations', 'security', 'devops'],
-    reviewCue: 'Validate logs, metrics, traces, alarms, dashboards, secrets, WAF, DDoS, posture-management, and retention assumptions.',
+    reviewCue:
+      'Validate logs, metrics, traces, alarms, dashboards, secrets, WAF, DDoS, posture-management, and retention assumptions.',
     matches: (lineItem) =>
       lineItem.category === 'operations' ||
       lineItem.costComponent === 'operations' ||
@@ -421,7 +419,8 @@ const COST_COVERAGE_DIMENSIONS: CostCoverageDimension[] = [
     key: 'support-licensing',
     label: 'Support plans and OS/licensing',
     requirementCategories: [],
-    reviewCue: 'Validate selected support tier, Windows/BYOL eligibility, Hybrid Benefit, sole-tenant or licensing constraints, and support minimums.',
+    reviewCue:
+      'Validate selected support tier, Windows/BYOL eligibility, Hybrid Benefit, sole-tenant or licensing constraints, and support minimums.',
     matches: (lineItem) =>
       lineItem.category === 'support' ||
       lineItem.category === 'licensing' ||
@@ -431,8 +430,7 @@ const COST_COVERAGE_DIMENSIONS: CostCoverageDimension[] = [
     configured: (result) => {
       const profile = result.requirements?.workloadProfile;
       return Boolean(
-        profile?.supportTier ||
-          (profile?.operatingSystem && profile.operatingSystem !== 'linux'),
+        profile?.supportTier || (profile?.operatingSystem && profile.operatingSystem !== 'linux'),
       );
     },
   },
@@ -440,7 +438,8 @@ const COST_COVERAGE_DIMENSIONS: CostCoverageDimension[] = [
     key: 'pricing-models',
     label: 'Pricing models, commitments, and spot estimates',
     requirementCategories: [],
-    reviewCue: 'Validate on-demand, reserved, Savings Plan/CUD, spot estimate, upfront option, term length, and commitment coverage assumptions.',
+    reviewCue:
+      'Validate on-demand, reserved, Savings Plan/CUD, spot estimate, upfront option, term length, and commitment coverage assumptions.',
     matches: (lineItem) =>
       Boolean(
         lineItem.pricingModels?.some(
@@ -452,8 +451,7 @@ const COST_COVERAGE_DIMENSIONS: CostCoverageDimension[] = [
         provider.pricingModels?.some(
           (model) => model.model !== 'on-demand' && (model.available || model.estimated),
         ),
-      ) ||
-      (result.requirements?.workloadProfile?.commitmentPreferencePercent ?? 0) > 0,
+      ) || (result.requirements?.workloadProfile?.commitmentPreferencePercent ?? 0) > 0,
   },
 ];
 
@@ -564,8 +562,7 @@ function dataHealthStatusSummary(options: ReportOptions): string {
 function providerFreshnessSummary(health: NonNullable<ReportOptions['dataHealth']>): string {
   return health.providers
     .map((provider) => {
-      const age =
-        provider.ageHours !== undefined ? `${provider.ageHours}h` : provider.freshness;
+      const age = provider.ageHours !== undefined ? `${provider.ageHours}h` : provider.freshness;
       return `${provider.providerId} ${provider.freshness} (${age}, ${provider.cache.currentRateRows} current rates)`;
     })
     .join('; ');
@@ -752,7 +749,9 @@ function stringScaleParam(value: string | number | boolean | undefined): string 
   return String(value);
 }
 
-function numericDiagramScaleParam(value: string | number | boolean | undefined): number | undefined {
+function numericDiagramScaleParam(
+  value: string | number | boolean | undefined,
+): number | undefined {
   if (typeof value === 'number') {
     return value;
   }
@@ -783,13 +782,12 @@ function availabilitySummary(
     return availability.slaTarget ? `multi-AZ (${availability.slaTarget} SLA target)` : 'multi-AZ';
   }
 
-  return availability.slaTarget ? `single-zone (${availability.slaTarget} SLA target)` : 'single-zone';
+  return availability.slaTarget
+    ? `single-zone (${availability.slaTarget} SLA target)`
+    : 'single-zone';
 }
 
-export function decisionSummaryRows(
-  result: ComparisonResult,
-  options: ReportOptions,
-): string[][] {
+export function decisionSummaryRows(result: ComparisonResult, options: ReportOptions): string[][] {
   const interval = options.interval ?? 'monthly';
   const pricingModel = options.pricingModel ?? 'on-demand';
   const rankedScenarios = rankedProviderScenarios(result, options);
@@ -815,7 +813,10 @@ export function decisionSummaryRows(
           )} monthly.`
         : `No provider is eligible for the selected ${labelForPricingModel(pricingModel)} scenario.`,
     ],
-    ['Selected scenario', `${labelForPricingModel(pricingModel)} viewed at ${labelForInterval(interval)} cadence.`],
+    [
+      'Selected scenario',
+      `${labelForPricingModel(pricingModel)} viewed at ${labelForInterval(interval)} cadence.`,
+    ],
     [
       'Savings spread',
       best && highest && highest.providerId !== best.providerId
@@ -826,7 +827,10 @@ export function decisionSummaryRows(
           )} annual separates the highest and lowest eligible provider.`
         : 'Not enough eligible providers to calculate a provider-to-provider spread.',
     ],
-    ['Evidence confidence', evidenceConfidence(result.providers.length, approximateLineItems, warningCount)],
+    [
+      'Evidence confidence',
+      evidenceConfidence(result.providers.length, approximateLineItems, warningCount),
+    ],
     [
       'Architecture validation',
       best
@@ -836,10 +840,7 @@ export function decisionSummaryRows(
   ];
 }
 
-export function providerRankingRows(
-  result: ComparisonResult,
-  options: ReportOptions,
-): string[][] {
+export function providerRankingRows(result: ComparisonResult, options: ReportOptions): string[][] {
   const interval = options.interval ?? 'monthly';
 
   return [
@@ -1172,9 +1173,7 @@ export function costCoverageMapRows(result: ComparisonResult): string[][] {
       'Review cue',
     ],
     ...result.providers.flatMap((provider) =>
-      COST_COVERAGE_DIMENSIONS.map((dimension) =>
-        costCoverageMapRow(result, provider, dimension),
-      ),
+      COST_COVERAGE_DIMENSIONS.map((dimension) => costCoverageMapRow(result, provider, dimension)),
     ),
   ];
 }
@@ -1348,7 +1347,9 @@ export function skuMappingAppendixRows(result: ComparisonResult): string[][] {
 
 export function optimizationOpportunityRows(result: ComparisonResult): string[][] {
   const rows: string[][] = [];
-  const commitmentCandidates = commitmentPricingModelCandidates(result.requirements?.workloadProfile);
+  const commitmentCandidates = commitmentPricingModelCandidates(
+    result.requirements?.workloadProfile,
+  );
   const rankedOnDemand = rankedProviderScenarios(result, {
     interval: 'monthly',
     pricingModel: 'on-demand',
@@ -1603,7 +1604,8 @@ export function optimizationOpportunityRows(result: ComparisonResult): string[][
 
   if (appPlatformModel.requestsMillion > 0 || appPlatformModel.hasRequirement) {
     for (const provider of result.providers) {
-      const requestMonthly = appPlatformRequestLineMonthly(provider) ||
+      const requestMonthly =
+        appPlatformRequestLineMonthly(provider) ||
         appPlatformRequestMonthly(provider.providerId, appPlatformModel);
       const alwaysOnMonthly = appPlatformAlwaysOnMonthly(provider.providerId, appPlatformModel);
       const monthlySavings = roundCurrency(Math.abs(alwaysOnMonthly - requestMonthly));
@@ -1775,7 +1777,10 @@ export function egressNetworkingDetailRows(result: ComparisonResult): string[][]
         lineItem.unitPriceUsd !== undefined ? formatNumber(lineItem.unitPriceUsd) : '',
         lineItem.egressTiers?.length
           ? `${lineItem.egressTiers.length} tier(s): ${lineItem.egressTiers
-              .map((tier) => `${tierBandLabel(tier.tierFromGb, tier.tierToGb)} @ $${formatNumber(tier.pricePerGb)}/GB`)
+              .map(
+                (tier) =>
+                  `${tierBandLabel(tier.tierFromGb, tier.tierToGb)} @ $${formatNumber(tier.pricePerGb)}/GB`,
+              )
               .join('; ')}`
           : `${lineItem.pricingBasis ?? 'flat'} network cost evidence`,
       ]),
@@ -1795,7 +1800,19 @@ export function egressNetworkingDetailRows(result: ComparisonResult): string[][]
     ],
     ...(rows.length > 0
       ? rows
-      : [['No networking or egress line items were attached to this comparison.', '', '', '', '', '', '', '', '']]),
+      : [
+          [
+            'No networking or egress line items were attached to this comparison.',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+          ],
+        ]),
   ];
 }
 
@@ -1892,7 +1909,18 @@ export function breakEvenSummaryRows(result: ComparisonResult): string[][] {
     ],
     ...(rows.length > 0
       ? rows
-      : [['No commitment model has enough pricing evidence for break-even analysis.', '', '', '', '', '', '', '']]),
+      : [
+          [
+            'No commitment model has enough pricing evidence for break-even analysis.',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+          ],
+        ]),
   ];
 }
 
@@ -1969,7 +1997,9 @@ function architectureOverviewRow(
 function fallbackArchitectureOverviewRows(result: ComparisonResult): string[][] {
   const categories = [
     ...new Set(
-      result.providers.flatMap((provider) => provider.lineItems.map((lineItem) => lineItem.category)),
+      result.providers.flatMap((provider) =>
+        provider.lineItems.map((lineItem) => lineItem.category),
+      ),
     ),
   ];
 
@@ -2079,9 +2109,7 @@ function providerCostDetailRowsForProvider(provider: ComparisonProviderResult): 
       '',
       formatNumber(provider.totals.monthly),
       '100%',
-      provider.lineItems.some((lineItem) => lineItem.isApproximate)
-        ? 'Review required'
-        : 'Mapped',
+      provider.lineItems.some((lineItem) => lineItem.isApproximate) ? 'Review required' : 'Mapped',
       `${provider.lineItems.length} line item(s) roll up to $${formatNumber(
         provider.totals.monthly,
       )}/mo.`,
@@ -2109,11 +2137,13 @@ function providerCostDetailRowsForProvider(provider: ComparisonProviderResult): 
         )
           ? 'Approximate'
           : 'Mapped',
-        `${provider.providerId} subtotal across ${provider.lineItems.filter(
-          (lineItem) =>
-            lineItem.category === category &&
-            (lineItem.costComponent ?? lineItem.category) === component,
-        ).length} row(s).`,
+        `${provider.providerId} subtotal across ${
+          provider.lineItems.filter(
+            (lineItem) =>
+              lineItem.category === category &&
+              (lineItem.costComponent ?? lineItem.category) === component,
+          ).length
+        } row(s).`,
       ];
     }),
     ...provider.lineItems.map((lineItem) => [
@@ -2142,9 +2172,7 @@ function costCoverageMapRow(
   const matchingRows = provider.lineItems.filter((lineItem) => dimension.matches(lineItem));
   const monthly = matchingRows.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
   const approximateRows = matchingRows.filter(
-    (lineItem) =>
-      lineItem.isApproximate ||
-      lineItem.skuId?.startsWith('modeled-'),
+    (lineItem) => lineItem.isApproximate || lineItem.skuId?.startsWith('modeled-'),
   ).length;
   const hasRequirement = costCoverageDimensionConfigured(result, dimension);
   const status = costCoverageStatus({
@@ -2212,7 +2240,9 @@ function costCoverageEvidence(
   const primary = [...matchingRows].sort(
     (left, right) => right.baseMonthlyCostUsd - left.baseMonthlyCostUsd,
   )[0];
-  const modeledRows = matchingRows.filter((lineItem) => lineItem.skuId?.startsWith('modeled-')).length;
+  const modeledRows = matchingRows.filter((lineItem) =>
+    lineItem.skuId?.startsWith('modeled-'),
+  ).length;
   const skuEvidence = primary.skuId ? `SKU ${primary.skuId}` : 'no SKU attached';
 
   return `${provider.providerId} has ${matchingRows.length} row(s); top driver "${primary.description}" is $${formatNumber(
@@ -2315,7 +2345,9 @@ function commitmentEvidence(model: PricingModelCost): string {
 
   return [
     model.providerTerm ?? model.displayName ?? labelForPricingModel(model.model),
-    model.upfrontCostUsd !== undefined ? `upfront $${formatNumber(model.upfrontCostUsd)}` : undefined,
+    model.upfrontCostUsd !== undefined
+      ? `upfront $${formatNumber(model.upfrontCostUsd)}`
+      : undefined,
     model.estimated ? 'estimate' : undefined,
     model.volatility === 'volatile' ? 'volatile' : undefined,
     model.caveat,
@@ -2331,7 +2363,9 @@ function rankedProviderScenarios(
   const scenarios = result.providers.map((provider) => providerScenario(provider, options));
   const eligible = scenarios
     .filter(
-      (scenario): scenario is ProviderScenario & Required<Pick<ProviderScenario, 'monthlyCostUsd'>> =>
+      (
+        scenario,
+      ): scenario is ProviderScenario & Required<Pick<ProviderScenario, 'monthlyCostUsd'>> =>
         scenario.available && scenario.monthlyCostUsd !== undefined,
     )
     .sort((left, right) => left.monthlyCostUsd - right.monthlyCostUsd);
@@ -2340,26 +2374,24 @@ function rankedProviderScenarios(
     eligible.map((scenario, index) => [scenario.providerId, index + 1]),
   );
 
-  return [...eligible, ...scenarios.filter((scenario) => !scenario.available)].map(
-    (scenario) => {
-      const rank = rankByProvider.get(scenario.providerId);
-      const deltaVsLowestMonthlyUsd =
-        lowestMonthly !== undefined && scenario.monthlyCostUsd !== undefined
-          ? roundCurrency(scenario.monthlyCostUsd - lowestMonthly)
-          : undefined;
+  return [...eligible, ...scenarios.filter((scenario) => !scenario.available)].map((scenario) => {
+    const rank = rankByProvider.get(scenario.providerId);
+    const deltaVsLowestMonthlyUsd =
+      lowestMonthly !== undefined && scenario.monthlyCostUsd !== undefined
+        ? roundCurrency(scenario.monthlyCostUsd - lowestMonthly)
+        : undefined;
 
-      return {
-        ...scenario,
-        ...(rank !== undefined ? { rank } : {}),
-        ...(deltaVsLowestMonthlyUsd !== undefined
-          ? {
-              deltaVsLowestMonthlyUsd,
-              annualAvoidableSpendUsd: roundCurrency(deltaVsLowestMonthlyUsd * 12),
-            }
-          : {}),
-      };
-    },
-  );
+    return {
+      ...scenario,
+      ...(rank !== undefined ? { rank } : {}),
+      ...(deltaVsLowestMonthlyUsd !== undefined
+        ? {
+            deltaVsLowestMonthlyUsd,
+            annualAvoidableSpendUsd: roundCurrency(deltaVsLowestMonthlyUsd * 12),
+          }
+        : {}),
+    };
+  });
 }
 
 function providerScenario(
@@ -2370,7 +2402,9 @@ function providerScenario(
   const interval = options.interval ?? 'monthly';
   const model = provider.pricingModels?.find((candidate) => candidate.model === pricingModel);
   const available = pricingModel === 'on-demand' || model?.available === true;
-  const monthlyCostUsd = available ? selectedMonthlyCost(model, provider.totals.monthly) : undefined;
+  const monthlyCostUsd = available
+    ? selectedMonthlyCost(model, provider.totals.monthly)
+    : undefined;
 
   return {
     providerId: provider.providerId,
@@ -2437,8 +2471,10 @@ function providerAvailabilityNote(provider: ComparisonProviderResult): string {
   const unavailableModels =
     provider.pricingModels
       ?.filter((model) => !model.available)
-      .map((model) => `${labelForPricingModel(model.model)}: ${model.unavailableReason ?? 'unavailable'}`) ??
-    [];
+      .map(
+        (model) =>
+          `${labelForPricingModel(model.model)}: ${model.unavailableReason ?? 'unavailable'}`,
+      ) ?? [];
 
   if (unavailableModels.length === 0) {
     return 'All modeled pricing scenarios are eligible for ranking.';
@@ -2503,9 +2539,10 @@ function pricingModelEvidence(lineItem: ComparisonLineItem): string {
   return lineItem.pricingModels
     .map((model) =>
       model.available
-        ? `${model.model}: $${formatNumber(model.monthlyCostUsd ?? 0)} monthly (estimate ${
-            modelEstimateFlag(model.model, model)
-          }; source ${pricingModelSource(model, model.model)})`
+        ? `${model.model}: $${formatNumber(model.monthlyCostUsd ?? 0)} monthly (estimate ${modelEstimateFlag(
+            model.model,
+            model,
+          )}; source ${pricingModelSource(model, model.model)})`
         : `${model.model}: unavailable (${model.unavailableReason ?? 'not offered'})`,
     )
     .join('; ');
@@ -2556,7 +2593,10 @@ function componentMonthly(
   component: NonNullable<ComparisonLineItem['costComponent']>,
 ): number {
   return provider.lineItems
-    .filter((lineItem) => (lineItem.costComponent ?? costComponentForCategory(lineItem.category)) === component)
+    .filter(
+      (lineItem) =>
+        (lineItem.costComponent ?? costComponentForCategory(lineItem.category)) === component,
+    )
     .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
 }
 
@@ -2646,7 +2686,9 @@ function computeSpecTierForRequirement(
 function computeArchitectureForRequirement(
   requirement: NonNullable<ComparisonResult['requirements']>['serviceRequirements'][number],
 ): 'x86_64' | 'arm64' | 'gpu' {
-  const architecture = String(requirementScaleParams(requirement).processorArchitecture ?? 'x86_64');
+  const architecture = String(
+    requirementScaleParams(requirement).processorArchitecture ?? 'x86_64',
+  );
 
   if (architecture === 'arm64' || architecture === 'gpu') {
     return architecture;
@@ -3274,7 +3316,10 @@ function storageAnatomyOpportunityRows(result: ComparisonResult): string[][] {
   const storageParams = storageRequirement ? requirementScaleParams(storageRequirement) : {};
   const databaseParams = databaseRequirement ? requirementScaleParams(databaseRequirement) : {};
   const storageClass = String(
-    storageParams.storageClass ?? storageRequirement?.tier ?? storageRequirement?.instanceType ?? 'standard',
+    storageParams.storageClass ??
+      storageRequirement?.tier ??
+      storageRequirement?.instanceType ??
+      'standard',
   ).replace(/-/g, ' ');
   const requestThousands =
     numericScaleParam(storageParams, 'monthlyPutRequestsThousand') +
@@ -3289,7 +3334,8 @@ function storageAnatomyOpportunityRows(result: ComparisonResult): string[][] {
   const provisionedIops = numericScaleParam(storageParams, 'provisionedIops');
   const databaseGrowthGb = numericScaleParam(databaseParams, 'storageGrowthGbPerMonth');
   const databaseSizeGb =
-    numericScaleParam(databaseParams, 'databaseSizeGb') || numericScaleParam(databaseParams, 'sizeGb');
+    numericScaleParam(databaseParams, 'databaseSizeGb') ||
+    numericScaleParam(databaseParams, 'sizeGb');
   const annualDatabaseGrowthPercent =
     databaseSizeGb > 0 ? (databaseGrowthGb * 12 * 100) / databaseSizeGb : 0;
 
@@ -3347,7 +3393,9 @@ function storageAnatomyOpportunityRows(result: ComparisonResult): string[][] {
         `${provider.providerId} storage-related run-rate is $${formatNumber(
           monthly,
         )}/mo across ${rows.length} row(s): ${dimensionSummary}. ${operationsEvidence}. ${
-          resilienceEvidence.length ? resilienceEvidence.join('; ') : 'no replication/snapshot/lifecycle signal'
+          resilienceEvidence.length
+            ? resilienceEvidence.join('; ')
+            : 'no replication/snapshot/lifecycle signal'
         }. ${performanceEvidence.length ? performanceEvidence.join('; ') : 'baseline performance only'}.`,
       ],
     ];
@@ -3364,7 +3412,9 @@ function storageEvidenceLineItems(provider: ComparisonProviderResult): Compariso
   );
 }
 
-function databaseStorageEvidenceLineItems(provider: ComparisonProviderResult): ComparisonLineItem[] {
+function databaseStorageEvidenceLineItems(
+  provider: ComparisonProviderResult,
+): ComparisonLineItem[] {
   return provider.lineItems.filter(
     (lineItem) =>
       lineItem.category === 'database' &&
@@ -3376,7 +3426,10 @@ function databaseStorageEvidenceLineItems(provider: ComparisonProviderResult): C
 
 function storageAnatomyDimensions(
   lineItems: ComparisonLineItem[],
-): Record<'base' | 'operations' | 'retrieval' | 'replication' | 'lifecycle' | 'snapshot' | 'performance', number> {
+): Record<
+  'base' | 'operations' | 'retrieval' | 'replication' | 'lifecycle' | 'snapshot' | 'performance',
+  number
+> {
   return lineItems.reduce(
     (totals, lineItem) => {
       const normalized = `${lineItem.skuId ?? ''} ${lineItem.description}`.toLowerCase();
@@ -3527,7 +3580,11 @@ function databaseOptimizationInsight(
     };
   }
 
-  if (normalizedPrimary.includes('nosql') || normalizedPrimary.includes('read unit') || normalizedPrimary.includes('write unit')) {
+  if (
+    normalizedPrimary.includes('nosql') ||
+    normalizedPrimary.includes('read unit') ||
+    normalizedPrimary.includes('write unit')
+  ) {
     const monthlySavings = roundCurrency(primaryMonthly * 0.2);
 
     return {
@@ -3716,7 +3773,9 @@ function databaseAnatomyOpportunityRows(result: ComparisonResult): string[][] {
         : undefined,
     ].filter(Boolean);
     const resilienceEvidence = [
-      backupGb > 0 ? `${formatNumber(backupGb)}GB backup for ${formatNumber(backupDays)} days` : undefined,
+      backupGb > 0
+        ? `${formatNumber(backupGb)}GB backup for ${formatNumber(backupDays)} days`
+        : undefined,
       readReplicas > 0 || replicaTransferGb > 0
         ? `${formatNumber(readReplicas)} replicas and ${formatNumber(replicaTransferGb)}GB transfer`
         : undefined,
@@ -3748,9 +3807,13 @@ function databaseAnatomyOpportunityRows(result: ComparisonResult): string[][] {
         `${provider.providerId} database-related run-rate is $${formatNumber(
           monthly,
         )}/mo across ${rows.length} row(s): ${databaseAnatomyDimensionSummary(dimensions)}. ${
-          capacityEvidence.length ? capacityEvidence.join('; ') : 'capacity-mode dimensions not configured'
+          capacityEvidence.length
+            ? capacityEvidence.join('; ')
+            : 'capacity-mode dimensions not configured'
         }. ${resilienceEvidence.length ? resilienceEvidence.join('; ') : 'no backup/replica/IOPS signal'}. ${
-          analyticsEvidence.length ? analyticsEvidence.join('; ') : 'no cache/warehouse/search signal'
+          analyticsEvidence.length
+            ? analyticsEvidence.join('; ')
+            : 'no cache/warehouse/search signal'
         }.`,
       ],
     ];
@@ -3760,7 +3823,16 @@ function databaseAnatomyOpportunityRows(result: ComparisonResult): string[][] {
 function databaseAnatomyDimensions(
   lineItems: ComparisonLineItem[],
 ): Record<
-  'base' | 'nosql' | 'ru' | 'query' | 'warehouse' | 'search' | 'cache' | 'backup' | 'replica' | 'performance',
+  | 'base'
+  | 'nosql'
+  | 'ru'
+  | 'query'
+  | 'warehouse'
+  | 'search'
+  | 'cache'
+  | 'backup'
+  | 'replica'
+  | 'performance',
   number
 > {
   return lineItems.reduce(
@@ -3829,7 +3901,16 @@ function databaseAnatomyDimensions(
 
 function databaseAnatomyDimensionSummary(
   dimensions: Record<
-    'base' | 'nosql' | 'ru' | 'query' | 'warehouse' | 'search' | 'cache' | 'backup' | 'replica' | 'performance',
+    | 'base'
+    | 'nosql'
+    | 'ru'
+    | 'query'
+    | 'warehouse'
+    | 'search'
+    | 'cache'
+    | 'backup'
+    | 'replica'
+    | 'performance',
     number
   >,
 ): string {
@@ -3841,7 +3922,16 @@ function databaseAnatomyDimensionSummary(
 
 function databaseAnatomyReportAction(
   dimensions: Record<
-    'base' | 'nosql' | 'ru' | 'query' | 'warehouse' | 'search' | 'cache' | 'backup' | 'replica' | 'performance',
+    | 'base'
+    | 'nosql'
+    | 'ru'
+    | 'query'
+    | 'warehouse'
+    | 'search'
+    | 'cache'
+    | 'backup'
+    | 'replica'
+    | 'performance',
     number
   >,
   signals: {
@@ -4356,8 +4446,7 @@ function egressOptimizationInsight(provider: ComparisonProviderResult): EgressOp
   const normalizedPrimary = `${primary?.skuId ?? ''} ${primaryDescription}`.toLowerCase();
   const tieredGb = egressRows.reduce(
     (sum, lineItem) =>
-      sum +
-      (lineItem.egressTiers?.reduce((tierSum, tier) => tierSum + tier.billableGb, 0) ?? 0),
+      sum + (lineItem.egressTiers?.reduce((tierSum, tier) => tierSum + tier.billableGb, 0) ?? 0),
     0,
   );
   const cacheHit = parseCacheHitPercent(primaryDescription);

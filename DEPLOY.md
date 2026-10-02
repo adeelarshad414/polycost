@@ -10,6 +10,14 @@ coverage and credentials, read `docs/operations/live-pricing-credentials.md`.
 This path is for anyone running PolyCost for themselves or their team without cloud
 infrastructure expertise.
 
+> ⚠️ **`docker-compose.yml` is a development and demo stack, not a hardened
+> deployment.** Vault runs in dev mode with a fixed root token, and Grafana allows
+> anonymous viewers. The infrastructure ports (Vault, Grafana, Prometheus, the OTel
+> collector) are published on `127.0.0.1` only. Keep it that way: do not put this
+> stack on a shared or internet-facing host. For anything beyond one machine, use
+> Part 2 or the Helm chart in `deploy/helm`. The optional observability profile needs
+> `GRAFANA_PASSWORD` set and will not start Grafana without it.
+
 ### Prerequisites
 
 - Docker Engine 24+ and Docker Compose v2.
@@ -96,12 +104,17 @@ npm run db:migrate
 ### Backups
 
 ```bash
-docker-compose exec postgres pg_dump -U polycost polycost_prod > backup-$(date +%Y%m%d).sql
-docker-compose exec -T postgres psql -U polycost polycost_prod < backup-20260627.sql
+npm run db:backup          # writes <stamp>.dump and <stamp>.globals.sql
+npm run db:restore-drill   # restores into a fresh cluster and compares fingerprints
 ```
 
-An untested backup is not a backup. Run a restore against a throwaway database after
-setup so the process is known-good before it is needed.
+Do not use a bare `pg_dump`. The application roles are cluster-level, so a
+database-only dump fails to restore into a new cluster. Keep both files `db:backup`
+writes, and follow [Backup And Restore](docs/RUNBOOK.md#backup-and-restore) in the
+runbook for the restore order.
+
+An untested backup is not a backup. Run `npm run db:restore-drill` after setup so the
+process is known-good before it is needed.
 
 ## Part 2 - Production deployment on AWS
 

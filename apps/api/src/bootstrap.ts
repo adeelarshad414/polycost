@@ -134,6 +134,39 @@ export function registerRequestContext(instance: {
   });
 }
 
+/**
+ * Unauthenticated credential routes that carry a few short strings. The global
+ * body limit is sized for diagram uploads (8 MB), which let anyone post 8 MB of
+ * JSON at login before any validation ran (audit H-03).
+ */
+export const CREDENTIAL_ROUTE_BODY_LIMIT_BYTES = 16 * 1024;
+const CREDENTIAL_ROUTES = new Set([
+  '/api/v1/auth/register',
+  '/api/v1/auth/login',
+  '/api/v1/auth/password',
+  '/api/v1/auth/invitations/accept',
+]);
+
+interface RouteOptionsLike {
+  url?: string;
+  bodyLimit?: number;
+}
+
+/**
+ * Lowers the body limit on credential routes. Must be installed before Nest
+ * registers routes, i.e. before app.init()/listen(), because onRoute only sees
+ * routes added after it.
+ */
+export function registerCredentialBodyLimits(instance: {
+  addHook(name: 'onRoute', handler: (route: RouteOptionsLike) => void): unknown;
+}): void {
+  instance.addHook('onRoute', (route) => {
+    if (route.url && CREDENTIAL_ROUTES.has(route.url)) {
+      route.bodyLimit = CREDENTIAL_ROUTE_BODY_LIMIT_BYTES;
+    }
+  });
+}
+
 export async function configureApp(
   app: ConfigurableApp,
   allowedOrigins: string[],
@@ -145,6 +178,7 @@ export async function configureApp(
   ).getInstance();
 
   registerRequestContext(httpInstance);
+  registerCredentialBodyLimits(httpInstance as never);
 
   if (metrics) {
     registerMetricsHook(httpInstance as never, metrics, requestLogger);

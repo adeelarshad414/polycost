@@ -126,7 +126,9 @@ export class PdfReportGenerator {
       objects.push(
         `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 ${boldFontObjectNumber} 0 R >> >> /Contents ${contentObjectNumber} 0 R >>`,
       );
-      objects.push(`<< /Length ${Buffer.byteLength(content, 'utf8')} >>\nstream\n${content}\nendstream`);
+      objects.push(
+        `<< /Length ${Buffer.byteLength(content, 'utf8')} >>\nstream\n${content}\nendstream`,
+      );
     }
 
     objects[1] = `<< /Type /Pages /Kids [${pageObjectNumbers
@@ -291,10 +293,7 @@ export class PdfReportGenerator {
       });
     }
 
-    lines.push(
-      { text: '', fontSize: 10 },
-      { text: 'Pricing model availability', fontSize: 14 },
-    );
+    lines.push({ text: '', fontSize: 10 }, { text: 'Pricing model availability', fontSize: 14 });
     for (const row of pricingModelAvailabilityRows(result).slice(1)) {
       lines.push({
         text: `${row[0]} | on-demand ${row[1]} | reserved 1yr ${row[2]} | reserved 3yr ${row[3]} | savings ${row[4]} | spot ${row[5]}`,
@@ -306,10 +305,7 @@ export class PdfReportGenerator {
       });
     }
 
-    lines.push(
-      { text: '', fontSize: 10 },
-      { text: 'Commitment payment and TCO', fontSize: 14 },
-    );
+    lines.push({ text: '', fontSize: 10 }, { text: 'Commitment payment and TCO', fontSize: 14 });
     for (const row of commitmentTcoRows(result).slice(1)) {
       lines.push({
         text: `${row[0]} | ${row[1]} | available ${row[2]} | estimate ${row[3]} | monthly $${row[5]} | upfront $${row[6] || 'n/a'} | payment ${row[7]} | term ${row[8]} | TCO $${row[9] || 'n/a'} | savings ${row[10] || 'n/a'}`,
@@ -325,10 +321,7 @@ export class PdfReportGenerator {
       });
     }
 
-    lines.push(
-      { text: '', fontSize: 10 },
-      { text: 'Egress and networking detail', fontSize: 14 },
-    );
+    lines.push({ text: '', fontSize: 10 }, { text: 'Egress and networking detail', fontSize: 14 });
     for (const row of egressNetworkingDetailRows(result).slice(1)) {
       lines.push({
         text: `${row[0]} | ${row[1]} | ${row[2]} | monthly $${row[4]} | share ${row[5]} | ${row[8]}`,
@@ -336,10 +329,7 @@ export class PdfReportGenerator {
       });
     }
 
-    lines.push(
-      { text: '', fontSize: 10 },
-      { text: 'Optimization opportunities', fontSize: 14 },
-    );
+    lines.push({ text: '', fontSize: 10 }, { text: 'Optimization opportunities', fontSize: 14 });
     for (const row of optimizationOpportunityRows(result).slice(1)) {
       lines.push({
         text: `${row[0]} | ${row[1]} | monthly savings $${row[2] || 'n/a'} | priority ${row[4]} | effort ${row[5]}`,
@@ -395,10 +385,7 @@ export class PdfReportGenerator {
       });
     }
 
-    lines.push(
-      { text: '', fontSize: 10 },
-      { text: 'Methodology and data sources', fontSize: 14 },
-    );
+    lines.push({ text: '', fontSize: 10 }, { text: 'Methodology and data sources', fontSize: 14 });
     for (const row of methodologySourceRows(result).slice(1)) {
       lines.push({
         text: `${row[0]}: ${row[1]} Reviewer action: ${row[2]}`,
@@ -583,10 +570,7 @@ function chartPageBase(title: string, subtitles: string[]): string[] {
   ];
 }
 
-function drawLegend(
-  commands: string[],
-  entries: Array<{ label: string; color: RgbColor }>,
-): void {
+function drawLegend(commands: string[], entries: Array<{ label: string; color: RgbColor }>): void {
   entries.forEach((entry, index) => {
     const x = CHART_ORIGIN_X + index * 94;
 
@@ -811,7 +795,6 @@ function serviceRequirementPdfText(row: string[]): string {
   return `${row[0]} | ${row[1]} | ${row[2]} | region ${row[3]} | ${row[4]} | qty ${row[5]}`;
 }
 
-
 function selectedScenarioPdfText(row: string[]): string {
   if (row[1] === 'no') {
     return `${row[0]}: not eligible for selected model | ${row[7]}`;
@@ -831,9 +814,7 @@ export function pageContent(lines: PdfLine[]): string {
     }
 
     const y = 750 - index * ROW_HEIGHT;
-    fills.push(
-      filledRect(PAGE_MARGIN - 4, y - 4, CONTENT_WIDTH + 8, ROW_HEIGHT - 2, line.fill),
-    );
+    fills.push(filledRect(PAGE_MARGIN - 4, y - 4, CONTENT_WIDTH + 8, ROW_HEIGHT - 2, line.fill));
   });
 
   const commands = [...fills, 'BT'];
@@ -860,7 +841,10 @@ export function pageContent(lines: PdfLine[]): string {
       const offset =
         cell.align === 'right' ? Math.max(0, cell.width - textWidth(text, line.fontSize)) : 0;
 
-      commands.push(`1 0 0 1 ${formatPdfNumber(x + offset)} ${y} Tm`, `(${escapePdfText(text)}) Tj`);
+      commands.push(
+        `1 0 0 1 ${formatPdfNumber(x + offset)} ${y} Tm`,
+        `(${escapePdfText(text)}) Tj`,
+      );
       x += cell.width + COLUMN_GAP;
     }
   });

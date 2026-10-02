@@ -1,5 +1,10 @@
 import { describe, it, expect, jest } from '@jest/globals';
-import { configureApp, corsOriginsFromConfig } from './bootstrap.js';
+import {
+  CREDENTIAL_ROUTE_BODY_LIMIT_BYTES,
+  configureApp,
+  corsOriginsFromConfig,
+  registerCredentialBodyLimits,
+} from './bootstrap.js';
 
 // Regression guard for the graceful-shutdown defect.
 //
@@ -63,5 +68,33 @@ describe('application bootstrap wiring', () => {
     it('returns an empty list when nothing is configured', () => {
       expect(corsOriginsFromConfig('')).toEqual([]);
     });
+  });
+});
+
+// H-03: the global 8 MB body limit (sized for diagrams) applied to login too.
+describe('credential route body limits', () => {
+  function routeHook() {
+    let hook: ((route: { url?: string; bodyLimit?: number }) => void) | undefined;
+    registerCredentialBodyLimits({
+      addHook: (_name, handler) => {
+        hook = handler;
+      },
+    });
+    return hook!;
+  }
+
+  it.each(['/api/v1/auth/login', '/api/v1/auth/register', '/api/v1/auth/password'])(
+    'caps %s at 16 KB',
+    (url) => {
+      const route: { url: string; bodyLimit?: number } = { url };
+      routeHook()(route);
+      expect(route.bodyLimit).toBe(CREDENTIAL_ROUTE_BODY_LIMIT_BYTES);
+    },
+  );
+
+  it('leaves other routes on the global limit', () => {
+    const route: { url: string; bodyLimit?: number } = { url: '/api/v1/diagrams/parse' };
+    routeHook()(route);
+    expect(route.bodyLimit).toBeUndefined();
   });
 });

@@ -1567,7 +1567,7 @@ await assertFileContains('scripts/provider-credential-check.mjs', [
 ]);
 
 await assertFileContains('docker/notary-receiver/Dockerfile', [
-  ['Node 20 base image', 'node:20-alpine'],
+  ['Node 24 base image (matches CI)', 'node:24-alpine'],
   ['non-root runtime user', 'USER node'],
   ['container healthcheck', 'HEALTHCHECK'],
   ['receiver command', 'invoice-evidence-notary-reference-receiver.mjs'],

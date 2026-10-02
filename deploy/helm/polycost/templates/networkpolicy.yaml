@@ -1,12 +1,15 @@
 {{- if .Values.networkPolicy.enabled }}
-# /metrics is unauthenticated by design: Prometheus carries no session token.
-# The payload has no tenant data, but it does describe traffic volume, auth
-# failure rates and ETL throughput, so it should be reachable from the
-# monitoring namespace rather than from anywhere in the cluster.
+# NetworkPolicy works on ports, not paths, and /metrics shares the `http` port
+# with the API. The previous version allowed that port from anywhere, which made
+# the monitoring-only rule meaningless. Now only three sources reach the pod:
+#   1. the ingress controller's namespace, which must deny /metrics (README);
+#   2. the monitoring namespace, for scrapes;
+#   3. any peers listed in networkPolicy.extraIngressFrom (e.g. the web tier).
+# Everything else in the cluster is denied, /metrics included.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "polycost.fullname" . }}-metrics
+  name: {{ include "polycost.fullname" . }}
   labels:
     {{- include "polycost.labels" . | nindent 4 }}
 spec:
@@ -15,15 +18,16 @@ spec:
       {{- include "polycost.selectorLabels" . | nindent 6 }}
   policyTypes: ['Ingress']
   ingress:
-    # Application traffic, from anywhere that can reach the Service.
-    - ports:
-        - port: http
-          protocol: TCP
-    # Scrapes are constrained to the monitoring namespace.
     - from:
         - namespaceSelector:
             matchLabels:
-              {{- toYaml .Values.networkPolicy.monitoringNamespaceSelector | nindent 14 }}
+              {{- required "networkPolicy.ingressNamespaceSelector is required" .Values.networkPolicy.ingressNamespaceSelector | toYaml | nindent 14 }}
+        - namespaceSelector:
+            matchLabels:
+              {{- required "networkPolicy.monitoringNamespaceSelector is required" .Values.networkPolicy.monitoringNamespaceSelector | toYaml | nindent 14 }}
+        {{- with .Values.networkPolicy.extraIngressFrom }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       ports:
         - port: http
           protocol: TCP

@@ -36,9 +36,13 @@ await assertFileContains('apps/web/src/components/TopLoadingBar.tsx', [
 
 await assertFileContains('apps/web/src/App.tsx', [
   ['boot splash wired', '<BootSplash active={isBooting} />'],
-  ['session loader wired', '<SessionLoader'],
   ['task queue wired', '<TaskQueue items={taskItems} />'],
   ['pricing evidence shared loader', 'Syncing pricing evidence'],
+]);
+
+// Session hydration moved into the workspace, so its loader lives there now.
+await assertFileContains('apps/web/src/components/WorkspaceControlCenter.tsx', [
+  ['session loader wired', '<SessionLoader'],
 ]);
 
 await assertFileContains('apps/web/src/components/PersonaComparisonWorkspace.tsx', [
