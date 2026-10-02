@@ -28,6 +28,7 @@ import {
   PricingSyncFailureNotifier,
   WebhookPricingSyncFailureNotifier,
 } from './pricing-sync-alert.service.js';
+import { bullmqConnection } from '../config/redis-connection.js';
 
 const PRICING_SYNC_FAILURE_NOTIFIER = Symbol('PRICING_SYNC_FAILURE_NOTIFIER');
 
@@ -98,7 +99,7 @@ const PRICING_SYNC_FAILURE_NOTIFIER = Symbol('PRICING_SYNC_FAILURE_NOTIFIER');
       */
       useFactory: (configService: ConfigService<AppConfig, true>): PricingEtlQueue =>
         new Queue(PRICING_ETL_QUEUE_NAME, {
-          connection: redisConnection(configService),
+          connection: bullmqConnection(configService),
         }),
     },
     {
@@ -111,7 +112,7 @@ const PRICING_SYNC_FAILURE_NOTIFIER = Symbol('PRICING_SYNC_FAILURE_NOTIFIER');
         ): PricingEtlWorkerFactory =>
         (processor) => {
           const worker = new Worker(PRICING_ETL_QUEUE_NAME, processor, {
-            connection: redisConnection(configService),
+            connection: bullmqConnection(configService),
           });
 
           reportWorkerFailures(worker, PRICING_ETL_QUEUE_NAME, errorReporter);
@@ -123,10 +124,3 @@ const PRICING_SYNC_FAILURE_NOTIFIER = Symbol('PRICING_SYNC_FAILURE_NOTIFIER');
   ],
 })
 export class PricingEtlModule {}
-
-function redisConnection(configService: ConfigService<AppConfig, true>) {
-  return {
-    host: configService.get('REDIS_HOST', { infer: true }),
-    port: configService.get('REDIS_PORT', { infer: true }),
-  };
-}

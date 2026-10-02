@@ -46,6 +46,15 @@ once tagged releases begin.
 
 ### Changed
 
+- Postgres pools are bounded (`DB_POOL_MAX`, default 5 per pool), every
+  statement has a server-side timeout, pools name themselves in
+  `pg_stat_activity`, and TLS is configurable (`DB_SSL_MODE`) (M-06).
+- BullMQ jobs retry with exponential backoff and keep failed jobs; Redis
+  supports AUTH and TLS; `JOB_WORKERS_ENABLED=false` runs the API without
+  workers (M-05).
+- Readiness is decided by a real `SELECT 1` through the app pool; Redis being
+  down no longer takes pods out of service. The compose healthcheck uses
+  `/health/ready` (M-09).
 - The pricing ETL never prunes after a partial run, and skips the prune unless
   the run refreshed at least `PRICING_ETL_PRUNE_MIN_FRESH_RATIO` (default 0.9)
   of the live catalog.

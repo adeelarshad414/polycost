@@ -18,6 +18,7 @@ import {
 } from './cost-management-jobs.scheduler.js';
 import { CostManagementJobsService } from './cost-management-jobs.service.js';
 import { ExchangeRateClient, FrankfurterExchangeRateClient } from './exchange-rate.client.js';
+import { bullmqConnection } from '../config/redis-connection.js';
 
 @Module({
   imports: [ApiModule],
@@ -54,7 +55,7 @@ import { ExchangeRateClient, FrankfurterExchangeRateClient } from './exchange-ra
       */
       useFactory: (configService: ConfigService<AppConfig, true>): CostManagementQueue =>
         new Queue(COST_MANAGEMENT_QUEUE_NAME, {
-          connection: redisConnection(configService),
+          connection: bullmqConnection(configService),
         }),
     },
     {
@@ -70,7 +71,7 @@ import { ExchangeRateClient, FrankfurterExchangeRateClient } from './exchange-ra
             COST_MANAGEMENT_QUEUE_NAME,
             (job) => processor({ name: job.name }),
             {
-              connection: redisConnection(configService),
+              connection: bullmqConnection(configService),
             },
           );
 
@@ -83,10 +84,3 @@ import { ExchangeRateClient, FrankfurterExchangeRateClient } from './exchange-ra
   ],
 })
 export class CostManagementJobsModule {}
-
-function redisConnection(configService: ConfigService<AppConfig, true>) {
-  return {
-    host: configService.get('REDIS_HOST', { infer: true }),
-    port: configService.get('REDIS_PORT', { infer: true }),
-  };
-}

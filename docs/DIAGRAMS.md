@@ -154,6 +154,29 @@ npm run db:migrate
 > `vault-seed` is a run-once container that provisions local development secrets;
 > it exits after seeding.
 
+### Health and readiness
+
+```mermaid
+flowchart LR
+    K["☸️ kubelet / compose<br/>healthcheck"] --> RDY["/health/ready"]
+    RDY --> DB{"SELECT 1 via app pool<br/>within 1s?"}
+    DB -->|no| N503["503 · not ready<br/><i>removed from Service</i>"]
+    DB -->|yes| CACHE{"Redis TCP<br/>reachable?"}
+    CACHE -->|yes| OK["200 · ok"]
+    CACHE -->|no| DEG["200 · degraded<br/><i>stays in service; in-process<br/>rate limits, jobs wait</i>"]
+    K --> LIVE["/health/live<br/>200 while the process runs"]
+
+    classDef bad fill:#fce8e6,stroke:#d93025,color:#111
+    classDef warn fill:#fef7e0,stroke:#f9ab00,color:#111
+    classDef good fill:#e6f4ea,stroke:#34a853,color:#111
+    class N503 bad
+    class DEG warn
+    class OK,LIVE good
+```
+
+Liveness never checks dependencies: restarting a process cannot fix a database,
+and doing so turns a blip into a restart loop.
+
 ---
 
 ## 🔄 Request flows

@@ -63,8 +63,32 @@ export const configSchema = z
     DB_HOST: z.string().min(1),
     DB_PORT: z.coerce.number().default(5432),
     DB_NAME: z.string().min(1),
+    // Audit M-06: per-pool limits. Four pools per process, so the total is
+    // 4 x DB_POOL_MAX x replicas; keep it under the database's max_connections.
+    DB_POOL_MAX: z.coerce.number().int().min(1).max(100).default(5),
+    DB_POOL_IDLE_TIMEOUT_MS: z.coerce.number().int().min(1_000).default(30_000),
+    DB_CONNECTION_TIMEOUT_MS: z.coerce.number().int().min(100).default(5_000),
+    DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(100).default(30_000),
+    DB_ETL_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(1_000).default(300_000),
+    // disable (local compose), require (encrypted), verify-full (encrypted and
+    // the server certificate checked against DB_SSL_CA or the system store).
+    DB_SSL_MODE: z.enum(['disable', 'require', 'verify-full']).default('disable'),
+    DB_SSL_CA: z.preprocess((value) => (value === '' ? undefined : value), z.string().optional()),
     REDIS_HOST: z.string().min(1),
     REDIS_PORT: z.coerce.number().default(6379),
+    // Audit M-05: managed Redis needs AUTH and usually TLS.
+    REDIS_USERNAME: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.string().optional(),
+    ),
+    REDIS_PASSWORD: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.string().optional(),
+    ),
+    REDIS_TLS: envBoolean(false),
+    // false runs the API without BullMQ workers (schedulers are still kept up
+    // to date), so a dedicated worker deployment can own job processing.
+    JOB_WORKERS_ENABLED: envBoolean(true),
     PRICING_ETL_SCHEDULE_CRON: z.string().default('0 2 * * *'),
     CURRENCY_SYNC_SCHEDULE_CRON: z.string().default('0 * * * *'),
     ALERT_EVALUATOR_SCHEDULE_CRON: z.string().default('*/15 * * * *'),

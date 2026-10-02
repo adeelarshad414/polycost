@@ -34,19 +34,42 @@ backup of this system — see the Backup And Restore section of the runbook.
 | --------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | startup   | `/health/live`  | Boot runs migrations and a pricing refresh; measured at 40–50s. Without it, liveness kills the pod mid-boot and the deployment never converges.                                 |
 | liveness  | `/health/live`  | Deliberately **not** `/health/ready`. Restarting cannot fix a database that is briefly unavailable; pointing liveness at readiness turns a dependency blip into a restart loop. |
-| readiness | `/health/ready` | Returns **503** when a dependency is unreachable, so Kubernetes withholds traffic.                                                                                              |
+| readiness | `/health/ready` | Returns **503** when the database does not answer `SELECT 1` within 1s (probe timeout 2s), so Kubernetes withholds traffic. Redis down keeps the pod Ready but `degraded`.      |
 
 The readiness endpoint used to answer `200` with `{"status":"degraded"}` in the
 body. Kubernetes reads the status code and ignores the body, so a pod with an
 unreachable database was marked Ready and served traffic. That was found by
 deploying this chart and fixed alongside it.
 
-Observed on a real cluster, with the fix in place:
+Readiness follows the database only (audit M-09). Without Redis the API still
+serves: rate limits fall back to in-process counters and queued jobs wait. Failing
+readiness on a Redis blip removed **every** replica from the Service at once. The
+database probe is a real `SELECT 1` with the app credentials through the app
+pool, so wrong credentials or an exhausted pool fail it; the old TCP connect
+passed both.
 
-| Dependencies     | `/health/live` | `/health/ready` | Pod Ready | Restarts |
-| ---------------- | -------------- | --------------- | --------- | -------- |
-| Redis only       | 200            | 503             | no        | 0        |
-| Redis + Postgres | 200            | 200             | yes       | 0        |
+| Dependencies     | `/health/live` | `/health/ready`  | Pod Ready | Restarts |
+| ---------------- | -------------- | ---------------- | --------- | -------- |
+| Postgres down    | 200            | 503              | no        | 0        |
+| Redis down       | 200            | 200 (`degraded`) | yes       | 0        |
+| Redis + Postgres | 200            | 200              | yes       | 0        |
+
+## Database, Redis and workers
+
+- **Pools:** every pod opens four Postgres pools (`api`, `pricing_catalog`,
+  `pricing_rates`, `diagram_import`), each capped at `config.db.poolMax`
+  (default 5). Size the database for `4 × poolMax × replicas` connections.
+  Every statement is bounded server-side by `config.db.statementTimeoutMs`
+  (30s; the ETL pool gets `etlStatementTimeoutMs`, 300s), and each pool sets
+  `application_name=polycost-<pool>` so `pg_stat_activity` names it.
+- **TLS:** set `config.db.sslMode: verify-full` for managed Postgres, with
+  `config.db.sslCaSecret` when the CA is not in the system store.
+  `config.redis.tls` and `config.redis.passwordSecret` do the same for Redis;
+  the password is read from a Secret, never the ConfigMap.
+- **Workers:** BullMQ workers run in every API pod by default. Jobs retry with
+  exponential backoff (ETL 2 attempts, cost-management 3) and failures are kept
+  for the `JobQueueFailuresAccumulating` alert. Set `config.jobWorkersEnabled:
+false` when a separate worker deployment processes the jobs.
 
 ## Deliberate settings
 

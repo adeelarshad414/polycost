@@ -14,6 +14,7 @@ import { AppConfig } from '../config/config.schema.js';
 import {
   ALERT_EVALUATOR_JOB_NAME,
   COST_MANAGEMENT_QUEUE_NAME,
+  COST_MANAGEMENT_JOB_OPTIONS,
   CostManagementJob,
   CostManagementJobName,
   CostManagementJobSummary,
@@ -99,7 +100,9 @@ export class CostManagementJobsScheduler implements OnModuleInit, OnModuleDestro
       TEAM_AUDIT_EXPORT_JOB_NAME,
       DATA_RETENTION_JOB_NAME,
     ]);
-    this.worker = this.workerFactory((job) => this.runJob(job));
+    if (this.configService.get('JOB_WORKERS_ENABLED', { infer: true }) !== false) {
+      this.worker = this.workerFactory((job) => this.runJob(job));
+    }
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -196,10 +199,7 @@ export class CostManagementJobsScheduler implements OnModuleInit, OnModuleDestro
         // stay the job name rather than defaulting to the scheduler id.
         name: jobName,
         data: {},
-        opts: {
-          removeOnComplete: true,
-          removeOnFail: 100,
-        },
+        opts: { ...COST_MANAGEMENT_JOB_OPTIONS },
       },
     );
   }

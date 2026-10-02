@@ -25,7 +25,10 @@ export class HealthController {
   private async readiness(response?: StatusResponse) {
     const health = await this.healthService.getHealth();
 
-    if (health.status !== 'ok') {
+    // Audit M-09: only the database takes a pod out of service. A Redis blip
+    // used to 503 every replica at once, removing the whole API from the load
+    // balancer while it could still serve requests.
+    if (!health.ready) {
       response?.status(HttpStatus.SERVICE_UNAVAILABLE);
     }
 

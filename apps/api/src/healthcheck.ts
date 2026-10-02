@@ -9,7 +9,9 @@ if (!portArg) {
 const port = Number(portArg);
 
 const request = http.get(
-  { host: '127.0.0.1', port, path: '/health', timeout: 3000 },
+  // /health/ready answers 503 when the database cannot be queried; plain
+  // /health always answered 200, so compose never saw an unhealthy API.
+  { host: '127.0.0.1', port, path: '/health/ready', timeout: 3000 },
   (response) => {
     if (response.statusCode === 200) {
       process.exit(0);

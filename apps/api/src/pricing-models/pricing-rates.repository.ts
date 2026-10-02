@@ -16,6 +16,7 @@ import {
   PricingRateRecord,
   PricingTermCode,
 } from './pricing-models.types.js';
+import { pgPoolTuning, type PgPoolTuning } from '../database/pg-pool-options.js';
 
 interface QueryResultLike<T> {
   rows: T[];
@@ -27,7 +28,7 @@ interface PgPoolLike {
   end(): Promise<void>;
 }
 
-interface PgPoolConfig {
+interface PgPoolConfig extends Partial<PgPoolTuning> {
   host: string;
   port: number;
   database: string;
@@ -221,6 +222,7 @@ export class PostgresPricingRatesRepository implements PricingRateReader, OnModu
   private async getPool(): Promise<PgPoolLike> {
     if (!this.pool) {
       this.pool = this.poolFactory({
+        ...pgPoolTuning(this.configService, 'pricing_rates'),
         host: this.configService.get('DB_HOST', { infer: true }),
         port: this.configService.get('DB_PORT', { infer: true }),
         database: this.configService.get('DB_NAME', { infer: true }),

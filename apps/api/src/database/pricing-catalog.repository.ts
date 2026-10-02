@@ -19,6 +19,7 @@ import {
   PricingCatalogWriter,
   PruneStaleLiveRowsResult,
 } from './pricing-repository.types.js';
+import { pgPoolTuning, type PgPoolTuning } from './pg-pool-options.js';
 
 interface QueryResultLike<T> {
   rows: T[];
@@ -30,7 +31,7 @@ export interface PgPoolLike {
   end(): Promise<void>;
 }
 
-interface PgPoolConfig {
+interface PgPoolConfig extends Partial<PgPoolTuning> {
   host: string;
   port: number;
   database: string;
@@ -789,6 +790,7 @@ export class PostgresPricingCatalogRepository
   private async getPool(): Promise<PgPoolLike> {
     if (!this.pool) {
       this.pool = this.poolFactory({
+        ...pgPoolTuning(this.configService, 'pricing_catalog'),
         host: this.configService.get('DB_HOST', { infer: true }),
         port: this.configService.get('DB_PORT', { infer: true }),
         database: this.configService.get('DB_NAME', { infer: true }),
