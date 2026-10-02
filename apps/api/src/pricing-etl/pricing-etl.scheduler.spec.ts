@@ -140,7 +140,7 @@ describe('PricingEtlScheduler', () => {
       upsertJobScheduler: jest.fn<PricingEtlQueue['upsertJobScheduler']>(async () => undefined),
       getJobSchedulers: jest.fn<PricingEtlQueue['getJobSchedulers']>(async () => [
         { key: PRICING_ETL_REFRESH_JOB_NAME },
-        { key: 'c7310bf36b03dc34f57b19d9ed651c0b' },
+        { key: 'c7310bf36b03dc34f57b19d9ed651c0b' }, // gitleaks:allow - BullMQ scheduler key
       ]),
       removeJobScheduler: jest.fn<PricingEtlQueue['removeJobScheduler']>(async () => true),
       close: jest.fn<PricingEtlQueue['close']>(async () => undefined),

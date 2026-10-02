@@ -1,0 +1,8 @@
+# Reviewed false positives in git history (2026-10-02): Vault secret paths,
+# a BullMQ scheduler key and a share-link test hash. New findings still fail CI.
+f367b5271792f1f3a28461ef1796d22f4a6f10ae:apps/api/src/pricing-etl/pricing-etl.scheduler.spec.ts:generic-api-key:143
+c3e9de8836de22b519754ce765f45a6e135a8795:apps/api/src/api/invoice-artifact-storage.service.ts:generic-api-key:10
+c3e9de8836de22b519754ce765f45a6e135a8795:apps/api/src/api/invoice-artifact-storage.service.ts:generic-api-key:12
+5abaeab725bb9a2945e87048f9949d3a6f55f553:apps/api/src/api/invoice-artifact-storage.service.ts:generic-api-key:10
+5abaeab725bb9a2945e87048f9949d3a6f55f553:apps/api/src/api/invoice-artifact-storage.service.ts:generic-api-key:12
+9cc7d7ce6b07bd63c696d725c7a725a17e4c2730:apps/api/src/api/cost-management.service.spec.ts:generic-api-key:88

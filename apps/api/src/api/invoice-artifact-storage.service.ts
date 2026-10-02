@@ -8,9 +8,9 @@ import type { SecretsReader } from '../secrets/secrets.service.js';
 import { ApiValidationError } from './api-errors.js';
 import { InvoiceArtifactBlobGovernance, InvoiceArtifactStorageBackend } from './billing.types.js';
 
-const AWS_ARTIFACT_SECRET_PATH = 'polycost/artifacts/aws';
+const AWS_ARTIFACT_SECRET_PATH = 'polycost/artifacts/aws'; // gitleaks:allow - Vault path, not a secret
 const AZURE_ARTIFACT_SECRET_PATH = 'polycost/artifacts/azure';
-const GCP_ARTIFACT_SECRET_PATH = 'polycost/artifacts/gcp';
+const GCP_ARTIFACT_SECRET_PATH = 'polycost/artifacts/gcp'; // gitleaks:allow - Vault path, not a secret
 const GCP_PROVIDER_SECRET_PATH = 'polycost/providers/gcp';
 
 export interface StoredInvoiceArtifactObject {

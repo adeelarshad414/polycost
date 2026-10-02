@@ -1,0 +1,8 @@
+# Reviewed exceptions. Each one is scoped to a path and states why.
+misconfigurations:
+  - id: KSV-0109
+    paths:
+      - deploy/helm/polycost/templates/configmap.yaml
+    statement: >-
+      VAULT_TOKEN_FILE is the path of a file mounted from Vault agent, not a
+      token. No secret value is stored in the ConfigMap.
