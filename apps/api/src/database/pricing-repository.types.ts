@@ -18,7 +18,18 @@ export interface PricingCatalogWriter {
    * number of rows removed. Optional so lightweight test writers need not
    * implement it.
    */
-  pruneStaleLiveRows?(provider: ProviderId, fetchedAt: string): Promise<number>;
+  pruneStaleLiveRows?(provider: ProviderId, fetchedAt: string): Promise<PruneStaleLiveRowsResult>;
+}
+
+export interface PruneStaleLiveRowsResult {
+  /** Rows deleted; 0 when the guard skipped the prune. */
+  pruned: number;
+  /** Live rows stamped by this run. */
+  fresh: number;
+  /** Live rows from earlier runs, i.e. the prune candidates. */
+  stale: number;
+  /** True when fresh / (fresh + stale) was below the configured minimum. */
+  skipped: boolean;
 }
 
 export interface NormalizedPricingWriter {

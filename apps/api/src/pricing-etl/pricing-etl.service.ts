@@ -121,14 +121,16 @@ export class PricingEtlService {
       const normalizedWriteResult = this.normalizedPricingWriter
         ? await this.normalizedPricingWriter.upsertNormalizedPricingRecords(records)
         : { recordsUpdated: 0, recordsRejected: 0, recordsSkipped: 0 };
-      // Reconcile: drop live rows the provider no longer returns (discontinued
-      // or now-filtered SKUs) so they cannot pollute selection. Only runs after
-      // a successful fetch + upsert; failed fetches throw before reaching here.
-      await this.catalogWriter.pruneStaleLiveRows?.(adapter.providerId, fetchedAt);
       const recordsUpdated =
         catalogWriteResult.recordsUpdated + normalizedWriteResult.recordsUpdated;
       const recordsRejected =
         catalogWriteResult.recordsRejected + normalizedWriteResult.recordsRejected;
+      // Reconcile: drop live rows the provider no longer returns (discontinued
+      // or now-filtered SKUs) so they cannot pollute selection. Failed fetches
+      // throw before reaching here. Audit H-08: a run with rejected rows is not
+      // a complete picture of the catalog, so it never prunes, and the
+      // repository additionally refuses when too little was refreshed.
+      await this.pruneAfterRefresh(adapter.providerId, fetchedAt, recordsRejected);
       const recordsSkipped =
         (catalogWriteResult.recordsSkipped ?? 0) + (normalizedWriteResult.recordsSkipped ?? 0);
       const status = recordsRejected > 0 ? 'partial' : 'success';
@@ -170,6 +172,40 @@ export class PricingEtlService {
     await this.notifyPricingSyncIssue(result);
 
     return result;
+  }
+
+  private async pruneAfterRefresh(
+    provider: CloudProviderAdapter['providerId'],
+    fetchedAt: string,
+    recordsRejected: number,
+  ): Promise<void> {
+    if (!this.catalogWriter.pruneStaleLiveRows) {
+      return;
+    }
+    if (recordsRejected > 0) {
+      this.domainMetrics?.recordEtlPrune(provider, 'skipped_partial_run');
+      this.logger.warn({
+        event: 'pricing_etl_prune_skipped',
+        reason: 'partial_run',
+        provider,
+        recordsRejected,
+      });
+      return;
+    }
+
+    const result = await this.catalogWriter.pruneStaleLiveRows(provider, fetchedAt);
+    if (result.skipped) {
+      this.domainMetrics?.recordEtlPrune(provider, 'skipped_low_fresh_ratio');
+      this.logger.warn({
+        event: 'pricing_etl_prune_skipped',
+        reason: 'low_fresh_ratio',
+        provider,
+        fresh: result.fresh,
+        stale: result.stale,
+      });
+      return;
+    }
+    this.domainMetrics?.recordEtlPrune(provider, 'pruned', result.pruned);
   }
 
   private async refreshCatalogWithRetry(

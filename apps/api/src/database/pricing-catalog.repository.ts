@@ -17,6 +17,7 @@ import {
   PricingEtlRunRecord,
   PricingEtlRunRepository,
   PricingCatalogWriter,
+  PruneStaleLiveRowsResult,
 } from './pricing-repository.types.js';
 
 interface QueryResultLike<T> {
@@ -342,21 +343,54 @@ export class PostgresPricingCatalogRepository
     return result.rowCount ?? 0;
   }
 
-  async pruneStaleLiveRows(provider: ProviderId, fetchedAt: string): Promise<number> {
+  async pruneStaleLiveRows(
+    provider: ProviderId,
+    fetchedAt: string,
+  ): Promise<PruneStaleLiveRowsResult> {
     const pool = await this.getPool();
+    const minFreshRatio = this.configService.get('PRICING_ETL_PRUNE_MIN_FRESH_RATIO', {
+      infer: true,
+    });
     // Delete only live (provider-fetched) rows older than this run's generation.
     // Seed rows (null source_endpoint) and mock rows (fixture://) are preserved
     // as fallback data and are never live, so they are untouched.
-    const result = await pool.query(
+    //
+    // Audit H-08: the count and the delete are one statement, so they see the
+    // same snapshot, and the delete only happens when this run refreshed at
+    // least minFreshRatio of the live catalog. A truncated provider response
+    // that still parses cleanly would otherwise delete most of the catalog.
+    const result = await pool.query<{ fresh: string; stale: string; pruned: string }>(
       `
-        DELETE FROM pricing_catalog
-        WHERE provider = $1
-          AND source_endpoint LIKE 'https://%'
-          AND fetched_at < $2
+        WITH live AS (
+          SELECT
+            count(*) FILTER (WHERE fetched_at >= $2) AS fresh,
+            count(*) FILTER (WHERE fetched_at < $2) AS stale
+          FROM pricing_catalog
+          WHERE provider = $1
+            AND source_endpoint LIKE 'https://%'
+        ),
+        deleted AS (
+          DELETE FROM pricing_catalog
+          WHERE provider = $1
+            AND source_endpoint LIKE 'https://%'
+            AND fetched_at < $2
+            AND (SELECT fresh FROM live) > 0
+            AND (SELECT fresh FROM live) >= $3 * ((SELECT fresh FROM live) + (SELECT stale FROM live))
+          RETURNING 1
+        )
+        SELECT
+          (SELECT fresh FROM live) AS fresh,
+          (SELECT stale FROM live) AS stale,
+          (SELECT count(*) FROM deleted) AS pruned
       `,
-      [provider, fetchedAt],
+      [provider, fetchedAt, minFreshRatio],
     );
-    return result.rowCount ?? 0;
+    const row = result.rows[0];
+    const fresh = Number(row?.fresh ?? 0);
+    const stale = Number(row?.stale ?? 0);
+    const pruned = Number(row?.pruned ?? 0);
+
+    return { pruned, fresh, stale, skipped: stale > 0 && pruned === 0 };
   }
 
   async upsertNormalizedPricingRecords(

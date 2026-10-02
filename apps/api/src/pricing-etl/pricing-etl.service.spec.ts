@@ -520,7 +520,7 @@ describe('PricingEtlService', () => {
         }),
       ),
       pruneStaleLiveRows: jest.fn<NonNullable<PricingCatalogWriter['pruneStaleLiveRows']>>(
-        async () => 3,
+        async () => ({ pruned: 3, fresh: 97, stale: 3, skipped: false }),
       ),
     };
     const runRepository: PricingEtlRunRepository = {
@@ -556,7 +556,7 @@ describe('PricingEtlService', () => {
         recordsRejected: 0,
       })),
       pruneStaleLiveRows: jest.fn<NonNullable<PricingCatalogWriter['pruneStaleLiveRows']>>(
-        async () => 0,
+        async () => ({ pruned: 0, fresh: 0, stale: 0, skipped: false }),
       ),
     };
     const runRepository: PricingEtlRunRepository = {
@@ -585,6 +585,94 @@ describe('PricingEtlService', () => {
 
     expect(writer.upsertPricingRecords).not.toHaveBeenCalled();
     expect(writer.pruneStaleLiveRows).not.toHaveBeenCalled();
+  });
+});
+
+// Audit H-08: a partial or truncated refresh must never shrink the catalog.
+describe('PricingEtlService prune guard', () => {
+  const pruneHarness = (input: {
+    recordsRejected: number;
+    prune?: { pruned: number; fresh: number; stale: number; skipped: boolean };
+  }) => {
+    const metrics = new MetricsService({ collectDefaults: false });
+    const writer: PricingCatalogWriter = {
+      upsertPricingRecords: jest.fn<PricingCatalogWriter['upsertPricingRecords']>(
+        async (records) => ({
+          recordsUpdated: records.length,
+          recordsRejected: input.recordsRejected,
+        }),
+      ),
+      pruneStaleLiveRows: jest.fn<NonNullable<PricingCatalogWriter['pruneStaleLiveRows']>>(
+        async () => input.prune ?? { pruned: 0, fresh: 1, stale: 0, skipped: false },
+      ),
+    };
+    const service = new PricingEtlService(
+      [
+        adapter(
+          'aws',
+          jest.fn(async () => [createCatalogRecord('aws', 'AWS-1')]),
+        ),
+      ],
+      writer,
+      {
+        recordProviderRun: jest.fn<PricingEtlRunRepository['recordProviderRun']>(
+          async () => undefined,
+        ),
+      },
+      fixedClock(),
+      undefined,
+      undefined,
+      {},
+      new DomainMetricsService(metrics),
+    );
+    return { service, writer, render: () => metrics.render() };
+  };
+
+  it('does not prune after a partial run', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const { service, writer, render } = pruneHarness({ recordsRejected: 4 });
+
+    await service.refreshAllProviders();
+
+    expect(writer.pruneStaleLiveRows).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'pricing_etl_prune_skipped', reason: 'partial_run' }),
+    );
+    expect(await render()).toContain(
+      'pricing_etl_prunes_total{provider="aws",outcome="skipped_partial_run"} 1',
+    );
+    warn.mockRestore();
+  });
+
+  it('reports a prune the repository refused because too little was refreshed', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const { service, render } = pruneHarness({
+      recordsRejected: 0,
+      prune: { pruned: 0, fresh: 120, stale: 4_880, skipped: true },
+    });
+
+    await service.refreshAllProviders();
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'low_fresh_ratio', fresh: 120, stale: 4_880 }),
+    );
+    expect(await render()).toContain(
+      'pricing_etl_prunes_total{provider="aws",outcome="skipped_low_fresh_ratio"} 1',
+    );
+    warn.mockRestore();
+  });
+
+  it('counts the rows a normal prune removes', async () => {
+    const { service, render } = pruneHarness({
+      recordsRejected: 0,
+      prune: { pruned: 12, fresh: 4_988, stale: 12, skipped: false },
+    });
+
+    await service.refreshAllProviders();
+    const rendered = await render();
+
+    expect(rendered).toContain('pricing_etl_prunes_total{provider="aws",outcome="pruned"} 1');
+    expect(rendered).toContain('pricing_etl_pruned_rows_total{provider="aws"} 12');
   });
 });
 
