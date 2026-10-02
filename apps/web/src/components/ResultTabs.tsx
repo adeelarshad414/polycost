@@ -25,22 +25,38 @@ export interface ResultTab {
 export function ResultTabs({
   tabs,
   ariaLabel = 'Comparison result views',
+  activeId: controlledActiveId,
+  onActiveChange,
 }: {
   tabs: ResultTab[];
   ariaLabel?: string;
+  /** Controlled mode (UI-5): the parent owns the selection, e.g. to mirror it in the URL. */
+  activeId?: string;
+  onActiveChange?: (id: string) => void;
 }) {
-  const [activeId, setActiveId] = useState(tabs[0]?.id ?? '');
+  const [localActiveId, setLocalActiveId] = useState(tabs[0]?.id ?? '');
+  const activeId = controlledActiveId ?? localActiveId;
+  const setActiveId = useCallback(
+    (id: string) => {
+      setLocalActiveId(id);
+      onActiveChange?.(id);
+    },
+    [onActiveChange],
+  );
   const baseId = useId();
   const tabRefs = useRef(new Map<string, HTMLButtonElement>());
 
   const active = tabs.find((tab) => tab.id === activeId) ?? tabs[0];
 
-  const focusTab = useCallback((id: string) => {
-    setActiveId(id);
-    // Move focus with the selection so a keyboard user is not left behind on
-    // the previous tab.
-    tabRefs.current.get(id)?.focus();
-  }, []);
+  const focusTab = useCallback(
+    (id: string) => {
+      setActiveId(id);
+      // Move focus with the selection so a keyboard user is not left behind on
+      // the previous tab.
+      tabRefs.current.get(id)?.focus();
+    },
+    [setActiveId],
+  );
 
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {

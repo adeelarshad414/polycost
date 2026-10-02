@@ -1,0 +1,55 @@
+/* Workspace overview (UI-5). Tokens only. */
+
+.workspace-loading {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--bg-surface);
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3);
+}
+
+.workspace-overview {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-2);
+}
+
+.workspace-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: var(--space-2);
+}
+
+.workspace-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  gap: var(--space-2);
+}
+
+.workspace-activity {
+  display: grid;
+  gap: var(--space-1-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workspace-activity li {
+  display: grid;
+  gap: 2px;
+  border-left: 2px solid var(--brand-primary-soft-strong);
+  padding-left: var(--space-1-5);
+}
+
+.workspace-activity strong {
+  color: var(--text-primary);
+  font-size: var(--fs-14);
+  font-weight: var(--fw-semibold);
+}
+
+.workspace-activity span,
+.workspace-activity-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-12);
+}

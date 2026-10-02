@@ -295,3 +295,47 @@ export function sequentialStep(value: number, min: number, max: number, steps = 
 function round(value: number): number {
   return Math.round(value * 10) / 10;
 }
+
+export interface VarianceInput {
+  key: string;
+  label: string;
+  estimate: number;
+  actual: number;
+}
+
+export interface VarianceRow extends VarianceInput {
+  variance: number;
+  /** Variance as a fraction of the estimate (0.12 = 12% over). */
+  ratio: number;
+  direction: 'under' | 'over' | 'even';
+  /** Diverging step 1-3 by magnitude: within 5%, within 15%, beyond. */
+  step: 1 | 2 | 3;
+  /** Half-bar length as a share of the largest absolute variance, 0-100. */
+  widthPercent: number;
+}
+
+/**
+ * Estimate against invoiced actuals. The diverging scale is centred on zero
+ * variance, so "on estimate" is neutral and under/over read as opposites.
+ */
+export function varianceRows(inputs: VarianceInput[]): VarianceRow[] {
+  const rows = inputs.map((input) => {
+    const variance = input.actual - input.estimate;
+    const ratio = input.estimate > 0 ? variance / input.estimate : 0;
+    const magnitude = Math.abs(ratio);
+    return {
+      ...input,
+      variance,
+      ratio,
+      direction: (Math.abs(variance) < 0.005 ? 'even' : variance < 0 ? 'under' : 'over') as
+        'under' | 'over' | 'even',
+      step: (magnitude <= 0.05 ? 1 : magnitude <= 0.15 ? 2 : 3) as 1 | 2 | 3,
+    };
+  });
+  const largest = Math.max(0, ...rows.map((row) => Math.abs(row.variance)));
+
+  return rows.map((row) => ({
+    ...row,
+    widthPercent: largest > 0 ? (Math.abs(row.variance) / largest) * 100 : 0,
+  }));
+}

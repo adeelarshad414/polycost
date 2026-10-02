@@ -1,4 +1,5 @@
 export { ChartFrame, type ChartTable, type LegendItem } from './ChartFrame';
+export { VarianceChart } from './VarianceChart';
 export { CostByServiceStacked, ProviderComparisonBar } from './BarCharts';
 export {
   CommitmentBreakEven,
