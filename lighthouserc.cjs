@@ -13,9 +13,12 @@ module.exports = {
     collect: {
       staticDistDir: './apps/web/dist',
       numberOfRuns: 3,
-      // The CI job runs as root inside the Playwright image, where Chrome
-      // refuses to start sandboxed.
-      settings: process.env.CI ? { chromeFlags: '--no-sandbox --headless=new' } : {},
+      // The CI job runs as root inside the Playwright image, where Chrome refuses
+      // to start sandboxed, and Docker's 64 MB /dev/shm crashes the tab
+      // (TARGET_CRASHED) unless Chrome uses /tmp instead.
+      settings: process.env.CI
+        ? { chromeFlags: '--no-sandbox --headless=new --disable-dev-shm-usage' }
+        : {},
     },
     assert: {
       assertions: {

@@ -73,6 +73,9 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble
+      # Playwright's recommended setting: share the host IPC namespace so
+      # Chromium is not limited to Docker's 64 MB /dev/shm.
+      options: --ipc=host
     steps:
       - uses: actions/checkout@v7
       - run: npm ci
