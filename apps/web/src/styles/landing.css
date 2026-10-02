@@ -1,0 +1,285 @@
+/*
+  Landing and onboarding (UI-6). The hero spans a 1200px grid on the Aurora
+  mesh; the form keeps a readable column under it. Tokens only.
+*/
+
+.initial-home {
+  width: min(100%, 1200px);
+  gap: var(--space-4);
+}
+
+.initial-home-form {
+  justify-self: center;
+  width: min(100%, 820px);
+}
+
+.home-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-4);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-hero);
+  background: var(--grad-hero-mesh);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-6) var(--space-5);
+}
+
+.home-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: var(--grad-brand-line);
+}
+
+.home-hero-copy {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-2);
+}
+
+.home-hero-eyebrow {
+  width: fit-content;
+  border-radius: var(--radius-pill);
+  background: var(--brand-primary-soft);
+  color: var(--brand-primary-text);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+  padding: 4px var(--space-1-5);
+  text-transform: uppercase;
+}
+
+.home-hero h1 {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: clamp(var(--fs-36), 4.6vw, var(--fs-56));
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-tight);
+  line-height: 1.05;
+}
+
+.home-hero-subtitle {
+  max-width: 52ch;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-16);
+  line-height: 1.6;
+}
+
+.home-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1-5);
+  margin-top: var(--space-1);
+}
+
+.home-proof {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  border-top: 1px solid color-mix(in srgb, var(--border-strong) 60%, transparent);
+  padding-top: var(--space-2);
+}
+
+.home-proof div {
+  display: grid;
+  gap: 2px;
+}
+
+.home-proof dt {
+  color: var(--text-muted);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.home-proof dd {
+  display: grid;
+  margin: 0;
+}
+
+.home-proof-value {
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--fs-28);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-bold);
+  line-height: 1.1;
+}
+
+.home-proof-detail {
+  color: var(--text-secondary);
+  font-size: var(--fs-12);
+}
+
+/* Sample result card */
+.home-sample {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-1-5);
+  margin: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--grad-glass);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-2);
+  backdrop-filter: blur(14px) saturate(140%);
+  animation: home-sample-in var(--dur-slow) var(--ease-emphasized) both;
+}
+
+.home-sample-caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--fs-12);
+}
+
+.home-sample-verdict {
+  display: grid;
+  gap: var(--space-0-5);
+  padding: var(--space-0-5) var(--space-1);
+}
+
+.home-sample-eyebrow {
+  color: var(--text-muted);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.home-sample-verdict strong {
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--fs-20);
+  font-weight: var(--fw-semibold);
+}
+
+.home-sample-price {
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--fs-36);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-tight);
+  line-height: 1.1;
+}
+
+.home-sample-price small {
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: var(--fs-14);
+  font-weight: var(--fw-regular);
+  letter-spacing: 0;
+}
+
+.home-sample-deltas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.home-sample .chart-frame {
+  box-shadow: none;
+}
+
+@keyframes home-sample-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Form steps */
+.form-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  margin: var(--space-1) 0 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--fs-16);
+  font-weight: var(--fw-semibold);
+}
+
+.form-step-number {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--grad-cta);
+  color: var(--on-brand);
+  font-family: var(--font-body);
+  font-size: var(--fs-14);
+  font-weight: var(--fw-bold);
+}
+
+.form-step-optional {
+  border-radius: var(--radius-pill);
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-medium);
+  padding: 2px var(--space-1);
+}
+
+/* Quick-start cards: neutral, with an icon per workload */
+.architecture-template-button {
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-1-5);
+}
+
+.architecture-template-button > small {
+  grid-column: 2;
+}
+
+.architecture-template-icon {
+  grid-row: span 2;
+  align-self: center;
+  width: 22px;
+  height: 22px;
+  color: var(--brand-primary-text);
+}
+
+@media (max-width: 900px) {
+  .home-hero {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--space-4) var(--space-3);
+  }
+}
+
+@media (max-width: 480px) {
+  .home-hero {
+    padding: var(--space-3) var(--space-2);
+  }
+
+  .home-proof {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .home-hero-actions .pc-button {
+    flex: 1 1 100%;
+  }
+}
+
+/* With the icon beside it, a one-line label truncated ("Three-Tier Ente…"); wrap instead. */
+.architecture-template-button > span {
+  overflow: visible;
+  white-space: normal;
+}

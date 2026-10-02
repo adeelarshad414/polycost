@@ -34,7 +34,10 @@ export function ChartFrame({
   actions,
   children,
   className,
+  headingLevel = 3,
 }: {
+  /** Heading level for the title, so the chart fits the page outline it sits in. */
+  headingLevel?: 2 | 3 | 4;
   title: string;
   unit: string;
   legend?: LegendItem[];
@@ -45,6 +48,7 @@ export function ChartFrame({
 }) {
   const [showTable, setShowTable] = useState(false);
   const titleId = useId();
+  const Heading = `h${headingLevel}` as const;
 
   return (
     <figure
@@ -53,9 +57,9 @@ export function ChartFrame({
     >
       <header className="chart-frame-header">
         <div className="chart-frame-heading">
-          <h3 id={titleId} className="chart-frame-title">
+          <Heading id={titleId} className="chart-frame-title">
             {title}
-          </h3>
+          </Heading>
           <span className="chart-frame-unit">{unit}</span>
         </div>
         <div className="chart-frame-actions">
