@@ -115,6 +115,10 @@ export const configSchema = z
     // Deliberate escape hatch for demo/staging stacks that run on sample data.
     ALLOW_MOCK_PROVIDERS_OUTSIDE_DEVELOPMENT: envBoolean(false),
     PRICING_ETL_RUN_ON_BOOT: envBoolean(true),
+    // Audit H-08: the stale-row prune is skipped unless at least this share of
+    // the provider's live catalog was returned by the current run, so a short
+    // but "successful" fetch cannot wipe the catalog.
+    PRICING_ETL_PRUNE_MIN_FRESH_RATIO: z.coerce.number().min(0).max(1).default(0.9),
     // Proxy hops in front of the API; read by main.ts for Fastify trustProxy.
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(1),
     RATE_LIMIT_COMPARISON_PER_MINUTE: z.coerce.number().int().positive().default(30),

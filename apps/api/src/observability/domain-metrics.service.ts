@@ -22,6 +22,7 @@ export type AuthOutcome = 'success' | 'invalid_credentials' | 'locked';
 export type ExportOutcome = 'success' | 'failure';
 export type CircuitState = 'closed' | 'open' | 'half_open';
 export type DbQueryOutcome = 'success' | 'failure';
+export type EtlPruneOutcome = 'pruned' | 'skipped_partial_run' | 'skipped_low_fresh_ratio';
 export type PricingFallbackReason = 'not_cached' | 'schema_or_connection_unavailable';
 
 /** Counts BullMQ reports per state; keys are the states we choose to publish. */
@@ -48,6 +49,8 @@ const QUEUE_READ_TIMEOUT_MS = 1_000;
 export class DomainMetricsService {
   private readonly etlRuns: Counter<'provider' | 'status'>;
   private readonly etlRecords: Counter<'provider' | 'outcome'>;
+  private readonly etlPrunes: Counter<'provider' | 'outcome'>;
+  private readonly etlPrunedRows: Counter<'provider'>;
   private readonly etlDuration: Histogram<'provider'>;
   private readonly etlLastSuccess: Gauge<'provider'>;
   private readonly vaultReads: Counter<'outcome'>;
@@ -112,6 +115,20 @@ export class DomainMetricsService {
       name: 'auth_attempts_total',
       help: 'Authentication attempts by outcome.',
       labelNames: ['outcome'],
+      registers,
+    });
+
+    this.etlPrunes = new Counter({
+      name: 'pricing_etl_prunes_total',
+      help: 'Stale live-row prune decisions after an ETL refresh, by provider and outcome.',
+      labelNames: ['provider', 'outcome'],
+      registers,
+    });
+
+    this.etlPrunedRows = new Counter({
+      name: 'pricing_etl_pruned_rows_total',
+      help: 'Live pricing rows deleted because the provider no longer returned them.',
+      labelNames: ['provider'],
       registers,
     });
 
@@ -337,6 +354,13 @@ export class DomainMetricsService {
 
   recordAuthAttempt(outcome: AuthOutcome): void {
     this.authAttempts.inc({ outcome });
+  }
+
+  recordEtlPrune(provider: string, outcome: EtlPruneOutcome, prunedRows = 0): void {
+    this.etlPrunes.inc({ provider, outcome });
+    if (prunedRows > 0) {
+      this.etlPrunedRows.inc({ provider }, prunedRows);
+    }
   }
 
   recordPricingFallback(provider: string, reason: PricingFallbackReason): void {

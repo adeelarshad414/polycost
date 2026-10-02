@@ -232,6 +232,19 @@ Actions:
 3. Inspect pricing ETL logs by provider.
 4. Review rejected/skipped row counts.
 5. Re-run ETL in a controlled window.
+
+Catalog shrank, or stale SKUs are still listed:
+
+- `pricing_etl_prunes_total{outcome="skipped_low_fresh_ratio"}` means a run
+  returned less than `PRICING_ETL_PRUNE_MIN_FRESH_RATIO` (default 0.9) of the
+  live catalog, so stale rows were kept rather than deleted. The log line
+  `pricing_etl_prune_skipped` carries the fresh and stale counts. A one-off
+  skip is usually a truncated provider response; repeated skips after a
+  genuine provider-side reduction mean the ratio needs lowering for one run.
+- `outcome="skipped_partial_run"` means the run rejected rows, and partial runs
+  never prune.
+- `pricing_etl_pruned_rows_total` shows how many rows a normal prune removed.
+
 6. Inspect evidence on one comparison line item before announcing recovery.
 
 Never represent modeled or stale rows as invoice-grade data.
