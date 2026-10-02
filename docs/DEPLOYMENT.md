@@ -212,7 +212,10 @@ Cloud equivalents:
    `npm run invoice:evidence:notary:smoke` against the configured HTTPS
    notary/WORM receiver.
 8. Build API and web images from the repo Dockerfiles.
-9. Run database migrations before shifting traffic.
+9. Run database migrations before shifting traffic. On Kubernetes the Helm
+   pre-install/pre-upgrade Job does this and a failure stops the release; elsewhere
+   run the migrations image once (see [database/README.md](../database/README.md)).
+   `MIGRATE_DRY_RUN=1` lists what will run.
 10. Deploy with the previous release still available for rollback.
 11. Verify `/health/live`, `/health/ready`, `/health`, and `/health/deep`.
 12. Run a comparison, export PDF/CSV/Excel, and inspect pricing evidence.

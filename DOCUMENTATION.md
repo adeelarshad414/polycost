@@ -1,6 +1,6 @@
 # 📚 PolyCost Documentation Index
 
-> **Master table of contents for all 99 Markdown documents in this repository.**
+> **Master table of contents for all 100 Markdown documents in this repository.**
 > Start at [🚀 New here?](#-new-here-start-with-these-five) if this is your first visit.
 
 PolyCost is an open-source **multi-cloud cost comparison engine**. You describe a
@@ -43,6 +43,7 @@ of exactly how every number was derived.
 | [🏛️ Architecture (docs)](docs/ARCHITECTURE.md)          | Implementation-level architecture    |
 | [📝 Architecture Notes](ARCHITECTURE_NOTES.md)          | Decisions and rationale              |
 | [🗄️ Data Model](04-DATA-MODEL.md)                       | Tables, relationships, constraints   |
+| [🧱 Database Migrations](database/README.md)            | Migrator, rules, troubleshooting     |
 | [🔌 API Contracts](05-API-CONTRACTS.md)                 | Endpoint contracts                   |
 | [🧩 Backend Spec](docs/BACKEND_SPEC.md)                 | Backend module responsibilities      |
 | [🖥️ Frontend Integration](docs/FRONTEND_INTEGRATION.md) | Web ↔ API integration                |
@@ -189,4 +190,4 @@ subsystem looks the way it does.
 
 ---
 
-<sub>📅 Index generated from a full sweep of the repository. 99 Markdown documents catalogued.</sub>
+<sub>📅 Index generated from a full sweep of the repository. 100 Markdown documents catalogued.</sub>

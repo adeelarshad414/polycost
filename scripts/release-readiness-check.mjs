@@ -890,14 +890,26 @@ await assertFileContains('database/migrations/040_team_scim_provisioning.sql', [
   ['SCIM audit action', 'team.scim.user_upserted'],
 ]);
 
-await assertFileContains('scripts/db.mjs', [
-  ['SCIM migration validation', '040_team_scim_provisioning.sql'],
+// Audit H-06: migrations are discovered, never listed, and every environment
+// (compose init hook, npm run db:migrate, the Helm Job) runs one migrator.
+await assertFileContains('database/migrations/040_team_scim_provisioning.sql', [
+  ['SCIM migration records itself', 'schema_migrations'],
 ]);
-
+await assertFileContains('scripts/db.mjs', [
+  ['migrations discovered from the directory', 'readdirSync(migrationsDir)'],
+  ['lock-safe DDL rules for new migrations', 'LOCK_SAFETY_FROM_VERSION'],
+  ['db:migrate runs the shared migrator', '/polycost-postgres/migrate.sh'],
+]);
 await assertFileContains('docker/postgres/initdb.d/001-run-migrations.sh', [
-  // Every migration is applied by version-sorted glob, so new ones (incl. SCIM 040,
-  // 041, 042) can no longer be missed by a hand-maintained list.
-  ['migration bootstrap glob', '/polycost-migrations/[0-9][0-9][0-9]_*.sql'],
+  ['fresh database init runs the shared migrator', '/polycost-postgres/migrate.sh'],
+]);
+await assertFileContains('docker/postgres/migrate.sh', [
+  ['version-sorted migration glob', '[0-9][0-9][0-9]_*.sql'],
+  ['single runner via advisory lock', 'pg_advisory_lock'],
+  ['checksum drift detection', 'changed after it was applied'],
+]);
+await assertFileContains('deploy/helm/polycost/templates/migrations-job.yaml', [
+  ['migrations run before install and upgrade', 'pre-install,pre-upgrade'],
 ]);
 
 await assertFileContains('scripts/clean-clone-demo-check.mjs', [
@@ -1652,16 +1664,11 @@ await assertFileContains(
     ['schema migration registration', 'invoice_artifact_provider_retention_proof_persistence'],
   ],
 );
-await assertFileContains('scripts/db.mjs', [
-  [
-    'provider retention proof migration in expected list',
-    '039_invoice_artifact_provider_retention_proof_persistence.sql',
-  ],
-]);
-// Fresh database init applies 039 through the version-sorted migration glob.
-await assertFileContains('docker/postgres/initdb.d/001-run-migrations.sh', [
-  ['fresh database init applies every migration', '/polycost-migrations/[0-9][0-9][0-9]_*.sql'],
-]);
+// 039 is applied by the shared migrator's version-sorted discovery (above).
+await assertFileContains(
+  'database/migrations/039_invoice_artifact_provider_retention_proof_persistence.sql',
+  [['provider retention proof migration records itself', 'schema_migrations']],
+);
 await assertFileContains('apps/api/src/api/api-database.repository.ts', [
   [
     'provider retention proof row update method',

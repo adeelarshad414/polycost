@@ -24,15 +24,25 @@ helm install polycost deploy/helm/polycost \
 > port — it is not a degraded start. Verified on a cluster: the pod restarts
 > until Redis is reachable. Plan rollouts accordingly.
 
-Postgres needs the migrations applied and the cluster-level roles from
-`002_least_privilege_roles.sql`. A `pg_dump` alone is **not** a restorable
+Postgres migrations are applied by the chart's **pre-install / pre-upgrade Job**
+(`templates/migrations-job.yaml`, image from `database/Dockerfile`). It needs:
+
+- `migrations.ownerSecret`: the database owner's username and password; schema
+  changes need more than the app role.
+- `migrations.rolePasswordsSecret`: only on a cluster where `polycost_app` and
+  `polycost_etl` do not exist yet. They must match Vault's `polycost/db` secret.
+
+The Job holds a Postgres advisory lock, checksums every applied file, and fails the
+release, leaving the running pods untouched, if a migration fails or an applied
+file was edited. Disable it with `migrations.enabled: false` only if migrations are
+run another way. See [database/README.md](../../../database/README.md). A `pg_dump` alone is **not** a restorable
 backup of this system — see the Backup And Restore section of the runbook.
 
 ## Probes
 
 | Probe     | Path            | Why                                                                                                                                                                             |
 | --------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| startup   | `/health/live`  | Boot runs migrations and a pricing refresh; measured at 40–50s. Without it, liveness kills the pod mid-boot and the deployment never converges.                                 |
+| startup   | `/health/live`  | Boot runs a startup pricing refresh (migrations already ran in the Job); measured at 40–50s. Without it, liveness kills the pod mid-boot and the deployment never converges.    |
 | liveness  | `/health/live`  | Deliberately **not** `/health/ready`. Restarting cannot fix a database that is briefly unavailable; pointing liveness at readiness turns a dependency blip into a restart loop. |
 | readiness | `/health/ready` | Returns **503** when the database does not answer `SELECT 1` within 1s (probe timeout 2s), so Kubernetes withholds traffic. Redis down keeps the pod Ready but `degraded`.      |
 

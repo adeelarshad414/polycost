@@ -8,7 +8,7 @@ PolyCost is built for decision-grade planning. It estimates and compares costs; 
 
 ## 📚 Documentation
 
-**➡️ [Full Documentation Index](DOCUMENTATION.md)** — table of contents for all 99 documents.
+**➡️ [Full Documentation Index](DOCUMENTATION.md)** — table of contents for all 100 documents.
 
 | Start here                                |                                                 |
 | ----------------------------------------- | ----------------------------------------------- |
@@ -473,9 +473,12 @@ npm run db:reset
 npm run db:validate
 ```
 
-`db:migrate` starts the local Postgres service, checks the live `schema_migrations`
-table, and applies any pending migration files in order. `db:validate` verifies that
-all expected migration files exist and that the running database has recorded them.
+`db:migrate` runs the shared migrator (`docker/postgres/migrate.sh`) against the local
+Postgres: pending files in version order, under an advisory lock, each checksummed so
+an edited migration is caught. `MIGRATE_DRY_RUN=1` lists what would run. `db:validate`
+checks the file rules (naming, no gaps, lock-safe DDL from 044 on) and that the running
+database is current. Kubernetes runs the same migrator as a Helm pre-upgrade Job. See
+[database/README.md](database/README.md).
 
 Security and quality checks:
 

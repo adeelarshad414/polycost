@@ -144,6 +144,28 @@ docker compose up -d
 npm run db:migrate
 ```
 
+### Kubernetes release with migrations
+
+```mermaid
+sequenceDiagram
+    participant H as helm upgrade
+    participant J as migrate Job (pre-upgrade hook)
+    participant P as Postgres
+    participant D as API Deployment
+    H->>J: create Job
+    J->>P: pg_advisory_lock
+    loop each NNN_*.sql
+        J->>P: pending? apply in a transaction, record sha256
+        J->>P: applied? verify checksum
+    end
+    J->>P: unlock
+    alt Job succeeded
+        H->>D: roll pods (maxUnavailable 0)
+    else Job failed
+        H-->>H: release fails, old pods keep serving
+    end
+```
+
 > ⚠️ Compose is a **development and demo** stack: Vault runs in dev mode, so
 > Vault, Grafana, Prometheus and the OTel collector publish on `127.0.0.1` only,
 > and Grafana will not start without `GRAFANA_PASSWORD`.
