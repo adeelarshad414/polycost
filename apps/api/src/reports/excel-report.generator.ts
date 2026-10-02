@@ -242,7 +242,14 @@ export class ExcelReportGenerator {
         style: 2,
       },
       {
-        cells: ['Provider', 'Daily USD', 'Weekly USD', 'Monthly USD', 'Quarterly USD', 'Yearly USD'],
+        cells: [
+          'Provider',
+          'Daily USD',
+          'Weekly USD',
+          'Monthly USD',
+          'Quarterly USD',
+          'Yearly USD',
+        ],
         style: 2,
       },
       ...result.providers.map((provider) => ({
@@ -414,11 +421,7 @@ export class ExcelReportGenerator {
           style: 2,
         },
         ...result.warnings.map((warning) => ({
-          cells: [
-            warning.providerId ?? '',
-            warning.code,
-            sanitizeSpreadsheetText(warning.message),
-          ],
+          cells: [warning.providerId ?? '', warning.code, sanitizeSpreadsheetText(warning.message)],
         })),
       );
     }
@@ -507,7 +510,9 @@ function whatIfRows(result: ComparisonResult, options: ReportOptions): WhatIfShe
     ...scenarios.map((scenario, index) => {
       const rowNumber = providerStartRow + index;
       const scenarioMonthly = roundCurrency(
-        scenario.baselineMonthlyUsd * DEFAULT_WHAT_IF_SCALE_FACTOR * DEFAULT_WHAT_IF_REGION_MULTIPLIER,
+        scenario.baselineMonthlyUsd *
+          DEFAULT_WHAT_IF_SCALE_FACTOR *
+          DEFAULT_WHAT_IF_REGION_MULTIPLIER,
       );
       const scenarioYearly = roundCurrency(scenarioMonthly * 12);
       const deltaMonthly = roundCurrency(scenarioMonthly - scenario.baselineMonthlyUsd);
@@ -530,11 +535,7 @@ function whatIfRows(result: ComparisonResult, options: ReportOptions): WhatIfShe
 
   if (scenarios.length === 0) {
     rows.push({
-      cells: [
-        'No provider has an eligible selected pricing model for this what-if sheet.',
-        '',
-        '',
-      ],
+      cells: ['No provider has an eligible selected pricing model for this what-if sheet.', '', ''],
     });
   }
 
@@ -550,7 +551,9 @@ function whatIfRows(result: ComparisonResult, options: ReportOptions): WhatIfShe
   );
   const scenarioSummaries = scenarios.map((scenario) => {
     const scenarioMonthly = roundCurrency(
-      scenario.baselineMonthlyUsd * DEFAULT_WHAT_IF_SCALE_FACTOR * DEFAULT_WHAT_IF_REGION_MULTIPLIER,
+      scenario.baselineMonthlyUsd *
+        DEFAULT_WHAT_IF_SCALE_FACTOR *
+        DEFAULT_WHAT_IF_REGION_MULTIPLIER,
     );
 
     return {
@@ -714,9 +717,7 @@ function breakEvenRows(result: ComparisonResult): BreakEvenSheet {
       ...timelineRows.map((timeline, index) => {
         const rowNumber = rows.length + index + 1;
         const onDemandCumulative = roundCurrency(
-          timeline.onDemandMonthlyUsd *
-            timeline.month *
-            DEFAULT_BREAK_EVEN_ON_DEMAND_MULTIPLIER,
+          timeline.onDemandMonthlyUsd * timeline.month * DEFAULT_BREAK_EVEN_ON_DEMAND_MULTIPLIER,
         );
         const committedCumulative = roundCurrency(
           timeline.upfrontUsd + timeline.committedMonthlyUsd * timeline.month,
@@ -957,7 +958,6 @@ function worksheetXml(rows: WorksheetRow[], tabColor?: string): string {
     </worksheet>
   `);
 }
-
 
 function rowXml(row: WorksheetRow, rowIndex: number, moneyColumns?: Set<number>): string {
   return `<row r="${rowIndex}">${row.cells

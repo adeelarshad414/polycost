@@ -15,7 +15,11 @@ export class ReportService {
     @Optional() private readonly domainMetrics?: DomainMetricsService,
   ) {}
 
-  generate(result: ComparisonResult, format: ReportFormat, options: ReportOptions = {}): GeneratedReport {
+  generate(
+    result: ComparisonResult,
+    format: ReportFormat,
+    options: ReportOptions = {},
+  ): GeneratedReport {
     const metadata = reportMetadata(format);
     const enrichedOptions: ReportOptions = {
       ...options,
