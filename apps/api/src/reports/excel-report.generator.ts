@@ -28,7 +28,7 @@ import {
 } from './report-evidence.js';
 import { PricingModelCost } from '../adapters/common/cloud-provider-adapter.js';
 import { escapeXml, sanitizeSpreadsheetText } from './report-security.js';
-import { PROVIDER_BRAND, REPORT_INK } from './report-brand.js';
+import { BRAND_ACCENTS, PROVIDER_BRAND, REPORT_INK } from './report-brand.js';
 import { buildReportInsights } from './report-insights.js';
 import { ReportOptions } from './report.types.js';
 import { createZip } from './zip-writer.js';
@@ -1117,25 +1117,25 @@ function stylesXml(): string {
         <numFmt numFmtId="166" formatCode="0.0%"/>
       </numFmts>
       <fonts count="5">
-        <font><sz val="11"/><name val="Calibri"/><color rgb="FF1F2430"/></font>
-        <font><b/><sz val="18"/><name val="Calibri"/><color rgb="FF1F2430"/></font>
-        <font><b/><sz val="13"/><name val="Calibri"/><color rgb="FF1F2430"/></font>
+        <font><sz val="11"/><name val="Calibri"/><color rgb="FF${REPORT_INK.heading}"/></font>
+        <font><b/><sz val="18"/><name val="Calibri"/><color rgb="FF${REPORT_INK.heading}"/></font>
+        <font><b/><sz val="13"/><name val="Calibri"/><color rgb="FF${REPORT_INK.heading}"/></font>
         <font><b/><sz val="11"/><name val="Calibri"/><color rgb="FFFFFFFF"/></font>
-        <font><i/><sz val="10"/><name val="Calibri"/><color rgb="FF5C6270"/></font>
+        <font><i/><sz val="10"/><name val="Calibri"/><color rgb="FF${REPORT_INK.muted}"/></font>
       </fonts>
       <fills count="4">
         <fill><patternFill patternType="none"/></fill>
         <fill><patternFill patternType="gray125"/></fill>
-        <fill><patternFill patternType="solid"><fgColor rgb="FF1F3864"/><bgColor indexed="64"/></patternFill></fill>
-        <fill><patternFill patternType="solid"><fgColor rgb="FFF2F5F9"/><bgColor indexed="64"/></patternFill></fill>
+        <fill><patternFill patternType="solid"><fgColor rgb="FF${BRAND_ACCENTS.indigo}"/><bgColor indexed="64"/></patternFill></fill>
+        <fill><patternFill patternType="solid"><fgColor rgb="FF${REPORT_INK.zebraFill}"/><bgColor indexed="64"/></patternFill></fill>
       </fills>
       <borders count="2">
         <border><left/><right/><top/><bottom/><diagonal/></border>
         <border>
-          <left style="thin"><color rgb="FFD4DAE3"/></left>
-          <right style="thin"><color rgb="FFD4DAE3"/></right>
-          <top style="thin"><color rgb="FFD4DAE3"/></top>
-          <bottom style="thin"><color rgb="FFD4DAE3"/></bottom>
+          <left style="thin"><color rgb="FF${REPORT_INK.hairline}"/></left>
+          <right style="thin"><color rgb="FF${REPORT_INK.hairline}"/></right>
+          <top style="thin"><color rgb="FF${REPORT_INK.hairline}"/></top>
+          <bottom style="thin"><color rgb="FF${REPORT_INK.hairline}"/></bottom>
           <diagonal/>
         </border>
       </borders>
