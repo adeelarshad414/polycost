@@ -2,6 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ApiNotFoundError, ApiUnauthorizedError } from './api-errors.js';
 import { ApiDatabaseRepository } from './api-database.repository.js';
+import { hashPassword, verifyPassword } from './password-hash.js';
 import {
   AlertRecord,
   BudgetInput,
@@ -78,23 +79,27 @@ export class CostManagementService {
   async createShareLink(input: ShareLinkInput): Promise<ShareLinkResponse> {
     await this.ensureWorkload(input.workloadId);
 
+    // Audit M-02: only sha256(token) is stored; the raw token goes back to the
+    // creator once, in the URL, and is never persisted.
     const token = this.tokenFactory();
     const expiresAt = new Date(
       this.now().getTime() + input.expiresInDays * 24 * 60 * 60 * 1000,
     ).toISOString();
-    const shareLink = await this.repository.createShareLink({
-      token,
+    await this.repository.createShareLink({
+      token: hashShareToken(token),
       workloadId: input.workloadId,
       watermark: input.watermark,
       pricingModel: input.pricingModel,
       granularity: input.granularity,
-      ...(input.password ? { passwordHash: hashSharePassword(input.password) } : {}),
+      // Salted scrypt, like account passwords. Links created before this
+      // change keep their legacy unsalted hash, which passwordMatches accepts.
+      ...(input.password ? { passwordHash: await hashPassword(input.password) } : {}),
       expiresAt,
     });
 
     return {
-      token: shareLink.token,
-      url: `/api/v1/share/${shareLink.token}`,
+      token,
+      url: `/api/v1/share/${token}`,
     };
   }
 
@@ -103,13 +108,13 @@ export class CostManagementService {
     password?: string,
     viewContext: ShareLinkViewContext = {},
   ): Promise<SharedReportResponse> {
-    const shareLink = await this.repository.getActiveShareLink(token);
+    const shareLink = await this.repository.getActiveShareLink(hashShareToken(token));
 
     if (!shareLink) {
       throw new ApiNotFoundError('Share link was not found or has expired');
     }
 
-    if (shareLink.passwordHash && !passwordMatches(password, shareLink.passwordHash)) {
+    if (shareLink.passwordHash && !(await passwordMatches(password, shareLink.passwordHash))) {
       throw new ApiUnauthorizedError('Share link password is required or invalid');
     }
 
@@ -124,7 +129,7 @@ export class CostManagementService {
     );
 
     return {
-      token: shareLink.token,
+      token,
       watermark: shareLink.watermark,
       expiresAt: shareLink.expiresAt,
       pricingModel: shareLink.pricingModel,
@@ -136,25 +141,29 @@ export class CostManagementService {
   }
 
   async getShareLinkAnalytics(token: string): Promise<ShareLinkAnalyticsResponse> {
-    const analytics = await this.repository.getShareLinkAnalytics(token);
+    const analytics = await this.repository.getShareLinkAnalytics(hashShareToken(token));
 
     if (!analytics) {
       throw new ApiNotFoundError('Share link was not found');
     }
 
-    return analytics;
+    // The repository only knows the hash; report the token the caller holds.
+    return { ...analytics, token };
   }
 
   async revokeShareLink(token: string): Promise<ShareLinkResponse> {
-    const revoked = await this.repository.revokeShareLink(token, this.now().toISOString());
+    const revoked = await this.repository.revokeShareLink(
+      hashShareToken(token),
+      this.now().toISOString(),
+    );
 
     if (!revoked) {
       throw new ApiNotFoundError('Share link was not found');
     }
 
     return {
-      token: revoked.token,
-      url: `/api/v1/share/${revoked.token}`,
+      token,
+      url: `/api/v1/share/${token}`,
     };
   }
 
@@ -173,7 +182,13 @@ export class CostManagementService {
   }
 }
 
-function hashSharePassword(password: string): string {
+/** sha256 hex of a share token: what share_links.token stores (migration 043). */
+export function hashShareToken(token: string): string {
+  return createHash('sha256').update(token, 'utf8').digest('hex');
+}
+
+/** The pre-M-02 format: unsalted sha256 hex. Still verified, never written. */
+function legacySharePasswordHash(password: string): string {
   return createHash('sha256').update(password, 'utf8').digest('hex');
 }
 
@@ -201,12 +216,19 @@ function toShareLinkEvent(
   };
 }
 
-function passwordMatches(password: string | undefined, expectedHash: string): boolean {
+async function passwordMatches(
+  password: string | undefined,
+  expectedHash: string,
+): Promise<boolean> {
   if (!password) {
     return false;
   }
 
-  const candidate = Buffer.from(hashSharePassword(password), 'hex');
+  if (expectedHash.startsWith('scrypt:')) {
+    return verifyPassword(password, expectedHash);
+  }
+
+  const candidate = Buffer.from(legacySharePasswordHash(password), 'hex');
   const expected = Buffer.from(expectedHash, 'hex');
 
   return candidate.length === expected.length && timingSafeEqual(candidate, expected);

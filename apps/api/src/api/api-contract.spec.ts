@@ -1005,6 +1005,13 @@ describe('API contracts', () => {
         expiresInDays: 30,
       }),
     ).rejects.toThrow(ApiValidationError);
+    // M-02: share links are bearer credentials and must expire within 90 days.
+    await expect(
+      shareLinksController.create({
+        workloadId: workloadRecord.id,
+        expiresInDays: 91,
+      }),
+    ).rejects.toThrow('expiresInDays must be at most 90');
   });
 
   it('POST /workloads persists a normalized workload config', async () => {
@@ -1093,19 +1100,32 @@ describe('API contracts', () => {
       granularity: 'yearly',
       password: 'client-demo',
     });
+    // M-02: the password travels in a POST body, never in the URL.
     await expect(
-      sharedReportsController.get(shareLinkResponse.token, 'client-demo', 'summary', {
-        headers: {
-          'cf-ipcountry': 'US',
-          'user-agent': 'jest',
-        },
-      }),
+      sharedReportsController.unlock(
+        shareLinkResponse.token,
+        { password: 'client-demo', section: 'summary' },
+        { headers: { 'cf-ipcountry': 'US', 'user-agent': 'jest' } },
+      ),
     ).resolves.toEqual(sharedReportResponse);
     expect(service.getSharedReport).toHaveBeenCalledWith(shareLinkResponse.token, 'client-demo', {
       countryCode: 'US',
       section: 'summary',
       userAgent: 'jest',
     });
+    await expect(
+      sharedReportsController.get(shareLinkResponse.token, 'client-demo', 'summary', {
+        headers: {},
+      }),
+    ).rejects.toThrow(ApiValidationError);
+    await expect(
+      sharedReportsController.get(shareLinkResponse.token, undefined, 'summary', { headers: {} }),
+    ).resolves.toEqual(sharedReportResponse);
+    expect(service.getSharedReport).toHaveBeenLastCalledWith(
+      shareLinkResponse.token,
+      undefined,
+      expect.objectContaining({ section: 'summary' }),
+    );
     await expect(shareLinksController.analytics(shareLinkResponse.token)).resolves.toEqual(
       shareLinkAnalyticsResponse,
     );
