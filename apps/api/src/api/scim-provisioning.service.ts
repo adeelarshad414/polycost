@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { isValidEmailAddress } from './email-address.js';
 import { Injectable } from '@nestjs/common';
 import { ApiDatabaseRepository } from './api-database.repository.js';
 import {
@@ -722,7 +723,7 @@ function sha256(value: string): string {
 
 function normalizeEmail(value: unknown): string {
   const email = requiredString(value, 'userName').toLowerCase();
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+  if (!isValidEmailAddress(email)) {
     throw new ApiValidationError('userName must be an email address', [
       {
         field: 'userName',

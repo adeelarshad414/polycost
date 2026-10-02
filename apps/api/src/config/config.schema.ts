@@ -109,8 +109,14 @@ export const configSchema = z
     PRICING_ETL_DEFAULT_REGION_AWS: z.string().default('us-east-1'),
     PRICING_ETL_DEFAULT_REGION_AZURE: z.string().default('eastus'),
     PRICING_ETL_DEFAULT_REGION_GCP: z.string().default('us-central1'),
-    USE_MOCK_PROVIDERS: envBoolean(true),
+    // Off by default (audit C-01): a deployment that forgets this flag must not
+    // present fixture prices as real. Compose sets it explicitly for local dev.
+    USE_MOCK_PROVIDERS: envBoolean(false),
+    // Deliberate escape hatch for demo/staging stacks that run on sample data.
+    ALLOW_MOCK_PROVIDERS_OUTSIDE_DEVELOPMENT: envBoolean(false),
     PRICING_ETL_RUN_ON_BOOT: envBoolean(true),
+    // Proxy hops in front of the API; read by main.ts for Fastify trustProxy.
+    TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(1),
     RATE_LIMIT_COMPARISON_PER_MINUTE: z.coerce.number().int().positive().default(30),
     RATE_LIMIT_EXPORT_PER_MINUTE: z.coerce.number().int().positive().default(10),
     RATE_LIMIT_SHARE_LINK_PER_MINUTE: z.coerce.number().int().positive().default(20),
@@ -482,6 +488,19 @@ export const configSchema = z
             'Provider control-plane retention proof requires the SHA-256 digest of the captured provider evidence.',
         });
       }
+    }
+
+    if (
+      (config.NODE_ENV === 'production' || config.NODE_ENV === 'staging') &&
+      config.USE_MOCK_PROVIDERS &&
+      !config.ALLOW_MOCK_PROVIDERS_OUTSIDE_DEVELOPMENT
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['USE_MOCK_PROVIDERS'],
+        message:
+          'USE_MOCK_PROVIDERS=true serves fixture prices as real ones; it is refused in production and staging. Set ALLOW_MOCK_PROVIDERS_OUTSIDE_DEVELOPMENT=true only for a labelled demo stack.',
+      });
     }
 
     if (

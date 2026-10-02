@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { isValidEmailAddress } from './email-address.js';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DomainMetricsService } from '../observability/domain-metrics.service.js';
@@ -36,7 +37,8 @@ interface AuthRequestMetadata {
   userAgent?: string;
 }
 
-const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+// Long enough for any passphrase, short enough that hashing it stays cheap.
+const MAX_PASSWORD_LENGTH = 1024;
 const TEAM_ADMIN_ROLES = new Set<TeamRole>(['owner', 'admin']);
 const TEAM_OWNER_ROLE: TeamRole = 'owner';
 const INVITABLE_ROLES: Array<Exclude<TeamRole, 'owner'>> = ['admin', 'member'];
@@ -1315,6 +1317,15 @@ function parseInvitationToken(body: unknown): string {
 function parsePassword(value: unknown, minimumLength: number): string {
   const password = requiredString(value, 'password');
 
+  if (password.length > MAX_PASSWORD_LENGTH) {
+    throw new ApiValidationError('password does not meet policy', [
+      {
+        field: 'password',
+        issue: `must be at most ${MAX_PASSWORD_LENGTH} characters`,
+      },
+    ]);
+  }
+
   if (password.length < minimumLength) {
     throw new ApiValidationError('password does not meet policy', [
       {
@@ -1330,7 +1341,7 @@ function parsePassword(value: unknown, minimumLength: number): string {
 function normalizeEmail(value: unknown): string {
   const email = requiredString(value, 'email').toLowerCase();
 
-  if (!EMAIL_PATTERN.test(email)) {
+  if (!isValidEmailAddress(email)) {
     throw new ApiValidationError('email must be valid', [
       {
         field: 'email',

@@ -32,47 +32,18 @@ psql \
   --dbname "$POSTGRES_DB" \
   --file /polycost-migrations/003_seed_service_equivalence_map.sql
 
-for migration in \
-  004_seed_local_pricing_catalog.sql \
-  005_backend_architecture_tables.sql \
-  006_cost_management_jobs.sql \
-  007_pricing_etl_run_counters.sql \
-  008_pricing_model_terms.sql \
-  009_pricing_rates_matrix.sql \
-  010_share_link_context.sql \
-  011_seed_local_commitment_pricing_catalog.sql \
-  012_production_depth_audit_analytics.sql \
-  013_report_export_jobs.sql \
-  014_comparison_prewarm_jobs.sql \
-  015_seed_accelerated_compute_pricing_catalog.sql \
-  016_pricing_cache_sync_status.sql \
-  017_seed_burstable_compute_catalog.sql \
-  018_pricing_rates_active_uniqueness.sql \
-  019_comparison_audit_rate_evidence.sql \
-  020_pricing_rates_estimate_only_guard.sql \
-  021_seed_distinct_payment_option_rates.sql \
-  022_diagram_imports.sql \
-  023_seed_sql_server_database_catalog.sql \
-  024_comparison_audit_pricing_trace.sql \
-  025_account_team_foundation.sql \
-  026_auth_sessions_and_billing_actuals.sql \
-  027_team_invites_and_sso.sql \
-  028_pricing_lineage_metadata.sql \
-  029_auth_billing_runtime_privileges.sql \
-  030_team_audit_events.sql \
-  031_team_audit_export_outbox.sql \
-  032_invoice_artifact_blobs.sql \
-  033_invoice_artifact_blob_governance.sql \
-  034_invoice_artifact_external_storage.sql \
-  035_team_audit_artifact_legal_hold_action.sql \
-  036_team_audit_artifact_review_action.sql \
-  037_team_audit_artifact_exception_action.sql \
-  038_team_audit_invoice_control_validation_action.sql \
-  039_invoice_artifact_provider_retention_proof_persistence.sql \
-  040_team_scim_provisioning.sql
-do
+# Apply every remaining migration in version order. The list used to be written
+# out by hand and stopped at 040, so a fresh volume silently missed 041 and 042
+# (audit H-06). Each migration records itself in schema_migrations, so
+# `npm run db:migrate` later skips what ran here. POSIX glob expansion is sorted.
+for migration_path in /polycost-migrations/[0-9][0-9][0-9]_*.sql; do
+  migration="$(basename "$migration_path")"
+  case "$migration" in
+    001_* | 002_* | 003_*) continue ;;
+  esac
+
   psql \
     --username "$POSTGRES_USER" \
     --dbname "$POSTGRES_DB" \
-    --file "/polycost-migrations/$migration"
+    --file "$migration_path"
 done

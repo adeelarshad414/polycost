@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
+import { createProxyTrust } from './api/rate-limit.service.js';
 import { AppModule } from './app.module.js';
 import { setProviderHttpDefaults } from './adapters/common/http-client.js';
 import { configureApp, corsOriginsFromConfig } from './bootstrap.js';
@@ -17,12 +18,20 @@ async function bootstrap() {
   // nothing emitted during module init is lost. The logger needs ConfigService,
   // which only exists once the app is created - buffering resolves that ordering
   // without reading the environment directly.
+  const proxyTrust = createProxyTrust();
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({ bodyLimit: DIAGRAM_JSON_BODY_MAX_BYTES }),
+    // Trust exactly TRUST_PROXY_HOPS proxies, so request.ip is the address our
+    // proxy saw rather than whatever a client wrote into X-Forwarded-For (audit
+    // H-02). The hop count is set from validated config just below.
+    new FastifyAdapter({
+      bodyLimit: DIAGRAM_JSON_BODY_MAX_BYTES,
+      trustProxy: proxyTrust.trust,
+    }),
     { bufferLogs: true },
   );
   const config = app.get(ConfigService<AppConfig, true>);
+  proxyTrust.setHops(config.get('TRUST_PROXY_HOPS', { infer: true }));
 
   const logger = new StructuredLogger({
     level: config.get('LOG_LEVEL', { infer: true }),

@@ -895,7 +895,9 @@ await assertFileContains('scripts/db.mjs', [
 ]);
 
 await assertFileContains('docker/postgres/initdb.d/001-run-migrations.sh', [
-  ['SCIM migration bootstrap', '040_team_scim_provisioning.sql'],
+  // Every migration is applied by version-sorted glob, so new ones (incl. SCIM 040,
+  // 041, 042) can no longer be missed by a hand-maintained list.
+  ['migration bootstrap glob', '/polycost-migrations/[0-9][0-9][0-9]_*.sql'],
 ]);
 
 await assertFileContains('scripts/clean-clone-demo-check.mjs', [
@@ -1656,11 +1658,9 @@ await assertFileContains('scripts/db.mjs', [
     '039_invoice_artifact_provider_retention_proof_persistence.sql',
   ],
 ]);
+// Fresh database init applies 039 through the version-sorted migration glob.
 await assertFileContains('docker/postgres/initdb.d/001-run-migrations.sh', [
-  [
-    'fresh database init applies provider proof migration',
-    '039_invoice_artifact_provider_retention_proof_persistence.sql',
-  ],
+  ['fresh database init applies every migration', '/polycost-migrations/[0-9][0-9][0-9]_*.sql'],
 ]);
 await assertFileContains('apps/api/src/api/api-database.repository.ts', [
   [

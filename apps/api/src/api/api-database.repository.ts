@@ -3868,6 +3868,42 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         return undefined;
       }
 
+      // Audit H-01: a team's SCIM token may only provision accounts that belong
+      // to that team - existing members, people with a pending invite to it, or
+      // identities this team's SCIM already linked. Matching on email alone let
+      // any team admin pull another tenant's account into their team and rewrite
+      // its global display name. New accounts are still created normally.
+      if (account) {
+        const eligible = await pool.query<{ eligible: boolean }>(
+          `
+            SELECT (
+              EXISTS (
+                SELECT 1 FROM team_memberships
+                WHERE team_id = $1 AND account_id = $2
+              )
+              OR EXISTS (
+                SELECT 1 FROM team_scim_external_users
+                WHERE team_id = $1 AND account_id = $2
+              )
+              OR EXISTS (
+                SELECT 1 FROM team_invitations
+                WHERE team_id = $1
+                  AND lower(email) = lower($3)
+                  AND status = 'pending'
+                  AND expires_at > now()
+              )
+            ) AS eligible
+          `,
+          [input.teamId, account.id, input.userName],
+        );
+
+        if (!eligible.rows[0]?.eligible) {
+          throw new ApiConflictError(
+            'This email belongs to an existing PolyCost account outside this team. Invite it to the team first, then provision it with SCIM.',
+          );
+        }
+      }
+
       if (!account) {
         const inserted = await pool.query<AccountProfileRow>(
           `

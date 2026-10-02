@@ -1514,6 +1514,38 @@ describe('BillingService', () => {
     );
   });
 
+  it.each([
+    ['belongs to another team', 'other-team-id'],
+    ['lost its team when the team was deleted', undefined],
+  ])('refuses billing records that %s (audit M-01)', async (_label, teamId) => {
+    const repository = repositoryMock();
+    repository.getBillingImport.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      teamId,
+      provider: 'aws',
+      sourceType: 'aws-cur',
+      status: 'completed',
+      billingPeriodStart: '2026-06-01',
+      billingPeriodEnd: '2026-06-30',
+      originalFileSha256: 'a'.repeat(64),
+      rowsReceived: 1,
+      rowsAccepted: 1,
+      rowsRejected: 0,
+      totalCostUsd: 107,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    });
+    const service = new BillingService(repository as never);
+
+    await expect(
+      service.reconcile(
+        '55555555-5555-4555-8555-555555555555',
+        { comparisonId: '11111111-1111-4111-8111-111111111111' },
+        { ...identity, role: 'owner' },
+      ),
+    ).rejects.toThrow(ApiForbiddenError);
+    expect(repository.listInvoiceLineItems).not.toHaveBeenCalled();
+  });
+
   it('reconciles imported actuals against comparison totals with trace evidence', async () => {
     const repository = repositoryMock();
     repository.getBillingImport.mockResolvedValue({
