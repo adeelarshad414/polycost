@@ -375,6 +375,28 @@ All actions are pinned to a commit SHA, scanner images to a digest, and the
 workflow token is read-only by default. Reviewed scanner exceptions live in
 `.gitleaksignore` and `.trivyignore.yaml`, each with its reason.
 
+### Release pipeline
+
+```mermaid
+flowchart LR
+    T["🏷️ tag vX.Y.Z"] --> V{"tag =<br/>package.json?"}
+    V -->|no| STOP["❌ stop"]
+    V -->|yes| B["📦 build api · web · migrations"]
+    B --> S["🛡️ Trivy image scan<br/><i>fixable HIGH/CRITICAL fail</i>"]
+    S --> P["⬆️ push to GHCR<br/><i>+ SBOM + SLSA provenance</i>"]
+    P --> SIG["✍️ cosign sign (keyless)<br/>+ GitHub attestation"]
+    SIG --> C["⎈ Helm chart pinned<br/>to image digests"]
+    C --> R["🚀 GitHub Release<br/><i>chart + digest table</i>"]
+
+    classDef bad fill:#fce8e6,stroke:#d93025,color:#111
+    classDef good fill:#e6f4ea,stroke:#34a853,color:#111
+    class STOP bad
+    class R good
+```
+
+Pull requests run the build and scan steps only; pushes to `main` publish
+`main` and `sha-<short>` images (signed and attested), without a chart.
+
 ### Local git hooks
 
 ```mermaid

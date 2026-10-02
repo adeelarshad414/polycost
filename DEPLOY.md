@@ -147,15 +147,23 @@ equivalent managed services.
    - Seed production secrets directly into Vault, never Terraform state or ECS task
      environment blocks.
 
-3. Build and push the container image.
+3. Use the released images; don't build them by hand.
+
+   Every `vX.Y.Z` tag publishes `ghcr.io/adeelarshad414/polycost-{api,web,migrations}`.
+   Each one is scanned with Trivy, signed with cosign (keyless, Sigstore), and has an
+   SBOM and SLSA provenance attached. The GitHub Release lists the digests. Deploy
+   by digest, after verifying:
 
    ```bash
-   docker build -t polycost-api:latest .
-   docker tag polycost-api:latest <account-id>.dkr.ecr.<region>.amazonaws.com/polycost-api:latest
-   docker push <account-id>.dkr.ecr.<region>.amazonaws.com/polycost-api:latest
+   IMAGE=ghcr.io/adeelarshad414/polycost-api@sha256:<digest from the release>
+   cosign verify "$IMAGE" \
+     --certificate-identity-regexp '^https://github.com/adeelarshad414/polycost/.github/workflows/release.yml@refs/tags/v' \
+     --certificate-oidc-issuer https://token.actions.githubusercontent.com
+   gh attestation verify "oci://$IMAGE" --owner adeelarshad414
    ```
 
-   Images are scanned before deployment.
+   To mirror into ECR, copy the image by digest (`crane copy` or
+   `docker buildx imagetools create`) so the signature still matches.
 
 4. Define the ECS task.
 

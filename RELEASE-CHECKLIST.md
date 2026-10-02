@@ -104,6 +104,26 @@ Complete this checklist before changing the GitHub repository visibility from pr
   `npm run invoice:evidence:notary:receiver:smoke` passed and the JSONL artifact
   directory is backed by WORM/object-lock storage before claiming immutability.
 
+## Cutting A Release
+
+Releases are built by `.github/workflows/release.yml`, never on a laptop (audit H-13).
+
+1. Bump `version` in `package.json`, `apps/api/package.json` and `apps/web/package.json`
+   (the workflow refuses a tag that doesn't match), and update `CHANGELOG.md`.
+2. Merge to `main`. Every main push already publishes `main` and `sha-<short>` images.
+3. Tag the merge commit: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+4. The workflow then:
+   - builds and Trivy-scans the api, web and migrations images, failing on fixable HIGH/CRITICAL findings;
+   - pushes `X.Y.Z` and `X.Y` tags with an SBOM and SLSA provenance;
+   - signs each image with cosign and adds a GitHub build-provenance attestation;
+   - packages the Helm chart with both images **pinned by digest**, pushes it to
+     `oci://ghcr.io/adeelarshad414/charts`, and signs it;
+   - creates the GitHub Release with the chart and a digest table.
+5. Verify one image with `cosign verify` and `gh attestation verify` (see DEPLOY.md)
+   before promoting it.
+
+Rollback means redeploying the previous release's chart version: its digests are immutable.
+
 ## Verification
 
 - Run `npm ci`.

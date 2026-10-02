@@ -37,7 +37,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: migrate
-          image: "{{ .Values.migrations.image.repository }}:{{ .Values.migrations.image.tag }}"
+          image: {{ include "polycost.image" (dict "image" .Values.migrations.image "root" .) | quote }}
           imagePullPolicy: {{ .Values.migrations.image.pullPolicy }}
           env:
             - name: PGHOST

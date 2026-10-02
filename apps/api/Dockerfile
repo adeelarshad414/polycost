@@ -22,7 +22,13 @@ COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/types/package.json packages/types/package.json
 COPY packages/types packages/types
-RUN npm ci --omit=dev --workspace @polycost/api --include-workspace-root=false
+RUN npm ci --omit=dev --workspace @polycost/api --include-workspace-root=false \
+  # The runtime only runs node. npm, npx and corepack are dead weight here, and
+  # npm's bundled dependencies carry their own CVEs (audit H-13), so drop them
+  # once dependencies are installed. Also pick up Alpine security fixes.
+  && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+     /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+  && apk upgrade --no-cache
 
 COPY --from=build --chown=node:node /app/apps/api/dist apps/api/dist
 COPY --chown=node:node apps/api/otel-register.mjs apps/api/otel-register.mjs
