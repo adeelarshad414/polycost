@@ -295,6 +295,7 @@ import {
   type CumulativeTerm,
 } from './charts';
 import { VerdictHero, VerdictKpis } from './components/results/VerdictHero';
+import { ComparisonAnnouncer } from './components/results/ComparisonAnnouncer';
 import { LandingHero } from './features/landing/LandingHero';
 import {
   Boxes,
@@ -1491,6 +1492,7 @@ export function App({ client = polyCostClient }: AppProps) {
       className={hasComparison ? 'app-shell' : 'app-shell app-shell-minimal'}
       aria-labelledby="page-title"
     >
+      <ComparisonAnnouncer comparison={comparison} />
       <a className="skip-link" href="#requirements">
         Skip to comparison workspace
       </a>
@@ -1756,9 +1758,11 @@ function AppHeader({
 }) {
   return (
     <header className="app-header" aria-label="PolyCost workspace header">
-      <a className="brand-lockup app-brand-link" href="#requirements" aria-label="PolyCost home">
+      {/* UI-7: the accessible name now comes from what is visible (logo alt +
+          tagline), so speech-control users can say the words they see (WCAG 2.5.3). */}
+      <a className="brand-lockup app-brand-link" href="#requirements">
         <span className="brand-logo-shell">
-          <img className="brand-logo-image" src={logoSrcForTheme(resolvedTheme)} alt="" />
+          <img className="brand-logo-image" src={logoSrcForTheme(resolvedTheme)} alt="PolyCost" />
         </span>
         <span className="brand-copy">
           <span className="brand-tagline">Cloud-neutral cost comparison</span>

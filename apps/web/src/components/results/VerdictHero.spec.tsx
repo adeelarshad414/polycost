@@ -43,7 +43,8 @@ describe('VerdictHero', () => {
     expect(
       screen.getByRole('heading', { name: 'Azure is the lowest-cost option for this workload' }),
     ).toBeTruthy();
-    expect(screen.getByText('$122.96')).toBeTruthy();
+    // Animated copy (aria-hidden) plus the final figure for assistive tech.
+    expect(screen.getAllByText('$122.96')).toHaveLength(2);
     expect(screen.getByText('7.5% below AWS')).toBeTruthy();
     expect(screen.getByText('76% below GCP')).toBeTruthy();
     expect(screen.getByText('Includes seed pricing')).toBeTruthy();

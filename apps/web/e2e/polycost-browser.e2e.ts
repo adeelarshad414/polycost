@@ -1,5 +1,6 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import AxeBuilder from '@axe-core/playwright';
 import { expect, Page, test } from '@playwright/test';
 import type {
   ComparisonAnalyticsResponse,
@@ -229,6 +230,84 @@ test('lands on a hero whose calls to action reach the form (UI-6)', async ({ pag
     'aria-selected',
     'true',
   );
+});
+
+test('has no serious or critical axe violations on each view (UI-7)', async ({ page }) => {
+  await mockRegionCatalog(page);
+  await mockComparisonCreation(page, browserComparison());
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme });
+
+    await page.goto('/');
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expectNoSeriousAxeViolations(page, `landing (${colorScheme})`);
+
+    await page.getByRole('button', { name: /compare costs/i }).click();
+    await expect(page.getByRole('heading', { name: /is the lowest-cost option/ })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expectNoSeriousAxeViolations(page, `results (${colorScheme})`);
+
+    await page.goto('/#workspace/overview');
+    await expect(page.getByRole('tablist', { name: 'Workspace sections' })).toBeVisible();
+    await expectNoSeriousAxeViolations(page, `workspace (${colorScheme})`);
+  }
+});
+
+test.describe('visual regression @visual (UI-7)', () => {
+  // Deterministic frames: mocked API, no motion, fonts settled before capture.
+  test.beforeEach(async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    // Registered first so the specific mocks below take precedence (Playwright
+    // matches the most recently added route first). Anything else answers 503,
+    // so no frame depends on a backend that is not there.
+    await page.route('**/api/v1/**', (route) =>
+      route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }),
+    );
+    await mockRegionCatalog(page);
+    await mockComparisonCreation(page, browserComparison());
+  });
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    for (const viewport of [
+      { name: 'desktop', width: 1440, height: 900 },
+      { name: 'mobile', width: 375, height: 812 },
+    ]) {
+      test(`landing ${viewport.name} ${colorScheme}`, async ({ page }) => {
+        await page.setViewportSize(viewport);
+        await page.emulateMedia({ colorScheme });
+        await page.goto('/');
+        await expect(page.getByText('Sample result')).toBeVisible();
+        await page.evaluate(() => document.fonts.ready);
+        await expect(page).toHaveScreenshot(`landing-${viewport.name}-${colorScheme}.png`);
+      });
+
+      test(`results ${viewport.name} ${colorScheme}`, async ({ page }) => {
+        await page.setViewportSize(viewport);
+        await page.emulateMedia({ colorScheme });
+        await page.goto('/');
+        await page.getByRole('button', { name: /compare costs/i }).click();
+        await expect(page.getByRole('heading', { name: /is the lowest-cost option/ })).toBeVisible({
+          timeout: 30_000,
+        });
+        await page.evaluate(() => {
+          window.scrollTo(0, 0);
+          return document.fonts.ready;
+        });
+        await expect(page).toHaveScreenshot(`results-${viewport.name}-${colorScheme}.png`);
+      });
+    }
+  }
+
+  test('workspace overview desktop light', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.goto('/#workspace/overview');
+    await expect(page.getByRole('tablist', { name: 'Workspace sections' })).toBeVisible();
+    await page.evaluate(() => document.fonts.ready);
+    await expect(page).toHaveScreenshot('workspace-overview-desktop-light.png');
+  });
 });
 
 test('surfaces provider pricing warnings in the engineering evidence view', async ({ page }) => {
@@ -553,6 +632,22 @@ async function expectNoClippedContent(page: Page): Promise<void> {
   });
 
   expect(clipped).toEqual([]);
+}
+
+/** WCAG 2.2 A/AA scan; serious and critical findings fail, with their targets listed. */
+async function expectNoSeriousAxeViolations(page: Page, label: string): Promise<void> {
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+    .analyze();
+  const blocking = results.violations
+    .filter((violation) => violation.impact === 'serious' || violation.impact === 'critical')
+    .map((violation) => ({
+      rule: violation.id,
+      impact: violation.impact,
+      targets: violation.nodes.slice(0, 5).map((node) => node.target.join(' ')),
+    }));
+
+  expect(blocking, `axe violations on ${label}`).toEqual([]);
 }
 
 async function expectInteractiveControlsAreNamed(page: Page, label: string): Promise<void> {

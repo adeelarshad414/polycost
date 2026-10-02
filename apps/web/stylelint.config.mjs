@@ -34,6 +34,8 @@ export default {
           'inset',
           'normal',
           'bold',
+          // CSS system colours, used only inside @media (forced-colors: active).
+          '/^(Canvas|CanvasText|Highlight|HighlightText|ButtonFace|ButtonText|LinkText|GrayText)$/',
           // Values composed from a token (e.g. a 4px ring of var(--focus-ring)) are fine;
           // what the rule catches is a bare literal colour, size or radius.
           '/var\\(--/',

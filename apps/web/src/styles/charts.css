@@ -667,3 +667,38 @@
 .div-over-3 {
   --div: var(--div-over-3);
 }
+
+/*
+  Forced colours (Windows high contrast, UI-7). The browser drops background
+  colours, so every bar would vanish. Marks get a system-colour fill and border,
+  and category segments alternate a hatch so neighbours stay distinguishable;
+  values are already printed beside every mark, so identity never needs hue.
+*/
+@media (forced-colors: active) {
+  .comparison-bar-fill,
+  .stacked-segment,
+  .variance-bar,
+  .heatmap-cell {
+    border: 1px solid CanvasText;
+    forced-color-adjust: none;
+    background: Canvas;
+  }
+
+  .comparison-bar-row.is-lowest .comparison-bar-fill,
+  .variance-bar {
+    background: Highlight;
+  }
+
+  .stacked-segment:nth-child(even) {
+    background: repeating-linear-gradient(45deg, CanvasText 0 2px, Canvas 2px 6px);
+  }
+
+  .chart-line,
+  .sparkline path {
+    stroke: CanvasText;
+  }
+
+  .chart-swatch {
+    border: 1px solid CanvasText;
+  }
+}

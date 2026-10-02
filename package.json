@@ -155,10 +155,12 @@
     "load:test": "node scripts/load-test.mjs",
     "openapi:generate": "node scripts/openapi-generate.mjs",
     "openapi:check": "node scripts/openapi-check.mjs",
-    "helm:lint": "helm lint deploy/helm/polycost && helm template polycost deploy/helm/polycost > /dev/null"
+    "helm:lint": "helm lint deploy/helm/polycost && helm template polycost deploy/helm/polycost > /dev/null",
+    "lighthouse:ci": "lhci autorun --config=./lighthouserc.cjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.63.0",
     "@sentropic/graphify": "^0.18.0",
     "@types/jest": "^30.0.0",

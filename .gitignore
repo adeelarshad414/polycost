@@ -28,3 +28,6 @@ artifacts/invoice-evidence-notary-reference-receiver/
 # Restore-drill working directory (backups are not committed)
 .restore-drill/
 backups/
+
+# Lighthouse CI output
+.lighthouseci/

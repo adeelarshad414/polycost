@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useCountUp } from '../../hooks/useCountUp';
 import { formatCurrency, formatPercent } from '../../lib/format';
 import type { ComparisonResult, DataHealthResponse, ProviderId } from '../../types';
 import { Badge, KpiTile, ProvenancePill } from '../ui';
@@ -74,7 +75,7 @@ export function VerdictHero({
           {providerName(lowest.providerId)} is the lowest-cost option for this workload
         </h2>
         <p className="verdict-price">
-          <strong>{formatCurrency(lowest.monthly)}</strong>
+          <AnimatedPrice value={lowest.monthly} />
           <span> / month</span>
         </p>
         <ul className="verdict-deltas" aria-label="Difference to the other providers">
@@ -181,4 +182,15 @@ function ageText(hours: number): string {
 
 function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+/** The verdict price counts up once; assistive tech reads only the final figure. */
+function AnimatedPrice({ value }: { value: number }) {
+  const shown = useCountUp(value);
+  return (
+    <strong>
+      <span aria-hidden="true">{formatCurrency(shown)}</span>
+      <span className="sr-only">{formatCurrency(value)}</span>
+    </strong>
+  );
 }
