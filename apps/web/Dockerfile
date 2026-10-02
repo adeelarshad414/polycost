@@ -14,9 +14,12 @@ COPY packages/types packages/types
 COPY apps/web apps/web
 WORKDIR /app/apps/web
 RUN npm run build
+# CSP and other security headers, hashed from the built index.html (H-05).
+RUN node scripts/write-security-headers.mjs dist/index.html /app/security-headers.conf
 
 FROM nginx:1.27-alpine
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html
 
 # Run the whole container as the unprivileged `nginx` user, master included.
