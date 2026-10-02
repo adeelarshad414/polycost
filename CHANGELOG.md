@@ -26,6 +26,11 @@ once tagged releases begin.
 
 ### Added
 
+- Release pipeline (H-13): api, web and migrations images on GHCR, Trivy-scanned,
+  with SBOM and SLSA provenance, cosign keyless signatures and GitHub
+  attestations; tagged releases publish a Helm chart pinned to image digests.
+  The chart defaults to the GHCR images and the chart `appVersion`, never `latest`.
+- actionlint and shellcheck for every workflow, in the `security` CI job.
 - `pricing_rate_fallbacks_total`, `pricing_etl_prunes_total` and
   `pricing_etl_pruned_rows_total` metrics.
 - Branch protection on `main` requiring `quality`, `visual`, `security` and

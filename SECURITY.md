@@ -68,6 +68,16 @@ Every pull request must pass four required checks before it can merge into
 - Every GitHub Action is pinned to a commit SHA and the workflow token is
   read-only unless a job asks for more.
 
+## Supply Chain
+
+- Images are built only in CI (`.github/workflows/release.yml`) and scanned with
+  Trivy before they are pushed.
+- Every published image carries an SPDX SBOM and SLSA provenance (BuildKit
+  attestations), a keyless cosign signature, and a GitHub build-provenance
+  attestation. Verify with `cosign verify` and `gh attestation verify` (DEPLOY.md).
+- Release charts pin images by digest. There is no `latest` tag.
+- Workflows are linted with actionlint and shellcheck on every PR.
+
 ## Runtime Protections
 
 - **Web:** nginx serves a strict Content-Security-Policy (no `'unsafe-inline'`;

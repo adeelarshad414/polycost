@@ -38,6 +38,20 @@ file was edited. Disable it with `migrations.enabled: false` only if migrations 
 run another way. See [database/README.md](../../../database/README.md). A `pg_dump` alone is **not** a restorable
 backup of this system — see the Backup And Restore section of the runbook.
 
+## Images and releases
+
+Tagged releases publish this chart to `oci://ghcr.io/adeelarshad414/charts/polycost`
+with `image.digest` and `migrations.image.digest` already pinned to the signed
+images (see RELEASE-CHECKLIST.md):
+
+```bash
+helm install polycost oci://ghcr.io/adeelarshad414/charts/polycost --version X.Y.Z -f my-values.yaml
+```
+
+From a checkout, an empty `tag` means the chart's `appVersion`, and a `digest` wins
+over a tag. `latest` is never used. Verify an image before deploying it
+(DEPLOY.md, step 3).
+
 ## Probes
 
 | Probe     | Path            | Why                                                                                                                                                                             |

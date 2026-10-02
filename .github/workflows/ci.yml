@@ -106,6 +106,10 @@ jobs:
           docker run --rm -v "$PWD":/repo -w /repo
           aquasec/trivy:0.71.0@sha256:016eae51fdcf989332a5404af7e8f625cd5d95d7c0907a221d080a996f556500
           fs --scanners vuln,secret --severity HIGH,CRITICAL --exit-code 1 --quiet .
+      - name: Workflow lint (actionlint + shellcheck)
+        run: >-
+          docker run --rm -v "$PWD":/repo -w /repo
+          rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
       - name: IaC misconfiguration scan (Dockerfiles, Helm)
         run: >-
           docker run --rm -v "$PWD":/repo -w /repo
@@ -133,7 +137,8 @@ jobs:
         run: npm run test:visual --workspace @polycost/web
       - name: Lighthouse budgets
         run: |
-          export CHROME_PATH="$(node -e "console.log(require('playwright-core').chromium.executablePath())")"
+          CHROME_PATH="$(node -e "console.log(require('playwright-core').chromium.executablePath())")"
+          export CHROME_PATH
           npm run lighthouse:ci
       - name: Upload visual diffs and Lighthouse reports
         if: failure()

@@ -33,7 +33,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: api
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: {{ include "polycost.image" (dict "image" .Values.image "root" .) | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http

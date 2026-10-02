@@ -18,3 +18,18 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 app.kubernetes.io/name: {{ include "polycost.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
+
+{{/*
+Image reference (audit H-13). A digest wins over a tag, so a release pins the
+exact bytes that were scanned, signed and attested; a tag (default: the chart's
+appVersion) is the fallback. `latest` is never implied.
+Usage: include "polycost.image" (dict "image" .Values.image "root" .)
+*/}}
+{{- define "polycost.image" -}}
+{{- $image := .image -}}
+{{- if $image.digest -}}
+{{- printf "%s@%s" $image.repository $image.digest -}}
+{{- else -}}
+{{- printf "%s:%s" $image.repository (default .root.Chart.AppVersion $image.tag) -}}
+{{- end -}}
+{{- end -}}

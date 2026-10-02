@@ -8,18 +8,24 @@
 
 replicaCount: 2
 
+# Images are published by .github/workflows/release.yml: scanned, signed with
+# cosign (keyless), with an SBOM and SLSA provenance attached. A packaged
+# release chart sets `digest`, which wins over `tag`; an empty tag means the
+# chart's appVersion. Verify before deploying (see DEPLOY.md).
 image:
-  repository: polycost-api
-  tag: latest
+  repository: ghcr.io/adeelarshad414/polycost-api
+  tag: ''
+  digest: ''
   pullPolicy: IfNotPresent
 
 # Pre-install / pre-upgrade migration Job (templates/migrations-job.yaml).
 migrations:
   enabled: true
   image:
-    # Built from database/Dockerfile.
-    repository: polycost-migrations
-    tag: latest
+    # Built from database/Dockerfile and released alongside the API image.
+    repository: ghcr.io/adeelarshad414/polycost-migrations
+    tag: ''
+    digest: ''
     pullPolicy: IfNotPresent
   # The migrator is idempotent and lock-protected, so one retry is safe.
   backoffLimit: 1
