@@ -20,6 +20,14 @@ UPDATE share_links
 SET token = encode(sha256(convert_to(token, 'UTF8')), 'hex')
 WHERE token !~ '^[0-9a-f]{64}$';
 
+-- New links are capped at 90 days by the API. Apply the same cap to links that
+-- already exist, which also bounds how long the legacy unsalted password
+-- hashes they carry can still be checked. Re-running only ever shortens.
+UPDATE share_links
+SET expires_at = LEAST(expires_at, now() + interval '90 days')
+WHERE revoked_at IS NULL
+  AND expires_at > now() + interval '90 days';
+
 COMMENT ON COLUMN share_links.token IS
     'sha256 hex of the share token. The raw token is never stored.';
 

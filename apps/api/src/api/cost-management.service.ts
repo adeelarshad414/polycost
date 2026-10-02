@@ -187,7 +187,11 @@ export function hashShareToken(token: string): string {
   return createHash('sha256').update(token, 'utf8').digest('hex');
 }
 
-/** The pre-M-02 format: unsalted sha256 hex. Still verified, never written. */
+/**
+ * The pre-M-02 format: unsalted sha256 hex. Verify-only, never written, and
+ * time-bounded: migration 043 capped every existing link at 90 days, so no
+ * link carrying one of these hashes outlives that window.
+ */
 function legacySharePasswordHash(password: string): string {
   return createHash('sha256').update(password, 'utf8').digest('hex');
 }
@@ -198,12 +202,14 @@ function toShareLinkEvent(
   viewedAt: Date,
 ): ShareLinkEventInput {
   const countryCode = context.countryCode?.trim().toUpperCase();
-  const section =
-    context.section
-      ?.trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]+/g, '-') ?? 'summary';
-  const normalizedSection = section.replace(/^-+|-+$/g, '').slice(0, 64) || 'summary';
+  // The section is caller-supplied (now a POST body field, so it can be
+  // megabytes). Bound it before any regex, and trim dashes without a
+  // backtracking pattern: `/-+$/` is polynomial on a long run of '-'.
+  const section = (context.section ?? 'summary')
+    .slice(0, 256)
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-');
+  const normalizedSection = trimDashes(section).slice(0, 64) || 'summary';
 
   return {
     token,
@@ -214,6 +220,14 @@ function toShareLinkEvent(
       : {}),
     viewedAt: viewedAt.toISOString(),
   };
+}
+
+function trimDashes(value: string): string {
+  let start = 0;
+  let end = value.length;
+  while (start < end && value[start] === '-') start += 1;
+  while (end > start && value[end - 1] === '-') end -= 1;
+  return value.slice(start, end);
 }
 
 async function passwordMatches(

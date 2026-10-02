@@ -181,6 +181,22 @@ describe('CostManagementService', () => {
     );
   });
 
+  // CodeQL js/polynomial-redos: the section comes from a request body.
+  it('normalises a hostile section name in linear time', async () => {
+    const repository = repositoryMock();
+    const service = new CostManagementService(repository as never);
+    const started = performance.now();
+
+    await service.getSharedReport(shareLink.token, undefined, {
+      section: `${'-'.repeat(200_000)}x${'-'.repeat(200_000)}`,
+    });
+
+    expect(performance.now() - started).toBeLessThan(500);
+    expect(repository.recordShareLinkEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ section: 'summary' }),
+    );
+  });
+
   it('returns aggregate share-link analytics by token', async () => {
     const service = new CostManagementService(repositoryMock() as never);
 
