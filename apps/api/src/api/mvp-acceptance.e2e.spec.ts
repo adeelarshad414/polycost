@@ -216,11 +216,22 @@ describe('MVP acceptance criteria E2E', () => {
     expect(share.token).toEqual(expect.any(String));
     expect(share.url).toContain(share.token);
 
+    // M-02: a password in the query string is refused; it goes in a POST body.
+    const queryPassword = await requestRaw(
+      `/share/${encodeURIComponent(share.token)}?password=${encodeURIComponent(password)}`,
+    );
+    expect(queryPassword.status).toBe(400);
+    const wrongPassword = await requestRaw(`/share/${encodeURIComponent(share.token)}`, {
+      method: 'POST',
+      body: JSON.stringify({ password: 'not-the-password' }),
+    });
+    expect(wrongPassword.status).toBe(401);
+
     const report = await requestJson<SharedReportResponse>(
-      `/share/${encodeURIComponent(share.token)}?password=${encodeURIComponent(
-        password,
-      )}&section=summary`,
+      `/share/${encodeURIComponent(share.token)}`,
       {
+        method: 'POST',
+        body: JSON.stringify({ password, section: 'summary' }),
         headers: {
           'user-agent': 'polycost-e2e',
           'cf-ipcountry': 'US',
@@ -255,9 +266,10 @@ describe('MVP acceptance criteria E2E', () => {
     await requestJson<ShareLinkResponse>(`/share-links/${encodeURIComponent(share.token)}/revoke`, {
       method: 'POST',
     });
-    const revoked = await requestRaw(
-      `/share/${encodeURIComponent(share.token)}?password=${encodeURIComponent(password)}`,
-    );
+    const revoked = await requestRaw(`/share/${encodeURIComponent(share.token)}`, {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    });
     expect(revoked.status).toBe(404);
   });
 

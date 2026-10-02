@@ -48,6 +48,7 @@ const expectedMigrations = [
   '040_team_scim_provisioning.sql',
   '041_pricing_catalog_live_indexes.sql',
   '042_utc_timestamptz.sql',
+  '043_share_link_token_hash.sql',
 ];
 
 if (!['migrate', 'seed', 'reset', 'validate'].includes(command)) {

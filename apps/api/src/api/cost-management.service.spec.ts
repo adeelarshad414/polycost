@@ -1,7 +1,8 @@
 import { describe, it, expect, jest } from '@jest/globals';
 import { createHash } from 'node:crypto';
 import { ApiNotFoundError, ApiUnauthorizedError } from './api-errors.js';
-import { CostManagementService } from './cost-management.service.js';
+import { CostManagementService, hashShareToken } from './cost-management.service.js';
+import { hashPassword } from './password-hash.js';
 import {
   ShareLinkAnalyticsResponse,
   ShareLinkRecord,
@@ -83,13 +84,15 @@ describe('CostManagementService', () => {
       url: `/api/v1/share/${shareLink.token}`,
     });
     expect(repository.getWorkload).toHaveBeenCalledWith(workload.id);
+    // M-02: the raw token is returned once and only its hash is stored; the
+    // password gets a salted scrypt hash.
     expect(repository.createShareLink).toHaveBeenCalledWith({
-      token: shareLink.token,
+      token: hashShareToken(shareLink.token),
       workloadId: workload.id,
       watermark: true,
       pricingModel: 'reserved-3yr',
       granularity: 'yearly',
-      passwordHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      passwordHash: expect.stringMatching(/^scrypt:v1:/),
       expiresAt: '2026-07-30T00:00:00.000Z',
     });
   });
@@ -126,6 +129,7 @@ describe('CostManagementService', () => {
     });
   });
 
+  // Links created before M-02 keep their unsalted sha256 password hash.
   it('enforces password-protected shared reports and revokes active tokens', async () => {
     const protectedShareLink: ShareLinkRecord = {
       ...shareLink,
@@ -153,7 +157,44 @@ describe('CostManagementService', () => {
       token: shareLink.token,
       url: `/api/v1/share/${shareLink.token}`,
     });
-    expect(repository.revokeShareLink).toHaveBeenCalledWith(shareLink.token, expect.any(String));
+    expect(repository.getActiveShareLink).toHaveBeenCalledWith(hashShareToken(shareLink.token));
+    expect(repository.revokeShareLink).toHaveBeenCalledWith(
+      hashShareToken(shareLink.token),
+      expect.any(String),
+    );
+  });
+
+  it('accepts the scrypt hashes new links are created with', async () => {
+    const repository = repositoryMock({
+      getActiveShareLink: jest.fn<ApiDatabaseRepository['getActiveShareLink']>(async () => ({
+        ...shareLink,
+        passwordHash: await hashPassword('client-demo'),
+      })),
+    });
+    const service = new CostManagementService(repository as never);
+
+    await expect(service.getSharedReport(shareLink.token, 'wrong')).rejects.toThrow(
+      ApiUnauthorizedError,
+    );
+    await expect(service.getSharedReport(shareLink.token, 'client-demo')).resolves.toEqual(
+      expect.objectContaining({ token: shareLink.token, passwordProtected: true }),
+    );
+  });
+
+  // CodeQL js/polynomial-redos: the section comes from a request body.
+  it('normalises a hostile section name in linear time', async () => {
+    const repository = repositoryMock();
+    const service = new CostManagementService(repository as never);
+    const started = performance.now();
+
+    await service.getSharedReport(shareLink.token, undefined, {
+      section: `${'-'.repeat(200_000)}x${'-'.repeat(200_000)}`,
+    });
+
+    expect(performance.now() - started).toBeLessThan(500);
+    expect(repository.recordShareLinkEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ section: 'summary' }),
+    );
   });
 
   it('returns aggregate share-link analytics by token', async () => {

@@ -2238,11 +2238,10 @@ describe('api client', () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
-      'http://api.test/api/v1/share/public-token?password=client-demo',
+      'http://api.test/api/v1/share/public-token',
       expect.objectContaining({
-        headers: expect.objectContaining({
-          'Content-Type': 'application/json',
-        }),
+        method: 'POST',
+        body: JSON.stringify({ password: 'client-demo' }),
       }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(

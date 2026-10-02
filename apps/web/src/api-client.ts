@@ -724,11 +724,15 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
       );
     },
     getSharedReport(token, password) {
-      const query = password ? `?password=${encodeURIComponent(password)}` : '';
-      return requestJson<SharedReportResponse>(
-        baseUrl,
-        `/share/${encodeURIComponent(token)}${query}`,
-      );
+      const path = `/share/${encodeURIComponent(token)}`;
+      // The API refuses a password in the query string (it would land in access
+      // logs and browser history), so a protected link is opened with a POST.
+      return password
+        ? requestJson<SharedReportResponse>(baseUrl, path, {
+            method: 'POST',
+            body: JSON.stringify({ password }),
+          })
+        : requestJson<SharedReportResponse>(baseUrl, path);
     },
     createBudget(input) {
       return requestJson<BudgetRecord>(baseUrl, '/budgets', {

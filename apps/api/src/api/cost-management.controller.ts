@@ -304,6 +304,39 @@ export class SharedReportsController {
     @Req() request: RequestLike,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
+    // Audit M-02: a password in the URL ends up in access logs, proxy logs and
+    // browser history. Refuse it rather than quietly accept it.
+    if (password !== undefined) {
+      throw new ApiValidationError('Send the share-link password in a POST body', [
+        { field: 'password', issue: 'must not be sent in the query string' },
+      ]);
+    }
+
+    return this.open(token, undefined, optionalSingleString(section), request, response);
+  }
+
+  /** Opens a password-protected link: `{ "password": "...", "section": "..." }`. */
+  @Post(':token')
+  async unlock(
+    @Param('token') token: string,
+    @Body() body: unknown,
+    @Req() request: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    const record = requireRecord(body, 'Shared-report request body must be an object');
+    const password = typeof record.password === 'string' ? record.password : undefined;
+    const section = typeof record.section === 'string' ? record.section : undefined;
+
+    return this.open(token, password, section, request, response);
+  }
+
+  private async open(
+    token: string,
+    password: string | undefined,
+    section: string | undefined,
+    request: RequestLike,
+    response?: RateLimitHeaderResponse,
+  ) {
     await consumePublicRateLimit(
       this.apiRateLimitService,
       this.configService,
@@ -313,9 +346,9 @@ export class SharedReportsController {
       'RATE_LIMIT_SHARE_LINK_PER_MINUTE',
     );
 
-    return this.costManagementService.getSharedReport(token, optionalSingleString(password), {
+    return this.costManagementService.getSharedReport(token, password, {
       countryCode: countryCodeFromHeaders(request.headers ?? {}),
-      section: optionalSingleString(section) ?? 'summary',
+      section: section ?? 'summary',
       userAgent: optionalSingleString(request.headers?.['user-agent']),
     });
   }
@@ -417,13 +450,23 @@ function parseBudgetInput(body: unknown): BudgetInput {
   };
 }
 
+/** Audit M-02: a share link is a bearer credential, so it must expire. */
+export const SHARE_LINK_MAX_EXPIRY_DAYS = 90;
+
 function parseShareLinkInput(body: unknown): ShareLinkInput {
   const record = requireRecord(body, 'Share-link request body must be an object');
+  const expiresInDays = parsePositiveNumber(record.expiresInDays, 'expiresInDays', true);
+
+  if (expiresInDays > SHARE_LINK_MAX_EXPIRY_DAYS) {
+    throw new ApiValidationError(`expiresInDays must be at most ${SHARE_LINK_MAX_EXPIRY_DAYS}`, [
+      { field: 'expiresInDays', issue: `must be at most ${SHARE_LINK_MAX_EXPIRY_DAYS}` },
+    ]);
+  }
 
   return {
     workloadId: parseUuid(record.workloadId, 'workloadId'),
     watermark: typeof record.watermark === 'boolean' ? record.watermark : true,
-    expiresInDays: parsePositiveNumber(record.expiresInDays, 'expiresInDays', true),
+    expiresInDays,
     pricingModel: parseSharePricingModel(record.pricingModel ?? 'on-demand'),
     granularity: parseShareGranularity(record.granularity ?? 'monthly'),
     ...(typeof record.password === 'string' && record.password.trim()
