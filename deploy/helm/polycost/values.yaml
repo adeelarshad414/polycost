@@ -61,11 +61,22 @@ podDisruptionBudget:
 # /metrics is unauthenticated by design - scrapers carry no session token. It is
 # aggregate data with no tenant content, but it does describe traffic volume,
 # auth failure rates and ETL throughput, so it must not be publicly reachable.
+# NetworkPolicy is port-level, so /metrics cannot be singled out by path: the
+# pod accepts traffic only from the ingress controller, the monitoring namespace
+# and extraIngressFrom. The ingress must also deny /metrics (see README).
 networkPolicy:
   enabled: true
+  # Namespace of the ingress controller that fronts the API.
+  ingressNamespaceSelector:
+    kubernetes.io/metadata.name: ingress-nginx
   # Namespaces allowed to scrape /metrics.
   monitoringNamespaceSelector:
     kubernetes.io/metadata.name: monitoring
+  # Additional NetworkPolicyPeer entries, e.g. the web tier when it proxies /api:
+  #   - podSelector:
+  #       matchLabels:
+  #         app.kubernetes.io/name: polycost-web
+  extraIngressFrom: []
 
 config:
   nodeEnv: production

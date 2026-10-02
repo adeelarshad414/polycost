@@ -158,6 +158,23 @@ describe('AuthService', () => {
     );
   });
 
+  // H-03: a different message for locked or unknown accounts told a caller
+  // which emails were registered.
+  it.each([
+    ['an unknown email', undefined],
+    ['a locked account', { ...account, lockedUntil: new Date(Date.now() + 60_000).toISOString() }],
+    ['a disabled account', { ...account, status: 'disabled' }],
+  ])('rejects %s with the same message as a wrong password', async (_label, found) => {
+    const repository = repositoryMock();
+    repository.findLocalAccountByEmail.mockResolvedValue(found as never);
+    const service = new AuthService(repository as never, configService());
+
+    await expect(
+      service.login({ email: 'architect@example.com', password: 'any-password' }),
+    ).rejects.toThrow('Invalid email or password');
+    expect(repository.recordFailedLogin).not.toHaveBeenCalled();
+  });
+
   it('hydrates the current session and account teams from bearer auth', async () => {
     const repository = repositoryMock();
     repository.resolveSession.mockResolvedValue(identity);
@@ -412,7 +429,7 @@ describe('AuthService', () => {
     const repository = repositoryMock();
     repository.findLocalAccountByEmail.mockResolvedValue({
       ...account,
-      passwordHash: hashPassword('correct horse battery staple'),
+      passwordHash: await hashPassword('correct horse battery staple'),
     });
     repository.updateAccountProfile.mockResolvedValue({
       id: account.accountId,
@@ -5231,7 +5248,7 @@ describe('AuthService metrics', () => {
     // plaintext, so derive one here rather than hardcoding a second digest.
     repository.findLocalAccountByEmail.mockResolvedValue({
       ...account,
-      passwordHash: hashPassword('correct horse battery staple'),
+      passwordHash: await hashPassword('correct horse battery staple'),
     });
     repository.createSession.mockResolvedValue({
       sessionId: identity.sessionId,

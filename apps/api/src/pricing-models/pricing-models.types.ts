@@ -48,7 +48,8 @@ export interface PricingRateRecord {
   isEstimate: boolean;
   estimateRangeLowUsd?: number;
   estimateRangeHighUsd?: number;
-  sourceFetchedAt: string;
+  /** null for modeled estimates: nothing was fetched, so there is no fetch time. */
+  sourceFetchedAt: string | null;
   validFrom: string;
   source: PricingRateSource;
   sourceEndpoint?: string;
@@ -92,7 +93,7 @@ export interface RateResult {
   isEstimate: boolean;
   estimateRangeLowUsd?: number;
   estimateRangeHighUsd?: number;
-  lastFetchedAt: string;
+  lastFetchedAt: string | null;
   validFrom: string;
   source: PricingRateSource;
   sourceEndpoint?: string;

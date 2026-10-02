@@ -1,8 +1,12 @@
-import { Inject, Injectable, OnModuleDestroy, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
 import { ProviderId } from '../adapters/common/cloud-provider-adapter.js';
 import { AppConfig } from '../config/config.schema.js';
+import {
+  DomainMetricsService,
+  PricingFallbackReason,
+} from '../observability/domain-metrics.service.js';
 import { SecretsService } from '../secrets/secrets.service.js';
 import type { SecretsReader } from '../secrets/secrets.service.js';
 import {
@@ -93,6 +97,7 @@ const PROVIDER_BASELINE_HOURLY_RATE_USD: Record<ProviderId, number> = {
 
 @Injectable()
 export class PostgresPricingRatesRepository implements PricingRateReader, OnModuleDestroy {
+  private readonly logger = new Logger(PostgresPricingRatesRepository.name);
   private pool?: PgPoolLike;
 
   constructor(
@@ -102,15 +107,47 @@ export class PostgresPricingRatesRepository implements PricingRateReader, OnModu
     @Optional()
     @Inject(PRICING_RATES_POOL_FACTORY)
     private readonly poolFactory: PgPoolFactory = defaultPgPoolFactory,
+    @Optional()
+    private readonly domainMetrics?: DomainMetricsService,
   ) {}
 
   async findCurrentRate(query: PricingRateQuery): Promise<PricingRateRecord | undefined> {
+    let row: PricingRateSqlRow | undefined;
     try {
-      const row = await this.findCurrentRateRow(query);
-      return row ? toPricingRateRecord(row) : fallbackPricingRate(query, 'not_cached');
-    } catch {
-      return fallbackPricingRate(query, 'schema_or_connection_unavailable');
+      row = await this.findCurrentRateRow(query);
+    } catch (error) {
+      // Still answer with a labelled estimate, but never silently: a database
+      // outage used to look exactly like a healthy catalog lookup.
+      return this.fallback(query, 'schema_or_connection_unavailable', error);
     }
+    return row ? toPricingRateRecord(row) : this.fallback(query, 'not_cached');
+  }
+
+  private fallback(
+    query: PricingRateQuery,
+    reason: PricingFallbackReason,
+    error?: unknown,
+  ): PricingRateRecord {
+    this.domainMetrics?.recordPricingFallback(query.provider, reason);
+    const fields = {
+      event: 'pricing_rate_fallback',
+      reason,
+      provider: query.provider,
+      service: query.service,
+      region: query.region,
+      termCode: query.termCode,
+    };
+    if (error) {
+      this.logger.error({
+        ...fields,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    } else {
+      // A cache miss is routine (seed catalogs are sparse); the metric is the
+      // signal to alert on, so keep per-lookup logs out of the default level.
+      this.logger.debug(fields);
+    }
+    return fallbackPricingRate(query, reason);
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -227,7 +264,7 @@ function toPricingRateRecord(row: PricingRateSqlRow): PricingRateRecord {
 
 function fallbackPricingRate(
   query: PricingRateQuery,
-  reasonCode: 'not_cached' | 'schema_or_connection_unavailable',
+  reasonCode: PricingFallbackReason,
 ): PricingRateRecord {
   const serviceFamily = serviceFamilyFromSlug(query.service);
   const hourlyRateUsd = roundRate(
@@ -255,7 +292,9 @@ function fallbackPricingRate(
           estimateRangeHighUsd: roundRate(hourlyRateUsd * 1.2),
         }
       : {}),
-    sourceFetchedAt: now,
+    // Nothing was fetched, so there is no fetch time to report. Stamping `now`
+    // made a modeled estimate look like a freshly fetched price.
+    sourceFetchedAt: null,
     validFrom: now,
     source: 'modeled-estimate',
     unavailableReason:

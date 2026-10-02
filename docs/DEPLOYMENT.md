@@ -237,15 +237,18 @@ Minimum production backup policy:
 - retained Vault recovery material according to the operator security policy
 - versioned app images and migration scripts for rollback
 
-Restore rehearsal:
+Back up and rehearse a restore with the project scripts, not a bare `pg_dump`. The
+application roles are cluster-level, so a database-only dump cannot be restored into a
+new cluster:
 
 ```bash
-docker compose exec -T postgres pg_dump -U polycost polycost_dev > polycost-backup.sql
-docker compose exec -T postgres psql -U polycost polycost_dev < polycost-backup.sql
+npm run db:backup          # <stamp>.dump plus <stamp>.globals.sql (roles)
+npm run db:restore-drill   # restores into a brand-new cluster and compares fingerprints
 ```
 
-Adjust database names and credentials for production. Never treat a backup as valid
-until a restore has been tested.
+The restore order and verification steps are in
+[Backup And Restore](RUNBOOK.md#backup-and-restore). Never treat a backup as valid until
+a restore has been tested.
 
 ## Rollback
 

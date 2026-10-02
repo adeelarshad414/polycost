@@ -22,6 +22,7 @@ export type AuthOutcome = 'success' | 'invalid_credentials' | 'locked';
 export type ExportOutcome = 'success' | 'failure';
 export type CircuitState = 'closed' | 'open' | 'half_open';
 export type DbQueryOutcome = 'success' | 'failure';
+export type PricingFallbackReason = 'not_cached' | 'schema_or_connection_unavailable';
 
 /** Counts BullMQ reports per state; keys are the states we choose to publish. */
 export interface QueueDepthCounts {
@@ -51,6 +52,7 @@ export class DomainMetricsService {
   private readonly etlLastSuccess: Gauge<'provider'>;
   private readonly vaultReads: Counter<'outcome'>;
   private readonly authAttempts: Counter<'outcome'>;
+  private readonly pricingFallbacks: Counter<'provider' | 'reason'>;
   private readonly authLockouts: Counter<string>;
   private readonly exports: Counter<'format' | 'outcome'>;
   private readonly exportDuration: Histogram<'format'>;
@@ -110,6 +112,13 @@ export class DomainMetricsService {
       name: 'auth_attempts_total',
       help: 'Authentication attempts by outcome.',
       labelNames: ['outcome'],
+      registers,
+    });
+
+    this.pricingFallbacks = new Counter({
+      name: 'pricing_rate_fallbacks_total',
+      help: 'Rate lookups answered with a modeled estimate instead of a catalog row, by provider and reason.',
+      labelNames: ['provider', 'reason'],
       registers,
     });
 
@@ -328,6 +337,10 @@ export class DomainMetricsService {
 
   recordAuthAttempt(outcome: AuthOutcome): void {
     this.authAttempts.inc({ outcome });
+  }
+
+  recordPricingFallback(provider: string, reason: PricingFallbackReason): void {
+    this.pricingFallbacks.inc({ provider, reason });
   }
 
   recordAuthLockout(): void {

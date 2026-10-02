@@ -1,4 +1,20 @@
-import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { randomBytes, scrypt, timingSafeEqual, type ScryptOptions } from 'node:crypto';
+
+// scrypt is deliberately expensive (~50 ms here). The sync variant blocked the
+// event loop for every request in flight during a login, so a burst of logins
+// stalled the whole API. The async variant runs on the libuv thread pool.
+function scryptAsync(
+  password: string,
+  salt: Buffer,
+  keyLength: number,
+  options: ScryptOptions,
+): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    scrypt(password, salt, keyLength, options, (error, derived) =>
+      error ? reject(error) : resolve(derived),
+    );
+  });
+}
 
 const SCRYPT_N = 16_384;
 const SCRYPT_R = 8;
@@ -6,9 +22,9 @@ const SCRYPT_P = 1;
 const KEY_LENGTH_BYTES = 64;
 const HASH_PREFIX = 'scrypt:v1';
 
-export function hashPassword(password: string): string {
+export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16);
-  const derived = scryptSync(password, salt, KEY_LENGTH_BYTES, {
+  const derived = await scryptAsync(password, salt, KEY_LENGTH_BYTES, {
     N: SCRYPT_N,
     r: SCRYPT_R,
     p: SCRYPT_P,
@@ -24,7 +40,7 @@ export function hashPassword(password: string): string {
   ].join(':');
 }
 
-export function verifyPassword(password: string, storedHash: string): boolean {
+export async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
   const parts = storedHash.split(':');
 
   if (parts.length !== 7 || `${parts[0]}:${parts[1]}` !== HASH_PREFIX) {
@@ -47,7 +63,20 @@ export function verifyPassword(password: string, storedHash: string): boolean {
     return false;
   }
 
-  const derived = scryptSync(password, salt, expected.length, { N: n, r, p });
+  const derived = await scryptAsync(password, salt, expected.length, { N: n, r, p });
 
   return derived.length === expected.length && timingSafeEqual(derived, expected);
+}
+
+/**
+ * A real hash of a random password, computed once. Login verifies against it
+ * when the account does not exist or cannot sign in, so those paths cost the
+ * same scrypt work as a wrong password and response time does not reveal which
+ * emails are registered.
+ */
+let dummyHash: Promise<string> | undefined;
+
+export async function burnPasswordCheck(password: string): Promise<void> {
+  dummyHash ??= hashPassword(randomBytes(32).toString('base64url'));
+  await verifyPassword(password, await dummyHash);
 }

@@ -30,7 +30,7 @@ import {
   TeamRole,
 } from './auth.types.js';
 import { InvitationDeliveryService } from './invitation-delivery.service.js';
-import { hashPassword, verifyPassword } from './password-hash.js';
+import { burnPasswordCheck, hashPassword, verifyPassword } from './password-hash.js';
 
 interface AuthRequestMetadata {
   ip?: string;
@@ -92,7 +92,7 @@ export class AuthService {
       email: input.email,
       ...(input.displayName ? { displayName: input.displayName } : {}),
       externalSubjectHash: sha256(`local:${input.email}`),
-      passwordHash: hashPassword(input.password),
+      passwordHash: await hashPassword(input.password),
       teamName: input.teamName,
       teamSlug: teamSlug(input.teamName, input.email),
     });
@@ -104,20 +104,25 @@ export class AuthService {
     const input = parseLoginBody(body);
     const account = await this.repository.findLocalAccountByEmail(input.email);
 
+    // Every rejection below returns the same message after the same scrypt
+    // work, so neither the response nor its timing tells a caller whether an
+    // email is registered, disabled or locked (audit H-03).
     if (!account || account.status !== 'active') {
+      await burnPasswordCheck(input.password);
       this.domainMetrics?.recordAuthAttempt('invalid_credentials');
-      throw new ApiUnauthorizedError('Invalid email or password');
+      throw new ApiUnauthorizedError(INVALID_LOGIN_MESSAGE);
     }
 
     if (account.lockedUntil && Date.parse(account.lockedUntil) > Date.now()) {
+      await burnPasswordCheck(input.password);
       // Counted separately from a bad password: a spike of 'locked' means an
       // attack is already being throttled, while a spike of
       // 'invalid_credentials' means it is still in progress.
       this.domainMetrics?.recordAuthAttempt('locked');
-      throw new ApiUnauthorizedError('Account is temporarily locked');
+      throw new ApiUnauthorizedError(INVALID_LOGIN_MESSAGE);
     }
 
-    if (!verifyPassword(input.password, account.passwordHash)) {
+    if (!(await verifyPassword(input.password, account.passwordHash))) {
       const failedAttempts = account.failedAttempts + 1;
       const maxAttempts = this.configService.get('AUTH_MAX_FAILED_LOGIN_ATTEMPTS', {
         infer: true,
@@ -140,7 +145,7 @@ export class AuthService {
         this.domainMetrics?.recordAuthLockout();
       }
 
-      throw new ApiUnauthorizedError('Invalid email or password');
+      throw new ApiUnauthorizedError(INVALID_LOGIN_MESSAGE);
     }
 
     await this.repository.resetFailedLogin(account.accountId);
@@ -267,7 +272,7 @@ export class AuthService {
 
     const changed = await this.repository.updateAccountPassword({
       accountId: identity.accountId,
-      passwordHash: hashPassword(input.newPassword),
+      passwordHash: await hashPassword(input.newPassword),
       changedAt: new Date().toISOString(),
     });
 
@@ -960,11 +965,13 @@ export class AuthService {
       throw new ApiUnauthorizedError('Local password credential was not found');
     }
 
-    if (!verifyPassword(currentPassword, account.passwordHash)) {
+    if (!(await verifyPassword(currentPassword, account.passwordHash))) {
       throw new ApiUnauthorizedError('Current password is invalid');
     }
   }
 }
+
+const INVALID_LOGIN_MESSAGE = 'Invalid email or password';
 
 export function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
