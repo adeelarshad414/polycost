@@ -16,8 +16,16 @@
 // The drill never touches the source database. It only reads.
 //
 // Usage: node scripts/restore-drill.mjs [--keep]
+//
+// --mode production  drill the path production uses instead of db:backup:
+//   docker/postgres/backup.sh (age-encrypted, written through rclone) and
+//   docker/postgres/restore.sh (decrypt, verify the manifest checksums, globals
+//   before data), both from the database tools image. The nightly CI drill
+//   runs this mode (audit H-16). Extra flags:
+//     --tools-image <image>      built from database/Dockerfile
+//     --source-password <pw>     the source cluster owner's password (TCP)
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 const args = parseArgs(process.argv.slice(2));
@@ -27,6 +35,10 @@ const owner = args.owner ?? 'polycost_owner';
 const drillContainer = 'polycost-restore-drill';
 const drillPort = args.port ?? '55433';
 const evidenceDir = path.resolve(args.evidence ?? 'docs/verification');
+const mode = args.mode ?? 'local';
+const toolsImage = args['tools-image'] ?? 'polycost-migrations:drill';
+const workDir = path.resolve('.restore-drill');
+const hostUser = `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`;
 
 const steps = [];
 
@@ -69,7 +81,10 @@ function cleanup() {
 
 console.log('PolyCost restore drill');
 console.log(`  source:  ${sourceContainer}/${database} (read-only)`);
-console.log(`  target:  a fresh, empty ${drillContainer} cluster\n`);
+console.log(`  target:  a fresh, empty ${drillContainer} cluster`);
+console.log(
+  `  path:    ${mode === 'production' ? 'production (backup.sh -> restore.sh)' : 'local (db:backup)'}\n`,
+);
 
 try {
   cleanup();
@@ -78,17 +93,20 @@ try {
     JSON.parse(run('node', ['scripts/db-fingerprint.mjs', '--container', sourceContainer]).stdout),
   );
 
-  const backup = step('take a backup (database + cluster globals)', () => {
-    const output = run('node', [
-      'scripts/db-backup.mjs',
-      '--container',
-      sourceContainer,
-      '--out',
-      '.restore-drill',
-    ]).stdout;
-    const line = output.trim().split('\n').at(-1);
-    return JSON.parse(line);
-  });
+  const backup =
+    mode === 'production'
+      ? step('take an encrypted backup with backup.sh', productionBackup)
+      : step('take a backup (database + cluster globals)', () => {
+          const output = run('node', [
+            'scripts/db-backup.mjs',
+            '--container',
+            sourceContainer,
+            '--out',
+            '.restore-drill',
+          ]).stdout;
+          const line = output.trim().split('\n').at(-1);
+          return JSON.parse(line);
+        });
 
   step('start an empty Postgres cluster', () => {
     // Same image as production compose. A drill against a different version
@@ -122,54 +140,60 @@ try {
     throw new Error('the drill cluster never became ready');
   });
 
-  step('restore cluster globals (roles)', () => {
-    const sql = readFileSync(backup.globals, 'utf8');
-    const result = spawnSync(
-      'docker',
-      ['exec', '-i', drillContainer, 'psql', '-U', owner, '-d', 'postgres'],
-      { input: sql, encoding: 'utf8' },
+  if (mode === 'production') {
+    step('restore with restore.sh (decrypt, verify, globals, data)', () =>
+      productionRestore(backup),
     );
+  } else {
+    step('restore cluster globals (roles)', () => {
+      const sql = readFileSync(backup.globals, 'utf8');
+      const result = spawnSync(
+        'docker',
+        ['exec', '-i', drillContainer, 'psql', '-U', owner, '-d', 'postgres'],
+        { input: sql, encoding: 'utf8' },
+      );
 
-    // Restoring globals into a cluster that already has the bootstrap superuser
-    // reports a duplicate for that one role. Anything else is a real failure.
-    const fatal = (result.stderr || '')
-      .split('\n')
-      .filter((line) => line.includes('ERROR'))
-      .filter((line) => !line.includes('already exists'));
+      // Restoring globals into a cluster that already has the bootstrap superuser
+      // reports a duplicate for that one role. Anything else is a real failure.
+      const fatal = (result.stderr || '')
+        .split('\n')
+        .filter((line) => line.includes('ERROR'))
+        .filter((line) => !line.includes('already exists'));
 
-    if (fatal.length > 0) {
-      throw new Error(fatal.slice(0, 3).join(' | '));
-    }
-  });
+      if (fatal.length > 0) {
+        throw new Error(fatal.slice(0, 3).join(' | '));
+      }
+    });
 
-  step('create the target database', () => {
-    run('docker', [
-      'exec',
-      drillContainer,
-      'psql',
-      '-U',
-      owner,
-      '-d',
-      'postgres',
-      '-c',
-      `CREATE DATABASE ${database} OWNER ${owner}`,
-    ]);
-  });
+    step('create the target database', () => {
+      run('docker', [
+        'exec',
+        drillContainer,
+        'psql',
+        '-U',
+        owner,
+        '-d',
+        'postgres',
+        '-c',
+        `CREATE DATABASE ${database} OWNER ${owner}`,
+      ]);
+    });
 
-  step('restore the database', () => {
-    const dump = readFileSync(backup.dump);
-    const result = spawnSync(
-      'docker',
-      ['exec', '-i', drillContainer, 'pg_restore', '-U', owner, '-d', database, '--no-owner'],
-      { input: dump, encoding: 'buffer' },
-    );
+    step('restore the database', () => {
+      const dump = readFileSync(backup.dump);
+      const result = spawnSync(
+        'docker',
+        ['exec', '-i', drillContainer, 'pg_restore', '-U', owner, '-d', database, '--no-owner'],
+        { input: dump, encoding: 'buffer' },
+      );
 
-    const stderr = result.stderr?.toString() ?? '';
-    if (result.status !== 0) {
-      throw new Error(stderr.trim().split('\n').slice(0, 3).join(' | '));
-    }
-    return { warnings: stderr.split('\n').filter((l) => l.includes('warning')).length };
-  });
+      const stderr = result.stderr?.toString() ?? '';
+      if (result.status !== 0) {
+        throw new Error(stderr.trim().split('\n').slice(0, 3).join(' | '));
+      }
+      return { warnings: stderr.split('\n').filter((l) => l.includes('warning')).length };
+    });
+  }
 
   const after = step('fingerprint the restored database', () =>
     JSON.parse(run('node', ['scripts/db-fingerprint.mjs', '--container', drillContainer]).stdout),
@@ -220,6 +244,73 @@ try {
   } else {
     console.log(`\nDrill cluster kept as ${drillContainer} on port ${drillPort}.`);
   }
+}
+
+function dockerTools(network, env, mounts, script) {
+  return run('docker', [
+    'run',
+    '--rm',
+    '--network',
+    `container:${network}`,
+    '--user',
+    hostUser,
+    '-e',
+    'HOME=/tmp',
+    ...Object.entries(env).flatMap(([key, value]) => ['-e', `${key}=${value}`]),
+    ...mounts.flatMap((mount) => ['-v', mount]),
+    '--entrypoint',
+    'sh',
+    toolsImage,
+    `/usr/local/bin/${script}`,
+  ]);
+}
+
+function productionBackup() {
+  const remote = path.join(workDir, 'remote');
+  mkdirSync(remote, { recursive: true });
+
+  // A throwaway key pair: the drill proves the encrypt/decrypt round trip,
+  // and the private half never leaves this machine.
+  const key = run('docker', ['run', '--rm', '--entrypoint', 'age-keygen', toolsImage]).stdout;
+  const recipient = key.match(/public key: (age1[0-9a-z]+)/)?.[1];
+  if (!recipient) {
+    throw new Error('age-keygen did not print a public key');
+  }
+  const identity = path.join(workDir, 'age.key');
+  writeFileSync(identity, key);
+  chmodSync(identity, 0o644);
+
+  const output = dockerTools(
+    sourceContainer,
+    {
+      PGHOST: '127.0.0.1',
+      PGUSER: owner,
+      PGPASSWORD: args['source-password'] ?? '',
+      PGDATABASE: database,
+      BACKUP_AGE_RECIPIENT: recipient,
+      BACKUP_DESTINATION: '/backups',
+      BACKUP_RETENTION_DAYS: '0',
+    },
+    [`${remote}:/backups`],
+    'polycost-backup',
+  ).stdout;
+  return { remote, identity, result: output.trim().split('\n').at(-1) };
+}
+
+function productionRestore(backup) {
+  dockerTools(
+    drillContainer,
+    {
+      PGHOST: '127.0.0.1',
+      PGUSER: owner,
+      PGPASSWORD: 'drill',
+      BACKUP_SOURCE: '/backups',
+      AGE_IDENTITY_FILE: '/run/age.key',
+      RESTORE_DATABASE: database,
+    },
+    [`${backup.remote}:/backups:ro`, `${backup.identity}:/run/age.key:ro`],
+    'polycost-restore',
+  );
 }
 
 function compare(before, after) {

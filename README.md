@@ -8,7 +8,7 @@ PolyCost is built for decision-grade planning. It estimates and compares costs; 
 
 ## 📚 Documentation
 
-**➡️ [Full Documentation Index](DOCUMENTATION.md)** — table of contents for all 100 documents.
+**➡️ [Full Documentation Index](DOCUMENTATION.md)** — table of contents for all 101 documents.
 
 | Start here                                |                                                 |
 | ----------------------------------------- | ----------------------------------------------- |

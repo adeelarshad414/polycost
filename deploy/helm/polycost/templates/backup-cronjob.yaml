@@ -1,0 +1,109 @@
+{{- if .Values.backup.enabled }}
+# Audit H-16: an encrypted, off-site logical backup on a schedule. It is the
+# second line behind managed point-in-time recovery: it survives the loss of
+# the database's cloud account or region and logical corruption older than the
+# PITR window. The nightly CI drill restores exactly this format
+# (docs/BACKUP-AND-DR.md).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "polycost.fullname" . }}-backup
+  labels:
+    {{- include "polycost.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  # Never two at once; a missed run is skipped, not stacked.
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: {{ .Values.backup.activeDeadlineSeconds }}
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: {{ include "polycost.name" . }}-backup
+            app.kubernetes.io/instance: {{ .Release.Name }}
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: backup
+              image: {{ include "polycost.image" (dict "image" .Values.migrations.image "root" .) | quote }}
+              imagePullPolicy: {{ .Values.migrations.image.pullPolicy }}
+              command: ['sh', '/usr/local/bin/polycost-backup']
+              env:
+                - name: PGHOST
+                  value: {{ .Values.config.dbHost | quote }}
+                - name: PGPORT
+                  value: {{ .Values.config.dbPort | quote }}
+                - name: PGDATABASE
+                  value: {{ .Values.config.dbName | quote }}
+                - name: PGSSLMODE
+                  value: {{ .Values.config.db.sslMode | quote }}
+                - name: PGUSER
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.migrations.ownerSecret.name }}
+                      key: {{ .Values.migrations.ownerSecret.usernameKey }}
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.migrations.ownerSecret.name }}
+                      key: {{ .Values.migrations.ownerSecret.passwordKey }}
+                {{- if .Values.config.db.sslCaSecret.name }}
+                - name: PGSSLROOTCERT
+                  value: /run/polycost-db-ca/{{ .Values.config.db.sslCaSecret.key }}
+                {{- end }}
+                # A public key: the cluster can write backups but never read them.
+                - name: BACKUP_AGE_RECIPIENT
+                  value: {{ required "backup.ageRecipient (an age public key) is required" .Values.backup.ageRecipient | quote }}
+                - name: BACKUP_DESTINATION
+                  value: {{ required "backup.destination is required" .Values.backup.destination | quote }}
+                - name: BACKUP_RETENTION_DAYS
+                  value: {{ .Values.backup.retentionDays | quote }}
+                - name: HOME
+                  value: /tmp
+              {{- with .Values.backup.storageCredentialsSecret }}
+              # RCLONE_* variables for the destination (e.g. RCLONE_S3_PROVIDER,
+              # RCLONE_S3_ENV_AUTH). Prefer workload identity over static keys.
+              envFrom:
+                - secretRef:
+                    name: {{ . }}
+              {{- end }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ['ALL']
+              resources:
+                {{- toYaml .Values.backup.resources | nindent 16 }}
+              volumeMounts:
+                # Plaintext dumps exist only here, briefly, before encryption.
+                - name: work
+                  mountPath: /tmp
+                {{- if .Values.config.db.sslCaSecret.name }}
+                - name: db-ca
+                  mountPath: /run/polycost-db-ca
+                  readOnly: true
+                {{- end }}
+          {{- with .Values.backup.serviceAccountName }}
+          serviceAccountName: {{ . }}
+          {{- end }}
+          volumes:
+            - name: work
+              emptyDir:
+                sizeLimit: {{ .Values.backup.workSizeLimit }}
+            {{- if .Values.config.db.sslCaSecret.name }}
+            - name: db-ca
+              secret:
+                secretName: {{ .Values.config.db.sslCaSecret.name }}
+            {{- end }}
+{{- end }}

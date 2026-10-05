@@ -564,7 +564,16 @@ The **error envelope is exact**, because every failure passes through a single
 
 ## Backup And Restore
 
+Recovery objectives per data class, the production backup design and how it is
+proven are in [BACKUP-AND-DR.md](BACKUP-AND-DR.md). This section is the procedure.
+
 ### Taking a backup
+
+**Production:** the Helm `backup` CronJob runs `polycost-backup` nightly
+(age-encrypted, written through rclone to an off-site bucket). Trigger one now with
+`kubectl create job --from=cronjob/<release>-polycost-backup manual-$(date +%s)`.
+
+**Local compose:**
 
 ```bash
 npm run db:backup
@@ -591,6 +600,24 @@ Produces **two** files, and the second is the one people forget:
 > below.
 
 ### Incident: Restore From Backup
+
+First choose the source. For loss within the PITR window, use the **managed provider's
+point-in-time restore** to a new instance, then repoint `DB_HOST`. Use the
+encrypted logical backup when PITR cannot help: lost account or region, or
+corruption older than the window.
+
+Restoring an encrypted backup (the database tools image, with the offline age
+private key):
+
+```bash
+docker run --rm -e PGHOST=… -e PGUSER=<owner> -e PGPASSWORD=… -e PGSSLMODE=verify-full \
+  -e BACKUP_SOURCE=':s3:polycost-backups-dr/prod' -e AGE_IDENTITY_FILE=/run/age.key \
+  -e RESTORE_DATABASE=polycost_restored -v ./age.key:/run/age.key:ro \
+  --entrypoint sh ghcr.io/adeelarshad414/polycost-migrations:<version> /usr/local/bin/polycost-restore
+```
+
+It decrypts, verifies every file against the manifest, and restores roles before
+data. The manual equivalent for the local `db:backup` files follows.
 
 1. **Stop writers first.** Scale the API to zero, or stop the worker. A restore
    racing live traffic produces a database that matches neither.

@@ -242,6 +242,10 @@ npm run provider:credentials:check:strict
 
 ## Backups And Restore
 
+Recovery objectives per data class, the backup design and the nightly restore drill
+are defined in [BACKUP-AND-DR.md](BACKUP-AND-DR.md). Enable the chart's `backup`
+CronJob with an age public key and an off-site destination.
+
 Minimum production backup policy:
 
 - nightly Postgres logical backup
