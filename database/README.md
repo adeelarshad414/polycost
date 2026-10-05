@@ -11,6 +11,9 @@ The same script runs in every environment, so they cannot disagree:
 | Kubernetes (Helm)               | the `pre-install` / `pre-upgrade` Job, image built from `Dockerfile` |
 | Anywhere else (ECS, a VM, a CI) | run the migrations image as a one-off task with libpq env vars       |
 
+The same image also ships `polycost-backup` and `polycost-restore` (encrypted
+backups, audit H-16); see [docs/BACKUP-AND-DR.md](../docs/BACKUP-AND-DR.md).
+
 ```mermaid
 flowchart LR
     U["helm upgrade /<br/>npm run db:migrate"] --> L["🔒 pg_advisory_lock"]

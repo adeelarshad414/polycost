@@ -48,6 +48,30 @@ migrations:
     limits:
       memory: 256Mi
 
+# Encrypted off-site logical backups (templates/backup-cronjob.yaml), the
+# second line behind managed point-in-time recovery. Off by default: it needs a
+# destination and a key. See docs/BACKUP-AND-DR.md for RPO/RTO per data class.
+backup:
+  enabled: false
+  schedule: '15 1 * * *'
+  # age public key (age1...). Keep the private key outside the cluster.
+  ageRecipient: ''
+  # rclone destination in another account/region, e.g. ':s3:my-bucket/polycost'.
+  destination: ''
+  # Secret holding RCLONE_* variables for the destination; empty when the
+  # service account's workload identity grants access.
+  storageCredentialsSecret: ''
+  serviceAccountName: ''
+  retentionDays: 35
+  activeDeadlineSeconds: 7200
+  workSizeLimit: 20Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
 service:
   type: ClusterIP
   port: 3000

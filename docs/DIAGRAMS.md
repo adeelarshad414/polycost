@@ -397,6 +397,23 @@ flowchart LR
 Pull requests run the build and scan steps only; pushes to `main` publish
 `main` and `sha-<short>` images (signed and attested), without a chart.
 
+### Backup and restore
+
+```mermaid
+flowchart LR
+    subgraph prod["☸️ production cluster"]
+        CJ["⏰ backup CronJob<br/><i>polycost-backup</i>"]
+    end
+    DB[("PostgreSQL<br/><i>managed PITR = primary</i>")] -->|"roles + pg_dump -Fc"| CJ
+    CJ -->|"sha256 manifest<br/>age-encrypt to public key"| B[("🪣 off-site bucket<br/><i>other account / region</i>")]
+    B -->|"polycost-restore<br/>decrypt · verify · roles then data"| N[("new cluster")]
+    K["🔑 age private key<br/><i>offline</i>"] -.-> N
+    CI["🌙 nightly CI drill"] -.->|"same scripts, fingerprint compare"| N
+
+    classDef store fill:#e6f4ea,stroke:#34a853,color:#111
+    class DB,B,N store
+```
+
 ### Local git hooks
 
 ```mermaid

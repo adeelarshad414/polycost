@@ -26,6 +26,12 @@ once tagged releases begin.
 
 ### Added
 
+- Backup and DR (H-16): recovery objectives per data class
+  (`docs/BACKUP-AND-DR.md`); `polycost-backup` / `polycost-restore` in the
+  database tools image (roles + `pg_dump -Fc`, sha256 manifest, age encryption
+  to a public key, rclone to any object store); an optional Helm backup CronJob;
+  and a nightly CI restore drill through the production scripts that opens an
+  issue on failure. `db:restore-drill --mode production` runs it locally.
 - Release pipeline (H-13): api, web and migrations images on GHCR, Trivy-scanned,
   with SBOM and SLSA provenance, cosign keyless signatures and GitHub
   attestations; tagged releases publish a Helm chart pinned to image digests.

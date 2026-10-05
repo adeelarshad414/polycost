@@ -1,0 +1,83 @@
+name: Restore drill
+
+# Audit H-16: a backup that has never been restored is a hope, not a recovery
+# plan. Every night this builds a database through the real migrator, backs it
+# up with the production backup script (age-encrypted, written through rclone),
+# restores it with the production restore script into a brand-new cluster, and
+# compares a structural and content fingerprint of the two.
+on:
+  schedule:
+    - cron: '30 3 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'docker/postgres/**'
+      - 'database/**'
+      - 'scripts/restore-drill.mjs'
+      - 'scripts/db-fingerprint.mjs'
+      - '.github/workflows/restore-drill.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: restore-drill-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write # open an issue when the scheduled drill fails
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+
+      - name: Build the database tools image
+        run: docker build -f database/Dockerfile -t polycost-migrations:drill .
+
+      - name: Start the source database
+        run: |
+          docker run -d --name drill-source \
+            -e POSTGRES_USER=polycost_owner -e POSTGRES_DB=polycost_dev \
+            -e POSTGRES_PASSWORD=drill-source postgres:16-alpine
+          for _ in $(seq 1 60); do
+            docker exec drill-source pg_isready -U polycost_owner -d polycost_dev && break
+            sleep 1
+          done
+
+      - name: Build the schema with the real migrator
+        run: |
+          docker run --rm --network container:drill-source \
+            -e PGHOST=127.0.0.1 -e PGUSER=polycost_owner -e PGPASSWORD=drill-source \
+            -e PGDATABASE=polycost_dev -e APP_DB_PASSWORD=drill-app -e ETL_DB_PASSWORD=drill-etl \
+            polycost-migrations:drill
+
+      - name: Back up, restore into a new cluster, compare
+        run: >-
+          node scripts/restore-drill.mjs --mode production
+          --container drill-source --source-password drill-source
+          --tools-image polycost-migrations:drill
+          --evidence restore-drill-evidence
+
+      - name: Upload the drill report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: restore-drill-report
+          path: restore-drill-evidence/
+          if-no-files-found: ignore
+
+      - name: Open an issue when the nightly drill fails
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create \
+            --title "Nightly restore drill failed ($(date -u +%Y-%m-%d))" \
+            --body "The backup → restore → fingerprint drill failed: $RUN_URL. Backups may not be restorable until this is fixed. See docs/BACKUP-AND-DR.md."

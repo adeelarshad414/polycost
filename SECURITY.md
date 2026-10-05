@@ -78,6 +78,13 @@ Every pull request must pass four required checks before it can merge into
 - Release charts pin images by digest. There is no `latest` tag.
 - Workflows are linted with actionlint and shellcheck on every PR.
 
+## Backups
+
+Scheduled backups are encrypted with age to a public key before they leave the
+cluster, so the backup bucket never holds readable data and the cluster cannot
+decrypt its own backups. Restores verify a sha256 manifest. See
+[docs/BACKUP-AND-DR.md](docs/BACKUP-AND-DR.md).
+
 ## Runtime Protections
 
 - **Web:** nginx serves a strict Content-Security-Policy (no `'unsafe-inline'`;

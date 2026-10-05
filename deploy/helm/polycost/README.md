@@ -38,6 +38,16 @@ file was edited. Disable it with `migrations.enabled: false` only if migrations 
 run another way. See [database/README.md](../../../database/README.md). A `pg_dump` alone is **not** a restorable
 backup of this system — see the Backup And Restore section of the runbook.
 
+## Backups
+
+`backup.enabled: true` adds a nightly CronJob that runs `polycost-backup` from the
+database tools image. It takes the roles plus `pg_dump -Fc`, writes a sha256
+manifest, encrypts each file with age to `backup.ageRecipient` (a public key), and
+uploads through rclone to `backup.destination`. Retention is `backup.retentionDays`.
+It is the second line behind managed point-in-time recovery; see
+[BACKUP-AND-DR.md](../../../docs/BACKUP-AND-DR.md). The nightly CI restore drill
+restores exactly this format.
+
 ## Images and releases
 
 Tagged releases publish this chart to `oci://ghcr.io/adeelarshad414/charts/polycost`
