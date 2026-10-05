@@ -8,7 +8,7 @@ never edited after acceptance except to mark it **Superseded** by a later ADR.
 
 | ADR                                   | Title                                    | Status   |
 | ------------------------------------- | ---------------------------------------- | -------- |
-| [ADR-0001](ADR-0001-tenancy-model.md) | Tenancy model for core data (audit H-04) | Proposed |
+| [ADR-0001](ADR-0001-tenancy-model.md) | Tenancy model for core data (audit H-04) | Accepted |
 
 Template: Status, Date, Audit reference, Context (facts with file references),
 Options considered, Decision, Consequences, Implementation plan, Open questions,

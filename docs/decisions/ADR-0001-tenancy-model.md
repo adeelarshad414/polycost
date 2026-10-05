@@ -105,7 +105,7 @@ Plus a deployment switch, **`ANONYMOUS_MODE=enabled|disabled`**:
 - **Default `enabled`**, so the self-hosted and demo experience is unchanged.
 - **`disabled`** makes every core route require a session. That's Option A, for a hosted multi-tenant deployment.
 
-## 3. Decision (proposed)
+## 3. Decision
 
 **Adopt Option C.**
 
@@ -133,8 +133,9 @@ Plus a deployment switch, **`ANONYMOUS_MODE=enabled|disabled`**:
 
 - **member:** create, read, change budgets and alerts, create share links.
 - **admin / owner:** also revoke any share link, delete comparisons and workloads.
-- The schema allows a **`viewer`** role that the code doesn't model. Either add it as
-  read-only or remove it from the CHECK constraint (open question 3).
+- **viewer:** read-only. Can see team comparisons, workloads, reports and alerts, but cannot
+  change budgets, alerts or share links, or create data. The role already exists in the
+  schema's CHECK constraint and is now modelled in code (decision 3).
 
 ### 3.4 Anonymous write key
 
@@ -142,7 +143,8 @@ Plus a deployment switch, **`ANONYMOUS_MODE=enabled|disabled`**:
   returned once and stored as sha256 (the same pattern as share-link tokens). Reads stay
   capability URLs. Changes need the key in a header (`X-PolyCost-Write-Key`).
 - The web app keeps the write key next to its local history, so the person who created the
-  resource can still change it, and a forwarded read link can't.
+  resource can still change it, and a forwarded read link can't. A **copy edit key** action
+  lets them move it to another device or claim it into a team later (decision 4).
 
 ### 3.5 Claiming
 
@@ -205,16 +207,14 @@ team's comparison". Read access alone can't claim.
 5. **P2-1e Docs.** Rewrite the README "Anonymous and Workspace Features" section and `11-SECURITY.md`
    authn/authz, correct REQUIREMENTS FR-6.5 / NFR-2.2, and update DIAGRAMS.
 
-## 6. Open questions for the maintainer
+## 6. Decisions (resolved 2026-10-05)
 
-1. **Should hosted deployments default to `ANONYMOUS_MODE=disabled`?**
-   Recommendation: keep the default `enabled` and have the Helm chart set it explicitly,
-   like `USE_MOCK_PROVIDERS`.
-2. **Anonymous retention and grace period:** 30 days for new anonymous data, with a
-   **60-day grace** for rows that exist today?
-3. **The `viewer` role:** implement it as read-only, or drop it from the schema?
-4. **Write-key UX:** is it acceptable that changing an anonymous resource is possible only
-   from the browser that created it, unless the key is copied?
+| #   | Question                                                        | Decision                                                                                                                                                                    |
+| --- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Should hosted deployments default to `ANONYMOUS_MODE=disabled`? | **Default `enabled`.** The Helm chart sets the value explicitly (`config.anonymousMode`), so every Kubernetes install makes a deliberate choice, like `USE_MOCK_PROVIDERS`. |
+| 2   | Anonymous retention                                             | **30 days** for new anonymous data. **A 60-day grace period** for rows that exist when retention ships. The UI shows the expiry.                                            |
+| 3   | The `viewer` role                                               | **Implement it as read-only** (§3.3).                                                                                                                                       |
+| 4   | Write-key handling                                              | **Kept in the creating browser, plus a "copy edit key" action** for other devices and for claiming.                                                                         |
 
 ## 7. Verification (definition of done for H-04)
 

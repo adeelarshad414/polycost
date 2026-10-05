@@ -43,7 +43,7 @@ of exactly how every number was derived.
 | [🏛️ Architecture (docs)](docs/ARCHITECTURE.md)                     | Implementation-level architecture    |
 | [📝 Architecture Notes](ARCHITECTURE_NOTES.md)                     | Decisions and rationale              |
 | [⚖️ Decisions & ADRs](docs/decisions/README.md)                    | ADR index (ADR-0001 tenancy)         |
-| [ADR-0001 Tenancy model](docs/decisions/ADR-0001-tenancy-model.md) | Proposed: core-data ownership        |
+| [ADR-0001 Tenancy model](docs/decisions/ADR-0001-tenancy-model.md) | Accepted: core-data ownership        |
 | [🗄️ Data Model](04-DATA-MODEL.md)                                  | Tables, relationships, constraints   |
 | [🧱 Database Migrations](database/README.md)                       | Migrator, rules, troubleshooting     |
 | [🛟 Backup & DR](docs/BACKUP-AND-DR.md)                            | RPO/RTO per data class, drill        |
