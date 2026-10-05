@@ -1,6 +1,6 @@
 # 📚 PolyCost Documentation Index
 
-> **Master table of contents for all 101 Markdown documents in this repository.**
+> **Master table of contents for all 103 Markdown documents in this repository.**
 > Start at [🚀 New here?](#-new-here-start-with-these-five) if this is your first visit.
 
 PolyCost is an open-source **multi-cloud cost comparison engine**. You describe a
@@ -37,18 +37,20 @@ of exactly how every number was derived.
 
 ## 🏗️ Architecture & design
 
-| Document                                                | Purpose                              |
-| ------------------------------------------------------- | ------------------------------------ |
-| [🏛️ Architecture (spec)](03-ARCHITECTURE.md)            | Canonical architecture specification |
-| [🏛️ Architecture (docs)](docs/ARCHITECTURE.md)          | Implementation-level architecture    |
-| [📝 Architecture Notes](ARCHITECTURE_NOTES.md)          | Decisions and rationale              |
-| [🗄️ Data Model](04-DATA-MODEL.md)                       | Tables, relationships, constraints   |
-| [🧱 Database Migrations](database/README.md)            | Migrator, rules, troubleshooting     |
-| [🛟 Backup & DR](docs/BACKUP-AND-DR.md)                 | RPO/RTO per data class, drill        |
-| [🔌 API Contracts](05-API-CONTRACTS.md)                 | Endpoint contracts                   |
-| [🧩 Backend Spec](docs/BACKEND_SPEC.md)                 | Backend module responsibilities      |
-| [🖥️ Frontend Integration](docs/FRONTEND_INTEGRATION.md) | Web ↔ API integration                |
-| [⚖️ Comparison Engine](docs/COMPARISON.md)              | How providers are compared           |
+| Document                                                           | Purpose                              |
+| ------------------------------------------------------------------ | ------------------------------------ |
+| [🏛️ Architecture (spec)](03-ARCHITECTURE.md)                       | Canonical architecture specification |
+| [🏛️ Architecture (docs)](docs/ARCHITECTURE.md)                     | Implementation-level architecture    |
+| [📝 Architecture Notes](ARCHITECTURE_NOTES.md)                     | Decisions and rationale              |
+| [⚖️ Decisions & ADRs](docs/decisions/README.md)                    | ADR index (ADR-0001 tenancy)         |
+| [ADR-0001 Tenancy model](docs/decisions/ADR-0001-tenancy-model.md) | Proposed: core-data ownership        |
+| [🗄️ Data Model](04-DATA-MODEL.md)                                  | Tables, relationships, constraints   |
+| [🧱 Database Migrations](database/README.md)                       | Migrator, rules, troubleshooting     |
+| [🛟 Backup & DR](docs/BACKUP-AND-DR.md)                            | RPO/RTO per data class, drill        |
+| [🔌 API Contracts](05-API-CONTRACTS.md)                            | Endpoint contracts                   |
+| [🧩 Backend Spec](docs/BACKEND_SPEC.md)                            | Backend module responsibilities      |
+| [🖥️ Frontend Integration](docs/FRONTEND_INTEGRATION.md)            | Web ↔ API integration                |
+| [⚖️ Comparison Engine](docs/COMPARISON.md)                         | How providers are compared           |
 
 ## 🎯 Product & scope
 
@@ -191,4 +193,4 @@ subsystem looks the way it does.
 
 ---
 
-<sub>📅 Index generated from a full sweep of the repository. 101 Markdown documents catalogued.</sub>
+<sub>📅 Index generated from a full sweep of the repository. 103 Markdown documents catalogued.</sub>
