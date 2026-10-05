@@ -2,7 +2,7 @@
 
 |                |                                                                                                                                      |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Status**     | **Proposed**: awaiting maintainer approval. Implementation must not start before it is accepted.                                     |
+| **Status**     | **Accepted** 2026-10-05 by the maintainer, with the decisions recorded in §6.                                                        |
 | **Date**       | 2026-10-05                                                                                                                           |
 | **Audit**      | H-04 (High): "Core data is anonymous and not tenant-scoped". Also SEC-5 in `FULLSTACK-UX-AUDIT.md`.                                  |
 | **Decides**    | Who may read and change comparisons, workloads, budgets, alerts, share links, report exports and diagram imports.                    |
