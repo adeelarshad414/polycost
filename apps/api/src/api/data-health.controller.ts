@@ -9,12 +9,14 @@ import {
   writeRateLimitHeaders,
 } from './rate-limit.service.js';
 import type { RateLimitHeaderResponse } from './rate-limit.service.js';
+import { RouteAccess } from './route-access.js';
 
 interface RequestLike {
   ip?: string;
   headers?: Record<string, unknown>;
 }
 
+@RouteAccess('public')
 @Controller('api/v1/data-health')
 export class DataHealthController {
   constructor(

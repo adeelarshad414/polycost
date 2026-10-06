@@ -31,6 +31,9 @@ data:
   TRUST_PROXY_HOPS: {{ .Values.config.trustProxyHops | quote }}
   # Explicit, never defaulted: production must run on real provider pricing.
   USE_MOCK_PROVIDERS: {{ .Values.config.useMockProviders | quote }}
+  # ADR-0001: always rendered, never defaulted - every install decides whether
+  # people may compare without an account.
+  ANONYMOUS_MODE: {{ required "config.anonymousMode must be set to enabled or disabled" .Values.config.anonymousMode | quote }}
   ALLOW_MOCK_PROVIDERS_OUTSIDE_DEVELOPMENT: {{ .Values.config.allowMockProvidersOutsideDevelopment | quote }}
   # Both are empty-string tolerant in the config schema: compose and Helm both
   # render unset values as "", and a bare .url() would reject that at boot.

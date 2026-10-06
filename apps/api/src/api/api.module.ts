@@ -30,6 +30,7 @@ import { Redis } from 'ioredis';
 import { ApiRateLimitService, RATE_LIMIT_REDIS } from './rate-limit.service.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
+import { ResourceAccessService } from './resource-access.service.js';
 import { BillingController } from './billing.controller.js';
 import { BillingService } from './billing.service.js';
 import { ComparisonAnalyticsService } from './comparison-analytics.service.js';
@@ -144,6 +145,7 @@ import { WorkloadController } from './workload.controller.js';
         new InvoiceArtifactStorageService(configService, secretsService),
     },
     AuthService,
+    ResourceAccessService,
     ScimProvisioningService,
     SessionAuthGuard,
     BillingService,
@@ -219,6 +221,11 @@ import { WorkloadController } from './workload.controller.js';
       useClass: ApiExceptionFilter,
     },
   ],
-  exports: [ApiDatabaseRepository, CostManagementService, TeamAuditExportService],
+  exports: [
+    ApiDatabaseRepository,
+    CostManagementService,
+    TeamAuditExportService,
+    ResourceAccessService,
+  ],
 })
 export class ApiModule {}

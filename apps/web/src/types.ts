@@ -338,7 +338,7 @@ export interface TerraformGenerationResult {
 export type DiagramInputFormat = 'mermaid' | 'drawio' | 'lucid_csv' | 'vsdx';
 export type DiagramClassificationConfidence = 'high' | 'moderate' | 'low';
 
-export type TeamRole = 'owner' | 'admin' | 'member';
+export type TeamRole = 'owner' | 'admin' | 'member' | 'viewer';
 
 export interface AuthSessionResponse {
   token: string;

@@ -96,6 +96,10 @@ decrypt its own backups. Restores verify a sha256 manifest. See
   work, as a wrong password; repeated failures lock the account.
 - **Rate limits** key on the client address resolved through exactly
   `TRUST_PROXY_HOPS` proxies, so a forged `X-Forwarded-For` is ignored.
+- **Tenancy (ADR-0001):** team-owned comparisons and workloads are visible only to
+  their team (others get `404`); viewers are read-only; billing reconciliation only
+  accepts the team's own comparisons; `ANONYMOUS_MODE=disabled` requires a session on
+  every core route. Every route declares an access class, enforced by a contract test.
 - **Share links** are stored as SHA-256 hashes, expire within 90 days, use
   salted scrypt for passwords, and take the password only in a POST body.
 - `qa` checks required workflow files and verifies application source does not add

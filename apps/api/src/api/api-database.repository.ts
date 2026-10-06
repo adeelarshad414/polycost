@@ -668,6 +668,11 @@ export interface TeamAuditExportClaimRecord {
 
 const defaultPgPoolFactory: PgPoolFactory = (config) => new Pool(config);
 
+/** Core resources whose ownership ADR-0001 governs. */
+export type ResourceKind = 'comparison' | 'workload' | 'alert' | 'shareLink';
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 @Injectable()
 export class ApiDatabaseRepository implements OnModuleDestroy {
   private pool?: PgPoolLike;
@@ -686,9 +691,10 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
   async saveComparisonWithAuditLog(
     nwsSnapshot: NormalizedWorkloadSpec,
     resultSnapshot: ComparisonResult,
+    ownerTeamId: string | null = null,
   ): Promise<void> {
     await this.withTransaction(async (queryRunner) => {
-      await this.saveComparison(nwsSnapshot, resultSnapshot, queryRunner);
+      await this.saveComparison(nwsSnapshot, resultSnapshot, queryRunner, ownerTeamId);
       await this.recordComparisonAuditLog(resultSnapshot, queryRunner);
     });
   }
@@ -697,23 +703,27 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     nwsSnapshot: NormalizedWorkloadSpec,
     resultSnapshot: ComparisonResult,
     runner?: PgQueryRunner,
+    ownerTeamId: string | null = null,
   ): Promise<void> {
     const queryRunner = runner ?? (await this.getPool());
+    // ADR-0001: team_id is the owning team (NULL = anonymous capability URL).
     await queryRunner.query(
       `
         INSERT INTO comparisons (
           id,
           nws_snapshot,
           result_snapshot,
-          pricing_as_of
+          pricing_as_of,
+          team_id
         )
-        VALUES ($1, $2::jsonb, $3::jsonb, $4)
+        VALUES ($1, $2::jsonb, $3::jsonb, $4, $5)
       `,
       [
         resultSnapshot.comparisonId,
         JSON.stringify(nwsSnapshot),
         JSON.stringify(resultSnapshot),
         resultSnapshot.pricingAsOf,
+        ownerTeamId,
       ],
     );
   }
@@ -1361,7 +1371,10 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     );
   }
 
-  async createWorkload(input: WorkloadInput): Promise<WorkloadRecord> {
+  async createWorkload(
+    input: WorkloadInput,
+    ownerTeamId: string | null = null,
+  ): Promise<WorkloadRecord> {
     const result = await (
       await this.getPool()
     ).query<WorkloadRow>(
@@ -1375,9 +1388,10 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
           hours_per_month,
           storage_gb,
           storage_tier,
-          egress_gb_per_month
+          egress_gb_per_month,
+          team_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING id,
                   instance_family,
                   vcpu,
@@ -1401,6 +1415,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         input.storageGb,
         input.storageTier,
         input.egressGbPerMonth,
+        ownerTeamId,
       ],
     );
 
@@ -2651,6 +2666,42 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         expiresAt: row.expires_at.toISOString(),
       },
     };
+  }
+
+  /**
+   * ADR-0001: the owning team of a core resource. `undefined` means the
+   * resource does not exist; `{ teamId: null }` means it is anonymous. Child
+   * resources (alerts, share links) inherit their workload's owner.
+   */
+  async getResourceOwner(
+    kind: ResourceKind,
+    id: string,
+  ): Promise<{ teamId: string | null } | undefined> {
+    if (kind !== 'shareLink' && !UUID_PATTERN.test(id)) {
+      return undefined;
+    }
+    const sql: Record<ResourceKind, string> = {
+      comparison: 'SELECT team_id FROM comparisons WHERE id = $1',
+      workload: 'SELECT team_id FROM workloads WHERE id = $1',
+      alert:
+        'SELECT workloads.team_id FROM alerts JOIN workloads ON workloads.id = alerts.workload_id WHERE alerts.id = $1',
+      shareLink:
+        'SELECT workloads.team_id FROM share_links JOIN workloads ON workloads.id = share_links.workload_id WHERE share_links.token = $1',
+    };
+    const result = await (await this.getPool()).query<{ team_id: string | null }>(sql[kind], [id]);
+    const row = result.rows[0];
+    return row ? { teamId: row.team_id ?? null } : undefined;
+  }
+
+  /** The caller's role in a team, or undefined when they are not a member. */
+  async getTeamRole(accountId: string, teamId: string): Promise<string | undefined> {
+    const result = await (
+      await this.getPool()
+    ).query<{ role: string }>(
+      'SELECT role FROM team_memberships WHERE account_id = $1 AND team_id = $2',
+      [accountId, teamId],
+    );
+    return result.rows[0]?.role;
   }
 
   async listAccountTeams(accountId: string): Promise<AccountTeamMembership[]> {

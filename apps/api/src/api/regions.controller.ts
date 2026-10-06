@@ -9,12 +9,14 @@ import {
 import type { RateLimitHeaderResponse } from './rate-limit.service.js';
 import { RegionCatalogResponse } from './regions.types.js';
 import { RegionsService } from './regions.service.js';
+import { RouteAccess } from './route-access.js';
 
 interface RequestLike {
   ip?: string;
   headers?: Record<string, unknown>;
 }
 
+@RouteAccess('public')
 @Controller('api/v1/regions')
 export class RegionsController {
   constructor(

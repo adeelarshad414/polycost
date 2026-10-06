@@ -1,10 +1,12 @@
 import { Controller, Get, Header, Res } from '@nestjs/common';
 import { MetricsService } from './metrics.service.js';
+import { RouteAccess } from '../api/route-access.js';
 
 interface MetricsResponse {
   header(name: string, value: string): unknown;
 }
 
+@RouteAccess('public')
 @Controller()
 export class MetricsController {
   constructor(private readonly metricsService: MetricsService) {}

@@ -1,4 +1,5 @@
-export type TeamRole = 'owner' | 'admin' | 'member';
+// viewer: read-only on team data (ADR-0001 decision 3).
+export type TeamRole = 'owner' | 'admin' | 'member' | 'viewer';
 
 export interface AccountTeamMembership {
   teamId: string;

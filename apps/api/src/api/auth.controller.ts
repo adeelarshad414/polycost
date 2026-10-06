@@ -22,7 +22,9 @@ import {
 } from './rate-limit.service.js';
 import type { RateLimitHeaderResponse } from './rate-limit.service.js';
 import { SessionAuthGuard } from './session-auth.guard.js';
+import { RouteAccess } from './route-access.js';
 
+@RouteAccess('public')
 @Controller('api/v1/auth')
 export class AuthController {
   constructor(
@@ -54,60 +56,70 @@ export class AuthController {
   }
 
   @Get('me')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   me(@Req() request: RequestWithAuth) {
     return this.authService.me(request.auth!);
   }
 
   @Post('logout')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   logout(@Req() request: RequestWithAuth) {
     return this.authService.logout(request.auth!);
   }
 
   @Patch('profile')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   updateProfile(@Body() body: unknown, @Req() request: RequestWithAuth) {
     return this.authService.updateProfile(body, request.auth!);
   }
 
   @Post('password')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   changePassword(@Body() body: unknown, @Req() request: RequestWithAuth) {
     return this.authService.changePassword(body, request.auth!);
   }
 
   @Delete('account')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   deleteAccount(@Body() body: unknown, @Req() request: RequestWithAuth) {
     return this.authService.deleteAccount(body, request.auth!);
   }
 
   @Get('sessions')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   listSessions(@Req() request: RequestWithAuth) {
     return this.authService.listSessions(request.auth!);
   }
 
   @Post('sessions/revoke-other')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   revokeOtherSessions(@Req() request: RequestWithAuth) {
     return this.authService.revokeOtherSessions(request.auth!);
   }
 
   @Post('sessions/team')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   switchActiveTeam(@Body() body: unknown, @Req() request: RequestWithAuth) {
     return this.authService.switchActiveTeam(body, request.auth!);
   }
 
   @Post('teams')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   createTeam(@Body() body: unknown, @Req() request: RequestWithAuth) {
     return this.authService.createTeam(body, request.auth!);
   }
 
   @Patch('teams/:teamId')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   updateTeamSettings(
     @Param('teamId') teamId: string,
@@ -118,12 +130,14 @@ export class AuthController {
   }
 
   @Get('teams/:teamId/members')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   listTeamMembers(@Param('teamId') teamId: string, @Req() request: RequestWithAuth) {
     return this.authService.listTeamMembers(teamId, request.auth!);
   }
 
   @Patch('teams/:teamId/members/:accountId')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   updateTeamMemberRole(
     @Param('teamId') teamId: string,
@@ -135,6 +149,7 @@ export class AuthController {
   }
 
   @Delete('teams/:teamId/members/:accountId')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   removeTeamMember(
     @Param('teamId') teamId: string,
@@ -145,6 +160,7 @@ export class AuthController {
   }
 
   @Post('teams/:teamId/invitations')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   inviteTeamMember(
     @Param('teamId') teamId: string,
@@ -155,12 +171,14 @@ export class AuthController {
   }
 
   @Get('teams/:teamId/invitations')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   listTeamInvitations(@Param('teamId') teamId: string, @Req() request: RequestWithAuth) {
     return this.authService.listTeamInvitations(teamId, request.auth!);
   }
 
   @Get('teams/:teamId/audit-events')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   listTeamAuditEvents(
     @Param('teamId') teamId: string,
@@ -171,6 +189,7 @@ export class AuthController {
   }
 
   @Post('teams/:teamId/invitations/:invitationId/revoke')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   revokeTeamInvitation(
     @Param('teamId') teamId: string,
@@ -181,6 +200,7 @@ export class AuthController {
   }
 
   @Post('teams/:teamId/invitations/:invitationId/resend')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   resendTeamInvitation(
     @Param('teamId') teamId: string,
@@ -191,6 +211,7 @@ export class AuthController {
   }
 
   @Post('invitations/accept')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   acceptInvitation(@Body() body: unknown, @Req() request: RequestWithAuth) {
     return this.authService.acceptInvitation(body, request.auth!);
@@ -208,6 +229,7 @@ export class AuthController {
   }
 
   @Get('sso/status')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   ssoStatus(@Req() request: RequestWithAuth) {
     return this.authService.ssoStatus(request.auth!);
@@ -247,6 +269,7 @@ export class AuthController {
   }
 
   @Post('teams/:teamId/sso/providers')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   configureSsoProvider(
     @Param('teamId') teamId: string,
@@ -257,6 +280,7 @@ export class AuthController {
   }
 
   @Post('teams/:teamId/sso/test-connection')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   async testSsoConnection(
     @Param('teamId') teamId: string,

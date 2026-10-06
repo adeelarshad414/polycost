@@ -343,6 +343,99 @@ describe('MVP acceptance criteria E2E', () => {
     expect(health.status).toBe('ok');
   });
 
+  // ADR-0001 definition of done, against the real stack: team-owned data is
+  // invisible outside its team (404, not 403), anonymous data stays a
+  // capability URL, and a stale token never silently becomes anonymous.
+  it('isolates team-owned comparisons and workloads between teams', async () => {
+    const suffix = randomUUID().slice(0, 8);
+    const register = (who: string) =>
+      requestJson<AuthSessionResponse>('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: `${who}-${suffix}@example.com`,
+          password: 'correct horse battery staple',
+          teamName: `Tenancy ${who} ${suffix}`,
+        }),
+      });
+    const teamA = await register('a');
+    const teamB = await register('b');
+    const nws = buildStructuredWorkload(`ADR-0001 isolation ${suffix}`);
+    const body = JSON.stringify({ nws, options: { useLivePricing: false } });
+
+    const owned = await requestJson<ComparisonResult>('/comparisons', {
+      method: 'POST',
+      body,
+      headers: authHeaders(teamA.token),
+    });
+    const path = `/comparisons/${owned.comparisonId}`;
+    expect((await requestRaw(path, { headers: authHeaders(teamA.token) })).status).toBe(200);
+    expect((await requestRaw(path, { headers: authHeaders(teamB.token) })).status).toBe(404);
+    expect((await requestRaw(path)).status).toBe(404);
+    expect(
+      (await requestRaw(`${path}/evidence`, { headers: authHeaders(teamB.token) })).status,
+    ).toBe(404);
+    expect(
+      (
+        await requestRaw(`${path}/refresh-live`, {
+          method: 'POST',
+          headers: authHeaders(teamB.token),
+        })
+      ).status,
+    ).toBe(404);
+    expect(
+      (await requestRaw(path, { headers: { authorization: 'Bearer not-a-real-session' } })).status,
+    ).toBe(401);
+
+    const anonymous = await requestJson<ComparisonResult>('/comparisons', { method: 'POST', body });
+    expect(
+      (
+        await requestRaw(`/comparisons/${anonymous.comparisonId}`, {
+          headers: authHeaders(teamB.token),
+        })
+      ).status,
+    ).toBe(200);
+
+    const workload = await requestJson<WorkloadRecord>('/workloads', {
+      method: 'POST',
+      headers: authHeaders(teamA.token),
+      body: JSON.stringify({
+        instanceFamily: 'general-purpose',
+        vcpu: 2,
+        memoryGb: 8,
+        region: 'us-east',
+        instanceCount: 1,
+        hoursPerMonth: 730,
+        storageGb: 50,
+        storageTier: 'standard',
+        egressGbPerMonth: 10,
+      }),
+    });
+    const budget = JSON.stringify({ workloadId: workload.id, thresholdUsd: 1 });
+    expect(
+      (
+        await requestRaw('/budgets', {
+          method: 'POST',
+          body: budget,
+          headers: authHeaders(teamB.token),
+        })
+      ).status,
+    ).toBe(404);
+    expect((await requestRaw('/budgets', { method: 'POST', body: budget })).status).toBe(404);
+    expect(
+      (
+        await requestRaw('/budgets', {
+          method: 'POST',
+          body: budget,
+          headers: authHeaders(teamA.token),
+        })
+      ).status,
+    ).toBe(201);
+    expect(
+      (await requestRaw(`/alerts?workloadId=${workload.id}`, { headers: authHeaders(teamB.token) }))
+        .status,
+    ).toBe(404);
+  });
+
   it('runs signup, invite, role-change, mock SSO, and member RBAC denial end to end', async () => {
     const suffix = randomUUID().slice(0, 8);
     const ownerEmail = `owner-${suffix}@example.com`;

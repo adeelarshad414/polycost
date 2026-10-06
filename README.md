@@ -297,13 +297,22 @@ PolyCost keeps the core comparison workflow frictionless. Anonymous users can st
 parse requirements, upload diagrams, run comparisons, inspect pricing evidence, export
 reports, and create share links.
 
-### Anonymous comparison capability-URL model
+### Ownership: team-owned or anonymous (ADR-0001)
 
-Comparisons, workloads, budgets, and alerts on the anonymous surface are **capability
-URLs**: they are keyed by an unguessable random UUID and are readable/actionable by
-anyone who holds that id. This is intentional — the core comparison flow requires no
-account. Callers can only reach a resource whose id they already have (list endpoints
-such as `GET /alerts` require the `workloadId`; there is no global enumeration).
+Every comparison, workload and diagram import is either **team-owned** or
+**anonymous**, decided when it is created
+([ADR-0001](docs/decisions/ADR-0001-tenancy-model.md)):
+
+- **Team-owned:** created with a session. Only members of the owning team can read it
+  (viewers read-only; revoking share links needs owner or admin), and everyone else gets
+  `404`, so another team's data cannot even be confirmed to exist.
+- **Anonymous:** created without a session. It is a **capability URL**, keyed by an
+  unguessable random UUID and usable by anyone who holds the id. This keeps comparing
+  frictionless; write keys and expiry for anonymous data follow (ADR-0001 §5).
+- `ANONYMOUS_MODE=disabled` requires a session on every core route, for hosted
+  multi-tenant deployments. Every route declares its access class, and a contract test
+  fails CI if one does not. Callers can only reach a resource whose id they already have (list endpoints
+  such as `GET /alerts` require the `workloadId`; there is no global enumeration).
 
 Abuse controls on this surface:
 

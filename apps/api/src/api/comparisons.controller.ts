@@ -25,6 +25,8 @@ import {
   writeRateLimitHeaders,
 } from './rate-limit.service.js';
 import { ReportExportJobsService } from './report-export-jobs.service.js';
+import { OPEN_ACCESS, ResourceAccessService } from './resource-access.service.js';
+import { RouteAccess } from './route-access.js';
 
 interface RequestLike {
   ip?: string;
@@ -35,6 +37,8 @@ interface HeaderResponse {
   header(name: string, value: string): void;
 }
 
+// ADR-0001: team-owned comparisons are visible to their team only (404 otherwise).
+@RouteAccess('core')
 @Controller('api/v1/comparisons')
 export class ComparisonsController {
   constructor(
@@ -44,7 +48,13 @@ export class ComparisonsController {
     private readonly configService: ConfigService<AppConfig, true>,
     private readonly reportExportJobsService: ReportExportJobsService,
     private readonly comparisonAnalyticsService: ComparisonAnalyticsService,
+    private readonly access: ResourceAccessService = OPEN_ACCESS,
   ) {}
+
+  private async authorize(request: RequestLike | undefined, comparisonId: string) {
+    const actor = await this.access.actor(request);
+    return this.access.assert('comparison', comparisonId, actor, 'read');
+  }
 
   @Post()
   async create(
@@ -58,9 +68,14 @@ export class ComparisonsController {
       response,
       'RATE_LIMIT_COMPARISON_PER_MINUTE',
     );
+    const actor = await this.access.actor(request);
     const parsed = parseCreateComparisonRequest(body);
 
-    return this.comparisonApplicationService.createComparison(parsed.nws, parsed.options);
+    return this.comparisonApplicationService.createComparison(
+      parsed.nws,
+      parsed.options,
+      this.access.ownerForCreate(actor),
+    );
   }
 
   @Get(':id')
@@ -75,6 +90,7 @@ export class ComparisonsController {
       response,
       'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
     );
+    await this.authorize(request, comparisonId);
     const snapshot = await this.comparisonApplicationService.getComparison(comparisonId);
 
     return snapshot.resultSnapshot;
@@ -93,6 +109,7 @@ export class ComparisonsController {
       'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
     );
 
+    await this.authorize(request, comparisonId);
     return this.comparisonApplicationService.getComparisonPricingEvidence(comparisonId);
   }
 
@@ -108,6 +125,7 @@ export class ComparisonsController {
       response,
       'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
     );
+    await this.authorize(request, comparisonId);
     const snapshot = await this.comparisonApplicationService.getComparison(comparisonId);
 
     return this.comparisonAnalyticsService.build(snapshot.resultSnapshot);
@@ -128,6 +146,7 @@ export class ComparisonsController {
       response,
       'RATE_LIMIT_EXPORT_PER_MINUTE',
     );
+    await this.authorize(request, comparisonId);
     const format = parseReportFormat(formatQuery);
     const options = {
       interval: parseReportInterval(intervalQuery),
@@ -167,6 +186,7 @@ export class ComparisonsController {
       response,
       'RATE_LIMIT_EXPORT_PER_MINUTE',
     );
+    await this.authorize(request, comparisonId);
     const parsed = parseCreateExportJobRequest(body);
 
     return this.reportExportJobsService.createExportJob(
@@ -190,6 +210,7 @@ export class ComparisonsController {
       'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
     );
 
+    await this.authorize(request, comparisonId);
     return this.reportExportJobsService.getExportJob(comparisonId, jobId);
   }
 
@@ -206,6 +227,7 @@ export class ComparisonsController {
       response,
       'RATE_LIMIT_EXPORT_PER_MINUTE',
     );
+    await this.authorize(request, comparisonId);
     const report = await this.reportExportJobsService.downloadExportJob(comparisonId, jobId);
     const fileName = report.fileName.replace(/"/g, '');
     const disposition = `attachment; filename="${fileName}"`;
@@ -233,9 +255,14 @@ export class ComparisonsController {
     );
     writeRateLimitHeaders(response, rateLimit);
 
+    // A refresh writes a new comparison, owned by the same team as the original.
+    const actor = await this.access.actor(request);
+    const owner = await this.access.assert('comparison', comparisonId, actor, 'write');
+
     return this.comparisonApplicationService.refreshLiveComparison(
       comparisonId,
       this.configService.get('FEATURE_LIVE_PRICING_REFRESH_ENABLED', { infer: true }),
+      owner,
     );
   }
 

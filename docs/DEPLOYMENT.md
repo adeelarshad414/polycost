@@ -57,6 +57,8 @@ Start from `.env.example`. The most important runtime variables are:
 | DB pools/TLS  | `DB_POOL_MAX`, `DB_STATEMENT_TIMEOUT_MS`, `DB_ETL_STATEMENT_TIMEOUT_MS`, `DB_SSL_MODE`, `DB_SSL_CA`            |
 | Redis auth    | `REDIS_USERNAME`, `REDIS_PASSWORD` (secret), `REDIS_TLS`                                                       |
 | Workers       | `JOB_WORKERS_ENABLED` (false = HTTP only; a worker deployment runs jobs)                                       |
+| Tenancy       | `ANONYMOUS_MODE` (`enabled` default; `disabled` requires a session on core routes; Helm always sets it)        |
+| Rate limits+  | `RATE_LIMIT_TERRAFORM_PER_MINUTE` (default 10)                                                                 |
 | Observability | `GRAFANA_PASSWORD` (required by the compose `observability` profile)                                           |
 | Jobs          | pricing, currency, alert, and share-link cleanup cron variables                                                |
 | Auth          | session TTL, registration, lockout, SSO, invite delivery mode/webhook                                          |

@@ -3,7 +3,12 @@ import { createHash } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 import { ComparisonResult } from '../comparison/comparison.types.js';
 import { AppConfig } from '../config/config.schema.js';
-import { ApiForbiddenError, ApiUnauthorizedError, ApiValidationError } from './api-errors.js';
+import {
+  ApiForbiddenError,
+  ApiNotFoundError,
+  ApiUnauthorizedError,
+  ApiValidationError,
+} from './api-errors.js';
 import { ApiDatabaseRepository, LocalAccountWithPassword } from './api-database.repository.js';
 import { AuthService } from './auth.service.js';
 import { AuthIdentity, TeamRole } from './auth.types.js';
@@ -1561,6 +1566,41 @@ describe('BillingService', () => {
       ),
     ).rejects.toThrow(ApiForbiddenError);
     expect(repository.listInvoiceLineItems).not.toHaveBeenCalled();
+  });
+
+  // ADR-0001: reconcile used to load ANY comparison by id, across tenants.
+  it.each([
+    ["another team's comparison", { teamId: '99999999-9999-4999-8999-999999999999' }],
+    ['an anonymous comparison', { teamId: null }],
+    ['a missing comparison', undefined],
+  ])('refuses to reconcile against %s, as not found', async (_label, owner) => {
+    const repository = repositoryMock();
+    repository.getBillingImport.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      teamId: identity.teamId,
+      provider: 'aws',
+      sourceType: 'aws-cur',
+      status: 'completed',
+      billingPeriodStart: '2026-06-01',
+      billingPeriodEnd: '2026-06-30',
+      originalFileSha256: 'a'.repeat(64),
+      rowsReceived: 1,
+      rowsAccepted: 1,
+      rowsRejected: 0,
+      totalCostUsd: 107,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    });
+    repository.getResourceOwner.mockResolvedValue(owner as never);
+    const service = new BillingService(repository as never);
+
+    await expect(
+      service.reconcile(
+        '55555555-5555-4555-8555-555555555555',
+        { comparisonId: '77777777-7777-4777-8777-777777777777' },
+        identity,
+      ),
+    ).rejects.toThrow(ApiNotFoundError);
+    expect(repository.getComparison).not.toHaveBeenCalled();
   });
 
   it('reconciles imported actuals against comparison totals with trace evidence', async () => {
@@ -5139,6 +5179,10 @@ function repositoryMock() {
     getBillingImport: jest.fn<ApiDatabaseRepository['getBillingImport']>(),
     listInvoiceLineItems: jest.fn<ApiDatabaseRepository['listInvoiceLineItems']>(),
     getComparison: jest.fn<ApiDatabaseRepository['getComparison']>(),
+    // ADR-0001: comparisons belong to the caller's team unless a test says otherwise.
+    getResourceOwner: jest.fn<ApiDatabaseRepository['getResourceOwner']>(async () => ({
+      teamId: identityTeamId,
+    })),
     saveInvoiceReconciliation: jest.fn<ApiDatabaseRepository['saveInvoiceReconciliation']>(),
     listInvoiceReconciliations: jest.fn<ApiDatabaseRepository['listInvoiceReconciliations']>(),
     getInvoiceReconciliation: jest.fn<ApiDatabaseRepository['getInvoiceReconciliation']>(),
