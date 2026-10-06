@@ -407,13 +407,13 @@ describe('API contracts', () => {
   it('POST /terraform/generate returns a provider-specific Terraform bundle', async () => {
     const controller = new TerraformGenerationController(new TerraformGenerationService());
 
-    expect(
+    await expect(
       controller.generate({
         targetCloud: 'aws',
         workspaceName: 'Client Portal',
         nws: validNws,
       }),
-    ).toEqual(
+    ).resolves.toEqual(
       expect.objectContaining({
         targetCloud: 'aws',
         bundleName: 'client-portal-aws-terraform',
@@ -466,7 +466,7 @@ describe('API contracts', () => {
   it('POST /terraform/generate validates generation options', async () => {
     const controller = new TerraformGenerationController(new TerraformGenerationService());
 
-    expect(() =>
+    await expect(
       controller.generate({
         targetCloud: 'aws',
         nws: validNws,
@@ -474,18 +474,18 @@ describe('API contracts', () => {
           runtimeTarget: 'mainframe',
         },
       }),
-    ).toThrow(ApiValidationError);
+    ).rejects.toThrow(ApiValidationError);
   });
 
   it('POST /terraform/generate rejects unsupported target cloud values', async () => {
     const controller = new TerraformGenerationController(new TerraformGenerationService());
 
-    expect(() =>
+    await expect(
       controller.generate({
         targetCloud: 'oracle',
         nws: validNws,
       }),
-    ).toThrow(ApiValidationError);
+    ).rejects.toThrow(ApiValidationError);
   });
 
   it('POST /comparisons persists and returns the comparison result', async () => {
@@ -510,9 +510,13 @@ describe('API contracts', () => {
         response,
       ),
     ).resolves.toEqual(comparisonResult);
-    expect(service.createComparison).toHaveBeenCalledWith(validNws, {
-      useLivePricing: false,
-    });
+    expect(service.createComparison).toHaveBeenCalledWith(
+      validNws,
+      {
+        useLivePricing: false,
+      },
+      null,
+    );
     expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
   });
 
@@ -774,7 +778,11 @@ describe('API contracts', () => {
         headers: {},
       }),
     ).resolves.toEqual(comparisonResult);
-    expect(service.refreshLiveComparison).toHaveBeenCalledWith(comparisonResult.comparisonId, true);
+    expect(service.refreshLiveComparison).toHaveBeenCalledWith(
+      comparisonResult.comparisonId,
+      true,
+      null,
+    );
   });
 
   it('GET /pricing/status returns provider status through the controller', async () => {
@@ -1037,6 +1045,7 @@ describe('API contracts', () => {
         region: 'us-east',
         storageTier: 'standard',
       }),
+      null, // anonymous owner (ADR-0001)
     );
   });
 
@@ -1447,7 +1456,11 @@ describe('API contracts', () => {
     await expect(service.createComparison(validNws, { useLivePricing: false })).resolves.toEqual(
       comparisonResult,
     );
-    expect(repository.saveComparisonWithAuditLog).toHaveBeenCalledWith(validNws, comparisonResult);
+    expect(repository.saveComparisonWithAuditLog).toHaveBeenCalledWith(
+      validNws,
+      comparisonResult,
+      null,
+    );
     expect(prewarm.enqueue).toHaveBeenCalledWith(comparisonResult);
     await expect(service.getComparison(comparisonResult.comparisonId)).resolves.toEqual({
       nwsSnapshot: validNws,
@@ -1554,16 +1567,20 @@ describe('API contracts', () => {
         },
       ],
     });
-    expect(repository.saveComparisonWithAuditLog).toHaveBeenCalledWith(validNws, {
-      ...refreshedResult,
-      warnings: [
-        {
-          providerId: 'azure',
-          code: 'live_refresh_failed',
-          message: 'azure live refresh failed: provider throttled',
-        },
-      ],
-    });
+    expect(repository.saveComparisonWithAuditLog).toHaveBeenCalledWith(
+      validNws,
+      {
+        ...refreshedResult,
+        warnings: [
+          {
+            providerId: 'azure',
+            code: 'live_refresh_failed',
+            message: 'azure live refresh failed: provider throttled',
+          },
+        ],
+      },
+      null,
+    );
   });
 
   it('adds pricing data-health warnings to created comparison snapshots', async () => {
@@ -1610,7 +1627,7 @@ describe('API contracts', () => {
     };
 
     await expect(service.createComparison(validNws)).resolves.toEqual(expected);
-    expect(repository.saveComparisonWithAuditLog).toHaveBeenCalledWith(validNws, expected);
+    expect(repository.saveComparisonWithAuditLog).toHaveBeenCalledWith(validNws, expected, null);
   });
 
   it('reports comparison application not-found and disabled live-refresh failures', async () => {

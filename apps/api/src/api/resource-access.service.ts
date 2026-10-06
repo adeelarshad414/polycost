@@ -49,6 +49,11 @@ export class ResourceAccessService {
    * data the user then cannot see in their team.
    */
   async actor(request: RequestWithAuth | undefined): Promise<Actor> {
+    // Optional authentication by design (CodeQL js/user-controlled-bypass is a
+    // reviewed false positive here): leaving the header out can only make the
+    // caller anonymous, which has strictly fewer rights - team-owned resources
+    // still demand membership in assert(), and ANONYMOUS_MODE=disabled turns
+    // the anonymous path into a 401 below.
     if (hasAuthorization(request)) {
       return { identity: await this.authService.authenticateRequest(request) };
     }
