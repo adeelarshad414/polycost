@@ -45,6 +45,8 @@ request-time API
   POST /api/v1/budgets
   GET  /api/v1/alerts
   PATCH /api/v1/alerts/:id
+  POST /api/v1/comparisons/:id/claim
+  POST /api/v1/workloads/:id/claim
   POST /api/v1/share-links
   GET  /api/v1/share/:token
   POST /api/v1/share/:token

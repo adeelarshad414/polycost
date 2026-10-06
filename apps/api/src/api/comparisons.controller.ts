@@ -70,12 +70,17 @@ export class ComparisonsController {
     );
     const actor = await this.access.actor(request);
     const parsed = parseCreateComparisonRequest(body);
-
-    return this.comparisonApplicationService.createComparison(
+    const owner = this.access.ownerForCreate(actor);
+    // ADR-0001 §3.4: an anonymous comparison gets an edit key, returned once.
+    const key = this.access.writeKeyFor(owner);
+    const result = await this.comparisonApplicationService.createComparison(
       parsed.nws,
       parsed.options,
-      this.access.ownerForCreate(actor),
+      owner,
+      key?.writeKeyHash ?? null,
     );
+
+    return key ? { ...result, writeKey: key.writeKey } : result;
   }
 
   @Get(':id')
@@ -259,11 +264,36 @@ export class ComparisonsController {
     const actor = await this.access.actor(request);
     const owner = await this.access.assert('comparison', comparisonId, actor, 'write');
 
+    // The new comparison keeps the original's team, or for anonymous data its
+    // edit key, so whoever could change the original can change the refresh.
     return this.comparisonApplicationService.refreshLiveComparison(
       comparisonId,
       this.configService.get('FEATURE_LIVE_PRICING_REFRESH_ENABLED', { infer: true }),
-      owner,
+      owner.teamId,
+      owner.writeKeyHash,
     );
+  }
+
+  /** ADR-0001 §3.5: move an anonymous comparison into the caller's team. */
+  @Post(':id/claim')
+  async claim(
+    @Param('id') comparisonId: string,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: HeaderResponse,
+  ) {
+    await this.consumeRateLimit(
+      'comparison_claim',
+      request,
+      response,
+      'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE',
+    );
+    const claimed = await this.access.claim(
+      'comparison',
+      comparisonId,
+      await this.access.actor(request),
+    );
+
+    return { comparisonId, teamId: claimed.teamId };
   }
 
   private async consumeRateLimit(
@@ -273,7 +303,8 @@ export class ComparisonsController {
     configKey:
       | 'RATE_LIMIT_COMPARISON_PER_MINUTE'
       | 'RATE_LIMIT_EXPORT_PER_MINUTE'
-      | 'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
+      | 'RATE_LIMIT_PUBLIC_READ_PER_MINUTE'
+      | 'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE',
   ): Promise<void> {
     const rateLimit = await this.apiRateLimitService.consume(
       scope,

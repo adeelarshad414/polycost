@@ -152,11 +152,37 @@ export class WorkloadsController {
     );
 
     const actor = await this.access.actor(request);
-
-    return this.costManagementService.createWorkload(
+    const owner = this.access.ownerForCreate(actor);
+    // ADR-0001 §3.4: an anonymous workload gets an edit key, returned once.
+    const key = this.access.writeKeyFor(owner);
+    const workload = await this.costManagementService.createWorkload(
       parseWorkloadInput(body),
-      this.access.ownerForCreate(actor),
+      owner,
+      key?.writeKeyHash ?? null,
     );
+
+    return key ? { ...workload, writeKey: key.writeKey } : workload;
+  }
+
+  /** ADR-0001 §3.5: move an anonymous workload (and its budgets, alerts, links) into a team. */
+  @Post(':id/claim')
+  async claim(
+    @Param('id') workloadId: string,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    await consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'workload_claim',
+      request,
+      response,
+      'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE',
+    );
+    const id = parseUuid(workloadId, 'id');
+    const claimed = await this.access.claim('workload', id, await this.access.actor(request));
+
+    return { workloadId: id, teamId: claimed.teamId };
   }
 }
 

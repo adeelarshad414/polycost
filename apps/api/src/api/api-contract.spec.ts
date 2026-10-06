@@ -516,6 +516,7 @@ describe('API contracts', () => {
         useLivePricing: false,
       },
       null,
+      null,
     );
     expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
   });
@@ -782,6 +783,7 @@ describe('API contracts', () => {
       comparisonResult.comparisonId,
       true,
       null,
+      null,
     );
   });
 
@@ -1046,6 +1048,7 @@ describe('API contracts', () => {
         storageTier: 'standard',
       }),
       null, // anonymous owner (ADR-0001)
+      null, // no edit key in this direct service call
     );
   });
 
@@ -1460,6 +1463,7 @@ describe('API contracts', () => {
       validNws,
       comparisonResult,
       null,
+      null,
     );
     expect(prewarm.enqueue).toHaveBeenCalledWith(comparisonResult);
     await expect(service.getComparison(comparisonResult.comparisonId)).resolves.toEqual({
@@ -1580,6 +1584,7 @@ describe('API contracts', () => {
         ],
       },
       null,
+      null,
     );
   });
 
@@ -1627,7 +1632,12 @@ describe('API contracts', () => {
     };
 
     await expect(service.createComparison(validNws)).resolves.toEqual(expected);
-    expect(repository.saveComparisonWithAuditLog).toHaveBeenCalledWith(validNws, expected, null);
+    expect(repository.saveComparisonWithAuditLog).toHaveBeenCalledWith(
+      validNws,
+      expected,
+      null,
+      null,
+    );
   });
 
   it('reports comparison application not-found and disabled live-refresh failures', async () => {

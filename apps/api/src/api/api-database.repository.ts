@@ -671,6 +671,12 @@ const defaultPgPoolFactory: PgPoolFactory = (config) => new Pool(config);
 /** Core resources whose ownership ADR-0001 governs. */
 export type ResourceKind = 'comparison' | 'workload' | 'alert' | 'shareLink';
 
+/** Owning team (null = anonymous) and, for anonymous rows, the edit-key hash. */
+export interface ResourceOwner {
+  teamId: string | null;
+  writeKeyHash: string | null;
+}
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 @Injectable()
@@ -692,9 +698,16 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     nwsSnapshot: NormalizedWorkloadSpec,
     resultSnapshot: ComparisonResult,
     ownerTeamId: string | null = null,
+    writeKeyHash: string | null = null,
   ): Promise<void> {
     await this.withTransaction(async (queryRunner) => {
-      await this.saveComparison(nwsSnapshot, resultSnapshot, queryRunner, ownerTeamId);
+      await this.saveComparison(
+        nwsSnapshot,
+        resultSnapshot,
+        queryRunner,
+        ownerTeamId,
+        writeKeyHash,
+      );
       await this.recordComparisonAuditLog(resultSnapshot, queryRunner);
     });
   }
@@ -704,6 +717,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     resultSnapshot: ComparisonResult,
     runner?: PgQueryRunner,
     ownerTeamId: string | null = null,
+    writeKeyHash: string | null = null,
   ): Promise<void> {
     const queryRunner = runner ?? (await this.getPool());
     // ADR-0001: team_id is the owning team (NULL = anonymous capability URL).
@@ -714,9 +728,10 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
           nws_snapshot,
           result_snapshot,
           pricing_as_of,
-          team_id
+          team_id,
+          write_key_hash
         )
-        VALUES ($1, $2::jsonb, $3::jsonb, $4, $5)
+        VALUES ($1, $2::jsonb, $3::jsonb, $4, $5, $6)
       `,
       [
         resultSnapshot.comparisonId,
@@ -724,6 +739,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         JSON.stringify(resultSnapshot),
         resultSnapshot.pricingAsOf,
         ownerTeamId,
+        writeKeyHash,
       ],
     );
   }
@@ -1374,6 +1390,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
   async createWorkload(
     input: WorkloadInput,
     ownerTeamId: string | null = null,
+    writeKeyHash: string | null = null,
   ): Promise<WorkloadRecord> {
     const result = await (
       await this.getPool()
@@ -1389,9 +1406,10 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
           storage_gb,
           storage_tier,
           egress_gb_per_month,
-          team_id
+          team_id,
+          write_key_hash
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING id,
                   instance_family,
                   vcpu,
@@ -1416,6 +1434,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         input.storageTier,
         input.egressGbPerMonth,
         ownerTeamId,
+        writeKeyHash,
       ],
     );
 
@@ -2673,24 +2692,47 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
    * resource does not exist; `{ teamId: null }` means it is anonymous. Child
    * resources (alerts, share links) inherit their workload's owner.
    */
-  async getResourceOwner(
-    kind: ResourceKind,
-    id: string,
-  ): Promise<{ teamId: string | null } | undefined> {
+  async getResourceOwner(kind: ResourceKind, id: string): Promise<ResourceOwner | undefined> {
     if (kind !== 'shareLink' && !UUID_PATTERN.test(id)) {
       return undefined;
     }
+    // Children (alerts, share links) carry their workload's owner and edit key.
     const sql: Record<ResourceKind, string> = {
-      comparison: 'SELECT team_id FROM comparisons WHERE id = $1',
-      workload: 'SELECT team_id FROM workloads WHERE id = $1',
+      comparison: 'SELECT team_id, write_key_hash FROM comparisons WHERE id = $1',
+      workload: 'SELECT team_id, write_key_hash FROM workloads WHERE id = $1',
       alert:
-        'SELECT workloads.team_id FROM alerts JOIN workloads ON workloads.id = alerts.workload_id WHERE alerts.id = $1',
+        'SELECT workloads.team_id, workloads.write_key_hash FROM alerts JOIN workloads ON workloads.id = alerts.workload_id WHERE alerts.id = $1',
       shareLink:
-        'SELECT workloads.team_id FROM share_links JOIN workloads ON workloads.id = share_links.workload_id WHERE share_links.token = $1',
+        'SELECT workloads.team_id, workloads.write_key_hash FROM share_links JOIN workloads ON workloads.id = share_links.workload_id WHERE share_links.token = $1',
     };
-    const result = await (await this.getPool()).query<{ team_id: string | null }>(sql[kind], [id]);
+    const result = await (
+      await this.getPool()
+    ).query<{ team_id: string | null; write_key_hash: string | null }>(sql[kind], [id]);
     const row = result.rows[0];
-    return row ? { teamId: row.team_id ?? null } : undefined;
+    return row
+      ? { teamId: row.team_id ?? null, writeKeyHash: row.write_key_hash ?? null }
+      : undefined;
+  }
+
+  /**
+   * ADR-0001 §3.5: move an anonymous comparison or workload into a team. The
+   * edit key is cleared - team roles govern changes from now on. Only an
+   * anonymous row can be claimed (`team_id IS NULL`), so a race cannot steal
+   * an already-claimed resource.
+   */
+  async claimResource(
+    kind: 'comparison' | 'workload',
+    id: string,
+    teamId: string,
+  ): Promise<boolean> {
+    const table = kind === 'comparison' ? 'comparisons' : 'workloads';
+    const result = await (
+      await this.getPool()
+    ).query(
+      `UPDATE ${table} SET team_id = $2, write_key_hash = NULL WHERE id = $1 AND team_id IS NULL`,
+      [id, teamId],
+    );
+    return (result.rowCount ?? 0) === 1;
   }
 
   /** The caller's role in a team, or undefined when they are not a member. */

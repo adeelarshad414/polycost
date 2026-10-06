@@ -1320,6 +1320,8 @@ export interface PricingModelRecommendation {
 
 export interface ComparisonResult {
   comparisonId: string;
+  /** Edit key, returned once when an anonymous comparison is created (ADR-0001). */
+  writeKey?: string;
   pricingAsOf: string;
   requirements?: {
     sourceType: NormalizedWorkloadSpec['metadata']['sourceType'];
@@ -1738,6 +1740,8 @@ export interface WorkloadInput {
 
 export interface WorkloadRecord extends WorkloadInput {
   id: string;
+  /** Edit key, returned once when an anonymous workload is created (ADR-0001). */
+  writeKey?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -165,6 +165,18 @@ Alert semantics:
 - Alerts are modeled estimates from cached pricing, not actual cloud billing spend.
 - Week-over-week anomalies use stored modeled-cost observations.
 
+## Ownership and edit keys (ADR-0001)
+
+- Send `Authorization: Bearer <session>` to create **team-owned** data; without it the
+  data is **anonymous**.
+- Creating anonymous data returns a one-time `writeKey` on the comparison or workload.
+  Every change to it - budgets, alert dismissal, share-link create/revoke, live refresh -
+  needs the header `X-PolyCost-Write-Key: <writeKey>`; without it the API returns `403`.
+  `src/lib/write-keys.ts` stores keys per browser and `api-client.ts` attaches them.
+- `POST /comparisons/:id/claim` and `POST /workloads/:id/claim` (session + edit key)
+  move anonymous data into the caller's active team.
+- Team-owned data answers `404` to anyone outside the team.
+
 ## Share Links
 
 `POST /share-links`
