@@ -306,9 +306,14 @@ Every comparison, workload and diagram import is either **team-owned** or
 - **Team-owned:** created with a session. Only members of the owning team can read it
   (viewers read-only; revoking share links needs owner or admin), and everyone else gets
   `404`, so another team's data cannot even be confirmed to exist.
-- **Anonymous:** created without a session. It is a **capability URL**, keyed by an
-  unguessable random UUID and usable by anyone who holds the id. This keeps comparing
-  frictionless; write keys and expiry for anonymous data follow (ADR-0001 §5).
+- **Anonymous:** created without a session. Reading it is a **capability URL**, keyed
+  by an unguessable random UUID. Changing it (budgets, alerts, share links, live
+  refresh) needs its **edit key**, returned once at creation in `writeKey` and sent as
+  `X-PolyCost-Write-Key`. The web app keeps the key in the browser that created the
+  resource. Anonymous data created before edit keys existed is read-only.
+- **Claiming:** a signed-in member holding the edit key can move anonymous data into
+  their team with `POST /comparisons/:id/claim` or `POST /workloads/:id/claim`; from then
+  on it is team-only.
 - `ANONYMOUS_MODE=disabled` requires a session on every core route, for hosted
   multi-tenant deployments. Every route declares its access class, and a contract test
   fails CI if one does not. Callers can only reach a resource whose id they already have (list endpoints

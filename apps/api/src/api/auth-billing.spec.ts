@@ -5182,6 +5182,7 @@ function repositoryMock() {
     // ADR-0001: comparisons belong to the caller's team unless a test says otherwise.
     getResourceOwner: jest.fn<ApiDatabaseRepository['getResourceOwner']>(async () => ({
       teamId: identityTeamId,
+      writeKeyHash: null,
     })),
     saveInvoiceReconciliation: jest.fn<ApiDatabaseRepository['saveInvoiceReconciliation']>(),
     listInvoiceReconciliations: jest.fn<ApiDatabaseRepository['listInvoiceReconciliations']>(),

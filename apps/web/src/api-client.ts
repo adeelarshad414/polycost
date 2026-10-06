@@ -1,3 +1,4 @@
+import { writeKeyHeaders, writeKeys } from './lib/write-keys';
 import {
   ApiErrorDetail,
   AccountSessionRecord,
@@ -624,8 +625,8 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         body: JSON.stringify(nws),
       });
     },
-    createComparison(nws) {
-      return requestJson<ComparisonResult>(baseUrl, '/comparisons', {
+    async createComparison(nws) {
+      const result = await requestJson<ComparisonResult>(baseUrl, '/comparisons', {
         method: 'POST',
         body: JSON.stringify({
           nws,
@@ -634,6 +635,8 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
           },
         }),
       });
+      if (result.writeKey) writeKeys.rememberComparison(result.comparisonId, result.writeKey);
+      return result;
     },
     generateTerraform(input) {
       return requestJson<TerraformGenerationResult>(baseUrl, '/terraform/generate', {
@@ -659,10 +662,16 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         `/comparisons/${encodeURIComponent(comparisonId)}/evidence`,
       );
     },
-    refreshLiveComparison(comparisonId) {
-      return requestJson<ComparisonResult>(baseUrl, `/comparisons/${comparisonId}/refresh-live`, {
-        method: 'POST',
-      });
+    async refreshLiveComparison(comparisonId) {
+      const writeKey = writeKeys.comparisonKey(comparisonId);
+      const result = await requestJson<ComparisonResult>(
+        baseUrl,
+        `/comparisons/${comparisonId}/refresh-live`,
+        { method: 'POST', headers: writeKeyHeaders(writeKey) },
+      );
+      // The refreshed comparison keeps the original's edit key.
+      if (writeKey) writeKeys.rememberComparison(result.comparisonId, writeKey);
+      return result;
     },
     createExportJob(comparisonId, format, options = {}) {
       return createExportJobRequest(baseUrl, comparisonId, format, options);
@@ -696,17 +705,22 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
     getRegionCatalog() {
       return requestJson<RegionCatalogResponse>(baseUrl, '/regions');
     },
-    createWorkload(input) {
-      return requestJson<WorkloadRecord>(baseUrl, '/workloads', {
+    async createWorkload(input) {
+      const workload = await requestJson<WorkloadRecord>(baseUrl, '/workloads', {
         method: 'POST',
         body: JSON.stringify(input),
       });
+      if (workload.writeKey) writeKeys.rememberWorkload(workload.id, workload.writeKey);
+      return workload;
     },
-    createShareLink(input) {
-      return requestJson<ShareLinkResponse>(baseUrl, '/share-links', {
+    async createShareLink(input) {
+      const share = await requestJson<ShareLinkResponse>(baseUrl, '/share-links', {
         method: 'POST',
+        headers: writeKeyHeaders(writeKeys.workloadKey(input.workloadId)),
         body: JSON.stringify(input),
       });
+      writeKeys.linkShareToken(share.token, input.workloadId);
+      return share;
     },
     revokeShareLink(token) {
       return requestJson<ShareLinkResponse>(
@@ -714,6 +728,7 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         `/share-links/${encodeURIComponent(token)}/revoke`,
         {
           method: 'POST',
+          headers: writeKeyHeaders(writeKeys.shareLinkKey(token)),
         },
       );
     },
@@ -737,16 +752,20 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
     createBudget(input) {
       return requestJson<BudgetRecord>(baseUrl, '/budgets', {
         method: 'POST',
+        headers: writeKeyHeaders(writeKeys.workloadKey(input.workloadId)),
         body: JSON.stringify(input),
       });
     },
-    listAlerts(workloadId) {
+    async listAlerts(workloadId) {
       const query = workloadId ? `?workloadId=${encodeURIComponent(workloadId)}` : '';
-      return requestJson<AlertRecord[]>(baseUrl, `/alerts${query}`);
+      const alerts = await requestJson<AlertRecord[]>(baseUrl, `/alerts${query}`);
+      writeKeys.linkAlerts(alerts);
+      return alerts;
     },
     updateAlertDismissed(alertId, dismissed) {
       return requestJson<AlertRecord>(baseUrl, `/alerts/${encodeURIComponent(alertId)}`, {
         method: 'PATCH',
+        headers: writeKeyHeaders(writeKeys.alertKey(alertId)),
         body: JSON.stringify({ dismissed }),
       });
     },

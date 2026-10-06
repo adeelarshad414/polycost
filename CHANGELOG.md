@@ -9,6 +9,12 @@ once tagged releases begin.
 
 ### Security
 
+- Edit keys and claiming, ADR-0001 step 2 (P2-1b): anonymous comparisons and workloads
+  get a one-time 256-bit edit key (stored as sha256, migration 044); changing them -
+  budgets, alerts, share links, live refresh - needs it, closing the "anyone with the
+  id can change it" gap. Pre-existing anonymous data is read-only. Signed-in members
+  holding the key can claim anonymous data into their team. The web client stores and
+  sends keys automatically.
 - Tenancy enforcement, ADR-0001 step 1 (P2-1a): comparisons, workloads and diagram
   imports record their owning team; team-owned data answers `404` outside its team;
   viewers are read-only; billing reconciliation no longer accepts another team's or an

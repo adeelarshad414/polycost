@@ -93,6 +93,7 @@ export class ComparisonApplicationService {
     input: unknown,
     options: CreateComparisonOptions = {},
     ownerTeamId: string | null = null,
+    writeKeyHash: string | null = null,
   ): Promise<ComparisonResult> {
     if (options.useLivePricing) {
       throw new LiveRefreshUnavailableError(
@@ -108,6 +109,7 @@ export class ComparisonApplicationService {
       nws,
       resultWithHealthWarnings,
       ownerTeamId,
+      writeKeyHash,
     );
     this.comparisonPrewarmService?.enqueue(resultWithHealthWarnings);
 
@@ -137,6 +139,7 @@ export class ComparisonApplicationService {
     comparisonId: string,
     liveRefreshEnabled: boolean,
     ownerTeamId: string | null = null,
+    writeKeyHash: string | null = null,
   ): Promise<ComparisonResult> {
     if (!liveRefreshEnabled) {
       throw new LiveRefreshUnavailableError('Live pricing refresh is disabled for this deployment');
@@ -156,6 +159,7 @@ export class ComparisonApplicationService {
       snapshot.nwsSnapshot,
       refreshed,
       ownerTeamId,
+      writeKeyHash,
     );
 
     return refreshed;

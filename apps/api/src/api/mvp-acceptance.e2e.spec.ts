@@ -79,10 +79,21 @@ describe('MVP acceptance criteria E2E', () => {
   });
 
   it('refreshes an existing comparison against the current pricing catalog', async () => {
+    // ADR-0001 §3.4: refreshing anonymous data needs its edit key.
+    const writeKey = (structuredComparison as ComparisonResult & { writeKey?: string }).writeKey;
+    expect(writeKey).toEqual(expect.any(String));
+    expect(
+      (
+        await requestRaw(`/comparisons/${structuredComparison.comparisonId}/refresh-live`, {
+          method: 'POST',
+        })
+      ).status,
+    ).toBe(403);
     const refreshed = await requestJson<ComparisonResult>(
       `/comparisons/${structuredComparison.comparisonId}/refresh-live`,
       {
         method: 'POST',
+        headers: { 'x-polycost-write-key': writeKey ?? '' },
       },
     );
 
@@ -186,7 +197,7 @@ describe('MVP acceptance criteria E2E', () => {
     expect(firstEvidenceRow?.derivation.monthlyCostUsd).toBeGreaterThan(0);
     expect(firstEvidenceRow?.displayedAmounts.monthlyCostUsd).toBeGreaterThan(0);
 
-    const workload = await requestJson<WorkloadRecord>('/workloads', {
+    const workload = await requestJson<WorkloadRecord & { writeKey?: string }>('/workloads', {
       method: 'POST',
       body: JSON.stringify({
         instanceFamily: 'general-purpose',
@@ -201,8 +212,20 @@ describe('MVP acceptance criteria E2E', () => {
       }),
     });
     const password = `client-demo-${randomUUID()}`;
+    // ADR-0001 §3.4: an anonymous workload is changed with its edit key.
+    expect(workload.writeKey).toEqual(expect.any(String));
+    const editKey = { 'x-polycost-write-key': workload.writeKey ?? '' };
+    expect(
+      (
+        await requestRaw('/share-links', {
+          method: 'POST',
+          body: JSON.stringify({ workloadId: workload.id, expiresInDays: 30 }),
+        })
+      ).status,
+    ).toBe(403);
     const share = await requestJson<ShareLinkResponse>('/share-links', {
       method: 'POST',
+      headers: editKey,
       body: JSON.stringify({
         workloadId: workload.id,
         watermark: true,
@@ -265,6 +288,7 @@ describe('MVP acceptance criteria E2E', () => {
 
     await requestJson<ShareLinkResponse>(`/share-links/${encodeURIComponent(share.token)}/revoke`, {
       method: 'POST',
+      headers: editKey,
     });
     const revoked = await requestRaw(`/share/${encodeURIComponent(share.token)}`, {
       method: 'POST',
@@ -434,6 +458,51 @@ describe('MVP acceptance criteria E2E', () => {
       (await requestRaw(`/alerts?workloadId=${workload.id}`, { headers: authHeaders(teamB.token) }))
         .status,
     ).toBe(404);
+
+    // ADR-0001 §3.4-3.5: anonymous data needs its edit key to change, and the
+    // key holder can claim it into a team, after which it is team-only.
+    const anonymousWorkload = await requestJson<WorkloadRecord & { writeKey: string }>(
+      '/workloads',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          instanceFamily: 'general-purpose',
+          vcpu: 2,
+          memoryGb: 8,
+          region: 'us-east',
+          instanceCount: 1,
+          hoursPerMonth: 730,
+          storageGb: 50,
+          storageTier: 'standard',
+          egressGbPerMonth: 10,
+        }),
+      },
+    );
+    const anonymousBudget = JSON.stringify({ workloadId: anonymousWorkload.id, thresholdUsd: 1 });
+    const key = { 'x-polycost-write-key': anonymousWorkload.writeKey };
+    expect((await requestRaw('/budgets', { method: 'POST', body: anonymousBudget })).status).toBe(
+      403,
+    );
+    expect(
+      (await requestRaw('/budgets', { method: 'POST', body: anonymousBudget, headers: key }))
+        .status,
+    ).toBe(201);
+    const claimPath = `/workloads/${anonymousWorkload.id}/claim`;
+    expect(
+      (await requestRaw(claimPath, { method: 'POST', headers: authHeaders(teamA.token) })).status,
+    ).toBe(403);
+    expect(
+      (
+        await requestRaw(claimPath, {
+          method: 'POST',
+          headers: { ...authHeaders(teamA.token), ...key },
+        })
+      ).status,
+    ).toBe(201);
+    const alertsPath = `/alerts?workloadId=${anonymousWorkload.id}`;
+    expect((await requestRaw(alertsPath)).status).toBe(404);
+    expect((await requestRaw(alertsPath, { headers: authHeaders(teamB.token) })).status).toBe(404);
+    expect((await requestRaw(alertsPath, { headers: authHeaders(teamA.token) })).status).toBe(200);
   });
 
   it('runs signup, invite, role-change, mock SSO, and member RBAC denial end to end', async () => {
